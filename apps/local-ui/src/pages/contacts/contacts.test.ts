@@ -403,6 +403,74 @@ describe('ContactsPage: rename and remove', () => {
   });
 });
 
+// WP-12 (F-2; D-72; 04 §2.5.1 `contact.block`, `contact.unblock`): Block and Unblock in the person
+// ⋯ menu. Block explains first, then asks for owner presence; Unblock asks for presence. Each is one
+// POST to a presence route; the page never signs.
+describe('ContactsPage: block and unblock (WP-12)', () => {
+  it('Block explains first, then asks for presence, then posts /block and says Blocked', async () => {
+    const calls = await mount({
+      [LIST]: { status: 'ok', contacts: [ana] },
+      [`POST /api/ui/contacts/${ANA}/block`]: { status: 'done' },
+    });
+    await openMenu();
+    await click(S.block);
+    expect(posts(calls)).toHaveLength(0);
+    expect(text()).toContain(S.blockExplain);
+    await click(S.blockContact);
+    expect(text()).toContain('Block Ana.');
+    await confirmWithCode();
+    const sent = posts(calls);
+    expect(sent.map((c) => c.url)).toEqual([`/api/ui/contacts/${ANA}/block`]);
+    expect(inputOf(sent[0] as Call)).toBeUndefined();
+    expect(text()).toContain(S.blockedNow);
+  });
+
+  it('a blocked contact offers Unblock (not Block) in the menu; it asks for presence and posts /unblock', async () => {
+    const calls = await mount({
+      [LIST]: { status: 'ok', contacts: [{ ...ana, status: 'blocked' }] },
+      [`POST /api/ui/contacts/${ANA}/unblock`]: { status: 'done' },
+    });
+    expect(text()).toContain(S.blockedDetail);
+    await openMenu();
+    const items = [...host.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent);
+    expect(items).toContain(S.unblock);
+    expect(items).not.toContain(S.block);
+    await click(S.unblock);
+    expect(text()).toContain('Unblock Ana.');
+    await confirmWithCode();
+    expect(posts(calls).map((c) => c.url)).toEqual([`/api/ui/contacts/${ANA}/unblock`]);
+    expect(text()).toContain(S.unblocked);
+  });
+
+  it('a revoked contact offers neither Block nor Unblock', async () => {
+    await mount({ [LIST]: { status: 'ok', contacts: [{ ...ana, status: 'revoked' }] } });
+    await openMenu();
+    const items = [...host.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent);
+    expect(items).not.toContain(S.block);
+    expect(items).not.toContain(S.unblock);
+  });
+
+  it('Cancel at the explain step or the presence step sends nothing', async () => {
+    const calls = await mount({ [LIST]: { status: 'ok', contacts: [ana] } });
+    await openMenu();
+    await click(S.block);
+    await click(S.cancel);
+    expect(text()).not.toContain(S.blockExplain);
+    await openMenu();
+    await click(S.block);
+    await click(S.blockContact);
+    await click(S.cancel);
+    expect(posts(calls)).toHaveLength(0);
+    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+  });
+
+  it('the copy follows 11 §5: plain words, no wallet, key or address', () => {
+    for (const line of [S.block, S.unblock, S.blockContact, S.blockExplain, S.blockedNow, S.unblocked]) {
+      expect(line).not.toMatch(/wallet|gas|seed|transaction|key|address|0x/i);
+    }
+  });
+});
+
 describe('the page markup', () => {
   it('has no inline style and no raw HTML', async () => {
     await mount({

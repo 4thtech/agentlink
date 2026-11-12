@@ -4,7 +4,7 @@
 //   closes it and the new pending row is there.
 // - The inviter's side of "Connected ✓": an open invite goes and a new paired contact arrives, and
 //   the page shows "You and {name} are connected" with the safety code.
-// - The person ⋯ menu carries Rename, Check safety code and Remove.
+// - The person ⋯ menu carries Rename, Check safety code, Block (WP-12) and Remove.
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -270,7 +270,10 @@ describe('People: the person ⋯ menu', () => {
     await settle();
     await click('More for Marko');
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent);
-    expect(items).toEqual([I.rename, I.checkCode, I.remove]);
+    // WP-12 (F-2): Block sits between Check safety code and Remove.
+    expect(items).toEqual([I.rename, I.checkCode, I.block, I.remove]);
+    expect(S.block).toBe(I.block);
+    expect(S.unblock).toBe(I.unblock);
     await click(I.rename);
     expect(document.querySelector('input[name="alias"]')).not.toBeNull();
     expect(S.rename).toBe(I.rename);

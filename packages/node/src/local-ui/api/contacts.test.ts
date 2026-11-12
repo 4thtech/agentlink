@@ -89,6 +89,8 @@ function fakeContacts(over: Partial<Contacts> = {}): Contacts {
     prepareRename: (id, alias) =>
       Promise.resolve(prepared('contact.rename', { contact: id, alias })),
     prepareRemove: (id) => Promise.resolve(prepared('contact.remove', { contact: id })),
+    prepareBlock: (id) => Promise.resolve(prepared('contact.block', { contact: id })),
+    prepareUnblock: (id) => Promise.resolve(prepared('contact.unblock', { contact: id })),
     ...over,
   };
 }
@@ -212,7 +214,7 @@ function expectNoLeak(value: unknown): void {
 }
 
 describe('routes (M1-11c-a2, I-4)', () => {
-  it('declares three reads without presence and three owner routes behind the gate', () => {
+  it('declares three reads without presence and five owner routes behind the gate', () => {
     expect(contactsRoutes.map((r) => [r.method, r.path, r.presence])).toEqual([
       ['GET', '/api/ui/contacts', false],
       ['GET', '/api/ui/contacts/:ref/safety-code', false],
@@ -220,20 +222,23 @@ describe('routes (M1-11c-a2, I-4)', () => {
       ['POST', '/api/ui/contacts/:ref/check', true],
       ['POST', '/api/ui/contacts/:ref/rename', true],
       ['POST', '/api/ui/contacts/:ref/remove', true],
+      // WP-12 (F-2): Block and Unblock are owner routes too (I-4: no MCP tool reaches them).
+      ['POST', '/api/ui/contacts/:ref/block', true],
+      ['POST', '/api/ui/contacts/:ref/unblock', true],
     ]);
     expect(Object.isFrozen(contactsRoutes)).toBe(true);
   });
 
-  it('is in the default registry; no block or unblock route bypasses the gate', () => {
+  it('is in the default registry; block and unblock sit behind the gate like every change', () => {
     const registry = createLocalUiRoutes();
     const list = registry.match('GET', '/api/ui/contacts');
     expect(list !== undefined && list !== 'method' && list.route.presence).toBe(false);
-    for (const op of ['check', 'rename', 'remove']) {
+    for (const op of ['check', 'rename', 'remove', 'block', 'unblock']) {
       const hit = registry.match('POST', `/api/ui/contacts/${MARKO}/${op}`);
       expect(hit !== undefined && hit !== 'method' && hit.route.presence).toBe(true);
       expect(registry.match('GET', `/api/ui/contacts/${MARKO}/${op}`)).toBe('method');
     }
-    for (const op of ['block', 'unblock', 'export']) {
+    for (const op of ['export', 'delete', 'apply']) {
       expect(registry.match('POST', `/api/ui/contacts/${MARKO}/${op}`)).toBeUndefined();
     }
   });
@@ -260,15 +265,19 @@ describe('the read-only client view (context.ts, IR-M1-11s-b-1 H-1)', () => {
           Promise.resolve({})
         ),
         prepareContactRemove: (id: string) => (seen.push(`remove:${id}`), Promise.resolve({})),
+        prepareContactBlock: (id: string) => (seen.push(`block:${id}`), Promise.resolve({})),
+        prepareContactUnblock: (id: string) => (seen.push(`unblock:${id}`), Promise.resolve({})),
         apply: () => (seen.push('apply'), Promise.resolve({})),
       },
     };
     const view = readOnlyClient(full as unknown as Parameters<typeof readOnlyClient>[0]);
     expect(Object.keys(view.contacts).sort()).toEqual([
       'list',
+      'prepareBlock',
       'prepareCheck',
       'prepareRemove',
       'prepareRename',
+      'prepareUnblock',
       'safetyCode',
     ]);
     expect(Object.isFrozen(view.contacts)).toBe(true);
@@ -278,12 +287,16 @@ describe('the read-only client view (context.ts, IR-M1-11s-b-1 H-1)', () => {
     await view.contacts.prepareCheck(MARKO);
     await view.contacts.prepareRename(MARKO, 'Marko');
     await view.contacts.prepareRemove(MARKO);
+    await view.contacts.prepareBlock(MARKO);
+    await view.contacts.prepareUnblock(MARKO);
     expect(seen).toEqual([
       'list',
       `code:${MARKO}`,
       `check:${MARKO}`,
       `rename:${MARKO}:Marko`,
       `remove:${MARKO}`,
+      `block:${MARKO}`,
+      `unblock:${MARKO}`,
     ]);
     // No direct write of the contact book is reachable (block, remove, apply).
     expect('block' in view.contacts).toBe(false);
@@ -649,3 +662,78 @@ describe('POST /api/ui/contacts/:ref/remove', () => {
     expect(s.calls).toHaveLength(0);
   });
 });
+
+// WP-12 (F-2; 04 §2.5.1 `contact.block`, `contact.unblock`): Block and Unblock from the People page.
+for (const [what, op, prepareKey, lines] of [
+  [
+    'block',
+    'contact.block',
+    'prepareBlock',
+    ['Block this contact. Messages from them are dropped until you unblock them.'],
+  ],
+  ['unblock', 'contact.unblock', 'prepareUnblock', ['Unblock this contact. Their messages arrive again.']],
+] as const) {
+  describe(`POST /api/ui/contacts/:ref/${what}`, () => {
+    const route = ownerRoute(`/api/ui/contacts/:ref/${what}`);
+
+    it(`signs the prepared ${op} once, with fixed review lines, and applies it`, async () => {
+      const s = signer();
+      const c = ctx(fakeClient());
+      const r = await route.handler(c, req({ ref: MARKO }), s);
+      expect(r).toEqual({ status: 200, body: { status: 'done' } });
+      expect(s.calls).toHaveLength(1);
+      expect(s.calls[0]?.review.lines).toEqual(lines);
+      const action = (s.calls[0]?.requests[0] as { action: JsonObject }).action;
+      expect(action['op']).toBe(op);
+      expect(action['params']).toEqual({ contact: MARKO });
+      expect(c.signed).toHaveLength(1);
+      expectNoLeak(s.calls[0]?.review);
+    });
+
+    it('signs nothing for a core refusal, another op, a bad ref or an input it does not take', async () => {
+      const refusing = fakeContacts({
+        [prepareKey]: () => Promise.resolve(refused(op, 'contact_revoked')),
+      });
+      const s1 = signer();
+      expect(await route.handler(ctx(fakeClient(refusing)), req({ ref: MARKO }), s1)).toEqual({
+        status: 409,
+        body: { error: 'refused' },
+      });
+      expect(s1.calls).toHaveLength(0);
+      const wrongOp = fakeContacts({
+        [prepareKey]: () => Promise.resolve(prepared('contact.remove', { contact: MARKO })),
+      });
+      const s2 = signer();
+      await route.handler(ctx(fakeClient(wrongOp)), req({ ref: MARKO }), s2);
+      expect(s2.calls).toHaveLength(0);
+      const s3 = signer();
+      await route.handler(ctx(fakeClient()), req({ ref: 'marko' }), s3);
+      expect(s3.calls).toHaveLength(0);
+      const s4 = signer();
+      await route.handler(ctx(fakeClient()), req({ ref: MARKO }, '', { contact: ANA }), s4);
+      expect(s4.calls).toHaveLength(0);
+      const throwing = fakeContacts({ [prepareKey]: () => Promise.reject(new Error('/secret/path')) });
+      const s5 = signer();
+      const r5 = await route.handler(ctx(fakeClient(throwing)), req({ ref: MARKO }), s5);
+      expect(s5.calls).toHaveLength(0);
+      expect(JSON.stringify(r5)).not.toContain('/secret/path');
+    });
+
+    it('answers not_applied, a fixed code, when core refuses the signed object', async () => {
+      const s = signer();
+      const c = ctx(fakeClient(), () =>
+        Promise.resolve({ status: 'refused', op, reason: 'nonce_used' }),
+      );
+      expect(await route.handler(c, req({ ref: MARKO }), s)).toEqual({
+        status: 409,
+        body: { error: 'not_applied' },
+      });
+    });
+
+    it('answers not_set_up without an agent, signing nothing', async () => {
+      const s = signer();
+      expect(await route.handler(ctx(undefined), req({ ref: MARKO }), s)).toBe(UI_NOT_SET_UP);
+      expect(s.calls).toHaveLength(0);
+    });
+  });
+}
