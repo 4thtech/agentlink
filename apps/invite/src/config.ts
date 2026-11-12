@@ -8,8 +8,9 @@
  */
 export const DOCS_BASE = 'https://wiki.4thtech.io/products/agentlink';
 export const DOCS_LINKS = {
-  /** "Start here" (docs-site/guide/get-started/start-here.md; its docs PR merges first). */
-  guide: `${DOCS_BASE}/get-started/start-here`,
+  /** "Install AgentLink" (docs-site/guide/get-started/start-fast.md), live on the wiki today. */
+  // switch to …/get-started/start-here at the 0.5.1 release (with MAC_APP_AVAILABLE)
+  guide: `${DOCS_BASE}/get-started/start-fast`,
   /** "Windows" (docs-site/guide/get-started/windows.md). */
   windows: `${DOCS_BASE}/get-started/windows`,
 } as const;

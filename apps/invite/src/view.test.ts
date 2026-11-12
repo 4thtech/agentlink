@@ -82,6 +82,8 @@ describe('config (REL051-INV)', () => {
   it('links only to 4thTech Docs and the project’s GitHub releases, over https', () => {
     for (const url of Object.values(DOCS_LINKS)) expect(url.startsWith(`${DOCS_BASE}/`)).toBe(true);
     expect(DOCS_BASE).toBe('https://wiki.4thtech.io/products/agentlink');
+    // Live on the wiki today; start-here only after the 0.5.1 release tag syncs.
+    expect(DOCS_LINKS.guide).toBe(`${DOCS_BASE}/get-started/start-fast`);
     for (const url of Object.values(MAC_APP_URLS))
       expect(url).toMatch(/^https:\/\/github\.com\/4thtech\/agentlink\/releases\//);
   });
