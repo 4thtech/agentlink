@@ -495,9 +495,12 @@ describe('ProofService.creditsBalance and requestFaucet (M1-11r-a)', () => {
 });
 
 describe('ActivityService.list (M1-11r-a)', () => {
-  it('an empty store gives an empty feed', async () => {
+  it('a new store lists only the ID creation (WP-A1)', async () => {
     const a = await openAgent(clock, 58);
-    expect(await a.client.activity.list({ limit: 20 })).toEqual({ items: [] });
+    const id = `id_created:${a.client.agentId}`;
+    expect(await a.client.activity.list({ limit: 20 })).toEqual({
+      items: [{ kind: 'id_created', id, at: clock.t }],
+    });
   });
 
   it('merges decided approvals, proofs, blocks and the rules change, newest first, paged', async () => {
@@ -534,6 +537,9 @@ describe('ActivityService.list (M1-11r-a)', () => {
       'approval_decided',
       'approval_decided',
       'approval_decided',
+      // WP-A1: this ID's creation and the pairing with Bravo, both at the setup time.
+      'id_created',
+      'contact_connected',
     ]);
     expect(all.nextCursor).toBeUndefined();
     const at = all.items.map((i) => i.at);
@@ -548,7 +554,9 @@ describe('ActivityService.list (M1-11r-a)', () => {
     for (const item of all.items) {
       switch (item.kind) {
         case 'approval_decided':
-          expect(keysOf(item)).toEqual(['approvalId', 'at', 'decision', 'id', 'kind']);
+          expect(keysOf(item)).toEqual(['action', 'approvalId', 'at', 'decision', 'id', 'kind']);
+          // WP-A1: the stored action here is not a valid approval action.
+          expect(item.action).toBeNull();
           break;
         case 'proof':
           expect(keysOf(item)).toEqual([
@@ -575,6 +583,15 @@ describe('ActivityService.list (M1-11r-a)', () => {
           expect(keysOf(item)).toEqual(['at', 'id', 'kind', 'version']);
           expect(item.version).toBe(1);
           break;
+        case 'id_created':
+          expect(keysOf(item)).toEqual(['at', 'id', 'kind']);
+          break;
+        case 'contact_connected':
+          expect(keysOf(item)).toEqual(['at', 'contactId', 'id', 'kind', 'via']);
+          expect(item.contactId).toBe(b.id);
+          break;
+        default:
+          throw new Error(`unexpected kind ${item.kind}`);
       }
     }
     const text = JSON.stringify(all);
@@ -603,7 +620,8 @@ describe('ActivityService.list (M1-11r-a)', () => {
     }
     await insertApproval(a, { id: 'apr_tie', status: 'approved', decidedAt: 1_000 });
     const all = await a.client.activity.list({ limit: 100 });
-    expect(all.items).toHaveLength(6);
+    // Five proofs and the approval at one time, and this ID's creation (WP-A1).
+    expect(all.items).toHaveLength(7);
     const paged: string[] = [];
     let cursor: string | undefined;
     for (let i = 0; i < 10; i += 1) {
@@ -613,7 +631,7 @@ describe('ActivityService.list (M1-11r-a)', () => {
       if (cursor === undefined) break;
     }
     expect(paged).toEqual(all.items.map((i) => i.id));
-    expect(new Set(paged).size).toBe(6);
+    expect(new Set(paged).size).toBe(7);
   });
 
   it('refuses a bad limit or cursor', async () => {
@@ -753,6 +771,8 @@ describe('activity: approval decisions (IR-M1-11r-a-1 M-1)', () => {
       apr_owner_cancelled: 'cancelled',
       apr_rules: 'approved_by_rules',
       apr_rules_used: 'approved_by_rules',
+      // WP-A1: this ID's creation; no other entry.
+      [`id_created:${a.client.agentId}`]: 'id_created',
     });
     expect(JSON.stringify(all)).not.toContain('CANCEL-MUST-NOT-LEAK');
   });
@@ -772,9 +792,10 @@ describe('large inputs (IR-M1-11r-a-1 L-1)', () => {
     expect(new Set(ids).size).toBe(205);
     expect(ids).toEqual(Array.from({ length: 205 }, (_, i) => recordId(205 - i)));
 
+    // The proofs and this ID's creation (WP-A1).
     const feed = await pageAll((cursor) => a.client.activity.list({ limit: 100, cursor }));
-    expect(feed).toHaveLength(205);
-    expect(new Set(feed).size).toBe(205);
+    expect(feed).toHaveLength(206);
+    expect(new Set(feed).size).toBe(206);
   });
 
   it('pages a mixed feed of 101+ entries with limit 100 to the end', async () => {
@@ -791,8 +812,9 @@ describe('large inputs (IR-M1-11r-a-1 L-1)', () => {
     expect(all.items).toHaveLength(100);
     expect(all.nextCursor).toBeTypeOf('string');
     const feed = await pageAll((cursor) => a.client.activity.list({ limit: 100, cursor }));
-    expect(feed).toHaveLength(120);
-    expect(new Set(feed).size).toBe(120);
+    // 60 proofs, 60 approvals and this ID's creation (WP-A1).
+    expect(feed).toHaveLength(121);
+    expect(new Set(feed).size).toBe(121);
     const small = await pageAll((cursor) => a.client.activity.list({ limit: 7, cursor }));
     expect(small).toEqual(feed);
   });
@@ -823,14 +845,16 @@ describe('ties at one time are read with a bound (IR-M1-11r-a-1 L-2)', () => {
     for (let i = 0; i < 100; i += 1) {
       store.rows = 0;
       const page = await a.client.activity.list({ limit, cursor });
-      // One source holds rows here; the others are empty.
-      expect(store.rows).toBeLessThanOrEqual(limit + 1);
+      // One source holds rows here; the others are empty, but for this ID's own row (WP-A1: the
+      // identity row, one row whatever the page).
+      expect(store.rows).toBeLessThanOrEqual(limit + 1 + 1);
       feed.push(...page.items.map((x) => x.id));
       cursor = page.nextCursor;
       if (cursor === undefined) break;
     }
-    expect(feed).toHaveLength(150);
-    expect(new Set(feed).size).toBe(150);
+    // The proofs and this ID's creation (WP-A1).
+    expect(feed).toHaveLength(151);
+    expect(new Set(feed).size).toBe(151);
   });
 });
 
@@ -855,7 +879,8 @@ describe('cursors carry no sender key (IR-M1-11r-a-2 M-2)', () => {
       await insertProof(a, { n, status: 'recorded', createdAt: 9_000 + (n % 4) });
     }
     const full = await a.client.activity.list({ limit: 100 });
-    expect(full.items).toHaveLength(49);
+    // 40 blocked senders, 9 proofs and this ID's creation (WP-A1).
+    expect(full.items).toHaveLength(50);
     for (const limit of [1, 3, 7, 13]) {
       const ids: string[] = [];
       let cursor: string | undefined;
