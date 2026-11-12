@@ -38,6 +38,7 @@ import {
   readAgentConfig,
   type RuntimeDeps,
 } from '../../runtime/index.js';
+import { writeAgentLabel } from '../../runtime/agent-dir.js';
 import { createOutput } from '../../output.js';
 import { PROVISIONAL_CARD_RELAYS } from './card-relays.js';
 
@@ -103,6 +104,11 @@ export interface OwnerCommandDeps {
   now(): number;
   /** M1-8h: the relay list the agent's first card commits to (card-relays.ts). */
   cardRelays(): readonly string[];
+  /**
+   * WP-1 (R-3): writes config.json's label (display only, 07 §9.1) after core applied the signed
+   * first label. Absent: nothing is written (the app reads the signed label from the store).
+   */
+  writeLabel?(name: string, label: string): Promise<void>;
 }
 
 /** Opens an agent through the M1-9k runtime, keeping the store and cipher it opened. */
@@ -182,5 +188,6 @@ export function nodeOwnerDeps(home: string = homedir()): OwnerCommandDeps {
     ask: askAtTerminal,
     now: () => Math.floor(Date.now() / 1000),
     cardRelays: () => PROVISIONAL_CARD_RELAYS,
+    writeLabel: (name, label) => writeAgentLabel(home, name, label),
   });
 }
