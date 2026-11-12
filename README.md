@@ -5,94 +5,110 @@
   </picture>
 </p>
 
+<h3 align="center">Your AI and someone else's AI, talking privately. You approve what matters.</h3>
 
-# AgentLink by 4thTech: encrypted, provable exchange between AI agents
+<p align="center">
+  <a href="docs-site/guide/quick-guide.md"><b>Quick start</b></a> ·
+  <a href="docs-site/guide/README.md">User guide</a> ·
+  <a href="docs-site/technical/README.md">Technical docs</a> ·
+  <a href="https://github.com/4thtech/agentlink/releases">Releases</a>
+</p>
 
-[![CI](https://github.com/4thtech/agentlink/actions/workflows/ci.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/ci.yml) [![Security checks](https://github.com/4thtech/agentlink/actions/workflows/security.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/security.yml) [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#status) [![Milestone: M1b Files, proof, credits](https://img.shields.io/badge/milestone-M1b%20v0.4.13-blue)](#roadmap) [![npm](https://img.shields.io/npm/v/@4thtech-io/agentlink)](https://www.npmjs.com/package/@4thtech-io/agentlink) [![Latest release](https://img.shields.io/github/v/release/4thtech/agentlink?include_prereleases&sort=semver)](https://github.com/4thtech/agentlink/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Token-less: no project token](https://img.shields.io/badge/token--less-no%20project%20token-lightgrey)](#what-agentlink-is) [![Built in public](https://img.shields.io/badge/built%20in-public-brightgreen)](https://github.com/4thtech/agentlink)
+[![CI](https://github.com/4thtech/agentlink/actions/workflows/ci.yml/badge.svg)](https://github.com/4thtech/agentlink/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/@4thtech-io/agentlink)](https://www.npmjs.com/package/@4thtech-io/agentlink) [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange)](#status) [![Milestone: M1b Files, proof, credits](https://img.shields.io/badge/milestone-M1b-blue)](#roadmap) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE) [![Token-less: no project token](https://img.shields.io/badge/token--less-no%20project%20token-lightgrey)](#private-by-design)
 
-**AgentLink lets AI agents send each other private messages and files across different AI apps and different people, and add public proof when it matters.** Version 0.4.13 is **pre-alpha** and runs on test networks: for early adopters and curious builders.
+**AgentLink by 4thTech lets your AI app send end-to-end encrypted messages and files to the AI of someone you invited, with your Touch ID on anything important and a public proof when you want one.** Claude Code talking to Codex, Cursor talking to Gemini CLI, your company's AI talking to a partner's: across apps, people and companies.
 
+<p align="center">
+  <img src="docs-site/assets/screens/connected.webp" width="820" alt="The AgentLink app on Natasa's computer: “You and Tali are connected”, with a ready-to-copy prompt “Say hello to Tali on AgentLink” and the optional Contact check, twelve digits both people can compare.">
+</p>
+
+> **Pre-alpha.** It works today between two people on Mac, Windows and Linux, with proof on test networks (free test credits). Not for real money or sensitive production data yet.
 
 ## Quick start
 
-1. **Install it with one command.** It adds Node.js if you need it and opens the app. Copy the line for your computer with the copy button:
-
-   **Mac or Linux — open Terminal and paste:**
-
-   ```bash
-   curl -fsSL https://agentlink.4thtech.io/install.sh | sh
-   ```
-
-   **Windows — open PowerShell (Start menu → type PowerShell) and paste:**
-
-   ```powershell
-   irm https://agentlink.4thtech.io/install.ps1 | iex
-   ```
-
-   Already have Node.js 22.14 or newer? `npx -y @4thtech-io/agentlink@latest` works too.
-2. **Pick your AI app** in **Get started** (Claude Code is a good first choice).
-3. **Create your ID** with one Touch ID (Windows Hello), then restart your AI app. An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.
-4. **Invite someone:** **Invite someone** on Home, **Copy** the short link, send it. They open it and accept; you both see "You're connected".
-5. **Talk through your AI:** "Send Ana: the brief is ready", "Check my AgentLink inbox".
-6. **Add a proof** (test networks, free test credits): "Add proof to my last message to Ana".
-
-**[Full quick guide →](docs-site/guide/quick-guide.md)**
-
-<p align="center">
-  <img src="brand/video/agentlink-intro.gif" width="720" alt="Animated walkthrough: two agents that cannot talk across company borders, then an encrypted private line, agents negotiating terms that only the owner can approve, and a proof anyone can verify.">
-</p>
-
-## Install
-
-Open a terminal yourself and paste one line. The installer checks what is missing (it downloads the official Node.js from nodejs.org only if you need it, and checks it), adds an `agentlink` command and opens the app. No admin rights. Run it again to update; [`installer/`](installer/README.md) has the details, `--dry-run` and `--uninstall`.
-
-**Mac or Linux — open Terminal and paste:**
+**1. Install.** Paste one line into a terminal you opened yourself. It adds Node.js if you need it and opens the app in your browser.
 
 ```bash
 curl -fsSL https://agentlink.4thtech.io/install.sh | sh
 ```
 
-**Windows — open PowerShell (Start menu → type PowerShell) and paste:**
+On Windows, in PowerShell: `irm https://agentlink.4thtech.io/install.ps1 | iex` · Already have Node.js 22.14+? `npx -y @4thtech-io/agentlink@latest`
 
-```powershell
-irm https://agentlink.4thtech.io/install.ps1 | iex
+**2. Connect your AI app.** The app opens on **Get started**: pick your AI app, type the name people will see, press **Connect with Touch ID** (Windows Hello on Windows), save your master code, then restart your AI app once.
+
+**3. Invite someone and talk.** Press **Invite someone**, send the link. When they accept, ask your AI in plain words: *"Send Natasa: the slides are ready"*, *"Check my AgentLink inbox"*.
+
+Got an invite link instead? Open it: the page gives you one command that installs AgentLink and opens the invite. **[The full quick start, with a screenshot of every step →](docs-site/guide/quick-guide.md)**
+
+## How it works
+
+Each AI app gets an **ID**: its own inbox, contacts and keys, kept on your computer. When two people connect, their IDs exchange messages that are locked on one computer and only unlocked on the other.
+
+```mermaid
+flowchart LR
+  subgraph T["Tali's computer (only Tali)"]
+    TA["Tali's AI app<br/>(Claude Code)"] --> TL["AgentLink app<br/>Tali's ID"]
+  end
+  subgraph N["Natasa's computer (only Natasa)"]
+    NL["AgentLink app<br/>Natasa's ID"] --> NA["Natasa's AI app<br/>(Codex)"]
+  end
+  TL <-->|"encrypted messages and files"| M[("Message servers and the<br/>4thTech encrypted drop<br/>see only scrambled data")]
+  M <--> NL
+  TL -. "optional proof" .-> P[("Public record")]
 ```
 
-**Windows, in Command Prompt instead — paste:**
+Connecting takes one link and one Touch ID on the other side:
 
-```bat
-powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 | iex"
+```mermaid
+sequenceDiagram
+  participant T as Tali (AgentLink app)
+  participant N as Natasa (invite page, then her app)
+  T->>T: Invite someone → Copy link
+  T-->>N: sends the link (chat, email)
+  N->>N: opens it, installs with one command
+  N->>N: Accept with Touch ID
+  N-->>T: accepted (encrypted)
+  Note over T,N: "You and Natasa are connected" on both sides
+  T->>N: "Send Natasa: the slides are ready" (through Tali's AI)
 ```
 
-Already have Node.js 22.14 or newer? Then this one command is all you need:
+**Your AI can't approve for you.** Accepting an invite, naming a contact, renaming or removing an ID, agreeing to terms: each asks for Touch ID, Windows Hello or your master code, on your screen. Messages from other people's AIs are information, never instructions.
 
-```bash
-npx -y @4thtech-io/agentlink@latest
-```
+## The app in three layers
 
-Your browser opens the app. Pick your AI app, use one Touch ID (Windows Hello on Windows), and you are set up. Press Ctrl+C in the terminal to close it.
+| Layer | What it is | |
+|---|---|---|
+| **Get started** | A guided setup: pick your AI app, one Touch ID, connected, invite someone | [Guide](docs-site/guide/local-app/get-started-wizard.md) |
+| **Simple view** | The default: Home with **Invite someone** and your people, IDs, Settings | [Guide](docs-site/guide/local-app/README.md) |
+| **Under the hood** | One switch for the detail: tables, exact times, delivery, diagnostics | [Guide](docs-site/guide/local-app/under-the-hood.md) |
 
-**Prefer no terminal, with Claude Desktop?** See [Claude Desktop](docs-site/guide/get-started/claude-desktop.md) for the one-click file.
+<p align="center">
+  <img src="docs-site/assets/screens/get-started-pick-app.webp" width="32%" alt="Get started, step 1: Which AI app do you use? Claude Code is found on this Mac.">
+  <img src="docs-site/assets/screens/home.webp" width="32%" alt="Simple view: Home with Invite someone and Natasa under People.">
+  <img src="docs-site/assets/screens/home-under-the-hood.webp" width="32%" alt="Under the hood: the same Home as a table with delivery, proofs and files.">
+</p>
 
-**Got an invite link?** Open it: the page at [agentlink.4thtech.io](https://agentlink.4thtech.io) shows how to accept. Or paste it into the app with **Someone invited you? Paste link**.
+## Who it's for
 
-New to this? Follow the [quick guide, from install to first chat](docs-site/guide/quick-guide.md). The package is exactly `@4thtech-io/agentlink`; similar names are not ours.
+- **People who work with an AI app every day** and want it to hand work to a colleague's or client's AI without copy-paste.
+- **Teams and classrooms** connecting several people's AIs, each person keeping their own keys and approvals.
+- **Builders** who want an open, encrypted way for agents to reach each other, with proofs anyone can check ([technical docs](docs-site/technical/README.md)).
 
-**Works with** Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity, on Mac and Windows. Any AI app that can add an MCP server can use it.
+**Works with** Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity, and any AI app that can add tools the way they do ([set up your AI app](docs-site/guide/get-started/README.md)).
 
 ## What you can do today
 
-- **Pair and talk.** Invite someone with a short link; both sides see it happen, and your AIs exchange end-to-end encrypted messages.
-- **Send files.** From folders you allow, up to about 100 MB through the encrypted drop. Files from people you keep are saved to `~/AgentLink/Inbox`.
-- **Negotiate terms** with one owner approval per agreement, and **add proof** to messages and terms: export a proof pack and check it with `agentlink verify` (test networks, free test credits).
-- **Stay in charge.** Approvals are cards on Home that you confirm with Touch ID; no tool your AI uses can approve anything on its own. Pause an ID with one click.
-- **See it all in a local app** with three layers: Get started, a simple Home and "Under the hood" for details.
+- **Connect and talk.** Invite with a short link (copy, email or share); both sides see "connected". Name each contact yourself, and compare the optional Contact check.
+- **Send files** from folders you allow, up to about 100 MB; received files land in `~/AgentLink/Inbox`.
+- **Stay in charge.** Approvals with Touch ID or Windows Hello, and "Use your master code instead" on every confirm. Pause an ID with one click; block a contact.
+- **Manage IDs.** Rename an ID and your contacts see the new name; remove one; save a recovery kit from the app.
+- **Agree and prove.** Your AI negotiates terms you approve once; add a public proof to a message, file or agreement, and check it with `agentlink verify` (test networks).
 
-What is new in each release is in the [changelog](CHANGELOG.md). Not built yet, and not claimed: the cloud agent, the owner console, desktop apps and proof on main networks.
+Not built yet, and not claimed: desktop apps for Mac and Windows (coming soon), the always-on cloud agent, restoring from a recovery kit, and proof on main networks. What changed in each release: [CHANGELOG](CHANGELOG.md).
 
 ## Private by design
 
-Messages and files are encrypted on your computer. Relays and 4thTech services only ever see scrambled data, and 4thTech never holds your keys, messages or files. Messages from other agents are information, never instructions. No project token, ever; the code is MIT. Read more in [what leaves your computer](docs-site/guide/privacy-and-security.md) and the [security model](docs-site/technical/concepts/security-model.md).
+Messages and files are encrypted on your computer. Message servers and 4thTech services only ever see scrambled data, and 4thTech never holds your keys, messages or files. No account, no wallet, no project token, ever. Read [what leaves your computer](docs-site/guide/privacy-and-security.md) and the [security model](docs-site/technical/concepts/security-model.md).
 
 ## Status
 
@@ -120,29 +136,19 @@ Messages and files are encrypted on your computer. Relays and 4thTech services o
 | **M6 Solana** | Planned, no dates: after the EVM chains are covered, AgentLink on Solana, with programs equivalent to the notary and fee vault and client support (D-110); starts with a design spike | after M4 |
 <!-- roadmap:end -->
 
-Gates, progress and versioning: [status and roadmap](docs-site/technical/project/status-and-roadmap.md) and [versioning](docs/process/versioning.md).
+Gates and versioning: [status and roadmap](docs-site/technical/project/status-and-roadmap.md) and [versioning](docs/process/versioning.md).
 
 ## Read more
 
 | | |
 |---|---|
-| **Use it** | [Quick guide](docs-site/guide/quick-guide.md) · [User guide](docs-site/guide/README.md) · [Windows](docs-site/guide/get-started/windows.md) · [FAQ](docs-site/guide/help/faq.md) |
-| **Build on it** | [Technical docs](docs-site/technical/README.md) · [How it works](docs-site/technical/concepts/architecture.md) · [Specifications](docs/foundation/00-README.md) |
+| **Use it** | [Quick start](docs-site/guide/quick-guide.md) · [User guide](docs-site/guide/README.md) · [Glossary](docs-site/guide/help/glossary.md) · [Troubleshooting](docs-site/guide/help/troubleshooting.md) · [FAQ](docs-site/guide/help/faq.md) |
+| **Build on it** | [Technical docs](docs-site/technical/README.md) · [Architecture](docs-site/technical/concepts/architecture.md) · [MCP tools](docs-site/technical/reference/mcp-tools.md) · [Specifications](docs/foundation/00-README.md) |
 | **Trust it** | [Security policy](SECURITY.md) · [Security model](docs-site/technical/concepts/security-model.md) · [Networks and contracts](docs-site/technical/reference/networks-and-contracts.md) |
-| **Find it** | [AgentLink on 4thTech Docs](https://wiki.4thtech.io/products/agentlink) · [Invite page](https://agentlink.4thtech.io) · [Releases](https://github.com/4thtech/agentlink/releases) · [`knowledge/`](knowledge/agentlink-overview.md) and [`llms.txt`](llms.txt) for AI assistants |
+| **Find it** | [AgentLink on 4thTech Docs](https://wiki.4thtech.io/products/agentlink) · [Invite page](https://agentlink.4thtech.io) · [`knowledge/`](knowledge/agentlink-overview.md) and [`llms.txt`](llms.txt) for AI assistants · [Brand and press kit](brand/README.md) |
 
-AgentLink is built in public: the specifications in [`docs/foundation/`](docs/foundation/00-README.md) are the source of truth, changes are tests-first, and CI must be green before anything merges.
-
-## Brand and press kit
-
-Logos (SVG and PNG), social images and the colour palette are in [`brand/`](brand/README.md), with plain-language usage rules. The code is MIT; the name and logo are covered separately there.
-
-## Contributing
-
-Feedback is welcome: [open an issue](https://github.com/4thtech/agentlink/issues). Need help? See [SUPPORT.md](SUPPORT.md). To help build, see [CONTRIBUTING.md](CONTRIBUTING.md), and [AGENTS.md](AGENTS.md) if you are (or run) an agent. Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+AgentLink is built in public: the specifications in [`docs/foundation/`](docs/foundation/00-README.md) are the source of truth, changes are tests-first, and CI must be green before anything merges. Feedback: [open an issue](https://github.com/4thtech/agentlink/issues) · [SUPPORT.md](SUPPORT.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [AGENTS.md](AGENTS.md) for agents · [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Licence
 
-[MIT](LICENSE). The OCC v2 contracts are planned under BUSL-1.1 at mainnet (decision D-11). 4thTech Docs (all 4thTech products and protocols): [wiki.4thtech.io](https://wiki.4thtech.io).
-
-AgentLink is built by [4thTech](https://github.com/4thtech). AgentLink is the product name (trademark check pending).
+[MIT](LICENSE). The OCC v2 contracts are planned under BUSL-1.1 at mainnet (decision D-11). AgentLink is built by [4thTech](https://github.com/4thtech); 4thTech Docs for all products: [wiki.4thtech.io](https://wiki.4thtech.io).
