@@ -34,7 +34,7 @@
 // begin/finish). `?add=agent` stays on every step, so an open agent never turns it into Connect
 // another AI app, and a new Add agent starts with nothing kept from an earlier run. It ends on Home
 // in the app (no reload), and the agents are read again.
-import { Banner, Button, CopyPrompt, Fingerprint, ProgressBar, TextField } from '@4thtech-io/ui';
+import { Banner, Button, CopyPrompt, ProgressBar, TextField } from '@4thtech-io/ui';
 import {
   useCallback,
   useEffect,
@@ -300,37 +300,7 @@ export function setupMessage(problem: SetupError | { readonly problem: 'cancelle
   return SETUP_MESSAGES[problem.problem];
 }
 
-/** F49: the save form's masked code field, with Show/Hide so the person can check it. */
-function RevealCodeField({ code }: { code: string }): ReactElement {
-  const [shown, setShown] = useState(false);
-  const id = useId();
-  return (
-    <TextField
-      id={id}
-      label={T.backupLabel}
-      name="password"
-      type={shown ? 'text' : 'password'}
-      autoComplete="new-password"
-      value={code}
-      readOnly
-      mono
-      suffix={
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-pressed={shown}
-          aria-controls={id}
-          data-reveal-code=""
-          onClick={() => setShown(!shown)}
-        >
-          {shown ? BACKUP_CODE_FIELD.hide : BACKUP_CODE_FIELD.show}
-        </Button>
-      }
-    />
-  );
-}
-
-/** The once-shown backup code: readable text, a real save form, Copy, Save as file, "I saved it". */
+/** The once-shown backup code: one display (Show/Hide), a real save form, Copy, Save as file, "I saved it". */
 function BackupCode({
   code,
   computer,
@@ -345,8 +315,11 @@ function BackupCode({
   const [copied, setCopied] = useState<'no' | 'yes' | 'failed'>('no');
   const [file, setFile] = useState<'no' | 'yes' | 'failed'>('no');
   const [asked, setAsked] = useState(false);
+  const [shown, setShown] = useState(true);
+  const codeId = useId();
   // A real form: submitting it lets the browser's own save sheet appear. It never navigates and
-  // never sends anything (no action; the page's CSP has form-action 'none').
+  // never sends anything (no action; the page's CSP has form-action 'none'). The two fields it
+  // saves are visually hidden but rendered (not display:none), so password managers still see them.
   const save = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     setAsked(true);
@@ -357,37 +330,60 @@ function BackupCode({
         <span className="al-text-label">{T.backupLabel}</span>
         <span className="al-text-caption al-muted">{T.shownOnce}</span>
       </div>
-      {/* F49: one selectable code. A click selects all of it, and a copy of the selection is the
-          code as one line (the grid's groups otherwise copy as broken lines). */}
-      <div
-        className="al-secret-val al-text-code-lg fr-code-select"
-        data-backup-code=""
-        onCopy={(event) => {
-          event.preventDefault();
-          event.clipboardData.setData('text/plain', code);
-        }}
-      >
-        {code.split(' ').map((g, i) => (
-          <span key={i}>{g}</span>
-        ))}
+      {/* One selectable code. A click selects all of it, and a copy of the selection is the code
+          as one line (the groups otherwise copy as broken lines). */}
+      <div className="al-secret-row">
+        <div
+          id={codeId}
+          className="al-secret-val al-text-code-lg fr-code-select"
+          data-backup-code=""
+          onCopy={(event) => {
+            event.preventDefault();
+            event.clipboardData.setData('text/plain', code);
+          }}
+        >
+          {code.split(' ').map((g, i) => (
+            <span key={i}>{shown ? g : '\u2022\u2022\u2022\u2022'}</span>
+          ))}
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-pressed={shown}
+          aria-controls={codeId}
+          data-reveal-code=""
+          onClick={() => setShown(!shown)}
+        >
+          {shown ? BACKUP_CODE_FIELD.hide : BACKUP_CODE_FIELD.show}
+        </Button>
       </div>
       <p className="al-text-body-sm">{T.backupBody(sensor)}</p>
-      <p className="al-text-body-sm al-muted">{T.backupLost}</p>
-      <form onSubmit={save} autoComplete="on">
-        <TextField
-          label={T.savedAs}
-          name="username"
-          autoComplete="username"
-          value={T.savedAsLabel(computer)}
-          readOnly
-        />
-        <RevealCodeField code={code} />
+      <form onSubmit={save} autoComplete="on" className="al-secret-form">
+        <div className="al-sr-only">
+          <input
+            type="text"
+            name="username"
+            autoComplete="username"
+            value={T.savedAsLabel(computer)}
+            readOnly
+            tabIndex={-1}
+            aria-hidden="true"
+          />
+          <input
+            type="password"
+            name="password"
+            autoComplete="new-password"
+            value={code}
+            readOnly
+            tabIndex={-1}
+            aria-hidden="true"
+          />
+        </div>
         <div className="al-secret-actions">
           <Button type="submit" variant="primary" icon="key-round">
             {T.saveToManager}
           </Button>
           <Button
-            size="sm"
             icon={copied === 'yes' ? 'check' : 'copy'}
             data-copy-code=""
             onClick={() => {
@@ -397,22 +393,27 @@ function BackupCode({
             {copied === 'yes' ? T.copied : T.copy}
           </Button>
           <Button
-            size="sm"
-            icon="download"
+            icon={file === 'yes' ? 'check' : 'download'}
             data-save-code-file=""
             onClick={() => setFile(saveBackupCodeFile(code, sensor) ? 'yes' : 'failed')}
           >
-            {T.saveFile}
+            {file === 'yes' ? T.fileSavedShort : T.saveFile}
           </Button>
         </div>
       </form>
-      <p className="al-text-body-sm" role="status" aria-live="polite" data-copy-status="">
+      {/* Screen readers only: the visible feedback is the button label. */}
+      <p className="al-sr-only" role="status" aria-live="polite" data-copy-status="">
         {copied === 'yes' ? T.copied : ''}
         {file === 'yes' ? ` ${T.fileSaved}` : ''}
       </p>
       {copied === 'failed' || file === 'failed' ? (
         <p className="al-text-body-sm ct-error" role="alert">
           {copied === 'failed' ? T.copyFailed : T.fileFailed}
+        </p>
+      ) : null}
+      {file === 'yes' ? (
+        <p className="al-text-caption al-muted" aria-hidden="true">
+          {T.fileSaved}
         </p>
       ) : null}
       <p className="al-text-caption al-muted">{T.clipboardWarning}</p>
@@ -1338,10 +1339,6 @@ export function FirstRunPage({
           {line === undefined ? null : (
             <Banner tone={done.sendFolder === 'allowed' ? 'success' : 'warning'}>{line}</Banner>
           )}
-          <p className="al-text-body">
-            <Fingerprint value={done.fingerprint} prefix={T.fingerprintLabel} />
-          </p>
-          <p className="st-note">{T.fingerprintNote}</p>
           <BackupCode
             code={done.ownerCode ?? ''}
             computer={done.computerName ?? ''}

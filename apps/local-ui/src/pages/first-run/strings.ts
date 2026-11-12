@@ -87,6 +87,7 @@ export const FIRST_RUN = {
   // F49: Copy never fails silently; "Save as file" downloads a small .txt (local only).
   copyFailed: "Couldn't copy here. Select the code above and copy it, or save it as a file.",
   saveFile: 'Save as file',
+  fileSavedShort: 'Saved',
   fileSaved: 'Saved to your Downloads folder as agentlink-backup-code.txt. Keep that file private.',
   fileFailed: "Couldn't save a file here. Copy the code or save it in your password manager.",
   // 08 §1 `done_unconfirmed`.
