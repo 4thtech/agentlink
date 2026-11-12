@@ -152,6 +152,29 @@ describe('nodeFilesPlatform', () => {
     await expect(platform.inbox('relative/Inbox')).rejects.toThrow();
   });
 
+  it('REL051-A12 readSaved: a regular file directly inside, up to the cap; never a link', async () => {
+    const platform = nodeFilesPlatform({ home, drop: false });
+    const inbox = await platform.inbox('~/AgentLink/Inbox');
+    await writeFile(path.join(inbox.realpath, 'plan.md'), '# Plan\n');
+    await writeFile(path.join(inbox.realpath, 'big.txt'), 'x'.repeat(100));
+    await symlink(path.join(home, 'outside.txt'), path.join(inbox.realpath, 'evil.md'));
+    await mkdir(path.join(inbox.realpath, 'folder.md'));
+    const read = async (name: string, max = 64) => {
+      const bytes = await inbox.readSaved?.(name, max);
+      return bytes === undefined ? undefined : new TextDecoder().decode(bytes);
+    };
+    expect(await read('plan.md')).toBe('# Plan\n');
+    expect(await read('big.txt')).toBeUndefined(); // above the cap
+    expect(await read('big.txt', 100)).toBe('x'.repeat(100));
+    expect(await read('evil.md')).toBeUndefined(); // a link is never followed
+    expect(await read('folder.md')).toBeUndefined();
+    expect(await read('missing.md')).toBeUndefined();
+    for (const bad of ['../outside.txt', 'a/b', '..', '.', '']) {
+      expect(await read(bad)).toBeUndefined();
+    }
+    await inbox.close?.();
+  });
+
   it('with drop: false there is no drop; by default the drop is configured', () => {
     expect(nodeFilesPlatform({ home, drop: false }).drop).toBeUndefined();
     expect(nodeFilesPlatform({ home }).drop).toBeDefined();

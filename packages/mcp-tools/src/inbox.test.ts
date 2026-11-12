@@ -655,6 +655,7 @@ describe('agentlink_inbox: item shapes (06 §2.2)', () => {
         plaintextSha256: 'b'.repeat(64),
         delivery: 'drop',
         expiresAt: '2025-10-09T09:53:20Z',
+        kind: 'other',
       },
     ]);
     expect(message!.untrusted['fileTypes']).toEqual(['application/pdf']);
@@ -917,5 +918,88 @@ describe('agentlink_inbox: delivery receipt requests (06 §2.2, 11 §5.6, D-109)
     expect(result.structured.nextStep).toBe(
       `${copy('chat.inbox.receiptRequestNextStep')} ${copy('chat.inbox.requestNextStep')}`,
     );
+  });
+});
+
+describe('files: type, size and where it was saved (REL051-A12, WP-A2, plan item 7)', () => {
+  const file = (over: Record<string, unknown> = {}) => ({
+    index: 0,
+    size: 97,
+    plaintextSha256: 'c'.repeat(64),
+    delivery: 'inline' as const,
+    expiresAt: null,
+    name: 'plan.md',
+    mime: 'application/octet-stream',
+    ...over,
+  });
+
+  it("the block line names the type derived from the name, never the sender's MIME", async () => {
+    const result = await inbox(
+      {},
+      fake({
+        items: [
+          inbound({
+            type: 'file',
+            files: [file(), file({ index: 1, name: 'evil.exe', mime: 'text/markdown', size: 5 })],
+          }),
+        ],
+      }),
+    );
+    const [message] = messagesOf(result);
+    expect(message!.block).toContain('File 0: plan.md (Markdown, 97 bytes)');
+    expect(message!.block).toContain('File 1: evil.exe (File, 5 bytes)');
+    expect(message!.block).not.toContain('text/markdown');
+    expect((message!['files'] as { kind: string }[]).map((f) => f.kind)).toEqual([
+      'markdown',
+      'other',
+    ]);
+    // The sender's stated types stay under `untrusted` only (schema unchanged).
+    expect(message!.untrusted['fileTypes']).toEqual(['application/octet-stream', 'text/markdown']);
+  });
+
+  it('a file saved automatically (or by Save) shows savedTo; an unsaved one has none', async () => {
+    const base = fake({
+      items: [inbound({ type: 'file', files: [file(), file({ index: 1, name: 'b.txt' })] })],
+    });
+    const asked: unknown[] = [];
+    const client: Fake = {
+      ...base,
+      files: {
+        attach: () => Promise.reject(new Error('not used')),
+        fetch: () => Promise.reject(new Error('not used')),
+        savedPaths: (refs) => {
+          asked.push(refs);
+          return Promise.resolve(new Map([[`${E1}.0`, '/home/u/AgentLink/Inbox/plan.md']]));
+        },
+      },
+    };
+    const result = await inbox({}, client);
+    const files = messagesOf(result)[0]!['files'] as Record<string, unknown>[];
+    expect(files[0]).toMatchObject({ index: 0, savedTo: '/home/u/AgentLink/Inbox/plan.md' });
+    expect(files[1]).not.toHaveProperty('savedTo');
+    expect(asked).toEqual([
+      [
+        { envelopeId: E1, fileIndex: 0 },
+        { envelopeId: E1, fileIndex: 1 },
+      ],
+    ]);
+  });
+
+  it('a failing saved-path lookup still answers, without savedTo', async () => {
+    const base = fake({ items: [inbound({ type: 'file', files: [file()] })] });
+    const client: Fake = {
+      ...base,
+      files: {
+        attach: () => Promise.reject(new Error('not used')),
+        fetch: () => Promise.reject(new Error('not used')),
+        savedPaths: () => Promise.reject(new Error(`disk said ${HOSTILE}`)),
+      },
+    };
+    const result = await inbox({}, client);
+    expect(result.structured.status).toBe('ok');
+    expect(messagesOf(result)[0]!['files']).toEqual([
+      expect.not.objectContaining({ savedTo: expect.anything() }),
+    ]);
+    expect(outsideTheWrapper(result)).not.toContain('CANARY-INBOX');
   });
 });
