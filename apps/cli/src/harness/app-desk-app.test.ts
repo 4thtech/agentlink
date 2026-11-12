@@ -260,6 +260,19 @@ describe('the launcher (optional)', () => {
     }
   });
 
+  it('the launcher could not be written: the entry is, and the result says so', async () => {
+    await writeClaude({ agentlink: npx('work') });
+    await writeLauncher(installerLauncher);
+    const plan = await desk(() => OK).plan('claude-code', 'work', { form: 'app', launcher: true });
+    if (plan.status !== 'change') throw new Error('no change');
+    // Changed after the preview: the launcher write refuses it.
+    await writeLauncher(`${installerLauncher}echo mine\n`);
+    expect(await plan.commit(WORK)).toBe('written_launcher_unchanged');
+    expect(await readClaude()).toBe(claudeJson({ agentlink: app('work') }));
+    expect(await readFile(launcherPath(), 'utf8')).toBe(`${installerLauncher}echo mine\n`);
+    expect(logs).toContain('agentlink command not changed');
+  });
+
   it('a launcher edited by hand is never offered nor written', async () => {
     await writeClaude({ agentlink: npx('work') });
     await writeLauncher(`${installerLauncher}echo mine\n`);

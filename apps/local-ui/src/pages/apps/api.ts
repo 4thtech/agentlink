@@ -38,6 +38,8 @@ export type ChangeKind =
   | 'failed';
 export interface ChangeOutcome {
   readonly kind: ChangeKind;
+  /** WP-D7: done, but the `agentlink` command (asked for) was not changed. */
+  readonly launcherUnchanged?: true;
 }
 
 /** WP-D7: "Use the app for …" (`form: 'app'`), with the `agentlink` command too (`launcher`). */
@@ -82,15 +84,20 @@ function base64url(text: string): string {
 }
 
 /** A route answers `{status}` (the presence gate, the preview) or `{error}` (a route's refusal). */
-async function word(res: Response): Promise<string | undefined> {
+async function word(res: Response): Promise<{ said?: string; launcherUnchanged?: true }> {
   try {
     const body: unknown = await res.json();
-    if (typeof body !== 'object' || body === null) return undefined;
-    const { status, error } = body as { status?: unknown; error?: unknown };
-    if (typeof status === 'string') return status;
-    return typeof error === 'string' ? error : undefined;
+    if (typeof body !== 'object' || body === null) return {};
+    const { status, error, launcher } = body as {
+      status?: unknown;
+      error?: unknown;
+      launcher?: unknown;
+    };
+    const extra = launcher === 'not_changed' ? { launcherUnchanged: true as const } : {};
+    if (typeof status === 'string') return { said: status, ...extra };
+    return typeof error === 'string' ? { said: error } : {};
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -130,8 +137,10 @@ export function createAppsApi(options: AppsApiOptions = {}): AppsApi {
     }
     if (res.status === 501) return { kind: 'not_available' };
     if (res.status === 401) return { kind: 'session' };
-    const said = await word(res);
-    if (res.status === 200 && said === 'done') return { kind: 'done' };
+    const { said, launcherUnchanged } = await word(res);
+    if (res.status === 200 && said === 'done') {
+      return launcherUnchanged === true ? { kind: 'done', launcherUnchanged } : { kind: 'done' };
+    }
     if (said === 'presence_rejected') return { kind: 'rejected' };
     if (said === 'presence_required') return { kind: 'required' };
     if (said === 'wait' || res.status === 429) return { kind: 'wait' };

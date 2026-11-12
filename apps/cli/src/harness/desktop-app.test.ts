@@ -1,6 +1,6 @@
 // WP-D7 (S2; plan 2026-11-12 Decision 2 "AI apps", "Translocation (M3)"): the desktop app's layout
 // constants, where it is found, and the places an AI app must never be pointed at.
-import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -99,7 +99,8 @@ describe('appLocationProblem: never point an AI app at a passing copy', () => {
   it('a read-only mounted disk image; a writable external disk is fine', () => {
     const p = '/Volumes/AgentLink/AgentLink.app/Contents/Resources/node/bin/node';
     expect(appLocationProblem(p, { ...mac, writable: () => false })).toBe('read_only');
-    expect(appLocationProblem(p, { ...mac, writable: () => true })).toBeUndefined();
+    // Any mounted volume is refused, a writable disk image too (it can be ejected or swapped).
+    expect(appLocationProblem(p, { ...mac, writable: () => true })).toBe('mounted');
   });
 
   it('temporary folders (this process, macOS per-user, /tmp, Windows Temp, npx cache)', () => {
@@ -201,6 +202,37 @@ describe('locateDesktopApp (a fake bundle on disk)', () => {
     const res = await bundle(join(root, 'Fake'), 'not-agentlink');
     expect(await locateDesktopApp({ ...base, home: root, candidates: [res] })).toBeUndefined();
   });
+
+  it.skipIf(process.platform === 'win32')(
+    'a node or CLI linked out of Resources is not the app',
+    async () => {
+      const res = await bundle(join(root, 'Applications'));
+      await writeFile(join(root, 'evil-node'), 'evil');
+      await unlink(join(res, 'node', 'bin', 'node'));
+      await symlink(join(root, 'evil-node'), join(res, 'node', 'bin', 'node'));
+      expect(await locateDesktopApp({ ...base, home: root, candidates: [res] })).toBeUndefined();
+      const res2 = await bundle(join(root, 'Other'));
+      const cli = join(
+        res2,
+        'core',
+        'node_modules',
+        '@4thtech-io',
+        'agentlink',
+        'dist',
+        'agentlink.js',
+      );
+      const outPkg = join(root, 'outpkg');
+      await mkdir(join(outPkg, 'dist'), { recursive: true });
+      await writeFile(join(outPkg, 'dist', 'agentlink.js'), '// evil');
+      await writeFile(
+        join(outPkg, 'package.json'),
+        JSON.stringify({ name: '@4thtech-io/agentlink' }),
+      );
+      await unlink(cli);
+      await symlink(join(outPkg, 'dist', 'agentlink.js'), cli);
+      expect(await locateDesktopApp({ ...base, home: root, candidates: [res2] })).toBeUndefined();
+    },
+  );
 
   it('a translocated or temporary copy is found but refused', async () => {
     const trans = await bundle(join(root, 'AppTranslocation', 'ABCD', 'd'));

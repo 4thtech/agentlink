@@ -97,14 +97,15 @@ const CHANGED = fixed(409, 'changed');
 /** 409: signed, but core did not apply it. */
 const NOT_APPLIED = fixed(409, 'not_applied');
 
-const WRITE_ANSWERS: Readonly<Record<Exclude<LocalUiAiAppWrite, 'written'>, LocalUiResult>> =
-  Object.freeze({
-    changed: CHANGED,
-    quit_first: fixed(409, 'quit_first'),
-    agent_mismatch: AGENT_MISMATCH,
-    app_location: fixed(409, 'app_location'),
-    failed: fixed(409, 'write_failed'),
-  });
+const WRITE_ANSWERS: Readonly<
+  Record<Exclude<LocalUiAiAppWrite, 'written' | 'written_launcher_unchanged'>, LocalUiResult>
+> = Object.freeze({
+  changed: CHANGED,
+  quit_first: fixed(409, 'quit_first'),
+  agent_mismatch: AGENT_MISMATCH,
+  app_location: fixed(409, 'app_location'),
+  failed: fixed(409, 'write_failed'),
+});
 
 /**
  * The `changeId` of 04 §2.5.1: SHA-256 (through @4thtech-io/crypto) of the JCS of the change. WP-D7:
@@ -518,6 +519,10 @@ async function changeApp(
   const outcome = await context.applyOwnerAction(first.signed);
   if (outcome.status !== 'applied' || outcome.op !== op) return NOT_APPLIED;
   const written = await fresh.commit(client.agentId).catch((): LocalUiAiAppWrite => 'failed');
+  // WP-D7: the entry is written (done), but the page must say the command was not changed.
+  if (written === 'written_launcher_unchanged') {
+    return { status: 200, body: { status: 'done', app: pending.app, launcher: 'not_changed' } };
+  }
   if (written !== 'written') return WRITE_ANSWERS[written] ?? WRITE_ANSWERS.failed;
   // "Restart {app} to finish" (b11 §30.3).
   return { status: 200, body: { status: 'done', app: pending.app } };

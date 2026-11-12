@@ -58,7 +58,8 @@ export interface AppStart {
   readonly cli: string;
 }
 
-export type AppLocationProblem = 'translocated' | 'read_only' | 'temporary';
+/** `mounted`: any other folder under `/Volumes` (a writable disk image or a removable disk). */
+export type AppLocationProblem = 'translocated' | 'read_only' | 'mounted' | 'temporary';
 
 export type DesktopApp =
   | { readonly status: 'ok'; readonly resources: string; readonly start: AppStart }
@@ -177,7 +178,8 @@ function within(path: string, dir: string, platform: NodeJS.Platform): boolean {
 
 /**
  * Why an AI app must not be pointed at `path` (a file inside the app), or `undefined`: translocated
- * (macOS App Translocation), on a read-only mounted disk image (`/Volumes/…`), or in a temporary
+ * (macOS App Translocation), on any mounted volume (`/Volumes/…`: a disk image, read-only or not, or
+ * a disk that can go away), or in a temporary
  * folder (this process's temp folder, macOS per-user temp folders, `/tmp`, Windows' Temp, npx's
  * cache). Plan Decision 2 "Translocation (M3)": the same rules as the shell's own refusal (WP-D2
  * move.ts), applied to the path that would be written.
@@ -193,7 +195,7 @@ export function appLocationProblem(
     if (segments.includes('AppTranslocation')) return 'translocated';
     if (path.startsWith('/Volumes/')) {
       const mount = segments.slice(0, 3).join('/');
-      if (!(input.writable ?? canWrite)(mount)) return 'read_only';
+      return (input.writable ?? canWrite)(mount) ? 'mounted' : 'read_only';
     }
   }
   if (segments.includes('_npx')) return 'temporary';
@@ -272,6 +274,12 @@ async function appAt(
   const pkgDir = p.dirname(p.dirname(cli));
   if ((await packageNameAt(pkgDir, platform)) !== PACKAGE_NAME) return undefined;
   if (!quotablePath(node, platform) || !quotablePath(cli, platform)) return undefined;
+  // Both files must really be inside the app: a link out of Resources is not the app's own copy.
+  const inside = (file: string): boolean => {
+    const rel = p.relative(realResources, file);
+    return rel !== '' && !rel.startsWith('..') && !p.isAbsolute(rel);
+  };
+  if (!inside(node) || !inside(cli)) return undefined;
   const real: AppStart = Object.freeze({ node, cli });
   const input: LocationInput = {
     platform,

@@ -239,6 +239,21 @@ describe('the sheet: the diff first, applied only after the owner confirms', () 
     expect(card().textContent).toContain('Restart Claude Code to finish');
   });
 
+  it("done, but the agentlink command wasn't changed: the owner is told", async () => {
+    answers['POST /api/ui/apps/apply'] = {
+      status: 200,
+      body: { status: 'done', app: 'claude-code', launcher: 'not_changed' },
+    };
+    await mountPage();
+    await click(button(card(), 'Use the app for Claude Code'));
+    await click(sheet().querySelector<HTMLInputElement>('input[type="checkbox"]'));
+    await click(button(sheet(), 'Apply with Touch ID'));
+    await enterCode();
+    expect(host.querySelector('[role="status"]')?.textContent).toContain(
+      "The agentlink command in your terminal wasn't changed.",
+    );
+  });
+
   it('the app moved during the gesture: says so and reviews again', async () => {
     answers['POST /api/ui/apps/apply'] = { status: 409, body: { error: 'app_location' } };
     await mountPage();

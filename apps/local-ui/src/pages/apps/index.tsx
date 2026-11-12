@@ -250,7 +250,7 @@ export function AppsPage({ api, agents, owner }: AppsPageProps): ReactElement {
     setNotice(S.agentChanged);
     read();
   }, [read]);
-  const done = (change: AppChange): void => {
+  const done = (change: AppChange, launcherUnchanged = false): void => {
     setPanel(undefined);
     if (change.kind !== 'disconnect') setRestart((s) => new Set(s).add(change.app));
     else
@@ -259,11 +259,11 @@ export function AppsPage({ api, agents, owner }: AppsPageProps): ReactElement {
         next.delete(change.app);
         return next;
       });
-    setNotice(
+    const said =
       change.kind === 'disconnect'
         ? S.willStop(change.name, labels.label)
-        : S.restartToFinish(change.name),
-    );
+        : S.restartToFinish(change.name);
+    setNotice(launcherUnchanged ? `${said}. ${S.launcherNotChanged}` : said);
     read();
     announceAgentsChanged();
   };

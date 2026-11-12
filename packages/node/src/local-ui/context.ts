@@ -194,6 +194,8 @@ export interface LocalUiAiAppView {
 /** U3-f: how a planned write ended. */
 export type LocalUiAiAppWrite =
   | 'written'
+  /** WP-D7: the entry is written, the `agentlink` command (asked for) could not be changed. */
+  | 'written_launcher_unchanged'
   /** The file is not the one planned (bytes or identity): nothing written. */
   | 'changed'
   /** Claude Desktop runs: nothing written. */

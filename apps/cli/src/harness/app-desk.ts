@@ -405,7 +405,9 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
             );
             log('agentlink command pointed at the app');
           } catch {
+            // The entry is written; the owner is told the command was not changed.
             log('agentlink command not changed');
+            return 'written_launcher_unchanged';
           }
         }
         return 'written';

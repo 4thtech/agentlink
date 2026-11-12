@@ -328,6 +328,32 @@ describe('apply a switch', () => {
     expect(w.written).toEqual([]);
   });
 
+  it('the launcher was not changed: done, and the answer says so', async () => {
+    const w = world();
+    const base = w.context.aiApps as LocalUiAiApps;
+    const plan = base.plan.bind(base);
+    (w.context.aiApps as { plan: unknown }).plan = async (
+      app: string,
+      agent: string,
+      request?: LocalUiAiAppPlanRequest,
+    ) => {
+      const p = await plan(app, agent, request);
+      return p.status === 'change'
+        ? { ...p, commit: () => Promise.resolve('written_launcher_unchanged') }
+        : p;
+    };
+    const p = await read('/api/ui/apps/preview').handler(
+      w.context,
+      query('app=claude-code&agent=work&form=app&launcher=1'),
+    );
+    const changeId = (p.body as { changeId: string }).changeId;
+    const r = await owner('/api/ui/apps/apply').handler(w.context, input(changeId), w.operation);
+    expect(r).toEqual({
+      status: 200,
+      body: { status: 'done', app: 'claude-code', launcher: 'not_changed' },
+    });
+  });
+
   it('a commit that finds the app moved answers app_location', async () => {
     const w = world();
     const base = w.context.aiApps as LocalUiAiApps;

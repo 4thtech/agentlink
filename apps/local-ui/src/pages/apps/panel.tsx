@@ -105,7 +105,7 @@ export function ChangePanel({
   api: AppsApi;
   owner: OwnerClient;
   onClose: () => void;
-  onDone: (change: AppChange) => void;
+  onDone: (change: AppChange, launcherUnchanged?: boolean) => void;
   onManual: (entry: Entry | undefined) => void;
   onAgentChanged: () => void;
 }): ReactElement {
@@ -149,7 +149,7 @@ export function ChangePanel({
     void run(change.changeId, proof).then((outcome) => {
       setBusy(false);
       const kind = outcome.kind;
-      if (kind === 'done') return onDone(change);
+      if (kind === 'done') return onDone(change, outcome.launcherUnchanged === true);
       const said = gateMessage(kind);
       if (said !== undefined) {
         setError(said);

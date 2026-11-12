@@ -89,6 +89,8 @@ export const APPS_STRINGS = {
   launcherRegion: 'The agentlink command after the change',
   statementSwitch: (app: string, label: string): string =>
     `${app} will use the AgentLink app for ${label}`,
+  launcherNotChanged:
+    "The agentlink command in your terminal wasn't changed. It still starts AgentLink with npx.",
   appLocation:
     'The AgentLink app moved or runs from a temporary place. Open it from your Applications folder and try again.',
 } as const;
