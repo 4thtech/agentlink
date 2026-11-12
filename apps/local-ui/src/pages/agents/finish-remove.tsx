@@ -3,7 +3,7 @@
 // there: one line "{label} wasn't fully removed" with Finish removing, which opens the same Remove
 // sheet the IDs page uses, in its finish mode (no typed name; export first; presence still asked).
 // The row comes from the shared live read (api/live.ts); labels are text only (I-5).
-import { Banner, Button } from '@4thtech-io/ui';
+import { Button, PageNotice } from '@4thtech-io/ui';
 import type { ReactElement } from 'react';
 import type { OwnerClient } from '../contacts/owner.js';
 import type { AgentsApi } from './api.js';
@@ -24,12 +24,15 @@ export function UnfinishedRemoval({
 }): ReactElement {
   return (
     <div data-unfinished={row.name}>
-      <Banner tone="warning">
-        {S.notFullyRemoved(row.label)}{' '}
-        <Button size="sm" onClick={() => onFinish(row)}>
-          {S.finishRemoving}
-        </Button>
-      </Banner>
+      <PageNotice
+        tone="warning"
+        title={S.notFullyRemoved(row.label)}
+        actions={
+          <Button size="sm" variant="primary" onClick={() => onFinish(row)}>
+            {S.finishRemoving}
+          </Button>
+        }
+      />
     </div>
   );
 }

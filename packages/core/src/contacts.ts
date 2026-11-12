@@ -1316,11 +1316,8 @@ export class ContactBook {
     const found = await this.#ctx.store.transaction((tx) => {
       const existing = tx.get('contacts', { contact_id: id });
       if (existing === undefined || existing.status === 'removed') return false;
-      tx.update(
-        'contacts',
-        { contact_id: id, status: { in: ['active', 'blocked'] } },
-        { status: 'removed', updated_at: now },
-      );
+      if (existing.status === 'revoked') return true;
+      removeContactTx(tx, existing, now);
       return true;
     });
     if (!found) notFound();
@@ -1364,4 +1361,83 @@ export function screenInboundTx(tx: StoreTx, from: string): InboundScreen {
   if (row.status === 'blocked') return { action: 'drop', reason: 'blocked' };
   if (row.status === 'removed') return { action: 'drop', reason: 'removed' };
   return { action: 'continue', sender: { kind, contactId: row.contact_id } };
+}
+
+/**
+ * `contact.remove` inside the caller's store transaction (02 F-14; 07 §3 `removed`). Both remove
+ * paths (ContactBook.remove and the owner-signed `contact.remove`) use it, so they cannot drift.
+ * - Staged pairings for the contact are deleted: a pairing begun before the remove never brings it
+ *   back (UX1113-QA-RECONNECT audit M1).
+ * - A blocked contact stays blocked (audit L2): each of its keys goes into `blocked_keys`, so a later
+ *   pairing from it is dropped until the owner unblocks the key (D-72, 04 §2.9).
+ * - The row becomes the `removed` tombstone; `updated_at` is the removal time the pairing exception
+ *   (removedPairingAdmitTx) compares against. Only an active or blocked row changes; nothing changes
+ *   `revoked`.
+ */
+export function removeContactTx(tx: StoreTx, row: Row<'contacts'>, now: number): void {
+  if (row.status !== 'active' && row.status !== 'blocked') return;
+  const id = row.contact_id;
+  tx.delete('pairings', { contact_id: id });
+  if (row.status === 'blocked') {
+    const via = row.handshake_envelope_id ?? encodeBase64url(randomBytes(PAIRING_ID_BYTES));
+    for (const key of new Set([row.agent_nostr, ...parseKeyList(row.nostr_keys)])) {
+      if (tx.get('blocked_keys', { from_key: key }) === undefined) {
+        tx.insert('blocked_keys', { from_key: key, blocked_at: now, via_envelope_id: via });
+      }
+    }
+  }
+  tx.update(
+    'contacts',
+    { contact_id: id, status: { in: ['active', 'blocked'] } },
+    { status: 'removed', updated_at: now },
+  );
+}
+
+/** A pairing message from a removed contact's key, as removedPairingAdmitTx reads it. */
+export type RemovedPairingMessage =
+  | { readonly type: 'handshake'; readonly inviteId: string }
+  | { readonly type: 'handshake-ack'; readonly handshakeId: string };
+
+/**
+ * The one exception to the removed-contact drop (07 §3 `removed`, 04 §2.9; UX1113-QA-RECONNECT
+ * audit M1, M2): a pairing message from a removed contact's key reaches the pairing flow only when
+ * it answers something this agent made after the removal that is still open:
+ * - a `handshake` naming an invite that is unused, not cancelled, unexpired and created after the
+ *   removal;
+ * - a `handshake-ack` for an invitee pairing staged from that key, unexpired and created after the
+ *   removal.
+ * Otherwise it is dropped with nothing stored. A key in `blocked_keys` never passes (audit L2).
+ */
+export function removedPairingAdmitTx(
+  tx: StoreTx,
+  from: string,
+  message: RemovedPairingMessage,
+  now: number,
+): boolean {
+  if (!NOSTR_KEY.test(from)) return false;
+  if (tx.get('blocked_keys', { from_key: from }) !== undefined) return false;
+  const row =
+    tx.select('contacts', { agent_nostr: from })[0] ??
+    tx.select('contacts').find((r) => parseKeyList(r.nostr_keys).includes(from));
+  if (row?.status !== 'removed' || isRevoked(tx, row.contact_id, row)) return false;
+  const removedAt = row.updated_at;
+  if (message.type === 'handshake') {
+    const invite = tx.get('invites', { invite_id: message.inviteId });
+    return (
+      invite !== undefined &&
+      invite.used_at == null &&
+      invite.cancelled_at == null &&
+      invite.expires_at > now &&
+      invite.created_at > removedAt
+    );
+  }
+  const staged = tx.get('pairings', { pairing_id: message.handshakeId });
+  return (
+    staged !== undefined &&
+    staged.role === 'invitee' &&
+    staged.agent_nostr === from &&
+    staged.contact_id === row.contact_id &&
+    staged.expires_at > now &&
+    staged.created_at > removedAt
+  );
 }

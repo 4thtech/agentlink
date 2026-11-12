@@ -1288,6 +1288,106 @@ body {
 .al-banner.is-compact {
   padding: var(--al-space-2) var(--al-space-3);
 }
+/* The inline banner's close and the page notice (notices.md): one look for every notice. */
+.al-banner-x,
+.al-notice-x,
+.al-toast-x {
+  flex: none;
+  background: none;
+  border: 0;
+  color: var(--al-color-fg-muted);
+  cursor: pointer;
+  display: inline-flex;
+  padding: var(--al-space-1);
+  border-radius: var(--al-radius-sm);
+}
+.al-banner-x:hover,
+.al-notice-x:hover,
+.al-toast-x:hover {
+  color: var(--al-color-fg-default);
+  background: var(--al-color-bg-sunken);
+}
+.al-banner-x:focus-visible,
+.al-notice-x:focus-visible,
+.al-toast-x:focus-visible {
+  outline: 2px solid var(--al-color-focus-ring);
+  outline-offset: 1px;
+}
+.al-notice {
+  display: flex;
+  gap: var(--al-space-3);
+  align-items: flex-start;
+  padding: var(--al-space-4);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-raised);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-inline-start: 3px solid var(--t-bd);
+  color: var(--al-color-fg-default);
+  width: 100%;
+  box-sizing: border-box;
+}
+.al-notice-ic {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--al-radius-md);
+  background: var(--t-bg);
+  color: var(--t-ic);
+}
+.al-notice-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-1);
+}
+.al-banner-text a,
+.al-notice-body a:not(.al-btn) {
+  color: var(--al-color-fg-link);
+  text-underline-offset: 2px;
+}
+.al-notice-title {
+  margin: 0;
+  font-weight: var(--al-font-weight-semibold);
+}
+.al-notice-body {
+  color: var(--al-color-fg-muted);
+}
+.al-notice-body p {
+  margin: 0;
+}
+.al-notice-act {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-2);
+  align-items: center;
+  margin-top: var(--al-space-2);
+}
+/* Toasts: one fixed stack, bottom right above the status bar (centred on narrow screens). */
+.al-toasts {
+  position: fixed;
+  inset-inline: var(--al-space-4);
+  inset-block-end: calc(var(--al-space-6) + 24px);
+  z-index: var(--al-z-toast);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--al-space-2);
+  pointer-events: none;
+}
+@media (min-width: 900px) {
+  .al-toasts {
+    inset-inline-start: auto;
+    align-items: flex-end;
+  }
+}
+.al-toast-slot {
+  pointer-events: auto;
+  display: flex;
+}
 .al-toast {
   display: inline-flex;
   align-items: center;
@@ -1311,15 +1411,6 @@ body {
   cursor: pointer;
   padding: 0;
   font-family: var(--font-sans);
-}
-.al-toast-x {
-  background: none;
-  border: 0;
-  color: var(--al-color-fg-muted);
-  cursor: pointer;
-  display: inline-flex;
-  padding: var(--al-space-1);
-  border-radius: var(--al-radius-sm);
 }
 .al-empty {
   display: flex;

@@ -310,7 +310,9 @@ describe('the localhost app with a PRF passkey (M1-8e, M1-31; Chromium)', () => 
     source.add(1);
     await page.goto(server.approvalUrl(id(1)));
     await page.getByRole('button', { name: 'Approve', exact: true }).click();
-    await page.getByRole('button', { name: 'Approve with your passkey' }).click();
+    await page
+      .getByRole('button', { name: /^Approve with (Touch ID|Windows Hello|your passkey)$/ })
+      .click();
     await page.getByText('Approved.').waitFor();
     expect(source.applied).toHaveLength(1);
     const signed = source.applied[0];
@@ -340,7 +342,11 @@ describe('the localhost app with a PRF passkey (M1-8e, M1-31; Chromium)', () => 
     source.add(1);
     await page.goto(server.approvalUrl(id(1)));
     await page.getByRole('button', { name: 'Approve', exact: true }).click();
-    expect(await page.getByRole('button', { name: 'Approve with your passkey' }).count()).toBe(0);
+    expect(
+      await page
+        .getByRole('button', { name: /^Approve with (Touch ID|Windows Hello|your passkey)$/ })
+        .count(),
+    ).toBe(0);
     await page.locator('input[type=password]').fill(code);
     await page.getByRole('button', { name: 'Confirm approval' }).click();
     await page.getByText('Approved.').waitFor();

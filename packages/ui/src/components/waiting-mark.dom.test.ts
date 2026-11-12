@@ -155,7 +155,7 @@ describe('WaitingMark component', () => {
 describe('waiting mark styles (progress.css)', () => {
   const css = progressCss.replace(/\/\*[\s\S]*?\*\//g, '');
   const rule = (sel: string): string => {
-    const esc = sel.replace(/[.[\]']/g, '\\$&');
+    const esc = sel.replace(/[\\^$.*+?()[\]{}|']/g, '\\$&');
     const m = new RegExp(`(?:^|\\})\\s*${esc}\\s*\\{([^}]*)\\}`, 'm').exec(css);
     return m?.[1] ?? '';
   };

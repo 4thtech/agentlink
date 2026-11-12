@@ -14,7 +14,14 @@ import {
   layoutShiftScore,
   observeLayoutShift,
 } from '../helpers/motion.js';
-import { addAgent, agentCard, labelled, openAgents, removeAgent } from './helpers-agents.js';
+import {
+  addAgent,
+  agentCard,
+  inMore,
+  labelled,
+  openAgents,
+  removeAgent,
+} from './helpers-agents.js';
 import {
   CONFIRM_PASSKEY,
   chapter,
@@ -40,7 +47,7 @@ afterAll(() => ch.stop());
 async function pauseAna(page: Page): Promise<void> {
   await openAgents(page);
   await agentCard(page, 'Ana')
-    .getByText(/^(Not used by any AI app|Offline|Connected|Working)/)
+    .getByText(/^(Not used by any AI app|Offline|Connected|Working|Ready)/)
     .first()
     .waitFor();
   await agentCard(page, 'Ana').getByRole('button', { name: 'Pause', exact: true }).click();
@@ -48,7 +55,10 @@ async function pauseAna(page: Page): Promise<void> {
   await sheet.getByText('Nothing is deleted.', { exact: false }).waitFor();
   await sheet.getByRole('button', { name: 'Pause', exact: true }).click();
   await page.getByText('Ana is paused').first().waitFor();
-  await agentCard(page, 'Ana').getByText('Paused', { exact: true }).first().waitFor();
+  await agentCard(page, 'Ana')
+    .getByText(/^Paused/)
+    .first()
+    .waitFor();
 }
 
 describe('chapter 4: agents', () => {
@@ -214,6 +224,8 @@ describe('chapter 4: agents', () => {
     if (ready === undefined) return;
     const world = journeyWorld();
     const pc = await world.computer();
+    // design-1112: Pause is only offered on an ID an AI app uses, so Claude Code is set up here.
+    await fakeClaudeCode(pc.home);
     const jp = await journeyPage(ready.browser);
     await firstRunWithTouchId(jp, await startUi(pc, ready.files, ch.closers), 'Ana');
     const { page } = jp;
@@ -228,7 +240,7 @@ describe('chapter 4: agents', () => {
     await emulateReducedMotion(page);
     await observeLayoutShift(page);
     const shifted = await layoutShiftScore(page);
-    await agentCard(page, 'Ana').getByRole('button', { name: 'AI apps', exact: true }).click();
+    await (await inMore(page, 'Ana', 'AI apps')).click();
     await page.getByText('Quit the AI app first, then open it again.').first().waitFor();
     await expectFadesOnly(page);
     await page.waitForTimeout(1_000);
@@ -242,6 +254,8 @@ describe('chapter 4: agents', () => {
     if (ready === undefined) return;
     const world = journeyWorld();
     const pc = await world.computer();
+    // design-1112: Pause is only offered on an ID an AI app uses, so Claude Code is set up here.
+    await fakeClaudeCode(pc.home);
     const jp = await journeyPage(ready.browser);
     await firstRunWithTouchId(jp, await startUi(pc, ready.files, ch.closers), 'Ana');
     const { page } = jp;
@@ -266,9 +280,13 @@ describe('chapter 4: agents', () => {
     if (ready === undefined) return;
     const world = journeyWorld();
     const pc = await world.computer();
+    await fakeClaudeCode(pc.home);
     const jp = await journeyPage(ready.browser);
     await firstRunWithTouchId(jp, await startUi(pc, ready.files, ch.closers), 'Ana');
     await addAgent(jp.page, 'Work');
+    // design-1112: Pause is only offered on an ID an AI app uses: Work's AI app runs here.
+    const workMcp = await startAiAppMcp(pc, 'work');
+    ch.closers.push(() => workMcp.close());
     const { page } = jp;
     const probe = await jp.arm();
 
@@ -292,7 +310,9 @@ describe('chapter 4: agents', () => {
       .waitFor();
     // The switch mounts the views again: wait until the Agents page itself shows Ana open (its own
     // read), so Resume is pressed on the page for the agent open now, not on the one being replaced.
-    await agentCard(page, 'Ana').getByText('Open', { exact: true }).waitFor();
+    await agentCard(page, 'Ana')
+      .getByText(/this is the ID you are looking at/)
+      .waitFor();
     await agentCard(page, 'Work').getByText('Paused', { exact: true }).first().waitFor();
     const before = jp.gestures.total();
     await agentCard(page, 'Work').getByRole('button', { name: 'Resume', exact: true }).click();

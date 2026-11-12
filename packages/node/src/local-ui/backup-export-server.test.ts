@@ -194,7 +194,14 @@ describe('Save a recovery kit from the app (WP-11, F-1, D-117 A)', () => {
     const h = await harness();
     const res = await h.read();
     expect(res.status).toBe(200);
-    expect(JSON.parse(res.body)).toEqual({ export: 'available' });
+    // WP-R2b: the backup desk is wired; with no kit saved yet the record reads as none.
+    expect(JSON.parse(res.body)).toEqual({
+      export: 'available',
+      record: 'none',
+      state: 'none',
+      lastKit: null,
+      missing: null,
+    });
   });
 
   it('with the master code: signs and applies one backup.export, then writes an ALKK kit that opens with the code shown', async () => {
@@ -206,11 +213,24 @@ describe('Save a recovery kit from the app (WP-11, F-1, D-117 A)', () => {
       file: string;
       folder: string;
       code: string;
+      covers: unknown;
+      check: string;
     };
     expect(body.status).toBe('saved');
     expect(body.file).toMatch(KIT_NAME);
     expect(body.folder).toBe('Downloads');
     expect(body.code).toMatch(CODE);
+    // WP-R2: the IDs the kit covers (for the Done toast) and the export handle for Check.
+    expect(body.covers).toEqual([{ name: 'default', label: 'default' }]);
+    expect(body.check).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(Object.keys(body).sort()).toEqual([
+      'check',
+      'code',
+      'covers',
+      'file',
+      'folder',
+      'status',
+    ]);
 
     // The audit record first: one backup.export for this ID, signed by the owner, applied by core.
     expect(h.state.applied).toHaveLength(1);
@@ -238,8 +258,12 @@ describe('Save a recovery kit from the app (WP-11, F-1, D-117 A)', () => {
       kit.wipe();
     }
 
-    // Nothing under ~/.agentlink but the ID's own folder; no event carries the code.
-    expect(readdirSync(join(h.home, '.agentlink'))).toEqual(['agents']);
+    // Nothing under ~/.agentlink but the ID's own folder and the kit record (WP-R2, no secret in
+    // it); no event carries the code.
+    expect(readdirSync(join(h.home, '.agentlink')).sort()).toEqual(['agents', 'kit-record.json']);
+    expect(readFileSync(join(h.home, '.agentlink', 'kit-record.json'), 'utf8')).not.toContain(
+      body.code,
+    );
     expect(JSON.stringify(h.events)).not.toContain(body.code);
     expect(JSON.stringify(h.events)).not.toContain(body.code.replace(/-/g, ''));
   });
@@ -290,7 +314,13 @@ describe('Save a recovery kit from the app (WP-11, F-1, D-117 A)', () => {
 
   it('an ID that cannot save a kit here: not_available before the gesture', async () => {
     const h = await harness({ recoveryKit: false });
-    expect(JSON.parse((await h.read()).body)).toEqual({ export: 'not_available' });
+    expect(JSON.parse((await h.read()).body)).toEqual({
+      export: 'not_available',
+      record: 'unreadable',
+      state: 'unknown',
+      lastKit: null,
+      missing: null,
+    });
     const res = await h.exportKit(world.code);
     expect(res.status).toBe(501);
     expect(h.state.applied).toEqual([]);

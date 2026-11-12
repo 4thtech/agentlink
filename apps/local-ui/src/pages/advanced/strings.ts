@@ -6,6 +6,7 @@ export const ADVANCED_STRINGS = {
   relays: 'Relays',
   relayCount: (connected: number, total: number): string =>
     `${String(connected)} of ${String(total)} connected`,
+  relaysWorking: 'Working',
   noRelays: 'No relays reported yet',
   network: 'Network',
   networkAuto: 'Picked automatically',
@@ -13,4 +14,6 @@ export const ADVANCED_STRINGS = {
   never: 'Not yet',
   unknown: "AgentLink didn't answer. Check that your AI app is open, then reload.",
   hoodRelays: 'Relays connected',
+  hoodRelaysKnown: 'Relays known',
+  hoodLastUpdateAt: 'Last update (UTC)',
 } as const;

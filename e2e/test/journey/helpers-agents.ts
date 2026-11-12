@@ -84,10 +84,33 @@ export function agentCard(page: Page, label: string) {
   return page.getByRole('main').getByRole('region', { name: label, exact: true }).first();
 }
 
+/**
+ * WP-I1: Back up (open ID), AI apps and Remove sit behind the card's "More" button; a card with no
+ * AI app shows Remove directly. Opens More when needed and returns the button.
+ */
+export async function inMore(page: Page, label: string, name: string) {
+  const card = agentCard(page, label);
+  const direct = card.getByRole('button', { name, exact: true });
+  // The card mounts again while the list is read (the button can detach under the click): retry,
+  // and only press More while it is closed (it toggles).
+  const more = card.getByRole('button', { name: 'More about this ID', exact: true });
+  for (let attempt = 0; attempt < 5 && (await direct.count()) === 0; attempt += 1) {
+    try {
+      if ((await more.getAttribute('aria-expanded', { timeout: 5_000 })) !== 'true') {
+        await more.click({ timeout: 5_000 });
+      }
+      await direct.waitFor({ timeout: 3_000 });
+    } catch {
+      // detached or not yet drawn: look again
+    }
+  }
+  return direct;
+}
+
 /** Agents → the agent's Remove → type the name → Remove with Touch ID. */
 export async function removeAgent(page: Page, label: string): Promise<void> {
   await openAgents(page);
-  await agentCard(page, label).getByRole('button', { name: 'Remove', exact: true }).click();
+  await (await inMore(page, label, 'Remove')).click();
   await page.getByRole('heading', { name: labelled('Remove ', label, '?') }).waitFor();
   await page.getByLabel(labelled('Type ', label, ' to confirm')).fill(label);
   await page.getByRole('button', { name: 'Remove with Touch ID' }).click();

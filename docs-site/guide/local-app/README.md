@@ -52,7 +52,7 @@ Old links from earlier versions still work.
 ## Not in the app yet
 
 - The live connections map from 0.4.4 is not part of the new IDs screen. A new Connections map is planned next, with saved views.
-- The **Backup & Touch ID** and **Notifications** pages in Settings say plainly that they are not available yet.
+- The **Notifications** page in Settings says plainly that it is not available yet.
 - Adding real credits is not available yet. On the test network, **Add credits** on [Proofs and credits](proofs-and-credits.md) shows a QR code. See [Credits](../everyday-use/credits.md).
 
 Looking at a page changes nothing. Any change asks for Touch ID (or your master code) first.

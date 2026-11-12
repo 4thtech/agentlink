@@ -19,7 +19,36 @@
 //   under the name rule (restrictName), the old one from `former_name`, the new one the contact's own
 //   name (also under an owner alias). It stays after the note was seen;
 // - `policies`: the signed rules now in force, at `applied_at` (the store keeps only the current
-//   version, so earlier changes are not listed).
+//   version, so earlier changes are not listed);
+// - UX1113 WP-A1 (design-1112 spec §7): `contacts` with a completed pairing (`contact_connected`,
+//   at `created_at`, with how: a handshake the contact sent answers your invite, one this agent sent
+//   answers theirs), with status `removed` (`contact_removed`) or `revoked` (`contact_revoked`), at
+//   `updated_at` like a block; the `identity` row (`id_created`, and `id_removed` at `revoked_at`);
+//   the `agent_pause` row (`id_paused`, while paused); and the applied owner actions of
+//   `owner_action_nonces` (never pruned) whose op the feed does not already show from another row:
+//   `agent.label` (`id_renamed`), `agent.resume` (`id_resumed`), `app.connect` / `app.disconnect`
+//   (`app_connected` / `app_disconnected`) and `backup.export` (`backup_saved`). A rename names the
+//   label, and an app change the app, only while that nonce's signed action is still the one
+//   `local_owner_actions` keeps (the latest per record); otherwise null.
+// - UX1113-QA2-ACTIVITY (QA finding N7): first run is part of creating the ID, so the ID's first
+//   `agent.label` applied within FIRST_RUN_SECONDS of its creation is not a rename (`id_created` carries
+//   that label while it is still the stored one), and the rules at version 1 applied in that window (the
+//   first rules signed with the first card, owner-first-policy.ts) are not a rules change. Blocks,
+//   unblocks and Contact checks are listed from their applied owner actions too (`contact.block`,
+//   `contact.unblock`, `contact.check`), so a block stays listed after an unblock or a remove; a block
+//   whose contact is still blocked from that second is left to the contact row (one entry, with the
+//   contact). The nonce row names no contact: an unblock names the one contact the unblock made
+//   active at that second, a Contact check the contact whose stored check carries that nonce, and a
+//   block listed this way none. A contact rename with no net change (A, then B, then A again before
+//   the owner saw the note) is left out after the names are opened, so such a page can be short.
+//
+// A decided approval also says what it was about (WP-A1, `action`): the type from its stored action's
+// tool (and decision or receipt), the other agent's ID as a contact reference, the files of a send
+// (sanitizeFileName of the name the owner's AI gave, or of its path; never the path) and the fee the
+// rules evaluated. The stored action is the core's own (approvals.ts: built from verified data); it is
+// parsed with the strict approval schema, and one that does not pass gives `action: null`. Never
+// `args.to`, `args.text`, `args.body`, a note or the summary: text the AI or another party may have
+// written (I-5).
 //
 // Display only: a decision shown here is the row's status cache, which authorises nothing (04
 // §2.5.1). Zero access and I-5: an entry carries IDs, times, statuses, codes, sizes and USD amounts,
@@ -34,8 +63,19 @@
 // Cost (12 §2): messages and files are free; a received proof is free (the sender paid); a sent
 // proof's cost is its budget ledger entry (07 §3.5): `charged` (settled), `reserved` (held, at most
 // that amount), `not_charged` (released), or `unknown` when no entry exists.
-import { decodeHex, formatFingerprint, senderCode as senderDigest } from '@4thtech-io/crypto';
-import type { ContactDisplayName } from '@4thtech-io/types';
+import {
+  decodeHex,
+  formatFingerprint,
+  parseJson,
+  senderCode as senderDigest,
+} from '@4thtech-io/crypto';
+import {
+  AGENT_LABEL_MAX_CODE_POINTS,
+  AI_APP_IDS,
+  MAX_FILES_PER_PAYLOAD,
+  approvalActionSchema,
+  type ContactDisplayName,
+} from '@4thtech-io/types';
 import type { ContactBook } from './contacts.js';
 import { open, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
@@ -100,6 +140,44 @@ export interface ActivityFile {
   readonly removed: boolean;
 }
 
+/** What a decided approval was about (WP-A1), one per approval tool and decision. */
+export type ActivityActionType =
+  /** `agentlink_send` with a proof, no file. */
+  | 'send_message'
+  /** `agentlink_send` with a proof and files. */
+  | 'send_file'
+  /** `agentlink_notarize`. */
+  | 'add_proof'
+  | 'accept_invite'
+  /** `agentlink_propose_terms`: a firm offer. */
+  | 'offer_terms'
+  /** `agentlink_respond_to_terms` `accept` / `reject` / `counter`. */
+  | 'accept_terms'
+  | 'reject_terms'
+  | 'counter_terms'
+  /** `agentlink_acknowledge` `ACCEPTED` / `REJECTED`. */
+  | 'accept_record'
+  | 'reject_record'
+  /** `agentlink_export_proof_pack` with the content key. */
+  | 'share_proof_key';
+
+/** A decided approval's action as the feed shows it (WP-A1). Built only from the stored action. */
+export interface ActivityApprovalAction {
+  readonly type: ActivityActionType;
+  /** The other agent's ID (a contact reference, 04 §2.9); null when the action has none. */
+  readonly contactId: string | null;
+  /**
+   * The files of a send: sanitizeFileName of the name the owner's AI gave (or of its path's last
+   * segment), and the size in bytes. Empty for every other type.
+   */
+  readonly files: readonly { readonly name: string; readonly size: number }[];
+  /** The fee in USD (04 §2.4.1 spelling) the rules evaluated; null when the action has none. */
+  readonly feeUsd: string | null;
+}
+
+/** How a connection was made: the contact accepted your invite, or you accepted theirs. */
+export type ActivityConnectedVia = 'your_invite' | 'their_invite';
+
 export type ActivityEntry =
   | (EntryBase & {
       readonly kind: 'approval_decided';
@@ -109,6 +187,44 @@ export type ActivityEntry =
        * owner's signed rules granted it without asking (a rules grant, 04 §3.4.2).
        */
       readonly decision: ApprovalDecision;
+      /** WP-A1: what it was about; null when the stored action does not pass the schema. */
+      readonly action: ActivityApprovalAction | null;
+    })
+  | (EntryBase & {
+      /** WP-A1: a completed pairing, at the contact's creation. Listed whatever the status now. */
+      readonly kind: 'contact_connected';
+      /** A contact reference only (spec §7): the page resolves the name with its people read. */
+      readonly contactId: string;
+      /** Null when the handshake is not stored. */
+      readonly via: ActivityConnectedVia | null;
+    })
+  | (EntryBase & {
+      /** WP-A1: `removed`, the owner removed the contact; `revoked`, its agent was revoked. */
+      readonly kind: 'contact_removed' | 'contact_revoked';
+      /** A contact reference only, as for `contact_connected`. */
+      readonly contactId: string;
+    })
+  | (EntryBase & {
+      /** WP-A1: this ID's own events. `id_paused` only while it is paused. */
+      readonly kind: 'id_removed' | 'id_paused' | 'id_resumed' | 'backup_saved';
+    })
+  | (EntryBase & {
+      readonly kind: 'id_created';
+      /**
+       * QA2: the label first run gave it (the owner's own), while that label is still the stored one;
+       * else null.
+       */
+      readonly name: string | null;
+    })
+  | (EntryBase & {
+      /** WP-A1: the owner renamed this ID (`agent.label`): the owner's own label, or null. */
+      readonly kind: 'id_renamed';
+      readonly name: string | null;
+    })
+  | (EntryBase & {
+      /** WP-A1: an AI app connected or disconnected: an id of the 06 §7 table, or null. */
+      readonly kind: 'app_connected' | 'app_disconnected';
+      readonly app: string | null;
     })
   | (EntryBase & {
       readonly kind: 'proof';
@@ -147,8 +263,18 @@ export type ActivityEntry =
     })
   | (EntryBase & {
       readonly kind: 'contact_blocked';
-      readonly contactId: string;
-      readonly contact: ActivityContact;
+      /**
+       * From the contact row while it is blocked; null for a block listed from its owner action after
+       * the contact was unblocked or removed (QA2).
+       */
+      readonly contactId: string | null;
+      readonly contact: ActivityContact | null;
+    })
+  | (EntryBase & {
+      /** QA2: the owner unblocked a contact, or did the Contact check (`contact.check`). */
+      readonly kind: 'contact_unblocked' | 'contact_checked';
+      /** A contact reference only; null when the store no longer ties the action to one contact. */
+      readonly contactId: string | null;
     })
   | (EntryBase & {
       /** D-141: "{formerName} is now called {newName}"; both restricted (06 §2.1). */
@@ -173,7 +299,15 @@ interface Pending {
     readonly row: Row<'contacts'>;
     readonly short: string;
   };
-  readonly build: (resolved: Resolved) => ActivityEntry;
+  /** WP-A1: an approval entry's sealed stored action. */
+  readonly approval?: {
+    readonly approvalId: string;
+    readonly sealed: Row<'approvals'>['action_json'];
+  };
+  /** WP-A1: an owner action entry's nonce and the local rows that may hold its signed action. */
+  readonly local?: { readonly nonce: string; readonly rows: readonly Row<'local_owner_actions'>[] };
+  /** Null leaves the entry out (QA2: a rename with no net change). */
+  readonly build: (resolved: Resolved) => ActivityEntry | null;
 }
 
 interface Resolved {
@@ -181,6 +315,10 @@ interface Resolved {
   readonly files: readonly ActivityFile[];
   /** D-141: the rename entry's names, opened and restricted outside the transaction. */
   readonly renamed?: { readonly formerName: string; readonly newName: string };
+  /** WP-A1: the approval's action, opened and parsed outside the transaction. */
+  readonly action?: ActivityApprovalAction | null;
+  /** WP-A1: the params of the owner action's signed body, while it is still stored. */
+  readonly params?: Readonly<Record<string, unknown>> | null;
 }
 
 /** A feed position; `pending` runs inside the transaction, for the page items only. */
@@ -191,6 +329,29 @@ const plain =
   (): Pending => ({ contactId, files: [], build });
 
 const NOSTR_KEY = /^[0-9a-f]{64}$/;
+const OWNER_ACTION = 'owner_action:';
+/** WP-A1: the owner action ops the feed lists from `owner_action_nonces`, and their kinds. */
+const OWNER_ACTION_KINDS = Object.freeze({
+  'agent.label': 'id_renamed',
+  'agent.resume': 'id_resumed',
+  'app.connect': 'app_connected',
+  'app.disconnect': 'app_disconnected',
+  'backup.export': 'backup_saved',
+  // QA2.
+  'contact.block': 'contact_blocked',
+  'contact.unblock': 'contact_unblocked',
+  'contact.check': 'contact_checked',
+} as const);
+/**
+ * QA2: how long after an ID's creation its first label and first rules still belong to creating it
+ * (first run and New ID sign them right after the card, in the same owner session).
+ */
+const FIRST_RUN_SECONDS = 600;
+const inFirstRun = (createdAt: number | undefined, at: number): boolean =>
+  createdAt !== undefined && at >= createdAt && at - createdAt <= FIRST_RUN_SECONDS;
+type ListedOwnerOp = keyof typeof OWNER_ACTION_KINDS;
+const LISTED_OWNER_OPS = Object.keys(OWNER_ACTION_KINDS) as ListedOwnerOp[];
+const isListedOwnerOp = (op: string): op is ListedOwnerOp => Object.hasOwn(OWNER_ACTION_KINDS, op);
 const BLOCKED = 'sender_blocked:';
 const ENVELOPE = 'envelope:';
 const DELIVERY_STATES = ['queued', 'sent', 'not_delivered'] as const;
@@ -223,6 +384,126 @@ function proofCostTx(tx: StoreTx, recordId: string): ActivityCost {
   if (entry.state === 'reserved') return { kind: 'reserved', usd: entry.reserved_usd };
   if (entry.state === 'released') return { kind: 'not_charged' };
   return { kind: 'unknown' };
+}
+
+const isRecord = (v: unknown): v is Readonly<Record<string, unknown>> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** Control, format (bidi and invisible) and line or paragraph separator characters. */
+const NOT_PLAIN = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+const AI_APPS: ReadonlySet<string> = new Set(AI_APP_IDS);
+const isAiAppId = (v: unknown): v is string => typeof v === 'string' && AI_APPS.has(v);
+
+/** The owner's ID label when it is short plain text (agent.label: at most 32 code points), else null. */
+function plainLabel(label: unknown): string | null {
+  if (typeof label !== 'string' || label.length === 0 || NOT_PLAIN.test(label)) return null;
+  return Array.from(label).length <= AGENT_LABEL_MAX_CODE_POINTS ? label : null;
+}
+
+type ActionFiles = ActivityApprovalAction['files'];
+
+/**
+ * The files of a send's `args.files` (send.ts readInput: `{realpath, size, name, mime}` each), with
+ * sanitized names and their sizes; [] when there are none, undefined when the list is malformed.
+ */
+function sendFilesOf(args: Readonly<Record<string, unknown>>): ActionFiles | undefined {
+  const files = args.files;
+  if (files === undefined || files === null) return [];
+  if (!Array.isArray(files) || files.length > MAX_FILES_PER_PAYLOAD) return undefined;
+  const out: { name: string; size: number }[] = [];
+  for (const f of files as unknown[]) {
+    if (!isRecord(f)) return undefined;
+    const { size, name, realpath } = f;
+    if (typeof size !== 'number' || !Number.isSafeInteger(size) || size < 0) return undefined;
+    const raw = typeof name === 'string' && name.length > 0 ? name : realpath;
+    if (typeof raw !== 'string' || raw.length === 0) return undefined;
+    out.push({ name: sanitizeFileName(raw), size });
+  }
+  return out;
+}
+
+/**
+ * WP-A1: what a stored approval action was about, from the strict approval schema only (the core
+ * built it from verified data). Other fields of `args`, such as `to`, `text` or a note, are never
+ * read. Null when the action does not pass.
+ */
+function approvalActionOf(value: unknown): ActivityApprovalAction | null {
+  const parsed = approvalActionSchema.safeParse(value);
+  if (!parsed.success) return null;
+  const action = parsed.data;
+  const of = (
+    type: ActivityActionType,
+    contactId: string | null,
+    feeUsd: string | null,
+    files: ActionFiles = [],
+  ): ActivityApprovalAction => ({ type, contactId, files, feeUsd });
+  switch (action.tool) {
+    case 'agentlink_send': {
+      const files = sendFilesOf(action.args);
+      if (files === undefined) return null;
+      const type = files.length > 0 || action.context.file !== null ? 'send_file' : 'send_message';
+      return of(type, action.context.counterparty.agentId, action.context.fee.usd, files);
+    }
+    case 'agentlink_notarize':
+      return of('add_proof', action.context.counterparty?.agentId ?? null, action.context.fee.usd);
+    case 'agentlink_accept_invite':
+      return of('accept_invite', action.context.counterparty.agentId, null);
+    case 'agentlink_propose_terms':
+      return of(
+        'offer_terms',
+        action.context.scope.counterparty.agentId,
+        action.context.fee?.usd ?? null,
+      );
+    case 'agentlink_respond_to_terms': {
+      const decision = action.args.decision;
+      const type =
+        decision === 'accept'
+          ? 'accept_terms'
+          : decision === 'reject'
+            ? 'reject_terms'
+            : 'counter_terms';
+      return of(type, action.context.scope.counterparty.agentId, action.context.fee?.usd ?? null);
+    }
+    case 'agentlink_acknowledge':
+      return of(
+        action.context.receipt === 'ACCEPTED' ? 'accept_record' : 'reject_record',
+        action.context.counterparty.agentId,
+        null,
+      );
+    case 'agentlink_export_proof_pack':
+      return of('share_proof_key', null, null);
+    default:
+      return null;
+  }
+}
+
+/**
+ * QA2: the contact an unblock at `at` made active: the one contact whose row changed to active at that
+ * second (the unblock writes `updated_at` with its nonce row). Null when none or more than one does,
+ * or the row has changed since.
+ */
+function unblockedContactTx(tx: StoreTx, at: number): string | null {
+  const rows = tx.select('contacts', { status: 'active', updated_at: at }, { limit: 2 });
+  return rows.length === 1 ? (rows[0]?.contact_id ?? null) : null;
+}
+
+/**
+ * QA2: the contact whose stored `contact.check` (the latest one, contacts.ts) carries `nonce`; null
+ * when no stored check does. Only the row's own key is taken, never a value from the signed object.
+ */
+function checkedContactTx(tx: StoreTx, nonce: string): string | null {
+  for (const row of tx.select('contacts', { safety_code_checked: 1 })) {
+    if (row.safety_check === null) continue;
+    let value: unknown;
+    try {
+      value = parseJson(row.safety_check);
+    } catch {
+      continue;
+    }
+    const body = isRecord(value) ? value.body : undefined;
+    if (isRecord(body) && body.nonce === nonce) return row.contact_id;
+  }
+  return null;
 }
 
 function deepFreeze<T>(value: T): T {
@@ -276,11 +557,19 @@ export class ActivityService {
         const decision = decisionOf(r);
         if (decision === undefined) continue;
         const id = `${AP}${r.approval_id}`;
-        add(
-          at,
-          id,
-          plain(() => ({ kind: 'approval_decided', id, at, approvalId: r.approval_id, decision })),
-        );
+        add(at, id, () => ({
+          contactId: null,
+          files: [],
+          approval: { approvalId: r.approval_id, sealed: r.action_json },
+          build: ({ action }) => ({
+            kind: 'approval_decided',
+            id,
+            at,
+            approvalId: r.approval_id,
+            decision,
+            action: action ?? null,
+          }),
+        }));
       }
 
       const proofs = candidatesTx(
@@ -434,20 +723,224 @@ export class ActivityService {
           contactId: r.contact_id,
           files: [],
           renamed: { row: r, short },
-          build: ({ contact, renamed: names }) => ({
-            kind: 'contact_renamed',
-            id,
-            at,
-            contactId: r.contact_id,
-            contact: contact ?? { id: r.contact_id, display: null },
-            formerName: names?.formerName ?? '',
-            newName: names?.newName ?? '',
-          }),
+          build: ({ contact, renamed: names }) =>
+            // QA2: no net change since the owner last saw the name ("Work is now called Work").
+            names !== undefined && names.formerName === names.newName
+              ? null
+              : {
+                  kind: 'contact_renamed',
+                  id,
+                  at,
+                  contactId: r.contact_id,
+                  contact: contact ?? { id: r.contact_id, display: null },
+                  formerName: names?.formerName ?? '',
+                  newName: names?.newName ?? '',
+                },
         }));
       }
 
+      // WP-A1: people. A completed pairing (whatever the contact's status now), a removal by the
+      // owner and a revoked agent, each at its own row time.
+      const connected = candidatesTx(
+        tx,
+        'contacts',
+        { pairing: 'complete' },
+        'created_at',
+        'contact_id',
+        'contact_connected:',
+        cursor,
+        limit,
+      );
+      for (const r of connected) {
+        const id = `contact_connected:${r.contact_id}`;
+        add(r.created_at, id, (t) => {
+          // The invitee sends the handshake (04 §3.6.1): a received one answers your invite.
+          const handshake =
+            r.handshake_envelope_id === null
+              ? undefined
+              : t.get('envelopes', { envelope_id: r.handshake_envelope_id });
+          const via: ActivityConnectedVia | null =
+            handshake === undefined
+              ? null
+              : handshake.direction === 'in'
+                ? 'your_invite'
+                : 'their_invite';
+          return {
+            contactId: null,
+            files: [],
+            build: () => ({
+              kind: 'contact_connected',
+              id,
+              at: r.created_at,
+              contactId: r.contact_id,
+              via,
+            }),
+          };
+        });
+      }
+      for (const kind of ['contact_removed', 'contact_revoked'] as const) {
+        const status = kind === 'contact_removed' ? 'removed' : 'revoked';
+        const rows = candidatesTx(
+          tx,
+          'contacts',
+          { status },
+          'updated_at',
+          'contact_id',
+          `${kind}:`,
+          cursor,
+          limit,
+        );
+        for (const r of rows) {
+          const id = `${kind}:${r.contact_id}`;
+          add(
+            r.updated_at,
+            id,
+            plain(() => ({ kind, id, at: r.updated_at, contactId: r.contact_id })),
+          );
+        }
+      }
+
+      // WP-A1: this ID's own rows (one each).
+      const identity = tx.select('identity', {}, { limit: 1 })[0];
+      // QA2: the ID's first label, when first run signed it right after creating the ID.
+      const firstLabel = tx.select(
+        'owner_action_nonces',
+        { op: 'agent.label' },
+        {
+          orderBy: [
+            ['applied_at', 'asc'],
+            ['nonce', 'asc'],
+          ],
+          limit: 1,
+        },
+      )[0];
+      const foldedLabel =
+        firstLabel !== undefined && inFirstRun(identity?.created_at, firstLabel.applied_at)
+          ? firstLabel.nonce
+          : undefined;
+      if (identity !== undefined) {
+        const created = `id_created:${identity.agent_id}`;
+        const createdAt = identity.created_at;
+        add(createdAt, created, (t) => ({
+          contactId: null,
+          files: [],
+          ...(foldedLabel === undefined
+            ? {}
+            : {
+                local: {
+                  nonce: foldedLabel,
+                  rows: t.select('local_owner_actions', { op: 'agent.label' }),
+                },
+              }),
+          build: ({ params }) => ({
+            kind: 'id_created',
+            id: created,
+            at: createdAt,
+            name: plainLabel(params?.label),
+          }),
+        }));
+        const revokedAt = identity.revoked_at;
+        if (revokedAt !== null) {
+          const removed = `id_removed:${identity.agent_id}`;
+          add(
+            revokedAt,
+            removed,
+            plain(() => ({ kind: 'id_removed', id: removed, at: revokedAt })),
+          );
+        }
+      }
+      // A pause is listed only while it lasts: the row is deleted on resume, so past pauses are gone.
+      const pause = tx.get('agent_pause', { slot: SINGLETON_SLOT });
+      if (pause !== undefined) {
+        const id = `id_paused:${String(pause.paused_at)}`;
+        add(
+          pause.paused_at,
+          id,
+          plain(() => ({ kind: 'id_paused', id, at: pause.paused_at })),
+        );
+      }
+
+      // WP-A1: applied owner actions the feed does not show from another row.
+      const owned = candidatesTx(
+        tx,
+        'owner_action_nonces',
+        { op: { in: LISTED_OWNER_OPS } },
+        'applied_at',
+        'nonce',
+        OWNER_ACTION,
+        cursor,
+        limit,
+      );
+      for (const r of owned) {
+        const op = r.op;
+        if (!isListedOwnerOp(op)) continue;
+        // QA2: first run's label is part of creating the ID (id_created carries it).
+        if (r.nonce === foldedLabel) continue;
+        const at = r.applied_at;
+        // QA2: a block whose contact is still blocked from that second is the contact row's entry.
+        if (
+          op === 'contact.block' &&
+          tx.select('contacts', { status: 'blocked', updated_at: at }, { limit: 1 }).length > 0
+        ) {
+          continue;
+        }
+        const id = `${OWNER_ACTION}${r.nonce}`;
+        if (op === 'contact.block' || op === 'contact.unblock' || op === 'contact.check') {
+          add(at, id, (t) => {
+            const contactId =
+              op === 'contact.block'
+                ? null
+                : op === 'contact.unblock'
+                  ? unblockedContactTx(t, at)
+                  : checkedContactTx(t, r.nonce);
+            return {
+              contactId: null,
+              files: [],
+              build: (): ActivityEntry =>
+                op === 'contact.block'
+                  ? { kind: 'contact_blocked', id, at, contactId: null, contact: null }
+                  : {
+                      kind: op === 'contact.unblock' ? 'contact_unblocked' : 'contact_checked',
+                      id,
+                      at,
+                      contactId,
+                    },
+            };
+          });
+          continue;
+        }
+        add(at, id, (t) => {
+          const kind = OWNER_ACTION_KINDS[op];
+          const local =
+            op === 'agent.label' || op === 'app.connect' || op === 'app.disconnect'
+              ? { nonce: r.nonce, rows: t.select('local_owner_actions', { op }) }
+              : undefined;
+          return {
+            contactId: null,
+            files: [],
+            ...(local === undefined ? {} : { local }),
+            build: ({ params }): ActivityEntry | null => {
+              if (kind === 'id_renamed') {
+                return { kind, id, at, name: plainLabel(params?.label) };
+              }
+              if (kind === 'app_connected' || kind === 'app_disconnected') {
+                const app = params?.app;
+                return { kind, id, at, app: isAiAppId(app) ? app : null };
+              }
+              if (kind === 'id_resumed' || kind === 'backup_saved') return { kind, id, at };
+              return null;
+            },
+          };
+        });
+      }
+
       const policy = tx.get('policies', { slot: SINGLETON_SLOT });
-      if (policy !== undefined) {
+      // QA2: the first rules, signed with the first card, are part of creating the ID.
+      const firstRules =
+        policy !== undefined &&
+        policy.version === 1 &&
+        inFirstRun(identity?.created_at, policy.applied_at);
+      if (policy !== undefined && !firstRules) {
         const id = `rules_changed:${String(policy.version)}`;
         add(
           policy.applied_at,
@@ -477,14 +970,66 @@ export class ActivityService {
       }
       const contact = p.contactId === null ? null : (contacts.get(p.contactId) ?? null);
       const renamed = p.renamed === undefined ? undefined : await this.#renamedNames(p.renamed);
-      items.push(
-        deepFreeze(p.build({ contact, files, ...(renamed === undefined ? {} : { renamed }) })),
-      );
+      const action = p.approval === undefined ? undefined : await this.#actionOf(p.approval);
+      const params = p.local === undefined ? undefined : await this.#paramsOf(p.local);
+      const entry = p.build({
+        contact,
+        files,
+        ...(renamed === undefined ? {} : { renamed }),
+        ...(action === undefined ? {} : { action }),
+        ...(params === undefined ? {} : { params }),
+      });
+      if (entry !== null) items.push(deepFreeze(entry));
     }
     return Object.freeze({
       items: Object.freeze(items),
       ...(read.nextCursor === undefined ? {} : { nextCursor: read.nextCursor }),
     });
+  }
+
+  /** WP-A1: an approval's stored action as the feed shows it; null when it does not parse. */
+  async #actionOf(
+    approval: NonNullable<Pending['approval']>,
+  ): Promise<ActivityApprovalAction | null> {
+    const key = [approval.approvalId];
+    const text = await open(this.#ctx, 'approvals', 'action_json', key, approval.sealed);
+    let value: unknown;
+    try {
+      value = parseJson(text);
+    } catch {
+      return null;
+    }
+    return approvalActionOf(value);
+  }
+
+  /**
+   * WP-A1: the params of the owner action with this nonce, while `local_owner_actions` still keeps
+   * its signed action (the latest per record); null otherwise. Display only: the row was verified
+   * when it was applied, and nothing here authorises anything.
+   */
+  async #paramsOf(
+    local: NonNullable<Pending['local']>,
+  ): Promise<Readonly<Record<string, unknown>> | null> {
+    for (const row of local.rows) {
+      const key = [row.record];
+      const text = await open(
+        this.#ctx,
+        'local_owner_actions',
+        'signed_json',
+        key,
+        row.signed_json,
+      );
+      let value: unknown;
+      try {
+        value = parseJson(text);
+      } catch {
+        continue;
+      }
+      const body = isRecord(value) ? value.body : undefined;
+      if (!isRecord(body) || body.nonce !== local.nonce) continue;
+      return isRecord(body.params) ? body.params : null;
+    }
+    return null;
   }
 
   /** D-141: a rename entry's former and own new names, opened and restricted (06 §2.1). */

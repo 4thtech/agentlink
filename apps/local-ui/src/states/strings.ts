@@ -4,8 +4,9 @@
 export const STATE_STRINGS = {
   notAvailableTitle: "This page isn't available yet.",
   notAvailableHint: 'It arrives in an update. Nothing is lost while you wait.',
-  notFoundTitle: "This page isn't here.",
-  notFoundHint: 'Pick a page from the menu.',
+  notFoundTitle: 'Page not found.',
+  notFoundHint: "This page isn't here.",
+  notFoundHome: 'Go to Home',
 
   // Local link invalid (audit 2b).
   linkExpiredTitle: 'This link has expired',

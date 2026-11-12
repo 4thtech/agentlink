@@ -15,7 +15,14 @@ export function useTitleFocus<T extends HTMLElement>(screen = ''): RefObject<T |
   return ref;
 }
 
-export function WelcomeScreen({ onStart }: { readonly onStart: () => void }): ReactElement {
+export function WelcomeScreen({
+  onStart,
+  restoreHref = '/restore/kit',
+}: {
+  readonly onStart: () => void;
+  /** D-147: the quiet link for a person who has a recovery kit. */
+  readonly restoreHref?: string;
+}): ReactElement {
   const title = useTitleFocus<HTMLHeadingElement>();
   return (
     <section className="wl-wrap" aria-labelledby="wl-h">
@@ -35,6 +42,9 @@ export function WelcomeScreen({ onStart }: { readonly onStart: () => void }): Re
           rel="noopener noreferrer"
         >
           {T.what}
+        </a>
+        <a className="wl-link al-text-body-sm" href={restoreHref} data-restore-link="">
+          {T.restore}
         </a>
       </div>
     </section>

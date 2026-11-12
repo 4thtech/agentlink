@@ -4,6 +4,7 @@
 // the card hides itself once all three are done, or when the person hides it (remembered in this
 // browser: hiding is a preference, not setup state). An unanswered read shows nothing.
 import { Icon } from '@4thtech-io/ui';
+import { keepInApp } from '../../prefs/app-kept.js';
 import { useEffect, useState, type ReactElement } from 'react';
 import { INTERIM_PEOPLE_PATH, INVITE_PATH } from '../../nav.js';
 import {
@@ -29,6 +30,7 @@ function hiddenHere(): boolean {
 function hideHere(): void {
   try {
     localStorage.setItem(CARD_HIDDEN_KEY, '1');
+    keepInApp(CARD_HIDDEN_KEY);
   } catch {
     // Not remembered: hidden until the page loads again.
   }

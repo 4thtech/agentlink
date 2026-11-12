@@ -2,6 +2,7 @@
 // "seed phrase", "transaction", no link, key or path talk. Other people's words and file names are
 // never part of these strings; the page shows them only inside the untrusted container (I-5).
 import type { FileSaveOutcome } from '@4thtech-io/types/ui-contract/inbox';
+import { sensorWord } from '../../presence-word.js';
 
 export const INBOX_STRINGS = {
   title: 'Inbox',
@@ -31,7 +32,9 @@ export const INBOX_STRINGS = {
   savedAs: 'Saved as',
   expired: 'Expired. It can no longer be saved.',
   sentFile: 'Sent',
-  confirmPasskey: 'Confirm with your passkey',
+  get confirmPasskey(): string {
+    return `Confirm with ${sensorWord()}`;
+  },
   confirmSave: 'Confirm save',
   saveStepLabel: 'Save this file to your Inbox folder',
   saving: 'Saving…',

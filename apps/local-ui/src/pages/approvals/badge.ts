@@ -39,7 +39,8 @@ export function useApprovalsWaiting(path: string, override?: () => Promise<numbe
   const [waiting, setWaiting] = useState(0);
 
   useEffect(() => {
-    if (SKIP.has(path)) return undefined;
+    // Get started runs before an owner exists: the server answers 409 there, so nothing is read.
+    if (SKIP.has(path) || path.startsWith('/start/')) return undefined;
     let live = true;
     (override ?? readWaiting)().then(
       (n) => live && setWaiting(count(n) ?? 0),

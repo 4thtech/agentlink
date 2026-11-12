@@ -25,6 +25,7 @@ import {
   type ComponentType,
   type ReactElement,
 } from 'react';
+import { notify } from '../../notices/index.js';
 import { getLive, subscribeLive } from '../../api/live.js';
 import { lazyPart } from '../../lazy/index.js';
 import { agentNameOf, INVITE_PATH, NEW_AGENT_PATH } from '../../nav.js';
@@ -37,6 +38,8 @@ import { orderAgents, stateOf, tidyCandidates, type AgentRow, type AgentsList } 
 import { AgentDetail } from './detail.js';
 import { createDetailApi, type DetailApi } from './detail-api.js';
 import { Fleet, fleetSummary } from './fleet.js';
+import { FitStrip } from './fit-strip.js';
+import { PlusIcon } from './icons.js';
 import { recordLive } from './history.js';
 import { forgetIntent, rememberIntent, takeIntent, type IntentAction } from './intent.js';
 import { CardNameNote, PausedBanner, PauseSheet, ResumeGate } from './parts.js';
@@ -60,17 +63,6 @@ const lazyMap = lazyPart(async () => (await import('./map/index.js')).AgentsMap)
 let mapView: AgentsMapView | undefined = lazyMap.Part;
 export function setAgentsMapView(view: AgentsMapView | undefined): void {
   mapView = view;
-}
-
-/**
- * A removal changes the generation, so the shell mounts every view again (router.tsx, W4-SHELL) and
- * the page's own state is lost: "{label} was removed." is carried here for the page that mounts next
- * (only while fresh), so the person still reads it.
- */
-let carriedNotice: { readonly text: string; readonly at: number } | undefined;
-function peekCarriedNotice(): string | undefined {
-  const c = carriedNotice;
-  return c !== undefined && Date.now() - c.at < 5_000 ? c.text : undefined;
 }
 
 /** "New agent" reuses the Get started steps (U2): `/start/app?add=agent` (nav.ts, W4-WIRE). */
@@ -157,16 +149,26 @@ export function AgentsPage({
   const [pausing, setPausing] = useState<AgentRow | undefined>(undefined);
   const [resuming, setResuming] = useState(false);
   const [cardName, setCardName] = useState<string | undefined>(undefined);
-  const [notice, setNotice] = useState<string | undefined>(peekCarriedNotice);
+  const [notice, setNotice] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    // Consumed once: a later mount within the 5 s window must not show it again.
-    carriedNotice = undefined;
     markAgentsOpened();
   }, []);
 
   const rows = useMemo(() => orderAgents(list?.agents ?? []), [list]);
   const tidy = useMemo(() => new Set(tidyCandidates(rows).map((r) => r.name)), [rows]);
+  // UX1113-QA2: every ID after the first with the same name (case ignored) gets the name nudge.
+  const duplicates = useMemo(() => {
+    const seen = new Set<string>();
+    const out = new Set<string>();
+    for (const r of rows) {
+      if (r.removing) continue;
+      const key = r.label.toLocaleLowerCase();
+      if (seen.has(key)) out.add(r.name);
+      else seen.add(key);
+    }
+    return out;
+  }, [rows]);
   const generation = list?.generation;
   const open = rows.find((r) => r.current);
   const labelOf = useCallback(
@@ -176,7 +178,7 @@ export function AgentsPage({
 
   const changed = useCallback((): void => announceAgentsChanged(), []);
   const agentChanged = useCallback((): void => {
-    setNotice(S.agentChanged);
+    notify({ tone: 'info', text: S.agentChanged });
     announceAgentsChanged();
   }, []);
 
@@ -188,6 +190,7 @@ export function AgentsPage({
   const act = useCallback((action: IntentAction, row: AgentRow): void => {
     if (action === 'pause') setPausing(row);
     else if (action === 'resume') setResuming(true);
+    else if (action === 'rename') setPanel({ name: row.name, panel: 'rename' });
     else setPanel({ name: row.name, panel: 'apps' });
   }, []);
   const fresh = state.kind === 'ready' ? state.list : undefined;
@@ -218,7 +221,7 @@ export function AgentsPage({
     (row: AgentRow): void => {
       setNotice(undefined);
       void switchTo(row.name).then((outcome) => {
-        if (outcome.kind === 'agent_changed') setNotice(S.agentChanged);
+        if (outcome.kind === 'agent_changed') notify({ tone: 'info', text: S.agentChanged });
         if (outcome.kind !== 'done') {
           pressedHere.current = false;
           forgetIntent();
@@ -242,24 +245,27 @@ export function AgentsPage({
   const onPause = (row: AgentRow): void => firstOpen(row, 'pause');
   const onResume = (row: AgentRow): void => firstOpen(row, 'resume');
   const onAppsElsewhere = (row: AgentRow): void => firstOpen(row, 'apps');
+  const onRenameElsewhere = (row: AgentRow): void => firstOpen(row, 'rename');
   /** F27: Invite someone for this ID: the open ID goes straight to the Invite screen; another opens first. */
   const onInvite = (row: AgentRow): void => {
     if (row.current) return navigate(INVITE_PATH);
     setNotice(undefined);
     void switchTo(row.name).then((outcome) => {
       if (outcome.kind === 'done') return navigate(INVITE_PATH);
-      if (outcome.kind === 'agent_changed') setNotice(S.agentChanged);
+      if (outcome.kind === 'agent_changed') notify({ tone: 'info', text: S.agentChanged });
       pressedHere.current = false;
       forgetIntent();
     });
   };
   const onRenamed = (label: string, told: boolean): void => {
-    setNotice(told ? S.renamedTold(label) : undefined);
+    setNotice(undefined);
+    if (told) notify({ text: S.renamedTold(label) });
   };
 
   const onCardUpdated = (told: boolean): void => {
     setCardName(undefined);
-    setNotice(told && open !== undefined ? S.renamedTold(open.label) : undefined);
+    setNotice(undefined);
+    if (told && open !== undefined) notify({ text: S.renamedTold(open.label) });
     changed();
   };
   // WP-1 (R-1): the note Under the hood and on the open ID's own page (the Simple card has its own).
@@ -406,6 +412,7 @@ export function AgentsPage({
           ) : null}
           {list?.switchable === false ? null : (
             <a className="al-btn al-btn-primary al-btn-md" href={NEW_AGENT_PATH}>
+              <PlusIcon />
               {S.newAgent}
             </a>
           )}
@@ -421,7 +428,7 @@ export function AgentsPage({
           title={S.empty}
           action={
             <a className="al-btn al-btn-primary al-btn-md" href={NEW_AGENT_PATH}>
-              {S.newAgent}
+              {S.connectAiApp}
             </a>
           }
         />
@@ -441,11 +448,13 @@ export function AgentsPage({
       </>
     ) : (
       <div className="ag-cards">
+        <FitStrip rows={rows} />
         {rows.map((row) => (
           <AgentCard
             key={row.name}
             row={row}
             tidy={tidy.has(row.name)}
+            duplicate={duplicates.has(row.name)}
             actions={{
               api,
               owner,
@@ -460,6 +469,7 @@ export function AgentsPage({
               onSwitch: doSwitch,
               onRemove: (r) => setRemoveQueue([r]),
               onAppsElsewhere,
+              onRenameElsewhere,
               onInvite,
               onRenamed,
               onCardUpdated,
@@ -532,8 +542,8 @@ export function AgentsPage({
           onChanged={changed}
           onRemoved={(label) => {
             setRemoveQueue((q) => q.slice(1));
-            carriedNotice = { text: S.removed(label), at: Date.now() };
-            setNotice(S.removed(label));
+            setNotice(undefined);
+            notify({ text: S.removed(label) });
           }}
           onAgentChanged={() => {
             setRemoveQueue([]);

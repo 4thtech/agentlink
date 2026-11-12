@@ -123,18 +123,21 @@ export interface SetupReads {
 export async function readSetupState(reads: SetupReads = {}): Promise<SetupState> {
   const client = reads.client ?? createApiClient();
   const safe = <T>(p: Promise<T>): Promise<T | undefined> => p.catch(() => undefined);
-  const [status, agents, apps, contacts, approvals] = await Promise.all([
+  const [status, agents, apps, contacts] = await Promise.all([
     safe(client.get<unknown>(STATUS_PATH)),
     safe(client.get<unknown>(AGENTS_READ)),
     safe(client.get<unknown>(APPS_READ)),
     safe(client.get<unknown>(LIST_PATH)),
-    safe(client.get<unknown>(APPROVALS_READ)),
   ]);
   let owner: SetupState['owner'];
   if (status?.kind === 'ok' && isRecord(status.data)) {
     const word = status.data['owner'];
     if (word === 'missing' || word === 'set_up') owner = word;
   }
+  // Approvals need an owner: before setup the server answers 409, so this read is never made while
+  // the owner is missing (no console error on Get started).
+  const approvals =
+    owner === 'missing' ? undefined : await safe(client.get<unknown>(APPROVALS_READ));
   const agentsData = agents?.kind === 'ok' ? agents.data : undefined;
   let agent = parseAgentOpen(agentsData);
   // No owner yet: there is no agent either, whatever the agents list says.

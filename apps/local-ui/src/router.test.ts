@@ -19,7 +19,11 @@ import {
   sectionOf,
   titleOf,
 } from './nav.js';
+import { isAppPagePath } from '@4thtech-io/types/ui-contract/app-pages';
+import { COMPACT_PATH } from './pages/compact/open.js';
 import { AppRoutes, ROUTES } from './router.js';
+import { detectPlatform } from './pages/first-run/passkey.js';
+import { SENSOR } from './pages/first-run/strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -48,14 +52,22 @@ const currentSection = (): string | null | undefined =>
 /** Path, the page's own heading (today's page), and the section marked current. */
 const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   ['/', 'Home', 'Home'],
-  ['/agents', 'IDs', 'IDs'],
+  ['/agents', 'My IDs', 'My IDs'],
   // W7-ID-B3 (D-144): the same page under its new name.
-  ['/ids', 'IDs', 'IDs'],
+  ['/ids', 'My IDs', 'My IDs'],
   ['/activity', 'Activity', 'Activity'],
   ['/activity/live', 'Live activity stream', null],
+  // WP-N1 (design-1112 §2.2): `/people` is the page's path; `/contacts` stays as an alias.
+  ['/people', 'People', 'People'],
   ['/contacts', 'People', 'People'],
   ['/settings', 'Settings', 'Settings'],
-  ['/settings/backup', 'Backup & Touch ID', 'Settings'],
+  ['/settings/backup', 'Backup & restore', 'Settings'],
+  // UX1113 WP-S2: the title carries the sensor's word for the platform the test runs on.
+  [
+    '/settings/touch-id',
+    `${SENSOR[detectPlatform()].replace(/^./, (c) => c.toUpperCase())} & master code`,
+    'Settings',
+  ],
   ['/settings/apps', 'AI apps', 'Settings'],
   ['/settings/files', 'Files', 'Settings'],
   ['/settings/appearance', 'Appearance', 'Settings'],
@@ -73,6 +85,9 @@ const FOCUSED = [
   '/start/connected',
   '/start/invite',
   '/settings/join',
+  '/restore/kit',
+  '/restore/check',
+  '/restore/move',
 ];
 
 describe('routes', () => {
@@ -103,7 +118,7 @@ describe('routes', () => {
     expect(location.pathname).toBe('/agents/work');
     // The Agents page draws the agent's page (its heading is the agent's label once read).
     expect(host.querySelector('main.ag-page')).not.toBeNull();
-    expect(currentSection()).toBe('IDs');
+    expect(currentSection()).toBe('My IDs');
   });
 
   it('shows the not-found state for an unknown path, still in the layout', () => {
@@ -142,7 +157,7 @@ describe('routes', () => {
     ['/settings/about', '/advanced/diagnostics'],
     ['/settings/messages', '/'],
     ['/inbox', '/'],
-    ['/settings/contacts', '/contacts'],
+    ['/settings/contacts', '/people'],
     ['/settings/storage', '/settings/files'],
     ['/settings/passkeys', '/settings/backup'],
     ['/settings/notifications', '/settings'],
@@ -155,18 +170,16 @@ describe('routes', () => {
 });
 
 describe('the sections (nav.ts)', () => {
-  it('Home, IDs, People, Activity, Settings; Advanced holds six pages', () => {
+  it('Home, People, My IDs, Activity, Settings; Advanced holds four pages', () => {
     expect(SECTIONS.map((s) => [s.label, s.path])).toEqual([
       ['Home', '/'],
-      ['IDs', '/agents'],
-      ['People', '/contacts'],
+      ['People', '/people'],
+      ['My IDs', '/ids'],
       ['Activity', '/activity'],
       ['Settings', '/settings'],
     ]);
     expect(ADVANCED_SECTIONS.map((s) => [s.label, s.path])).toEqual([
       ['Live activity', '/activity/live'],
-      ['Rules', '/advanced/rules'],
-      ['Proofs & credits', '/advanced/proofs'],
       ['Relays & network', '/advanced/network'],
       ['Diagnostics', '/advanced/diagnostics'],
       ['Connections map', '/advanced/map'],
@@ -175,7 +188,8 @@ describe('the sections (nav.ts)', () => {
 
   it('Settings (A9) in order, ending with Advanced', () => {
     expect(SETTINGS_PAGES.map((p) => p.label)).toEqual([
-      'Backup & Touch ID',
+      'Backup & restore',
+      'Touch ID & master code',
       'AI apps',
       'Files folder',
       'Appearance',
@@ -203,20 +217,30 @@ describe('the sections (nav.ts)', () => {
     expect(sectionOf('/advanced/network')).toBe('network');
     expect(titleOf('/settings/rules')).toBe('Rules');
     expect(titleOf('/start/connect')).toBe('Get started');
-    expect(titleOf('/agents/work')).toBe('IDs');
-    expect(titleOf('/ids/work')).toBe('IDs');
+    expect(titleOf('/agents/work')).toBe('My IDs');
+    expect(titleOf('/ids/work')).toBe('My IDs');
+    expect(sectionOf('/people')).toBe('people');
+    expect(sectionOf('/contacts')).toBe('people');
+    expect(titleOf('/people')).toBe('People');
     expect(sectionOf('/ids/work')).toBe('agents');
   });
 
-  it('shows the Settings sub-navigation on a Settings page only', () => {
+  it('shows the Settings side list (no tab strip) on a Settings sub-page only', () => {
     mountAt('/settings/rules');
-    const sub = host.querySelector('nav[aria-label="Settings"]');
-    expect([...(sub?.querySelectorAll('a') ?? [])].map((a) => a.textContent)).toEqual(
-      SETTINGS_PAGES.map((p) => p.label),
+    expect(host.querySelector('.al-subnav')).toBeNull();
+    const side = host.querySelector('nav[aria-label="Settings pages"]');
+    const hrefs = [...(side?.querySelectorAll('a.set-side-link') ?? [])].map((a) =>
+      a.getAttribute('href'),
     );
-    expect(sub?.querySelector('a[aria-current="page"]')?.textContent).toBe('Rules');
+    expect(hrefs).toEqual(expect.arrayContaining(SETTINGS_PAGES.map((p) => p.path)));
+    expect(side?.querySelector('a[aria-current="page"]')?.getAttribute('href')).toBe(
+      '/settings/rules',
+    );
+    expect(side?.querySelector('a.set-back')?.getAttribute('href')).toBe('/settings');
+    mountAt('/settings');
+    expect(host.querySelector('nav[aria-label="Settings pages"]')).toBeNull();
     mountAt('/agents');
-    expect(host.querySelector('nav[aria-label="Settings"]')).toBeNull();
+    expect(host.querySelector('nav[aria-label="Settings pages"]')).toBeNull();
   });
 
   it('changes page on a click without a reload and moves the current mark', () => {
@@ -237,7 +261,7 @@ describe('the sections (nav.ts)', () => {
       history.pushState(null, '', '/settings/backup');
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
-    expect(host.querySelector('main h1')?.textContent).toBe('Backup & Touch ID');
+    expect(host.querySelector('main h1')?.textContent).toBe('Backup & restore');
   });
 });
 
@@ -282,5 +306,34 @@ describe('compact view route (UX2-h)', () => {
   it('adds no route to the shell list or the menu', () => {
     expect(ROUTES.some((r) => r.path.includes('compact'))).toBe(false);
     expect(SECTIONS.some((s) => s.path.includes('compact'))).toBe(false);
+  });
+});
+
+// UX1113-QA-HOST (B1): a reload asks the app host for the path itself, so every path the router
+// shows must be on the host's one list of app pages (types ui-contract/app-pages.ts).
+describe('reload: every routed path is an app page on the host', () => {
+  it('ROUTES, redirects, the menus, one ID and the compact view are all on the list', () => {
+    const paths = [
+      ...ROUTES.map((r) => r.path),
+      ...Object.keys(REDIRECTS),
+      ...Object.values(REDIRECTS),
+      ...SECTIONS.map((s) => s.path),
+      ...ADVANCED_SECTIONS.map((s) => s.path),
+      ...SETTINGS_PAGES.map((p) => p.path),
+      COMPACT_PATH,
+      '/agents/work',
+      '/ids/work',
+    ].map((p) => p.split('?')[0] as string);
+    for (const path of paths) expect(isAppPagePath(path), path).toBe(true);
+  });
+
+  it('an unknown path shows Page not found with a way back to Home', () => {
+    mountAt('/nope');
+    const main = host.querySelector('main');
+    expect(main?.textContent).toContain('Page not found');
+    const home = [...(main?.querySelectorAll('a') ?? [])].find(
+      (a) => a.textContent === 'Go to Home',
+    );
+    expect(home?.getAttribute('href')).toBe('/');
   });
 });

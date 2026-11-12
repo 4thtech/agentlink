@@ -5,6 +5,8 @@
 // Nothing here is secret: values come from fixed lists, anything else in storage is ignored.
 // UX2-a: the Approvals Grid/List layout (B-11 §26.2) is a view choice, kept here too; default Grid.
 // UX2-f2: so is the Messages and Contacts sort (Recent or Most active, B-11 §24.5); default Recent.
+import { keepInApp } from './app-kept.js';
+
 export type MotionPref = 'system' | 'on' | 'off';
 export type TransparencyPref = 'system' | 'reduce';
 export type ThemePref = 'system' | 'light' | 'dark';
@@ -81,6 +83,8 @@ function write(p: Prefs): void {
   } catch {
     // Storage is blocked or full: the choice still holds for this session.
   }
+  // UX1113-QA-HOST: the app keeps the choice too (storage is per launch, app-kept.ts).
+  keepInApp(PREFS_KEY);
 }
 
 function setAttr(name: string, value: string | null): void {
@@ -126,9 +130,14 @@ export function subscribePrefs(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
-/** Test seam: forget the in-memory copy and load again from storage. */
-export function resetPrefsForTests(): void {
+/** Load again from storage and tell every page (UX1113-QA-HOST: after the app's copy arrived). */
+export function reloadPrefs(): void {
   current = null;
   getPrefs();
   for (const l of listeners) l();
+}
+
+/** Test seam: forget the in-memory copy and load again from storage. */
+export function resetPrefsForTests(): void {
+  reloadPrefs();
 }

@@ -12,6 +12,7 @@
 // I-5: a name the other side chose never goes into the prompt the owner copies to their AI; only the
 // owner-confirmed alias does. Names are returned as plain text for React to render as text.
 import { formatContactName } from '@4thtech-io/ui';
+import { keepInApp } from '../../prefs/app-kept.js';
 import type { ContactRow } from '../contacts/data.js';
 import { firstToCompare } from '../contacts/safety.js';
 import { startHello } from './strings.js';
@@ -237,6 +238,8 @@ export function saveDone(done: ReadonlySet<StepId>): void {
   } catch {
     // Not remembered; nothing else changes.
   }
+  // UX1113-QA-HOST: the app keeps it too (storage is per launch).
+  keepInApp(START_DONE_KEY);
 }
 
 /** The reads behind the card; every one is replaceable in tests. `undefined` is "no answer". */

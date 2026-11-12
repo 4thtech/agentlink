@@ -255,7 +255,7 @@ export function AgentDetail({
         </Section>
 
         <Section title={S.backup}>
-          <BackupPanel row={row} onSwitch={onSwitch} />
+          <BackupPanel />
         </Section>
       </div>
     </div>

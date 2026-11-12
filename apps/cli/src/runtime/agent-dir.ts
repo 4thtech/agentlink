@@ -30,7 +30,12 @@
 //
 // Same-user processes can change all of this (G-1, D-67): these checks keep mistakes and other
 // users out; they are not a boundary against the agent.
-import { readUiSettings, type UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
+import {
+  UI_SETTINGS_MAX_BODY_BYTES,
+  mergeUiSettings,
+  readUiSettings,
+  type UiSettings,
+} from '@4thtech-io/types/ui-contract/ui-settings';
 import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { constants, type Stats } from 'node:fs';
 import {
@@ -783,7 +788,8 @@ async function readRootJson(
 
 /** W4-SHELL-V2: the app's UI settings file (Under the hood, the section menu). */
 export const UI_SETTINGS_FILE = 'ui-settings.json';
-const MAX_UI_SETTINGS_BYTES = 256;
+// UX1113-QA-HOST: room for the kept page choices (the PUT body cap plus the record around it).
+const MAX_UI_SETTINGS_BYTES = UI_SETTINGS_MAX_BODY_BYTES + 1024;
 
 /**
  * W4-SHELL-V2: the app's UI settings from `~/.agentlink/ui-settings.json` (`{"v":1,"settings":{…}}`),
@@ -810,7 +816,7 @@ export async function writeUiSettingsFile(
   await writeRootFile(
     home,
     UI_SETTINGS_FILE,
-    `${JSON.stringify({ v: 1, settings: checked })}\n`,
+    `${JSON.stringify({ v: 1, settings: mergeUiSettings({}, checked) })}\n`,
     options,
   );
 }
@@ -834,6 +840,8 @@ async function directoryEntry(
       labelled: config.label !== undefined,
       available: true,
       removing,
+      // WP-R2b: the recorded backend, so Back up names a file-KeyStore ID without opening it.
+      keyStore: config.keyStore,
     });
   } catch {
     // A folder that breaks the rules is still listed (never lost), and never opened.

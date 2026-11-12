@@ -23,16 +23,26 @@ export interface BannerProps {
   /** At most one action. */
   action?: ReactNode;
   compact?: boolean;
+  /** The inline banner's optional close (notices.md); the caller decides whether it is remembered. */
+  onDismiss?: () => void;
+  dismissLabel?: string;
+  className?: string;
   children?: ReactNode;
 }
 
-/** Page-level message with an icon, one or two sentences and at most one action. */
+/**
+ * The inline banner (notices.md): a message next to what it is about, with an icon, one or two
+ * sentences, at most one action and an optional close.
+ */
 export function Banner({
   tone = 'info',
   title,
   icon,
   action,
   compact,
+  onDismiss,
+  dismissLabel = 'Dismiss',
+  className,
   children,
 }: BannerProps): ReactElement {
   return (
@@ -41,6 +51,7 @@ export function Banner({
         'al-banner',
         `al-tone-${tone === 'offline' ? 'neutral' : tone}`,
         compact === true && 'is-compact',
+        className,
       )}
       role={tone === 'danger' || tone === 'warning' ? 'alert' : 'status'}
     >
@@ -50,6 +61,11 @@ export function Banner({
         {children}
       </div>
       {action === undefined ? null : <div className="al-banner-act">{action}</div>}
+      {onDismiss === undefined ? null : (
+        <button type="button" className="al-banner-x" aria-label={dismissLabel} onClick={onDismiss}>
+          <Icon name="x" size={14} />
+        </button>
+      )}
     </div>
   );
 }

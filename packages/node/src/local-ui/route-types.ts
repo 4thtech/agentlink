@@ -20,6 +20,7 @@ import type { CreatedInvite, PendingContact } from '@4thtech-io/core';
 import type { EnvelopeKeys, JsonObject, JsonValue } from '@4thtech-io/crypto';
 import { UI_SETTINGS_PATH, type UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 import type { LocalUiContext } from './context.js';
+import type { LocalUiOwnerCodeStep } from './owner-code-paths.js';
 import type { RenameSignOutcome } from '../owner-rename.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
 
@@ -91,7 +92,27 @@ export interface LocalUiOwnerOperation {
    * the folder's display name and the new recovery code, which it answers to the page once.
    */
   exportRecoveryKit?(review: OwnerReview): Promise<LocalUiRecoveryKitOutcome>;
+  /**
+   * UX1113 WP-S2 (04 §2.5 "Touch ID & master code page"), the `check` and `test` steps only: the
+   * presence this request carried was verified (and its session already closed); this records the
+   * one owner operation and signs nothing.
+   */
+  presenceChecked?(): void;
+  /**
+   * WP-S2, the `replace` step only, instead of `sign` (once): stages a new generated master code in
+   * `owner-next` for this page session (owner-change-code.ts stageOwnerCodeChange). The `owner` item
+   * is untouched. The handler gets the code, which it answers to the page once.
+   */
+  replaceOwnerCode?(): Promise<LocalUiOwnerCodeOutcome>;
+  /** WP-S2, the `finish` step only (once): the staged item, opened by the code typed back, replaces the `owner` item. */
+  finishOwnerCode?(): Promise<'done' | 'unconfirmed'>;
 }
+
+/** WP-S2: how staging a new master code ended. */
+export type LocalUiOwnerCodeOutcome =
+  | { readonly status: 'staged'; readonly code: string }
+  /** A leftover `owner-next` item: nothing was written (the terminal step finishes it). */
+  | { readonly status: 'unfinished' };
 
 /** WP-11: how saving a recovery kit ended (route-types.ts `exportRecoveryKit`). */
 export type LocalUiRecoveryKitOutcome =
@@ -145,6 +166,8 @@ export interface LocalUiOwnerRoute {
    * (unlockForExport) and offers `exportRecoveryKit` instead of `sign`; no other route does.
    */
   readonly recoveryKit?: true;
+  /** UX1113 WP-S2: one owner-code step, only at its fixed path (owner-code-paths.ts). */
+  readonly ownerCode?: LocalUiOwnerCodeStep;
   /**
    * U3-invite: a read-only check run after the generation check and before the presence gate. A
    * result refuses the request with it (the owner store is never opened, nothing is signed); the
@@ -244,6 +267,22 @@ export interface LocalUiRevealRoute {
     itemId: string,
     reveal: LocalUiRevealFile,
   ) => Promise<LocalUiResult>;
+}
+
+/**
+ * WP-R2b (04 §2.3.3 "Kit record"): Show in Finder for the recorded recovery kit. Like the reveal kind
+ * it changes nothing and needs no owner presence, but it takes no input at all: only
+ * `POST /api/ui/backup/reveal`, registered once (routes.ts). The server's kit-reveal gate runs after
+ * the same session, CSRF, Origin, fetch-metadata, octet-stream and generation checks as every write,
+ * refuses a query, an `X-AgentLink-Input` or presence header and any body byte, and hands the
+ * handler only the context: the file is the kit record's own, checked by kit-record.ts
+ * revealKitFile, and its path is never answered.
+ */
+export interface LocalUiKitRevealRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'kit-reveal';
+  readonly handler: (context: LocalUiContext) => Promise<LocalUiResult>;
 }
 
 /** UX2-d1: the steps of the invite kind (U3-invite adds `dismiss`, "Not now" on the join screen). */
@@ -388,7 +427,40 @@ export interface LocalUiUiSettingsRoute {
   readonly handler: (context: LocalUiContext, change: UiSettings) => Promise<LocalUiResult>;
 }
 
+/** UX1113-R1 (D-147): the steps of the restore kind, each at one fixed path (04 §2.3.3). */
+export const RESTORE_PATHS = Object.freeze({
+  found: '/api/ui/restore/found',
+  upload: '/api/ui/restore/upload',
+  header: '/api/ui/restore/header',
+  presence: '/api/ui/restore/presence',
+  open: '/api/ui/restore/open',
+  check: '/api/ui/restore/check',
+  cancel: '/api/ui/restore/cancel',
+  applyBegin: '/api/ui/restore/apply/begin',
+  applyFinish: '/api/ui/restore/apply/finish',
+} as const);
+
+export type LocalUiRestoreStep = keyof typeof RESTORE_PATHS;
+
+/**
+ * UX1113-R1 (D-147; 04 §2.3.3 "Restore in the app"; 08 §1): restoring from a recovery kit, the
+ * eleventh named route kind. Nine fixed paths (RESTORE_PATHS), each registered once, `found` a GET
+ * and the rest POSTs, with no handler: the server's restore gate runs them after the session, CSRF,
+ * Host, fetch-metadata (and, for a POST, Origin and octet-stream) checks, refuses a query, and hands
+ * the restore engine (recovery-kit-restore.ts) only the page session, the parsed
+ * `X-AgentLink-Input` and the body bytes (the recovery code, the presence proof, the WebAuthn
+ * response or the uploaded kit). No page file and no MCP handler reaches the engine (I-4; the
+ * import fence). It works with no agent open and needs no generation: it changes no open agent.
+ */
+export interface LocalUiRestoreRoute {
+  readonly method: 'GET' | 'POST';
+  readonly path: string;
+  readonly presence: 'restore';
+  readonly step: LocalUiRestoreStep;
+}
+
 export type LocalUiRoute =
+  | LocalUiRestoreRoute
   | LocalUiPauseRoute
   | LocalUiUiSettingsRoute
   | LocalUiHandoffRoute
@@ -400,6 +472,7 @@ export type LocalUiRoute =
   | LocalUiPayConfirmRoute
   | LocalUiCreateAgentRoute
   | LocalUiRevealRoute
+  | LocalUiKitRevealRoute
   | LocalUiInviteRoute;
 
 /**

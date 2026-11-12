@@ -2,8 +2,21 @@
 // address or a hash in the default view; 11 §5.2 names and labels; 04 §3.6.1 Contact check; UX audit
 // 3b, 10a). A contact's name is never part of a fixed string: the helpers below take the name as
 // formatted by the ui name rule and the page renders the result as text.
+import { sensorWord } from '../../presence-word.js';
 export const CONTACTS_STRINGS = {
   listLabel: 'Your people',
+  lead: 'The people your AI can message. You connect by invite, and only you and they can read what is sent.',
+  archivedLabel: 'Archived',
+  archivedFoot:
+    "Connections that ended. Your AI can't send to them. Their conversation and saved files stay until you delete them.",
+  theyRemoved: 'They removed this connection.',
+  connectedAgain: (date: string): string =>
+    `You connected again on ${date}, so nothing is missing.`,
+  oldConversation: 'The old conversation stays here.',
+  olderConnection: 'older connection',
+  open: 'Open',
+  checkContact: 'Check contact',
+  invitesWaiting: 'Invites waiting',
   detailTitle: 'Person',
   closeSheet: 'Close',
   loading: 'Loading…',
@@ -16,14 +29,18 @@ export const CONTACTS_STRINGS = {
   blockedDetail: 'Blocked. Messages from this person are dropped.',
   revoked: 'No longer active',
   revokedDetail: 'This person turned this ID off. Messages from it are dropped.',
+  // UX 2026-11-12 (notices): the full explanation lives here, not on Home.
+  revokedTitle: 'They removed this connection.',
+  revokedMore:
+    "Your AI can't send to them any more. Your conversation and saved files stay here. On Home you can archive them.",
   waiting: 'Waiting for them',
   waitingDetail: 'Waiting for them to answer the invite. The 12 digits show here once it does.',
   mismatchChip: '12 digits did not match',
   safetyCode: 'Contact check',
   safetyExplain:
     'Compare these 12 digits with the other person by call or in person; if they match, it’s really them.',
-  sameName: 'Another person has the same name.',
   wasName: (former: string): string => `(was ${former})`,
+  nowCalls: (name: string): string => `Now calls itself ${name}`,
   keepBoth: 'Keep both',
   removeOlder: 'Remove older',
   codeLoading: 'Loading the 12 digits…',
@@ -48,7 +65,7 @@ export const CONTACTS_STRINGS = {
   remove: 'Remove',
   removeContact: 'Remove person',
   removeExplain:
-    'Remove this person? Messages from them are dropped. To connect again, ask them for a new invite.',
+    "Remove this person? They aren't told, and messages from them are dropped. To connect again, send them a new invite or ask them for one.",
   removed: 'Removed.',
   // UX1112 WP-12 (F-2; D-72; 11 §6.2 "Rename and Block"): block or unblock one person.
   block: 'Block',
@@ -60,7 +77,9 @@ export const CONTACTS_STRINGS = {
   unblocked: 'Unblocked. Messages from this person arrive again.',
   cancel: 'Cancel',
   presenceIntro: 'Confirm it’s you. Never give your master code to your AI.',
-  usePasskey: 'Confirm with your passkey',
+  get usePasskey(): string {
+    return `Confirm with ${sensorWord()}`;
+  },
   /** F24: the same button with the platform's own word (SENSOR: Touch ID, Windows Hello, your passkey). */
   usePasskeyOn: (sensor: string): string => `Confirm with ${sensor}`,
   useCode: 'Use your master code instead',
@@ -75,7 +94,7 @@ export const CONTACTS_STRINGS = {
   refused:
     'Nothing was changed. If you were comparing the 12 digits, they may have changed: compare them again.',
   notApplied: 'Nothing was changed. Try again.',
-  sessionExpired: 'This page has expired. Ask your AI to open AgentLink again.',
+  sessionExpired: 'This page has timed out. Open AgentLink again from your AI app.',
   failed: "That didn't work. Nothing was changed. Try again in a minute.",
 } as const;
 
@@ -122,8 +141,23 @@ export const HOOD = {
   selfDeclared: 'Not checked yet',
 } as const;
 
-export function countLine(n: number): string {
-  return n === 1 ? '1 person' : `${String(n)} people`;
+export function countLine(n: number, waiting = 0): string {
+  const people = n === 1 ? '1 person' : `${String(n)} people`;
+  if (waiting === 0) return people;
+  return `${people} · ${String(waiting)} invite${waiting === 1 ? '' : 's'} waiting`;
+}
+
+/** "Last message 2 h ago · connected 3 Nov" (dates and ages are plain text). */
+export function personLine(last: string | undefined, connected: string): string {
+  return `${last === undefined ? 'No messages yet' : `Last message ${last}`} · connected ${connected}`;
+}
+
+/**
+ * Two people with the same name look alike in a list: the row adds what tells them apart, their
+ * ID tag (or, when none is known, the time they connected). Plain text.
+ */
+export function sameNameTag(tag: string | undefined, connectedAt: string): string {
+  return tag === undefined ? `connected ${connectedAt}` : `ID tag ${tag}`;
 }
 
 /** The safety-code nudge (UX audit 3b). `name` is the name-rule output. */
@@ -155,6 +189,28 @@ export function since(date: string): string {
 export function waitSeconds(seconds: number): string {
   return `Too many wrong tries. Wait ${String(seconds)} seconds, then try again. Nothing was changed.`;
 }
+
+/** WP-P2 (design-1112 spec §5): People across all IDs. ID labels are plain text, isolated. */
+export const ALL_IDS = {
+  filterLabel: 'Show people of',
+  allIds: 'All my IDs',
+  search: 'Find a person',
+  noMatch: 'Nobody matches that name.',
+  /** "with Tali" on each row when there are 2+ IDs (the label follows in its own `<bdi>`). */
+  with: 'with',
+  /** Another ID's people, before it is opened. */
+  otherIds: 'People of your other IDs',
+  openToSee: 'Open this ID to see who they are.',
+  open: 'Open',
+  /** The existing switch step, before another ID opens. */
+  opening: (label: string): string => `Opening ⁨${label}⁩…`,
+  openFailed: "That ID can't be opened right now. Try again in a minute.",
+  /** One or more IDs could not be read: their people are missing from the list. */
+  missing: (labels: readonly string[]): string =>
+    labels.length === 1
+      ? `People of ⁨${labels[0] ?? ''}⁩ can't be shown right now.`
+      : `People of ${String(labels.length)} of your IDs can't be shown right now.`,
+} as const;
 
 export const SUMMARY = {
   check: (name: string): string => `Mark ${name} as Contact checked.`,

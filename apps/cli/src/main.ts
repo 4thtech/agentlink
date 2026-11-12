@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import process from 'node:process';
 import { isatty } from 'node:tty';
 import { acceptHandler } from './commands/accept.js';
+import { backupCommandHandler } from './commands/backup.js';
 import { createContactsHandler } from './commands/contacts.js';
 import { creditsHandler } from './commands/credits.js';
 import { doctorHandler } from './commands/doctor.js';
@@ -40,7 +41,10 @@ function packageVersion(): string {
 
 const version = packageVersion();
 setCliVersion(version);
+// UX1113-R1 (D-147): `agentlink backup restore` and `agentlink restore`.
 const dispatch = createDispatcher({
+  backup: backupCommandHandler,
+  restore: backupCommandHandler,
   init: createInitHandler(nodeInitDeps()),
   invite: inviteHandler,
   accept: acceptHandler,

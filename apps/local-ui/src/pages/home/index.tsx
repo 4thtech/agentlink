@@ -15,6 +15,7 @@
 // I-5 / §17.4: every value is React text, from a typed parse (data.ts). Last activity says what
 // happened in a fixed phrase and when; never message text, a contact's name or a file name.
 import {
+  Banner,
   CountBadge,
   Icon,
   LiveDot,
@@ -404,15 +405,13 @@ export function HomePage({
       </header>
       <StartHere model={start} platform={platform} />
       {model.offline ? (
-        <p className="hm-note al-text-body-sm" role="status">
-          <Icon name="wifi-off" size={16} />
+        <Banner tone="offline" compact className="hm-note">
           {S.offlineLine}
-        </p>
+        </Banner>
       ) : model.error ? (
-        <p className="hm-note al-text-body-sm" role="status">
-          <Icon name="refresh-cw" size={16} />
+        <Banner tone="neutral" icon="refresh-cw" compact className="hm-note">
           {S.errorLine}
-        </p>
+        </Banner>
       ) : null}
       <div
         className="hm-tiles"

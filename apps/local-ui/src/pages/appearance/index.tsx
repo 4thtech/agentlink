@@ -18,8 +18,8 @@ export function AppearancePage(): ReactElement {
   const base = useId();
   const labelFor = (key: string): string => `${base}-${key}`;
   return (
-    <main>
-      <h1 className="al-text-h1">{S.title}</h1>
+    <div className="set-stack">
+      <h1 className="al-text-title-1">{S.title}</h1>
       <p className="al-text-body al-muted">{S.intro}</p>
       <p id={labelFor('theme')} className="al-text-label">
         {S.theme}
@@ -70,6 +70,6 @@ export function AppearancePage(): ReactElement {
         onChange={(on) => toggleHood(on)}
       />
       <PreviewTile />
-    </main>
+    </div>
   );
 }

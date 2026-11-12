@@ -1,5 +1,6 @@
 // U3-h: Agents copy (b11 §29; 11 §5). "keys" appears only in the Remove sheet, because it is what is
 // deleted. No "wallet", "gas", "seed phrase" or "transaction".
+import { sensorWord } from '../../presence-word.js';
 /**
  * W4-AGENTS (I-5; IR-W4-AGENTS-SEC-1 L1): an agent label inside a title, a statement or an aria
  * name is its own bidi-isolated run (U+2068 … U+2069), so no character in it can reorder the words
@@ -8,7 +9,7 @@
 export const iso = (label: string): string => `\u2068${label}\u2069`;
 
 export const AGENTS_STRINGS = {
-  title: 'IDs',
+  title: 'My IDs',
   open: 'Open',
   worksFrom: 'Works from',
   notConnected: 'Not connected to an AI app',
@@ -39,9 +40,11 @@ export const AGENTS_STRINGS = {
   notFullyRemoved: (label: string): string => `${iso(label)} wasn't fully removed`,
   finishRemoving: 'Finish removing',
   finishTitle: (label: string): string => `Finish removing ${iso(label)}`,
-  finishTouchId: 'Finish with Touch ID',
+  get finishTouchId(): string {
+    return `Finish with ${sensorWord()}`;
+  },
   finishStatement: (label: string): string => `Finish removing ${iso(label)}`,
-  empty: 'No IDs left. Add one to keep using AgentLink.',
+  empty: 'No IDs yet. An ID is created when you connect your first AI app.',
   loadError: "Couldn't load your IDs.",
   loading: 'Loading your IDs',
   findAgent: 'Find an ID',
@@ -53,7 +56,9 @@ export const AGENTS_STRINGS = {
   mapSoon: 'The map arrives in an update. The list has everything you need.',
   switcherLabel: 'IDs',
   renameField: 'Name',
-  saveTouchId: 'Save with Touch ID',
+  get saveTouchId(): string {
+    return `Save with ${sensorWord()}`;
+  },
   labelInvalid: "That name can't be used. Change it and try again.",
   notRenamed: 'Not renamed yet. Try again.',
   renameFailed: "Couldn't rename it. Try again.",
@@ -73,7 +78,9 @@ export const AGENTS_STRINGS = {
   typeName: "Type the ID's name to confirm",
   typeNameLabel: (label: string): string => `Type ${iso(label)} to confirm`,
   typeNameDisabled: 'Type the name to enable this',
-  removeTouchId: 'Remove with Touch ID',
+  get removeTouchId(): string {
+    return `Remove with ${sensorWord()}`;
+  },
   quitAny: (label: string): string => `Quit any AI app that uses ${iso(label)} first.`,
   /** F22: a CLI app (Terminal sessions); no count is read, so no number is claimed. */
   quitTerminal: (app: string): string =>
@@ -105,7 +112,38 @@ export const AGENTS_STRINGS = {
   removeStatement: (label: string): string => `Remove ${iso(label)}`,
 
   // W4-AGENTS (W4 UX v2 "Agents"; 08 §1 "Live AI-app status" words; "AI app", never "harness").
-  intro: 'Each ID is the identity an AI app uses on AgentLink. Status updates by itself.',
+  intro:
+    'An ID is how one of your AI apps appears on AgentLink. The people you connect with see its name.',
+  // WP-I1 (spec §4): the card words.
+  workingNow: 'Working now',
+  readyWord: 'Ready',
+  pausedWord: 'Paused',
+  notUsedYet: 'Not used by any AI app yet',
+  openSuffix: ' · this is the ID you are looking at',
+  noAppConnected: 'No AI app is connected to this ID.',
+  connectAiApp: 'Connect an AI app',
+  peopleCount: (n: number): string => (n === 1 ? 'person' : 'people'),
+  kitBacked: (date: string): string => `Backed up ${date}`,
+  kitNone: 'Not in a kit',
+  kitLabel: 'recovery kit',
+  moreLabel: 'More about this ID',
+  // The name nudge (I-3): a machine name such as macbook-agent-1.
+  nudgeBefore: 'People see this ID as ',
+  nudgeAfter: '. Give it a name they will recognise, like your own.',
+  // UX1113-QA2: two IDs with the same name (a restore next to an ID of the same name keeps both).
+  duplicateBefore: 'Another of your IDs is also called ',
+  duplicateAfter: '. Give this one a name people can tell apart.',
+  // The "how it fits" strip (spec §2.1).
+  fitLabel: 'How it fits together',
+  fitHide: 'Hide this',
+  fitApp: 'Your AI app',
+  fitAppBody: 'Claude Code, Codex…',
+  fitUses: 'Uses',
+  fitId: 'Your ID',
+  fitIdBody: 'A name, an inbox, your rules',
+  fitTalks: 'Talks to',
+  fitPeople: 'People',
+  fitPeopleBody: 'Their AI apps, by invite',
   aiApps: 'AI apps',
   /** D-144 improvement (c): which AI apps use this ID. */
   usedBy: (apps: readonly string[]): string => `Used by ${apps.join(', ')}`,
@@ -132,9 +170,10 @@ export const AGENTS_STRINGS = {
     'Quit the AI app first, then open it again. AgentLink sets it up; nothing to copy or paste.',
   restartToFinish: (app: string): string => `Restart ${app} to finish.`,
   backupTitle: 'Recovery kit',
-  backupHint: 'Save a recovery kit. Keep it somewhere safe, away from this computer.',
-  // WP-11: a recovery kit is saved for the open ID.
-  backupOpenFirst: (label: string): string => `Open ${iso(label)} to save its recovery kit.`,
+  // UX1113: one recovery kit covers every ID; it is saved in Settings › Backup & restore.
+  backupHint:
+    'One recovery kit covers all your IDs. Save it, check it and restore from it in Backup & restore.',
+  backupOpen: 'Open Backup & restore',
   switching: (label: string): string => `Opening ${iso(label)}…`,
 
   // Pause (08 §1 "Pause an ID", D-143 (5)): one click, no Touch ID; Resume with Touch ID.
@@ -145,7 +184,9 @@ export const AGENTS_STRINGS = {
     `Your AI apps can't send or receive messages as ${iso(label)} until you resume it. Nothing is deleted.`,
   /** After the label (in its own bdi run): "{label} is paused". */
   isPaused: ' is paused',
-  resumeTouchId: 'Resume with Touch ID',
+  get resumeTouchId(): string {
+    return `Resume with ${sensorWord()}`;
+  },
   resumeStatement: (label: string): string => `Resume ${iso(label)}`,
   pauseFailed: "Couldn't pause it. Try again.",
   resumeFailed: "Couldn't resume it. Try again.",
@@ -153,7 +194,9 @@ export const AGENTS_STRINGS = {
 
   // Rename (D-141, 11 §5.8).
   renameHint: 'People see this name.',
-  renameTouchId: 'Rename with Touch ID',
+  get renameTouchId(): string {
+    return `Rename with ${sensorWord()}`;
+  },
   renamedTold: (label: string): string =>
     `Renamed. Your contacts will see ${label} next time they're online.`,
   renameLimited: (label: string, time: string): string =>
@@ -170,7 +213,9 @@ export const AGENTS_STRINGS = {
   newInvitesStillShow: 'New invites still show ',
   updateName: 'Update name',
   /** After the label (in its own bdi run): "… so everyone sees {label}." */
-  noteHint: 'One Touch ID, so everyone sees ',
+  get noteHint(): string {
+    return `One ${sensorWord()}, so everyone sees `;
+  },
   // WP-1 (R-2): the invite asks for the update first.
   /** Before the card name: "Your invites still show {cardName}". */
   invitesStillShow: 'Your invites still show ',
@@ -193,6 +238,7 @@ export const AGENTS_STRINGS = {
   sortStatus: 'Status',
   colAgent: 'ID',
   colApps: 'AI app (harness)',
+  colFolder: 'Folder',
   harnessHint:
     'AI apps: developers call them harnesses, the program that runs your AI and connects it to AgentLink.',
   colStatus: 'Status',
@@ -229,7 +275,7 @@ export const AGENTS_STRINGS = {
     `${app}: ${word}. ${n} checks while this page was open.`,
   historyNote: 'History shows while this page is open; it is not kept.',
   ruleProofs: (word: string): string => `Add a proof: ${word}`,
-  ruleContacts: (word: string): string => `New contacts: ${word}`,
+  ruleContacts: (word: string): string => `New people: ${word}`,
   ruleFiles: (send: number, receive: number): string =>
     `Files: send up to ${send} MB, receive up to ${receive} MB`,
   ruleAllow: 'Allowed',
