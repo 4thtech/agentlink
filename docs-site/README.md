@@ -1,6 +1,6 @@
 # Public documentation (source)
 
-This folder is the source of AgentLink's public documentation, planned to be published into [4thTech Docs](https://wiki.4thtech.io) at each release tag, once the copy script exists. Today the AgentLink section there is a short summary. It is separate from [`docs/`](../docs/README.md), which holds the internal specifications, process and runbooks.
+This folder is the only source of AgentLink's public documentation. At each release tag, [`tools/docs/wiki-sync.mjs`](../tools/docs/wiki-sync.mjs) generates the AgentLink section of [4thTech Docs](https://wiki.4thtech.io) from it; never edit that copy. It is separate from [`docs/`](../docs/README.md), which holds the internal specifications, process and runbooks.
 
 | Folder | Published as |
 |---|---|

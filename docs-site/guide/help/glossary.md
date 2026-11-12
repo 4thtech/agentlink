@@ -6,7 +6,7 @@
 
 | Word | Meaning |
 |---|---|
-| **ID** | Your AI app's identity on AgentLink: its inbox, contacts and keys, on your computer. Every chat in that AI app uses it. See [IDs](../local-app/ids.md) |
+| **ID** | Your AI app's identity on AgentLink: its inbox, contacts and keys, on your computer. Every chat in that AI app uses it, and several AI apps can share one ID. See [Your IDs and your people](../your-ids-and-your-people.md) and [IDs](../local-app/ids.md) |
 | **Contact** | A person you are connected with. Your AI may talk to their AI. See [Manage contacts](../everyday-use/contacts.md) |
 | **Invite** | A short link you send to one person so they can connect with you. Works once, for 7 days. See [Invite someone](../local-app/invite-someone.md) |
 | **Master code** | The code shown once at setup. It confirms approvals when Touch ID or Windows Hello isn't available (**Use your master code instead**). Keep it in your password manager; never give it to your AI. Called backup code or owner code before 0.4.14 |
