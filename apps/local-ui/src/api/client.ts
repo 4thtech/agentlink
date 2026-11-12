@@ -47,7 +47,11 @@ export interface ApiClient {
 }
 
 /** The master code as typed, or a passkey assertion body (contacts/owner.ts `passkeyProof`). */
-export type OwnerPresence = string | { readonly passkey: Uint8Array };
+export type OwnerPresence =
+  | string
+  | { readonly passkey: Uint8Array }
+  /** DESK-D12c: Touch ID / Windows Hello in the desktop app (no bytes). */
+  | { readonly native: true };
 
 const CSRF_HEADER = 'X-AgentLink-CSRF';
 
@@ -143,11 +147,18 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         'content-type': 'application/octet-stream',
         'X-AgentLink-Input': base64url(JSON.stringify(input)),
       });
-      if (typeof presence !== 'string') headers.set('X-AgentLink-Presence', 'passkey');
+      if (typeof presence !== 'string') {
+        headers.set('X-AgentLink-Presence', 'native' in presence ? 'native' : 'passkey');
+      }
       res = await doFetch(path, {
         method: 'POST',
         headers,
-        body: typeof presence === 'string' ? presence : (presence.passkey as BodyInit),
+        body:
+          typeof presence === 'string'
+            ? presence
+            : 'native' in presence
+              ? new Uint8Array(0)
+              : (presence.passkey as BodyInit),
         credentials: 'same-origin',
         cache: 'no-store',
       });
@@ -156,7 +167,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       noteHostUnreachable();
       return { kind: 'offline' };
     } finally {
-      if (typeof presence !== 'string') presence.passkey.fill(0);
+      if (typeof presence !== 'string' && 'passkey' in presence) presence.passkey.fill(0);
     }
     noteHostReached();
     const parsed = await readJson(res);

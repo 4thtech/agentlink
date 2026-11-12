@@ -45,6 +45,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'createInboxFile',
       'createOsKeychainAgent',
       'decideReviewedApprovals',
+      // DESK-D12c: the desktop app's presence helper behind fixed commands (no path or runner seam;
+      // it releases a secret only after the owner's OS gesture, and only the approval server uses it).
+      'desktopNativeHelper',
       // U3-d: removes the keychain items of an agent the app just created (agentId-derived names
       // only; never the owner's items), when it could not be completed.
       'discardNewOsKeychainAgent',

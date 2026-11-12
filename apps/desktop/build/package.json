@@ -9,7 +9,7 @@
     "node": ">=22.14.0"
   },
   "scripts": {
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs ../native/test/*.test.mjs"
   },
   "devDependencies": {
     "@electron/asar": "4.3.1",

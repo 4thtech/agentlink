@@ -28,6 +28,7 @@ import { asarIntegrity, writeMacDigest } from './lib/integrity.mjs';
 import { describeSignature, planFor, signApp, verifyApp } from './lib/mac-sign.mjs';
 import { APP_NAME, infoPlist } from './lib/plist.mjs';
 import { parseArgs, run } from './lib/run.mjs';
+import { buildMacHelper } from './native.mjs';
 import {
   CACHE_DIR,
   DESKTOP_DIR,
@@ -102,6 +103,8 @@ cpSync(join(nodeSrc, 'bin', 'node'), nodeBin);
 cpSync(join(nodeSrc, 'LICENSE'), join(nodeDest, 'LICENSE'));
 chmodSync(nodeBin, 0o755);
 const nodeBefore = describeSignature(join(nodeSrc, 'bin', 'node'));
+// Owner-presence helper (WP-D12b), built from source for this arch; signed in step 7.
+const presenceHelper = buildMacHelper({ arch, outDir: join(contents, 'Helpers') });
 
 console.log('[5/9] core (packed tarball, npm ci from core-lock, --ignore-scripts)');
 const core = installCore({
@@ -193,6 +196,7 @@ const inputs = {
     sha256: constants.node.assets[platform].sha256,
     signature: nodeAfter,
   },
+  presenceHelperSha256: await sha256Of(presenceHelper),
   coreTgzSha256: await sha256Of(tgz),
   asarHeaderSha256: integrity.hash,
   integritySlotsPatched: slots,

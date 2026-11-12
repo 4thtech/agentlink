@@ -5,7 +5,7 @@
 // with the link-sink server, `join`'s invite checks and handoff) and runs host-core.ts.
 import process from 'node:process';
 import { checkInviteLink, resolveInviteLink, shortInviteFetcher } from '@4thtech-io/core';
-import { startApprovalServerWithLinkSink } from '@4thtech-io/node';
+import { desktopNativeHelper, startApprovalServerWithLinkSink } from '@4thtech-io/node';
 import { DROP_DEFAULT_ENDPOINT } from '@4thtech-io/storage';
 import { nodeUiDeps, onStopSignals } from '../commands/ui.js';
 import { sendHandoff } from '../runtime/app-host-record.js';
@@ -64,7 +64,15 @@ export function nodeDesktopHostDeps(pipe: DesktopPipe): DesktopHostDeps {
   return Object.freeze<DesktopHostDeps>({
     pipe,
     uiDeps: (startServer) => nodeUiDeps({ startServer }),
-    startServer: (options, sink) => startApprovalServerWithLinkSink(options, sink),
+    // DESK-D12c: Touch ID / Windows Hello for approvals, when the app's presence helper is in place
+    // next to the bundled Node (a fixed path, never from the environment or the pipe).
+    startServer: (options, sink) => {
+      const nativePresence = desktopNativeHelper();
+      return startApprovalServerWithLinkSink(
+        nativePresence === undefined ? options : { ...options, nativePresence },
+        sink,
+      );
+    },
     invite: Object.freeze<DesktopInviteDeps>({
       resolve: (link: string) => resolveInviteLink(link, fetchShort),
       check: (link: string, nowSeconds: number) => checkInviteLink(link, nowSeconds),

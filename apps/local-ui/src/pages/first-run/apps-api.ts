@@ -10,7 +10,12 @@
 // and only the answers' fixed fields. Answers from a server that does not have the route yet (501)
 // are `not_available`; the page then offers "Later". Nothing is logged.
 import { createOwnerClient } from '../contacts/owner.js';
-import type { PasskeyInfo, PresenceProof } from '../contacts/owner.js';
+import {
+  presenceBody,
+  presenceMode,
+  type PasskeyInfo,
+  type PresenceProof,
+} from '../contacts/owner.js';
 
 export const APPS_PATH = '/api/ui/apps';
 export const APPS_PREVIEW_PATH = '/api/ui/apps/preview';
@@ -285,8 +290,9 @@ export function createAppsApi(options: AppsApiOptions = {}): AppsApi {
         'Content-Type': 'application/octet-stream',
         'X-AgentLink-Input': base64url(JSON.stringify({ changeId })),
       });
-      if (proof.kind === 'passkey') headers.set('X-AgentLink-Presence', 'passkey');
-      const body = proof.kind === 'passkey' ? proof.body : new TextEncoder().encode(proof.code);
+      const mode = presenceMode(proof);
+      if (mode !== undefined) headers.set('X-AgentLink-Presence', mode);
+      const body = presenceBody(proof);
       let res: Response;
       try {
         res = await doFetch(APPS_APPLY_PATH, {

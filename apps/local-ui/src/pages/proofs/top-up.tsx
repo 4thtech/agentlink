@@ -769,7 +769,12 @@ export function ConfirmMove({
     setBusy(true);
     setLine(undefined);
     const input = { network: move.net.network, amount: move.money.amount };
-    const presence = proof.kind === 'code' ? proof.code : { passkey: proof.body };
+    const presence =
+      proof.kind === 'code'
+        ? proof.code
+        : proof.kind === 'native'
+          ? { native: true as const }
+          : { passkey: proof.body };
     void api.owner(deposit ? TOP_UP_PATH : WITHDRAW_PATH, input, presence).then((res) => {
       setBusy(false);
       const out = outcomeLine(res);

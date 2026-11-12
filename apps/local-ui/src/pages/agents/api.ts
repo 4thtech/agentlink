@@ -9,7 +9,7 @@
 // rename answers how many contacts are told, or `rename_limited` with its time (D-141).
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { knownFailureReason, type FailureReasonCode } from '../../api/failure-reasons.js';
-import type { PresenceProof } from '../contacts/owner.js';
+import { presenceBody, presenceMode, type PresenceProof } from '../contacts/owner.js';
 import { appNameOf, parseAppNames } from './app-names.js';
 import { parseAgents, type AgentsList } from './data.js';
 
@@ -167,8 +167,9 @@ export function createAgentsApi(options: AgentsApiOptions = {}): AgentsApi {
       'Content-Type': 'application/octet-stream',
       'X-AgentLink-Input': base64url(JSON.stringify(input)),
     });
-    if (proof.kind === 'passkey') headers.set('X-AgentLink-Presence', 'passkey');
-    const body = proof.kind === 'passkey' ? proof.body : new TextEncoder().encode(proof.code);
+    const mode = presenceMode(proof);
+    if (mode !== undefined) headers.set('X-AgentLink-Presence', mode);
+    const body = presenceBody(proof);
     let res: Response;
     try {
       res = await doFetch(path, {

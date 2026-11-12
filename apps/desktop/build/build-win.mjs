@@ -3,7 +3,7 @@
 // Runs on windows-2022 in CI (needs `tar` and `makensis`), or anywhere with --nsi-only for a dry run
 // (the PE edits and fuses are pure Node, so everything except makensis can be checked on a Mac).
 //
-//   node build-win.mjs --tgz <packed-cli.tgz> [--version 0.5.0] [--out dir] [--nsi-only]
+//   node build-win.mjs --tgz <packed-cli.tgz> [--version 0.5.0] [--out dir] [--nsi-only] [--helper agentlink-presence.exe]
 //
 // Signing: Authenticode is a hook that is OFF. DESKTOP_SIGNING=on is refused here until WP-D18.
 import { cpSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -16,6 +16,7 @@ import { asarIntegrity, writeWinIcon, writeWinIntegrity } from './lib/integrity.
 import { winIcoPath } from './lib/icon.mjs';
 import { nsisScript } from './lib/nsis.mjs';
 import { capture, parseArgs, run } from './lib/run.mjs';
+import { buildWinHelper } from './native.mjs';
 import {
   CACHE_DIR,
   LAYOUT,
@@ -36,6 +37,7 @@ const args = parseArgs(process.argv.slice(2), {
   out: 'v',
   'dist-dir': 'v',
   'nsi-only': 'flag',
+  helper: 'v',
 });
 if (!args.tgz) throw new Error('--tgz <packed CLI tarball> is required.');
 if (process.env.DESKTOP_SIGNING === 'on')
@@ -77,6 +79,16 @@ const nodeExe = join(dir, 'resources', ...LAYOUT.node.win32); // resources\\node
 mkdirSync(join(nodeExe, '..'), { recursive: true });
 cpSync(join(nodeSrc, 'node.exe'), nodeExe);
 cpSync(join(nodeSrc, 'LICENSE'), join(nodeExe, '..', 'LICENSE'));
+// Owner-presence helper (WP-D12b): a prebuilt one from CI (--helper) or built here with MSVC.
+const helperDir = join(dir, 'resources', 'native');
+if (args.helper) {
+  mkdirSync(helperDir, { recursive: true });
+  cpSync(resolve(args.helper), join(helperDir, 'agentlink-presence.exe'));
+} else if (process.platform === 'win32') {
+  buildWinHelper({ outDir: helperDir, arch: 'x64' });
+} else if (!args['nsi-only']) {
+  throw new Error('The presence helper needs MSVC: pass --helper <agentlink-presence.exe>.');
+}
 
 console.log('[5/7] core (packed tarball, npm ci from core-lock, --ignore-scripts)');
 const core = installCore({
