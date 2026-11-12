@@ -69,8 +69,13 @@ describe('--help (06 §8)', () => {
       'doctor',
       'ui',
       'mcp',
+      // UX1113-R1 (D-147; 06 §8): restore from a recovery kit, and its alias.
+      'backup',
+      'restore',
     ]);
     const help = helpText();
+    expect(help).toContain('agentlink backup restore [file] [--check]');
+    expect(help).toContain('agentlink restore [file] [--check]');
     for (const usage of [
       'agentlink init',
       'agentlink owner init',
