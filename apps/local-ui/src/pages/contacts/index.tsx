@@ -47,14 +47,7 @@ import {
 } from 'react';
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
 import { usePrefs } from '../../prefs/index.js';
-import {
-  ActivityCell,
-  ActivitySort,
-  compareMostActive,
-  sortKey,
-  usePulse,
-  type Pulse,
-} from '../pulse/index.js';
+import { ActivitySort, compareMostActive, sortKey, usePulse, type Pulse } from '../pulse/index.js';
 import { PAGE_TITLES } from '../../strings.js';
 import { ADD_CONTACT_MARKER } from './add-contact-link.js';
 import { connectingTo } from './add-strings.js';
@@ -106,6 +99,7 @@ import {
   countLine,
   mismatchBody,
   nudge,
+  personLine,
   secondConnection,
   since,
   waitSeconds,
@@ -199,72 +193,170 @@ function StateChip({ contact }: { contact: ContactRow }): ReactElement | null {
   return null;
 }
 
-/** Shown names that more than one contact has, so each of those rows can say so (UI-only hint). */
-function duplicateNames(contacts: readonly ContactRow[]): ReadonlySet<string> {
-  const seen = new Set<string>();
-  const dupes = new Set<string>();
-  for (const c of contacts) {
-    const n = shownName(c).trim().toLowerCase();
-    if (seen.has(n)) dupes.add(n);
-    seen.add(n);
-  }
-  return dupes;
+/** "2 h ago", "yesterday", or a short date: plain text for the row line. */
+function ago(at: number, now: number): string {
+  const sec = Math.max(0, now - at);
+  if (sec < 60) return 'just now';
+  if (sec < 3600) return `${String(Math.floor(sec / 60))} min ago`;
+  if (sec < 86_400) return `${String(Math.floor(sec / 3600))} h ago`;
+  if (sec < 172_800) return 'yesterday';
+  return DAY.format(new Date(at * 1000));
+}
+
+function PersonRow({
+  c,
+  selected,
+  fresh,
+  pulse,
+  onSelect,
+  archived,
+  again,
+}: {
+  c: ContactRow;
+  selected: string | undefined;
+  fresh?: string | undefined;
+  pulse: Pulse | undefined;
+  onSelect: (ref: string) => void;
+  /** Set for an archived (removed) connection. */
+  archived?: boolean;
+  /** An active person with the same owner: the day you connected again. */
+  again?: string | undefined;
+}): ReactElement {
+  const last = pulse?.contacts.get(c.ref)?.lastAt;
+  const connected = DAY.format(new Date((c.pairedAt ?? c.since) * 1000));
+  const name = (
+    <span className="al-contact-name">
+      <bdi>{shownName(c)}</bdi>
+      {c.formerName === undefined ? null : (
+        <span className="al-text-caption al-muted ct-former">
+          {' '}
+          <bdi>{S.wasName(c.formerName)}</bdi>
+        </span>
+      )}
+      {archived === true ? (
+        <span className="al-text-caption al-muted"> · {S.olderConnection}</span>
+      ) : null}
+    </span>
+  );
+  return (
+    <li>
+      <button
+        type="button"
+        className={`al-contact ct-row${c.status === 'active' ? '' : ` is-${c.status}`}${c.ref === fresh ? ' is-fresh' : ''}`}
+        aria-current={c.ref === selected ? 'true' : undefined}
+        onClick={() => onSelect(c.ref)}
+      >
+        <span className="al-avatar al-text-label" aria-hidden="true">
+          {initials(shownName(c))}
+        </span>
+        <span className="al-contact-main">
+          {name}
+          <span className="al-text-caption al-muted ct-line">
+            {archived === true
+              ? `${S.theyRemoved}${again === undefined ? '' : ` ${S.connectedAgain(again)}`} ${S.oldConversation}`
+              : personLine(
+                  last === undefined || last <= 0 || pulse === undefined
+                    ? undefined
+                    : ago(last, pulse.now),
+                  connected,
+                )}
+          </span>
+        </span>
+        <span className="al-contact-side">
+          {archived === true ? (
+            <span className="al-text-label ct-open">{S.open}</span>
+          ) : (
+            <>
+              <StateChip contact={c} />
+              {c.status === 'active' && c.pairing === 'complete' ? (
+                c.label === 'safety-code-checked' ? (
+                  <Chip icon="check" tone="success">
+                    {HOOD.checked}
+                  </Chip>
+                ) : (
+                  <span className="al-text-label ct-check">{S.checkContact}</span>
+                )
+              ) : null}
+            </>
+          )}
+        </span>
+      </button>
+    </li>
+  );
 }
 
 function ContactList({
   contacts,
   selected,
   pulse,
-  arrivals,
-  seq,
   onSelect,
   fresh,
 }: {
   contacts: readonly ContactRow[];
   selected: string | undefined;
   pulse: Pulse | undefined;
-  arrivals: ReadonlySet<string>;
-  seq: number;
   onSelect: (ref: string) => void;
   /** W5-INVITE-FEEDBACK: the contact that just connected (a short pulse). */
   fresh?: string | undefined;
 }): ReactElement {
-  const dupes = duplicateNames(contacts);
   return (
     <Surface as="ul" level={1} className="ct-list" aria-label={S.listLabel}>
       {contacts.map((c) => (
-        <li key={c.ref}>
-          <button
-            type="button"
-            className={`al-contact ct-row${c.status === 'active' ? '' : ` is-${c.status}`}${c.ref === fresh ? ' is-fresh' : ''}`}
-            aria-current={c.ref === selected ? 'true' : undefined}
-            onClick={() => onSelect(c.ref)}
-          >
-            <span className="al-avatar al-text-label" aria-hidden="true">
-              {initials(shownName(c))}
-            </span>
-            <span className="al-contact-main">
-              <span className="al-contact-name">
-                <ContactName {...nameInput(c)} label={labelKind(c)} showLabel />
-                {c.formerName === undefined ? null : (
-                  <span className="al-text-caption al-muted ct-former">
-                    {' '}
-                    <bdi>{S.wasName(c.formerName)}</bdi>
-                  </span>
-                )}
-              </span>
-              {dupes.has(shownName(c).trim().toLowerCase()) ? (
-                <span className="al-text-caption al-muted ct-same-name">{S.sameName}</span>
-              ) : null}
-            </span>
-            <ActivityCell pulse={pulse} contactId={c.ref} arrival={arrivals.has(c.ref) ? seq : 0} />
-            <span className="al-contact-side">
-              <StateChip contact={c} />
-            </span>
-          </button>
-        </li>
+        <PersonRow
+          key={c.ref}
+          c={c}
+          selected={selected}
+          fresh={fresh}
+          pulse={pulse}
+          onSelect={onSelect}
+        />
       ))}
     </Surface>
+  );
+}
+
+/** Revoked and removed connections: they move here by themselves; collapsed by default (spec §5). */
+function ArchivedList({
+  gone,
+  active,
+  selected,
+  pulse,
+  onSelect,
+}: {
+  gone: readonly ContactRow[];
+  active: readonly ContactRow[];
+  selected: string | undefined;
+  pulse: Pulse | undefined;
+  onSelect: (ref: string) => void;
+}): ReactElement | null {
+  if (gone.length === 0) return null;
+  const againOf = (c: ContactRow): string | undefined => {
+    const n = shownName(c).trim().toLowerCase();
+    const next = active.find(
+      (a) => a.olderSameOwner === c.ref || shownName(a).trim().toLowerCase() === n,
+    );
+    return next === undefined
+      ? undefined
+      : DAY.format(new Date((next.pairedAt ?? next.since) * 1000));
+  };
+  return (
+    <details className="ct-archived">
+      <summary className="al-text-label">{`${S.archivedLabel} (${String(gone.length)})`}</summary>
+      <Surface as="ul" level={1} className="ct-list ct-list-archived" aria-label={S.archivedLabel}>
+        {gone.map((c) => (
+          <PersonRow
+            key={c.ref}
+            c={c}
+            selected={selected}
+            pulse={pulse}
+            onSelect={onSelect}
+            archived
+            again={againOf(c)}
+          />
+        ))}
+      </Surface>
+      <p className="al-text-caption al-muted">{S.archivedFoot}</p>
+    </details>
   );
 }
 
@@ -1150,15 +1242,21 @@ export function ContactsPage({
     }
     return 'failed';
   };
+  const waitingCount = rows.length + connectingRows.length;
   const invitesList = (
-    <PendingInvites
-      rows={rows}
-      cancelled={cancelledRows}
-      highlight={highlight}
-      now={Date.now()}
-      onCancel={cancelInvite}
-      connecting={connectingRows}
-    />
+    <>
+      {waitingCount > 0 ? (
+        <h2 className="al-text-label al-muted ct-group">{`${S.invitesWaiting} (${String(waitingCount)})`}</h2>
+      ) : null}
+      <PendingInvites
+        rows={rows}
+        cancelled={cancelledRows}
+        highlight={highlight}
+        now={Date.now()}
+        onCancel={cancelInvite}
+        connecting={connectingRows}
+      />
+    </>
   );
   const moment =
     arrived === undefined ? null : (
@@ -1249,10 +1347,25 @@ export function ContactsPage({
         : list.contacts.find(
             (c) => c.ref === olderRef && c.ref !== current.ref && c.status === 'active',
           );
+    const live = list.contacts.filter((c) => c.status !== 'revoked');
+    const liveSorted =
+      activitySort === 'active'
+        ? [...live].sort((x, y) =>
+            compareMostActive(sortKey(activity.pulse, x.ref, 0), sortKey(activity.pulse, y.ref, 0)),
+          )
+        : live;
+    const openRow = (ref: string): void => {
+      setRemoved(false);
+      setSelected(ref);
+      setSheetOpen(true);
+    };
     return (
       <>
-        <p className="al-text-label al-muted ct-count">{countLine(list.contacts.length)}</p>
         {title}
+        <p className="al-text-body al-muted ct-lead">{S.lead}</p>
+        <p className="al-text-label al-muted ct-count">
+          {countLine(list.contacts.filter((c) => c.status !== 'revoked').length, rows.length)}
+        </p>
         {removed ? (
           <p className="al-text-body" role="status">
             {S.removed}
@@ -1263,26 +1376,18 @@ export function ContactsPage({
           {invitesList}
           <ActivitySort />
           <ContactList
-            contacts={
-              activitySort === 'active'
-                ? [...list.contacts].sort((a, b) =>
-                    compareMostActive(
-                      sortKey(activity.pulse, a.ref, 0),
-                      sortKey(activity.pulse, b.ref, 0),
-                    ),
-                  )
-                : list.contacts
-            }
+            contacts={liveSorted}
             selected={current?.ref}
             pulse={activity.pulse}
-            arrivals={activity.arrivals}
-            seq={activity.seq}
             fresh={fresh}
-            onSelect={(ref) => {
-              setRemoved(false);
-              setSelected(ref);
-              setSheetOpen(true);
-            }}
+            onSelect={openRow}
+          />
+          <ArchivedList
+            gone={list.contacts.filter((c) => c.status === 'revoked')}
+            active={live}
+            selected={current?.ref}
+            pulse={activity.pulse}
+            onSelect={openRow}
           />
         </div>
         <Sheet

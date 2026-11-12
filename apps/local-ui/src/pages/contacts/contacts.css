@@ -176,3 +176,41 @@
     animation: al-fade-out var(--al-duration-moment) var(--al-easing-standard) 5 alternate;
   }
 }
+
+/* People (UX 2026-11-12 §5): the lead, the row line, the Check contact link, the Archived group. */
+.ct-lead {
+  margin: 0;
+}
+.ct-group {
+  margin: 0;
+  width: 100%;
+}
+.ct-line {
+  display: block;
+}
+.ct-check,
+.ct-open {
+  color: var(--al-color-accent-default);
+  text-decoration: underline;
+}
+.ct-archived {
+  flex: 1 1 100%;
+  margin-top: var(--al-space-4);
+}
+.ct-archived > summary {
+  cursor: pointer;
+  margin-bottom: var(--al-space-3);
+}
+.ct-list-archived .ct-row {
+  background: var(--al-color-bg-sunken);
+}
+.ct-list-archived .ct-line {
+  white-space: normal;
+}
+.ct-row .al-contact-side {
+  align-items: center;
+}
+.ct-row .al-chip {
+  width: fit-content;
+  flex: none;
+}
