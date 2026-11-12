@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Published @4thtech-io/agentlink version or dist-tag"
+        description: "latest only (the student installer always installs latest); another version stops with an error"
         type: string
         default: latest
   pull_request:

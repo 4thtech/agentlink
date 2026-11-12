@@ -7,8 +7,9 @@
 // install `@4thtech-io/agentlink@latest` through npx exactly as the one-line command does), then
 // drives the installed launcher with two temporary profiles (two HOMEs: "ana" and "ben"). Each step
 // is timed and written to the job summary. Nothing here touches production 4thTech services: the
-// installers fetch Node.js from nodejs.org and the package from the npm registry; no step starts a
-// relay connection.
+// installers fetch Node.js from nodejs.org and the package from the npm registry. Step S5 starts
+// `mcp` on an initialised profile, whose background inbox loop may contact the public default relays
+// (third-party Nostr relays, never a 4thTech service); no message is sent.
 //
 // Steps:
 //   S1 install            student installer, --no-start / -NoStart
@@ -40,6 +41,10 @@ import process from 'node:process';
 
 const win = process.platform === 'win32';
 const requested = process.argv[2] ?? 'latest';
+if (!/^[A-Za-z0-9.+_-]+$/.test(requested)) {
+  console.error('unexpected version');
+  process.exit(1);
+}
 const repo = process.cwd();
 const root = mkdtempSync(join(tmpdir(), 'agentlink-golden-'));
 const results = [];
@@ -49,6 +54,17 @@ const npmView = spawnSync('npm', ['view', `@4thtech-io/agentlink@${requested}`, 
   shell: win,
 });
 const expected = npmView.stdout.trim().split('\n').pop()?.trim() ?? '';
+const latest = spawnSync('npm', ['view', '@4thtech-io/agentlink@latest', 'version'], {
+  encoding: 'utf8',
+  shell: win,
+});
+if (latest.stdout.trim().split('\n').pop()?.trim() !== expected) {
+  // The student installers always install @latest, so only latest can be rehearsed truthfully.
+  console.error(
+    `the student installers install @latest only; ${requested} is not the latest version`,
+  );
+  process.exit(1);
+}
 if (!/^\d+\.\d+\.\d+/.test(expected)) {
   console.error(`could not resolve @4thtech-io/agentlink@${requested} on npm`);
   process.exit(1);
@@ -138,7 +154,11 @@ if (process.platform === 'darwin') {
       ['unlock-keychain', '-p', 'ci', kc],
       ['set-keychain-settings', kc],
     ]) {
-      spawnSync('security', args, { env: profileEnv(home) });
+      const r = spawnSync('security', args, { env: profileEnv(home) });
+      if (r.status !== 0) {
+        console.error(`FAIL setup: security ${args[0]} exited ${r.status}`);
+        process.exit(1);
+      }
     }
   }
 }
