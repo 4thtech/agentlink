@@ -11,7 +11,9 @@ import { createApiClient, type ApiClient, type OwnerApiResult } from '../../api/
 import { forgetRecoveryKitLater } from '../../states/index.js';
 import { gateMessage, OwnerGate } from '../agents/owner-gate.js';
 import { createOwnerClient, type PasskeyInfo, type PresenceProof } from '../contacts/owner.js';
+import { SaveChecklist } from './save-checklist.js';
 import { BACKUP_STRINGS as S } from './strings.js';
+import { dayOf, joinNames } from './status.js';
 
 export const BACKUP_READ_PATH = '/api/ui/backup';
 export const BACKUP_EXPORT_PATH = '/api/ui/backup/export';
@@ -23,6 +25,10 @@ export interface SavedKit {
   readonly file: string;
   readonly folder: 'Downloads' | 'Home';
   readonly code: string;
+  /** The IDs the kit covers, by name (text only). */
+  readonly covers: readonly string[];
+  /** The one-use Check handle (WP-R2), when the server gave one. */
+  readonly check?: string;
 }
 
 /** What the export answered, in the page's terms. */
@@ -46,7 +52,28 @@ export function exportOutcomeOf(result: OwnerApiResult): ExportOutcome {
         typeof d['code'] === 'string' &&
         CODE.test(d['code'])
       ) {
-        return { kind: 'saved', kit: { file: d['file'], folder: d['folder'], code: d['code'] } };
+        const covers = Array.isArray(d['covers'])
+          ? d['covers']
+              .map((c) =>
+                typeof c === 'object' && c !== null ? (c as { name?: unknown }).name : c,
+              )
+              .filter((n): n is string => typeof n === 'string' && n.length > 0 && n.length < 65)
+              .slice(0, 12)
+          : [];
+        const check =
+          typeof d['check'] === 'string' && /^[A-Za-z0-9_-]{22}$/.test(d['check'])
+            ? d['check']
+            : undefined;
+        return {
+          kind: 'saved',
+          kit: {
+            file: d['file'],
+            folder: d['folder'],
+            code: d['code'],
+            covers,
+            ...(check === undefined ? {} : { check }),
+          },
+        };
       }
       return { kind: 'error', message: S.failed };
     }
@@ -82,19 +109,30 @@ type Phase =
   | { readonly kind: 'confirm'; readonly error?: string }
   | { readonly kind: 'working' }
   | { readonly kind: 'saved'; readonly kit: SavedKit }
-  | { readonly kind: 'done'; readonly kit: Omit<SavedKit, 'code'> };
+  | { readonly kind: 'done'; readonly covers: readonly string[] };
 
 export interface ExportKitProps {
   readonly api?: ApiClient;
   /** The stored passkey this browser can use (contacts/owner.ts); tests pass their own. */
   readonly passkey?: () => Promise<PasskeyInfo | undefined>;
-  /** The ID's label for the confirmation line; "this ID" when not known. */
+  /** The ID's label for the confirmation line; "your IDs" when not known. */
   readonly label?: string;
+  /** The page already read it (GET /api/ui/backup `export`): skip our own read. */
+  readonly known?: 'available' | 'not_available' | undefined;
+  /** The button reads "Save a new kit" when a kit is on record. */
+  readonly hasKit?: boolean;
+  /** Check my kit's route, when it is registered (default: save-checklist.ts). */
+  readonly checkPath?: string | undefined;
+  /** Called after Done, so the page can read the record again. */
+  readonly onDone?: (() => void) | undefined;
+  /** Tests inject the print window opener. */
+  readonly openWindow?: Parameters<typeof import('./print-sheet.js').printSheet>[1] | undefined;
 }
 
-function useAvailability(api: ApiClient): Availability {
+function useAvailability(api: ApiClient, known: Availability | undefined): Availability {
   const [state, setState] = useState<Availability>('loading');
   useEffect(() => {
+    if (known !== undefined) return undefined;
     let live = true;
     void api.get<{ export?: unknown }>(BACKUP_READ_PATH).then(
       (r) => {
@@ -108,8 +146,8 @@ function useAvailability(api: ApiClient): Availability {
     return () => {
       live = false;
     };
-  }, [api]);
-  return state;
+  }, [api, known]);
+  return known ?? state;
 }
 
 function usePasskeyInfo(read: () => Promise<PasskeyInfo | undefined>): PasskeyInfo | undefined {
@@ -134,9 +172,14 @@ export function ExportKit({
   api: given,
   passkey: readPasskey = defaultPasskey,
   label,
+  known,
+  hasKit = false,
+  checkPath,
+  onDone,
+  openWindow,
 }: ExportKitProps): ReactElement {
   const [api] = useState<ApiClient>(() => given ?? defaultApi());
-  const availability = useAvailability(api);
+  const availability = useAvailability(api, known);
   const passkey = usePasskeyInfo(readPasskey);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [copied, setCopied] = useState(false);
@@ -203,27 +246,22 @@ export function ExportKit({
           </div>
           <p className="al-text-body-sm">{S.codeBody}</p>
           <p className="al-text-body-sm al-muted">{S.privacy}</p>
-          <div className="al-secret-actions">
-            <Button
-              variant="primary"
-              onClick={() => {
-                forgetRecoveryKitLater();
-                setPhase({ kind: 'done', kit: { file: kit.file, folder: kit.folder } });
-              }}
-            >
-              {S.savedIt}
-            </Button>
-            <Button
-              variant="secondary"
-              icon="copy"
-              aria-controls={codeId}
-              onClick={() => copy(kit.code)}
-            >
-              {copied ? S.copied : S.copy}
-            </Button>
-          </div>
           <p className="al-text-caption al-muted">{S.copyNote}</p>
         </section>
+        <SaveChecklist
+          api={api}
+          facts={{ code: kit.code, file: kit.file, date: dayOf(Date.now()) }}
+          check={kit.check}
+          checkPath={checkPath}
+          copied={copied}
+          onCopy={() => copy(kit.code)}
+          open={openWindow}
+          onDone={() => {
+            forgetRecoveryKitLater();
+            setPhase({ kind: 'done', covers: kit.covers });
+            onDone?.();
+          }}
+        />
       </div>
     );
   }
@@ -241,7 +279,7 @@ export function ExportKit({
     <div className="bk-export" data-backup-export={phase.kind}>
       {phase.kind === 'done' ? (
         <p className="al-text-body-sm" role="status">
-          {S.done}
+          {S.done(joinNames(phase.covers))}
         </p>
       ) : null}
       {phase.kind === 'confirm' || phase.kind === 'working' ? (
@@ -256,14 +294,14 @@ export function ExportKit({
       ) : (
         <div className="bk-actions">
           <Button
-            variant={phase.kind === 'done' ? 'secondary' : 'primary'}
+            variant={hasKit || phase.kind === 'done' ? 'secondary' : 'primary'}
             icon="download"
             onClick={() => {
               setNote(undefined);
               setPhase({ kind: 'confirm' });
             }}
           >
-            {phase.kind === 'done' ? S.saveAnother : S.saveKit}
+            {hasKit || phase.kind === 'done' ? S.saveNew : S.saveFirst}
           </Button>
           <p className="al-text-caption al-muted">{S.saveHint}</p>
         </div>

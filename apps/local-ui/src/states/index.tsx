@@ -12,6 +12,9 @@ export {
   recoveryKitPending,
   rememberRecoveryKitLater,
   forgetRecoveryKitLater,
+  setKitRecordState,
+  kitRecordState,
+  type KitRecordState,
 } from './recovery-kit.js';
 
 /** A page title with the "not available yet" state under it; every stub page is this. */
