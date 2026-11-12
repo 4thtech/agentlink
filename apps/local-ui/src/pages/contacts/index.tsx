@@ -96,6 +96,7 @@ import { ConnectedMoment, type ConnectedMomentProps } from '../invite/connected.
 import { useOwnName } from '../invite/own-name.js';
 import { InviteScreen, PasteScreen } from '../invite/invite-screen.js';
 import { PendingInviteRow, type CancelResult } from '../invite/pending-row.js';
+import { initials } from '../../initials.js';
 import { PersonMenu } from '../invite/person-menu.js';
 import { INVITE_STRINGS as I } from '../invite/strings.js';
 import { START_STRINGS } from '../home/strings.js';
@@ -190,19 +191,6 @@ export const renameNote = (c: ContactRow): string => {
 
 const labelKind = (c: ContactRow): IdentityKind =>
   c.label === 'safety-code-checked' ? 'checked' : 'selfdeclared';
-
-function initials(text: string): string {
-  const t = text.replace(/[“”"]/g, '').trim();
-  if (t.startsWith('Contact ')) return '#';
-  return (
-    t
-      .split(/\s+/)
-      .map((w) => w.charAt(0))
-      .join('')
-      .slice(0, 2)
-      .toUpperCase() || '?'
-  );
-}
 
 function Chip({ icon, tone, children }: { icon: string; tone: string; children: string }) {
   return (

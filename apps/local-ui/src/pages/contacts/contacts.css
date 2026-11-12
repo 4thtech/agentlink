@@ -45,13 +45,28 @@
 }
 .ct-detail-head {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--al-space-4);
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
 }
 .ct-detail-head h2 {
   margin: 0;
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+/* The whole name shows in the person's own sheet (R1-UI-24): it wraps, it is never cut. */
+.ct-detail-head .al-cname-text {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+/* R1-UI-05: the ⋯ button stays pinned top right, so its menu always opens inside the sheet. */
+.ct-detail-head .inv-menu-wrap {
+  flex: none;
 }
 .ct-actions {
   display: flex;

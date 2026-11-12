@@ -273,7 +273,7 @@ export function AppsPage({ api, agents, owner }: AppsPageProps): ReactElement {
   };
 
   return (
-    <main className="ap-page">
+    <div className="ap-page">
       <div className="ap-head">
         <h1 className="al-text-title-1">{S.title}</h1>
         {labels.label === '' ? null : (
@@ -380,6 +380,6 @@ export function AppsPage({ api, agents, owner }: AppsPageProps): ReactElement {
           onClose={closePanel}
         />
       ) : null}
-    </main>
+    </div>
   );
 }

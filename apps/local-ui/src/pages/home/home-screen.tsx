@@ -41,6 +41,7 @@ import {
 } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { getLive, subscribeLive, switchAgent, type LiveAgent } from '../../api/live.js';
+import { initials } from '../../initials.js';
 import { INVITE_PATH, PEOPLE_PATH } from '../../nav.js';
 import { notify, setArchived, useArchived } from '../../notices/index.js';
 import { checkHref } from '../contacts/safety.js';
@@ -192,7 +193,7 @@ function Avatar({
   readonly name: string;
   readonly small?: boolean;
 }): ReactElement {
-  const letter = [...name.trim()][0]?.toUpperCase() ?? '?';
+  const letter = initials(name);
   // A tint picked from the name, so a person keeps their colour (no image, no key).
   let tint = 0;
   for (const ch of name) tint = (tint * 31 + (ch.codePointAt(0) ?? 0)) % 2;
@@ -559,6 +560,11 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
     ]);
     if (!live.current) return;
     if (list.kind === 'ok') setApprovals(list.items);
+    // R1-UI-13: a failed passkey read changes nothing (the notice above says "couldn't check").
+    if (passkey.kind === 'unknown') {
+      setOwner((prev) => (prev.ready ? prev : { ready: true }));
+      return;
+    }
     setOwner(
       passkey.kind === 'ready'
         ? {
@@ -715,6 +721,21 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
       ? fmt(S.otherIdOne, { name: a.label })
       : fmt(S.otherIdPeople, { name: a.label, count: String(n) });
   };
+  // R1-UI-07: in "All IDs", another ID's people are not on this page (its names are sealed in its
+  // own store, 04 §2.5), so each other ID that has people gets its line and an Open button. The
+  // empty state is for when no ID has anyone.
+  const othersWithPeople =
+    filter === 'all' && many
+      ? agents.filter((a) => !a.current && (data?.idCounts?.get(a.name) ?? 0) > 0)
+      : [];
+  const otherIdRows = othersWithPeople.map((a) => (
+    <div className="hm-nomatch hm-f" data-other-id={a.name} key={`other-${a.name}`}>
+      <p className="al-text-body-sm al-muted">{otherLine(a)}</p>
+      <Button size="sm" onClick={() => void switchAgent(a.name)}>
+        {fmt(S.openAgent, { name: a.label })}
+      </Button>
+    </div>
+  ));
   const idChips = many ? (
     <div className="hm-id-chips hm-f" role="group" aria-label={S.idChips} data-id-chips="">
       <button
@@ -1003,6 +1024,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
               data.people.length === 0 &&
               pending.length === 0 &&
               connectingRows.length === 0 &&
+              othersWithPeople.length === 0 &&
               props.pendingRows === undefined ? (
               <EmptyState
                 title={S.noPeople}
@@ -1055,6 +1077,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                 {connectingRows.map((row) => (
                   <ConnectingRowView key={`c-${row.ref}`} row={row} />
                 ))}
+                {otherIdRows}
                 {props.pendingRows ??
                   pending.map((invite) => (
                     <PendingInviteRow

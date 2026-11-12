@@ -234,6 +234,14 @@ export function TouchIdPage({
                 </h2>
                 <p className="al-text-body-sm al-muted">{S.offLine}</p>
               </>
+            ) : status.kind === 'unavailable' && status.reason === 'unknown' ? (
+              // R1-UI-13: a failed read is not "can't be used here".
+              <>
+                <h2 id="ti-sensor" className="al-text-h3">
+                  {S.couldntCheckTitle(sensor)}
+                </h2>
+                <p className="al-text-body-sm al-muted">{S.couldntCheckLine}</p>
+              </>
             ) : (
               <>
                 <h2 id="ti-sensor" className="al-text-h3">
@@ -250,6 +258,10 @@ export function TouchIdPage({
           ) : canSwitch && panel !== 'turn-on' ? (
             <Button variant="primary" icon="key-round" onClick={() => open('turn-on')}>
               {S.turnOn(sensor)}
+            </Button>
+          ) : status?.kind === 'unavailable' && status.reason === 'unknown' ? (
+            <Button variant="secondary" onClick={readStatus}>
+              {S.tryAgain}
             </Button>
           ) : null}
         </div>

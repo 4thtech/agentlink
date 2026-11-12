@@ -80,7 +80,7 @@ async function mount(open: boolean): Promise<void> {
   await settle();
   if (open) {
     await act(async () => {
-      host.querySelector<HTMLButtonElement>('.ct-row')?.click();
+      document.body.querySelector<HTMLButtonElement>('.ct-row')?.click();
     });
     await settle();
   }
@@ -89,12 +89,12 @@ async function mount(open: boolean): Promise<void> {
 describe('axe', () => {
   it('finds no violation on the contact list', async () => {
     await mount(false);
-    expect(host.querySelector('.ct-row')).not.toBeNull();
+    expect(document.body.querySelector('.ct-row')).not.toBeNull();
     expect((await run()).violations.map((v) => v.id)).toEqual([]);
   });
   it('finds no violation with a contact open in the detail sheet', async () => {
     await mount(true);
-    expect(host.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
     expect((await run()).violations.map((v) => v.id)).toEqual([]);
   });
 });

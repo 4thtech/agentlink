@@ -47,7 +47,7 @@ function page(sheetOpen: boolean, dialogOpen = false): ReactNode {
     ),
   );
 }
-const inert = (id: string): boolean => document.getElementById(id)?.hasAttribute('inert') === true;
+const inert = (id: string): boolean => document.getElementById(id)?.closest('[inert]') != null; // the layer is drawn on <body>: the page's root, not each element, carries the attribute
 
 describe('modal background is inert', () => {
   it('is not inert while nothing is open', () => {

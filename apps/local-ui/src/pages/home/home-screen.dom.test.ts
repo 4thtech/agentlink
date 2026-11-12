@@ -220,8 +220,9 @@ async function render(answers: Answers, props: Partial<HomeScreenProps> = {}) {
   return s;
 }
 
-const q = <T extends Element = HTMLElement>(sel: string): T | null => host.querySelector<T>(sel);
-const all = (sel: string): HTMLElement[] => [...host.querySelectorAll<HTMLElement>(sel)];
+const q = <T extends Element = HTMLElement>(sel: string): T | null =>
+  document.body.querySelector<T>(sel);
+const all = (sel: string): HTMLElement[] => [...document.body.querySelectorAll<HTMLElement>(sel)];
 const byText = (sel: string, text: string | RegExp): HTMLElement | undefined =>
   all(sel).find((e) =>
     typeof text === 'string' ? e.textContent?.trim() === text : text.test(e.textContent ?? ''),
@@ -252,7 +253,7 @@ describe('Home simple (A4)', () => {
     expect(denis?.textContent).toContain(S.notDelivered);
     expect(row('Ana')).toBeTruthy();
     expect(s.calls.every((c) => c.method === 'GET')).toBe(true);
-    expect(lintVocabulary(host.textContent ?? '')).toEqual([]);
+    expect(lintVocabulary(document.body.textContent ?? '')).toEqual([]);
   });
 
   it('opens a row in place to the conversation, both directions, with delivery words and Copy', async () => {
@@ -261,36 +262,36 @@ describe('Home simple (A4)', () => {
     await render(base());
     await click(row('Denis'));
     expect(row('Denis')?.getAttribute('aria-expanded')).toBe('true');
-    expect(host.textContent).toContain(S.conversationTitle);
+    expect(document.body.textContent).toContain(S.conversationTitle);
     // Inbound words only inside the untrusted container.
     const inbound = all('figure.al-untrusted').map((f) => f.textContent ?? '');
     expect(inbound.some((t) => t.includes('Got them. Here is a first sketch.'))).toBe(true);
     const heads = all('h1, h2, h3, button, [role="status"]').map((e) => e.textContent ?? '');
     expect(heads.some((t) => t.includes('Got them'))).toBe(false);
     // Outbound: Sent / Waiting to send / Not delivered.
-    expect(host.textContent).toContain('Sending the brief.');
+    expect(document.body.textContent).toContain('Sending the brief.');
     expect(byText('span', S.sent)).toBeTruthy();
     expect(byText('span', S.waitingToSend)).toBeTruthy();
     expect(byText('span', S.notDelivered)).toBeTruthy();
-    expect(host.textContent).toContain(S.notDeliveredRetry);
+    expect(document.body.textContent).toContain(S.notDeliveredRetry);
     // Oldest first: the brief comes before the reply.
-    const text = host.textContent ?? '';
+    const text = document.body.textContent ?? '';
     expect(text.indexOf('Sending the brief.')).toBeLessThan(text.indexOf('Got them.'));
     // Copy writes the message text and says Copied.
     const copy = all('button').find((b) => b.getAttribute('aria-label') === S.copyLabel);
     await click(copy);
     expect(writeText).toHaveBeenCalledTimes(1);
     expect(byText('span', S.copied)).toBeTruthy();
-    expect(host.textContent).toContain(fmtName(S.encrypted, 'Denis'));
+    expect(document.body.textContent).toContain(fmtName(S.encrypted, 'Denis'));
   });
 
   it('loads earlier messages with the cursor', async () => {
     const s = await render(base());
     await click(row('Denis'));
-    expect(host.textContent).not.toContain('Hi, Denis here.');
+    expect(document.body.textContent).not.toContain('Hi, Denis here.');
     await click(byText('button', S.loadEarlier));
     expect(s.calls.some((c) => c.url === box(DENIS, 'in', 'cur-in-1'))).toBe(true);
-    expect(host.textContent).toContain('Hi, Denis here.');
+    expect(document.body.textContent).toContain('Hi, Denis here.');
     expect(byText('button', S.loadEarlier)).toBeUndefined();
   });
 
@@ -390,7 +391,7 @@ describe('Home simple (A4)', () => {
       }),
     );
     await click(row('Denis'));
-    expect(host.textContent).toContain(S.arrivedNotSaved);
+    expect(document.body.textContent).toContain(S.arrivedNotSaved);
     expect(byText('button', 'Save to Inbox')).toBeTruthy();
   });
 
@@ -423,7 +424,7 @@ describe('Home simple (A4)', () => {
     expect(confirm?.textContent).toContain('Remove Ana?');
     await click(byText('[role="alertdialog"] button', S.remove));
     // The presence step of Contacts: nothing is sent before the owner confirms.
-    expect(host.textContent).toMatch(/master code/i);
+    expect(document.body.textContent).toMatch(/master code/i);
   });
 
   it('lists invites that wait to be accepted, never the link, with Cancel', async () => {
@@ -436,8 +437,10 @@ describe('Home simple (A4)', () => {
         '/api/ui/invites/cancel': ok({ status: 'cancelled' }),
       }),
     );
-    expect(host.textContent).toContain('Waiting for Marko to accept · link works 7 more days');
-    expect(host.textContent).not.toMatch(/https?:\/\//);
+    expect(document.body.textContent).toContain(
+      'Waiting for Marko to accept · link works 7 more days',
+    );
+    expect(document.body.textContent).not.toMatch(/https?:\/\//);
     await click(byText('button', S.cancelInvite));
     const post = s.calls.find((c) => c.url === '/api/ui/invites/cancel');
     expect(post?.method).toBe('POST');
@@ -458,10 +461,10 @@ describe('Home simple (A4)', () => {
     await click(row('Denis'));
     // The inbox still has older messages (it has `next`), so nothing older than its oldest loaded
     // message shows yet: a gap would hide their side of that stretch.
-    expect(host.textContent).toContain('Newest from us.');
-    expect(host.textContent).not.toContain('An old reply from long ago.');
+    expect(document.body.textContent).toContain('Newest from us.');
+    expect(document.body.textContent).not.toContain('An old reply from long ago.');
     await click(byText('button', S.loadEarlier));
-    const text = host.textContent ?? '';
+    const text = document.body.textContent ?? '';
     expect(text).toContain('An old reply from long ago.');
     expect(text.indexOf('Hi, Denis here.')).toBeLessThan(
       text.indexOf('An old reply from long ago.'),
@@ -484,7 +487,7 @@ describe('Home simple (A4)', () => {
   it('shows names with no direction-changing or invisible characters, isolated (Fable g)', async () => {
     const SPOOF = { ...ANA, name: 'An\u202Ea\u200B' };
     await render(base({ [MESSAGES]: ok({ conversations: [DENIS, SPOOF] }) }));
-    expect(host.textContent).not.toMatch(/[\u202A-\u202E\u2066-\u2069\u200B-\u200F]/);
+    expect(document.body.textContent).not.toMatch(/[\u202A-\u202E\u2066-\u2069\u200B-\u200F]/);
     const names = all('bdi.hm-name');
     expect(names.length).toBeGreaterThanOrEqual(2);
     for (const n of names) expect(n.getAttribute('dir')).toBe('auto');
@@ -533,7 +536,7 @@ describe('W6-FLOW-FIXES: a connection the other side removed', () => {
     await click(row('Denis'));
     // UX 2026-11-12 (notices): one calm line on Home, no warning; the full words are on the
     // contact's own page, one link away.
-    expect(host.textContent).not.toContain(fmtName(S.connectionRemovedBody, 'Denis'));
+    expect(document.body.textContent).not.toContain(fmtName(S.connectionRemovedBody, 'Denis'));
     const gone = q('.hm-gone');
     expect(gone?.className).toContain('al-tone-neutral');
     expect(gone?.textContent).toContain(fmtName(S.connectionRemoved, 'Denis'));
@@ -541,9 +544,9 @@ describe('W6-FLOW-FIXES: a connection the other side removed', () => {
     expect(gone?.querySelector('a')?.getAttribute('href')).toBe(
       `/contacts?check=${encodeURIComponent(DENIS.contactId)}`,
     );
-    expect(host.textContent).not.toContain(S.notDeliveredRetry);
+    expect(document.body.textContent).not.toContain(S.notDeliveredRetry);
     // The history stays readable.
-    expect(host.textContent).toContain('Sending the brief.');
+    expect(document.body.textContent).toContain('Sending the brief.');
     await click(all('button').find((b) => b.getAttribute('aria-label') === 'More for Denis'));
     const items = all('[role="menuitem"]').map((e) => e.textContent?.trim());
     expect(items).toEqual([S.rename, S.remove]);
@@ -669,7 +672,7 @@ describe('Home pro (A10, Under the hood on)', () => {
     });
     await settle();
     expect(s.calls.some((c) => c.url === '/api/approvals/review')).toBe(true);
-    expect(host.textContent).toContain('A request in this list changed.');
+    expect(document.body.textContent).toContain('A request in this list changed.');
   });
 
   it('shows People as a table with search and the agent filter; search filters', async () => {
@@ -701,13 +704,13 @@ describe('Home pro (A10, Under the hood on)', () => {
   it('shows message details and contact facts in the conversation', async () => {
     await render(base());
     await click(row('Denis'));
-    expect(host.textContent).toContain(S.fingerprint);
-    expect(host.textContent).toContain('7F3A');
-    expect(host.textContent).toContain(S.identityChecked);
-    expect(host.textContent).toContain(S.paired);
-    expect(host.textContent).toContain(ENV_OUT1);
-    expect(host.textContent).toContain(`${S.receipt} ${S.receiptYes}`);
-    expect(host.textContent).toContain(`${S.proof} ${S.proofYes}`);
+    expect(document.body.textContent).toContain(S.fingerprint);
+    expect(document.body.textContent).toContain('7F3A');
+    expect(document.body.textContent).toContain(S.identityChecked);
+    expect(document.body.textContent).toContain(S.paired);
+    expect(document.body.textContent).toContain(ENV_OUT1);
+    expect(document.body.textContent).toContain(`${S.receipt} ${S.receiptYes}`);
+    expect(document.body.textContent).toContain(`${S.proof} ${S.proofYes}`);
   });
 
   it('approvals show ID, kind and expiry; only free plain requests can be picked for a bulk approve', async () => {
@@ -730,7 +733,7 @@ describe('Home pro (A10, Under the hood on)', () => {
     expect(boxes).toHaveLength(1);
     await click(boxes[0]);
     expect(byText('button', fmtCount(S.approveSelected, 1))).toBeTruthy();
-    expect(host.textContent).toContain(S.paidAlone);
+    expect(document.body.textContent).toContain(S.paidAlone);
   });
 });
 
@@ -815,6 +818,21 @@ describe('W7-ID-X1: ID chips, grouping, colour and who is asking', () => {
     expect(note?.textContent).toContain('Tali work has 1 person. Open it to see them.');
     expect(q('.hm-nomatch')?.textContent).not.toContain(S.noMatch);
     expect(row('Denis')).toBeFalsy();
+  });
+
+  it('R1-UI-07: in All IDs, an open ID with no people does not say "No one here yet" when another ID has some', async () => {
+    await render(
+      base({
+        ...agentsAnswer(2),
+        [MESSAGES]: ok({ conversations: [] }),
+        [CONTACTS]: ok({ status: 'ok', contacts: [] }),
+      }),
+    );
+    expect(q('[data-id-chips] button')?.getAttribute('aria-pressed')).toBe('true');
+    expect(document.body.textContent).not.toContain(S.noPeople);
+    const note = q('[data-other-id="tali-work"]');
+    expect(note?.textContent).toContain('Tali work has 1 person. Open it to see them.');
+    expect(note?.querySelector('button')?.textContent).toContain('Tali work');
   });
 
   it('names the asking ID with its app and draws its colour on the approval card', async () => {

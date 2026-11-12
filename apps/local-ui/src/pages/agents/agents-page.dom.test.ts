@@ -124,7 +124,7 @@ async function mountPage(reload = vi.fn<() => void>()): Promise<Mock<() => void>
   return reload;
 }
 const rowOf = (name: string): HTMLElement =>
-  host.querySelector<HTMLElement>(`[data-agent="${name}"]`)!;
+  document.body.querySelector<HTMLElement>(`[data-agent="${name}"]`)!;
 const button = (scope: ParentNode, text: string): HTMLButtonElement | undefined =>
   [...scope.querySelectorAll<HTMLButtonElement>('button')].find(
     (b) => b.textContent?.trim() === text,
@@ -153,13 +153,13 @@ async function type(el: HTMLInputElement, value: string): Promise<void> {
 /** Text without the bidi isolates the page puts around labels (U+2068, U+2069). */
 const plain = (el: Element): string => (el.textContent ?? '').replace(/[\u2068\u2069]/g, '');
 const code = (): HTMLInputElement =>
-  host.querySelector<HTMLInputElement>('input[name="owner-code"]')!;
+  document.body.querySelector<HTMLInputElement>('input[name="owner-code"]')!;
 
 describe('the Agents page', () => {
   it('lists every agent with its AI apps, contacts and the open one', async () => {
     await mountPage();
-    expect(host.querySelector('h1')?.textContent).toBe('My IDs');
-    expect(host.querySelectorAll('[data-agent]')).toHaveLength(4);
+    expect(document.body.querySelector('h1')?.textContent).toBe('My IDs');
+    expect(document.body.querySelectorAll('[data-agent]')).toHaveLength(4);
     const personal = rowOf('default');
     expect(personal.textContent).toContain('this is the ID you are looking at');
     expect(personal.textContent).toContain('Ready');
@@ -185,7 +185,7 @@ describe('the Agents page', () => {
   });
   it('has no List and Map control in the simple layer (it lives Under the hood)', async () => {
     await mountPage();
-    expect(button(host, 'Map')).toBeUndefined();
+    expect(button(document.body, 'Map')).toBeUndefined();
   });
   it('renders a label as text, never as markup', async () => {
     answers['GET /api/ui/agents'] = {
@@ -193,8 +193,8 @@ describe('the Agents page', () => {
       body: list([agent('x', '<img src=x onerror=alert(1)>', { current: true })]),
     };
     await mountPage();
-    expect(host.querySelector('img')).toBeNull();
-    expect(plain(host)).toContain('<img src=x onerror=alert(1)>');
+    expect(document.body.querySelector('img')).toBeNull();
+    expect(plain(document.body)).toContain('<img src=x onerror=alert(1)>');
   });
   it('says what to do with no agents, and offers New agent (Get started)', async () => {
     answers['GET /api/ui/agents'] = {
@@ -202,21 +202,23 @@ describe('the Agents page', () => {
       body: list([], { current: null, label: null }),
     };
     await mountPage();
-    expect(plain(host)).toContain(
+    expect(plain(document.body)).toContain(
       'No IDs yet. An ID is created when you connect your first AI app.',
     );
     // D-144 (b): the owner's explainer sentence on the empty page.
-    expect(plain(host)).toContain(
+    expect(plain(document.body)).toContain(
       "An ID is your AI app's identity on AgentLink: its inbox, people and keys. Every chat in that AI app uses it.",
     );
-    const links = [...host.querySelectorAll('a')].filter((a) => a.textContent === 'New ID');
+    const links = [...document.body.querySelectorAll('a')].filter(
+      (a) => a.textContent === 'New ID',
+    );
     expect(links.map((a) => a.getAttribute('href'))).toContain('/start/app?add=agent');
   });
   it('says "Couldn\'t load your IDs." with Try again when the read fails', async () => {
     answers['GET /api/ui/agents'] = { status: 500, body: {} };
     await mountPage();
-    expect(plain(host)).toContain("Couldn't load your IDs.");
-    expect(button(host, 'Try again')).toBeDefined();
+    expect(plain(document.body)).toContain("Couldn't load your IDs.");
+    expect(button(document.body, 'Try again')).toBeDefined();
   });
   it('an unused ID has no extra "no contacts" line (WP-I1)', async () => {
     await mountPage();
@@ -240,7 +242,7 @@ describe('the Agents page', () => {
       calls.filter((c) => c.url === '/api/ui/agents' && c.method === 'GET').length;
     const before = reads();
     await click(button(rowOf('work'), 'Open'));
-    expect(plain(host)).toContain('You switched IDs. Nothing was changed.');
+    expect(plain(document.body)).toContain('You switched IDs. Nothing was changed.');
     // The page's read and the shared live store's read.
     expect(reads()).toBeGreaterThan(before);
   });
@@ -269,7 +271,7 @@ describe('F27: Invite someone on each ID card', () => {
     await mountPage();
     await click(button(rowOf('work'), 'Invite someone'));
     expect(location.pathname).toBe('/agents');
-    expect(plain(host)).toContain('You switched IDs. Nothing was changed.');
+    expect(plain(document.body)).toContain('You switched IDs. Nothing was changed.');
   });
   it('a removing ID has no Invite someone', async () => {
     await mountPage();
@@ -294,9 +296,9 @@ describe('Rename', () => {
     expect(field.maxLength).toBe(32);
     await type(field, 'Home');
     await click(button(rowOf('work'), 'Rename with Touch ID'));
-    expect(plain(host)).toContain('Rename Work to Home');
+    expect(plain(document.body)).toContain('Rename Work to Home');
     await type(code(), '123456');
-    await click(button(host, 'Confirm with your master code'));
+    await click(button(document.body, 'Confirm with your master code'));
     const post = calls.find((c) => c.url === '/api/ui/agents/label')!;
     expect(post.body).toBe('123456');
     expect(post.headers.get('X-AgentLink-Input')).toBeTruthy();
@@ -316,9 +318,9 @@ describe('Rename', () => {
     await type(rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
     await click(button(rowOf('work'), 'Rename with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm with your master code'));
+    await click(button(document.body, 'Confirm with your master code'));
     // WP-1: a 501 (the rename that updates the card was not offered) says what to do, not "Try again".
-    expect(plain(host)).toContain('Quit the AgentLink app and open it again');
+    expect(plain(document.body)).toContain('Quit the AgentLink app and open it again');
     expect(rowOf('work')).toBeTruthy();
   });
 });
@@ -341,19 +343,19 @@ describe('label check and removal states', () => {
     await click(button(rowOf('work'), 'Rename'));
     await type(rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
     await click(button(rowOf('work'), 'Rename with Touch ID'));
-    expect(plain(host)).toContain("That name can't be used.");
-    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(plain(document.body)).toContain("That name can't be used.");
+    expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
   });
   it('closes the Remove sheet on agent_removing: the agent shows as Removal not finished', async () => {
     answers['POST /api/ui/agents/remove'] = { status: 409, body: { status: 'agent_removing' } };
     await mountPage();
     await click(await inMore(rowOf('work'), 'Remove'));
-    const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
+    const sheet = document.body.querySelector<HTMLElement>('[role="dialog"]')!;
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm with your master code'));
-    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    await click(button(document.body, 'Confirm with your master code'));
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
   });
 });
 
@@ -361,13 +363,13 @@ describe('Remove', () => {
   const open = async (name: string): Promise<HTMLElement> => {
     await mountPage();
     await click(await inMore(rowOf(name), 'Remove'));
-    return host.querySelector<HTMLElement>('[role="dialog"]')!;
+    return document.body.querySelector<HTMLElement>('[role="dialog"]')!;
   };
   const confirmTyped = async (sheet: HTMLElement): Promise<void> => {
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm with your master code'));
+    await click(button(document.body, 'Confirm with your master code'));
   };
   it('names what goes and keeps the button off until the exact label is typed', async () => {
     const sheet = await open('work');
@@ -394,8 +396,8 @@ describe('Remove', () => {
       atob(post.headers.get('X-AgentLink-Input')!.replace(/-/g, '+').replace(/_/g, '/')),
     );
     expect(sent).toEqual({ name: 'work', typedLabel: 'Work' });
-    expect(plain(host)).toContain('Quit any AI app that uses Work first.');
-    expect(button(host, 'Check again')).toBeDefined();
+    expect(plain(document.body)).toContain('Quit any AI app that uses Work first.');
+    expect(button(document.body, 'Check again')).toBeDefined();
   });
   it('W6-FLOW-FIXES: says "Quit Codex first" before any Touch ID while Codex runs the agent', async () => {
     const running = list([
@@ -412,16 +414,16 @@ describe('Remove', () => {
     const sheet = await open('work');
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
-    expect(plain(host)).toContain('Quit Codex first.');
-    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(plain(document.body)).toContain('Quit Codex first.');
+    expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
     expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
     // Still running: Check again stays on the sentence, still without a gesture.
-    await click(button(host, 'Check again'));
-    expect(plain(host)).toContain('Quit Codex first.');
-    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    await click(button(document.body, 'Check again'));
+    expect(plain(document.body)).toContain('Quit Codex first.');
+    expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
     // Quit: Check again goes on to the Touch ID step, and the server still decides.
     answers['GET /api/ui/agents'] = { status: 200, body: list(FOUR) };
-    await click(button(host, 'Check again'));
+    await click(button(document.body, 'Check again'));
     expect(code()).toBeTruthy();
     expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
   });
@@ -440,20 +442,20 @@ describe('Remove', () => {
     const sheet = await open('work');
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
-    expect(plain(host)).toContain(
+    expect(plain(document.body)).toContain(
       'Claude Code sessions in Terminal are still using this ID. Close them, then check again.',
     );
-    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
     expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
     // Still running: Check again stays on the sentence, still without a gesture.
-    await click(button(host, 'Check again'));
-    expect(plain(host)).toContain(
+    await click(button(document.body, 'Check again'));
+    expect(plain(document.body)).toContain(
       'Claude Code sessions in Terminal are still using this ID. Close them, then check again.',
     );
-    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
     // Quit: Check again goes on to the Touch ID step, and the server still decides.
     answers['GET /api/ui/agents'] = { status: 200, body: list(FOUR) };
-    await click(button(host, 'Check again'));
+    await click(button(document.body, 'Check again'));
     expect(code()).toBeTruthy();
     expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
   });
@@ -472,20 +474,20 @@ describe('Remove', () => {
     const sheet = await open('work');
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
-    expect(plain(host)).toContain(
+    expect(plain(document.body)).toContain(
       'OpenCode keeps running in the background after you close its window. Quit it from its menu, then check again.',
     );
-    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
     expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
     // Still running: Check again stays on the sentence, still without a gesture.
-    await click(button(host, 'Check again'));
-    expect(plain(host)).toContain(
+    await click(button(document.body, 'Check again'));
+    expect(plain(document.body)).toContain(
       'OpenCode keeps running in the background after you close its window. Quit it from its menu, then check again.',
     );
-    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
     // Quit: Check again goes on to the Touch ID step, and the server still decides.
     answers['GET /api/ui/agents'] = { status: 200, body: list(FOUR) };
-    await click(button(host, 'Check again'));
+    await click(button(document.body, 'Check again'));
     expect(code()).toBeTruthy();
     expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
   });
@@ -500,8 +502,10 @@ describe('Remove', () => {
     answers['POST /api/ui/agents/remove'] = { status: 501, body: {} };
     const sheet = await open('work');
     await confirmTyped(sheet);
-    expect(plain(host)).toContain("Couldn't finish removing Work. Nothing else was changed.");
-    expect(host.textContent).not.toContain('Work was removed.');
+    expect(plain(document.body)).toContain(
+      "Couldn't finish removing Work. Nothing else was changed.",
+    );
+    expect(document.body.textContent).not.toContain('Work was removed.');
   });
   it('offers Remove anyway when contacts cannot be told, with Not now', async () => {
     answers['POST /api/ui/agents/remove'] = {
@@ -510,23 +514,23 @@ describe('Remove', () => {
     };
     const sheet = await open('work');
     await confirmTyped(sheet);
-    expect(plain(host)).toContain("Remove anyway? Contacts can't be told now.");
-    expect(button(host, 'Remove anyway')).toBeDefined();
-    expect(button(host, 'Not now')).toBeDefined();
+    expect(plain(document.body)).toContain("Remove anyway? Contacts can't be told now.");
+    expect(button(document.body, 'Remove anyway')).toBeDefined();
+    expect(button(document.body, 'Not now')).toBeDefined();
   });
   it('says "You switched agents" and closes when the page was for another agent', async () => {
     answers['POST /api/ui/agents/remove'] = { status: 409, body: { status: 'agent_changed' } };
     const sheet = await open('work');
     await confirmTyped(sheet);
-    expect(host.querySelector('[role="dialog"]')).toBeNull();
-    expect(plain(host)).toContain('You switched IDs. Nothing was changed.');
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    expect(plain(document.body)).toContain('You switched IDs. Nothing was changed.');
   });
   it('after a removal the sheet closes and a note names it', async () => {
     answers['POST /api/ui/agents/remove'] = { status: 200, body: { status: 'done' } };
     const sheet = await open('work');
     await confirmTyped(sheet);
-    expect(host.querySelector('[role="dialog"]')).toBeNull();
-    expect(plain(host)).toContain('Work was removed.');
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    expect(plain(document.body)).toContain('Work was removed.');
   });
   it('Save recovery kit first on an ID that is not open asks before switching; Cancel keeps the sheet', async () => {
     const sheet = await open('work');
@@ -536,13 +540,13 @@ describe('Remove', () => {
     expect(calls.some((c) => c.method === 'POST')).toBe(false);
     await click(button(sheet, 'Cancel'));
     expect(plain(sheet)).not.toContain('Open Work to save its recovery kit?');
-    expect(host.querySelector('[role="dialog"]')).toBe(sheet);
+    expect(document.body.querySelector('[role="dialog"]')).toBe(sheet);
     expect(calls.some((c) => c.method === 'POST')).toBe(false);
   });
 });
 
 const backupCode = (): HTMLInputElement =>
-  host.querySelector<HTMLInputElement>('input[name="backup-code"]')!;
+  document.body.querySelector<HTMLInputElement>('input[name="backup-code"]')!;
 
 describe('Add', () => {
   // W4-ONE-TOUCH (D-140): one screen and one gesture (pages/apps/create-agent-gate.tsx); its calls go
@@ -596,9 +600,9 @@ describe('Add', () => {
   it('`?add=1` (an older Add agent link) opens no sheet on Agents', async () => {
     history.replaceState(null, '', '/agents?add=1');
     await mountPage();
-    expect(host.querySelector('[role="dialog"]')).toBeNull();
-    expect(plain(host)).not.toContain('Add an agent');
-    expect([...host.querySelectorAll('button')].map((b) => b.textContent)).not.toContain(
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
+    expect(plain(document.body)).not.toContain('Add an agent');
+    expect([...document.body.querySelectorAll('button')].map((b) => b.textContent)).not.toContain(
       'Add with Touch ID',
     );
   });
@@ -609,9 +613,9 @@ describe('Add', () => {
       body: { status: 'done', name: 'second-agent', label: 'Second agent' },
     };
     const onDone = await mountGate();
-    await click(button(host, 'Use your master code instead'));
+    await click(button(document.body, 'Use your master code instead'));
     await type(backupCode(), '123456');
-    await click(button(host, 'Confirm with my master code'));
+    await click(button(document.body, 'Confirm with my master code'));
     await settle();
     const begin = calls.find((c) => c.url === '/api/ui/agents/begin' && c.method === 'POST');
     const finish = calls.find((c) => c.url === '/api/ui/agents' && c.method === 'POST');
@@ -623,12 +627,12 @@ describe('Add', () => {
   it('a refused begin says why and creates nothing', async () => {
     answers['POST /api/ui/agents/begin'] = { status: 409, body: { status: 'busy' } };
     const onDone = await mountGate();
-    await click(button(host, 'Use your master code instead'));
+    await click(button(document.body, 'Use your master code instead'));
     await type(backupCode(), '123456');
-    await click(button(host, 'Confirm with my master code'));
+    await click(button(document.body, 'Confirm with my master code'));
     await settle();
     expect(calls.some((c) => c.url === '/api/ui/agents' && c.method === 'POST')).toBe(false);
-    expect(plain(host)).toContain('Another setup or approval is running.');
+    expect(plain(document.body)).toContain('Another setup or approval is running.');
     expect(onDone).not.toHaveBeenCalled();
   });
 });
@@ -652,13 +656,16 @@ describe('W8-S4: finish removing, and one "Not used" line', () => {
     answers['POST /api/ui/agents/remove'] = { status: 200, body: { status: 'done' } };
     await mountPage();
     await click(button(rowOf('old'), 'Try again'));
-    const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
+    const sheet = document.body.querySelector<HTMLElement>('[role="dialog"]')!;
     expect(unisolated(sheet)).toContain('Finish removing Old test');
     expect(sheet.querySelector('input[type="text"]')).toBeNull();
     expect(button(sheet, 'Save recovery kit first')).toBeDefined();
     await click(button(sheet, 'Finish with Touch ID'));
-    await type(host.querySelector<HTMLInputElement>('input[name="owner-code"]')!, '123456');
-    await click(button(host, 'Confirm with your master code'));
+    await type(
+      document.body.querySelector<HTMLInputElement>('input[name="owner-code"]')!,
+      '123456',
+    );
+    await click(button(document.body, 'Confirm with your master code'));
     const post = calls.find((c) => c.url === '/api/ui/agents/remove')!;
     const sent = JSON.parse(
       atob(post.headers.get('X-AgentLink-Input')!.replace(/-/g, '+').replace(/_/g, '/')),

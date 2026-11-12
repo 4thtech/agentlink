@@ -9,13 +9,14 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type MouseEvent,
   type ReactElement,
   type ReactNode,
 } from 'react';
 import { getLive } from '../api/live.js';
-import { sectionOf } from '../nav.js';
+import { sectionOf, titleOf } from '../nav.js';
 import { isSettingsSubpage, SettingsFrame } from '../pages/settings/side-nav.js';
 import {
   PrefsHood,
@@ -166,6 +167,44 @@ function skipToContent(event: MouseEvent<HTMLAnchorElement>): void {
 
 export { toggleHood };
 
+/**
+ * R1-UI-17: each page has its own document title, and after a move inside the app focus lands on the
+ * page's heading (made focusable here), so a screen reader hears where it is. Not on the first load,
+ * and never when focus is already inside the page.
+ */
+function useRouteAnnouncement(path: string): void {
+  const first = useRef(true);
+  useEffect(() => {
+    document.title = `${titleOf(path)} · AgentLink`;
+    if (first.current) {
+      first.current = false;
+      return undefined;
+    }
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const settle = (): void => {
+      const heading = document.querySelector<HTMLElement>('#al-main h1');
+      const active = document.activeElement;
+      const inside =
+        active !== null &&
+        active !== document.body &&
+        heading?.closest('#al-main')?.contains(active) === true;
+      if (inside) return;
+      if (heading === null) {
+        tries += 1;
+        if (tries < 8) timer = setTimeout(settle, 120);
+        return;
+      }
+      heading.setAttribute('tabindex', '-1');
+      heading.focus({ preventScroll: true });
+    };
+    timer = setTimeout(settle, 0);
+    return () => {
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [path]);
+}
+
 /** How long the shell waits at most for the app's settings before it shows the page (CLS). */
 export const SETTINGS_WAIT_MS = 300;
 
@@ -223,6 +262,7 @@ export function Layout({
   const expanded = useMenuExpanded();
   const settled = useUiSettingsSettled();
   useShellKeys();
+  useRouteAnnouncement(path);
   useEffect(() => {
     void startUiSettings();
     // W4-SHELL-LIVE (CLS ≤ 0.01): the strip and the body wait for the app's Under the hood and menu

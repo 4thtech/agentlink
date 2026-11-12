@@ -117,8 +117,15 @@ describe('routes', () => {
     mountAt('/agents/work');
     expect(location.pathname).toBe('/agents/work');
     // The Agents page draws the agent's page (its heading is the agent's label once read).
-    expect(host.querySelector('main.ag-page')).not.toBeNull();
+    expect(host.querySelector('main .ag-page')).not.toBeNull();
     expect(currentSection()).toBe('My IDs');
+  });
+
+  it('R1-UI-17: each page sets its own document title', () => {
+    mountAt('/people');
+    expect(document.title).toBe('People · AgentLink');
+    mountAt('/activity');
+    expect(document.title).toBe('Activity · AgentLink');
   });
 
   it('shows the not-found state for an unknown path, still in the layout', () => {
