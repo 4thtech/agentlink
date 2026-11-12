@@ -1120,6 +1120,8 @@ export function ContactsPage({
       <div className="inv-connected-card">
         <OwnMoment
           name={shownName(arrived)}
+          selfDeclared={arrived.nameSource !== 'owner'}
+          owner={owner}
           contactRef={arrived.ref}
           api={api}
           headingLevel={2}

@@ -450,6 +450,16 @@ h2.inv-connected-title {
   font-size: 28px;
   line-height: 34px;
 }
+.inv-hello {
+  inline-size: 100%;
+  text-align: start;
+}
+.inv-optional-check {
+  align-self: center;
+}
+a.al-btn.inv-email {
+  text-decoration: none;
+}
 .inv-code {
   inline-size: 100%;
   display: flex;

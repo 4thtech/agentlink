@@ -192,9 +192,9 @@ function stubClipboard(): string[] {
   });
   return written;
 }
-/** No attribute anywhere on the page holds the link's secret part. */
+/** No attribute anywhere on the page holds the link's secret part (Email's mailto: href aside). */
 function attributesHold(secret: string): boolean {
-  for (const el of host.querySelectorAll('*')) {
+  for (const el of host.querySelectorAll('*:not(a.inv-email)')) {
     for (const attr of el.attributes) if (attr.value.includes(secret)) return true;
   }
   return false;
@@ -227,17 +227,43 @@ describe('the invite panel (A3/A5)', () => {
     expect(text()).toContain(S.copiedAnnounce);
   });
 
-  it('Email opens the mail app with the share text; Share only where a share sheet exists', async () => {
+  it('Copy invite message puts the whole share text on the clipboard, says so, and counts as sent', async () => {
     const w = world();
-    const opened: string[] = [];
-    await show(panel(w, { openMail: (url) => opened.push(url) }));
-    expect(hasButton(S.share)).toBe(false);
-    await click(S.email);
-    expect(opened).toHaveLength(1);
-    expect(opened[0]).toMatch(/^mailto:\?subject=/);
-    expect(decodeURIComponent(opened[0] ?? '')).toContain(SHORT_A);
+    const written = stubClipboard();
+    await show(panel(w));
+    await click(S.copyMessage);
+    expect(written).toEqual([`Connect with me on AgentLink: ${SHORT_A}`]);
+    expect(text()).toContain(S.copiedMessage);
+    expect(text()).toContain(S.copiedMessageAnnounce);
     act(() => root?.unmount());
     root = undefined;
+    await settle();
+    expect(w.cancelled).toHaveLength(0);
+  });
+
+  it('Email is a real mailto link with the share text and does not mark the invite shared; Share only where a share sheet exists', async () => {
+    const w = world();
+    await show(panel(w));
+    expect(hasButton(S.share)).toBe(false);
+    const mail = host.querySelector<HTMLAnchorElement>('a.inv-email');
+    expect(mail?.textContent).toContain(S.email);
+    const href = mail?.getAttribute('href') ?? '';
+    expect(href).toMatch(/^mailto:\?subject=/);
+    expect(decodeURIComponent(href)).toContain(SHORT_A);
+    // A click is the mail app's business: it is not shown as sent (the name field stays open), but a
+    // mail app hiding the page must not cancel the invite; it stays pending until it expires.
+    await act(async () => {
+      mail?.addEventListener('click', (e) => e.preventDefault());
+      mail?.click();
+    });
+    expect(nameField().readOnly).toBe(false);
+    act(() => window.dispatchEvent(new Event('pagehide')));
+    await settle();
+    expect(w.cancelled).toHaveLength(0);
+    act(() => root?.unmount());
+    root = undefined;
+    await settle();
+    expect(w.cancelled).toHaveLength(0);
 
     const shared: string[] = [];
     Object.defineProperty(navigator, 'share', {

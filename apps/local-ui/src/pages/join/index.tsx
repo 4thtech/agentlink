@@ -252,6 +252,7 @@ export function JoinPage({
         <ConnectedMoment
           name={name}
           me={agent}
+          selfDeclared
           api={contacts}
           {...(contactRef === undefined ? {} : { contactRef })}
           onDone={() => void api.dismiss().then(() => go(HOME))}
