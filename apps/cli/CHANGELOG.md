@@ -1,5 +1,20 @@
 # @4thtech-io/agentlink
 
+## 0.4.14
+
+### Patch Changes
+
+- ce79b9f: Every screen that asks for Touch ID, Windows Hello or a passkey now also offers "Use your backup code instead": saving rules, connecting an AI app after setup, accepting an invite (from the invite page or a pasted link) and moving credits. Moving credits can now also be confirmed with Touch ID or Windows Hello. A passphrase you type key by key is sent exactly as typed; only pasted backup codes have stray spaces and dashes removed.
+- ce79b9f: People: block or unblock a person from the ⋯ menu. Block explains what it does, then asks for your passkey or backup code; messages from a blocked person are dropped until you unblock them.
+- ce79b9f: After an update, the app says "Restart {app} to use the new version" for an AI app that still runs the older AgentLink. Each AI app session now records the version it runs (store schema 13).
+- ce79b9f: The backup code screen shows the code once, with Show/Hide, one Copied message, more space between the buttons, and no fingerprint.
+- ce79b9f: One name for each code: master code (was backup code and owner code), Contact check (was safety code) and ID tag (was owner fingerprint), in the app, the terminal, the AI tool texts, the invite page and the guides (D-146).
+- ce79b9f: WP-1 Rename truth: the ID open when the app starts can be renamed (and "Update contacts" works); the name note shows on the IDs page in both views, on the ID's own page and on Home; an invite asks for the name update first while the card still has an older name; `owner init` and `owner add-agent` take `--label` and sign card and label alike.
+- ce79b9f: Save your recovery kit from the app: Settings › Backup & Touch ID and each ID's Back up button ask for Touch ID or your backup code, save the kit to your Downloads folder and show its new recovery code once (WP-11).
+- ce79b9f: Doctor speaks in plain words: no folder names, no npx commands, each ID by its own name with its connected AI apps (WP-14).
+- ce79b9f: Your AI reports the ID's own name and can address a contact by the name you say (WP-6).
+- ce79b9f: Started from the one-line installer's `agentlink` command, AgentLink now names `agentlink` (not `npx -y @4thtech-io/agentlink`) in the lines it prints, such as "AgentLink closed. Run `agentlink` to open it again." (WP-2, D4)
+
 ## 0.4.13
 
 ### Patch Changes

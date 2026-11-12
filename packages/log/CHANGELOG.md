@@ -1,5 +1,9 @@
 # @4thtech-io/log
 
+## 0.4.14
+
+No changes in this release.
+
 ## 0.4.13
 
 No changes in this release.

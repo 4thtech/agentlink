@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.4.14] - 2026-11-12
+
+### Added
+
+- Block and unblock a person on People (UX1112 WP-12, F-2, S2; 04 §2.5.1 `contact.block` and `contact.unblock`, 08 §1): the person ⋯ menu offers Block, or Unblock on a blocked person. Block explains first, and both ask for your passkey or backup code. Messages from a blocked person are dropped until you unblock them; they aren't told. Your AI can't block or unblock anyone.
+- After an update, an AI app that still runs the older AgentLink shows "Restart {app} to use the new version" on its ID, in Simple, Under the hood and the top bar, instead of looking broken (WP-13, F-4 / F45, S2, 07 §3.2, 08 §1). Each AI app session records the AgentLink version it runs; the local store moves to schema 13 by adding one optional column, and existing rows are kept.
+- Save your recovery kit in the app (WP-11, S2, F-1, D-117 A; 04 §2.3.3): Settings › Backup & Touch ID and the open ID's Back up button ask for Touch ID or your backup code, record one owner-signed `backup.export`, then write an encrypted `ALKK` kit (this ID, its contacts and messages, under a new recovery code) to your Downloads folder, or your home folder when there is none. The new recovery code is shown once. Nothing is sent anywhere. Restoring from a kit is not available yet (it will be a terminal step, D-117 A). Another ID's Back up asks to open that ID first. IDs whose keys are not in the computer's keychain say the kit can't be saved from the app yet.
+
+### Changed
+
+- DOCS-0413-GAP: the user guide, README, knowledge base and llms.txt now also cover the backup code (Show/Hide, Copy, paste, Save as file, the main button without a passkey), Windows Hello approvals, Invite someone on each ID, approval pages that name the ID, and the classroom handout.
+- DOCS-0413: Status, README, knowledge base, llms.txt and the user guide are current to 0.4.13 (setup with an `agentlink` folder in another case, green connected AI apps, Claude Code in the Claude app, `agentlink doctor` in plain words).
+- UI polish from the walkthrough (UX-1112-POLISH, S1): Settings tabs line up with the title and do not wrap; one orange button on the Connected moment and no duplicate "Not checked yet"; no stray line on a new contact's row; toasts sit in the corner on wide screens; Show/Hide inside the backup code box and the card as wide as the page column; clean phone header for the setup steps; name note left-aligned with a real "Invite as" button and a full-width confirm; spaced Touch ID button; success line for "Copied. Paste it into your email."; the invite page names the same "Have an invite link? Paste it" button as the app.
+- The backup code screen shows the code once (Show/Hide), says Copied once, spaces its buttons and no longer shows the fingerprint (UX-1112-WP5, S1).
+- People is now in the menu, and no button leads to a page that says it "arrives in an update": the Notifications row is gone from Settings, Backup & Touch ID saves the recovery kit in the app ("Save recovery kit", behind Touch ID or the backup code), and the unused pages and reserved routes are removed (UX1112-WP7, S1).
+- An ID whose contacts still see an older name shows "Contacts still see {name}" (or "New invites still show {name}" with no contacts yet) on the IDs page in both views, on the ID's own page and on Home, with one Touch ID to update it (WP-1, 08 §1).
+- Making an invite while your ID's card still has an older name asks you to update the name first, or to invite under the older name (WP-1, 08 §1).
+- `agentlink owner init` and `agentlink owner add-agent` take `--label <name>`: the card and the app show that name from the start (default: the folder name) (WP-1, 06 §8).
+- `agentlink doctor` and the "AgentLink isn't set up" replies in AI apps use plain words: they point to the AgentLink app, never name a folder or an npx command, and an AI app pointing at a removed ID is described without a folder name (WP-14, F-7, S1).
+- One command from an invite, no Node.js needed (WP-2, S2, 08 §4): the invite page now offers the one-line installer with the invite built in, for Mac or Linux (`curl … install.sh | sh -s -- --invite '<link>'`) and Windows PowerShell (`-Invite '<link>'`), chosen from your browser; Node.js 22.14 or later stays as the third choice. The installer checks the link with the same rules as `agentlink join`, refuses anything else with one fixed line without printing it, then opens AgentLink on the invite. "Ask your AI" and "Already have AgentLink? paste the link" stay.
+- The installer says "AgentLink is installed." first and "Next time, open a new terminal and type: agentlink" after the app closes (F43); started from the installer's command, AgentLink names `agentlink` in its closing line (D4).
+- The invite site has a favicon; its CSP allows images from the site itself only (`img-src 'self'`, F33).
+- Your AI now reports the ID's own name, and knows it can address a contact by the name you say ("send Natasa a message"); two contacts with the same name are refused with their ids (WP-6, S1, 06 §2.1, §5).
+- One name for each code (UX1112-WP-9, D-146, S1, 11 §5.5): the secret AgentLink showed as "backup code" in the app and "owner code" in the terminal is now the **master code** everywhere, with a purpose line ("approves changes when Touch ID isn't available and unlocks your AgentLink key; save it once; we can't recover it") and "Use your master code instead" on every confirm screen. The 12 digits both sides see at pairing are the **Contact check**, an optional step, never called a code. The owner fingerprint is hidden in the Simple view and is the **ID tag** under the hood; joining an invite no longer asks you to check it. Formats and behaviour are unchanged. A vocabulary test bans the old words.
+
+### Fixed
+
+- Backup code on every confirm (FB-8, P-1…P-5, S2, 04 §2.5, 11 §5): rules save, connect your AI app, invite accept (join page and pasted link) and credits moves offer "Use your backup code instead" next to Touch ID / Windows Hello, which confirms through the same backup-code path; credits moves also accept Touch ID / Windows Hello. A test fails if a new owner-presence screen lacks the option.
+- Backup code field (F49 low, S2): the cleanup of stray separators applies only to pasted, dropped or filled text, so a passphrase typed key by key is never changed.
+- UX1112-WP3: Email in the invite panel is a real mail link, "Copy invite message" copies the whole text with a visible "Copied" and the invite is only marked as sent after a copy or share (not a mail click); after connecting the 12 safety digits are behind an optional check that says what they are for, and "Say hello" uses your own name for the contact, which you confirm in "Name this contact" (the name they chose is never put in a prompt) (S1).
+- UX1112: People shows "(was old name)" next to a contact that renamed itself, as plain text (S1).
+- Renaming the ID that was open when the AgentLink app started now works, and so does "Update contacts" for an ID renamed before 0.4.10 (WP-1, S2, D-141): before, it answered "Couldn't rename it" until you opened another ID. A rename that doesn't finish now says why.
+
 ## [0.4.13] - 2026-11-03
 
 ### Added
@@ -973,7 +1006,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.13...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.4.14...HEAD
+[0.4.14]: https://github.com/4thtech/agentlink/compare/v0.4.13...v0.4.14
 [0.4.13]: https://github.com/4thtech/agentlink/compare/v0.4.12...v0.4.13
 [0.4.12]: https://github.com/4thtech/agentlink/compare/v0.4.11...v0.4.12
 [0.4.11]: https://github.com/4thtech/agentlink/compare/v0.4.10...v0.4.11
