@@ -387,6 +387,19 @@ describe('Check my kit', () => {
     expect(api.calls).not.toContain('applyBegin');
   });
 
+  it('UX1113-QA2 N4: names an ID already on this computer by its label', async () => {
+    const labelled: Summary = {
+      ...SUMMARY,
+      ids: SUMMARY.ids.map((r) => (r.state === 'already_here' ? { ...r, label: 'My Mac' } : r)),
+    };
+    const api = fakeApi({ check: () => ok({ summary: labelled }) });
+    await mount(api, { mode: 'check' });
+    await click(S.KIT.next);
+    await fillCode();
+    await click(S.CODE.open);
+    expect(text()).toContain('tali, work, My Mac and demo');
+  });
+
   it('says a wrong code changed nothing', async () => {
     await mount(
       fakeApi({ check: () => Promise.resolve({ kind: 'error', problem: 'wrong_code' }) }),

@@ -245,6 +245,47 @@ describe('Agents, simple (A8)', () => {
     });
   });
 
+  it('UX1113-QA2 N1: Rename on another ID switches to it first; nothing is renamed yet', async () => {
+    answers['POST /api/ui/agents/switch'] = { status: 200, body: { status: 'done' } };
+    await mount();
+    await click(button(card('work'), 'Rename'));
+    expect(JSON.parse(posts('/api/ui/agents/switch')[0]!.body)).toEqual({
+      name: 'work',
+      generation: 7,
+    });
+    expect(posts('/api/ui/agents/label')).toHaveLength(0);
+    expect(card('work').querySelector('form.ag-rename')).toBeNull();
+    expect(JSON.parse(sessionStorage.getItem(INTENT_KEY) ?? '{}')).toMatchObject({
+      name: 'work',
+      action: 'rename',
+    });
+  });
+
+  it('UX1113-QA2 N1: after the switch, the remembered Rename opens on that ID, once', async () => {
+    sessionStorage.setItem(
+      INTENT_KEY,
+      JSON.stringify({ name: 'work', action: 'rename', at: Date.now() }),
+    );
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list(
+        FLEET().map((a) => ({ ...a, current: a.name === 'work' })),
+        { current: 'work', label: 'Work' },
+      ),
+    };
+    await mount();
+    expect(card('work').querySelector('form.ag-rename')).not.toBeNull();
+    expect(card('default').querySelector('form.ag-rename')).toBeNull();
+    expect(sessionStorage.getItem(INTENT_KEY)).toBeNull();
+  });
+
+  it('UX1113-QA2 N1: Rename on the open ID opens the editor in place, with no switch', async () => {
+    await mount();
+    await click(button(card('default'), 'Rename'));
+    expect(card('default').querySelector('form.ag-rename')).not.toBeNull();
+    expect(posts('/api/ui/agents/switch')).toHaveLength(0);
+  });
+
   it('after the switch, the remembered Pause opens for the agent that is open now, once', async () => {
     sessionStorage.setItem(
       INTENT_KEY,

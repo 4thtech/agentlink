@@ -199,6 +199,22 @@ describe('Back up: save the recovery kit in the app', () => {
     expect(localStorage.getItem(RECOVERY_KIT_LATER_KEY)).toBeNull();
   });
 
+  it('UX1113-QA2 N4: the Done toast names the IDs by their labels, never their folders', async () => {
+    const { exportOutcomeOf } = await import('./export-kit.js');
+    const out = exportOutcomeOf({
+      ...SAVED,
+      data: {
+        ...(SAVED as { data: Record<string, unknown> }).data,
+        covers: [
+          { name: 'default', label: 'Ana' },
+          { name: 'work', label: 'Work' },
+          { name: 'odd', label: '<b>x</b>' },
+        ],
+      },
+    } as OwnerApiResult);
+    expect(out.kind === 'saved' && out.kit.covers).toEqual(['Ana', 'Work', 'odd']);
+  });
+
   it('a wrong check does not tick and says nothing was changed', async () => {
     const f = fakeApi(SAVED);
     await saveKit(f, { checkKit: checkKit('wrong'), openWindow: fakeWindow().open });

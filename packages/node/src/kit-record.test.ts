@@ -25,6 +25,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   KIT_RECORD_FILE,
   kitStatus,
+  markKitRecordChecked,
   readKitRecord,
   revealKitFile,
   writeKitRecord,
@@ -76,8 +77,16 @@ function record(over: Partial<KitRecord> = {}): KitRecord {
     },
     contents: 'full',
     file: join(root, 'Downloads', 'agentlink-recovery-kit-2027-01-15.alkk'),
+    // UX1113-QA2 N14: a kit counts as backed up once it opened with its code (Check).
+    checked: true,
     ...over,
   };
+}
+
+/** A record as the save writes it: not checked yet. */
+function unchecked(over: Partial<KitRecord> = {}): KitRecord {
+  const { checked: _checked, ...rest } = record(over);
+  return rest;
 }
 
 describe('kit record file (04 §2.3.3 "Kit record")', () => {
@@ -257,6 +266,60 @@ describe('kitStatus (GET /api/ui/backup body)', () => {
       lastKit: null,
       missing: null,
     });
+  });
+});
+
+describe('UX1113-QA2 N14: a save that was never checked is not "backed up"', () => {
+  const today = [
+    { name: 'default', label: 'Personal', contacts: 3 },
+    { name: 'work', label: 'Work', contacts: 1 },
+  ];
+
+  it('a save whose kit never opened with its code reads as unfinished, with its date and names', () => {
+    const status = kitStatus({ status: 'saved', record: unchecked() }, today, true);
+    expect(status.state).toBe('unfinished');
+    expect(status.record).toBe('saved');
+    expect(status.lastKit?.covers).toEqual([
+      { name: 'default', label: 'Personal' },
+      { name: 'work', label: 'Work' },
+    ]);
+    // Unfinished wins over out of date: whether the kit can be opened at all is unknown.
+    const later = kitStatus(
+      { status: 'saved', record: unchecked() },
+      [...today, { name: 'shop', label: 'Shop', contacts: 0 }],
+      undefined,
+    );
+    expect(later.state).toBe('unfinished');
+  });
+
+  it('the save writes an unchecked record; a check of that very kit marks it, once', async () => {
+    await writeKitRecord(dir, unchecked());
+    const raw = JSON.parse(await readFile(join(dir, KIT_RECORD_FILE), 'utf8')) as object;
+    expect(raw).not.toHaveProperty('checked');
+    // Another kit (another kitId) never marks this one.
+    expect(await markKitRecordChecked(dir, 'L'.repeat(22))).toBe(false);
+    let read = await readKitRecord(dir);
+    expect(read.status === 'saved' && read.record.checked).toBeFalsy();
+    expect(await markKitRecordChecked(dir, KIT)).toBe(true);
+    read = await readKitRecord(dir);
+    expect(read).toEqual({ status: 'saved', record: record() });
+    expect(kitStatus(read, today, true).state).toBe('backed_up');
+    expect(await readdir(dir)).toEqual([KIT_RECORD_FILE]);
+  });
+
+  it('no record, an unreadable record or a bad kitId: nothing is written', async () => {
+    expect(await markKitRecordChecked(dir, KIT)).toBe(false);
+    expect(await readdir(dir)).toEqual([]);
+    writeFileSync(join(dir, KIT_RECORD_FILE), '{"v":1}');
+    expect(await markKitRecordChecked(dir, KIT)).toBe(false);
+    expect(await readFile(join(dir, KIT_RECORD_FILE), 'utf8')).toBe('{"v":1}');
+    expect(await markKitRecordChecked(dir, 'not a kit id')).toBe(false);
+  });
+
+  it('a record with checked other than true is unreadable', async () => {
+    const bad = { ...record(), checked: false };
+    writeFileSync(join(dir, KIT_RECORD_FILE), JSON.stringify(bad));
+    expect(await readKitRecord(dir)).toEqual({ status: 'unreadable' });
   });
 });
 
