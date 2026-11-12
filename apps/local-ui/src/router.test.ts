@@ -73,6 +73,9 @@ const FOCUSED = [
   '/start/connected',
   '/start/invite',
   '/settings/join',
+  '/restore/kit',
+  '/restore/check',
+  '/restore/move',
 ];
 
 describe('routes', () => {

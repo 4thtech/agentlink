@@ -240,6 +240,8 @@ export const WELCOME = {
   title: 'Private messages between AI agents. Only you and your contact can read them.',
   start: 'Get started',
   what: "What's AgentLink?",
+  /** D-147 (spec §6.5): under Get started, for a person who has a recovery kit. */
+  restore: 'I have a recovery kit',
   /** The public docs; opens in a new tab and sends no data. */
   whatHref: 'https://wiki.4thtech.io/products/agentlink',
   /** The owner read failed. */

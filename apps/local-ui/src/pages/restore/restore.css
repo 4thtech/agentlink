@@ -1,0 +1,565 @@
+/* Restore wizard (UX1113-R3; design-1112 mockups 07 to 10). Tokens only. The wizard frame is the focused
+   column's own header (brand, four-segment progress, Cancel). Nothing loops; the screen changes by
+   replacing its content. Nothing moves here, so reduced motion needs no rule. */
+.rs-wizard {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 100dvh;
+  inline-size: 100%;
+  background: var(--al-color-bg-canvas);
+  color: var(--al-color-fg-default);
+}
+.rs-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-3) var(--al-space-6);
+  padding: var(--al-space-6) clamp(16px, 4vw, 40px);
+  border-block-end: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.rs-head-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--al-space-3) var(--al-space-6);
+}
+.rs-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-4);
+}
+.rs-segs {
+  display: inline-flex;
+  gap: var(--al-space-2);
+}
+.rs-seg {
+  inline-size: 24px;
+  block-size: 4px;
+  border-radius: 2px;
+  background: var(--al-color-border-default);
+}
+.rs-seg[data-state='done'] {
+  background: var(--al-color-status-success-icon);
+}
+.rs-seg[data-state='current'] {
+  background: var(--al-color-accent-default);
+}
+.rs-eyebrow {
+  font-family: var(--al-font-family-mono);
+  font-size: 11px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--al-color-fg-subtle);
+}
+.rs-cancel {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 44px;
+  padding: 0 var(--al-space-2);
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--al-color-fg-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.rs-body {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 56px clamp(16px, 4vw, 40px);
+}
+.rs-screen {
+  inline-size: 100%;
+  max-inline-size: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-6);
+}
+.rs-screen.rs-wide {
+  max-inline-size: 1000px;
+}
+.rs-kicker {
+  margin: 0;
+  font-family: var(--al-font-family-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--al-color-fg-subtle);
+}
+.rs-title {
+  margin: 0;
+  font-size: 40px;
+  line-height: 44px;
+  font-weight: var(--al-font-weight-semibold);
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
+}
+.rs-title:focus {
+  outline: none;
+}
+.rs-lead {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--al-color-fg-muted);
+}
+.rs-intro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+}
+.rs-label {
+  margin: 0;
+  font-weight: var(--al-font-weight-medium);
+  color: var(--al-color-fg-muted);
+}
+.rs-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--al-color-fg-subtle);
+}
+.rs-assure {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  padding: var(--al-space-4);
+  border: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-sunken);
+  color: var(--al-color-fg-muted);
+  font-size: 14px;
+}
+.rs-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--al-space-4) var(--al-space-5);
+}
+.rs-actions .rs-end {
+  margin-inline-start: auto;
+}
+.rs-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--al-color-fg-link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.rs-error {
+  margin: 0;
+  color: var(--al-color-status-danger-fg);
+  font-size: 14px;
+}
+
+/* Step 1: found kits and the drop zone. */
+.rs-kits {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+}
+.rs-kit {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-4);
+  padding: var(--al-space-4) var(--al-space-5);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+  cursor: pointer;
+}
+.rs-kit:has(input:checked) {
+  border-color: var(--al-color-accent-default);
+  box-shadow: 0 0 0 1px var(--al-color-accent-default);
+}
+.rs-kit:has(input:focus-visible) {
+  outline: 2px solid var(--al-color-focus-ring);
+  outline-offset: 2px;
+}
+.rs-kit input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.rs-kit-icon {
+  display: grid;
+  place-items: center;
+  inline-size: 40px;
+  block-size: 40px;
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-accent-subtle);
+  color: var(--al-color-accent-default);
+  flex: none;
+}
+.rs-kit-text {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  flex: 1;
+}
+.rs-kit-name {
+  font-weight: var(--al-font-weight-medium);
+  overflow-wrap: anywhere;
+}
+.rs-kit-meta {
+  font-size: 14px;
+  color: var(--al-color-fg-muted);
+}
+.rs-tick {
+  display: grid;
+  place-items: center;
+  inline-size: 24px;
+  block-size: 24px;
+  border-radius: 5px;
+  border: var(--al-border-width-thin) solid var(--al-color-border-strong);
+  background: var(--al-color-bg-surface);
+  color: transparent;
+  flex: none;
+}
+.rs-kit:has(input:checked) .rs-tick,
+.rs-row:has(input:checked) .rs-tick,
+.rs-saved:has(input:checked) .rs-tick {
+  background: var(--al-color-accent-default);
+  border-color: var(--al-color-accent-default);
+  color: var(--al-color-fg-on-accent);
+}
+.rs-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--al-space-3);
+  padding: var(--al-space-10) var(--al-space-5);
+  border: 1px dashed var(--al-color-border-strong);
+  border-radius: var(--al-radius-lg);
+  text-align: center;
+}
+.rs-drop[data-over='true'] {
+  border-color: var(--al-color-accent-default);
+  background: var(--al-color-accent-subtle);
+}
+.rs-drop strong {
+  font-weight: var(--al-font-weight-semibold);
+}
+.rs-drop p {
+  margin: 0;
+  color: var(--al-color-fg-muted);
+}
+.rs-file-input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+
+/* Step 2: the six boxes. */
+.rs-code {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--al-space-3);
+}
+.rs-code-box {
+  inline-size: 100%;
+  min-inline-size: 0;
+  box-sizing: border-box;
+  block-size: 56px;
+  padding: 0 var(--al-space-2);
+  text-align: center;
+  font-family: var(--al-font-family-mono);
+  font-size: 20px;
+  letter-spacing: 0.12em;
+  color: var(--al-color-fg-default);
+  background: var(--al-color-bg-surface);
+  border: var(--al-border-width-thin) solid var(--al-color-border-strong);
+  border-radius: var(--al-radius-md);
+}
+.rs-code-box:focus-visible {
+  outline: 2px solid var(--al-color-focus-ring);
+  outline-offset: 1px;
+  border-color: var(--al-color-accent-default);
+}
+.rs-code-box[aria-invalid='true'] {
+  border-color: var(--al-color-status-danger-border);
+}
+@media (max-width: 480px) {
+  .rs-code {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .rs-title {
+    font-size: 32px;
+    line-height: 36px;
+  }
+}
+
+/* Step 3: the IDs list. */
+.rs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+  overflow: hidden;
+}
+.rs-row {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-4);
+  padding: var(--al-space-4) var(--al-space-5);
+}
+.rs-row + .rs-row {
+  border-block-start: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.rs-row label.rs-pick {
+  display: inline-flex;
+  position: relative;
+  flex: none;
+  cursor: pointer;
+}
+.rs-row[data-off='true'] .rs-pick {
+  cursor: default;
+}
+.rs-pick input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+}
+.rs-pick:has(input:focus-visible) .rs-tick {
+  outline: 2px solid var(--al-color-focus-ring);
+  outline-offset: 2px;
+}
+.rs-avatar {
+  display: grid;
+  place-items: center;
+  inline-size: 40px;
+  block-size: 40px;
+  border-radius: 50%;
+  flex: none;
+  font-weight: var(--al-font-weight-semibold);
+  background: var(--al-color-accent-subtle);
+  color: var(--al-color-accent-default);
+  border: var(--al-border-width-thin) solid var(--al-color-accent-default);
+}
+.rs-row[data-state='already_here'] .rs-avatar,
+.rs-row[data-state='removed_earlier'] .rs-avatar {
+  background: var(--al-color-bg-sunken);
+  color: var(--al-color-fg-muted);
+  border-color: var(--al-color-border-default);
+}
+.rs-row-text {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  flex: 1;
+}
+.rs-row-name {
+  font-weight: var(--al-font-weight-semibold);
+  overflow-wrap: anywhere;
+}
+.rs-row-line {
+  font-size: 14px;
+  color: var(--al-color-fg-muted);
+}
+.rs-row-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-3);
+  align-items: center;
+  margin-block-start: var(--al-space-2);
+}
+.rs-chip {
+  flex: none;
+  padding: 2px var(--al-space-3);
+  border-radius: 999px;
+  font-size: 13px;
+  border: var(--al-border-width-thin) solid var(--al-color-status-neutral-border);
+  background: var(--al-color-status-neutral-bg);
+  color: var(--al-color-status-neutral-fg);
+}
+.rs-chip[data-tone='success'] {
+  border-color: var(--al-color-status-success-border);
+  background: var(--al-color-status-success-bg);
+  color: var(--al-color-status-success-fg);
+}
+.rs-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--al-space-6) var(--al-space-8);
+}
+.rs-cols h2 {
+  margin: 0 0 var(--al-space-3);
+  font-size: 16px;
+  font-weight: var(--al-font-weight-semibold);
+}
+.rs-bullets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+}
+.rs-bullets li {
+  display: flex;
+  gap: var(--al-space-3);
+}
+.rs-bullets .al-icon {
+  flex: none;
+  margin-block-start: 3px;
+}
+.rs-bullets[data-tone='ok'] .al-icon {
+  color: var(--al-color-status-success-icon);
+}
+.rs-bullets[data-tone='todo'] .al-icon {
+  color: var(--al-color-accent-default);
+}
+.rs-hood {
+  font-size: 13px;
+  color: var(--al-color-fg-subtle);
+}
+.rs-hood code {
+  font-family: var(--al-font-family-mono);
+}
+
+/* Step 4. */
+.rs-done-mark {
+  display: grid;
+  place-items: center;
+  inline-size: 80px;
+  block-size: 80px;
+  border-radius: 50%;
+  background: var(--al-color-status-success-bg);
+  border: var(--al-border-width-thin) solid var(--al-color-status-success-border);
+  color: var(--al-color-status-success-icon);
+}
+.rs-secret {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding: var(--al-space-5);
+  border: var(--al-border-width-thin) solid var(--al-color-accent-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-accent-subtle);
+}
+.rs-secret-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-3);
+  font-weight: var(--al-font-weight-semibold);
+}
+.rs-secret-val {
+  margin: 0;
+  font-family: var(--al-font-family-mono);
+  font-size: 24px;
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.rs-secret p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--al-color-fg-muted);
+}
+.rs-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  position: relative;
+  cursor: pointer;
+}
+.rs-saved input {
+  position: absolute;
+  opacity: 0;
+  inline-size: 24px;
+  block-size: 24px;
+  margin: 0;
+}
+.rs-saved:has(input:focus-visible) .rs-tick {
+  outline: 2px solid var(--al-color-focus-ring);
+  outline-offset: 2px;
+}
+.rs-apps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+}
+.rs-app {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-4);
+  padding: var(--al-space-4) var(--al-space-5);
+}
+.rs-app + .rs-app {
+  border-block-start: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.rs-mark {
+  display: grid;
+  place-items: center;
+  inline-size: 40px;
+  block-size: 40px;
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-inverse);
+  color: var(--al-color-fg-inverse);
+  font-weight: var(--al-font-weight-semibold);
+  flex: none;
+}
+.rs-connect-wrap {
+  padding: var(--al-space-5);
+  border-block-start: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.rs-h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: var(--al-font-weight-semibold);
+}
+.rs-steps {
+  margin: 0;
+  padding-inline-start: var(--al-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+}
+.rs-spin {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  color: var(--al-color-fg-muted);
+}
+
+/* The printed sheet: only this shows on paper, and it exists only while the code is on screen. */
+.rs-print-sheet {
+  display: none;
+}
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .rs-print-sheet,
+  .rs-print-sheet * {
+    visibility: visible;
+  }
+  .rs-print-sheet {
+    display: block;
+    position: absolute;
+    inset: 0;
+    padding: 40px;
+    color: #000;
+    background: #fff;
+  }
+  .rs-print-sheet code {
+    font-size: 24px;
+    letter-spacing: 0.06em;
+  }
+}

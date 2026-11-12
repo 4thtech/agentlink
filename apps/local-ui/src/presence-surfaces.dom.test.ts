@@ -425,6 +425,8 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   'pages/apps/panel.tsx': { offers: /<OwnerGate\b/ },
   // WP-11: Save recovery kit (Settings › Backup and the ID card's Back up panel).
   'pages/backup/export-kit.tsx': { offers: /<OwnerGate\b/ },
+  // UX1113-R3: Restore here asks first on a computer that has an owner (PresenceStep offers the code).
+  'pages/restore/index.tsx': { offers: /<PresenceStep\b/ },
   'pages/contacts/index.tsx': { offers: /<PresencePrompt\b/ },
   'pages/invite/name-contact.tsx': { offers: /<PresencePrompt\b/ },
   'pages/home/person-menu.tsx': { offers: /<PresencePrompt\b/ },

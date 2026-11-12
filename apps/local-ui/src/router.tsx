@@ -71,6 +71,10 @@ export const ROUTES: readonly RouteDef[] = [
   { path: '/advanced/map', page: lazyPage('/advanced/map') },
   // U3-invite (b11 §33.2): the waiting invite, in the focused shell (no chrome).
   { path: '/settings/join', page: lazyPage('/settings/join') },
+  // UX1113-R3 (D-147): restore from a recovery kit, in the focused shell (no chrome).
+  { path: '/restore/kit', page: lazyPage('/restore/kit') },
+  { path: '/restore/check', page: lazyPage('/restore/check') },
+  { path: '/restore/move', page: lazyPage('/restore/move') },
 ];
 
 /**
