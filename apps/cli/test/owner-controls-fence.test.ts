@@ -156,6 +156,34 @@ describe('no MCP tool handler reaches the owner controls (M1-9i-b2, I-4)', () =>
   });
 });
 
+// UX1113 WP-S2 (04 §2.5 "Touch ID & master code page", I-4): checking, testing and replacing the
+// owner's master code or Touch ID is the owner's own step on the local page or in the terminal. No
+// tool module, nor anything it reaches, names those routes, their paths or the change-code engine.
+const OWNER_CODE_NAME =
+  /owner-?code|owner-?presence|change-?code|changeOwnerCode|stageOwnerCode|touch-?id|ownerCodeStep/i;
+
+describe('no MCP tool handler reaches the master code or Touch ID routes (WP-S2, I-4)', () => {
+  const graph = toolGraph();
+
+  it('no reached file names an owner-code route, path or the change-code engine', () => {
+    const hits = [...graph].filter(([, text]) => OWNER_CODE_NAME.test(code(text)));
+    expect(hits.map(([file]) => file)).toEqual([]);
+  });
+
+  it('the scan would catch a reference (negative control)', () => {
+    for (const sample of [
+      "await fetch('/api/ui/owner-code/check')",
+      "const p = '/api/ui/owner-presence/test';",
+      "import { changeOwnerCode } from '@4thtech-io/node';",
+      'stageOwnerCodeChange(keychain, seed)',
+      "const path = '/settings/touch-id';",
+    ]) {
+      expect(OWNER_CODE_NAME.test(code(sample)), sample).toBe(true);
+    }
+    expect(OWNER_CODE_NAME.test(code('// the master code page is owner-only'))).toBe(false);
+  });
+});
+
 type ControlMethod =
   keyof KeyExportControl | keyof KeyImportControl | keyof StorageCredentialControl;
 type Depth = [never, 0, 1, 2, 3, 4];
