@@ -84,9 +84,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'resolveAllowedFile',
       // UX1113-R1 (D-147; 06 §8 `agentlink restore`): the terminal restore on this user's keychain,
       // home and own TTY prompt; no backend, path or prompt seam (the engine stays inside).
+      // UX1113-R1: `doctor` names why first run is held (store-only, no seam).
+      'restoreHoldHere',
       'restoreInTerminal',
-      // UX1113-R1: `doctor` names an unfinished restore (store-only, no seam).
-      'restorePendingHere',
       'selectKeyStoreBackend',
       // M1-36b-2-c: the Send folder for an existing agent; the owner signs through the given
       // owner operation (performOwnerOperation in the CLI), nothing is unlocked here.

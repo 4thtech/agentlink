@@ -29,7 +29,7 @@ afterEach(async () => {
 });
 
 let homes = 0;
-async function harness(over: { keychain?: KeychainBackend } = {}) {
+async function harness(over: { keychain?: KeychainBackend; keychainTimeoutMs?: number } = {}) {
   homes += 1;
   const home = join(world.root, `home-${String(homes)}`);
   mkdirSync(join(home, 'Downloads'), { recursive: true });
@@ -52,7 +52,13 @@ async function harness(over: { keychain?: KeychainBackend } = {}) {
         return Promise.resolve(true);
       },
       notifier: () => Promise.resolve(true),
-      restore: { home, kdf: KDF },
+      restore: {
+        home,
+        kdf: KDF,
+        ...(over.keychainTimeoutMs === undefined
+          ? {}
+          : { keychainTimeoutMs: over.keychainTimeoutMs }),
+      },
     },
   );
   servers.push(server);
@@ -195,5 +201,31 @@ describe('first run waits for an unfinished restore (T-7; IR Low)', () => {
     });
     expect(res.status).toBe(409);
     expect(JSON.parse(res.body)).toEqual({ status: 'finish_restore' });
+  });
+});
+
+describe('first run fails closed on a keychain that does not answer (T-1)', () => {
+  it('holds owner setup with keychain_unavailable and creates nothing; proceeds once it answers', async () => {
+    let hang = true;
+    const real = new MemoryKeychain();
+    const keychain: KeychainBackend = {
+      get: (account) => (hang ? new Promise(() => undefined) : real.get(account)),
+      set: (account, value) => real.set(account, value),
+      delete: (account) => real.delete(account),
+    };
+    const h = await harness({ keychain, keychainTimeoutMs: 50 });
+    const begin = () =>
+      send(h.server.port, '/api/ui/first-run/owner/begin', {
+        method: 'POST',
+        headers: h.headers({ 'X-AgentLink-Input': input({}) }),
+      });
+    const held = await begin();
+    expect(held.status).toBe(409);
+    expect(JSON.parse(held.body)).toEqual({ status: 'keychain_unavailable' });
+    expect([...real.items.keys()]).toEqual([]);
+    hang = false;
+    const retried = await begin();
+    expect(JSON.parse(retried.body)).not.toEqual({ status: 'keychain_unavailable' });
+    expect(JSON.parse(retried.body)).not.toEqual({ status: 'finish_restore' });
   });
 });

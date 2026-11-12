@@ -22,7 +22,7 @@ import {
   hasOwnerOnMachine,
   hasUnfinishedOwnerCodeChange,
   nodeRpcFetch,
-  restorePendingHere,
+  restoreHoldHere,
 } from '@4thtech-io/node';
 import { listAgentNames, readAgentConfig } from '../runtime/agent-dir.js';
 import { localDoctorChecks, type LocalChecks } from './doctor-local.js';
@@ -59,6 +59,9 @@ export const DOCTOR_TEXT = Object.freeze({
   get restoreUnfinished(): string {
     return `Problem  A restore didn't finish: your IDs are back, but not their owner\n         Run \`${commandPrefix()} restore\` with the same recovery kit, or choose the kit again in the app.`;
   },
+  /** UX1113-R1 (fail closed): the keychain did not answer, so first run is held. */
+  keychainUnanswered:
+    "Problem  AgentLink couldn't check this computer's keychain. Try again.\n         Unlock the keychain if it asks, then run doctor again.",
   get rulesFailClosed(): string {
     return `Problem  Your rules can't be used, so AgentLink uses its strictest settings\n         In a terminal you opened yourself, run \`${commandPrefix()} policy recover\` to review and confirm them again.`;
   },
@@ -91,7 +94,7 @@ export interface DoctorDeps extends CommandDeps {
    * UX1113-R1 (04 §2.3.3, T-7): true when restored IDs wait for their owner (a restore stopped
    * between the IDs and the owner). Store-only. Absent: the line is never printed.
    */
-  readonly restorePending?: () => Promise<boolean>;
+  readonly restoreHold?: () => Promise<'finish_restore' | 'keychain_unavailable' | undefined>;
 }
 
 /** M1-9h doctor lines (11 §5: "public record", never chain, RPC or a network name). */
@@ -179,9 +182,9 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
       problems += local.problems;
     }
     // UX1113-R1: an unfinished restore is named before anything tries to open an ID.
-    if (deps.restorePending !== undefined && (await deps.restorePending().catch(() => false))) {
-      emit(DOCTOR_TEXT.restoreUnfinished, true);
-    }
+    const hold = await deps.restoreHold?.().catch(() => 'keychain_unavailable' as const);
+    if (hold === 'finish_restore') emit(DOCTOR_TEXT.restoreUnfinished, true);
+    if (hold === 'keychain_unavailable') emit(DOCTOR_TEXT.keychainUnanswered, true);
 
     /** One ID's checks (`name` undefined: the default ID). True when it stopped early on a problem. */
     const checkOne = async (
@@ -369,6 +372,6 @@ export const doctorHandler: CommandHandler = createDoctorHandler({
   ...createDeps({ unfinishedOwnerCodeChange: hasUnfinishedOwnerCodeChange }),
   proofNetwork: nodeProofNetworkCheck(),
   ownerOnMachine: hasOwnerOnMachine,
-  restorePending: restorePendingHere,
+  restoreHold: restoreHoldHere,
   local: () => localDoctorChecks({ env: process.env }),
 });
