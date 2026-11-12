@@ -23,6 +23,9 @@ import {
   Switch,
   TextField,
 } from '@4thtech-io/ui';
+import { getLive, subscribeLive, switchAgent, type LiveSnapshot } from '../../api/live.js';
+import { detectPlatform } from '../first-run/passkey.js';
+import { SENSOR } from '../first-run/strings.js';
 import { UnderTheHood } from '../../lazy/hood.js';
 import {
   useCallback,
@@ -30,6 +33,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactElement,
   type ReactNode,
 } from 'react';
@@ -105,18 +109,25 @@ function Row({
   control,
   children,
   tone,
+  changed,
 }: {
   title: string;
   help?: ReactNode;
   control?: ReactNode;
   children?: ReactNode;
   tone?: 'commit';
+  changed?: boolean;
 }): ReactElement {
   return (
-    <div className={tone === 'commit' ? 'rl-row is-commit' : 'rl-row'}>
+    <div
+      className={`rl-row${tone === 'commit' ? ' is-commit' : ''}${changed === true ? ' is-changed' : ''}`}
+    >
       <div className="rl-row-main">
         <div className="rl-row-text">
-          <div className="al-text-body">{title}</div>
+          <div className="al-text-body rl-row-title">
+            {title}
+            {changed === true ? <span className="rl-tag">{S.changedTag}</span> : null}
+          </div>
           {help === undefined ? null : <div className="al-text-caption al-muted">{help}</div>}
         </div>
         {control === undefined ? null : <div className="rl-row-control">{control}</div>}
@@ -129,6 +140,15 @@ function Row({
 /** The summary's word for a three-way rule. */
 const ruleWord = (v: 'allow' | 'approval' | 'deny'): string =>
   v === 'allow' ? S.allowed : v === 'approval' ? S.askMe : S.never;
+
+const EMPTY_LIVE: () => LiveSnapshot = () => ({ list: undefined, agents: [], error: false });
+
+/** How freely a three-way rule lets the AI act: never < ask < allow. */
+const rank3 = (v: string): number => (v === 'allow' ? 2 : v === 'approval' ? 1 : 0);
+const toNum = (v: string): number => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
 const unique = (codes: readonly string[]): string[] => [...new Set(codes)];
 
@@ -144,6 +164,25 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
   const [step, setStep] = useState<Step>({ kind: 'edit' });
   const [notice, setNotice] = useState<Notice | undefined>(undefined);
   const [code, setCode] = useState('');
+  // Owner presence read: Touch ID (or the platform's word) when a passkey is registered, else the master code.
+  const [sensor, setSensor] = useState<string>(SENSOR[detectPlatform()]);
+  const live = useSyncExternalStore(subscribeLive, getLive, EMPTY_LIVE);
+  const current = live.agents.find((a) => a.current);
+  const currentName = current?.name;
+  useEffect(() => {
+    let on = true;
+    void ownerClient
+      .passkey()
+      .then((p) => {
+        if (on) setSensor(p === null ? S.masterCode : SENSOR[detectPlatform()]);
+      })
+      .catch(() => {
+        if (on) setSensor(S.masterCode);
+      });
+    return () => {
+      on = false;
+    };
+  }, [ownerClient, currentName]);
 
   const reload = useCallback(async (): Promise<void> => {
     const res = await client.get(RULES_PATH);
@@ -158,7 +197,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
 
   useEffect(() => {
     void reload();
-  }, [reload]);
+  }, [reload, currentName]);
 
   const view = load.kind === 'ok' ? load.rules : undefined;
   const checked = useMemo(
@@ -265,7 +304,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
       case 'busy':
         return stay(S.busy);
       case 'passkey_cancelled':
-        return stay(S.passkeyCancelled);
+        return stay(S.passkeyCancelled(sensor));
       case 'stale':
         return back(S.stale);
       case 'session_expired':
@@ -278,13 +317,34 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
   };
 
   const title = <h1 className="al-text-title-1">{PAGE_TITLES.rules}</h1>;
+  const picker =
+    live.agents.length >= 2 && current !== undefined ? (
+      <label className="rl-picker al-text-body-sm">
+        <span>{S.pickerLabel}</span>
+        <select
+          aria-label={S.pickerLabel}
+          value={current.name}
+          disabled={
+            step.kind !== 'edit' ||
+            (draft !== undefined && load.kind === 'ok' && checkDraft(load.rules, draft).changes > 0)
+          }
+          onChange={(e) => void switchAgent(e.currentTarget.value)}
+        >
+          {live.agents.map((a) => (
+            <option key={a.name} value={a.name}>
+              {a.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    ) : null;
   const header = (
     <header className="rl-header">
       <div>
-        <div className="al-text-label al-muted">{S.eyebrow}</div>
         {title}
+        <p className="al-text-body al-muted rl-lead">{S.lead}</p>
       </div>
-      <span className="al-text-body-sm al-muted">{S.savingNote}</span>
+      {picker}
     </header>
   );
 
@@ -359,6 +419,27 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
   const sizeError = (key: keyof Draft): { error?: string } =>
     checked.invalid.has(key) ? { error: S.invalidSize } : {};
   const turningSellOn = draft.sellOn && !viewSellOn(view);
+  const base = draftOf(view);
+  const differs = (...keys: (keyof Draft)[]): boolean => keys.some((k) => draft[k] !== base[k]);
+  const changedProof = differs('notarize', 'dailyBudgetUSD', 'perActionMaxUSD');
+  const changedInvites = differs('acceptInvites');
+  const changedTerms = differs('accept');
+  const moreChanged = [
+    differs('unknownSenders'),
+    differs('maxSendSizeMB', 'maxReceiveSizeMB'),
+    differs('allowKeyDisclosure'),
+    differs('buyOn', 'buyMaxUSD', 'sellOn', 'sellMinUSD'),
+  ].filter(Boolean).length;
+  const widens =
+    rank3(draft.notarize) > rank3(base.notarize) ||
+    toNum(draft.dailyBudgetUSD) > toNum(base.dailyBudgetUSD) ||
+    toNum(draft.perActionMaxUSD) > toNum(base.perActionMaxUSD) ||
+    (draft.acceptInvites === 'auto' && base.acceptInvites !== 'auto') ||
+    rank3(draft.accept) > rank3(base.accept) ||
+    (draft.unknownSenders === 'queue' && base.unknownSenders === 'drop') ||
+    (draft.allowKeyDisclosure === 'approval' && base.allowKeyDisclosure === 'deny') ||
+    (draft.buyOn && !base.buyOn) ||
+    (draft.sellOn && !base.sellOn);
   const dirty = checked.changes > 0 || checked.invalid.size > 0;
 
   return (
@@ -381,7 +462,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
             <dd>{ruleWord(view.proofs.notarize)}</dd>
           </div>
           <div>
-            <dt>{S.invitesTitle}</dt>
+            <dt>{S.summaryInvites}</dt>
             <dd>{view.contacts.acceptInvites === 'auto' ? S.allowed : S.askMe}</dd>
           </div>
           <div>
@@ -398,6 +479,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
           <Row
             title={S.proofTitle}
             help={S.proofHelp}
+            changed={changedProof}
             control={
               <Segmented
                 label={S.proofTitle}
@@ -438,6 +520,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
           </Row>
           <Row
             title={S.invitesTitle}
+            changed={changedInvites}
             help={S.invitesHelp}
             control={
               <Segmented
@@ -453,6 +536,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
           />
           <Row
             title={S.termsTitle}
+            changed={changedTerms}
             help={S.termsHelp}
             tone="commit"
             control={
@@ -481,13 +565,20 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
             onClick={() => setMoreOpen((o) => !o)}
           >
             <Icon name={moreOpen ? 'chevron-down' : 'chevron-right'} size={16} />
-            <span>{S.moreRules}</span>
+            <span className="rl-more-text">
+              <span>{S.moreRules}</span>
+              <span className="al-text-body-sm al-muted">{S.moreHelp}</span>
+            </span>
+            <span className="al-text-body-sm al-muted rl-more-state">
+              {S.moreState(5, moreChanged)}
+            </span>
           </button>
         </h2>
         {moreOpen ? (
           <Surface id="rules-more" className="rl-card">
             <Row
               title={S.unknownTitle}
+              changed={differs('unknownSenders')}
               help={S.unknownHelp}
               control={
                 <Segmented
@@ -609,7 +700,11 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
 
       {dirty ? (
         <div className="rl-unsaved" role="region" aria-label={S.changes(checked.changes)}>
-          <span className="al-text-body-sm">{S.changes(checked.changes)}</span>
+          <span className="al-text-body-sm">
+            <strong>{S.changes(checked.changes)}</strong>
+            {' · '}
+            {widens ? S.barWider(sensor) : S.barPlain(sensor)}
+          </span>
           <div className="rl-unsaved-actions">
             <Button
               variant="ghost"
