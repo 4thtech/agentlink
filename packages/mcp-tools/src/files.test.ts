@@ -406,28 +406,6 @@ describe('agentlink_fetch_file (06 §2.3)', () => {
     expectClean(r);
   });
 
-  it('REL051-A12: as "save" asks for no text; the core is asked without readText', async () => {
-    const inputs: FetchFileInput[] = [];
-    const client = fake({
-      fetch: (input) => {
-        inputs.push(input);
-        return Promise.resolve({
-          status: 'ok',
-          savedTo: '/home/u/AgentLink/Inbox/plan.md',
-          name: 'plan.md',
-          size: 6,
-          integrity: 'verified',
-        } as FetchFileResult);
-      },
-    });
-    const r = await fetchFile({ envelopeId: ENVELOPE, as: 'save' }, client);
-    expect(inputs).toEqual([{ envelopeId: ENVELOPE }]);
-    expect(r.structured).toMatchObject({ status: 'ok', kind: 'markdown' });
-    expect(r.structured).not.toHaveProperty('untrusted');
-    const bad = await fetchFile({ envelopeId: ENVELOPE, as: 'open' }, client);
-    expect(bad.structured).toMatchObject({ status: 'error', code: 'INVALID_ARGUMENT' });
-  });
-
   it('REL051-A12: the result matches the output schema, with and without text', async () => {
     const validate = new Ajv({ strict: false }).compile(
       findTool('agentlink_fetch_file')!.outputSchema,

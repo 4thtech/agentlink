@@ -105,8 +105,13 @@ describe('the sender labels the type from the extension (WP-A2)', () => {
       maxBytes: 1_000_000,
     });
     if (page.status !== 'ok') throw new Error('no page');
-    const files = page.items.flatMap((item) => item.files);
-    expect(files.map((f) => f.kind)).toEqual(['markdown', 'other']);
+    const kinds = new Map(page.items.flatMap((item) => item.files).map((f) => [f.name, f.kind]));
+    expect(kinds).toEqual(
+      new Map([
+        ['plan.md', 'markdown'],
+        ['evil.exe', 'other'],
+      ]),
+    );
   });
 });
 
@@ -157,7 +162,7 @@ describe('fetchFile returns the text of a small text file (WP-A1)', () => {
     expect(fetched).not.toHaveProperty('text');
   });
 
-  it("a spoofed sender type never decides: text/markdown on a .bin has no text; octet-stream on a .md has", async () => {
+  it('a spoofed sender type never decides: text/markdown on a .bin has no text; octet-stream on a .md has', async () => {
     const binId = await sendFile('payload.bin', enc('# looks like markdown'), {
       mime: 'text/markdown',
     });
@@ -195,9 +200,7 @@ describe('savedFilePaths: where saved files are, for the inbox (plan item 7)', (
   it('a saved file has its path; an unsaved or missing one has none', async () => {
     const saved = await sendFile('plan.md', enc(PLAN));
     const unsaved = await sendFile('later.md', enc('later'));
-    expect(await b.client.savedFilePaths([{ envelopeId: saved, fileIndex: 0 }])).toEqual(
-      new Map(),
-    );
+    expect(await b.client.savedFilePaths([{ envelopeId: saved, fileIndex: 0 }])).toEqual(new Map());
     await b.client.fetchFile({ envelopeId: saved });
     const paths = await b.client.savedFilePaths([
       { envelopeId: saved, fileIndex: 0 },
@@ -207,8 +210,6 @@ describe('savedFilePaths: where saved files are, for the inbox (plan item 7)', (
     expect(paths).toEqual(new Map([[`${saved}.0`, `${INBOX}/plan.md`]]));
     // Deleted from the folder since: no path.
     b.inbox.entries.delete('plan.md');
-    expect(await b.client.savedFilePaths([{ envelopeId: saved, fileIndex: 0 }])).toEqual(
-      new Map(),
-    );
+    expect(await b.client.savedFilePaths([{ envelopeId: saved, fileIndex: 0 }])).toEqual(new Map());
   });
 });

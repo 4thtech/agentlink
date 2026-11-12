@@ -28,9 +28,16 @@
 //    (`incomplete`) and the nextStep adds one fixed line: some messages may be missing and the next
 //    check looks again. No count, relay, second or event ID reaches the result or the log text.
 //
+// 8. Files (REL051-A12): each file's `kind` is ours, derived from its name alone (the sender's MIME
+//    type stays under `untrusted.fileTypes` and decides nothing); the block line reads
+//    `File 0: plan.md (Markdown, 97 bytes)`. A received file already saved (automatically, by Save in
+//    the app or by agentlink_fetch_file) carries `savedTo` (06 §2.2), read from the save record after
+//    the page; a lookup that fails leaves it out.
+//
 // I-5, I-7: summaries and `nextStep` are fixed text with counts and names under the 06 §2.1 rule;
 // logs carry counts only.
 import { canonicalize, encodeUtf8 } from '@4thtech-io/crypto';
+import { FILE_KIND_LABELS, fileKindOf, type FileKind } from '@4thtech-io/types';
 import {
   activeContacts,
   contactRef,
@@ -152,6 +159,9 @@ interface Rendered {
   readonly block: string;
 }
 
+/** The file's kind: the core's, or derived from the name here (never from the MIME type). */
+const kindOf = (file: PageFile): FileKind => file.kind ?? fileKindOf(file.name);
+
 function fileInfo(file: PageFile): Record<string, unknown> {
   // Built field by field: whatever else the port item carries (a URL, a key) never gets copied.
   return {
@@ -160,6 +170,7 @@ function fileInfo(file: PageFile): Record<string, unknown> {
     plaintextSha256: file.plaintextSha256,
     delivery: file.delivery,
     expiresAt: file.expiresAt === null ? null : (isoOrUndefined(file.expiresAt) ?? null),
+    kind: kindOf(file),
   };
 }
 
@@ -187,7 +198,7 @@ function untrustedOf(item: PageItem): { untrusted: Record<string, unknown>; cont
     untrusted['fileNames'] = names;
     untrusted['fileTypes'] = types;
     const lines = item.files.map(
-      (f, i) => `File ${f.index}: ${names[i]} (${types[i]}, ${f.size} bytes)`,
+      (f, i) => `File ${f.index}: ${names[i]} (${FILE_KIND_LABELS[kindOf(f)]}, ${f.size} bytes)`,
     );
     content = [content, ...lines].filter((part) => part !== '').join('\n');
   }
@@ -369,6 +380,31 @@ export async function inboxHandler(input: unknown, context: ToolContext): Promis
   }
 
   const items = page.items.map(renderOnce);
+
+  // REL051-A12 (plan item 7): `savedTo` on received files already saved, from the save record.
+  const refs = page.items.flatMap((item) =>
+    item.direction === 'in'
+      ? item.files.map((f) => ({ envelopeId: item.envelopeId, fileIndex: f.index }))
+      : [],
+  );
+  let savedPaths: ReadonlyMap<string, string> = new Map();
+  if (refs.length > 0 && client.files?.savedPaths !== undefined) {
+    try {
+      savedPaths = await client.files.savedPaths(refs);
+    } catch {
+      logger.info('inbox saved files unavailable');
+    }
+  }
+  if (savedPaths.size > 0) {
+    page.items.forEach((item, index) => {
+      if (item.direction !== 'in' || item.files.length === 0) return;
+      const files = item.files.map((f) => {
+        const savedTo = savedPaths.get(`${item.envelopeId}.${String(f.index)}`);
+        return { ...fileInfo(f), ...(typeof savedTo === 'string' ? { savedTo } : {}) };
+      });
+      items[index] = { ...items[index]!, message: { ...items[index]!.message, files } };
+    });
+  }
 
   // M1-22-b: names for the addresses in each offer's terms, and a hint for identical open offers.
   const withTerms = page.items.filter((item) => item.terms !== undefined);

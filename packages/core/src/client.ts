@@ -29,7 +29,12 @@ import { DeliveryAcks } from './acks.js';
 import { AgentRemovalService } from './agent-removal.js';
 import { CardUpdateSender, type CardUpdateSendResult } from './card-update.js';
 import { AutoSaver, type AutoSavePause } from './files/auto-save.js';
-import { FileFetcher, type FetchFileInput, type FetchFileResult } from './files/incoming.js';
+import {
+  FileFetcher,
+  type FetchFileInput,
+  type FetchFileResult,
+  type SavedFileRef,
+} from './files/incoming.js';
 import { savedNameOf } from './files/received.js';
 import { saveReceivedFile, type SaveReceivedFileResult } from './files/save.js';
 import type { FilesPlatform } from './files/platform.js';
@@ -478,6 +483,15 @@ export class AgentLinkClient {
   async fetchFile(input: FetchFileInput): Promise<FetchFileResult> {
     await this.pause.assertRunning();
     return this.#files.fetch(input);
+  }
+
+  /**
+   * Where already saved received files are now (06 §2.2 `FileInfo.savedTo`; REL051-A12): keyed
+   * `<envelope ID>.<index>`, from the saved-name record, only while that name is still a regular file
+   * directly inside the Inbox folder. Reads only; never throws.
+   */
+  savedFilePaths(refs: readonly SavedFileRef[]): Promise<ReadonlyMap<string, string>> {
+    return this.#files.savedPaths(refs);
   }
 
   /** W4-FILES-SAVE (IR L2): saves in flight per item, so one file is never saved twice at once. */

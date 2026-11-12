@@ -572,6 +572,7 @@ describe('inbox page: what is returned (06 §2.2 "What is returned"; D-72)', () 
         expiresAt: null,
         name: 'report.pdf',
         mime: 'application/pdf',
+        kind: 'other',
       },
       {
         index: 1,
@@ -581,6 +582,7 @@ describe('inbox page: what is returned (06 §2.2 "What is returned"; D-72)', () 
         expiresAt: T0 + 86_400,
         name: 'report.pdf',
         mime: 'application/pdf',
+        kind: 'other',
       },
       {
         index: 2,
@@ -590,6 +592,7 @@ describe('inbox page: what is returned (06 §2.2 "What is returned"; D-72)', () 
         expiresAt: T0 + 86_400,
         name: 'x.bin',
         mime: 'application/pdf',
+        kind: 'other',
       },
     ]);
     const json = JSON.stringify(item);
