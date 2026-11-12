@@ -617,7 +617,11 @@ function expectNothingInstalled(box) {
 describe.each(desktopShells)('install.sh --desktop, switched off (today), under %s', (shell) => {
   it('refuses --desktop with one fixed line, exit code 2, before anything happens', () => {
     const box = sandbox();
-    for (const args of [['--desktop'], ['--desktop', '--invite', SHORT_LINK], ['--desktop', '--dry-run']]) {
+    for (const args of [
+      ['--desktop'],
+      ['--desktop', '--invite', SHORT_LINK],
+      ['--desktop', '--dry-run'],
+    ]) {
       const r = run(box, args, { shell, script: SCRIPT, env: MAC });
       expect(r.code, r.out).toBe(2);
       expect(r.out.trim()).toBe(
@@ -702,7 +706,9 @@ describe.each(desktopShells)('install.sh --desktop, switched on, under %s', (she
     expect(r.out).toContain(
       'The desktop app download was sent to an unexpected address, so nothing was installed.',
     );
-    expect(r.log.split('\n').filter((l) => l.startsWith('http'))).toEqual([`${RELEASE}/${DESKTOP_ZIP}`]);
+    expect(r.log.split('\n').filter((l) => l.startsWith('http'))).toEqual([
+      `${RELEASE}/${DESKTOP_ZIP}`,
+    ]);
     expect(existsSync(box.app)).toBe(false);
     expectNothingInstalled(box);
   });
@@ -710,7 +716,10 @@ describe.each(desktopShells)('install.sh --desktop, switched on, under %s', (she
   it('stops after 5 redirects', () => {
     const box = desktopSandbox();
     const hop = (n) => `https://objects.githubusercontent.com/hop${n}/${DESKTOP_ZIP}`;
-    redirect(box, [[`${RELEASE}/${DESKTOP_ZIP}`, hop(1)], ...[1, 2, 3, 4, 5].map((n) => [hop(n), hop(n + 1)])]);
+    redirect(box, [
+      [`${RELEASE}/${DESKTOP_ZIP}`, hop(1)],
+      ...[1, 2, 3, 4, 5].map((n) => [hop(n), hop(n + 1)]),
+    ]);
     const r = run(box, ['--desktop'], { shell, env: MAC });
     expect(r.code, r.out).toBe(1);
     expect(r.out).toContain('redirected too often');
@@ -748,7 +757,9 @@ describe.each(desktopShells)('install.sh --desktop, switched on, under %s', (she
     rmSync(join(box.serve, DESKTOP_SUMS));
     const r = run(box, ['--desktop'], { shell, env: MAC });
     expect(r.code).toBe(1);
-    expect(r.out).toContain(`Could not download ${RELEASE}/${DESKTOP_SUMS}. Check your internet connection`);
+    expect(r.out).toContain(
+      `Could not download ${RELEASE}/${DESKTOP_SUMS}. Check your internet connection`,
+    );
     expect(existsSync(box.app)).toBe(false);
   });
 
@@ -847,7 +858,9 @@ describe('install.sh --desktop in a terminal', () => {
     }
     expect(r.code, r.out).toBe(0);
     const payload = SHORT_LINK.slice('https://agentlink.4thtech.io/i#'.length);
-    expect(r.log.trimEnd().split('\n').at(-1)).toBe(`open -a ${box.app} agentlink://join#${payload}`);
+    expect(r.log.trimEnd().split('\n').at(-1)).toBe(
+      `open -a ${box.app} agentlink://join#${payload}`,
+    );
     expect(r.out).not.toContain(payload);
     expect(r.out).toContain('Opening AgentLink on the invite.');
   });
@@ -869,16 +882,23 @@ describe('install.sh source', () => {
 
   it('ships with the desktop app switched off, so today the installer does what it did', () => {
     expect(source).toContain('  DESKTOP_RELEASED=0\n');
-    expect(source).toContain('  DESKTOP_RELEASES="https://github.com/4thtech/agentlink/releases/download"\n');
+    expect(source).toContain(
+      '  DESKTOP_RELEASES="https://github.com/4thtech/agentlink/releases/download"\n',
+    );
   });
 
   it('never removes the quarantine mark and never changes Gatekeeper', () => {
     const code = source.replace(/^\s*#.*$/gm, '');
-    expect(code).not.toMatch(/xattr|com\.apple\.quarantine|spctl|--master-disable|LSQuarantine|sudo/);
+    expect(code).not.toMatch(
+      /xattr|com\.apple\.quarantine|spctl|--master-disable|LSQuarantine|sudo/,
+    );
   });
 
   it('downloads the desktop app with curl following no redirect itself', () => {
-    const fetch = source.slice(source.indexOf('fetch_release() {'), source.indexOf('install_desktop() {'));
+    const fetch = source.slice(
+      source.indexOf('fetch_release() {'),
+      source.indexOf('install_desktop() {'),
+    );
     expect(fetch).toContain("curl -sS --proto '=https' --tlsv1.2 --retry 2 --max-redirs 0");
     expect(fetch).not.toMatch(/curl -[A-Za-z]*L|--location/);
     expect(source.match(/fetch_release "/g)).toHaveLength(2);

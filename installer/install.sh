@@ -5,6 +5,7 @@
 #   curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --dry-run
 #   curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --uninstall
 #   curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --invite '<invite link>'
+#   curl -fsSL https://agentlink.4thtech.io/install.sh | sh -s -- --desktop [--invite '<invite link>']
 #
 # What it does, and nothing more:
 #   1. Uses your Node.js if it is 22.14 or newer. Otherwise it downloads the official Node.js
@@ -16,6 +17,11 @@
 #      page), it opens AgentLink on that invite: `agentlink join` with the link. The link is checked
 #      first, with the same patterns as `agentlink join`; anything else is refused with one fixed
 #      line, and the link is never printed or stored by this script.
+# With --desktop (Mac only; refused until the desktop app is released, DESKTOP_RELEASED below), it
+# does none of the above. It downloads the AgentLink desktop app (DESKTOP_VERSION below) from the
+# AgentLink GitHub Release, checks its SHA-256 against the release's SHA256SUMS AND against the hash
+# written in this file, and puts AgentLink.app in ~/Applications (your own Applications folder).
+# It never removes the quarantine mark from anything and never changes Gatekeeper.
 # No sudo, no admin rights, no telemetry. It never asks for or prints a secret. Run it again to
 # update. Your IDs and messages (the rest of ~/.agentlink) are never touched, not even by --uninstall.
 #
@@ -34,18 +40,26 @@ main() {
   PACKAGE="@4thtech-io/agentlink@latest"
   MARK="# added by the AgentLink installer"
   INVITE_PREFIX="https://agentlink.4thtech.io/i#"
+  # The desktop app (--desktop). Off until the desktop app is released: until then --desktop is
+  # refused before anything happens, and nothing else changes. Releasing it sets DESKTOP_RELEASED=1,
+  # DESKTOP_VERSION and the hashes in desktop_pinned_sha (installer/README.md, "For maintainers").
+  DESKTOP_RELEASED=0
+  DESKTOP_VERSION=0.0.0
+  DESKTOP_RELEASES="https://github.com/4thtech/agentlink/releases/download"
 
   dry_run=0
   uninstall=0
   start=1
   invite=""
   has_invite=0
+  desktop=0
   # No option value is ever printed: an invite link pasted in the wrong place stays unseen.
   while [ $# -gt 0 ]; do
     case "$1" in
       --dry-run) dry_run=1 ;;
       --uninstall) uninstall=1 ;;
       --no-start) start=0 ;;
+      --desktop) desktop=1 ;;
       --invite)
         [ "$has_invite" -eq 0 ] || refuse "Give one invite only."
         [ $# -ge 2 ] || refuse_invite
@@ -54,7 +68,7 @@ main() {
         shift
         ;;
       -h | --help)
-        echo "Usage: install.sh [--dry-run] [--uninstall] [--no-start] [--invite '<invite link>']"
+        echo "Usage: install.sh [--dry-run] [--uninstall] [--no-start] [--desktop] [--invite '<invite link>']"
         return 0
         ;;
       *) refuse "Unknown option (try --help)." ;;
@@ -65,6 +79,12 @@ main() {
   if [ "$has_invite" -eq 1 ]; then
     valid_invite "$invite" || refuse_invite
     [ "$uninstall" -eq 0 ] || refuse "--invite can't be used with --uninstall."
+  fi
+  if [ "$desktop" -eq 1 ]; then
+    [ "$DESKTOP_RELEASED" -eq 1 ] ||
+      refuse "The AgentLink desktop app is not released yet. Run the installer without --desktop."
+    [ "$uninstall" -eq 0 ] ||
+      refuse "--desktop can't be used with --uninstall. To remove the app, move AgentLink from Applications to the Bin."
   fi
 
   [ -n "${HOME:-}" ] || fail "HOME is not set."
@@ -79,6 +99,10 @@ main() {
   fi
 
   detect_platform
+  if [ "$desktop" -eq 1 ]; then
+    install_desktop
+    return 0
+  fi
   say "Installing AgentLink for $os_label."
 
   node_bin=""
@@ -165,10 +189,12 @@ valid_invite() {
   [ "${#payload}" -le 21846 ]
 }
 
-# Removes the download folder, if there is one.
+# Removes the download folder and the desktop app's unpack folder, if there are any.
 cleanup() {
   if [ -n "${tmp:-}" ]; then rm -rf "$tmp"; fi
   tmp=""
+  if [ -n "${stage:-}" ]; then rm -rf "$stage"; fi
+  stage=""
 }
 
 # Runs a command, or only prints it with --dry-run.
@@ -274,6 +300,141 @@ install_node() {
   for old in "$runtime_root"/node-v*; do
     [ "$old" = "$runtime_root/node-v$NODE_VERSION-$platform" ] || rm -rf "$old"
   done
+}
+
+# --- the desktop app (--desktop) ------------------------------------------------------------------
+
+# The SHA-256 of each desktop app zip of DESKTOP_VERSION, copied from that release's SHA256SUMS
+# files when DESKTOP_VERSION is set (installer/README.md). Empty: no desktop app for that Mac.
+desktop_pinned_sha() {
+  case "$1" in
+    mac-arm64) echo "" ;;
+    mac-x64) echo "" ;;
+    *) echo "" ;;
+  esac
+}
+
+# True when $1 may be fetched for the desktop app: https, exactly one of these hosts (no user name,
+# no port), and only the characters a GitHub Release download or its redirect uses. The characters
+# are listed one by one (no ranges), so no locale can widen the set.
+desktop_url_ok() {
+  case "$1" in
+    *[!ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~/?=\&%:+,\;-]*) return 1 ;;
+  esac
+  rest="${1#https:}"
+  [ "$rest" != "$1" ] || return 1
+  case "$rest" in //*) rest="${rest#//}" ;; *) return 1 ;; esac
+  host="${rest%%/*}"
+  [ "$rest" != "$host" ] || return 1
+  case "$host" in
+    github.com | objects.githubusercontent.com | release-assets.githubusercontent.com) return 0 ;;
+  esac
+  return 1
+}
+
+# Downloads $1 into $2. curl follows no redirect itself: this loop follows at most 5 and checks
+# every address (the first and each hop) with desktop_url_ok. Only $1, a fixed address, is printed.
+fetch_release() {
+  url="$1"
+  hops=0
+  while :; do
+    desktop_url_ok "$url" ||
+      fail "The desktop app download was sent to an unexpected address, so nothing was installed."
+    reply="$(curl -sS --proto '=https' --tlsv1.2 --retry 2 --max-redirs 0 --max-filesize 1073741824 \
+      -o "$2" -w '%{http_code} %{redirect_url}' "$url")" ||
+      fail "Could not download $1. Check your internet connection and run the installer again."
+    case "${reply%% *}" in
+      200) return 0 ;;
+      301 | 302 | 303 | 307 | 308)
+        hops=$((hops + 1))
+        [ "$hops" -le 5 ] ||
+          fail "The desktop app download was redirected too often, so nothing was installed."
+        url="${reply#* }"
+        ;;
+      *) fail "Could not download $1. Check your internet connection and run the installer again." ;;
+    esac
+  done
+}
+
+# --desktop: the desktop app into ~/Applications (Mac). No Node.js, no agentlink command, no PATH
+# change: the app brings its own. Nothing here touches the quarantine mark or Gatekeeper: curl marks
+# nothing, so the app opens as any app you built yourself would, and nothing else is changed.
+install_desktop() {
+  [ "$os" = darwin ] ||
+    fail "The desktop app is for Mac and Windows. On Linux, run the installer without --desktop."
+  asset="AgentLink-$DESKTOP_VERSION-mac-$arch.zip"
+  sums="SHA256SUMS-mac-$arch"
+  release="$DESKTOP_RELEASES/v$DESKTOP_VERSION"
+  pinned="$(desktop_pinned_sha "mac-$arch")"
+  [ -n "$pinned" ] ||
+    fail "The desktop app is not available for this Mac yet. Run the installer without --desktop."
+  apps_dir="$HOME/Applications"
+  app="$apps_dir/AgentLink.app"
+  say "Installing the AgentLink desktop app $DESKTOP_VERSION for $os_label."
+  say "Downloading it from the AgentLink release on GitHub."
+  if [ "$dry_run" -eq 1 ]; then
+    say "  would download $release/$asset and $sums, check SHA-256 $pinned,"
+    say "  and put AgentLink.app in $apps_dir"
+    if [ "$has_invite" -eq 1 ]; then say "  would open the invite in AgentLink"; fi
+    say "Dry run: nothing was changed."
+    return 0
+  fi
+  command -v curl >/dev/null 2>&1 || fail "curl is needed to download the desktop app."
+  command -v ditto >/dev/null 2>&1 || fail "ditto (part of macOS) is needed to unpack the desktop app."
+  [ ! -L "$app" ] || fail "$app is a link. Remove it, then run the installer again."
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/agentlink-install.XXXXXX")" ||
+    fail "Could not create a temporary folder."
+  # Both folders are removed at the end, and on any abort before that (Ctrl+C included).
+  trap 'cleanup' EXIT
+  trap 'cleanup; exit 130' INT TERM
+  fetch_release "$release/$asset" "$tmp/$asset"
+  fetch_release "$release/$sums" "$tmp/$sums"
+  listed="$(awk -v f="$asset" '$2 == f { print $1 }' "$tmp/$sums")"
+  actual="$(sha256_of "$tmp/$asset")"
+  if [ "$actual" != "$listed" ] || [ "$actual" != "$pinned" ]; then
+    fail "The desktop app download did not pass its safety check (SHA-256 mismatch), so nothing was installed. Please try again later."
+  fi
+  say "Checked: the download matches the release and this installer."
+  # Unpacked next to its final place, so putting it there is one rename on the same disk.
+  mkdir -p "$apps_dir" || fail "Could not create $apps_dir."
+  stage="$(mktemp -d "$apps_dir/.agentlink-install.XXXXXX")" ||
+    fail "Could not create a folder in $apps_dir."
+  ditto -x -k "$tmp/$asset" "$stage" ||
+    fail "Could not unpack the desktop app, so nothing was installed."
+  new_app="$stage/AgentLink.app"
+  if [ -L "$new_app" ] || [ ! -d "$new_app" ] || [ ! -f "$new_app/Contents/MacOS/AgentLink" ]; then
+    fail "The desktop app download is not a complete app, so nothing was installed."
+  fi
+  if [ -e "$app" ]; then
+    mv "$app" "$stage/previous.app" ||
+      fail "Could not replace $app. Quit AgentLink, then run the installer again."
+  fi
+  if ! mv "$new_app" "$app"; then
+    if [ -e "$stage/previous.app" ]; then mv "$stage/previous.app" "$app" || :; fi
+    fail "Could not install AgentLink into $apps_dir."
+  fi
+  cleanup
+  trap - EXIT INT TERM
+  say "AgentLink is installed: $app"
+  next_time="Next time, open AgentLink from Applications in your home folder, or with Spotlight."
+  if [ "$start" -eq 1 ] && [ -t 1 ] && { : </dev/tty; } 2>/dev/null; then
+    if [ "$has_invite" -eq 1 ]; then
+      say "Opening AgentLink on the invite."
+      # The app's own link (08 section 8): agentlink://join# and the checked payload, to this app.
+      open -a "$app" "agentlink://join#${invite#"$INVITE_PREFIX"}" || fail "Could not open AgentLink."
+    else
+      say "Opening AgentLink."
+      open "$app" || fail "Could not open AgentLink."
+    fi
+    say "$next_time"
+  else
+    say "$next_time"
+    if [ "$has_invite" -eq 1 ]; then
+      say "To open the invite, run the command from the invite page again in your own terminal."
+    else
+      say "To open it now, run: open $(quote "$app")"
+    fi
+  fi
 }
 
 # ~/.agentlink also holds your IDs, so a new one is private to you (as AgentLink makes it).
