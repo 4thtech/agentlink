@@ -230,9 +230,9 @@ export interface NativeHelper {
   /** Touch ID / Windows Hello is set up (exit 0). Never prompts. */
   available(): Promise<boolean>;
   /** `create`: the bytes printed (macOS: the record; Windows: record ‖ u16 ‖ signature, one prompt). */
-  create(): Promise<Uint8Array>;
+  create(signal?: AbortSignal): Promise<Uint8Array>;
   /** macOS `check`: resolves only when the key exists and refuses without a gesture. Never prompts. */
-  check(record: Uint8Array): Promise<void>;
+  check(record: Uint8Array, signal?: AbortSignal): Promise<void>;
   /**
    * `ecdh <reason>` / `sign <reason>`: one OS prompt, the released secret (the caller wipes it).
    * `signal` aborts it (the helper is killed and the prompt goes away): `cancelled`, no bytes.
@@ -306,11 +306,20 @@ export function createNativeHelper(options: {
       const result = await run(['available'], undefined);
       return result.code === 0;
     },
-    async create() {
-      return printed(await run(['create'], undefined));
+    // DESK-TOUCHID-FIX review: turning it on can be cancelled at every helper call.
+    async create(signal) {
+      if (signal?.aborted === true) throw new NativeHelperError('cancelled', 'aborted');
+      const result = await run(['create'], undefined, signal);
+      if (isAborted(signal)) {
+        result.stdout.fill(0);
+        throw new NativeHelperError('cancelled', 'aborted');
+      }
+      return printed(result);
     },
-    async check(record) {
-      const result = await run(['check'], stdinOf(record));
+    async check(record, signal) {
+      if (signal?.aborted === true) throw new NativeHelperError('cancelled', 'aborted');
+      const result = await run(['check'], stdinOf(record), signal);
+      if (isAborted(signal)) throw new NativeHelperError('cancelled', 'aborted');
       if (result.code !== 0) throw refusal(result);
     },
     async release(record, reason, signal) {

@@ -404,6 +404,12 @@ const NATIVE_PATH = '/api/owner/native';
 /** Fable review M1: turn native presence off, or on again (replace), each its own owner operation. */
 const NATIVE_OFF_PATH = '/api/owner/native/off';
 const NATIVE_REPLACE_PATH = '/api/owner/native/replace';
+/**
+ * DESK-TOUCHID-FIX review (Fable M-1): the page's Cancel while the presence helper waits. Stops the
+ * helper of the native presence operation in progress (turn on, on again, or a native approval); that
+ * request then answers with what really happened. Changes nothing else; no body.
+ */
+const NATIVE_CANCEL_PATH = '/api/owner/native/cancel';
 /** DESK-D12c: the HTTP status of each fixed native presence state (never counted as a wrong code). */
 type NativeAnswerState = NativeUiState | 'not_registered' | 'damaged' | 'keychain';
 const NATIVE_HTTP: Readonly<Record<NativeAnswerState, number>> = Object.freeze({
@@ -2053,6 +2059,29 @@ export async function startApprovalServerWith(
       // Diagnostics never change the outcome.
     }
   };
+  /**
+   * DESK-TOUCHID-FIX review (Fable M-1): the abort of the native presence operation in progress (one
+   * at a time: `busy`), for POST /api/owner/native/cancel.
+   */
+  let nativeInProgress: AbortController | undefined;
+  /** Aborts `stop` when the page goes away before the answer; returns the cleanup. */
+  const abortOnClose = (
+    req: IncomingMessage,
+    res: ServerResponse,
+    stop: AbortController,
+  ): (() => void) => {
+    const abandon = (): void => {
+      if (!res.writableFinished) stop.abort();
+    };
+    req.once('close', abandon);
+    res.once('close', abandon);
+    nativeInProgress = stop;
+    return () => {
+      req.off('close', abandon);
+      res.off('close', abandon);
+      if (nativeInProgress === stop) nativeInProgress = undefined;
+    };
+  };
   /** The answer when the page asks for native presence where there is no helper (not the app). */
   const NO_NATIVE = Object.freeze({ native: 'unavailable' });
 
@@ -2074,11 +2103,7 @@ export async function startApprovalServerWith(
     // helper is killed, its OS prompt closes, `busy` is released by the gate's own finally, and a
     // touch that still arrives approves nothing.
     const abandoned = new AbortController();
-    const abandon = (): void => {
-      if (!res.writableFinished) abandoned.abort();
-    };
-    req.once('close', abandon);
-    res.once('close', abandon);
+    const cleanup = abortOnClose(req, res, abandoned);
     try {
       return {
         presence: await nativePresence(keychainOf(), nativeHelper, ownerNostr, reason, {
@@ -2095,8 +2120,7 @@ export async function startApprovalServerWith(
       nativeDiagnostic(`${reason} failed (${nativeFailureReason(error)})`);
       return { http: NATIVE_HTTP[state], state };
     } finally {
-      req.off('close', abandon);
-      res.off('close', abandon);
+      cleanup();
     }
   }
 
@@ -2204,12 +2228,24 @@ export async function startApprovalServerWith(
         // DESK-NATIVE-DEBUG: the step reached, for the one diagnostic line of this operation.
         const name = op === 'off' ? 'turn_off' : op;
         let step: NativeStep | 'presence' = 'presence';
+        // DESK-TOUCHID-FIX review (Fable M-1): Cancel, or the page going away, stops the helper.
+        const stop = new AbortController();
+        const cleanup = abortOnClose(req, res, stop);
         const steps = {
           onStep: (next: NativeStep): void => {
             step = next;
           },
+          signal: stop.signal,
         };
         nativeDiagnostic(`${name} started`);
+        /**
+         * DESK-TOUCHID-FIX review (Fable L-2): on again removes the old one first; a failure after
+         * that leaves it off, and the answer says so (never "nothing was changed").
+         */
+        const nowOff = (): Record<string, unknown> =>
+          op === 'replace' && step !== 'presence' && step !== 'master_code' && step !== 'remove_old'
+            ? { nowOff: true }
+            : {};
         try {
           // Each wipes the presented bytes, whether or not it succeeds. None takes native presence.
           if (op === 'off') {
@@ -2220,7 +2256,10 @@ export async function startApprovalServerWith(
         } catch (error) {
           nativeDiagnostic(`${name} failed at ${step} (${nativeFailureReason(error)})`);
           if (error instanceof NativeHelperError) {
-            reply(NATIVE_HTTP[error.state], 'presence_rejected', { native: error.state });
+            reply(NATIVE_HTTP[error.state], 'presence_rejected', {
+              native: error.state,
+              ...nowOff(),
+            });
             return;
           }
           const code = (error as { code?: unknown } | null)?.code;
@@ -2233,9 +2272,16 @@ export async function startApprovalServerWith(
           else if (code === 'owner_missing') reply(503, 'needs_setup');
           // DESK-NATIVE-DEBUG: the keychain did not answer or refused: its own message, not "error".
           else if (code === 'keychain_failed') {
-            reply(NATIVE_HTTP.keychain, 'failed', { native: 'keychain' });
-          } else reply(500, 'failed');
+            // Fable review L-1: a write that may still have landed is its own answer.
+            const unsure = (error as { detail?: unknown }).detail === 'unsure';
+            reply(NATIVE_HTTP.keychain, 'failed', {
+              native: unsure ? 'keychain_unsure' : 'keychain',
+              ...nowOff(),
+            });
+          } else reply(500, 'failed', nowOff());
           return;
+        } finally {
+          cleanup();
         }
         nativeDiagnostic(`${name} done`);
         presenceSucceeded();
@@ -5292,9 +5338,11 @@ export async function startApprovalServerWith(
             ? 'replace'
             : undefined;
     const nativeRoute = nativeOp !== undefined;
+    const cancelRoute = path === NATIVE_CANCEL_PATH;
     const reviewRoute = path === REVIEW_PATH;
     if (
       path !== '/api/approvals' &&
+      !cancelRoute &&
       one === null &&
       decideMatch === null &&
       !passkeyRoute &&
@@ -5307,6 +5355,7 @@ export async function startApprovalServerWith(
     const post =
       decideMatch !== null ||
       reviewRoute ||
+      cancelRoute ||
       ((passkeyRoute || nativeRoute) && method === 'POST') ||
       (nativeOp !== undefined && nativeOp !== 'register');
     if (method !== (post ? 'POST' : 'GET')) return reject(res, 405, 'method');
@@ -5314,6 +5363,15 @@ export async function startApprovalServerWith(
     if (!fetchSiteOk(req)) return reject(res, 403, 'fetch_site');
     if (post && originHeader === undefined) return reject(res, 403, 'origin');
     if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return reject(res, 403, 'csrf');
+    if (cancelRoute) {
+      // DESK-TOUCHID-FIX review (Fable M-1): before the generation hold (the operation it stops
+      // holds one), after the session, fetch-metadata, origin and CSRF gates. No body.
+      req.resume();
+      const running = nativeInProgress;
+      running?.abort();
+      sendJson(res, 200, { status: running === undefined ? 'none' : 'cancelling' });
+      return;
+    }
 
     if (post) {
       const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();

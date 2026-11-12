@@ -14,6 +14,8 @@ export type NativeState =
   | 'not_registered'
   | 'damaged'
   | 'keychain'
+  /** DESK-TOUCHID-FIX review (Fable L-1): a keychain write that may still have landed. */
+  | 'keychain_unsure'
   | 'error';
 
 export const NATIVE_STATES: readonly NativeState[] = Object.freeze([
@@ -27,6 +29,7 @@ export const NATIVE_STATES: readonly NativeState[] = Object.freeze([
   'not_registered',
   'damaged',
   'keychain',
+  'keychain_unsure',
   'error',
 ]);
 
@@ -62,6 +65,12 @@ export const NATIVE_STRINGS = Object.freeze({
   wait: 'Too many tries with a wrong master code. Wait a moment, then try again.',
   needsSetup: 'Open your agent first, then try again.',
   pageTimeout: 'That took too long to answer. Check the switch above, then try again.',
+  /**
+   * DESK-TOUCHID-FIX review (Fable L-2): turning it on again removes the old one first; when the new
+   * one then did not finish (cancelled, timed out, the keychain), it is off.
+   */
+  nowOff: (platform: DesktopPlatform): string =>
+    `${nativeSensor(platform)} is now off for approvals on this computer: the old one was removed and the new one was not finished. Turn it on again, or use your master code.`,
   unavailableNow: (platform: DesktopPlatform): string =>
     platform === 'mac'
       ? "Touch ID isn't available right now (for example, the lid is closed). Use your master code."
@@ -80,6 +89,8 @@ export const NATIVE_STRINGS = Object.freeze({
     damaged:
       'This computer needs it turned on again before it can be used. Use your master code, then turn it on again.',
     keychain: 'The system keychain did not answer. Unlock your computer and try again.',
+    keychain_unsure:
+      'The system keychain did not answer in time, so it may have been turned on. Check the switch above, then try again if it is off.',
     error: 'That did not work. Nothing was changed. Use your master code.',
   } satisfies Record<NativeState, string>),
 });
@@ -89,7 +100,12 @@ export type NativeOutcomeKind =
   | { readonly kind: 'registered' }
   | { readonly kind: 'off' }
   | { readonly kind: 'rejected' }
-  | { readonly kind: 'native'; readonly state: NativeState }
+  | {
+      readonly kind: 'native';
+      readonly state: NativeState;
+      /** DESK-TOUCHID-FIX review (Fable L-2): on again failed after the old one was removed. */
+      readonly nowOff?: true;
+    }
   | { readonly kind: 'busy' }
   | { readonly kind: 'wait' }
   | { readonly kind: 'needs_setup' }
@@ -106,6 +122,7 @@ export function nativeOutcomeText(outcome: NativeOutcomeKind, platform: DesktopP
     case 'rejected':
       return NATIVE_STRINGS.wrongCode;
     case 'native':
+      if (outcome.nowOff === true) return NATIVE_STRINGS.nowOff(platform);
       return outcome.state === 'unavailable'
         ? NATIVE_STRINGS.unavailableNow(platform)
         : NATIVE_STRINGS.state[outcome.state];

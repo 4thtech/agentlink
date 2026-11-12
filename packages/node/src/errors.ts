@@ -87,9 +87,13 @@ export class NodeKeyStoreError extends Error {
    * DESK-NATIVE-DEBUG: a fixed word for a diagnostic line only (`timeout` or `refused` for a failed
    * keychain call); never a native message.
    */
-  readonly detail?: 'timeout' | 'refused';
+  readonly detail?: 'timeout' | 'refused' | 'unsure';
 
-  constructor(code: NodeKeyStoreErrorCode, message: string, detail?: 'timeout' | 'refused') {
+  constructor(
+    code: NodeKeyStoreErrorCode,
+    message: string,
+    detail?: 'timeout' | 'refused' | 'unsure',
+  ) {
     super(message);
     this.name = 'NodeKeyStoreError';
     this.code = code;

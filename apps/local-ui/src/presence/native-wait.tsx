@@ -4,10 +4,10 @@
 // - Before the request leaves, the focused element loses focus: a focused master-code field keeps
 //   macOS secure input on, which can keep the Touch ID sheet from becoming key. (The desktop shell
 //   also takes focus off the page as a backstop, apps/desktop/src/main/security.ts.)
-// - While it waits, the app says "Rest your finger on the Touch ID key" with a Cancel. Cancel ends
-//   the request; the server sees the page go away and stops the helper (SIGTERM; the helper closes
-//   its sheet), and the screen gets the server's own "cancelled" answer (403, presence_rejected,
-//   native: cancelled), so it shows its usual message, never "offline".
+// - While it waits, the app says "Rest your finger on the Touch ID key" with a Cancel. Cancel asks
+//   the server (POST /api/owner/native/cancel) to stop the helper (SIGTERM; the helper closes its
+//   sheet); the waiting request is left alone, and the screen gets the server's own answer: cancelled, or done when the touch was
+//   already accepted. The page never makes an answer up.
 // The page's `fetch` is wrapped once at start (main.tsx), like the generation guard, so every call
 // site is covered. Nothing here sees or keeps a secret: only the method, the path and one header.
 import { Button } from '@4thtech-io/ui';
@@ -52,9 +52,12 @@ export function isNativePresenceRequest(
   return HELPER_PATHS.includes(parsed.pathname);
 }
 
-// --- the waiting state (one at a time: the server runs one presence at a time) -----------------
+// --- the waiting state ----------------------------------------------------------------------
 
-let current: AbortController | undefined;
+/** Every request that started the helper and is not answered yet (Fable review L-4). */
+let inFlight = 0;
+/** The fetch the cancel request goes through (the wrapped page fetch's base). */
+let cancelFetch: typeof fetch | undefined;
 let inlineHosts = 0;
 const listeners = new Set<() => void>();
 const notify = (): void => {
@@ -66,21 +69,43 @@ const subscribe = (l: () => void): (() => void) => {
     listeners.delete(l);
   };
 };
-let snapshot = { waiting: false, inline: 0 };
+let snapshot = { waiting: false, inline: 0, cancelling: false };
+let cancelling = false;
 const refresh = (): void => {
-  snapshot = { waiting: current !== undefined, inline: inlineHosts };
+  if (inFlight === 0) cancelling = false;
+  snapshot = { waiting: inFlight > 0, inline: inlineHosts, cancelling };
   notify();
 };
 
 /** True while a request that started the helper has not been answered. */
 export function nativeWaiting(): boolean {
-  return current !== undefined;
+  return inFlight > 0;
 }
 
-/** Ends the waiting request (the Cancel button). Nothing when none is waiting. */
-export function cancelNativeWait(): void {
-  current?.abort();
+function pageToken(): string {
+  if (typeof document === 'undefined') return '';
+  return document.querySelector('meta[name="agentlink-csrf"]')?.getAttribute('content') ?? '';
 }
+
+/**
+ * The Cancel button (Fable review M-1): asks the server to stop the helper of the operation in
+ * progress (POST /api/owner/native/cancel). The waiting request itself is neither aborted nor
+ * answered here: it ends with the server's own answer (cancelled, or done when the touch was
+ * already accepted). Nothing when none is waiting.
+ */
+export function cancelNativeWait(fetcher: typeof fetch | undefined = cancelFetch): void {
+  if (inFlight === 0 || fetcher === undefined) return;
+  cancelling = true;
+  refresh();
+  void fetcher(CANCEL_PATH, {
+    method: 'POST',
+    headers: { 'X-AgentLink-CSRF': pageToken(), 'Content-Type': 'application/octet-stream' },
+    credentials: 'same-origin',
+    cache: 'no-store',
+  }).catch(() => undefined);
+}
+
+const CANCEL_PATH = '/api/owner/native/cancel';
 
 /** Takes focus off whatever has it (a focused password field keeps macOS secure input on). */
 function blurFocused(): void {
@@ -99,16 +124,12 @@ const headersOf = (input: RequestInfo | URL, init: RequestInit | undefined): Hea
   init?.headers ??
   (typeof input !== 'string' && !(input instanceof URL) ? input.headers : undefined);
 
-/** The server's own answer for a cancelled native presence (approval-server.ts NATIVE_HTTP). */
-function cancelledAnswer(): Response {
-  return new Response(JSON.stringify({ status: 'presence_rejected', native: 'cancelled' }), {
-    status: 403,
-    headers: { 'content-type': 'application/json' },
-  });
-}
-
-/** `base` with the native presence wait around the requests that start the helper. */
+/**
+ * `base` with the native presence wait around the requests that start the helper. The request is
+ * passed on exactly as given (its own signal included); only focus and the waiting state change.
+ */
 export function nativeWaitFetch(base: typeof fetch, origin: string): typeof fetch {
+  cancelFetch = base;
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     if (
       !isNativePresenceRequest(methodOf(input, init), urlOf(input), headersOf(input, init), origin)
@@ -116,23 +137,12 @@ export function nativeWaitFetch(base: typeof fetch, origin: string): typeof fetc
       return base(input, init);
     }
     blurFocused();
-    const stop = new AbortController();
-    const own = init?.signal ?? undefined;
-    const follow = (): void => stop.abort();
-    if (own?.aborted === true) stop.abort();
-    else own?.addEventListener('abort', follow, { once: true });
-    current = stop;
+    inFlight += 1;
     refresh();
     try {
-      return await base(input, { ...init, signal: stop.signal });
-    } catch (error) {
-      // Our Cancel (not the caller's own abort): the answer the server gives for a cancelled
-      // prompt, so every screen shows its usual "Cancelled. Nothing was changed." and never "offline".
-      if (stop.signal.aborted && own?.aborted !== true) return cancelledAnswer();
-      throw error;
+      return await (init === undefined ? base(input) : base(input, init));
     } finally {
-      own?.removeEventListener('abort', follow);
-      if (current === stop) current = undefined;
+      inFlight -= 1;
       refresh();
     }
   };
@@ -180,7 +190,12 @@ export function NativeWaitNotice({
       <p className="al-text-body-sm" role="status" data-native-waiting="">
         {NATIVE_STRINGS.waiting(platform)}
       </p>
-      <Button variant="ghost" onClick={cancelNativeWait} data-native-cancel="">
+      <Button
+        variant="ghost"
+        onClick={() => cancelNativeWait()}
+        disabled={state.cancelling}
+        data-native-cancel=""
+      >
         {NATIVE_STRINGS.cancel}
       </Button>
     </div>

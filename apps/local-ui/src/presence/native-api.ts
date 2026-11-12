@@ -127,6 +127,14 @@ async function nativeOp(
     if (status === 'native_missing') return { kind: 'off' };
     // Already on (another tab, or an earlier setup): nothing to do.
     if (status === 'native_exists') return { kind: 'registered' };
+    // DESK-TOUCHID-FIX review (Fable L-2): on again failed after the old one was removed: off now.
+    if (answer['nowOff'] === true) {
+      return {
+        kind: 'native',
+        state: isState(answer['native']) ? answer['native'] : 'error',
+        nowOff: true,
+      };
+    }
     if (status === 'native_unavailable') return { kind: 'native', state: 'unavailable' };
     if (isState(answer['native'])) return { kind: 'native', state: answer['native'] };
     if (status === 'presence_rejected') return { kind: 'rejected' };
