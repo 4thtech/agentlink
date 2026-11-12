@@ -14,6 +14,15 @@ export const APPROVAL_STRINGS = Object.freeze({
   firstRun:
     'Approvals need you: each approval, or each list of approvals you review together, asks for your passkey or master code, and only after you click Approve. Never give them to your AI.',
   desktopNote: 'The desktop app protects approvals more strongly.',
+  // UX 2026-11-12 (notices): the desktop app's own words (it is never "this browser").
+  protectedTitle: 'Approvals use your master code',
+  protectedBody:
+    'Each approval asks for your master code, and only after you click Approve. Never give it to your AI.',
+  nativeTitle: 'Turn on {sensor} for approvals',
+  nativeBody:
+    "Approve with {sensor} instead of typing your master code. Your AI still can't approve anything.",
+  nativeAction: 'Turn on {sensor}',
+  hideNotice: 'Hide this',
   needsOwnerTitle: 'Set up AgentLink',
   needsOwner: `Set up your master code first: run ${CLI_PREFIX} owner init in your own terminal. Until then, nothing can be approved here.`,
   noPasskeys: "Passkeys aren't available in this browser. Approve with your master code.",
@@ -113,6 +122,8 @@ export const BACKUP_CODE_WORDING: ReadonlySet<string> = new Set([
   'firstRun',
   'needsOwner',
   'noPasskeys',
+  'protectedBody',
+  'nativeBody',
   'orCode',
   'codeLabel',
   'codeHint',

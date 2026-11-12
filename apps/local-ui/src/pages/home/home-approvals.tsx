@@ -10,7 +10,7 @@
 //
 // Nothing here signs (D-118); every server value is React text (I-5); the badge hears how many
 // still wait (a number only).
-import { AgentIcon, Button, Icon, VT_CLASS } from '@4thtech-io/ui';
+import { AgentIcon, Banner, Button, Icon, VT_CLASS } from '@4thtech-io/ui';
 import { useEffect, useState, type ReactElement } from 'react';
 import { announceDecided, announceWaiting } from '../approvals/badge.js';
 import {
@@ -204,9 +204,9 @@ export function HomeApprovals({
   const first = sorted[0];
   if (first === undefined) {
     return notice === undefined ? null : (
-      <p role="status" className="hm-ap-done al-text-body-sm">
+      <Banner tone="info" compact className="hm-ap-done" onDismiss={() => setNotice(undefined)}>
         {notice}
-      </p>
+      </Banner>
     );
   }
   const more = sorted.slice(1);
@@ -359,9 +359,9 @@ export function HomeApprovals({
         />
       ) : null}
       {notice === undefined ? null : (
-        <p role="status" className="hm-ap-done al-text-body-sm">
+        <Banner tone="info" compact className="hm-ap-done" onDismiss={() => setNotice(undefined)}>
           {notice}
-        </p>
+        </Banner>
       )}
     </section>
   );

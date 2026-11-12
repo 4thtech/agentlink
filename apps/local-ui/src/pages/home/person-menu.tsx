@@ -10,7 +10,7 @@
 //
 // The presence step is Contacts' own PresencePrompt (the passkey, or the master code). U4 may
 // replace this menu with its PersonMenu; the routes and the steps stay the same.
-import { Button, Icon } from '@4thtech-io/ui';
+import { Banner, Button, Icon } from '@4thtech-io/ui';
 import {
   useCallback,
   useEffect,
@@ -372,9 +372,14 @@ export function PersonMenu({
           />
         )}
         {notice === undefined ? null : (
-          <p role="status" className="hm-inline-note al-text-body-sm">
+          <Banner
+            tone="success"
+            compact
+            className="hm-inline-note"
+            onDismiss={() => setNotice(undefined)}
+          >
             {notice}
-          </p>
+          </Banner>
         )}
       </div>
     </>

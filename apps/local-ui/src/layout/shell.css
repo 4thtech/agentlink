@@ -693,29 +693,6 @@
   padding: var(--al-space-3);
 }
 
-/* W5-INVITE-FEEDBACK: the contact toasts, bottom centre above the status bar. */
-.al-toasts {
-  position: fixed;
-  inset-inline: var(--al-space-4);
-  inset-block-end: calc(var(--al-space-6) + 24px);
-  z-index: var(--al-z-toast);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--al-space-2);
-  pointer-events: none;
-}
-/* Wide screens: the corner, so a toast never covers the page's own controls (the People sort row).
-   Narrow screens keep the centred stack. */
-@media (min-width: 900px) {
-  .al-toasts {
-    inset-inline-start: auto;
-    align-items: flex-end;
-  }
-}
-.al-toasts > .al-toast {
-  pointer-events: auto;
-}
 .al-menu-note {
   display: block;
   padding: 0 10px 6px 34px;

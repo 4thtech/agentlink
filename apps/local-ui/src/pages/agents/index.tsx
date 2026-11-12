@@ -25,6 +25,7 @@ import {
   type ComponentType,
   type ReactElement,
 } from 'react';
+import { notify } from '../../notices/index.js';
 import { getLive, subscribeLive } from '../../api/live.js';
 import { lazyPart } from '../../lazy/index.js';
 import { agentNameOf, INVITE_PATH, NEW_AGENT_PATH } from '../../nav.js';
@@ -163,7 +164,7 @@ export function AgentsPage({
 
   const changed = useCallback((): void => announceAgentsChanged(), []);
   const agentChanged = useCallback((): void => {
-    setNotice(S.agentChanged);
+    notify({ tone: 'info', text: S.agentChanged });
     announceAgentsChanged();
   }, []);
 
@@ -205,7 +206,7 @@ export function AgentsPage({
     (row: AgentRow): void => {
       setNotice(undefined);
       void switchTo(row.name).then((outcome) => {
-        if (outcome.kind === 'agent_changed') setNotice(S.agentChanged);
+        if (outcome.kind === 'agent_changed') notify({ tone: 'info', text: S.agentChanged });
         if (outcome.kind !== 'done') {
           pressedHere.current = false;
           forgetIntent();
@@ -235,18 +236,20 @@ export function AgentsPage({
     setNotice(undefined);
     void switchTo(row.name).then((outcome) => {
       if (outcome.kind === 'done') return navigate(INVITE_PATH);
-      if (outcome.kind === 'agent_changed') setNotice(S.agentChanged);
+      if (outcome.kind === 'agent_changed') notify({ tone: 'info', text: S.agentChanged });
       pressedHere.current = false;
       forgetIntent();
     });
   };
   const onRenamed = (label: string, told: boolean): void => {
-    setNotice(told ? S.renamedTold(label) : undefined);
+    setNotice(undefined);
+    if (told) notify({ text: S.renamedTold(label) });
   };
 
   const onCardUpdated = (told: boolean): void => {
     setCardName(undefined);
-    setNotice(told && open !== undefined ? S.renamedTold(open.label) : undefined);
+    setNotice(undefined);
+    if (told && open !== undefined) notify({ text: S.renamedTold(open.label) });
     changed();
   };
   // WP-1 (R-1): the note Under the hood and on the open ID's own page (the Simple card has its own).
@@ -519,7 +522,8 @@ export function AgentsPage({
           onChanged={changed}
           onRemoved={(label) => {
             setRemoveQueue((q) => q.slice(1));
-            setNotice(S.removed(label));
+            setNotice(undefined);
+            notify({ text: S.removed(label) });
           }}
           onAgentChanged={() => {
             setRemoveQueue([]);
