@@ -92,8 +92,9 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite, [Parameter
 
   # Anything the script does not know (a mistyped option, a link split by smart quotes) is refused
   # with one fixed line; no part of it is ever printed.
+  # With nothing left over, $Stray is $null, and @($null) has one item: count only real ones.
   function Assert-NoStrayArguments($Stray) {
-    if (@($Stray).Count -gt 0) {
+    if (@($Stray | Where-Object { $null -ne $_ }).Count -gt 0) {
       throw 'This installer was given something it does not know. Copy the command again from the invite page.'
     }
   }
