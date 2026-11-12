@@ -369,6 +369,7 @@ async function serve(
   health?: () => LocalUiHealthSnapshot,
   version?: string,
   dataFolder?: { path: string; home: string },
+  clientExtra: Record<string, unknown> = {},
 ): Promise<{ port: number; cookie: string; csrf: string }> {
   const opened: string[] = [];
   const server = await startApprovalServerWith(
@@ -386,7 +387,7 @@ async function serve(
             ['assets/index-Bx3f9a2Q.js', encodeUtf8('console.log(1);')],
           ]),
         },
-        client: { agentId: '0x' + '11'.repeat(20) } as never,
+        client: { agentId: '0x' + '11'.repeat(20), ...clientExtra } as never,
         ...(health === undefined ? {} : { health }),
         ...(version === undefined ? {} : { version }),
         ...(dataFolder === undefined ? {} : { dataFolder }),
@@ -483,4 +484,27 @@ describe('the health route through the server (M1-11s-a-d)', () => {
     expect(res.body).not.toContain('alice');
     expect(res.body).not.toContain('/Users');
   });
+
+  it("REL051-CF2: with no source wired, answers the open agent's real relay counts (0 of 3 while unreachable)", async () => {
+    let reach = 0;
+    const { port, cookie, csrf } = await serve(undefined, '0.5.1', undefined, {
+      relayReachability: () => Promise.resolve({ connected: reach, total: 3 }),
+    });
+    const read = async (): Promise<Record<string, unknown>> =>
+      JSON.parse(
+        (await send(port, '/api/ui/health', { Cookie: cookie, 'X-AgentLink-CSRF': csrf })).body,
+      ) as Record<string, unknown>;
+    const down = await read();
+    expect(down['agent']).toBe('running');
+    expect(down['relays']).toEqual({ connected: 0, total: 3 });
+    expect(down['lastSyncAt']).toBeNull();
+    reach = 3;
+    // The answer is cached for a short window; the check after it sees the relays back.
+    await new Promise((r) => setTimeout(r, HEALTH_CACHE_MS + 50));
+    await read();
+    await new Promise((r) => setTimeout(r, HEALTH_CACHE_MS + 50));
+    const up = await read();
+    expect(up['relays']).toEqual({ connected: 3, total: 3 });
+    expect(typeof up['lastSyncAt']).toBe('number');
+  }, 20_000);
 });

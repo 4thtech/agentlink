@@ -76,3 +76,49 @@ describe('nostrTransport (07 §4.1)', () => {
     await keys.close();
   });
 });
+
+describe('nostrTransport relayStatus (REL051-CF2: relay health for the app)', () => {
+  /** Opens `up` relays, refuses `refused` ones at once, and never answers the rest (black hole). */
+  const switchable = (up: Set<string>, refused: Set<string>): RelayConnector => ({
+    open(target, handlers) {
+      if (up.has(target.url)) void Promise.resolve().then(() => handlers.onOpen());
+      else if (refused.has(target.url)) void Promise.resolve().then(() => handlers.onClose());
+      // anything else: a black hole, only the connect timeout ends it
+      return { send: () => {}, close: () => {} };
+    },
+  });
+  // The pool's timers, shortened so a black-holed connect gives up at once in the test.
+  const quick = {
+    setTimeout: (cb: () => void, ms: number) => setTimeout(cb, Math.min(ms, 5)),
+    clearTimeout: (h: unknown) => clearTimeout(h as ReturnType<typeof setTimeout>),
+  };
+  const RELAYS = [
+    'wss://one.relay-alpha.net',
+    'wss://two.relay-alpha.net',
+    'wss://three.relay-alpha.net',
+  ];
+
+  it('counts the relays it can connect to: none while refused or black-holed, all once they are back', async () => {
+    const up = new Set<string>();
+    const refused = new Set<string>([RELAYS[0]!, RELAYS[1]!]);
+    const keys = new MemoryKeyStore(seed(3));
+    const transport = nostrTransport({
+      connector: switchable(up, refused),
+      addressCheck: 'platform',
+      timers: quick,
+    })({ keys, now: () => 1_800_000_000, mayAuthenticate: () => false });
+    expect(typeof transport.relayStatus).toBe('function');
+    await expect(transport.relayStatus!(RELAYS)).resolves.toEqual({ connected: 0, total: 3 });
+    // Back: the next check reconnects on its own.
+    for (const r of RELAYS) up.add(r);
+    refused.clear();
+    await expect(transport.relayStatus!(RELAYS)).resolves.toEqual({ connected: 3, total: 3 });
+    // Duplicates count once; the answer is counts only.
+    await expect(transport.relayStatus!([RELAYS[0]!, RELAYS[0]!])).resolves.toEqual({
+      connected: 1,
+      total: 1,
+    });
+    transport.close?.();
+    await keys.close();
+  });
+});

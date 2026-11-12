@@ -290,4 +290,53 @@ describe('the status bar (M1-11s-a-c)', () => {
     const text = bar()?.textContent ?? '';
     expect(text).not.toMatch(/wss:|nsec|relay/i);
   });
+
+  it('REL051-CF2: says the message network cannot be reached when no relay is connected, never Connected', async () => {
+    let connected = 0;
+    await render(() =>
+      Promise.resolve(
+        ok({
+          agent: 'running',
+          relays: { connected, total: 3 },
+          lastSyncAt: null,
+          version: '0.5.1',
+        }),
+      ),
+    );
+    const text = bar()?.textContent ?? '';
+    expect(text).not.toContain('Connected');
+    expect(text).toContain("Can't reach the message network");
+    expect(text).toContain("Messages wait and send when it's back");
+    expect(text).not.toMatch(/relay|wallet|gas|transaction/i);
+    expect(bar()?.querySelector('.al-dot.is-unreachable')).not.toBeNull();
+    connected = 2;
+    act(() => root.unmount());
+    root = createRoot(host);
+    await render(() =>
+      Promise.resolve(
+        ok({
+          agent: 'running',
+          relays: { connected, total: 3 },
+          lastSyncAt: null,
+          version: '0.5.1',
+        }),
+      ),
+    );
+    expect(bar()?.textContent).toContain('Connected');
+  });
+});
+
+describe('REL051-CF2: unreachable network', () => {
+  it('parses running with 0 of N relays as unreachable; counts above 0 or none stay connected', () => {
+    const at = (relays: unknown): ApiResult<unknown> =>
+      ok({ agent: 'running', relays, lastSyncAt: null, version: '0.5.1' });
+    expect(connectionFromHealth(at({ connected: 0, total: 3 }))).toBe('unreachable');
+    expect(connectionFromHealth(at({ connected: 1, total: 3 }))).toBe('connected');
+    expect(connectionFromHealth(at(null))).toBe('connected');
+    // A paused agent stays Paused: it does not reach the network on purpose.
+    expect(connectionFromHealth(ok({ agent: 'paused', relays: { connected: 0, total: 3 } }))).toBe(
+      'paused',
+    );
+    expect(parseHealth(at({ connected: 0, total: 3 }))?.state).toBe('unreachable');
+  });
 });

@@ -146,6 +146,43 @@ function expectNoCanary(result: FinishedResult, lines: readonly string[] = []): 
   }
 }
 
+describe('REL051-CF2: agentlink_send says sent or queued (06 §2.2)', () => {
+  const withDelivery = (delivery: 'sent' | 'queued' | 'not_delivered') =>
+    fake({
+      send: () =>
+        Promise.resolve({
+          status: 'ok',
+          envelopeId: ENVELOPE,
+          thread: THREAD,
+          sentAt: '2026-10-15T10:00:00Z',
+          delivery,
+        } as SendMessageResult),
+    });
+
+  it('tells the AI the message is queued, not sent, while no relay accepted it', async () => {
+    const result = await send({ to: 'marko', text: 'hi' }, withDelivery('queued'));
+    expect(result.structured).toMatchObject({ status: 'ok', delivery: 'queued' });
+    const summary = String((result.structured as { summary: string }).summary);
+    expect(summary).not.toMatch(/^Sent/);
+    expect(summary).toContain("can't reach the message network");
+    expect(summary).toContain('sends it on its own');
+    // 11 §5.1: no network jargon in the copy.
+    expect(summary).not.toMatch(/relay|wallet|gas|transaction/i);
+  });
+
+  it('keeps the sent summary and adds delivery "sent" once a relay accepted it', async () => {
+    const result = await send({ to: 'marko', text: 'hi' }, withDelivery('sent'));
+    expect(result.structured).toMatchObject({ status: 'ok', delivery: 'sent' });
+    expect(String((result.structured as { summary: string }).summary)).toMatch(/^Sent to /);
+  });
+
+  it('never says sent for a message that could not be delivered', async () => {
+    const result = await send({ to: 'marko', text: 'hi' }, withDelivery('not_delivered'));
+    expect(result.structured).toMatchObject({ delivery: 'not_delivered' });
+    expect(String((result.structured as { summary: string }).summary)).not.toMatch(/^Sent/);
+  });
+});
+
 describe('agentlink_send: ok (06 §2.2; D-70: a paired contact talks without approval)', () => {
   it('resolves the contact by name and sends to its ID; the summary names it under the 06 §2.1 rule', async () => {
     const client = fake();
