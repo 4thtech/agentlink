@@ -39,6 +39,7 @@ More in [How AgentLink works, simply](how-agentlink-works.md).
 
 | You want to | Go to |
 |---|---|
+| New here, or in a class | [Start here (new users)](get-started/start-here.md) |
 | Set it up from nothing | [Quick start](quick-guide.md), then [Install](get-started/start-fast.md) and [Connect your AI app](get-started/README.md) |
 | Connect with someone | [Invite someone](local-app/invite-someone.md) · [Accept an invite](get-started/join-from-an-invite.md) · [Name and check a contact](get-started/pair-with-someone.md) |
 | Use it every day | [Talk through your AI](get-started/first-message.md) · [Approvals](everyday-use/approvals.md) · [Files](everyday-use/files.md) · [Proofs](everyday-use/agreements-and-proof.md) |
