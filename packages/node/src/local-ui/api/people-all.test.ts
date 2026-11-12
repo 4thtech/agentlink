@@ -1,13 +1,13 @@
-// WP-P2 (design-1112 spec §5): `GET /api/ui/people`, every ID's people in one read.
+// WP-P2 (design-1112 spec §5): `GET /api/ui/people`, every ID in one read.
 //
 // - Read only (`presence: false`); no query; outside the app host `{switchable: false, ids: []}`.
-// - Each ID: name, label, current and its rows through the contacts allowlist, or `unavailable`
-//   (no reason, no error text) when that ID cannot be read: the others still answer.
-// - Names stay counterparty text: a hostile name passes through as plain data, never reaches an
-//   error, and nothing beyond the allowlisted fields leaves.
-// - The desk opens another ID once per cache window and always closes it again.
+// - The open ID: its rows through the contacts allowlist. Every other ID: only a count from the
+//   read-only store peek; no KeyStore, client or store of another ID is opened (04 §2.5).
+// - A switch during the read drops the open ID's rows (never one ID's people "with" another).
+// - One read at a time, given up after the time limit (503), so a stuck read never pins the route.
+// - Hostile names are plain data and never reach an error; nothing beyond the allowlist leaves.
 import type { ContactView } from '@4thtech-io/core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { LocalUiContext } from '../context.js';
 import {
   UI_INVALID_QUERY,
@@ -26,10 +26,9 @@ import {
 } from './people-all.js';
 
 const MARKO = '0x7f3a19c200000000000000000000000000000001';
-const ANA = '0x4c21a0f700000000000000000000000000000002';
 const HOSTILE = '<img src=x onerror=alert(1)>‮gnp.exe';
 
-function view(id: string, name: string, over: Partial<ContactView> = {}): ContactView {
+function view(id: string, name: string): ContactView {
   return {
     agentNostr: 'ee'.repeat(32),
     name: { value: `RAW ${name}`, source: 'counterparty', selfDeclared: true },
@@ -43,7 +42,6 @@ function view(id: string, name: string, over: Partial<ContactView> = {}): Contac
     createdAt: 1_759_449_600,
     updatedAt: 1_759_449_600,
     id,
-    ...over,
   } as unknown as ContactView;
 }
 
@@ -69,48 +67,20 @@ const entry = (
   ...over,
 });
 
-interface Harness {
-  readonly deps: PeopleAllDeskDeps;
-  readonly opens: string[];
-  readonly closes: string[];
-  clock: number;
-}
-
-function harness(
-  others: Record<string, readonly ContactView[] | 'fail' | 'no-open'>,
-  entries: readonly PeopleAllEntry[] = [
-    entry('default', 'Tali'),
-    entry('macbook-agent-1', 'macbook-agent-1'),
-  ],
-): Harness {
-  const h: Harness = {
-    opens: [],
-    closes: [],
-    clock: 1_000_000,
-    deps: undefined as unknown as PeopleAllDeskDeps,
+function deps(over: Partial<PeopleAllDeskDeps> = {}): PeopleAllDeskDeps {
+  return {
+    entries: () =>
+      Promise.resolve([entry('default', 'Tali'), entry('macbook-agent-1', 'macbook-agent-1')]),
+    open: () => ({
+      name: 'default',
+      label: 'Tali',
+      generation: 1,
+      contacts: () => Promise.resolve([view(MARKO, 'Marko Novak')]),
+    }),
+    generation: () => 1,
+    count: (name) => Promise.resolve(name === 'macbook-agent-1' ? 1 : undefined),
+    ...over,
   };
-  (h as { deps: PeopleAllDeskDeps }).deps = {
-    entries: () => Promise.resolve(entries),
-    current: () => ({ name: 'default', label: 'Tali' }),
-    currentContacts: () => Promise.resolve([view(MARKO, 'Marko Novak')]),
-    open: (name) => {
-      h.opens.push(name);
-      const what = others[name];
-      if (what === undefined || what === 'no-open') return Promise.resolve(undefined);
-      return Promise.resolve({
-        contacts: () =>
-          what === 'fail'
-            ? Promise.reject(new Error(`/Users/someone/.agentlink/${name}/store.sqlite`))
-            : Promise.resolve(what),
-        close: () => {
-          h.closes.push(name);
-          return Promise.resolve();
-        },
-      });
-    },
-    now: () => h.clock,
-  };
-  return h;
 }
 
 describe('GET /api/ui/people (WP-P2)', () => {
@@ -129,148 +99,188 @@ describe('GET /api/ui/people (WP-P2)', () => {
   });
 
   it('refuses any query without echoing it', async () => {
-    const h = harness({});
-    const result = await route.handler(ctx(createPeopleAllDesk(h.deps)), req('x=<b>'));
+    const result = await route.handler(ctx(createPeopleAllDesk(deps())), req('x=<b>'));
     expect(result).toBe(UI_INVALID_QUERY);
     expect(JSON.stringify(result)).not.toContain('<b>');
   });
 
-  it('answers every ID with its people through the contacts allowlist', async () => {
-    const h = harness({ 'macbook-agent-1': [view(ANA, 'oc-test')] });
-    const result = await route.handler(ctx(createPeopleAllDesk(h.deps)), req());
-    expect(result.status).toBe(200);
-    const body = result.body as {
-      status: string;
-      switchable: boolean;
-      ids: { name: string; label: string; current: boolean; status: string; contacts: unknown[] }[];
-    };
-    expect(body.status).toBe('ok');
-    expect(body.switchable).toBe(true);
-    expect(body.ids.map((i) => [i.name, i.label, i.current, i.status])).toEqual([
-      ['default', 'Tali', true, 'ok'],
-      ['macbook-agent-1', 'macbook-agent-1', false, 'ok'],
-    ]);
-    expect(body.ids[1]?.contacts).toEqual([
-      {
-        ref: ANA,
-        name: 'oc-test',
-        nameSource: 'counterparty',
-        fingerprint: '7F3A·19C2',
-        label: 'self-declared',
-        status: 'active',
-        pairing: 'complete',
-        since: 1_759_449_600,
+  it('the open ID answers rows through the allowlist; another ID only its count', async () => {
+    const result = await route.handler(ctx(createPeopleAllDesk(deps())), req());
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        status: 'ok',
+        switchable: true,
+        ids: [
+          {
+            name: 'default',
+            label: 'Tali',
+            current: true,
+            status: 'ok',
+            contacts: [
+              {
+                ref: MARKO,
+                name: 'Marko Novak',
+                nameSource: 'counterparty',
+                fingerprint: '7F3A·19C2',
+                label: 'self-declared',
+                status: 'active',
+                pairing: 'complete',
+                since: 1_759_449_600,
+              },
+            ],
+          },
+          {
+            name: 'macbook-agent-1',
+            label: 'macbook-agent-1',
+            current: false,
+            status: 'ok',
+            count: 1,
+          },
+        ],
       },
-    ]);
-    // Never the card, the raw name, the long fingerprint or a key.
+    });
     const text = JSON.stringify(result.body);
     for (const leak of ['RAW ', 'card', '5D0E', 'ee'.repeat(32), 'dd'.repeat(32)]) {
       expect(text).not.toContain(leak);
     }
-    // The other ID was opened for the read and closed again.
-    expect(h.opens).toEqual(['macbook-agent-1']);
-    expect(h.closes).toEqual(['macbook-agent-1']);
+  });
+
+  it('never opens another ID: only the peek count is asked for it, the open client only for the open ID', async () => {
+    const count = vi.fn((name: string) => Promise.resolve(name === 'work' ? 4 : 0));
+    const contacts = vi.fn(() => Promise.resolve([view(MARKO, 'Marko')]));
+    const open = vi.fn(() => ({ name: 'default', label: 'Tali', generation: 1, contacts }));
+    const desk = createPeopleAllDesk(
+      deps({
+        entries: () => Promise.resolve([entry('default', 'Tali'), entry('work', 'Work')]),
+        open,
+        count,
+      }),
+    );
+    await desk.list();
+    expect(count.mock.calls).toEqual([['work']]);
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(contacts).toHaveBeenCalledTimes(1);
+    // The desk's deps have no way to open another ID: no KeyStore, client or store method exists.
+    expect(Object.keys(deps()).sort()).toEqual(['count', 'entries', 'generation', 'open']);
   });
 
   it('an ID that cannot be read is `unavailable` with no reason; the others still answer', async () => {
-    const h = harness({ broken: 'fail', locked: 'no-open' }, [
-      entry('default', 'Tali'),
-      entry('broken', 'Broken'),
-      entry('locked', 'Locked'),
-    ]);
-    const result = await route.handler(ctx(createPeopleAllDesk(h.deps)), req());
-    const body = result.body as { ids: Record<string, unknown>[] };
-    expect(body.ids).toEqual([
+    const desk = createPeopleAllDesk(
+      deps({
+        entries: () =>
+          Promise.resolve([
+            entry('default', 'Tali'),
+            entry('broken', 'Broken'),
+            entry('cfg', 'Cfg', { available: false }),
+            entry('gone', 'Gone', { removing: true }),
+          ]),
+        count: (name) =>
+          name === 'broken'
+            ? Promise.reject(new Error('/Users/someone/.agentlink/broken/store.sqlite'))
+            : Promise.resolve(3),
+      }),
+    );
+    const result = await route.handler(ctx(desk), req());
+    expect((result.body as { ids: unknown[] }).ids).toEqual([
       expect.objectContaining({ name: 'default', status: 'ok' }),
       { name: 'broken', label: 'Broken', current: false, status: 'unavailable' },
-      { name: 'locked', label: 'Locked', current: false, status: 'unavailable' },
+      { name: 'cfg', label: 'Cfg', current: false, status: 'unavailable' },
     ]);
-    // The failure's text (a path) never leaves; the opened ID is closed anyway.
     expect(JSON.stringify(result.body)).not.toContain('/Users/');
-    expect(h.closes).toEqual(['broken']);
   });
 
-  it('leaves out removing IDs and never opens an unavailable one', async () => {
-    const h = harness({ gone: [view(ANA, 'x')] }, [
-      entry('default', 'Tali'),
-      entry('gone', 'Gone', { removing: true }),
-      entry('cfg', 'Cfg', { available: false }),
-    ]);
-    const result = await route.handler(ctx(createPeopleAllDesk(h.deps)), req());
-    const body = result.body as { ids: { name: string; status: string }[] };
-    expect(body.ids.map((i) => [i.name, i.status])).toEqual([
-      ['default', 'ok'],
-      ['cfg', 'unavailable'],
-    ]);
-    expect(h.opens).toEqual([]);
-  });
-
-  it('a hostile name is plain data in the body and the open ID failing is a fixed answer', async () => {
-    const h = harness({ 'macbook-agent-1': [view(ANA, HOSTILE)] });
-    const desk = createPeopleAllDesk(h.deps);
+  it('a switch during the read drops the open ID’s rows (never shown with another ID)', async () => {
+    let generation = 1;
+    const desk = createPeopleAllDesk(
+      deps({
+        generation: () => generation,
+        open: () => ({
+          name: 'default',
+          label: 'Tali',
+          generation: 1,
+          contacts: () => {
+            generation = 2; // the switch lands while the rows are read
+            return Promise.resolve([view(MARKO, 'Someone of the next ID')]);
+          },
+        }),
+      }),
+    );
     const result = await route.handler(ctx(desk), req());
-    const body = result.body as { ids: { contacts?: { name: string }[] }[] };
-    expect(body.ids[1]?.contacts?.[0]?.name).toBe(HOSTILE);
-    // A whole-read failure is the shared fixed answer, never the error's text.
+    const body = result.body as { ids: Record<string, unknown>[] };
+    expect(body.ids[0]).toEqual({
+      name: 'default',
+      label: 'Tali',
+      current: true,
+      status: 'unavailable',
+    });
+    expect(JSON.stringify(result.body)).not.toContain('Someone of the next ID');
+  });
+
+  it('a stuck read gives up after the time limit (503) and the next read runs again', async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      const desk = createPeopleAllDesk(
+        deps({
+          timeoutMs: 1000,
+          entries: () => {
+            calls += 1;
+            return calls === 1 ? new Promise(() => undefined) : Promise.resolve([]);
+          },
+        }),
+      );
+      const first = route.handler(ctx(desk), req());
+      await vi.advanceTimersByTimeAsync(1001);
+      expect(await first).toBe(UI_UNAVAILABLE);
+      const second = await route.handler(ctx(desk), req());
+      expect(second.status).toBe(200);
+      expect(calls).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('runs one read at a time (concurrent calls share it)', async () => {
+    const count = vi.fn(() => Promise.resolve(1));
+    const desk = createPeopleAllDesk(deps({ count }));
+    const [a, b] = await Promise.all([desk.list(), desk.list()]);
+    expect(a).toBe(b);
+    expect(count).toHaveBeenCalledTimes(1);
+  });
+
+  it('a hostile name is plain data; a whole-read failure is the fixed answer', async () => {
+    const desk = createPeopleAllDesk(
+      deps({
+        open: () => ({
+          name: 'default',
+          label: HOSTILE,
+          generation: 1,
+          contacts: () => Promise.resolve([view(MARKO, HOSTILE)]),
+        }),
+      }),
+    );
+    const result = await route.handler(ctx(desk), req());
+    const body = result.body as { ids: { label: string; contacts?: { name: string }[] }[] };
+    expect(body.ids[0]?.label).toBe(HOSTILE);
+    expect(body.ids[0]?.contacts?.[0]?.name).toBe(HOSTILE);
     const failing: LocalUiPeopleAllDesk = {
       list: () => Promise.reject(new Error(`no ${HOSTILE} at /Users/x`)),
     };
-    const failed = await route.handler(ctx(failing), req());
-    expect(failed).toBe(UI_UNAVAILABLE);
+    expect(await route.handler(ctx(failing), req())).toBe(UI_UNAVAILABLE);
   });
 
-  it('an ID part with a name outside the folder rule is left out', async () => {
+  it('a part with a name outside the folder rule or a bad count is left out or unavailable', async () => {
     const desk: LocalUiPeopleAllDesk = {
       list: () =>
         Promise.resolve([
-          { name: '../etc', label: 'x', current: false, contacts: [] },
-          { name: 'ok-id', label: '', current: false, contacts: [] },
+          { name: '../etc', label: 'x', current: false, count: 1 },
+          { name: 'ok-id', label: '', current: false, count: -1 },
         ]),
     };
     const result = await route.handler(ctx(desk), req());
     expect((result.body as { ids: unknown[] }).ids).toEqual([
-      { name: 'ok-id', label: 'ok-id', current: false, status: 'ok', contacts: [] },
-    ]);
-  });
-});
-
-describe('createPeopleAllDesk (WP-P2)', () => {
-  it('reuses another ID within the cache window and opens it again after', async () => {
-    const h = harness({ 'macbook-agent-1': [view(ANA, 'oc-test')] });
-    const desk = createPeopleAllDesk({ ...h.deps, cacheMs: 1000 });
-    await desk.list();
-    await desk.list();
-    expect(h.opens).toEqual(['macbook-agent-1']);
-    h.clock += 1001;
-    await desk.list();
-    expect(h.opens).toEqual(['macbook-agent-1', 'macbook-agent-1']);
-  });
-
-  it('runs one read at a time (concurrent calls share it)', async () => {
-    const h = harness({ 'macbook-agent-1': [view(ANA, 'oc-test')] });
-    const desk = createPeopleAllDesk(h.deps);
-    const [a, b] = await Promise.all([desk.list(), desk.list()]);
-    expect(a).toBe(b);
-    expect(h.opens).toEqual(['macbook-agent-1']);
-  });
-
-  it('the open ID is read through its own client, never opened again', async () => {
-    const h = harness({ default: [view(ANA, 'never')] }, [entry('default', 'Tali')]);
-    const out = await createPeopleAllDesk(h.deps).list();
-    expect(out.map((p) => [p.name, p.current, p.contacts?.length])).toEqual([['default', true, 1]]);
-    expect(h.opens).toEqual([]);
-  });
-
-  it('the open ID failing is that ID missing, not the whole read', async () => {
-    const h = harness({ 'macbook-agent-1': [view(ANA, 'oc-test')] });
-    const desk = createPeopleAllDesk({
-      ...h.deps,
-      currentContacts: () => Promise.reject(new Error('busy')),
-    });
-    const out = await desk.list();
-    expect(out.map((p) => [p.name, p.contacts === undefined])).toEqual([
-      ['default', true],
-      ['macbook-agent-1', false],
+      { name: 'ok-id', label: 'ok-id', current: false, status: 'unavailable' },
     ]);
   });
 });

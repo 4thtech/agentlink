@@ -2,10 +2,10 @@
 // WP-P2 (design-1112 spec §5, third bullet): People across all IDs.
 //
 // - With one ID nothing changes: no ID filter, no "with {ID}".
-// - With 2+ IDs: one list of every ID's people, "with {ID}" on each row, the "All my IDs" filter
-//   and the "Find a person" search; an ID that cannot be read is missing with a plain note.
-// - Opening a person of another ID runs the existing switch (no Touch ID) with "Opening {ID}…" and
-//   asks the shell to open that person's panel afterwards (`?check=<ref>`).
+// - With 2+ IDs: the open ID's people with "with {ID}" on each row, the "All my IDs" filter and the
+//   "Find a person" search. Another ID's names stay sealed in its own store until it is opened
+//   (04 §2.5), so it shows as "{n} people with {ID}" and Open {ID}, which runs the existing switch
+//   (no Touch ID) with "Opening {ID}…". An ID that cannot be read is missing with a plain note.
 // - Names (people and IDs) are text only, inside <bdi> (I-5): hostile names never become markup.
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -36,7 +36,6 @@ afterEach(() => {
 
 const MARKO = '0x7f3a19c200000000000000000000000000000001';
 const ANA = '0x4c21a0f700000000000000000000000000000002';
-const OC = '0x9d0000000000000000000000000000000000000c';
 const HOSTILE = '<img src=x onerror="alert(1)">';
 const HOSTILE_ID = '<b>evil</b>‮id';
 
@@ -52,7 +51,6 @@ const person = (ref: string, name: string, over: Record<string, unknown> = {}) =
 });
 const marko = person(MARKO, 'Marko Novak');
 const natasa = person(ANA, 'Natasa', { label: 'safety-code-checked' });
-const oc = person(OC, 'oc-test');
 
 function server(routes: Record<string, unknown>): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -76,16 +74,17 @@ async function settle(): Promise<void> {
 }
 
 const twoIds = (
-  otherContacts: unknown[] | 'unavailable' = [oc],
+  other: number | 'unavailable' = 1,
   otherLabel = 'macbook-agent-1',
+  own: unknown[] = [natasa, marko],
 ) => ({
   status: 'ok',
   switchable: true,
   ids: [
-    { name: 'default', label: 'Tali', current: true, status: 'ok', contacts: [natasa, marko] },
-    otherContacts === 'unavailable'
+    { name: 'default', label: 'Tali', current: true, status: 'ok', contacts: own },
+    other === 'unavailable'
       ? { name: 'mac', label: otherLabel, current: false, status: 'unavailable' }
-      : { name: 'mac', label: otherLabel, current: false, status: 'ok', contacts: otherContacts },
+      : { name: 'mac', label: otherLabel, current: false, status: 'ok', count: other },
   ],
 });
 
@@ -110,8 +109,9 @@ async function mount(people: unknown, own: unknown[] = [natasa, marko]): Promise
 
 const text = (): string => host.textContent ?? '';
 const rows = (): HTMLButtonElement[] => [
-  ...host.querySelectorAll<HTMLButtonElement>('.ct-list:not(.ct-list-archived) .ct-row'),
+  ...host.querySelectorAll<HTMLButtonElement>('.ct-list:not(.ct-list-archived) button.ct-row'),
 ];
+const idRows = (): HTMLElement[] => [...host.querySelectorAll<HTMLElement>('.ct-idrow')];
 const filter = (): HTMLSelectElement | null =>
   host.querySelector<HTMLSelectElement>('.ct-idfilter select');
 const search = (): HTMLInputElement | null =>
@@ -150,26 +150,34 @@ describe('People across all IDs (WP-P2)', () => {
     ]);
   });
 
-  it('with two IDs: one list, "with {ID}" on each row, the filter and the count', async () => {
-    await mount(twoIds());
-    expect(rows()).toHaveLength(3);
+  it('with two IDs: "with {ID}" on each row, the other ID as a count with Open, the filter and the total', async () => {
+    await mount(twoIds(2));
     expect(rows().map((r) => r.querySelector('.ct-with')?.textContent)).toEqual([
       'with Tali',
       'with Tali',
-      'with macbook-agent-1',
     ]);
+    expect(idRows()).toHaveLength(1);
+    expect(idRows()[0]?.querySelector('.al-contact-name')?.textContent).toBe('2 people');
+    expect(idRows()[0]?.querySelector('.ct-with bdi')?.textContent).toBe('macbook-agent-1');
+    expect(idRows()[0]?.querySelector('button')?.textContent).toBe('Open');
+    expect(idRows()[0]?.querySelector('button')?.getAttribute('aria-label')).toBe(
+      'Open macbook-agent-1',
+    );
     const options = [...(filter()?.options ?? [])].map((o) => o.textContent);
     expect(options).toEqual([ALL_IDS.allIds, 'Tali', 'macbook-agent-1']);
-    expect(host.querySelector('.ct-count')?.textContent).toBe('3 people');
-    // The ID label is its own isolated text.
-    expect(rows()[2]?.querySelector('.ct-with bdi')?.textContent).toBe('macbook-agent-1');
+    expect(host.querySelector('.ct-count')?.textContent).toBe('4 people');
   });
 
-  it('the filter shows one ID’s people; the search narrows by name', async () => {
+  it('the filter shows one ID; the search narrows the open ID’s people by name', async () => {
     await mount(twoIds());
     setValue(filter() as HTMLSelectElement, 'mac');
     await settle();
-    expect(rows().map((r) => r.querySelector('bdi')?.textContent)).toEqual(['oc-test']);
+    expect(rows()).toHaveLength(0);
+    expect(idRows()).toHaveLength(1);
+    setValue(filter() as HTMLSelectElement, 'default');
+    await settle();
+    expect(rows()).toHaveLength(2);
+    expect(idRows()).toHaveLength(0);
     setValue(filter() as HTMLSelectElement, '');
     setValue(search() as HTMLInputElement, 'MARK');
     await settle();
@@ -183,6 +191,7 @@ describe('People across all IDs (WP-P2)', () => {
   it('an ID that cannot be read is missing, with a plain note', async () => {
     await mount(twoIds('unavailable'));
     expect(rows()).toHaveLength(2);
+    expect(idRows()).toHaveLength(0);
     expect(host.querySelector('.ct-missing')?.textContent).toBe(
       ALL_IDS.missing(['macbook-agent-1']),
     );
@@ -190,12 +199,11 @@ describe('People across all IDs (WP-P2)', () => {
   });
 
   it('hostile person and ID names stay text inside <bdi>', async () => {
-    await mount(twoIds([person(OC, HOSTILE)], HOSTILE_ID));
+    await mount(twoIds(1, HOSTILE_ID, [person(MARKO, HOSTILE)]), [person(MARKO, HOSTILE)]);
     expect(host.querySelector('img')).toBeNull();
-    expect(host.querySelector('.ct-row b')).toBeNull();
-    const row = rows()[2];
-    expect(row?.querySelector('.al-contact-name bdi')?.textContent).toBe(HOSTILE);
-    expect(row?.querySelector('.ct-with bdi')?.textContent).toBe(HOSTILE_ID);
+    expect(host.querySelector('.ct-row b, .ct-idrow b')).toBeNull();
+    expect(rows()[0]?.querySelector('.al-contact-name bdi')?.textContent).toBe(HOSTILE);
+    expect(idRows()[0]?.querySelector('.ct-with bdi')?.textContent).toBe(HOSTILE_ID);
     expect([...(filter()?.options ?? [])].map((o) => o.textContent)).toContain(HOSTILE_ID);
   });
 
@@ -207,47 +215,48 @@ describe('People across all IDs (WP-P2)', () => {
     expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
   });
 
-  it('a person of another ID runs the existing switch with "Opening {ID}…" and asks for its panel', async () => {
+  it('Open {ID} runs the existing switch with "Opening {ID}…"', async () => {
     switchAgent.mockResolvedValue({ kind: 'done' });
     await mount(twoIds());
-    await act(async () => rows()[2]?.click());
+    await act(async () => idRows()[0]?.querySelector('button')?.click());
     await settle();
     expect(switchAgent).toHaveBeenCalledWith('mac');
     expect(text()).toContain(ALL_IDS.opening('macbook-agent-1'));
-    expect(location.search).toBe(`?check=${OC}`);
   });
 
-  it('a switch that fails says so in plain words and leaves the address clean', async () => {
+  it('a switch that fails says so in plain words', async () => {
     switchAgent.mockResolvedValue({ kind: 'failed' });
     await mount(twoIds());
-    await act(async () => rows()[2]?.click());
+    await act(async () => idRows()[0]?.querySelector('button')?.click());
     await settle();
     expect(text()).toContain(ALL_IDS.openFailed);
-    expect(location.search).toBe('');
   });
 
-  it('with no people on the open ID, another ID’s people still list', async () => {
-    const people = twoIds();
-    (people.ids[0] as { contacts: unknown[] }).contacts = [];
-    await mount(people, []);
-    expect(rows().map((r) => r.querySelector('bdi')?.textContent)).toEqual(['oc-test']);
+  it('with no people on the open ID, another ID’s people still show', async () => {
+    await mount(twoIds(3, 'macbook-agent-1', []), []);
+    expect(idRows()).toHaveLength(1);
+    expect(host.querySelector('.ct-count')?.textContent).toBe('3 people');
   });
 });
 
 describe('parsePeopleAll (WP-P2)', () => {
-  it('keeps checked IDs and rows only', () => {
+  it('keeps checked IDs, rows for the open ID and counts for the others', () => {
     const out = parsePeopleAll({
       status: 'ok',
       ids: [
-        { name: '../x', label: 'bad', current: false, status: 'ok', contacts: [] },
-        { name: 'ok', label: '', current: 'yes', status: 'ok', contacts: [oc, { ref: 'nope' }] },
-        { name: 'ok', label: 'dup', current: false, status: 'ok', contacts: [] },
+        { name: '../x', label: 'bad', current: false, status: 'ok', count: 1 },
+        { name: 'ok', label: '', current: true, status: 'ok', contacts: [marko, { ref: 'nope' }] },
+        { name: 'ok', label: 'dup', current: false, status: 'ok', count: 1 },
+        { name: 'two', label: 'Two', current: false, status: 'ok', count: 2 },
+        { name: 'neg', label: 'Neg', current: false, status: 'ok', count: -1 },
         { name: 'gone', label: 'Gone', current: false, status: 'unavailable' },
       ],
     });
-    expect(out?.map((i) => [i.name, i.label, i.current, i.contacts?.length])).toEqual([
-      ['ok', 'ok', false, 1],
-      ['gone', 'Gone', false, undefined],
+    expect(out?.map((i) => [i.name, i.label, i.current, i.contacts?.length, i.count])).toEqual([
+      ['ok', 'ok', true, 1, undefined],
+      ['two', 'Two', false, undefined, 2],
+      ['neg', 'Neg', false, undefined, undefined],
+      ['gone', 'Gone', false, undefined, undefined],
     ]);
     expect(parsePeopleAll({ status: 'error' })).toBeUndefined();
   });

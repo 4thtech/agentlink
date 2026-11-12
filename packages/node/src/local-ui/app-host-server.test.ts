@@ -416,26 +416,25 @@ describe('GET /api/ui/agents (U3-c)', () => {
     expect(query.status).toBe(400);
   });
 
-  it('WP-P2: People across all IDs opens another ID briefly, closes it and never switches', async () => {
+  it('WP-P2: People across all IDs never opens another ID (a count from the store peek) and never switches', async () => {
     const h = await harness();
     const cookie = await h.cookie();
     const res = await send(h.port, '/api/ui/people', {
       headers: { Cookie: cookie, 'X-AgentLink-CSRF': await h.csrf(cookie) },
     });
     expect(res.status).toBe(200);
-    // Neither fake agent can list its people here: each is that ID missing, with no reason.
+    // The open fake agent has no client to list its people (that ID is missing, no reason); `work`
+    // answers the count its store peek gives (directory.stats); `old` is being removed: left out.
     expect(JSON.parse(res.body)).toEqual({
       status: 'ok',
       switchable: true,
       ids: [
         { name: 'default', label: 'default', current: true, status: 'unavailable' },
-        { name: 'work', label: "Work's agent", current: false, status: 'unavailable' },
+        { name: 'work', label: "Work's agent", current: false, status: 'ok', count: 3 },
       ],
     });
-    expect(h.world.log.filter((l) => l.startsWith('open') || l.startsWith('close'))).toEqual([
-      'open work',
-      'close work',
-    ]);
+    // 04 §2.5: no other agent was opened (no KeyStore, store or client) and none was closed.
+    expect(h.world.log.filter((l) => l.startsWith('open') || l.startsWith('close'))).toEqual([]);
     // Nothing switched: no app.json write, the generation is still 1.
     expect(h.world.written).toEqual([]);
     expect(res.headers['x-agentlink-generation']).toBe('1');

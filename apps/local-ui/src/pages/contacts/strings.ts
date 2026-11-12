@@ -186,7 +186,11 @@ export const ALL_IDS = {
   noMatch: 'Nobody matches that name.',
   /** "with Tali" on each row when there are 2+ IDs (the label follows in its own `<bdi>`). */
   with: 'with',
-  /** The existing switch step, before a person of another ID opens. */
+  /** Another ID's people, before it is opened. */
+  otherIds: 'People of your other IDs',
+  openToSee: 'Open this ID to see who they are.',
+  open: 'Open',
+  /** The existing switch step, before another ID opens. */
   opening: (label: string): string => `Opening ⁨${label}⁩…`,
   openFailed: "That ID can't be opened right now. Try again in a minute.",
   /** One or more IDs could not be read: their people are missing from the list. */

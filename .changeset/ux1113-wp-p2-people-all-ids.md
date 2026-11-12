@@ -2,4 +2,4 @@
 '@4thtech-io/agentlink': patch
 ---
 
-People: with two or more IDs, everyone across all your IDs shows in one list with "with {ID}" on each row, an "All my IDs" filter and a "Find a person" search. Opening a person of another ID opens that ID first.
+People: with two or more IDs, each row says "with {ID}", your other IDs show how many people they have with an Open button, and an "All my IDs" filter and a "Find a person" search sit above the list.

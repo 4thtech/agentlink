@@ -57,6 +57,7 @@ import {
   contactPath,
   parseCode,
   parseList,
+  idMissing,
   parsePeopleAll,
   parseRenameCheck,
   renameCheckPath,
@@ -120,8 +121,9 @@ type ListState =
   | { readonly phase: 'ok'; readonly contacts: readonly ContactRow[] };
 
 /**
- * WP-P2: a person as listed, with the ID it belongs to when there are 2+ IDs. `id` is absent with one
- * ID; `id.current` false means opening it switches to that ID first.
+ * WP-P2: a person of the open ID as listed, with that ID when there are 2+ IDs (`id` is absent with
+ * one ID). Another ID's people are not listed by name: its names stay sealed in its own store until
+ * it is opened (04 §2.5), so it shows as "{n} people with {ID}" with Open {ID}.
  */
 type Person = ContactRow & {
   readonly id?: { readonly name: string; readonly label: string; readonly current: boolean };
@@ -1324,44 +1326,48 @@ export function ContactsPage({
   // people come from its own read (LIST_PATH), every other ID's from the all-IDs read.
   const multi = ids !== undefined && ids.length >= 2;
   const openIdOf = ids?.find((id) => id.current);
-  const tag = (id: IdPeople) => ({ name: id.name, label: id.label, current: id.current });
-  const otherPeople: readonly Person[] = !multi
-    ? []
-    : (ids ?? [])
-        .filter((id) => !id.current)
-        .flatMap((id) => (id.contacts ?? []).map((c): Person => ({ ...c, id: tag(id) })));
   const ownPeople: readonly Person[] =
     list.phase !== 'ok'
       ? []
       : multi && openIdOf !== undefined
-        ? list.contacts.map((c): Person => ({ ...c, id: tag(openIdOf) }))
+        ? list.contacts.map((c): Person => ({
+            ...c,
+            id: { name: openIdOf.name, label: openIdOf.label, current: true },
+          }))
         : list.contacts;
   const needle = query.trim().toLowerCase();
-  const shownPeople: readonly Person[] = [...ownPeople, ...otherPeople].filter(
+  const shownPeople: readonly Person[] = ownPeople.filter(
     (c) =>
       (!multi || idFilter === '' || c.id?.name === idFilter) &&
       (needle === '' || shownName(c).toLowerCase().includes(needle)),
   );
+  // Another ID's people are only counted (names are found after opening that ID): shown while no
+  // name is searched, under All my IDs or that ID's filter.
+  const otherIds: readonly IdPeople[] = !multi
+    ? []
+    : (ids ?? []).filter(
+        (id) =>
+          !id.current &&
+          id.count !== undefined &&
+          id.count > 0 &&
+          needle === '' &&
+          (idFilter === '' || id.name === idFilter),
+      );
+  const otherCount = otherIds.reduce((n, id) => n + (id.count ?? 0), 0);
+  const anyOther = multi && (ids ?? []).some((id) => !id.current && (id.count ?? 0) > 0);
   const missingIds = !multi
     ? []
     : (ids ?? [])
-        .filter((id) => !id.current && id.contacts === undefined)
+        .filter((id) => !id.current && idMissing(id))
         .filter((id) => idFilter === '' || id.name === idFilter)
         .map((id) => id.label);
-  const openOtherId = (name: string, label: string, ref: string): void => {
+  const openOtherId = (name: string, label: string): void => {
     setNotice(ALL_IDS.opening(label));
-    // The shell opens again after the switch; this page then opens that person's panel.
-    history.replaceState(history.state, '', `${location.pathname}?check=${ref}${location.hash}`);
     void switchTo(name).then(
       (outcome) => {
-        if (outcome.kind === 'done') return;
-        clearCheckParam();
-        setNotice(ALL_IDS.openFailed);
+        if (outcome.kind !== 'done') setNotice(ALL_IDS.openFailed);
       },
-      () => {
-        clearCheckParam();
-        setNotice(ALL_IDS.openFailed);
-      },
+      () => setNotice(ALL_IDS.openFailed),
     );
   };
 
@@ -1390,7 +1396,7 @@ export function ContactsPage({
         </>
       );
     }
-    if (list.contacts.length === 0 && otherPeople.length === 0) {
+    if (list.contacts.length === 0 && !anyOther) {
       return (
         <>
           {title}
@@ -1443,13 +1449,7 @@ export function ContactsPage({
             compareMostActive(sortKey(activity.pulse, x.ref, 0), sortKey(activity.pulse, y.ref, 0)),
           )
         : live;
-    const openRow = (ref: string, person?: Person): void => {
-      // WP-P2: a person of another ID opens that ID first (the existing switch, no Touch ID); the
-      // shell then opens again on this page with that person's panel (`?check=`).
-      if (person?.id !== undefined && !person.id.current) {
-        openOtherId(person.id.name, person.id.label, ref);
-        return;
-      }
+    const openRow = (ref: string): void => {
       setRemoved(false);
       setSelected(ref);
       setSheetOpen(true);
@@ -1507,7 +1507,9 @@ export function ContactsPage({
             />
           </span>
           <ActivitySort />
-          <p className="al-text-body-sm al-muted ct-count">{countLine(live.length, rows.length)}</p>
+          <p className="al-text-body-sm al-muted ct-count">
+            {countLine(live.length + otherCount, rows.length)}
+          </p>
         </div>
         {missingIds.length > 0 ? (
           <p className="al-text-body-sm al-muted ct-missing" role="status">
@@ -1516,9 +1518,9 @@ export function ContactsPage({
         ) : null}
         <div className="ct-layout">
           {invitesList}
-          {live.length === 0 && query.trim() !== '' ? (
+          {live.length === 0 && needle !== '' ? (
             <p className="al-text-body al-muted ct-nomatch">{ALL_IDS.noMatch}</p>
-          ) : (
+          ) : live.length > 0 || otherIds.length === 0 ? (
             <ContactList
               contacts={liveSorted}
               selected={current?.ref}
@@ -1526,6 +1528,38 @@ export function ContactsPage({
               fresh={fresh}
               onSelect={openRow}
             />
+          ) : null}
+          {otherIds.length === 0 ? null : (
+            <Surface
+              as="ul"
+              level={1}
+              className="ct-list ct-list-ids"
+              aria-label={ALL_IDS.otherIds}
+            >
+              {otherIds.map((id) => (
+                <li key={id.name} className="al-contact ct-row ct-idrow">
+                  <span className="al-avatar al-text-label" aria-hidden="true">
+                    <Icon name="agent" size={16} />
+                  </span>
+                  <span className="al-contact-main">
+                    <span className="al-contact-name">{countLine(id.count ?? 0)}</span>
+                    <span className="al-text-caption al-muted ct-line">{ALL_IDS.openToSee}</span>
+                  </span>
+                  <span className="al-contact-side">
+                    <span className="al-text-body-sm al-muted ct-with">
+                      {ALL_IDS.with} <bdi>{id.label}</bdi>
+                    </span>
+                    <Button
+                      size="sm"
+                      aria-label={`${ALL_IDS.open} ${id.label}`}
+                      onClick={() => openOtherId(id.name, id.label)}
+                    >
+                      {ALL_IDS.open}
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </Surface>
           )}
           <ArchivedList
             gone={shownPeople.filter((c) => c.status === 'revoked')}

@@ -272,6 +272,24 @@
   .ct-with {
     max-width: 120px;
   }
+  .ct-idrow {
+    flex-wrap: wrap;
+  }
+  .ct-idrow .al-contact-side {
+    flex: 1 1 100%;
+    justify-content: flex-end;
+  }
+}
+/* Another ID's row is a list item (its Open button acts), not a button like a person's row. */
+.ct-idrow {
+  box-sizing: border-box;
+  cursor: default;
+}
+.ct-idrow:hover {
+  background: var(--al-color-bg-surface);
+}
+.ct-idrow .al-contact-side .al-btn {
+  flex: none;
 }
 .ct-check,
 .ct-open {
