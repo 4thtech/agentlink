@@ -51,7 +51,7 @@ import {
 import { isCommitmentAction } from './commitments.js';
 import { isPaidPendingAction } from './pay-confirm.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
-import type { ContactBook } from './contacts.js';
+import { removeContactTx, type ContactBook } from './contacts.js';
 import type { IdentityService } from './identity.js';
 import { isRestrictedAlias } from './names.js';
 import { credentialDigestsEqual, readStorageMark, type OwnStorageKeys } from './own-storage.js';
@@ -493,11 +493,8 @@ export class OwnerActions {
         return refused(op, 'contact_revoked');
       }
       tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
-      tx.update(
-        'contacts',
-        { contact_id: contactId, status: { in: ['active', 'blocked'] } },
-        { status: 'removed', updated_at: now },
-      );
+      // The one remove (07 §3): staged pairings go, a block survives as key blocks (audit M1, L2).
+      removeContactTx(tx, row, now);
       return { status: 'applied', op };
     });
     return outcome.status === 'refused' ? this.#report(outcome) : outcome;

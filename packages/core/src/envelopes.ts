@@ -70,8 +70,10 @@ import {
   TERMS_WAIT_SECONDS,
 } from './constants.js';
 import {
+  removedPairingAdmitTx,
   screenInboundTx,
   type ContactBook,
+  type RemovedPairingMessage,
   type InboundCard,
   type PreparedCardUpdate,
 } from './contacts.js';
@@ -1252,10 +1254,23 @@ export class EnvelopeService {
     const screen = await this.#ctx.store.transaction((tx) => screenInboundTx(tx, from));
     if (screen.action === 'drop') {
       // A removed contact comes back only through a fresh completed pairing (07 §3 `removed`, 04
-      // §2.9, §2.5.1 `contact.remove`). Its pairing messages go to the pairing screen as an unknown
-      // key's would: kept only for an invite this agent holds or a pairing it staged from that key,
-      // otherwise dropped. Blocked and revoked agents stay out (D-72; 04 §3.4.1).
-      if (screen.reason === 'removed' && PAIRING_TYPES.has(type)) return this.#screenPairing(o);
+      // §2.9, §2.5.1 `contact.remove`): its pairing message goes on to the pairing flow, as an
+      // unknown key's would, only when it answers an open invite or staged pairing made after the
+      // removal (removedPairingAdmitTx); otherwise it is dropped with nothing stored. Blocked keys
+      // and revoked agents stay out (D-72; 04 §3.4.1).
+      const message: RemovedPairingMessage | undefined =
+        payload.type === 'handshake'
+          ? { type: 'handshake', inviteId: payload.body.inviteId }
+          : payload.type === 'handshake-ack'
+            ? { type: 'handshake-ack', handshakeId: payload.body.handshakeId }
+            : undefined;
+      if (screen.reason === 'removed' && message !== undefined) {
+        const now = nowOf(this.#ctx);
+        const fresh = await this.#ctx.store.transaction((tx) =>
+          removedPairingAdmitTx(tx, from, message, now),
+        );
+        if (fresh) return this.#screenPairing(o);
+      }
       return { kind: 'drop', reason: screen.reason === 'malformed' ? 'invalid' : screen.reason };
     }
     const sender = screen.sender;

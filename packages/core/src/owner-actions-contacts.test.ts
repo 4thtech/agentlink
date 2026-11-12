@@ -12,6 +12,7 @@
 import { encodeBase64url, encodeHex, randomBytes, type JsonObject } from '@4thtech-io/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { describe, expect, it } from 'vitest';
+import type { Sealed } from './store/schema.js';
 import { FakeClock, passphrase, seed } from './testing/fixtures.js';
 import {
   cardUpdatePayload,
@@ -239,9 +240,9 @@ describe('contact.remove (M1-9za; 04 §2.5.1; 07 §3; 02 F-14)', () => {
         agent_nostr: 'ab'.repeat(32),
         key_epoch: 0,
         owner_fingerprint: 'cd'.repeat(32),
-        agent_card_json: 'x',
-        name: 'x',
-        relays: 'x',
+        agent_card_json: 'x' as unknown as Sealed,
+        name: 'x' as unknown as Sealed,
+        relays: 'x' as unknown as Sealed,
         created_at: clock.t,
         expires_at: clock.t + 3600,
       }),
