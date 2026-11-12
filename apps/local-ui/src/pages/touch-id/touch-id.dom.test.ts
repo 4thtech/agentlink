@@ -371,3 +371,53 @@ describe('Touch ID & master code (WP-S2, §3.3)', () => {
     }
   });
 });
+
+// DESK051-C2: in the desktop app the page recognises the app's own Touch ID (native presence), not
+// only the browser passkey: the card says it is on, Test Touch ID and Replace use the native gesture,
+// and the browser's one-time switch is not offered there (the app's switch below is the way).
+describe('Touch ID & master code in the desktop app (DESK051-C2)', () => {
+  const MAC_APP = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Electron/39.0 AgentLinkDesktop/1';
+  const desktop = (registered: boolean) => ({
+    userAgent: MAC_APP,
+    nativeStatus: () => Promise.resolve({ available: true, registered }),
+  });
+
+  it('native Touch ID on: the card says on and Test Touch ID uses the native gesture', async () => {
+    const { calls, proof } = await render(
+      UNKNOWN,
+      { '/api/ui/owner-presence/test': [DONE] },
+      desktop(true),
+    );
+    expect(text()).toContain('Touch ID is on');
+    expect(text()).not.toContain("Touch ID can't be used here");
+    await click('Test Touch ID');
+    expect(calls).toEqual([{ path: '/api/ui/owner-presence/test', presence: { native: true } }]);
+    expect(proof).not.toHaveBeenCalled();
+    expect(toasts).toContain('Touch ID works.');
+  });
+
+  it('native Touch ID on: Replace confirms with the native gesture', async () => {
+    const { calls } = await render(
+      UNKNOWN,
+      { '/api/ui/owner-code/replace': [STAGED] },
+      desktop(true),
+    );
+    await click('Replace master code');
+    await click('Confirm with Touch ID');
+    expect(calls[0]).toEqual({ path: '/api/ui/owner-code/replace', presence: { native: true } });
+    expect(host.querySelector('[data-new-code]')?.textContent).toBe(NEW);
+  });
+
+  it('native Touch ID off: the card says off and points to the switch; no browser switch offered', async () => {
+    await render(OFF, {}, desktop(false));
+    expect(text()).toContain('Touch ID is off');
+    expect(labels()).not.toContain('Turn on Touch ID');
+    expect(host.querySelector('[data-slot="native-touch-id-switch"] [role="switch"]')).not.toBeNull();
+  });
+
+  it('in a browser nothing changes: the passkey decides, no native switch', async () => {
+    await render(OFF);
+    expect(labels()).toContain('Turn on Touch ID');
+    expect(host.querySelector('[data-slot="native-touch-id-switch"]')).toBeNull();
+  });
+});

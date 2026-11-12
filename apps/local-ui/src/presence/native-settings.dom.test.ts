@@ -5,7 +5,7 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { DESKTOP_MARKER } from './desktop.js';
+import { DESKTOP_MARKER, nativeConfirmLabel } from './desktop.js';
 import type { NativeRegistration, NativeStatus } from './native-api.js';
 import { NativeSettings } from './native-settings.js';
 import { NATIVE_STRINGS } from './strings.js';
@@ -90,7 +90,7 @@ describe('Settings: Use Touch ID for approvals', () => {
     await act(async () => toggle()?.click());
     await flush();
     await typeCode('ABCD EFGH');
-    await clickButton(NATIVE_STRINGS.confirmCode);
+    await clickButton(NATIVE_STRINGS.turnOff);
     expect(calls).toEqual(['off:ABCD EFGH']);
     expect(host.textContent).toContain(NATIVE_STRINGS.turnedOff('mac'));
     expect(checked()).toBe(false);
@@ -104,7 +104,7 @@ describe('Settings: Use Touch ID for approvals', () => {
     expect(host.textContent).toContain(NATIVE_STRINGS.state.reregister);
     await clickButton(NATIVE_STRINGS.turnOnAgain);
     await typeCode('ABCD EFGH');
-    await clickButton(NATIVE_STRINGS.confirmCode);
+    await clickButton(nativeConfirmLabel('mac'));
     expect(calls).toEqual(['again:ABCD EFGH']);
     expect(checked()).toBe(true);
   });
@@ -143,7 +143,7 @@ describe('Settings: every outcome is visible (DESK-NATIVE-DEBUG)', () => {
     await act(async () => toggle()?.click());
     await flush();
     await typeCode('ABCD EFGH');
-    await clickButton(NATIVE_STRINGS.confirmCode);
+    await clickButton(nativeConfirmLabel('mac'));
   }
 
   it('says it is waiting for Touch ID while the prompt is up', async () => {
@@ -203,5 +203,157 @@ describe('Settings: every outcome is visible (DESK-NATIVE-DEBUG)', () => {
     await flush();
     const form = card?.querySelector('form.st-native-body');
     expect(form?.previousElementSibling?.classList.contains('st-native-row')).toBe(true);
+  });
+});
+
+// DESK051-C2 (owner feedback, Tali after testing on a real Mac): the switch guides. A click puts it
+// in an in-between state with its own look; the master code field appears with the reason, once; the
+// sensor button works only with a code typed; after the OS prompt the switch is fully on. Errors and
+// Cancel go back to off with a plain message.
+describe('Settings: the switch guides the owner (DESK051-C2)', () => {
+  const look = (): string | null => toggle()?.getAttribute('data-look') ?? null;
+  const sensorButton = (): HTMLButtonElement | undefined =>
+    [...host.querySelectorAll('button')].find((x) => x.textContent === nativeConfirmLabel('mac'));
+
+  async function renderOn(
+    on: (code: string) => Promise<NativeRegistration>,
+    statuses: NativeStatus[] = [{ available: true, registered: false }],
+  ): Promise<void> {
+    let at = 0;
+    await act(async () => {
+      root.render(
+        createElement(NativeSettings, {
+          userAgent: MAC_APP,
+          nativeStatus: () =>
+            Promise.resolve(statuses[Math.min(at++, statuses.length - 1)] as NativeStatus),
+          ops: { on, off: on, again: on },
+        }),
+      );
+    });
+    await flush();
+  }
+
+  it('off → in-between (own look, reason, code field) → sensor → fully on', async () => {
+    let answer: (r: NativeRegistration) => void = () => undefined;
+    const sent: string[] = [];
+    await renderOn(
+      (code) => {
+        sent.push(code);
+        return new Promise<NativeRegistration>((resolve) => (answer = resolve));
+      },
+      [
+        { available: true, registered: false },
+        { available: true, registered: true },
+      ],
+    );
+    expect(look()).toBe('off');
+    expect(host.querySelector('input[type="password"]')).toBeNull();
+    await act(async () => toggle()?.click());
+    await flush();
+    expect(look()).toBe('pending');
+    expect(toggle()?.classList.contains('is-pending')).toBe(true);
+    expect(toggle()?.classList.contains('is-on')).toBe(false);
+    expect(host.textContent).toContain(NATIVE_STRINGS.whyOn('mac'));
+    expect(host.querySelector('input[type="password"]')).not.toBeNull();
+    // The sensor button waits for the master code.
+    expect(sensorButton()?.disabled).toBe(true);
+    await typeCode('ABCD EFGH');
+    expect(sensorButton()?.disabled).toBe(false);
+    await clickButton(nativeConfirmLabel('mac'));
+    expect(sent).toEqual(['ABCD EFGH']);
+    // The OS prompt is up: still in-between, the code field gone, the waiting line shown.
+    expect(look()).toBe('pending');
+    expect(host.querySelector('input[type="password"]')).toBeNull();
+    expect(host.querySelector('[data-native-waiting]')).not.toBeNull();
+    await act(async () => answer({ kind: 'registered' }));
+    await flush();
+    expect(look()).toBe('on');
+    expect(toggle()?.classList.contains('is-on')).toBe(true);
+    expect(checked()).toBe(true);
+    expect(host.textContent).toContain(NATIVE_STRINGS.turnedOn('mac'));
+  });
+
+  it('Cancel in the code step returns to off; nothing is sent', async () => {
+    const sent: string[] = [];
+    await renderOn((code) => {
+      sent.push(code);
+      return Promise.resolve({ kind: 'registered' });
+    });
+    await act(async () => toggle()?.click());
+    await flush();
+    await typeCode('ABCD EFGH');
+    await clickButton(NATIVE_STRINGS.cancel);
+    expect(look()).toBe('off');
+    expect(host.querySelector('input[type="password"]')).toBeNull();
+    expect(sent).toEqual([]);
+  });
+
+  it('clicking the in-between switch again also backs out to off', async () => {
+    await renderOn(() => Promise.resolve({ kind: 'registered' }));
+    await act(async () => toggle()?.click());
+    await flush();
+    expect(look()).toBe('pending');
+    await act(async () => toggle()?.click());
+    await flush();
+    expect(look()).toBe('off');
+    expect(host.querySelector('input[type="password"]')).toBeNull();
+  });
+
+  it('a cancelled fingerprint returns to off with a plain message', async () => {
+    await renderOn(() => Promise.resolve({ kind: 'native', state: 'cancelled' }));
+    await act(async () => toggle()?.click());
+    await flush();
+    await typeCode('ABCD EFGH');
+    await clickButton(nativeConfirmLabel('mac'));
+    expect(look()).toBe('off');
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(NATIVE_STRINGS.state.cancelled);
+  });
+
+  it('a wrong master code stays in-between with the field to try again', async () => {
+    await renderOn(() => Promise.resolve({ kind: 'rejected' }));
+    await act(async () => toggle()?.click());
+    await flush();
+    await typeCode('WRONG');
+    await clickButton(nativeConfirmLabel('mac'));
+    expect(look()).toBe('pending');
+    expect(host.querySelector('input[type="password"]')).not.toBeNull();
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe(NATIVE_STRINGS.wrongCode);
+  });
+
+  it('turning off: in-between with its own reason and a Turn off button that waits for the code', async () => {
+    await renderOn(
+      () => Promise.resolve({ kind: 'off' }),
+      [
+        { available: true, registered: true },
+        { available: true, registered: false },
+      ],
+    );
+    expect(look()).toBe('on');
+    await act(async () => toggle()?.click());
+    await flush();
+    expect(look()).toBe('pending');
+    expect(host.textContent).toContain(NATIVE_STRINGS.whyOff('mac'));
+    const off = [...host.querySelectorAll('button')].find(
+      (x) => x.textContent === NATIVE_STRINGS.turnOff,
+    );
+    expect(off?.disabled).toBe(true);
+    await typeCode('ABCD EFGH');
+    await clickButton(NATIVE_STRINGS.turnOff);
+    expect(look()).toBe('off');
+  });
+
+  it('reports what is stored to the page around it', async () => {
+    const seen: boolean[] = [];
+    await act(async () => {
+      root.render(
+        createElement(NativeSettings, {
+          userAgent: MAC_APP,
+          nativeStatus: () => Promise.resolve({ available: true, registered: true }),
+          onStatus: (s: NativeStatus) => seen.push(s.registered),
+        }),
+      );
+    });
+    await flush();
+    expect(seen).toEqual([true]);
   });
 });
