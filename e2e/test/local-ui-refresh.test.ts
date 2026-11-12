@@ -12,7 +12,8 @@
 //     increased contrast and forced colours (§8);
 //   - Sheets make the page behind them inert and Escape closes them; Approve is never focused on
 //     load; the nav, the Under the hood switch and the Approvals controls are keyboard reachable;
-//   - added CSS within 15 KB gzipped against 0.4.0.
+//   - added CSS against 0.4.0: initial-load CSS within 15 KB gzipped, total within 30 KB (owner
+//     decision 2026-11-12, see the bundle test).
 // Timing (only with LOCAL_UI_REFRESH_STRICT=1, which gates, or LOCAL_UI_REFRESH_REPORT=<file>, which
 // records): route paint within 100 ms, and frame times and long tasks with the CPU throttled 4× (no
 // frame over 33 ms, no long task over 50 ms). Shared CI runners are far too slow and noisy for these;
@@ -43,7 +44,12 @@ const AXE = readFileSync(
 
 /** 0.4.0's local app (tag v0.4.0, `vite build`, gzip -9), measured once for card q. */
 const BASELINE_040 = { jsGzip: 131_357, cssGzip: 12_685 } as const;
-const BUDGET = { cssGzip: 15 * 1024, jsGzip: 10 * 1024 } as const; // plan §7
+// Owner decision 2026-11-12 (Tali): initial-load CSS <= 15 KB growth, total <= 30 KB growth; page CSS loads with its route.
+const BUDGET = {
+  cssGzip: 15 * 1024,
+  totalCssGzip: 30 * 1024,
+  jsGzip: 10 * 1024,
+} as const; // plan §7, amended
 
 // W4-SHELL-V2: the sections (today's pages until their builders replace the bodies), Settings,
 // Advanced and Get started.
@@ -520,7 +526,7 @@ afterAll(async () => {
 });
 
 describe('UI-REFRESH-q: the refreshed local app, performance and accessibility', () => {
-  it('bundle: added CSS within 15 KB gzipped against 0.4.0 (JS growth reported)', () => {
+  it('bundle: initial CSS within 15 KB and total CSS within 30 KB gzipped against 0.4.0 (JS growth reported)', () => {
     const sizes = { js: 0, css: 0 };
     const dir = join(DIST, 'assets');
     for (const f of readdirSync(dir)) {
@@ -541,15 +547,29 @@ describe('UI-REFRESH-q: the refreshed local app, performance and accessibility',
       initialJs += gzipSync(readFileSync(join(DIST, f)), { level: 9 }).length;
     }
     const initialJsGrowth = initialJs - BASELINE_040.jsGzip;
+    // Owner decision 2026-11-12 (Tali): initial-load CSS <= 15 KB growth, total <= 30 KB growth;
+    // page CSS loads with its route. Initial CSS = the stylesheets index.html links (page
+    // stylesheets are fetched with their lazy chunk).
+    const initialCssFiles = new Set(
+      [...html.matchAll(/(?:src|href)="\/(assets\/[^"]+\.css)"/g)].map((m) => m[1] as string),
+    );
+    let initialCss = 0;
+    for (const f of initialCssFiles) {
+      initialCss += gzipSync(readFileSync(join(DIST, f)), { level: 9 }).length;
+    }
+    const initialCssGrowth = initialCss - BASELINE_040.cssGzip;
     report['bundle'] = {
       gzip: sizes,
       baseline040: BASELINE_040,
       growth,
       initialJsGzip: initialJs,
       initialJsGrowth,
+      initialCssGzip: initialCss,
+      initialCssGrowth,
       budget: BUDGET,
     };
-    expect(growth.css).toBeLessThanOrEqual(BUDGET.cssGzip);
+    expect(initialCssGrowth).toBeLessThanOrEqual(BUDGET.cssGzip);
+    expect(growth.css).toBeLessThanOrEqual(BUDGET.totalCssGzip);
   });
 
   it(
