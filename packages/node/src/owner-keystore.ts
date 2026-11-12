@@ -1,12 +1,12 @@
 // M1-8c: the OwnerKeyStore on keychain machines (04 §2.2 "Owner seed on keychain machines", D-67).
 // The owner seed is stored only wrapped: one keychain item, service `agentlink`, account `owner`,
-// whose value is the 90-byte `ALKO` v1 blob (04 §2.8) under the generated owner code (kind 1) or,
+// whose value is the 90-byte `ALKO` v1 blob (04 §2.8) under the generated master code (kind 1) or,
 // after an explicit opt-in, a chosen owner passphrase (kind 2). It is unwrapped only inside one owner
 // operation (owner-operation.ts), turned into the session's owner keys, and wiped.
 //
 // What this protects, and what it does not (04 §2.5, G-1 accepted for M1 by D-67): a same-user
 // script that does not modify the installed package and does not read process memory cannot produce
-// an owner signature without the owner code (owner-same-user.test.ts). Presence, not intent: a
+// an owner signature without the master code (owner-same-user.test.ts). Presence, not intent: a
 // modified package, a memory read, a fake prompt, or offline guessing of an opted-in chosen
 // passphrase all defeat it, and no software check on a same-user machine stops them.
 //
@@ -103,7 +103,7 @@ export const ownerMissing = (): NodeKeyStoreError =>
 const ownerMismatch = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'owner_mismatch',
-    `The owner set up on this computer isn't the owner this agent names, or its saved copy is damaged. \`${CLI_COMMAND} doctor\` shows the owner fingerprint.`,
+    `The owner set up on this computer isn't the owner this agent names, or its saved copy is damaged. \`${CLI_COMMAND} doctor\` shows the ID tag.`,
   );
 
 const presenceRejected = (): KeyStoreError =>
@@ -112,7 +112,7 @@ const presenceRejected = (): KeyStoreError =>
 const presenceRequired = (): KeyStoreError =>
   new KeyStoreError('presence_required', 'owner keystore: a presence proof is required');
 
-/** The short owner fingerprint of 11 §5.2, for example `7F3A·19C2`. Public. */
+/** The short ID tag of 11 §5.2, for example `7F3A·19C2`. Public. */
 export function ownerFingerprintText(keys: OwnerPublicKeys): string {
   return formatFingerprint(
     ownerFingerprint(keys.ownerEvm, keys.ownerNostr, keys.ownerEnc),
@@ -341,10 +341,10 @@ export async function removeOwnerItemIfOurs(
   return removed ? 'removed' : 'failed';
 }
 
-// --- Changing the owner code (M1-9z) -------------------------------------------------------------
+// --- Changing the master code (M1-9z) -------------------------------------------------------------
 
 /**
- * M1-9z (04 §2.8 "Changing the owner code"): the keychain account that holds the re-wrapped owner
+ * M1-9z (04 §2.8 "Changing the master code"): the keychain account that holds the re-wrapped owner
  * seed while `owner change-code` verifies it, before it replaces the `owner` item. It only ever holds
  * an `ALKO` v1 blob (ciphertext) and is removed once the change has finished or failed.
  */
@@ -413,11 +413,11 @@ export async function openOwnerItem(
 const changeFailedUnchanged = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keychain_failed',
-    `The system keychain refused the request, so your owner code wasn't changed. Your current owner code still works. Unlock the keychain and run \`${CLI_COMMAND} owner change-code\` again.`,
+    `The system keychain refused the request, so your master code wasn't changed. Your current master code still works. Unlock the keychain and run \`${CLI_COMMAND} owner change-code\` again.`,
   );
 
 /**
- * M1-9z (04 §2.8 "Changing the owner code"): re-wraps `seed` under the new generated owner code and
+ * M1-9z (04 §2.8 "Changing the master code"): re-wraps `seed` under the new generated master code and
  * replaces the `owner` item without ever losing the seed:
  *
  * 1. seal a fresh `ALKO` v1 blob (new salt and nonce) under `secret` and write it to the staging
@@ -514,7 +514,7 @@ export async function replaceOwnerWrap(
   // Neither the old nor the new wrap: keep the staging item, which holds the seed under the new code.
   throw new NodeKeyStoreError(
     'keychain_failed',
-    `The system keychain didn't confirm the change. Keep both your current and your new owner code, and run \`${CLI_COMMAND} owner change-code\` again in your own terminal: it finishes or cleans up this change.`,
+    `The system keychain didn't confirm the change. Keep both your current and your new master code, and run \`${CLI_COMMAND} owner change-code\` again in your own terminal: it finishes or cleans up this change.`,
   );
 }
 
@@ -525,8 +525,8 @@ const restoreOwnerFailed = (): NodeKeyStoreError =>
   );
 
 /**
- * M1-9i-c (04 §2.3.3 restore step 6, §2.8 "Changing the owner code"): stores a restored owner seed as
- * the `owner` item under `secret` (a new generated owner code, kind 1) with the `owner-next` write,
+ * M1-9i-c (04 §2.3.3 restore step 6, §2.8 "Changing the master code"): stores a restored owner seed as
+ * the `owner` item under `secret` (a new generated master code, kind 1) with the `owner-next` write,
  * read-back and open protocol, and never overwrites:
  *
  * 1. refuse (`item_exists`) while an `owner`, `owner-next` or `owner-passkey` item exists;
@@ -659,7 +659,7 @@ export async function promoteStagedOwnerWrap(
   if (!unchanged) {
     throw new NodeKeyStoreError(
       'owner_mismatch',
-      `The owner key on this computer changed while you were finishing the owner code change, so nothing was changed. Run \`${CLI_COMMAND} owner change-code\` again in your own terminal.`,
+      `The owner key on this computer changed while you were finishing the master code change, so nothing was changed. Run \`${CLI_COMMAND} owner change-code\` again in your own terminal.`,
     );
   }
   try {
@@ -673,7 +673,7 @@ export async function promoteStagedOwnerWrap(
   if (!replaced) {
     throw new NodeKeyStoreError(
       'keychain_failed',
-      `The system keychain refused the request, so the owner code change isn't finished yet. Keep both your current and your new owner code, unlock the keychain and run \`${CLI_COMMAND} owner change-code\` again.`,
+      `The system keychain refused the request, so the master code change isn't finished yet. Keep both your current and your new master code, unlock the keychain and run \`${CLI_COMMAND} owner change-code\` again.`,
     );
   }
   await removeStagedOwnerItem(keychain, staged, timeoutMs);
@@ -1002,7 +1002,7 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
   }
 
   /**
-   * The stored wrap's `secretKind` header byte (1 owner code, 2 chosen passphrase), so the prompt
+   * The stored wrap's `secretKind` header byte (1 master code, 2 chosen passphrase), so the prompt
    * names the right secret. Public header data; the value is checked again, authenticated, on unlock.
    */
   async secretKind(): Promise<SecretKind> {
@@ -1021,7 +1021,7 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
   }
 
   /**
-   * 04 §2.5: unwraps the owner seed with the owner code or passphrase typed at the prompt (the
+   * 04 §2.5: unwraps the owner seed with the master code or passphrase typed at the prompt (the
    * `owner` item, `ALKO`), or with the localhost passkey's PRF output after the owner's gesture
    * (M1-8e: the `owner-passkey` item, `ALKP` v1, 04 §2.3.1), checks it against the expected owner,
    * derives the session's owner keys and wipes the seed. The presented secret or PRF output is wiped
@@ -1133,7 +1133,7 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
   /**
    * M1-9x (04 §2.8 "Adding an agent to the existing owner"): unlocks the `owner` item when no local
    * agent card names the owner, so there is no expected owner to check against. The owner keys are
-   * taken from the item itself: the seed the owner code (or opted-in passphrase) unwraps derives
+   * taken from the item itself: the seed the master code (or opted-in passphrase) unwraps derives
    * them, and the returned store expects exactly those keys from then on. The authenticated
    * decryption under the typed secret is the only check, so `confirm` (which MUST show the owner
    * fingerprint and ask the owner) runs before the session is issued; false returns null and
@@ -1194,7 +1194,7 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
    * HOTFIX-045-REMOVE (04 §2.5 "Removing an agent", Try again after step 6): unlocks the stored
    * owner when no agent card is open and only the owner's Nostr key is known, from a signed
    * `agent.revoke` the caller has verified (the owner's revoked list). The same presence as unlock:
-   * the owner code or passphrase on the `owner` item, or the localhost passkey's PRF output on the
+   * the master code or passphrase on the `owner` item, or the localhost passkey's PRF output on the
    * `owner-passkey` item (the caller has checked the assertion against `ownerNostr`). The seed must
    * derive exactly `ownerNostr`; the other owner keys are derived from that seed, and the returned
    * store expects exactly those keys from then on. A wrong secret, a damaged item and another owner

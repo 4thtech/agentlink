@@ -41,7 +41,7 @@ export interface CardActions {
 
 /**
  * The Back up panel (WP-11, D-117 A): the open ID saves its recovery kit right here, behind Touch ID
- * or the backup code (backup/export-kit.tsx). Another ID is opened first, since a kit is saved for
+ * or the master code (backup/export-kit.tsx). Another ID is opened first, since a kit is saved for
  * the open ID; the page keeps this panel open across the switch.
  */
 export function BackupPanel({

@@ -69,7 +69,7 @@ With no folders yet, the page says **Your AI can't send files yet. Allow a folde
 2. In **Folder**, type the full path, for example `~/Documents/Shared`. Press **Check folder**.
 3. The confirm step asks **Allow your AI to send files from this folder?** It shows the real folder that will be allowed. If you typed a link or another spelling, it says so: "You typed … It leads to the folder above, so that is the folder allowed."
 4. Under **Before you confirm, tick each one:**, tick every line. Each line says, in plain words, what the change lets your AI do. **Allow folder** stays off until all are ticked.
-5. Press **Allow folder** and confirm with your passkey. No passkey? Press **Use master code instead** and type your master code.
+5. Press **Allow folder** and confirm with your passkey. No passkey? Press **Use your master code instead** and type your master code.
 6. The page says **Allowed. Your AI can now send files from this folder.**
 
 <figure><img src="../.gitbook/assets/local-files--confirm-add.png" alt="The confirm step: the folder, one ticked line saying what your AI may do, and the Allow folder button."><figcaption><p>The confirm step. Allow folder stays off until every line is ticked.</p></figcaption></figure>

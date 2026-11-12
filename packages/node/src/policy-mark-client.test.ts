@@ -3,7 +3,7 @@
 // hands out (04 §2.5.1; 06 §3 G-6; 07 §3.4).
 //
 // Stated scope (G-1, D-67): the "script" below runs as the same OS user, with read and write access to
-// the store file and the agent's keychain items, but without the owner code. It does not modify the
+// the store file and the agent's keychain items, but without the master code. It does not modify the
 // installed package and does not read process memory. Within that scope, deleting the `policies` row,
 // putting back an older signed row or deleting the mark item gives the fail-closed result, never the
 // defaults. Outside it: a script that rewrites BOTH the store row and the keychain mark item to an
@@ -62,8 +62,8 @@ const approvals: ApprovalChannel = {
 function codeTerminal() {
   const written: string[] = [];
   const shown = (): string =>
-    (written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(
-      'Your owner code: '.length,
+    (written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(
+      'Your master code: '.length,
     );
   const terminal: OwnerTerminal = {
     write: (text) => void written.push(text),
@@ -122,7 +122,7 @@ async function openClient(): Promise<{ client: AgentLinkClient; store: AgentStor
   return { client, store };
 }
 
-/** One owner operation: the owner code at the prompt, one signature, the session closed. */
+/** One owner operation: the master code at the prompt, one signature, the session closed. */
 async function ownerSign(body: JsonObject): Promise<string> {
   const ownerStore = await KeychainOwnerKeyStore.open(keychain, owner);
   try {
@@ -251,7 +251,7 @@ describe('openAgentStore hands the core its policy-version mark (M1-8g)', () => 
   });
 });
 
-describe('a same-user script without the owner code (G-1, D-67 scope)', () => {
+describe('a same-user script without the master code (G-1, D-67 scope)', () => {
   it('deleting the policies row gives the fail-closed result, never the defaults', async () => {
     const { client } = await openClient();
     await initIdentity(client);

@@ -1,5 +1,5 @@
 // U3-h: the owner-presence step shared by Rename, Add and Remove (04 §2.5). The page never signs: it
-// hands the proof (the passkey, or the owner code) to one request, and the server's gate checks it.
+// hands the proof (the passkey, or the master code) to one request, and the server's gate checks it.
 // The statement names the agent and the change, so a prompt never approves something for another
 // agent (b11 §29.1). Reuses the Contacts presence prompt.
 import { useEffect, useState, type ReactElement } from 'react';

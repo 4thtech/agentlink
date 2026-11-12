@@ -23,7 +23,7 @@ export interface ContactRow {
   readonly since: number;
   /**
    * M1-UX3-DUP-CONTACTS: the ref of the next older contact with the same owner (the server groups
-   * by owner fingerprint and sends only the ref). Never shown.
+   * by ID tag and sends only the ref). Never shown.
    */
   readonly olderSameOwner?: string;
   /** W5-INVITE-FEEDBACK: unix seconds of the kept pairing; a later one is a re-pair. Never shown. */

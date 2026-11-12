@@ -15,7 +15,7 @@
 //   the app listening (`onAgentChanged`), the page reloads as before.
 // - U3-g-b: one exception. A successful first-run `finish` (POST, 200) that the server marks with
 //   `X-AgentLink-Generation-Adopted: 1` opened the first agent in this same host: the page adopts its
-//   generation (sent from then on) at once, so the one-time backup code stays on screen. Other
+//   generation (sent from then on) at once, so the one-time master code stays on screen. Other
 //   answers seen while that finish was in flight are checked against it once it settled.
 // Without the meta tag (an approval page opened by an MCP process, bound to its agent) nothing is
 // wrapped. The guard reads and sends only that number: never a body, a token or a header value of

@@ -35,7 +35,7 @@ describe('IR-M1-35b-1', () => {
     expect(html(h(ui.ContactName, { alias: 'Marko' }))).not.toContain('Not checked yet');
     expect(
       html(h(ui.ContactName, { name: 'Marko', fingerprint: 'AB', label: 'checked' })),
-    ).toContain('Safety code checked');
+    ).toContain('Contact checked');
   });
 
   it('3: keeps line breaks and tabs in a message body only', () => {

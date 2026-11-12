@@ -1,4 +1,4 @@
-// M1-8c: the CLI prompt seam for owner steps (04 §2.5, §2.8; 07 §9.2, §9.3). The owner code or
+// M1-8c: the CLI prompt seam for owner steps (04 §2.5, §2.8; 07 §9.2, §9.3). The master code or
 // owner passphrase is read only from an interactive terminal, without echo, as bytes. No environment
 // variable, file, argument or piped stdin can supply it: a non-TTY input or output is refused before
 // anything is read, and `AGENTLINK_OWNER_*` variables are never read (D-54, 07 §9.2).
@@ -27,7 +27,7 @@ export interface OwnerTerminal {
   /**
    * M1-8e: the presence proof itself, for surfaces that are not a TTY (the localhost page: the owner
    * code, or the localhost passkey's PRF output after the gesture). Optional: without it the owner
-   * flows read the owner code with readSecret. Never reachable from agent-facing code (I-4).
+   * flows read the master code with readSecret. Never reachable from agent-facing code (I-4).
    */
   readPresence?(label: string): Promise<OwnerPresence>;
 }
@@ -55,7 +55,7 @@ const MAX_INPUT_BYTES = 1024;
 const promptUnavailable = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'owner_prompt_unavailable',
-    'Owner steps ask for your owner code in an interactive terminal. Run this command yourself, in a terminal window you opened; your AI cannot do it for you.',
+    'Owner steps ask for your master code in an interactive terminal. Run this command yourself, in a terminal window you opened; your AI cannot do it for you.',
   );
 
 const promptCancelled = (): NodeKeyStoreError =>
@@ -227,7 +227,7 @@ export function assertNoHarnessMarker(
     if (value !== undefined && value !== '') {
       throw new NodeKeyStoreError(
         'harness_detected',
-        'This looks like a terminal your AI app controls. Run this command yourself, in a terminal window you opened, so your AI never sees your owner code.',
+        'This looks like a terminal your AI app controls. Run this command yourself, in a terminal window you opened, so your AI never sees your master code.',
       );
     }
   }

@@ -1,6 +1,6 @@
 // WP-11 (F-1 full, D-117 A; 04 §2.3.3; 07 §9.4): "Save recovery kit", the one in-app way to back up.
 // The page never signs and never sees a seed: it sends one POST to the presence route
-// `/api/ui/backup/export` with Touch ID (or the backup code) as the proof and `{}` as the input; the
+// `/api/ui/backup/export` with Touch ID (or the master code) as the proof and `{}` as the input; the
 // server's gate signs `backup.export`, core records it, and the kit is sealed into a new file in the
 // Downloads folder. The answer carries the file name and the new recovery code, which is shown once,
 // kept only in this component's state and dropped at "I saved it" (or when the page closes). It is

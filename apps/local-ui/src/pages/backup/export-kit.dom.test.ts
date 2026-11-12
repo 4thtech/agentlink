@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // WP-11 (F-1 full, D-117 A): Settings › Backup saves the recovery kit in the app, behind Touch ID or
-// the backup code. No terminal command, no button that does nothing. The new recovery code is shown
+// the master code. No terminal command, no button that does nothing. The new recovery code is shown
 // once, with Copy; "I saved it" takes it off the screen and ends the "you put this off" reminder.
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -110,7 +110,7 @@ describe('Back up: save the recovery kit in the app (WP-11)', () => {
     await settle();
     await click(S.saveKit);
     await typeCode(OWNER_CODE);
-    await click('Confirm with your backup code');
+    await click('Confirm with your master code');
     expect(calls).toEqual([{ path: '/api/ui/backup/export', input: {}, presence: OWNER_CODE }]);
     expect(host.textContent).toContain('agentlink-recovery-kit-2026-11-12.alkk');
     expect(host.textContent).toContain(S.savedIn('Downloads'));
@@ -124,7 +124,7 @@ describe('Back up: save the recovery kit in the app (WP-11)', () => {
     expect(recoveryKitPending()).toBe(false);
   });
 
-  it('a wrong backup code says so and saves nothing', async () => {
+  it('a wrong master code says so and saves nothing', async () => {
     const { api } = fakeApi({ kind: 'presence_rejected' });
     await act(async () =>
       root.render(h(BackupPage, { api, passkey: () => Promise.resolve(undefined) })),
@@ -132,7 +132,7 @@ describe('Back up: save the recovery kit in the app (WP-11)', () => {
     await settle();
     await click(S.saveKit);
     await typeCode(OWNER_CODE);
-    await click('Confirm with your backup code');
+    await click('Confirm with your master code');
     expect(host.querySelector('[role="alert"]')?.textContent ?? '').not.toBe('');
     expect(host.querySelector('[data-recovery-code]')).toBeNull();
   });

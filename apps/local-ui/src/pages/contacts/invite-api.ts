@@ -5,7 +5,7 @@
 //   page's CSRF token, and nothing else: no query, no `X-AgentLink-Input`, no presence header.
 // - `POST /api/ui/invites/accept`: an owner route behind the central presence gate. The invite
 //   travels as the operation input (`X-AgentLink-Input`, base64url JSON), the presence proof as the
-//   body (owner code as UTF-8, or the passkey assertion with `X-AgentLink-Presence: passkey`). The
+//   body (master code as UTF-8, or the passkey assertion with `X-AgentLink-Presence: passkey`). The
 //   server checks presence, signs one approval and accepts; the page never signs.
 //
 // Everything goes to this same-origin server only (never a 4thTech service, never a shortener). An

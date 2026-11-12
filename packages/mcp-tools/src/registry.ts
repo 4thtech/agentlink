@@ -442,7 +442,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     name: 'agentlink_list_contacts',
     title: 'AgentLink: list contacts',
     description:
-      "List the user's AgentLink contacts with their pairing state, whether the owner compared the safety code, and unread counts. Read-only.",
+      "List the user's AgentLink contacts with their pairing state, whether the owner compared the 12 digits, and unread counts. Read-only.",
     inputSchema: obj({}),
     outputSchema: output({
       contacts: arr(

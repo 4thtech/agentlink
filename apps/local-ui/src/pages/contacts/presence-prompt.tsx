@@ -1,10 +1,10 @@
-// The owner-presence prompt of Contacts (04 §2.5; 11 §6.2.1): the passkey, or the backup code. It
+// The owner-presence prompt of Contacts (04 §2.5; 11 §6.2.1): the passkey, or the master code. It
 // hands the proof to the caller, which sends it once to a presence route; the page never signs.
 // Shared by the contact detail (check, rename, remove) and the Add contact sheet (accept, UX2-d2).
 //
 // HOTFIX-045-TOUCHID: when the passkey can't be used, the prompt says why in plain words instead of
-// falling back to the backup code silently, and an owner without a passkey on this computer can
-// switch once inside the sheet (passkey-switch.ts): the backup code and one touch register the
+// falling back to the master code silently, and an owner without a passkey on this computer can
+// switch once inside the sheet (passkey-switch.ts): the master code and one touch register the
 // passkey; then the operation itself is confirmed with its own touch (one entry, one operation).
 import { Button } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
@@ -51,7 +51,7 @@ export function PresencePrompt({
   passkeyStatus?: () => Promise<PasskeyStatus>;
   switchPasskey?: SwitchToPasskey;
   /**
-   * FB-8: the owner already chose "Use your backup code instead" on the caller's screen, so the
+   * FB-8: the owner already chose "Use your master code instead" on the caller's screen, so the
    * prompt opens on the code field and does not ask for the passkey again.
    */
   codeFirst?: boolean;
@@ -160,7 +160,7 @@ export function PresencePrompt({
         outcome.kind === 'unsupported' ||
         (outcome.kind === 'error' && outcome.problem === 'passkey_unsupported')
       ) {
-        // F49: this computer's passkey gives no PRF. Back to the backup code, which confirms this
+        // F49: this computer's passkey gives no PRF. Back to the master code, which confirms this
         // operation now; the switch is not pushed again in this browser (a UI nudge only).
         rememberSwitchUnsupported();
         setNoSwitch(true);
@@ -253,7 +253,7 @@ export function PresencePrompt({
               value={code}
               onValue={setCode}
             />
-            {/* F49: one primary action, the backup code confirms. The switch is a quiet link. */}
+            {/* F49: one primary action, the master code confirms. The switch is a quiet link. */}
             <div className="ct-actions">
               <Button type="submit" variant="primary" disabled={busy} data-confirm-code="">
                 {S.confirmWithCode}

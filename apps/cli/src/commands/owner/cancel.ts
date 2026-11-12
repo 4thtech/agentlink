@@ -5,8 +5,8 @@
 // ever takes authority away; the core verifies the owner signature and burns the nonce (M1-7d).
 //
 // The request is shown first (its card when the stored action parses, under the terminal output
-// rule), then @4thtech-io/node shows the fixed summary, reads the owner code once at the TTY prompt
-// and signs one `approval.cancel`. The owner code never passes through this module (I-1).
+// rule), then @4thtech-io/node shows the fixed summary, reads the master code once at the TTY prompt
+// and signs one `approval.cancel`. The master code never passes through this module (I-1).
 import { encodeBase64url, encodeHex, randomBytes, type JsonObject } from '@4thtech-io/crypto';
 import { LOCAL_APPROVAL_LIFETIME_S } from '@4thtech-io/node';
 import { EXIT_FAILED, EXIT_OK, type CommandContext } from '../../dispatch.js';

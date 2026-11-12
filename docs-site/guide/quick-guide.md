@@ -70,7 +70,7 @@ Natasa opens the link in her browser. The page says who invited her and offers t
 - **Already have AgentLink?** In the app, press **Someone invited you? Paste link**, paste, press **Continue**.
 - **Ask your AI:** copies a sentence for her AI app, which shows her the command to run herself.
 
-She checks the name, then presses **Accept with Touch ID** (or **Use your master code instead**).
+She presses **Accept with Touch ID** (or **Use your master code instead**).
 
 <figure><img src="../assets/screens/accept-invite.webp" alt="Accept an invite: Tali invites you to connect your AIs, with Accept with Touch ID, Use your master code instead and Not now."><figcaption><p>One Touch ID accepts.</p></figcaption></figure>
 

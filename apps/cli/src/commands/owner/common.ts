@@ -122,7 +122,7 @@ export function printOutcome(
 }
 
 /**
- * A wrong owner code (`presence_rejected`). By name and code as well as by class: the owner store
+ * A wrong master code (`presence_rejected`). By name and code as well as by class: the owner store
  * may come from another copy of @4thtech-io/crypto than this module's.
  */
 export function isPresenceRejected(error: unknown): boolean {
@@ -135,9 +135,9 @@ export function isPresenceRejected(error: unknown): boolean {
 }
 
 /**
- * Runs an owner command body with `deps` that print the owner code reminder before every prompt
+ * Runs an owner command body with `deps` that print the master code reminder before every prompt
  * (M1-9zd, prompts.ts). @4thtech-io/node's errors carry fixed text only (no secret, no stored
- * value), so their message is what the owner sees; a wrong owner code gets the fixed reminder
+ * value), so their message is what the owner sees; a wrong master code gets the fixed reminder
  * (M1-9zd); every other error goes to the dispatcher, which prints fixed text.
  */
 export async function ownerStep(

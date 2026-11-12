@@ -1,5 +1,5 @@
 // M1-11s-c-b (IR-M1-11s-c-2 L-8): the owner setup canary covers the seed and the PRF output, not only
-// the owner code (04 §2.2, §2.3.1; I-1, I-7).
+// the master code (04 §2.2, §2.3.1; I-1, I-7).
 //
 // Decision (L-8): the canary seed is not a real seed. A real owner seed is 32 bytes from the CSPRNG
 // (newOwnerSeed); the canary seed is the 32 printable ASCII bytes of CANARY_SEED_TEXT, built here
@@ -11,7 +11,7 @@
 // What is checked: through the whole route (begin, finish, success and each failure), no event,
 // console line, stdout/stderr write, HTTP response (body and headers) or thrown error carries the
 // seed or the PRF output in any of those forms, and no event, console line or stream write carries
-// the owner code. And completeOwnerSetup refuses a seed that does not derive the owner keys it was
+// the master code. And completeOwnerSetup refuses a seed that does not derive the owner keys it was
 // given, before any keychain write.
 import { request as httpRequest, type IncomingHttpHeaders } from 'node:http';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -416,7 +416,7 @@ describe('the owner setup canary uses a seed that is not a real seed (M1-11s-c-b
     expect(allZero(run.held[0] as Uint8Array)).toBe(true);
     const written = output();
     expectNoCanary(everything(run, written));
-    // The owner code is in the finish body once, by design (D-120 follow-up); nowhere else.
+    // The master code is in the finish body once, by design (D-120 follow-up); nowhere else.
     const compact = done.ownerCode.replaceAll(' ', '');
     const logged = [JSON.stringify(run.events), written].join('\n');
     expect(logged).not.toContain(compact);

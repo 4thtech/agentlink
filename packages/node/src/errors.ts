@@ -53,7 +53,7 @@ export type NodeKeyStoreErrorCode =
   | 'receipts_kept_not_written'
   /** M1-8e: a localhost passkey is already set up for this OS user (one in M1b); never replaced. */
   | 'owner_passkey_exists'
-  /** M1-8e: the authenticator returned no PRF output; nothing is stored, the owner code stays. */
+  /** M1-8e: the authenticator returned no PRF output; nothing is stored, the master code stays. */
   | 'passkey_unsupported'
   /**
    * M1-8f: the file KeyStore has no unlock source, was closed, or its file changed under the
@@ -68,7 +68,7 @@ export type NodeKeyStoreErrorCode =
   | 'keystore_failed'
   /** M1-8f: the file KeyStore opt-in was refused (a keychain works, or no interactive terminal). */
   | 'keystore_opt_in_refused'
-  /** M1-8f: a new agent secret was refused (too short, invalid, the owner code, not confirmed). */
+  /** M1-8f: a new agent secret was refused (too short, invalid, the master code, not confirmed). */
   | 'keystore_passphrase_refused'
   /**
    * U3-e: an agent's keys were not all erased (04 §2.5 step 6): a backend call failed, an item is

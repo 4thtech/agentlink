@@ -17,7 +17,7 @@
 // leading `~/` stands for the real home folder): one that became a link, or sits below a folder that
 // became a link, is not used, so a later link cannot widen what the owner allowed. pinFolder and
 // stillPinned add the folder's identity on disk (device and inode) for owner flows that check a
-// folder, ask the owner code and then apply: the folder must still be the same one at each step.
+// folder, ask the master code and then apply: the folder must still be the same one at each step.
 //
 // Nothing here logs, and no error carries a path or a file name (a tool error is shown to the AI):
 // callers branch on AllowedPathError.code.

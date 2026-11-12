@@ -1,5 +1,5 @@
 // M1-8c: approving reviewed requests in one owner operation (04 §2.5.1, §2.5.2; D-68). One entry of
-// the owner code signs one object over exactly the items shown: `approval.decide` for one item (a
+// the master code signs one object over exactly the items shown: `approval.decide` for one item (a
 // single decision is never a batch of one), `approval.decideBatch` for 2 to 20.
 //
 // What this module does (node, the signing surface):
@@ -7,7 +7,7 @@
 //   the whole operation if a stored digest differs (a mismatched request is never offered);
 // - builds the canonical params: items in strictly ascending `approvalId` byte order, no duplicates;
 // - sets expiresAt ≤ issuedAt + 600 s (proposed local bound) and ≤ the earliest request expiry;
-// - shows every item and the totals, asks "Continue?", then the owner code once; signs; wipes.
+// - shows every item and the totals, asks "Continue?", then the master code once; signs; wipes.
 //
 // - refuses a commitment (D-31) inside a batch: terms are always decided alone (IR-D-68-1);
 // - covers exactly one agent: the one `agent` of the context.
@@ -82,7 +82,7 @@ export interface ApprovalInternals {
 }
 
 /** How the stored owner secret is named in the summary line (11 §5.5). */
-export type OwnerSecretName = 'owner code' | 'owner passphrase';
+export type OwnerSecretName = 'master code' | 'owner passphrase';
 
 /** The object to sign and what the owner sees before entering the code. */
 export interface ApprovalOperation {
@@ -166,7 +166,7 @@ export function buildApprovalOperation(
   context: ApprovalContext,
   reviewed: readonly ReviewedApproval[],
   internals: ApprovalInternals = {},
-  secretName: OwnerSecretName = 'owner code',
+  secretName: OwnerSecretName = 'master code',
 ): ApprovalOperation {
   assertAgentId(context.agent);
   const owner = ownerKeysCopy(context.owner);
@@ -235,7 +235,7 @@ export function buildApprovalOperation(
 
 /**
  * One owner operation over the reviewed items: builds the object, shows it, asks "Continue?", reads
- * the owner code once, signs, closes the session and wipes the secret. Returns the SignedOwnerAction
+ * the master code once, signs, closes the session and wipes the secret. Returns the SignedOwnerAction
  * for the core to verify and apply (M1-7e).
  */
 export async function decideReviewedWith(
@@ -250,7 +250,7 @@ export async function decideReviewedWith(
     context,
     reviewed,
     internals,
-    kind === 1 ? 'owner code' : 'owner passphrase',
+    kind === 1 ? 'master code' : 'owner passphrase',
   );
   const signature = await runOwnerOperation(
     store,
@@ -264,7 +264,7 @@ export async function decideReviewedWith(
 
 /**
  * The package entry (index.ts) behind `agentlink approve` (M1-9b): the reviewed items, signed with the
- * owner code typed at this process's own terminal, against the OS keychain's `owner` item.
+ * master code typed at this process's own terminal, against the OS keychain's `owner` item.
  */
 export async function decideReviewedApprovals(
   context: ApprovalContext,

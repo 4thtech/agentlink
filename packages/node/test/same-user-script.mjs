@@ -78,7 +78,7 @@ for (const label of [KEY_LABELS.nostr, KEY_LABELS.evm, KEY_LABELS.drop]) {
 // 2. Random signatures.
 for (const body of bodies) attempts.push({ name: 'random', body, sig: encodeHex(randomBytes(64)) });
 
-// 3. Open the owner item without the owner code: environment, empty, agent seed, guesses, and every
+// 3. Open the owner item without the master code: environment, empty, agent seed, guesses, and every
 //    code-shaped string found in any file.
 const guesses = [
   process.env.AGENTLINK_OWNER_CODE,

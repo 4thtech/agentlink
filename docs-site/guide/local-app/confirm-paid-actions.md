@@ -24,7 +24,7 @@ Everything else keeps its usual passkey or backup-code check. AgentLink does not
 3. Choose **Confirm with Touch ID** (or **Windows Hello**, or **your passkey**). Your computer shows its own prompt. Use your fingerprint, face or PIN there.
 4. The sheet shows a check and closes by itself after about a second. With reduced motion turned on, it waits for **Close**.
 
-No passkey, or it won't work? Choose **Use master code instead** (a small link under the button) and type your master code.
+No passkey, or it won't work? Choose **Use your master code instead** (a small link under the button) and type your master code.
 
 ## If something goes wrong
 

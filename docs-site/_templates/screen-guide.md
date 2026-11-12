@@ -25,7 +25,7 @@
 
 1. Press **<Button>**.
 2. <One action per step. The result in the same step.>
-3. Confirm with your passkey, or press **<Use master code instead>**.
+3. Confirm with your passkey, or press **<Use your master code instead>**.
 4. The page says **<success message>**.
 
 {% hint style="warning" %}

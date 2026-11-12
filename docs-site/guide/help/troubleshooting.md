@@ -39,7 +39,7 @@ If the encrypted drop could not be reached within 10 seconds, you get the long l
 **The invite page says the invite is damaged.**
 The link was cut off or changed on the way, for example by a chat app. Ask the sender to copy it again in full.
 
-**The Contact checks don't match.**
+**The 12 digits don't match.**
 Stop. Check with the other person by phone or in person before you go on.
 
 **My AI says more than one contact matches a name (`AMBIGUOUS_CONTACT`).**

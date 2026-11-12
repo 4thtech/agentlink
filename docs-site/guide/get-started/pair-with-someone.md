@@ -25,9 +25,9 @@ Your AI now finds the person by that name ("Send Tali the slides"). You can rena
 
 The **Contact check** is 12 digits that both of you see. Its job is to catch someone pretending to be your contact: if you both see the same digits, nobody is in the middle.
 
-1. Press **Optional: make sure it's really {name}. Check**.
+1. Press **Optional: make sure it's really {name}. Contact check →**.
 2. Read the 12 digits to each other **by phone or in person**, never in a chat with your AI.
-3. If they match, press **They match**. If they don't, press **They don't match** (or **Numbers don't match?**): don't send anything, remove that contact and invite them again.
+3. If they match, press **They match**: the person shows as **Contact checked**. If they don't, press **They don't match** (or **Numbers don't match?**): don't send anything, remove that contact and invite them again.
 
 <figure><img src="../../assets/screens/connected.webp" alt="You and Tali are connected, with the Contact check open: Read these 12 digits to Tali by phone or in person. If they match, nobody tampered with your invite. Nothing to save."><figcaption><p>The Contact check: the same 12 digits on both screens.</p></figcaption></figure>
 

@@ -76,7 +76,7 @@ async function fingerprintShown(fingerprint: string): Promise<string | null | un
   });
   await settle();
   const row = [...host.querySelectorAll('.al-hood-row')].find(
-    (r) => r.querySelector('dt')?.textContent === 'Fingerprint',
+    (r) => r.querySelector('dt')?.textContent === 'ID tag',
   );
   return row?.querySelector('dd')?.textContent;
 }

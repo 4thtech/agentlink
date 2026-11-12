@@ -1,9 +1,9 @@
 // HOTFIX-045-TOUCHID: the one-time switch to a passkey inside a presence sheet, for an owner set up
 // before 0.3.0 (or switched on another computer). It is the same owner operation as the first-run
 // switch (M1-UX-FIRSTRUN-V2-c; `POST /api/owner/passkey`, owner-passkey.ts registerOwnerPasskey):
-// one passkey creation on this page, then the backup code and the assertion in one octet-stream body.
+// one passkey creation on this page, then the master code and the assertion in one octet-stream body.
 // The server checks the code (the wrong-code backoff applies), keeps the same owner and never
-// rewrites the `owner` item, so the backup code keeps working. It signs nothing: the operation the
+// rewrites the `owner` item, so the master code keeps working. It signs nothing: the operation the
 // sheet is for still needs its own gesture afterwards (one entry, one operation, D-68). The code is
 // zeroed after encoding and is never logged or put in a URL.
 import { createUpgradePasskey, encodeUpgradeBody } from '../first-run/passkey.js';

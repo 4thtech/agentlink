@@ -141,7 +141,7 @@ function ownerAtTerminal() {
     write: (text) => void written.push(text),
     readSecret: (label) => {
       labels.push(label);
-      const line = written.find((t) => t.startsWith('Your owner code: ')) ?? '';
+      const line = written.find((t) => t.startsWith('Your master code: ')) ?? '';
       return Promise.resolve(new TextEncoder().encode(line.slice(-4)));
     },
     confirm: () => Promise.resolve(false),
@@ -286,7 +286,7 @@ describe('owner init signs the first agent card (M1-8h; 04 §2.5, §2.4)', () =>
       ),
     );
     expect(refused.code).toBe('owner_exists');
-    expect(run.written.some((t) => t.startsWith('Your owner code: '))).toBe(false);
+    expect(run.written.some((t) => t.startsWith('Your master code: '))).toBe(false);
     expect(alice.keychain.items.has(OWNER_ACCOUNT)).toBe(false);
     expect(await alice.client.identity.get()).toEqual(before);
   });
@@ -452,8 +452,8 @@ describe('owner init signs the first agent card (M1-8h; 04 §2.5, §2.4)', () =>
   it('keeps the owner key and the card consistent: the stored owner unlocks to the card owner', async () => {
     const alice = await initAgent('alice');
     const { result, run } = await ownerInit(alice, firstCard(alice, 'Alice', ALPHA));
-    const code = (run.written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(
-      'Your owner code: '.length,
+    const code = (run.written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(
+      'Your master code: '.length,
     );
     const ownerStore = await KeychainOwnerKeyStore.open(alice.keychain, result.owner);
     const session = await ownerStore.unlock({
@@ -552,7 +552,7 @@ describe('owner-card follow-ups (M1-8h-b; IR-M1-8h-1)', () => {
     expect(run.asked).toEqual(['Your agent\'s name for contacts (press Enter for "alice"):']);
     expect(names).toEqual(['Ana Kovač']);
     const nameAt = run.written.findIndex((t) => t.startsWith('Contacts see this name'));
-    const codeAt = run.written.findIndex((t) => t.startsWith('Your owner code: '));
+    const codeAt = run.written.findIndex((t) => t.startsWith('Your master code: '));
     expect(nameAt).toBeGreaterThanOrEqual(0);
     expect(nameAt).toBeLessThan(codeAt);
     expect(await alice.client.identity.get()).toBeDefined();

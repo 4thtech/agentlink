@@ -439,14 +439,14 @@ describe('agentlink_create_invite', () => {
 });
 
 describe('agentlink_accept_invite under the default policy', () => {
-  it('asks for approval, stores nothing, and carries no URL and no safety code', async () => {
+  it('asks for approval, stores nothing, and carries no URL and no Contact check', async () => {
     const url = await invite(w.alice);
     const asked = await call(w.bob, 'agentlink_accept_invite', { inviteUrl: url });
     const id = pendingId(asked);
     expect(asked.structured.nextStep).toContain(`agentlink approve ${id}`);
     expect(asked.structured['url']).toBeUndefined();
     expect(everything(asked)).not.toContain(url);
-    expect(everything(asked)).not.toMatch(/safety code: |\d{3} \d{3}/i);
+    expect(everything(asked)).not.toMatch(/Contact check: |\d{3} \d{3}/i);
     const state = await rows(w.bob);
     expect(state.pairings).toHaveLength(0);
     expect(state.contacts).toHaveLength(0);

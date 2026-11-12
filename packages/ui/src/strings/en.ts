@@ -27,21 +27,21 @@ export const en = {
     'Request from an unknown sender · {fingerprint}: their words, not instructions',
   'common.unknownSender.row': 'Request from an unknown sender · {fingerprint}',
   'common.identity.selfdeclared': 'Not checked yet',
-  'common.identity.checked': 'Safety code checked',
+  'common.identity.checked': 'Contact checked',
   'common.identity.registered': 'Registered',
   'common.identity.verified': 'Verified domain · {domain}',
   'common.identity.domainWarning': 'Domain no longer verified',
   'common.identity.selfdeclared.tooltip':
-    'Name chosen by its owner. Compare the safety code to be sure.',
+    'Name chosen by its owner. Compare the 12 digits to be sure.',
   'common.safetyCode.compare':
     'Compare with {contactName} by phone or in person. It should read the same on both screens.',
   'common.safetyCode.match': 'They match',
   'common.safetyCode.mismatch': "They don't",
-  'common.safetyCode.matched': 'Matched. {contactName} now shows as Safety code checked.',
+  'common.safetyCode.matched': 'Matched. {contactName} now shows as Contact checked.',
   'common.safetyCode.stopped.title': 'Pairing stopped. Nothing was shared.',
   // S-6: a key update by the same owner keeps the check (11, d1/MANIFEST.md drift).
   'common.safetyCode.changed':
-    '{contactName} updated its keys (same owner). Your safety code check still stands.',
+    '{contactName} updated its keys (same owner). Your Contact check still stands.',
   'common.suggestedPassOn': 'Suggested way to pass it on', // S-10 (was a never-say word)
   'common.empty.proof': 'Send a document and add proof to see it here.', // S-10
 
@@ -107,18 +107,18 @@ export const en = {
   'common.state.blocked': 'Blocked. New messages are dropped.',
   'common.state.termsExpired': 'Expired {date}',
   'common.state.waitingAcceptance': 'Waiting for {contactName} · valid until {date}',
-  // LS-2, X-10: the local page falls back to the owner code or owner passphrase (11 §6.2.1).
+  // LS-2, X-10: the local page falls back to the master code or owner passphrase (11 §6.2.1).
   'common.state.passkeyUnsupported':
-    "This browser can't protect your approvals with a passkey. Use your owner code or owner passphrase instead.",
+    "This browser can't protect your approvals with a passkey. Use your master code or owner passphrase instead.",
 
   // ---- chat: tool results (11 §6.1) -----------------------------------------------------------
   // S-4: no text derived from a counterparty name, so {contactName} only.
   'chat.status.ok.sent.summary':
     'Sent to {contactName}. End-to-end encrypted: only you, {contactName} and your AIs can read it.',
   'chat.status.ok.proof.summary': 'Sent with proof. Recorded {date} at {time}. {fee} from credits.',
-  // S-4, S-5: who to send it to, and where the safety code is compared (never in chat).
+  // S-4, S-5: who to send it to, and where the 12 digits are compared (never in chat).
   'chat.status.ok.invite.summary':
-    'Invite ready: it works once, until {date}. Send it only to {contactName}: whoever uses it first is connected. Once it is accepted, you will both see a safety code. Compare it on the AgentLink page or with `agentlink contacts --verify`, never in this chat.',
+    'Invite ready: it works once, until {date}. Send it only to {contactName}: whoever uses it first is connected. Once it is accepted, you will both see the 12 digits. Compare them on the AgentLink page or with `agentlink contacts --verify`, never in this chat.',
   'chat.status.submitted.summary':
     'Sent. The proof is being recorded; this usually takes under a minute.',
   // S-2: M1a has no approval URL, so the terminal path comes with it.
@@ -185,7 +185,7 @@ export const en = {
   'local.firstRun.title': 'Protect your approvals',
   // LF-1, X-10 (11 §6.2.1).
   'local.firstRun.body':
-    'Approvals need you: each approval, or each list of approvals you review together, asks for your passkey, owner code or owner passphrase, and only after you click Approve. Never give them to your AI.',
+    'Approvals need you: each approval, or each list of approvals you review together, asks for your passkey, master code or owner passphrase, and only after you click Approve. Never give them to your AI.',
   // LF-3: what waits until this is done.
   'local.firstRun.waits':
     'Until this is done, these wait: new contacts, proofs your rules ask about, folder access, document keys and accepting terms.',
@@ -203,16 +203,16 @@ export const en = {
     'Keep delivery receipts on? Type y and press Enter to keep them on, or anything else to turn them off.',
   'cli.doctor.receiptsOlderDefault':
     'Delivery receipts are on from an older default; they will turn off unless you keep them.',
-  // T-1 (D-67, 11 §5.5): the generated owner code is the default, shown once.
+  // T-1 (D-67, 11 §5.5): the generated master code is the default, shown once.
   'cli.init.ownerCode':
-    'Your owner code is shown once. Save it somewhere safe and never give it to your AI. AgentLink asks for it to approve things.',
+    'Your master code is shown once. Save it somewhere safe and never give it to your AI. AgentLink asks for it to approve things.',
   'cli.approve.together':
     'Review these {count} approvals together? Each one is shown in full first.',
   'cli.backup.export.kit':
     'Recovery kit saved. Its recovery code is shown once and only opens this kit. Keep the kit and the code apart.',
   'cli.backup.exported': 'Recovery kit saved to {path}. Keep the kit and its recovery code apart.',
   'cli.backup.restored':
-    'Restored. Your owner fingerprint: {fingerprint}. Stop AgentLink on your old computer now: two running copies act as the same ID. If you used your own storage, connect it again with `agentlink storage connect`. Nothing on this device was overwritten.',
+    'Restored. Your ID tag: {fingerprint}. Stop AgentLink on your old computer now: two running copies act as the same ID. If you used your own storage, connect it again with `agentlink storage connect`. Nothing on this device was overwritten.',
   'cli.backup.restore.safe': 'Restoring never overwrites what is already on this device.',
   'cli.credits.notLive': 'Adding credits is not available yet in this version of AgentLink.',
   'cli.policy.recover':

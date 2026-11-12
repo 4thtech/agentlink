@@ -47,7 +47,7 @@ export interface Inviter {
   readonly fallback: boolean;
   /** Always `self-declared`: the page checks no signature and no domain (11 §5.2). */
   readonly label: 'self-declared';
-  /** Short owner fingerprint, for example `7F3A·19C2` (04 §2.9). */
+  /** Short ID tag, for example `7F3A·19C2` (04 §2.9). */
   readonly fingerprint: string;
   /** Unix seconds. */
   readonly expiresAt: number;

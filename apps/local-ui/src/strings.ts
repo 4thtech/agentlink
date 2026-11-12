@@ -96,6 +96,6 @@ export const PAGE_TITLES = {
   connectionsMap: 'Connections map',
 } as const;
 
-/** Shown under every code field (F26): what the backup code is, never a terminal command. */
+/** Shown under every code field (F26): what the master code is, never a terminal command. */
 export const EARLIER_OWNER_CODE_HINT =
-  'Your backup code is the code you saved when you first set up AgentLink.';
+  'Your master code is the code you saved when you first set up AgentLink.';

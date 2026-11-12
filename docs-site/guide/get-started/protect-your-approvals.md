@@ -58,7 +58,7 @@ The page then shows **your master code** once. Press **Save in my password manag
 
 ## Already set up in the terminal? Switch to Touch ID
 
-If you set up your master code with `owner init` (as in 0.2.0), the local app shows **Switch to Touch ID** (or Windows Hello) on every page until you do it. Press it, enter your master code once (the app calls it your master code), then touch the sensor. Your owner and your IDs stay the same. Your code keeps working as the backup way to approve, for example in another browser or in the terminal. Your AI can open the page, but it can't switch for you: it needs your code and your touch.
+If you set up your master code with `owner init` (as in 0.2.0), the local app shows **Switch to Touch ID** (or Windows Hello) on every page until you do it. Press it, enter your master code once, then touch the sensor. Your owner and your IDs stay the same. Your code keeps working as the backup way to approve, for example in another browser or in the terminal. Your AI can open the page, but it can't switch for you: it needs your code and your touch.
 
 ## What this protects, and what it can't
 

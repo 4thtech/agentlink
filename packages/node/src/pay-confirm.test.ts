@@ -4,7 +4,7 @@
 // Refused, each on its own: a response without UV (verification_required, never presence alone), a
 // reused or expired challenge, a changed amount after begin, a challenge from another session or
 // origin, a statement built from an input value, a paid item in a review list, a paid approval or a
-// spending change through an ordinary owner route, and a backup code entered wrong three times. A
+// spending change through an ordinary owner route, and a master code entered wrong three times. A
 // policy change without a spending field keeps the ordinary prompt. No MCP tool or CLI file reaches
 // the confirmation (rule 4).
 import { readFileSync, readdirSync } from 'node:fs';
@@ -503,7 +503,7 @@ describe('the holds (rules 2 and 3)', () => {
     ).toThrow();
   });
 
-  it('end after three wrong backup codes (rule 6)', () => {
+  it('end after three wrong master codes (rule 6)', () => {
     const holds = new PayConfirmHolds(() => 0);
     const session = randomBytes(32);
     const hold = holds.begin(session, { kind: 'proof', approvalId: approvalId(1) }, flow(), [
@@ -614,7 +614,7 @@ describe('a proof above the limits, confirmed on the page (04 §2.5.3)', () => {
     expect(h.source.applied).toHaveLength(0);
   });
 
-  it('a passkey without a stored key is never accepted; the backup code still works (rule 5)', async () => {
+  it('a passkey without a stored key is never accepted; the master code still works (rule 5)', async () => {
     const h = await harness();
     const page = await h.page();
     addPaid(h.source, 1);
@@ -745,7 +745,7 @@ describe('a proof above the limits, confirmed on the page (04 §2.5.3)', () => {
     ).toBe(409);
   });
 
-  it('the backup code signs the same single action; three wrong entries end the attempt', async () => {
+  it('the master code signs the same single action; three wrong entries end the attempt', async () => {
     const h = await harness();
     const page = await h.page();
     addPaid(h.source, 1);

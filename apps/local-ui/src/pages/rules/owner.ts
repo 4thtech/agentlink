@@ -3,7 +3,7 @@
 // never builds a signed body (D-118): it sends the review it acknowledged as `X-AgentLink-Input` and
 // the owner's presence as the octet-stream body, either the passkey assertion (credential ID,
 // authenticator data, user handle and PRF output, each with a 16-bit length first, as the approval
-// page sends it) or the owner code or owner passphrase the owner typed. The presence bytes are
+// page sends it) or the master code or owner passphrase the owner typed. The presence bytes are
 // wiped after the request and are never logged or kept.
 //
 // The passkey prompt runs only after the owner clicks Save (11 §6.2.1), against `localhost` and the
@@ -37,7 +37,7 @@ export type Presence =
   | { readonly kind: 'code'; readonly code: string };
 
 export interface OwnerClient {
-  /** The owner's registered passkey, or null (then the owner types the owner code or passphrase). */
+  /** The owner's registered passkey, or null (then the owner types the master code or passphrase). */
   passkey(): Promise<PasskeyInfo | null>;
   /** One owner operation: `input` as the operation input, `presence` as the body. */
   save(path: string, input: unknown, presence: Presence): Promise<SaveAnswer>;

@@ -10,7 +10,7 @@
 // relay URL rule) runs here first; a link that fails it is never stored.
 //
 // The join screen reads only `view()`: the state, the public `inviteId` (16 bytes, never the
-// `secret`), the name-rule name with its Self-declared label, the short owner fingerprint and the
+// `secret`), the name-rule name with its Self-declared label, the short ID tag and the
 // expiry. Never the link or any other invite field. Accepting (api/join.ts) takes the link with the
 // `inviteId` the screen showed: a different one is `invite_changed` and nothing is signed. After a
 // started accept the link is dropped; only the display fields stay, to follow the pairing to
@@ -24,7 +24,7 @@ export interface JoinInviter {
   /** The contact-name rule output (06 §2.1). */
   readonly name: string;
   readonly label: 'self-declared';
-  /** The short owner fingerprint (04 §2.9). */
+  /** The short ID tag (04 §2.9). */
   readonly fingerprint: string;
 }
 
@@ -47,7 +47,7 @@ export interface JoinView {
   readonly expiresAt?: string;
   /**
    * W4-PEOPLE-INVITE: only when `connected`, the new contact's ref (its lower-case ID, as the
-   * contacts routes take it), so the screen reads that contact's safety code and no other.
+   * contacts routes take it), so the screen reads that contact's Contact check and no other.
    */
   readonly contactRef?: string;
 }

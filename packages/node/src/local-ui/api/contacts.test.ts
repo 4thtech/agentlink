@@ -1,6 +1,6 @@
 // M1-11c-a2: the Contacts page's API (08 §1; 04 §2.5.1, §3.6.1; 06 §2.1; 11 §5.2; D-118; I-4, I-5).
 //
-// - Three read routes (`presence: false`): the contact list, one contact's safety code and a rename
+// - Three read routes (`presence: false`): the contact list, one contact's Contact check and a rename
 //   pre-check. Three owner routes (`presence: true`, the central gate checks presence first):
 //   "They match" (`contact.check`), rename (`contact.rename`) and remove (`contact.remove`).
 // - Owner routes build the unsigned body with core's prepare helpers (#415), sign it once through
@@ -457,7 +457,7 @@ describe('GET /api/ui/contacts: same owner, second connection (M1-UX3-DUP-CONTAC
     expect(r.map((x) => x['olderSameOwner'])).toEqual([undefined, MARKO, THIRD]);
   });
 
-  it('links nothing when the owner fingerprint is missing', async () => {
+  it('links nothing when the ID tag is missing', async () => {
     const none = { ownerFingerprint: { short: '7F3A·19C2' } };
     const r = await rows([at(MARKO, 1_759_449_600, none), at(ANA, 1_761_350_400, none)]);
     for (const row of r) expect(row).not.toHaveProperty('olderSameOwner');

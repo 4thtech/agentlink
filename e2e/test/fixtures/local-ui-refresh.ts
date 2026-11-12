@@ -203,7 +203,7 @@ export const APPROVALS = {
   ],
 };
 
-/** No passkey yet: the owner code path (the Approvals page offers the code field). */
+/** No passkey yet: the master code path (the Approvals page offers the code field). */
 export const OWNER_PASSKEY = { passkey: { rpId: 'localhost', registered: false } };
 
 export const ROUTES: Readonly<Record<string, unknown>> = {

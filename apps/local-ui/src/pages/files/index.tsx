@@ -6,7 +6,7 @@
 // (04 §4: realpath, links followed, protected and too-broad folders refused, D-99), which answers the
 // folder that would be signed and every warning. The confirm screen shows that real folder, lists
 // each warning in plain words with its own tick, and stays off until every one is ticked (D-119).
-// Then the owner's passkey gesture or owner code goes to the local server, which signs; the browser
+// Then the owner's passkey gesture or master code goes to the local server, which signs; the browser
 // never signs. A `?folder=` link (from the AI's "allow a folder" step) only fills the field.
 //
 // Three tabs (MSG-FILES-IO-f): Received and Sent (io.tsx, read-only) and this page as Send folders.

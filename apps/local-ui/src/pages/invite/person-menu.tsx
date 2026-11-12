@@ -1,4 +1,4 @@
-// W4-PEOPLE-INVITE: the person ⋯ menu (prototype v23 A4: Rename · Check safety code · Remove; UX1112
+// W4-PEOPLE-INVITE: the person ⋯ menu (prototype v23 A4: Rename · Contact check · Remove; UX1112
 // WP-12 adds Block, or Unblock on a blocked person, before Remove).
 // Exported for Home (U3). A menu button with aria-expanded; the menu opens with U0's al-menu, takes
 // focus on its first item, moves with the arrow keys, and closes on Escape, Tab or a click outside,

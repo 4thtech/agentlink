@@ -5,9 +5,9 @@
 // - The card leads with the plain headline, then the facts, the terms, and what the AI chose in its
 //   own marked region. Every value is React text, never markup (I-5).
 // - A request's own Approve or Deny opens the owner step: the passkey (asked only after this click,
-//   11 §6.2.1), or the owner code below it. A request that costs credits (`paid`) approves only
+//   11 §6.2.1), or the master code below it. A request that costs credits (`paid`) approves only
 //   through the confirmation sheet (04 §2.5.3 rule 7); its Deny is the plain owner step.
-// - The owner code field keeps any length, is never autocompleted, is hidden until shown, and is
+// - The master code field keeps any length, is never autocompleted, is hidden until shown, and is
 //   cleared on submit. Neither the code nor any server value is logged.
 //
 // UI-REFRESH-o (visual only; B-11 §16, §6 rows 4 and 7, §7): the card sits on level 1 and rises to
@@ -279,7 +279,7 @@ export function ApprovalFoot(): ReactElement {
 }
 
 /**
- * The owner code field (D1 TextField, mono): full width, any length (no maxlength), paste and
+ * The master code field (D1 TextField, mono): full width, any length (no maxlength), paste and
  * password managers welcome, never autocompleted or corrected, hidden until the owner shows it.
  * The value lives only in the input and is cleared on submit.
  */
@@ -358,7 +358,7 @@ export function CodeForm({
 }
 
 /**
- * The presence step: the passkey first when there is one, the owner code below it. `send` runs once
+ * The presence step: the passkey first when there is one, the master code below it. `send` runs once
  * per attempt; it resolves when the answer is shown.
  */
 export function OwnerStep({

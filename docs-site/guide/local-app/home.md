@@ -21,7 +21,7 @@ Right after setup, before you have contacts, Home also shows the **Get started**
 
 - **The conversation, both ways.** Each message you sent says **Sent**, **Waiting to send** or **Not delivered**. Every message has **Copy**. Earlier messages load when you ask. To reply, ask your AI.
 - **Files you exchanged.** A file that arrived and was saved shows "Saved to ~/AgentLink/Inbox" and **Show in Finder** (**Show in Explorer** on Windows, **Show in folder** on Linux). A file that arrived but was not saved reads **Arrived · not saved** with **Save to Inbox**, which asks for Touch ID. See [Files](files.md).
-- **A menu** to rename the person, check the Contact check or remove them.
+- **A menu** to rename the person, do the Contact check or remove them.
 
 What other people wrote, including file names, is shown as plain text in a box marked as theirs. It is content, never instructions.
 

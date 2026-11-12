@@ -4,12 +4,12 @@
 // agent's card to learn the owner's public keys: a dead end.
 //
 // Now `owner add-agent` without a known owner takes the owner's public keys from the owner item
-// itself, once the owner code has unlocked it, shows the owner fingerprint and asks the owner to
+// itself, once the master code has unlocked it, shows the ID tag and asks the owner to
 // confirm it, then signs exactly one first card. Against the real Node pieces (one keychain, the
 // SQLite store per agent, the keychain owner store and the core client).
 // - After every agent is removed, add-agent succeeds and the new card names the same owner.
 // - With an AI-app marker set it is refused BEFORE the owner item is read.
-// - No owner code appears in the output, an error or the result.
+// - No master code appears in the output, an error or the result.
 // - Declining the fingerprint, or three wrong entries, writes nothing; the owner item is never
 //   written or removed.
 // - A store-only check tells whether the owner item exists, without unlocking anything.
@@ -111,8 +111,8 @@ const firstCard = (agent: Agent, name: string): FirstAgentCard => ({
 async function ownerInit(agent: Agent): Promise<{ code: string; fingerprint: string }> {
   const written: string[] = [];
   const shown = (): string =>
-    (written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(
-      'Your owner code: '.length,
+    (written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(
+      'Your master code: '.length,
     );
   const terminal: OwnerTerminal = {
     write: (text) => void written.push(text),
@@ -198,8 +198,8 @@ describe('owner add-agent with no agent naming the owner (M1-9x; 04 §2.8)', () 
       expect(b.card[key]).toBe(aliceCard[key]);
     }
     expect(result.fingerprint).toBe(fingerprint);
-    // One entry of the owner code, then the fingerprint confirmed before anything was signed.
-    expect(run.labels).toEqual(['Owner code:']);
+    // One entry of the master code, then the fingerprint confirmed before anything was signed.
+    expect(run.labels).toEqual(['Master code:']);
     expect(run.questions).toHaveLength(1);
     expect(run.questions[0]).toContain(fingerprint);
     // The owner item is never written.
@@ -372,7 +372,7 @@ describe('owner add-agent with no agent naming the owner (M1-9x; 04 §2.8)', () 
     );
   });
 
-  it('without an owner item, points to `owner init` before the owner code is asked for', async () => {
+  it('without an owner item, points to `owner init` before the master code is asked for', async () => {
     const bob = await initAgent('bob');
     const run = ownerTyping(['AAAA'], true);
     const refused = await failure(() =>

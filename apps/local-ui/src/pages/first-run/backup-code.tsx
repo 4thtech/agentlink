@@ -1,4 +1,4 @@
-// F49 (owner feedback, Windows): the backup code is easy to type, paste, see and keep.
+// F49 (owner feedback, Windows): the master code is easy to type, paste, see and keep.
 // - BackupCodeField: every backup-code input. Paste is never blocked; a Show/Hide toggle lets the
 //   person check what they typed or pasted; pasted invisible separators are removed (below).
 // - saveBackupCodeFile: "Save as file" on the once-shown code, a small .txt made in this page and
@@ -55,7 +55,7 @@ export function typedByKey(event: Event): boolean {
  * switches the screen to the backup-code field, whose submit is that screen's existing code path.
  * `data-use-code` is what the presence-surface guard (src/presence-surfaces.dom.test.ts) looks for.
  */
-export const USE_CODE_INSTEAD = 'Use your backup code instead';
+export const USE_CODE_INSTEAD = 'Use your master code instead';
 
 export function UseCodeInstead({
   onClick,
@@ -134,7 +134,7 @@ export const BACKUP_CODE_FILE_NAME = 'agentlink-backup-code.txt';
 
 /** The file's text: the code and one line on what it is for. */
 export function backupCodeFileText(code: string, sensor: string): string {
-  return `AgentLink backup code: ${code}\nUse it to approve when ${sensor} isn't available. Keep this file private and never give the code to your AI.\n`;
+  return `AgentLink master code: ${code}\nUse it to approve when ${sensor} isn't available. Keep this file private and never give the code to your AI.\n`;
 }
 
 /**

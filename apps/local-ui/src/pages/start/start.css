@@ -493,7 +493,7 @@
   align-items: center;
   gap: var(--al-space-3);
 }
-/* "Use a backup code instead" reads at the normal 14 px, not the small button's 12. */
+/* "Use your master code instead" reads at the normal 14 px, not the small button's 12. */
 .st-actions > .al-btn-ghost {
   font-size: 14px;
   line-height: 20px;

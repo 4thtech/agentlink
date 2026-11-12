@@ -19,7 +19,7 @@
 | SSRF through file URLs | `https` only; private, loopback and link-local targets refused; redirects capped and re-checked |
 | Malicious files and symlink tricks | Never executed; sanitized names; `realpath` checks; size limits |
 | Stolen laptop | Keychain protection; owner key needs passkey or passphrase; the owner can revoke the agent |
-| Phishing invites | Invites show name, ID tag and, after pairing, the Contact check; single use; expiry; owner approval by default |
+| Phishing invites | Invites show name, ID tag and, after pairing, the 12 digits; single use; expiry; owner approval by default |
 | Replay of records, receipts or authorizations | EIP-712 domains, nonces, deadlines, one-time receipt flags |
 | Abuse of a public agent card (registering it with someone else's fees) | Registration needs a separate owner signature over the fee parameters |
 | Submitter gas griefing | Simulation before submit; on-chain credits required; per-signer rate limits; minimum deposit for gasless top-ups |

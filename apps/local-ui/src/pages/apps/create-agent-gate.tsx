@@ -1,15 +1,15 @@
 // W4-ONE-TOUCH (D-140; 04 §2.8; 11 §5.8 "Create and connect"; b11 §29.4): the one screen of New
 // agent: the statement ("Add {label}"), "Connect to {app}" prefilled with a detected AI app that no
-// agent uses yet (unticked = "Not now"), and one button for the one gesture (or the backup code).
+// agent uses yet (unticked = "Not now"), and one button for the one gesture (or the master code).
 // The page never signs; begin fixes the plan on the server right before the gesture, and finish
 // carries only the begin nonce and the proof (create-agent-api.ts).
 //
 // W8-F13 (04 §2.5; HOTFIX-045-TOUCHID's switch): an owner without a passkey on this computer is
-// offered the switch first, inside the gate: the backup code once and one touch register the
+// offered the switch first, inside the gate: the master code once and one touch register the
 // passkey (passkey-switch.ts, `POST /api/owner/passkey`; it signs nothing and creates nothing),
 // then the new ID is created with its own touch (one entry, one operation, D-68). The server
 // decides what it accepts; the gate offers the switch only when `GET /api/owner/passkey` gives the
-// values for it. W8-F12: the code form says what the backup code is. W8-F11: one Back (none in
+// values for it. W8-F12: the code form says what the master code is. W8-F11: one Back (none in
 // Get started, whose own Back is on the screen), and the form spaces its field and buttons.
 //
 // W8-S5 (F7; 04 §2.8; 11 §5.8): an AI app whose entry names another ID (or one that was removed) is
@@ -73,7 +73,7 @@ const MESSAGES: Partial<Record<CreateFinish['kind'] | string, string>> = {
   wait: SETUP_MESSAGES.wait(30),
   dismissed: SETUP_MESSAGES.cancelled,
   verification_required: SETUP_MESSAGES.presence_rejected,
-  passkey_update_needed: 'Use your backup code this time.',
+  passkey_update_needed: 'Use your master code this time.',
   label_invalid: SETUP_MESSAGES.label_invalid,
   session: SETUP_MESSAGES.session_expired,
   offline: SETUP_MESSAGES.offline,
@@ -179,7 +179,7 @@ export function CreateAgentGate({
   const mounted = useRef(true);
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const sensor = SENSOR[platform];
-  // The held plan's nonce for retries with the backup code (Decision 45), and the app it was for.
+  // The held plan's nonce for retries with the master code (Decision 45), and the app it was for.
   // W8-S5: a plan begun early to show a move keeps its challenge for the first gesture.
   const held = useRef<
     | {
@@ -375,7 +375,7 @@ export function CreateAgentGate({
   const noneHere =
     status?.kind === 'unavailable' && status.reason === 'not_set_up_here' && !switched;
 
-  /** W8-F13: the backup code once and one touch register the passkey; nothing is created yet. */
+  /** W8-F13: the master code once and one touch register the passkey; nothing is created yet. */
   const submitSwitch = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     if (switchTo === undefined || working) return;
@@ -455,7 +455,7 @@ export function CreateAgentGate({
   );
   const codeField = (
     <BackupCodeField
-      label="Backup code"
+      label="Master code"
       hint={EARLIER_OWNER_CODE_HINT}
       name="backup-code"
       autoComplete="current-password"

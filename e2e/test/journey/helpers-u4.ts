@@ -39,7 +39,9 @@ export async function inviteFromScreen(jp: JourneyPage, name?: string): Promise<
 async function seesDigits(page: Page, ms: number): Promise<void> {
   const digits = page.getByText(/\d{4}\D{1,3}\d{4}\D{1,3}\d{4}/).first();
   if (!(await digits.isVisible())) {
-    await page.getByRole('button', { name: /^Optional: make sure it's really .*Check/ }).click();
+    await page
+      .getByRole('button', { name: /^Optional: make sure it's really .*Contact check/ })
+      .click();
   }
   await digits.waitFor({ timeout: ms });
 }

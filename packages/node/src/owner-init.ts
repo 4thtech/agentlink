@@ -2,12 +2,12 @@
 // (04 §2.2, §2.8 "owner init rules"; 07 §9.3, §9.4; D-67). Until the M1b setup page exists the owner
 // runs it personally, in a terminal the agent does not control.
 //
-// - Default: a generated 120-bit owner code (secretKind 1), shown once, re-typed, screen cleared.
+// - Default: a generated 120-bit master code (secretKind 1), shown once, re-typed, screen cleared.
 // - A chosen owner passphrase (secretKind 2) only after an explicit opt-in that first states the
 //   offline-guessing exposure (04 §2.2); at least 12 code points after NFKC (D-66 (3)).
 // - Never overwrites: an existing `owner` item, or an owner the agent card already names, refuses.
 // - The code is display-only: never written to a file, never offered as one (04 §2.8).
-// - The owner fingerprint and the lost-code consequence are shown before the code.
+// - The ID tag and the lost-code consequence are shown before the code.
 // - File-KeyStore machines: a chosen passphrase is refused; their `owner.alko` is M1-8f.
 // - M1-8h: in the same owner operation, the agent's first card (04 §2.5 "the card signature at owner
 //   setup"; owner-first-card.ts). The new owner is stored, unlocked once with the secret still in
@@ -98,9 +98,9 @@ export type OwnerSetupOptions = OwnerInitOptions & { readonly firstCard: FirstAg
 export interface OwnerInitResult {
   /** The new owner's public keys, for the agent card (04 §2.4). */
   readonly owner: OwnerPublicKeys;
-  /** The short owner fingerprint (11 §5.2). */
+  /** The short ID tag (11 §5.2). */
   readonly fingerprint: string;
-  /** 1 = generated owner code, 2 = chosen owner passphrase. */
+  /** 1 = generated master code, 2 = chosen owner passphrase. */
   readonly secretKind: 1 | 2;
   /** M1-8h: the first card, signed by the new owner and stored, when `firstCard` was given. */
   readonly card?: AgentCard;
@@ -120,30 +120,30 @@ export interface OwnerInitInternals {
 
 const ATTEMPTS = 3;
 
-// 07 §9.4 copy (string keys cli.owner_init.*). "Owner code" and "owner passphrase" are the 11 §5.5
+// 07 §9.4 copy (string keys cli.owner_init.*). "Master code" and "owner passphrase" are the 11 §5.5
 // names; never "password".
 const COPY = {
   ownerExists: (fingerprint: string): string =>
     `This agent already has an owner (${fingerprint}). AgentLink won't replace it. To use an owner from another device, link it from that device.`,
-  fingerprint: (fingerprint: string): string => `Your owner fingerprint: ${fingerprint}.`,
+  fingerprint: (fingerprint: string): string => `Your ID tag: ${fingerprint}.`,
   beforeCode:
-    "Store this owner code off this machine, for example in your password manager. Without it, nobody can approve for this agent or remove it, and until backups are available you'd have to set up a new agent and pair again.",
+    "Store this master code off this machine, for example in your password manager. Without it, nobody can approve for this agent or remove it, and until backups are available you'd have to set up a new agent and pair again.",
   beforePassphrase:
     "Keep this owner passphrase off this machine, for example in your password manager. Without it, nobody can approve for this agent or remove it, and until backups are available you'd have to set up a new agent and pair again.",
-  code: (grouped: string): string => `Your owner code: ${grouped}`,
+  code: (grouped: string): string => `Your master code: ${grouped}`,
   retype: 'Type its last four characters to continue:',
-  retypeWrong: "That doesn't match. Check the last four characters of your owner code.",
-  retypeFailed: `The owner code wasn't confirmed. Nothing was saved; run \`${CLI_COMMAND} owner init\` again.`,
+  retypeWrong: "That doesn't match. Check the last four characters of your master code.",
+  retypeFailed: `The master code wasn't confirmed. Nothing was saved; run \`${CLI_COMMAND} owner init\` again.`,
   passphraseNote:
-    'A passphrase you choose is weaker than a generated owner code. Any program running as you on this computer, including your AI app, can read the locked copy your passphrase protects and try to guess the passphrase offline. A generated owner code makes that infeasible.',
+    'A passphrase you choose is weaker than a generated master code. Any program running as you on this computer, including your AI app, can read the locked copy your passphrase protects and try to guess the passphrase offline. A generated master code makes that infeasible.',
   passphraseConfirm: 'Use your own owner passphrase anyway? [y/N]',
   passphrase: 'Owner passphrase (at least 12 characters):',
   passphraseAgain: 'Type it again:',
   passphraseMismatch: "The two entries don't match.",
   done: (fingerprint: string): string =>
-    `Owner set up. Your owner fingerprint: ${fingerprint}. Check that \`${CLI_COMMAND} doctor\` shows the same one.`,
+    `Owner set up. Your ID tag: ${fingerprint}. Check that \`${CLI_COMMAND} doctor\` shows the same one.`,
   fileNoPassphrase:
-    'On a computer without a system keychain, approvals are protected by a generated owner code only.',
+    'On a computer without a system keychain, approvals are protected by a generated master code only.',
   fileUnavailable:
     "This agent's identity is kept in a passphrase-locked file, which this version of AgentLink can't set up an owner for yet. Update AgentLink.",
   ownerOnMachine: `An owner is already set up on this computer, so AgentLink won't create another. To give this agent a card from it, run \`${CLI_COMMAND} owner add-agent --agent <name>\` yourself, in your own terminal.`,

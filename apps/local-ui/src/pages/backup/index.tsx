@@ -1,5 +1,5 @@
 // Settings › Backup & Touch ID (W4-SETTINGS-ADVANCED; A9; WP-11, F-1 full, D-117 A). Two plain
-// sections. The recovery kit is saved right here, behind Touch ID or the backup code (export-kit.tsx);
+// sections. The recovery kit is saved right here, behind Touch ID or the master code (export-kit.tsx);
 // the reminder shows only when you put the kit off at setup (states/recovery-kit.ts). Restore stays
 // in the terminal (D-117 A).
 import { Surface } from '@4thtech-io/ui';

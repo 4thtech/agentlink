@@ -4,7 +4,7 @@
 // - `GET /api/ui/contacts`: a contact whose `card-update` changed its name, and whose note the
 //   owner has not seen yet, carries `formerName`: the former name under the name rule (core's
 //   restricted form), never the raw text. Nothing else changes: the label, the fingerprint and
-//   "Safety code checked" stay as core says (no key warning).
+//   "Contact checked" stay as core says (no key warning).
 // - `GET /api/ui/contacts/:ref/name-seen`: the page says it showed the note; core sets
 //   `name_change_seen` (display state only, 07 §3: nothing is decided from it). An unknown ref is
 //   not_found; nothing is signed.

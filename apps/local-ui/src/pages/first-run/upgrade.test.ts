@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 // M1-UX-FIRSTRUN-V2-c acceptance, page side (B-9; 08 §1 first run v2; 04 §2.5; 11 §5.5, §6.2.1):
 // - an owner set up before 0.3.0 (owner exists, no passkey) gets "Switch to Touch ID" on the
-//   first-run page: the backup code once, then one passkey gesture; never owner setup again;
+//   first-run page: the master code once, then one passkey gesture; never owner setup again;
 // - the code goes only into the one registration body (`/api/owner/passkey`, the existing owner
 //   operation that checks it); never into a URL, the page text, a log or another request;
 // - a wrong code, a wait, a cancelled gesture and a passkey without PRF are explained in plain
-//   words and change nothing; the backup code keeps working afterwards (the copy says so);
+//   words and change nothing; the master code keeps working afterwards (the copy says so);
 // - every app page shows the "Switch to Touch ID" next step until a passkey is registered.
 import { lintVocabulary } from '@4thtech-io/ui';
 import { act, createElement as h, type ComponentType } from 'react';
@@ -128,7 +128,7 @@ async function mount(
 
 function codeInput(): HTMLInputElement {
   const input = host.querySelector<HTMLInputElement>('input[name="backup-code"]');
-  if (input === null) throw new Error(`no backup code field: ${host.textContent ?? ''}`);
+  if (input === null) throw new Error(`no master code field: ${host.textContent ?? ''}`);
   return input;
 }
 
@@ -143,7 +143,7 @@ function typeCode(value: string): void {
 
 async function submit(): Promise<void> {
   const form = codeInput().form;
-  if (form === null) throw new Error('the backup code field is not in a form');
+  if (form === null) throw new Error('the master code field is not in a form');
   await act(async () => {
     form.requestSubmit();
     await Promise.resolve();
@@ -219,7 +219,7 @@ describe('switch to Touch ID on the first-run page (M1-UX-FIRSTRUN-V2-c, B-9)', 
     expect(upgrade.originals[0]?.every((b) => b === 0)).toBe(true);
     expect(heading()).toBe(UPGRADE.doneTitle('mac'));
     expect(text()).toContain(UPGRADE.doneBody('Touch ID'));
-    // The backup code keeps working; the page says so, and the code is gone from the DOM.
+    // The master code keeps working; the page says so, and the code is gone from the DOM.
     expect(host.querySelector('input')).toBeNull();
     expect(text()).not.toContain(CODE);
     expect(host.innerHTML).not.toContain(CODE);
@@ -262,7 +262,7 @@ describe('switch to Touch ID on the first-run page (M1-UX-FIRSTRUN-V2-c, B-9)', 
     expect(codeInput().value).toBe(CODE);
   });
 
-  it('a passkey without PRF sends nothing and says the backup code keeps working', async () => {
+  it('a passkey without PRF sends nothing and says the master code keeps working', async () => {
     const upgrade = fakeUpgrade();
     await mount(upgrade, {}, () => ({ kind: 'unsupported' }));
     typeCode(CODE);
@@ -313,9 +313,8 @@ describe('switch to Touch ID on the first-run page (M1-UX-FIRSTRUN-V2-c, B-9)', 
     ].join('\n');
     expect(lintVocabulary(all)).toEqual([]);
     expect(all.toLowerCase()).not.toContain('password');
-    expect(all).not.toMatch(/owner code/i);
-    // The one exception: the field hint names the terminal's "owner code", for 0.2.0 owners, and
-    // is the app's one shared hint (quickwins.test.ts).
+    expect(all).not.toMatch(/\b(?:backup|owner|safety) code/i);
+    // The field hint is the app's one shared hint (quickwins.test.ts).
     expect(UPGRADE.codeHint).toBe(EARLIER_OWNER_CODE_HINT);
     expect(lintVocabulary(UPGRADE.codeHint)).toEqual([]);
     expect(text()).toContain(EARLIER_OWNER_CODE_HINT);

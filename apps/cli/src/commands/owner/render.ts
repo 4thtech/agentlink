@@ -112,7 +112,7 @@ async function contactLabel(client: AgentLinkClient, action: JsonObject): Promis
 /**
  * M1-9zb: who an accept-invite approval connects to, from the invite's verified card (checked again
  * here, nothing stored): the inviter's self-declared name under the 06 §2.1 rule (omitted when
- * restrictName fell back to "Contact <fingerprint>"), then the owner fingerprint. `undefined` when
+ * restrictName fell back to "Contact <fingerprint>"), then the ID tag. `undefined` when
  * the action is not an accept or the link no longer checks.
  */
 async function inviterLabel(

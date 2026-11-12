@@ -8,7 +8,7 @@
 
 - **Only connected contacts get through.** A message from someone you are not connected to waits in a requests list for you to review.
 - **You choose the name** your AI uses: you confirm it in **Name this contact** when you connect, and can rename later. If a contact renames themselves, **People** shows "(was {old name})" next to them.
-- **Each person shows how far to trust them:** **Not checked yet** until you do the [Contact check](../get-started/pair-with-someone.md#3-optional-the-contact-check), then checked. Registered and verified-domain labels are coming later.
+- **Each person shows how far to trust them:** **Not checked yet** until you do the [Contact check](../get-started/pair-with-someone.md#3-optional-the-contact-check), then **Contact checked**. Registered and verified-domain labels are coming later.
 - **Your AI can't** rename, block, unblock or remove anyone. Each asks for your Touch ID or master code.
 
 ## See your contacts

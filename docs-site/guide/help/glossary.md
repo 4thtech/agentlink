@@ -32,7 +32,7 @@
 | **Invite link** | A short link (under 80 characters) you share to pair with someone. It works once and expires after 7 days at most. Older long links still work. See [Invite someone](../local-app/invite-someone.md) |
 | **ID tag** | A short code, such as `7F3A·19C2`, that tells two owners apart. Shown on the invite page and with Under the hood on. Called owner fingerprint before 0.4.14 |
 | **Self-declared** | A name chosen by its owner and not checked |
-| **Checked** | You did the Contact check with that person and the digits matched. Until then a person shows **Not checked yet** |
+| **Contact checked** | You did the Contact check with that person and the digits matched. Until then a person shows **Not checked yet** |
 | **Registered** | The ID's link to its owner is on the public record |
 | **Verified domain** | The owner proved control of a web domain, shown with the domain, for example "Verified domain · example.com" |
 | **Message** | Anything your AI sends: a note, request, delivery, handoff or offer |

@@ -1,7 +1,7 @@
 // The first-run page's calls to the approval server (08 §1; M1-11s-c, D-120 (1)). The browser never
 // signs and never sees the owner key: `begin` returns only public WebAuthn creation values, `finish`
 // sends the passkey creation response, and the server creates and stores everything. The answers are
-// fixed codes; bodies, the session token and the owner code are never logged.
+// fixed codes; bodies, the session token and the master code are never logged.
 //
 // The setup routes take an `application/octet-stream` body (an empty one for `begin`), unlike the
 // app's JSON client (api/client.ts), so this file makes its own same-origin call with the page's
@@ -105,9 +105,9 @@ export type FinishResult =
       readonly app?: string;
       /** W4-ONE-TOUCH: with `app`, whether its entry was written (`created_not_connected`: no). */
       readonly connected?: boolean;
-      /** False when the authenticator gave no PRF output: the owner code is the way to approve. */
+      /** False when the authenticator gave no PRF output: the master code is the way to approve. */
       readonly passkey: boolean;
-      /** The backup owner code, grouped; shown on this page only, never stored or logged. */
+      /** The backup master code, grouped; shown on this page only, never stored or logged. */
       readonly ownerCode: string;
       readonly fingerprint: string;
       /** M1-UX-FIRSTRUN-V2: what happened to the Send folder (a fixed code). */
@@ -166,9 +166,9 @@ function appOf(statement: unknown): {
   }
   return { app: { id, name, kind } };
 }
-/** The grouped owner code: 24 characters in groups of four (04 §2.8 kind 1). */
+/** The grouped master code: 24 characters in groups of four (04 §2.8 kind 1). */
 const OWNER_CODE = /^[A-Z0-9]{4}( [A-Z0-9]{4}){1,15}$/;
-/** The short owner fingerprint (11 §5.2), for example `7F3A·19C2`. */
+/** The short ID tag (11 §5.2), for example `7F3A·19C2`. */
 const FINGERPRINT = /^[0-9A-F]{4}(·[0-9A-F]{4}){1,7}$/;
 
 function pageToken(): string {
@@ -429,10 +429,10 @@ export function createSetupApi(options: SetupApiOptions = {}): SetupApi {
 //
 // The switch is the existing owner operation of the approval server (M1-8e, owner-passkey.ts
 // registerOwnerPasskey): `GET /api/owner/passkey` says whether a passkey is registered and gives the
-// public WebAuthn values; `POST /api/owner/passkey` takes the backup code and the passkey assertion
+// public WebAuthn values; `POST /api/owner/passkey` takes the master code and the passkey assertion
 // in one octet-stream body. The server opens the `owner` item with the code (the wrong-code backoff
 // applies), seals the same owner key under the passkey and never writes the `owner` item, so the
-// backup code keeps working. Nothing here signs; the code is never in a URL or a log.
+// master code keeps working. Nothing here signs; the code is never in a URL or a log.
 
 export const PASSKEY_PATH = '/api/owner/passkey';
 

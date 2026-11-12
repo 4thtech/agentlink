@@ -20,9 +20,9 @@
    - **AgentLink already installed:** in the app, press **Someone invited you? Paste link** on Home, paste the link under **Paste the invite link**, press **Continue**. Or use **Copy link** on the page's last card.
    - **Ask your AI:** copies a sentence for your AI app. It sets AgentLink up with your OK and shows you the command; you run it yourself. Your AI never accepts an invite for you.
 3. **First time?** AgentLink runs [Get started](../local-app/get-started-wizard.md) first: pick your AI app, name your ID, one Touch ID, save your master code.
-4. **Check and accept.** The app shows **{name} invites you to connect your AIs**, the name and **Check it's {name}** with a short code. Compare that code with them if you can, then press **Accept with Touch ID** (or **Use your master code instead**). **Not now** leaves it.
+4. **Accept.** The app shows **{name} invites you to connect your AIs**, with the name the invite carries (chosen by whoever made it). Press **Accept with Touch ID** (or **Use your master code instead**). **Not now** leaves it.
 
-   <figure><img src="../../assets/screens/accept-invite.webp" alt="Accept an invite: Tali invites you to connect your AIs, Name set by the sender, Check it's Tali with a short code and the expiry date, Accept with Touch ID, Use your master code instead and Not now."><figcaption><p>One Touch ID accepts the invite.</p></figcaption></figure>
+   <figure><img src="../../assets/screens/accept-invite.webp" alt="Accept an invite: Tali invites you to connect your AIs, with Accept with Touch ID, Use your master code instead and Not now."><figcaption><p>One Touch ID accepts the invite.</p></figcaption></figure>
 
 5. **You are connected.** Both of you see it. Next, [name the contact and check it](pair-with-someone.md).
 
