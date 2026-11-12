@@ -2,7 +2,9 @@
 // run (two temp-HOME computers, `agentlink ui`, real passkey owner actions; ux1113/integration d220725b,
 // 2026-11-12), read back through the activity feed's own open-and-parse step. Not hand-made. One value is
 // replaced: the accept action's `args.inviteUrl` (a test invite's secret link) is redacted; the feed never
-// reads `args`. `expected` is what core's feed made of each action in that run.
+// reads `args`. The `counterparty.ownerKey` values (the PUBLIC owner key of a throwaway harness computer,
+// not a secret) are replaced by an obviously fake key, 64 zeros; the feed never reads them either.
+// `expected` is what core's feed made of each action in that run.
 // The harness has no proof network, so `agentlink_notarize` approvals cannot be recorded there.
 export const RECORDED_APPROVAL_ACTIONS = [
   {
@@ -28,7 +30,7 @@ export const RECORDED_APPROVAL_ACTIONS = [
           },
           counterparty: {
             agentId: '0xe653356417386eb9b79fb0224a62cda258883c8e',
-            ownerKey: '709c7aa8daaa6760b9012ecb9053e9465a1f662cd8053a6d615df0226345025c',
+            ownerKey: '0000000000000000000000000000000000000000000000000000000000000000',
           },
           createdAt: 1794502052,
           decision: 'accept',
@@ -91,7 +93,7 @@ export const RECORDED_APPROVAL_ACTIONS = [
       context: {
         counterparty: {
           agentId: '0xe653356417386eb9b79fb0224a62cda258883c8e',
-          ownerKey: '709c7aa8daaa6760b9012ecb9053e9465a1f662cd8053a6d615df0226345025c',
+          ownerKey: '0000000000000000000000000000000000000000000000000000000000000000',
         },
         inviteId: 'qcXnLXXBS9s3i6cmqPD__g',
         triggers: ['contacts.acceptInvites'],

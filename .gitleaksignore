@@ -1,0 +1,7 @@
+# gitleaks fingerprints to ignore (read from main by the secret scan; a reviewed, sensitive path).
+# Public owner key of a throwaway e2e harness computer in a recorded fixture; not a secret
+# (UX1113-QA2-ACTIVITY). The current file holds a fake key; these lines cover the two commits in history.
+b806b318f2c9dd20dd9cbffc328768f3129164c3:packages/core/src/testing/recorded-approval-actions.ts:generic-api-key:31
+b806b318f2c9dd20dd9cbffc328768f3129164c3:packages/core/src/testing/recorded-approval-actions.ts:generic-api-key:94
+02f435f4e1c7594f20decea940e0f08d4916e2cc:packages/core/src/testing/recorded-approval-actions.ts:generic-api-key:31
+02f435f4e1c7594f20decea940e0f08d4916e2cc:packages/core/src/testing/recorded-approval-actions.ts:generic-api-key:96
