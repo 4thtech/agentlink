@@ -3,6 +3,8 @@
 export const BACKUP_STRINGS = {
   title: 'Backup & Touch ID',
   kitTitle: 'Recovery kit',
+  hoodFormat: 'Kit format',
+  hoodFormatValue: 'ALKK v1',
   kitBody:
     'Your recovery kit gets you back in on a new computer: this ID, its contacts and its messages, locked under a new recovery code.',
   kitPending: 'You put this off during setup. Keep your master code safe until you save the kit.',

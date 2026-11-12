@@ -31,6 +31,7 @@ import {
   Surface,
   TextField,
   formatContactName,
+  useHood,
   useReducedMotion,
 } from '@4thtech-io/ui';
 import { UnderTheHood } from '../../lazy/hood.js';
@@ -449,6 +450,7 @@ function Detail({
   onKeepBoth: () => void;
   onChanged: (what: Pending['what']) => void;
 }): ReactElement {
+  const hood = useHood();
   const ref = contact.ref;
   const name = shownName(contact);
   const compare = canCompareCode(contact);
@@ -700,6 +702,16 @@ function Detail({
       <p className="al-text-body-sm al-muted">
         {since(DATE.format(new Date(contact.since * 1000)))}
       </p>
+      {hood ? (
+        <dl className="ct-hood" data-hood-facts>
+          {hoodFacts(contact).map(([label, value]) => (
+            <div key={label} className="ct-hood-row">
+              <dt className="al-text-body-sm al-muted">{label}</dt>
+              <dd className="al-text-body-sm al-text-code">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
       {duplicate}
       {contact.status === 'blocked' ? <p className="al-text-body">{S.blockedDetail}</p> : null}
       {contact.status === 'revoked' ? (
@@ -815,6 +827,16 @@ function Detail({
  * Under the hood (B-11 §16): what the list already carries, nothing more. The fingerprint is only
  * sent for some contacts, so it is left out otherwise; the contact's ref is never shown.
  */
+function hoodFacts(c: ContactRow): [string, string][] {
+  return [
+    ...(c.fingerprint === undefined
+      ? []
+      : ([[HOOD.fingerprint, c.fingerprint]] as [string, string][])),
+    [HOOD.identity, c.label === 'safety-code-checked' ? HOOD.checked : HOOD.selfDeclared],
+    [HOOD.paired, new Date(c.since * 1000).toISOString().slice(0, 10)],
+  ];
+}
+
 function hoodFields(c: ContactRow): unknown[] {
   return [
     ...(c.fingerprint === undefined

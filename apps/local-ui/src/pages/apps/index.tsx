@@ -3,7 +3,7 @@
 // to the open agent. An AI app serves one agent at a time; an agent may serve several apps. The page
 // never signs and never sends a path: the server takes paths from its fixed table (06 §7). Names and
 // paths are rendered as text only (I-5).
-import { Button, EmptyState, Icon, Skeleton, Surface } from '@4thtech-io/ui';
+import { Button, EmptyState, Icon, Skeleton, Surface, useHood } from '@4thtech-io/ui';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { createAgentsApi, type AgentsApi } from '../agents/api.js';
 import { announceAgentsChanged } from '../agents/use-agents.js';
@@ -60,6 +60,7 @@ function Card({
   onManual: () => void;
   onRecheck: () => void;
 }): ReactElement {
+  const hood = useHood();
   const state = cardState(row, open);
   let word: string;
   let detail: string | undefined;
@@ -161,6 +162,20 @@ function Card({
         <span>{word}</span>
       </p>
       {detail === undefined ? null : <p className="al-text-body-sm al-muted">{detail}</p>}
+      {hood ? (
+        <dl className="ap-facts" data-hood-facts>
+          <dt className="al-text-body-sm">{S.hoodAppId}</dt>
+          <dd className="al-text-body-sm al-text-code">{row.app}</dd>
+          <dt className="al-text-body-sm">{S.file}</dt>
+          <dd className="al-text-body-sm al-text-code">{row.path}</dd>
+          {row.agent === undefined ? null : (
+            <>
+              <dt className="al-text-body-sm">{S.hoodFolder}</dt>
+              <dd className="al-text-body-sm al-text-code">{row.agent}</dd>
+            </>
+          )}
+        </dl>
+      ) : null}
       <div className="ap-card-actions">{actions}</div>
     </li>
   );

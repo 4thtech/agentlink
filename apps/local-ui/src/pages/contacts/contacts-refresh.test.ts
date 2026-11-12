@@ -310,6 +310,18 @@ describe('UI-REFRESH-i: Under the hood', () => {
     ]);
   });
 
+  it('also lists the facts inside the opened person panel, and only with the switch on', async () => {
+    await mount(routes([marko, ana]), true);
+    const inline = host.querySelector('.ct-hood');
+    expect(inline?.textContent).toContain('ID tag');
+    expect(inline?.textContent).toContain('7F3A·19C2');
+    expect(inline?.textContent).toContain('Paired');
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount(routes([marko, ana]), false);
+    expect(host.querySelector('.ct-hood')).toBeNull();
+  });
+
   it('leaves out the fingerprint when the server did not send one, and never shows an ID', async () => {
     await mount(routes([ana]), true);
     const hood = host.querySelector('.al-hood') as HTMLElement;

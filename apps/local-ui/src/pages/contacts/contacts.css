@@ -257,3 +257,16 @@
 .ct-list-archived .ct-row.is-revoked {
   opacity: 1;
 }
+.ct-hood {
+  display: grid;
+  gap: var(--al-space-1);
+  margin: 0;
+}
+.ct-hood-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-1) var(--al-space-4);
+}
+.ct-hood-row dd {
+  margin: 0;
+}

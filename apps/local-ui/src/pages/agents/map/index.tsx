@@ -154,7 +154,9 @@ function ContactBox({
         aria-label={S.contactBox(agent, c.name, word)}
         onClick={() => openConversation(c.ref)}
       >
-        <span className="mp-name al-text-body">{c.name}</span>
+        <span className="mp-name al-text-body">
+          <bdi>{c.name}</bdi>
+        </span>
         <span className="mp-word al-text-label al-muted">
           {c.moving !== undefined ? <span className="mp-mark" aria-hidden="true" /> : null}
           {word}

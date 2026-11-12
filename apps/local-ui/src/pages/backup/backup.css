@@ -40,3 +40,12 @@
 .bk-error {
   color: var(--al-color-status-danger-fg);
 }
+.bk-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--al-space-2) var(--al-space-4);
+  margin: 0;
+}
+.bk-facts dd {
+  margin: 0;
+}

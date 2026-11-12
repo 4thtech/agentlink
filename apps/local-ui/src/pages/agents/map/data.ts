@@ -1,7 +1,7 @@
 // U3-map: the flow answer parsed defensively, and the map's rules as pure functions (b11 §32). The
 // model holds names, words, counts and directions only: nothing here ever carries a message, a
-// subject, a file name or a link (I-5). Contact names are the owner-confirmed ones; the other side's
-// own name is never drawn ("Unnamed contact").
+// subject, a file name or a link (I-5). Contact names follow the People name rule (the owner's own
+// name, else the name they declared when it passes the rule), so a person reads the same everywhere.
 import { formatContactName } from '@4thtech-io/ui';
 import type { ContactRow } from '../../contacts/data.js';
 import {
@@ -142,11 +142,17 @@ export interface MapInput {
   readonly live?: boolean;
 }
 
-/** The owner-confirmed name, or "Unnamed contact" (b11 §32.1). */
+/**
+ * The same name rule as People: the owner's own name, else the name they declared (only when it
+ * passes the rule), else "Contact {ID tag}"; "Unnamed contact" only when there is no ID tag either.
+ */
 export function mapName(c: ContactRow): string {
-  return c.nameSource === 'owner' && c.name.trim() !== ''
-    ? formatContactName({ alias: c.name }).text
-    : S.unnamed;
+  const n = formatContactName(
+    c.nameSource === 'owner'
+      ? { alias: c.name }
+      : { name: c.name, ...(c.fingerprint === undefined ? {} : { fingerprint: c.fingerprint }) },
+  );
+  return n.kind === 'fingerprint' && c.fingerprint === undefined ? S.unnamed : n.text;
 }
 
 /** As the pulse module's `activityOf`: unlisted is Quiet unless the answer is partial (unknown). */

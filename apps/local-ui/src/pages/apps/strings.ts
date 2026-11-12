@@ -36,6 +36,8 @@ export const APPS_STRINGS = {
   disconnectTitle: (app: string, label: string): string => `Disconnect ${app} from ${label}`,
   addsOne: (app: string): string => `This adds one entry to ${app}'s settings.`,
   file: 'File',
+  hoodAppId: 'App id',
+  hoodFolder: 'ID folder',
   adds: 'Adds',
   removes: 'Removes',
   entryRegion: 'The entry that will be added',
