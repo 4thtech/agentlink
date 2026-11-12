@@ -79,7 +79,13 @@ export function nodeDesktopHostDeps(pipe: DesktopPipe): DesktopHostDeps {
     // DESK-NATIVE-DEBUG: its one fixed diagnostic line per outcome goes to stderr, which the shell's
     // redacting core log keeps (apps/desktop/src/main/core-log.ts). Fixed tokens only.
     startServer: (options, sink) => {
-      const nativePresence = desktopNativeHelper();
+      // DESK-TOUCHID-FIX: the helper's secure-input note becomes the same kind of fixed line.
+      const nativePresence = desktopNativeHelper(
+        process.execPath,
+        process.platform,
+        undefined,
+        writeDiagnosticLine,
+      );
       return startApprovalServerWithLinkSink(
         nativePresence === undefined
           ? options

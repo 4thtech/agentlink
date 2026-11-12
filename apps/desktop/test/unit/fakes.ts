@@ -13,6 +13,7 @@ import type {
   MessageBoxOptions,
   NativeImage,
   OnBeforeRequestDetails,
+  OnBeforeSendHeadersDetails,
   PermissionRequestDetails,
   Session,
   Tray,
@@ -85,6 +86,8 @@ export class FakeBrowserWindow extends Emitter implements BrowserWindow {
   visible = false;
   destroyed = false;
   shows = 0;
+  /** DESK-TOUCHID-FIX: how often the page's focus was taken away (blurWebView). */
+  blurs = 0;
   constructor(readonly options: BrowserWindowOptions) {
     super();
     FakeBrowserWindow.created.push(this);
@@ -99,6 +102,9 @@ export class FakeBrowserWindow extends Emitter implements BrowserWindow {
     this.shows += 1;
   }
   focus(): void {}
+  blurWebView(): void {
+    this.blurs += 1;
+  }
   hide(): void {
     this.visible = false;
   }
@@ -131,6 +137,12 @@ export class FakeSession extends Emitter implements Session {
   beforeRequest:
     | ((details: OnBeforeRequestDetails, callback: (r: { cancel?: boolean }) => void) => void)
     | null = null;
+  beforeSendHeaders:
+    | ((
+        details: OnBeforeSendHeadersDetails,
+        callback: (r: { cancel?: boolean; requestHeaders?: Record<string, string> }) => void,
+      ) => void)
+    | null = null;
   proxy: unknown = null;
   userAgent = 'Mozilla/5.0 Chrome/156 Electron/45.1.0';
   readonly webRequest = {
@@ -141,6 +153,9 @@ export class FakeSession extends Emitter implements Session {
       ) => void,
     ): void => {
       this.beforeRequest = listener;
+    },
+    onBeforeSendHeaders: (listener: NonNullable<FakeSession['beforeSendHeaders']>): void => {
+      this.beforeSendHeaders = listener;
     },
   };
   setPermissionRequestHandler(handler: NonNullable<FakeSession['permissionRequest']>): void {
@@ -178,6 +193,21 @@ export class FakeSession extends Emitter implements Session {
     );
     if (granted === undefined) throw new Error('permission callback not called');
     return granted;
+  }
+  /** DESK-TOUCHID-FIX: runs the onBeforeSendHeaders listener; the headers it lets through. */
+  sendHeaders(
+    method: string,
+    url: string,
+    requestHeaders: Record<string, string>,
+  ): Record<string, string> | undefined {
+    let sent: Record<string, string> | undefined;
+    let called = false;
+    this.beforeSendHeaders?.({ method, url, requestHeaders }, (r) => {
+      called = true;
+      sent = r.requestHeaders;
+    });
+    if (!called) throw new Error('onBeforeSendHeaders callback not called');
+    return sent;
   }
   /** Runs the webRequest listener; true when the request is cancelled. */
   cancels(url: string): boolean {

@@ -153,6 +153,8 @@ describe('Settings: every outcome is visible (DESK-NATIVE-DEBUG)', () => {
     expect(host.querySelector('[data-native-waiting]')?.textContent).toBe(
       NATIVE_STRINGS.waiting('mac'),
     );
+    // DESK-TOUCHID-FIX: a Cancel that ends the request (the server then stops the helper).
+    expect(host.querySelector('[data-native-cancel]')?.textContent).toBe(NATIVE_STRINGS.cancel);
     await act(async () => answer({ kind: 'native', state: 'cancelled' }));
     await flush();
     expect(host.querySelector('[data-native-waiting]')).toBeNull();

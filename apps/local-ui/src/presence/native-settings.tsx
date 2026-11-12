@@ -21,6 +21,7 @@ import {
   type NativeRegistration,
   type NativeStatus,
 } from './native-api.js';
+import { NativeWaitNotice } from './native-wait.js';
 import { NATIVE_STRINGS as N, nativeOutcomeText } from './strings.js';
 import './native-settings.css';
 
@@ -46,6 +47,8 @@ export function NativeSettings({
   const [asking, setAsking] = useState<Op | undefined>(undefined);
   const [code, setCode] = useState('');
   const [working, setWorking] = useState(false);
+  // DESK-TOUCHID-FIX: turning it off never runs the helper (no Touch ID wording then).
+  const [workingOp, setWorkingOp] = useState<Op | undefined>(undefined);
   const [note, setNote] = useState<Note | undefined>(undefined);
   const mounted = useRef(true);
 
@@ -78,6 +81,7 @@ export function NativeSettings({
     const typed = code;
     setCode('');
     setWorking(true);
+    setWorkingOp(op);
     setNote(undefined);
     void ops[op](typed)
       .catch((): NativeRegistration => ({ kind: 'failed' }))
@@ -161,9 +165,14 @@ export function NativeSettings({
           </div>
         </form>
       )}
-      {working ? (
-        <p className="al-text-body-sm st-native-note" role="status" data-native-waiting="">
-          {N.waiting(platform)}
+      {working && workingOp !== 'off' ? (
+        <div className="st-native-note">
+          <NativeWaitNotice inline {...(userAgent === undefined ? {} : { userAgent })} />
+        </div>
+      ) : null}
+      {working && workingOp === 'off' ? (
+        <p className="al-text-body-sm st-native-note" role="status">
+          {N.working}
         </p>
       ) : null}
       {note === undefined || working ? null : (

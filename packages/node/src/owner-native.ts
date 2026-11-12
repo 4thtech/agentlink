@@ -129,7 +129,23 @@ export interface OwnerNativeOptions {
   readonly timeoutMs?: number;
   /** DESK-NATIVE-DEBUG: called with each step's fixed name as it begins (diagnostics only). */
   readonly onStep?: (step: NativeStep) => void;
+  /**
+   * DESK-TOUCHID-FIX review (Fable M-1): the page cancelled or went away. Reaches every helper call
+   * of turning it on (create, check, the setup gesture): the helper is stopped, nothing is stored.
+   */
+  readonly signal?: AbortSignal;
 }
+
+/** The fixed cancel of an aborted operation. */
+const aborted = (): NativeHelperError => new NativeHelperError('cancelled', 'aborted');
+
+/** DESK-TOUCHID-FIX review (Fable L-1): a write that timed out and did not settle in time either. */
+const keychainUnsure = (): NodeKeyStoreError =>
+  new NodeKeyStoreError(
+    'keychain_failed',
+    `The system keychain did not answer in time. Touch ID or Windows Hello may have been turned on; check the status. \`${CLI_COMMAND} doctor\` shows what is wrong.`,
+    'unsure',
+  );
 
 /** Calls `onStep` with `step`; an exception in it changes nothing. */
 function stepTo(options: OwnerNativeOptions, step: NativeStep): void {
@@ -288,15 +304,20 @@ export async function storeOwnerNativeSeed(
     throw nativeExists();
   }
   const kind: NativePresenceKind = helper.kind;
+  const signal = options.signal;
+  if (isAborted(signal)) throw aborted();
   stepTo(options, 'helper_create');
-  const printed = await helper.create();
+  const printed = await helper.create(signal);
   let secret: Uint8Array | undefined;
   let back: Uint8Array | null = null;
   let check: Uint8Array | undefined;
   let created: Uint8Array | undefined;
   /** DESK-NATIVE-DEBUG: the blob once written; removed again when a later step fails. */
   let written: Uint8Array | undefined;
+  /** DESK-TOUCHID-FIX review (Fable L-1): the write itself, which may settle after its timeout. */
+  let writing: Promise<unknown> | undefined;
   try {
+    if (isAborted(signal)) throw aborted();
     // The record is read into the header fields here and rebuilt from them; it must be canonical.
     // DESK-NATIVE-DEBUG: an output core cannot use is the helper's fault (`error`), never a wrong
     // master code: it must not show "that master code did not work" or count as a wrong code.
@@ -313,13 +334,16 @@ export async function storeOwnerNativeSeed(
     if (kind === NATIVE_PRESENCE_MACOS) {
       // The key must refuse without a gesture before the one gesture of registration.
       stepTo(options, 'helper_check');
-      await helper.check(record);
+      await helper.check(record, signal);
+      if (isAborted(signal)) throw aborted();
       stepTo(options, 'helper_ecdh');
-      secret = await helper.release(record, 'setup');
+      secret = await helper.release(record, 'setup', signal);
     } else {
       secret = parsed.firstSecret;
     }
     if (secret === undefined) throw helperOutputBad();
+    // A touch that arrives after the cancel turns nothing on.
+    if (isAborted(signal)) throw aborted();
     stepTo(options, 'seal');
     const blob = await sealNativeSeed({
       kind,
@@ -332,7 +356,9 @@ export async function storeOwnerNativeSeed(
     options.sealed?.(blob);
     stepTo(options, 'keychain_write');
     written = blob;
-    await guarded(() => keychain.set(OWNER_NATIVE_ACCOUNT, blob), timeoutMs);
+    const write = keychain.set(OWNER_NATIVE_ACCOUNT, blob);
+    writing = write.catch(() => undefined);
+    await guarded(() => write, timeoutMs);
     stepTo(options, 'keychain_read_back');
     back = await readItem(keychain, timeoutMs);
     if (back === null || !equalBytes(back, blob)) throw readBackDiffers();
@@ -350,7 +376,23 @@ export async function storeOwnerNativeSeed(
     // land) must not leave an item behind: the next try would answer "already on" while the status
     // says off. Removed only while it is still exactly our bytes (best effort).
     if (written !== undefined) {
+      // DESK-TOUCHID-FIX review (Fable L-1): a write that timed out may still land after this
+      // rollback. Wait for it to settle (as long again) before removing; if it never settles, say
+      // that it may have been turned on instead of "nothing changed".
+      let settled = true;
+      if (writing !== undefined) {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        settled = await Promise.race([
+          writing.then(() => true),
+          new Promise<boolean>((resolve) => {
+            timer = setTimeout(() => resolve(false), timeoutMs);
+          }),
+        ]);
+        clearTimeout(timer);
+      }
       await removeOwnerNativeItemIfOurs(keychain, written, timeoutMs).catch(() => undefined);
+      // Unsure: the Windows credential is kept (the item may still name it).
+      if (!settled) throw keychainUnsure();
     }
     if (created !== undefined && kind !== NATIVE_PRESENCE_MACOS) {
       await helper.remove(created).catch(() => undefined);

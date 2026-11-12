@@ -12,6 +12,12 @@
 // a spawn failure, a malformed or wrong-length output) rides on NativeHelperError.detail for the
 // core's one diagnostic line (approval-server.ts nativeDiagnostic); it is never shown on the page.
 //
+// DESK-TOUCHID-FIX: the macOS helper may put the fixed note `note secureinput 1` before that line
+// (secure input was on as its sheet was about to show); it becomes ONE fixed core diagnostic line
+// (createNativeHelper `diagnose`). A cancelled or timed-out run is stopped with SIGTERM (the helper
+// invalidates its Touch ID context, so no sheet is left on screen) and core waits for it to exit
+// (SIGKILL after NATIVE_HELPER_KILL_GRACE_MS).
+//
 // The helper is spawned without a shell, with an empty environment (nothing of ours, no PATH, no
 // HOME), stdin/stdout pipes only, a bounded stdout and a timeout. Its path is fixed by the app layout
 // (desktopHelperPath): next to the bundled Node of the desktop app, never from an argument, an
@@ -155,12 +161,18 @@ export interface NativeHelperRunResult {
   readonly ended?: 'timeout' | 'aborted' | 'no_start' | 'killed' | 'too_much_output';
   /** DESK-NATIVE-DEBUG: the helper's diagnostic line, already checked by readHelperDiagnostic. */
   readonly diag?: string;
+  /** DESK-TOUCHID-FIX: the helper noted that macOS secure input was on before its sheet. */
+  readonly secureInput?: true;
 }
 
 /** The fixed shape of the macOS helper's one stderr line (agentlink-presence.swift header). */
 const HELPER_DIAG =
-  /^(args|input|create|verify|gate|sensor|sheet|output) (none|la|os|ck) (-?[0-9]{1,7})\n?$/;
+  /^(args|input|create|verify|gate|sensor|sheet|output|signal) (none|la|os|ck) (-?[0-9]{1,7})\n?$/;
 const MAX_STDERR = 128;
+/** DESK-TOUCHID-FIX: the helper's one fixed note, before its diagnostic line. */
+const SECURE_INPUT_NOTE = 'note secureinput 1\n';
+/** DESK-TOUCHID-FIX: the one fixed core line for that note. */
+export const SECURE_INPUT_LINE = 'native presence: secure input was on when the helper started';
 
 /**
  * DESK-NATIVE-DEBUG: the helper's stderr as `<stage> <domain> <code>` when it is exactly that fixed
@@ -168,10 +180,27 @@ const MAX_STDERR = 128;
  * stderr is ever kept.
  */
 export function readHelperDiagnostic(stderr: Uint8Array): string | undefined {
-  if (stderr.length === 0 || stderr.length > MAX_STDERR) return undefined;
-  for (const b of stderr) if (b < 0x0a || b > 0x7a) return undefined;
-  const m = HELPER_DIAG.exec(new TextDecoder().decode(stderr));
-  return m === null ? undefined : `${m[1] ?? ''} ${m[2] ?? ''} ${m[3] ?? ''}`;
+  return readHelperStderr(stderr).diag;
+}
+
+/**
+ * DESK-TOUCHID-FIX: the helper's stderr as an optional fixed secure-input note followed by an
+ * optional fixed diagnostic line. Anything else (other text, a malformed line) drops both.
+ */
+export function readHelperStderr(stderr: Uint8Array): {
+  readonly diag?: string;
+  readonly secureInput?: true;
+} {
+  if (stderr.length === 0 || stderr.length > MAX_STDERR) return {};
+  for (const b of stderr) if (b < 0x0a || b > 0x7a) return {};
+  let text = new TextDecoder().decode(stderr);
+  const secureInput = text.startsWith(SECURE_INPUT_NOTE);
+  if (secureInput) text = text.slice(SECURE_INPUT_NOTE.length);
+  if (text === '') return secureInput ? { secureInput: true } : {};
+  const m = HELPER_DIAG.exec(text);
+  if (m === null) return {};
+  const diag = `${m[1] ?? ''} ${m[2] ?? ''} ${m[3] ?? ''}`;
+  return secureInput ? { diag, secureInput: true } : { diag };
 }
 
 /** The error of a run that did not exit 0: its UI state and how it ended. */
@@ -201,9 +230,9 @@ export interface NativeHelper {
   /** Touch ID / Windows Hello is set up (exit 0). Never prompts. */
   available(): Promise<boolean>;
   /** `create`: the bytes printed (macOS: the record; Windows: record ‖ u16 ‖ signature, one prompt). */
-  create(): Promise<Uint8Array>;
+  create(signal?: AbortSignal): Promise<Uint8Array>;
   /** macOS `check`: resolves only when the key exists and refuses without a gesture. Never prompts. */
-  check(record: Uint8Array): Promise<void>;
+  check(record: Uint8Array, signal?: AbortSignal): Promise<void>;
   /**
    * `ecdh <reason>` / `sign <reason>`: one OS prompt, the released secret (the caller wipes it).
    * `signal` aborts it (the helper is killed and the prompt goes away): `cancelled`, no bytes.
@@ -252,8 +281,21 @@ const stdinOf = (record: Uint8Array): Uint8Array =>
 export function createNativeHelper(options: {
   readonly kind: NativePresenceKind;
   readonly run: NativeHelperRunner;
+  /** DESK-TOUCHID-FIX: receives SECURE_INPUT_LINE once per run whose helper noted secure input. */
+  readonly diagnose?: (line: string) => void;
 }): NativeHelper {
-  const { kind, run } = options;
+  const { kind, run: runOnce, diagnose } = options;
+  const run: NativeHelperRunner = async (args, stdin, signal) => {
+    const result = await runOnce(args, stdin, signal);
+    if (result.secureInput === true) {
+      try {
+        diagnose?.(SECURE_INPUT_LINE);
+      } catch {
+        // Diagnostics never change the outcome.
+      }
+    }
+    return result;
+  };
   if (kind !== NATIVE_PRESENCE_MACOS && kind !== NATIVE_PRESENCE_WINDOWS) {
     throw new TypeError('native helper: unknown kind');
   }
@@ -264,11 +306,20 @@ export function createNativeHelper(options: {
       const result = await run(['available'], undefined);
       return result.code === 0;
     },
-    async create() {
-      return printed(await run(['create'], undefined));
+    // DESK-TOUCHID-FIX review: turning it on can be cancelled at every helper call.
+    async create(signal) {
+      if (signal?.aborted === true) throw new NativeHelperError('cancelled', 'aborted');
+      const result = await run(['create'], undefined, signal);
+      if (isAborted(signal)) {
+        result.stdout.fill(0);
+        throw new NativeHelperError('cancelled', 'aborted');
+      }
+      return printed(result);
     },
-    async check(record) {
-      const result = await run(['check'], stdinOf(record));
+    async check(record, signal) {
+      if (signal?.aborted === true) throw new NativeHelperError('cancelled', 'aborted');
+      const result = await run(['check'], stdinOf(record), signal);
+      if (isAborted(signal)) throw new NativeHelperError('cancelled', 'aborted');
       if (result.code !== 0) throw refusal(result);
     },
     async release(record, reason, signal) {
@@ -299,6 +350,11 @@ export function createNativeHelper(options: {
 
 /** The longest a helper call may take: the OS prompt waits for the owner (then it is cancelled). */
 export const NATIVE_HELPER_TIMEOUT_MS = 120_000;
+/**
+ * DESK-TOUCHID-FIX: how long a stopped helper gets after SIGTERM to close its sheet and exit (it
+ * needs about a second) before it is killed outright.
+ */
+export const NATIVE_HELPER_KILL_GRACE_MS = 3_000;
 
 /**
  * Spawns the helper at `path` (no shell, empty environment, stdin/stdout/stderr pipes, stderr only
@@ -308,9 +364,10 @@ export const NATIVE_HELPER_TIMEOUT_MS = 120_000;
  */
 export function spawnNativeHelper(
   path: string,
-  options: { readonly timeoutMs?: number } = {},
+  options: { readonly timeoutMs?: number; readonly killGraceMs?: number } = {},
 ): NativeHelperRunner {
   const timeoutMs = options.timeoutMs ?? NATIVE_HELPER_TIMEOUT_MS;
+  const killGraceMs = options.killGraceMs ?? NATIVE_HELPER_KILL_GRACE_MS;
   return (args, stdin, signal) =>
     new Promise((resolve) => {
       const chunks: Buffer[] = [];
@@ -318,6 +375,9 @@ export function spawnNativeHelper(
       let errSize = 0;
       let size = 0;
       let settled = false;
+      /** DESK-TOUCHID-FIX: why we stopped it; the run settles when it has exited. */
+      let stopped: 'timeout' | 'aborted' | 'too_much_output' | undefined;
+      let grace: ReturnType<typeof setTimeout> | undefined;
       const finish = (
         code: number | null,
         ended?: 'timeout' | 'aborted' | 'no_start' | 'killed' | 'too_much_output',
@@ -325,6 +385,7 @@ export function spawnNativeHelper(
         if (settled) return;
         settled = true;
         clearTimeout(timer);
+        clearTimeout(grace);
         signal?.removeEventListener('abort', onAbort);
         // One copy out, then every chunk and the concatenation are wiped (Fable review L2).
         let stdout = new Uint8Array(0);
@@ -335,12 +396,11 @@ export function spawnNativeHelper(
         }
         for (const chunk of chunks) chunk.fill(0);
         chunks.length = 0;
-        const diag =
-          errSize <= MAX_STDERR ? readHelperDiagnostic(Buffer.concat(errChunks)) : undefined;
+        const notes = errSize <= MAX_STDERR ? readHelperStderr(Buffer.concat(errChunks)) : {};
         errChunks.length = 0;
         const base =
           code === null ? { code, stdout, ended: ended ?? 'no_start' } : { code, stdout };
-        resolve(diag === undefined ? base : { ...base, diag });
+        resolve({ ...base, ...notes });
       };
       let child: ReturnType<typeof spawn>;
       try {
@@ -354,15 +414,33 @@ export function spawnNativeHelper(
         resolve({ code: null, stdout: new Uint8Array(0), ended: 'no_start' });
         return;
       }
-      const timer = setTimeout(() => {
-        child.kill();
-        finish(null, 'timeout');
-      }, timeoutMs);
-      // Fable review L1: the page went away (client disconnected, prompt abandoned): kill the helper,
+      // DESK-TOUCHID-FIX: SIGTERM (the helper invalidates its Touch ID context, so the sheet goes
+      // away), then wait for it to exit; SIGKILL only if it has not exited after the grace period.
+      // Its output after the stop is never used: the run settles with no exit code.
+      function stop(why: 'timeout' | 'aborted' | 'too_much_output'): void {
+        if (settled || stopped !== undefined) return;
+        stopped = why;
+        clearTimeout(timer);
+        try {
+          child.kill('SIGTERM');
+        } catch {
+          // Already gone: 'close' settles.
+        }
+        grace = setTimeout(() => {
+          try {
+            child.kill('SIGKILL');
+          } catch {
+            // Already gone.
+          }
+          // A helper that cannot even be killed is not waited for any longer.
+          grace = setTimeout(() => finish(null, why), killGraceMs);
+        }, killGraceMs);
+      }
+      const timer = setTimeout(() => stop('timeout'), timeoutMs);
+      // Fable review L1: the page went away (client disconnected, prompt abandoned): stop the helper,
       // so its OS prompt closes and no late touch is waited for.
       function onAbort(): void {
-        child.kill();
-        finish(null, 'aborted');
+        stop('aborted');
       }
       if (signal?.aborted === true) onAbort();
       else signal?.addEventListener('abort', onAbort, { once: true });
@@ -377,14 +455,21 @@ export function spawnNativeHelper(
         size += chunk.length;
         if (size > MAX_STDOUT) {
           chunk.fill(0);
-          child.kill();
-          finish(null, 'too_much_output');
+          stop('too_much_output');
+          return;
+        }
+        if (stopped !== undefined) {
+          chunk.fill(0);
           return;
         }
         chunks.push(chunk);
       });
-      // Ended by a signal from outside (our own kills settle first): no exit code.
-      child.on('close', (code) => finish(typeof code === 'number' ? code : null, 'killed'));
+      // Stopped by us: no exit code, whatever it exited with. Ended by a signal from outside: no
+      // exit code either.
+      child.on('close', (code) => {
+        if (stopped !== undefined) finish(null, stopped);
+        else finish(typeof code === 'number' ? code : null, 'killed');
+      });
       child.stdin?.on('error', () => undefined);
       child.stdin?.end(stdin === undefined ? undefined : Buffer.from(stdin));
     });
@@ -439,11 +524,17 @@ export function desktopNativeHelper(
   execPath: string = process.execPath,
   platform: NodeJS.Platform = process.platform,
   exists: (path: string) => boolean = existsSync,
+  /** DESK-TOUCHID-FIX: the core's one-line diagnostic sink (the secure-input note). */
+  diagnose?: (line: string) => void,
 ): NativeHelper | undefined {
   const path = desktopHelperPath(execPath, platform);
   if (path === undefined || !exists(path)) return undefined;
   const kind = platform === 'darwin' ? NATIVE_PRESENCE_MACOS : NATIVE_PRESENCE_WINDOWS;
-  return createNativeHelper({ kind, run: spawnNativeHelper(path) });
+  return createNativeHelper({
+    kind,
+    run: spawnNativeHelper(path),
+    ...(diagnose === undefined ? {} : { diagnose }),
+  });
 }
 
 /** True once `signal` was aborted (read fresh after an await). */

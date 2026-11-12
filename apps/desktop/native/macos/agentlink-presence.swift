@@ -27,11 +27,20 @@
 //   stdout: on success only, lowercase hex followed by "\n". Nothing else, ever.
 //   stderr: DESK-NATIVE-DEBUG: on failure only, ONE fixed diagnostic line
 //           "<stage> <domain> <code>\n": stage one of args input create verify gate sensor sheet
-//           output; domain one of none la os ck (LocalAuthentication, OSStatus, CryptoKit); code a
+//           output signal; domain one of none la os ck (LocalAuthentication, OSStatus, CryptoKit); code a
 //           signed integer (the LAError / OSStatus code, 0 when none). Never a key, a handle, a
 //           secret or any text from the system. Core parses it strictly and keeps only these tokens
 //           for its own diagnostic line (owner-native-helper.ts readHelperDiagnostic).
 //           Errors are still decided only by the exit code.
+//           DESK-TOUCHID-FIX: `ecdh` may first write the fixed note "note secureinput 1\n" (before
+//           the sheet, success or not) when macOS secure input is on (a focused password field
+//           somewhere keeps the Touch ID sheet from becoming key). Core logs one fixed line for it.
+//
+//   Signals (DESK-TOUCHID-FIX): SIGTERM and SIGINT are handled on a dispatch queue. The handler
+//   invalidates the live interactive LAContext (the Touch ID sheet goes away, the pending call
+//   ends with appCancel) and the helper exits 10 (cancelled): with the sheet's own line when the
+//   main thread finishes first, else "signal none <signal number>". A killed or cancelled helper
+//   never leaves a Touch ID sheet on screen.
 //
 //   Record v1 (what `create` prints and `check`/`ecdh` read back; not secret, and useless on any
 //   other Mac). The core does not store it: it reads it into the ALKH header fields and rebuilds it
@@ -72,6 +81,7 @@
 //   5. add a fingerprint in System Settings → $H check < /tmp/alp/rec and ecdh exit 13
 //   6. ecdh setup / ecdh pay show their own fixed texts. Then: rm -r /tmp/alp (no keychain cleanup).
 
+import Carbon.HIToolbox
 import CryptoKit
 import Foundation
 import LocalAuthentication
@@ -115,12 +125,65 @@ func noteError(_ error: Error) {
   diagCode = diagDomain == "none" ? 0 : max(-9_999_999, min(9_999_999, ns.code))
 }
 
+// DESK-TOUCHID-FIX: exactly one way out. The first caller (the main thread, or the signal handler)
+// takes this lock and never releases it; anyone after it waits here until the process has exited.
+let exitLock = NSLock()
+
+func writeErr(_ text: String) {
+  let line = Array(text.utf8)
+  _ = line.withUnsafeBufferPointer { write(2, $0.baseAddress, $0.count) }
+}
+
 func finish(_ code: Exit) -> Never {
+  exitLock.lock()
   if code != .ok {
-    let line = Array("\(diagStage) \(diagDomain) \(diagCode)\n".utf8)
-    _ = line.withUnsafeBufferPointer { write(2, $0.baseAddress, $0.count) }
+    writeErr("\(diagStage) \(diagDomain) \(diagCode)\n")
   }
   exit(code.rawValue)
+}
+
+// MARK: signals (DESK-TOUCHID-FIX)
+
+// The interactive context while it exists (ecdh only), so the signal handler can invalidate it.
+let contextLock = NSLock()
+var activeContext: LAContext?
+var signalSources: [DispatchSourceSignal] = []
+
+func setActiveContext(_ ctx: LAContext?) {
+  contextLock.lock()
+  activeContext = ctx
+  contextLock.unlock()
+}
+
+/// SIGTERM / SIGINT: invalidate the live Touch ID context (its sheet closes and the pending call
+/// ends with appCancel, which the main thread reports as cancelled), give the main thread a moment
+/// to finish on its own, then exit cancelled with the fixed line "signal none <n>".
+func stopOnSignal(_ sig: Int32) {
+  contextLock.lock()
+  let ctx = activeContext
+  contextLock.unlock()
+  if let live = ctx {
+    live.invalidate()
+    Thread.sleep(forTimeInterval: 1.0)
+  }
+  exitLock.lock()
+  writeErr("signal none \(sig)\n")
+  _exit(Exit.cancelled.rawValue)
+}
+
+func installSignalHandlers() {
+  for sig in [SIGTERM, SIGINT] {
+    signal(sig, SIG_IGN)
+    let source = DispatchSource.makeSignalSource(signal: sig, queue: DispatchQueue.global())
+    source.setEventHandler { stopOnSignal(sig) }
+    source.resume()
+    signalSources.append(source)
+  }
+}
+
+/// DESK-TOUCHID-FIX: one fixed note when macOS secure input is on as the sheet is about to show.
+func noteSecureInput() {
+  if IsSecureEventInputEnabled() { writeErr("note secureinput 1\n") }
 }
 
 // Phase 3 (signed builds): check the parent's code signature (team ID + identifier, via its audit
@@ -375,17 +438,21 @@ func cmdEcdh(_ reason: String) -> Never {
   let ctx = LAContext()
   ctx.localizedReason = reason
   ctx.touchIDAuthenticationAllowableReuseDuration = 0
+  setActiveContext(ctx)
+  noteSecureInput()
   diagStage = "sheet"
   do {
     let key = try SecureEnclave.P256.KeyAgreement.PrivateKey(
       dataRepresentation: rec.handle, authenticationContext: ctx)
     guard key.publicKey.x963Representation == rec.sePub else { finish(.keyUnusable) }
     let s = rawSecret(try key.sharedSecretFromKeyAgreement(with: rec.peer))
+    setActiveContext(nil)
     ctx.invalidate()
     diagStage = "output"
     guard s.count == 32 else { finish(.internalError) }
     writeOut(s)
   } catch {
+    setActiveContext(nil)
     ctx.invalidate()
     finish(code(for: error, keyStage: true))
   }
@@ -394,6 +461,7 @@ func cmdEcdh(_ reason: String) -> Never {
 // MARK: main
 
 signal(SIGPIPE, SIG_IGN)
+installSignalHandlers()
 let argv = CommandLine.arguments
 guard callerAllowed() else { finish(.callerRefused) }
 switch (argv.count, argv.count > 1 ? argv[1] : "") {

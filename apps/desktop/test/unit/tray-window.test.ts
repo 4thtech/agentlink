@@ -136,6 +136,15 @@ describe('MainWindow', () => {
     expect(fake?.loaded).toHaveLength(1);
   });
 
+  it('DESK-TOUCHID-FIX: blurPage takes focus off the page, and is a no-op with no window', () => {
+    const { window } = make();
+    expect(window.blurPage()).toBe(false);
+    window.showStatus('starting');
+    const fake = FakeBrowserWindow.created.at(-1);
+    expect(window.blurPage()).toBe(true);
+    expect(fake?.blurs).toBe(1);
+  });
+
   it('puts the AgentLinkDesktop/1 marker on the window user agent once (Touch ID UI)', () => {
     const { window } = make();
     window.showStatus('starting');

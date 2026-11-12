@@ -271,7 +271,11 @@ export async function runShell(
   }
 
   const windowSession = electron.session.fromPartition(WINDOW_PARTITION, { cache: false });
-  await hardenSession(windowSession, lock, proc.platform);
+  // DESK-TOUCHID-FIX: before a request that starts the presence helper reaches the core, focus
+  // leaves the page (secure input off), so the Touch ID sheet can become key.
+  await hardenSession(windowSession, lock, proc.platform, () => {
+    window?.blurPage();
+  });
 
   const coreLog = new CoreLog({ dir: proc.logDir });
   // Set below, once the supervisor and the checks exist.

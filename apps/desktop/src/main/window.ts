@@ -119,6 +119,17 @@ export class MainWindow {
     return true;
   }
 
+  /**
+   * DESK-TOUCHID-FIX: takes keyboard focus off the page (a focused password field keeps macOS
+   * secure input on). False when there is no window.
+   */
+  blurPage(): boolean {
+    const window = this.#window;
+    if (window === null || window.isDestroyed()) return false;
+    window.blurWebView();
+    return true;
+  }
+
   /** For a new core process: the origin may change, the old page is gone. */
   resetForNewCore(): void {
     this.#deps.lock.reset();
