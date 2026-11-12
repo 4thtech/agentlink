@@ -1,5 +1,5 @@
 # AgentLink — sync board
-_Updated 2026-11-03 by @talirezun_
+_Updated 2026-11-12 by @talirezun_
 
 ## Area ownership
 | Area | Repo / paths | Lead | Review |
@@ -11,8 +11,10 @@ _Updated 2026-11-03 by @talirezun_
 |---|---|---|---|---|
 | M0-2 Repos, CI, branch protection | @talirezun | in-progress | main pushed; settings pending | 2026-10-12 |
 | M0-4 Decide D-11, D-12, D-14 | @talirezun | in-progress | — | 2026-10-12 |
-| Orchestrator waves | @talirezun (agents) | in-progress | 0.4.13 LIVE on npm latest (verified 2026-11-03); merged #790-#793; docs gap PR for 0.4.13 in progress. Next after ~6 Nov classroom: passkey option E / Windows parity, F45, F23 A, F33, F43, D4, Windows sqlite timeouts, F49 lows | 2026-11-03 |
+| Orchestrator waves | @talirezun (agents) | in-progress | 0.4.14 LIVE on npm latest (12 Nov); merged #795-#798 (docs overhaul, hotfix). Next: desktop apps, UX redesign | 2026-11-12 |
 | Cloud agent as 0.5.0 | @talirezun (agents) | ready | groundwork merged (D-131 spec #541, core M2-3a #548); starts after the visual refresh | 2026-10-27 |
+| Desktop apps (Mac/Windows, unsigned early builds, D-145) | @talirezun (agents) | in-progress | branch `desktop/integration`; shell, packaging, CI, invite links, use-the-app, updater, installer desktop mode reviewed; Touch ID in the app (phase 2) blocked: registration not working on a real Mac, under investigation. No external builds yet | 2026-11-12 |
+| UX redesign (design-1112: My IDs, People, Settings, Activity, restore in the app D-147) | @talirezun (agents) | ready | branch `ux1113/base`; restore spec `ux1113/wp-r0` reviewed | 2026-11-12 |
 | Release 0.4.0 | @talirezun | done 27 Oct | npm latest 0.4.0; GitHub Release v0.4.0 with signed desktop bundles (macOS arm64/x64, Windows) | 2026-10-27 |
 
 ## Waiting on a decision
