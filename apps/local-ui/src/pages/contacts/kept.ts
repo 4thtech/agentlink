@@ -2,6 +2,8 @@
 // localStorage only, as pairs of contact refs (IDs the page already has; never a name or a
 // fingerprint). Nothing is written to the server. Storage can be missing or blocked: every access
 // is wrapped, and the page then remembers the choice only while it is open.
+import { keepInApp } from '../../prefs/app-kept.js';
+
 export const KEPT_KEY = 'agentlink.contacts.duplicates-kept.v1';
 
 const REF = /^0x[0-9a-f]{40}$/;
@@ -37,6 +39,7 @@ export function keep(kept: ReadonlySet<string>, newer: string, older: string): R
   next.add(pair(newer, older));
   try {
     localStorage.setItem(KEPT_KEY, JSON.stringify([...next].slice(-MAX_PAIRS)));
+    keepInApp(KEPT_KEY);
   } catch {
     // No storage: the choice lives only in this page's memory.
   }

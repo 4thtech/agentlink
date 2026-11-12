@@ -190,6 +190,12 @@ async function mountAt(path: string): Promise<void> {
   await settle();
 }
 
+/**
+ * The switch saves (Under the hood, the menu). UX1113-QA-HOST: the page choices the app keeps go in
+ * their own `kept` requests (prefs/app-kept.test.ts covers them), so they are left out here.
+ */
+const switchPuts = (w: World): Record<string, unknown>[] => w.puts.filter((p) => !('kept' in p));
+
 const q = <T extends Element = HTMLElement>(sel: string): T | null => host.querySelector<T>(sel);
 const qa = <T extends Element = HTMLElement>(sel: string): T[] => [
   ...host.querySelectorAll<T>(sel),
@@ -364,7 +370,7 @@ describe('the live agent dropdown', () => {
     await mountAt('/');
     await click(chip());
     const menu = q('[role="menu"]')?.textContent ?? '';
-    expect(menu).toContain('A new identity with its own inbox and contacts.');
+    expect(menu).toContain('A new ID with its own inbox and people.');
     expect(menu).toContain('The AI app shares this ID.');
     await click(
       menuItems().find((m) => m.textContent?.trim() === 'Connect another AI app to this ID'),
@@ -436,15 +442,15 @@ describe('the live agent dropdown', () => {
 });
 
 describe('the section menu (Decision 48)', () => {
-  it('is a minimized rail: Home, IDs, People, Activity, Settings, the current one marked', async () => {
+  it('is a minimized rail: Home, People, My IDs, Activity, Settings, the current one marked', async () => {
     serve(world());
     await mountAt('/agents');
     expect(rail()?.getAttribute('aria-label')).toBe('Sections');
     expect(rail()?.dataset['expanded']).toBe('false');
-    expect(railLabels()).toEqual(['Home', 'IDs', 'People', 'Activity', 'Settings']);
+    expect(railLabels()).toEqual(['Home', 'People', 'My IDs', 'Activity', 'Settings']);
     expect(
       qa('nav.al-rail [aria-current="page"]').map((a) => a.getAttribute('aria-label')),
-    ).toEqual(['IDs']);
+    ).toEqual(['My IDs']);
     // Minimized: icons only; the name is on the link.
     expect(q('nav.al-rail .al-rail-label')).toBeNull();
     // Inbox and Contacts are no destinations any more.
@@ -463,14 +469,59 @@ describe('the section menu (Decision 48)', () => {
     expect(qa('nav.al-rail .al-rail-label').map((l) => l.textContent)).toEqual([
       'Collapse',
       'Home',
-      'IDs',
       'People',
+      'My IDs',
       'Activity',
       'Settings',
     ]);
     expect(w.puts).toContainEqual({ menuExpanded: true });
     await click(button('Collapse menu'));
     expect(rail()?.dataset['expanded']).toBe('false');
+  });
+
+  it('the collapsed rail shows different icons for People and My IDs, each with a title (WP-N1)', async () => {
+    serve(world());
+    await mountAt('/');
+    const link = (label: string): Element | null => q(`nav.al-rail a[aria-label="${label}"]`);
+    const shape = (label: string): string =>
+      link(label)?.querySelector('svg')?.innerHTML.replace(/\s+/g, ' ') ?? '';
+    expect(shape('People')).not.toBe('');
+    expect(shape('My IDs')).not.toBe('');
+    expect(shape('People')).not.toBe(shape('My IDs'));
+    // The ID card is a rounded rectangle; the People icon has none.
+    expect(link('My IDs')?.querySelector('svg rect')).not.toBeNull();
+    expect(link('People')?.querySelector('svg rect')).toBeNull();
+    expect(link('People')?.getAttribute('title')).toBe('People');
+    expect(link('My IDs')?.getAttribute('title')).toBe('My IDs');
+  });
+
+  describe('default width rule (WP-N1)', () => {
+    const real = window.innerWidth;
+    const widen = (w: number): void => {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: w });
+    };
+    afterEach(() => widen(real));
+
+    it('opens expanded on a window 1100 px wide or more', async () => {
+      widen(1280);
+      serve(world());
+      await mountAt('/');
+      expect(rail()?.dataset['expanded']).toBe('true');
+    });
+
+    it('stays collapsed below 1100 px', async () => {
+      widen(1099);
+      serve(world());
+      await mountAt('/');
+      expect(rail()?.dataset['expanded']).toBe('false');
+    });
+
+    it("keeps the owner's own choice, wide or not", async () => {
+      widen(1280);
+      serve(world({ settings: { menuExpanded: false } }));
+      await mountAt('/');
+      expect(rail()?.dataset['expanded']).toBe('false');
+    });
   });
 
   it('opens expanded when the app says so', async () => {
@@ -488,14 +539,7 @@ describe('the section menu (Decision 48)', () => {
     expect(group?.getAttribute('aria-label')).toBe('Advanced');
     expect(
       [...(group?.querySelectorAll('a') ?? [])].map((a) => a.getAttribute('aria-label')),
-    ).toEqual([
-      'Live activity',
-      'Rules',
-      'Proofs & credits',
-      'Relays & network',
-      'Diagnostics',
-      'Connections map',
-    ]);
+    ).toEqual(['Live activity', 'Relays & network', 'Diagnostics', 'Connections map']);
   });
 
   it('on a phone: a bar names the page and its arrow opens the sections as a sheet', async () => {
@@ -509,8 +553,8 @@ describe('the section menu (Decision 48)', () => {
     const sheet = q('#al-section-sheet');
     expect([...(sheet?.querySelectorAll('a') ?? [])].map((a) => a.textContent)).toEqual([
       'Home',
-      'IDs',
       'People',
+      'My IDs',
       'Activity',
       'Settings',
     ]);
@@ -617,7 +661,7 @@ describe('Under the hood (kept by the app)', () => {
     expect(getPrefs().hood).toBe(true);
     await key({ key: 'u', ctrlKey: true, shiftKey: true });
     expect(getPrefs().hood).toBe(false);
-    expect(w.puts).toEqual([{ underTheHood: true }, { underTheHood: false }]);
+    expect(switchPuts(w)).toEqual([{ underTheHood: true }, { underTheHood: false }]);
   });
 
   it("the app's stored value wins over this browser's", async () => {
@@ -627,7 +671,7 @@ describe('Under the hood (kept by the app)', () => {
     serve(w);
     await mountAt('/');
     expect(hood()?.getAttribute('aria-checked')).toBe('true');
-    expect(w.puts).toEqual([]);
+    expect(switchPuts(w)).toEqual([]);
   });
 
   it('imports this browser’s old switch once when the app has none yet', async () => {
@@ -636,7 +680,7 @@ describe('Under the hood (kept by the app)', () => {
     const w = world();
     serve(w);
     await mountAt('/');
-    expect(w.puts).toEqual([{ underTheHood: true }]);
+    expect(switchPuts(w)).toEqual([{ underTheHood: true }]);
     expect(hood()?.getAttribute('aria-checked')).toBe('true');
   });
 
@@ -647,7 +691,7 @@ describe('Under the hood (kept by the app)', () => {
     await mountAt('/settings/appearance');
     act(() => setPref('hood', true));
     await settle();
-    expect(w.puts).toEqual([{ underTheHood: true }]);
+    expect(switchPuts(w)).toEqual([{ underTheHood: true }]);
     expect(hood()?.getAttribute('aria-checked')).toBe('true');
   });
 });
@@ -664,7 +708,7 @@ describe('Cmd+K (kept from #715), in both modes', () => {
     serve(world());
     await mountAt('/');
     expect(await open()).not.toBeNull();
-    expect(options().slice(0, 5)).toEqual(['Home', 'IDs', 'People', 'Activity', 'Settings']);
+    expect(options().slice(0, 5)).toEqual(['Home', 'People', 'My IDs', 'Activity', 'Settings']);
     expect(options()).toContain('Get started');
     expect(options()).toContain('Turn on Under the hood');
     expect(options()).toContain('Keyboard shortcuts');
@@ -685,7 +729,7 @@ describe('Cmd+K (kept from #715), in both modes', () => {
       qa('[role="option"]').find((o) => o.textContent?.includes('Turn on Under the hood')),
     );
     expect(getPrefs().hood).toBe(true);
-    expect(w.puts).toEqual([{ underTheHood: true }]);
+    expect(switchPuts(w)).toEqual([{ underTheHood: true }]);
   });
 });
 
@@ -897,6 +941,6 @@ describe('motion through the U0 kit (IR-6, 7, 8)', () => {
     await click(q('main [role="switch"]'));
     expect(vt.calls).toBe(1);
     expect(getPrefs().hood).toBe(true);
-    expect(w.puts).toEqual([{ underTheHood: true }]);
+    expect(switchPuts(w)).toEqual([{ underTheHood: true }]);
   });
 });

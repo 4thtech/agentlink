@@ -2,7 +2,7 @@
 // app's dot and word, the Pause sheet (one click, no Touch ID), the paused banner with Resume (Touch
 // ID, signs `agent.resume`), and the "Contacts still see {name}" note (D-141). Labels and former names
 // are text only, each in its own bidi-isolated run (I-5).
-import { Button, Pulse, Sheet } from '@4thtech-io/ui';
+import { Button, Icon, PageNotice, Pulse, Sheet } from '@4thtech-io/ui';
 import { useState, type ReactElement } from 'react';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import type { AgentsApi } from './api.js';
@@ -20,15 +20,100 @@ export function AppDot({ app }: { app: AppLive }): ReactElement {
   );
 }
 
-/** "Claude Code · Working" for each app that runs the agent (never colour alone). */
-export function AppChips({ apps, now }: { apps: readonly AppLive[]; now: number }): ReactElement {
+/** WP-I1 (I-3): a machine name such as `macbook-agent-1`, or the folder name that says "agent". */
+const MACHINE_NAME = /^[a-z0-9]+(-[a-z0-9]+)*-\d+$/;
+export function machineNamed(row: Pick<AgentRow, 'label' | 'name'>): boolean {
+  return MACHINE_NAME.test(row.label) || (row.label === row.name && /agent/i.test(row.label));
+}
+
+/** WP-I1: the name nudge on a card. The label is text in its own bidi run (I-5). */
+export function NameNudge({
+  row,
+  onRename,
+  duplicate = false,
+}: {
+  row: AgentRow;
+  onRename: () => void;
+  /** UX1113-QA2: another ID has the same name (a restore keeps names; folders differ). */
+  duplicate?: boolean;
+}): ReactElement {
+  return (
+    <div className="ag-nudge" role="note" data-nudge>
+      <Icon name="info" size={18} />
+      <p className="al-text-body-sm">
+        {duplicate ? S.duplicateBefore : S.nudgeBefore}
+        <strong>
+          <bdi>{row.label}</bdi>
+        </strong>
+        {duplicate ? S.duplicateAfter : S.nudgeAfter}
+      </p>
+      <Button variant="secondary" size="sm" onClick={onRename}>
+        {S.rename}
+      </Button>
+    </div>
+  );
+}
+
+/** WP-I1: the kit state of one ID. Hidden until the kit record exists (WP-R2): `kit` is undefined. */
+export type KitState = { readonly at: number } | 'none' | undefined;
+export function KitPill({
+  kit,
+  onOpen,
+}: {
+  kit: KitState;
+  onOpen: () => void;
+}): ReactElement | null {
+  if (kit === undefined) return null;
+  const date =
+    kit === 'none'
+      ? ''
+      : new Date(kit.at * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return (
+    <button
+      type="button"
+      className={`ag-kit ${kit === 'none' ? 'is-none' : 'is-ok'} al-text-label`}
+      onClick={onOpen}
+    >
+      {kit === 'none' ? S.kitNone : S.kitBacked(date)}
+    </button>
+  );
+}
+
+/** The tile letters of the mockup: C, D and X; any other app uses the first letter of its name. */
+const APP_LETTER: Readonly<Record<string, string>> = {
+  'claude-code': 'C',
+  'claude-desktop': 'D',
+  codex: 'X',
+};
+
+/**
+ * "Claude Code · Working" for each app that runs the agent (never colour alone). On a My IDs card
+ * (`card`): a letter tile, the name, the dot and the word, and a ready app reads "Ready".
+ */
+export function AppChips({
+  apps,
+  now,
+  card = false,
+}: {
+  apps: readonly AppLive[];
+  now: number;
+  card?: boolean;
+}): ReactElement {
   return (
     <ul className="ag-chips">
       {apps.map((a) => (
         <li key={a.id} className="ag-chip al-text-body-sm">
-          <AppDot app={a} />
+          {card ? (
+            <span className="ag-chip-tile" aria-hidden="true">
+              {APP_LETTER[a.id] ?? [...a.name][0]?.toUpperCase()}
+            </span>
+          ) : null}
+          {card ? null : <AppDot app={a} />}
           <span className="ag-chip-name">{a.name}</span>
-          <span className="al-muted">{appWord(a, now)}</span>
+          {card ? <AppDot app={a} /> : null}
+          <span className="al-muted">
+            {card && a.state === 'ready' && a.outdated !== true ? S.readyWord : appWord(a, now)}
+          </span>
         </li>
       ))}
     </ul>
@@ -145,18 +230,26 @@ export function PausedBanner({
   children?: ReactElement | null;
 }): ReactElement {
   return (
-    <div className="ag-banner al-reveal" data-paused-banner role="status">
-      <p className="al-text-body">
-        <bdi>{row.label}</bdi>
-        {S.isPaused}
-      </p>
-      {resuming ? (
-        children
-      ) : (
-        <Button variant="primary" icon="play" onClick={onResume}>
-          {S.resumeTouchId}
-        </Button>
-      )}
+    <div className="al-reveal" data-paused-banner>
+      <PageNotice
+        tone="warning"
+        icon="pause"
+        title={
+          <>
+            <bdi>{row.label}</bdi>
+            {S.isPaused}
+          </>
+        }
+        actions={
+          resuming ? undefined : (
+            <Button size="sm" variant="primary" icon="play" onClick={onResume}>
+              {S.resumeTouchId}
+            </Button>
+          )
+        }
+      >
+        {resuming ? children : undefined}
+      </PageNotice>
     </div>
   );
 }
@@ -196,31 +289,39 @@ export function CardNameNote({
     });
   };
   return (
-    <div className="ag-note" role="status" data-card-name-note>
-      <p className="al-text-body-sm">
-        <strong>
-          {noContacts ? S.newInvitesStillShow : S.contactsStillSee}
-          <bdi>{cardName}</bdi>
-        </strong>
-      </p>
-      <p className="al-text-body-sm al-muted">
-        {S.noteHint}
-        <bdi>{row.label}</bdi>.
-      </p>
-      {asking ? (
-        <OwnerGate
-          summary={S.renameStatement(cardName, row.label)}
-          passkey={passkey}
-          busy={busy}
-          error={error}
-          onProof={send}
-          onCancel={() => setAsking(false)}
-        />
-      ) : (
-        <Button variant="primary" size="sm" onClick={() => setAsking(true)}>
-          {noContacts ? S.updateName : S.updateContacts}
-        </Button>
-      )}
+    <div data-card-name-note>
+      <PageNotice
+        tone="info"
+        icon="users"
+        title={
+          <>
+            {noContacts ? S.newInvitesStillShow : S.contactsStillSee}
+            <bdi>{cardName}</bdi>
+          </>
+        }
+        actions={
+          asking ? undefined : (
+            <Button variant="primary" size="sm" onClick={() => setAsking(true)}>
+              {noContacts ? S.updateName : S.updateContacts}
+            </Button>
+          )
+        }
+      >
+        <p>
+          {S.noteHint}
+          <bdi>{row.label}</bdi>.
+        </p>
+        {asking ? (
+          <OwnerGate
+            summary={S.renameStatement(cardName, row.label)}
+            passkey={passkey}
+            busy={busy}
+            error={error}
+            onProof={send}
+            onCancel={() => setAsking(false)}
+          />
+        ) : null}
+      </PageNotice>
     </div>
   );
 }

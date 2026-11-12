@@ -1,7 +1,7 @@
 // U3-h: the calm "Tidy up" note on Home (b11 §29.7), above the Start here card, never inside it.
 // Shown only when at least one agent serves no AI app and has no contacts, the Agents page has not
 // been opened, and the note was not dismissed. Neutral tone: nothing needs you.
-import { Button, Surface } from '@4thtech-io/ui';
+import { Button, PageNotice } from '@4thtech-io/ui';
 import { useMemo, useState, type ReactElement } from 'react';
 import { navigate } from '../../router.js';
 import type { AgentsApi } from './api.js';
@@ -18,24 +18,23 @@ export function TidyNote({ api }: { api?: AgentsApi } = {}): ReactElement | null
   const count = useMemo(() => tidyCandidates(list?.agents ?? []).length, [list]);
   if (hidden || list === undefined || !list.switchable || count === 0) return null;
   return (
-    <Surface as="section" level={2} className="ag-tidy" aria-label={S.tidyUp}>
-      <p className="al-text-body">
-        <strong>{S.tidyNote(count)}</strong> {S.tidyHint}
-      </p>
-      <div className="ag-actions">
-        <Button variant="secondary" onClick={() => navigate(AGENTS_PATH)}>
+    <PageNotice
+      tone="neutral"
+      icon="sliders-horizontal"
+      title={S.tidyNote(count)}
+      className="ag-tidy"
+      actions={
+        <Button size="sm" variant="secondary" onClick={() => navigate(AGENTS_PATH)}>
           {S.tidyUp}
         </Button>
-        <Button
-          variant="ghost"
-          onClick={() => {
-            dismissTidy();
-            setHidden(true);
-          }}
-        >
-          {S.notNow}
-        </Button>
-      </div>
-    </Surface>
+      }
+      onDismiss={() => {
+        dismissTidy();
+        setHidden(true);
+      }}
+      dismissLabel={S.notNow}
+    >
+      <p>{S.tidyHint}</p>
+    </PageNotice>
   );
 }

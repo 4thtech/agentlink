@@ -52,6 +52,7 @@ import { lazyPart } from '../../lazy/index.js';
 import { INVITE_PATH } from '../../nav.js';
 import { createInviteApi, type InviteApi } from '../contacts/invite-api.js';
 import { navigate } from '../../router.js';
+import { setFinishRestore } from '../restore/outcome.js';
 import { announceAgentsChanged } from '../agents/use-agents.js';
 import { createAgentsApi, type AgentsApi } from '../agents/api.js';
 import {
@@ -482,7 +483,7 @@ function ConnectFirstStep({
         <h1 id="fr-h" ref={title} tabIndex={-1} className="st-title">
           {S.title}
         </h1>
-        <p className="st-lead">{S.body(appName ?? T.yourAiApp)}</p>
+        <p className="st-lead">{appName === undefined ? T.noAppCreateBody : S.body(appName)}</p>
       </div>
       <IdExplainerCard />
       <AgentCard name={shown} line={appName === undefined ? T.noAppYet : S.worksIn(appName)} />
@@ -659,6 +660,9 @@ export function FirstRunPage({
   // most 1.5 s), then Home opens.
   const stepInvites = useMemo(() => trackCancels(createInviteApi()), []);
   const [inviteGone, setInviteGone] = useState(false);
+  const [linkUnsent, setLinkUnsent] = useState(false);
+  // The warning for a link nobody has copied: raised by Done, Skip for now or the header's "Skip to Home".
+  const [leaveWarned, setLeaveWarned] = useState(false);
   const leaveInvite = (): void => {
     setInviteGone(true);
     window.setTimeout(() => void stepInvites.settled().then(goHome), 0);
@@ -905,6 +909,10 @@ export function FirstRunPage({
         });
       const problem = (error: SetupError): void => {
         if (error.problem === 'session_expired') return setView({ k: 'expired' });
+        if (error.problem === 'finish_restore') {
+          setFinishRestore(true);
+          return navigate('/restore/kit');
+        }
         if (error.problem === 'label_invalid')
           return again(undefined, SETUP_MESSAGES.label_invalid);
         again(setupMessage(error));
@@ -1141,8 +1149,11 @@ export function FirstRunPage({
   }, [step]);
 
   const sensorWords = S.connect(sensor);
+  const unsentLink = step === 'invite' && linkUnsent && invitePanel === undefined;
+  // "Skip to Home" warns like Done does while the link on screen has not been copied (once).
+  const guardedSkip = unsentLink && !leaveWarned ? (): void => setLeaveWarned(true) : onSkip;
   const frame = (body: ReactElement, at: StepId = step): ReactElement => (
-    <WizardFrame step={at} {...(onSkip === undefined ? {} : { onSkip })}>
+    <WizardFrame step={at} {...(guardedSkip === undefined ? {} : { onSkip: guardedSkip })}>
       {body}
     </WizardFrame>
   );
@@ -1171,9 +1182,17 @@ export function FirstRunPage({
     return frame(
       <InviteStep
         inviteHref={INVITE_PATH}
+        unsent={linkUnsent && invitePanel === undefined}
+        warned={leaveWarned}
+        onWarn={() => setLeaveWarned(true)}
         onHome={invitePanel === undefined ? leaveInvite : goHome}
         panel={
-          invitePanel ?? (inviteGone ? <></> : <INVITE_PANEL.Part invites={stepInvites.api} />)
+          invitePanel ??
+          (inviteGone ? (
+            <></>
+          ) : (
+            <INVITE_PANEL.Part invites={stepInvites.api} onUnsent={setLinkUnsent} />
+          ))
         }
       />,
     );
@@ -1397,9 +1416,11 @@ export function FirstRunPage({
           <h1 id="fr-h" className="st-title">
             {S.title}
           </h1>
-          <p className="st-lead">{S.body(appName)}</p>
+          <p className="st-lead">
+            {chosenApp === undefined ? T.notFoundCreateBody(appName) : S.body(appName)}
+          </p>
         </div>
-        <AgentCard name={label} line={S.worksIn(appName)} />
+        <AgentCard name={label} line={chosenApp === undefined ? T.noAppYet : S.worksIn(appName)} />
         <CreateAgentGate
           label={label}
           summary=""
@@ -1417,7 +1438,7 @@ export function FirstRunPage({
             })
           }
         />
-        <p className="st-note">{S.restartNote(appName)}</p>
+        {chosenApp === undefined ? null : <p className="st-note">{S.restartNote(appName)}</p>}
       </section>,
     );
   }

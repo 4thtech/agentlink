@@ -25,6 +25,7 @@ import {
   useRowPresence,
 } from '@4thtech-io/ui';
 import { UnderTheHood } from '../../lazy/hood.js';
+import { keepInApp } from '../../prefs/app-kept.js';
 import { useCallback, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { RevealOutcome } from './files-api.js';
 import {
@@ -380,6 +381,7 @@ const noteSeen = (): boolean => {
 const markNoteSeen = (): void => {
   try {
     window.localStorage.setItem(NOTE_KEY, 'seen');
+    keepInApp(NOTE_KEY);
   } catch {
     // The note simply shows again next time.
   }

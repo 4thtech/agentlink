@@ -39,3 +39,32 @@ main.al-first-run {
   padding: var(--al-space-8) var(--al-space-5);
   box-sizing: border-box;
 }
+
+/* Shared tones (design-1112): the state pills, tags and notices of Settings, My IDs and Rules. */
+.set-state.is-good,
+.set-state.is-warn,
+.ag-kit,
+.rl-tag,
+.set-notice {
+  border: var(--al-border-width-thin) solid;
+}
+.set-state.is-good,
+.set-state.is-warn,
+.ag-kit,
+.rl-tag {
+  border-radius: 999px;
+}
+.set-state.is-good,
+.ag-kit.is-ok {
+  background: var(--al-color-status-success-bg);
+  color: var(--al-color-status-success-fg);
+  border-color: var(--al-color-status-success-border);
+}
+.set-state.is-warn,
+.ag-kit.is-none,
+.rl-tag,
+.set-notice {
+  background: var(--al-color-status-warning-bg);
+  color: var(--al-color-status-warning-fg);
+  border-color: var(--al-color-status-warning-border);
+}

@@ -531,13 +531,87 @@ describe('W6-FLOW-FIXES: a connection the other side removed', () => {
   it('the conversation says sending is over; no "send it again", no Contact check to check', async () => {
     await render(revoked());
     await click(row('Denis'));
-    expect(host.textContent).toContain(fmtName(S.connectionRemovedBody, 'Denis'));
+    // UX 2026-11-12 (notices): one calm line on Home, no warning; the full words are on the
+    // contact's own page, one link away.
+    expect(host.textContent).not.toContain(fmtName(S.connectionRemovedBody, 'Denis'));
+    const gone = q('.hm-gone');
+    expect(gone?.className).toContain('al-tone-neutral');
+    expect(gone?.textContent).toContain(fmtName(S.connectionRemoved, 'Denis'));
+    expect(q('[role="alert"]')).toBeNull();
+    expect(gone?.querySelector('a')?.getAttribute('href')).toBe(
+      `/contacts?check=${encodeURIComponent(DENIS.contactId)}`,
+    );
     expect(host.textContent).not.toContain(S.notDeliveredRetry);
     // The history stays readable.
     expect(host.textContent).toContain('Sending the brief.');
     await click(all('button').find((b) => b.getAttribute('aria-label') === 'More for Denis'));
     const items = all('[role="menuitem"]').map((e) => e.textContent?.trim());
     expect(items).toEqual([S.rename, S.remove]);
+  });
+
+  const withId = (): Answers => ({
+    ...revoked(),
+    '/api/ui/agents': ok({
+      switchable: true,
+      generation: 1,
+      current: 'tali',
+      label: 'Tali',
+      agents: [
+        {
+          name: 'tali',
+          label: 'Tali',
+          current: true,
+          available: true,
+          removing: false,
+          contacts: 2,
+          running: false,
+          state: 'offline',
+          apps: [],
+        },
+      ],
+    }),
+    '/api/ui/apps': ok({ desktopRunning: false, apps: [] }),
+  });
+  const archiveBtn = (): HTMLElement | undefined =>
+    all('button').find((b) => b.getAttribute('aria-label') === fmtName(S.archiveLabel, 'Denis'));
+
+  it('Archive moves a removed connection to Archived (kept, per ID); Restore brings it back', async () => {
+    await render(withId());
+    // Only the removed connection can be archived.
+    expect(
+      all('button').some((b) => b.getAttribute('aria-label') === fmtName(S.archiveLabel, 'Ana')),
+    ).toBe(false);
+    await click(archiveBtn());
+    const archived = q('[data-archived]');
+    expect(archived?.querySelector('summary')?.textContent).toBe(
+      S.archivedCount.replace('{count}', '1'),
+    );
+    // Out of People, into Archived, still there to open.
+    expect(archived?.querySelector(`[data-person="${DENIS.contactId}"]`)).not.toBeNull();
+    const main = [...all('[data-person]')].filter((e) => e.closest('[data-archived]') === null);
+    expect(main.map((e) => e.getAttribute('data-person'))).toEqual([ANA.contactId]);
+    // Remembered in this browser for this ID (contact refs only).
+    expect(localStorage.getItem('agentlink.home.archived.v1')).toBe(
+      JSON.stringify([`tali/${DENIS.contactId}`]),
+    );
+    await click(
+      all('button').find((b) => b.getAttribute('aria-label') === fmtName(S.restoreLabel, 'Denis')),
+    );
+    expect(q('[data-archived]')).toBeNull();
+    expect(archiveBtn()).toBeTruthy();
+  });
+
+  it('an archived connection that is active again is back in People', async () => {
+    localStorage.setItem(
+      'agentlink.home.archived.v1',
+      JSON.stringify([`tali/${DENIS.contactId}`, `tali/${ANA.contactId}`]),
+    );
+    await render({
+      ...withId(),
+      [CONTACTS]: ok({ status: 'ok', contacts: [contact(DENIS), contact(ANA)] }),
+    });
+    expect(q('[data-archived]')).toBeNull();
+    expect(all('[data-person]')).toHaveLength(2);
   });
 
   it('under the hood, the last-message cell says so too', async () => {
@@ -697,6 +771,14 @@ describe('W7-ID-X1: ID chips, grouping, colour and who is asking', () => {
         { app: 'cursor', name: 'Cursor', state: 'connected', agent: 'tali-work' },
       ],
     }),
+    // N3: the other ID's number of people comes from the all-IDs read.
+    '/api/ui/people': ok({
+      status: 'ok',
+      ids: [
+        { name: 'tali', label: 'Tali', current: true, status: 'ok', contacts: [] },
+        { name: 'tali-work', label: 'Tali work', current: false, status: 'ok', count: 1 },
+      ],
+    }),
   });
   const tone = (el: Element | null | undefined): string | undefined =>
     [...(el?.classList ?? [])].find((c) => c.startsWith('is-') && c !== 'is-lg');
@@ -713,9 +795,9 @@ describe('W7-ID-X1: ID chips, grouping, colour and who is asking', () => {
     await render(base(agentsAnswer(2)));
     const chips = all('[data-id-chips] button');
     expect(chips.map((c) => c.textContent)).toEqual([
-      `${S.allAgents}2`,
+      `${S.allAgents}3`,
       'TTali · Claude Code2',
-      'TTali work · Cursor',
+      'TTali work · Cursor1',
     ]);
     expect(chips[0]?.getAttribute('aria-pressed')).toBe('true');
     expect(q('[data-id-group]')?.textContent).toContain('Tali · Claude Code');
@@ -724,6 +806,15 @@ describe('W7-ID-X1: ID chips, grouping, colour and who is asking', () => {
     expect(tone(q('[data-id-chip="tali"] .al-agent-icon'))).toBe(
       tone(row('Denis')?.querySelector('.al-agent-icon')),
     );
+  });
+
+  it('N3: choosing another ID says how many people it has, not "No one matches"', async () => {
+    await render(base(agentsAnswer(2)));
+    await click(q('[data-id-chip="tali-work"]'));
+    const note = q('[data-other-id]');
+    expect(note?.textContent).toContain('Tali work has 1 person. Open it to see them.');
+    expect(q('.hm-nomatch')?.textContent).not.toContain(S.noMatch);
+    expect(row('Denis')).toBeFalsy();
   });
 
   it('names the asking ID with its app and draws its colour on the approval card', async () => {

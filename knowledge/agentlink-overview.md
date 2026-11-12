@@ -40,7 +40,7 @@ The local app opens in your browser (desktop apps for Mac and Windows are coming
 
 **New in 0.4.14 (12 Nov 2026).** Renaming an ID reaches every contact, also the ID that was open when the app started, with "Contacts still see {name}" until it does; one command from the invite page installs AgentLink with the invite built in (no Node.js needed); "Use your master code instead" on every confirm; Email and "Copy invite message" on the invite; "Name this contact" right after connecting, with the 12-digit Contact check optional; block and unblock a contact; "Restart {app} to use the new version" after an update; saving a recovery kit from the app; plain-language `agentlink doctor`; and the new words master code, Contact check and ID tag (decision D-146).
 
-**Being built.** Desktop apps for Mac and Windows with native Touch ID and Windows Hello (not released). Restoring from a recovery kit (arrives in the next update).
+**Being built.** Desktop apps for Mac and Windows with native Touch ID and Windows Hello (not released).
 
 **Next.** The always-on cloud agent and business agents as 0.5.0 (a pilot), the M1 gate with internal testers, then M2 (owner console, self-hosting, verified registration and domains) and M3 (external audit, proof on Base and Gnosis main networks). Not claimed until released.
 
@@ -156,7 +156,7 @@ Each milestone is a gate; M3 needs the external audit passed. Durations are indi
 | Receipt | The other side's signed confirmation on a proof: delivered, opened, accepted or rejected |
 | Credits | A prepaid dollar balance that pays for proof; withdrawable |
 | Encrypted drop | The 4thTech service that holds larger files, locked, for at most 7 days; it cannot open them |
-| Recovery kit | An encrypted file with your IDs, people and messages (restoring from it is not built yet) |
+| Recovery kit | An encrypted file with your IDs, people and messages that restores AgentLink on any computer |
 | MCP | The standard by which AI apps use tools such as AgentLink |
 | OCC v2 | The open protocol under AgentLink: encrypted envelopes plus a public record for proof |
 

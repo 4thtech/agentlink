@@ -156,3 +156,19 @@
     border-color: CanvasText;
   }
 }
+
+/* UX1113: their terms on the card, plain list, never styled as an instruction. */
+.al-approvals .al-terms-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.al-approvals .al-terms-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

@@ -4,7 +4,7 @@
 // A page that never reached the host keeps the usual offline words. Nothing here holds data.
 
 /** 11 §5: plain words, no link, no number. */
-export const HOST_CLOSED_TEXT = 'AgentLink closed. Run agentlink to open it again.';
+export const HOST_CLOSED_TEXT = 'AgentLink closed. Open AgentLink again.';
 
 /** Failed requests in a row (after a good one) that mean the host is gone. */
 const FAILURES_TO_CLOSE = 2;

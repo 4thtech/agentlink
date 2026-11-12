@@ -69,8 +69,13 @@ describe('--help (06 §8)', () => {
       'doctor',
       'ui',
       'mcp',
+      // UX1113-R1 (D-147; 06 §8): restore from a recovery kit, and its alias.
+      'backup',
+      'restore',
     ]);
     const help = helpText();
+    expect(help).toContain('agentlink backup restore [file] [--check]');
+    expect(help).toContain('agentlink restore [file] [--check]');
     for (const usage of [
       'agentlink init',
       'agentlink owner init',
@@ -108,7 +113,14 @@ describe('--help (06 §8)', () => {
       expect(help).toContain(usage);
     }
     // Later cards, and the file KeyStore (M1-8f, off the M1a path): not listed.
-    for (const absent of ['storage', 'backup', 'relays', '--keystore', 'keystore passphrase']) {
+    // UX1113-R1: `backup restore` exists now (D-147); `backup export` stays app-only.
+    for (const absent of [
+      'storage',
+      'backup export',
+      'relays',
+      '--keystore',
+      'keystore passphrase',
+    ]) {
       expect(help).not.toContain(absent);
     }
     const commandLines = help.split('\n').filter((line) => line.startsWith('  agentlink '));
@@ -116,7 +128,8 @@ describe('--help (06 §8)', () => {
     // verify; M1-29: init --hook. M1-36c: `contacts --verify` and `policy set` are not listed. M1-36b-2-c: policy allow-send-folder.
     // U3-invite: `agentlink join '<invite link>'`.
     expect(help).toContain("agentlink join '<invite link>'");
-    expect(commandLines).toHaveLength(27);
+    // UX1113-R1: `backup restore` and `restore`.
+    expect(commandLines).toHaveLength(29);
   });
 
   it('prints help for --help, -h and help', async () => {

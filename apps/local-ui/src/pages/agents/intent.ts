@@ -9,13 +9,14 @@ export const INTENT_KEY = 'agentlink.agents.intent';
 /** A switch answers within seconds; an intent older than this is dropped. */
 export const INTENT_TTL_MS = 60_000;
 
-export type IntentAction = 'pause' | 'resume' | 'apps';
+// UX1113-QA2 N1: Rename too (08 §1: every agent action on another agent switches to it first).
+export type IntentAction = 'pause' | 'resume' | 'apps' | 'rename';
 export interface Intent {
   readonly name: string;
   readonly action: IntentAction;
 }
 
-const ACTIONS: ReadonlySet<string> = new Set(['pause', 'resume', 'apps']);
+const ACTIONS: ReadonlySet<string> = new Set(['pause', 'resume', 'apps', 'rename']);
 const NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export function rememberIntent(intent: Intent, now: number = Date.now()): void {

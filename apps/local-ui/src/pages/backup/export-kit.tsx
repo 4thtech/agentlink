@@ -8,10 +8,13 @@
 import { Button } from '@4thtech-io/ui';
 import { useEffect, useId, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient, type OwnerApiResult } from '../../api/client.js';
+import { useLeaveGuard } from '../../leave-guard.js';
 import { forgetRecoveryKitLater } from '../../states/index.js';
 import { gateMessage, OwnerGate } from '../agents/owner-gate.js';
 import { createOwnerClient, type PasskeyInfo, type PresenceProof } from '../contacts/owner.js';
+import { SaveChecklist, type CheckKit } from './save-checklist.js';
 import { BACKUP_STRINGS as S } from './strings.js';
+import { dayOf, joinNames } from './status.js';
 
 export const BACKUP_READ_PATH = '/api/ui/backup';
 export const BACKUP_EXPORT_PATH = '/api/ui/backup/export';
@@ -23,7 +26,46 @@ export interface SavedKit {
   readonly file: string;
   readonly folder: 'Downloads' | 'Home';
   readonly code: string;
+  /** The IDs the kit covers, by name (text only). */
+  readonly covers: readonly string[];
+  /** The one-use Check handle (WP-R2), when the server gave one. */
+  readonly check?: string;
+  /** IDs of this owner the kit does not hold, and why (WP-R2b). */
+  readonly notIncluded?: readonly NotIncluded[];
 }
+
+/** WP-R2b: why an ID is not in the kit. Only `file_keystore` can be backed up in the terminal. */
+export type NotIncludedReason = 'file_keystore' | 'could_not_open' | 'over_limit';
+export interface NotIncluded {
+  readonly name: string;
+  readonly label: string;
+  readonly reason: NotIncludedReason;
+}
+
+const NOT_INCLUDED_REASONS: ReadonlySet<string> = new Set([
+  'file_keystore',
+  'could_not_open',
+  'over_limit',
+]);
+/** An ID's folder name: lower-case words joined by single hyphens (as on the ID card's path). */
+const ID_NAME = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function notIncludedOf(value: unknown): NotIncluded[] {
+  if (!Array.isArray(value)) return [];
+  const out: NotIncluded[] = [];
+  for (const item of value.slice(0, 32)) {
+    if (typeof item !== 'object' || item === null) continue;
+    const { name, label, reason } = item as Record<string, unknown>;
+    if (typeof name !== 'string' || name.length > 64 || !ID_NAME.test(name)) continue;
+    if (typeof reason !== 'string' || !NOT_INCLUDED_REASONS.has(reason)) continue;
+    const shown = typeof label === 'string' && label.length > 0 && label.length < 65 ? label : name;
+    out.push({ name, label: shown, reason: reason as NotIncludedReason });
+  }
+  return out;
+}
+
+/** A label shown as is: letters, numbers, spaces and `._'-` only (else the folder name). */
+const SHOWN_LABEL = /^[\p{L}\p{N}][\p{L}\p{N} ._'-]{0,63}$/u;
 
 /** What the export answered, in the page's terms. */
 export type ExportOutcome =
@@ -46,7 +88,33 @@ export function exportOutcomeOf(result: OwnerApiResult): ExportOutcome {
         typeof d['code'] === 'string' &&
         CODE.test(d['code'])
       ) {
-        return { kind: 'saved', kit: { file: d['file'], folder: d['folder'], code: d['code'] } };
+        // UX1113-QA2 N4: the label people know; the folder name only when there is no plain label.
+        const covers = Array.isArray(d['covers'])
+          ? d['covers']
+              .map((c) => {
+                if (typeof c !== 'object' || c === null) return c;
+                const { name, label } = c as { name?: unknown; label?: unknown };
+                return typeof label === 'string' && SHOWN_LABEL.test(label) ? label : name;
+              })
+              .filter((n): n is string => typeof n === 'string' && n.length > 0 && n.length < 65)
+              .slice(0, 12)
+          : [];
+        const notIncluded = notIncludedOf(d['notIncluded']);
+        const check =
+          typeof d['check'] === 'string' && /^[A-Za-z0-9_-]{22}$/.test(d['check'])
+            ? d['check']
+            : undefined;
+        return {
+          kind: 'saved',
+          kit: {
+            file: d['file'],
+            folder: d['folder'],
+            code: d['code'],
+            covers,
+            ...(check === undefined ? {} : { check }),
+            ...(notIncluded.length === 0 ? {} : { notIncluded }),
+          },
+        };
       }
       return { kind: 'error', message: S.failed };
     }
@@ -82,19 +150,30 @@ type Phase =
   | { readonly kind: 'confirm'; readonly error?: string }
   | { readonly kind: 'working' }
   | { readonly kind: 'saved'; readonly kit: SavedKit }
-  | { readonly kind: 'done'; readonly kit: Omit<SavedKit, 'code'> };
+  | { readonly kind: 'done'; readonly covers: readonly string[] };
 
 export interface ExportKitProps {
   readonly api?: ApiClient;
   /** The stored passkey this browser can use (contacts/owner.ts); tests pass their own. */
   readonly passkey?: () => Promise<PasskeyInfo | undefined>;
-  /** The ID's label for the confirmation line; "this ID" when not known. */
+  /** The ID's label for the confirmation line; "your IDs" when not known. */
   readonly label?: string;
+  /** The page already read it (GET /api/ui/backup `export`): skip our own read. */
+  readonly known?: 'available' | 'not_available' | undefined;
+  /** The button reads "Save a new kit" when a kit is on record. */
+  readonly hasKit?: boolean;
+  /** How Check my kit runs (default: R1's restore check, save-checklist.ts); tests inject theirs. */
+  readonly checkKit?: CheckKit | null | undefined;
+  /** Called after Done, so the page can read the record again. */
+  readonly onDone?: (() => void) | undefined;
+  /** Tests inject the print window opener. */
+  readonly openWindow?: Parameters<typeof import('./print-sheet.js').printSheet>[1] | undefined;
 }
 
-function useAvailability(api: ApiClient): Availability {
+function useAvailability(api: ApiClient, known: Availability | undefined): Availability {
   const [state, setState] = useState<Availability>('loading');
   useEffect(() => {
+    if (known !== undefined) return undefined;
     let live = true;
     void api.get<{ export?: unknown }>(BACKUP_READ_PATH).then(
       (r) => {
@@ -108,8 +187,8 @@ function useAvailability(api: ApiClient): Availability {
     return () => {
       live = false;
     };
-  }, [api]);
-  return state;
+  }, [api, known]);
+  return known ?? state;
 }
 
 function usePasskeyInfo(read: () => Promise<PasskeyInfo | undefined>): PasskeyInfo | undefined {
@@ -134,11 +213,18 @@ export function ExportKit({
   api: given,
   passkey: readPasskey = defaultPasskey,
   label,
+  known,
+  hasKit = false,
+  checkKit,
+  onDone,
+  openWindow,
 }: ExportKitProps): ReactElement {
   const [api] = useState<ApiClient>(() => given ?? defaultApi());
-  const availability = useAvailability(api);
+  const availability = useAvailability(api, known);
   const passkey = usePasskeyInfo(readPasskey);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
+  // UX1113-QA2 N14: while the kit is being saved, or its code and checklist are up, leaving asks.
+  useLeaveGuard(phase.kind === 'working' || phase.kind === 'saved' ? S.leaveWarning : undefined);
   const [copied, setCopied] = useState(false);
   const [note, setNote] = useState<string | undefined>(undefined);
   const codeId = useId();
@@ -203,27 +289,42 @@ export function ExportKit({
           </div>
           <p className="al-text-body-sm">{S.codeBody}</p>
           <p className="al-text-body-sm al-muted">{S.privacy}</p>
-          <div className="al-secret-actions">
-            <Button
-              variant="primary"
-              onClick={() => {
-                forgetRecoveryKitLater();
-                setPhase({ kind: 'done', kit: { file: kit.file, folder: kit.folder } });
-              }}
-            >
-              {S.savedIt}
-            </Button>
-            <Button
-              variant="secondary"
-              icon="copy"
-              aria-controls={codeId}
-              onClick={() => copy(kit.code)}
-            >
-              {copied ? S.copied : S.copy}
-            </Button>
-          </div>
           <p className="al-text-caption al-muted">{S.copyNote}</p>
         </section>
+        {kit.notIncluded === undefined ? null : (
+          <section className="bk-not-included" aria-label={S.notIncludedTitle}>
+            <p className="al-text-label">{S.notIncludedTitle}</p>
+            <ul className="al-text-body-sm">
+              {kit.notIncluded.map((n) => (
+                <li key={n.name} data-not-included={n.reason}>
+                  <bdi>
+                    <strong>{n.label}</strong>
+                  </bdi>
+                  {': '}
+                  {n.reason === 'file_keystore'
+                    ? S.notIncludedTerminal
+                    : n.reason === 'over_limit'
+                      ? S.notIncludedOverLimit
+                      : S.notIncludedCouldNotOpen}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        <SaveChecklist
+          api={api}
+          facts={{ code: kit.code, file: kit.file, date: dayOf(Date.now()) }}
+          check={kit.check}
+          checkKit={checkKit}
+          copied={copied}
+          onCopy={() => copy(kit.code)}
+          open={openWindow}
+          onDone={() => {
+            forgetRecoveryKitLater();
+            setPhase({ kind: 'done', covers: kit.covers });
+            onDone?.();
+          }}
+        />
       </div>
     );
   }
@@ -241,7 +342,7 @@ export function ExportKit({
     <div className="bk-export" data-backup-export={phase.kind}>
       {phase.kind === 'done' ? (
         <p className="al-text-body-sm" role="status">
-          {S.done}
+          {S.done(joinNames(phase.covers))}
         </p>
       ) : null}
       {phase.kind === 'confirm' || phase.kind === 'working' ? (
@@ -256,14 +357,14 @@ export function ExportKit({
       ) : (
         <div className="bk-actions">
           <Button
-            variant={phase.kind === 'done' ? 'secondary' : 'primary'}
+            variant={hasKit || phase.kind === 'done' ? 'secondary' : 'primary'}
             icon="download"
             onClick={() => {
               setNote(undefined);
               setPhase({ kind: 'confirm' });
             }}
           >
-            {phase.kind === 'done' ? S.saveAnother : S.saveKit}
+            {hasKit || phase.kind === 'done' ? S.saveNew : S.saveFirst}
           </Button>
           <p className="al-text-caption al-muted">{S.saveHint}</p>
         </div>

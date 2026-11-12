@@ -11,7 +11,7 @@ import type { ApiClient, ApiResult } from '../api/client.js';
 import { createApiClient } from '../api/client.js';
 import { createPayConfirmClient } from '../pay-confirm/index.js';
 import { ActivityPage } from './activity/index.js';
-import { ACTIVITY_STRINGS as A } from './activity/strings.js';
+import { ACTIVITY_COPY as A } from './activity/strings.js';
 import { AppearancePage } from './appearance/index.js';
 import { APPEARANCE_STRINGS as P } from './appearance/strings.js';
 import { FilesPage, type FilesPageProps } from './files/index.js';
@@ -120,33 +120,46 @@ describe('Files: Received / Sent / Send folders', () => {
 
 // --- Activity: the filter is a radiogroup ---------------------------------------------------------
 
-describe('Activity: All / Approvals / Proofs / Other', () => {
+describe('Activity: All / Approvals / Proofs / People & IDs / Safety (WP-A2)', () => {
   const AT = 1_760_000_000;
   const items = [
     { kind: 'approval_decided', at: AT, decision: 'approved' },
     { kind: 'proof', at: AT - 60, direction: 'sent', state: 'recorded' },
   ];
   const mount = async (): Promise<void> => {
-    const api = { get: vi.fn(async () => ok({ items })), post: vi.fn() } as unknown as ApiClient;
+    // WP-A2: the page also reads the people (to name them).
+    const api = {
+      get: vi.fn(async (path: string) =>
+        path.startsWith('/api/ui/contacts') ? ok({ status: 'ok', contacts: [] }) : ok({ items }),
+      ),
+      post: vi.fn(),
+    } as unknown as ApiClient;
     await act(async () => {
       root.render(h(HoodProvider, { value: false }, h(ActivityPage, { api })));
     });
+    await flush();
   };
 
-  it('is a segmented radiogroup of four with exactly one chosen, and no pressed chips', async () => {
+  it('is a segmented radiogroup of five with exactly one chosen, and no pressed chips', async () => {
     await mount();
     const group = host.querySelector(`[role="radiogroup"][aria-label="${A.filterLabel}"]`);
     expect(group?.classList.contains('al-seg')).toBe(true);
     const radios = all('[role="radio"]');
-    expect(radios).toHaveLength(4);
+    expect(radios).toHaveLength(5);
     expect(radios.filter((r) => r.getAttribute('aria-checked') === 'true')).toHaveLength(1);
-    expect(host.querySelector('[aria-pressed], .al-activity-chip, .al-activity-chips')).toBeNull();
+    // The filter itself has no pressed chips. WP-A2's count tiles above it (design-1112 §7) are
+    // toggle buttons by design (aria-pressed), so they are checked by their own tests.
+    expect(
+      host.querySelector(
+        '.al-activity-filter [aria-pressed], .al-seg [aria-pressed], .al-activity-chip, .al-activity-chips',
+      ),
+    ).toBeNull();
   });
 
   it('one tab stop; arrow keys move and select; the list follows', async () => {
     await mount();
     const radios = all('[role="radio"]');
-    expect(radios.map((r) => r.tabIndex)).toEqual([0, -1, -1, -1]);
+    expect(radios.map((r) => r.tabIndex)).toEqual([0, -1, -1, -1, -1]);
     await key(radios[0]!, 'ArrowRight');
     expect(radios[1]?.getAttribute('aria-checked')).toBe('true');
     expect(document.activeElement).toBe(radios[1]);

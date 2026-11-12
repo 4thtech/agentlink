@@ -33,7 +33,7 @@ export const FILES_IO_STRINGS = {
   tryAgain: 'Try again',
   showMore: 'Show more',
   receivedEmptyTitle: 'No files received yet.',
-  receivedEmptyHint: 'Files your contacts send you appear here.',
+  receivedEmptyHint: 'Files people send you appear here.',
   sentEmptyTitle: 'No files sent yet.',
   sentEmptyHint: 'Files your AI sends appear here. To send one, ask your AI.',
   from: 'From',

@@ -31,9 +31,11 @@ import {
   Surface,
   TextField,
   formatContactName,
+  useHood,
   useReducedMotion,
 } from '@4thtech-io/ui';
 import { UnderTheHood } from '../../lazy/hood.js';
+import { ShellIcon } from '../../layout/shell-icons.js';
 import type { IdentityKind } from '@4thtech-io/ui';
 import {
   useCallback,
@@ -47,27 +49,25 @@ import {
 } from 'react';
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
 import { usePrefs } from '../../prefs/index.js';
-import {
-  ActivityCell,
-  ActivitySort,
-  compareMostActive,
-  sortKey,
-  usePulse,
-  type Pulse,
-} from '../pulse/index.js';
+import { ActivitySort, compareMostActive, sortKey, usePulse, type Pulse } from '../pulse/index.js';
 import { PAGE_TITLES } from '../../strings.js';
 import { ADD_CONTACT_MARKER } from './add-contact-link.js';
 import { connectingTo } from './add-strings.js';
 import {
   LIST_PATH,
+  PEOPLE_ALL_PATH,
   contactPath,
   parseCode,
   parseList,
+  idMissing,
+  parsePeopleAll,
   parseRenameCheck,
   renameCheckPath,
   type CodeAnswer,
   type ContactRow,
+  type IdPeople,
 } from './data.js';
+import { switchAgent } from '../../api/live.js';
 import {
   INVITES_LIST_PATH,
   createInviteApi,
@@ -100,12 +100,15 @@ import { PersonMenu } from '../invite/person-menu.js';
 import { INVITE_STRINGS as I } from '../invite/strings.js';
 import { START_STRINGS } from '../home/strings.js';
 import {
+  ALL_IDS,
   CONTACTS_STRINGS as S,
   HOOD,
   SUMMARY,
   countLine,
   mismatchBody,
   nudge,
+  personLine,
+  sameNameTag,
   secondConnection,
   since,
   waitSeconds,
@@ -119,6 +122,17 @@ type ListState =
   | { readonly phase: 'error' }
   | { readonly phase: 'not_set_up' }
   | { readonly phase: 'ok'; readonly contacts: readonly ContactRow[] };
+
+/**
+ * WP-P2: a person of the open ID as listed, with that ID when there are 2+ IDs (`id` is absent with
+ * one ID). Another ID's people are not listed by name: its names stay sealed in its own store until
+ * it is opened (04 §2.5), so it shows as "{n} people with {ID}" with Open {ID}.
+ */
+type Person = ContactRow & {
+  readonly id?: { readonly name: string; readonly label: string; readonly current: boolean };
+};
+
+const personKey = (c: Person): string => `${c.id?.name ?? ''}:${c.ref}`;
 
 /** One owner operation waiting for presence. */
 interface Pending {
@@ -134,6 +148,21 @@ const DATE = new Intl.DateTimeFormat(undefined, {
   year: 'numeric',
 });
 
+/** Time of day, for telling two same-named people apart when no ID tag is known. */
+const TIME = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+
+/** The names (as the rows show them, lower case) that more than one person in `rows` has. */
+export function repeatedNames(rows: readonly ContactRow[]): ReadonlySet<string> {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+  for (const c of rows) {
+    const key = shownName(c).trim().toLowerCase();
+    if (seen.has(key)) repeated.add(key);
+    seen.add(key);
+  }
+  return repeated;
+}
+
 /** The pairing day in the second-connection notice ("paired 25 Oct"). */
 const DAY = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' });
 
@@ -144,6 +173,20 @@ const nameInput = (c: ContactRow): { alias?: string; name?: string; fingerprint?
 
 /** The name as the ui name rule shows it, for sentences (always rendered as text). */
 const shownName = (c: ContactRow): string => formatContactName(nameInput(c)).text;
+
+/**
+ * The rename note: the new name is always visible (under your own name for them, as "Now calls
+ * itself {new}"), and "(was {old})" only when the old name differs from what the row shows.
+ */
+export const renameNote = (c: ContactRow): string => {
+  const shown = shownName(c);
+  const parts: string[] = [];
+  if (c.newName !== undefined && c.newName !== shown) parts.push(S.nowCalls(c.newName));
+  if (c.formerName !== undefined && c.formerName !== shown && c.formerName !== c.newName) {
+    parts.push(S.wasName(c.formerName));
+  }
+  return parts.join(' ');
+};
 
 const labelKind = (c: ContactRow): IdentityKind =>
   c.label === 'safety-code-checked' ? 'checked' : 'selfdeclared';
@@ -163,9 +206,9 @@ function initials(text: string): string {
 
 function Chip({ icon, tone, children }: { icon: string; tone: string; children: string }) {
   return (
-    <span className={`al-chip al-tone-${tone}`}>
+    <span className={`ct-chip al-tone-${tone}`}>
       <Icon name={icon} size={12} strokeWidth={2.25} />
-      <span className="al-text-label">{children}</span>
+      <span className="al-text-body-sm">{children}</span>
     </span>
   );
 }
@@ -199,72 +242,188 @@ function StateChip({ contact }: { contact: ContactRow }): ReactElement | null {
   return null;
 }
 
-/** Shown names that more than one contact has, so each of those rows can say so (UI-only hint). */
-function duplicateNames(contacts: readonly ContactRow[]): ReadonlySet<string> {
-  const seen = new Set<string>();
-  const dupes = new Set<string>();
-  for (const c of contacts) {
-    const n = shownName(c).trim().toLowerCase();
-    if (seen.has(n)) dupes.add(n);
-    seen.add(n);
-  }
-  return dupes;
+/** "2 h ago", "yesterday", or a short date: plain text for the row line. */
+function ago(at: number, now: number): string {
+  const sec = Math.max(0, now - at);
+  if (sec < 60) return 'just now';
+  if (sec < 3600) return `${String(Math.floor(sec / 60))} min ago`;
+  if (sec < 86_400) return `${String(Math.floor(sec / 3600))} h ago`;
+  if (sec < 172_800) return 'yesterday';
+  return DAY.format(new Date(at * 1000));
+}
+
+function PersonRow({
+  c,
+  selected,
+  fresh,
+  pulse,
+  onSelect,
+  archived,
+  again,
+  sameName = false,
+}: {
+  c: Person;
+  selected: string | undefined;
+  fresh?: string | undefined;
+  pulse: Pulse | undefined;
+  onSelect: (ref: string, person: Person) => void;
+  /** Set for an archived (removed) connection. */
+  archived?: boolean;
+  /** An active person with the same owner: the day you connected again. */
+  again?: string | undefined;
+  /** Another person in this list has the same name: the row says what tells them apart. */
+  sameName?: boolean;
+}): ReactElement {
+  // WP-P2: the activity pulse is the open ID's; another ID's people show no last message here.
+  const other = c.id !== undefined && !c.id.current;
+  const last = other ? undefined : pulse?.contacts.get(c.ref)?.lastAt;
+  const connected = DAY.format(new Date((c.pairedAt ?? c.since) * 1000));
+  const name = (
+    <span className="al-contact-name">
+      <bdi>{shownName(c)}</bdi>
+      {renameNote(c) === '' ? null : (
+        <span className="al-text-caption al-muted ct-former">
+          {' '}
+          <bdi>{renameNote(c)}</bdi>
+        </span>
+      )}
+      {archived === true ? (
+        <span className="al-text-caption al-muted"> · {S.olderConnection}</span>
+      ) : null}
+    </span>
+  );
+  return (
+    <li>
+      <button
+        type="button"
+        className={`al-contact ct-row${c.status === 'active' ? '' : ` is-${c.status}`}${c.ref === fresh ? ' is-fresh' : ''}`}
+        aria-current={c.ref === selected && !other ? 'true' : undefined}
+        onClick={() => onSelect(c.ref, c)}
+      >
+        <span className="al-avatar al-text-label" aria-hidden="true">
+          {initials(shownName(c))}
+        </span>
+        <span className="al-contact-main">
+          {name}
+          <span className="al-text-caption al-muted ct-line">
+            {archived === true
+              ? `${S.theyRemoved}${again === undefined ? '' : ` ${S.connectedAgain(again)}`} ${S.oldConversation}`
+              : personLine(
+                  last === undefined || last <= 0 || pulse === undefined
+                    ? undefined
+                    : ago(last, pulse.now),
+                  connected,
+                ) +
+                (sameName
+                  ? ` · ${sameNameTag(c.fingerprint, TIME.format(new Date((c.pairedAt ?? c.since) * 1000)))}`
+                  : '')}
+          </span>
+        </span>
+        <span className="al-contact-side">
+          {c.id === undefined ? null : (
+            <span className="al-text-body-sm al-muted ct-with">
+              {ALL_IDS.with} <bdi>{c.id.label}</bdi>
+            </span>
+          )}
+          {archived === true ? (
+            <span className="al-text-body-sm ct-open">{S.open}</span>
+          ) : (
+            <>
+              <StateChip contact={c} />
+              {c.status === 'active' && c.pairing === 'complete' ? (
+                c.label === 'safety-code-checked' ? (
+                  <Chip icon="check" tone="success">
+                    {HOOD.checked}
+                  </Chip>
+                ) : (
+                  <span className="al-text-body-sm ct-check">{S.checkContact}</span>
+                )
+              ) : null}
+            </>
+          )}
+        </span>
+      </button>
+    </li>
+  );
 }
 
 function ContactList({
   contacts,
   selected,
   pulse,
-  arrivals,
-  seq,
   onSelect,
   fresh,
 }: {
-  contacts: readonly ContactRow[];
+  contacts: readonly Person[];
   selected: string | undefined;
   pulse: Pulse | undefined;
-  arrivals: ReadonlySet<string>;
-  seq: number;
-  onSelect: (ref: string) => void;
+  onSelect: (ref: string, person: Person) => void;
   /** W5-INVITE-FEEDBACK: the contact that just connected (a short pulse). */
   fresh?: string | undefined;
 }): ReactElement {
-  const dupes = duplicateNames(contacts);
+  const repeated = repeatedNames(contacts);
   return (
     <Surface as="ul" level={1} className="ct-list" aria-label={S.listLabel}>
       {contacts.map((c) => (
-        <li key={c.ref}>
-          <button
-            type="button"
-            className={`al-contact ct-row${c.status === 'active' ? '' : ` is-${c.status}`}${c.ref === fresh ? ' is-fresh' : ''}`}
-            aria-current={c.ref === selected ? 'true' : undefined}
-            onClick={() => onSelect(c.ref)}
-          >
-            <span className="al-avatar al-text-label" aria-hidden="true">
-              {initials(shownName(c))}
-            </span>
-            <span className="al-contact-main">
-              <span className="al-contact-name">
-                <ContactName {...nameInput(c)} label={labelKind(c)} showLabel />
-                {c.formerName === undefined ? null : (
-                  <span className="al-text-caption al-muted ct-former">
-                    {' '}
-                    <bdi>{S.wasName(c.formerName)}</bdi>
-                  </span>
-                )}
-              </span>
-              {dupes.has(shownName(c).trim().toLowerCase()) ? (
-                <span className="al-text-caption al-muted ct-same-name">{S.sameName}</span>
-              ) : null}
-            </span>
-            <ActivityCell pulse={pulse} contactId={c.ref} arrival={arrivals.has(c.ref) ? seq : 0} />
-            <span className="al-contact-side">
-              <StateChip contact={c} />
-            </span>
-          </button>
-        </li>
+        <PersonRow
+          key={personKey(c)}
+          c={c}
+          sameName={repeated.has(shownName(c).trim().toLowerCase())}
+          selected={selected}
+          fresh={fresh}
+          pulse={pulse}
+          onSelect={onSelect}
+        />
       ))}
     </Surface>
+  );
+}
+
+/** Revoked and removed connections: they move here by themselves; collapsed by default (spec §5). */
+function ArchivedList({
+  gone,
+  active,
+  selected,
+  pulse,
+  onSelect,
+}: {
+  gone: readonly Person[];
+  active: readonly Person[];
+  selected: string | undefined;
+  pulse: Pulse | undefined;
+  onSelect: (ref: string, person: Person) => void;
+}): ReactElement | null {
+  if (gone.length === 0) return null;
+  const againOf = (c: Person): string | undefined => {
+    const n = shownName(c).trim().toLowerCase();
+    // WP-P2: only a person of the same ID tells "you connected again".
+    const next = active.find(
+      (a) =>
+        a.id?.name === c.id?.name &&
+        (a.olderSameOwner === c.ref || shownName(a).trim().toLowerCase() === n),
+    );
+    return next === undefined
+      ? undefined
+      : DAY.format(new Date((next.pairedAt ?? next.since) * 1000));
+  };
+  return (
+    <details className="ct-archived">
+      <summary className="al-text-body ct-sum">{`${S.archivedLabel} (${String(gone.length)})`}</summary>
+      <Surface as="ul" level={1} className="ct-list ct-list-archived" aria-label={S.archivedLabel}>
+        {gone.map((c) => (
+          <PersonRow
+            key={personKey(c)}
+            c={c}
+            selected={selected}
+            pulse={pulse}
+            onSelect={onSelect}
+            archived
+            again={againOf(c)}
+          />
+        ))}
+      </Surface>
+      <p className="al-text-caption al-muted">{S.archivedFoot}</p>
+    </details>
   );
 }
 
@@ -357,6 +516,7 @@ function Detail({
   onKeepBoth: () => void;
   onChanged: (what: Pending['what']) => void;
 }): ReactElement {
+  const hood = useHood();
   const ref = contact.ref;
   const name = shownName(contact);
   const compare = canCompareCode(contact);
@@ -608,9 +768,23 @@ function Detail({
       <p className="al-text-body-sm al-muted">
         {since(DATE.format(new Date(contact.since * 1000)))}
       </p>
+      {hood ? (
+        <dl className="ct-hood" data-hood-facts>
+          {hoodFacts(contact).map(([label, value]) => (
+            <div key={label} className="ct-hood-row">
+              <dt className="al-text-body-sm al-muted">{label}</dt>
+              <dd className="al-text-body-sm al-text-code">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
       {duplicate}
       {contact.status === 'blocked' ? <p className="al-text-body">{S.blockedDetail}</p> : null}
-      {contact.status === 'revoked' ? <p className="al-text-body">{S.revokedDetail}</p> : null}
+      {contact.status === 'revoked' ? (
+        <Banner tone="neutral" icon="minus" title={S.revokedTitle}>
+          {S.revokedDetail} {S.revokedMore}
+        </Banner>
+      ) : null}
       {notice === undefined ? null : (
         <p className="al-text-body" role="status">
           {notice}
@@ -719,6 +893,16 @@ function Detail({
  * Under the hood (B-11 §16): what the list already carries, nothing more. The fingerprint is only
  * sent for some contacts, so it is left out otherwise; the contact's ref is never shown.
  */
+function hoodFacts(c: ContactRow): [string, string][] {
+  return [
+    ...(c.fingerprint === undefined
+      ? []
+      : ([[HOOD.fingerprint, c.fingerprint]] as [string, string][])),
+    [HOOD.identity, c.label === 'safety-code-checked' ? HOOD.checked : HOOD.selfDeclared],
+    [HOOD.paired, new Date(c.since * 1000).toISOString().slice(0, 10)],
+  ];
+}
+
 function hoodFields(c: ContactRow): unknown[] {
   return [
     ...(c.fingerprint === undefined
@@ -752,6 +936,8 @@ function PendingInvites({
   now,
   onCancel,
   connecting = [],
+  blockedRefs,
+  onUnblock,
 }: {
   rows: readonly OpenInvite[];
   cancelled: readonly OpenInvite[];
@@ -760,6 +946,9 @@ function PendingInvites({
   onCancel: (inviteId: string) => Promise<CancelResult>;
   /** W5-INVITE-FEEDBACK: this agent's accepts that wait for the inviter's answer. */
   connecting?: readonly ConnectingRow[];
+  /** Contacts the page knows are blocked (matched to a waiting accept by ref). */
+  blockedRefs?: ReadonlySet<string>;
+  onUnblock?: (ref: string) => void;
 }): ReactElement | null {
   const gone = cancelled.filter((c) => !rows.some((r) => r.inviteId === c.inviteId));
   if (rows.length === 0 && gone.length === 0 && connecting.length === 0) return null;
@@ -767,7 +956,14 @@ function PendingInvites({
   return (
     <Surface as="ul" level={1} className="ct-list ct-invites" aria-label={I.pendingLabel}>
       {connecting.map((c) => (
-        <ConnectingInviteRow key={`c-${c.ref}`} row={c} />
+        <ConnectingInviteRow
+          key={`c-${c.ref}`}
+          row={c}
+          blocked={c.blocked === true || blockedRefs?.has(c.ref) === true}
+          {...(onUnblock === undefined || blockedRefs?.has(c.ref) !== true
+            ? {}
+            : { onUnblock: () => onUnblock(c.ref) })}
+        />
       ))}
       {[...gone, ...rows].map((r) => (
         <PendingInviteRow
@@ -806,6 +1002,8 @@ export interface ContactsPageProps {
   readonly invites?: InviteApi;
   /** How often the page reads again while something waits (5 s; tests use less). */
   readonly pollMs?: number;
+  /** WP-P2: opens another ID (the shell's switch, api/live.ts `switchAgent`); tests pass a fake. */
+  readonly switchTo?: (name: string) => Promise<{ readonly kind: string }>;
 }
 
 /** W4-PEOPLE-INVITE: `?invite` opens the Invite screen; the marker leaves the address at once. */
@@ -836,6 +1034,7 @@ export function ContactsPage({
   owner: givenOwner,
   invites: givenInvites,
   pollMs = 5_000,
+  switchTo = switchAgent,
 }: ContactsPageProps = {}): ReactElement {
   const api = useMemo(() => givenApi ?? createApiClient(), [givenApi]);
   const owner = useMemo(() => givenOwner ?? createOwnerClient(), [givenOwner]);
@@ -878,6 +1077,13 @@ export function ContactsPage({
   const acceptInFlight = useRef(false);
   const [arrived, setArrived] = useState<ContactRow | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
+  // WP-P2 (spec §5): every ID's people (undefined until read, or when the read is not usable: the
+  // page then keeps the open ID's list), the ID filter ('' = All my IDs) and the name search.
+  const [ids, setIds] = useState<readonly IdPeople[] | undefined>(undefined);
+  const [idFilter, setIdFilter] = useState('');
+  const [query, setQuery] = useState('');
+  const filterId = useId();
+  const searchId = useId();
   const activity = usePulse(api);
   const { activitySort } = usePrefs();
   const inviteFirst = useInviteFirst();
@@ -906,6 +1112,15 @@ export function ContactsPage({
         const waiting = parseConnecting(res.data);
         lastConnecting.current = waiting;
         setConnectingRows(waiting);
+      },
+      () => undefined,
+    );
+    // WP-P2: every ID's people; a failed read keeps the last good one.
+    void api.get(PEOPLE_ALL_PATH).then(
+      (res) => {
+        if (!live || res.kind !== 'ok') return;
+        const read = parsePeopleAll(res.data);
+        if (read !== undefined) setIds(read);
       },
       () => undefined,
     );
@@ -1146,15 +1361,33 @@ export function ContactsPage({
     }
     return 'failed';
   };
+  const waitingCount = rows.length + connectingRows.length;
   const invitesList = (
-    <PendingInvites
-      rows={rows}
-      cancelled={cancelledRows}
-      highlight={highlight}
-      now={Date.now()}
-      onCancel={cancelInvite}
-      connecting={connectingRows}
-    />
+    <>
+      {waitingCount > 0 ? (
+        <h2 className="al-text-body ct-group">{`${S.invitesWaiting} (${String(waitingCount)})`}</h2>
+      ) : null}
+      <PendingInvites
+        rows={rows}
+        cancelled={cancelledRows}
+        highlight={highlight}
+        now={Date.now()}
+        onCancel={cancelInvite}
+        connecting={connectingRows}
+        blockedRefs={
+          new Set(
+            (list.phase === 'ok' ? list.contacts : [])
+              .filter((c) => c.status === 'blocked')
+              .map((c) => c.ref),
+          )
+        }
+        onUnblock={(ref) => {
+          setRemoved(false);
+          setSelected(ref);
+          setSheetOpen(true);
+        }}
+      />
+    </>
   );
   const moment =
     arrived === undefined ? null : (
@@ -1173,6 +1406,55 @@ export function ContactsPage({
         />
       </div>
     );
+
+  // WP-P2 (spec §5): with 2+ IDs every row says "with {ID}" and the filter shows; the open ID's
+  // people come from its own read (LIST_PATH), every other ID's from the all-IDs read.
+  const multi = ids !== undefined && ids.length >= 2;
+  const openIdOf = ids?.find((id) => id.current);
+  const ownPeople: readonly Person[] =
+    list.phase !== 'ok'
+      ? []
+      : multi && openIdOf !== undefined
+        ? list.contacts.map((c): Person => ({
+            ...c,
+            id: { name: openIdOf.name, label: openIdOf.label, current: true },
+          }))
+        : list.contacts;
+  const needle = query.trim().toLowerCase();
+  const shownPeople: readonly Person[] = ownPeople.filter(
+    (c) =>
+      (!multi || idFilter === '' || c.id?.name === idFilter) &&
+      (needle === '' || shownName(c).toLowerCase().includes(needle)),
+  );
+  // Another ID's people are only counted (names are found after opening that ID): shown while no
+  // name is searched, under All my IDs or that ID's filter.
+  const otherIds: readonly IdPeople[] = !multi
+    ? []
+    : (ids ?? []).filter(
+        (id) =>
+          !id.current &&
+          id.count !== undefined &&
+          id.count > 0 &&
+          needle === '' &&
+          (idFilter === '' || id.name === idFilter),
+      );
+  const otherCount = otherIds.reduce((n, id) => n + (id.count ?? 0), 0);
+  const anyOther = multi && (ids ?? []).some((id) => !id.current && (id.count ?? 0) > 0);
+  const missingIds = !multi
+    ? []
+    : (ids ?? [])
+        .filter((id) => !id.current && idMissing(id))
+        .filter((id) => idFilter === '' || id.name === idFilter)
+        .map((id) => id.label);
+  const openOtherId = (name: string, label: string): void => {
+    setNotice(ALL_IDS.opening(label));
+    void switchTo(name).then(
+      (outcome) => {
+        if (outcome.kind !== 'done') setNotice(ALL_IDS.openFailed);
+      },
+      () => setNotice(ALL_IDS.openFailed),
+    );
+  };
 
   const page = ((): ReactElement => {
     if (list.phase === 'not_set_up') {
@@ -1199,7 +1481,7 @@ export function ContactsPage({
         </>
       );
     }
-    if (list.contacts.length === 0) {
+    if (list.contacts.length === 0 && !anyOther) {
       return (
         <>
           {title}
@@ -1245,40 +1527,131 @@ export function ContactsPage({
         : list.contacts.find(
             (c) => c.ref === olderRef && c.ref !== current.ref && c.status === 'active',
           );
+    const live = shownPeople.filter((c) => c.status !== 'revoked');
+    const liveSorted =
+      activitySort === 'active'
+        ? [...live].sort((x, y) =>
+            compareMostActive(sortKey(activity.pulse, x.ref, 0), sortKey(activity.pulse, y.ref, 0)),
+          )
+        : live;
+    const openRow = (ref: string): void => {
+      setRemoved(false);
+      setSelected(ref);
+      setSheetOpen(true);
+    };
     return (
       <>
-        <p className="al-text-label al-muted ct-count">{countLine(list.contacts.length)}</p>
         {title}
+        <p className="al-text-body al-muted ct-lead">{S.lead}</p>
+
         {removed ? (
           <p className="al-text-body" role="status">
             {S.removed}
           </p>
         ) : null}
         {status}
+        <div className="ct-toolbar">
+          {multi ? (
+            <span className="al-input-wrap ct-idfilter">
+              <label className="al-visually-hidden" htmlFor={filterId}>
+                {ALL_IDS.filterLabel}
+              </label>
+              <span className="al-input-prefix" aria-hidden="true">
+                <ShellIcon name="idcard" size={14} />
+              </span>
+              <select
+                id={filterId}
+                className="al-input"
+                value={idFilter}
+                onChange={(e) => setIdFilter(e.currentTarget.value)}
+              >
+                <option value="">{ALL_IDS.allIds}</option>
+                {(ids ?? []).map((id) => (
+                  <option key={id.name} value={id.name}>
+                    {id.label}
+                  </option>
+                ))}
+              </select>
+            </span>
+          ) : null}
+          <span className="al-input-wrap ct-search">
+            <label className="al-visually-hidden" htmlFor={searchId}>
+              {ALL_IDS.search}
+            </label>
+            <span className="al-input-prefix" aria-hidden="true">
+              <Icon name="search" size={14} />
+            </span>
+            <input
+              id={searchId}
+              className="al-input"
+              type="search"
+              placeholder={ALL_IDS.search}
+              autoComplete="off"
+              value={query}
+              onChange={(e) => setQuery(e.currentTarget.value)}
+            />
+          </span>
+          <ActivitySort />
+          <p className="al-text-body-sm al-muted ct-count">
+            {countLine(live.length + otherCount, rows.length)}
+          </p>
+        </div>
+        {missingIds.length > 0 ? (
+          <p className="al-text-body-sm al-muted ct-missing" role="status">
+            {ALL_IDS.missing(missingIds)}
+          </p>
+        ) : null}
         <div className="ct-layout">
           {invitesList}
-          <ActivitySort />
-          <ContactList
-            contacts={
-              activitySort === 'active'
-                ? [...list.contacts].sort((a, b) =>
-                    compareMostActive(
-                      sortKey(activity.pulse, a.ref, 0),
-                      sortKey(activity.pulse, b.ref, 0),
-                    ),
-                  )
-                : list.contacts
-            }
+          {live.length === 0 && needle !== '' ? (
+            <p className="al-text-body al-muted ct-nomatch">{ALL_IDS.noMatch}</p>
+          ) : live.length > 0 || otherIds.length === 0 ? (
+            <ContactList
+              contacts={liveSorted}
+              selected={current?.ref}
+              pulse={activity.pulse}
+              fresh={fresh}
+              onSelect={openRow}
+            />
+          ) : null}
+          {otherIds.length === 0 ? null : (
+            <Surface
+              as="ul"
+              level={1}
+              className="ct-list ct-list-ids"
+              aria-label={ALL_IDS.otherIds}
+            >
+              {otherIds.map((id) => (
+                <li key={id.name} className="al-contact ct-row ct-idrow">
+                  <span className="al-avatar al-text-label" aria-hidden="true">
+                    <Icon name="agent" size={16} />
+                  </span>
+                  <span className="al-contact-main">
+                    <span className="al-contact-name">{countLine(id.count ?? 0)}</span>
+                    <span className="al-text-caption al-muted ct-line">{ALL_IDS.openToSee}</span>
+                  </span>
+                  <span className="al-contact-side">
+                    <span className="al-text-body-sm al-muted ct-with">
+                      {ALL_IDS.with} <bdi>{id.label}</bdi>
+                    </span>
+                    <Button
+                      size="sm"
+                      aria-label={`${ALL_IDS.open} ${id.label}`}
+                      onClick={() => openOtherId(id.name, id.label)}
+                    >
+                      {ALL_IDS.open}
+                    </Button>
+                  </span>
+                </li>
+              ))}
+            </Surface>
+          )}
+          <ArchivedList
+            gone={shownPeople.filter((c) => c.status === 'revoked')}
+            active={live}
             selected={current?.ref}
             pulse={activity.pulse}
-            arrivals={activity.arrivals}
-            seq={activity.seq}
-            fresh={fresh}
-            onSelect={(ref) => {
-              setRemoved(false);
-              setSelected(ref);
-              setSheetOpen(true);
-            }}
+            onSelect={openRow}
           />
         </div>
         <Sheet

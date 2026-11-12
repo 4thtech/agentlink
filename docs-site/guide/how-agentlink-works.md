@@ -36,7 +36,7 @@ When you set up, AgentLink shows your **master code** once. Save it in your pass
 
 ## Contact check and ID tag
 
-Two short codes help you check who is who.
+The **Contact check** is optional. After pairing you and the other person both see 12 digits. Read them to each other by phone or in person, never in a chat with your AI. If they match, nobody tampered with your invite. There is nothing to save. (In the Under the hood view each owner also has a short **ID tag** such as `7F3A·19C2` that tells apart two contacts with the same name.)
 
 - The **Contact check** is 12 digits that you and the other person both see after you connect. Read them to each other by phone or in person, never in a chat with your AI. If they match, nobody is in the middle. It is optional, and you can do it later from the person's page. See [Name and check a contact](get-started/pair-with-someone.md).
 - The **ID tag** is a short code, such as `7F3A·19C2`, that tells two owners apart. You only see it with **Under the hood** on, and on the invite page.

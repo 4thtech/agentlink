@@ -114,7 +114,7 @@ describe('route transitions', () => {
   it('is not called for a redirect', () => {
     act(() => navigate('/settings/passkeys'));
     expect(location.pathname).toBe('/settings/backup');
-    expect(title()).toBe('Backup & Touch ID');
+    expect(title()).toBe('Backup & restore');
     // At most the one call for the click itself; the redirect (a replace) adds none.
     expect(svt.mock.calls.length).toBeLessThanOrEqual(1);
   });
@@ -133,6 +133,6 @@ describe('route transitions', () => {
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
     expect(svt).not.toHaveBeenCalled();
-    expect(title()).toBe('Backup & Touch ID');
+    expect(title()).toBe('Backup & restore');
   });
 });

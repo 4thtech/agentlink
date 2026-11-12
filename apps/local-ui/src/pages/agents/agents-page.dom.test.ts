@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 // U3-h (b11 §29.2 to §29.8): the Agents page, the Rename, Add and Remove sheets, and the switcher.
 // W4-AGENTS: the cards of the simple layer (agents-v2.dom.test.ts has Pause, the fleet and the page).
-import { act, createElement } from 'react';
+import { Fragment, act, createElement } from 'react';
+import { ContactToasts } from '../../layout/contact-toasts.js';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { resetLiveForTests } from '../../api/live.js';
@@ -109,7 +110,15 @@ const api = () => createAgentsApi({ fetch: fetchFn, token: 't' });
 const owner = () => createOwnerClient({ fetch: fetchFn, token: 't' });
 async function mountPage(reload = vi.fn<() => void>()): Promise<Mock<() => void>> {
   await act(async () => {
-    root.render(createElement<AgentsPageProps>(AgentsPage, { api: api(), owner: owner(), reload }));
+    // notices.md: outcomes are toasts, so the shell's toast host is mounted beside the page.
+    root.render(
+      createElement(
+        Fragment,
+        null,
+        createElement<AgentsPageProps>(AgentsPage, { api: api(), owner: owner(), reload }),
+        createElement(ContactToasts, { subscribe: () => () => undefined, ms: 0 }),
+      ),
+    );
   });
   await settle();
   return reload;
@@ -127,6 +136,14 @@ async function click(el: Element | undefined | null): Promise<void> {
   });
   await settle();
 }
+
+/** WP-I1: Back up (open ID), AI apps and Remove sit behind the card's "More" button. */
+async function inMore(scope: ParentNode, text: string): Promise<HTMLButtonElement | undefined> {
+  const direct = button(scope, text);
+  if (direct !== undefined) return direct;
+  await click(button(scope, 'More'));
+  return button(scope, text);
+}
 async function type(el: HTMLInputElement, value: string): Promise<void> {
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(el, value);
@@ -141,27 +158,25 @@ const code = (): HTMLInputElement =>
 describe('the Agents page', () => {
   it('lists every agent with its AI apps, contacts and the open one', async () => {
     await mountPage();
-    expect(host.querySelector('h1')?.textContent).toBe('IDs');
+    expect(host.querySelector('h1')?.textContent).toBe('My IDs');
     expect(host.querySelectorAll('[data-agent]')).toHaveLength(4);
     const personal = rowOf('default');
-    expect(personal.textContent).toContain('Open');
-    expect(personal.textContent).toContain('Connected to Claude Code and 1 more');
+    expect(personal.textContent).toContain('this is the ID you are looking at');
+    expect(personal.textContent).toContain('Ready');
     expect(personal.textContent).toContain('Claude Code');
     expect(personal.textContent).toContain('Claude Desktop');
-    // D-144 (c): which AI apps use the ID, or none.
-    expect(personal.textContent).toContain('Used by Claude Code, Claude Desktop');
     expect(rowOf('second').textContent).toContain('Not used by any AI app');
-    expect(personal.textContent).toContain('4 contacts');
+    expect(personal.textContent).toContain('4people');
     expect(button(personal, 'Open')).toBeUndefined();
     expect(button(rowOf('work'), 'Open')).toBeDefined();
-    expect(rowOf('work').textContent).toContain('1 contact');
+    expect(rowOf('work').textContent).toContain('1person');
   });
   it('an agent with no AI app reads Not used by any AI app with its AI apps panel; Removal not finished with Try again', async () => {
     await mountPage();
     const second = rowOf('second');
     expect(second.textContent).toContain('Not used by any AI app');
-    await click(button(second, 'AI apps'));
-    expect(rowOf('second').textContent).toContain('No AI app is set up for this ID yet.');
+    expect(second.textContent).toContain('No AI app is connected to this ID.');
+    expect(button(second, 'Connect an AI app')).toBeDefined();
     const old = rowOf('old');
     expect(old.textContent).toContain('Removal not finished');
     expect(old.textContent).toContain('Removing it stopped part-way. Nothing else was affected.');
@@ -187,10 +202,12 @@ describe('the Agents page', () => {
       body: list([], { current: null, label: null }),
     };
     await mountPage();
-    expect(plain(host)).toContain('No IDs left. Add one to keep using AgentLink.');
+    expect(plain(host)).toContain(
+      'No IDs yet. An ID is created when you connect your first AI app.',
+    );
     // D-144 (b): the owner's explainer sentence on the empty page.
     expect(plain(host)).toContain(
-      "An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.",
+      "An ID is your AI app's identity on AgentLink: its inbox, people and keys. Every chat in that AI app uses it.",
     );
     const links = [...host.querySelectorAll('a')].filter((a) => a.textContent === 'New ID');
     expect(links.map((a) => a.getAttribute('href'))).toContain('/start/app?add=agent');
@@ -201,10 +218,9 @@ describe('the Agents page', () => {
     expect(plain(host)).toContain("Couldn't load your IDs.");
     expect(button(host, 'Try again')).toBeDefined();
   });
-  it('marks the Tidy up agents "No AI app, no contacts"', async () => {
+  it('an unused ID has no extra "no contacts" line (WP-I1)', async () => {
     await mountPage();
-    expect(rowOf('second').textContent).toContain('No AI app, no contacts');
-    expect(rowOf('work').textContent).not.toContain('No AI app, no contacts');
+    expect(rowOf('second').textContent).not.toContain('No AI app, no contacts');
   });
   it('Switch posts the name and generation, then reloads every page', async () => {
     answers['POST /api/ui/agents/switch'] = {
@@ -264,6 +280,14 @@ describe('F27: Invite someone on each ID card', () => {
 describe('Rename', () => {
   it('uses the Touch ID wording, the code, and posts to the label route', async () => {
     answers['POST /api/ui/agents/label'] = { status: 200, body: { status: 'done' } };
+    // UX1113-QA2 N1: core renames the open ID only, so Work is the open one here.
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list(
+        FOUR.map((a) => ({ ...a, current: a.name === 'work' })),
+        { current: 'work', label: 'Work' },
+      ),
+    };
     await mountPage();
     await click(button(rowOf('work'), 'Rename'));
     const field = rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!;
@@ -279,6 +303,14 @@ describe('Rename', () => {
   });
   it('handles a route that is not available yet without breaking', async () => {
     answers['POST /api/ui/agents/label'] = { status: 501, body: {} };
+    // UX1113-QA2 N1: core renames the open ID only, so Work is the open one here.
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list(
+        FOUR.map((a) => ({ ...a, current: a.name === 'work' })),
+        { current: 'work', label: 'Work' },
+      ),
+    };
     await mountPage();
     await click(button(rowOf('work'), 'Rename'));
     await type(rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
@@ -297,6 +329,14 @@ describe('label check and removal states', () => {
       status: 200,
       body: { status: 'refused', reason: 'label_invalid' },
     };
+    // UX1113-QA2 N1: core renames the open ID only, so Work is the open one here.
+    answers['GET /api/ui/agents'] = {
+      status: 200,
+      body: list(
+        FOUR.map((a) => ({ ...a, current: a.name === 'work' })),
+        { current: 'work', label: 'Work' },
+      ),
+    };
     await mountPage();
     await click(button(rowOf('work'), 'Rename'));
     await type(rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
@@ -307,7 +347,7 @@ describe('label check and removal states', () => {
   it('closes the Remove sheet on agent_removing: the agent shows as Removal not finished', async () => {
     answers['POST /api/ui/agents/remove'] = { status: 409, body: { status: 'agent_removing' } };
     await mountPage();
-    await click(button(rowOf('work'), 'Remove'));
+    await click(await inMore(rowOf('work'), 'Remove'));
     const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
@@ -320,7 +360,7 @@ describe('label check and removal states', () => {
 describe('Remove', () => {
   const open = async (name: string): Promise<HTMLElement> => {
     await mountPage();
-    await click(button(rowOf(name), 'Remove'));
+    await click(await inMore(rowOf(name), 'Remove'));
     return host.querySelector<HTMLElement>('[role="dialog"]')!;
   };
   const confirmTyped = async (sheet: HTMLElement): Promise<void> => {
@@ -487,20 +527,6 @@ describe('Remove', () => {
     await confirmTyped(sheet);
     expect(host.querySelector('[role="dialog"]')).toBeNull();
     expect(plain(host)).toContain('Work was removed.');
-  });
-  it('the carried removal note is shown once: a second mount within 5 s does not show it again', async () => {
-    answers['POST /api/ui/agents/remove'] = { status: 200, body: { status: 'done' } };
-    const sheet = await open('work');
-    await confirmTyped(sheet);
-    expect(plain(host)).toContain('Work was removed.');
-    await act(async () => root.unmount());
-    root = createRoot(host);
-    await mountPage();
-    expect(plain(host)).toContain('Work was removed.');
-    await act(async () => root.unmount());
-    root = createRoot(host);
-    await mountPage();
-    expect(plain(host)).not.toContain('Work was removed.');
   });
   it('Save recovery kit first on an ID that is not open asks before switching; Cancel keeps the sheet', async () => {
     const sheet = await open('work');

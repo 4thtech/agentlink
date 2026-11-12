@@ -13,7 +13,13 @@
 // Reading here never writes and never marks anything read for the AI.
 import type { ApiClient } from '../../api/client.js';
 import { cleanName } from './person-name.js';
-import { LIST_PATH, parseList, type ContactRow } from '../contacts/data.js';
+import {
+  LIST_PATH,
+  PEOPLE_ALL_PATH,
+  parseList,
+  parsePeopleAll,
+  type ContactRow,
+} from '../contacts/data.js';
 import {
   INVITES_LIST_PATH,
   parseConnecting,
@@ -72,6 +78,8 @@ export interface HomeData {
   readonly connecting?: readonly ConnectingRow[];
   /** W4-WIRE-3: the Inbox folder received files are saved to (`~/AgentLink/Inbox`), when known. */
   readonly inboxFolder?: string;
+  /** Other IDs' number of people (folder name -> count), from the all-IDs read; absent when unread. */
+  readonly idCounts?: ReadonlyMap<string, number>;
 }
 
 /** A received or sent file's item ID: `<envelope ID>.<two-digit index>`. */
@@ -120,18 +128,23 @@ export function createPeopleApi(api: ApiClient): PeopleApi {
   return {
     messages,
     async load() {
-      const [people, contacts, received, sent, invites] = await Promise.all([
+      const [people, contacts, received, sent, invites, all] = await Promise.all([
         messages.conversations(),
         api.get<unknown>(LIST_PATH),
         api.get<unknown>(RECEIVED_LIST),
         api.get<unknown>(SENT_LIST),
         api.get<unknown>(INVITES_LIST_PATH),
+        api.get<unknown>(PEOPLE_ALL_PATH),
       ]);
       if (!people.ok) return { ok: false, problem: people.problem };
       const list = contacts.kind === 'ok' ? parseList(contacts.data) : undefined;
       const rec = received.kind === 'ok' ? parseReceived(received.data) : undefined;
       const out = sent.kind === 'ok' ? parseSent(sent.data) : undefined;
       const inboxFolder = received.kind === 'ok' ? parseInboxFolder(received.data) : undefined;
+      const ids = all.kind === 'ok' ? parsePeopleAll(all.data) : undefined;
+      const idCounts = new Map<string, number>();
+      for (const id of ids ?? [])
+        if (!id.current && id.count !== undefined) idCounts.set(id.name, id.count);
       return {
         ok: true,
         data: {
@@ -153,6 +166,7 @@ export function createPeopleApi(api: ApiClient): PeopleApi {
             }),
           ),
           ...(inboxFolder === undefined ? {} : { inboxFolder }),
+          ...(ids === undefined ? {} : { idCounts }),
         },
       };
     },

@@ -211,6 +211,16 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       // WP-11: the Backup page's read and the recovery-kit export (backup-export-server.test.ts).
       '/api/ui/backup',
       '/api/ui/backup/export',
+      // WP-P2: People across all IDs (local-ui/api/people-all.test.ts).
+      '/api/ui/people',
+      // UX1113 WP-S2: Touch ID & master code (local-ui/owner-presence-server.test.ts).
+      '/api/ui/owner-code/check',
+      '/api/ui/owner-presence/test',
+      '/api/ui/owner-code/replace',
+      '/api/ui/owner-code/replace/finish',
+      '/api/ui/owner-code/replace/cancel',
+      // WP-R2b: Show in Finder for the recovery kit (local-ui/backup-host-server.test.ts).
+      '/api/ui/backup/reveal',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).
@@ -223,6 +233,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
         r.presence !== 'pay-confirm' &&
         // W4-ONE-TOUCH: New agent's two routes are covered in create-connect-server.test.ts.
         r.presence !== 'create-agent' &&
+        // UX1113-R1: the nine restore routes are covered in restore-server.test.ts.
+        r.presence !== 'restore' &&
         r.path !== '/api/ui/first-run' &&
         !built.has(r.path),
     );

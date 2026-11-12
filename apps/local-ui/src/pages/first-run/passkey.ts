@@ -29,7 +29,7 @@ export function detectPlatform(): Platform {
   if (typeof navigator === 'undefined') return 'other';
   const data = (navigator as { userAgentData?: { platform?: unknown } }).userAgentData;
   const named = typeof data?.platform === 'string' ? data.platform : navigator.userAgent;
-  if (/mac/i.test(named)) return 'mac';
+  if (/mac|darwin/i.test(named)) return 'mac';
   if (/win/i.test(named)) return 'windows';
   return 'other';
 }

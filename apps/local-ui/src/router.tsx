@@ -19,6 +19,7 @@ import {
   type ReactElement,
 } from 'react';
 import { onAgentChanged } from './api/generation.js';
+import { mayLeave } from './leave-guard.js';
 import { Layout } from './layout/index.js';
 import { withRouteTransition } from './layout/transition.js';
 import { ApprovalsPage } from './pages/approvals/index.js';
@@ -54,10 +55,12 @@ export const ROUTES: readonly RouteDef[] = [
   // Get started (U2 builds the steps; today's first run until then), in the focused shell.
   ...START_STEPS.map((path) => ({ path, page: FirstRunPage })),
   // Interim: today's People page (U4 folds it into Home).
+  { path: '/people', page: lazyPage('/contacts') },
   { path: '/contacts', page: lazyPage('/contacts') },
   // Settings (A9).
   { path: '/settings', page: lazyPage('/settings') },
   { path: '/settings/backup', page: lazyPage('/settings/backup') },
+  { path: '/settings/touch-id', page: lazyPage('/settings/touch-id') },
   { path: '/settings/apps', page: lazyPage('/settings/apps') },
   { path: '/settings/files', page: lazyPage('/settings/files') },
   { path: '/settings/appearance', page: lazyPage('/settings/appearance') },
@@ -71,6 +74,10 @@ export const ROUTES: readonly RouteDef[] = [
   { path: '/advanced/map', page: lazyPage('/advanced/map') },
   // U3-invite (b11 §33.2): the waiting invite, in the focused shell (no chrome).
   { path: '/settings/join', page: lazyPage('/settings/join') },
+  // UX1113-R3 (D-147): restore from a recovery kit, in the focused shell (no chrome).
+  { path: '/restore/kit', page: lazyPage('/restore/kit') },
+  { path: '/restore/check', page: lazyPage('/restore/check') },
+  { path: '/restore/move', page: lazyPage('/restore/move') },
 ];
 
 /**
@@ -91,6 +98,8 @@ function normalize(pathname: string): string {
 export function navigate(to: string, replace = false): void {
   const target = normalize(new URL(to, location.href).pathname);
   const changesPage = target !== normalize(location.pathname);
+  // UX1113-QA2 N14: a page that would lose something (a kit save in progress) asks first.
+  if (changesPage && !mayLeave()) return;
   // The address changes at once; only the re-render may sit inside a view transition.
   if (replace) history.replaceState(null, '', to);
   else history.pushState(null, '', to);

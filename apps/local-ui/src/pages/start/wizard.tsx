@@ -8,7 +8,13 @@
 // kit turns every one into a fade. Names from the server (an app, the agent) are rendered as text.
 import { IdExplainerCard } from './id-explainer.js';
 import { Button, Icon, Lockup, Skeleton, TextField } from '@4thtech-io/ui';
-import type { FormEvent, MouseEvent, ReactElement, ReactNode } from 'react';
+import {
+  useState,
+  type FormEvent,
+  type MouseEvent,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { useTitleFocus } from '../welcome/index.js';
 import type { DetectedApp } from '../first-run/apps-api.js';
 import { skipToHome } from './guard.js';
@@ -318,6 +324,14 @@ export function PickStep({
           {lookFailed ? P.lookFailed : P.later}
         </p>
       </div>
+      {eyebrow === P.eyebrow ? (
+        <p className="st-note">
+          {P.restoreLead}{' '}
+          <a href="/restore/kit" data-restore-link="">
+            {P.restore}
+          </a>
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -522,7 +536,7 @@ export function ConnectedStep({
           {connected && appName !== undefined ? D.title(appName) : D.notConnectedTitle(label)}
         </h1>
         <p className="st-lead">
-          {connected || appName === undefined ? D.body : D.notConnectedBody(appName)}
+          {connected ? D.body : appName === undefined ? D.noAppBody : D.notConnectedBody(appName)}
         </p>
       </div>
       <div className="st-row al-reveal st-delay-2">
@@ -569,11 +583,34 @@ export interface InviteStepProps {
   /** Where invites are made today (People). */
   readonly inviteHref: string;
   readonly onHome: () => void;
+  /** A link is on screen that has not been copied or sent: leaving cancels it, so warn first. */
+  readonly unsent?: boolean;
+  /** The warning is showing (the page holds this, so "Skip to Home" in the header can raise it too). */
+  readonly warned?: boolean;
+  readonly onWarn?: () => void;
 }
 
 /** A3, step 4 (optional): invite someone; "Skip for now" and "Done, go to Home". */
-export function InviteStep({ panel, inviteHref, onHome }: InviteStepProps): ReactElement {
+export function InviteStep({
+  panel,
+  inviteHref,
+  onHome,
+  unsent = false,
+  warned: givenWarned,
+  onWarn,
+}: InviteStepProps): ReactElement {
   const title = useTitleFocus<HTMLHeadingElement>();
+  const [ownWarned, setOwnWarned] = useState(false);
+  const warned = givenWarned ?? ownWarned;
+  // Leaving with a link nobody has: say so once, then let the person go.
+  const leave = (): void => {
+    if (unsent && !warned) {
+      if (onWarn === undefined) setOwnWarned(true);
+      else onWarn();
+      return;
+    }
+    onHome();
+  };
   return (
     <section className="st-screen st-w-600" aria-labelledby="st-h">
       <div className="st-intro">
@@ -590,12 +627,19 @@ export function InviteStep({ panel, inviteHref, onHome }: InviteStepProps): Reac
           </a>
         </div>
       )}
+      {unsent && warned ? (
+        <p className="st-unsent al-text-body-sm" role="alert">
+          {I.unsentWarn}
+        </p>
+      ) : null}
       <div className="st-row st-end">
-        <Button variant="ghost" size="lg" onClick={onHome}>
-          {I.skip}
-        </Button>
-        <Button variant="secondary" size="lg" onClick={onHome}>
-          {I.done}
+        {unsent && warned ? null : (
+          <Button variant="ghost" size="lg" onClick={leave}>
+            {I.skip}
+          </Button>
+        )}
+        <Button variant="secondary" size="lg" onClick={leave}>
+          {unsent && warned ? I.leaveAnyway : I.done}
         </Button>
       </div>
     </section>

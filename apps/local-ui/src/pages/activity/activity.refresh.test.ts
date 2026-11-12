@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HoodProvider } from '@4thtech-io/ui';
 import type { ApiClient, ApiResult } from '../../api/client.js';
 import { ACTIVITY_POLL_MS, ActivityPage } from './index.js';
-import { ACTIVITY_STRINGS as S } from './strings.js';
+import { ACTIVITY_COPY as S } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -36,8 +36,18 @@ afterEach(() => {
 });
 
 type Get = (path: string) => Promise<ApiResult<unknown>>;
+// The page also reads the people (to name them); only the activity calls reach `get`.
 const apiWith = (get: Get): ApiClient & { get: ReturnType<typeof vi.fn> } =>
-  ({ get: vi.fn(get), post: vi.fn() }) as unknown as ApiClient & { get: ReturnType<typeof vi.fn> };
+  ({
+    get: vi.fn((path: string) =>
+      path.startsWith('/api/ui/contacts')
+        ? Promise.resolve({ kind: 'ok', status: 200, data: { status: 'ok', contacts: [] } })
+        : get(path),
+    ),
+    post: vi.fn(),
+  }) as unknown as ApiClient & { get: ReturnType<typeof vi.fn> };
+const activityCalls = (api: { get: ReturnType<typeof vi.fn> }): number =>
+  api.get.mock.calls.filter((c) => String(c[0]).startsWith('/api/ui/activity')).length;
 const ok = (data: unknown): ApiResult<unknown> => ({ kind: 'ok', status: 200, data });
 const offline = { kind: 'offline' } as ApiResult<unknown>;
 
@@ -53,7 +63,7 @@ const tick = async (ms: number): Promise<void> => {
 };
 const q = (sel: string): Element | null => host.querySelector(sel);
 const qa = (sel: string): Element[] => [...host.querySelectorAll(sel)];
-const ROWS = 'tbody tr';
+const ROWS = 'li.al-act-row';
 
 const DAY = 86_400;
 const AT = 1_760_000_000;
@@ -106,7 +116,8 @@ describe('header, day groups and chips', () => {
       S.filterAll,
       S.filterApprovals,
       S.filterProofs,
-      S.filterOther,
+      S.filterPeople,
+      S.filterSafety,
     ]);
     expect(chips[0]?.getAttribute('aria-checked')).toBe('true');
     const wrapper = q('.al-activity-list');
@@ -114,7 +125,7 @@ describe('header, day groups and chips', () => {
     expect(chips[2]?.getAttribute('aria-checked')).toBe('true');
     expect(chips[0]?.getAttribute('aria-checked')).toBe('false');
     expect(qa(ROWS)).toHaveLength(1);
-    expect(host.textContent).toContain(S.proofSent);
+    expect(host.textContent).toContain(S.proofRecorded[1]);
     // The chip row is never rebuilt; only the list wrapper is swapped (it carries the fade).
     expect([...group.querySelectorAll('button')]).toEqual(chips);
     expect(q('.al-activity-list')).not.toBe(wrapper);
@@ -152,7 +163,7 @@ describe('live refresh', () => {
 
   it('adds a new row at the top with the entrance, keeping the old rows', async () => {
     const api = await run(ok({ items: [...fresh(1), ...MIXED] }));
-    expect(api.get).toHaveBeenCalledTimes(2);
+    expect(activityCalls(api)).toBe(2);
     const rows = qa(ROWS);
     expect(rows).toHaveLength(5);
     expect(rows[0]?.classList.contains('al-row-presence')).toBe(true);
@@ -196,7 +207,7 @@ describe('live refresh', () => {
       const api = apiWith(async () => ok({ items: MIXED }));
       await mount(api);
       await tick(ACTIVITY_POLL_MS * 3);
-      expect(api.get).toHaveBeenCalledTimes(1);
+      expect(activityCalls(api)).toBe(1);
     } finally {
       delete (document as unknown as Record<string, unknown>)['hidden'];
     }

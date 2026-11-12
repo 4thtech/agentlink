@@ -54,10 +54,11 @@ describe('chapter 7: advanced', () => {
     await page.getByRole('heading', { name: 'Settings', level: 1 }).waitFor();
     const list = await text(page);
     for (const row of [
-      'Backup & Touch ID',
-      'Files folder',
+      'Backup & restore',
+      'Touch ID & master code',
+      'Files',
       'Appearance',
-      'Rules for approvals',
+      'Rules',
       'Proofs & credits',
     ]) {
       expect(list).toContain(row);
@@ -65,9 +66,8 @@ describe('chapter 7: advanced', () => {
     // WP-7: no Notifications row, and the old address lands on Settings.
     expect(list).not.toContain('Notifications');
     expect(await page.locator('a[href="/settings/notifications"]').count()).toBe(0);
-    await page.locator('button.st-row[aria-expanded]').click();
-    await page.getByText('Activity log', { exact: true }).waitFor();
-    expect(await text(page)).toContain('Long invite links');
+    // Advanced is a row that leads to its page now (the in-place list is gone).
+    expect(await page.locator('a.set-row[href="/settings/advanced"]').count()).toBe(1);
     expect(
       await sections(page)
         .getByRole('link', { name: /Live activity/ })
@@ -79,17 +79,12 @@ describe('chapter 7: advanced', () => {
     await observeLayoutShift(page);
     await page.waitForTimeout(500);
     const beforeHood = await layoutShiftScore(page);
-    await page.getByRole('switch', { name: /Under the hood/ }).click();
+    await page.getByRole('switch', { name: 'Under the hood', exact: true }).click();
     await sections(page)
       .getByRole('link', { name: /Live activity/ })
       .waitFor();
-    for (const item of [
-      'Rules',
-      'Proofs & credits',
-      'Relays & network',
-      'Diagnostics',
-      'Connections map',
-    ]) {
+    // Rules and Proofs & credits are Settings pages now (asserted in the Settings list above).
+    for (const item of ['Relays & network', 'Diagnostics', 'Connections map']) {
       await sections(page).getByRole('link', { name: item }).waitFor();
     }
 
@@ -112,7 +107,9 @@ describe('chapter 7: advanced', () => {
     expect(await text(page)).not.toMatch(/wss?:\/\//);
 
     await sections(page).getByRole('link', { name: 'Connections map' }).click();
-    await page.getByText('Coming next').first().waitFor();
+    // UX1113-QA-UTH: the live Connections map, not a "Coming next" stub.
+    await page.getByRole('heading', { name: 'Connections map', level: 1 }).waitFor();
+    expect(await text(page)).not.toContain('Coming next');
 
     // Diagnostics: the report copies, and says what it holds.
     await jp.context.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => undefined);
@@ -161,13 +158,13 @@ describe('chapter 7: advanced', () => {
       expect(await sections(page).count()).toBe(0);
     };
     await viaSheet('Activity', 'Activity');
-    await viaSheet('IDs', 'IDs');
-    await page.getByRole('switch', { name: /Under the hood/ }).click();
+    await viaSheet('My IDs', 'My IDs');
+    await page.getByRole('switch', { name: 'Under the hood', exact: true }).click();
     await viaSheet('Activity', 'Activity');
     await viaSheet('Settings', 'Settings');
     // Go to (the search button on a phone) reaches Activity as well, also from the fleet table,
     // whose own filters are comboboxes too (the walkthrough's helper picked theirs).
-    await viaSheet('IDs', 'IDs');
+    await viaSheet('My IDs', 'My IDs');
     await goTo(page, 'Activity');
     await page.getByRole('heading', { name: 'Activity', level: 1 }).first().waitFor();
     // navTo opens the sheet itself on a phone.
