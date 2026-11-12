@@ -71,7 +71,7 @@ import {
 } from './key-controls.js';
 import { keychainAccount, osKeychain, type KeychainBackend } from './keychain.js';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
-import { openRecordedKeyStore } from './keychain-keystore.js';
+import { KEYCHAIN_CALL_TIMEOUT_MS, guarded, openRecordedKeyStore } from './keychain-keystore.js';
 import { ttyOwnerTerminal } from './owner-terminal.js';
 import { OWNER_ACCOUNT, OWNER_NEXT_ACCOUNT } from './owner-keystore.js';
 import {
@@ -191,6 +191,8 @@ export interface RestoreEngineOptions {
   readonly onRestored?: (names: readonly string[]) => Promise<void> | void;
   /** Test seams. */
   readonly maxUploadBytes?: number;
+  /** Limit of each native keychain read (default KEYCHAIN_CALL_TIMEOUT_MS). */
+  readonly keychainTimeoutMs?: number;
   readonly freeBytes?: (dir: string) => Promise<number | undefined>;
 }
 
@@ -229,8 +231,17 @@ export interface RestoreEngine {
   ): Promise<string | undefined>;
   /** First run's guard: restored IDs wait for their owner (a crash between agents and owner). */
   restorePending(): Promise<boolean>;
+  /**
+   * First run's hold (fail closed): `finish_restore` while restored IDs wait for their owner,
+   * `keychain_unavailable` when the keychain did not answer (never read as "no owner"), else
+   * undefined.
+   */
+  firstRunHold(): Promise<FirstRunHold | undefined>;
   close(): Promise<void>;
 }
+
+/** Why first run may not create an owner now (04 §2.3.3; fail closed). */
+export type FirstRunHold = 'finish_restore' | 'keychain_unavailable';
 
 /** The terminal's restore (`agentlink restore`): the engine plus a path and the no-gesture apply. */
 export interface TerminalRestore extends RestoreEngine {
@@ -359,6 +370,26 @@ function headerOutcome(head: Uint8Array): { outcome: HeaderOutcome; ownerNostr?:
   }
 }
 
+type CoreLogger = NonNullable<Parameters<typeof AgentLinkClient.create>[0]['logger']>;
+
+/**
+ * IR-UX1113-R1 round 2: the cores the engine opens (read-back, verified cards for the header step,
+ * first run and doctor) write no log line: restore's log surface stays the spec's (none here).
+ */
+const SILENT_LOGGER: CoreLogger = (() => {
+  const silent = {
+    level: 'error',
+    isEnabled: () => false,
+    debug: () => undefined,
+    info: () => undefined,
+    warn: () => undefined,
+    error: () => undefined,
+    child: () => silent,
+    withCodes: () => silent,
+  };
+  return Object.freeze(silent) as unknown as CoreLogger;
+})();
+
 const NO_APPROVALS: ApprovalChannel = Object.freeze({
   request: (request: { readonly approvalId: string }) =>
     Promise.resolve({ approvalId: request.approvalId }),
@@ -401,6 +432,7 @@ async function inspectId(
       store: opened.store,
       cipher: opened.cipher,
       approvals: NO_APPROVALS,
+      logger: SILENT_LOGGER,
       policyMark: opened.policyMark,
       receiptsKept: opened.receiptsKept,
     });
@@ -435,6 +467,7 @@ export function createRestoreEngine(options: RestoreEngineOptions): RestoreEngin
     applyFinish,
     registerExportedKit,
     restorePending,
+    firstRunHold,
     close,
   } = full;
   return Object.freeze({
@@ -449,6 +482,7 @@ export function createRestoreEngine(options: RestoreEngineOptions): RestoreEngin
     applyFinish,
     registerExportedKit,
     restorePending,
+    firstRunHold,
     close,
   });
 }
@@ -467,6 +501,7 @@ function build(options: RestoreEngineOptions): TerminalRestore {
   const revokedDir = join(agentlinkDir, 'revoked');
   const pendingPath = join(agentlinkDir, PENDING_FILE);
   const maxUpload = options.maxUploadBytes ?? RECOVERY_KIT_LIMITS.maxKitBytes;
+  const keychainTimeoutMs = options.keychainTimeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
   const handles = new Map<string, HandleEntry>();
   const uploads = new Map<string, UploadEntry>();
   const restoreSessions = new Map<string, RestoreSessionEntry>();
@@ -538,6 +573,9 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     locked = true;
     try {
       return await fn();
+    } catch {
+      // A failed or timed-out keychain call: a fixed answer, and the lock is released below.
+      return fail('failed');
     } finally {
       locked = false;
     }
@@ -617,7 +655,8 @@ function build(options: RestoreEngineOptions): TerminalRestore {
   async function keychainOwnerPresent(): Promise<boolean> {
     const keychain = options.keychain();
     for (const account of [OWNER_ACCOUNT, OWNER_NEXT_ACCOUNT]) {
-      const blob = await keychain.get(account).catch(() => null);
+      // Bounded (round 2): a hung native call rejects, so the operation answers `failed`.
+      const blob = await guarded(() => keychain.get(account), keychainTimeoutMs);
       if (blob !== null) {
         wipe(blob);
         return true;
@@ -811,7 +850,10 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       if (await inOwnersRevokedList(revokedDir, agent.agentId)) state = 'removed_earlier';
       else if (ids.has(agent.agentId)) state = 'already_here';
       else {
-        const seed = await keychain.get(keychainAccount(agent.agentId, 'seed')).catch(() => null);
+        const seed = await guarded(
+          () => keychain.get(keychainAccount(agent.agentId, 'seed')),
+          keychainTimeoutMs,
+        );
         if (seed !== null) {
           wipe(seed);
           state = 'already_here';
@@ -1216,6 +1258,23 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     return owners.length > 0 || (marker !== undefined && equalBytes(marker, kitOwner));
   }
 
+  /**
+   * 04 §2.3.3: first run never mints an owner while a verified card here names an owner that is not
+   * present (no owner item at all); the marker of an unfinished restore is a hint too. Fail closed:
+   * a keychain that does not answer (or times out) holds first run as `keychain_unavailable`.
+   */
+  async function firstRunHold(): Promise<FirstRunHold | undefined> {
+    let ownerHere: boolean;
+    try {
+      ownerHere = await keychainOwnerPresent();
+    } catch {
+      return 'keychain_unavailable';
+    }
+    if (ownerHere) return undefined;
+    if ((await readPending()) !== undefined) return 'finish_restore';
+    return (await verifiedCardOwners()).length > 0 ? 'finish_restore' : undefined;
+  }
+
   function gestureChallenge(
     label: Uint8Array,
     nonce: Uint8Array,
@@ -1439,6 +1498,7 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     proof: Uint8Array,
     mode: 'passphrase' | 'passkey',
   ): Promise<RestoreAnswer> {
+    const cancelAt = cancels.get(session) ?? 0;
     try {
       await start();
       const handle = handleOf(input);
@@ -1484,6 +1544,11 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         return fail('failed');
       }
       presenceFails = { count: 0, until: 0 };
+      // Cancelled while presence ran (the page left): the new session never stays.
+      if ((cancels.get(session) ?? 0) !== cancelAt) {
+        hold.end();
+        return fail('expired');
+      }
       restoreSessions.get(session)?.hold.end();
       restoreSessions.set(session, { hold, expiresAt: now() + RESTORE_HANDLE_TTL_MS });
       return ok({ status: 'ok' });
@@ -1658,7 +1723,7 @@ function build(options: RestoreEngineOptions): TerminalRestore {
   return {
     found: (session) => foundStep(sessionKey(session)),
     upload: (session, chunks, declared) => uploadStep(sessionKey(session), chunks, declared),
-    header: (session, input) => headerStep(sessionKey(session), input),
+    header: (session, input) => headerStep(sessionKey(session), input).catch(() => fail('failed')),
     presence: (session, input, proof, mode) =>
       exclusive(() => presenceStep(sessionKey(session), input, proof, mode), proof),
     open: (session, input, code) =>
@@ -1676,13 +1741,8 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       const ref = await refOf(file.path, 'export', file.kitId);
       return ref === undefined ? undefined : addHandle(sessionKey(session), ref);
     },
-    restorePending: async () => {
-      // 04 §2.3.3: first run never mints an owner while a verified card here names an owner that
-      // is not present (no owner item at all); the marker of an unfinished restore is a hint too.
-      if (await keychainOwnerPresent()) return false;
-      if ((await readPending()) !== undefined) return true;
-      return (await verifiedCardOwners()).length > 0;
-    },
+    restorePending: async () => (await firstRunHold()) === 'finish_restore',
+    firstRunHold,
     close: () => {
       clearInterval(sweep);
       wipeHeld();
@@ -1879,18 +1939,18 @@ export function restoreInTerminal(
 }
 
 /**
- * `doctor` (UX1113-R1, 04 §2.3.3): true when restored IDs on this computer wait for their owner (an
- * unfinished restore). Reads this user's keychain owner items, the marker and the agent folders'
+ * `doctor` (UX1113-R1, 04 §2.3.3): why first run is held here: restored IDs wait for their owner
+ * (`finish_restore`), or the keychain did not answer (`keychain_unavailable`). Reads this user's keychain owner items, the marker and the agent folders'
  * verified cards; unlocks nothing and writes nothing. No seam.
  */
-export async function restorePendingHere(): Promise<boolean> {
+export async function restoreHoldHere(): Promise<FirstRunHold | undefined> {
   const engine = createRestoreEngine({
     home: homedir(),
     keychain: osKeychainOnce(),
     origin: 'terminal',
   });
   try {
-    return await engine.restorePending();
+    return await engine.firstRunHold();
   } finally {
     await engine.close();
   }

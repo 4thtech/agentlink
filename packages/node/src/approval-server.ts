@@ -863,7 +863,12 @@ export interface ApprovalServerInternals {
    * UX1113-R1 (D-147): the restore engine's home folder and the new master code's KDF parameters
    * (tests use a temporary HOME and the floor). Default: the OS user's home and the kit defaults.
    */
-  readonly restore?: { readonly home?: string; readonly kdf?: Argon2idParams };
+  readonly restore?: {
+    readonly home?: string;
+    readonly kdf?: Argon2idParams;
+    /** The restore engine's keychain read limit (tests). */
+    readonly keychainTimeoutMs?: number;
+  };
   /**
    * WP-R2b (IR M-1): the recovery-kit export walk's per-ID limit and the settle time of a late open
    * (tests: shorter). Default VISIT_STEP_MS and VISIT_SETTLE_MS (app-host.ts).
@@ -1706,6 +1711,9 @@ export async function startApprovalServerWith(
       origin,
       now,
       ...(internals.restore?.kdf === undefined ? {} : { kdf: internals.restore.kdf }),
+      ...(internals.restore?.keychainTimeoutMs === undefined
+        ? {}
+        : { keychainTimeoutMs: internals.restore.keychainTimeoutMs }),
       knownOwnerNostr: async () => {
         if (noAgentOpen()) return undefined;
         return (await source.context().catch(() => undefined))?.owner.ownerNostr;
@@ -3870,9 +3878,13 @@ export async function startApprovalServerWith(
     }
     // UX1113-R1 (04 §2.3.3, T-7): restored IDs wait for their owner (a crash between the agents and
     // the owner): first run never mints another owner over them; the page says "Finish restoring".
-    if (await restoreEngine().restorePending()) {
+    // Fail closed: a keychain that does not answer holds first run too ("Try again").
+    const hold = await restoreEngine()
+      .firstRunHold()
+      .catch(() => 'keychain_unavailable' as const);
+    if (hold !== undefined) {
       req.resume();
-      sendJson(res, 409, { status: 'finish_restore' });
+      sendJson(res, 409, { status: hold });
       return;
     }
     // U3-g-b: the open agent's setup, else first run with no agent yet (the host's firstRun).
