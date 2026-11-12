@@ -63,7 +63,7 @@ export const CONTACTS_STRINGS = {
   remove: 'Remove',
   removeContact: 'Remove person',
   removeExplain:
-    'Remove this person? Messages from them are dropped. To connect again, ask them for a new invite.',
+    "Remove this person? They aren't told, and messages from them are dropped. To connect again, send them a new invite or ask them for one.",
   removed: 'Removed.',
   // UX1112 WP-12 (F-2; D-72; 11 §6.2 "Rename and Block"): block or unblock one person.
   block: 'Block',
