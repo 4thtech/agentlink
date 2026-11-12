@@ -8,7 +8,7 @@
 export const iso = (label: string): string => `\u2068${label}\u2069`;
 
 export const AGENTS_STRINGS = {
-  title: 'IDs',
+  title: 'My IDs',
   open: 'Open',
   worksFrom: 'Works from',
   notConnected: 'Not connected to an AI app',
@@ -41,7 +41,7 @@ export const AGENTS_STRINGS = {
   finishTitle: (label: string): string => `Finish removing ${iso(label)}`,
   finishTouchId: 'Finish with Touch ID',
   finishStatement: (label: string): string => `Finish removing ${iso(label)}`,
-  empty: 'No IDs left. Add one to keep using AgentLink.',
+  empty: 'No IDs yet. An ID is created when you connect your first AI app.',
   loadError: "Couldn't load your IDs.",
   loading: 'Loading your IDs',
   findAgent: 'Find an ID',
@@ -105,7 +105,35 @@ export const AGENTS_STRINGS = {
   removeStatement: (label: string): string => `Remove ${iso(label)}`,
 
   // W4-AGENTS (W4 UX v2 "Agents"; 08 §1 "Live AI-app status" words; "AI app", never "harness").
-  intro: 'Each ID is the identity an AI app uses on AgentLink. Status updates by itself.',
+  intro:
+    'An ID is how one of your AI apps appears on AgentLink. The people you connect with see its name.',
+  // WP-I1 (spec §4): the card words.
+  workingNow: 'Working now',
+  readyWord: 'Ready',
+  pausedWord: 'Paused',
+  notUsedYet: 'Not used by any AI app yet',
+  openSuffix: ' · this is the ID you are looking at',
+  noAppConnected: 'No AI app is connected to this ID.',
+  connectAiApp: 'Connect an AI app',
+  peopleCount: (n: number): string => (n === 1 ? 'person' : 'people'),
+  kitBacked: (date: string): string => `Backed up ${date}`,
+  kitNone: 'Not in a kit',
+  kitLabel: 'recovery kit',
+  moreLabel: 'More about this ID',
+  // The name nudge (I-3): a machine name such as macbook-agent-1.
+  nudgeBefore: 'People see this ID as ',
+  nudgeAfter: '. Give it a name they will recognise, like your own.',
+  // The "how it fits" strip (spec §2.1).
+  fitLabel: 'How it fits together',
+  fitHide: 'Hide this',
+  fitApp: 'Your AI app',
+  fitAppBody: 'Claude Code, Codex…',
+  fitUses: 'Uses',
+  fitId: 'Your ID',
+  fitIdBody: 'A name, an inbox, your rules',
+  fitTalks: 'Talks to',
+  fitPeople: 'People',
+  fitPeopleBody: 'Their AI apps, by invite',
   aiApps: 'AI apps',
   /** D-144 improvement (c): which AI apps use this ID. */
   usedBy: (apps: readonly string[]): string => `Used by ${apps.join(', ')}`,

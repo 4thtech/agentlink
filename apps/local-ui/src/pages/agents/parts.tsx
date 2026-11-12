@@ -2,7 +2,7 @@
 // app's dot and word, the Pause sheet (one click, no Touch ID), the paused banner with Resume (Touch
 // ID, signs `agent.resume`), and the "Contacts still see {name}" note (D-141). Labels and former names
 // are text only, each in its own bidi-isolated run (I-5).
-import { Button, PageNotice, Pulse, Sheet } from '@4thtech-io/ui';
+import { Button, Icon, PageNotice, Pulse, Sheet } from '@4thtech-io/ui';
 import { useState, type ReactElement } from 'react';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import type { AgentsApi } from './api.js';
@@ -17,6 +17,62 @@ export function AppDot({ app }: { app: AppLive }): ReactElement {
     <Pulse tone="success" className="ag-adot" />
   ) : (
     <span className={`al-ldot ag-adot is-${appDot(app)}`} aria-hidden="true" />
+  );
+}
+
+/** WP-I1 (I-3): a machine name such as `macbook-agent-1`, or the folder name that says "agent". */
+const MACHINE_NAME = /^[a-z0-9]+(-[a-z0-9]+)*-\d+$/;
+export function machineNamed(row: Pick<AgentRow, 'label' | 'name'>): boolean {
+  return MACHINE_NAME.test(row.label) || (row.label === row.name && /agent/i.test(row.label));
+}
+
+/** WP-I1: the name nudge on a card. The label is text in its own bidi run (I-5). */
+export function NameNudge({
+  row,
+  onRename,
+}: {
+  row: AgentRow;
+  onRename: () => void;
+}): ReactElement {
+  return (
+    <div className="ag-nudge" role="note" data-nudge>
+      <Icon name="info" size={18} />
+      <p className="al-text-body-sm">
+        {S.nudgeBefore}
+        <strong>
+          <bdi>{row.label}</bdi>
+        </strong>
+        {S.nudgeAfter}
+      </p>
+      <Button variant="secondary" size="sm" onClick={onRename}>
+        {S.rename}
+      </Button>
+    </div>
+  );
+}
+
+/** WP-I1: the kit state of one ID. Hidden until the kit record exists (WP-R2): `kit` is undefined. */
+export type KitState = { readonly at: number } | 'none' | undefined;
+export function KitPill({
+  kit,
+  onOpen,
+}: {
+  kit: KitState;
+  onOpen: () => void;
+}): ReactElement | null {
+  if (kit === undefined) return null;
+  const date =
+    kit === 'none'
+      ? ''
+      : new Date(kit.at * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return (
+    <button
+      type="button"
+      className={`ag-kit ${kit === 'none' ? 'is-none' : 'is-ok'} al-text-label`}
+      onClick={onOpen}
+    >
+      {kit === 'none' ? S.kitNone : S.kitBacked(date)}
+    </button>
   );
 }
 

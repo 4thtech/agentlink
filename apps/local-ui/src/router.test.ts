@@ -48,9 +48,9 @@ const currentSection = (): string | null | undefined =>
 /** Path, the page's own heading (today's page), and the section marked current. */
 const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   ['/', 'Home', 'Home'],
-  ['/agents', 'IDs', 'IDs'],
+  ['/agents', 'My IDs', 'IDs'],
   // W7-ID-B3 (D-144): the same page under its new name.
-  ['/ids', 'IDs', 'IDs'],
+  ['/ids', 'My IDs', 'IDs'],
   ['/activity', 'Activity', 'Activity'],
   ['/activity/live', 'Live activity stream', null],
   ['/contacts', 'People', 'People'],

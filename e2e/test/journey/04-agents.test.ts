@@ -14,7 +14,14 @@ import {
   layoutShiftScore,
   observeLayoutShift,
 } from '../helpers/motion.js';
-import { addAgent, agentCard, labelled, openAgents, removeAgent } from './helpers-agents.js';
+import {
+  addAgent,
+  agentCard,
+  inMore,
+  labelled,
+  openAgents,
+  removeAgent,
+} from './helpers-agents.js';
 import {
   CONFIRM_PASSKEY,
   chapter,
@@ -40,7 +47,7 @@ afterAll(() => ch.stop());
 async function pauseAna(page: Page): Promise<void> {
   await openAgents(page);
   await agentCard(page, 'Ana')
-    .getByText(/^(Not used by any AI app|Offline|Connected|Working)/)
+    .getByText(/^(Not used by any AI app|Offline|Connected|Working|Ready)/)
     .first()
     .waitFor();
   await agentCard(page, 'Ana').getByRole('button', { name: 'Pause', exact: true }).click();
@@ -228,7 +235,7 @@ describe('chapter 4: agents', () => {
     await emulateReducedMotion(page);
     await observeLayoutShift(page);
     const shifted = await layoutShiftScore(page);
-    await agentCard(page, 'Ana').getByRole('button', { name: 'AI apps', exact: true }).click();
+    await (await inMore(page, 'Ana', 'AI apps')).click();
     await page.getByText('Quit the AI app first, then open it again.').first().waitFor();
     await expectFadesOnly(page);
     await page.waitForTimeout(1_000);
