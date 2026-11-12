@@ -9,15 +9,16 @@
 //   also in `agentlink_fetch_file`'s `name` and `savedTo`, as 06 §2.3 specifies);
 // - no inbound byte, path or pack value appears in a summary, `nextStep` or error;
 // - our code issues no action: nothing sent, signed, recorded or receipted; a file is written only
-//   by `agentlink_fetch_file`, only into the inbox folder, under a safe name, never executable, and
-//   its content is never returned; a refused pack path is never opened.
+//   by `agentlink_fetch_file`, only into the inbox folder, under a safe name, never executable; its
+//   content is returned only for a text kind derived from the saved name (REL051-A12), and then only
+//   inside an untrusted element and under `untrusted.content`; a refused pack path is never opened.
 //
 // RED does not apply: this suite tests behaviour that is already merged (M1-9d, M1-15, M1-33d).
 // A failure here is a real I-5 bug.
 import { lstat, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { expectContained, hasTag, oursFields } from '../assert.js';
+import { deliveredWrapped, expectContained, hasTag, oursFields } from '../assert.js';
 import {
   allNeedles,
   FILE_CONTENT,
@@ -197,8 +198,9 @@ describe('M1-13d: hostile inbound content over the file tools', () => {
     expect(after.rows).toEqual(before.rows);
   });
 
-  it('fetch_file saves into the inbox folder only, under a safe name, never executable, content never returned', async () => {
+  it('fetch_file saves into the inbox folder only, under a safe name, never executable; text only wrapped', async () => {
     const before = await effects(world, bob);
+    let textReturned = 0;
     for (const f of fileMessages) {
       const r = await bob.call('agentlink_fetch_file', { envelopeId: f.envelopeId, fileIndex: 0 });
       expect(r.structured['status'], f.id).toBe('ok');
@@ -217,10 +219,25 @@ describe('M1-13d: hostile inbound content over the file tools', () => {
       expect(stat.isFile(), f.id).toBe(true);
       expect(stat.mode & 0o777, f.id).toBe(0o600);
       expect(await readFile(savedTo, 'utf8')).toBe(FILE_CONTENT);
-      // Zero access and I-5: the content never comes back through a tool.
-      expect(`${r.text}${JSON.stringify(r.structured)}`).not.toContain(FILE_CONTENT_MARKER);
+      // I-5 (REL051-A12, IR-REL051-A12-1 L5): the content comes back only for a text kind derived
+      // from the saved name, and then only inside an untrusted element and `untrusted.content`;
+      // `contained` above already proved no needle of it is outside. Otherwise it never comes back.
+      const kind = String(r.structured['kind']);
+      const all = `${r.text}${JSON.stringify(r.structured)}`;
+      if (['markdown', 'text', 'code', 'json', 'patch'].includes(kind)) {
+        expect(deliveredWrapped(r, FILE_CONTENT_MARKER), f.id).toBe(true);
+        const content = (r.structured['untrusted'] as { content: string }).content;
+        expect(content, f.id).toContain(FILE_CONTENT_MARKER);
+        expect(hasTag(content), f.id).toBe(false);
+        expect(r.text.split('\n</untrusted_content>'), f.id).toHaveLength(3);
+        textReturned += 1;
+      } else {
+        expect(all, f.id).not.toContain(FILE_CONTENT_MARKER);
+      }
       expect(oursFields(r)).not.toContain(name);
     }
+    // The corpus holds .sh, .txt and .json names: the wrapped-text path is exercised.
+    expect(textReturned).toBeGreaterThan(0);
     const after = await effects(world, bob);
     expect(after.inboxFolder).toHaveLength(fileMessages.length);
     expect(after.published).toBe(before.published);

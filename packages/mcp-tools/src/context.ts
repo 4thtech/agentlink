@@ -20,6 +20,7 @@ import {
   type ExportProofPackResult,
   type FetchFileInput,
   type FetchFileResult,
+  type SavedFileRef,
   type InboxSender,
   type NotarizeInput,
   type NotarizeResult,
@@ -36,7 +37,7 @@ import {
   type SendMessageInput,
   type SendMessageResult,
 } from '@4thtech-io/core';
-import type { ContactDisplayName, ReceiptTypeName } from '@4thtech-io/types';
+import type { ContactDisplayName, FileKind, ReceiptTypeName } from '@4thtech-io/types';
 import {
   agentFingerprint,
   decodeHex0x,
@@ -93,6 +94,8 @@ export interface PageFile {
   /** Untrusted (I-5): the sender's file name and MIME type, for the block only. */
   readonly name: string;
   readonly mime: string;
+  /** REL051-A12: ours, from the name only (the core's; derived here when absent). */
+  readonly kind?: FileKind;
 }
 
 /** What every inbox page item carries (06 §2.2 `MessageBase`, before the wrapper). */
@@ -281,6 +284,11 @@ export interface FileTools {
   attach(path: string): Promise<AttachOutcome>;
   /** Core `fetchFile` (M1-7f): size cap, SSRF-safe download, both hashes, quarantine (D-84). */
   fetch(input: FetchFileInput): Promise<FetchFileResult>;
+  /**
+   * REL051-A12: where already saved received files are (06 §2.2 `FileInfo.savedTo`), keyed
+   * `<envelope ID>.<index>`. Absent: the inbox shows no `savedTo`.
+   */
+  savedPaths?(refs: readonly SavedFileRef[]): Promise<ReadonlyMap<string, string>>;
 }
 
 /** The two folders a proof pack `path` may name (06 §2.4, D-87): policy paths, `~/` allowed. */
@@ -616,6 +624,7 @@ function coreFileTools(client: AgentLinkClient, opener: FileOpener): FileTools {
       return opener.attach(path, folders);
     },
     fetch: (input) => client.fetchFile(input),
+    savedPaths: (refs) => client.savedFilePaths(refs),
   });
 }
 

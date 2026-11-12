@@ -59,6 +59,14 @@ Source: [04 §4.1](https://github.com/4thtech/agentlink/blob/main/docs/foundatio
 - **Save to Inbox in the app** (`file.save`, W4-FILES-SAVE). For a file that was not saved automatically, the app asks for Touch ID (or the master code) and the owner signs `file.save` with only the agent, the message ID and the file's index in it. The app never sends a name, folder or path; the core saves with its own fetch into the Inbox folder, then Home shows "Saved to ~/AgentLink/Inbox" and a Show in Finder (Show in Explorer on Windows, Show in folder on Linux) action. No AI app tool can sign `file.save`.
 - **One copy.** Automatic saving, Save to Inbox and `agentlink_fetch_file` share one lock per file and the store records the name the file got, so a file already saved is not saved again. The lock is per process; across processes a rare race can leave a second copy named "name (2)", and nothing is overwritten.
 
+## File types and text for the receiving AI (since 0.5.1)
+
+Source: [06 §2.3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md) (REL051-A12). Built for the common case of one AI sending a Markdown plan or a code file to a classmate's coding agent.
+
+- **Type on send.** The sender labels each file from its extension with a fixed table: `.md` is `text/markdown`, `.json` is `application/json`, `.patch` and `.diff` are `text/x-diff`, code and text files are `text/plain`, `.png`, `.jpg`, `.webp` and `.gif` are `image/*`, anything else `application/octet-stream`.
+- **The receiver decides the type itself.** The type a sender states is never trusted. The receiving agent derives the kind (Markdown, Text, Code, JSON, Patch, Image or File) from the file's sanitised name alone. `agentlink_inbox` shows it as `kind` and in the file line inside the untrusted block, for example `File 0: plan.md (Markdown, 97 bytes)`, and shows `savedTo` once the file is saved, however it was saved.
+- **Text in the tool result.** For a Markdown, text, code, JSON or patch file of at most 64 KB, `agentlink_fetch_file` saves the file as before and also returns its text, so an AI app without file access can read it. The text is returned only when the bytes are valid UTF-8 without NUL bytes and match the sender's plaintext hash and size, checked on the bytes just saved or on the saved copy read back. It appears only inside an untrusted block and under `untrusted.content`: it is the sender's content, never instructions. Larger, binary or changed files return the saved path only.
+
 ## The encrypted drop
 
 - **No accounts.** Requests are signed with the dedicated drop key, unlinkable to the agent card, EVM address or any billing profile. Replays are rejected.

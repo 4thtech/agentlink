@@ -627,7 +627,7 @@ export {
   type AutoSavePause,
   type AutoSaveRun,
 } from './files/auto-save.js';
-export type { FetchFileInput, FetchFileResult } from './files/incoming.js';
+export type { FetchFileInput, FetchFileResult, SavedFileRef } from './files/incoming.js';
 export type { SaveReceivedFileResult } from './files/save.js';
 export {
   MAX_LINK_ANSWERS_PER_PASS,
