@@ -35,6 +35,7 @@ import {
   decodeHex,
   generateShortInviteSecret,
   pairingProof,
+  parseJson,
   randomBytes,
   sealShortInvite,
   safetyCodeCommit,
@@ -46,6 +47,7 @@ import {
   type JsonValue,
 } from '@4thtech-io/crypto';
 import {
+  CLOCK_SKEW_SECONDS,
   INVITE_DEFAULT_EXPIRY_DAYS,
   type ContactDisplayName,
   type Invite,
@@ -89,6 +91,8 @@ import { openStoredPairingMessage, recomputeStoredPairing } from './stored-envel
 
 /** Seconds per day, for invite expiry. */
 const DAY_SECONDS = 86_400;
+/** The longest an invite lives (04 §3.6: 1 to 7 days). */
+const INVITE_MAX_SECONDS = INVITE_DEFAULT_EXPIRY_DAYS * DAY_SECONDS;
 const INVITE_ID_BYTES = 16;
 const SECRET_BYTES = 32;
 const NONCE_BYTES = 32;
@@ -293,6 +297,17 @@ export function shortInviteFetcher(drop: DropConfig | undefined): ShortInviteFet
 }
 
 /**
+ * R1-SEC-10 (06 §2.1 rule 1): an invite label as an owner surface may show it, the restricted form,
+ * or null when the name rule would fall back (a fallback names no one: it would carry this agent's
+ * own fingerprint). `·` never appears in a restricted name, so the fallback is told apart exactly.
+ */
+function shownLabel(label: string): string | null {
+  const restricted = restrictName(label, LABEL_FALLBACK_MARK);
+  return restricted === restrictName(undefined, LABEL_FALLBACK_MARK) ? null : restricted;
+}
+const LABEL_FALLBACK_MARK = '\u00b7';
+
+/**
  * Accept step 1 (04 §3.6): the one D-69 codec and the strict schema, the expiry, both card
  * signatures, the name and relays against the card and the relay URL rule (04 §4). No agent, no
  * store. Throws core's fixed errors only; none carries anything from the link (I-5, I-7).
@@ -309,6 +324,11 @@ async function acceptStepOne(
   // B's expiry check is advisory (A enforces the expiry it stored, 04 §3.6).
   if (invite.expiresAt <= now) {
     throw new CoreError('invite_expired', 'The invite has expired. Ask for a new one.');
+  }
+  // R1-SEC-11 (04 §3.6): no invite lives longer than 7 days. `expiresAt` is not signed, so a link
+  // that claims more (beyond the clock skew allowance) is not one this protocol makes.
+  if (invite.expiresAt > now + INVITE_MAX_SECONDS + CLOCK_SKEW_SECONDS) {
+    throw new CoreError('invite_invalid', 'The invite link is not valid.');
   }
   const checked = checkReceivedCard(
     {
@@ -574,7 +594,9 @@ export class PairingService implements PairingHandler {
 
   /**
    * The open invites (not used, not cancelled, not expired), newest first: ID, label and expiry
-   * only. Never a link, a secret or a lookup ID (I-1, I-7).
+   * only. Never a link, a secret or a lookup ID (I-1, I-7). R1-SEC-10 (06 §2.1 rule 1): the label
+   * may be the AI's text, a suggested alias, so it is given only in its restricted form, and as
+   * null when the name rule leaves nothing of it.
    */
   async openInvites(): Promise<readonly OpenInvite[]> {
     const ctx = this.#ctx;
@@ -590,7 +612,7 @@ export class PairingService implements PairingHandler {
       let label: string | null = null;
       if (row.label != null) {
         try {
-          label = await open(ctx, 'invites', 'label', [row.invite_id], row.label);
+          label = shownLabel(await open(ctx, 'invites', 'label', [row.invite_id], row.label));
         } catch {
           label = null;
         }
@@ -718,7 +740,8 @@ export class PairingService implements PairingHandler {
       name: invite.name,
       relays: invite.relays,
       role: 'invitee',
-      expiresAt: invite.expiresAt,
+      // R1-SEC-11 (04 §2.9): a staged accept lapses at the invite's expiry, never past 7 days.
+      expiresAt: Math.min(invite.expiresAt, now + INVITE_MAX_SECONDS),
     });
     // M1-9ze: the counterparty staged (and sealed to, below) must be the contact this invite names,
     // the one step 1 verified and the approval showed. M1-9zf: that binds the owner too (step 2
@@ -858,6 +881,72 @@ export class PairingService implements PairingHandler {
     return drop('type_unhandled', inbound.contactId);
   }
 
+  /**
+   * R1-SEC-03 (04 §3.6): a second valid answer to a used invite is refused, and the owner is told in
+   * the activity feed under the contact the invite connected (its owner alias or restricted name,
+   * never the second party's text). The refused row is filed under that contact, so it is kept with
+   * the contact (07 §3.2: only unknown senders' refused rows are pruned) and lists as
+   * `invite_answered_twice`. One warning per use of the invite: a later answer adds no row. When the
+   * contact cannot be found (its handshake is no longer stored), the refusal stays as before.
+   */
+  async #secondAnswer(
+    inviteId: string,
+    usedAt: number,
+    senderContactId: string | undefined,
+  ): Promise<PairingOutcome> {
+    const refused = (id: string | undefined): PairingOutcome => ({
+      kind: 'refuse',
+      reason: 'invite_used',
+      ...(id === undefined ? {} : { contactId: id }),
+      flagged: false,
+    });
+    let paired: string | undefined;
+    try {
+      paired = await this.#invitePairedContact(inviteId);
+    } catch {
+      paired = undefined;
+    }
+    if (paired === undefined) return refused(senderContactId);
+    const warned = await this.#ctx.store.transaction((tx) =>
+      tx
+        .select('envelopes', {
+          direction: 'in',
+          type: 'handshake',
+          state: 'refused',
+          refused_reason: 'invite_used',
+          contact_id: paired,
+        })
+        .some((r) => (r.refused_at ?? 0) >= usedAt),
+    );
+    return warned ? drop('invite_used', senderContactId) : refused(paired);
+  }
+
+  /** The contact whose stored, processed `handshake` used `inviteId` (this agent as inviter). */
+  async #invitePairedContact(inviteId: string): Promise<string | undefined> {
+    const ctx = this.#ctx;
+    const rows = await ctx.store.transaction((tx) =>
+      tx.select(
+        'envelopes',
+        { direction: 'in', type: 'handshake', state: 'ok' },
+        { orderBy: [['created_at', 'desc']] },
+      ),
+    );
+    for (const row of rows) {
+      if (row.contact_id === null || row.payload_json === null) continue;
+      let used: unknown;
+      try {
+        const payload = parseJson(
+          await open(ctx, 'envelopes', 'payload_json', [row.envelope_id], row.payload_json),
+        ) as { readonly body?: { readonly inviteId?: unknown } };
+        used = payload.body?.inviteId;
+      } catch {
+        continue;
+      }
+      if (used === inviteId) return row.contact_id;
+    }
+    return undefined;
+  }
+
   /** A, on a `handshake` (04 §3.6 Complete, agent A). */
   async #onHandshake(inbound: InboundPairing): Promise<PairingOutcome> {
     const ctx = this.#ctx;
@@ -894,12 +983,7 @@ export class PairingService implements PairingHandler {
     if (!proofOk) return drop('pairing_invalid', contactId);
     // A second valid answer: the link leaked or someone raced the intended contact (04 §3.6).
     if (invite.used_at !== null) {
-      return {
-        kind: 'refuse',
-        reason: 'invite_used',
-        ...(contactId === undefined ? {} : { contactId }),
-        flagged: false,
-      };
+      return this.#secondAnswer(invite.invite_id, invite.used_at, contactId);
     }
     const now = nowOf(ctx);
     if (invite.expires_at <= now) return drop('invite_expired', contactId);
@@ -962,6 +1046,7 @@ export class PairingService implements PairingHandler {
       });
       return await this.#complete(inbound, staged.staged, ack, {
         invite: invite.invite_id,
+        inviteCreatedAt: invite.created_at,
         stage: staged.apply,
         now,
       });
@@ -1052,6 +1137,8 @@ export class PairingService implements PairingHandler {
     context: {
       readonly now: number;
       readonly invite?: string;
+      /** R1-SEC-02: when the invite was made (a remove after it binds it). */
+      readonly inviteCreatedAt?: number;
       readonly stage?: (tx: Parameters<PairingHandler['screen']>[0]) => void;
       readonly handshake?: Awaited<ReturnType<typeof openStoredPairingMessage>>;
     },
@@ -1074,7 +1161,11 @@ export class PairingService implements PairingHandler {
     }
     let completion: Awaited<ReturnType<ContactBook['prepareCompletion']>>;
     try {
-      completion = await this.#contacts.prepareCompletion(staged, transcript);
+      completion = await this.#contacts.prepareCompletion(
+        staged,
+        transcript,
+        context.inviteCreatedAt,
+      );
     } catch (error) {
       return classify(error, contactId);
     }
@@ -1104,7 +1195,7 @@ export class PairingService implements PairingHandler {
       request_accepted_at: null,
     };
     const ackRow = ack === undefined ? undefined : await outboundRow(ctx, ack, id);
-    let result: 'claimed_elsewhere' | 'invite_used' | 'done';
+    let result: 'claimed_elsewhere' | { readonly usedAt: number } | 'done';
     try {
       result = await ctx.store.transaction((tx) => {
         if (!inbound.claim(tx)) return 'claimed_elsewhere';
@@ -1118,7 +1209,7 @@ export class PairingService implements PairingHandler {
           ) {
             throw new CoreError('pairing_expired', 'The pairing has expired.');
           }
-          if (current.used_at !== null) return 'invite_used';
+          if (current.used_at !== null) return { usedAt: current.used_at };
           tx.update(
             'invites',
             { invite_id: context.invite, used_at: null },
@@ -1134,13 +1225,8 @@ export class PairingService implements PairingHandler {
     } catch (error) {
       return classify(error, contactId);
     }
-    if (result === 'invite_used') {
-      return {
-        kind: 'refuse',
-        reason: 'invite_used',
-        ...(contactId === undefined ? {} : { contactId }),
-        flagged: false,
-      };
+    if (typeof result === 'object' && context.invite !== undefined) {
+      return this.#secondAnswer(context.invite, result.usedAt, contactId);
     }
     if (result === 'claimed_elsewhere') return { kind: 'done' };
     ctx.log.info('pairing completed', { role: transcript.role });

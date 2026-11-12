@@ -921,12 +921,15 @@ export class ContactBook {
    * received from the card key and processed, ours sent) are checked again, then the revocation,
    * re-pair and key rules, the 04 §2.9 tie-break for concurrent pairings, and the contact is written
    * and the staged row deleted. A completed re-pair replaces the card and the pairing columns and
-   * clears the safety check (a new pairing has a new code). A removed contact becomes active again;
-   * a blocked one stays blocked.
+   * clears the safety check (a new pairing has a new code). A removed contact becomes active again
+   * only under pairingAllowedTx (R1-SEC-02); a blocked one completes nothing. `startedAt`, when
+   * given, is when this agent began the pairing (the inviter's invite `created_at`); otherwise the
+   * staged row's time.
    */
   async prepareCompletion(
     staged: StagedPairing,
     transcript: PairingTranscript,
+    startedAt?: number,
   ): Promise<PreparedCompletion> {
     const ctx = this.#ctx;
     const missing = (): never => {
@@ -1012,6 +1015,13 @@ export class ContactBook {
       const existing = tx.get('contacts', { contact_id: id });
       if (isRevoked(tx, id, existing)) {
         throw new CoreError('contact_revoked', 'That agent has been revoked and cannot be paired.');
+      }
+      // R1-SEC-02: a blocked contact, or a removed one through something begun before the removal
+      // or while its keys stay blocked, completes nothing (whatever key it answers from).
+      if (
+        !pairingAllowedTx(tx, id, Math.min(current.created_at, startedAt ?? current.created_at))
+      ) {
+        throw new CoreError('pairing_not_allowed', 'That pairing is not allowed.');
       }
       assertRepairAllowed(existing, {
         ownerFingerprint: current.owner_fingerprint,
@@ -1391,6 +1401,29 @@ export function removeContactTx(tx: StoreTx, row: Row<'contacts'>, now: number):
     { contact_id: id, status: { in: ['active', 'blocked'] } },
     { status: 'removed', updated_at: now },
   );
+}
+
+/**
+ * R1-SEC-02 (07 §3 `removed`, 04 §2.9; proposed, owner confirms at merge): may a pairing with
+ * `contactId` complete, inside the completing transaction? `startedAt` is when this agent began it:
+ * the invite's `created_at` (inviter) or the staged pairing's (invitee). The rule is bound to the
+ * contact, not to the sender key, so a key the contact rotated to after the remove or block is
+ * caught too:
+ * - a `blocked` contact completes no pairing until the owner unblocks it;
+ * - a `removed` contact completes one only when none of its keys is still in `blocked_keys` (it was
+ *   blocked when removed; `contact.unblock` clears them) and this agent began it after the removal
+ *   (the tombstone's `updated_at`), so an invite made before the remove never brings it back.
+ * Anything else (no row, active) is allowed here; revocation and the re-pair rules are checked apart.
+ */
+export function pairingAllowedTx(tx: StoreTx, contactId: string, startedAt: number): boolean {
+  const row = tx.get('contacts', { contact_id: contactId });
+  if (row === undefined) return true;
+  if (row.status === 'blocked') return false;
+  if (row.status !== 'removed') return true;
+  for (const key of new Set([row.agent_nostr, ...parseKeyList(row.nostr_keys)])) {
+    if (tx.get('blocked_keys', { from_key: key }) !== undefined) return false;
+  }
+  return startedAt > row.updated_at;
 }
 
 /** A pairing message from a removed contact's key, as removedPairingAdmitTx reads it. */

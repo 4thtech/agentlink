@@ -1746,9 +1746,12 @@ export class EnvelopeService {
         effective = { kind: 'drop', reason: REQUESTS_FULL };
       }
       // 07 §3.2 rate_counters: a contact's refused envelope counts too; above the limit it is dropped.
+      // R1-SEC-03: a second answer filed under the contact its invite connected is the owner's
+      // warning, kept once per use of the invite (pairing.ts); it never spends that contact's rate.
       if (
         effective.kind === 'refuse' &&
         effective.contactId !== undefined &&
+        effective.reason !== 'invite_used' &&
         !this.#countRate(tx, effective.contactId)
       ) {
         effective = { kind: 'drop', reason: 'rate_limited', contactId: effective.contactId };

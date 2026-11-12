@@ -587,6 +587,8 @@ describe('refusals (04 §3.6 Accept and Complete, §2.9)', () => {
         envelopeId: second.handshake.envelope.id,
         outcome: 'refused',
         reason: 'invite_used',
+        // R1-SEC-03: filed under the contact the invite connected (the owner's warning).
+        contactId: b.id,
         flagged: false,
       },
     ]);

@@ -18,7 +18,18 @@
 // IPA and the phonetic extensions) are refused by range. Residual: a whole-script confusable (a name
 // written entirely in Cyrillic letters that look Latin) passes; it is a single script, which the
 // profile allows, and it is still labelled self-declared.
+//
+// R1-SEC-12 (06 §2.1; proposed, owner confirms at merge): the reserved-word test runs on a look-alike
+// skeleton as well as on the plain text, so "AgentIink", "0wner", "Syst3m" or an all-Cyrillic
+// "ѕуѕтем" fall back too. The skeleton is a small fixed map in the spirit of UTS #39 confusables
+// (digits 0 1 3 4 5 7, capital I and l, `rn`/`vv`, and the Cyrillic and Greek letters that look
+// Latin), used only for this test: it never changes the shown name, so names in any script are kept
+// as written. A name that is, as a whole, a role word (RESERVED_NAME_ROLES: "you", "user",
+// "assistant", "unknown sender", "a contact", ...) or starts with the fallback word "Contact" falls
+// back as well. Residual: a look-alike of an ordinary name (not a reserved or role word) passes; it
+// is a single script and is always labelled self-declared.
 import {
+  RESERVED_NAME_ROLES,
   RESERVED_NAME_WORDS,
   RESTRICTED_NAME_FALLBACK,
   RESTRICTED_NAME_MAX_CODE_POINTS,
@@ -77,8 +88,86 @@ const NOT_ALLOWED =
 const DISALLOWED_CHARS = /[^\p{L}\p{N} .'-]/gu;
 
 const squeeze = (s: string): string => s.replace(/[ .'-]/g, '');
+
+/** Look-alikes folded for the reserved-word test only (applied after lower-casing). */
+const SKELETON: Readonly<Record<string, string>> = Object.freeze({
+  '0': 'o',
+  '1': 'l',
+  '3': 'e',
+  '4': 'a',
+  '5': 's',
+  '7': 't',
+  i: 'l',
+  // Cyrillic
+  а: 'a',
+  е: 'e',
+  ё: 'e',
+  к: 'k',
+  м: 'm',
+  н: 'h',
+  о: 'o',
+  р: 'p',
+  с: 'c',
+  т: 't',
+  у: 'y',
+  х: 'x',
+  ѕ: 's',
+  і: 'l',
+  ї: 'l',
+  ј: 'j',
+  ԁ: 'd',
+  ԛ: 'q',
+  ԝ: 'w',
+  һ: 'h',
+  ү: 'y',
+  ӏ: 'l',
+  // Greek
+  α: 'a',
+  β: 'b',
+  γ: 'y',
+  ε: 'e',
+  η: 'n',
+  ι: 'l',
+  κ: 'k',
+  ν: 'v',
+  ο: 'o',
+  ρ: 'p',
+  σ: 'o',
+  τ: 't',
+  υ: 'u',
+  χ: 'x',
+  ω: 'w',
+});
+/** The look-alike skeleton of lower-cased text (R1-SEC-12). */
+const skeleton = (lower: string): string =>
+  [...lower]
+    .map((ch) => SKELETON[ch] ?? ch)
+    .join('')
+    .replace(/rn/g, 'm')
+    .replace(/vv/g, 'w');
+
 const RESERVED = RESERVED_NAME_WORDS.map((w) => w.toLowerCase());
 const RESERVED_SQUEEZED = RESERVED.map(squeeze);
+const RESERVED_SKELETON = RESERVED_SQUEEZED.map(skeleton);
+const ROLES = new Set(RESERVED_NAME_ROLES.map((w) => skeleton(squeeze(w.toLowerCase()))));
+const FALLBACK_WORD = skeleton(RESTRICTED_NAME_FALLBACK.toLowerCase());
+
+/** True when lower-cased text holds a reserved word or is a role word, look-alikes folded. */
+function reservedName(lower: string): boolean {
+  const squeezed = squeeze(lower);
+  if (
+    RESERVED.some((w) => lower.includes(w)) ||
+    RESERVED_SQUEEZED.some((w) => squeezed.includes(w))
+  ) {
+    return true;
+  }
+  const skel = skeleton(squeezed);
+  if (RESERVED_SKELETON.some((w) => skel.includes(w))) return true;
+  if (ROLES.has(skel)) return true;
+  // The fallback's own form, "Contact" plus a fingerprint, in any separators.
+  const first = skeleton(lower.split(/[ .'-]/u)[0] ?? '');
+  return first === FALLBACK_WORD;
+}
 
 function scriptOf(ch: string): Script | 'common' | 'other' {
   if (COMMON.test(ch)) return 'common';
@@ -124,14 +213,7 @@ export function restrictName(name: unknown, ownerFingerprintShort: string): Rest
     if (script !== 'common') scripts.add(script);
   }
   if (!moderatelyRestrictive(scripts)) return fallback;
-  const lower = text.toLowerCase();
-  const squeezed = squeeze(lower);
-  if (
-    RESERVED.some((w) => lower.includes(w)) ||
-    RESERVED_SQUEEZED.some((w) => squeezed.includes(w))
-  ) {
-    return fallback;
-  }
+  if (reservedName(text.toLowerCase())) return fallback;
   return text as RestrictedName;
 }
 
