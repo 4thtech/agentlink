@@ -45,8 +45,13 @@ const body = (a: RestoreAnswer): Record<string, unknown> => a.body as Record<str
 /** A keychain whose set() of one account never answers (the process is closed at that write). */
 class HangingKeychain extends MemoryKeychain {
   hangAccount: string | undefined;
+  /** A set() of `hangAccount` was reached (and never answers). */
+  hung = false;
   override set(account: string, value: Uint8Array): Promise<void> {
-    if (account === this.hangAccount) return new Promise<void>(() => undefined);
+    if (account === this.hangAccount) {
+      this.hung = true;
+      return new Promise<void>(() => undefined);
+    }
     return super.set(account, value);
   }
 }
@@ -77,7 +82,7 @@ async function restoreClick(
   engine: RestoreEngine,
   code: string,
   selection: string[],
-): Promise<Promise<RestoreAnswer>> {
+): Promise<RestoreAnswer> {
   const kits = body(await engine.found('S1'))['kits'] as { handle: string; name: string }[];
   const handle = (kits.find((k) => k.name === KIT) as { handle: string }).handle;
   expect(body(await engine.header('S1', { handle }))['header']).toBe('ok');
@@ -117,8 +122,9 @@ async function oneIdKit() {
 async function closedAfterOwnerItem(code: string, agentId: string): Promise<void> {
   keychain.hangAccount = OWNER_PASSKEY_ACCOUNT;
   const first = engineOf();
-  void restoreClick(first, code, [agentId]).then((p) => void p.catch(() => undefined));
-  await until('the owner item is written', () => keychain.items.has(OWNER_ACCOUNT));
+  void restoreClick(first, code, [agentId]).catch(() => undefined);
+  await until('the Touch ID wrap is being written', () => keychain.hung);
+  expect(keychain.items.has(OWNER_ACCOUNT)).toBe(true);
   keychain.hangAccount = undefined;
 }
 
@@ -127,7 +133,7 @@ describe('R1-CLASS-04: the app closed right after "Restore 1 ID"', () => {
     const { a1, kit } = await oneIdKit();
     keychain.hangAccount = OWNER_ACCOUNT;
     const first = engineOf();
-    void restoreClick(first, kit.code, [a1.agentId]).then((p) => void p.catch(() => undefined));
+    void restoreClick(first, kit.code, [a1.agentId]).catch(() => undefined);
     await until(
       'the marker is written',
       async () => (await readUnsavedMarker(t.home)) !== undefined,
@@ -152,7 +158,7 @@ describe('R1-CLASS-04: the app closed right after "Restore 1 ID"', () => {
     expect(await next.firstRunHold()).toBe('finish_restore');
     expect(await next.masterCodeState()).toEqual({ status: 'finish_restore' });
     // Finish restoring with the same kit: owner-only completion, a new master code shown once.
-    const done = await await restoreClick(next, kit.code, []);
+    const done = await restoreClick(next, kit.code, []);
     expect(done.status).toBe(200);
     expect(body(done)['status']).toBe('done');
     expect(body(done)['masterCode']).toMatch(/^[A-Z2-7]{4}(-[A-Z2-7]{4}){5}$/);
@@ -164,7 +170,7 @@ describe('R1-CLASS-04: the app closed right after "Restore 1 ID"', () => {
   it('a Touch ID wrap was written too: the owner is kept and the page is told the code was never saved', async () => {
     const { a1, kit } = await oneIdKit();
     const first = engineOf();
-    const done = await await restoreClick(first, kit.code, [a1.agentId]);
+    const done = await restoreClick(first, kit.code, [a1.agentId]);
     expect(body(done)['status']).toBe('done');
     expect((await readUnsavedMarker(t.home))?.stage).toBe('shown');
     const next = engineOf({ runAlive: () => false });

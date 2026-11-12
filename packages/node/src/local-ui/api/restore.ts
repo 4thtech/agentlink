@@ -22,6 +22,10 @@
 //                 plus the get() assertion) → {status: "done", ids, masterCode, touchId} or
 //                 {status: "prf_needed", nonce, expiresInMs, publicKey: {rpId, challenge,
 //                 credentialId, prfSalt}}
+//   POST /api/ui/master-code/show  (REL051-CF3) → {status: "shown", kind, code, …the step's public
+//                 fields} for the page session that got it (10 minutes), else {status: "lost", kind,
+//                 touchId} | {status: "finish_restore"} | {status: "none"}; never another session's code
+//   POST /api/ui/master-code/saved (REL051-CF3) → {status: "saved"}: "I saved it"
 import {
   RESTORE_PATHS,
   type LocalUiRestoreRoute,
@@ -38,7 +42,7 @@ const route = (step: LocalUiRestoreStep): LocalUiRestoreRoute =>
     step,
   });
 
-/** Every restore route (found, upload, header, presence, open, check, cancel, apply/begin, apply/finish). */
+/** Every restore route (found, upload, header, presence, open, check, cancel, apply/begin, apply/finish, and REL051-CF3's master-code show and saved). */
 export const restoreRoutes: readonly LocalUiRestoreRoute[] = Object.freeze(
   (Object.keys(RESTORE_PATHS) as LocalUiRestoreStep[]).map(route),
 );

@@ -145,4 +145,44 @@ describe('chapter 1: onboarding', () => {
     await page.waitForURL((url) => url.pathname === '/start/app');
     await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
   }, 180_000);
+
+  // REL051-CF3 (R1-CLASS-03): a reload on "Your master code" shows the same code again; after the app
+  // was closed before "I saved it", the next launch says the code was not saved and offers a new one.
+  it('a reload on "Your master code" keeps the code; a restart says it was not saved', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const pc = await world.computer();
+    const jp = await journeyPage(ready.browser);
+    const { page } = jp;
+    const first = await startUiRun(pc, ready.files, ch.closers);
+    await page.goto(first.link);
+    await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
+    await page
+      .getByRole('button', { name: /^Continue with / })
+      .first()
+      .click();
+    await page.getByLabel('Name people see').fill('Reloaded');
+    await page.getByRole('button', { name: CONNECT_WITH }).click();
+    await page.getByRole('heading', { name: 'Your master code' }).waitFor();
+    const codeOf = async (): Promise<string> =>
+      (await page.locator('[data-backup-code] span').allInnerTexts()).join(' ');
+    const shown = await codeOf();
+    expect(shown).toMatch(/^[A-Z2-9]{4}( [A-Z2-9]{4}){5}$/);
+
+    await page.reload();
+    await page.getByRole('heading', { name: 'Your master code' }).waitFor();
+    expect(await codeOf()).toBe(shown);
+    expect(new URL(page.url()).pathname).toBe('/start/connect');
+    expect(jp.gestures.create).toBe(1);
+
+    // The app is closed before "I saved it": the next launch never shows or asks for that code.
+    await first.stop();
+    const again = await startUiRun(pc, ready.files, ch.closers);
+    await page.goto(again.link);
+    await page.getByRole('heading', { name: "Your master code wasn't saved" }).waitFor();
+    await page.getByRole('button', { name: 'Make a new master code' }).waitFor();
+    expect(await text(page)).not.toContain(shown);
+    expect(await page.locator('input[type="password"]').count()).toBe(0);
+  }, 180_000);
 });

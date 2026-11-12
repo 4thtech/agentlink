@@ -504,6 +504,9 @@ const SETUP_TIME = new Set([
   'POST /api/ui/restore/cancel',
   'POST /api/ui/restore/apply/begin',
   'POST /api/ui/restore/apply/finish',
+  // REL051-CF3: first run's own master code, again after a reload (restore-kind gate).
+  'POST /api/ui/master-code/show',
+  'POST /api/ui/master-code/saved',
   // W4-SHELL-V2: the app's UI settings are the app's, not an agent's (ui-settings-server.test.ts).
   'GET /api/ui/ui-settings',
   'PUT /api/ui/ui-settings',
