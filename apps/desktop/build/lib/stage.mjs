@@ -7,11 +7,22 @@ import { pathToFileURL } from 'node:url';
 import { assetFor, constants } from './constants.mjs';
 import { fetchVerified, sha256File } from './fetch-verified.mjs';
 import { checkTgzDeps, lockRegistryProblems, treeHash } from './core-lock.mjs';
+import { PREVIEW_VAR, findPreviewString } from './preview-check.mjs';
 import { capture, run, walk } from './run.mjs';
 
 export const DESKTOP_DIR = resolve(new URL('../..', import.meta.url).pathname);
 export const CACHE_DIR = join(DESKTOP_DIR, '.cache');
 export const OUT_DIR = join(DESKTOP_DIR, 'out');
+/** The release bundle of the shell's main process (`pnpm --filter @4thtech-io/desktop bundle`). */
+export const RELEASE_DIST_DIR = join(DESKTOP_DIR, 'dist-release');
+
+/**
+ * The packaged layout under Resources: ONE source, src/shared/resource-layout.json, which the
+ * shell's main process (main.ts resourcePaths) reads too. Values are path segments.
+ */
+export const LAYOUT = JSON.parse(
+  readFileSync(join(DESKTOP_DIR, 'src', 'shared', 'resource-layout.json'), 'utf8'),
+);
 
 const PLACEHOLDER_MAIN = `'use strict';
 // PLACEHOLDER main (WP-D4 packaging check only): the real shell is apps/desktop/src/main (WP-D2).
@@ -51,26 +62,27 @@ export function extract(archive, dest) {
 }
 
 /**
- * Builds the ASAR payload dir: package.json + dist/ (the compiled main, apps/desktop/dist) and, when
- * present, assets used by the renderer. Falls back to a placeholder main when WP-D2's dist is absent.
- * Returns {dir, placeholder}.
+ * Builds the ASAR payload dir: package.json + dist/ (the RELEASE bundle of the shell's main process,
+ * apps/desktop/dist-release, built with the preview constant defined false; never plain tsc output).
+ * Falls back to a placeholder main only when the bundle is absent. Returns {dir, placeholder}.
  */
-export function buildPayload({ workDir, version, distDir = join(DESKTOP_DIR, 'dist') }) {
+export function buildPayload({ workDir, version, distDir = RELEASE_DIST_DIR }) {
   const dir = join(workDir, 'payload');
+  const main = LAYOUT.asarMain; // ['dist', 'main', 'entry.js']
   rmSync(dir, { recursive: true, force: true });
-  mkdirSync(join(dir, 'dist', 'main'), { recursive: true });
+  mkdirSync(join(dir, ...main.slice(0, -1)), { recursive: true });
   let placeholder = false;
-  if (existsSync(join(distDir, 'main', 'main.js'))) {
+  if (existsSync(join(distDir, ...main.slice(1)))) {
     cpSync(distDir, join(dir, 'dist'), { recursive: true });
   } else {
     placeholder = true;
-    writeFileSync(join(dir, 'dist', 'main', 'main.js'), PLACEHOLDER_MAIN);
+    writeFileSync(join(dir, ...main), PLACEHOLDER_MAIN);
   }
   const pkg = {
     name: 'agentlink-desktop',
     productName: 'AgentLink',
     version,
-    main: 'dist/main/main.js',
+    main: main.join('/'),
     private: true,
   };
   const srcPkg = join(DESKTOP_DIR, 'package.json');
@@ -80,6 +92,26 @@ export function buildPayload({ workDir, version, distDir = join(DESKTOP_DIR, 'di
   }
   writeFileSync(join(dir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
   return { dir, placeholder };
+}
+
+/**
+ * The release ASAR must not contain the preview variable name (Fable H1): the same scan as
+ * check-preview-string.mjs, run on the real app.asar during the build so a bad bundle never ships.
+ */
+export async function assertNoPreviewString(asarPath) {
+  const req = createRequire(new URL('../package.json', import.meta.url));
+  const asar = await import(pathToFileURL(req.resolve('@electron/asar')).href);
+  const files = [{ path: '(raw app.asar bytes)', content: readFileSync(asarPath) }];
+  for (const p of asar.listPackage(asarPath, { isPack: false })) {
+    const rel = p.replace(/^[\\/]/, '');
+    try {
+      files.push({ path: rel, content: asar.extractFile(asarPath, rel) });
+    } catch {
+      /* directories */
+    }
+  }
+  const hits = findPreviewString(files);
+  if (hits.length) throw new Error(`${PREVIEW_VAR} is in the release ASAR: ${hits.join(', ')}`);
 }
 
 /** Packs the payload dir into app.asar (deterministic file order from @electron/asar). */

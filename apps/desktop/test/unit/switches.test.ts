@@ -160,6 +160,11 @@ describe('commandLineIsClean', () => {
     expect(commandLineIsClean((s) => s === 'user-data-dir', true)).toBe(true);
     expect(commandLineIsClean((s) => s === 'user-data-dir', false)).toBe(false);
   });
+
+  it('accepts the switch Electron adds itself (allow-file-access-from-files), refused in argv', () => {
+    expect(commandLineIsClean((s) => s === 'allow-file-access-from-files', false)).toBe(true);
+    expect(checkLaunch(input(['--allow-file-access-from-files'])).ok).toBe(false);
+  });
 });
 
 describe('forwardedDeepLink', () => {

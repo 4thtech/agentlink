@@ -59,7 +59,10 @@ export const FORBIDDEN_SWITCHES = [
   'vmodule',
   'ignore-certificate-errors',
   'ignore-certificate-errors-spki-list',
-  'allow-file-access-from-files',
+  // NOT 'allow-file-access-from-files': Electron itself appends it to every launch (seen on the
+  // built app, Electron 45), so listing it here refused every start. A launch argument carrying it is
+  // still refused by the argv allowlist above; the window never loads file:// (origin lock, and the
+  // GrantFileProtocolExtraPrivileges fuse is off).
   'no-sandbox',
   'disable-site-isolation-trials',
   'auto-open-devtools-for-tabs',

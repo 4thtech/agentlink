@@ -13,6 +13,7 @@
   "main": "./dist/main/entry.js",
   "scripts": {
     "build": "tsc -b",
+    "bundle": "vite build --config bundle.config.mjs",
     "typecheck": "tsc -p tsconfig.test.json",
     "lint": "eslint .",
     "test": "vitest run"

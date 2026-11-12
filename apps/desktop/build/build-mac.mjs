@@ -11,6 +11,7 @@
 import {
   chmodSync,
   cpSync,
+  existsSync,
   mkdirSync,
   renameSync,
   rmSync,
@@ -18,7 +19,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
-import { basename, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { constants } from './lib/constants.mjs';
 import { BUILD_FUSES } from './lib/fuses.mjs';
@@ -31,6 +32,8 @@ import {
   CACHE_DIR,
   DESKTOP_DIR,
   OUT_DIR,
+  LAYOUT,
+  assertNoPreviewString,
   buildPayload,
   extract,
   fetchRuntimes,
@@ -85,26 +88,33 @@ const payload = buildPayload({
 });
 const asarPath = join(contents, 'Resources', 'app.asar');
 await packAsar(payload.dir, asarPath);
+await assertNoPreviewString(asarPath);
 const integrity = await asarIntegrity(asarPath);
 
 console.log('[4/9] bundled Node (official binary, left untouched)');
 const nx = join(work, 'node-x');
 extract(rt.node, nx);
 const nodeSrc = join(nx, `node-v${constants.node.version}-${platform}`);
-const nodeDest = join(contents, 'Resources', 'node');
-mkdirSync(join(nodeDest, 'bin'), { recursive: true });
-cpSync(join(nodeSrc, 'bin', 'node'), join(nodeDest, 'bin', 'node'));
+const nodeBin = join(contents, 'Resources', ...LAYOUT.node.posix); // Resources/node/bin/node
+const nodeDest = join(contents, 'Resources', LAYOUT.node.posix[0]);
+mkdirSync(dirname(nodeBin), { recursive: true });
+cpSync(join(nodeSrc, 'bin', 'node'), nodeBin);
 cpSync(join(nodeSrc, 'LICENSE'), join(nodeDest, 'LICENSE'));
-chmodSync(join(nodeDest, 'bin', 'node'), 0o755);
+chmodSync(nodeBin, 0o755);
 const nodeBefore = describeSignature(join(nodeSrc, 'bin', 'node'));
 
 console.log('[5/9] core (packed tarball, npm ci from core-lock, --ignore-scripts)');
 const core = installCore({
   tgz,
-  dest: join(contents, 'Resources', 'core'),
+  dest: join(contents, 'Resources', ...LAYOUT.coreDir),
   os: 'darwin',
   cpu: arch,
 });
+if (!existsSync(join(contents, 'Resources', ...LAYOUT.hostScript))) {
+  throw new Error(
+    `The core has no desktop host at Resources/${LAYOUT.hostScript.join('/')}: pack the CLI after \`pnpm --filter @4thtech-io/agentlink build\` (it builds dist/desktop-host.js).`,
+  );
+}
 
 console.log('[6/9] Info.plist, fuses, ASAR integrity digest');
 writeFileSync(join(contents, 'Info.plist'), infoPlist({ version, asarHash: integrity.hash }));
@@ -130,7 +140,7 @@ const mode =
   planFor(app, process.env, entitlements).at(-1).identity === '-' ? 'ad-hoc' : 'developer-id';
 const signed = signApp(app, process.env, entitlements);
 verifyApp(app);
-const nodeAfter = describeSignature(join(nodeDest, 'bin', 'node'));
+const nodeAfter = describeSignature(nodeBin);
 if (nodeAfter.cdhash !== nodeBefore.cdhash || nodeAfter.teamId !== nodeBefore.teamId) {
   throw new Error(
     'The bundled node signature changed. It must keep the upstream Node.js signature.',

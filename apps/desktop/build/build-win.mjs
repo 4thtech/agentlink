@@ -17,7 +17,9 @@ import { nsisScript } from './lib/nsis.mjs';
 import { capture, parseArgs, run } from './lib/run.mjs';
 import {
   CACHE_DIR,
+  LAYOUT,
   OUT_DIR,
+  assertNoPreviewString,
   buildPayload,
   extract,
   fetchRuntimes,
@@ -63,18 +65,20 @@ const payload = buildPayload({
 });
 const asarPath = join(dir, 'resources', 'app.asar');
 await packAsar(payload.dir, asarPath);
+await assertNoPreviewString(asarPath);
 const integrity = await asarIntegrity(asarPath);
 
 console.log('[4/7] bundled Node (official node.exe, untouched)');
 const nx = join(work, 'node-x');
 extract(rt.node, nx);
 const nodeSrc = join(nx, `node-v${constants.node.version}-win-x64`);
-mkdirSync(join(dir, 'resources', 'node'), { recursive: true });
-cpSync(join(nodeSrc, 'node.exe'), join(dir, 'resources', 'node', 'node.exe'));
-cpSync(join(nodeSrc, 'LICENSE'), join(dir, 'resources', 'node', 'LICENSE'));
+const nodeExe = join(dir, 'resources', ...LAYOUT.node.win32); // resources\\node\\node.exe
+mkdirSync(join(nodeExe, '..'), { recursive: true });
+cpSync(join(nodeSrc, 'node.exe'), nodeExe);
+cpSync(join(nodeSrc, 'LICENSE'), join(nodeExe, '..', 'LICENSE'));
 
 console.log('[5/7] core (packed tarball, npm ci from core-lock, --ignore-scripts)');
-const core = installCore({ tgz, dest: join(dir, 'resources', 'core'), os: 'win32', cpu: 'x64' });
+const core = installCore({ tgz, dest: join(dir, 'resources', ...LAYOUT.coreDir), os: 'win32', cpu: 'x64' });
 
 console.log('[6/7] fuses and ASAR integrity resource');
 const exe = join(dir, 'AgentLink.exe');
