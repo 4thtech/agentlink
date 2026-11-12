@@ -169,6 +169,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/health',
       // MSG-FILES-IO-h: Show in Finder (api/files-io-reveal.test.ts).
       '/api/ui/files/received/reveal',
+      // REL051-A34: the in-app preview of a received text file (api/files-preview.test.ts).
+      '/api/ui/files/received/preview',
       // W4-FILES-SAVE: Save to Inbox (api/files-save.test.ts).
       '/api/ui/files/save',
       // UX2-d1: create, check and accept an invite (api/invites.test.ts).

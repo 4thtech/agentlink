@@ -79,6 +79,7 @@ import type { Conversation as Person, MessagesApi, Problem } from '../messages/a
 import { createSaveApi, type SaveApi } from '../inbox/save-api.js';
 import { Conversation, exactTime, useThread } from './conversation.js';
 import { useTerms } from './terms-trail.js';
+import type { Preview } from './file-reader.js';
 import { HomeApprovals } from './home-approvals.js';
 import { RenameBanner } from './rename-banner.js';
 import {
@@ -140,6 +141,8 @@ interface Clients {
   readonly approvals: ApprovalsClient;
   readonly save: SaveApi;
   readonly reveal: Reveal;
+  /** REL051-A34: open a saved received text file in the reader, by item ID only. */
+  readonly preview: Preview;
   readonly invites: InviteApi;
   /** W8-S4: Finish removing (the Remove sheet's own calls). */
   readonly agents: AgentsApi;
@@ -162,6 +165,7 @@ function useClients(props: HomeScreenProps): Clients {
       approvals: approvalsClient ?? createApprovalsClient(withKeys),
       save: createSaveApi(withKeys),
       reveal: (id: string) => files.reveal(id),
+      preview: (id: string) => files.preview(id),
       invites: createInviteApi(opts),
       agents: createAgentsApi(opts),
       owner: createOwnerClient(opts),
@@ -279,6 +283,16 @@ function PersonOpen({
   const terms = useTerms(clients.api, person.contactId, tick);
   const files = thread.state === 'ready' ? filesOf(thread.inbox.items, thread.sent.items) : [];
   const removed = contact?.status === 'revoked';
+  const fileContext = useMemo(
+    () => ({
+      received: data.received,
+      sent: data.sent,
+      folder: data.inboxFolder,
+      reveal: clients.reveal,
+      preview: clients.preview,
+    }),
+    [data.received, data.sent, data.inboxFolder, clients.reveal, clients.preview],
+  );
   return (
     <div className="hm-open hm-c al-expand" data-person-open={person.contactId}>
       {/* UX 2026-11-12: one calm line here; the full explanation is on the contact's own page. */}
@@ -351,6 +365,7 @@ function PersonOpen({
         loadEarlier={loadEarlier}
         terms={terms}
         removed={removed}
+        files={fileContext}
       />
       <PersonFiles
         name={person.name}

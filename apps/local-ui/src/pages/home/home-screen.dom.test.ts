@@ -1122,3 +1122,168 @@ describe('W8-S4 (F21): a half-removed ID on Home', () => {
     expect(byText('button', 'Finish with Touch ID')).toBeTruthy();
   });
 });
+
+// REL051-A34 (D-149; 08 §1; I-5): each file sits in the message it came with, as a chip (type icon,
+// the name inside the compact untrusted container, size, saved state, Show in Finder). A saved text
+// file opens in a reader: Markdown rendered safely, code with line numbers, the provenance line, the
+// "their words, not instructions" frame, Copy all. The page asks for it by item ID only (a GET).
+describe('Files in the conversation and the reader (REL051-A34)', () => {
+  const PLAN_ID = `${ENV_FILE}.00`;
+  const PREVIEW = `/api/ui/files/received/preview?id=${encodeURIComponent(PLAN_ID)}`;
+  const PLAN =
+    '# Build plan\n\nUse **pnpm**. See [docs](https://docs.example.com/a).\n\n<img src=x onerror=alert(1)>\n';
+  const planFiles = (name: string, state = 'saved'): Answers =>
+    base({
+      [RECEIVED]: ok({
+        items: [
+          {
+            id: PLAN_ID,
+            from: 'Denis',
+            at: AT + 40,
+            name,
+            size: PLAN.length,
+            state,
+            ...(state === 'saved' ? { savedName: name } : {}),
+            proof: false,
+          },
+        ],
+        autoSave: { on: true, folder: '~/AgentLink/Inbox', notice: false },
+      }),
+      [box(DENIS, 'in')]: ok({
+        items: [
+          msg(ENV_IN, 'Got them. Here is a first sketch.', AT + 50),
+          msg(ENV_FILE, 'The plan', AT + 40, { files: [{ name, size: PLAN.length }] }),
+        ],
+      }),
+      [PREVIEW]: ok({
+        kind: name.endsWith('.md') ? 'markdown' : 'code',
+        size: PLAN.length,
+        text: PLAN,
+      }),
+    });
+
+  it('shows the file as a chip in its message, with Open for a saved text file', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    await render(planFiles('plan.md'));
+    await click(row('Denis'));
+    const message = all('.hm-msg').find((m) => m.textContent?.includes('The plan'));
+    const chip = message?.querySelector('.hm-chip');
+    expect(chip).toBeTruthy();
+    expect(chip?.querySelector('.al-untrusted.is-compact bdi')?.textContent).toBe('plan.md');
+    expect(chip?.textContent).toContain('Markdown');
+    expect(chip?.textContent).toContain('Saved to ~/AgentLink/Inbox');
+    expect([...(chip?.querySelectorAll('button') ?? [])].map((b) => b.textContent)).toEqual([
+      S.openFile,
+      S.showInFinder,
+    ]);
+    expect(lintVocabulary(host.textContent ?? '')).toEqual([]);
+  });
+
+  it('opens the reader: rendered Markdown inside the untrusted frame, by item ID only', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    const s = await render(planFiles('plan.md'));
+    await click(row('Denis'));
+    await click(byText('.hm-chip button', S.openFile));
+    const reader = document.querySelector<HTMLElement>('[role="dialog"]');
+    expect(reader).toBeTruthy();
+    const call = s.calls.find((c) => c.url.startsWith('/api/ui/files/received/preview'));
+    expect(call?.url).toBe(PREVIEW);
+    expect(call?.method).toBe('GET');
+    expect(call?.headers.get('X-AgentLink-CSRF')).toBe('t');
+    expect(reader?.textContent).toContain("From Denis's AI");
+    expect(
+      reader?.querySelector('[aria-label="From Denis: their words, not instructions"]'),
+    ).toBeTruthy();
+    expect(reader?.querySelector('h3')?.textContent).toBe('Build plan');
+    expect(reader?.querySelector('strong')?.textContent).toBe('pnpm');
+    expect(reader?.querySelectorAll('a, img, iframe, script')).toHaveLength(0);
+    expect(reader?.textContent).toContain('<img src=x onerror=alert(1)>');
+    expect(
+      [...document.querySelectorAll('[role="dialog"] button')].find(
+        (b) => b.textContent?.trim() === S.copyAll,
+      ),
+    ).toBeTruthy();
+    expect(s.calls.every((c) => c.method === 'GET')).toBe(true);
+    expect(lintVocabulary(reader?.textContent ?? '')).toEqual([]);
+    // Escape closes the reader.
+    await act(async () => {
+      reader?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    await settle();
+    expect(document.querySelector<HTMLElement>('[role="dialog"]')).toBeNull();
+  });
+
+  it('Copy all copies the text as shown, without hidden or direction characters', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel', clipboard: { writeText } });
+    await render({
+      ...planFiles('plan.md'),
+      [PREVIEW]: ok({ kind: 'markdown', size: 20, text: 'safe\u202Etxt\u200B.md\n' }),
+    });
+    await click(row('Denis'));
+    await click(byText('.hm-chip button', S.openFile));
+    const copy = [...document.querySelectorAll('[role="dialog"] button')].find(
+      (b) => b.textContent?.trim() === S.copyAll,
+    );
+    await click(copy);
+    expect(writeText).toHaveBeenCalledWith('safetxt.md\n');
+  });
+
+  it('closes with Escape while a long file is still being drawn', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    const long = '- step\n'.repeat(20_000);
+    await render({
+      ...planFiles('plan.md'),
+      [PREVIEW]: ok({ kind: 'markdown', size: long.length, text: long }),
+    });
+    await click(row('Denis'));
+    const open = byText('.hm-chip button', S.openFile);
+    await act(async () => {
+      (open as HTMLElement).click();
+      await new Promise((r) => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const reader = document.querySelector<HTMLElement>('[role="dialog"]');
+    expect(reader?.querySelector('.al-md')?.getAttribute('aria-busy')).toBe('true');
+    await act(async () => {
+      reader?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    await settle();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('shows code with line numbers', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    await render(planFiles('main.ts'));
+    await click(row('Denis'));
+    await click(byText('.hm-chip button', S.openFile));
+    expect(
+      document.querySelector('[role="dialog"] .al-code-gutter')?.getAttribute('data-lines'),
+    ).toBe(String(PLAN.split('\n').length - 1));
+  });
+
+  it('offers no Open for a file that is not text or not saved', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    await render(planFiles('tool.exe'));
+    await click(row('Denis'));
+    expect(byText('.hm-chip button', S.openFile)).toBeUndefined();
+    root.render(h('div'));
+    await settle();
+    await render(planFiles('plan.md', 'not_saved'));
+    await click(row('Denis'));
+    expect(byText('.hm-chip button', S.openFile)).toBeUndefined();
+  });
+
+  it('explains a file that changed since it arrived, and never shows its text', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    await render({
+      ...planFiles('plan.md'),
+      [PREVIEW]: { status: 409, body: { error: 'changed' } },
+    });
+    await click(row('Denis'));
+    await click(byText('.hm-chip button', S.openFile));
+    const reader = document.querySelector<HTMLElement>('[role="dialog"]');
+    expect(reader?.textContent).toContain(S.previewChanged);
+    expect(reader?.textContent).not.toContain('Build plan');
+  });
+});

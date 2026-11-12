@@ -149,10 +149,12 @@ describe('GET /api/ui/files/received and /sent: registration (MSG-FILES-IO-d)', 
     };
     const view = readOnlyClient(full as never);
     // W4-FILES-SAVE adds prepareSave: core's unsigned `file.save` (prepare only, writes nothing),
-    // and (SEC-L1) isReceived, a store read before presence.
+    // and (SEC-L1) isReceived, a store read before presence. REL051-A34 adds previewSource, the
+    // in-app preview's store read (name, size, hash, saved name; no file is touched).
     expect(Object.keys(view.filesIo).sort()).toEqual([
       'isReceived',
       'prepareSave',
+      'previewSource',
       'received',
       'savedName',
       'sent',

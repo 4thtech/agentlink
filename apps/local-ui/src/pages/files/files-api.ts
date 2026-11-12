@@ -15,6 +15,13 @@ import {
   sendWithProof,
   type CeremonyGesture,
 } from '../../api/presence-ceremony.js';
+import {
+  FILE_PREVIEW_MAX_BYTES,
+  FILE_PREVIEW_PATH,
+  PREVIEW_KINDS,
+  type FilePreview,
+  type PreviewError,
+} from '@4thtech-io/types/ui-contract/file-preview';
 import { REVEAL_PATH } from './io-api.js';
 
 const CSRF_HEADER = 'X-AgentLink-CSRF';
@@ -49,6 +56,27 @@ export type RevealOutcome =
   | 'session_expired'
   | 'offline'
   | 'failed';
+
+/**
+ * REL051-A34 (D-149): what opening a received text file in the app came to. The text is the other
+ * party's words (I-5): the reader shows it only inside the untrusted frame.
+ */
+export type PreviewOutcome =
+  | { readonly kind: 'ok'; readonly preview: FilePreview }
+  | {
+      readonly kind:
+        Exclude<PreviewError, 'bad_request'> | 'session_expired' | 'offline' | 'failed';
+    };
+
+const PREVIEW_PROBLEMS = [
+  'not_found',
+  'not_saved',
+  'changed',
+  'too_large',
+  'not_text',
+  'refused',
+  'unavailable',
+] as const;
 
 /** What a confirm came to, as the page explains it (strings.ts). */
 export type CommitOutcome =
@@ -108,6 +136,8 @@ export interface FilesApi {
   ): Promise<CommitOutcome>;
   /** MSG-FILES-IO-h: Show in Finder for one received item, by its ID only. */
   reveal(id: string): Promise<RevealOutcome>;
+  /** REL051-A34: the text of one saved received text file, by its ID only (a GET). */
+  preview(id: string): Promise<PreviewOutcome>;
 }
 
 const REVEAL_ERRORS: readonly RevealOutcome[] = [
@@ -216,6 +246,35 @@ export function createFilesApi(options: FilesApiOptions = {}): FilesApi {
       if (answer.status === 200 && json['status'] === 'shown') return 'shown';
       const error = json['error'];
       return REVEAL_ERRORS.find((e) => e === error) ?? 'failed';
+    },
+
+    async preview(id) {
+      const answer = await call(`${FILE_PREVIEW_PATH}?id=${encodeURIComponent(id)}`, {
+        method: 'GET',
+        headers: new Headers({ [CSRF_HEADER]: token() }),
+      });
+      if (answer.kind === 'offline') return { kind: 'offline' };
+      if (answer.status === 401) return { kind: 'session_expired' };
+      const json = isObject(answer.json) ? answer.json : {};
+      if (answer.status === 200) {
+        // Only the three named fields, each checked; anything else is a failure.
+        const { kind, size, text } = json;
+        const known = PREVIEW_KINDS.find((k) => k === kind);
+        if (
+          known !== undefined &&
+          typeof text === 'string' &&
+          text.length <= FILE_PREVIEW_MAX_BYTES &&
+          typeof size === 'number' &&
+          Number.isSafeInteger(size) &&
+          size >= 0 &&
+          size <= FILE_PREVIEW_MAX_BYTES
+        ) {
+          return { kind: 'ok', preview: { kind: known, size, text } };
+        }
+        return { kind: 'failed' };
+      }
+      const error = json['error'];
+      return { kind: PREVIEW_PROBLEMS.find((e) => e === error) ?? 'failed' };
     },
   };
 }

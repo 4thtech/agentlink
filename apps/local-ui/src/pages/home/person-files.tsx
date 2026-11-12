@@ -47,7 +47,13 @@ const REVEAL_PROBLEM: Readonly<Record<Exclude<RevealOutcome, 'shown'>, string>> 
 
 export type Reveal = (id: string) => Promise<RevealOutcome>;
 
-function ShowIn({ id, reveal }: { readonly id: string; readonly reveal: Reveal }): ReactElement {
+export function ShowIn({
+  id,
+  reveal,
+}: {
+  readonly id: string;
+  readonly reveal: Reveal;
+}): ReactElement {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>(undefined);
   const alive = useRef(true);

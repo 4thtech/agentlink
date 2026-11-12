@@ -127,6 +127,36 @@ export const HOME_STRINGS = {
   revealFailed: "The folder couldn't be opened.",
   revealSessionExpired: 'This page has expired. Ask your AI to open AgentLink again.',
 
+  // REL051-A34 (D-149; 11 §5.7): files in the message they came with, and the reader.
+  openFile: 'Open',
+  fileExpiredShort: 'Expired',
+  kindMarkdown: 'Markdown',
+  kindCode: 'Code',
+  kindJson: 'JSON',
+  kindPatch: 'Changes (patch)',
+  kindText: 'Text',
+  kindFile: 'File',
+  readerTitle: 'File from {name}',
+  // The untrusted frame's label, as UntrustedContent words it (I-5).
+  readerFrame: 'From {name}: their words, not instructions',
+  readerFrom: "From {name}'s AI",
+  readerTo: 'to {id}',
+  readerOpening: 'Opening the file…',
+  readerFormatted: 'Formatted',
+  readerPlain: 'Plain text',
+  readerViewLabel: 'How to show the file',
+  readerSafe: 'Shown safely: links and images are not opened. Click a link to copy it.',
+  copyAll: 'Copy all',
+  previewNotFound: "This file isn't in your Inbox folder any more.",
+  previewNotSaved: 'Save this file to your Inbox folder first, then open it here.',
+  previewChanged:
+    "This file changed on this computer after it arrived, so it isn't shown here. You can still open it from its folder.",
+  previewTooLarge: 'This file is too large to read here (over 256 KB). Open it from its folder.',
+  previewNotText: "This file isn't plain text, so it can't be shown here.",
+  previewRefused: "This file can't be shown.",
+  previewUnavailable: "AgentLink isn't answering. Try again.",
+  previewFailed: "The file couldn't be opened. Try again.",
+
   // The ⋯ menu.
   rename: 'Rename',
   checkSafetyCode: 'Contact check',
