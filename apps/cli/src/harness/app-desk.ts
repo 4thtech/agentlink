@@ -17,6 +17,14 @@
 // - Claude Desktop rewrites its file on exit: while it runs (best effort, checked when listing,
 //   planning and again right before the write) nothing is written for it. It is never closed here.
 //
+// - WP-D7 (plan 2026-11-12 Decision 2 "AI apps", "Translocation (M3)"): the desktop app's form
+//   (`<bundled node> <bundled cli> mcp …`, desktop-app.ts) is recognised next to the npx form, and
+//   "Use the app for …" (`{form: 'app'}`) plans a `switch` of the same agent's entry to it. A move or
+//   disconnect keeps the entry's form. The app is located when the plan is made and again right
+//   before the write; a translocated, temporary or read-only location is never written
+//   (`app_location`). Optionally the installer's `agentlink` launcher is pointed at the app too
+//   (launcher.ts), only when it is exactly the installer's own file.
+//
 // Threat note (04 §2.5): an entry starts a program, so this is a code-execution path. The fixed
 // content, the fixed paths and the owner's signed gesture (node local-ui/api/apps.ts) are what stop
 // the local app page from rewiring AI apps; a same-user process can edit these files anyway (G-1,
@@ -28,15 +36,26 @@ import process from 'node:process';
 import type {
   LocalUiAiAppEntryState,
   LocalUiAiAppPlan,
+  LocalUiAiAppPlanRequest,
   LocalUiAiApps,
   LocalUiAiAppView,
   LocalUiAiAppWrite,
+  LocalUiLauncherChange,
 } from '@4thtech-io/node';
 import type { JsonObject } from '@4thtech-io/crypto';
 import { readAgentConfig } from '../runtime/agent-dir.js';
 import { isAgentName } from '../runtime/agent-name.js';
-import { agentlinkEntry, readEntryState, removeEntry, setEntry, type EntryState } from './entry.js';
+import { locateDesktopApp, type AppStart, type DesktopApp } from './desktop-app.js';
+import {
+  entryOf,
+  readEntryState,
+  removeEntry,
+  setEntry,
+  type EntryForm,
+  type EntryState,
+} from './entry.js';
 import { HarnessError } from './errors.js';
+import { appLauncherText, launcherDisplay, launcherParts, readLauncher } from './launcher.js';
 import { readConfigFile, writeConfigFile, type ConfigFile } from './files.js';
 import {
   configLocation,
@@ -64,6 +83,11 @@ export interface AiAppsDeskOptions {
   readonly agentIdOf?: (name: string) => Promise<string | undefined>;
   /** Fixed-text events only (never a path, a name or file content). */
   readonly log?: (line: string) => void;
+  /**
+   * WP-D7: the desktop app on this computer, looked up for every list, plan and write (default:
+   * locateDesktopApp for this process; `undefined`: none).
+   */
+  readonly desktopApp?: () => Promise<DesktopApp | undefined>;
 }
 
 const DESKTOP: HarnessDef['id'] = 'claude-desktop';
@@ -129,10 +153,17 @@ export async function claudeDesktopRunning(
 }
 
 function viewState(state: EntryState): LocalUiAiAppEntryState {
-  if (state.kind === 'agent') return { kind: 'agent', agent: state.agent };
+  if (state.kind === 'agent') {
+    // WP-D7: only the app form is named; an entry without `form` is the npx form, as before.
+    return state.form === 'app'
+      ? { kind: 'agent', agent: state.agent, form: 'app' }
+      : { kind: 'agent', agent: state.agent };
+  }
   return state.kind === 'none' ? { kind: 'none' } : { kind: 'foreign' };
 }
 const UNREADABLE: LocalUiAiAppEntryState = Object.freeze({ kind: 'unreadable' });
+
+const sameStart = (a: AppStart, b: AppStart): boolean => a.node === b.node && a.cli === b.cli;
 
 /** The harness desk over the fixed table (see the header). */
 export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
@@ -149,6 +180,9 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
     options.agentIdOf ??
     (async (name: string) => (await readAgentConfig(options.home, name))?.config.agentId);
   const log = options.log ?? (() => undefined);
+  const locate = options.desktopApp ?? (() => locateDesktopApp({ home: options.home, platform }));
+  /** The desktop app now; a failed lookup is no app. */
+  const appNow = (): Promise<DesktopApp | undefined> => locate().catch(() => undefined);
   const context: HarnessContext = {
     home: options.home,
     env: options.env,
@@ -161,7 +195,10 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
     def.id === DESKTOP ? desktopNow().then((state) => state === 'running') : Promise.resolve(false);
 
   /** The config as read now, entry-only, or `unreadable`. Never throws with file content. */
-  async function read(def: HarnessDef): Promise<
+  async function read(
+    def: HarnessDef,
+    app: AppStart | undefined,
+  ): Promise<
     | {
         readonly base: string;
         readonly parts: readonly string[];
@@ -174,7 +211,25 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
     try {
       const { base, parts, path } = await configLocation(def, context);
       const before = await readConfigFile(base, parts, fileOptions);
-      return { base, parts, path, before, state: readEntryState(def, before.text) };
+      return {
+        base,
+        parts,
+        path,
+        before,
+        state: readEntryState(def, before.text, app === undefined ? {} : { app }),
+      };
+    } catch {
+      return 'unreadable';
+    }
+  }
+
+  /** The installer's launcher as read now (`unreadable` on any problem). */
+  async function readLauncherFile(
+    app: AppStart,
+  ): Promise<{ readonly before: ConfigFile; readonly kind: string } | 'unreadable'> {
+    try {
+      const before = await readConfigFile(options.home, launcherParts(platform), fileOptions);
+      return { before, kind: readLauncher(before.text, app, platform).kind };
     } catch {
       return 'unreadable';
     }
@@ -191,9 +246,10 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
         ? await desktopNow()
         : 'not_running';
       const desktop = state === 'running';
+      const found = await appNow();
       const apps: LocalUiAiAppView[] = [];
       for (const def of defs) {
-        const found = await read(def);
+        const read_ = await read(def, found?.start);
         let path: string;
         try {
           path = (await configLocation(def, context)).path;
@@ -205,38 +261,62 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
             app: def.id,
             name: def.appName,
             path,
-            state: found === 'unreadable' ? UNREADABLE : viewState(found.state),
+            state: read_ === 'unreadable' ? UNREADABLE : viewState(read_.state),
             quitFirst: def.id === DESKTOP && desktop,
             // R2: the check itself failed: not "Quit first", but "couldn't check".
             ...(def.id === DESKTOP && state === 'unknown' ? { checkFailed: true } : {}),
           }),
         );
       }
-      return Object.freeze({ apps: Object.freeze(apps), desktopRunning: desktop });
+      return Object.freeze({
+        apps: Object.freeze(apps),
+        desktopRunning: desktop,
+        ...(found === undefined
+          ? {}
+          : { desktopApp: found.status === 'ok' ? 'available' : 'move_first' }),
+      } as const);
     },
 
-    async plan(app, agent): Promise<LocalUiAiAppPlan> {
+    async plan(app, agent, request: LocalUiAiAppPlanRequest = {}): Promise<LocalUiAiAppPlan> {
       if (!isHarnessId(app) || !isAgentName(agent)) {
         return { status: 'not_found', app: isHarnessId(app) ? app : '', name: '' };
       }
       const def = harnessById(app);
       const brief = (status: Exclude<LocalUiAiAppPlan['status'], 'change'>): LocalUiAiAppPlan =>
         Object.freeze({ status, app: def.id, name: def.appName });
+      const wantApp = request.form === 'app';
+      if (request.launcher === true && !wantApp) return brief('unreadable');
       if (!(await detected(def.id))) return brief('not_found');
       if (await running(def)) return brief('quit_first');
-      const found = await read(def);
+      const located = await appNow();
+      // An app in a translocated, temporary or read-only place is never written into a config.
+      if (wantApp && located?.status !== 'ok') return brief('app_location');
+      const appStart = located?.start;
+      const found = await read(def, appStart);
       if (found === 'unreadable') return brief('unreadable');
       const { base, parts, path, before, state } = found;
       if (state.kind === 'foreign') return brief('conflict');
       let text: string;
-      let kind: 'connect' | 'move' | 'disconnect';
+      let kind: 'connect' | 'move' | 'disconnect' | 'switch';
+      let form: EntryForm | undefined;
+      const recognise = appStart === undefined ? {} : { app: appStart };
       try {
         if (state.kind === 'agent' && state.agent === agent) {
-          kind = 'disconnect';
-          text = removeEntry(def, before.text);
+          if (wantApp) {
+            if (state.form === 'app') return brief('present');
+            kind = 'switch';
+            form = 'app';
+            text = setEntry(def, before.text, agent, { ...recognise, form });
+          } else {
+            kind = 'disconnect';
+            text = removeEntry(def, before.text, recognise);
+          }
         } else {
           kind = state.kind === 'agent' ? 'move' : 'connect';
-          text = setEntry(def, before.text, agent);
+          form = wantApp ? 'app' : state.kind === 'agent' ? state.form : 'npx';
+          // A move keeps an app-form entry only while the app may be written.
+          if (form === 'app' && located?.status !== 'ok') return brief('app_location');
+          text = setEntry(def, before.text, agent, { ...recognise, form });
         }
       } catch {
         return brief('unreadable');
@@ -248,9 +328,40 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
         return brief('unreadable');
       }
       const oldEntry = state.kind === 'agent' ? (state.entry as JsonObject) : null;
-      const newEntry = kind === 'disconnect' ? null : (agentlinkEntry(def, agent) as JsonObject);
+      let newEntry: JsonObject | null;
+      try {
+        newEntry =
+          kind === 'disconnect' || form === undefined
+            ? null
+            : (entryOf(def, agent, form, appStart) as JsonObject);
+      } catch {
+        return brief('unreadable');
+      }
       const oldAgent = state.kind === 'agent' ? state.agent : null;
       const newAgent = kind === 'disconnect' ? null : agent;
+
+      // The installer's launcher (WP-D7, optional): offered, or planned when asked for.
+      let launcher: { readonly change: LocalUiLauncherChange; readonly before: ConfigFile } | null =
+        null;
+      let launcherOffer = false;
+      if (form === 'app' && appStart !== undefined && kind !== 'disconnect') {
+        const current = await readLauncherFile(appStart);
+        const repointable = current !== 'unreadable' && current.kind === 'npx';
+        if (request.launcher === true) {
+          if (!repointable || current.before.text === undefined) return brief('unreadable');
+          launcher = {
+            before: current.before,
+            change: Object.freeze({
+              path: launcherDisplay(platform),
+              oldText: current.before.text,
+              newText: appLauncherText(appStart, platform),
+            }),
+          };
+        } else {
+          launcherOffer = repointable;
+        }
+      }
+
       const commit = async (agentId: string): Promise<LocalUiAiAppWrite> => {
         if (await running(def)) return 'quit_first';
         // Fixed content (04 §2.5): the folder the entry runs records the agentId that was signed.
@@ -258,6 +369,18 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
         if (runs === null || !isAgentName(runs)) return 'agent_mismatch';
         const recorded = await agentIdOf(runs).catch(() => undefined);
         if (recorded === undefined || recorded !== agentId) return 'agent_mismatch';
+        // Plan Decision 2 "Translocation (M3)": an app-form write points at the app as it is now,
+        // in a place that may be written (looked up again: the app may have been moved meanwhile).
+        if (form === 'app') {
+          const again = await appNow();
+          if (
+            again?.status !== 'ok' ||
+            appStart === undefined ||
+            !sameStart(again.start, appStart)
+          ) {
+            return 'app_location';
+          }
+        }
         try {
           await writeConfigFile(base, parts, before, text, {
             ...fileOptions,
@@ -270,6 +393,23 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
           return 'failed';
         }
         log('ai app settings written');
+        if (launcher !== null) {
+          try {
+            // Default backup mode (0600): a backup in the launcher's folder must not be a command.
+            await writeConfigFile(
+              options.home,
+              launcherParts(platform),
+              launcher.before,
+              launcher.change.newText,
+              { ...fileOptions, now: now() },
+            );
+            log('agentlink command pointed at the app');
+          } catch {
+            // The entry is written; the owner is told the command was not changed.
+            log('agentlink command not changed');
+            return 'written_launcher_unchanged';
+          }
+        }
         return 'written';
       };
       return Object.freeze({
@@ -284,6 +424,8 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
         oldAgent,
         newAgent,
         identity: before.identity ?? 'none',
+        ...(launcher === null ? {} : { launcher: launcher.change }),
+        ...(launcherOffer ? { launcherOffer: true } : {}),
         commit,
       });
     },

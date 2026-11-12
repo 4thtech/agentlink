@@ -34,3 +34,13 @@ export {
 export { resolveInstalledCli } from './installed-cli.js';
 export { addJsonMcpServer, type JsonEdit } from './json-config.js';
 export { addTomlMcpServer, agentlinkTable, scanToml, type TomlEdit } from './toml-config.js';
+export {
+  BUNDLED_CLI_PARTS,
+  BUNDLED_HOST_PARTS,
+  BUNDLED_NODE_PARTS,
+  appLocationProblem,
+  appStartAt,
+  locateDesktopApp,
+  type AppStart,
+  type DesktopApp,
+} from './desktop-app.js';

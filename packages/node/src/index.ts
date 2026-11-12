@@ -125,6 +125,10 @@ export type {
   LocalUiAiApps,
   LocalUiAiAppView,
   LocalUiAiAppWrite,
+  LocalUiAiAppForm,
+  LocalUiAiAppPlanRequest,
+  LocalUiDesktopAppState,
+  LocalUiLauncherChange,
 } from './local-ui/context.js';
 // U3-c (D-138, 08 §1): the app host's seams the CLI implements (the agent folders, opening an agent);
 // the generation, the switch gate and the route stubs stay inside the package.

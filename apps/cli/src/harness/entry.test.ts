@@ -49,11 +49,13 @@ describe('readEntryState (JSON)', () => {
     expect(readEntryState(claudeCode, jsonFile({ agentlink: ours(), other }))).toEqual({
       kind: 'agent',
       agent: 'default',
+      form: 'npx',
       entry: ours(),
     });
     expect(readEntryState(claudeCode, jsonFile({ other, agentlink: ours('work') }))).toEqual({
       kind: 'agent',
       agent: 'work',
+      form: 'npx',
       entry: ours('work'),
     });
   });
@@ -133,6 +135,7 @@ describe('setEntry and removeEntry (JSON)', () => {
     expect(state).toEqual({
       kind: 'agent',
       agent: 'work',
+      form: 'npx',
       entry: {
         type: 'local',
         command: ['npx', '-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'work'],
@@ -156,6 +159,7 @@ describe('Codex TOML', () => {
     expect(readEntryState(codex, `${head}\n${table('work')}`)).toEqual({
       kind: 'agent',
       agent: 'work',
+      form: 'npx',
       entry: { command: 'npx', args: ['-y', '@4thtech-io/agentlink', 'mcp', '--agent', 'work'] },
     });
     const extraKey = `${head}\n${table('work')}env = { T = "${SENTINEL}" }\n`;
