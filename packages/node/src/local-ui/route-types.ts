@@ -105,7 +105,7 @@ export interface LocalUiOwnerOperation {
    */
   replaceOwnerCode?(): Promise<LocalUiOwnerCodeOutcome>;
   /** WP-S2, the `finish` step only (once): the staged item, opened by the code typed back, replaces the `owner` item. */
-  finishOwnerCode?(): Promise<void>;
+  finishOwnerCode?(): Promise<'done' | 'unconfirmed'>;
 }
 
 /** WP-S2: how staging a new master code ended. */

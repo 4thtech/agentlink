@@ -19,6 +19,7 @@
 // - `cancel`: no proof; drops this page session's staged change. The gate answers it itself.
 import type { Argon2idParams } from '@4thtech-io/crypto';
 import { equalBytes, wipe } from '@4thtech-io/crypto';
+import { NodeKeyStoreError } from '../../errors.js';
 import type { KeychainBackend } from '../../keychain.js';
 import {
   dropOwnerCodeChange,
@@ -43,6 +44,8 @@ const fixed = (status: number, body: Record<string, string>): LocalUiResult =>
 const DONE = fixed(200, { status: 'done' });
 const REFUSED = fixed(409, { status: 'refused' });
 const UNFINISHED = fixed(409, { status: 'unfinished' });
+/** The staged item may have replaced `owner` but the keychain did not confirm it (keep both codes). */
+const UNCONFIRMED = fixed(200, { status: 'unconfirmed' });
 /** The new code as the generator spells it: six groups of four, base32 upper case. */
 const NEW_CODE = /^[A-Z2-7]{4}(?: [A-Z2-7]{4}){5}$/;
 
@@ -63,8 +66,8 @@ async function replace(owner: LocalUiOwnerOperation): Promise<LocalUiResult> {
 
 async function finish(owner: LocalUiOwnerOperation): Promise<LocalUiResult> {
   if (owner.finishOwnerCode === undefined) return REFUSED;
-  await owner.finishOwnerCode();
-  return DONE;
+  // IR WP-S2 M-1: written but not confirmed is its own answer, never "nothing was changed".
+  return (await owner.finishOwnerCode()) === 'done' ? DONE : UNCONFIRMED;
 }
 
 function route(
@@ -176,11 +179,18 @@ export class OwnerCodeChanges {
   }
 
   /** The staged item replaces the `owner` item; the change is then over either way. */
-  async finish(held: Held): Promise<void> {
+  async finish(held: Held): Promise<'done' | 'unconfirmed'> {
     if (this.#held !== held) throw new Error('not pending');
     this.#forget(held);
     try {
       await finishOwnerCodeChange(this.#options.keychain(), held.change);
+      return 'done';
+    } catch (error) {
+      // IR WP-S2 M-1: `owner_mismatch` is refused before any write (nothing changed). Anything else
+      // may have written the `owner` item without a confirming read-back: the old code may be dead
+      // and `owner-next` is kept, so the owner must keep both codes and finish in the terminal.
+      if (error instanceof NodeKeyStoreError && error.code === 'owner_mismatch') throw error;
+      return 'unconfirmed';
     } finally {
       wipeOwnerCodeChange(held.change);
     }

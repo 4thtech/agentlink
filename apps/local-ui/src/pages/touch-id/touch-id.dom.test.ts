@@ -227,6 +227,76 @@ describe('Touch ID & master code (WP-S2, §3.3)', () => {
     expect(text()).not.toContain('ABCD');
   });
 
+  it('M-1: written but not confirmed keeps the new code on screen, says keep both, offers no Finish', async () => {
+    const { calls } = await render(UNKNOWN, {
+      '/api/ui/owner-code/replace': [STAGED],
+      '/api/ui/owner-code/replace/finish': [
+        { kind: 'ok', status: 200, data: { status: 'unconfirmed' } },
+      ],
+    });
+    await click('Replace master code');
+    await typeIn(OLD);
+    await submit();
+    await typeIn(NEW);
+    await submit();
+    expect(calls).toHaveLength(2);
+    // The code stays (never cleared on this path) and the copy never claims nothing changed.
+    expect(host.querySelector('[data-new-code]')?.textContent).toBe(NEW);
+    expect(text()).toContain('Keep both your current and your new master code');
+    expect(text()).toContain('agentlink owner change-code');
+    expect(text()).not.toContain('Nothing was changed');
+    expect(text()).not.toContain('still works until you finish');
+    // No second Finish (it would be not_pending and clear the code) and no Cancel.
+    expect(labels()).not.toContain('Finish');
+    expect(labels()).not.toContain('Cancel');
+    expect(host.querySelector('[data-new-code]')).not.toBeNull();
+  });
+
+  it('L-2: the new code carries the first-run clipboard warning', async () => {
+    await render(UNKNOWN, { '/api/ui/owner-code/replace': [STAGED] });
+    await click('Replace master code');
+    await typeIn(OLD);
+    await submit();
+    expect(text()).toContain('Other apps can read your clipboard.');
+  });
+
+  it('Cancel that the server holds back keeps the code and says so', async () => {
+    await render(UNKNOWN, {
+      '/api/ui/owner-code/replace': [STAGED],
+      '/api/ui/owner-code/replace/cancel': [{ kind: 'busy' }],
+    });
+    await click('Replace master code');
+    await typeIn(OLD);
+    await submit();
+    await click('Cancel');
+    expect(host.querySelector('[data-new-code]')?.textContent).toBe(NEW);
+    expect(text()).not.toContain('Nothing was changed. Your current master code still works.');
+  });
+
+  it('L-1: leaving the page with a staged change sends one best-effort cancel (keepalive)', async () => {
+    const sent: { url: string; init: RequestInit | undefined }[] = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = ((url: string, init?: RequestInit) => {
+      sent.push({ url, init });
+      return Promise.resolve(new Response('{}'));
+    }) as typeof fetch;
+    try {
+      await render(UNKNOWN, { '/api/ui/owner-code/replace': [STAGED] });
+      await click('Replace master code');
+      await typeIn(OLD);
+      await submit();
+      await act(async () => {
+        window.dispatchEvent(new Event('pagehide'));
+      });
+      expect(sent).toHaveLength(1);
+      expect(sent[0]?.url).toBe('/api/ui/owner-code/replace/cancel');
+      expect(sent[0]?.init?.keepalive).toBe(true);
+      expect(JSON.stringify(sent[0]?.init)).not.toContain('ABCD');
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
   it('Replace with Touch ID sends the passkey as the presence', async () => {
     const { calls } = await render(READY, { '/api/ui/owner-code/replace': [STAGED] });
     await click('Replace master code');

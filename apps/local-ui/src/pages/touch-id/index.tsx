@@ -16,6 +16,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useRef,
   useState,
   type FormEvent,
   type ReactElement,
@@ -37,7 +38,7 @@ import { PASSKEY_WHY } from '../contacts/strings.js';
 import { BackupCodeField, UseCodeInstead } from '../first-run/backup-code.js';
 import { detectPlatform } from '../first-run/passkey.js';
 import { otherBrowser } from '../first-run/passkey-nudge.js';
-import { SENSOR, UPGRADE_MESSAGES, type Platform } from '../first-run/strings.js';
+import { FIRST_RUN, SENSOR, UPGRADE_MESSAGES, type Platform } from '../first-run/strings.js';
 import { SettingsIcon } from '../settings/icons.js';
 import { nativeTouchIdSwitch } from './native-slot.js';
 import { TOUCH_ID_STRINGS as S } from './strings.js';
@@ -48,6 +49,33 @@ export const OWNER_PRESENCE_TEST_PATH = '/api/ui/owner-presence/test';
 export const OWNER_CODE_REPLACE_PATH = '/api/ui/owner-code/replace';
 export const OWNER_CODE_FINISH_PATH = '/api/ui/owner-code/replace/finish';
 export const OWNER_CODE_CANCEL_PATH = '/api/ui/owner-code/replace/cancel';
+
+/**
+ * IR WP-S2 L-1: a best-effort Cancel when the page goes away with a staged change (tab closed,
+ * navigated). `keepalive` lets the request outlive the page; it carries the page's CSRF token like
+ * every API call (sendBeacon cannot send that header) and no code. Any failure is ignored: the
+ * server's expiry removes the staged item anyway.
+ */
+function cancelOnLeave(): void {
+  try {
+    if (typeof fetch !== 'function' || typeof document === 'undefined') return;
+    const token =
+      document.querySelector('meta[name="agentlink-csrf"]')?.getAttribute('content') ?? '';
+    void fetch(OWNER_CODE_CANCEL_PATH, {
+      method: 'POST',
+      keepalive: true,
+      credentials: 'same-origin',
+      cache: 'no-store',
+      headers: {
+        'X-AgentLink-CSRF': token,
+        'Content-Type': 'application/octet-stream',
+        'X-AgentLink-Input': 'e30', // base64url of `{}`
+      },
+    }).catch(() => undefined);
+  } catch {
+    // Best effort only.
+  }
+}
 
 /** A new code as the server spells it: six groups of four. Anything else is never shown. */
 const NEW_CODE = /^[A-Z2-7]{4}(?: [A-Z2-7]{4}){5}$/;
@@ -522,7 +550,23 @@ function ReplaceCode({
   const [note, setNote] = useState<Note>(undefined);
   const [newCode, setNewCode] = useState<string | undefined>(undefined);
   const [copied, setCopied] = useState(false);
+  // IR WP-S2 M-1: the keychain may have taken the new code without confirming it. The new code stays
+  // on screen (never cleared on this path) and no Finish or Cancel is offered.
+  const [unconfirmed, setUnconfirmed] = useState(false);
   const codeId = useId();
+  // IR WP-S2 L-1: a staged change this page began is cancelled (best effort) when the page goes away.
+  const stagedRef = useRef(false);
+  stagedRef.current = newCode !== undefined && !unconfirmed;
+  useEffect(() => {
+    const leave = (): void => {
+      if (stagedRef.current) cancelOnLeave();
+    };
+    window.addEventListener('pagehide', leave);
+    return () => {
+      window.removeEventListener('pagehide', leave);
+      leave();
+    };
+  }, []);
 
   const begin = (proof: PresenceProof): void => {
     setBusy(true);
@@ -565,7 +609,7 @@ function ReplaceCode({
 
   const submitFinish = (event: FormEvent): void => {
     event.preventDefault();
-    if (busy) return;
+    if (busy || unconfirmed) return;
     if (typed.trim() === '') return setNote({ tone: 'bad', text: UPGRADE_MESSAGES.empty });
     const back = typed;
     setTyped('');
@@ -578,6 +622,10 @@ function ReplaceCode({
         if (result.kind === 'ok' && word === 'done') {
           setNewCode(undefined);
           return onEnd({ tone: 'good', text: S.replaced });
+        }
+        if (result.kind === 'ok' && word === 'unconfirmed') {
+          setUnconfirmed(true);
+          return setNote({ tone: 'bad', text: S.unconfirmed });
         }
         if (result.kind === 'presence_rejected') {
           return setNote({ tone: 'bad', text: S.typeBackWrong });
@@ -593,18 +641,24 @@ function ReplaceCode({
   };
 
   const cancel = (): void => {
+    if (unconfirmed) return;
     const staged = newCode !== undefined;
-    setNewCode(undefined);
     setTyped('');
     if (!staged) return onEnd(undefined);
     setBusy(true);
     void api
       .owner(OWNER_CODE_CANCEL_PATH, {}, '')
-      .catch(() => undefined)
-      .finally(() => {
-        setBusy(false);
-        onEnd({ tone: 'plain', text: S.cancelled });
-      });
+      .then((result) => {
+        const word = statusWord(result);
+        // Dropped now, or already gone (expiry, three wrong entries): the current code works.
+        if (word === 'cancelled' || word === 'not_pending') {
+          setNewCode(undefined);
+          return onEnd({ tone: 'plain', text: S.cancelled });
+        }
+        return setNote({ tone: 'bad', text: gateWords(result) ?? S.cancelFailed });
+      })
+      .catch(() => setNote({ tone: 'bad', text: S.cancelFailed }))
+      .finally(() => setBusy(false));
   };
 
   const copy = (code: string): void => {
@@ -633,23 +687,29 @@ function ReplaceCode({
             {copied ? S.copied : S.copy}
           </Button>
         </div>
+        {/* IR WP-S2 L-2: the same clipboard warning as the first-run code (08 §1). */}
+        <p className="al-text-caption al-muted">{FIRST_RUN.clipboardWarning}</p>
         <p className="al-text-body-sm">{S.newSave}</p>
-        <p className="al-text-body-sm al-muted">{S.stillWorks}</p>
-        <BackupCodeField
-          label={S.typeBack}
-          name="new-owner-code"
-          value={typed}
-          disabled={busy}
-          onValue={setTyped}
-        />
-        <div className="ti-row">
-          <Button type="submit" variant="primary" disabled={busy}>
-            {S.finish}
-          </Button>
-          <Button variant="ghost" onClick={cancel} disabled={busy}>
-            {S.cancel}
-          </Button>
-        </div>
+        {unconfirmed ? null : (
+          <>
+            <p className="al-text-body-sm al-muted">{S.stillWorks}</p>
+            <BackupCodeField
+              label={S.typeBack}
+              name="new-owner-code"
+              value={typed}
+              disabled={busy}
+              onValue={setTyped}
+            />
+            <div className="ti-row">
+              <Button type="submit" variant="primary" disabled={busy}>
+                {S.finish}
+              </Button>
+              <Button variant="ghost" onClick={cancel} disabled={busy}>
+                {S.cancel}
+              </Button>
+            </div>
+          </>
+        )}
         <NoteLine note={note} />
       </form>
     );

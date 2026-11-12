@@ -2141,6 +2141,31 @@ export async function startApprovalServerWith(
       readonly session?: string;
     } = {},
   ): Promise<void> {
+    if (gate.ownerCode === 'cancel') {
+      // WP-S2 (IR L-1, L-4): Cancel takes no proof, so the wrong-code wait does not hold it back
+      // (it only removes this session's own staged change); it runs inside `busy`, so it never
+      // races a finish: one of them answers `busy`.
+      req.resume();
+      if (header(req, 'x-agentlink-presence') !== undefined) {
+        finishOwner(res, 403, 'presence_required');
+        return;
+      }
+      if (busy) {
+        finishOwner(res, 409, 'busy');
+        return;
+      }
+      busy = true;
+      try {
+        const session = gate.session === undefined ? undefined : encodeUtf8(gate.session);
+        const dropped = session !== undefined && (await ownerCodes.cancel(session));
+        finishOwner(res, dropped ? 200 : 409, dropped ? 'cancelled' : 'not_pending');
+      } catch {
+        finishOwner(res, 500, 'failed');
+      } finally {
+        busy = false;
+      }
+      return;
+    }
     const wait = waitSeconds();
     if (wait > 0) {
       req.resume();
@@ -2161,13 +2186,6 @@ export async function startApprovalServerWith(
       if (!ownerCodeProofAllowed(codeStep, passkey)) {
         req.resume();
         finishOwner(res, 403, 'presence_required');
-        return;
-      }
-      if (codeStep === 'cancel') {
-        req.resume();
-        const session = gate.session === undefined ? undefined : encodeUtf8(gate.session);
-        const dropped = session !== undefined && (await ownerCodes.cancel(session));
-        finishOwner(res, dropped ? 200 : 409, dropped ? 'cancelled' : 'not_pending');
         return;
       }
     }
@@ -2608,7 +2626,7 @@ export async function startApprovalServerWith(
         sign: () => Promise.reject(ownerOperationRefused()),
         finishOwnerCode: async () => {
           once();
-          await ownerCodes.finish(held);
+          return ownerCodes.finish(held);
         },
       }),
       run,

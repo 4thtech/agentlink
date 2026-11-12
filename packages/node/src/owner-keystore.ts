@@ -1062,9 +1062,12 @@ export class KeychainOwnerKeyStore implements OwnerKeyStore {
   }
 
   /**
-   * M1-9i-c: unlock() for `agentlink backup export` † only. The same presence proof and checks; the
-   * session also lets this store's KeyExportControl read a copy of the owner seed (04 §2.3.3 "Export:
-   * who sees the seeds"), which is wiped when the session ends. Never offered to the agent path.
+   * M1-9i-c: unlock() for `agentlink backup export` † and the app's recovery-kit export, and (UX1113
+   * WP-S2) the app's Replace master code, only. The same presence proof and checks; the session also
+   * lets code in this package read a copy of the owner seed through exportSeedOf: the
+   * KeyExportControl to seal a kit (04 §2.3.3 "Export: who sees the seeds"), and the approval
+   * server's Replace step to re-wrap it under a new master code (04 §2.5, wiped at once). The copy is
+   * wiped when the session ends. Never offered to the agent path.
    */
   unlockForExport(presence: OwnerPresence, options: UnlockOptions = {}): Promise<OwnerSession> {
     return this.#unlock(presence, options, true);

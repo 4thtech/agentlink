@@ -21,6 +21,7 @@ import {
   type ApprovalServerSource,
 } from '../approval-server.js';
 import { ownerWorld, send, type OwnerWorld } from '../approval-ui.fixture.js';
+import type { KeychainBackend } from '../keychain.js';
 import { TEST_APP } from '../local-ui-app.fixture.js';
 import { KeychainOwnerKeyStore, OWNER_NEXT_ACCOUNT, readOwnerItem } from '../owner-keystore.js';
 import { encodePasskeyAssertion, registerOwnerPasskey } from '../owner-passkey.js';
@@ -63,7 +64,7 @@ interface Answer {
   readonly retryAfter: string | undefined;
 }
 
-async function harness(): Promise<Harness> {
+async function harness(wrap?: (k: KeychainBackend) => KeychainBackend): Promise<Harness> {
   const world = await ownerWorld('agentlink-wp-s2-');
   worlds.push(world);
   const home = join(world.root, 'home');
@@ -87,7 +88,7 @@ async function harness(): Promise<Harness> {
       localUi: { assets: TEST_APP },
     },
     {
-      keychain: world.keychain,
+      keychain: wrap === undefined ? world.keychain : wrap(world.keychain),
       openOwnerStore: (expected) => KeychainOwnerKeyStore.open(world.keychain, expected),
       opener: (url) => {
         opened.push(url);
@@ -390,6 +391,72 @@ describe('Replace master code (WP-S2): owner-next, all or nothing, shown once', 
     await h.post(REPLACE, h.world.code);
     await Promise.all(servers.splice(0).map((s) => s.close()));
     expect(await h.world.keychain.get(OWNER_NEXT_ACCOUNT)).toBeNull();
+  });
+});
+
+/** A keychain whose `owner` reads fail once the `owner` item was written (armed). */
+function failReadBackAfterOwnerWrite(inner: KeychainBackend): KeychainBackend {
+  let written = false;
+  return {
+    get: (account) =>
+      written && account === 'owner'
+        ? Promise.reject(new Error('read-back timed out'))
+        : inner.get(account),
+    set: async (account, value) => {
+      await inner.set(account, value);
+      if (account === 'owner') written = true;
+    },
+    delete: (account) => inner.delete(account),
+  } as KeychainBackend;
+}
+
+describe('Replace, review round 1 (IR WP-S2 M-1, L-1, L-4)', () => {
+  it('M-1: written but not confirmed is `unconfirmed`, never "nothing changed"; owner-next is kept', async () => {
+    const h = await harness(failReadBackAfterOwnerWrite);
+    const code = String((await h.post(REPLACE, h.world.code)).json['code']);
+    const res = await h.post(FINISH, code);
+    expect(res.status).toBe(200);
+    expect(res.json).toEqual({ status: 'unconfirmed' });
+    // The write did land: the new code opens the owner item, and the staged copy is still there.
+    expect(await h.world.keychain.get(OWNER_NEXT_ACCOUNT)).not.toBeNull();
+    const store = await KeychainOwnerKeyStore.open(h.world.keychain, h.world.owner);
+    const session = await store.unlock({ kind: 'passphrase', secret: encodeUtf8(code) });
+    await session.close();
+    await store.close();
+    noCodeIn(h, code, h.world.code);
+  });
+
+  it('M-1: a second Finish after `unconfirmed` is not_pending (the page must not offer it)', async () => {
+    const h = await harness(failReadBackAfterOwnerWrite);
+    const code = String((await h.post(REPLACE, h.world.code)).json['code']);
+    expect((await h.post(FINISH, code)).json).toEqual({ status: 'unconfirmed' });
+    const again = await h.post(FINISH, code);
+    expect(again.status).toBe(409);
+    expect(again.json).toEqual({ status: 'not_pending' });
+  });
+
+  it('L-1: Cancel is never held back by the wrong-code wait', async () => {
+    const h = await harness();
+    await h.post(REPLACE, h.world.code);
+    for (let i = 0; i < 3; i += 1) await h.post(RULES, WRONG);
+    expect((await h.post(CHECK, h.world.code)).status).toBe(429);
+    const res = await h.post(CANCEL, '');
+    expect(res.status).toBe(200);
+    expect(res.json).toEqual({ status: 'cancelled' });
+    expect(await h.world.keychain.get(OWNER_NEXT_ACCOUNT)).toBeNull();
+  });
+
+  it('L-4: Cancel racing Finish gets a defined answer, never 500', async () => {
+    const h = await harness();
+    const code = String((await h.post(REPLACE, h.world.code)).json['code']);
+    const [finish, cancel] = await Promise.all([h.post(FINISH, code), h.post(CANCEL, '')]);
+    expect([200, 409]).toContain(finish.status);
+    expect([200, 409]).toContain(cancel.status);
+    const words = [finish.json['status'], cancel.json['status']];
+    expect(
+      (words[0] === 'done' && (words[1] === 'busy' || words[1] === 'not_pending')) ||
+        (words[1] === 'cancelled' && (words[0] === 'busy' || words[0] === 'not_pending')),
+    ).toBe(true);
   });
 });
 

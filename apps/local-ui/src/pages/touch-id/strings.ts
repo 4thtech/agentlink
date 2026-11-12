@@ -60,6 +60,10 @@ export const TOUCH_ID_STRINGS = {
     "The new code wasn't typed back, so nothing was changed. Your current master code still works.",
   unfinished:
     'An earlier master code change didn’t finish. Run `agentlink owner change-code` in your own terminal to finish or clean it up, then try again here.',
+  // IR WP-S2 M-1: the keychain may have taken the new code without confirming it.
+  unconfirmed:
+    "AgentLink couldn't confirm the change, so your old master code may already have stopped working. Keep both your current and your new master code, and run `agentlink owner change-code` in your own terminal: it finishes or cleans up this change.",
+  cancelFailed: "Couldn't cancel just now. Your current master code still works. Try again.",
   replaceFailed:
     "That didn't work. Nothing was changed. Your current master code still works. Try again in a minute.",
   lost: 'I lost my master code',

@@ -10750,3 +10750,10 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** owner setup (release GitHub App, environments `release-bot` and `desktop-sign`, variables `RELEASE_APP_CLIENT_ID` and `RELEASE_BOT_LOGIN`)
 - **Spec:** OPS-UNSTICK report changes C2 and C4; D-25, D-52; `audit-rules.md` §3
 - **Done when:** the `version` job opens the PR with the App token and turns on auto-merge; `review-gate` classes an App-authored, version-shaped diff as S0 with no review requirement and anything else as an ordinary automated PR (tests on the real gate script, RED commit first); `desktop-extension-release` uses `desktop-sign`; the npm-publish click is the only owner click; the retrigger workaround and the hand-filled body are gone from docs and tools.
+
+#### UX1113-S2-REWRAP · a dedicated `unlockForRewrap` scope for Replace master code (follow-up from the WP-S2 Fable audit)
+- **Status:** new · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (owner keys)
+- **Repo/path:** agentlink · `packages/node/src/owner-keystore.ts`, `packages/node/src/approval-server.ts` (`ownerCodeRun`), tests
+- **Depends on:** UX1113 WP-S2
+- **Scope:** Replace master code reuses `unlockForExport` and `exportSeedOf` to copy the seed for its re-wrap. Give it its own unlock (a session scope that only `stageOwnerCodeChange` can read), so the export capability is the recovery-kit export alone again.
+- **Acceptance:** the export route and Replace each read the seed only through their own scope; a session of one is refused by the other (tests); 04 §2.3.3 and §2.5 name both.
