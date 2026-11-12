@@ -7,7 +7,7 @@ Rules decide what your AI may do without asking you. The page shows them in two 
 - **Everyday:** adding proof and its budget, new contacts, accepting terms.
 - **More rules:** unknown senders, files, exports and the limits for accepting terms on its own.
 
-<figure><img src="../.gitbook/assets/local-rules--overview.png" alt="The Everyday rules: add proof, new contacts and accepting terms, each a row of choices with Ask me selected."><figcaption><p>Rules, showing the safe defaults.</p></figcaption></figure>
+<figure><img src="../../assets/screens/rules-overview.webp" alt="The Everyday rules: add a public proof (Allowed), connect with someone new (Ask me) and accepting terms (Ask me), each a row of choices."><figcaption><p>Rules, showing the defaults.</p></figcaption></figure>
 
 ## Change a rule
 

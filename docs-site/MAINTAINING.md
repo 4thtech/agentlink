@@ -35,7 +35,7 @@ This repo is the source of truth (D-57, amends D-29). GitBook is **one space**, 
 - **Never edit in GitBook.** Changes go through a pull request here like any other change; the wiki repo holds only copies. `main` accepts changes only through pull requests, so a GitBook-side edit could not sync back without bypassing review. Never add the GitBook app as a ruleset bypass actor.
 - **Moving or renaming a page** needs a redirect on the site (a `redirects:` entry in `.gitbook.yaml` if the sync script keeps those files, otherwise in the wiki repo), so published links keep working.
 - **Links.** Between guide and technical pages, use relative links (both folders are copied together). Links to the specs or to other repository files use absolute GitHub URLs (`https://github.com/4thtech/agentlink/blob/main/...`), because the copy contains only `docs-site/guide` and `docs-site/technical`.
-- **Images:** screenshots come from `pnpm docs:screens` into `docs-site/assets/screens/` (light theme; [docs architecture](../docs/process/docs-architecture.md) §3); the wiki sync copies that folder with the guide. Other images go in the folder's `.gitbook/assets/`. The intro GIF is pinned to the release tag.
+- **Images:** screenshots come from `pnpm docs:screenshots` ([runbook](../docs/runbooks/docs-screenshots.md)) into `docs-site/assets/screens/` (light theme; [docs architecture](../docs/process/docs-architecture.md) §3); the wiki sync copies that folder with the guide. Every image the guide shows must be in the manifest (`tools/docs-screenshots/manifest.json`). The intro GIF is pinned to the release tag.
 
 ### One-time setup (owner)
 

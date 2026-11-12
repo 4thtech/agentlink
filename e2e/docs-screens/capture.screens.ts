@@ -16,12 +16,13 @@
 // Natasa, the same messages); keys, links and the Contact check digits are new on every run, so the
 // pixels are not byte-identical between runs. Nothing is printed; a failed step names itself.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import type { Browser, BrowserContext, Locator, Page } from 'playwright';
 import { build } from 'vite';
-import { afterAll, beforeAll, describe, it } from 'vitest';
+import { afterAll, beforeAll, describe, it, vi } from 'vitest';
 import {
   builtAppFiles,
   fakeClaudeCode,
@@ -29,6 +30,7 @@ import {
   startAiAppMcp,
   until,
 } from '../test/app-world.js';
+import { inMore } from '../test/journey/helpers-agents.js';
 import { futureLink } from '../test/invite/fixtures.js';
 import { CONNECT_WITH } from '../test/journey/helpers-wizard.js';
 import {
@@ -51,6 +53,22 @@ const QUALITY = 0.82;
 /** Only these shots are written when set (comma-separated names), for a quick refresh of one page. */
 const ONLY = process.env['DOCS_SCREENS_ONLY']?.split(',').filter(Boolean);
 
+/** The one moment every shot lives at: the host, the agents and the browser all read it. */
+const FIXED_NOW = '2026-11-12T10:00:00Z';
+/** What the pages show where the app makes a fresh value on every run (keys, links, codes). */
+const MASK = {
+  check: '4821 7365 0914',
+  master: 'K7QM-2XD9-HW4T-PB6N-8RFC-3VYE',
+  invite: 'agentlink.4thtech.io/i#made-up-invite',
+};
+
+/** tools/docs-screenshots/manifest.json: every shot this run must write (docs model section 5). */
+const MANIFEST = JSON.parse(
+  readFileSync(new URL('../../tools/docs-screenshots/manifest.json', import.meta.url), 'utf8'),
+) as { shots: { name: string; image: string }[] };
+const written = new Set<string>();
+
+const CONFIRM_PASSKEY_ANY = /^Confirm with (Touch ID|Windows Hello|your passkey)$/;
 const closers: (() => Promise<unknown>)[] = [];
 let browser: Browser | undefined;
 let encoder: Page | undefined;
@@ -69,6 +87,20 @@ async function screenPage(
     timezoneId: 'UTC',
     permissions: ['clipboard-read', 'clipboard-write'],
   });
+  // The page clock starts at the fixed moment and runs on from there.
+  await context.addInitScript((fixed) => {
+    const Real = Date;
+    const offset = Real.parse(fixed) - Real.now();
+    class Shifted extends Real {
+      constructor(...args: unknown[]) {
+        super(...((args.length === 0 ? [Real.now() + offset] : args) as [number]));
+      }
+      static override now(): number {
+        return Real.now() + offset;
+      }
+    }
+    (globalThis as { Date: unknown }).Date = Shifted;
+  }, FIXED_NOW);
   closers.push(() => context.close());
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
@@ -117,6 +149,7 @@ async function shot(
   await page.evaluate(() => document.fonts.ready);
   // Passing notices ("Your new contact accepted your invite") belong to a moment, not to the page.
   for (const x of await page.locator('.al-toast-x').all()) await x.click().catch(() => undefined);
+  await maskFresh(page);
   await page.mouse.move(0, 0);
   await page.waitForTimeout(400);
   // `above`: crop just above this element (a button that belongs to the page behind the moment).
@@ -131,6 +164,61 @@ async function shot(
   });
   const webp = await toWebp(png);
   writeFileSync(`${OUT}${name}.webp`, webp);
+  written.add(name);
+}
+
+/** Made-up stand-ins for the values that are new on every run, so two runs draw the same pixels. */
+async function maskFresh(page: Page): Promise<void> {
+  await page.evaluate((mask) => {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const nodes: Text[] = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+    for (const node of nodes) {
+      let t = node.nodeValue ?? '';
+      // A temp home shows as the home folder ("~"): the real folder name is new on every run.
+      if (/agentlink-u3k-/.test(t)) {
+        t = t.replace(/\/[^\s]*agentlink-u3k-[^/\s]*\/home/g, '~');
+        node.nodeValue = t;
+      }
+      if (/\d{4}\D{1,3}\d{4}\D{1,3}\d{4}/.test(t)) {
+        node.nodeValue = t.replace(/\d{4}(\D{1,3})\d{4}(\D{1,3})\d{4}/, () => mask.check);
+      }
+    }
+    // Seconds of a clock time run on with the real wait; the page shows them as :00.
+    for (const node of nodes) {
+      const t = node.nodeValue ?? '';
+      if (/\d{1,2}:\d{2}:\d{2}/.test(t)) {
+        node.nodeValue = t.replace(/(\d{1,2}:\d{2}):\d{2}/g, '$1:00');
+      }
+    }
+    // The Contact check can sit in one node per group of four numbers.
+    const groups4 = new Map<Element, Text[]>();
+    for (const node of nodes) {
+      if (!/^\s*\d{4}\s*$/.test(node.nodeValue ?? '') || node.parentElement === null) continue;
+      const key = node.parentElement.parentElement ?? node.parentElement;
+      groups4.set(key, [...(groups4.get(key) ?? []), node]);
+    }
+    for (const list of groups4.values()) {
+      if (list.length === 3) list.forEach((n, i) => (n.nodeValue = mask.check.split(' ')[i] ?? ''));
+    }
+    for (const input of document.querySelectorAll('input')) {
+      if (/agentlink-u3k-/.test(input.value)) {
+        input.value = input.value.replace(/\/[^\s]*agentlink-u3k-[^/\s]*\/home/g, '~');
+      }
+    }
+    for (const el of document.querySelectorAll('.inv-link[data-state="ready"]')) {
+      el.textContent = mask.invite;
+    }
+    // The master code and the recovery code: groups of characters in their own spans.
+    const groups = document.querySelectorAll('[data-recovery-code] span, [data-backup-code] span');
+    const text = mask.master.replace(/-/g, '');
+    groups.forEach((el, i) => {
+      el.textContent = text.slice(
+        i * (text.length / groups.length),
+        (i + 1) * (text.length / groups.length),
+      );
+    });
+  }, MASK);
 }
 
 /** One step of the story; a failed step names itself, and the story stops (later steps need it). */
@@ -169,6 +257,8 @@ function serveInvite(): Promise<Server> {
 }
 
 beforeAll(async () => {
+  // Date only (timers keep running): the host, the agents and the relay read the same fixed day.
+  vi.useFakeTimers({ toFake: ['Date'], now: new Date(FIXED_NOW), shouldAdvanceTime: true });
   mkdirSync(OUT, { recursive: true });
   const launched = await launchBrowser();
   if (launched.browser === undefined) throw launched.error;
@@ -177,6 +267,13 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  vi.useRealTimers();
+  const missing = MANIFEST.shots.filter((x) => !written.has(x.name) && ONLY === undefined);
+  if (missing.length > 0) {
+    throw new Error(
+      `docs screens: the manifest lists shots this run did not write: ${missing.map((x) => x.name).join(', ')}`,
+    );
+  }
   for (const close of closers.splice(0).reverse()) await close().catch(() => undefined);
   await browser?.close();
 });
@@ -228,9 +325,7 @@ describe('docs screens', () => {
       await saved.click();
       await a.getByRole('heading', { name: 'Connected to Claude Code' }).waitFor();
       await shot(a, 'get-started-connected');
-      await a.getByRole('button', { name: 'Invite someone' }).click();
-      await a.locator('.inv-link[data-state="ready"]').waitFor();
-      await a.getByRole('button', { name: 'Done, go to Home' }).click();
+      await a.getByRole('button', { name: 'Go to Home' }).click();
       await a.waitForURL((url) => url.pathname === '/');
       await a.getByRole('heading', { name: 'People' }).first().waitFor();
       await shot(a, 'home-first');
@@ -322,7 +417,6 @@ describe('docs screens', () => {
         .getByRole('heading', { name: /connected$/ })
         .first()
         .waitFor({ timeout: 30_000 });
-      await shot(a, 'connected-inviter');
       const name = a.getByLabel('Name this contact');
       if (await name.isVisible()) {
         await name.fill('Natasa');
@@ -347,6 +441,110 @@ describe('docs screens', () => {
       await shot(a, 'home');
     });
 
+    // ---- A fuller conversation: a file each way, an offer of terms ----
+    await step('conversation', async () => {
+      for (const [pc, name, text] of [
+        [pcB, 'workshop-agenda.txt', 'Workshop agenda\n09:00 Welcome\n09:30 Demo\n'],
+        [pcA, 'project-plan.txt', 'Project plan\nStep 1: connect\nStep 2: share\n'],
+      ] as const) {
+        const folder = join(pc.home, 'AgentLink', 'Send');
+        mkdirSync(folder, { recursive: true });
+        writeFileSync(join(folder, name), text);
+      }
+      await mcpB.call('agentlink_send', {
+        to: 'Tali',
+        text: 'Here is the agenda.',
+        path: join(pcB.home, 'AgentLink', 'Send', 'workshop-agenda.txt'),
+      });
+      await mcpA.call('agentlink_send', {
+        to: 'Natasa',
+        text: 'And the plan.',
+        path: join(pcA.home, 'AgentLink', 'Send', 'project-plan.txt'),
+      });
+      const offered = await mcpB.call('agentlink_propose_terms', {
+        to: 'Tali',
+        terms: {
+          subject: 'Workshop slides',
+          deliverables: [{ description: 'Ten slides for the workshop', by: 'me' }],
+          price: { amount: '50.00', currency: 'USD', payer: 'them' },
+          deadlines: [{ ref: 'd1', due: '2026-11-30T17:00:00Z' }],
+        },
+        note: 'Happy to talk.',
+        clientRequestId: 'docs-offer-1',
+      });
+      if (offered.structured['status'] !== 'ok') throw new Error('the offer was not sent');
+      // The inbox hands each message over once: collect until the file and the offer are both in.
+      let got = '';
+      await until(
+        'Tali has the file and the offer',
+        async () => {
+          got += JSON.stringify((await mcpA.call('agentlink_inbox')).structured);
+          return got.includes('Here is the agenda') && got.includes('Workshop slides')
+            ? true
+            : undefined;
+        },
+        60_000,
+      );
+      await navTo(a, 'Home');
+      await a
+        .getByRole('button', { name: /Natasa/ })
+        .first()
+        .click();
+      await a.getByText('workshop-agenda.txt').first().waitFor({ timeout: 30_000 });
+      await a.waitForTimeout(1500);
+      await shot(a, 'conversation', { fullPage: true });
+      await a.keyboard.press('Escape');
+    });
+
+    // ---- Settings pages: Files folder, Rules, Proofs & credits; Activity ----
+    await step('files', async () => {
+      await a.goto(new URL('/settings/files', a.url()).toString());
+      await a.getByRole('heading', { name: 'Files', level: 1 }).first().waitFor();
+      await a.getByRole('tab', { name: 'Received' }).click();
+      await a.getByText('workshop-agenda.txt').first().waitFor();
+      await shot(a, 'files-received');
+      await a.getByRole('tab', { name: 'Sent' }).click();
+      await a.getByText('project-plan.txt').first().waitFor();
+      await shot(a, 'files-sent');
+      await a.getByRole('tab', { name: 'Send folders' }).click();
+      await a.getByText('Folders your AI can send files from').first().waitFor();
+      await shot(a, 'files-folders');
+      mkdirSync(join(pcA.home, 'Documents', 'Shared'), { recursive: true });
+      await a.getByRole('button', { name: 'Allow a folder' }).click();
+      await a.getByRole('textbox', { name: 'Folder' }).fill(join(pcA.home, 'Documents', 'Shared'));
+      await shot(a, 'files-add-folder');
+      await a.getByRole('button', { name: 'Check folder' }).click();
+      await a.getByText('Before you confirm, tick each one:').waitFor();
+      await a.getByRole('checkbox').first().check();
+      await shot(a, 'files-add-folder-confirm');
+    });
+    await step('rules', async () => {
+      await a.goto(new URL('/settings/rules', a.url()).toString());
+      await a.getByRole('heading', { name: 'Rules', level: 1 }).first().waitFor();
+      await a.waitForTimeout(800);
+      await shot(a, 'rules-overview');
+      await a.getByRole('textbox', { name: 'Ask me over' }).fill('2');
+      await a.getByRole('button', { name: 'Review and save' }).click();
+      await a.getByRole('checkbox').first().waitFor();
+      for (const box of await a.getByRole('checkbox').all()) await box.check();
+      await a.getByRole('button', { name: 'Continue' }).click();
+      await a.getByRole('button', { name: CONFIRM_PASSKEY_ANY }).waitFor();
+      await shot(a, 'rules-confirm-spending');
+      await a.keyboard.press('Escape');
+    });
+    await step('proofs', async () => {
+      await a.goto(new URL('/settings/proofs', a.url()).toString());
+      await a.getByRole('heading', { name: 'Proofs & credits', level: 1 }).first().waitFor();
+      await a.waitForTimeout(800);
+      await shot(a, 'proofs');
+    });
+    await step('activity', async () => {
+      await a.goto(new URL('/activity', a.url()).toString());
+      await a.getByRole('heading', { name: 'Activity', level: 1 }).first().waitFor();
+      await a.waitForTimeout(800);
+      await shot(a, 'activity');
+    });
+
     // ---- People, contact actions ----
     await step('people', async () => {
       await goTo(a, 'People');
@@ -361,8 +559,8 @@ describe('docs screens', () => {
     // ---- IDs: the simple card, rename, remove (not confirmed) ----
     await step('ids', async () => {
       await a.keyboard.press('Escape');
-      await goTo(a, 'IDs');
-      await a.getByRole('heading', { name: 'IDs', level: 1 }).first().waitFor();
+      await goTo(a, 'My IDs');
+      await a.getByRole('heading', { name: 'My IDs', level: 1 }).first().waitFor();
       await shot(a, 'ids');
       const card = a.getByRole('main').getByRole('region', { name: 'Tali', exact: true }).first();
       await card.getByRole('button', { name: 'Rename', exact: true }).click();
@@ -375,7 +573,7 @@ describe('docs screens', () => {
         .first()
         .click()
         .catch(() => undefined);
-      await card.getByRole('button', { name: 'Remove', exact: true }).click();
+      await (await inMore(a, 'Tali', 'Remove')).click();
       await a.getByRole('heading', { name: /^Remove .*Tali.*\?$/ }).waitFor();
       await shot(a, 'id-remove');
       await a
@@ -402,7 +600,6 @@ describe('docs screens', () => {
     await step('settings', async () => {
       await goTo(a, 'Settings');
       await a.getByRole('heading', { name: 'Settings', level: 1 }).first().waitFor();
-      await shot(a, 'settings');
       await a.goto(new URL('/settings/apps', a.url()).toString());
       await a.getByRole('heading', { level: 1 }).first().waitFor();
       await a.waitForTimeout(800);
@@ -413,7 +610,7 @@ describe('docs screens', () => {
       await shot(a, 'recovery-kit');
       // WP-11: save the kit (Touch ID), then the recovery code shown once. The kit is written into
       // this computer's temp home, never a real Downloads folder.
-      await a.getByRole('button', { name: 'Save recovery kit' }).first().click();
+      await a.getByRole('button', { name: 'Save a recovery kit' }).first().click();
       const confirm = a.getByRole('button', { name: CONFIRM_PASSKEY });
       const code = a.getByRole('region', { name: 'Your recovery code' });
       await confirm.or(code).first().waitFor({ timeout: 30_000 });
