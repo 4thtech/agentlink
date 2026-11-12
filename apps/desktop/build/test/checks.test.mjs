@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { findPreviewString, PREVIEW_VAR } from '../lib/preview-check.mjs';
-import { FORBIDDEN_SWITCHES, runLockdown } from '../lib/switch-check.mjs';
+import { EXTRA_CASES, FORBIDDEN_SWITCHES, runLockdown } from '../lib/switch-check.mjs';
 
 test('preview check flags the variable name anywhere in the content', () => {
   assert.equal(PREVIEW_VAR, 'AGENTLINK_DESKTOP_PREVIEW');
@@ -34,6 +34,26 @@ test('the forbidden switch list covers the H1 set', () => {
       s,
     );
   }
+});
+
+test('single-dash, Windows-style and after-the-link forms are covered', async () => {
+  for (const f of ['-inspect', '/inspect', '/remote-debugging-port=9222']) {
+    assert.ok(
+      FORBIDDEN_SWITCHES.some((x) => x.split('=')[0] === f.split('=')[0]),
+      f,
+    );
+  }
+  assert.ok(
+    EXTRA_CASES.some(
+      (c) => c[0] === '--' && c[1].startsWith('agentlink://') && c[2]?.startsWith('--'),
+    ),
+  );
+  const seen = [];
+  await runLockdown({
+    exe: '/x',
+    launch: async (_e, argv) => (seen.push(argv), { code: 1, windowSeen: false }),
+  });
+  assert.ok(seen.length >= FORBIDDEN_SWITCHES.length + EXTRA_CASES.length);
 });
 
 test('runLockdown passes only when every switch exits non-zero with no window', async () => {

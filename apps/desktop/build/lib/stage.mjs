@@ -1,10 +1,12 @@
 // Steps shared by build-mac.mjs and build-win.mjs.
+import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { assetFor, constants } from './constants.mjs';
 import { fetchVerified, sha256File } from './fetch-verified.mjs';
+import { checkTgzDeps, lockRegistryProblems, treeHash } from './core-lock.mjs';
 import { capture, run, walk } from './run.mjs';
 
 export const DESKTOP_DIR = resolve(new URL('../..', import.meta.url).pathname);
@@ -87,32 +89,48 @@ export async function packAsar(payloadDir, asarPath) {
   await asar.createPackage(payloadDir, asarPath);
 }
 
+export const REGISTRY = 'https://registry.npmjs.org/';
+const CORE_LOCK_DIR = new URL('../core-lock/', import.meta.url).pathname;
+
 /**
- * Installs the packed CLI/core tarball for the target with scripts off and a release-age cooldown.
- * Fails if any installed package declares an install-time script (policy: none are allowed).
+ * Installs the core with NOTHING resolved at build time:
+ *  1. `npm ci --ignore-scripts` from the committed core-lock (the CLI's production dependencies,
+ *     integrity-checked, public registry only), for the target os/cpu;
+ *  2. the packed CLI tarball is unpacked on top (its dependencies must be a subset of the lock);
+ *  3. fails if any installed package declares an install-time script.
+ * Returns {lockSha256, treeSha256} for the inputs record. Resources/core is NOT covered by the ASAR
+ * integrity fuse; see README.md.
  */
-export function installCore({ tgz, dest, os, cpu, before }) {
+export function installCore({ tgz, dest, os, cpu }) {
   if (!existsSync(tgz)) throw new Error(`Core tarball not found: ${tgz}`);
+  const lockText = readFileSync(join(CORE_LOCK_DIR, 'package-lock.json'), 'utf8');
+  const registryProblems = lockRegistryProblems(JSON.parse(lockText), REGISTRY);
+  if (registryProblems.length) throw new Error(`core-lock:\n${registryProblems.join('\n')}`);
+  const lockPkg = JSON.parse(readFileSync(join(CORE_LOCK_DIR, 'package.json'), 'utf8'));
+  const tgzPkg = JSON.parse(capture('tar', ['-xOzf', tgz, 'package/package.json']).stdout);
+  const depProblems = checkTgzDeps(tgzPkg.dependencies, lockPkg.dependencies);
+  if (depProblems.length) throw new Error(`Core tarball vs core-lock:\n${depProblems.join('\n')}`);
+
   rmSync(dest, { recursive: true, force: true });
   mkdirSync(dest, { recursive: true });
-  writeFileSync(
-    join(dest, 'package.json'),
-    JSON.stringify({ name: 'agentlink-core', private: true }) + '\n',
-  );
+  cpSync(join(CORE_LOCK_DIR, 'package.json'), join(dest, 'package.json'));
+  cpSync(join(CORE_LOCK_DIR, 'package-lock.json'), join(dest, 'package-lock.json'));
   run('npm', [
-    'install',
+    'ci',
     '--prefix',
     dest,
     '--omit=dev',
     '--ignore-scripts',
     '--no-audit',
     '--no-fund',
-    '--no-package-lock',
+    `--registry=${REGISTRY}`,
     `--os=${os}`,
     `--cpu=${cpu}`,
-    `--before=${before}`,
-    tgz,
   ]);
+  const pkgDir = join(dest, 'node_modules', ...tgzPkg.name.split('/'));
+  mkdirSync(pkgDir, { recursive: true });
+  run('tar', ['-xzf', tgz, '--strip-components=1', '-C', pkgDir]);
+
   const bad = [];
   for (const e of walk(join(dest, 'node_modules'))) {
     if (e.dir || (!e.path.endsWith('/package.json') && !e.path.endsWith('\\package.json')))
@@ -129,9 +147,13 @@ export function installCore({ tgz, dest, os, cpu, before }) {
     throw new Error(
       `Installed packages declare install scripts (none may run):\n${bad.join('\n')}`,
     );
+  return {
+    lockSha256: createHash('sha256').update(lockText).digest('hex'),
+    treeSha256: treeHash(join(dest, 'node_modules')),
+  };
 }
 
-export function defaultBefore(days = 3) {
+export function defaultBefore(days = 7) {
   return new Date(Date.now() - days * 86400_000).toISOString();
 }
 

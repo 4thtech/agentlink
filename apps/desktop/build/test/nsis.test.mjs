@@ -22,6 +22,23 @@ test('NSIS script: per-user, scheme with -- separator, uninstaller keeps ~/.agen
   assert.doesNotMatch(s, /\$PROFILE/);
 });
 
+test('uninstall deletes recursively only after the folder guards, never anything else', () => {
+  const s = nsisScript({ version: '0.5.0', sourceDir: 'a', outFile: 'b' });
+  const un = s.slice(s.indexOf('Section "Uninstall"'));
+  const rm = un.indexOf('RMDir /r "$INSTDIR"');
+  assert.ok(rm > 0);
+  assert.equal(un.split('RMDir /r').length - 1, 1, 'one recursive delete only');
+  for (const guard of [
+    'StrCmp "$INSTDIR" "$LOCALAPPDATA\\Programs\\AgentLink"',
+    'IfFileExists "$INSTDIR\\AgentLink.exe"',
+    'IfFileExists "$INSTDIR\\Uninstall.exe"',
+  ]) {
+    const at = un.indexOf(guard);
+    assert.ok(at >= 0 && at < rm, guard);
+  }
+  assert.doesNotMatch(un, /\$PROFILE|\$APPDATA|\$DOCUMENTS|\$LOCALAPPDATA"/);
+});
+
 test('NSIS script rejects an unsafe version', () => {
   assert.throws(() => nsisScript({ version: '1"; ExecShell', sourceDir: 'a', outFile: 'b' }));
 });
