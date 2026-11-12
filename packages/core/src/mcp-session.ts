@@ -6,7 +6,8 @@
 // who keeps the relay subscriptions, never what the app calls Running.
 //
 // - Start: when the process answers `initialize`, it inserts its row (a random session ID, the AI app
-//   id, the agent's agentId, its pid, started_at, beat_until = now + 45) and deletes rows that are no
+//   id, the agent's agentId, its pid, started_at, beat_until = now + 45 and, since schema version 13
+//   (WP-13, F45), the AgentLink version it runs, else null) and deletes rows that are no
 //   longer live (TTL, another agent, and, with `pidAlive`, a pid that is gone). Before start: no row.
 // - Beat: every 15 s (the caller's timer, apart from the lease loop), beat_until = now + 45 with a
 //   compare-and-set on the session ID; a pruned row is inserted again.
@@ -38,6 +39,39 @@ export const OTHER_APP = 'other' as const;
 const SESSION_ID_BYTES = 16;
 /** 04 §2.5: a pid is accepted only as an integer in 2 .. 2^31 - 1. */
 const MAX_PID = 2 ** 31 - 1;
+
+/**
+ * WP-13 (F45; 07 §3.2 `mcp_sessions`.version): an AgentLink version as a session row may carry it:
+ * x.y.z (each 1–6 digits) with an optional prerelease of at most 32 characters. Anything else is
+ * stored and read as no version.
+ */
+const VERSION = /^(\d{1,6})\.(\d{1,6})\.(\d{1,6})(?:-([0-9A-Za-z.-]{1,32}))?$/;
+
+/** WP-13: whether `v` is a version a session row may carry. */
+export function mcpVersionValid(v: unknown): v is string {
+  return typeof v === 'string' && VERSION.test(v);
+}
+
+/**
+ * WP-13 (F45; 08 §1 "Live AI-app status"): whether a live session runs an older AgentLink than the
+ * app (`current`), so its AI app should be restarted to use the new version. A session without a
+ * valid version was written by a process from before version 13: older. Without a valid `current`,
+ * never. A newer session is not outdated; at the same x.y.z, a session prerelease that differs from
+ * the app's (e.g. 0.5.0-next.1 against 0.5.0) is.
+ */
+export function mcpVersionOutdated(session: unknown, current: unknown): boolean {
+  if (!mcpVersionValid(current)) return false;
+  const now = VERSION.exec(current);
+  const ran = mcpVersionValid(session) ? VERSION.exec(session) : null;
+  if (now === null) return false;
+  if (ran === null) return true;
+  for (let i = 1; i <= 3; i += 1) {
+    const a = Number(ran[i]);
+    const b = Number(now[i]);
+    if (a !== b) return a < b;
+  }
+  return (ran[4] ?? '') !== (now[4] ?? '') && ran[4] !== undefined;
+}
 
 /** An id of the 06 §7 table, else `other`. */
 export function mcpAppId(app: unknown): string {
@@ -89,6 +123,8 @@ export interface McpSessionOptions {
   readonly pid: number;
   /** Signal 0 only (node pid-alive.ts). Without it, the writer prunes by TTL and agent only. */
   readonly pidAlive?: (pid: number) => boolean;
+  /** WP-13 (F45): the AgentLink version this process runs; stored only when `mcpVersionValid`. */
+  readonly version?: string;
 }
 
 /** One process's MCP session row. */
@@ -100,6 +136,7 @@ export class McpSession {
   readonly #agentId: string;
   readonly #pid: number;
   readonly #pidAlive: ((pid: number) => boolean) | undefined;
+  readonly #version: string | null;
   #app: string | undefined;
   #startedAt = 0;
   #ended = false;
@@ -111,6 +148,7 @@ export class McpSession {
     this.#agentId = options.agentId;
     this.#pid = options.pid;
     this.#pidAlive = options.pidAlive;
+    this.#version = mcpVersionValid(options.version) ? options.version : null;
     this.sessionId = encodeBase64url(randomBytes(SESSION_ID_BYTES));
   }
 
@@ -203,6 +241,7 @@ export class McpSession {
       started_at: this.#startedAt,
       beat_until: now + MCP_SESSION_TTL_SECONDS,
       last_tool_at: lastToolAt,
+      version: this.#version,
     });
   }
 

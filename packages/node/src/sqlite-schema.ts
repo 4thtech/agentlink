@@ -90,6 +90,9 @@ const V11_TABLES: readonly TableName[] = ['auto_save_log', 'auto_save_state'];
 /** Tables added by version 12 (W4-PAUSE, D-143 (5)): the owner's pause of the agent (07 §3.2). */
 const V12_TABLES: readonly TableName[] = ['agent_pause'];
 
+/** mcp_sessions columns added by version 13 (WP-13, F45): the AgentLink version a process runs. */
+const V13_MCP_SESSIONS_COLUMNS: readonly string[] = ['version'];
+
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
   return {
@@ -113,6 +116,29 @@ function v1Spec(table: TableName): TableSpec {
   if (table === 'invites') return without(spec, V8_INVITES_COLUMNS);
   if (table === 'contacts') return without(spec, V9_CONTACTS_COLUMNS);
   return spec;
+}
+
+/**
+ * The version 10 (W4-LIVE-STATUS, D-143) heartbeat tables: today's specs without what version 13
+ * added (`mcp_sessions.version`). Its statements are pinned by digest in sqlite-store.test.ts.
+ */
+function v10Spec(table: TableName): TableSpec {
+  const spec = tableSpec(table);
+  return table === 'mcp_sessions' ? without(spec, V13_MCP_SESSIONS_COLUMNS) : spec;
+}
+
+/**
+ * Version 13 (WP-13, F45; 07 §3.2): `mcp_sessions.version`, appended, nullable. Every existing row
+ * keeps null: it was written by a process from before version 13, which the app reads as older
+ * ("Restart {app} to use the new version"). Such a process keeps running after the update and keeps
+ * writing its row by named columns, so the added column never breaks it; nothing is rewritten.
+ */
+function v13Statements(): readonly string[] {
+  const sessions = tableSpec('mcp_sessions');
+  return V13_MCP_SESSIONS_COLUMNS.map(
+    (column) =>
+      `ALTER TABLE "mcp_sessions" ADD COLUMN ${columnDef('mcp_sessions', column, sessions.columns[column] as ColumnSpec)}`,
+  );
 }
 
 /**
@@ -216,8 +242,9 @@ function v11Statements(): readonly string[] {
  * invites drop columns (W4-SHORT-INVITE, D-139; nullable, null on existing rows), version 9 adds the
  * contacts former-name columns (W4-RENAME-REACHES-CONTACTS, D-141; nullable, null on existing rows),
  * version 10 adds `mcp_sessions` and `mcp_last_seen` (W4-LIVE-STATUS, D-143; new tables only), version
- * 11 adds the auto-save columns and tables (W4-AUTO-SAVE, D-142; nullable, null on existing rows).,
- * version 12 adds `agent_pause` (W4-PAUSE, D-143 (5); a new table, no row: not paused). A later
+ * 11 adds the auto-save columns and tables (W4-AUTO-SAVE, D-142; nullable, null on existing rows),
+ * version 12 adds `agent_pause` (W4-PAUSE, D-143 (5); a new table, no row: not paused), version 13
+ * adds `mcp_sessions.version` (WP-13, F45; nullable, null on existing rows). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -247,9 +274,10 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 7, statements: createSchemaStatements(V7_TABLES) }),
   Object.freeze({ version: 8, statements: Object.freeze(v8Statements()) }),
   Object.freeze({ version: 9, statements: Object.freeze(v9Statements()) }),
-  Object.freeze({ version: 10, statements: createSchemaStatements(V10_TABLES) }),
+  Object.freeze({ version: 10, statements: createSchemaStatements(V10_TABLES, v10Spec) }),
   Object.freeze({ version: 11, statements: Object.freeze(v11Statements()) }),
   Object.freeze({ version: 12, statements: createSchemaStatements(V12_TABLES) }),
+  Object.freeze({ version: 13, statements: Object.freeze(v13Statements()) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

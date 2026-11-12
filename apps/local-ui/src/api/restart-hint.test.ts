@@ -3,12 +3,7 @@
 // layers: the agent's one line (the Simple card and the Under the hood table share `agentLine`), the
 // AI app's own word, and the top bar's live line and dropdown (`liveAgentFromWire`).
 import { describe, expect, it } from 'vitest';
-import {
-  agentLine,
-  appWord,
-  parseAgents,
-  type AgentRow,
-} from '../pages/agents/data.js';
+import { agentLine, appWord, parseAgents, type AgentRow } from '../pages/agents/data.js';
 import { LIVE_WORDS, liveAgentFromWire } from './live.js';
 
 const NOW = 1_800_000_000;

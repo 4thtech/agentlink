@@ -178,7 +178,13 @@ describe('MCP session heartbeat: write, beat, stamp, exit', () => {
     const store = new MemoryStore();
     const clock = new FakeClock();
     await store.transaction((tx) => {
-      const base = { app: 'codex', agent_id: AGENT, started_at: clock.t - 100, last_tool_at: null };
+      const base = {
+        app: 'codex',
+        agent_id: AGENT,
+        started_at: clock.t - 100,
+        last_tool_at: null,
+        version: null,
+      };
       tx.insert('mcp_sessions', { ...base, session_id: 'expired', pid: 11, beat_until: clock.t });
       tx.insert('mcp_sessions', { ...base, session_id: 'gone', pid: 12, beat_until: clock.t + 30 });
       tx.insert('mcp_sessions', {
@@ -279,7 +285,13 @@ describe('MCP session heartbeat: the running version (WP-13, F45)', () => {
   it('writes the version it runs; an odd version string is stored as null', async () => {
     const clock = new FakeClock();
     const store = new MemoryStore();
-    const s = new McpSession({ store, now: clock.now, agentId: AGENT, pid: 4242, version: '0.4.14' });
+    const s = new McpSession({
+      store,
+      now: clock.now,
+      agentId: AGENT,
+      pid: 4242,
+      version: '0.4.14',
+    });
     await s.start('claude-code');
     expect((await rows(store))[0]?.version).toBe('0.4.14');
     const odd = new MemoryStore();
@@ -300,7 +312,13 @@ describe('MCP session heartbeat: the running version (WP-13, F45)', () => {
   it('a pruned row is written again with its version', async () => {
     const clock = new FakeClock();
     const store = new MemoryStore();
-    const s = new McpSession({ store, now: clock.now, agentId: AGENT, pid: 4242, version: '0.5.0' });
+    const s = new McpSession({
+      store,
+      now: clock.now,
+      agentId: AGENT,
+      pid: 4242,
+      version: '0.5.0',
+    });
     await s.start('codex');
     await store.transaction((tx) => tx.delete('mcp_sessions', { session_id: s.sessionId }));
     await s.beat();

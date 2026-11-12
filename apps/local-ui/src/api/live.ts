@@ -103,6 +103,13 @@ export const LIVE_WORDS = {
    * right after "Connected to Claude Code"): the honest state, never "Offline".
    */
   connectedRestart: (app: string): string => `Connected · restart ${app} to start`,
+  /**
+   * WP-13 (F-4 / F45): the AI app still runs an older AgentLink after an update (`outdated`); its
+   * agent's line, in both layers and the top bar.
+   */
+  restartToUpdate: (app: string): string => `Restart ${app} to use the new version`,
+  /** WP-13: the same, as the word next to that AI app's name. */
+  restartApp: 'Restart to use the new version',
 } as const;
 
 /** "just now", "5 min ago", "3 h ago", "1 day ago" (08 §1: the page computes relative times). */
@@ -125,6 +132,8 @@ interface AppRecord {
   readonly lastSeenAt?: number;
   /** The earlier read form (a plain id): it never carries a last seen time. */
   readonly legacy?: true;
+  /** WP-13 (F45): a live session of this app runs an older AgentLink (only while live). */
+  readonly outdated?: true;
 }
 interface AgentRecord {
   readonly name: string;
@@ -168,10 +177,12 @@ function parseApp(v: unknown, running: boolean): AppRecord | undefined {
   const state = v['state'];
   if (typeof state !== 'string' || !APP_STATES.has(state)) return undefined;
   const lastSeenAt = timeOf(v['lastSeenAt']);
+  const live = state === 'working' || state === 'ready' || state === 'idle';
   return {
     app: v['app'],
     state: state as AppWire,
     ...(lastSeenAt === undefined ? {} : { lastSeenAt }),
+    ...(live && v['outdated'] === true ? { outdated: true as const } : {}),
   };
 }
 
@@ -227,6 +238,7 @@ const RANK: Readonly<Record<AppWire, number>> = {
 };
 
 function appWord(app: AppRecord, now: number): string {
+  if (app.outdated === true) return LIVE_WORDS.restartApp;
   if (app.state === 'not_running' && app.lastSeenAt !== undefined) {
     return LIVE_WORDS.lastSeen(LIVE_WORDS.off, agoText(app.lastSeenAt, now));
   }
@@ -246,6 +258,7 @@ function toLive(r: AgentRecord, name: (id: string) => string, now: number): Live
     .filter((a) => a.state === 'working' || a.state === 'ready' || a.state === 'idle')
     .sort((a, b) => RANK[a.state] - RANK[b.state]);
   const first = live[0];
+  const outdated = live.find((a) => a.outdated === true);
   let state: LiveState;
   let statusText: string;
   if (r.removing) {
@@ -254,6 +267,13 @@ function toLive(r: AgentRecord, name: (id: string) => string, now: number): Live
   } else if (r.state === 'paused') {
     state = 'paused';
     statusText = LIVE_WORDS.paused;
+  } else if (
+    outdated !== undefined &&
+    (r.state === 'working' || r.state === 'ready' || r.state === 'idle')
+  ) {
+    // WP-13 (F45): the AI app still runs the older AgentLink: the one thing to do is restart it.
+    state = r.state;
+    statusText = LIVE_WORDS.restartToUpdate(name(outdated.app));
   } else if (r.state === 'working' && first !== undefined) {
     state = 'working';
     statusText = LIVE_WORDS.workingIn(name(first.app));
@@ -290,6 +310,19 @@ function toLive(r: AgentRecord, name: (id: string) => string, now: number): Live
     apps,
     removing: r.removing,
   };
+}
+
+/**
+ * WP-13: one agent record of the agents read or the stream (08 §1 allowlist), read defensively, as
+ * the top bar shows it; undefined for a record that is not one. `name` maps an app id to its name.
+ */
+export function liveAgentFromWire(
+  v: unknown,
+  now: number,
+  name: (id: string) => string = (id) => appNameOf(id, appNames),
+): LiveAgent | undefined {
+  const record = parseRecord(v);
+  return record === undefined ? undefined : toLive(record, name, now);
 }
 
 /** A row of the earlier agents read (names, Running) as a live agent: never Working without a beat. */

@@ -280,6 +280,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | `mcp_sessions`.agent_id | the agent's `agentId`; a reader ignores a row whose value is not the store's agent |
 | `mcp_sessions`.pid | `int`: the writer's process ID, read only by a reader on this machine and never put in an answer, event, log or error |
 | `mcp_sessions`.started_at, beat_until, last_tool_at | `int`: unix seconds; `last_tool_at` is null until the first tool call |
+| `mcp_sessions`.version | text or null: the AgentLink version the process runs (x.y.z, optional prerelease of at most 32 characters). Added by store schema version 13 (WP-13, F45; proposed, owner confirms at merge), appended and nullable: a row from before it, or one an older process still running after an update writes, is null. A reader treats an odd value as null and uses it only for the "restart to use the new version" flag (08 §1); the text never leaves the app host |
 | `mcp_last_seen`.app | text: an id as above; primary key, so at most one row per id |
 | `mcp_last_seen`.last_seen_at | `int`: unix seconds |
 | `agent_pause`.paused_at | `int`: unix seconds; one row at most, present only while the agent is paused |

@@ -17,10 +17,17 @@
 // Per agent: `paused` when paused (W4-PAUSE sets it); else the most active app's state; else
 // `offline`, with the newest `lastSeenAt` of its apps.
 //
+// WP-13 (F-4 / F45; 08 §1 "Live AI-app status"): a live app is `outdated` when one of its live sessions
+// runs an older AgentLink than the app host (`currentVersion`), or carries no version (a process from
+// before store schema 13): the page says "Restart {app} to use the new version". Only the flag leaves:
+// never the version text. Without a valid `currentVersion` nothing is outdated; an app that is not
+// running is never outdated (its next start runs the new version).
+//
 // `liveAgentRecord` is the one allowlist (08 §1 "Allowlist") that both `GET /api/ui/agents` and
 // `GET /api/ui/events` use: per agent only name, label, current, removing, state, lastSeenAt and apps;
-// per AI app only app, state, since and lastSeenAt. Never a path, pid, session or holder ID, client
+// per AI app only app, state, since, lastSeenAt and outdated. Never a path, pid, session or holder ID, client
 // name, agent ID, key, contact, content, URL or error text (I-5, I-7).
+import { mcpVersionOutdated } from '@4thtech-io/core';
 import { AI_APP_IDS } from '@4thtech-io/types';
 
 export type LiveAppState = 'not_set_up' | 'not_running' | 'working' | 'ready' | 'idle';
@@ -34,6 +41,8 @@ export interface LiveAppRecord {
   readonly since?: number;
   /** Unix seconds: when a session of this app last ran this agent; only while it is not live. */
   readonly lastSeenAt?: number;
+  /** WP-13 (F45): present (true) only while a live session of this app runs an older AgentLink. */
+  readonly outdated?: true;
 }
 
 /** One agent as the stream and the agents read carry it, allowlisted. */
@@ -56,6 +65,8 @@ export interface LiveInput {
     readonly app: string;
     readonly startedAt: number;
     readonly lastToolAt: number | null;
+    /** WP-13: the AgentLink version the session runs; absent or null when its row has none. */
+    readonly version?: string | null;
   }[];
   readonly lastSeen: readonly { readonly app: string; readonly at: number }[];
   /** App ids whose `agentlink` entry runs this agent. */
@@ -64,6 +75,8 @@ export interface LiveInput {
   readonly detected: readonly string[];
   /** W4-PAUSE: the agent's pause row exists. */
   readonly paused?: boolean;
+  /** WP-13 (F45): the app host's own AgentLink version; a live session older than it is outdated. */
+  readonly currentVersion?: string;
 }
 
 /** 08 §1 "Allowlist". */
@@ -76,7 +89,13 @@ export const LIVE_AGENT_FIELDS = Object.freeze([
   'lastSeenAt',
   'apps',
 ] as const);
-export const LIVE_APP_FIELDS = Object.freeze(['app', 'state', 'since', 'lastSeenAt'] as const);
+export const LIVE_APP_FIELDS = Object.freeze([
+  'app',
+  'state',
+  'since',
+  'lastSeenAt',
+  'outdated',
+] as const);
 
 const APP_STATES: readonly LiveAppState[] = [
   'not_set_up',
@@ -136,8 +155,10 @@ function sessionState(
 /** The status of one agent at `now`, with `since` as derived from the rows. */
 export function liveStatus(input: LiveInput, now: number): LiveStatus {
   const live = new Map<string, Derived>();
+  const outdated = new Set<string>();
   for (const session of input.sessions) {
     const app = appId(session.app);
+    if (mcpVersionOutdated(session.version, input.currentVersion)) outdated.add(app);
     const derived = sessionState(session, now);
     const held = live.get(app);
     if (
@@ -161,7 +182,14 @@ export function liveStatus(input: LiveInput, now: number): LiveStatus {
     if (!listed.has(app)) continue;
     const running = live.get(app);
     if (running !== undefined) {
-      apps.push(freezeApp({ app, state: running.state, since: running.since }));
+      apps.push(
+        freezeApp({
+          app,
+          state: running.state,
+          since: running.since,
+          outdated: outdated.has(app),
+        }),
+      );
       continue;
     }
     const at = seen.get(app);
@@ -201,12 +229,15 @@ function freezeApp(record: {
   state: LiveAppState;
   since?: number | undefined;
   lastSeenAt?: number | undefined;
+  outdated?: boolean | undefined;
 }): LiveAppRecord {
+  const live = record.state === 'working' || record.state === 'ready' || record.state === 'idle';
   return Object.freeze({
     app: record.app,
     state: record.state,
     ...(record.since === undefined ? {} : { since: record.since }),
     ...(record.lastSeenAt === undefined ? {} : { lastSeenAt: record.lastSeenAt }),
+    ...(record.outdated === true && live ? { outdated: true as const } : {}),
   });
 }
 
@@ -248,6 +279,7 @@ export function liveAgentRecord(view: LiveAgentRecord): LiveAgentRecord {
         state: app.state,
         since: isTime(app.since) ? app.since : undefined,
         lastSeenAt: isTime(app.lastSeenAt) ? app.lastSeenAt : undefined,
+        outdated: app.outdated === true,
       }),
     );
   }

@@ -450,9 +450,7 @@ describe(
       const digestOf = (i: number) =>
         encodeHex(sha256(encodeUtf8(MIGRATIONS[i]?.statements.join(';\n') ?? '')));
       expect(STORE_SCHEMA_VERSION).toBe(13);
-      expect(MIGRATIONS.map((m) => m.version)).toEqual([
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
-      ]);
+      expect(MIGRATIONS.map((m) => m.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
       // Version 1 (G-9) is unchanged by D-72.
       expect(digestOf(0)).toMatchInlineSnapshot(
         `"6a2a36755c97cca746bdfe0b166c409cf1a067b1fd526011470446c0bb7dfd1b"`,
@@ -589,8 +587,9 @@ describe(
       // Version 13 (WP-13, F45; 07 §3.2): `mcp_sessions.version`, one nullable column appended.
       // Versions 1 to 12 keep their digests above (version 10 is frozen without the column).
       expect(MIGRATIONS[12]?.statements).toEqual([
-        `ALTER TABLE "mcp_sessions" ADD COLUMN "version" TEXT CHECK ("version" IS NULL OR (typeof("version") = 'text' AND length("version") > 0))`,
+        `ALTER TABLE "mcp_sessions" ADD COLUMN "version" TEXT CHECK ("version" IS NULL OR (typeof("version") = 'text'))`,
       ]);
+      expect(digestOf(12)).toBe('b1f4cd696cbfd40f22df66a704b91150139e187eae84d972cc479e40069cbb53');
     });
 
     it('migrates a version 12 file to version 13 (WP-13, F45): rows kept, version null', async () => {
@@ -641,9 +640,14 @@ describe(
       });
       const rows = await v13.transaction((tx) => tx.select('mcp_sessions'));
       expect(rows.map((r) => r.version)).toEqual([null, '0.4.14']);
+      // A value that is not text is refused (the column is text or null).
       await expect(
         v13.transaction((tx) => {
-          tx.update('mcp_sessions', { session_id: 'BBBBBBBBBBBBBBBBBBBBBB' }, { version: '' });
+          tx.update(
+            'mcp_sessions',
+            { session_id: 'BBBBBBBBBBBBBBBBBBBBBB' },
+            { version: 5 as never },
+          );
         }),
       ).rejects.toThrow();
       await v13.close();
@@ -773,6 +777,8 @@ describe(
           started_at: 1,
           beat_until: 46,
           last_tool_at: null,
+          // WP-13: the newest schema (13) has the version column too.
+          version: null,
         });
         tx.insert('mcp_last_seen', { app: 'codex', last_seen_at: 1 });
       });
