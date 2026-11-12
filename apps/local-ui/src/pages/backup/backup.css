@@ -255,3 +255,12 @@
 .bk-status > .bk-export[data-backup-export='saved'] {
   margin-inline-start: 0;
 }
+.bk-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--al-space-2) var(--al-space-4);
+  margin: 0;
+}
+.bk-facts dd {
+  margin: 0;
+}

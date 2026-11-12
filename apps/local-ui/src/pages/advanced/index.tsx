@@ -2,7 +2,7 @@
 // relays are connected, when the last update happened and that the network is picked automatically.
 // Counts only, from the health read; never an address, and no response time until one is measured
 // (a made-up number would be worse than none). Skeleton on the first load.
-import { Skeleton } from '@4thtech-io/ui';
+import { Skeleton, useHood } from '@4thtech-io/ui';
 import { useEffect, useState, type ReactElement } from 'react';
 import type { ApiResult } from '../../api/client.js';
 import { readHealth } from '../../layout/health.js';
@@ -23,6 +23,7 @@ type State = { readonly loading: true } | { readonly loading: false; readonly re
 const WHEN = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' });
 
 export function AdvancedPage({ read = readHealth }: AdvancedPageProps): ReactElement {
+  const hood = useHood();
   const [state, setState] = useState<State>({ loading: true });
   useEffect(() => {
     let live = true;
@@ -78,6 +79,24 @@ export function AdvancedPage({ read = readHealth }: AdvancedPageProps): ReactEle
                 )}
               </dd>
             </div>
+            {hood ? (
+              <>
+                <div className="ad-row" data-hood-fact="relays-connected">
+                  <dt>{S.hoodRelays}</dt>
+                  <dd>{relays.connected === undefined ? S.never : String(relays.connected)}</dd>
+                </div>
+                <div className="ad-row" data-hood-fact="relays-known">
+                  <dt>{S.hoodRelaysKnown}</dt>
+                  <dd>{relays.total === undefined ? S.never : String(relays.total)}</dd>
+                </div>
+                <div className="ad-row" data-hood-fact="last-update-time">
+                  <dt>{S.hoodLastUpdateAt}</dt>
+                  <dd className="al-text-code">
+                    {sync === undefined ? S.never : new Date(sync * 1000).toISOString()}
+                  </dd>
+                </div>
+              </>
+            ) : null}
           </dl>
         ) : (
           <p className="al-text-body al-muted">{S.unknown}</p>

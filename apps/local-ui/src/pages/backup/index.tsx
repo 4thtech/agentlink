@@ -3,7 +3,7 @@
 // every browser; where the record is unreadable the page says so in plain words and never invents a
 // state. The kit is saved right here, behind Touch ID or the master code (export-kit.tsx). Restore is
 // the wizard of WP-R3 (/restore/*); these rows only link to it.
-import { Icon, Surface } from '@4thtech-io/ui';
+import { Icon, Surface, useHood } from '@4thtech-io/ui';
 import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { setKitRecordState } from '../../states/index.js';
@@ -146,6 +146,7 @@ export function NativeSettingsSlot(): ReactElement {
 export function BackupPage({ api: given, ...rest }: BackupPageProps): ReactElement {
   const [api] = useState<ApiClient>(() => given ?? createApiClient());
   const { status, reload } = useKitStatus(api);
+  const hood = useHood();
   const [shown, setShown] = useState<string | undefined>(undefined);
   const state = status?.state ?? 'unknown';
   const hasKit = state === 'backed_up' || state === 'out_of_date';
@@ -229,6 +230,12 @@ export function BackupPage({ api: given, ...rest }: BackupPageProps): ReactEleme
             </a>
           </li>
         </ol>
+        {hood ? (
+          <dl className="bk-facts" data-hood-facts>
+            <dt className="al-text-body-sm al-muted">{S.hoodFormat}</dt>
+            <dd className="al-text-body-sm al-text-code">{S.hoodFormatValue}</dd>
+          </dl>
+        ) : null}
       </Surface>
 
       <div className="bk-lists">

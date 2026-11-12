@@ -2,6 +2,9 @@
 // kit covers all IDs. Restore itself is the wizard of WP-R3 (links only here).
 export const BACKUP_STRINGS = {
   title: 'Backup & restore',
+  // QA-UTH: Under the hood names the kit format.
+  hoodFormat: 'Kit format',
+  hoodFormatValue: 'ALKK v1',
   lead: 'A recovery kit is everything you need to get AgentLink back on any computer.',
   // --- status card (three states, plus plain words when the record cannot be read)
   upToDateTitle: "You're backed up",

@@ -221,6 +221,7 @@ export const AGENTS_STRINGS = {
   sortStatus: 'Status',
   colAgent: 'ID',
   colApps: 'AI app (harness)',
+  colFolder: 'Folder',
   harnessHint:
     'AI apps: developers call them harnesses, the program that runs your AI and connects it to AgentLink.',
   colStatus: 'Status',

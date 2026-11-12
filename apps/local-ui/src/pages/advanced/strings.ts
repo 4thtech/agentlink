@@ -13,4 +13,6 @@ export const ADVANCED_STRINGS = {
   never: 'Not yet',
   unknown: "AgentLink didn't answer. Check that your AI app is open, then reload.",
   hoodRelays: 'Relays connected',
+  hoodRelaysKnown: 'Relays known',
+  hoodLastUpdateAt: 'Last update (UTC)',
 } as const;
