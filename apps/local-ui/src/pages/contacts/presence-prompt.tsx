@@ -10,7 +10,7 @@ import { Button } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
 import { detectPlatform } from '../first-run/passkey.js';
-import { BackupCodeField } from '../first-run/backup-code.js';
+import { BackupCodeField, UseCodeInstead } from '../first-run/backup-code.js';
 import {
   forgetSwitchUnsupported,
   otherBrowser,
@@ -39,6 +39,7 @@ export function PresencePrompt({
   onCancel,
   passkeyStatus = readPasskeyStatus,
   switchPasskey = switchToPasskey,
+  codeFirst = false,
 }: {
   summary: string;
   passkey: PasskeyInfo | undefined;
@@ -49,9 +50,14 @@ export function PresencePrompt({
   /** HOTFIX-045-TOUCHID seams (tests): the passkey state read and the one-time switch. */
   passkeyStatus?: () => Promise<PasskeyStatus>;
   switchPasskey?: SwitchToPasskey;
+  /**
+   * FB-8: the owner already chose "Use your backup code instead" on the caller's screen, so the
+   * prompt opens on the code field and does not ask for the passkey again.
+   */
+  codeFirst?: boolean;
 }): ReactElement {
   const [code, setCode] = useState('');
-  const [useCode, setUseCode] = useState(passkey === undefined);
+  const [useCode, setUseCode] = useState(codeFirst || passkey === undefined);
   const [notUsed, setNotUsed] = useState(false);
   const [found, setFound] = useState<PasskeyInfo | undefined>(undefined);
   const [why, setWhy] = useState<Unavailable | undefined>(undefined);
@@ -81,7 +87,7 @@ export function PresencePrompt({
         if (!mounted.current) return;
         if (status.kind === 'ready') {
           setFound(status.info);
-          setUseCode(false);
+          if (!codeFirst) setUseCode(false);
         } else {
           setWhy(status);
         }
@@ -285,9 +291,7 @@ export function PresencePrompt({
           <Button variant="primary" icon="approval" onClick={usePasskey} disabled={busy}>
             {S.usePasskeyOn(sensor)}
           </Button>
-          <Button variant="ghost" onClick={() => setUseCode(true)} disabled={busy}>
-            {S.useCode}
-          </Button>
+          <UseCodeInstead onClick={() => setUseCode(true)} disabled={busy} />
           <Button variant="ghost" onClick={onCancel} disabled={busy}>
             {S.cancel}
           </Button>

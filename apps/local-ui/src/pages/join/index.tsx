@@ -30,6 +30,7 @@ import {
   type PresenceProof,
 } from '../contacts/owner.js';
 import { PresencePrompt } from '../contacts/presence-prompt.js';
+import { UseCodeInstead } from '../first-run/backup-code.js';
 import { detectPlatform } from '../first-run/passkey.js';
 import type { Platform } from '../first-run/strings.js';
 import { createJoinApi, type JoinApi, type JoinInvite, type JoinState } from './api.js';
@@ -307,7 +308,8 @@ export function JoinPage({
       {askCode ? (
         <PresencePrompt
           summary={S.statement(name, fingerprint, agent === '' ? 'this ID' : agent)}
-          passkey={undefined}
+          passkey={passkey}
+          codeFirst={passkey !== undefined}
           busy={busy}
           error={error}
           onSubmit={send}
@@ -332,6 +334,16 @@ export function JoinPage({
               {passkey === undefined ? S.acceptWithCode : S.acceptWith(platform)}
             </span>
           </Button>
+          {/* FB-8: the backup code is always a way to confirm, also with a passkey here. */}
+          {passkey === undefined || declined ? null : (
+            <UseCodeInstead
+              disabled={busy}
+              onClick={() => {
+                setError(undefined);
+                setAskCode(true);
+              }}
+            />
+          )}
           {busy ? <ProgressBar label={S.connecting(name)} indeterminate /> : null}
           {error === undefined ? null : (
             <p className="al-text-body-sm jn-error" role="alert">

@@ -40,10 +40,14 @@ export interface ApiClient {
   /**
    * One owner operation (M1-11c-a4c; 04 §2.5): `input` travels base64url JSON in
    * `X-AgentLink-Input`, the owner code is the octet-stream body (the server's presence gate reads
-   * it once and wipes it). Never in the URL.
+   * it once and wipes it). Never in the URL. FB-8 (P-5): or the localhost passkey assertion as the
+   * body with `X-AgentLink-Presence: passkey` (as contacts/owner.ts sends it); wiped after sending.
    */
-  owner(path: string, input: unknown, ownerCode: string): Promise<OwnerApiResult>;
+  owner(path: string, input: unknown, presence: OwnerPresence): Promise<OwnerApiResult>;
 }
+
+/** The owner code as typed, or a passkey assertion body (contacts/owner.ts `passkeyProof`). */
+export type OwnerPresence = string | { readonly passkey: Uint8Array };
 
 const CSRF_HEADER = 'X-AgentLink-CSRF';
 
@@ -120,25 +124,32 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     return { kind: 'ok', status: res.status, data: parsed.value as T };
   }
 
-  async function owner(path: string, input: unknown, ownerCode: string): Promise<OwnerApiResult> {
+  async function owner(
+    path: string,
+    input: unknown,
+    presence: OwnerPresence,
+  ): Promise<OwnerApiResult> {
     checkPath(path);
     const headers = new Headers({
       [CSRF_HEADER]: options.token ?? pageToken(),
       'content-type': 'application/octet-stream',
       'X-AgentLink-Input': base64url(JSON.stringify(input)),
     });
+    if (typeof presence !== 'string') headers.set('X-AgentLink-Presence', 'passkey');
     let res: Response;
     try {
       res = await doFetch(path, {
         method: 'POST',
         headers,
-        body: ownerCode,
+        body: typeof presence === 'string' ? presence : (presence.passkey as BodyInit),
         credentials: 'same-origin',
         cache: 'no-store',
       });
     } catch {
       noteHostUnreachable();
       return { kind: 'offline' };
+    } finally {
+      if (typeof presence !== 'string') presence.passkey.fill(0);
     }
     noteHostReached();
     const parsed = await readJson(res);

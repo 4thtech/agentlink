@@ -18,7 +18,7 @@ import type {
   PreviewResult,
 } from './apps-api.js';
 import { AppMark } from './pick-app.js';
-import { BackupCodeField } from './backup-code.js';
+import { BackupCodeField, UseCodeInstead } from './backup-code.js';
 import { CONNECT as T, FIRST_RUN, SETUP_MESSAGES } from './strings.js';
 import './first-run.css';
 
@@ -81,6 +81,8 @@ export function ConnectApp({
   const [view, setView] = useState<View>({ k: 'loading' });
   const [info, setInfo] = useState<PasskeyInfo | undefined | 'unknown'>('unknown');
   const [code, setCode] = useState('');
+  // FB-8: the owner chose the backup code although a passkey is here.
+  const [codeChosen, setCodeChosen] = useState(false);
   const [message, setMessage] = useState<string | undefined>(undefined);
   const live = useRef(true);
   const title = useTitleFocus<HTMLHeadingElement>(view.k);
@@ -149,9 +151,9 @@ export function ConnectApp({
   const apply = async (change: AppChange): Promise<void> => {
     setMessage(undefined);
     let proof: PresenceProof | undefined;
-    if (info !== 'unknown' && info !== undefined) {
+    if (info !== 'unknown' && info !== undefined && !codeChosen) {
       proof = await passkeyProof(info);
-    } else if (code !== '') {
+    } else if (info !== 'unknown' && code !== '') {
       proof = { kind: 'code', code };
       setCode('');
     }
@@ -248,7 +250,7 @@ export function ConnectApp({
 
   const change = view.change;
   const working = view.k === 'working';
-  const useCode = info === undefined;
+  const useCode = info === undefined || (info !== 'unknown' && codeChosen);
   const failed = view.k === 'failed';
   return (
     <section className="fr-card" aria-labelledby="fr-connect-h">
@@ -309,6 +311,15 @@ export function ConnectApp({
           >
             {useCode ? T.applyCode : T.apply(sensor)}
           </Button>
+          {/* FB-8: the backup code is always a way to confirm, also with a passkey here. */}
+          {useCode || info === 'unknown' ? null : (
+            <UseCodeInstead
+              onClick={() => {
+                setMessage(undefined);
+                setCodeChosen(true);
+              }}
+            />
+          )}
           <Button variant="ghost" size="sm" onClick={onDone}>
             {T.later}
           </Button>

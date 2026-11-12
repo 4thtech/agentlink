@@ -35,7 +35,7 @@ import {
 } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { EARLIER_OWNER_CODE_HINT, PAGE_TITLES } from '../../strings.js';
-import { BackupCodeField } from '../first-run/backup-code.js';
+import { BackupCodeField, UseCodeInstead } from '../first-run/backup-code.js';
 import {
   RULES_PATH,
   checkDraft,
@@ -337,6 +337,13 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
             setStep({ ...rest, acks });
           }}
           onKeep={(keep) => void prepare(keep)}
+          onUseCode={() => {
+            // FB-8: the owner chose the backup code; this confirm then saves with the code.
+            const { error: _error, ...rest } = step;
+            void _error;
+            setCode('');
+            setStep({ ...rest, passkey: null });
+          }}
           onSave={() => (step.spending ? confirmSpending(step) : void save(step))}
           onBack={() => setStep({ kind: 'edit' })}
         />
@@ -646,6 +653,7 @@ function ConfirmStep({
   onAck,
   onKeep,
   onSave,
+  onUseCode,
   onBack,
 }: {
   confirm: Confirm;
@@ -655,6 +663,7 @@ function ConfirmStep({
   onAck: (code: string, on: boolean) => void;
   onKeep: (keep: boolean) => void;
   onSave: () => void;
+  onUseCode: () => void;
   onBack: () => void;
 }): ReactElement {
   const codes = unique(confirm.review.warnings.map((w) => w.code));
@@ -729,6 +738,10 @@ function ConfirmStep({
                 : S.save}
           </Button>
         </div>
+        {/* FB-8: the backup code is always a way to confirm, also with a passkey here. */}
+        {confirm.passkey === null || confirm.spending ? null : (
+          <UseCodeInstead onClick={onUseCode} disabled={confirm.busy} />
+        )}
         {confirm.busy ? (
           <p className="al-text-body-sm al-muted" role="status">
             {S.saving}
