@@ -24,6 +24,8 @@ const SAMPLES: Record<string, string> = {
   'owner key / signature': 'Check the signature',
   keystore: 'Open the keystore',
   'old code names': 'Enter your backup code',
+  '12-digit code': 'Compare the 12-digit code',
+  'pairing code': 'Enter the pairing code',
   password: 'Enter a password',
   contract: 'A legally binding contract',
   'commitment label': 'A new commitment',

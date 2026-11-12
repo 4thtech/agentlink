@@ -412,10 +412,13 @@ function runInTerminal(box, args) {
   const tool = findTool('script');
   if (!tool || !['darwin', 'linux'].includes(process.platform)) return undefined;
   const q = (v) => `'${v.replaceAll("'", `'\\''`)}'`;
-  const argv =
-    process.platform === 'darwin'
-      ? ['-q', '/dev/null', findTool('sh'), box.script, ...args]
-      : ['-qec', [findTool('sh'), box.script, ...args].map(q).join(' '), '/dev/null'];
+  const sh = findTool('sh');
+  // BSD `script` (macOS) runs the command itself; util-linux `script` runs it with `$SHELL -c`, so
+  // there SHELL is the sh under test (zsh may not be installed) and the installer still sees zsh.
+  const darwin = process.platform === 'darwin';
+  const argv = darwin
+    ? ['-q', '/dev/null', sh, box.script, ...args]
+    : ['-qec', `SHELL=/bin/zsh ${[sh, box.script, ...args].map(q).join(' ')}`, '/dev/null'];
   const result = spawnSync(tool, argv, {
     encoding: 'utf8',
     timeout: 30_000,
@@ -423,7 +426,7 @@ function runInTerminal(box, args) {
     env: {
       PATH: box.bin,
       HOME: box.home,
-      SHELL: '/bin/zsh',
+      SHELL: darwin ? '/bin/zsh' : sh,
       TMPDIR: box.dir,
       MOCK_SERVE: box.serve,
       MOCK_LOG: box.log,
