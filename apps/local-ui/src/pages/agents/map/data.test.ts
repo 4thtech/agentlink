@@ -136,7 +136,7 @@ describe('buildMap', () => {
     expect(shown.contacts.map((c) => c.ref)).toEqual([ref(3), ref(2), ref(1)]);
   });
 
-  it('names follow the People rule: owner name, else the declared name', () => {
+  it('names: owner-confirmed only, others are "Unnamed contact"', () => {
     const m = buildMap({
       ...base,
       contacts: [contact(1), contact(2, { nameSource: 'counterparty', name: 'Mallory' })],
@@ -145,7 +145,7 @@ describe('buildMap', () => {
         [2, 1, 'today'],
       ]),
     });
-    expect(m.contacts.map((c) => c.name).sort()).toEqual(['Mallory', 'Person 1']);
+    expect(m.contacts.map((c) => c.name).sort()).toEqual(['Person 1', 'Unnamed contact']);
   });
 
   it('line weight follows the count (1 to 3) and a line needs an exchange in 24 hours', () => {

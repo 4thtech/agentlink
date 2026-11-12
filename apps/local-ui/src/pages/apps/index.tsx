@@ -10,6 +10,7 @@ import { announceAgentsChanged } from '../agents/use-agents.js';
 import type { AgentsList } from '../agents/data.js';
 import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
 import { createAppsApi, type AppsApi } from './api.js';
+import { tildePath } from './tilde.js';
 import { cardState, type AppChange, type AppRow, type AppsList, type Entry } from './data.js';
 import { ChangePanel, ManualPanel, type Labels } from './panel.js';
 import { APPS_STRINGS as S } from './strings.js';
@@ -167,7 +168,7 @@ function Card({
           <dt className="al-text-body-sm">{S.hoodAppId}</dt>
           <dd className="al-text-body-sm al-text-code">{row.app}</dd>
           <dt className="al-text-body-sm">{S.file}</dt>
-          <dd className="al-text-body-sm al-text-code">{row.path}</dd>
+          <dd className="al-text-body-sm al-text-code">{tildePath(row.path)}</dd>
           {row.agent === undefined ? null : (
             <>
               <dt className="al-text-body-sm">{S.hoodFolder}</dt>

@@ -9,14 +9,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiResult } from '../api/client.js';
 import { createAgentsApi } from './agents/api.js';
 import { AgentsPage } from './agents/index.js';
-import { mapName } from './agents/map/data.js';
+import { tildePath } from './apps/tilde.js';
 import { resetAgentsCacheForTests } from './agents/use-agents.js';
 import { AdvancedPage } from './advanced/index.js';
 import { createAppsApi } from './apps/api.js';
 import { AppsPage } from './apps/index.js';
 import { BackupPage } from './backup/index.js';
 import { createOwnerClient } from './contacts/owner.js';
-import type { ContactRow } from './contacts/data.js';
 import { ConnectionsMapPage } from './advanced/map.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -164,20 +163,12 @@ describe('Connections map', () => {
     expect(host.textContent).not.toContain('Coming next');
     expect(host.querySelector('h1')?.textContent).toBe('Connections map');
   });
-  it('a person who declared a name is named as in People, never "Unnamed contact"', () => {
-    const c: ContactRow = {
-      ref: '0x4c21a0f700000000000000000000000000000002',
-      name: 'Bea',
-      nameSource: 'counterparty',
-      fingerprint: '7F3A·19C2',
-      label: 'self-declared',
-      status: 'active',
-      pairing: 'complete',
-      since: 1,
-    };
-    expect(mapName(c)).toBe('Bea');
-    expect(mapName({ ...c, name: '' })).toBe('Contact 7F3A·19C2');
-    const noTag = { ...c, fingerprint: undefined } as unknown as ContactRow;
-    expect(mapName({ ...noTag, name: '' })).toBe('Unnamed contact');
+  it('shows paths with the home folder as ~', () => {
+    expect(
+      tildePath('/Users/jane/Library/Application Support/Claude/claude_desktop_config.json'),
+    ).toBe('~/Library/Application Support/Claude/claude_desktop_config.json');
+    expect(tildePath('/home/jane/.codex/config.toml')).toBe('~/.codex/config.toml');
+    expect(tildePath('C:\\Users\\jane\\x.json')).toBe('~\\x.json');
+    expect(tildePath('~/.claude.json')).toBe('~/.claude.json');
   });
 });
