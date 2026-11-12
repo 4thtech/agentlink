@@ -26,6 +26,9 @@ const TOOLS_DIR = fileURLToPath(new URL('../../../packages/mcp-tools/src/', impo
 
 /** Any identifier naming one of the controls or a factory of one. */
 const CONTROL_NAME = /(?:export|import|credential)control/i;
+/** UX1113-R1: the restore routes, engine and session, by name or path. */
+const RESTORE_NAME =
+  /restoreroutes|restoreengine|unlockforrestore|recovery-kit-restore|api\/ui\/restore|api\/restore/i;
 const FENCED_IMPORT = /from\s+['"]@4thtech-io\/(?:node|crypto\/keystore)(?:\/[^'"]*)?['"]/;
 const RELATIVE = /(?:from|import)\s*\(?\s*['"](\.{1,2}\/[^'"]+)['"]/g;
 
@@ -127,6 +130,21 @@ describe('no MCP tool handler reaches the owner controls (M1-9i-b2, I-4)', () =>
   it('no reached file imports the KeyStore backends or the secret-key subpath', () => {
     const hits = [...graph].filter(([, text]) => FENCED_IMPORT.test(code(text)));
     expect(hits.map(([file]) => file)).toEqual([]);
+  });
+
+  // UX1113-R1 (D-147; 04 §2.3.3 "Restore in the app", T-3): the app's restore routes, their engine
+  // and the restore-only owner session are reached from no MCP tool module either.
+  it('no reached file names the restore routes, the restore engine or the restore session', () => {
+    const hits = [...graph].filter(([, text]) => RESTORE_NAME.test(code(text)));
+    expect(hits.map(([file]) => file)).toEqual([]);
+    for (const sample of [
+      "import { restoreRoutes } from '../local-ui/api/restore.js';",
+      'createRestoreEngine({ home })',
+      'await unlockForRestore(keychain, owner, binding)',
+      "fetch('/api/ui/restore/open')",
+    ]) {
+      expect(RESTORE_NAME.test(code(sample)), sample).toBe(true);
+    }
   });
 
   it('the scan would catch a reference (negative control)', () => {

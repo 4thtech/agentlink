@@ -70,7 +70,9 @@ export type CommandName =
   | 'cancel'
   | 'doctor'
   | 'ui'
-  | 'mcp';
+  | 'mcp'
+  | 'backup'
+  | 'restore';
 
 // W7-ID-B4 (D-144, owner Q6): `--id` is an alias of `--agent`, with identical behaviour. Both are
 // parsed here; the dispatcher folds `--id` into `agent` before any handler sees it.
@@ -223,6 +225,20 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
     guard: 'none',
     options: { ...AGENT, advanced: { type: 'boolean' } },
   },
+  // UX1113-R1 (D-147; 06 §8): restore from a recovery kit (†). Interactive terminal only, no
+  // harness marker, no piped stdin (the owner guard); the recovery code only at the hidden prompt.
+  {
+    name: 'backup',
+    usage: ['agentlink backup restore [file] [--check]   †'],
+    guard: 'owner',
+    options: { check: { type: 'boolean' } },
+  },
+  {
+    name: 'restore',
+    usage: ['agentlink restore [file] [--check]   †'],
+    guard: 'owner',
+    options: { check: { type: 'boolean' } },
+  },
 ] satisfies CommandSpec[]);
 
 /** The command names, for tests and for the harness config writers. */
@@ -290,7 +306,10 @@ const HELP_GROUPS: readonly { readonly title: string; readonly names: readonly C
     title: 'Every day:',
     names: ['status', 'invite', 'accept', 'requests', 'approve', 'deny', 'cancel'],
   },
-  { title: 'More:', names: ['contacts', 'policy', 'credits', 'verify', 'doctor', 'ui', 'mcp'] },
+  {
+    title: 'More:',
+    names: ['contacts', 'policy', 'credits', 'verify', 'doctor', 'ui', 'mcp', 'backup', 'restore'],
+  },
 ];
 
 /** U3-b: `init` and `ui` never ask which ID, so their `--id` is not shown by default. */

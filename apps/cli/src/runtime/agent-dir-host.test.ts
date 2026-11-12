@@ -164,10 +164,31 @@ describe('agentDirectory (U3-c, the node AgentDirectory seam)', () => {
     const list = await agentDirectory(home).list();
     expect(list).toEqual([
       { name: 'broken', label: 'broken', available: false, removing: false },
-      { name: 'default', label: 'default', labelled: false, available: true, removing: false },
+      {
+        name: 'default',
+        label: 'default',
+        labelled: false,
+        available: true,
+        removing: false,
+        keyStore: 'keychain',
+      },
       { name: 'empty', label: 'empty', available: false, removing: false },
-      { name: 'home', label: 'Family', labelled: true, available: true, removing: false },
-      { name: 'work', label: 'work', labelled: false, available: true, removing: false },
+      {
+        name: 'home',
+        label: 'Family',
+        labelled: true,
+        available: true,
+        removing: false,
+        keyStore: 'keychain',
+      },
+      {
+        name: 'work',
+        label: 'work',
+        labelled: false,
+        available: true,
+        removing: false,
+        keyStore: 'keychain',
+      },
     ]);
     // Listing changed nothing on disk.
     expect((await readdir(join(home, '.agentlink/agents'))).sort()).toEqual([

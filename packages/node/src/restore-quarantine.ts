@@ -38,6 +38,8 @@ const FILE_MODE = 0o600;
 const DIR_MODE = 0o700;
 /** The quarantine file names: `.restore-<16 hex>.sqlite`. */
 const RESTORE_FILE = /^\.restore-[0-9a-f]{16}\.sqlite(?:-wal|-shm)?$/;
+/** UX1113-R1 (04 §2.3.3 "Upload"): a kit uploaded from the page, `.upload-<16 hex>.alkk`. */
+export const UPLOAD_FILE = /^\.upload-[0-9a-f]{16}\.alkk$/;
 
 type SinkState = 'open' | 'committed' | 'checked' | 'installed' | 'discarded';
 
@@ -47,6 +49,8 @@ interface QuarantinedFile {
   handle: FileHandle | undefined;
   /** W4-RENAME-REACHES-CONTACTS: the checked snapshot's `identity.key_epoch` (its card's epoch). */
   keyEpoch?: number;
+  /** UX1113-R1: commit() ran, so the whole kit authenticated (the code was right). */
+  authenticated?: true;
 }
 
 /** Every quarantine sink this module made, by identity (a look-alike sink is never one). */
@@ -103,6 +107,7 @@ export function createRestoreQuarantine(dir: string): {
           file.handle = undefined;
           // Authenticated, not yet checked: still quarantined.
           file.state = 'committed';
+          file.authenticated = true;
         },
         discard: async (): Promise<void> => {
           await discardFile(file);
@@ -242,6 +247,47 @@ export async function installRestoredStore(
   await unlink(file.path).catch(() => undefined);
 }
 
+/**
+ * UX1113-R1 (04 §2.3.3 "Restore in the app"): true when `sink` was committed, so the kit it came
+ * from authenticated with the code given (a later snapshot check may still have refused it). The
+ * restore engine answers `damaged` then, not `wrong_code`, and does not count a wrong code.
+ */
+export function quarantineAuthenticated(sink: RecoveryKitStoreSink): boolean {
+  return SINKS.get(sink)?.authenticated === true;
+}
+
+/**
+ * UX1113-R1 (T-10): counts and dates only from a checked quarantined snapshot of `agentId`: the
+ * active contacts and the newest message time (Unix seconds, or null). Only clear columns are read
+ * (07 §3): `contacts.status` and `envelopes.created_at`; never a name, a card or a message. Undefined
+ * when the sink is not a checked sink of this module or cannot be read.
+ */
+export function peekQuarantinedSnapshot(
+  kit: RecoveryKitImport,
+  agentId: string,
+): { readonly people: number; readonly lastMessageAt: number | null } | undefined {
+  const sink = sinkOf(kit, agentId);
+  const file = sink === undefined ? undefined : SINKS.get(sink);
+  if (file?.state !== 'checked') return undefined;
+  let db: Database.Database | undefined;
+  try {
+    db = new Database(file.path, { fileMustExist: true, readonly: true });
+    db.pragma('query_only = ON');
+    db.pragma('trusted_schema = OFF');
+    const people = db
+      .prepare("SELECT count(*) AS n FROM contacts WHERE status = 'active'")
+      .get() as { n: unknown };
+    const last = db.prepare('SELECT max(created_at) AS t FROM envelopes').get() as { t: unknown };
+    const n = typeof people.n === 'number' && Number.isSafeInteger(people.n) ? people.n : 0;
+    const t = typeof last.t === 'number' && Number.isSafeInteger(last.t) ? last.t : null;
+    return Object.freeze({ people: n, lastMessageAt: t });
+  } catch {
+    return undefined;
+  } finally {
+    db?.close();
+  }
+}
+
 /** 04 §4 (D-84): removes quarantine files a crashed restore left in `dir`. */
 export async function removeStaleRestoreFiles(dir: string): Promise<void> {
   let names: string[];
@@ -251,6 +297,8 @@ export async function removeStaleRestoreFiles(dir: string): Promise<void> {
     return;
   }
   for (const name of names) {
-    if (RESTORE_FILE.test(name)) await unlink(join(dir, name)).catch(() => undefined);
+    if (RESTORE_FILE.test(name) || UPLOAD_FILE.test(name)) {
+      await unlink(join(dir, name)).catch(() => undefined);
+    }
   }
 }

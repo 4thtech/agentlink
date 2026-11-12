@@ -459,7 +459,10 @@ describe('the generation check on every mutating request (U3-c, 08 §1)', () => 
           r.presence !== 'switch' &&
           r.presence !== 'pause' &&
           r.presence !== 'handoff' &&
-          r.presence !== 'ui-settings',
+          r.presence !== 'ui-settings' &&
+          // UX1113-R1 (D-147): restore changes no open agent; it takes no generation and works
+          // with none open (local-ui/restore-server.test.ts).
+          r.presence !== 'restore',
       );
     expect(mutating.length).toBeGreaterThan(10);
     for (const route of mutating) {

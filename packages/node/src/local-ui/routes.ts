@@ -23,6 +23,12 @@
 // - A path is fixed segments `[a-z0-9-]` and `:name` parameters; a parameter matches only
 //   `[A-Za-z0-9_-]{1,128}` (no dot, no percent-escape, no slash), so no handler sees `..` or an
 //   encoded separator. Duplicates throw.
+// - UX1113-R1 (D-147): a `presence: 'restore'` route is one of the nine fixed RESTORE_PATHS, each
+//   registered once, `found` a GET and every other step a POST, with no handler; the server's restore
+//   gate runs it (recovery-kit-restore.ts). No other path, method or route can use the kind.
+// - WP-R2b (04 §2.3.3 "Kit record"): a `presence: 'kit-reveal'` route (Show in Finder for the
+//   recovery kit) is only a POST at BACKUP_REVEAL_PATH with a handler, registered once; the server's
+//   kit-reveal gate runs it with no input at all. No other path, method or route can use the kind.
 // - The page files in api/ each own their routes; this file only lists them.
 import { activityRoutes } from './api/activity.js';
 // U3-c: the Agents list and the switch kind; the stubs of U3-d, U3-e, U3-f and U3-flow.
@@ -56,6 +62,8 @@ import { rulesRoutes } from './api/rules.js';
 // UX1113 WP-S2: Settings › Touch ID & master code (check, test, replace; the owner-code kind).
 import { ownerPresenceRoutes } from './api/owner-presence.js';
 import { OWNER_CODE_PATHS, isOwnerCodeStep } from './owner-code-paths.js';
+// UX1113-R1: restore from a recovery kit (the restore kind).
+import { restoreRoutes } from './api/restore.js';
 import {
   AGENTS_PAUSE_PATH,
   AGENTS_REMOVE_PATH,
@@ -64,13 +72,14 @@ import {
   BACKUP_EXPORT_PATH,
   BACKUP_PATH,
   CREATE_AGENT_PATHS,
+  RESTORE_PATHS,
   UI_SETTINGS_WRITE_PATH,
   type LocalUiRoute,
 } from './route-types.js';
 // W4-SHELL-V2: the app's own UI settings (read, and the ui-settings kind).
 import { uiSettingsRoutes } from './api/ui-settings.js';
 // The fixed path lives in reveal-path.ts so api/files-io.ts uses it without importing this file.
-import { REVEAL_PATH } from './reveal-path.js';
+import { BACKUP_REVEAL_PATH, REVEAL_PATH } from './reveal-path.js';
 // UX2-d1: the invite paths live in invite-paths.ts for the same reason.
 import {
   INVITE_ACCEPT_PATH,
@@ -205,7 +214,21 @@ export class LocalUiRouteRegistry {
     if (stub !== undefined && (stub !== true || presence !== true || method !== 'POST')) {
       throw invalid('only a POST owner route can be a stub');
     }
-    if (presence === 'handoff') {
+    if (presence === 'restore') {
+      // UX1113-R1 (D-147): restore from a recovery kit; the server's restore gate runs it.
+      const paths = RESTORE_PATHS as Readonly<Record<string, string>>;
+      if (typeof step !== 'string' || !Object.hasOwn(paths, step)) {
+        throw invalid('unknown restore step');
+      }
+      if (route.path !== paths[step]) throw invalid('a restore route is only at its fixed path');
+      if (method !== (step === 'found' ? 'GET' : 'POST')) {
+        throw invalid('a restore route has its fixed method');
+      }
+      if (handler !== undefined) throw invalid('a restore route has no handler');
+      if (this.#entries.some((e) => e.route.presence === 'restore' && e.route.step === step)) {
+        throw invalid('this restore step is already registered');
+      }
+    } else if (presence === 'handoff') {
       // U3-invite: `agentlink join` to a running app host; the server's handoff gate runs it.
       if (method !== 'POST') throw invalid('a handoff route is a POST');
       if (route.path !== JOIN_HANDOFF_PATH) {
@@ -293,6 +316,16 @@ export class LocalUiRouteRegistry {
       if (typeof handler !== 'function') throw invalid('a reveal route needs a handler');
       if (this.#entries.some((e) => e.route.presence === 'reveal')) {
         throw invalid('the reveal route is already registered');
+      }
+    } else if (presence === 'kit-reveal') {
+      // WP-R2b: Show in Finder for the recovery kit only; the server's kit-reveal gate runs it.
+      if (method !== 'POST') throw invalid('a kit-reveal route is a POST');
+      if (route.path !== BACKUP_REVEAL_PATH) {
+        throw invalid('a kit-reveal route is only at the kit reveal path');
+      }
+      if (typeof handler !== 'function') throw invalid('a kit-reveal route needs a handler');
+      if (this.#entries.some((e) => e.route.presence === 'kit-reveal')) {
+        throw invalid('the kit-reveal route is already registered');
       }
     } else if (presence === 'invite') {
       // UX2-d1 (decision 1.1): create and check an invite only; the server's invite gate runs it.
@@ -404,6 +437,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     peopleAllRoutes,
     // UX1113 WP-S2: Touch ID & master code.
     ownerPresenceRoutes,
+    // UX1113-R1 (D-147): restore from a recovery kit, in the app.
+    restoreRoutes,
   ]) {
     for (const route of routes) registry.register(route);
   }

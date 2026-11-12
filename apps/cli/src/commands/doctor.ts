@@ -18,7 +18,12 @@ import {
   type CommandHandler,
 } from '../dispatch.js';
 import * as chain from '@4thtech-io/chain';
-import { hasOwnerOnMachine, hasUnfinishedOwnerCodeChange, nodeRpcFetch } from '@4thtech-io/node';
+import {
+  hasOwnerOnMachine,
+  hasUnfinishedOwnerCodeChange,
+  nodeRpcFetch,
+  restorePendingHere,
+} from '@4thtech-io/node';
 import { listAgentNames, readAgentConfig } from '../runtime/agent-dir.js';
 import { localDoctorChecks, type LocalChecks } from './doctor-local.js';
 import { isAgentName } from '../runtime/agent-name.js';
@@ -50,6 +55,10 @@ export const DOCTOR_TEXT = Object.freeze({
   get noIdsYet(): string {
     return `Problem  You have no IDs yet. Open AgentLink to create one: run \`agentlink\`.`;
   },
+  /** UX1113-R1 (04 §2.3.3): a restore stopped between the IDs and the owner. */
+  get restoreUnfinished(): string {
+    return `Problem  A restore didn't finish: your IDs are back, but not their owner\n         Run \`${commandPrefix()} restore\` with the same recovery kit, or choose the kit again in the app.`;
+  },
   get rulesFailClosed(): string {
     return `Problem  Your rules can't be used, so AgentLink uses its strictest settings\n         In a terminal you opened yourself, run \`${commandPrefix()} policy recover\` to review and confirm them again.`;
   },
@@ -78,6 +87,11 @@ export interface DoctorDeps extends CommandDeps {
   readonly ownerOnMachine?: () => Promise<boolean>;
   /** R1: the local checks (last exit, leftover host note, half-removed IDs, AI apps). Absent: none. */
   readonly local?: () => Promise<LocalChecks>;
+  /**
+   * UX1113-R1 (04 §2.3.3, T-7): true when restored IDs wait for their owner (a restore stopped
+   * between the IDs and the owner). Store-only. Absent: the line is never printed.
+   */
+  readonly restorePending?: () => Promise<boolean>;
 }
 
 /** M1-9h doctor lines (11 §5: "public record", never chain, RPC or a network name). */
@@ -163,6 +177,10 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
     if (local !== undefined) {
       for (const line of local.lines) emit(line);
       problems += local.problems;
+    }
+    // UX1113-R1: an unfinished restore is named before anything tries to open an ID.
+    if (deps.restorePending !== undefined && (await deps.restorePending().catch(() => false))) {
+      emit(DOCTOR_TEXT.restoreUnfinished, true);
     }
 
     /** One ID's checks (`name` undefined: the default ID). True when it stopped early on a problem. */
@@ -351,5 +369,6 @@ export const doctorHandler: CommandHandler = createDoctorHandler({
   ...createDeps({ unfinishedOwnerCodeChange: hasUnfinishedOwnerCodeChange }),
   proofNetwork: nodeProofNetworkCheck(),
   ownerOnMachine: hasOwnerOnMachine,
+  restorePending: restorePendingHere,
   local: () => localDoctorChecks({ env: process.env }),
 });

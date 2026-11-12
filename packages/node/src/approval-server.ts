@@ -148,8 +148,9 @@
 // by port, so another local server the owner's browser visits could receive the session cookie; it
 // grants viewing only. The opener's argv briefly holds the session link (approval-os.ts).
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { hostname as osHostname } from 'node:os';
+import { homedir, hostname as osHostname } from 'node:os';
 import type { AddressInfo, ListenOptions } from 'node:net';
+import { join } from 'node:path';
 import {
   PayConfirmError,
   buildPayConfirmFlow,
@@ -240,6 +241,7 @@ import {
   type SetupFolders,
   type SetupRegistration,
 } from './owner-setup.js';
+import { createRestoreEngine, type RestoreEngine } from './recovery-kit-restore.js';
 import {
   keepsFolder,
   prepareSendFolder,
@@ -304,12 +306,14 @@ import type {
   LocalUiRoute,
   LocalUiSwitchRoute,
   LocalUiPauseRoute,
+  LocalUiRestoreRoute,
   LocalUiCreateAgentStep,
   LocalUiOwnerOperation,
   LocalUiPayConfirmStep,
   LocalUiRenameRequest,
   LocalUiResult,
   LocalUiRevealRoute,
+  LocalUiKitRevealRoute,
   LocalUiUiSettingsRoute,
   LocalUiSetupStep,
 } from './local-ui/route-types.js';
@@ -326,6 +330,8 @@ import {
   FIRST_AGENT_LABEL,
   FIRST_AGENT_NAME,
   HOST_AGENT_NAME,
+  VISIT_STEP_MS,
+  type AgentDirectoryEntry,
   type AppHostAgent,
   type AppHostFirstRun,
   type AppHostHold,
@@ -343,7 +349,13 @@ import {
 } from './local-ui/api/agents-remove.js';
 import { AgentFolderLockError } from './agent-folder-lock.js';
 import { createKeyEraseControl } from './key-controls.js';
-import { exportRecoveryKit, type RecoveryKitClient } from './recovery-kit-export.js';
+import {
+  exportRecoveryKit,
+  type RecoveryKitClient,
+  type RecoveryKitNotIncluded,
+  type RecoveryKitOthers,
+} from './recovery-kit-export.js';
+import { MAX_KIT_IDS, type KitTodayId, type LocalUiBackupDesk } from './kit-record.js';
 import { ownerOperationRefused } from './owner-allowlist.js';
 import {
   LOCAL_UI_API_PREFIX,
@@ -446,6 +458,8 @@ const CSRF_META = /<meta\s+name="agentlink-csrf"\s+content="([^"]*)"\s*\/?>/gi;
 const HEAD_OPEN = /<head(?:\s[^>]*)?>/i;
 /** MSG-FILES-IO-h: the largest Show in Finder body (`{"id":"<64 chars>.<2 digits>"}` fits easily). */
 const MAX_REVEAL_BODY_BYTES = 256;
+/** WP-R2b: the kit-reveal route takes no body; anything up to this is read and refused (400). */
+const MAX_KIT_REVEAL_BODY_BYTES = 256;
 /** MSG-FILES-IO-h: an item ID, `<envelope ID>.<index>` (core ui-messages.ts). */
 const REVEAL_ITEM_ID = /^[A-Za-z0-9_-]{1,64}\.[0-9]{2}$/;
 
@@ -845,6 +859,20 @@ export interface ApprovalServerInternals {
   readonly checkInvite?: JoinCheck;
   /** W4-LIVE-STATUS: the live event hub's read interval (tests: shorter). Default 2 s. */
   readonly liveEvents?: { readonly readIntervalMs?: number };
+  /**
+   * UX1113-R1 (D-147): the restore engine's home folder and the new master code's KDF parameters
+   * (tests use a temporary HOME and the floor). Default: the OS user's home and the kit defaults.
+   */
+  readonly restore?: { readonly home?: string; readonly kdf?: Argon2idParams };
+  /**
+   * WP-R2b (IR M-1): the recovery-kit export walk's per-ID limit and the settle time of a late open
+   * (tests: shorter). Default VISIT_STEP_MS and VISIT_SETTLE_MS (app-host.ts).
+   */
+  readonly backupWalk?: {
+    readonly stepMs?: number;
+    readonly settleMs?: number;
+    readonly reopenMs?: number;
+  };
 }
 
 export interface ApprovalServer {
@@ -1472,6 +1500,72 @@ export async function startApprovalServerWith(
           generation: () => host?.generation ?? 0,
           count: async (name) => (await host?.directory.stats(name))?.contacts,
         });
+  /**
+   * WP-R2b (04 §2.3.3 "Kit record"): what `GET /api/ui/backup` and Show in Finder read. Reads only;
+   * it signs nothing, opens no other ID's core and reads no keychain item. Built where an ID can
+   * save a kit here, or in the app host.
+   */
+  const backupDeskOf = (
+    bound: Omit<LocalUiOptions, 'assets'> | undefined,
+  ): LocalUiBackupDesk | undefined => {
+    const kit = recoveryKitOf(bound);
+    if (kit === undefined && options.host === undefined) return undefined;
+    const home = kit?.home ?? internals.restore?.home ?? homedir();
+    return Object.freeze<LocalUiBackupDesk>({
+      agentlinkDir: join(home, '.agentlink'),
+      revealer: fileRevealer,
+      ids: async () => {
+        const openId = bound?.client?.agentId;
+        const slot = host;
+        if (slot === undefined) {
+          if (kit === undefined) return [];
+          return [
+            Object.freeze<KitTodayId>({
+              name: kit.name,
+              label: agentLabel ?? kit.name,
+              contacts: null,
+              agentId: kit.agentId,
+            }),
+          ];
+        }
+        const current = slot.current;
+        const entries = (await slot.directory.list()).slice(0, MAX_LISTED_AGENTS);
+        const today: KitTodayId[] = [];
+        for (const entry of entries) {
+          const stats = entry.available
+            ? await slot.directory.stats(entry.name).catch(() => undefined)
+            : undefined;
+          const isOpen = entry.name === current;
+          today.push(
+            Object.freeze<KitTodayId>({
+              name: entry.name,
+              label: isOpen ? (agentLabel ?? entry.name) : entry.label,
+              contacts: stats?.contacts ?? null,
+              ...(entry.removing ? { removing: true } : {}),
+              ...(isOpen && openId !== undefined ? { agentId: openId } : {}),
+            }),
+          );
+        }
+        return today;
+      },
+      exportRecorded: async (agentId, signed, kitId) => {
+        // Core's word, from the open ID's own core only (another ID's core is never opened here).
+        const client = agentUi?.client as
+          | {
+              agentId?: string;
+              ownerActions?: {
+                backupExportRecorded?: (signed: unknown, kitId: string) => Promise<boolean>;
+              };
+            }
+          | undefined;
+        if (client?.agentId !== agentId) return undefined;
+        const actions = client.ownerActions;
+        if (typeof actions?.backupExportRecorded !== 'function') return undefined;
+        return actions.backupExportRecorded(signed, kitId);
+      },
+    });
+  };
+
   const buildUiContext = (bound: ApprovalServerSource = source): LocalUiContext =>
     Object.freeze<LocalUiContext>({
       // IR-M1-11s-b-1 H-1: handlers read through a read-only view, never the client itself.
@@ -1480,6 +1574,11 @@ export async function startApprovalServerWith(
       ...(agentUi?.client === undefined ? {} : { credits: creditsPort(agentUi.client) }),
       // WP-11: whether the open agent can save a recovery kit here (the source stays here).
       recoveryKitAvailable: recoveryKitOf(agentUi) !== undefined,
+      // WP-R2b: the kit record and Show in Finder for it (reads only; no path is ever answered).
+      ...(() => {
+        const backup = backupDeskOf(agentUi);
+        return backup === undefined ? {} : { backup };
+      })(),
       // W4-FILES-SAVE: for the save owner route only; core takes only a `file.save` and re-verifies
       // the owner signature before it saves (I-4).
       ...(agentUi?.client === undefined ? {} : { fileSave: fileSavePort(agentUi.client) }),
@@ -1597,6 +1696,108 @@ export async function startApprovalServerWith(
   const hostValue = `${APPROVAL_SERVER_HOST}:${String(port)}`;
   const origin = `http://${hostValue}`;
   const cookieName = `agentlink_${String(port)}`;
+  // UX1113-R1 (D-147; 04 §2.3.3 "Restore in the app"): the restore engine of the restore gate. Its
+  // only caller is restoreGate below (and WP-R2's export route, through registerExportedKit).
+  let restoreInstance: RestoreEngine | undefined;
+  const restoreEngine = (): RestoreEngine =>
+    (restoreInstance ??= createRestoreEngine({
+      home: internals.restore?.home ?? homedir(),
+      keychain: keychainOf,
+      origin,
+      now,
+      ...(internals.restore?.kdf === undefined ? {} : { kdf: internals.restore.kdf }),
+      knownOwnerNostr: async () => {
+        if (noAgentOpen()) return undefined;
+        return (await source.context().catch(() => undefined))?.owner.ownerNostr;
+      },
+      onRestored: async (names) => {
+        // First run with no agent open: the app opens the first restored ID.
+        const first = names[0];
+        if (host !== undefined && host.current === undefined && first !== undefined) {
+          await host.adoptFirst(first).catch(() => false);
+        }
+      },
+    }));
+
+  /**
+   * WP-R2b (04 §2.3.3 "In the local app"; §2.5 "KeyStore isolation"): the recovery-kit export's walk
+   * over this owner's other IDs in the app host, inside the one owner operation only (after the
+   * gesture; nothing of another ID is opened before it). The listed IDs (not the open one, not one
+   * being removed) are visited through the slot's visitOthers: one core open at any time, each
+   * closed before the next, the open ID opened again at the end. A keychain ID of this home gives its
+   * own core's prepare and apply; an ID that cannot be opened here or has no recovery-kit source
+   * (a file-KeyStore ID) is named in `notIncluded`, as is any beyond the 16 IDs of one kit.
+   */
+  const otherIdsOf = (open: LocalUiRecoveryKitSource): RecoveryKitOthers =>
+    Object.freeze<RecoveryKitOthers>({
+      each: async (step, bounds) => {
+        const slot = host;
+        if (slot === undefined) return { ok: true, notIncluded: [] };
+        let entries: readonly AgentDirectoryEntry[];
+        try {
+          entries = (await slot.directory.list()).slice(0, MAX_LISTED_AGENTS);
+        } catch {
+          return { ok: false, notIncluded: [] };
+        }
+        // IR L-1: each ID left out carries its reason; only a file-KeyStore ID can be backed up in
+        // the terminal. A file-KeyStore ID is never opened here (it would need its passphrase).
+        const notIncluded: RecoveryKitNotIncluded[] = [];
+        const names: string[] = [];
+        for (const entry of entries) {
+          if (entry.name === open.name || entry.name === slot.current || entry.removing) continue;
+          if (entry.keyStore === 'file') {
+            notIncluded.push({ name: entry.name, reason: 'file_keystore' });
+          } else if (!entry.available) {
+            notIncluded.push({ name: entry.name, reason: 'could_not_open' });
+          } else if (names.length >= MAX_KIT_IDS - 1) {
+            notIncluded.push({ name: entry.name, reason: 'over_limit' });
+          } else {
+            names.push(entry.name);
+          }
+        }
+        if (names.length === 0) return { ok: true, notIncluded };
+        // IR M-1: each open and each step bounded by the per-ID limit and the export's budget.
+        const stepMs = (): number =>
+          Math.min(internals.backupWalk?.stepMs ?? VISIT_STEP_MS, bounds.deadlineAt - now());
+        const walked = await slot.visitOthers(
+          names,
+          async (name, agent) => {
+            const kit = agent === undefined ? undefined : recoveryKitOf(agent.localUi);
+            const client = agent?.localUi.client as unknown as RecoveryKitClient | undefined;
+            if (
+              agent === undefined ||
+              kit === undefined ||
+              client === undefined ||
+              kit.home !== open.home ||
+              kit.name !== name
+            ) {
+              // Opened, but no recovery-kit source: the CLI gives one to keychain IDs only.
+              const fileKeyStore = agent !== undefined && kit === undefined && client !== undefined;
+              notIncluded.push({ name, reason: fileKeyStore ? 'file_keystore' : 'could_not_open' });
+              return true;
+            }
+            const apply = (signed: { readonly body: JsonObject; readonly sig: string }) =>
+              agent.source.apply(signed);
+            return step({
+              source: { agentId: kit.agentId, name: kit.name, storePath: kit.storePath },
+              prepareBackupExport: (kitId, contents) =>
+                client.ownerActions.prepareBackupExport(kitId, contents),
+              apply,
+            });
+          },
+          {
+            stepMs,
+            ...(internals.backupWalk?.settleMs === undefined
+              ? {}
+              : { settleMs: internals.backupWalk.settleMs }),
+            ...(internals.backupWalk?.reopenMs === undefined
+              ? {}
+              : { reopenMs: internals.backupWalk.reopenMs }),
+          },
+        );
+        return { ok: walked.ok, notIncluded };
+      },
+    });
 
   const wellFormed = (candidate: string | undefined): candidate is string =>
     candidate !== undefined &&
@@ -2167,6 +2368,11 @@ export async function startApprovalServerWith(
        */
       readonly ownerCode?: LocalUiOwnerCodeStep;
       readonly session?: string;
+      /**
+       * WP-R2b: the page session (its cookie value), for the recovery-kit export only: the restore
+       * engine binds the export handle for Check to it (registerExportedKit).
+       */
+      readonly pageSession?: string;
     } = {},
   ): Promise<void> {
     if (gate.ownerCode === 'cancel') {
@@ -2453,6 +2659,19 @@ export async function startApprovalServerWith(
                         },
                         apply: (signed) => source.apply(signed),
                         now: () => now(),
+                        // WP-R2b (04 §2.3.3 "In the local app", §2.5 "KeyStore isolation"): every
+                        // other keychain ID of this owner, one core open at a time (the host's slot).
+                        ...(host === undefined ? {} : { others: otherIdsOf(exportUi.source) }),
+                        // WP-R2b: Check's export handle, from the restore engine, bound to this page.
+                        ...(gate.pageSession === undefined
+                          ? {}
+                          : {
+                              registerCheck: (file: { path: string; kitId: string }) =>
+                                restoreEngine().registerExportedKit(
+                                  gate.pageSession as string,
+                                  file,
+                                ),
+                            }),
                       });
                     },
                   }),
@@ -3649,6 +3868,13 @@ export async function startApprovalServerWith(
       finishSetup(res, 429, 'wait', { retryAfter: wait });
       return;
     }
+    // UX1113-R1 (04 §2.3.3, T-7): restored IDs wait for their owner (a crash between the agents and
+    // the owner): first run never mints another owner over them; the page says "Finish restoring".
+    if (await restoreEngine().restorePending()) {
+      req.resume();
+      sendJson(res, 409, { status: 'finish_restore' });
+      return;
+    }
     // U3-g-b: the open agent's setup, else first run with no agent yet (the host's firstRun).
     const setup = agentUi?.ownerSetup;
     const firstRun = setup === undefined ? noAgentFirstRun() : undefined;
@@ -4683,6 +4909,47 @@ export async function startApprovalServerWith(
   }
 
   /**
+   * WP-R2b (04 §2.3.3 "Kit record"): the kit-reveal gate. The caller checked the session, CSRF,
+   * Origin, fetch metadata, the octet-stream type and the generation. No query, no operation input,
+   * no presence header and no body byte: the handler gets the context only and reveals the kit
+   * record's own file (kit-record.ts revealKitFile). Nothing is signed or written; fixed answers.
+   */
+  async function kitRevealGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiKitRevealRoute,
+  ): Promise<void> {
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    const body = await boundedBody(req, res, MAX_KIT_REVEAL_BODY_BYTES);
+    if (body === undefined) return;
+    if (body.length !== 0) {
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    if (!stillCurrent(req)) {
+      agentChanged(res);
+      return;
+    }
+    let result: LocalUiResult;
+    try {
+      result = await route.handler(uiContext);
+    } catch (error) {
+      sendJson(res, 500, failedBody(error));
+      return;
+    }
+    sendResult(res, result);
+  }
+
+  /**
    * UX2-d1 (owner decision 1.1): the gate of the two invite-kind routes (create, check). The caller
    * checked the session, CSRF, Origin, fetch metadata and the octet-stream type. No query, operation
    * input or presence header; create is rate-limited before the body is read; the body must be one
@@ -4690,6 +4957,104 @@ export async function startApprovalServerWith(
    * object and the invite desk only. The body is wiped afterwards (a pasted link holds the invite
    * secret); nothing here logs it, and an error answers a fixed code (I-7).
    */
+  /**
+   * UX1113-R1 (D-147; 04 §2.3.3 "Restore in the app"): the restore kind. After the session, CSRF,
+   * Host and fetch-metadata checks of handleUi: no query; a POST needs Origin and an octet-stream
+   * body; the engine gets only the page session, the parsed `X-AgentLink-Input` and the body bytes.
+   * A presence header only on the presence step. Nothing here reads, logs or echoes a body.
+   */
+  async function restoreGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiRestoreRoute,
+    cookie: string,
+    originHeader: string | undefined,
+  ): Promise<void> {
+    const engine = restoreEngine();
+    const refuse = (status: number, error: string): void => {
+      req.resume();
+      sendJson(res, status, { error });
+    };
+    if (url.search !== '') return refuse(400, 'invalid');
+    if (route.step === 'found') {
+      req.resume();
+      sendResult(res, await engine.found(cookie));
+      return;
+    }
+    if (originHeader === undefined) return refuse(403, 'origin');
+    const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
+    if (type !== 'application/octet-stream') return refuse(415, 'content_type');
+    const mode = header(req, 'x-agentlink-presence');
+    if (mode !== undefined && (route.step !== 'presence' || mode !== 'passkey')) {
+      return refuse(400, 'invalid');
+    }
+    if (route.step === 'upload') {
+      if (header(req, 'x-agentlink-input') !== undefined) return refuse(400, 'invalid');
+      const declaredText = header(req, 'content-length');
+      const declared = declaredText === undefined ? undefined : Number(declaredText);
+      const answer = await engine.upload(cookie, req, declared);
+      if (answer.status !== 200) {
+        res.setHeader('Connection', 'close');
+        req.resume();
+      }
+      sendResult(res, answer);
+      return;
+    }
+    const input = operationInput(req);
+    if (input === 'invalid') return refuse(400, 'invalid');
+    const limit =
+      route.step === 'applyFinish'
+        ? MAX_SETUP_REGISTRATION_BYTES
+        : route.step === 'presence'
+          ? MAX_PASSKEY_BYTES
+          : route.step === 'open' || route.step === 'check'
+            ? MAX_SECRET_BYTES
+            : 0;
+    const body = await boundedBody(req, res, limit);
+    if (body === undefined) return;
+    try {
+      let answer;
+      switch (route.step) {
+        case 'header':
+          answer = await engine.header(cookie, input);
+          break;
+        case 'presence':
+          answer = await engine.presence(
+            cookie,
+            input,
+            body.slice(),
+            mode === 'passkey' ? 'passkey' : 'passphrase',
+          );
+          break;
+        case 'open':
+          answer = await engine.open(cookie, input, body.slice());
+          break;
+        case 'check':
+          answer = await engine.check(cookie, input, body.slice());
+          break;
+        case 'cancel':
+          answer = await engine.cancel(cookie, input);
+          break;
+        case 'applyBegin':
+          answer = await engine.applyBegin(cookie, input);
+          break;
+        case 'applyFinish':
+          answer = await engine.applyFinish(cookie, input, body.slice());
+          break;
+      }
+      if (answer.status === 429) {
+        const retry = (answer.body as { retryAfter?: unknown }).retryAfter;
+        if (typeof retry === 'number') res.setHeader('Retry-After', String(retry));
+      }
+      sendResult(res, answer);
+    } catch {
+      sendJson(res, 500, { error: 'failed' });
+    } finally {
+      wipe(body);
+    }
+  }
+
   async function inviteGate(
     req: IncomingMessage,
     res: ServerResponse,
@@ -4895,6 +5260,13 @@ export async function startApprovalServerWith(
     if (matchIndex(cookie, sessions) < 0) return fail(401, 'token');
     if (!fetchSiteOk(req)) return fail(403, 'fetch_site');
     const { route, params } = found;
+    if (route.presence === 'restore') {
+      // UX1113-R1 (D-147): restore has its own gate. It works with no agent open and takes no
+      // generation (it changes no open agent); Origin and the content type are checked there.
+      if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return fail(403, 'csrf');
+      await restoreGate(req, res, url, route, cookie as string, originHeader);
+      return;
+    }
     if (route.presence && originHeader === undefined) return fail(403, 'origin');
     if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return fail(403, 'csrf');
     if (!route.presence && route.stream === true) {
@@ -4974,7 +5346,11 @@ export async function startApprovalServerWith(
     url: URL,
     route: Exclude<
       LocalUiRoute,
-      LocalUiReadRoute | LocalUiSwitchRoute | LocalUiPauseRoute | LocalUiUiSettingsRoute
+      | LocalUiReadRoute
+      | LocalUiSwitchRoute
+      | LocalUiPauseRoute
+      | LocalUiUiSettingsRoute
+      | LocalUiRestoreRoute
     >,
     params: Readonly<Record<string, string>>,
     cookie: string,
@@ -4994,6 +5370,11 @@ export async function startApprovalServerWith(
     if (route.presence === 'remove') {
       // U3-e: removing an agent has its own gate around ownerGate (the folder lock, its context).
       await removeGate(req, res, url);
+      return;
+    }
+    if (route.presence === 'kit-reveal') {
+      // WP-R2b: Show in Finder for the recovery kit has its own gate; no presence, no input.
+      await kitRevealGate(req, res, url, route);
       return;
     }
     if (route.presence === 'reveal') {
@@ -5055,7 +5436,7 @@ export async function startApprovalServerWith(
           owner,
         ),
       route.recoveryKit === true
-        ? { recoveryKit: true }
+        ? { recoveryKit: true, pageSession: cookie }
         : route.ownerCode !== undefined
           ? { ownerCode: route.ownerCode, session: cookie }
           : {},
@@ -5345,6 +5726,14 @@ export async function startApprovalServerWith(
   function noAgent(res: ServerResponse): void {
     emit({ kind: 'rejected', reason: 'no_agent' });
     stamp(res);
+    // WP-R2b (IR round 2): the ID open before a recovery-kit save is being opened again.
+    if (host?.restarting === true) {
+      sendJson(res, 503, {
+        status: 'restarting',
+        message: 'AgentLink is restarting this ID. Try again in a moment.',
+      });
+      return;
+    }
     sendJson(res, 409, { status: 'no_agent' });
   }
 
@@ -6000,6 +6389,7 @@ export async function startApprovalServerWith(
       return url;
     },
     close: async () => {
+      await restoreInstance?.close();
       dropSetup();
       payHolds.clear();
       dropCreate();
