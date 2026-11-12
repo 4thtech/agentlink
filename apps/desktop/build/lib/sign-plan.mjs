@@ -9,6 +9,17 @@
 
 const NODE_DIR = '/Contents/Resources/node';
 
+// The owner-presence helper (WP-D12b) keeps a fixed identifier and the hardened runtime even when
+// ad-hoc signed, so phase 3 can check it by identity.
+export const HELPER_ID = 'io.4thtech.agentlink.presence';
+export const HELPER_PATH = '/Contents/Helpers/agentlink-presence';
+export const HELPER_SIGN_OPTIONS = Object.freeze([
+  '--identifier',
+  HELPER_ID,
+  '--options',
+  'runtime',
+]);
+
 /** 'adhoc' unless DESKTOP_SIGNING is exactly 'on'. */
 export function signingMode(env) {
   return env.DESKTOP_SIGNING === 'on' ? 'developer-id' : 'adhoc';
@@ -35,7 +46,16 @@ export function macSignPlan({ app, files, bundles, mode = 'adhoc', identity, ent
     ...[...files].filter((f) => !isBundledNode(f)).sort((a, b) => depth(b) - depth(a)),
     ...[...bundles].sort((a, b) => depth(b) - depth(a)),
   ];
-  const plan = ordered.map((target) => ({ target, identity: id, options }));
+  const plan = ordered.map((target) => ({
+    target,
+    identity: id,
+    options: target.endsWith(HELPER_PATH)
+      ? [
+          ...options.filter((o, i, a) => o !== '--options' && a[i - 1] !== '--options'),
+          ...HELPER_SIGN_OPTIONS,
+        ]
+      : options,
+  }));
   plan.push({
     target: app,
     identity: id,

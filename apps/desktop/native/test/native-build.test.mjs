@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { URL } from 'node:url';
+import { HELPER_PATH, HELPER_SIGN_OPTIONS, macSignPlan } from '../../build/lib/sign-plan.mjs';
 import {
   EXIT,
   HELPER_ID,
@@ -27,6 +28,7 @@ test('exit code table is fixed and the same in both helpers', () => {
     callerRefused: 15,
     notHardware: 16,
     attestationRetry: 17,
+    weakKey: 18,
     usage: 64,
     badInput: 65,
     unavailable: 69,
@@ -136,6 +138,7 @@ test('mac build plan: per-arch compiles, lipo for universal, ad-hoc sign with th
   const sign = uni.at(-1);
   assert.equal(sign.cmd, 'codesign');
   assert.deepEqual(sign.args.slice(0, 5), ['--force', '--sign', '-', '--identifier', HELPER_ID]);
+  assert.deepEqual(sign.args.slice(5, 7), ['--options', 'runtime']);
   assert.equal(sign.args.at(-1), '/o/agentlink-presence');
 });
 
@@ -151,6 +154,8 @@ test('MSVC args: static CRT, hardening flags, WinRT + bcrypt only, no debug info
     '/guard:cf',
     '/sdl',
     '/W4',
+    '/WX',
+    '/guard:ehcont',
   ]) {
     assert.ok(a.includes(f), f);
   }
@@ -163,8 +168,45 @@ test('MSVC args: static CRT, hardening flags, WinRT + bcrypt only, no debug info
     'windowsapp.lib',
     'bcrypt.lib',
     '/SUBSYSTEM:CONSOLE',
+    '/guard:ehcont',
+    '/DEPENDENTLOADFLAG:0x800',
   ]) {
     assert.ok(link.includes(f), f);
   }
+  const arm = msvcArgs({ src: 'a.cpp', out: 'b.exe', arch: 'arm64' });
+  assert.ok(!arm.includes('/CETCOMPAT'), 'CET shadow stacks are x64-only');
+  assert.throws(() => msvcArgs({ src: 'a', out: 'b', arch: 'x86' }), /arch/);
   assert.ok(!a.some((x) => /^\/(DEBUG|Zi|ZI|MD)$/i.test(x)));
+});
+
+test('app sign plan keeps the helper identifier and hardened runtime inside the bundle', () => {
+  const app = '/out/AgentLink.app';
+  const helper = `${app}${HELPER_PATH}`;
+  for (const mode of ['adhoc', 'developer-id']) {
+    const plan = macSignPlan({ app, files: [helper], bundles: [], mode, identity: 'X' });
+    const step = plan.find((s) => s.target === helper);
+    assert.deepEqual(step.options.slice(-4), [...HELPER_SIGN_OPTIONS]);
+    assert.equal(step.options.filter((o) => o === '--options').length, 1);
+    assert.ok(plan.indexOf(step) < plan.length - 1, 'signed before the app');
+  }
+});
+
+test('Windows create: refusals delete the new key, RSA < 2048 has its own code, first signature folded in', () => {
+  assert.match(winSrc, /\[\[noreturn\]\] static void Refuse\(/);
+  assert.ok(!winSrc.includes('auto refuse'));
+  assert.match(winSrc, /Refuse\(name, EXIT_WEAK_KEY\)/);
+  const create = winSrc.slice(
+    winSrc.indexOf('static void CmdCreate'),
+    winSrc.indexOf('static void CmdCheck'),
+  );
+  assert.match(create, /RequestSignAsync/);
+  assert.match(create, /CryptographicEngine::VerifySignature/);
+  assert.match(winSrc, /LOCAL HEURISTIC/);
+  assert.match(winSrc, /backup\s+\/\/?\s*code|backup code/);
+});
+
+test('macOS ecdh proves the key needs a gesture before any sheet', () => {
+  const ecdh = macSrc.slice(macSrc.indexOf('func cmdEcdh'), macSrc.indexOf('// MARK: main'));
+  assert.ok(ecdh.indexOf('requireGated(') >= 0);
+  assert.ok(ecdh.indexOf('requireGated(') < ecdh.indexOf('LAContext()'));
 });

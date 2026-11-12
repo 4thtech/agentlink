@@ -12,9 +12,10 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { capture } from './lib/run.mjs';
+import { HELPER_SIGN_OPTIONS } from './lib/sign-plan.mjs';
 
 export const HELPER_NAME = 'agentlink-presence';
-export const HELPER_ID = 'io.4thtech.agentlink.presence';
+export { HELPER_ID } from './lib/sign-plan.mjs';
 export const MAC_MIN_OS = '13.0';
 export const REASONS = Object.freeze(['setup', 'approve', 'pay']);
 
@@ -29,6 +30,7 @@ export const EXIT = Object.freeze({
   callerRefused: 15,
   notHardware: 16,
   attestationRetry: 17,
+  weakKey: 18,
   usage: 64,
   badInput: 65,
   unavailable: 69,
@@ -85,15 +87,15 @@ export function macBuildPlan({ arch, outDir, work }) {
     );
     steps.push({ cmd: 'lipo', args: ['-create', ...slices, '-output', out] });
   }
-  // Ad-hoc today (signing hooks off); the app's sign plan re-signs it inside the bundle.
-  steps.push({
-    cmd: 'codesign',
-    args: ['--force', '--sign', '-', '--identifier', HELPER_ID, out],
-  });
+  // Ad-hoc today (signing hooks off), fixed identifier, hardened runtime on; the app's sign plan
+  // re-signs it inside the bundle with the same options (sign-plan.mjs HELPER_SIGN_OPTIONS).
+  steps.push({ cmd: 'codesign', args: ['--force', '--sign', '-', ...HELPER_SIGN_OPTIONS, out] });
   return steps;
 }
 
-export function msvcArgs({ src, out }) {
+/** cl.exe args. arch: the target of the Developer Command Prompt (CET shadow stacks are x64-only). */
+export function msvcArgs({ src, out, arch = 'x64' }) {
+  if (!['x64', 'arm64'].includes(arch)) throw new Error(`Unknown arch ${arch}.`);
   return [
     '/nologo',
     '/std:c++20',
@@ -105,6 +107,8 @@ export function msvcArgs({ src, out }) {
     '/guard:cf',
     '/sdl',
     '/W4',
+    '/WX',
+    '/guard:ehcont',
     '/DUNICODE',
     '/D_UNICODE',
     '/DWIN32_LEAN_AND_MEAN',
@@ -116,8 +120,11 @@ export function msvcArgs({ src, out }) {
     '/SUBSYSTEM:CONSOLE',
     '/DYNAMICBASE',
     '/NXCOMPAT',
-    '/CETCOMPAT',
+    ...(arch === 'x64' ? ['/CETCOMPAT'] : []),
     '/guard:cf',
+    '/guard:ehcont',
+    // LOAD_LIBRARY_SEARCH_SYSTEM32: delay-loaded and dependent DLLs only from System32 (no planting)
+    '/DEPENDENTLOADFLAG:0x800',
     'windowsapp.lib',
     'bcrypt.lib',
   ];
@@ -144,14 +151,14 @@ export function buildMacHelper({ arch = 'universal', outDir }) {
 }
 
 /** Builds the Windows helper with cl.exe from the current MSVC environment; returns its path. */
-export function buildWinHelper({ outDir }) {
+export function buildWinHelper({ outDir, arch = 'x64' }) {
   if (process.platform !== 'win32') throw new Error('The Windows helper builds on Windows only.');
   if (capture('where', ['cl.exe']).code !== 0) {
     throw new Error('cl.exe not found: run from a Visual Studio Developer Command Prompt.');
   }
   mkdirSync(outDir, { recursive: true });
   const out = join(outDir, `${HELPER_NAME}.exe`);
-  runStep({ cmd: 'cl.exe', args: msvcArgs({ src: WIN_SRC, out }) });
+  runStep({ cmd: 'cl.exe', args: msvcArgs({ src: WIN_SRC, out, arch }) });
   rmSync(`${out}.obj`, { force: true });
   return out;
 }
@@ -182,10 +189,10 @@ if (isMain) {
     const outDir = resolve(args.out ?? join(CACHE_DIR, 'native', `darwin-${arch}`));
     console.log(buildMacHelper({ arch, outDir }));
   } else if (process.platform === 'win32') {
-    // cl.exe targets the architecture of the Developer Command Prompt; --arch only names the folder.
+    // --arch must match the Developer Command Prompt's target (it sets the folder and /CETCOMPAT).
     const arch = args.arch ?? process.arch;
     const outDir = resolve(args.out ?? join(CACHE_DIR, 'native', `win32-${arch}`));
-    console.log(buildWinHelper({ outDir }));
+    console.log(buildWinHelper({ outDir, arch }));
   } else {
     throw new Error('Presence helpers exist for macOS and Windows only.');
   }

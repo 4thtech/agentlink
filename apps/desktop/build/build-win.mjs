@@ -3,7 +3,7 @@
 // Runs on windows-2022 in CI (needs `tar` and `makensis`), or anywhere with --nsi-only for a dry run
 // (the PE edits and fuses are pure Node, so everything except makensis can be checked on a Mac).
 //
-//   node build-win.mjs --tgz <packed-cli.tgz> [--version 0.5.0] [--out dir] [--nsi-only]
+//   node build-win.mjs --tgz <packed-cli.tgz> [--version 0.5.0] [--out dir] [--nsi-only] [--helper agentlink-presence.exe]
 //
 // Signing: Authenticode is a hook that is OFF. DESKTOP_SIGNING=on is refused here until WP-D18.
 import { cpSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -15,6 +15,7 @@ import { BUILD_FUSES } from './lib/fuses.mjs';
 import { asarIntegrity, writeWinIntegrity } from './lib/integrity.mjs';
 import { nsisScript } from './lib/nsis.mjs';
 import { capture, parseArgs, run } from './lib/run.mjs';
+import { buildWinHelper } from './native.mjs';
 import {
   CACHE_DIR,
   OUT_DIR,
@@ -33,6 +34,7 @@ const args = parseArgs(process.argv.slice(2), {
   out: 'v',
   'dist-dir': 'v',
   'nsi-only': 'flag',
+  helper: 'v',
 });
 if (!args.tgz) throw new Error('--tgz <packed CLI tarball> is required.');
 if (process.env.DESKTOP_SIGNING === 'on')
@@ -72,6 +74,16 @@ const nodeSrc = join(nx, `node-v${constants.node.version}-win-x64`);
 mkdirSync(join(dir, 'resources', 'node'), { recursive: true });
 cpSync(join(nodeSrc, 'node.exe'), join(dir, 'resources', 'node', 'node.exe'));
 cpSync(join(nodeSrc, 'LICENSE'), join(dir, 'resources', 'node', 'LICENSE'));
+// Owner-presence helper (WP-D12b): a prebuilt one from CI (--helper) or built here with MSVC.
+const helperDir = join(dir, 'resources', 'native');
+if (args.helper) {
+  mkdirSync(helperDir, { recursive: true });
+  cpSync(resolve(args.helper), join(helperDir, 'agentlink-presence.exe'));
+} else if (process.platform === 'win32') {
+  buildWinHelper({ outDir: helperDir, arch: 'x64' });
+} else if (!args['nsi-only']) {
+  throw new Error('The presence helper needs MSVC: pass --helper <agentlink-presence.exe>.');
+}
 
 console.log('[5/7] core (packed tarball, npm ci from core-lock, --ignore-scripts)');
 const core = installCore({ tgz, dest: join(dir, 'resources', 'core'), os: 'win32', cpu: 'x64' });

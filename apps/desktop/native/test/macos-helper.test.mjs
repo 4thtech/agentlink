@@ -5,24 +5,23 @@
 //  - keys made by `create` are Secure Enclave handles held only in this test's memory: no keychain
 //    item is created, read or deleted (AgentLink's real keychain items are never touched).
 // Gesture paths (Touch ID OK, cancel, lockout, new finger) are the manual list in the Swift header.
-import { test, before, after } from 'node:test';
+import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
+import { URL, fileURLToPath } from 'node:url';
 import { EXIT, buildMacHelper, parseMacRecord } from '../../build/native.mjs';
 
 const onMac = process.platform === 'darwin';
-let dir;
-let bin;
+// Built at load time: the skip conditions below run the helper while the tests are declared.
+const dir = onMac ? mkdtempSync(join(tmpdir(), 'al-presence-')) : undefined;
+const bin = onMac
+  ? buildMacHelper({ arch: process.arch === 'arm64' ? 'arm64' : 'x64', outDir: dir })
+  : undefined;
 
-before(() => {
-  if (!onMac) return;
-  dir = mkdtempSync(join(tmpdir(), 'al-presence-'));
-  bin = buildMacHelper({ arch: process.arch === 'arm64' ? 'arm64' : 'x64', outDir: dir });
-});
 after(() => {
   if (dir) rmSync(dir, { recursive: true, force: true });
 });
@@ -39,7 +38,9 @@ function refused(args, input, code) {
   assert.equal(r.err, '', 'stderr stays empty');
 }
 
-const seAvailable = () => onMac && runHelper(['available']).code === EXIT.ok;
+// Needs a Secure Enclave, enrolled Touch ID and an unlocked Mac (a locked Mac makes create exit 12).
+const seAvailable = () =>
+  onMac && runHelper(['available']).code === EXIT.ok && runHelper(['create']).code === EXIT.ok;
 
 test('argv: only the fixed commands, with exactly their fixed arguments', { skip: !onMac }, () => {
   for (const args of [
@@ -161,3 +162,30 @@ test('a peer key that is not on the curve is refused', { skip: !seAvailable() },
   refused(['check'], bad, EXIT.badInput);
   refused(['ecdh', 'approve'], bad, EXIT.badInput);
 });
+
+test(
+  'a Secure Enclave key without a biometry gate is refused by check and ecdh, with no sheet',
+  { skip: !seAvailable() },
+  () => {
+    const tool = join(dir, 'ungated-key');
+    const src = fileURLToPath(new URL('./fixtures/ungated-key.swift', import.meta.url));
+    const c = spawnSync('swiftc', ['-O', src, '-o', tool], { encoding: 'utf8' });
+    assert.equal(c.status, 0, c.stderr);
+    const rec = spawnSync(tool, [], { encoding: 'utf8' }).stdout;
+    assert.match(rec, /^01[0-9a-f]+\n$/);
+    parseMacRecord(rec);
+    refused(['check'], rec, EXIT.keyUnusable);
+    for (const reason of ['setup', 'approve', 'pay'])
+      refused(['ecdh', reason], rec, EXIT.keyUnusable);
+  },
+);
+
+test(
+  'the helper carries the fixed identifier and the hardened runtime flag',
+  { skip: !onMac },
+  () => {
+    const r = spawnSync('codesign', ['-dv', bin], { encoding: 'utf8' });
+    assert.match(r.stderr, /^Identifier=io\.4thtech\.agentlink\.presence$/m);
+    assert.match(r.stderr, /flags=0x10002\(adhoc,runtime\)/);
+  },
+);

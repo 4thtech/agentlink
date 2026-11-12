@@ -15,7 +15,9 @@
 //     check              stdin: record; ECDH with interaction NOT allowed; exit 0 only when the
 //                        Secure Enclave refuses with LAError.notInteractive (the key is valid and
 //                        needs a gesture); a key that works without a gesture exits 13
-//     ecdh <reason-id>   stdin: record; one Touch ID sheet; prints the 32-byte secret
+//     ecdh <reason-id>   stdin: record; first the same no-gesture proof as `check` (anything but
+//                        notInteractive exits without a sheet), then one Touch ID sheet; prints
+//                        the 32-byte secret
 //   reason-id is one of: setup | approve | pay. The sheet text is fixed here (reasonText below);
 //   the caller cannot supply text. macOS shows it as "<app> is trying to <text>".
 //
@@ -39,9 +41,9 @@
 //
 //   Exit codes (fixed, same numbers on Windows):
 //     0 ok · 10 cancelled (Cancel, Use Password, system or app cancel) · 11 failed (not recognised)
-//     12 not interactive · 13 key unusable (bad or foreign handle, public key mismatch, key no longer
+//     12 not interactive (incl. the Mac is locked) · 13 key unusable (bad or foreign handle, public key mismatch, key no longer
 //     valid e.g. fingers changed, or a key that needs no gesture) · 14 lockout (too many attempts)
-//     15 caller refused (phase 3) · 16/17 Windows only · 64 usage · 65 bad input · 69 unavailable
+//     15 caller refused (phase 3) · 16/17/18 Windows only · 64 usage · 65 bad input · 69 unavailable
 //     70 internal error
 //
 // SECURITY NOTES
@@ -76,6 +78,7 @@ enum Exit: Int32 {
   case callerRefused = 15
   case notHardware = 16
   case attestationRetry = 17
+  case weakKey = 18
   case usage = 64
   case badInput = 65
   case unavailable = 69
@@ -207,6 +210,10 @@ func code(for error: Error, keyStage: Bool) -> Exit {
     default: return .keyUnusable
     }
   }
+  // Mac locked (errSecInteractionNotAllowed): nothing can be asked now.
+  if ns.domain == NSOSStatusErrorDomain && ns.code == Int(errSecInteractionNotAllowed) {
+    return .notInteractive
+  }
   if error is CryptoKitError || keyStage { return .keyUnusable }
   return .internalError
 }
@@ -275,23 +282,31 @@ func cmdCreate() -> Never {
   writeOut(out)
 }
 
-func cmdCheck() -> Never {
-  let rec = parseRecord(readInput())
-  let key = verifiedKey(rec)
+/// Proves the key needs a gesture: an ECDH attempt with interaction NOT allowed must be refused
+/// with LAError.notInteractive. A key that works without a gesture (not made by `create`) or fails
+/// any other way is never used for the real exchange.
+func requireGated(_ key: SecureEnclave.P256.KeyAgreement.PrivateKey, _ peer: P256.KeyAgreement.PublicKey) {
   do {
-    var s = rawSecret(try key.sharedSecretFromKeyAgreement(with: rec.peer))
+    var s = rawSecret(try key.sharedSecretFromKeyAgreement(with: peer))
     for i in s.indices { s[i] = 0 }
-    // It worked without a gesture: not a key AgentLink made.
     finish(.keyUnusable)
   } catch {
-    let c = code(for: error, keyStage: false)
-    finish(c == .notInteractive ? .ok : c)
+    // Only the LocalAuthentication refusal proves the gate (a locked Mac's OSStatus does not).
+    let ns = error as NSError
+    if ns.domain == LAErrorDomain && ns.code == LAError.notInteractive.rawValue { return }
+    finish(code(for: error, keyStage: true))
   }
+}
+
+func cmdCheck() -> Never {
+  let rec = parseRecord(readInput())
+  requireGated(verifiedKey(rec), rec.peer)
+  finish(.ok)
 }
 
 func cmdEcdh(_ reason: String) -> Never {
   let rec = parseRecord(readInput())
-  _ = verifiedKey(rec)
+  requireGated(verifiedKey(rec), rec.peer)
   let ctx = LAContext()
   ctx.localizedReason = reason
   ctx.touchIDAuthenticationAllowableReuseDuration = 0
@@ -305,7 +320,7 @@ func cmdEcdh(_ reason: String) -> Never {
     writeOut(s)
   } catch {
     ctx.invalidate()
-    finish(code(for: error, keyStage: false))
+    finish(code(for: error, keyStage: true))
   }
 }
 

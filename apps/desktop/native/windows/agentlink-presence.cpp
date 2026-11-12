@@ -14,8 +14,10 @@
 //   argv (fixed; anything else exits 64 before any key is touched):
 //     available          exit 0 if Windows Hello is set up (KeyCredentialManager.IsSupportedAsync)
 //     version            prints "01\n" (record version)
-//     create             one Windows Hello prompt; makes a new credential, requires TPM attestation,
-//                        prints a new record (below); on any refusal the new credential is deleted
+//     create             Windows Hello prompt(s); makes a new credential, requires TPM attestation,
+//                        signs the new challenge once (so registration needs no separate sign), and
+//                        prints record || u16 BE sig length || signature (below); on any refusal
+//                        the new credential is deleted and nothing is printed
 //     check              stdin: record; no prompt; exit 0 if the credential exists and its public
 //                        key matches the record, else 13
 //     sign <reason-id>   stdin: record; one Windows Hello prompt; prints the signature
@@ -36,6 +38,8 @@
 //     next S     public key                   X.509 SubjectPublicKeyInfo DER (RSA)
 //     next 32    challenge                    random per install
 //
+//   create output: hex of (record v1 || u16 big-endian L || L-byte signature over the challenge).
+//   The record is self-delimiting; the core stores only the record and uses the signature once.
 //   sign output: hex of the RSASSA-PKCS1-v1_5 SHA-256 signature over the challenge (256 bytes for
 //   RSA 2048). Suggested ALKH bindings for WP-D12a: credential ID = the name bytes, credential
 //   public-key hash = SHA-256(SPKI DER), plus the record version (0x01).
@@ -44,18 +48,24 @@
 //     0 ok · 10 cancelled (incl. "use password") · 11 failed · 12 not interactive (macOS only)
 //     13 key unusable (credential missing, public key mismatch, signature does not verify)
 //     14 lockout (security device locked) · 15 caller refused (phase 3)
-//     16 not hardware (attestation NotSupported or unknown: a software key; refused)
+//     16 not hardware (attestation NotSupported: a software key, or UnknownError; refused)
 //     17 attestation not available yet (TemporaryFailure; the new credential is deleted, retry later)
+//     18 weak key (RSA modulus under 2048 bits; refused)
 //     64 usage · 65 bad input · 69 unavailable (no Windows Hello) · 70 internal error
 //
 // SECURITY NOTES
 //   - Phase 2 (unsigned builds) strength equals the WebAuthn PRF path: a same-user process can run
 //     this helper and get the signature after the owner's gesture. Phase 3 enables the caller check.
-//   - The attestation status comes from the OS; the certificate chain is not validated here (a
-//     same-user attacker could not forge the OS answer without already controlling the process).
+//   - Attestation Success is a LOCAL HEURISTIC only: the status and buffers come from the OS on
+//     this machine, and the certificate chain is not validated against a TPM vendor root here or by
+//     any 4thTech service. It keeps honest software-only Hello keys out; it proves nothing to a
+//     remote party and does not stop a same-user process that already controls this helper.
+//   - Refusals at create (16, 17, 18) are not dead ends: approvals keep working with the backup
+//     code (master/owner code), and 17 may be retried later. The core shows that fallback.
 //
 // MANUAL CHECKS (need Windows Hello; Tali, on a TPM machine and on a VM without TPM):
-//   create -> one prompt, record printed; sign approve twice -> identical signature; Cancel -> 10;
+//   create -> record + signature printed; count the Hello prompts (goal: one);
+//   sign approve -> same signature as the one create printed; sign approve twice -> identical signature; Cancel -> 10;
 //   VM without TPM / software Hello -> create exits 16 and no credential stays behind;
 //   delete -> check exits 13; note whether the Hello dialog opens in front of the AgentLink window.
 
@@ -89,6 +99,7 @@ constexpr int EXIT_LOCKOUT = 14;
 constexpr int EXIT_CALLER_REFUSED = 15;
 constexpr int EXIT_NOT_HARDWARE = 16;
 constexpr int EXIT_ATTESTATION_RETRY = 17;
+constexpr int EXIT_WEAK_KEY = 18;
 constexpr int EXIT_USAGE = 64;
 constexpr int EXIT_BAD_INPUT = 65;
 constexpr int EXIT_UNAVAILABLE = 69;
@@ -240,7 +251,7 @@ static int MapStatus(KeyCredentialStatus s) {
 static CryptographicKey VerifyKey(const std::vector<std::uint8_t>& spki) {
   auto alg = AsymmetricKeyAlgorithmProvider::OpenAlgorithm(AsymmetricAlgorithmNames::RsaSignPkcs1Sha256());
   auto key = alg.ImportPublicKey(ToBuffer(spki), CryptographicPublicKeyBlobType::X509SubjectPublicKeyInfo);
-  if (key.KeySize() < kMinRsaBits) Finish(EXIT_NOT_HARDWARE);
+  if (key.KeySize() < kMinRsaBits) Finish(EXIT_WEAK_KEY);
   return key;
 }
 
@@ -254,6 +265,15 @@ static KeyCredential OpenMatching(const Record& r) {
 }
 
 // ---- commands ----
+
+// Deletes a credential made by this run of `create`, then exits with code.
+[[noreturn]] static void Refuse(const std::wstring& name, int code) {
+  try {
+    KeyCredentialManager::DeleteAsync(hstring(name)).get();
+  } catch (...) {
+  }
+  Finish(code);
+}
 
 [[noreturn]] static void CmdAvailable() {
   Finish(KeyCredentialManager::IsSupportedAsync().get() ? EXIT_OK : EXIT_UNAVAILABLE);
@@ -277,28 +297,31 @@ static KeyCredential OpenMatching(const Record& r) {
   auto cred = res.Credential();
 
   // From here on, any refusal deletes the new credential so no unusable key stays behind.
-  auto refuse = [&](int code) {
-    try {
-      KeyCredentialManager::DeleteAsync(hstring(name)).get();
-    } catch (...) {
-    }
-    Finish(code);
-  };
   try {
     auto att = cred.GetAttestationAsync().get();
     const auto status = att.Status();
-    if (status == KeyCredentialAttestationStatus::TemporaryFailure) refuse(EXIT_ATTESTATION_RETRY);
+    // Local heuristic only (see SECURITY NOTES): the OS's own answer, chain not validated.
+    if (status == KeyCredentialAttestationStatus::TemporaryFailure) Refuse(name, EXIT_ATTESTATION_RETRY);
     // NotSupported (software key) or UnknownError: fail closed.
-    if (status != KeyCredentialAttestationStatus::Success) refuse(EXIT_NOT_HARDWARE);
+    if (status != KeyCredentialAttestationStatus::Success) Refuse(name, EXIT_NOT_HARDWARE);
     if (!att.AttestationBuffer() || att.AttestationBuffer().Length() == 0 || !att.CertificateChainBuffer() ||
         att.CertificateChainBuffer().Length() == 0) {
-      refuse(EXIT_NOT_HARDWARE);
+      Refuse(name, EXIT_NOT_HARDWARE);
     }
     auto spki = FromBuffer(cred.RetrievePublicKey(CryptographicPublicKeyBlobType::X509SubjectPublicKeyInfo));
-    if (spki.empty() || spki.size() > kMaxSpki) refuse(EXIT_INTERNAL_ERROR);
+    if (spki.empty() || spki.size() > kMaxSpki) Refuse(name, EXIT_INTERNAL_ERROR);
     auto alg = AsymmetricKeyAlgorithmProvider::OpenAlgorithm(AsymmetricAlgorithmNames::RsaSignPkcs1Sha256());
     auto key = alg.ImportPublicKey(ToBuffer(spki), CryptographicPublicKeyBlobType::X509SubjectPublicKeyInfo);
-    if (key.KeySize() < kMinRsaBits) refuse(EXIT_NOT_HARDWARE);
+    if (key.KeySize() < kMinRsaBits) Refuse(name, EXIT_WEAK_KEY);
+
+    // First signature now, so registration needs no separate `sign setup` (and,
+    // where Windows reuses the create gesture, no second prompt). Same fixed-padding check as `sign`.
+    auto data = ToBuffer(challenge);
+    auto sr = cred.RequestSignAsync(data).get();
+    if (sr.Status() != KeyCredentialStatus::Success) Refuse(name, MapStatus(sr.Status()));
+    if (!CryptographicEngine::VerifySignature(key, data, sr.Result())) Refuse(name, EXIT_KEY_UNUSABLE);
+    auto sig = FromBuffer(sr.Result());
+    if (sig.empty() || sig.size() > 0xffff) Refuse(name, EXIT_INTERNAL_ERROR);
 
     std::vector<std::uint8_t> out;
     out.push_back(kRecordVersion);
@@ -308,9 +331,13 @@ static KeyCredential OpenMatching(const Record& r) {
     out.push_back(static_cast<std::uint8_t>(spki.size() & 0xff));
     out.insert(out.end(), spki.begin(), spki.end());
     out.insert(out.end(), challenge.begin(), challenge.end());
+    out.push_back(static_cast<std::uint8_t>(sig.size() >> 8));
+    out.push_back(static_cast<std::uint8_t>(sig.size() & 0xff));
+    out.insert(out.end(), sig.begin(), sig.end());
+    SecureZeroMemory(sig.data(), sig.size());
     WriteOut(std::move(out));
   } catch (...) {
-    refuse(EXIT_INTERNAL_ERROR);
+    Refuse(name, EXIT_INTERNAL_ERROR);
   }
 }
 
@@ -367,5 +394,5 @@ int wmain(int argc, wchar_t** argv) {
   } catch (...) {
     Finish(EXIT_INTERNAL_ERROR);
   }
-  return EXIT_INTERNAL_ERROR;
+  // Every path above ends in Finish (ExitProcess); no return, so /W4 /WX sees no unreachable code.
 }
