@@ -150,6 +150,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { homedir, hostname as osHostname } from 'node:os';
 import type { AddressInfo, ListenOptions } from 'node:net';
+import { join } from 'node:path';
 import {
   PayConfirmError,
   buildPayConfirmFlow,
@@ -308,6 +309,7 @@ import type {
   LocalUiRenameRequest,
   LocalUiResult,
   LocalUiRevealRoute,
+  LocalUiKitRevealRoute,
   LocalUiUiSettingsRoute,
   LocalUiSetupStep,
 } from './local-ui/route-types.js';
@@ -323,6 +325,7 @@ import {
   FIRST_AGENT_LABEL,
   FIRST_AGENT_NAME,
   HOST_AGENT_NAME,
+  type AgentDirectoryEntry,
   type AppHostAgent,
   type AppHostFirstRun,
   type AppHostHold,
@@ -340,7 +343,12 @@ import {
 } from './local-ui/api/agents-remove.js';
 import { AgentFolderLockError } from './agent-folder-lock.js';
 import { createKeyEraseControl } from './key-controls.js';
-import { exportRecoveryKit, type RecoveryKitClient } from './recovery-kit-export.js';
+import {
+  exportRecoveryKit,
+  type RecoveryKitClient,
+  type RecoveryKitOthers,
+} from './recovery-kit-export.js';
+import { MAX_KIT_IDS, type KitTodayId, type LocalUiBackupDesk } from './kit-record.js';
 import { ownerOperationRefused } from './owner-allowlist.js';
 import {
   LOCAL_UI_API_PREFIX,
@@ -443,6 +451,8 @@ const CSRF_META = /<meta\s+name="agentlink-csrf"\s+content="([^"]*)"\s*\/?>/gi;
 const HEAD_OPEN = /<head(?:\s[^>]*)?>/i;
 /** MSG-FILES-IO-h: the largest Show in Finder body (`{"id":"<64 chars>.<2 digits>"}` fits easily). */
 const MAX_REVEAL_BODY_BYTES = 256;
+/** WP-R2b: the kit-reveal route takes no body; anything up to this is read and refused (400). */
+const MAX_KIT_REVEAL_BODY_BYTES = 256;
 /** MSG-FILES-IO-h: an item ID, `<envelope ID>.<index>` (core ui-messages.ts). */
 const REVEAL_ITEM_ID = /^[A-Za-z0-9_-]{1,64}\.[0-9]{2}$/;
 
@@ -1438,6 +1448,70 @@ export async function startApprovalServerWith(
           write: (settings) =>
             (uiSettingsDirectory.writeUiSettings as (s: UiSettings) => Promise<void>)(settings),
         });
+  /**
+   * WP-R2b (04 §2.3.3 "Kit record"): what `GET /api/ui/backup` and Show in Finder read. Reads only;
+   * it signs nothing, opens no other ID's core and reads no keychain item. Built where an ID can
+   * save a kit here, or in the app host.
+   */
+  const backupDeskOf = (
+    bound: Omit<LocalUiOptions, 'assets'> | undefined,
+  ): LocalUiBackupDesk | undefined => {
+    const kit = recoveryKitOf(bound);
+    if (kit === undefined && options.host === undefined) return undefined;
+    const home = kit?.home ?? internals.restore?.home ?? homedir();
+    return Object.freeze<LocalUiBackupDesk>({
+      agentlinkDir: join(home, '.agentlink'),
+      revealer: fileRevealer,
+      ids: async () => {
+        const openId = bound?.client?.agentId;
+        const slot = host;
+        if (slot === undefined) {
+          if (kit === undefined) return [];
+          return [
+            Object.freeze<KitTodayId>({
+              name: kit.name,
+              label: agentLabel ?? kit.name,
+              contacts: null,
+              agentId: kit.agentId,
+            }),
+          ];
+        }
+        const current = slot.current;
+        const entries = (await slot.directory.list()).slice(0, MAX_LISTED_AGENTS);
+        const today: KitTodayId[] = [];
+        for (const entry of entries) {
+          const stats = entry.available
+            ? await slot.directory.stats(entry.name).catch(() => undefined)
+            : undefined;
+          const isOpen = entry.name === current;
+          today.push(
+            Object.freeze<KitTodayId>({
+              name: entry.name,
+              label: isOpen ? (agentLabel ?? entry.name) : entry.label,
+              contacts: stats?.contacts ?? null,
+              ...(entry.removing ? { removing: true } : {}),
+              ...(isOpen && openId !== undefined ? { agentId: openId } : {}),
+            }),
+          );
+        }
+        return today;
+      },
+      exportRecorded: async (agentId, nonce) => {
+        // Core's word, from the open ID's own core only (another ID's core is never opened here).
+        const client = agentUi?.client as
+          | {
+              agentId?: string;
+              ownerActions?: { backupExportRecorded?: (n: string) => Promise<boolean> };
+            }
+          | undefined;
+        if (client?.agentId !== agentId) return undefined;
+        const actions = client.ownerActions;
+        if (typeof actions?.backupExportRecorded !== 'function') return undefined;
+        return actions.backupExportRecorded(nonce);
+      },
+    });
+  };
+
   const buildUiContext = (bound: ApprovalServerSource = source): LocalUiContext =>
     Object.freeze<LocalUiContext>({
       // IR-M1-11s-b-1 H-1: handlers read through a read-only view, never the client itself.
@@ -1446,6 +1520,11 @@ export async function startApprovalServerWith(
       ...(agentUi?.client === undefined ? {} : { credits: creditsPort(agentUi.client) }),
       // WP-11: whether the open agent can save a recovery kit here (the source stays here).
       recoveryKitAvailable: recoveryKitOf(agentUi) !== undefined,
+      // WP-R2b: the kit record and Show in Finder for it (reads only; no path is ever answered).
+      ...(() => {
+        const backup = backupDeskOf(agentUi);
+        return backup === undefined ? {} : { backup };
+      })(),
       // W4-FILES-SAVE: for the save owner route only; core takes only a `file.save` and re-verifies
       // the owner signature before it saves (I-4).
       ...(agentUi?.client === undefined ? {} : { fileSave: fileSavePort(agentUi.client) }),
@@ -1584,6 +1663,60 @@ export async function startApprovalServerWith(
         }
       },
     }));
+
+  /**
+   * WP-R2b (04 §2.3.3 "In the local app"; §2.5 "KeyStore isolation"): the recovery-kit export's walk
+   * over this owner's other IDs in the app host, inside the one owner operation only (after the
+   * gesture; nothing of another ID is opened before it). The listed IDs (not the open one, not one
+   * being removed) are visited through the slot's visitOthers: one core open at any time, each
+   * closed before the next, the open ID opened again at the end. A keychain ID of this home gives its
+   * own core's prepare and apply; an ID that cannot be opened here or has no recovery-kit source
+   * (a file-KeyStore ID) is named in `notIncluded`, as is any beyond the 16 IDs of one kit.
+   */
+  const otherIdsOf = (open: LocalUiRecoveryKitSource): RecoveryKitOthers =>
+    Object.freeze<RecoveryKitOthers>({
+      each: async (step) => {
+        const slot = host;
+        if (slot === undefined) return { ok: true, notIncluded: [] };
+        let entries: readonly AgentDirectoryEntry[];
+        try {
+          entries = (await slot.directory.list()).slice(0, MAX_LISTED_AGENTS);
+        } catch {
+          return { ok: false, notIncluded: [] };
+        }
+        const notIncluded: string[] = [];
+        const names: string[] = [];
+        for (const entry of entries) {
+          if (entry.name === open.name || entry.name === slot.current || entry.removing) continue;
+          if (!entry.available || names.length >= MAX_KIT_IDS - 1) notIncluded.push(entry.name);
+          else names.push(entry.name);
+        }
+        if (names.length === 0) return { ok: true, notIncluded };
+        const ok = await slot.visitOthers(names, async (name, agent) => {
+          const kit = agent === undefined ? undefined : recoveryKitOf(agent.localUi);
+          const client = agent?.localUi.client as unknown as RecoveryKitClient | undefined;
+          if (
+            agent === undefined ||
+            kit === undefined ||
+            client === undefined ||
+            kit.home !== open.home ||
+            kit.name !== name
+          ) {
+            notIncluded.push(name);
+            return true;
+          }
+          const apply = (signed: { readonly body: JsonObject; readonly sig: string }) =>
+            agent.source.apply(signed);
+          return step({
+            source: { agentId: kit.agentId, name: kit.name, storePath: kit.storePath },
+            prepareBackupExport: (kitId, contents) =>
+              client.ownerActions.prepareBackupExport(kitId, contents),
+            apply,
+          });
+        });
+        return { ok, notIncluded };
+      },
+    });
 
   const wellFormed = (candidate: string | undefined): candidate is string =>
     candidate !== undefined &&
@@ -2145,6 +2278,11 @@ export async function startApprovalServerWith(
        * offers `exportRecoveryKit` for the open agent's recovery-kit source instead.
        */
       readonly recoveryKit?: true;
+      /**
+       * WP-R2b: the page session (its cookie value), for the recovery-kit export only: the restore
+       * engine binds the export handle for Check to it (registerExportedKit).
+       */
+      readonly pageSession?: string;
     } = {},
   ): Promise<void> {
     const wait = waitSeconds();
@@ -2379,6 +2517,19 @@ export async function startApprovalServerWith(
                         },
                         apply: (signed) => source.apply(signed),
                         now: () => now(),
+                        // WP-R2b (04 §2.3.3 "In the local app", §2.5 "KeyStore isolation"): every
+                        // other keychain ID of this owner, one core open at a time (the host's slot).
+                        ...(host === undefined ? {} : { others: otherIdsOf(exportUi.source) }),
+                        // WP-R2b: Check's export handle, from the restore engine, bound to this page.
+                        ...(gate.pageSession === undefined
+                          ? {}
+                          : {
+                              registerCheck: (file: { path: string; kitId: string }) =>
+                                restoreEngine().registerExportedKit(
+                                  gate.pageSession as string,
+                                  file,
+                                ),
+                            }),
                       });
                     },
                   }),
@@ -4487,6 +4638,47 @@ export async function startApprovalServerWith(
   }
 
   /**
+   * WP-R2b (04 §2.3.3 "Kit record"): the kit-reveal gate. The caller checked the session, CSRF,
+   * Origin, fetch metadata, the octet-stream type and the generation. No query, no operation input,
+   * no presence header and no body byte: the handler gets the context only and reveals the kit
+   * record's own file (kit-record.ts revealKitFile). Nothing is signed or written; fixed answers.
+   */
+  async function kitRevealGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiKitRevealRoute,
+  ): Promise<void> {
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    const body = await boundedBody(req, res, MAX_KIT_REVEAL_BODY_BYTES);
+    if (body === undefined) return;
+    if (body.length !== 0) {
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    if (!stillCurrent(req)) {
+      agentChanged(res);
+      return;
+    }
+    let result: LocalUiResult;
+    try {
+      result = await route.handler(uiContext);
+    } catch (error) {
+      sendJson(res, 500, failedBody(error));
+      return;
+    }
+    sendResult(res, result);
+  }
+
+  /**
    * UX2-d1 (owner decision 1.1): the gate of the two invite-kind routes (create, check). The caller
    * checked the session, CSRF, Origin, fetch metadata and the octet-stream type. No query, operation
    * input or presence header; create is rate-limited before the body is read; the body must be one
@@ -4909,6 +5101,11 @@ export async function startApprovalServerWith(
       await removeGate(req, res, url);
       return;
     }
+    if (route.presence === 'kit-reveal') {
+      // WP-R2b: Show in Finder for the recovery kit has its own gate; no presence, no input.
+      await kitRevealGate(req, res, url, route);
+      return;
+    }
     if (route.presence === 'reveal') {
       // MSG-FILES-IO-h: Show in Finder has its own gate; ownerGate never runs it (D-134).
       await revealGate(req, res, url, route);
@@ -4967,7 +5164,7 @@ export async function startApprovalServerWith(
           { params, query: url.searchParams, ...(input === undefined ? {} : { input }) },
           owner,
         ),
-      route.recoveryKit === true ? { recoveryKit: true } : {},
+      route.recoveryKit === true ? { recoveryKit: true, pageSession: cookie } : {},
     );
   }
 

@@ -643,7 +643,13 @@ describe.runIf(POSIX)('a crash or failure part way (T-7)', () => {
     const second = agents.find((a) => a.agentId !== first.agentId)!;
     expect(ids.find((r) => r.agentId === first.agentId)?.outcome).toBe('restored');
     expect(ids.find((r) => r.agentId === second.agentId)?.outcome).toBe('failed');
-    for (const item of ['seed', 'store-key', 'policy-version', 'receipts-kept', 'storage-mark']) {
+    for (const item of [
+      'seed',
+      'store-key',
+      'policy-version',
+      'receipts-kept',
+      'storage-mark',
+    ] as const) {
       expect(keychain.items.has(keychainAccount(second.agentId, item))).toBe(false);
     }
     await expect(lstat(join(t.home, '.agentlink', 'agents', second.name))).rejects.toThrow();

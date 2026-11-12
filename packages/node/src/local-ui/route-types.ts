@@ -246,6 +246,22 @@ export interface LocalUiRevealRoute {
   ) => Promise<LocalUiResult>;
 }
 
+/**
+ * WP-R2b (04 §2.3.3 "Kit record"): Show in Finder for the recorded recovery kit. Like the reveal kind
+ * it changes nothing and needs no owner presence, but it takes no input at all: only
+ * `POST /api/ui/backup/reveal`, registered once (routes.ts). The server's kit-reveal gate runs after
+ * the same session, CSRF, Origin, fetch-metadata, octet-stream and generation checks as every write,
+ * refuses a query, an `X-AgentLink-Input` or presence header and any body byte, and hands the
+ * handler only the context: the file is the kit record's own, checked by kit-record.ts
+ * revealKitFile, and its path is never answered.
+ */
+export interface LocalUiKitRevealRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'kit-reveal';
+  readonly handler: (context: LocalUiContext) => Promise<LocalUiResult>;
+}
+
 /** UX2-d1: the steps of the invite kind (U3-invite adds `dismiss`, "Not now" on the join screen). */
 export type LocalUiInviteStep = 'create' | 'check' | 'dismiss' | 'cancel';
 
@@ -433,6 +449,7 @@ export type LocalUiRoute =
   | LocalUiPayConfirmRoute
   | LocalUiCreateAgentRoute
   | LocalUiRevealRoute
+  | LocalUiKitRevealRoute
   | LocalUiInviteRoute;
 
 /**

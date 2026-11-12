@@ -26,6 +26,9 @@
 // - UX1113-R1 (D-147): a `presence: 'restore'` route is one of the nine fixed RESTORE_PATHS, each
 //   registered once, `found` a GET and every other step a POST, with no handler; the server's restore
 //   gate runs it (recovery-kit-restore.ts). No other path, method or route can use the kind.
+// - WP-R2b (04 §2.3.3 "Kit record"): a `presence: 'kit-reveal'` route (Show in Finder for the
+//   recovery kit) is only a POST at BACKUP_REVEAL_PATH with a handler, registered once; the server's
+//   kit-reveal gate runs it with no input at all. No other path, method or route can use the kind.
 // - The page files in api/ each own their routes; this file only lists them.
 import { activityRoutes } from './api/activity.js';
 // U3-c: the Agents list and the switch kind; the stubs of U3-d, U3-e, U3-f and U3-flow.
@@ -72,7 +75,7 @@ import {
 // W4-SHELL-V2: the app's own UI settings (read, and the ui-settings kind).
 import { uiSettingsRoutes } from './api/ui-settings.js';
 // The fixed path lives in reveal-path.ts so api/files-io.ts uses it without importing this file.
-import { REVEAL_PATH } from './reveal-path.js';
+import { BACKUP_REVEAL_PATH, REVEAL_PATH } from './reveal-path.js';
 // UX2-d1: the invite paths live in invite-paths.ts for the same reason.
 import {
   INVITE_ACCEPT_PATH,
@@ -294,6 +297,16 @@ export class LocalUiRouteRegistry {
       if (typeof handler !== 'function') throw invalid('a reveal route needs a handler');
       if (this.#entries.some((e) => e.route.presence === 'reveal')) {
         throw invalid('the reveal route is already registered');
+      }
+    } else if (presence === 'kit-reveal') {
+      // WP-R2b: Show in Finder for the recovery kit only; the server's kit-reveal gate runs it.
+      if (method !== 'POST') throw invalid('a kit-reveal route is a POST');
+      if (route.path !== BACKUP_REVEAL_PATH) {
+        throw invalid('a kit-reveal route is only at the kit reveal path');
+      }
+      if (typeof handler !== 'function') throw invalid('a kit-reveal route needs a handler');
+      if (this.#entries.some((e) => e.route.presence === 'kit-reveal')) {
+        throw invalid('the kit-reveal route is already registered');
       }
     } else if (presence === 'invite') {
       // UX2-d1 (decision 1.1): create and check an invite only; the server's invite gate runs it.

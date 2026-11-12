@@ -540,6 +540,85 @@ export class AppHostSlot {
     }
   }
 
+  /**
+   * WP-R2b (04 §2.5 "KeyStore isolation"; §2.3.3 "In the local app"): for the recovery-kit export's
+   * one owner operation only, called by the export request itself (its own hold stays). Takes the
+   * slot as a switch does (refused while a switch is in progress; new requests wait or are refused;
+   * the other requests in flight drain first), closes the open agent, then opens each of `names` in
+   * turn through the same `open` path and hands it to `visit`, closing it before the next one: at
+   * most one agent's KeyStore and store are open here at any time, and the open agent is never
+   * opened a second time. `visit` gets undefined for a name that could not be opened (or is no
+   * longer listed, or is `removing`, or is the open agent); its false stops the walk. Finally the
+   * agent that was open is opened again; the generation does not change (the page still shows it),
+   * unless it cannot be opened again (then the page reloads). Resolves false when the walk did not
+   * finish (stopped, refused, or `visit` threw: every agent it opened is closed all the same).
+   */
+  async visitOthers(
+    names: readonly string[],
+    visit: (name: string, agent: AppHostAgent | undefined) => Promise<boolean>,
+  ): Promise<boolean> {
+    if (this.#closed || this.#switching !== undefined || this.#agent === undefined) return false;
+    let finish: () => void = () => undefined;
+    this.#switching = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const previous = this.#agent;
+    let ok = true;
+    try {
+      // The export request's own hold stays; every other request in flight drains first.
+      await this.#drainedBut(1);
+      this.#agent = undefined;
+      this.#bind(undefined);
+      // KeyStore isolation (04 §2.5): the open agent is closed before any other is opened.
+      await previous.close().catch(() => undefined);
+      for (const name of names) {
+        if (this.#closed) {
+          ok = false;
+          break;
+        }
+        let agent: AppHostAgent | undefined;
+        if (HOST_AGENT_NAME.test(name) && name !== previous.name) {
+          const entry = await this.#options.directory.read(name).catch(() => undefined);
+          if (entry !== undefined && entry.name === name && entry.available && !entry.removing) {
+            agent = await this.#options.open(name).catch(() => undefined);
+            if (agent !== undefined && agent.name !== name) {
+              await agent.close().catch(() => undefined);
+              agent = undefined;
+            }
+          }
+        }
+        let next: boolean;
+        try {
+          next = await visit(name, agent);
+        } catch {
+          next = false;
+        } finally {
+          await agent?.close().catch(() => undefined);
+        }
+        if (!next) {
+          ok = false;
+          break;
+        }
+      }
+    } finally {
+      // The agent that was open, opened again (never while another is open).
+      const back = this.#closed
+        ? undefined
+        : await this.#options.open(previous.name).catch(() => undefined);
+      if (back !== undefined && back.name === previous.name && !this.#closed) {
+        this.#agent = back;
+        this.#bind(back);
+      } else {
+        await back?.close().catch(() => undefined);
+        // Nothing open now: every page reloads.
+        this.#generation += 1;
+      }
+      this.#switching = undefined;
+      finish();
+    }
+    return ok;
+  }
+
   /** Resolves when at most `keep` requests are in flight (the caller's own), or after the drain. */
   #drainedBut(keep: number): Promise<void> {
     if (this.#inflight <= keep) return Promise.resolve();

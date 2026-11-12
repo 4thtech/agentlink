@@ -20,11 +20,13 @@ import Database from 'better-sqlite3';
 import {
   buildOwnerActionBody,
   newOwnerActionNonce,
+  rowKeyOf,
   type OwnerActionOutcome,
 } from '@4thtech-io/core';
 import {
   encodeBase64url,
   encodeHex,
+  encodeHex0x,
   encodeUtf8,
   type JsonObject,
   type RecoveryKitStoreSink,
@@ -43,6 +45,9 @@ import { createKeychainAgent } from '../keychain-keystore.js';
 import { readKitRecord } from '../kit-record.js';
 import { TEST_APP } from '../local-ui-app.fixture.js';
 import { KeychainOwnerKeyStore } from '../owner-keystore.js';
+import { SqliteStore } from '../sqlite-store.js';
+import { createAgentStoreCipher } from '../store-cipher.js';
+import { sampleRow } from '../store-rows.fixture.js';
 import { BACKUP_REVEAL_PATH } from './api/backup.js';
 import { RESTORE_PATHS } from './api/restore.js';
 import type { AgentDirectory, AgentDirectoryEntry, AppHostAgent } from './app-host.js';
@@ -73,15 +78,45 @@ function memorySink(parts: Uint8Array[]): RecoveryKitStoreSink {
   };
 }
 
-/** A store with `people` active contacts. */
-function storeAt(dir: string, people: number): string {
+/**
+ * A real agent store for `agentId` (its identity row, a card naming this owner, `people` active
+ * contacts), sealed with that ID's own store key from the keychain, so Check's store checks pass.
+ */
+async function storeAt(dir: string, agentId: string, people: number): Promise<string> {
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, 'store.sqlite');
+  const storeKey = (await world.keychain.get(keychainAccount(agentId, 'store-key'))) as Uint8Array;
+  const store = await SqliteStore.open(path);
+  const cipher = await createAgentStoreCipher(storeKey);
+  const row = await sampleRow('identity', 0, cipher);
+  const card = JSON.stringify({
+    card: { ownerNostr: encodeHex0x(world.owner.ownerNostr), keyEpoch: row.key_epoch },
+    cardSig: 'x',
+    cardAgentSig: null,
+  });
+  const sealed = await cipher.seal(
+    { table: 'identity', column: 'agent_card_json', rowKey: rowKeyOf([agentId]) },
+    card,
+  );
+  const contacts: Record<string, unknown>[] = [];
+  for (let i = 0; i < people; i += 1) {
+    contacts.push({ ...(await sampleRow('contacts', i, cipher)), status: 'active' });
+  }
+  await store.transaction((tx) => {
+    tx.insert('identity', { ...row, agent_id: agentId, agent_card_json: sealed });
+    for (const contact of contacts) tx.insert('contacts', contact as never);
+  });
+  await store.close();
+  cipher.close();
+  return path;
+}
+
+/** A plain store file (the file-KeyStore ID's; never sealed into a kit). */
+function plainStoreAt(dir: string): string {
   mkdirSync(dir, { recursive: true });
   const path = join(dir, 'store.sqlite');
   const db = new Database(path);
   db.exec('CREATE TABLE contacts (contact_id TEXT, status TEXT);');
-  for (let i = 0; i < people; i += 1) {
-    db.prepare("INSERT INTO contacts VALUES (?, 'active')").run(`c${String(i)}`);
-  }
   db.close();
   return path;
 }
@@ -90,7 +125,7 @@ function storeAt(dir: string, people: number): string {
  * The world of one test: three IDs on disk (`default` and `work` in the keychain, `files` a
  * file-KeyStore ID) plus one being removed; every core open and close is counted (the KeyStore spy).
  */
-function idsWorld(home: string, over: { refuseWork?: boolean } = {}) {
+async function idsWorld(home: string, over: { refuseWork?: boolean } = {}) {
   const log: string[] = [];
   const open = new Set<string>();
   let most = 0;
@@ -103,12 +138,15 @@ function idsWorld(home: string, over: { refuseWork?: boolean } = {}) {
   const ids = {
     default: {
       agentId: world.agentId,
-      store: storeAt(join(home, '.agentlink', 'agents', 'default'), 2),
+      store: await storeAt(join(home, '.agentlink', 'agents', 'default'), world.agentId, 2),
     },
-    work: { agentId: second, store: storeAt(join(home, '.agentlink', 'agents', 'work'), 5) },
+    work: {
+      agentId: second,
+      store: await storeAt(join(home, '.agentlink', 'agents', 'work'), second, 5),
+    },
     files: {
       agentId: `0x${'ab'.repeat(20)}`,
-      store: storeAt(join(home, '.agentlink', 'agents', 'files'), 1),
+      store: plainStoreAt(join(home, '.agentlink', 'agents', 'files')),
     },
   } as const;
   type Name = keyof typeof ids;
@@ -219,14 +257,14 @@ function idsWorld(home: string, over: { refuseWork?: boolean } = {}) {
   };
 }
 
-type IdsWorld = ReturnType<typeof idsWorld>;
+type IdsWorld = Awaited<ReturnType<typeof idsWorld>>;
 
 let homes = 0;
 async function harness(over: { refuseWork?: boolean; home?: string; ids?: IdsWorld } = {}) {
   homes += 1;
   const home = over.home ?? join(world.root, `home-${String(homes)}`);
   mkdirSync(join(home, 'Downloads'), { recursive: true });
-  const ids = over.ids ?? idsWorld(home, over);
+  const ids = over.ids ?? (await idsWorld(home, over));
   const initial = ids.agent('default');
   const events: ApprovalServerEvent[] = [];
   const opened: string[] = [];
@@ -332,7 +370,7 @@ describe('Back up covers every ID of this owner, one core open at a time (WP-R2b
       const body = JSON.parse(res.body) as Saved;
       expect(body.status).toBe('saved');
       expect(body.covers).toEqual([
-        { name: 'default', label: 'Personal' },
+        { name: 'default', label: 'default' },
         { name: 'work', label: 'Work' },
       ]);
       // The file-KeyStore ID is named, never sealed; the one being removed is skipped.
@@ -459,7 +497,7 @@ describe('Back up covers every ID of this owner, one core open at a time (WP-R2b
       lastKit: {
         at: expect.any(Number) as number,
         covers: [
-          { name: 'default', label: 'Personal' },
+          { name: 'default', label: 'default' },
           { name: 'work', label: 'Work' },
         ],
         peopleAtSave: 7,

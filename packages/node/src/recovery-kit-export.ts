@@ -6,20 +6,26 @@
 // I-4: called only from the app host's presence gate (approval-server.ts `exportRecoveryKit`), with
 // the owner session that gate unlocked for an export (KeychainOwnerKeyStore.unlockForExport) from the
 // presence this request carried. In order, inside that one owner operation:
-//   1. the server draws one kitId (16 CSPRNG bytes); core prepares `backup.export` {kitId, "full"} for
-//      the open ID and for each other ID the host passes (`others`, each with its own core), all with
-//      that kitId; the gate's `sign` signs each body, one checked request per call, with this one
-//      gesture's session (one entry of the owner secret covers them, 04 §2.5 "One entry");
-//   2. each ID's core applies its own (its nonce row is the audit record, 07 §3.4); if any is
-//      refused, nothing is sealed;
+//   1. the server draws one kitId (16 CSPRNG bytes); one ID at a time, that ID's core prepares
+//      `backup.export` {kitId, "full"}, the gate's `sign` signs it (one checked request per call,
+//      with this one gesture's session: one entry of the owner secret covers them all, 04 §2.5 "One
+//      entry") and that same core applies it (its nonce row is the audit record, 07 §3.4). The open
+//      ID goes first, with its own core; then the host walks this owner's other IDs (`others`, WP-R2b):
+//      its slot closes the open ID's core and opens each other ID's core alone, closing it before the
+//      next, so at most one agent's KeyStore and store are open in the host at any time (04 §2.5
+//      "KeyStore isolation"); the open ID's core is never opened twice;
+//   2. if any is refused, an ID is not valid or listed twice, the walk cannot finish or the time
+//      budget (EXPORT_BUDGET_MS) has passed, nothing is sealed;
 //   3. the KeyExportControl seals the owner seed, each ID's KeyStore items and its store snapshot as
 //      `ALKK` v1 into one new file (O_CREAT | O_EXCL | O_NOFOLLOW, 0600, never under ~/.agentlink) in
 //      the Downloads folder, else the home folder, and returns one new recovery code for display once;
 //   4. the kit record `~/.agentlink/kit-record.json` is written (kit-record.ts; a display aid, its
-//      failure keeps the save) and an in-memory export handle is issued for Check (the device and
-//      inode of the file just created; the page never sees the path).
+//      failure keeps the save) and the restore engine registers an export handle for Check
+//      (`registerCheck`, WP-R2b: recovery-kit-restore.ts registerExportedKit, the device and inode of
+//      the file just created, bound to the page session; the page never sees the path).
 // Each snapshot is `VACUUM INTO` a private temporary file under that ID's own lock hold (the control
-// holds it, one ID at a time), read back after the hold, and deleted at the end whatever happened.
+// holds it, one ID at a time, after every other ID's core was closed again), read back after the
+// hold, and deleted at the end whatever happened.
 // The people count of the record is read from that same snapshot (the same cut).
 //
 // Zero access: nothing here talks to any network. Nothing is logged; failures are fixed outcomes
@@ -40,12 +46,7 @@ import {
 } from '@4thtech-io/crypto';
 import { createKeyExportControl } from './key-controls.js';
 import type { KeychainBackend } from './keychain.js';
-import {
-  MAX_KIT_IDS,
-  kitExportHandles,
-  writeKitRecord,
-  type KitExportHandles,
-} from './kit-record.js';
+import { MAX_KIT_IDS, writeKitRecord } from './kit-record.js';
 import type { LocalUiRecoveryKitSource } from './local-ui/context.js';
 import type { LocalUiRecoveryKitOutcome } from './local-ui/route-types.js';
 import type { KeychainOwnerKeyStore } from './owner-keystore.js';
@@ -78,13 +79,30 @@ export interface RecoveryKitPeerSource {
 
 /**
  * WP-R2: another keychain ID of this owner to include (the host builds these; a file-KeyStore ID is
- * not included). Its own core prepares and applies its `backup.export`.
+ * not included). Its own core prepares and applies its `backup.export`; it is valid only during the
+ * `step` it is handed to (its core is closed right after).
  */
 export interface RecoveryKitPeer {
   readonly source: RecoveryKitPeerSource;
   readonly prepareBackupExport: PrepareBackupExport;
   apply(signed: { readonly body: JsonObject; readonly sig: string }): Promise<OwnerActionOutcome>;
 }
+
+/**
+ * WP-R2b: the host's walk over this owner's other IDs (approval-server.ts, AppHostSlot.visitOthers).
+ * `each` hands `step` one ID at a time, with that ID's core the only one open in the host, and
+ * closes it before the next; `step` resolving false stops the walk. `ok` is false when the walk
+ * stopped or could not finish. `notIncluded` names the IDs of this owner it could not include
+ * (a file-KeyStore ID, an ID it could not open): never sealed, named on the page.
+ */
+export interface RecoveryKitOthers {
+  each(
+    step: (peer: RecoveryKitPeer) => Promise<boolean>,
+  ): Promise<{ readonly ok: boolean; readonly notIncluded: readonly string[] }>;
+}
+
+/** WP-R2b: the whole operation's time budget, from the gesture to the last apply (milliseconds). */
+export const EXPORT_BUDGET_MS = 120_000;
 
 export interface RecoveryKitExportArgs {
   /** A session the paired store issued with unlockForExport (the gate's). */
@@ -104,18 +122,26 @@ export interface RecoveryKitExportArgs {
   apply(signed: { readonly body: JsonObject; readonly sig: string }): Promise<OwnerActionOutcome>;
   /** Milliseconds. */
   now(): number;
-  /** WP-R2: this owner's other IDs, in kit order after the open one (at most 15). */
-  readonly others?: readonly RecoveryKitPeer[];
-  /** WP-R2: the export handle registry; default the server process's (kit-record.ts). */
-  readonly handles?: KitExportHandles;
+  /** WP-R2b: this owner's other IDs, walked one at a time after the open one (at most 15). */
+  readonly others?: RecoveryKitOthers;
+  /**
+   * WP-R2b: registers the file just sealed for Check (the restore engine's registerExportedKit,
+   * bound to the page session); resolves the export handle, or undefined. Absent: no handle.
+   */
+  registerCheck?(file: {
+    readonly path: string;
+    readonly kitId: string;
+  }): Promise<string | undefined>;
 }
 
 /** The saved outcome with what WP-R2 adds: the IDs it covers and the export handle for Check. */
 export type RecoveryKitSaved = Extract<LocalUiRecoveryKitOutcome, { status: 'saved' }> & {
   /** The covered IDs in kit order (public facts only). */
   readonly covers: readonly { readonly agentId: string; readonly name: string }[];
-  /** The export handle (kit-record.ts), when the file just created could be identified. */
+  /** The export handle (the restore engine's), when the file just created could be registered. */
   readonly check?: string;
+  /** WP-R2b: this owner's IDs the kit does not include (folder names), when any. */
+  readonly notIncluded?: readonly string[];
 };
 
 export type RecoveryKitExportOutcome =
@@ -236,44 +262,33 @@ interface KitPart {
   apply(signed: { readonly body: JsonObject; readonly sig: string }): Promise<OwnerActionOutcome>;
 }
 
-/** The parts in kit order (the open ID first), or undefined when any is not valid or listed twice. */
-function partsOf(args: RecoveryKitExportArgs): readonly KitPart[] | undefined {
+/** True when `s` is a valid ID's public facts not yet in the kit, and the kit has room for it. */
+function admissible(s: unknown, inKit: readonly KitPart[]): s is RecoveryKitPeerSource {
+  if (inKit.length >= MAX_KIT_IDS) return false;
+  if (
+    !isObject(s) ||
+    typeof s['agentId'] !== 'string' ||
+    !AGENT_ID.test(s['agentId']) ||
+    typeof s['name'] !== 'string' ||
+    !AGENT_NAME.test(s['name']) ||
+    typeof s['storePath'] !== 'string'
+  ) {
+    return false;
+  }
+  return !inKit.some((p) => p.source.agentId === s['agentId'] || p.source.name === s['name']);
+}
+
+/** The open ID's part, or undefined when its source does not name the open client. */
+function openPart(args: RecoveryKitExportArgs): KitPart | undefined {
   const { source, client } = args;
   if (source.agentId !== client.agentId) return undefined;
-  const parts: KitPart[] = [
-    {
-      source: { agentId: source.agentId, name: source.name, storePath: source.storePath },
-      prepare: (kitId) => client.ownerActions.prepareBackupExport(kitId, 'full'),
-      apply: (signed) => args.apply(signed),
-    },
-  ];
-  for (const peer of args.others ?? []) {
-    parts.push({
-      source: peer.source,
-      prepare: (kitId) => peer.prepareBackupExport(kitId, 'full'),
-      apply: (signed) => peer.apply(signed),
-    });
-  }
-  if (parts.length > MAX_KIT_IDS) return undefined;
-  const ids = new Set<string>();
-  const names = new Set<string>();
-  for (const { source: s } of parts) {
-    if (
-      !isObject(s) ||
-      typeof s.agentId !== 'string' ||
-      !AGENT_ID.test(s.agentId) ||
-      typeof s.name !== 'string' ||
-      !AGENT_NAME.test(s.name) ||
-      typeof s.storePath !== 'string' ||
-      ids.has(s.agentId) ||
-      names.has(s.name)
-    ) {
-      return undefined;
-    }
-    ids.add(s.agentId);
-    names.add(s.name);
-  }
-  return parts;
+  const facts = { agentId: source.agentId, name: source.name, storePath: source.storePath };
+  if (!admissible(facts, [])) return undefined;
+  return {
+    source: facts,
+    prepare: (kitId) => client.ownerActions.prepareBackupExport(kitId, 'full'),
+    apply: (signed) => args.apply(signed),
+  };
 }
 
 /** The one owner operation of saving a recovery kit (see the file comment). */
@@ -281,44 +296,65 @@ export async function exportRecoveryKit(
   args: RecoveryKitExportArgs,
 ): Promise<RecoveryKitExportOutcome> {
   const { source } = args;
-  const parts = partsOf(args);
-  if (parts === undefined) return { status: 'failed' };
+  const first = openPart(args);
+  if (first === undefined) return { status: 'failed' };
   const kitId = encodeBase64url(randomBytes(16));
+  const deadline = args.now() + EXPORT_BUDGET_MS;
 
-  // 1. Core prepares one backup.export per ID, all with this kitId.
+  // 1 and 2. One ID at a time, with its own core open: prepare, sign, apply.
+  const parts: KitPart[] = [];
   const bodies: JsonObject[] = [];
-  for (const part of parts) {
+  const one = async (part: KitPart): Promise<boolean> => {
+    if (args.now() > deadline) return false;
     const prepared = await part.prepare(kitId);
     if (
       prepared.status !== 'prepared' ||
       !isExportBody(prepared.body, part.source.agentId, kitId)
     ) {
-      return { status: 'not_applied' };
+      return false;
     }
-    bodies.push(prepared.body);
-  }
-  // 1b. This gesture's session signs each, one checked request per call.
-  const signed: { readonly body: JsonObject; readonly sig: string }[] = [];
-  for (const body of bodies) {
+    const body = prepared.body;
     const signatures = await args.sign(args.review, [{ kind: 'owner-action', action: body }]);
     const only = signatures[0];
-    if (signatures.length !== 1 || only === undefined || only.kind !== 'owner-action') {
-      return { status: 'not_applied' };
-    }
-    signed.push(only.signed);
+    if (signatures.length !== 1 || only === undefined || only.kind !== 'owner-action') return false;
+    const applied = await part.apply(only.signed);
+    if (applied.status !== 'applied') return false;
+    parts.push(part);
+    bodies.push(body);
+    return true;
+  };
+  try {
+    if (!(await one(first))) return { status: 'not_applied' };
+  } catch {
+    return { status: 'not_applied' };
   }
-  // 2. Each ID's core applies its own (the audit rows); if any is refused, nothing is sealed.
-  for (const [i, part] of parts.entries()) {
-    const one = signed[i];
-    if (one === undefined) return { status: 'not_applied' };
-    let applied: OwnerActionOutcome;
+  let notIncluded: readonly string[] = [];
+  if (args.others !== undefined) {
+    let invalid = false;
+    let walk: { readonly ok: boolean; readonly notIncluded: readonly string[] };
     try {
-      applied = await part.apply(one);
+      walk = await args.others.each(async (peer) => {
+        const facts = isObject(peer) ? peer.source : undefined;
+        if (!admissible(facts, parts)) {
+          invalid = true;
+          return false;
+        }
+        return one({
+          source: { agentId: facts.agentId, name: facts.name, storePath: facts.storePath },
+          prepare: (k) => peer.prepareBackupExport(k, 'full'),
+          apply: (signed) => peer.apply(signed),
+        });
+      });
     } catch {
-      return { status: 'not_applied' };
+      return { status: invalid ? 'failed' : 'not_applied' };
     }
-    if (applied.status !== 'applied') return { status: 'not_applied' };
+    if (invalid) return { status: 'failed' };
+    if (!walk.ok) return { status: 'not_applied' };
+    notIncluded = walk.notIncluded.filter(
+      (name) => typeof name === 'string' && AGENT_NAME.test(name),
+    );
   }
+  if (args.now() > deadline) return { status: 'not_applied' };
 
   // 3. Only now, after every audit record, is anything sealed.
   const createdMs = args.now();
@@ -388,10 +424,14 @@ export async function exportRecoveryKit(
       contents: 'full',
       file: path,
     }).catch(() => undefined);
-    const check =
-      created === undefined
-        ? undefined
-        : (args.handles ?? kitExportHandles).issue({ kitId, path, ...created });
+    let check: string | undefined;
+    if (created !== undefined && args.registerCheck !== undefined) {
+      try {
+        check = await args.registerCheck({ path, kitId });
+      } catch {
+        check = undefined;
+      }
+    }
     return {
       status: 'saved',
       file: name,
@@ -401,6 +441,7 @@ export async function exportRecoveryKit(
         parts.map((p) => Object.freeze({ agentId: p.source.agentId, name: p.source.name })),
       ),
       ...(check === undefined ? {} : { check }),
+      ...(notIncluded.length === 0 ? {} : { notIncluded: Object.freeze([...notIncluded]) }),
     };
   } catch {
     // The control deletes a kit it did not finish; the error's text is never passed on (I-7).

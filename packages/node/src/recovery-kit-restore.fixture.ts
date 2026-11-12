@@ -106,7 +106,7 @@ export async function makeAgent(
     { table: 'identity', column: 'agent_card_json', rowKey: rowKeyOf([agentId]) },
     card,
   );
-  const contacts = [];
+  const contacts: Record<string, unknown>[] = [];
   for (let i = 0; i < (extra.people ?? 0); i += 1) {
     contacts.push({ ...(await sampleRow('contacts', i, cipher)), status: 'active' });
   }

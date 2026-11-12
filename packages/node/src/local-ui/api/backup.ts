@@ -17,9 +17,10 @@
 //   only then seals the one kit (approval-server.ts, recovery-kit-export.ts). The answer carries the
 //   file name, the folder's display name, the new recovery code (once; never logged or emitted as an
 //   event, I-7), the covered IDs by name and label, and `check`, the export handle Check takes.
-// - Show in Finder for the kit (`revealKit`, BACKUP_REVEAL_PATH): takes no input; reveals only the
-//   record's own file, a regular file, in its folder (kit-record.ts revealKitFile). Its registration
-//   needs a route kind that takes no presence and no input (the server's reveal gate): WP-R1's routes.
+// - `POST /api/ui/backup/reveal` (WP-R2b, the `kit-reveal` kind): Show in Finder for the kit. No
+//   presence and no input (the server's kit-reveal gate refuses a query, an input header, a presence
+//   header and any body byte); reveals only the record's own file, a regular file, in its folder
+//   (kit-record.ts revealKitFile). Fixed answers only; never the path.
 //
 // Restore and Check are WP-R1's routes. No MCP tool reaches this (I-4).
 import type { JsonValue } from '@4thtech-io/crypto';
@@ -33,11 +34,13 @@ import {
 } from '../../kit-record.js';
 import type { RecoveryKitSaved } from '../../recovery-kit-export.js';
 import type { LocalUiContext } from '../context.js';
+import { BACKUP_REVEAL_PATH } from '../reveal-path.js';
 import {
   BACKUP_EXPORT_PATH,
   BACKUP_PATH,
   NOT_AVAILABLE,
   UI_NOT_SET_UP,
+  type LocalUiKitRevealRoute,
   type LocalUiOwnerOperation,
   type LocalUiOwnerRoute,
   type LocalUiReadRoute,
@@ -46,17 +49,10 @@ import {
   type LocalUiRoute,
 } from '../route-types.js';
 
-/** WP-R2: Show in Finder for the recorded kit (registered by WP-R1's routes, see the file comment). */
-export const BACKUP_REVEAL_PATH = '/api/ui/backup/reveal';
+export { BACKUP_REVEAL_PATH };
 
-/**
- * WP-R2: the app host's backup desk on the context. The context field is added by the server wiring
- * (context.ts `backup?: LocalUiBackupDesk`, built in approval-server.ts buildUiContext); until then
- * it is absent and the record reads as `unreadable`.
- */
-type BackupContext = LocalUiContext & { readonly backup?: LocalUiBackupDesk };
-const deskOf = (context: LocalUiContext): LocalUiBackupDesk | undefined =>
-  (context as BackupContext).backup;
+/** The backup desk on the context (approval-server.ts backupDeskOf); absent: `unreadable`. */
+const deskOf = (context: LocalUiContext): LocalUiBackupDesk | undefined => context.backup;
 
 const fixed = (status: number, error: string): LocalUiResult =>
   Object.freeze({ status, body: Object.freeze({ error }) });
@@ -197,8 +193,9 @@ function exportPrecheck(
 function savedExtras(outcome: object): {
   covers: readonly { readonly name: string }[];
   check: string | undefined;
+  notIncluded: readonly { readonly name: string }[];
 } {
-  const extra = outcome as Partial<Pick<RecoveryKitSaved, 'covers' | 'check'>>;
+  const extra = outcome as Partial<Pick<RecoveryKitSaved, 'covers' | 'check' | 'notIncluded'>>;
   const covers = Array.isArray(extra.covers)
     ? extra.covers.filter(
         (c): c is { agentId: string; name: string } =>
@@ -209,7 +206,15 @@ function savedExtras(outcome: object): {
     typeof extra.check === 'string' && /^[A-Za-z0-9_-]{22}$/.test(extra.check)
       ? extra.check
       : undefined;
-  return { covers, check };
+  // WP-R2b: this owner's IDs the kit does not include (a file-KeyStore ID), named on the page.
+  const notIncluded = Array.isArray(extra.notIncluded)
+    ? extra.notIncluded
+        .filter((name): name is string => typeof name === 'string')
+        .map((name) => ({
+          name,
+        }))
+    : [];
+  return { covers, check, notIncluded };
 }
 
 /** The covered IDs by name and label (labels from the desk; else the folder name). */
@@ -253,7 +258,7 @@ async function exportKit(
   });
   if (outcome.status === 'not_applied') return NOT_APPLIED;
   if (outcome.status !== 'saved') return FAILED;
-  const { covers, check } = savedExtras(outcome);
+  const { covers, check, notIncluded } = savedExtras(outcome);
   return {
     status: 200,
     body: {
@@ -262,6 +267,7 @@ async function exportKit(
       folder: outcome.folder,
       code: outcome.code,
       covers: await coversShown(context, covers),
+      ...(notIncluded.length === 0 ? {} : { notIncluded: await coversShown(context, notIncluded) }),
       ...(check === undefined ? {} : { check }),
     },
   };
@@ -283,4 +289,15 @@ const exportRoute: LocalUiOwnerRoute = Object.freeze({
   handler: exportKit,
 });
 
-export const backupRoutes: readonly LocalUiRoute[] = Object.freeze([readRoute, exportRoute]);
+const revealRoute: LocalUiKitRevealRoute = Object.freeze({
+  method: 'POST',
+  path: BACKUP_REVEAL_PATH,
+  presence: 'kit-reveal',
+  handler: revealKit,
+});
+
+export const backupRoutes: readonly LocalUiRoute[] = Object.freeze([
+  readRoute,
+  exportRoute,
+  revealRoute,
+]);
