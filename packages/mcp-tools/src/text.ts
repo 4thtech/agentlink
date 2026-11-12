@@ -47,8 +47,14 @@ export const TOOL_TEXT = Object.freeze({
   contactNotFound: "I couldn't find that contact, so nothing was done.",
   contactNotFoundNextStep:
     "Call agentlink_list_contacts to see the user's contacts, then use a contact's id or name.",
-  // REL051-CF1 (R1-CLASS-11): found by its previous name. Slot: the current name under 06 §2.1.
-  contactRenamedNote: 'This contact is now called {contactName}.',
+  // REL051-CF1 (R1-CLASS-11; IR-REL051-CF1-1 CF1-B1): only a previous name matched; never acted on.
+  // Slot: the current name under 06 §2.1 (never the query or the previous name).
+  contactRenamed:
+    'No contact has that name now. Did you mean {contactName}, which used to have it?',
+  contactRenamedMany:
+    'No contact has that name now. More than one contact used to have it; they are listed in candidates.',
+  contactRenamedNextStep:
+    'Ask the user which contact they mean; never pick one yourself. Then call the tool again with its id from candidates.',
   // REL051-CF1 (R1-CLASS-11): a blocked contact is not "not found". Fixed text, no slot (I-5).
   contactBlocked: 'The owner blocked this contact, so nothing was done.',
   contactBlockedNextStep:

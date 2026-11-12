@@ -24,7 +24,7 @@
 // I-5, I-7: the terms, the note and the `to` query are agent-written (steerable) text; none of it
 // reaches a summary, `nextStep`, error or log line.
 import type { NotarizeResult, ProposeTermsInput, ProposeTermsResult } from '@4thtech-io/core';
-import { contactRef, resolveContact, withRenamedNote, type ContactResolution } from './contacts.js';
+import { contactRef, resolveContact } from './contacts.js';
 import type { ToolContext } from './context.js';
 import { internalError, notAvailable, ok, pendingApproval, type HandlerOutput } from './result.js';
 import {
@@ -119,19 +119,6 @@ export async function proposeTermsHandler(
   input: unknown,
   context: ToolContext,
 ): Promise<HandlerOutput> {
-  // REL051-CF1 (R1-CLASS-11): a contact found by its previous name gets the "now called" note.
-  let resolution: ContactResolution | undefined;
-  const output = await proposeTerms(input, context, (r) => {
-    resolution = r;
-  });
-  return resolution?.ok === true ? withRenamedNote(output, resolution) : output;
-}
-
-async function proposeTerms(
-  input: unknown,
-  context: ToolContext,
-  onResolved: (resolution: ContactResolution) => void,
-): Promise<HandlerOutput> {
   const { client, logger } = context;
   const terms = client.terms;
   if (terms === undefined) return notAvailable();
@@ -142,7 +129,6 @@ async function proposeTerms(
     return noOwnerResult(context);
   }
   const resolved = resolveContact(to, await client.contacts());
-  onResolved(resolved);
   if (!resolved.ok) return resolved.output;
   const ref = contactRef(resolved.contact);
   if (resolved.contact.pairing !== 'complete') {

@@ -148,22 +148,18 @@ export const activeContacts = (views: readonly ContactView[]): ContactView[] =>
   views.filter((view) => view.status === 'active');
 
 export type ContactResolution =
-  | {
-      readonly ok: true;
-      readonly contact: ContactView;
-      /**
-       * REL051-CF1 (R1-CLASS-11): found by its previous name (it renamed its ID); the caller adds
-       * `renamedNote` to its summary so the AI learns the current name.
-       */
-      readonly renamed?: true;
-    }
+  | { readonly ok: true; readonly contact: ContactView }
   | { readonly ok: false; readonly output: HandlerOutput };
 
 const fold = (text: string): string =>
   removeInvisible(text).normalize('NFKC').replace(/\s+/g, ' ').trim().toLowerCase();
 
-/** REL051-CF1: the contact's previous name (restricted by core), when it has one. */
+/**
+ * REL051-CF1: the contact's previous name (restricted by core), when it has one. Never for a contact
+ * the owner named (IR-REL051-CF1-1 CF1-B1): the owner's alias is the only name it answers to.
+ */
 const previousOf = (view: ContactView): string | undefined => {
+  if (view.display.nameSource === 'owner') return undefined;
   const previous: unknown = (view as { readonly previousName?: unknown }).previousName;
   return typeof previous === 'string' && previous !== '' ? previous : undefined;
 };
@@ -177,11 +173,13 @@ const blockedOutput = (): HandlerOutput =>
  * (alias or restricted name), compared after NFKC and case folding. The query is agent-written text:
  * it is never echoed in a summary, `nextStep` or error (IR-M1-9g-1 L1).
  *
- * REL051-CF1 (R1-CLASS-11): when no shown name matches, the contacts' previous names (core's
- * restricted `previousName`, after a rename of their ID) are tried the same way, and a match says so
- * (`renamed`). When no active contact matches, a blocked one that does (ID, shown or previous name)
- * answers CONTACT_BLOCKED, so the AI can tell the user it is blocked rather than unknown. Removed
- * and revoked contacts stay not found.
+ * REL051-CF1 (R1-CLASS-11; IR-REL051-CF1-1 CF1-B1): when no shown name matches, the contacts'
+ * previous names (core's restricted `previousName`, after a rename of their ID; never for an
+ * owner-aliased contact) are compared the same way. A match there never acts: a contact could rename
+ * itself to someone else's name and back to keep a hidden second name. It is CONTACT_RENAMED, which
+ * names the current name(s) with their ids as candidates and asks the AI to ask the user. When no
+ * active contact matches, a blocked one that does (ID, shown or previous name) answers
+ * CONTACT_BLOCKED. Removed and revoked contacts stay not found.
  */
 export function resolveContact(query: string, views: readonly ContactView[]): ContactResolution {
   const contacts = activeContacts(views);
@@ -198,17 +196,10 @@ export function resolveContact(query: string, views: readonly ContactView[]): Co
           const previous = previousOf(view);
           return previous !== undefined && fold(previous) === wanted;
         });
-  let matches = named(contacts);
-  let renamed = false;
-  if (matches.length === 0) {
-    matches = formerly(contacts);
-    renamed = matches.length > 0;
-  }
-  if (matches.length === 1) {
-    return renamed
-      ? { ok: true, contact: matches[0]!, renamed: true }
-      : { ok: true, contact: matches[0]! };
-  }
+  const matches = named(contacts);
+  if (matches.length === 1) return { ok: true, contact: matches[0]! };
+  const renamed = matches.length === 0 ? formerly(contacts) : [];
+  if (renamed.length > 0) return { ok: false, output: renamedOutput(renamed) };
   if (matches.length === 0) {
     const blocked = views.filter((view) => view.status === 'blocked');
     if (
@@ -236,24 +227,20 @@ export function resolveContact(query: string, views: readonly ContactView[]): Co
 }
 
 /**
- * REL051-CF1 (R1-CLASS-11): appends "This contact is now called “X” (label)." to a result found by a
- * previous name. X is the contact's current shown name under the 06 §2.1 rule (renderRef), never the
- * query. Left out when the summary would pass the 500 code point limit.
+ * IR-REL051-CF1-1 CF1-B1: contacts found only by a previous name. Never acted on: the summary names
+ * the current name (06 §2.1 rule, renderRef), never the query or the previous name, and
+ * `candidates` carries each one's id so the AI asks the user and calls again with it.
  */
-export function withRenamedNote(
-  output: HandlerOutput,
-  resolution: { readonly renamed?: true; readonly contact: ContactView },
-): HandlerOutput {
-  if (resolution.renamed !== true || output.text !== undefined) return output;
-  const note = renderCopy(TOOL_TEXT.contactRenamedNote, {
-    contactName: renderRef(contactRef(resolution.contact)),
+function renamedOutput(views: readonly ContactView[]): HandlerOutput {
+  const first = views[0]!;
+  const summary =
+    views.length === 1
+      ? renderCopy(TOOL_TEXT.contactRenamed, { contactName: renderRef(contactRef(first)) })
+      : TOOL_TEXT.contactRenamedMany;
+  return fail('error', summary, TOOL_TEXT.contactRenamedNextStep, 'CONTACT_RENAMED', {
+    candidates: views.map(candidateRef),
   });
-  const summary = `${output.result.summary} ${note}`;
-  if (Array.from(summary).length > SUMMARY_MAX_CODE_POINTS) return output;
-  return { ...output, result: { ...output.result, summary } };
 }
-
-const SUMMARY_MAX_CODE_POINTS = 500;
 
 /** At most this many options are spelled out in an ambiguous summary; `candidates` has them all. */
 const SUMMARY_OPTIONS = 5;
