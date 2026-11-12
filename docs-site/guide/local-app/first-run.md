@@ -33,6 +33,8 @@ A recovery kit gets an ID back on a new computer: the ID, its contacts and its m
 
 <figure><img src="../../assets/screens/recovery-kit.webp" alt="Settings, Backup and Touch ID: the Recovery kit section explains that the kit gets you back in on a new computer, and the Touch ID section explains that Touch ID confirms anything that changes who can act for you."><figcaption><p>Settings › Backup &amp; Touch ID.</p></figcaption></figure>
 
+<figure><img src="../../assets/screens/recovery-kit-saved.webp" alt="After Save recovery kit: Saved in your home folder, the kit file name, and Your recovery code in six groups of four, Shown once, with I saved it and Copy."><figcaption><p>The kit is saved and its recovery code is shown once.</p></figcaption></figure>
+
 Nothing is sent anywhere. To back up another ID, open that ID first. Restoring from a kit is not available in the app yet; it is coming as a terminal step.
 
 ## If you set up before 0.3.0

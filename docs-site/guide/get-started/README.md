@@ -12,7 +12,7 @@ When AgentLink opens for the first time, it shows **Get started**: four short st
 
    <figure><img src="../../assets/screens/get-started-pick-app.webp" alt="Which AI app do you use? Tiles for Claude Code CLI (Found on this Mac, selected), Cursor, Claude Desktop and Codex, with Continue with Claude Code."><figcaption><p>Step 1 of 4: pick your AI app.</p></figcaption></figure>
 
-2. **Confirm it's you.** Type the name people will see under **Name people see** (it is on your invites), then press **Connect with Touch ID** (**Connect with Windows Hello** on Windows). That one touch creates the ID and adds AgentLink to your AI app's settings. Your AI can't do this for you.
+2. **Confirm it's you.** Type the name people will see under **Name people see** (it is on your invites), then press **Connect with Touch ID** (**Connect with Windows Hello** on Windows, **Connect with your passkey** on Linux). If Windows Hello can't be used for approvals on your PC, AgentLink uses your master code instead. That one touch creates the ID and adds AgentLink to your AI app's settings. Your AI can't do this for you.
 
    <figure><img src="../../assets/screens/get-started-confirm.webp" alt="Confirm it's you: What is an ID? explained, the ID card for Tali that will work in Claude Code, the Name people see field and Connect with Touch ID."><figcaption><p>Step 2: name the ID and confirm with Touch ID.</p></figcaption></figure>
 

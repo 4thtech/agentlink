@@ -19,7 +19,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { fileURLToPath } from 'node:url';
-import type { Browser, BrowserContext, Page } from 'playwright';
+import type { Browser, BrowserContext, Locator, Page } from 'playwright';
 import { build } from 'vite';
 import { afterAll, beforeAll, describe, it } from 'vitest';
 import {
@@ -108,15 +108,24 @@ async function toWebp(png: Buffer): Promise<Buffer> {
 }
 
 /** Settles the page (fonts, no focus ring, no caret), then writes one shot. */
-async function shot(page: Page, name: string, options: { fullPage?: boolean } = {}): Promise<void> {
+async function shot(
+  page: Page,
+  name: string,
+  options: { fullPage?: boolean; above?: Locator } = {},
+): Promise<void> {
   if (ONLY !== undefined && !ONLY.includes(name)) return;
   await page.evaluate(() => document.fonts.ready);
   // Passing notices ("Your new contact accepted your invite") belong to a moment, not to the page.
   for (const x of await page.locator('.al-toast-x').all()) await x.click().catch(() => undefined);
   await page.mouse.move(0, 0);
   await page.waitForTimeout(400);
+  // `above`: crop just above this element (a button that belongs to the page behind the moment).
+  const box = options.above === undefined ? null : await options.above.boundingBox();
   const png = await page.screenshot({
     fullPage: options.fullPage ?? false,
+    ...(box === null
+      ? {}
+      : { clip: { x: 0, y: 0, width: VIEWPORT.width, height: Math.floor(box.y - 16) } }),
     animations: 'disabled',
     caret: 'hide',
   });
@@ -277,7 +286,9 @@ describe('docs screens', () => {
         .getByText(/invites you to connect your AIs$/)
         .first()
         .waitFor();
-      await shot(b, 'accept-invite');
+      await shot(b, 'accept-invite', {
+        above: b.getByRole('button', { name: 'Done', exact: true }).last(),
+      });
       await b.getByRole('button', { name: ACCEPT_WITH }).click();
       await until('Natasa is paired with Tali', () => pairedWith(mcpB, 'Tali'), 60_000);
       await until('Tali is paired with Natasa', () => pairedWith(mcpA, 'Natasa'), 60_000);
@@ -400,6 +411,15 @@ describe('docs screens', () => {
       await a.getByRole('heading', { level: 1 }).first().waitFor();
       await a.waitForTimeout(800);
       await shot(a, 'recovery-kit');
+      // WP-11: save the kit (Touch ID), then the recovery code shown once. The kit is written into
+      // this computer's temp home, never a real Downloads folder.
+      await a.getByRole('button', { name: 'Save recovery kit' }).first().click();
+      const confirm = a.getByRole('button', { name: CONFIRM_PASSKEY });
+      const code = a.getByRole('region', { name: 'Your recovery code' });
+      await confirm.or(code).first().waitFor({ timeout: 30_000 });
+      if (await confirm.isVisible()) await confirm.click();
+      await code.waitFor({ timeout: 30_000 });
+      await shot(a, 'recovery-kit-saved');
     });
   });
 });

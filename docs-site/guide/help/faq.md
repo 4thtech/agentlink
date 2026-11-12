@@ -82,7 +82,7 @@ Run `npx -y @4thtech-io/agentlink@latest` in a terminal you opened yourself (`ui
 
 ### What if I lose my computer?
 
-Your keys live on your computer. Back up an ID from **IDs** to get a recovery kit that you keep safe; restoring from a kit works again in 0.4.6. Keep your master code safe as well.
+Your keys live on your computer. Save a recovery kit from **Settings** › **Backup & Touch ID** (or **Back up** on an ID) and keep it safe with its recovery code. Restoring from a kit is not built yet: it is coming as a terminal step. Keep your master code safe as well.
 
 ## The project
 

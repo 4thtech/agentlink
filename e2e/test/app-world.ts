@@ -241,6 +241,9 @@ export function uiDepsOf(
       let opened: Awaited<ReturnType<typeof openAgentStoreWith>> | undefined;
       // W4-RENAME-REACHES-CONTACTS: the host's agent gets its key-items token (as openWithStore).
       let epochKeys: AgentEpochKeys | undefined;
+      // WP-11: the recovery-kit source, as openWithStore gives it (keychain-backed agents only; here
+      // the keychain is this computer's stand-in file, which the server's owner gate also uses).
+      let kit: { backend: string; agentId: string; storePath: string } | undefined;
       const deps: RuntimeDeps = {
         ...pc.runtime,
         openKeyStore: async (backend, agentId) => {
@@ -249,6 +252,7 @@ export function uiDepsOf(
           return keyStore;
         },
         openStore: async (backend, agentId, path) => {
+          kit = { backend, agentId, storePath: path };
           opened = await pc.runtime.openStore(backend, agentId, path);
           return opened;
         },
@@ -270,6 +274,18 @@ export function uiDepsOf(
           store: opened.store,
           cipher: opened.cipher,
           ...(epochKeys === undefined ? {} : { epochKeys }),
+          ...(kit === undefined ||
+          kit.backend !== 'keychain' ||
+          kit.agentId !== result.agent.client.agentId
+            ? {}
+            : {
+                recoveryKit: Object.freeze({
+                  agentId: kit.agentId,
+                  name: result.agent.name,
+                  storePath: kit.storePath,
+                  home: pc.home,
+                }),
+              }),
           close: () => result.agent.close(),
         }),
       };

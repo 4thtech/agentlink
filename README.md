@@ -34,7 +34,7 @@ curl -fsSL https://agentlink.4thtech.io/install.sh | sh
 
 On Windows, in PowerShell: `irm https://agentlink.4thtech.io/install.ps1 | iex` · Already have Node.js 22.14+? `npx -y @4thtech-io/agentlink@latest`
 
-**2. Connect your AI app.** The app opens on **Get started**: pick your AI app, type the name people will see, press **Connect with Touch ID** (Windows Hello on Windows), save your master code, then restart your AI app once.
+**2. Connect your AI app.** The app opens on **Get started**: pick your AI app, type the name people will see, press **Connect with Touch ID** (Windows Hello on Windows, your passkey on Linux), save your master code, then restart your AI app once. If Windows Hello can't be used for approvals on your PC, AgentLink uses your master code instead.
 
 **3. Invite someone and talk.** Press **Invite someone**, send the link. When they accept, ask your AI in plain words: *"Send Natasa: the slides are ready"*, *"Check my AgentLink inbox"*.
 
@@ -113,7 +113,7 @@ Messages and files are encrypted on your computer. Message servers and 4thTech s
 ## Status
 
 <!-- status:start -->
-> **Version:** v0.4.13 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-03
+> **Version:** v0.4.14 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-12
 >
 > - **Components:** 78 merged, 14 in progress, 7 planned
 > - **Next:** The cloud agent and business agents as 0.5.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
@@ -128,7 +128,7 @@ Messages and files are encrypted on your computer. Message servers and 4thTech s
 |---|---|---|
 | **M0 Foundations** (nearly complete) | Repository, CI and rules in place | 0.0.x |
 | **M1a Walking skeleton: pair and talk** (released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open) | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 |
-| **M1b Files, proof, credits** (v0.2.0 to v0.4.10 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
+| **M1b Files, proof, credits** (v0.2.0 to v0.4.14 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
 | **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify page; accept in the browser (planned; today the live invite page at agentlink.4thtech.io shows how to accept in the app); verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109) | 0.5.0 (cloud agent first) and later |
 | **M3 Mainnet beta (Base, Gnosis)** | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 |
 | **M4 Expansion** | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 |

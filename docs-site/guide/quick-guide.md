@@ -15,7 +15,7 @@ flowchart LR
 
 Open a terminal yourself, paste one line and press Return (Enter on Windows):
 
-- **Mac or Linux** (Terminal: Cmd+Space, type Terminal):
+- **Mac or Linux** (Mac: Cmd+Space, type Terminal; Linux: your usual terminal):
 
   ```bash
   curl -fsSL https://agentlink.4thtech.io/install.sh | sh
@@ -38,13 +38,13 @@ The app opens on **Get started**. It finds the AI apps on your computer.
 <figure><img src="../assets/screens/get-started-pick-app.webp" alt="Get started, step 1 of 4: Which AI app do you use? Claude Code CLI is marked Found on this Mac and selected; the button reads Continue with Claude Code."><figcaption><p>Step 1: pick your AI app.</p></figcaption></figure>
 
 1. Under **Which AI app do you use?**, pick yours and press **Continue with** and its name.
-2. On **Confirm it's you**, type the name people will see (for example your first name) under **Name people see**, then press **Connect with Touch ID** (**Connect with Windows Hello** on Windows). This creates your [ID](help/glossary.md) and adds AgentLink to your AI app.
+2. On **Confirm it's you**, type the name people will see (for example your first name) under **Name people see**, then press **Connect with Touch ID** (**Connect with Windows Hello** on Windows, **Connect with your passkey** on Linux). If Windows Hello can't be used for approvals on your PC, AgentLink uses your master code instead. This creates your [ID](help/glossary.md) and adds AgentLink to your AI app.
 
    <figure><img src="../assets/screens/get-started-confirm.webp" alt="Confirm it's you: the name Tali is typed under Name people see, with Connect with Touch ID below."><figcaption><p>Step 2: one Touch ID creates your ID and connects your AI app.</p></figcaption></figure>
 
 3. Your **master code** appears, once. Save it in your password manager (**Save in my password manager**, **Copy** or **Save as file**), then press **I saved it**. It confirms approvals when Touch ID isn't available. Never give it to your AI.
 
-   <figure><img src="../assets/screens/master-code.webp" alt="The master code screen: twelve groups of characters shown once, with Save in my password manager, Copy, Save as file and I saved it."><figcaption><p>Your master code is shown once.</p></figcaption></figure>
+   <figure><img src="../assets/screens/master-code.webp" alt="The master code screen: six groups of four characters, shown once, with Save in my password manager, Copy, Save as file and I saved it."><figcaption><p>Your master code is shown once.</p></figcaption></figure>
 
 4. **Connected to Claude Code.** If your AI app was open, **quit it and open it again**: it picks up AgentLink only after a restart. Until then the app says **Connected · restart Claude Code to start**, which is normal.
 
@@ -82,7 +82,7 @@ Both sides now see **You are connected**. Type a name under **Name this contact*
 
 <figure><img src="../assets/screens/connected.webp" alt="You and Tali are connected, with the prompt Say hello to Tali on AgentLink, and the optional Contact check: 12 digits to read to each other."><figcaption><p>Connected, named, with the optional Contact check open.</p></figcaption></figure>
 
-Optional but wise: open the **Contact check** and read the 12 digits to each other by phone or in person. If they match, press **They match**. If not, don't send anything and remove that contact. Details: [Name and check a contact](get-started/pair-with-someone.md).
+The connected screen offers **Say hello** (a prompt to copy into your AI app), **Done**, and the optional **Optional: make sure it's really {name}. Contact check →**. Open it and read the 12 digits to each other by phone or in person. If they match, press **Done**. If they don't, press **Numbers don't match?**: don't send anything, and remove that contact. You can also do the check later from the person's page on **People**, where it offers **They match**. Details: [Name and check a contact](get-started/pair-with-someone.md).
 
 ## 6. Talk through your AI
 
