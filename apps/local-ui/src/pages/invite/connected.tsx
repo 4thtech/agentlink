@@ -1,6 +1,6 @@
 // W4-PEOPLE-INVITE: the "Connected ✓" moment, on both sides (prototype v23 A7; 04 §3.6.1).
 // Two letters meet and a check pops (U0 al-pop; a fade only under reduced motion), "You and {name}
-// are connected", and "Say hello to {name}" (a prompt to copy for your AI). The safety code (12
+// are connected", and "Say hello to {name}" (a prompt to copy for your AI). The 12 digits (12
 // digits in 0.4.6) is not shown by default (UX 2026-11-12 S-1): an optional check says in one line
 // what it is for, and only then is the code read from this app's server for the new contact. It
 // exists only once the pairing completed. "Numbers don't match?" says what to do next in plain
@@ -21,7 +21,7 @@ export interface ConnectedMomentProps {
   readonly name: string;
   /** Your own name, for the first letter (optional). */
   readonly me?: string;
-  /** The new contact's ref, for the safety code. */
+  /** The new contact's ref, for the 12 digits. */
   readonly contactRef?: string;
   readonly api?: ApiClient;
   /** The name came from the other side, not from your own alias: it is never our heading or prompt. */

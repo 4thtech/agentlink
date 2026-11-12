@@ -155,7 +155,7 @@ export const en = {
 
   // ---- Identity labels (11 §5.2) ----------------------------------------------------------
   'common.identity.selfdeclared': 'Self-declared',
-  'common.identity.checked': 'Safety code checked',
+  'common.identity.checked': 'Contact checked',
   'common.identity.registered': 'Registered',
   'common.identity.verified': 'Verified domain · {domain}',
   'common.identity.domainWarning': 'Domain no longer verified',
@@ -221,7 +221,7 @@ export const en = {
   'cli.approve.question': 'Approve, deny or later? (a/d/L)',
   'cli.approve.termsOwn': 'Decide this one on its own: `{prefix} approve {approvalId}`',
   'cli.approve.summary':
-    'Approve {approved} and deny {denied}. Your owner code or passphrase covers exactly these {total}. Anything new waits for your next review.',
+    'Approve {approved} and deny {denied}. Your master code or passphrase covers exactly these {total}. Anything new waits for your next review.',
   'cli.approve.continue': 'Continue? (y/N)',
   'cli.approve.footer': "Your AI can't approve for you.",
   'cli.approve.resultApproved': 'OK       Approved: {action}',

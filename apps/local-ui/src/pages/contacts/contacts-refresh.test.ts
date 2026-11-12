@@ -229,7 +229,7 @@ describe('UI-REFRESH-i: waiting, codes match, duplicate notice', () => {
     expect(text()).toContain(S.matched);
   });
 
-  it('the safety code is three groups, never one element per letter', async () => {
+  it('the 12 digits are three groups, never one element per letter', async () => {
     await mount({
       [LIST]: { status: 'ok', contacts: [marko] },
       [`/api/ui/contacts/${MARKO}/safety-code`]: { status: 'ok', code: CODE },
@@ -304,7 +304,7 @@ describe('UI-REFRESH-i: Under the hood', () => {
       r.querySelector('dd')?.textContent,
     ]);
     expect(rows).toEqual([
-      ['Fingerprint', '7F3A·19C2'],
+      ['ID tag', '7F3A·19C2'],
       ['Identity level', 'Not checked yet'],
       ['Paired', '2025-10-03'],
     ]);
@@ -313,8 +313,8 @@ describe('UI-REFRESH-i: Under the hood', () => {
   it('leaves out the fingerprint when the server did not send one, and never shows an ID', async () => {
     await mount(routes([ana]), true);
     const hood = host.querySelector('.al-hood') as HTMLElement;
-    expect(hood.textContent).not.toContain('Fingerprint');
-    expect(hood.textContent).toContain('Safety code checked');
+    expect(hood.textContent).not.toContain('ID tag');
+    expect(hood.textContent).toContain('Contact checked');
     expect(hood.textContent).not.toMatch(/0x[0-9a-f]{6}/i);
     expect(hood.textContent).not.toContain(CODE);
   });

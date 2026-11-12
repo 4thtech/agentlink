@@ -89,8 +89,8 @@ async function party(name: string): Promise<Party> {
   const agentId = await createKeychainAgent(keychain);
   const written: string[] = [];
   const shown = (): string =>
-    (written.find((w) => w.startsWith('Your owner code: ')) ?? '').slice(
-      'Your owner code: '.length,
+    (written.find((w) => w.startsWith('Your master code: ')) ?? '').slice(
+      'Your master code: '.length,
     );
   const terminal: OwnerTerminal = {
     write: (text) => void written.push(text),

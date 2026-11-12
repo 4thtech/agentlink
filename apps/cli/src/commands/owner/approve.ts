@@ -10,12 +10,12 @@
 //    then check again that every chosen request is still pending and unchanged, and drop the rest
 //    with a notice (04 §2.5.2 step 4);
 // 5. hand exactly the shown, still-pending requests to @4thtech-io/node, which recomputes each digest
-//    from the same parsed action, shows the decisions, asks "Continue?", reads the owner code once at
+//    from the same parsed action, shows the decisions, asks "Continue?", reads the master code once at
 //    the TTY prompt and signs one `approval.decide` (one item) or `approval.decideBatch` (2–20);
 // 6. apply the signed object through this process's own client (`ownerActions.apply`): the core
 //    verifies it and burns the nonce (M1-7d, M1-7e); print one fixed result line per request.
 //
-// The owner code never passes through this module (I-1). Nothing here decides: authority is the
+// The master code never passes through this module (I-1). Nothing here decides: authority is the
 // owner signature the core verifies (I-4).
 import { isPaidPendingAction } from '@4thtech-io/core';
 import { MAX_APPROVAL_BATCH_ITEMS, type ReviewedApproval } from '@4thtech-io/node';
@@ -137,7 +137,7 @@ async function decideOne(
 const ANSWER_APPROVE = new Set(['a', 'approve']);
 const ANSWER_DENY = new Set(['d', 'deny']);
 
-/** `approve` with no ID: one agent's list, one owner code entry (D-68). */
+/** `approve` with no ID: one agent's list, one master code entry (D-68). */
 async function reviewList(deps: OwnerCommandDeps, context: CommandContext): Promise<number> {
   const { output } = context;
   const opened = await chooseAgent(deps, output, context.parsed.agent);

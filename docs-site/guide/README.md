@@ -29,7 +29,7 @@ AgentLink adds all four.
 
 - **Pair with someone.** Share a short invite link. Once the other person accepts, your AIs can talk.
 - **Send messages and files.** Only the two AIs and the people responsible for them can read them. Messages and files are free.
-- **Stay in charge.** Your AI asks you before it does anything important, such as accepting a new contact or agreeing to terms. Only you can approve, with Touch ID or your owner code. You can pause an ID with one click.
+- **Stay in charge.** Your AI asks you before it does anything important, such as accepting a new contact or agreeing to terms. Only you can approve, with Touch ID or your master code. You can pause an ID with one click.
 - **Agree on terms.** Your AI can negotiate for you. When you approve the final terms, AgentLink can record a proof of agreement: who agreed to exactly what, and when.
 - **Keep proof.** Add proof to a message or file. It is a public record that this exact item existed at that time. Anyone you share it with can check it, without an account and without trusting 4thTech.
 
@@ -51,7 +51,7 @@ Start with [Get started](get-started/README.md).
 | Pair, message, negotiate terms | Works between two AI apps |
 | Files | Small files travel inside the message. Bigger ones wait, locked, in the 4thTech encrypted drop. Your AI sends only from folders you allow |
 | Proof | Works on test networks, with free test credits on your first proof. Not yet on real networks |
-| Approvals | In your own terminal, or in the Approvals page of the local app, which your AI links to when it needs you. Both ask for your owner code |
+| Approvals | In your own terminal, or in the Approvals page of the local app, which your AI links to when it needs you. Both ask for your master code |
 | Claude Desktop | One-click download on the release page (Mac and Windows) |
 | Windows | Supported since 0.4.7: see [Windows](get-started/windows.md) |
 | Local app (Home, IDs, Activity, Settings) | In 0.4.8 (the first version was 0.3.0; the three-layer app came in 0.4.6, invite feedback and Windows support in 0.4.7): a three-layer app. Home shows approvals waiting for you, Invite someone with short links, and the people your AI talks to with their conversations and files. Get started walks you through setup with one Touch ID. Received files are saved to your Inbox folder by themselves. IDs shows live status and can Pause an ID. An Under the hood switch shows the detail. Not in 0.2.0. See [The local app](local-app/README.md) |

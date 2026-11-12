@@ -35,7 +35,7 @@ const SAMPLES: Record<string, string | number> = {
   appName: 'Claude Code',
   agent: 'writer',
   code: '123456',
-  codeName: 'owner code',
+  codeName: 'master code',
   index: 1,
   approvalId: 'apr_1',
   approved: 3,

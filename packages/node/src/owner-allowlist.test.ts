@@ -68,7 +68,9 @@ function scripted(answers: string[]) {
 }
 
 const codeShown = (written: readonly string[]): string =>
-  (written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice('Your owner code: '.length);
+  (written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(
+    'Your master code: '.length,
+  );
 
 async function ready() {
   const keychain = new FakeKeychain();

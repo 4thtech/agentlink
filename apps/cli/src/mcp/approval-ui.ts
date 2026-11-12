@@ -9,7 +9,7 @@
 //   The agent sees it, so it holds no secret. It grants nothing on its own: the page and the API need
 //   the session cookie, which only the one-shot session link gives, and that link goes only to the
 //   OS browser opener (`server.open`), never into a result, a log line or an error. A decision needs
-//   owner presence (the owner code or the localhost passkey) on top of the session (08 §1).
+//   owner presence (the master code or the localhost passkey) on top of the session (08 §1).
 // - The owner is alerted at most once per BROWSER_OPEN_INTERVAL_MS across all requests (IR-M1-11a-b-1
 //   L-3): the browser opens with the one-shot link, or, when no browser could be opened, the fixed OS
 //   notification is raised (08 §1: "Opens automatically (or via OS notification)"). Requests inside

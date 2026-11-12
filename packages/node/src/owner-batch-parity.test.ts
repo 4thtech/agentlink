@@ -7,7 +7,7 @@
 //   clock and nonce and the reviewed requests in another order, produces the vector's JCS byte for
 //   byte, so its bodyHash and signatureInput match too, and the vector's signature verifies over
 //   node's body in core.
-// - decideReviewedWith itself (a real owner store, the owner code at a scripted prompt) signs a batch
+// - decideReviewedWith itself (a real owner store, the master code at a scripted prompt) signs a batch
 //   that core verifies, and that differs from the vector only in `owner` (the owner key is this
 //   test's, not the vector's).
 import { readFileSync } from 'node:fs';
@@ -218,7 +218,7 @@ describe('node approval.decideBatch matches the M1-2e vectors byte for byte (M1-
       let shown = '';
       const setup = terminalWith(() => shown.slice(-4));
       setup.terminal.write = (text) => {
-        if (text.startsWith('Your owner code: ')) shown = text.slice('Your owner code: '.length);
+        if (text.startsWith('Your master code: ')) shown = text.slice('Your master code: '.length);
       };
       const { owner } = await initOwnerWith(
         keychain,

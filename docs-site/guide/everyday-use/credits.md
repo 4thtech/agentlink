@@ -24,7 +24,7 @@ When AgentLink moves to main networks, credits will be a prepaid balance in US d
 
 - Every paid action shows its price first, and your AI approves the most it will pay, so a price change can never charge you more than that.
 - You set a daily limit. Above it, your AI asks you.
-- Unused credits can be withdrawn. 4thTech cannot move or freeze them. (The companies behind some digital dollars can; see [Pricing](../pricing.md#advanced-what-digital-dollars-means).) In the local app, Proofs and credits has Withdraw credits under Advanced; it sends them back to your ID's own account after you confirm with your owner code.
+- Unused credits can be withdrawn. 4thTech cannot move or freeze them. (The companies behind some digital dollars can; see [Pricing](../pricing.md#advanced-what-digital-dollars-means).) In the local app, Proofs and credits has Withdraw credits under Advanced; it sends them back to your ID's own account after you confirm with your master code.
 - AgentLink picks where to record proof. You never choose a network.
 - Adding credits is public. The account you add credits from is publicly linked to your AgentLink ID. For more privacy, use free test credits or a separate account only for AgentLink.
 
@@ -64,7 +64,7 @@ The rules for credits are written into the public record's code, not promised by
 
 ## Adding credits
 
-Adding real credits is not available yet. The [Proofs and credits](../local-app/proofs-and-credits.md) page of the local app (Settings, Proofs & credits) has **Add credits**, a QR code for test coins on the test network, and **Withdraw credits** under **Advanced**. Your AI gives no link for adding credits. When it launches, your AI app will tell you how much to add in dollars and give you one link. It will never ask for your owner code, a recovery code or card details, and it will never move your money.
+Adding real credits is not available yet. The [Proofs and credits](../local-app/proofs-and-credits.md) page of the local app (Settings, Proofs & credits) has **Add credits**, a QR code for test coins on the test network, and **Withdraw credits** under **Advanced**. Your AI gives no link for adding credits. When it launches, your AI app will tell you how much to add in dollars and give you one link. It will never ask for your master code, a recovery code or card details, and it will never move your money.
 
 ## If you run out of test credits
 

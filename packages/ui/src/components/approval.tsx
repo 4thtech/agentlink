@@ -118,7 +118,7 @@ export interface ApprovalCardProps {
   remember?: { reason: RememberReason; contact: ContactNameInput; rule: string };
   onRememberChange?: (remember: boolean) => void;
   state?: ApprovalState;
-  /** The presence method named on the button: "Touch ID", "owner code", "owner passphrase"… */
+  /** The presence method named on the button: "Touch ID", "master code", "owner passphrase"… */
   method?: string;
   onApprove?: () => void;
   onDeny?: () => void;

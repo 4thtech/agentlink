@@ -134,7 +134,7 @@ const STATUS: Readonly<Record<ConnectionState, readonly [cls: string, word: stri
 };
 
 /**
- * M1-UX-FIRSTRUN-V2-c: true when the owner exists but approves only with the backup code (no
+ * M1-UX-FIRSTRUN-V2-c: true when the owner exists but approves only with the master code (no
  * passkey) and this browser can make one. Any failure is false: the next step is a nudge, never a
  * gate, and nothing about it can be skipped or completed from here.
  */

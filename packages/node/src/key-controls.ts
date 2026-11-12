@@ -12,7 +12,7 @@
 //   the quarantined store, restore-quarantine.ts) and writes one agent's items at once, never over
 //   an existing item or `.alks` (D-115 C), with `storage-mark` as `{"v":1,"active":null}`. On a
 //   machine with an owner item it needs a session of the paired OwnerKeyStore whose owner is the
-//   kit's. importOwner writes the owner seed under a new generated owner code with the `owner-next`
+//   kit's. importOwner writes the owner seed under a new generated master code with the `owner-next`
 //   protocol (keychain machines; a file-machine owner fails closed, as `owner init` does there).
 // - StorageCredentialControl writes and deletes `s3:<id>` under the agent's inter-process lock.
 // - ownStorageKeysOver is core's OwnStorageKeys (M1-9i-a) over the same items.

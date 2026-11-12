@@ -6,7 +6,7 @@
 //   plain text, display only).
 // - `POST /api/ui/join/accept`: an owner route. The input `{inviteId}` (the ID this screen shows)
 //   travels base64url JSON in `X-AgentLink-Input`; the presence proof is the body (the passkey
-//   assertion with `X-AgentLink-Presence: passkey`, or the backup code). The server signs; the page
+//   assertion with `X-AgentLink-Presence: passkey`, or the master code). The server signs; the page
 //   never does.
 // - `POST /api/ui/join/dismiss` ("Not now"): the invite kind, an octet-stream body `{}`.
 // Every non-GET carries the page's generation in `X-AgentLink-Generation`: the app's fetch guard
@@ -61,7 +61,7 @@ export type JoinRead =
       readonly state: JoinState;
       readonly invite?: JoinInvite;
       readonly agent?: string;
-      /** W4-PEOPLE-INVITE: when connected, the new contact's ref (for its safety code). */
+      /** W4-PEOPLE-INVITE: when connected, the new contact's ref (for its Contact check). */
       readonly contactRef?: string;
     }
   | { readonly kind: 'session_expired' | 'offline' | 'not_available' | 'failed' };

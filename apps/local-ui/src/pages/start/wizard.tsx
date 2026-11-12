@@ -2,7 +2,7 @@
 // "Connected", A3 "Invite someone"): the frame and the steps that hold no secret. The frame is the
 // focused column's own header: the brand, a four-segment progress bar with "Step n of 4 · …" and
 // "Skip to Home" on every step. The connect step's gesture lives in the first-run page (it holds the
-// one-time backup code); this file only draws.
+// one-time master code); this file only draws.
 //
 // Motion comes from the U0 kit only (al-reveal, al-pop, al-draw, al-press); under reduced motion the
 // kit turns every one into a fade. Names from the server (an app, the agent) are rendered as text.

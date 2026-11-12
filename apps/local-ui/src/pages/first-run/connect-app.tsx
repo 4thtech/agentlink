@@ -81,7 +81,7 @@ export function ConnectApp({
   const [view, setView] = useState<View>({ k: 'loading' });
   const [info, setInfo] = useState<PasskeyInfo | undefined | 'unknown'>('unknown');
   const [code, setCode] = useState('');
-  // FB-8: the owner chose the backup code although a passkey is here.
+  // FB-8: the owner chose the master code although a passkey is here.
   const [codeChosen, setCodeChosen] = useState(false);
   const [message, setMessage] = useState<string | undefined>(undefined);
   const live = useRef(true);
@@ -311,7 +311,7 @@ export function ConnectApp({
           >
             {useCode ? T.applyCode : T.apply(sensor)}
           </Button>
-          {/* FB-8: the backup code is always a way to confirm, also with a passkey here. */}
+          {/* FB-8: the master code is always a way to confirm, also with a passkey here. */}
           {useCode || info === 'unknown' ? null : (
             <UseCodeInstead
               onClick={() => {

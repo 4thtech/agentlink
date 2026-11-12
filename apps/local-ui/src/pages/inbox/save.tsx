@@ -2,7 +2,7 @@
 // by the Inbox (Needs you and the conversation) and Files, Received.
 //
 // Click "Save to Inbox", then the presence step: "Confirm with your passkey" when this computer has
-// one, the backup code below it (the same step as an approval, approvals/card.tsx OwnerStep). The
+// one, the master code below it (the same step as an approval, approvals/card.tsx OwnerStep). The
 // passkey is asked only after the click (11 §6.2.1). Only the item's ID is sent (save-api.ts); the
 // saved name shows when the list is read again ("Saved as", untrusted text). Status lines are fixed
 // strings: never the sender's file name (I-5).
@@ -83,7 +83,7 @@ export function SaveFile({
       onSaved?.();
       return;
     }
-    // A dismissed passkey prompt keeps the step open for the backup code; anything else brings the
+    // A dismissed passkey prompt keeps the step open for the master code; anything else brings the
     // button back so the owner can try again.
     if (a.kind !== 'dismissed') setStep(undefined);
   };

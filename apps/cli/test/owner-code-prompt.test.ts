@@ -1,10 +1,10 @@
-// M1-9zd: the owner code typed at a shell prompt (the M1-9z incident: an owner code typed into a
+// M1-9zd: the master code typed at a shell prompt (the M1-9z incident: a master code typed into a
 // shell and a chat). Two guards, both UX only (04 §2.5, §2.8; G-1, D-67), never a security boundary:
 //
-// - Before every owner code prompt the owner commands say, in fixed text, that the code goes only
+// - Before every master code prompt the owner commands say, in fixed text, that the code goes only
 //   at the prompt: it isn't a shell command and never goes into a chat (11 §5.5, §6.10). A wrong
 //   code gets the same reminder.
-// - An argument shaped like a generated owner code (04 §2.8 `password` kind 1: 24 base32
+// - An argument shaped like a generated master code (04 §2.8 `password` kind 1: 24 base32
 //   characters, spaces and dashes ignored, `0`/`1`/`8` read as `O`/`I`/`B`) stops the command
 //   before anything runs, with fixed text that never echoes it (I-1, I-5), and says how to change
 //   the code.
@@ -31,7 +31,7 @@ import type { TerminalContext } from '../src/runtime/guards.js';
 
 const TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
 
-// Shaped like a generated owner code, made up for these tests: 24 characters of A–Z and 2–7.
+// Shaped like a generated master code, made up for these tests: 24 characters of A–Z and 2–7.
 const CODE = 'QF7K2MZDH4XTWR6JPL3NAEBC';
 const GROUPS = ['QF7K', '2MZD', 'H4XT', 'WR6J', 'PL3N', 'AEBC'];
 
@@ -66,7 +66,7 @@ function dispatcherRecording() {
   };
 }
 
-describe('an owner code typed as part of a command (M1-9zd)', () => {
+describe('a master code typed as part of a command (M1-9zd)', () => {
   const typedInCommands: string[][] = [
     ['approve', CODE],
     ['approve', 'apr_AAAAAAAAAAAAAAAAAAAAAA', CODE],
@@ -172,7 +172,7 @@ const OWNER: OwnerPublicKeys = {
   ownerEnc: new Uint8Array(32).fill(3),
 };
 
-/** Deps whose owner steps record what was printed when the owner code prompt would appear. */
+/** Deps whose owner steps record what was printed when the master code prompt would appear. */
 function machine(options: { readonly cardOwner?: boolean } = {}) {
   const out: string[] = [];
   const err: string[] = [];
@@ -234,7 +234,7 @@ function machine(options: { readonly cardOwner?: boolean } = {}) {
   };
 }
 
-describe('the owner code prompt says where the code goes (M1-9zd; 11 §5.5, §6.10)', () => {
+describe('the master code prompt says where the code goes (M1-9zd; 11 §5.5, §6.10)', () => {
   it('owner change-code: the reminder is the last line before the prompt', async () => {
     const m = machine();
     expect(await m.run(['owner', 'change-code'])).toBe(0);
@@ -337,7 +337,7 @@ describe('withOwnerPrompts (M1-9zd)', () => {
   });
 });
 
-describe('a wrong owner code (M1-9zd)', () => {
+describe('a wrong master code (M1-9zd)', () => {
   it('owner change-code: node’s own refusal is kept; a bare presence_rejected gets the reminder', async () => {
     const out: string[] = [];
     const err: string[] = [];

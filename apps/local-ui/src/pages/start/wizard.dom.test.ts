@@ -2,7 +2,7 @@
 // W4-WIZARD acceptance (W4 UX v2 layer 1; artboards A1 to A3; D-140): Get started is four steps,
 // each its own route (`/start/app` → `/start/connect` → `/start/connected` → `/start/invite`), with
 // a progress bar and "Skip to Home" on every step. One Touch ID creates the agent and connects the
-// picked app; the backup code is still shown once; Connected ✓ (or E1: the agent kept, Connect
+// picked app; the master code is still shown once; Connected ✓ (or E1: the agent kept, Connect
 // offered); the invite step is optional. The same steps serve "Add agent" and "Connect another AI
 // app". The page mounts again on every step in the app, so these tests remount it per step too.
 import { lintVocabulary } from '@4thtech-io/ui';
@@ -357,7 +357,7 @@ describe('W4-WIZARD step 1: pick your AI app (A1)', () => {
   });
 });
 
-describe('W4-WIZARD step 2 → 3: one Touch ID, the backup code once, Connected ✓ (A1, A2; D-140)', () => {
+describe('W4-WIZARD step 2 → 3: one Touch ID, the master code once, Connected ✓ (A1, A2; D-140)', () => {
   it('Continue opens /start/connect: "Confirm it\'s you", the agent card, Connect with Touch ID', async () => {
     const { went } = await mount();
     await click(PICK_STEP.next('Claude Code'));
@@ -380,7 +380,7 @@ describe('W4-WIZARD step 2 → 3: one Touch ID, the backup code once, Connected 
     await click(CONNECT_STEP.connect('Touch ID'));
     expect(setup.begun).toEqual([{ label: 'Ana', app: 'claude-code' }]);
     expect(setup.finished).toHaveLength(1);
-    expect(h1()).toBe('Your backup code');
+    expect(h1()).toBe('Your master code');
     expect(host.querySelector('.al-secret-val')?.textContent?.replace(/\s/g, '')).toBe(
       CODE.replace(/\s/g, ''),
     );
@@ -398,7 +398,7 @@ describe('W4-WIZARD step 2 → 3: one Touch ID, the backup code once, Connected 
     expect(host.querySelector('[role="status"] h1')).toBeNull();
   });
 
-  it('an invite left waiting by `agentlink join` opens its screen after the backup code (U3-invite)', async () => {
+  it('an invite left waiting by `agentlink join` opens its screen after the master code (U3-invite)', async () => {
     const openJoin = vi.fn();
     const { went } = await mount({
       readJoin: () => Promise.resolve({ kind: 'ok', state: 'waiting' } as never),
@@ -464,7 +464,7 @@ describe('W4-WIZARD step 2 → 3: one Touch ID, the backup code once, Connected 
   });
 });
 
-describe('IR-W4-WIZARD-SEC-1 L1: leaving the backup code without "I saved it"', () => {
+describe('IR-W4-WIZARD-SEC-1 L1: leaving the master code without "I saved it"', () => {
   it('a path change away from step 2 drops the code (and records the kit as later), never hides it', async () => {
     // One mount followed by in-place path changes (Back/Forward, a typed address).
     const props: FirstRunPageProps = {
@@ -488,7 +488,7 @@ describe('IR-W4-WIZARD-SEC-1 L1: leaving the backup code without "I saved it"', 
     await settle();
     await click(PICK_STEP.next('Claude Code'));
     await click(CONNECT_STEP.connect('Touch ID'));
-    expect(h1()).toBe('Your backup code');
+    expect(h1()).toBe('Your master code');
     await act(async () => {
       history.pushState(null, '', '/start/connected');
       window.dispatchEvent(new PopStateEvent('popstate'));
@@ -778,7 +778,7 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
         (b) => b.textContent?.trim() === CONNECT_STEP.back,
       ).length;
     expect(backs()).toBe(1);
-    await click('Use a backup code instead');
+    await click('Use your master code instead');
     expect(host.querySelector('input[type="password"]')).not.toBeNull();
     expect(backs()).toBe(1);
   });

@@ -751,7 +751,7 @@ for (const backend of [keychainImportBackend(), fileImportBackend()]) {
 }
 
 describe.runIf(POSIX)('KeyImportControl: owner and snapshot checks', () => {
-  it('importOwner writes ALKO under a new generated owner code via owner-next (never the recovery code)', async () => {
+  it('importOwner writes ALKO under a new generated master code via owner-next (never the recovery code)', async () => {
     const owner = await makeOwner();
     const agent = await makeKeychainAgent(owner);
     const { kit, code } = await exportKit(owner, agent);

@@ -272,7 +272,7 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
     expect(result.structured.summary).not.toContain('EEEE');
   });
 
-  it('WAVE-030: status shows the owner fingerprint next to duplicate names only', async () => {
+  it('WAVE-030: status shows the ID tag next to duplicate names only', async () => {
     const client = fakeClient({
       counts: {
         inbox: [
@@ -564,7 +564,7 @@ describe('coreToolClient (read-only in fact, 06 §2.0)', () => {
 // ---- agentlink_list_contacts ----------------------------------------------------------------------
 
 describe('agentlink_list_contacts (06 §2.1)', () => {
-  it('ok: active contacts with pairing, check state, last activity and unread; no safety code', async () => {
+  it('ok: active contacts with pairing, check state, last activity and unread; no Contact check', async () => {
     const client = fakeClient({
       counts: { inbox: [{ contactId: B, unread: 5 }], requests: 9 },
       contacts: [
@@ -593,10 +593,10 @@ describe('agentlink_list_contacts (06 §2.1)', () => {
       'You have 2 contacts: \u201cMarko\u201d (self-declared), \u201cAna\u201d (self-declared).',
     );
     expect(client.calls).not.toContain('catchUp');
-    expect(dump(result).toLowerCase()).not.toContain('safety code');
+    expect(dump(result).toLowerCase()).not.toContain('Contact check');
   });
 
-  it('WAVE-030: duplicate names show the owner fingerprint in the summary; unique names stay as they were', async () => {
+  it('WAVE-030: duplicate names show the ID tag in the summary; unique names stay as they were', async () => {
     const client = fakeClient({
       contacts: [
         contact(B, display('oc-test'), { fingerprint: '1111\u00b72222' }),
@@ -1010,7 +1010,7 @@ describe('resolveContact (06 §2: ID, name; AMBIGUOUS_CONTACT with candidates)',
     ).not.toContain('CANARY');
   });
 
-  it('WAVE-030: two contacts that both declare the same name are told apart by owner fingerprint, and the self-declared name is never echoed', () => {
+  it('WAVE-030: two contacts that both declare the same name are told apart by ID tag, and the self-declared name is never echoed', () => {
     const twins = [
       contact(B, display('oc-test'), { fingerprint: '1111\u00b72222' }),
       contact(C, display('oc-test'), { fingerprint: '3333\u00b74444' }),

@@ -3,8 +3,8 @@
 // - "Invite someone" opens the Invite screen in place (and `?invite` opens it at once); Done
 //   closes it and the new pending row is there.
 // - The inviter's side of "Connected ✓": an open invite goes and a new paired contact arrives, and
-//   the page shows "You and {name} are connected" with the safety code.
-// - The person ⋯ menu carries Rename, Check safety code, Block (WP-12) and Remove.
+//   the page shows "You and {name} are connected" with the 12 digits.
+// - The person ⋯ menu carries Rename, Contact check, Block (WP-12) and Remove.
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -182,7 +182,7 @@ describe('W4-WIRE-2: a pasted invite link on the Invite screen (Decision 52 (3))
     expect(document.querySelector('[role="tab"]')).toBeNull();
   });
 
-  it('Paste it → Continue → Accept with the backup code → the Connected moment', async () => {
+  it('Paste it → Continue → Accept with the master code → the Connected moment', async () => {
     const state: State = { contacts: [], open: [] };
     await mount(state);
     // W5-PASTE-ENTRY: People's own way in is now the top-level "Someone invited you? Paste link".
@@ -197,7 +197,7 @@ describe('W4-WIRE-2: a pasted invite link on the Invite screen (Decision 52 (3))
     });
     await click('Continue');
     expect(text()).toContain('invites you to connect your AIs');
-    await click('Accept with your backup code');
+    await click('Accept with your master code');
     const code = document.querySelector<HTMLInputElement>('input[type="password"]')!;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
@@ -262,7 +262,7 @@ describe("People: the inviter's Connected moment (A7)", () => {
 });
 
 describe('People: the person ⋯ menu', () => {
-  it('Rename, Check safety code and Remove sit in the menu', async () => {
+  it('Rename, Contact check and Remove sit in the menu', async () => {
     await mount({ contacts: [marko], open: [] });
     await act(async () => {
       document.querySelector<HTMLButtonElement>('.ct-row')?.click();
@@ -270,7 +270,7 @@ describe('People: the person ⋯ menu', () => {
     await settle();
     await click('More for Marko');
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent);
-    // WP-12 (F-2): Block sits between Check safety code and Remove.
+    // WP-12 (F-2): Block sits between Contact check and Remove.
     expect(items).toEqual([I.rename, I.checkCode, I.block, I.remove]);
     expect(S.block).toBe(I.block);
     expect(S.unblock).toBe(I.unblock);

@@ -45,7 +45,7 @@ This is the one thing your AI can never do for you. Run it **in your own termina
   npx -y @4thtech-io/agentlink@latest owner init --agent <name>
   ```
 
-  It shows a generated owner code once and asks you to type its last four characters back. Keep the code in your password manager. Never type it into a chat with your AI.
+  It shows a generated master code once and asks you to type its last four characters back. Keep the code in your password manager. Never type it into a chat with your AI.
 
 - **Every further ID on the same computer** (a second AI tool): in 0.4.6 you can add it in the app (the ID menu at the top or **IDs**, then **New ID**: name, AI app, one Touch ID; see [IDs](../local-app/ids.md)). In the terminal, run `init` for it as in step 2, then, in your own terminal:
 
@@ -53,7 +53,7 @@ This is the one thing your AI can never do for you. Run it **in your own termina
   npx -y @4thtech-io/agentlink@latest owner add-agent --agent <name>
   ```
 
-  It asks for your owner code once and does not change it. A second `owner init` is refused.
+  It asks for your master code once and does not change it. A second `owner init` is refused.
 
 The same step also creates an empty `AgentLink/Send` folder in your home folder. It is the first place your AI may send files from. Details: [Protect your approvals](protect-your-approvals.md).
 
@@ -71,7 +71,7 @@ Say you set up Claude Code (`claude`) and Codex (`codex`) and want them to talk.
 
 1. In Claude Code ask: "Create an AgentLink invite for my Codex." You get a link that works once and expires after 7 days.
 2. In Codex ask: "Accept this AgentLink invite: (the link)."
-3. A new contact needs your approval. Codex gives you a command like `npx -y @4thtech-io/agentlink@latest approve <approval ID>`, or shows a link that opens Approvals in the local app. Use either one yourself, check who and what, and enter your owner code.
+3. A new contact needs your approval. Codex gives you a command like `npx -y @4thtech-io/agentlink@latest approve <approval ID>`, or shows a link that opens Approvals in the local app. Use either one yourself, check who and what, and enter your master code.
 4. Codex continues once you have approved. If it does not, tell it you approved.
 5. Test it. In Claude Code ask "Tell my Codex the build is green", then in Codex ask "Any new AgentLink messages?".
 

@@ -1,5 +1,5 @@
 // `agentlink invite` (M1-9l; 06 §8, §7.1; 11 §6.1, §6.10): creates a single-use invite and prints
-// the link on its own line, the ready-to-send share text and where the safety code is compared.
+// the link on its own line, the ready-to-send share text and where the 12 digits are compared.
 // Needs no owner presence (the invite carries only the agent's own signed card, 04 §3.6). The link
 // holds the invite secret: it is printed to the terminal the user asked in and goes nowhere else
 // (never a log line, I-7). W4-SHORT-INVITE (D-139 (7)): the link is short by default (the encrypted

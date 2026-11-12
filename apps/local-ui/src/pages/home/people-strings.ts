@@ -78,10 +78,10 @@ export const HOME_STRINGS = {
   proofNo: 'None',
 
   // Contact facts (pro).
-  fingerprint: 'Fingerprint',
+  fingerprint: 'ID tag',
   identity: 'Identity',
-  identityChecked: 'Safety code checked',
-  identityNotChecked: 'Safety code not checked yet',
+  identityChecked: 'Contact checked',
+  identityNotChecked: 'Contact check not done yet',
   paired: 'Paired',
   handledBy: 'Handled by',
 
@@ -109,7 +109,7 @@ export const HOME_STRINGS = {
 
   // The ⋯ menu.
   rename: 'Rename',
-  checkSafetyCode: 'Check safety code',
+  checkSafetyCode: 'Contact check',
   remove: 'Remove',
   nameInList: 'Name in your list',
   save: 'Save',
@@ -122,14 +122,14 @@ export const HOME_STRINGS = {
   connectionRemoved: '{name} removed this connection',
   connectionRemovedBody:
     "{name} removed this connection. Your AI can't send to them any more. Your conversation and saved files stay here.",
-  checked: 'Safety code checked.',
+  checked: 'Contact checked.',
   codeLead: 'Compare this code with {name}, on a call or in person.',
-  codeLoading: 'Getting the safety code…',
-  codeUnavailable: "The safety code can't be shown right now. Try again later.",
+  codeLoading: 'Getting the 12 digits…',
+  codeUnavailable: "The 12 digits can't be shown right now. Try again later.",
   theyMatch: 'They match',
   theyDontMatch: "They don't match",
-  alreadyChecked: "You've already checked {name}'s safety code.",
-  notPairedYet: 'The safety code appears once you and {name} are connected.',
+  alreadyChecked: "You've already done the Contact check with {name}.",
+  notPairedYet: 'The 12 digits appear once you and {name} are connected.',
 
   // Approvals on Home.
   approvalsLabel: 'Waiting for your approval',

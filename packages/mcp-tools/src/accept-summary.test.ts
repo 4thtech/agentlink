@@ -1,6 +1,6 @@
 // IR UX2-d1 (Medium): `agentlink_accept_invite` asks the owner with core's one accept summary, the
 // same text the local app's accept route and the CLI use, so one request (reused through findOpen)
-// shows the same words on every surface: name, label and short owner fingerprint (04 §3.6 Accept
+// shows the same words on every surface: name, label and short ID tag (04 §3.6 Accept
 // step 2).
 import { acceptInviteSummary, encodeInviteLink, type PendingContact } from '@4thtech-io/core';
 import { encodeBase64url } from '@4thtech-io/crypto';
@@ -47,7 +47,7 @@ async function aLink(): Promise<string> {
 }
 
 describe('the accept summary (IR UX2-d1 M)', () => {
-  it('the tool asks with core acceptInviteSummary, which carries the owner fingerprint', async () => {
+  it('the tool asks with core acceptInviteSummary, which carries the ID tag', async () => {
     const summaries: string[] = [];
     const context = {
       approvalNextStep: () => 'Approve it.',

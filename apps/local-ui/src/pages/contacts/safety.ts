@@ -1,4 +1,4 @@
-// W5-SAFETY-STEP: one rule for "this contact's safety code can be compared", shared by Home's Get
+// W5-SAFETY-STEP: one rule for "this contact's Contact check can be compared", shared by Home's Get
 // started step and the contact's detail panel, so the two never disagree; and the deep link from
 // Home to that contact's code. The link holds a contact's reference only (the same one the page's
 // own API paths use), never a code. Completion stays the owner-signed "They match" (I-4): nothing
@@ -18,7 +18,7 @@ export function firstToCompare(rows: readonly ContactRow[]): ContactRow | undefi
   return rows.filter(canCompareCode).sort((a, b) => a.since - b.since)[0];
 }
 
-/** `/contacts?check=<ref>`: opens that contact's panel at its safety code. */
+/** `/contacts?check=<ref>`: opens that contact's panel at its Contact check. */
 export function checkHref(ref: string): string {
   return `${INTERIM_PEOPLE_PATH}?${CHECK_PARAM}=${encodeURIComponent(ref)}`;
 }

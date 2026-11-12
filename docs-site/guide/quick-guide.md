@@ -45,7 +45,7 @@ On a new computer the app opens on **Get started**. Under **Which AI app do you 
 An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.
 
 1. Press **Connect with Touch ID** (on Windows, **Connect with Windows Hello**). This creates the ID for your AI app and adds AgentLink to it. Your AI cannot approve this for you.
-2. If the app shows a backup code, save it in a password manager right away. It is shown once.
+2. If the app shows a master code, save it in a password manager right away. It is shown once.
 3. The screen says **Connected to** your AI app. If the AI app was open, **quit it and open it again** (in Claude Code, close the session and start `claude` again). It only picks up AgentLink after a restart. Until then Home shows **Connected · restart {app} to start**, which is normal. When it says **Ready in {app}**, you can go on.
 
 You can skip step 4 of Get started ("Invite someone") and do it from Home. **Skip for now** and **Done, go to Home** both work.
@@ -69,7 +69,7 @@ They need nothing installed yet. They open your link in a browser and see the in
 
 Then they check the name on screen and press **Accept with Touch ID** (on Windows, **Accept with Windows Hello**). **Both of you now see "You're connected with {name}".** (Before 0.4.9 the person who accepted never saw this screen. It now appears on both sides.)
 
-Both sides should then compare the **Safety code** by phone or in person. If the numbers match, press **They match**. If they do not, do not send anything: choose **Remove** for that person and invite them again.
+Both sides should then compare the **Contact check** by phone or in person. If the numbers match, press **They match**. If they do not, do not send anything: choose **Remove** for that person and invite them again.
 
 ## 6. Talk through your AI
 

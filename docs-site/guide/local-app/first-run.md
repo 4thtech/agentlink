@@ -1,4 +1,4 @@
-# First run and your backup code
+# First run and your master code
 
 *Applies to AgentLink 0.4.8. The Welcome page and the separate first-run steps from 0.4.4 are replaced by [Get started](get-started-wizard.md).*
 
@@ -13,24 +13,24 @@ First run is the short path that sets you up as the owner of your ID. It takes o
 
 Coming from an invite link? The same steps run, and the page ends on **Accept** the inviter's **invite?** See [Join from an invite](../get-started/join-from-an-invite.md).
 
-## What the backup code is for
+## What the master code is for
 
-The backup code approves things when Touch ID is not available, for example in another browser. Nobody can get it back for you, not even 4thTech. Never give it to your AI or paste it into a chat.
+The master code approves things when Touch ID is not available, for example in another browser. Nobody can get it back for you, not even 4thTech. Never give it to your AI or paste it into a chat.
 
-When the app shows your code once, you can **Copy** it (the button then says **Copied**; if copying is blocked you are told), select it in one piece, or **Save as file** to keep it as a small text file on your computer. Every backup code field has **Show** and **Hide**, and accepts a pasted code even with line breaks or long dashes. If you set up without a passkey, the last screen says "Save your backup code — you need it to approve."
+When the app shows your code once, you can **Copy** it (the button then says **Copied**; if copying is blocked you are told), select it in one piece, or **Save as file** to keep it as a small text file on your computer. Every master code field has **Show** and **Hide**, and accepts a pasted code even with line breaks or long dashes. If you set up without a passkey, the last screen says "Save your master code — you need it to approve."
 
 ## If you set up before 0.3.0
 
 If you set up AgentLink in the terminal before the local app, your approvals use a code. The app offers **Switch to Touch ID** (**Switch to Windows Hello** or **Switch to a passkey** on other computers), and the note goes away as soon as Touch ID is set up.
 
 1. Press **Switch to Touch ID**.
-2. Type your backup code once. The page may call it the code `owner init` printed.
+2. Type your master code once. The page may call it the code `owner init` printed.
 3. Touch the sensor. The page says **Touch ID is on**.
 
-From then on you approve with a touch. Your backup code keeps working when the sensor isn't available, so keep it saved. Never give the code to your AI.
+From then on you approve with a touch. Your master code keeps working when the sensor isn't available, so keep it saved. Never give the code to your AI.
 
 ## If your browser has no passkey
 
-The page tells you which browser works, or lets you continue with the backup code only. Nothing breaks. See [Protect your approvals](../get-started/protect-your-approvals.md).
+The page tells you which browser works, or lets you continue with the master code only. Nothing breaks. See [Protect your approvals](../get-started/protect-your-approvals.md).
 
 Back to [The local app](README.md).

@@ -4,7 +4,7 @@
 // its handler gets the context and the request. A mutating route (POST, PUT, PATCH, DELETE) must
 // declare `presence: true` (routes.ts refuses it otherwise): the approval server's central gate
 // checks owner presence before its handler runs, and the handler gets a one-use owner operation that
-// signs with the presence this request carried. No handler ever sees the owner code, the passkey
+// signs with the presence this request carried. No handler ever sees the master code, the passkey
 // assertion or the session values. M1-11s-c adds a third kind, `presence: 'setup'`, for owner setup
 // on the first-run page: no handler, run by the server's own setup gate. MSG-FILES-IO-h (D-134) adds
 // a fourth, `presence: 'reveal'`, for Show in Finder only: one fixed POST, no presence, no signing,
@@ -57,7 +57,7 @@ export interface LocalUiResult {
 /**
  * One owner operation with the presence this request carried (04 §2.5, D-68): `sign` runs once,
  * shows nothing (the page was the confirmation), and signs exactly the given objects (one, or the
- * pairs runOwnerGesture allows). A second call throws. A wrong owner code throws KeyStoreError
+ * pairs runOwnerGesture allows). A second call throws. A wrong master code throws KeyStoreError
  * `presence_rejected`, which the gate answers as 403 and counts towards the wrong-code backoff.
  */
 export interface LocalUiOwnerOperation {
@@ -167,7 +167,7 @@ export type LocalUiSetupStep = 'begin' | 'finish';
 /**
  * M1-11s-c: an owner setup route (D-120 (1)). It has no page handler: the approval server's own
  * setupGate runs the step (approval-server.ts, owner-setup.ts), so no page file ever touches the
- * owner seed, the PRF output or the owner code. Only POST, only under /api/ui/first-run/, one route
+ * owner seed, the PRF output or the master code. Only POST, only under /api/ui/first-run/, one route
  * per step (routes.ts). Reached only while no owner exists anywhere.
  */
 export interface LocalUiSetupRoute {
@@ -183,7 +183,7 @@ export type LocalUiPayConfirmStep = 'begin' | 'finish';
 /**
  * M1-PAY-CONFIRM-a: a paid-action confirmation route (04 §2.5.3, D-132). Like a setup route it has
  * no page handler: the approval server's own payConfirmGate runs the step (approval-server.ts,
- * pay-confirm.ts), so no page file ever touches the challenge, the assertion, the backup code or
+ * pay-confirm.ts), so no page file ever touches the challenge, the assertion, the master code or
  * the owner key. Only POST, only under /api/ui/pay-confirm/, one route per step (routes.ts).
  */
 export interface LocalUiPayConfirmRoute {
@@ -206,7 +206,7 @@ export const CREATE_AGENT_PATHS: Readonly<Record<LocalUiCreateAgentStep, string>
  * W4-ONE-TOUCH (D-140; 08 §1 `POST /api/ui/agents/begin` and `POST /api/ui/agents`): creating an
  * agent (and connecting its AI app) with one gesture. Like a pay-confirm route it has no page
  * handler: the approval server's own createAgentGate runs the step, so no page file ever touches the
- * held seed, the challenge, the assertion, the backup code or the owner key. Only POST, only these
+ * held seed, the challenge, the assertion, the master code or the owner key. Only POST, only these
  * two paths, one route per step (routes.ts).
  */
 export interface LocalUiCreateAgentRoute {

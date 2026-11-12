@@ -5,11 +5,11 @@
 // - Wrong or missing token → 401; a `Host` other than `localhost:<port>` (DNS rebinding, and
 //   `127.0.0.1:<port>`) and a foreign `Origin` are refused;
 //   no state change through a simple cross-site request (CSRF token, non-simple content type).
-// - The token grants viewing only: approving or denying needs the owner code or owner passphrase,
+// - The token grants viewing only: approving or denying needs the master code or owner passphrase,
 //   and produces an owner-signed `approval.decide` that the source (core) verifies and applies.
 // - Each approval ID is decided once through the server; a second decision is refused.
 // - The token never reaches a file, a log line, an event, an approval URL or an error body.
-// - The M1-8c same-user script, run against the live server, cannot approve without the owner code.
+// - The M1-8c same-user script, run against the live server, cannot approve without the master code.
 import { execFile } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { request as httpRequest, type IncomingHttpHeaders, type Server } from 'node:http';
@@ -111,7 +111,7 @@ beforeAll(async () => {
     write: (text) => void written.push(text),
     readSecret: () =>
       Promise.resolve(
-        encodeUtf8((written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(-4)),
+        encodeUtf8((written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(-4)),
       ),
     confirm: () => Promise.resolve(true),
     clearScreen: () => undefined,
@@ -122,8 +122,8 @@ beforeAll(async () => {
     { backend: 'keychain', env: {} },
     { kdf: KDF },
   ));
-  code = (written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(
-    'Your owner code: '.length,
+  code = (written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(
+    'Your master code: '.length,
   );
   expect(code).toMatch(/^[A-Z2-7 ]{29}$/);
 }, 60_000);
@@ -735,7 +735,7 @@ describe('Host and Origin checks (DNS rebinding, cross-site requests)', () => {
 });
 
 describe('owner presence for every decision (04 §2.5, I-4)', () => {
-  it('refuses to approve without the owner code, and with a wrong one', async () => {
+  it('refuses to approve without the master code, and with a wrong one', async () => {
     const h = await harness();
     h.source.add(1);
     const none = await decide(h, id(1), 'approve', undefined);
@@ -749,7 +749,7 @@ describe('owner presence for every decision (04 §2.5, I-4)', () => {
     expect(h.source.applied).toEqual([]);
   });
 
-  it('signs one approval.decide over exactly the shown request with the owner code', async () => {
+  it('signs one approval.decide over exactly the shown request with the master code', async () => {
     const h = await harness();
     const row = h.source.add(1);
     const res = await decide(h, id(1), 'approve', code);
@@ -768,7 +768,7 @@ describe('owner presence for every decision (04 §2.5, I-4)', () => {
     });
   });
 
-  it('denies with the owner code too', async () => {
+  it('denies with the master code too', async () => {
     const h = await harness();
     h.source.add(2);
     const res = await decide(h, id(2), 'deny', code);
@@ -1004,7 +1004,7 @@ describe('the agent-visible approval url (M1-11a-b, 06 §2.5, I-4)', () => {
   });
 });
 
-describe('the token and the owner code stay out of files, logs and URLs (08 §1, I-7)', () => {
+describe('the token and the master code stay out of files, logs and URLs (08 §1, I-7)', () => {
   it('never writes or logs them', async () => {
     const logged: string[] = [];
     const capture = (...args: unknown[]): void => void logged.push(args.map(String).join(' '));
@@ -1080,7 +1080,7 @@ describe('the token and the owner code stay out of files, logs and URLs (08 §1,
 });
 
 describe('the M1-8c same-user script against the running server (10 M1-8, D-67)', () => {
-  it('cannot approve or deny without the owner code, even holding the token', async () => {
+  it('cannot approve or deny without the master code, even holding the token', async () => {
     const jobFile = join(root, 'server-job.json');
     const outFile = join(root, 'server-script-result.json');
     /** A server with three pending requests, and the script's job file for it. */
@@ -1126,7 +1126,7 @@ describe('the M1-8c same-user script against the running server (10 M1-8, D-67)'
     // M1-11a: the wrong guesses also ran into the backoff.
     expect(result.attempts.some((a) => a.status === 429)).toBe(true);
 
-    // Harness control (not vacuous): the same script holding the owner code does approve. It runs
+    // Harness control (not vacuous): the same script holding the master code does approve. It runs
     // against a fresh server, since the guesses above left this one in the M1-11a backoff.
     const fresh = await serverWithJob();
     const leaked = await run(code);

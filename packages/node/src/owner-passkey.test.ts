@@ -1,18 +1,18 @@
 // M1-8e acceptance: the localhost passkey (WebAuthn PRF) path of the OwnerKeyStore (04 §2.2,
 // §2.3.1, §2.5; 08 §1; D-79, D-82; I-1, I-4).
 //
-// - Registration is its own owner operation on the localhost page: one entry of the owner code
+// - Registration is its own owner operation on the localhost page: one entry of the master code
 //   opens the `ALKO` owner item, the seed is sealed as `ALKP` v1 under the passkey's PRF output and
 //   stored as the keychain item `owner-passkey`; the `owner` item is unchanged; the seed, the owner
 //   code and the PRF output are wiped. One passkey per OS user in M1b: a second is refused.
 // - Unlock: the `passkey-prf` presence opens `owner-passkey` for exactly one owner operation; a
 //   wrong credential, a tampered blob, another owner and the other blob types (ALKO, ALKR, ALKS)
-//   are one refusal, and the owner code path keeps working.
+//   are one refusal, and the master code path keeps working.
 // - The assertion the page sends must name the stored credential, the owner as user handle, the
 //   RP ID `localhost` (rpIdHash) and the UP and UV flags; anything else is refused before unlock.
 // - The deferred M1-31 acceptance: a test registers and uses a PRF passkey on
 //   `http://localhost:<port>`, and requests with any other Host value are rejected.
-// - A PRF-less authenticator stores nothing and the owner code still decides.
+// - A PRF-less authenticator stores nothing and the master code still decides.
 // - No owner-seed or PRF bytes on disk after setup and after an operation (scan); the M1-8c
 //   same-user script with the passkey path enabled cannot approve without the PRF output.
 // The authenticator is the virtual one of passkey-authenticator.fixture.ts (no hardware).
@@ -151,7 +151,7 @@ beforeAll(async () => {
     write: (text) => void written.push(text),
     readSecret: () =>
       Promise.resolve(
-        encodeUtf8((written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(-4)),
+        encodeUtf8((written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(-4)),
       ),
     confirm: () => Promise.resolve(true),
     clearScreen: () => undefined,
@@ -162,8 +162,8 @@ beforeAll(async () => {
     { backend: 'keychain', env: {} },
     { kdf: KDF },
   ));
-  code = (written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(
-    'Your owner code: '.length,
+  code = (written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(
+    'Your master code: '.length,
   );
   expect(code).toMatch(/^[A-Z2-7 ]{29}$/);
 }, 60_000);
@@ -271,11 +271,11 @@ describe('registering the localhost passkey: one owner operation (04 §2.2, §2.
     expect(header.credentialId).toEqual(auth.credentialId);
     expect(header.ownerNostr).toEqual(owner.ownerNostr);
     expect(await readOwnerPasskeyHeader(keychain)).toEqual(header);
-    // The owner code path is unchanged: the `owner` item is byte-identical.
+    // The master code path is unchanged: the `owner` item is byte-identical.
     expect(await keychain.get(OWNER_ACCOUNT)).toEqual(ownerBefore);
   });
 
-  it('wipes the owner code and the PRF output it was given', async () => {
+  it('wipes the master code and the PRF output it was given', async () => {
     const auth = new VirtualPrfAuthenticator();
     const assertion = auth.create(owner.ownerNostr, salt);
     const secret = ownerCode();
@@ -285,7 +285,7 @@ describe('registering the localhost passkey: one owner operation (04 §2.2, §2.
     expect(prf.every((b) => b === 0)).toBe(true);
   });
 
-  it('refuses a wrong owner code and stores nothing (presence_rejected)', async () => {
+  it('refuses a wrong master code and stores nothing (presence_rejected)', async () => {
     const auth = new VirtualPrfAuthenticator();
     const assertion = auth.create(owner.ownerNostr, salt);
     await expectCode(
@@ -438,7 +438,7 @@ describe('unlocking with the passkey PRF (04 §2.3.1, §2.5)', () => {
         store.unlock({ kind: 'passkey-prf', prfOutput: auth.get(salt).prfOutput }),
       ).rejects.toMatchObject({ code: 'presence_rejected' });
     }
-    // The ALKP blob in the `owner` item never opens with the owner code.
+    // The ALKP blob in the `owner` item never opens with the master code.
     await keychain.set(OWNER_ACCOUNT, alkp);
     try {
       await expect(
@@ -452,7 +452,7 @@ describe('unlocking with the passkey PRF (04 §2.3.1, §2.5)', () => {
     await store.close();
   });
 
-  it('keeps the owner code path working after a passkey is registered', async () => {
+  it('keeps the master code path working after a passkey is registered', async () => {
     await register(new VirtualPrfAuthenticator());
     const store = await KeychainOwnerKeyStore.open(keychain, owner);
     const session = await store.unlock({ kind: 'passphrase', secret: ownerCode() });
@@ -488,7 +488,7 @@ describe('unlocking by the owner Nostr key, with no card (HOTFIX-045-REMOVE, 04 
     expiresAt: 2,
   });
 
-  it('unlocks with the owner code, derives exactly the stored owner, and wipes the code', async () => {
+  it('unlocks with the master code, derives exactly the stored owner, and wipes the code', async () => {
     const secret = ownerCode();
     const {
       store,
@@ -921,7 +921,7 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
     expect(h.source.applied).toEqual([]);
   });
 
-  it('a PRF-less authenticator registers nothing and the owner code still decides', async () => {
+  it('a PRF-less authenticator registers nothing and the master code still decides', async () => {
     const h = await harness();
     const plain = new VirtualPrfAuthenticator({ prf: false });
     const reg = await registerVia(h, code, plain.create(owner.ownerNostr, salt));
@@ -952,7 +952,7 @@ describe('the passkey on http://localhost:<port> (M1-31, D-79; 08 §1)', () => {
     expect(JSON.parse(res.body)).toMatchObject({ status: 'presence_rejected' });
   });
 
-  it('registration needs the owner code, and a second passkey is refused', async () => {
+  it('registration needs the master code, and a second passkey is refused', async () => {
     const h = await harness();
     const auth = new VirtualPrfAuthenticator();
     const wrong = await registerVia(

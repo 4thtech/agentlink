@@ -169,7 +169,7 @@ const posts = (url: string): Call[] => calls.filter((c) => c.method === 'POST' &
 
 async function confirmWithCode(): Promise<void> {
   await type(code(), '123456');
-  await click(button(host, 'Confirm with your backup code'));
+  await click(button(host, 'Confirm with your master code'));
 }
 
 describe('WP-1: the note shows wherever the owner looks', () => {

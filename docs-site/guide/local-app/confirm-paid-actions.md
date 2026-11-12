@@ -24,7 +24,7 @@ Everything else keeps its usual passkey or backup-code check. AgentLink does not
 3. Choose **Confirm with Touch ID** (or **Windows Hello**, or **your passkey**). Your computer shows its own prompt. Use your fingerprint, face or PIN there.
 4. The sheet shows a check and closes by itself after about a second. With reduced motion turned on, it waits for **Close**.
 
-No passkey, or it won't work? Choose **Use backup code instead** (a small link under the button) and type your backup code.
+No passkey, or it won't work? Choose **Use your master code instead** (a small link under the button) and type your master code.
 
 ## If something goes wrong
 
@@ -34,8 +34,8 @@ No passkey, or it won't work? Choose **Use backup code instead** (a small link u
 | **Couldn't confirm it was you. Try again.** | Try again with your fingerprint, face or PIN |
 | **Something changed since you opened this. Check it again.** | Read the new amounts, then confirm again |
 | **This request expired.** | Ask your AI to start again. Nothing was paid |
-| **Your passkey needs to be set up again for paid actions. Use your backup code this time.** | Use the backup code now. Setting Touch ID up again from the app is not available yet |
-| **That backup code didn't match.** | Check the code. After three wrong tries, start again |
+| **Your passkey needs to be set up again for paid actions. Use your master code this time.** | Use the master code now. Setting Touch ID up again from the app is not available yet |
+| **That master code didn't match.** | Check the code. After three wrong tries, start again |
 
 <details>
 

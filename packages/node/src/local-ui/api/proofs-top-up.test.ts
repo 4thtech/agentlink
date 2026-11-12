@@ -46,7 +46,7 @@ import { proofsRoutes } from './proofs.js';
 const AGENT = '0x71c4000000000000000000000000000000009a2e';
 const OTHER = '0x' + '22'.repeat(20);
 const XDAI = 10n ** 18n;
-const presence = (): OwnerPresence => ({ kind: 'passphrase', secret: encodeUtf8('owner code') });
+const presence = (): OwnerPresence => ({ kind: 'passphrase', secret: encodeUtf8('master code') });
 const OWNER = new MemoryOwnerKeyStore(new Uint8Array(32).fill(7), presence());
 let OWNER_NOSTR: Uint8Array = new Uint8Array(32);
 beforeAll(async () => {

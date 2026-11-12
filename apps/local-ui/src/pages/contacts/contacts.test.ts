@@ -215,7 +215,7 @@ describe('ContactsPage: the list', () => {
     await mount({ [LIST]: { status: 'ok', contacts: [marko, ana] } });
     expect(text()).toContain('Marko Novak');
     expect(text()).toContain('Not checked yet');
-    expect(text()).toContain('Safety code checked');
+    expect(text()).toContain('Contact checked');
     expect(text()).not.toMatch(/wallet|gas|seed phrase|transaction|address|hash|chain/i);
     // A paired contact never shows presence (X-11).
     expect(text()).not.toMatch(/online|last seen/i);
@@ -245,7 +245,7 @@ describe('ContactsPage: the list', () => {
   });
 });
 
-describe('ContactsPage: the safety code (04 §3.6.1)', () => {
+describe('ContactsPage: the 12 digits (04 §3.6.1)', () => {
   const routes = (extra: Routes = {}): Routes => ({
     [LIST]: { status: 'ok', contacts: [marko] },
     [`/api/ui/contacts/${MARKO}/safety-code`]: { status: 'ok', code: CODE },
@@ -263,7 +263,7 @@ describe('ContactsPage: the safety code (04 §3.6.1)', () => {
     expect(button(S.skip)).toBeDefined();
   });
 
-  it('UX-031-QUICKWINS: explains the safety code in one line', async () => {
+  it('UX-031-QUICKWINS: explains the 12 digits in one line', async () => {
     await mount(routes());
     expect(text()).toContain(
       'Compare these 12 digits with the other person by call or in person; if they match, it’s really them.',
@@ -314,7 +314,7 @@ describe('ContactsPage: the safety code (04 §3.6.1)', () => {
     expect(inputOf(sent[0] as Call)).toBeUndefined();
   });
 
-  it('a wrong owner code changes nothing and says so', async () => {
+  it('a wrong master code changes nothing and says so', async () => {
     await mount(
       routes({
         [`POST /api/ui/contacts/${MARKO}/check`]: new Answer(403, {
@@ -675,7 +675,7 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
   });
 });
 
-describe('ContactsPage: the Home link to a safety code (W5-SAFETY-STEP)', () => {
+describe('ContactsPage: the Home link to the 12 digits (W5-SAFETY-STEP)', () => {
   const open = async (search: string): Promise<void> => {
     history.replaceState(null, '', `/contacts${search}`);
     const s = server({

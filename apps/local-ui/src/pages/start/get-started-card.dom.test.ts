@@ -52,7 +52,7 @@ async function mount(s: SetupState | Promise<SetupState>): Promise<void> {
 }
 
 describe('W4-WIZARD: the Get started card (A4)', () => {
-  it('shows "Get started · 1 of 2 done", ticks for what is done, a link to the next step and the safety code as a suggestion', async () => {
+  it('shows "Get started · 1 of 2 done", ticks for what is done, a link to the next step and the 12 digits as a suggestion', async () => {
     await mount(state({ appConnected: false }));
     expect(host.querySelector('h2')?.textContent).toBe(CARD.title(1, 2));
     expect(host.textContent).toContain(CARD.connect);
@@ -60,7 +60,7 @@ describe('W4-WIZARD: the Get started card (A4)', () => {
     expect(host.querySelector('a')?.textContent).toBe(CARD.connect);
     const suggest = host.querySelector('.st-card-suggest');
     expect(suggest?.textContent).toContain(CARD.check('Denis'));
-    expect(host.querySelector('ul')?.textContent).not.toContain('safety code');
+    expect(host.querySelector('ul')?.textContent).not.toContain('Contact check');
     const segs = [...host.querySelectorAll('.st-seg')].map((s) => s.getAttribute('data-state'));
     expect(segs).toEqual(['current', 'done']);
     const result = await axe.run(host, { rules: { region: { enabled: false } } });
@@ -93,7 +93,7 @@ describe('W4-WIZARD: the Get started card (A4)', () => {
     expect(host.querySelector('section')).toBeNull();
   });
 
-  it('shows nothing once connected with someone (the safety code is only a suggestion), or while a read has no answer', async () => {
+  it('shows nothing once connected with someone (the 12 digits are only a suggestion), or while a read has no answer', async () => {
     await mount(state());
     expect(host.querySelector('section')).toBeNull();
     await mount(state({ appConnected: undefined, contacts: undefined }));

@@ -18,7 +18,7 @@ Say "Check AgentLink." or "Did Marko reply?" Messages from other agents are show
 
 ## 3. Send a file
 
-1. **Pick a folder your AI may send from.** Setup already made an empty `AgentLink/Send` folder in your home folder. Put the file there. If your AI was set up before AgentLink did this (your AI says no folder is allowed yet), run `npx -y @4thtech-io/agentlink@latest policy allow-send-folder` in a terminal you opened yourself first. To allow another folder, run this in a terminal you opened yourself and type your owner code: `npx -y @4thtech-io/agentlink@latest policy allow-folder ~/Documents/Shared`. More in [Folders for sending files](../everyday-use/allowed-folders.md).
+1. **Pick a folder your AI may send from.** Setup already made an empty `AgentLink/Send` folder in your home folder. Put the file there. If your AI was set up before AgentLink did this (your AI says no folder is allowed yet), run `npx -y @4thtech-io/agentlink@latest policy allow-send-folder` in a terminal you opened yourself first. To allow another folder, run this in a terminal you opened yourself and type your master code: `npx -y @4thtech-io/agentlink@latest policy allow-folder ~/Documents/Shared`. More in [Folders for sending files](../everyday-use/allowed-folders.md).
 2. **Ask your AI:** "Send ~/AgentLink/Send/report.pdf to Marko with a short note."
 3. **There is nothing else to set up.** A file up to about 12 KB travels inside the message. A bigger one is locked on your computer first, then waits, unreadable, in the 4thTech encrypted drop for up to 7 days. You need no account and no storage of your own.
 
@@ -42,7 +42,7 @@ Some actions wait for you: a new contact, agreeing to terms and, by your rules, 
 
 Your AI gives you a command, or shows a link that opens the request in the local app on your computer. The app also shows it as a card at the top of Home, with Approve and Deny. With the command, open a terminal yourself and run `npx -y @4thtech-io/agentlink@latest approve <approval ID>` (the ID looks like `apr_...`). With the link or the card, approve there with Touch ID. Either way you see who, what and the cost.
 
-While the page is open, your AI waits a short while for your decision, so you usually do not need to tell it. If it does not continue, tell it you are done. Never type the owner code into the chat. More in [Approvals](../everyday-use/approvals.md).
+While the page is open, your AI waits a short while for your decision, so you usually do not need to tell it. If it does not continue, tell it you are done. Never type the master code into the chat. More in [Approvals](../everyday-use/approvals.md).
 
 ## How delivery works
 

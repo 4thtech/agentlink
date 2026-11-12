@@ -2,7 +2,7 @@
 // UX2-g + U3-j (S1): the Start here card on Home (B-11 §27 v2; owner decision 7.1).
 // - Ticks come only from reads (health/passkey, contacts, messages, backup state), never a click,
 //   a timer or a copy. One primary button, on the next step; progress "x of 7"; no dismiss control.
-// - The safety code row is "(recommended)", uncounted, never the primary button, never holds the card.
+// - The 12 digits row is "(recommended)", uncounted, never the primary button, never holds the card.
 // - U3-j: Name, Connect your AI app (the agent's app and mark, Running), See the reply, and the
 //   "No one to invite yet?" path to a second agent of your own.
 // - A step done while you watch is announced politely; at the end "You're all set." shows for
@@ -173,7 +173,7 @@ describe('Start here: the card', () => {
     expect(text).toContain('Name this ID');
     expect(text).toContain('Connect your AI app');
     expect(text).toContain('Invite your first contact');
-    expect(text).toContain('Check the safety code with them');
+    expect(text).toContain('Contact check with them');
     expect(text).toContain('(recommended)');
     expect(text).toContain('Say hello');
     expect(text).toContain('See the reply arrive');
@@ -260,18 +260,18 @@ describe('Start here: the card', () => {
     expect(step('check').querySelectorAll('a, button').length).toBe(0);
   });
 
-  it('step 3 once they answered: Compare safety code, secondary, and step 4 stays the next step', async () => {
+  it('step 3 once they answered: Compare the 12 digits, secondary, and step 4 stays the next step', async () => {
     const live = fresh({ contacts: [contact()], sent: false });
     await mount(props(reads(live)));
     const link = step('check').querySelector('a');
-    expect(link?.textContent).toBe('Compare safety code');
-    // W5-SAFETY-STEP: the link opens that contact's panel at its safety code.
+    expect(link?.textContent).toBe('Compare the 12 digits');
+    // W5-SAFETY-STEP: the link opens that contact's panel at its Contact check.
     expect(link?.getAttribute('href')).toBe(checkHref(contact().ref));
     expect(link?.classList.contains('al-btn-primary')).toBe(false);
     expect(step('send').getAttribute('data-state')).toBe('next');
   });
 
-  it('step 3 ticks when a contact shows Safety code checked, without moving the count', async () => {
+  it('step 3 ticks when a contact shows Contact checked, without moving the count', async () => {
     const live = fresh({ contacts: [contact({ label: 'safety-code-checked' })], sent: false });
     await mount(props(reads(live)));
     expect(step('check').getAttribute('data-state')).toBe('done');

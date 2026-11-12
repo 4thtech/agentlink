@@ -300,7 +300,7 @@ describe('verify: the verdict first, the test network labelled (D-95, 05 §9.1 (
 });
 
 describe('verify: who made the record (06 §2.1 name rule)', () => {
-  it('this agent; a contact by its shown name; otherwise the owner fingerprint, never a pack name', async () => {
+  it('this agent; a contact by its shown name; otherwise the ID tag, never a pack name', async () => {
     const own = setup({
       verify: () => Promise.resolve(valid({ signer: AGENT_ID as `0x${string}` })),
     });

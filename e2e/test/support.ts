@@ -134,7 +134,7 @@ export async function setupAgent(options: {
   const seed = randomBytes(32);
   const code = encodeHex(randomBytes(16));
   options.canaries.addBytes(`${options.label} owner seed`, seed);
-  options.canaries.add({ name: `${options.label} owner code`, value: code });
+  options.canaries.add({ name: `${options.label} master code`, value: code });
   const presence = (): OwnerPresence => ({ kind: 'passphrase', secret: encodeUtf8(code) });
   const owner = new MemoryOwnerKeyStore(seed, presence());
   seed.fill(0);

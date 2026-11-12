@@ -197,7 +197,7 @@ describe('Save a recovery kit from the app (WP-11, F-1, D-117 A)', () => {
     expect(JSON.parse(res.body)).toEqual({ export: 'available' });
   });
 
-  it('with the owner code: signs and applies one backup.export, then writes an ALKK kit that opens with the code shown', async () => {
+  it('with the master code: signs and applies one backup.export, then writes an ALKK kit that opens with the code shown', async () => {
     const h = await harness();
     const res = await h.exportKit(world.code);
     expect(res.status).toBe(200);
@@ -272,7 +272,7 @@ describe('Save a recovery kit from the app (WP-11, F-1, D-117 A)', () => {
     expect(statSync(join(h.home, body.file)).isFile()).toBe(true);
   });
 
-  it('a wrong owner code signs nothing and writes no kit', async () => {
+  it('a wrong master code signs nothing and writes no kit', async () => {
     const h = await harness();
     const res = await h.exportKit('AAAA BBBB CCCC DDDD EEEE FFFF');
     expect(res.status).toBe(403);

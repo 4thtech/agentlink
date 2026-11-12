@@ -1,7 +1,7 @@
 // M1-8h (IR-M1-9b-1 M-3): the agent's first card, signed in `owner init` (04 §2.5: the owner setup
 // operation includes "the card signature at owner setup"; 04 §2.4, §2.9 `init`).
 //
-// `owner init` has just stored the new owner, and still holds the owner code it generated (or the
+// `owner init` has just stored the new owner, and still holds the master code it generated (or the
 // passphrase the owner typed twice). It unlocks the stored owner once with that secret (no second
 // entry: one entry, one owner operation, D-68 (1)) and hands core `identity.init` a session that can
 // do exactly one thing: sign one AgentCard (owner-allowlist.ts) that names this agent and this owner.

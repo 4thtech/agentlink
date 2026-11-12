@@ -77,7 +77,7 @@ export type SendFolderPlan =
 // Fixed copy (11 §5: "your rules", "your AI"; the path is local data shown only when printable).
 const COPY = {
   review: (folder: string): string =>
-    `Your owner code also sets your first rule: your AI can send files you put in ${folder} (empty for now). Nothing else on this computer can be sent. To remove it later, run \`${CLI_COMMAND} policy remove-folder ${folder}\`.`,
+    `Your master code also sets your first rule: your AI can send files you put in ${folder} (empty for now). Nothing else on this computer can be sent. To remove it later, run \`${CLI_COMMAND} policy remove-folder ${folder}\`.`,
   notEmpty: `The folder AgentLink/Send in your home folder already holds files, so it is not allowed for sending. To send files later, run \`${CLI_COMMAND} policy allow-folder <path>\` yourself.`,
   unavailable: `AgentLink couldn't set up the folder AgentLink/Send in your home folder, so no folder is allowed for sending. To send files later, run \`${CLI_COMMAND} policy allow-folder <path>\` yourself.`,
   allowed: (folder: string): string => `OK       Your AI can send files you put in ${folder}.`,

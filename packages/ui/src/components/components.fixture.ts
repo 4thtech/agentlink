@@ -28,7 +28,7 @@ export const fixtures: Record<string, () => ReactElement> = {
   'Button/primary': () => h(ui.Button, { variant: 'primary', icon: 'check' }, 'Save'),
   'Kbd/default': () => h(ui.Kbd, null, 'Ctrl'),
   'TextField/error': () =>
-    h(ui.TextField, { label: 'Owner code', hint: 'Letters and digits', error: 'Too short' }),
+    h(ui.TextField, { label: 'Master code', hint: 'Letters and digits', error: 'Too short' }),
   'Switch/off': () => h(ui.Switch, { label: 'Confirm deliveries', defaultChecked: false }),
   'Segmented/default': () =>
     h(ui.Segmented, {

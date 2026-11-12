@@ -83,7 +83,7 @@ describe('generationGuard (U3-c)', () => {
 // U3-g-b (IR-U3-g-b-1 H-1): first run with no agent yet opens the first agent in the same host, so
 // the successful setup `finish` answer carries a new generation. Only that answer, marked by the
 // server with `X-AgentLink-Generation-Adopted: 1`, makes the page adopt the new generation instead of
-// refreshing (the one-time backup code stays on screen); every other mismatch still refreshes.
+// refreshing (the one-time master code stays on screen); every other mismatch still refreshes.
 describe('generationGuard adopts the first agent after first run (U3-g-b)', () => {
   const FINISH = '/api/ui/first-run/owner/finish';
   interface Answer {

@@ -2,7 +2,7 @@
 // M1-PAY-CONFIRM-b (#581 audit Medium): where the authenticator evaluates PRF only when the passkey
 // is used, the upgrade takes one more gesture, and that get() carries no credential public key. The
 // body then carries the create() authenticator data as a fifth field, so the server can keep the key
-// for paid actions (04 §2.5.3 rule 5) instead of leaving the owner on the backup code.
+// for paid actions (04 §2.5.3 rule 5) instead of leaving the owner on the master code.
 import { afterEach, describe, expect, it } from 'vitest';
 import { createUpgradePasskey } from './passkey.js';
 
