@@ -42,7 +42,13 @@ for (const name of [
   'CLAUDE_CODE_ENTRYPOINT',
   'CODEX_SANDBOX',
   'CODEX_SANDBOX_NETWORK_DISABLED',
+  'CODEX_THREAD_ID',
   'GEMINI_CLI',
+  'OPENCODE',
+  'OPENCODE_CLIENT',
+  'CURSOR_AGENT',
+  'ANTIGRAVITY_AGENT',
+  'AI_AGENT',
 ]) {
   delete env[name];
 }

@@ -98,8 +98,16 @@ describe('GET /api/ui/files/received and /sent: registration (MSG-FILES-IO-d)', 
       expect(match).toBeDefined();
       expect(createLocalUiRoutes().match('POST', path)).toBe('method');
     }
-    expect(filesIoRoutes.every((r) => r.method === 'GET' && r.presence === false)).toBe(true);
-    // W4-AUTO-SAVE adds the notice's dismiss (a read-kind display-state route).
+    // Every route is a read, except the notice's dismiss: a display mark (R1-SEC-16, the mark kind).
+    expect(
+      filesIoRoutes.every(
+        (r) =>
+          (r.method === 'GET' && r.presence === false) ||
+          (r.method === 'POST' && r.presence === 'mark'),
+      ),
+    ).toBe(true);
+    expect(filesIoRoutes.filter((r) => r.presence === 'mark')).toHaveLength(1);
+    // W4-AUTO-SAVE adds the notice's dismiss.
     expect(filesIoRoutes).toHaveLength(3);
   });
 

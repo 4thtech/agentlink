@@ -108,7 +108,7 @@ const RISKY_NAMES: ReadonlySet<string> = new Set(['desktop.ini', 'autorun.inf'])
  * `.searchconnector-ms`; Linux `.desktop`) and, decided in Decision 51 (2026-10-30), those that run
  * when double-clicked from the folder (macOS `.webloc`, `.inetloc`, `.fileloc`, `.command`, `.tool`,
  * `.terminal`; Windows `.exe`, `.scr`, `.pif`, `.bat`, `.cmd`, `.ps1`, `.vbs`, `.js`, `.hta`, `.msi`,
- * `.website`, `.settingcontent-ms`).
+ * `.website`, `.settingcontent-ms`), and (R1-SEC-13) the other Windows double-click types below.
  */
 const RISKY_EXTENSIONS: ReadonlySet<string> = new Set([
   '.lnk',
@@ -135,6 +135,28 @@ const RISKY_EXTENSIONS: ReadonlySet<string> = new Set([
   '.msi',
   '.website',
   '.settingcontent-ms',
+  // R1-SEC-13 (04 §4.1, extended; proposed, owner confirms at merge): the other Windows types that
+  // run, install or mount on double-click (disk images: older Windows does not pass the
+  // Mark-of-the-Web to the files inside them).
+  '.com',
+  '.cpl',
+  '.vbe',
+  '.jse',
+  '.wsf',
+  '.wsh',
+  '.jar',
+  '.reg',
+  '.msc',
+  '.msp',
+  '.chm',
+  '.xll',
+  '.application',
+  '.appref-ms',
+  '.gadget',
+  '.iso',
+  '.img',
+  '.vhd',
+  '.vhdx',
 ]);
 
 /** True when `name` (already sanitised) gets `.download` before it is saved (04 §4.1). */

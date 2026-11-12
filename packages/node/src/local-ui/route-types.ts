@@ -471,7 +471,33 @@ export interface LocalUiRestoreRoute {
   readonly step: LocalUiRestoreStep;
 }
 
+/**
+ * R1-SEC-16 (routes.ts rule: a GET is a read; a change is a POST with Origin and an octet-stream
+ * body): the display marks, the `mark` kind. Only at MARK_PATHS: the auto-save notice's dismiss
+ * (D-142) and a contact's former-name seen mark (D-141), each registered once. The server's mark
+ * gate runs after the same session, CSRF, Origin, fetch-metadata, octet-stream and generation checks
+ * as every write, refuses a query, an `X-AgentLink-Input` or presence header and any body byte, and
+ * hands the handler only the context and the route parameters. No owner presence, nothing signed:
+ * display state only (07 §3: nothing is decided from it).
+ */
+export interface LocalUiMarkRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'mark';
+  readonly handler: (
+    context: LocalUiContext,
+    params: Readonly<Record<string, string>>,
+  ) => Promise<LocalUiResult>;
+}
+
+/** R1-SEC-16: the only paths of the mark kind. */
+export const MARK_PATHS: readonly string[] = Object.freeze([
+  '/api/ui/files/auto-save-notice/dismiss',
+  '/api/ui/contacts/:ref/name-seen',
+]);
+
 export type LocalUiRoute =
+  | LocalUiMarkRoute
   | LocalUiRestoreRoute
   | LocalUiPauseRoute
   | LocalUiUiSettingsRoute

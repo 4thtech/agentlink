@@ -8,7 +8,8 @@
 // - The page's top-level `autoSave` block (same read) carries the Inbox folder as the owner's own
 //   setting with the home folder shown as `~` (never inbound text), and `notice` while the one-time
 //   "Files you receive are now saved to {folder} automatically" notice is due.
-// - `GET /api/ui/files/auto-save-notice/dismiss` dismisses the notice (OK, or Settings from it).
+// - `POST /api/ui/files/auto-save-notice/dismiss` (the mark kind, R1-SEC-16) dismisses the notice
+//   (OK, or Settings from it).
 //   Display state only, like the former-name seen mark (D-141): no presence, nothing signed, nothing
 //   decided from it; idempotent. It writes one display flag in the agent's store.
 

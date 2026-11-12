@@ -10,7 +10,9 @@ import {
   type OsSeams,
 } from './approval-os.js';
 
-const URL_ = 'http://localhost:47321/approve/apr_AAAAAAAAAAAAAAAAAAAAAA?t=abc;rm -rf ~ $(x)';
+const URL_ = `http://localhost:47321/approve/apr_AAAAAAAAAAAAAAAAAAAAAA?t=${'A'.repeat(43)}`;
+// R2-10: these tests cover the fallback opener, used only when the default web browser is unknown
+// (the seams below find none). The launch-file path is in approval-os-launch.test.ts.
 const ALLOWED = new Set<string>([
   ...Object.values(OS_PROGRAMS),
   'D:\\Windows\\explorer.exe',
@@ -38,6 +40,11 @@ function seams(
         calls.push({ file, args: [...args], options: { ...options } });
         callback(null);
       },
+      home: '/home/me',
+      readOutput: () => Promise.resolve(undefined),
+      readText: () => Promise.resolve(undefined),
+      exists: () => Promise.resolve(true),
+      writeLaunchFile: () => Promise.reject(new Error('the fallback writes no launch file')),
       ...over,
     },
   };
@@ -48,16 +55,19 @@ describe('the browser opener (L-2, L-4)', () => {
     ['darwin', '/usr/bin/open'],
     ['linux', '/usr/bin/xdg-open'],
     ['freebsd', '/usr/bin/xdg-open'],
-  ] as const)('on %s runs %s with shell false and the url as one argument', async (p, program) => {
-    const { seams: s, calls } = seams(p);
-    expect(await browserOpenerWith(s)(URL_)).toBe(true);
-    expect(calls).toHaveLength(1);
-    const call = calls[0] as Call;
-    expect(call.file).toBe(program);
-    expect(ALLOWED.has(call.file)).toBe(true);
-    expect(call.args).toEqual([URL_]);
-    expect(call.options['shell']).toBe(false);
-  });
+  ] as const)(
+    'on %s (no default browser found) runs %s with shell false and the url as one argument',
+    async (p, program) => {
+      const { seams: s, calls } = seams(p);
+      expect(await browserOpenerWith(s)(URL_)).toBe(true);
+      expect(calls).toHaveLength(1);
+      const call = calls[0] as Call;
+      expect(call.file).toBe(program);
+      expect(ALLOWED.has(call.file)).toBe(true);
+      expect(call.args).toEqual([URL_]);
+      expect(call.options['shell']).toBe(false);
+    },
+  );
 
   // F40 (Windows 11, 0.4.10): explorer.exe <url> exits 1 whether or not a browser opened, so a
   // silent failure read as "opened". rundll32 url.dll,FileProtocolHandler hands the url to the
@@ -131,7 +141,8 @@ describe('the browser opener (L-2, L-4)', () => {
     });
     expect(await browserOpenerWith(s)(URL_)).toBe(false);
     expect(calls).toHaveLength(0);
-    expect(checked).toEqual(['/usr/bin/open']);
+    // The default-browser lookup and the fallback both check only the fixed absolute path.
+    expect(new Set(checked)).toEqual(new Set(['/usr/bin/open']));
   });
 
   it('resolves false when the program fails or throws', async () => {
