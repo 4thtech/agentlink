@@ -818,6 +818,14 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
           "type": "string",
         },
+        "delivery": {
+          "enum": [
+            "queued",
+            "sent",
+            "not_delivered",
+          ],
+          "type": "string",
+        },
         "envelopeId": {
           "pattern": "^[A-Za-z0-9_-]{22}$",
           "type": "string",

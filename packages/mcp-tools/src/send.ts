@@ -213,12 +213,21 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
     case 'ok': {
       const name = renderRef(ref);
       logger.info('message sent', { messages: 1, files: attached === undefined ? 0 : 1 });
+      // REL051-CF2: `delivery` says whether the relays took it (sent) or it waits (queued); a core
+      // that does not report it keeps the old answer.
+      const delivery = result.delivery;
       const fields = {
         envelopeId: result.envelopeId,
         thread: result.thread,
         sentAt: result.sentAt,
+        ...(delivery === undefined ? {} : { delivery }),
       };
-      const summary = copy('chat.status.ok.sent', { contactName: name, contactFirstName: name });
+      const summary =
+        delivery === 'queued'
+          ? copy('chat.status.ok.queued', { contactName: name })
+          : delivery === 'not_delivered'
+            ? copy('chat.status.ok.notDelivered', { contactName: name })
+            : copy('chat.status.ok.sent', { contactName: name, contactFirstName: name });
       let sentFields: Record<string, unknown> = fields;
       if (attached !== undefined) {
         const sent = result.files?.find((f) => f.index === 0);

@@ -699,6 +699,10 @@
           "type": "string",
           "maxLength": 64
         },
+        "delivery": {
+          "type": "string",
+          "enum": ["queued", "sent", "not_delivered"]
+        },
         "file": {
           "type": "object",
           "properties": {

@@ -135,7 +135,8 @@ export async function readSettingsState(get: Get): Promise<SettingsState> {
   const h = parseHealth(health);
   if (h !== undefined) {
     if (h.state === 'connected') out.health = 'working';
-    else if (h.state === 'not_running') out.health = 'reconnecting';
+    // REL051-CF2: no relay reachable is never "All working".
+    else if (h.state === 'not_running' || h.state === 'unreachable') out.health = 'reconnecting';
     if (h.version !== undefined) out.version = h.version;
   }
   return out;

@@ -500,6 +500,8 @@ const DEFINITIONS: readonly ToolDefinition[] = [
         envelopeId,
         thread: envelopeId,
         sentAt: timestamp,
+        // REL051-CF2: sent (the relays took it) or queued (it goes out when the network is back).
+        delivery: oneOf(['queued', 'sent', 'not_delivered']),
         file: sentFile,
         proof: proofStatus,
         ...creditFields,

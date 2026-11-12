@@ -364,6 +364,7 @@ import {
   createLocalUiRoutes,
 } from './local-ui/routes.js';
 import { createHealthReader } from './local-ui/api/health.js';
+import { networkHealthSource, type NetworkHealthClient } from './local-ui/network-health.js';
 import { LiveEvents, type LiveEventSink } from './local-ui/api/events.js';
 import { LiveStatusTracker, liveAgentRecord } from './local-ui/live-status.js';
 import {
@@ -1599,7 +1600,16 @@ export async function startApprovalServerWith(
       now: () => now(),
       // M1-11s-a-d: the status bar's health read (fixed fields, cached, bounded).
       health: createHealthReader({
-        ...(agentUi?.health === undefined ? {} : { source: agentUi.health }),
+        // REL051-CF2: with no source wired, the open agent's own relay check (network-health.ts),
+        // so the app never says Connected while no relay can be reached.
+        ...(() => {
+          if (agentUi?.health !== undefined) return { source: agentUi.health };
+          const client = agentUi?.client as Partial<NetworkHealthClient> | undefined;
+          if (typeof client?.relayReachability !== 'function') return {};
+          return {
+            source: networkHealthSource(client as NetworkHealthClient, { now: () => now() }),
+          };
+        })(),
         hasClient: agentUi?.client !== undefined,
         // REL051-B3b: the app host's version when the page options carry none (the strip's Version).
         ...(() => {

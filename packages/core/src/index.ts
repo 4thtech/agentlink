@@ -279,12 +279,14 @@ export {
   SEND_TOOL,
   USE_TERMS_TOOLS,
   type SendMessageInput,
+  type SendDelivery,
   type SendMessageResult,
   type SendMessageType,
 } from './send.js';
 export {
   nostrTransport,
   type NostrTransportOptions,
+  type RelayStatus,
   type Transport,
   type TransportDeps,
   type TransportFactory,

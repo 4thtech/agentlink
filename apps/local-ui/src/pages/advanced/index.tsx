@@ -50,6 +50,8 @@ export function AdvancedPage({ read = readHealth }: AdvancedPageProps): ReactEle
   const sync = relays?.lastSyncAt;
   const working = !state.loading && state.working === true;
   const answered = !state.loading && relays !== undefined;
+  // REL051-CF2: counts known and none connected: say so in words, never "Working".
+  const unreachable = relays?.connected === 0 && relays.total !== undefined && relays.total > 0;
   return (
     <div className="ad-page">
       <header className="ad-head">
@@ -58,6 +60,11 @@ export function AdvancedPage({ read = readHealth }: AdvancedPageProps): ReactEle
         <p className="al-text-body al-muted">{S.intro}</p>
       </header>
       <Skeleton loading={state.loading} lines={3}>
+        {unreachable ? (
+          <p className="al-text-body ad-unreachable" role="status">
+            {S.unreachable}
+          </p>
+        ) : null}
         {answered ? (
           <dl className="ad-list">
             <div className="ad-row">
