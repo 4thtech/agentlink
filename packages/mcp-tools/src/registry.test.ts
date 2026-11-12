@@ -52,6 +52,24 @@ describe('tool surface (06 §2.0, D-53)', () => {
     expect(TOOLS).toMatchSnapshot();
   });
 
+  it('C-1: the recipient arguments tell the AI it can use the name the user says', () => {
+    for (const [tool, arg] of [
+      ['agentlink_send', 'to'],
+      ['agentlink_propose_terms', 'to'],
+      ['agentlink_inbox', 'contact'],
+    ] as const) {
+      const props = TOOLS.find((t) => t.name === tool)!.inputSchema['properties'] as Record<
+        string,
+        { description?: string }
+      >;
+      const text = props[arg]!.description ?? '';
+      expect(text).toContain('send Natasa a message');
+      expect(text).toContain('agentlink_list_contacts');
+      expect(text).toContain('more than one');
+      expect(text).toContain('never guess');
+    }
+  });
+
   it('registers exactly the nine M1a tools and the six M1b tools', () => {
     const registered = TOOLS.map((t) => t.name);
     expect([...registered, ...Object.keys(PENDING_M1A_TOOLS)].sort()).toEqual(

@@ -107,7 +107,11 @@ export async function statusHandler(_input: unknown, context: ToolContext): Prom
       : incomplete > 0
         ? { nextStep: copy('chat.inbox.incompleteNextStep') }
         : {}),
-    agent: { name: context.agentName, id: self.agentId, fingerprint: self.agentFingerprint },
+    agent: {
+      name: self.label ?? context.agentName,
+      id: self.agentId,
+      fingerprint: self.agentFingerprint,
+    },
     owner: { fingerprint: self.ownerFingerprint },
     contacts: contacts.length,
     unread,
