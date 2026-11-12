@@ -93,10 +93,12 @@ export {
   type ReviewedApproval,
 } from './owner-approval.js';
 // M1-8d: the local approval server (08 §1). Only the entry point and its types: the owner store,
-// browser opener and notifier seams stay inside the package (startApprovalServerWith).
+// browser opener and notifier seams stay inside the package (startApprovalServerWith). WP-D3: the
+// desktop app's core passes a link sink (its private pipe) in place of the OS browser opener.
 export {
   APPROVAL_SERVER_HOST,
   startApprovalServer,
+  startApprovalServerWithLinkSink,
   type ApprovalDetails,
   type ApprovalForDecision,
   type ApprovalServer,

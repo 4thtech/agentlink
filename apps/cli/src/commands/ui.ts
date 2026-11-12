@@ -47,7 +47,13 @@ import { DEFAULT_AGENT_NAME } from '../runtime/agent-name.js';
 import { checkOwnerTerminal } from '../runtime/guards.js';
 import { appServes, chooseCurrentAgent } from './current-agent.js';
 import { nodeOwnerDeps } from './owner/deps.js';
-import { hostUiOf, openUiHostAgent, startUiWelcome, type UiHostDeps } from './ui-host.js';
+import {
+  hostUiOf,
+  openUiHostAgent,
+  startUiWelcome,
+  type UiHostDeps,
+  type UiHostHooks,
+} from './ui-host.js';
 import { uiRemovalPort } from './ui-remove.js';
 import { removeAppHostRecord, writeAppHostRecord } from '../runtime/app-host-record.js';
 import { writeLastExit, type LastExitReason } from '../runtime/last-exit.js';
@@ -229,19 +235,21 @@ export async function uiStep(
   return serveUi(context, deps, prefix);
 }
 
+/** R1, WP-D3: the started app host, or why nothing could be started. */
+export type UiStartResult =
+  | { readonly ok: true; readonly server: UiServer }
+  | { readonly ok: false; readonly failure: StartFailure };
+
 /**
- * The served part of `ui`, after the terminal check (U3-invite: shared with `join`, which passes
- * the checked invite). Picks the agent, starts the app host, opens the browser and serves until
- * Ctrl+C or UI_WAIT_MS.
+ * Picks the agent and starts the app host (U3-b, U3-g-b, U3-invite), or says why it could not
+ * (R1). Prints nothing and opens nothing: `serveUi` and the desktop host (WP-D3) share it.
  */
-export async function serveUi(
-  context: CommandContext,
+export async function startUiServer(
   deps: UiDeps,
-  prefix: string,
-  join?: UiJoin,
-): Promise<number> {
-  const { output } = context;
-  let agent = context.parsed.agent;
+  requested: string | undefined,
+  invite?: string,
+): Promise<UiStartResult> {
+  let agent = requested;
   let none = false;
   if (agent === undefined && deps.agents !== undefined) {
     // U3-b (USABILITY-WAVE-3 §7.4): never asked. The last used agent, else the one an AI app
@@ -257,7 +265,7 @@ export async function serveUi(
     // `default` is opened the way every command without `--agent` opens it.
     if (chosen !== undefined && chosen !== DEFAULT_AGENT_NAME) agent = chosen;
   }
-  const startOptions = join === undefined ? {} : { invite: join.invite };
+  const startOptions = invite === undefined ? {} : { invite };
   // U3-g-b (08 §1): no agent at all: the app opens on Welcome, with no agent open yet. U3-invite:
   // with an invite, first run then ends on "Accept {name}'s invite?" (08 §4).
   let server: UiServer | undefined =
@@ -269,21 +277,43 @@ export async function serveUi(
     thrown = error;
     return undefined;
   });
-  if (server === undefined) {
-    // R1: say what went wrong; "run init" only when nothing is set up. Nothing from the error is shown.
-    const failure: StartFailure = isPortError(thrown)
-      ? 'port'
-      : thrown === undefined
-        ? await (deps.diagnose?.() ?? Promise.resolve('no_owner' as const)).catch(
-            () => 'failed' as const,
-          )
-        : await (deps.diagnose?.() ?? Promise.resolve('failed' as const)).catch(
-            () => 'failed' as const,
-          );
-    output.printError(UI_TEXT.startFailure[failure](prefix));
-    await deps.recordExit?.(START_EXIT[failure]);
+  if (server !== undefined) return { ok: true, server };
+  // R1: say what went wrong; "run init" only when nothing is set up. Nothing from the error is shown.
+  const failure: StartFailure = isPortError(thrown)
+    ? 'port'
+    : thrown === undefined
+      ? await (deps.diagnose?.() ?? Promise.resolve('no_owner' as const)).catch(
+          () => 'failed' as const,
+        )
+      : await (deps.diagnose?.() ?? Promise.resolve('failed' as const)).catch(
+          () => 'failed' as const,
+        );
+  return { ok: false, failure };
+}
+
+/**
+ * The served part of `ui`, after the terminal check (U3-invite: shared with `join`, which passes
+ * the checked invite). Picks the agent, starts the app host, opens the browser and serves until
+ * Ctrl+C or UI_WAIT_MS.
+ */
+export async function serveUi(
+  context: CommandContext,
+  deps: UiDeps,
+  prefix: string,
+  join?: UiJoin,
+): Promise<number> {
+  const { output } = context;
+  const started = await startUiServer(
+    deps,
+    context.parsed.agent,
+    join === undefined ? undefined : join.invite,
+  );
+  if (!started.ok) {
+    output.printError(UI_TEXT.startFailure[started.failure](prefix));
+    await deps.recordExit?.(START_EXIT[started.failure]);
     return EXIT_FAILED;
   }
+  const { server } = started;
   let unsubscribe: (() => void) | undefined;
   let unguard: (() => void) | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -411,8 +441,12 @@ export async function diagnoseStart(
   }
 }
 
-/** The production step: the OS user's home, the OS keychain, the OS browser opener. */
-export function nodeUiDeps(): UiDeps {
+/**
+ * The production step: the OS user's home, the OS keychain, the OS browser opener. WP-D3: the
+ * desktop host passes `hooks.startServer` (ui-host.ts UiHostHooks) so its links go to its pipe.
+ */
+export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
+  const startServer = hooks.startServer ?? startApprovalServer;
   const owner = nodeOwnerDeps();
   const logger: Logger = cliLogger('ui', process.env);
   return Object.freeze<UiDeps>({
@@ -443,7 +477,7 @@ export function nodeUiDeps(): UiDeps {
         open: (name) => openUiHostAgent(hostDeps, name),
         // HOTFIX-045-REMOVE-FIRSTRUN: Remove works in the session first run started.
         removal: uiRemovalPort(),
-        startServer: (options) => startApprovalServer(options),
+        startServer: (options) => startServer(options),
         // Fixed values only (ApprovalServerEvent, I-7).
         onEvent: (event) => {
           logger.debug('approval ui event', { ...event });
@@ -489,7 +523,7 @@ export function nodeUiDeps(): UiDeps {
         };
         // WP-1: the ID open at launch carries its key-items token too, so it can be renamed (D-141).
         const initialUi = hostUiOf(agent, localUi);
-        const server = await startApprovalServer({
+        const server = await startServer({
           source,
           localUi,
           // U3-c: the app host; it owns the agent from here and closes whichever is open.

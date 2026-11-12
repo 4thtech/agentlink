@@ -5681,3 +5681,19 @@ export async function startApprovalServerWith(
 export function startApprovalServer(options: ApprovalServerOptions): Promise<ApprovalServer> {
   return startApprovalServerWith(options);
 }
+
+/**
+ * WP-D3 (desktop host; 08 §1, 04 §2.5 "opening a page adds no authority"): the same server as
+ * startApprovalServer, except that every one-shot session link it would hand to the OS browser
+ * opener (`open`, `openHome`, `openFirstRun`, `openJoin` and the join handoff's open) goes to
+ * `linkSink` instead: the desktop app's core hands it to the app window over its private pipe only.
+ * Nothing else changes: the same routes, session, CSRF, presence gate and owner signature. The sink
+ * gets exactly what the opener would (a fixed path and a fresh one-shot token), resolves true when
+ * it delivered the link, and must never log, print or store it.
+ */
+export function startApprovalServerWithLinkSink(
+  options: ApprovalServerOptions,
+  linkSink: (sessionUrl: string) => Promise<boolean>,
+): Promise<ApprovalServer> {
+  return startApprovalServerWith(options, { opener: linkSink });
+}
