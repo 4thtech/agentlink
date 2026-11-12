@@ -203,7 +203,12 @@ import {
 import { failedBody } from './local-ui/failure-reasons.js';
 import { revealSavedFile } from './local-ui/reveal-file.js';
 import { readSavedText, type PreviewReadLimits } from './local-ui/read-preview.js';
-import { EXPIRED_HTML, NOT_FOUND_HTML, NO_APP_HTML } from './approval-pages.js';
+import {
+  EXPIRED_APPROVAL_HTML,
+  EXPIRED_HTML,
+  NOT_FOUND_HTML,
+  NO_APP_HTML,
+} from './approval-pages.js';
 import { isAppPagePath } from '@4thtech-io/types/ui-contract/app-pages';
 import { NodeKeyStoreError } from './errors.js';
 import { osKeychain, type KeychainBackend } from './keychain.js';
@@ -2056,10 +2061,16 @@ export async function startApprovalServerWith(
     return undefined;
   };
 
-  const reject = (res: ServerResponse, status: number, reason: RejectReason): void => {
+  // REL051-INTFIX: `expired` is the 401 page; an approval link gets the one that points to Approvals.
+  const reject = (
+    res: ServerResponse,
+    status: number,
+    reason: RejectReason,
+    expired: string = EXPIRED_HTML,
+  ): void => {
     emit({ kind: 'rejected', reason });
     if (status === 401) {
-      sendText(res, 401, 'text/html; charset=utf-8', EXPIRED_HTML);
+      sendText(res, 401, 'text/html; charset=utf-8', expired);
     } else {
       sendJson(res, status, { status: 'refused' });
     }
@@ -6097,13 +6108,15 @@ export async function startApprovalServerWith(
     }
 
     const appPage = APP_PAGE.test(path);
-    const page = path === '/' || APPROVE_PAGE.test(path) || appPage;
+    const approvePage = APPROVE_PAGE.test(path);
+    const page = path === '/' || approvePage || appPage;
     if (page) {
       if (method !== 'GET') return reject(res, 405, 'method');
+      const expired = approvePage ? EXPIRED_APPROVAL_HTML : EXPIRED_HTML;
       const t = url.searchParams.get('t');
       if (t !== null) {
         // One-shot (M1-11a): the link is consumed here and never opens the page again.
-        if (!consumeLink(t)) return reject(res, 401, 'token');
+        if (!consumeLink(t)) return reject(res, 401, 'token', expired);
         res.setHeader(
           'Set-Cookie',
           // SameSite=Strict (IR-M1-11a-1 L-2): the OS opens the link as a top-level navigation
@@ -6123,7 +6136,7 @@ export async function startApprovalServerWith(
         sendText(res, 303, 'text/plain; charset=utf-8', '');
         return;
       }
-      if (matchIndex(cookieToken(req), sessions) < 0) return reject(res, 401, 'token');
+      if (matchIndex(cookieToken(req), sessions) < 0) return reject(res, 401, 'token', expired);
       // M1-11b-2: Approvals (`/`) and one request (`/approve/<id>`) render inside the app. Where
       // the UI renders only: the session gate above, and the CSRF, Origin, fetch-metadata and
       // presence gates of the approval API below, are unchanged.

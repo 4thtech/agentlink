@@ -1011,6 +1011,10 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   return (
     <div className="hm-page hm-c" data-layer={pro ? 'pro' : 'simple'}>
       <h1 className="al-visually-hidden">{S.title}</h1>
+      {/* REL051-INTFIX: an approval waits but there is no ID yet: the reason stays above the
+          "Create your first ID" card, so whoever came for that approval learns why it can't be
+          approved here yet. */}
+      {props.noId !== undefined && approvals.length > 0 ? (props.ownerNotice ?? null) : null}
       {props.noId !== undefined ? props.noId : null}
       {props.noId === undefined && view.state === 'failed' ? (
         <Banner tone="warning">

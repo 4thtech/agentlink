@@ -11,6 +11,7 @@
 import { REDIRECTS } from '../../nav.js';
 import { keepInApp } from '../../prefs/app-kept.js';
 import { navigate } from '../../router.js';
+import { createMasterCodeApi, type MasterCodeAnswer } from '../restore/master-code-api.js';
 import { readSetupState, setupIncomplete, type SetupState } from './setup-state.js';
 import { markAutoShown, wasAutoShown } from './store.js';
 
@@ -58,6 +59,18 @@ export function shouldOpenStart(path: string, state: SetupState): boolean {
   return state.owner === 'missing' || state.agent === false;
 }
 
+/**
+ * REL051-INTFIX (REL051-CF3 with R1-UI-14): an owner and an ID exist, so Home would stay, but the
+ * server still holds a master code step for Get started to finish: one made and never saved (`lost`:
+ * the app was closed before "I saved it"), the code of this page session's first run (`shown`), or
+ * restored IDs waiting for their owner (`finish_restore`). Get started opens and shows that screen.
+ * A restore's own code is the restore page's to show (it keeps its own path on a reload).
+ */
+export function heldStepOpensStart(answer: MasterCodeAnswer): boolean {
+  if (answer.kind === 'lost' || answer.kind === 'finish_restore') return true;
+  return answer.kind === 'shown' && answer.which === 'first_run';
+}
+
 /** Get started ends on Home with a full load: the check of that load keeps Home. */
 export function markLeavingStart(): void {
   rememberLeftStart();
@@ -87,6 +100,8 @@ export interface StartGuardOptions {
   readonly path?: () => string;
   readonly read?: () => Promise<SetupState>;
   readonly go?: (path: string) => void;
+  /** REL051-INTFIX: the server's held master code step (only its kind is used). */
+  readonly held?: () => Promise<MasterCodeAnswer>;
 }
 
 /**
@@ -99,6 +114,7 @@ export async function openStartIfIncomplete(options: StartGuardOptions = {}): Pr
     path = () => location.pathname,
     read = readSetupState,
     go = (to: string) => navigate(to, true),
+    held = () => createMasterCodeApi().show(),
   } = options;
   const at = shown(path());
   if (!mayOpenStart(at)) return false;
@@ -115,7 +131,19 @@ export async function openStartIfIncomplete(options: StartGuardOptions = {}): Pr
   // Decided once per page life; the person may have gone elsewhere while the reads ran.
   if (wasAutoShown() || shown(path()) !== at) return false;
   markAutoShown();
-  if (!shouldOpenStart(at, state)) return false;
+  if (!shouldOpenStart(at, state)) {
+    // REL051-INTFIX: an owner and an ID, nothing waiting: a master code step the server still
+    // holds (cf3) opens Get started, which shows it; otherwise Home stays. Only the answer's kind
+    // is read here; the code itself is never kept by the guard.
+    if (state.owner !== 'set_up' || state.agent !== true || state.waiting !== 0) return false;
+    let answer: MasterCodeAnswer;
+    try {
+      answer = await held();
+    } catch {
+      return false;
+    }
+    if (!heldStepOpensStart(answer) || shown(path()) !== at) return false;
+  }
   go(START_FIRST_STEP);
   return true;
 }
