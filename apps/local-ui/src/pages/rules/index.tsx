@@ -24,6 +24,7 @@ import {
   TextField,
 } from '@4thtech-io/ui';
 import { getLive, subscribeLive, switchAgent, type LiveSnapshot } from '../../api/live.js';
+import { SettingsIcon } from '../settings/icons.js';
 import { detectPlatform } from '../first-run/passkey.js';
 import { SENSOR } from '../first-run/strings.js';
 import { UnderTheHood } from '../../lazy/hood.js';
@@ -32,6 +33,7 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useId,
   useState,
   useSyncExternalStore,
   type ReactElement,
@@ -149,6 +151,37 @@ const toNum = (v: string): number => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
 };
+
+/** A small mono amount field that sits inside a sentence; its label is read aloud only. */
+function InlineAmount({
+  label,
+  value,
+  invalid,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  invalid: boolean;
+  onChange: (value: string) => void;
+}): ReactElement {
+  const id = useId();
+  return (
+    <span className="rl-amt">
+      <label htmlFor={id} className="al-sr-only">
+        {label}
+      </label>
+      <span aria-hidden="true">$</span>
+      <input
+        id={id}
+        className="rl-amt-input"
+        inputMode="decimal"
+        value={value}
+        aria-invalid={invalid ? 'true' : undefined}
+        onChange={(e) => onChange(e.currentTarget.value)}
+      />
+    </span>
+  );
+}
 
 const unique = (codes: readonly string[]): string[] => [...new Set(codes)];
 
@@ -478,7 +511,22 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
         <Surface className="rl-card">
           <Row
             title={S.proofTitle}
-            help={S.proofHelp}
+            help={
+              draft.notarize === 'deny' ? (
+                S.proofOff
+              ) : (
+                <>
+                  {S.proofHelpBefore}{' '}
+                  <InlineAmount
+                    label={S.budget}
+                    value={draft.dailyBudgetUSD}
+                    invalid={checked.invalid.has('dailyBudgetUSD')}
+                    onChange={(v) => edit({ dailyBudgetUSD: v })}
+                  />{' '}
+                  {S.proofHelpAfter}
+                </>
+              )
+            }
             changed={changedProof}
             control={
               <Segmented
@@ -493,28 +541,20 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
               />
             }
           >
-            {draft.notarize === 'deny' ? (
-              <p className="al-text-body-sm al-muted">{S.proofOff}</p>
-            ) : (
-              <div className="rl-fields">
-                <TextField
-                  label={S.budget}
-                  prefix="$"
-                  mono
-                  inputMode="decimal"
-                  value={draft.dailyBudgetUSD}
-                  {...amountError('dailyBudgetUSD')}
-                  onChange={(e) => edit({ dailyBudgetUSD: e.currentTarget.value })}
-                />
-                <TextField
+            {draft.notarize === 'deny' ? null : (
+              <div className="rl-ask-over al-text-body-sm al-muted">
+                <span aria-hidden="true">{S.askOver}</span>
+                <InlineAmount
                   label={S.askOver}
-                  prefix="$"
-                  mono
-                  inputMode="decimal"
                   value={draft.perActionMaxUSD}
-                  {...amountError('perActionMaxUSD')}
-                  onChange={(e) => edit({ perActionMaxUSD: e.currentTarget.value })}
+                  invalid={checked.invalid.has('perActionMaxUSD')}
+                  onChange={(v) => edit({ perActionMaxUSD: v })}
                 />
+                {checked.invalid.has('dailyBudgetUSD') || checked.invalid.has('perActionMaxUSD') ? (
+                  <span className="rl-error" role="alert">
+                    {S.invalidAmount}
+                  </span>
+                ) : null}
               </div>
             )}
           </Row>
@@ -556,24 +596,29 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
       </section>
 
       <section className="rl-group" aria-labelledby="rules-more-title">
-        <h2 id="rules-more-title" className="al-text-title-3">
-          <button
-            type="button"
-            className="rl-toggle"
-            aria-expanded={moreOpen ? 'true' : 'false'}
-            aria-controls="rules-more"
-            onClick={() => setMoreOpen((o) => !o)}
-          >
-            <Icon name={moreOpen ? 'chevron-down' : 'chevron-right'} size={16} />
-            <span className="rl-more-text">
-              <span>{S.moreRules}</span>
-              <span className="al-text-body-sm al-muted">{S.moreHelp}</span>
-            </span>
-            <span className="al-text-body-sm al-muted rl-more-state">
-              {S.moreState(5, moreChanged)}
-            </span>
-          </button>
-        </h2>
+        <Surface className="rl-card rl-more-card">
+          <h2 id="rules-more-title" className="rl-more-h">
+            <button
+              type="button"
+              className="rl-toggle rl-more-btn"
+              aria-expanded={moreOpen ? 'true' : 'false'}
+              aria-controls="rules-more"
+              onClick={() => setMoreOpen((o) => !o)}
+            >
+              <span className="rl-more-ic" aria-hidden="true">
+                <Icon name="sliders-horizontal" size={18} />
+              </span>
+              <span className="rl-more-text">
+                <span className="al-text-body">{S.moreRules}</span>
+                <span className="al-text-caption al-muted">{S.moreHelp}</span>
+              </span>
+              <span className="al-text-body-sm al-muted rl-more-state">
+                {S.moreState(5, moreChanged)}
+              </span>
+              <Icon name={moreOpen ? 'chevron-down' : 'chevron-right'} size={16} />
+            </button>
+          </h2>
+        </Surface>
         {moreOpen ? (
           <Surface id="rules-more" className="rl-card">
             <Row
@@ -700,10 +745,15 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
 
       {dirty ? (
         <div className="rl-unsaved" role="region" aria-label={S.changes(checked.changes)}>
-          <span className="al-text-body-sm">
-            <strong>{S.changes(checked.changes)}</strong>
-            {' · '}
-            {widens ? S.barWider(sensor) : S.barPlain(sensor)}
+          <span className="rl-bar-text al-text-body-sm">
+            <span className="rl-bar-ic" aria-hidden="true">
+              <SettingsIcon name="fingerprint" />
+            </span>
+            <span>
+              <strong>{S.changes(checked.changes)}</strong>
+              {' · '}
+              {widens ? S.barWider(sensor) : S.barPlain(sensor)}
+            </span>
           </span>
           <div className="rl-unsaved-actions">
             <Button

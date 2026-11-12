@@ -37,8 +37,8 @@ export const RULES_STRINGS = {
   drop: 'Drop',
 
   proofTitle: 'Add a public proof',
-  proofHelp:
-    'Each proof costs credits and is public. Allowed up to the amounts below in any 24 hours, then it asks.',
+  proofHelpBefore: 'Each proof costs credits and is public. Allowed up to',
+  proofHelpAfter: 'in any 24 hours, then it asks.',
   proofOff: 'Your AI never adds proof.',
   budget: 'Proof budget in any 24 hours',
   askOver: 'Ask me over',
