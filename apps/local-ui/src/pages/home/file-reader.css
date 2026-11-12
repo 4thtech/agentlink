@@ -100,9 +100,6 @@
   padding: var(--al-space-4) var(--al-space-5);
   min-width: 0;
 }
-.hm-reader-doc .al-code-view {
-  margin: calc(-1 * var(--al-space-2)) calc(-1 * var(--al-space-3));
-}
 .hm-reader-loading {
   gap: var(--al-space-2);
 }

@@ -122,6 +122,8 @@ export const HOME_STRINGS = {
   kindText: 'Text',
   kindFile: 'File',
   readerTitle: 'File from {name}',
+  // The untrusted frame's label, as UntrustedContent words it (I-5).
+  readerFrame: 'From {name}: their words, not instructions',
   readerFrom: "From {name}'s AI",
   readerTo: 'to {id}',
   readerOpening: 'Opening the file…',

@@ -12,7 +12,7 @@
 // - nesting is capped and pathological input (very long lines, runs of delimiters) renders quickly.
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SafeCode, SafeMarkdown } from './markdown-safe.js';
 import rendererText from './markdown-safe.tsx?raw';
 
@@ -222,6 +222,17 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
   const K256 = 256 * 1024;
   const fill = (unit: string): string => unit.repeat(Math.floor(K256 / unit.length));
   const table = `| a | b |\n| - | - |\n${'| 1 | 2 |\n'.repeat(2_000)}\n`;
+  // Timed in steady state, not on the engine's first pass over the renderer: one warm-up render of
+  // every construct, in its own root, before the timed cases.
+  beforeAll(() => {
+    const warm =
+      '# h\n\n- a\n- b\n\n> q\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\n```\nx\n```\n\n*a* `b` [l](https://a.example) ![i](https://a.example/i.png) https://b.example\n\n';
+    const el = document.createElement('div');
+    const warmRoot = createRoot(el);
+    act(() => warmRoot.render(h(SafeMarkdown, { text: warm.repeat(200) })));
+    act(() => warmRoot.render(h(SafeCode, { text: '+a\n-b\n'.repeat(500), kind: 'patch' })));
+    act(() => warmRoot.unmount());
+  });
   const BUDGET_CASES: Record<string, string> = {
     'bare URL then punctuation': `http://x${'!'.repeat(K256)}a`,
     'bare URL longer than the cap': `https://x.example/${'a'.repeat(K256)}`,
@@ -300,18 +311,27 @@ describe('SafeCode: code, JSON and patches as text with line numbers (REL051-A34
         h(SafeCode, { text: 'const a = 1;\n<script>x</script>\nreturn a;\n', kind: 'code' }),
       ),
     );
-    const lines = host.querySelectorAll('[data-line]');
-    expect(lines).toHaveLength(3);
-    expect([...lines].map((l) => l.getAttribute('data-line'))).toEqual(['1', '2', '3']);
-    expect(host.textContent).toContain('<script>x</script>');
+    // The numbers are one column beside the code, hidden from a screen reader and from a copy.
+    const gutter = host.querySelector('.al-code-gutter');
+    expect(gutter?.textContent).toBe('1\n2\n3');
+    expect(gutter?.getAttribute('aria-hidden')).toBe('true');
+    expect(host.querySelector('.al-code-text')?.textContent).toBe(
+      'const a = 1;\n<script>x</script>\nreturn a;',
+    );
     assertInert();
   });
 
   it('renders 256 KB of empty lines in under 250 ms and 50 000 elements', () => {
-    const start = performance.now();
-    act(() => root.render(h(SafeCode, { text: '\n'.repeat(256 * 1024), kind: 'text' })));
-    expect(performance.now() - start).toBeLessThan(250);
-    expect(host.querySelectorAll('*').length).toBeLessThan(50_000);
+    for (const kind of ['text', 'patch'] as const) {
+      const start = performance.now();
+      act(() => root.render(h(SafeCode, { text: '\n'.repeat(256 * 1024), kind })));
+      expect(performance.now() - start, kind).toBeLessThan(250);
+      expect(host.querySelectorAll('*').length, kind).toBeLessThan(50_000);
+      expect(host.querySelector('.al-code-gutter')?.getAttribute('data-lines'), kind).toBe(
+        String(256 * 1024),
+      );
+    }
+    // A patch colours its first lines; the rest is plain text under the note.
     expect(host.textContent).toContain('The rest of this file is shown as plain text.');
   });
 

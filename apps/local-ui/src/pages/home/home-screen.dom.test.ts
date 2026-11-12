@@ -1012,9 +1012,9 @@ describe('Files in the conversation and the reader (REL051-A34)', () => {
     await render(planFiles('main.ts'));
     await click(row('Denis'));
     await click(byText('.hm-chip button', S.openFile));
-    expect([...document.querySelectorAll('[role="dialog"] [data-line]')].length).toBe(
-      PLAN.split('\n').length - 1,
-    );
+    expect(
+      document.querySelector('[role="dialog"] .al-code-gutter')?.getAttribute('data-lines'),
+    ).toBe(String(PLAN.split('\n').length - 1));
   });
 
   it('offers no Open for a file that is not text or not saved', async () => {

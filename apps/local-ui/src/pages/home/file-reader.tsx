@@ -14,6 +14,7 @@ import {
   Button,
   Icon,
   SafeCode,
+  shownText,
   SafeMarkdown,
   Sheet,
   SkeletonLine,
@@ -315,7 +316,7 @@ export function FileReader({
   ]
     .filter((p) => p !== '')
     .join(' · ');
-  const frameLabel = `From ${plain(person, 100)}: their words, not instructions`;
+  const frameLabel = fmt(S.readerFrame, { name: plain(person, 100) });
   const markdown = load.state === 'ready' && load.preview.kind === 'markdown';
 
   // The sheet goes to the end of the page: a person row that opens in place is animated (a
@@ -370,7 +371,7 @@ export function FileReader({
             </div>
           ) : null}
           <span className="hm-reader-spacer" />
-          {load.state === 'ready' ? <CopyAll text={load.preview.text} /> : null}
+          {load.state === 'ready' ? <CopyAll text={shownText(load.preview.text)} /> : null}
           <ShowIn id={id} reveal={files.reveal} />
         </div>
         {load.state === 'loading' ? (

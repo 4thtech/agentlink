@@ -13,9 +13,13 @@
 //   (javascript:, data:, file:, vbscript:, mailto: …) shows "Link removed" and is not kept anywhere.
 // - An image is never loaded: an inert chip with its alt text and domain, never the address.
 // - Nesting of quotes and lists is capped (MAX_DEPTH); deeper content is shown as plain text.
-// - Every inline search remembers a failed search, so a run of delimiters is linear, not quadratic.
+// - Every inline search remembers what it found, and no address or label is longer than a fixed
+//   bound, so a run of delimiters is linear, not quadratic.
+// - One output budget covers the whole document (blocks, table cells, list items, formatted pieces,
+//   code lines): past it the rest is plain text under a short note, so no input draws more than a
+//   bounded number of elements (IR-REL051-A34-1).
 // - Document headings start at h3 (the reader's own title is the dialog's h2).
-import { useEffect, useState, type ReactElement, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { Icon } from './brand.js';
 import { cleanText, cx } from './util.js';
 
@@ -30,6 +34,15 @@ const MAX_TABLE_ROWS = 2_000;
 const MAX_URL_CHARS = 2_048;
 /** The most formatted pieces in one paragraph or cell; the rest is plain text. */
 const MAX_INLINE_NODES = 1_000;
+/** The longest link text read as a link; longer is text. */
+const MAX_LABEL_CHARS = 4_096;
+/**
+ * The document's output budget, in drawn elements (about: a block, a row or cell, a list item or a
+ * formatted piece 1; a link or image chip 5; a code block 12). Past it the rest is plain text.
+ */
+export const MARKDOWN_BUDGET = 1_200;
+/** The most numbered lines SafeCode draws; the rest is plain text. */
+export const CODE_MAX_LINES = 1_500;
 const COPIED_MS = 1_600;
 
 export interface MarkdownLabels {
@@ -45,6 +58,8 @@ export interface MarkdownLabels {
   readonly imageNotLoaded: string;
   /** A code block without a language. */
   readonly code: string;
+  /** The note before the part past the output budget. */
+  readonly rest: string;
 }
 
 export const MARKDOWN_LABELS: MarkdownLabels = Object.freeze({
@@ -55,7 +70,31 @@ export const MARKDOWN_LABELS: MarkdownLabels = Object.freeze({
   linkRemoved: 'Link removed',
   imageNotLoaded: 'Image not loaded',
   code: 'Code',
+  rest: 'The rest of this file is shown as plain text.',
 });
+
+/**
+ * The same characters util.ts cleanText removes from multi-line text (controls but tab and line
+ * feed, zero-width, bidi marks, embeddings, overrides and isolates, word joiner, BOM, tag
+ * characters), in one pass: a 256 KB file is cleaned in a few milliseconds.
+ */
+const HIDDEN_MULTILINE =
+  // eslint-disable-next-line no-control-regex
+  /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff\u{e0000}-\u{e007f}]/gu;
+
+function cleanDocument(text: string): string {
+  return String(text)
+    .slice(0, MAX_CHARS * 2)
+    .replace(HIDDEN_MULTILINE, '')
+    .slice(0, MAX_CHARS);
+}
+
+/** What is left of the document's output budget. */
+interface Budget {
+  left: number;
+  /** The rest note was drawn once. */
+  noted: boolean;
+}
 
 // ---------------------------------------------------------------------------------------------
 // Blocks
@@ -78,7 +117,9 @@ type Block =
       readonly align: readonly Align[];
       readonly rows: readonly (readonly string[])[];
     }
-  | { readonly t: 'hr' };
+  | { readonly t: 'hr' }
+  /** Past the output budget: the remaining lines as plain text. */
+  | { readonly t: 'rest'; readonly text: string };
 
 const FENCE = /^( {0,3})(`{3,}|~{3,})(.*)$/;
 const HEADING = /^ {0,3}(#{1,6})(?:[ \t]+|$)/;
@@ -166,7 +207,7 @@ function headingText(line: string, hashes: number, skip: number): string {
   return text;
 }
 
-function parseBlocks(lines: readonly string[], depth: number): Block[] {
+function parseBlocks(lines: readonly string[], depth: number, budget: Budget): Block[] {
   const out: Block[] = [];
   let i = 0;
   while (i < lines.length) {
@@ -174,6 +215,10 @@ function parseBlocks(lines: readonly string[], depth: number): Block[] {
     if (isBlank(line)) {
       i += 1;
       continue;
+    }
+    if (budget.left <= 0) {
+      out.push({ t: 'rest', text: lines.slice(i).join('\n') });
+      break;
     }
 
     const fence = FENCE.exec(line);
@@ -198,6 +243,7 @@ function parseBlocks(lines: readonly string[], depth: number): Block[] {
         body.push(l.slice(Math.min(indent, indentOf(l))));
         i += 1;
       }
+      budget.left -= 10;
       out.push({ t: 'code', lang, text: body.join('\n') });
       continue;
     }
@@ -205,12 +251,14 @@ function parseBlocks(lines: readonly string[], depth: number): Block[] {
     const heading = HEADING.exec(line);
     if (heading !== null) {
       const level = heading[1]?.length ?? 1;
+      budget.left -= 1;
       out.push({ t: 'h', level, text: headingText(line, level, heading[0].length) });
       i += 1;
       continue;
     }
 
     if (isRule(line)) {
+      budget.left -= 1;
       out.push({ t: 'hr' });
       i += 1;
       continue;
@@ -222,8 +270,9 @@ function parseBlocks(lines: readonly string[], depth: number): Block[] {
         inner.push((lines[i] as string).replace(QUOTE, ''));
         i += 1;
       }
+      budget.left -= 1;
       if (depth >= MARKDOWN_MAX_DEPTH) out.push({ t: 'p', text: inner.join('\n') });
-      else out.push({ t: 'quote', children: parseBlocks(inner, depth + 1) });
+      else out.push({ t: 'quote', children: parseBlocks(inner, depth + 1, budget) });
       continue;
     }
 
@@ -233,7 +282,10 @@ function parseBlocks(lines: readonly string[], depth: number): Block[] {
       const kind = ordered ? (list[2] ?? '').slice(-1) : (list[2] ?? '');
       const start = ordered ? Math.min(Number.parseInt(list[2] ?? '1', 10), 1e9) : 1;
       const items: Block[][] = [];
+      budget.left -= 1;
       while (i < lines.length) {
+        // Past the budget the list ends here; the next pass shows the rest as text.
+        if (budget.left <= 0) break;
         const first = LIST.exec(lines[i] as string);
         if (first === null || indentOf(lines[i] as string) > 3) break;
         const firstKind = /[0-9]/.test(first[2] ?? '') ? (first[2] ?? '').slice(-1) : first[2];
@@ -270,17 +322,18 @@ function parseBlocks(lines: readonly string[], depth: number): Block[] {
           }
           break;
         }
+        budget.left -= 1;
         items.push(
           depth >= MARKDOWN_MAX_DEPTH
             ? [{ t: 'p', text: body.join('\n') }]
-            : parseBlocks(body, depth + 1),
+            : parseBlocks(body, depth + 1, budget),
         );
         // A blank line between items ends the list unless another item follows.
         let j = i;
         while (j < lines.length && isBlank(lines[j] as string)) j += 1;
         if (j < lines.length && LIST.test(lines[j] as string)) i = j;
       }
-      out.push({ t: 'list', ordered, start, items });
+      if (items.length > 0) out.push({ t: 'list', ordered, start, items });
       continue;
     }
 
@@ -290,11 +343,16 @@ function parseBlocks(lines: readonly string[], depth: number): Block[] {
         const head = cells(line);
         if (head.length === align.length) {
           const rows: string[][] = [];
+          budget.left -= 1 + head.length;
           i += 2;
           while (i < lines.length) {
             const l = lines[i] as string;
             if (isBlank(l) || !l.includes('|') || startsBlock(l)) break;
-            if (rows.length < MAX_TABLE_ROWS) rows.push(cells(l));
+            // Past the row cap or the budget the table ends; the next pass shows the rest.
+            if (rows.length >= MAX_TABLE_ROWS || budget.left <= 0) break;
+            const row = cells(l);
+            budget.left -= 1 + row.length;
+            rows.push(row);
             i += 1;
           }
           out.push({ t: 'table', head, align, rows });
@@ -325,6 +383,7 @@ function parseBlocks(lines: readonly string[], depth: number): Block[] {
       i += 1;
     }
     const text = para.join('\n');
+    budget.left -= 1;
     out.push(setext === 0 ? { t: 'p', text } : { t: 'h', level: setext, text });
   }
   return out;
@@ -350,10 +409,26 @@ type Inline =
 interface Memo {
   readonly codeFail: Set<number>;
   readonly delimFail: Set<string>;
-  bracketFail: boolean;
-  parenFail: boolean;
-  angleFail: boolean;
+  /** The last search for each closing character: where it started and what it found. */
+  readonly seen: Map<string, { readonly from: number; readonly at: number }>;
 }
+
+/**
+ * The first `ch` at or after `from`. A search from inside an earlier search's range reuses its
+ * answer (the first one at or after the earlier start is also the first after any later start up
+ * to it), so repeated openers with one far closer stay linear.
+ */
+function seek(m: Memo, text: string, ch: string, from: number): number {
+  const last = m.seen.get(ch);
+  if (last !== undefined && from >= last.from && (last.at === -1 || from <= last.at)) {
+    return last.at;
+  }
+  const at = text.indexOf(ch, from);
+  m.seen.set(ch, { from, at });
+  return at;
+}
+
+const TRAILING_CHARS: ReadonlySet<string> = new Set(['.', ',', ';', ':', '!', '?', ')', ']']);
 
 /** The end of the run of `ch` starting at `i`. */
 function runEnd(text: string, i: number, ch: string): number {
@@ -403,32 +478,32 @@ function linkTarget(raw: string): string {
   return t.slice(0, MAX_URL_CHARS);
 }
 
-const TRAILING = /[.,;:!?)\]]+$/;
 /** Characters that end a bare web address (quotes and angle brackets around it stay text). */
 const URL_STOP: ReadonlySet<string> = new Set(['<', '>', '"', "'", '`']);
 
-function parseInline(text: string, depth: number, inLink: boolean, memo?: Memo): Inline[] {
-  const m: Memo = memo ?? {
-    codeFail: new Set(),
-    delimFail: new Set(),
-    bracketFail: false,
-    parenFail: false,
-    angleFail: false,
-  };
+function parseInline(
+  text: string,
+  depth: number,
+  inLink: boolean,
+  meter: Budget,
+  memo?: Memo,
+): Inline[] {
+  const m: Memo = memo ?? { codeFail: new Set(), delimFail: new Set(), seen: new Map() };
   const out: Inline[] = [];
   let buf = '';
   const flush = (): void => {
     if (buf.length > 0) out.push({ t: 'text', text: buf });
     buf = '';
   };
+
   const nested = (inner: string): Inline[] =>
     depth >= MAX_INLINE_DEPTH
       ? [{ t: 'text', text: inner }]
-      : parseInline(inner, depth + 1, inLink);
+      : parseInline(inner, depth + 1, inLink, meter);
 
   let i = 0;
   while (i < text.length) {
-    if (out.length >= MAX_INLINE_NODES) {
+    if (meter.left <= 0) {
       buf += text.slice(i);
       break;
     }
@@ -458,6 +533,7 @@ function parseInline(text: string, depth: number, inLink: boolean, memo?: Memo):
             code = code.slice(1, -1);
           }
           out.push({ t: 'code', text: code });
+          meter.left -= 1;
           i = close + n;
           continue;
         }
@@ -482,6 +558,7 @@ function parseInline(text: string, depth: number, inLink: boolean, memo?: Memo):
         if (close !== -1) {
           flush();
           const t = ch === '~' ? 'del' : n === 2 ? 'strong' : 'em';
+          meter.left -= 1;
           out.push({ t, children: nested(text.slice(end, close)) });
           i = close + delim.length;
           continue;
@@ -494,19 +571,16 @@ function parseInline(text: string, depth: number, inLink: boolean, memo?: Memo):
     }
 
     const image = ch === '!' && text[i + 1] === '[';
-    if ((ch === '[' || image) && !m.bracketFail) {
+    if (ch === '[' || image) {
       const open = image ? i + 1 : i;
-      const close = text.indexOf(']', open + 1);
-      if (close === -1) {
-        m.bracketFail = true;
-      } else if (text[close + 1] === '(' && !m.parenFail) {
-        const paren = text.indexOf(')', close + 2);
-        if (paren === -1) {
-          m.parenFail = true;
-        } else {
+      const close = seek(m, text, ']', open + 1);
+      if (close !== -1 && close - open <= MAX_LABEL_CHARS && text[close + 1] === '(') {
+        const paren = seek(m, text, ')', close + 2);
+        if (paren !== -1 && paren - close <= MAX_URL_CHARS + 2) {
           const label = text.slice(open + 1, close);
           const url = linkTarget(text.slice(close + 2, paren));
           flush();
+          meter.left -= image ? 5 : 6;
           if (image) out.push({ t: 'image', url, alt: label.slice(0, 200) });
           else if (inLink) out.push({ t: 'text', text: label });
           else
@@ -516,7 +590,7 @@ function parseInline(text: string, depth: number, inLink: boolean, memo?: Memo):
               children:
                 depth >= MAX_INLINE_DEPTH
                   ? [{ t: 'text', text: label }]
-                  : parseInline(label, depth + 1, true),
+                  : parseInline(label, depth + 1, true, meter),
             });
           i = paren + 1;
           continue;
@@ -524,14 +598,13 @@ function parseInline(text: string, depth: number, inLink: boolean, memo?: Memo):
       }
     }
 
-    if (ch === '<' && !m.angleFail && /^<(https?:\/\/|mailto:)/i.test(text.slice(i, i + 10))) {
-      const close = text.indexOf('>', i + 1);
-      if (close === -1) {
-        m.angleFail = true;
-      } else {
+    if (ch === '<' && /^<(https?:\/\/|mailto:)/i.test(text.slice(i, i + 10))) {
+      const close = seek(m, text, '>', i + 1);
+      if (close !== -1 && close - i <= MAX_URL_CHARS + 1) {
         const url = text.slice(i + 1, close);
         if (!/\s/.test(url) && !inLink) {
           flush();
+          meter.left -= 6;
           out.push({ t: 'link', url: url.slice(0, MAX_URL_CHARS), children: [] });
           i = close + 1;
           continue;
@@ -545,16 +618,17 @@ function parseInline(text: string, depth: number, inLink: boolean, memo?: Memo):
       !isWordChar(text[i - 1]) &&
       /^https?:\/\//i.test(text.slice(i, i + 8))
     ) {
+      // At most MAX_URL_CHARS: anything after it is ordinary text.
+      const stop = Math.min(text.length, i + MAX_URL_CHARS);
       let end = i;
-      while (end < text.length && !isSpace(text[end]) && !URL_STOP.has(text[end] as string))
-        end += 1;
-      let url = text.slice(i, end);
-      const trail = TRAILING.exec(url);
-      if (trail !== null) url = url.slice(0, url.length - trail[0].length);
-      if (url.length > 8) {
+      while (end < stop && !isSpace(text[end]) && !URL_STOP.has(text[end] as string)) end += 1;
+      // Trailing punctuation stays text: a backwards walk, linear in the address.
+      while (end > i && TRAILING_CHARS.has(text[end - 1] as string)) end -= 1;
+      if (end - i > 8) {
         flush();
-        out.push({ t: 'link', url: url.slice(0, MAX_URL_CHARS), children: [] });
-        i += url.length;
+        meter.left -= 6;
+        out.push({ t: 'link', url: text.slice(i, end), children: [] });
+        i = end;
         continue;
       }
     }
@@ -702,8 +776,14 @@ function renderInline(nodes: readonly Inline[], labels: MarkdownLabels): ReactNo
   });
 }
 
-function inline(text: string, labels: MarkdownLabels): ReactNode[] {
-  return renderInline(parseInline(text, 0, false), labels);
+function inline(text: string, labels: MarkdownLabels, budget: Budget): ReactNode[] {
+  if (budget.left <= 0) return [text];
+  // One paragraph or cell spends at most MAX_INLINE_NODES of the document's budget.
+  const meter: Budget = { left: Math.min(MAX_INLINE_NODES, budget.left), noted: false };
+  const start = meter.left;
+  const nodes = parseInline(text, 0, false, meter);
+  budget.left -= start - meter.left;
+  return renderInline(nodes, labels);
 }
 
 function CopyButton({
@@ -730,16 +810,20 @@ function CopyButton({
 
 const HEADINGS = ['h3', 'h4', 'h5', 'h6', 'h6', 'h6'] as const;
 
-function renderBlocks(blocks: readonly Block[], labels: MarkdownLabels): ReactNode[] {
+function renderBlocks(
+  blocks: readonly Block[],
+  labels: MarkdownLabels,
+  budget: Budget,
+): ReactNode[] {
   return blocks.map((b, k) => {
     switch (b.t) {
       case 'p':
-        return <p key={k}>{inline(b.text, labels)}</p>;
+        return <p key={k}>{inline(b.text, labels, budget)}</p>;
       case 'h': {
         const Tag = HEADINGS[Math.min(Math.max(b.level, 1), 6) - 1] ?? 'h6';
         return (
           <Tag key={k} className={`al-md-h al-md-h${String(b.level)}`}>
-            {inline(b.text, labels)}
+            {inline(b.text, labels, budget)}
           </Tag>
         );
       }
@@ -758,18 +842,18 @@ function renderBlocks(blocks: readonly Block[], labels: MarkdownLabels): ReactNo
           </div>
         );
       case 'quote':
-        return <blockquote key={k}>{renderBlocks(b.children, labels)}</blockquote>;
+        return <blockquote key={k}>{renderBlocks(b.children, labels, budget)}</blockquote>;
       case 'list': {
         const items = b.items.map((item, j) => (
           <li key={j}>
             {item.length === 1 && item[0]?.t === 'p'
-              ? inline(item[0].text, labels)
+              ? inline(item[0].text, labels, budget)
               : item.length > 0 && item[0]?.t === 'p'
                 ? [
-                    <span key="first">{inline(item[0].text, labels)}</span>,
-                    ...renderBlocks(item.slice(1), labels),
+                    <span key="first">{inline(item[0].text, labels, budget)}</span>,
+                    ...renderBlocks(item.slice(1), labels, budget),
                   ]
-                : renderBlocks(item, labels)}
+                : renderBlocks(item, labels, budget)}
           </li>
         ));
         return b.ordered ? (
@@ -790,7 +874,7 @@ function renderBlocks(blocks: readonly Block[], labels: MarkdownLabels): ReactNo
                 <tr>
                   {b.head.map((c, j) => (
                     <th key={j} className={alignClass(b.align[j])}>
-                      {inline(c, labels)}
+                      {inline(c, labels, budget)}
                     </th>
                   ))}
                 </tr>
@@ -798,9 +882,9 @@ function renderBlocks(blocks: readonly Block[], labels: MarkdownLabels): ReactNo
               <tbody>
                 {b.rows.map((r, j) => (
                   <tr key={j}>
-                    {b.head.map((_, x) => (
+                    {r.slice(0, b.head.length).map((c, x) => (
                       <td key={x} className={alignClass(b.align[x])}>
-                        {inline(r[x] ?? '', labels)}
+                        {inline(c, labels, budget)}
                       </td>
                     ))}
                   </tr>
@@ -810,10 +894,25 @@ function renderBlocks(blocks: readonly Block[], labels: MarkdownLabels): ReactNo
           </div>
         );
       }
+      case 'rest': {
+        const first = !budget.noted;
+        budget.noted = true;
+        return (
+          <p key={k} className="al-md-rest">
+            {first ? <span className="al-md-note">{labels.rest}</span> : null}
+            {b.text}
+          </p>
+        );
+      }
       default:
         return null;
     }
   });
+}
+
+/** The text as the renderers show it (hidden and direction characters removed): Copy uses it. */
+export function shownText(text: string): string {
+  return cleanDocument(text);
 }
 
 export interface SafeMarkdownProps {
@@ -826,9 +925,12 @@ export interface SafeMarkdownProps {
 /** Received Markdown, rendered from a safe subset (see the file header). */
 export function SafeMarkdown({ text, labels, className }: SafeMarkdownProps): ReactElement {
   const l: MarkdownLabels = { ...MARKDOWN_LABELS, ...labels };
-  const clean = cleanText(text, MAX_CHARS, true);
-  const blocks = parseBlocks(clean.split('\n'), 0);
-  return <div className={cx('al-md', className)}>{renderBlocks(blocks, l)}</div>;
+  const clean = cleanDocument(text);
+  const budget: Budget = { left: MARKDOWN_BUDGET, noted: false };
+  const blocks = parseBlocks(clean.split('\n'), 0, budget);
+  // Formatted pieces get what the blocks left, and at least a third of the budget.
+  budget.left = Math.max(budget.left, Math.floor(MARKDOWN_BUDGET / 3));
+  return <div className={cx('al-md', className)}>{renderBlocks(blocks, l, budget)}</div>;
 }
 
 export type CodeKind = 'code' | 'json' | 'patch' | 'text';
@@ -847,26 +949,35 @@ export interface SafeCodeProps {
   readonly className?: string;
   /** The accessible name of the scrollable block. */
   readonly label?: string;
+  /** The note before the lines past CODE_MAX_LINES. */
+  readonly restLabel?: string;
 }
 
-/** Received code, JSON, a patch or plain text: each line as text, with its number. */
-export function SafeCode({ text, kind, className, label }: SafeCodeProps): ReactElement {
-  const lines = cleanText(text, MAX_CHARS, true).split('\n');
-  if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
-  const width = String(lines.length).length;
-  return (
-    <pre
-      className={cx('al-code-view', className)}
-      data-kind={kind}
-      data-gutter={String(Math.min(Math.max(width, 2), 6))}
-      tabIndex={0}
-      {...(label === undefined ? {} : { 'aria-label': label })}
-    >
-      <code>
+/**
+ * Received code, JSON, a patch or plain text, with line numbers. The numbers are one text column
+ * beside the code (not one element per line), so any length draws a handful of elements; a patch
+ * colours its first CODE_MAX_LINES lines, one element each, and shows the rest as plain text.
+ */
+export function SafeCode({
+  text,
+  kind,
+  className,
+  label,
+  restLabel = MARKDOWN_LABELS.rest,
+}: SafeCodeProps): ReactElement {
+  const all = cleanDocument(text).split('\n');
+  if (all.length > 1 && all[all.length - 1] === '') all.pop();
+  const numbers = all.map((_, n) => String(n + 1)).join('\n');
+  let body: ReactNode;
+  if (kind === 'patch') {
+    const lines = all.slice(0, CODE_MAX_LINES);
+    const rest = all.length > CODE_MAX_LINES ? all.slice(CODE_MAX_LINES).join('\n') : undefined;
+    body = (
+      <>
         {lines.map((line, n) => {
-          const diff = kind === 'patch' ? diffOf(line) : undefined;
+          const diff = diffOf(line);
           return (
-            <span key={n}>
+            <Fragment key={n}>
               <span
                 className="al-code-line"
                 data-line={String(n + 1)}
@@ -874,11 +985,34 @@ export function SafeCode({ text, kind, className, label }: SafeCodeProps): React
               >
                 {line}
               </span>
-              {n < lines.length - 1 ? '\n' : null}
-            </span>
+              {n < lines.length - 1 || rest !== undefined ? '\n' : null}
+            </Fragment>
           );
         })}
-      </code>
-    </pre>
+        {rest === undefined ? null : (
+          <span className="al-code-rest">
+            <span className="al-md-note">{restLabel}</span>
+            {rest}
+          </span>
+        )}
+      </>
+    );
+  } else {
+    body = all.join('\n');
+  }
+  return (
+    <div
+      className={cx('al-code-view', className)}
+      data-kind={kind}
+      tabIndex={0}
+      {...(label === undefined ? {} : { role: 'group', 'aria-label': label })}
+    >
+      <pre className="al-code-gutter" aria-hidden="true" data-lines={String(all.length)}>
+        {numbers}
+      </pre>
+      <pre className="al-code-text">
+        <code>{body}</code>
+      </pre>
+    </div>
   );
 }
