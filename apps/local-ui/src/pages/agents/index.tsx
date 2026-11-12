@@ -38,6 +38,8 @@ import { orderAgents, stateOf, tidyCandidates, type AgentRow, type AgentsList } 
 import { AgentDetail } from './detail.js';
 import { createDetailApi, type DetailApi } from './detail-api.js';
 import { Fleet, fleetSummary } from './fleet.js';
+import { FitStrip } from './fit-strip.js';
+import { PlusIcon } from './icons.js';
 import { recordLive } from './history.js';
 import { forgetIntent, rememberIntent, takeIntent, type IntentAction } from './intent.js';
 import { CardNameNote, PausedBanner, PauseSheet, ResumeGate } from './parts.js';
@@ -396,6 +398,7 @@ export function AgentsPage({
           ) : null}
           {list?.switchable === false ? null : (
             <a className="al-btn al-btn-primary al-btn-md" href={NEW_AGENT_PATH}>
+              <PlusIcon />
               {S.newAgent}
             </a>
           )}
@@ -411,7 +414,7 @@ export function AgentsPage({
           title={S.empty}
           action={
             <a className="al-btn al-btn-primary al-btn-md" href={NEW_AGENT_PATH}>
-              {S.newAgent}
+              {S.connectAiApp}
             </a>
           }
         />
@@ -431,6 +434,7 @@ export function AgentsPage({
       </>
     ) : (
       <div className="ag-cards">
+        <FitStrip rows={rows} />
         {rows.map((row) => (
           <AgentCard
             key={row.name}

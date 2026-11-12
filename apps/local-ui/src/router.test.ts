@@ -48,9 +48,9 @@ const currentSection = (): string | null | undefined =>
 /** Path, the page's own heading (today's page), and the section marked current. */
 const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   ['/', 'Home', 'Home'],
-  ['/agents', 'IDs', 'My IDs'],
+  ['/agents', 'My IDs', 'My IDs'],
   // W7-ID-B3 (D-144): the same page under its new name.
-  ['/ids', 'IDs', 'My IDs'],
+  ['/ids', 'My IDs', 'My IDs'],
   ['/activity', 'Activity', 'Activity'],
   ['/activity/live', 'Live activity stream', null],
   // WP-N1 (design-1112 §2.2): `/people` is the page's path; `/contacts` stays as an alias.

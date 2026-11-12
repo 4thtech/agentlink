@@ -136,6 +136,14 @@ async function click(el: Element | undefined | null): Promise<void> {
   });
   await settle();
 }
+
+/** WP-I1: Back up (open ID), AI apps and Remove sit behind the card's "More" button. */
+async function inMore(scope: ParentNode, text: string): Promise<HTMLButtonElement | undefined> {
+  const direct = button(scope, text);
+  if (direct !== undefined) return direct;
+  await click(button(scope, 'More'));
+  return button(scope, text);
+}
 async function type(el: HTMLInputElement, value: string): Promise<void> {
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(el, value);
@@ -150,27 +158,25 @@ const code = (): HTMLInputElement =>
 describe('the Agents page', () => {
   it('lists every agent with its AI apps, contacts and the open one', async () => {
     await mountPage();
-    expect(host.querySelector('h1')?.textContent).toBe('IDs');
+    expect(host.querySelector('h1')?.textContent).toBe('My IDs');
     expect(host.querySelectorAll('[data-agent]')).toHaveLength(4);
     const personal = rowOf('default');
-    expect(personal.textContent).toContain('Open');
-    expect(personal.textContent).toContain('Connected to Claude Code and 1 more');
+    expect(personal.textContent).toContain('this is the ID you are looking at');
+    expect(personal.textContent).toContain('Ready');
     expect(personal.textContent).toContain('Claude Code');
     expect(personal.textContent).toContain('Claude Desktop');
-    // D-144 (c): which AI apps use the ID, or none.
-    expect(personal.textContent).toContain('Used by Claude Code, Claude Desktop');
     expect(rowOf('second').textContent).toContain('Not used by any AI app');
-    expect(personal.textContent).toContain('4 contacts');
+    expect(personal.textContent).toContain('4people');
     expect(button(personal, 'Open')).toBeUndefined();
     expect(button(rowOf('work'), 'Open')).toBeDefined();
-    expect(rowOf('work').textContent).toContain('1 contact');
+    expect(rowOf('work').textContent).toContain('1person');
   });
   it('an agent with no AI app reads Not used by any AI app with its AI apps panel; Removal not finished with Try again', async () => {
     await mountPage();
     const second = rowOf('second');
     expect(second.textContent).toContain('Not used by any AI app');
-    await click(button(second, 'AI apps'));
-    expect(rowOf('second').textContent).toContain('No AI app is set up for this ID yet.');
+    expect(second.textContent).toContain('No AI app is connected to this ID.');
+    expect(button(second, 'Connect an AI app')).toBeDefined();
     const old = rowOf('old');
     expect(old.textContent).toContain('Removal not finished');
     expect(old.textContent).toContain('Removing it stopped part-way. Nothing else was affected.');
@@ -196,7 +202,9 @@ describe('the Agents page', () => {
       body: list([], { current: null, label: null }),
     };
     await mountPage();
-    expect(plain(host)).toContain('No IDs left. Add one to keep using AgentLink.');
+    expect(plain(host)).toContain(
+      'No IDs yet. An ID is created when you connect your first AI app.',
+    );
     // D-144 (b): the owner's explainer sentence on the empty page.
     expect(plain(host)).toContain(
       "An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it.",
@@ -210,10 +218,9 @@ describe('the Agents page', () => {
     expect(plain(host)).toContain("Couldn't load your IDs.");
     expect(button(host, 'Try again')).toBeDefined();
   });
-  it('marks the Tidy up agents "No AI app, no contacts"', async () => {
+  it('an unused ID has no extra "no contacts" line (WP-I1)', async () => {
     await mountPage();
-    expect(rowOf('second').textContent).toContain('No AI app, no contacts');
-    expect(rowOf('work').textContent).not.toContain('No AI app, no contacts');
+    expect(rowOf('second').textContent).not.toContain('No AI app, no contacts');
   });
   it('Switch posts the name and generation, then reloads every page', async () => {
     answers['POST /api/ui/agents/switch'] = {
@@ -316,7 +323,7 @@ describe('label check and removal states', () => {
   it('closes the Remove sheet on agent_removing: the agent shows as Removal not finished', async () => {
     answers['POST /api/ui/agents/remove'] = { status: 409, body: { status: 'agent_removing' } };
     await mountPage();
-    await click(button(rowOf('work'), 'Remove'));
+    await click(await inMore(rowOf('work'), 'Remove'));
     const sheet = host.querySelector<HTMLElement>('[role="dialog"]')!;
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
     await click(button(sheet, 'Remove with Touch ID'));
@@ -329,7 +336,7 @@ describe('label check and removal states', () => {
 describe('Remove', () => {
   const open = async (name: string): Promise<HTMLElement> => {
     await mountPage();
-    await click(button(rowOf(name), 'Remove'));
+    await click(await inMore(rowOf(name), 'Remove'));
     return host.querySelector<HTMLElement>('[role="dialog"]')!;
   };
   const confirmTyped = async (sheet: HTMLElement): Promise<void> => {

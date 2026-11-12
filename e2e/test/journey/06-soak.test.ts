@@ -26,7 +26,7 @@ import { join } from 'node:path';
 import type { Browser, Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { fakeClaudeCode, startAiAppMcp, until, type AiAppMcp } from '../app-world.js';
-import { addAgent, agentCard, labelled, openAgents } from './helpers-agents.js';
+import { addAgent, agentCard, inMore, labelled, openAgents } from './helpers-agents.js';
 import {
   KNOWN_FAILING,
   KNOWN_REASONS,
@@ -474,7 +474,7 @@ async function soak(
     // F16: an AI app runs this ID, so removal step 5 has an entry to take out.
     await seedAiAppEntry(pcA.home, label);
     await openAgents(a.page);
-    await agentCard(a.page, label).getByRole('button', { name: 'Remove', exact: true }).click();
+    await (await inMore(a.page, label, 'Remove')).click();
     await driveRemoval(label, namesBefore, mustBeUndeliverable);
   };
 
@@ -673,7 +673,7 @@ async function soak(
         fault.armed = true;
         expectUnfinished = true;
         await openAgents(a.page);
-        await agentCard(a.page, other).getByRole('button', { name: 'Remove', exact: true }).click();
+        await (await inMore(a.page, other, 'Remove')).click();
         await a.page.getByLabel(labelled('Type ', other, ' to confirm')).fill(other);
         await a.page.getByRole('button', { name: 'Remove with Touch ID' }).click();
         const confirm = a.page.getByRole('button', { name: CONFIRM_PASSKEY });

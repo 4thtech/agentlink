@@ -159,6 +159,14 @@ async function click(el: Element | undefined | null): Promise<void> {
   });
   await settle();
 }
+
+/** WP-I1: Back up (open ID), AI apps and Remove sit behind the card's "More" button. */
+async function inMore(scope: ParentNode, text: string): Promise<HTMLButtonElement | undefined> {
+  const direct = button(scope, text);
+  if (direct !== undefined) return direct;
+  await click(button(scope, 'More'));
+  return button(scope, text);
+}
 async function type(el: HTMLInputElement, value: string): Promise<void> {
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(el, value);
@@ -182,15 +190,15 @@ const posts = (url: string): Call[] => calls.filter((c) => c.method === 'POST' &
 describe('Agents, simple (A8)', () => {
   it('lists each agent with its letter icon, its label isolated, and its live line', async () => {
     await mount();
-    expect(host.querySelector('h1')?.textContent).toBe('IDs');
+    expect(host.querySelector('h1')?.textContent).toBe('My IDs');
     const personal = card('default');
     expect(personal.querySelector('.al-agent-icon')?.textContent).toBe('P');
     expect(personal.querySelector('.al-agent-icon-dot.is-working')).not.toBeNull();
     expect(personal.querySelector('bdi')?.textContent).toBe('Personal');
-    expect(personal.textContent).toContain('Working in Claude Code');
+    expect(personal.textContent).toContain('Working now · this is the ID you are looking at');
     expect(personal.textContent).toContain('Not connected · last seen 10 min ago');
-    expect(card('work').textContent).toContain('Connected to Cursor');
-    expect(card('research').textContent).toContain('Not used by any AI app');
+    expect(card('work').textContent).toContain('Cursor');
+    expect(card('research').textContent).toContain('Not used by any AI app yet');
     expect(card('invoices').textContent).toContain('Paused');
     const add = [...host.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'New ID');
     expect(add?.getAttribute('href')).toBe('/start/app?add=agent');
@@ -412,7 +420,7 @@ describe('Agents, simple (A8)', () => {
 
   it('AI apps: each app with its word, Connect or Disconnect, and the quit-first guidance', async () => {
     await mount();
-    await click(button(card('default'), 'AI apps'));
+    await click(await inMore(card('default'), 'AI apps'));
     const panel = card('default').querySelector<HTMLElement>('[data-panel="apps"]')!;
     expect(panel.textContent).toContain('Claude Code');
     expect(panel.textContent).toContain('Working');
@@ -427,17 +435,17 @@ describe('Agents, simple (A8)', () => {
   it("Back up saves the open ID's kit in place, asks to open another ID first; Remove asks for the name", async () => {
     await mount();
     // WP-11: the open ID saves its recovery kit right here (no link away, no terminal command).
-    await click(button(card('default'), 'Back up'));
+    await click(await inMore(card('default'), 'Back up'));
     expect(button(card('default'), 'Save recovery kit')).toBeDefined();
     // Another ID is opened first: a kit is saved for the open ID.
-    await click(button(card('work'), 'Back up'));
+    await click(await inMore(card('work'), 'Back up'));
     const panel = card('work').querySelector<HTMLElement>('[data-panel="backup"]')!;
     expect(plain(panel)).toContain('to save its recovery kit.');
     expect(button(panel, 'Open this ID')).toBeDefined();
     expect([...panel.querySelectorAll('button')].map((b) => b.textContent?.trim())).not.toContain(
       'Save recovery kit',
     );
-    await click(button(card('work'), 'Remove'));
+    await click(await inMore(card('work'), 'Remove'));
     expect(plain(host)).toContain('Remove Work?');
     expect(host.querySelector('[role="dialog"] input[type="text"]')).not.toBeNull();
   });
@@ -495,7 +503,7 @@ describe('Agents, Under the hood: the fleet (A11)', () => {
     expect(plain(host)).toContain('2 IDs selected');
     // Pause applies to the open agent (08 §1): several at once is not offered.
     expect(button(host.querySelector('[data-bulk]')!, 'Pause')).toBeUndefined();
-    await click(button(host.querySelector('[data-bulk]')!, 'Remove'));
+    await click(await inMore(host.querySelector('[data-bulk]')!, 'Remove'));
     expect(plain(host)).toContain('Remove Research?');
   });
 
