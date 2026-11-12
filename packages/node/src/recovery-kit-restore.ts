@@ -32,6 +32,7 @@ import {
 } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { AgentLinkClient, type ApprovalChannel } from '@4thtech-io/core';
 import {
   CryptoInputError,
   KeyStoreError,
@@ -40,6 +41,7 @@ import {
   concatBytes,
   decodeBase64url,
   decodeHex,
+  decodeHex0x,
   decodeUtf8,
   encodeBase64url,
   encodeHex,
@@ -54,6 +56,7 @@ import {
   wipe,
   type Argon2idParams,
   type JsonValue,
+  type KeyStore,
   type OwnerPresence,
   type RecoveryKitImport,
   type RecoveryKitStoreSink,
@@ -67,6 +70,8 @@ import {
   type RestoreOwnerSessionHold,
 } from './key-controls.js';
 import { keychainAccount, osKeychain, type KeychainBackend } from './keychain.js';
+import { openAgentStoreWith, type AgentStore } from './agent-store.js';
+import { openRecordedKeyStore } from './keychain-keystore.js';
 import { ttyOwnerTerminal } from './owner-terminal.js';
 import { OWNER_ACCOUNT, OWNER_NEXT_ACCOUNT } from './owner-keystore.js';
 import {
@@ -99,6 +104,8 @@ export const RESTORE_GESTURE_TTL_MS = 120_000;
 export const RESTORE_MAX_FOUND = 20;
 const HEADER_LENGTH = 74;
 const FREE_MARGIN = 1_073_741_824;
+/** How often free space is checked again while an upload streams. */
+const FREE_RECHECK_BYTES = 64 * 1_048_576;
 const MAX_UPLOADS = 2;
 const FIRST_WAIT_S = 30;
 const MAX_WAIT_S = 900;
@@ -246,6 +253,12 @@ interface FileRef {
   readonly kitId?: string;
 }
 
+interface UploadEntry {
+  handle: string | undefined;
+  size: number;
+  streaming: boolean;
+}
+
 interface HandleEntry {
   readonly session: string;
   readonly file: FileRef;
@@ -346,6 +359,67 @@ function headerOutcome(head: Uint8Array): { outcome: HeaderOutcome; ownerNostr?:
   }
 }
 
+const NO_APPROVALS: ApprovalChannel = Object.freeze({
+  request: (request: { readonly approvalId: string }) =>
+    Promise.resolve({ approvalId: request.approvalId }),
+  status: () => Promise.resolve({ state: 'pending' as const }),
+}) as unknown as ApprovalChannel;
+
+/**
+ * 04 §2.3.3 restore step 7 (IR-UX1113-R1 M2): opens the restored ID with its recorded KeyStore and
+ * its store, as every start does: the KeyStore's agent is `agentId`, the stored card re-verifies
+ * (both signatures) for that agent and names `ownerNostr`, and the policy loads at the restored
+ * `policy-version` mark (not fail closed). Nothing is written; everything is closed again.
+ */
+async function readBack(
+  keychain: KeychainBackend,
+  agentId: string,
+  ownerNostr: Uint8Array,
+  path: string,
+): Promise<boolean> {
+  const seen = await inspectId(keychain, agentId, path);
+  return seen !== undefined && seen.policyLoads && equalBytes(seen.ownerNostr, ownerNostr);
+}
+
+/**
+ * Opens an ID as every start does (its recorded keychain KeyStore and its store) and answers the
+ * owner its re-verified card names and whether its policy loads at its mark. Undefined when it does
+ * not open or its card does not verify. Writes nothing.
+ */
+async function inspectId(
+  keychain: KeychainBackend,
+  agentId: string,
+  path: string,
+): Promise<{ readonly ownerNostr: Uint8Array; readonly policyLoads: boolean } | undefined> {
+  let opened: AgentStore | undefined;
+  let keyStore: KeyStore | undefined;
+  try {
+    opened = await openAgentStoreWith('keychain', agentId, path, { keychain });
+    keyStore = await openRecordedKeyStore('keychain', agentId, { keychain });
+    const client = await AgentLinkClient.create({
+      keyStore,
+      store: opened.store,
+      cipher: opened.cipher,
+      approvals: NO_APPROVALS,
+      policyMark: opened.policyMark,
+      receiptsKept: opened.receiptsKept,
+    });
+    if (client.agentId !== agentId) return undefined;
+    const view = await client.identity.get();
+    if (view === undefined || view.agentId !== agentId) return undefined;
+    const named = (view.card as { ownerNostr?: unknown }).ownerNostr;
+    if (typeof named !== 'string') return undefined;
+    const owner = decodeHex0x(named, { length: 32 });
+    const policy = await client.ownerActions.loadPolicy();
+    return { ownerNostr: owner, policyLoads: policy.mode !== 'fail_closed' };
+  } catch {
+    return undefined;
+  } finally {
+    await keyStore?.close().catch(() => undefined);
+    await opened?.close().catch(() => undefined);
+  }
+}
+
 /** The restore engine of the app's routes (no terminal apply). */
 export function createRestoreEngine(options: RestoreEngineOptions): RestoreEngine {
   const full = build(options);
@@ -394,14 +468,20 @@ function build(options: RestoreEngineOptions): TerminalRestore {
   const pendingPath = join(agentlinkDir, PENDING_FILE);
   const maxUpload = options.maxUploadBytes ?? RECOVERY_KIT_LIMITS.maxKitBytes;
   const handles = new Map<string, HandleEntry>();
-  const uploads = new Map<string, { readonly handle: string; readonly size: number }>();
+  const uploads = new Map<string, UploadEntry>();
   const restoreSessions = new Map<string, RestoreSessionEntry>();
   const fails = new Map<string, { count: number; until: number }>();
   let presenceFails = { count: 0, until: 0 };
   let held: HeldKit | undefined;
   let pending: PendingGesture | undefined;
-  let kdfBusy = false;
-  let applying = false;
+  /**
+   * IR-UX1113-R1 M1: one engine-wide lock, taken synchronously (before any await) by open, check,
+   * presence, apply/begin and apply/finish. A second request while one runs answers `busy`: one KDF
+   * at a time, one opened kit, one apply (T-4, T-7).
+   */
+  let locked = false;
+  /** Bumped by `cancel` per page session; an open that finishes after a cancel wipes its kit. */
+  const cancels = new Map<string, number>();
   let ready: Promise<void> | undefined;
   const sweep = setInterval(() => {
     expire();
@@ -435,13 +515,31 @@ function build(options: RestoreEngineOptions): TerminalRestore {
   function expire(): void {
     const at = now();
     for (const [handle, entry] of handles) if (at >= entry.expiresAt) dropHandle(handle);
-    if (held !== undefined && at >= held.expiresAt) wipeHeld();
-    if (pending !== undefined && at >= pending.expiresAt) pending = undefined;
+    // Never under a running operation: it holds the kit and the plan until it ends.
+    if (!locked && held !== undefined && at >= held.expiresAt) wipeHeld();
+    if (!locked && pending !== undefined && at >= pending.expiresAt) pending = undefined;
     for (const [session, entry] of restoreSessions) {
       if (at >= entry.expiresAt) {
         entry.hold.end();
         restoreSessions.delete(session);
       }
+    }
+  }
+
+  /** Runs `fn` under the engine-wide lock, or answers `busy` (wiping `secret`) when it is taken. */
+  async function exclusive(
+    fn: () => Promise<RestoreAnswer>,
+    secret?: Uint8Array,
+  ): Promise<RestoreAnswer> {
+    if (locked) {
+      if (secret !== undefined) wipe(secret);
+      return fail('busy');
+    }
+    locked = true;
+    try {
+      return await fn();
+    } finally {
+      locked = false;
     }
   }
 
@@ -540,11 +638,39 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     return false;
   }
 
-  /** The owner this computer is known to have, before any presence; undefined when unknown. */
+  /**
+   * The owners the verified cards of this computer's agent folders name (04 §2.3.3: both card
+   * signatures re-verified on open). A folder that does not open counts for nothing.
+   */
+  async function verifiedCardOwners(): Promise<Uint8Array[]> {
+    const out: Uint8Array[] = [];
+    for (const [name, agentId] of await existingFolders()) {
+      if (agentId === undefined) continue;
+      const seen = await inspectId(
+        options.keychain(),
+        agentId,
+        join(agentsDir, name, 'store.sqlite'),
+      );
+      if (seen !== undefined && !out.some((o) => equalBytes(o, seen.ownerNostr))) {
+        out.push(seen.ownerNostr);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * The owner this computer is known to have, before any presence; undefined when unknown: the
+   * `owner-passkey` header, else the open ID's card, else the one owner every verified card here
+   * names (IR-UX1113-R1 Low: `other_owner` before the code with no passkey and no ID open). A hint
+   * only: presence still opens the owner item to exactly the kit's owner.
+   */
   async function knownOwner(): Promise<Uint8Array | undefined> {
     const passkey = await readOwnerPasskeyHeader(options.keychain()).catch(() => null);
     if (passkey !== null) return passkey.ownerNostr;
-    return (await options.knownOwnerNostr?.().catch(() => undefined)) ?? undefined;
+    const hinted = await options.knownOwnerNostr?.().catch(() => undefined);
+    if (hinted !== undefined) return hinted;
+    const owners = await verifiedCardOwners();
+    return owners.length === 1 ? owners[0] : undefined;
   }
 
   interface ParsedHeader {
@@ -577,9 +703,15 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         return { outcome: 'other_owner', ownerPresent, ownerNostr: parsed.ownerNostr, headerHash };
       }
     } else {
-      // A crash between the agents and the owner: only the same owner's kit finishes it (T-7).
+      // A crash between the agents and the owner: only the same owner's kit finishes it (T-7):
+      // the owner the verified cards here name, or the marker's.
       const marker = await readPending();
-      if (marker !== undefined && !equalBytes(marker, parsed.ownerNostr)) {
+      const owners = await verifiedCardOwners();
+      const kitOwner = parsed.ownerNostr;
+      if (
+        (marker !== undefined && !equalBytes(marker, kitOwner)) ||
+        owners.some((o) => !equalBytes(o, kitOwner))
+      ) {
         return { outcome: 'other_owner', ownerPresent, ownerNostr: parsed.ownerNostr, headerHash };
       }
     }
@@ -729,6 +861,8 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     code: Uint8Array,
     mode: 'open' | 'check',
   ): Promise<RestoreAnswer> {
+    // Taken before any await: a cancel from now on wipes what this open holds.
+    const cancelAt = cancels.get(session) ?? 0;
     try {
       await start();
       const handle = handleOf(input);
@@ -736,9 +870,10 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       if (entry === undefined || handle === undefined) return fail('expired');
       // An export handle is for Check after a save only (04 §2.3.3 "Check that my kit opens").
       if (entry.file.kind === 'export' && mode !== 'check') return fail('expired');
-      if (kdfBusy || applying) return fail('busy');
       if (held !== undefined && held.session !== session) return fail('busy');
       if (pending !== undefined && pending.session !== session) return fail('busy');
+      // The same page session opening again replaces its kit exactly as `cancel` does (wipe, and
+      // its quarantine files deleted); never while another operation runs (the lock).
       if (held !== undefined) wipeHeld();
       const parsed = await parseHeaderOf(entry.file);
       if (parsed === undefined) {
@@ -770,7 +905,6 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         return fail('expired');
       }
       if (entry.file.kind === 'export') dropHandle(handle);
-      kdfBusy = true;
       const sinks: RecoveryKitStoreSink[] = [];
       let kit: RecoveryKitImport;
       try {
@@ -808,7 +942,6 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         }
         return fail('damaged');
       } finally {
-        kdfBusy = false;
         await fh.close().catch(() => undefined);
       }
       fails.delete(key);
@@ -827,6 +960,11 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       if (mode === 'check') {
         kit.wipe();
         return ok({ summary });
+      }
+      // Cancelled while the kit was opening (the page left): never held.
+      if ((cancels.get(session) ?? 0) !== cancelAt) {
+        kit.wipe();
+        return fail('expired');
       }
       const kitHandle = newHandle();
       held = Object.freeze({
@@ -869,6 +1007,15 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       finals.add(name);
     }
     return Object.freeze({ selection: Object.freeze([...ids]), names: Object.freeze(map) });
+  }
+
+  /** Removes a folder this apply just installed (config, store files, folder; never recursive). */
+  async function removeInstalledFolder(name: string): Promise<void> {
+    const dir = join(agentsDir, name);
+    for (const file of ['config.json', 'store.sqlite', 'store.sqlite-wal', 'store.sqlite-shm']) {
+      await unlink(join(dir, file)).catch(() => undefined);
+    }
+    await rmdir(dir).catch(() => undefined);
   }
 
   /** Restore step 5 for one ID: its folder, its store, then `config.json` last. */
@@ -942,6 +1089,7 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       if (!plan.selection.includes(agent.agentId)) continue;
       const name = plan.names[agent.agentId] ?? ascii(agent.name);
       let written = false;
+      let installed = false;
       try {
         await control.importAgent(current.kit, agent.agentId, {
           name,
@@ -949,8 +1097,16 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         });
         written = true;
         await installFolder(current.kit, agent.agentId, name);
+        installed = true;
+        // Restore step 7 (IR-UX1113-R1 M2): the ID opens with its KeyStore and store, its card names
+        // the kit's owner, and its policy loads at the restored mark; else this ID is rolled back.
+        const storePath = join(agentsDir, name, 'store.sqlite');
+        if (!(await readBack(keychain, agent.agentId, current.kit.ownerNostr, storePath))) {
+          throw new Error('read-back');
+        }
         out.push({ agentId: agent.agentId, name, outcome: 'restored' });
       } catch {
+        if (installed) await removeInstalledFolder(name);
         if (written) await discardImportedAgent(keychain, agent.agentId);
         out.push({ agentId: agent.agentId, name, outcome: 'failed' });
       }
@@ -972,6 +1128,10 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     if (current === undefined || current.session !== session || kit !== current.handle) {
       return undefined;
     }
+    if (now() >= current.expiresAt) {
+      wipeHeld();
+      return undefined;
+    }
     return current;
   }
 
@@ -983,7 +1143,6 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       | { prfOutput: Uint8Array; credentialId: Uint8Array; authenticatorData: Uint8Array }
       | undefined,
   ): Promise<RestoreAnswer> {
-    applying = true;
     let code: Uint8Array | undefined;
     try {
       if (await keychainOwnerPresent()) return fail('busy');
@@ -1000,6 +1159,11 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         code = new Uint8Array(await control.importOwner(current.kit));
       } catch {
         if (passkey !== undefined) wipe(passkey.prfOutput);
+        // Nothing of this kit was written: no hint is left behind (an ID that was restored keeps
+        // it, with its verified card, for owner-only completion).
+        if (!outcomes.some((o) => o.outcome === 'restored')) {
+          await unlink(pendingPath).catch(() => undefined);
+        }
         await restored(outcomes);
         return fail('failed', { ids: outcomesJson(outcomes) });
       }
@@ -1017,7 +1181,6 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       });
     } finally {
       wipe(code);
-      applying = false;
       if (held === current) wipeHeld();
       pending = undefined;
     }
@@ -1026,13 +1189,11 @@ function build(options: RestoreEngineOptions): TerminalRestore {
   async function writeWithOwner(current: HeldKit, plan: Plan): Promise<RestoreAnswer> {
     const owner = current.restore;
     if (owner === undefined || !owner.boundTo(current.headerHash)) return fail('presence_required');
-    applying = true;
     try {
       const outcomes = await writeIds(current, plan, owner);
       await restored(outcomes);
       return ok({ status: 'done', ids: outcomesJson(outcomes), touchId: 'unchanged' });
     } finally {
-      applying = false;
       owner.end();
       for (const [session, entry] of restoreSessions) {
         if (entry.hold === owner) restoreSessions.delete(session);
@@ -1044,12 +1205,15 @@ function build(options: RestoreEngineOptions): TerminalRestore {
   /** Owner-only completion is allowed only after a crash, for the same owner (T-7). */
   async function completionAllowed(current: HeldKit): Promise<boolean> {
     if (await keychainOwnerPresent()) return false;
+    if (!current.rows.every((r) => r.state === 'already_here' || r.state === 'removed_earlier')) {
+      return false;
+    }
+    // 04 §2.3.3: the restored IDs' verified cards name this kit's owner (the marker is a hint).
+    const owners = await verifiedCardOwners();
     const marker = await readPending();
-    return (
-      marker !== undefined &&
-      equalBytes(marker, current.kit.ownerNostr) &&
-      current.rows.every((r) => r.state === 'already_here' || r.state === 'removed_earlier')
-    );
+    const kitOwner = current.kit.ownerNostr;
+    if (owners.some((o) => !equalBytes(o, kitOwner))) return false;
+    return owners.length > 0 || (marker !== undefined && equalBytes(marker, kitOwner));
   }
 
   function gestureChallenge(
@@ -1074,7 +1238,6 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     const record = objectInput(input);
     const current = heldFor(session, record?.['kit']);
     if (current === undefined) return fail('expired');
-    if (applying) return fail('busy');
     const plan = await planOf(input, current);
     if (plan === undefined) return fail('invalid');
     const ownerHere = await keychainOwnerPresent();
@@ -1177,6 +1340,7 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     try {
       expire();
       const nonceText = objectInput(input)?.['nonce'];
+      if (pending !== undefined && now() >= pending.expiresAt) pending = undefined;
       const current = pending;
       if (
         current === undefined ||
@@ -1192,7 +1356,6 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         pending = undefined;
         return fail('expired');
       }
-      if (applying) return fail('busy');
       const rejected = (): RestoreAnswer => {
         current.tries += 1;
         if (current.tries >= GESTURE_TRIES) pending = undefined;
@@ -1329,66 +1492,91 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     }
   }
 
+  async function freeSpace(): Promise<number | undefined> {
+    return options.freeBytes
+      ? options.freeBytes(restoreDir)
+      : statfs(restoreDir)
+          .then((s) => s.bavail * s.bsize)
+          .catch(() => undefined);
+  }
+
+  /**
+   * 04 §2.3.3 "Upload" (IR-UX1113-R1 Low): one live upload per page session (a new one deletes the
+   * old; one still streaming answers `busy`), two in all counting those still streaming, 4 GiB
+   * together, and at least 1 GiB left free, checked before and again while the body streams.
+   */
   async function uploadStep(
     session: string,
     chunks: AsyncIterable<Uint8Array> | Iterable<Uint8Array>,
     declared: number | undefined,
   ): Promise<RestoreAnswer> {
-    await start();
+    // Reserved synchronously, before any await, so parallel uploads count at once.
     expire();
     const previous = uploads.get(session);
-    if (previous !== undefined) dropHandle(previous.handle);
-    const others = [...uploads.values()];
-    if (others.length >= MAX_UPLOADS) return fail('busy');
-    const room = maxUpload - others.reduce((n, u) => n + u.size, 0);
+    if (previous?.streaming === true) return fail('busy');
+    if (previous?.handle !== undefined) dropHandle(previous.handle);
+    uploads.delete(session);
+    if (uploads.size >= MAX_UPLOADS) return fail('busy');
     if (declared !== undefined && (!Number.isSafeInteger(declared) || declared < 0)) {
       return fail('invalid');
     }
-    if (declared !== undefined && declared > room) return fail('too_large');
-    await mkdir(restoreDir, { recursive: true, mode: DIR_MODE });
-    const free = options.freeBytes
-      ? await options.freeBytes(restoreDir)
-      : await statfs(restoreDir)
-          .then((s) => s.bavail * s.bsize)
-          .catch(() => undefined);
-    if (free !== undefined && free - (declared ?? 0) < FREE_MARGIN) return fail('too_large');
-    const path = join(restoreDir, `.upload-${encodeHex(randomBytes(8))}.alkk`);
-    let fh: FileHandle;
-    try {
-      fh = await open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, FILE_MODE);
-    } catch {
-      return fail('failed');
-    }
-    let size = 0;
+    const others = (): number =>
+      [...uploads].reduce((n, [key, u]) => (key === session ? n : n + u.size), 0);
+    if (declared !== undefined && declared > maxUpload - others()) return fail('too_large');
+    const mine: UploadEntry = { handle: undefined, size: 0, streaming: true };
+    uploads.set(session, mine);
+    let path: string | undefined;
     let kept = false;
     try {
-      for await (const chunk of chunks) {
-        size += chunk.length;
-        if (size > room || (declared !== undefined && size > declared)) {
-          return fail(size > room ? 'too_large' : 'invalid');
-        }
-        let done = 0;
-        while (done < chunk.length) {
-          const { bytesWritten } = await fh.write(chunk, done, chunk.length - done);
-          done += bytesWritten;
-        }
+      await start();
+      await mkdir(restoreDir, { recursive: true, mode: DIR_MODE });
+      const free = await freeSpace();
+      if (free !== undefined && free - (declared ?? 0) < FREE_MARGIN) return fail('too_large');
+      path = join(restoreDir, `.upload-${encodeHex(randomBytes(8))}.alkk`);
+      let fh: FileHandle;
+      try {
+        fh = await open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, FILE_MODE);
+      } catch {
+        path = undefined;
+        return fail('failed');
       }
-      await fh.sync();
+      let sinceCheck = 0;
+      try {
+        for await (const chunk of chunks) {
+          mine.size += chunk.length;
+          sinceCheck += chunk.length;
+          if (mine.size > maxUpload - others()) return fail('too_large');
+          if (declared !== undefined && mine.size > declared) return fail('invalid');
+          if (sinceCheck >= FREE_RECHECK_BYTES) {
+            sinceCheck = 0;
+            const left = await freeSpace();
+            if (left !== undefined && left - chunk.length < FREE_MARGIN) return fail('too_large');
+          }
+          let done = 0;
+          while (done < chunk.length) {
+            const { bytesWritten } = await fh.write(chunk, done, chunk.length - done);
+            done += bytesWritten;
+          }
+        }
+        await fh.sync();
+      } catch {
+        return fail('failed');
+      } finally {
+        await fh.close().catch(() => undefined);
+      }
+      const ref = await refOf(path, 'upload');
+      if (ref === undefined) return fail('failed');
+      const handle = addHandle(session, ref);
+      mine.handle = handle;
+      mine.streaming = false;
       kept = true;
-    } catch {
-      return fail('failed');
+      return ok({ handle, size: mine.size });
     } finally {
-      await fh.close().catch(() => undefined);
-      if (!kept) await unlink(path).catch(() => undefined);
+      if (!kept) {
+        if (uploads.get(session) === mine) uploads.delete(session);
+        if (path !== undefined) await unlink(path).catch(() => undefined);
+      }
     }
-    const ref = await refOf(path, 'upload');
-    if (ref === undefined) {
-      await unlink(path).catch(() => undefined);
-      return fail('failed');
-    }
-    const handle = addHandle(session, ref);
-    uploads.set(session, { handle, size });
-    return ok({ handle, size });
   }
 
   async function foundStep(session: string): Promise<RestoreAnswer> {
@@ -1455,11 +1643,13 @@ function build(options: RestoreEngineOptions): TerminalRestore {
   }
 
   async function cancelStep(session: string, input: JsonValue | undefined): Promise<RestoreAnswer> {
-    const kit = objectInput(input)?.['kit'];
-    if (held !== undefined && held.session === session && (kit === held.handle || !applying)) {
-      if (!applying) wipeHeld();
+    void objectInput(input);
+    cancels.set(session, (cancels.get(session) ?? 0) + 1);
+    // Under a running operation the kit stays until it ends (an open in flight then wipes it).
+    if (!locked) {
+      if (held?.session === session) wipeHeld();
+      if (pending?.session === session) pending = undefined;
     }
-    if (pending?.session === session && !applying) pending = undefined;
     restoreSessions.get(session)?.hold.end();
     restoreSessions.delete(session);
     return Promise.resolve(ok({ status: 'cancelled' }));
@@ -1470,12 +1660,15 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     upload: (session, chunks, declared) => uploadStep(sessionKey(session), chunks, declared),
     header: (session, input) => headerStep(sessionKey(session), input),
     presence: (session, input, proof, mode) =>
-      presenceStep(sessionKey(session), input, proof, mode),
-    open: (session, input, code) => openWith(sessionKey(session), input, code, 'open'),
-    check: (session, input, code) => openWith(sessionKey(session), input, code, 'check'),
+      exclusive(() => presenceStep(sessionKey(session), input, proof, mode), proof),
+    open: (session, input, code) =>
+      exclusive(() => openWith(sessionKey(session), input, code, 'open'), code),
+    check: (session, input, code) =>
+      exclusive(() => openWith(sessionKey(session), input, code, 'check'), code),
     cancel: (session, input) => cancelStep(sessionKey(session), input),
-    applyBegin: (session, input) => begin(sessionKey(session), input, false),
-    applyFinish: (session, input, body) => finish(sessionKey(session), input, body),
+    applyBegin: (session, input) => exclusive(() => begin(sessionKey(session), input, false)),
+    applyFinish: (session, input, body) =>
+      exclusive(() => finish(sessionKey(session), input, body), body),
     registerExportedKit: async (session, file) => {
       if (typeof file.kitId !== 'string' || !HANDLE.test(file.kitId)) return undefined;
       const info = await lstat(file.path).catch(() => undefined);
@@ -1483,8 +1676,13 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       const ref = await refOf(file.path, 'export', file.kitId);
       return ref === undefined ? undefined : addHandle(sessionKey(session), ref);
     },
-    restorePending: async () =>
-      (await readPending()) !== undefined && !(await keychainOwnerPresent()),
+    restorePending: async () => {
+      // 04 §2.3.3: first run never mints an owner while a verified card here names an owner that
+      // is not present (no owner item at all); the marker of an unfinished restore is a hint too.
+      if (await keychainOwnerPresent()) return false;
+      if ((await readPending()) !== undefined) return true;
+      return (await verifiedCardOwners()).length > 0;
+    },
     close: () => {
       clearInterval(sweep);
       wipeHeld();
@@ -1500,7 +1698,7 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       const ref = await refOf(await realpath(path), 'terminal');
       return ref === undefined ? undefined : addHandle(sessionKey(session), ref);
     },
-    applyInTerminal: (session, input) => begin(sessionKey(session), input, true),
+    applyInTerminal: (session, input) => exclusive(() => begin(sessionKey(session), input, true)),
   };
 }
 
@@ -1678,6 +1876,24 @@ export function restoreInTerminal(
     origin: 'terminal',
   });
   return runRestoreInTerminal(engine, terminal, request, text);
+}
+
+/**
+ * `doctor` (UX1113-R1, 04 §2.3.3): true when restored IDs on this computer wait for their owner (an
+ * unfinished restore). Reads this user's keychain owner items, the marker and the agent folders'
+ * verified cards; unlocks nothing and writes nothing. No seam.
+ */
+export async function restorePendingHere(): Promise<boolean> {
+  const engine = createRestoreEngine({
+    home: homedir(),
+    keychain: osKeychainOnce(),
+    origin: 'terminal',
+  });
+  try {
+    return await engine.restorePending();
+  } finally {
+    await engine.close();
+  }
 }
 
 function osKeychainOnce(): () => KeychainBackend {

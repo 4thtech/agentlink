@@ -21,7 +21,7 @@ import {
   type JsonValue,
 } from '@4thtech-io/crypto';
 import { newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { keychainAccount } from './keychain.js';
 import {
   OWNER_ACCOUNT,
@@ -744,6 +744,17 @@ describe.runIf(POSIX)('uploads (T-5, T-6, T-7)', () => {
 describe.runIf(POSIX)('the exact log and error surface (T-3, T-11)', () => {
   it('no answer carries the code, a path, a seed or a library message', async () => {
     const { code: c, agents, owner } = await kitOnDisk();
+    // IR-UX1113-R1 Low: nothing is logged at all (every console channel).
+    const logged: string[] = [];
+    const spies = [
+      ...(['log', 'info', 'warn', 'error', 'debug'] as const).map((m) =>
+        vi.spyOn(console, m).mockImplementation((...a: unknown[]) => void logged.push(a.join(' '))),
+      ),
+    ];
+    onTestFinished(() => {
+      for (const spy of spies) spy.mockRestore();
+      expect(logged).toEqual([]);
+    });
     const handle = await foundHandle();
     await openKit('S1', handle, 'AAAA-AAAA-AAAA-AAAA-AAAA-AAAA');
     const kit = body(await openKit('S1', handle, c))['kit'] as string;
@@ -938,5 +949,198 @@ describe('the route engine has no path to an owner without the gesture (T-1)', (
     expect(Object.keys(routeEngine)).not.toContain('fileHandle');
     expect(Object.isFrozen(routeEngine)).toBe(true);
     void routeEngine.close();
+  });
+});
+
+// --- IR-UX1113-R1 fix round ----------------------------------------------------------------------
+
+describe.runIf(POSIX)('serialised: one operation at a time (IR M1; T-4, T-7)', () => {
+  it('eight parallel wrong codes run one KDF; the rest are busy and the counter moves by one', async () => {
+    const { code: c } = await kitOnDisk();
+    const handle = await foundHandle();
+    const wrong = 'AAAA-AAAA-AAAA-AAAA-AAAA-AAAA';
+    const res = await Promise.all(
+      Array.from({ length: 8 }, (_, i) =>
+        (i % 2 === 1 ? engine.check : engine.open)('S1', { handle }, code(wrong)),
+      ),
+    );
+    const errors = res.map((r) => body(r)['error']);
+    expect(errors.filter((e) => e === 'wrong_code')).toHaveLength(1);
+    expect(errors.filter((e) => e === 'busy')).toHaveLength(7);
+    // Two more wrong codes, then the wait: the parallel burst counted once.
+    expect(body(await openKit('S1', handle, wrong))['error']).toBe('wrong_code');
+    expect(body(await openKit('S1', handle, wrong))['error']).toBe('wrong_code');
+    expect(body(await openKit('S1', handle, c))['error']).toBe('wait');
+  });
+
+  it('three parallel right opens hold one kit; cancel leaves no quarantine file', async () => {
+    const { code: c } = await kitOnDisk();
+    const handle = await foundHandle();
+    const res = await Promise.all([1, 2, 3].map(() => openKit('S1', handle, c)));
+    expect(res.filter((r) => r.status === 200)).toHaveLength(1);
+    expect(res.filter((r) => body(r)['error'] === 'busy')).toHaveLength(2);
+    const kit = body(res.find((r) => r.status === 200) as RestoreAnswer)['kit'] as string;
+    await engine.cancel('S1', { kit });
+    const q = join(t.home, '.agentlink', 'restore');
+    expect((await readdir(q)).filter((n) => n.startsWith('.restore-'))).toEqual([]);
+  });
+
+  it('a cancel while the kit is still opening wipes it when the open ends', async () => {
+    const { code: c } = await kitOnDisk();
+    const handle = await foundHandle();
+    const opening = openKit('S1', handle, c);
+    await engine.cancel('S1', { kit: 'pending' });
+    expect(body(await opening)['error']).toBe('expired');
+    const q = join(t.home, '.agentlink', 'restore');
+    expect((await readdir(q)).filter((n) => n.startsWith('.restore-'))).toEqual([]);
+  });
+
+  it('two parallel apply/begin with an owner: one restores, the other is busy', async () => {
+    const owner = await makeOwner(keychain);
+    await engine.close();
+    engine = newEngine({ knownOwner: owner.keys.ownerNostr });
+    const { code: c, agents } = await kitOnDisk(undefined, owner);
+    const handle = await foundHandle();
+    expect((await engine.presence('S1', { handle }, owner.code.slice(), 'passphrase')).status).toBe(
+      200,
+    );
+    const kit = body(await openKit('S1', handle, c))['kit'] as string;
+    const input = { kit, selection: [agents[0]?.agentId as string], names: {} };
+    const res = await Promise.all([engine.applyBegin('S1', input), engine.applyBegin('S1', input)]);
+    expect(res.map((r) => body(r)['status'] ?? body(r)['error']).sort()).toEqual(['busy', 'done']);
+    expect(keychain.items.has(keychainAccount(agents[0]?.agentId as string, 'seed'))).toBe(true);
+  });
+});
+
+describe.runIf(POSIX)('restore step 7: the read-back (IR M2)', () => {
+  it('an ID whose policy does not load at its mark is failed and rolled back; the others stay', async () => {
+    const owner = await makeOwner();
+    const good = await makeAgent(t.root, owner, 'good');
+    const bad = await makeAgent(t.root, owner, 'bad', { policyMark: 5 });
+    const kit = await makeKit(
+      t.root,
+      owner,
+      [good, bad],
+      'agentlink-recovery-kit-rb.alkk',
+      join(t.home, 'Downloads'),
+    );
+    const handle = await foundHandle();
+    const opened = body(await openKit('S1', handle, kit.code))['kit'] as string;
+    const done = await gestureAndFinish('S1', opened, [good.agentId, bad.agentId]);
+    const ids = done['ids'] as { agentId: string; outcome: string }[];
+    expect(ids.find((r) => r.agentId === good.agentId)?.outcome).toBe('restored');
+    expect(ids.find((r) => r.agentId === bad.agentId)?.outcome).toBe('failed');
+    expect(keychain.items.has(keychainAccount(bad.agentId, 'seed'))).toBe(false);
+    await expect(lstat(join(t.home, '.agentlink', 'agents', 'bad'))).rejects.toThrow();
+    expect(
+      await readFile(join(t.home, '.agentlink', 'agents', 'good', 'config.json'), 'utf8'),
+    ).toContain(good.agentId);
+  });
+});
+
+describe.runIf(POSIX)(
+  'first run is held by verified cards, not only the marker (IR deviation 1)',
+  () => {
+    it('an ownerless computer holding IDs of an owner who is not here, with no marker, is held', async () => {
+      const { code: c, agents } = await kitOnDisk();
+      const handle = await foundHandle();
+      const kit = body(await openKit('S1', handle, c))['kit'] as string;
+      await gestureAndFinish('S1', kit, [agents[0]?.agentId as string]);
+      expect(await engine.restorePending()).toBe(false);
+      // The owner items go and no marker is left: the verified card still holds first run.
+      for (const account of [...keychain.items.keys()]) {
+        if (account.startsWith('owner')) keychain.items.delete(account);
+      }
+      await expect(lstat(join(t.home, '.agentlink', 'restore-pending.json'))).rejects.toThrow();
+      expect(await engine.restorePending()).toBe(true);
+      // A kit of another owner cannot finish it.
+      const other = await kitOnDisk([{ name: 'x' }], undefined, 'agentlink-recovery-kit-o.alkk');
+      const oh = await foundHandle('S1', 'agentlink-recovery-kit-o.alkk');
+      expect(body(await openKit('S1', oh, other.code))['error']).toBe('other_owner');
+    });
+
+    it('the marker goes when every ID and the owner failed', async () => {
+      const { code: c, agents } = await kitOnDisk();
+      const handle = await foundHandle();
+      const kit = body(await openKit('S1', handle, c))['kit'] as string;
+      keychain.failSetAfter = 0;
+      const begun = await engine.applyBegin('S1', {
+        kit,
+        selection: [agents[0]?.agentId as string],
+        names: {},
+      });
+      const pk = body(begun)['publicKey'] as { challenge: string; userId: string; prfSalt: string };
+      const auth = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
+      const done = await engine.applyFinish(
+        'S1',
+        { nonce: body(begun)['nonce'] as string },
+        webauthnCreate(auth, pk, ORIGIN),
+      );
+      expect(done.status).toBe(500);
+      keychain.failSetAfter = Infinity;
+      await expect(lstat(join(t.home, '.agentlink', 'restore-pending.json'))).rejects.toThrow();
+      expect(await engine.restorePending()).toBe(false);
+    });
+
+    it('other_owner before the code when the owner key is known only from a verified card here', async () => {
+      // An ID of owner A restored here, then no passkey, no ID open and no hint.
+      const a = await kitOnDisk();
+      const handle = await foundHandle();
+      const kit = body(await openKit('S1', handle, a.code))['kit'] as string;
+      await gestureAndFinish('S1', kit, [a.agents[0]?.agentId as string]);
+      keychain.items.delete(OWNER_PASSKEY_ACCOUNT);
+      await engine.close();
+      engine = newEngine();
+      const b = await kitOnDisk([{ name: 'other' }], undefined, 'agentlink-recovery-kit-b.alkk');
+      const bh = await foundHandle('S1', 'agentlink-recovery-kit-b.alkk');
+      expect(body(await engine.header('S1', { handle: bh }))).toEqual({
+        header: 'other_owner',
+        ownerPresent: true,
+      });
+      expect(b.owner.keys.ownerNostr).not.toEqual(a.owner.keys.ownerNostr);
+    });
+  },
+);
+
+describe.runIf(POSIX)('uploads in parallel (IR Low)', () => {
+  it('a second upload of the same session while one streams is busy; streaming ones count in two-in-all', async () => {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    async function* slow() {
+      yield new Uint8Array(10);
+      await gate;
+      yield new Uint8Array(10);
+    }
+    const first = engine.upload('S1', slow(), 20);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(body(await engine.upload('S1', [new Uint8Array(1)], 1))['error']).toBe('busy');
+    expect((await engine.upload('S2', [new Uint8Array(1)], 1)).status).toBe(200);
+    expect(body(await engine.upload('S3', [new Uint8Array(1)], 1))['error']).toBe('busy');
+    release();
+    expect((await first).status).toBe(200);
+  });
+
+  it('free space is checked again while the body streams', async () => {
+    let free = 10 * 1_073_741_824;
+    await engine.close();
+    engine = createRestoreEngine({
+      home: t.home,
+      keychain: () => keychain,
+      origin: ORIGIN,
+      now: () => clock,
+      freeBytes: () => Promise.resolve(free),
+    });
+    async function* big() {
+      const chunk = new Uint8Array(16 * 1_048_576);
+      for (let i = 0; i < 8; i += 1) {
+        if (i === 5) free = 512 * 1_048_576;
+        yield chunk;
+      }
+    }
+    expect(body(await engine.upload('S1', big(), undefined))['error']).toBe('too_large');
+    const dir = join(t.home, '.agentlink', 'restore');
+    expect((await readdir(dir)).filter((n) => n.startsWith('.upload-'))).toEqual([]);
   });
 });

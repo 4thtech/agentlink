@@ -260,3 +260,22 @@ describe('doctor runs the local checks even with no ID (R1)', () => {
     expect(out[0]).toBe('OK       Last time');
   });
 });
+
+describe('UX1113-R1: an unfinished restore (04 §2.3.3)', () => {
+  it('doctor names it first, as a problem', async () => {
+    const out: string[] = [];
+    const deps = createDeps({
+      open: () =>
+        Promise.resolve({ status: 'needs_setup', reason: 'no_agent', message: 'Not set up here.' }),
+      home: '/nonexistent-home',
+    });
+    const handler = createDoctorHandler({ ...deps, restorePending: () => Promise.resolve(true) });
+    const code = await createDispatcher({ doctor: handler })(['doctor'], {
+      output: { print: (t) => out.push(t), printError: (t) => out.push(t) },
+      terminal: { stdinIsTTY: true, stdoutIsTTY: true, env: {} },
+      version: '0.0.0',
+    });
+    expect(code).toBe(1);
+    expect(out[0]).toContain("A restore didn't finish");
+  });
+});

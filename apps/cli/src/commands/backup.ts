@@ -4,7 +4,11 @@
 // recovery-code and master-code prompts, runs in @4thtech-io/node (restoreInTerminal), so the code
 // never passes through this package: never an argument, environment variable, file or pipe. No MCP
 // tool reaches this command (I-4).
-import type { RestoreTerminalText, TerminalRestoreOutcome } from '@4thtech-io/node';
+import {
+  restoreInTerminal,
+  type RestoreTerminalText,
+  type TerminalRestoreOutcome,
+} from '@4thtech-io/node';
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, type CommandHandler } from '../dispatch.js';
 import { BACKUP_TEXT, restoreText } from './backup-strings.js';
 
@@ -40,3 +44,8 @@ export function createBackupHandler(deps: BackupDeps): CommandHandler {
     return outcome === 'restored' || outcome === 'checked' ? EXIT_OK : EXIT_FAILED;
   };
 }
+
+/** The production wiring of `backup` and `restore` (main.ts): node's restoreInTerminal. */
+export const backupCommandHandler: CommandHandler = createBackupHandler({
+  restore: restoreInTerminal,
+});

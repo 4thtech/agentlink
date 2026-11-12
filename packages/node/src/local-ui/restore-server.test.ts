@@ -1,7 +1,7 @@
 // UX1113-R1 (D-147; 04 §2.3.3 "Restore in the app"; 08 §1): the restore routes are their own route
 // kind, behind the session, CSRF, Host, Origin and fetch-metadata gate of every /api/ui/ route, run
 // by the server's restore gate (never a page handler), with fixed answers only.
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { encodeBase64url, encodeUtf8 } from '@4thtech-io/crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -9,6 +9,8 @@ import { startApprovalServerWith, type ApprovalServer } from '../approval-server
 import { ownerWorld, send, type OwnerWorld } from '../approval-ui.fixture.js';
 import { TEST_APP } from '../local-ui-app.fixture.js';
 import { KeychainOwnerKeyStore } from '../owner-keystore.js';
+import type { KeychainBackend } from '../keychain.js';
+import { MemoryKeychain } from '../recovery-kit-restore.fixture.js';
 import { RESTORE_PATHS, restoreRoutes } from './api/restore.js';
 import { LocalUiRouteRegistry, createLocalUiRoutes } from './routes.js';
 
@@ -27,7 +29,7 @@ afterEach(async () => {
 });
 
 let homes = 0;
-async function harness() {
+async function harness(over: { keychain?: KeychainBackend } = {}) {
   homes += 1;
   const home = join(world.root, `home-${String(homes)}`);
   mkdirSync(join(home, 'Downloads'), { recursive: true });
@@ -43,7 +45,7 @@ async function harness() {
       localUi: { assets: TEST_APP },
     },
     {
-      keychain: world.keychain,
+      keychain: over.keychain ?? world.keychain,
       openOwnerStore: (expected) => KeychainOwnerKeyStore.open(world.keychain, expected),
       opener: (url) => {
         opened.push(url);
@@ -175,5 +177,23 @@ describe('the restore gate (08 §1; T-3, T-6)', () => {
       headers: h.headers({ 'X-AgentLink-Input': input({ handle }) }),
     });
     expect(JSON.parse(header.body)).toEqual({ header: 'not_a_kit', ownerPresent: true });
+  });
+});
+
+describe('first run waits for an unfinished restore (T-7; IR Low)', () => {
+  it('the owner setup step answers 409 finish_restore while restored IDs wait for their owner', async () => {
+    const h = await harness({ keychain: new MemoryKeychain() });
+    mkdirSync(join(h.home, '.agentlink'), { recursive: true, mode: 0o700 });
+    writeFileSync(
+      join(h.home, '.agentlink', 'restore-pending.json'),
+      `${JSON.stringify({ v: 1, ownerNostr: 'ab'.repeat(32) })}\n`,
+      { mode: 0o600 },
+    );
+    const res = await send(h.server.port, '/api/ui/first-run/owner/begin', {
+      method: 'POST',
+      headers: h.headers({ 'X-AgentLink-Input': input({}) }),
+    });
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({ status: 'finish_restore' });
   });
 });

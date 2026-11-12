@@ -8,7 +8,6 @@ import Database from 'better-sqlite3';
 import {
   encodeBase64url,
   encodeHex,
-  encodeHex0x,
   encodeUtf8,
   randomBytes,
   sha256,
@@ -16,13 +15,13 @@ import {
   type OwnerPublicKeys,
 } from '@4thtech-io/crypto';
 import { generateSecretCode } from '@4thtech-io/crypto/keystore';
-import { rowKeyOf } from '@4thtech-io/core';
+import { AgentLinkClient } from '@4thtech-io/core';
 import { createKeyExportControl } from './key-controls.js';
 import { createKeychainAgent } from './keychain-keystore.js';
 import { keychainAccount, type KeychainBackend } from './keychain.js';
 import { KeychainOwnerKeyStore, newOwnerSeed, storeOwnerSeed } from './owner-keystore.js';
-import { SqliteStore } from './sqlite-store.js';
-import { createAgentStoreCipher } from './store-cipher.js';
+import { openAgentStoreWith } from './agent-store.js';
+import { openRecordedKeyStore } from './keychain-keystore.js';
 import { sampleRow } from './store-rows.fixture.js';
 import { encodeSetupRegistration } from './owner-setup.js';
 import { VirtualPrfAuthenticator } from './passkey-authenticator.fixture.js';
@@ -87,40 +86,63 @@ export async function makeAgent(
   root: string,
   owner: TestOwner,
   name: string,
-  extra: { readonly people?: number; readonly lastAt?: number } = {},
+  extra: { readonly people?: number; readonly lastAt?: number; readonly policyMark?: number } = {},
 ): Promise<TestAgent> {
   const keychain = new MemoryKeychain();
   const agentId = await createKeychainAgent(keychain);
-  const storeKey = (await keychain.get(keychainAccount(agentId, 'store-key'))) as Uint8Array;
+  if (extra.policyMark !== undefined) {
+    await keychain.set(
+      keychainAccount(agentId, 'policy-version'),
+      encodeUtf8(String(extra.policyMark)),
+    );
+  }
   const dir = await mkdtemp(join(root, 'snap-'));
   const path = join(dir, 'store.sqlite');
-  const store = await SqliteStore.open(path);
-  const cipher = await createAgentStoreCipher(storeKey);
-  const row = await sampleRow('identity', 0, cipher);
-  const card = JSON.stringify({
-    card: { ownerNostr: encodeHex0x(owner.keys.ownerNostr), keyEpoch: row.key_epoch },
-    cardSig: 'x',
-    cardAgentSig: null,
-  });
-  const sealed = await cipher.seal(
-    { table: 'identity', column: 'agent_card_json', rowKey: rowKeyOf([agentId]) },
-    card,
-  );
-  const contacts = [];
-  for (let i = 0; i < (extra.people ?? 0); i += 1) {
-    contacts.push({ ...(await sampleRow('contacts', i, cipher)), status: 'active' });
+  // A card the real identity path issued (identity.init), signed by `owner`, so the restored ID
+  // re-verifies at the read-back (04 §2.3.3 step 7) exactly as a real one.
+  const opened = await openAgentStoreWith('keychain', agentId, path, { keychain });
+  const keyStore = await openRecordedKeyStore('keychain', agentId, { keychain });
+  const session = await owner.store.unlock({ kind: 'passphrase', secret: owner.code.slice() });
+  try {
+    const client = await AgentLinkClient.create({
+      keyStore,
+      store: opened.store,
+      cipher: opened.cipher,
+      approvals: {
+        request: (request) => Promise.resolve({ approvalId: request.approvalId }),
+        status: () => Promise.resolve({ state: 'pending' }),
+      },
+      policyMark: opened.policyMark,
+    });
+    await client.identity.init({
+      owner: session,
+      ownerKeys: owner.keys,
+      name,
+      relays: ['wss://relay.agentlink.dev', 'wss://nos.lol'],
+    });
+    const contacts = [];
+    for (let i = 0; i < (extra.people ?? 0); i += 1) {
+      contacts.push({
+        ...(await sampleRow('contacts', i, opened.cipher as never)),
+        status: 'active',
+      });
+    }
+    const envelope =
+      extra.lastAt === undefined
+        ? undefined
+        : {
+            ...(await sampleRow('envelopes', 0, opened.cipher as never)),
+            created_at: extra.lastAt,
+          };
+    await opened.store.transaction((tx) => {
+      for (const contact of contacts) tx.insert('contacts', contact as never);
+      if (envelope !== undefined) tx.insert('envelopes', envelope as never);
+    });
+  } finally {
+    await session.close();
+    await keyStore.close();
+    await opened.close();
   }
-  const envelope =
-    extra.lastAt === undefined
-      ? undefined
-      : { ...(await sampleRow('envelopes', 0, cipher)), created_at: extra.lastAt };
-  await store.transaction((tx) => {
-    tx.insert('identity', { ...row, agent_id: agentId, agent_card_json: sealed });
-    for (const contact of contacts) tx.insert('contacts', contact as never);
-    if (envelope !== undefined) tx.insert('envelopes', envelope as never);
-  });
-  await store.close();
-  cipher.close();
   const db = new Database(path);
   const out = join(dir, 'snap.sqlite');
   db.prepare('VACUUM INTO ?').run(out);
