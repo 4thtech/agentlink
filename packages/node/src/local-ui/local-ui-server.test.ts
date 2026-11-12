@@ -9,7 +9,7 @@
 //   CSRF token injected; `/` and `/approve/<id>` keep the existing approval page.
 // - The session token (cookie) gates the app pages, the assets and every /api/ui/ route.
 // - A route declared `presence: true` runs only after the central presence gate: a POST with the
-//   page's Origin, CSRF and an octet-stream body carrying the owner code (or the passkey assertion).
+//   page's Origin, CSRF and an octet-stream body carrying the master code (or the passkey assertion).
 //   No proof, or a wrong one: 403 before the handler runs (the store is unlocked first, IR-M1-11s-b-1
 //   H-1), and a wrong code counts towards the server's wrong-code backoff. The handler gets a
 //   read-only client view and a one-use `sign` on that session; one that signs nothing is 409.
@@ -101,7 +101,7 @@ beforeAll(async () => {
     write: (text) => void written.push(text),
     readSecret: () =>
       Promise.resolve(
-        encodeUtf8((written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(-4)),
+        encodeUtf8((written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(-4)),
       ),
     confirm: () => Promise.resolve(true),
     clearScreen: () => undefined,
@@ -112,8 +112,8 @@ beforeAll(async () => {
     { backend: 'keychain', env: {} },
     { kdf: KDF },
   ));
-  code = (written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(
-    'Your owner code: '.length,
+  code = (written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(
+    'Your master code: '.length,
   );
 }, 60_000);
 
@@ -645,7 +645,7 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
           params: { contact: req.params['id'] ?? '' },
         };
         call.signed = [
-          ...(await ownerOp.sign({ lines: ['Mark the safety code as checked'] }, [
+          ...(await ownerOp.sign({ lines: ['Mark the 12 digits as checked'] }, [
             { kind: 'owner-action', action },
           ])),
         ];
@@ -758,7 +758,7 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
 
   // IR-M1-11s-b-1 H-1: presence is verified before the handler runs. A wrong code never reaches it
   // (this test pinned the opposite at eebdebd6, a bad pin corrected here, not a weakening).
-  it('refuses a wrong owner code before the handler runs and counts it towards the backoff', async () => {
+  it('refuses a wrong master code before the handler runs and counts it towards the backoff', async () => {
     const calls: { input: unknown }[] = [];
     let clock = 1_000_000;
     const h = await harness({ internals: { routes: ownerRoutes(calls), now: () => clock } });

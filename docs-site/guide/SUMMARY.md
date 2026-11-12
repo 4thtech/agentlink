@@ -32,7 +32,7 @@
   * [Get started](local-app/get-started-wizard.md)
   * [Invite someone](local-app/invite-someone.md)
   * [Approvals](local-app/approvals.md)
-  * [First run and your backup code](local-app/first-run.md)
+  * [First run and your master code](local-app/first-run.md)
   * [IDs](local-app/ids.md)
   * [AI apps page](local-app/ai-apps.md)
   * [Activity](local-app/activity.md)

@@ -16,7 +16,7 @@ Check that the package name is exactly `@4thtech-io/agentlink`, so you do not in
 
 ## 2. Protect your approvals
 
-If this is your first AgentLink ID on this computer, `init` run in a terminal you opened opens the setup page in your browser (0.3.0); or run `npx -y @4thtech-io/agentlink@latest owner init` in that terminal. For an ID on a computer that already has an owner code, run `npx -y @4thtech-io/agentlink@latest owner add-agent --agent <name>` instead. Both are on [Protect your approvals](protect-your-approvals.md); never through your AI.
+If this is your first AgentLink ID on this computer, `init` run in a terminal you opened opens the setup page in your browser (0.3.0); or run `npx -y @4thtech-io/agentlink@latest owner init` in that terminal. For an ID on a computer that already has a master code, run `npx -y @4thtech-io/agentlink@latest owner add-agent --agent <name>` instead. Both are on [Protect your approvals](protect-your-approvals.md); never through your AI.
 
 ## 3. Check it works
 

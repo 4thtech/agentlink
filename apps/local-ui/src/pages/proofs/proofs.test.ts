@@ -446,7 +446,7 @@ describe('Add credits and Withdraw credits (M1-11c-a4c)', () => {
     expect(button(PROOFS_STRINGS.addCredits)).toBeUndefined();
   });
 
-  it('turns received funds into credits after a confirm screen and the owner code', async () => {
+  it('turns received funds into credits after a confirm screen and the master code', async () => {
     const calls = await mount(base({ [`POST ${TOP_UP}`]: { status: 'done' } }));
     await click(PROOFS_STRINGS.addCredits);
     expect(text()).toContain('$4.99');
@@ -466,7 +466,7 @@ describe('Add credits and Withdraw credits (M1-11c-a4c)', () => {
       network: 'gnosis-test',
       amount: ADDABLE,
     });
-    // The owner code is the body only, never in the URL or the input header.
+    // The master code is the body only, never in the URL or the input header.
     expect(post?.body).toBe('7K2M-9QXA');
     expect(post?.url).not.toContain('7K2M');
     // UX2-e2 (B-11 §23.1): submitted is not added; the tracker waits for the credits read.
@@ -493,7 +493,7 @@ describe('Add credits and Withdraw credits (M1-11c-a4c)', () => {
     });
   });
 
-  it('cancel sends nothing; a wrong owner code says so', async () => {
+  it('cancel sends nothing; a wrong master code says so', async () => {
     const calls = await mount(
       base({ [`POST ${TOP_UP}`]: new Answer(403, { status: 'presence_rejected' }) }),
     );

@@ -572,7 +572,7 @@ describe('confirmation', () => {
     const plan = await init([]);
     const run = await init(['--confirm', codeOf(plan)]);
     expect(run.out).toContain('agentlink owner init');
-    expect(`${plan.out}${run.out}`).not.toMatch(/passphrase|owner code:/i);
+    expect(`${plan.out}${run.out}`).not.toMatch(/passphrase|master code:/i);
   });
 });
 

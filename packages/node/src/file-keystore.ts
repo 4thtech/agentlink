@@ -109,7 +109,7 @@ const fileExists = (): NodeKeyStoreError =>
 const passphraseRefused = (): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keystore_passphrase_refused',
-    'That passphrase cannot be used. Choose one of at least 12 characters that is not your owner code, or use the generated unlock code.',
+    'That passphrase cannot be used. Choose one of at least 12 characters that is not your master code, or use the generated unlock code.',
   );
 
 const keychainAvailable = (): NodeKeyStoreError =>

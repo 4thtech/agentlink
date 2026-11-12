@@ -29,6 +29,11 @@ export interface LiveAppRecord {
   readonly since?: number;
   /** Unix seconds: when a session of this app last ran the agent; only while not live. */
   readonly lastSeenAt?: number;
+  /**
+   * WP-13 (F-4 / F45): present (true) only while a live session of this app runs an older AgentLink
+   * than the app: the page says "Restart {app} to use the new version". Never the version text.
+   */
+  readonly outdated?: true;
 }
 
 /** One agent as the stream carries it (the allowlist; `GET /api/ui/agents` adds its own counts). */
@@ -53,7 +58,7 @@ export const LIVE_AGENT_FIELDS = [
   'lastSeenAt',
   'apps',
 ] as const;
-export const LIVE_APP_FIELDS = ['app', 'state', 'since', 'lastSeenAt'] as const;
+export const LIVE_APP_FIELDS = ['app', 'state', 'since', 'lastSeenAt', 'outdated'] as const;
 
 /** `event: snapshot`: the whole state; the first event unless Last-Event-ID was resumable. */
 export interface LiveSnapshotEvent {

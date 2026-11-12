@@ -18,15 +18,15 @@
 //   receipts turning off (D-109: only the owner's explicit answer keeps receipts on from an older
 //   default), which only narrows. Anything else is not signed (policy widening).
 // - The signature comes from `sign`: the CLI passes @4thtech-io/node's `performOwnerOperation` (the
-//   owner code at this process's own TTY prompt, no AI-app marker, 04 §2.5). What it returns is
+//   master code at this process's own TTY prompt, no AI-app marker, 04 §2.5). What it returns is
 //   applied only when its body is exactly what was checked; core `apply()` then checks the owner
 //   signature, the nonce and the version, as for every owner action.
 // - No half-set state: whenever the rules are not applied, the folders this run created are removed
-//   again (rmdir: only while empty). A wrong owner code is the caller's error (nothing signed).
+//   again (rmdir: only while empty). A wrong master code is the caller's error (nothing signed).
 // - One folder from the check to the rules (M1-36b-2-d, IR-M1-36b-2-c-1): the agent runs as the
 //   same OS user and can rename, replace or link the folder at any moment. The folder checked is
 //   pinned (allowed-path `pinFolder`: its real path, device and inode) and must still be that same
-//   real, empty folder just before the owner code is asked AND after signing, just before the rules
+//   real, empty folder just before the master code is asked AND after signing, just before the rules
 //   are applied; otherwise nothing is applied. Once allowed, the stored real path is the pin: a
 //   folder that later resolves anywhere else is not used for sending (allowed-path).
 // - Already allowed: any entry in the rules that names this folder where it really is, `~/` form
@@ -70,12 +70,12 @@ export interface SendFolderSetupOptions {
   readonly actions: SendFolderSetupActions;
   /**
    * One owner operation that signs the one `policy.set` with owner presence. The CLI passes
-   * `performOwnerOperation` (owner code at the TTY prompt).
+   * `performOwnerOperation` (master code at the TTY prompt).
    */
   readonly sign: (owner: OwnerPublicKeys, item: OwnerOperationItem) => Promise<OwnerSignature>;
   /**
    * Asked only when delivery receipts are on from an older default (06 §3, D-109), after the folder
-   * is ready and before the owner code: true keeps them on, anything else turns them off.
+   * is ready and before the master code: true keeps them on, anything else turns them off.
    */
   readonly keepDeliveryReceipts?: () => Promise<boolean>;
   /** The home folder the Send folder is created in; default the OS user's (tests only). */
@@ -177,7 +177,7 @@ const notAllowed = (reason: Extract<SendFolderSetupResult, { status: 'not_allowe
 
 /**
  * Creates (or checks) `~/AgentLink/Send` and signs one `policy.set` that adds only that folder to
- * the agent's rules in force (see the header). A wrong owner code or a cancelled prompt is thrown
+ * the agent's rules in force (see the header). A wrong master code or a cancelled prompt is thrown
  * by `sign`, after the folders this run created are removed.
  */
 export async function setUpSendFolder(
@@ -287,7 +287,7 @@ async function signAndApply(
   }
   if (!(await unchanged())) return failed;
 
-  // The owner reads the summary and types the owner code once (a wrong code is thrown).
+  // The owner reads the summary and types the master code once (a wrong code is thrown).
   const signature = await options.sign(owner, {
     kind: 'owner-action',
     action: body,
@@ -296,7 +296,7 @@ async function signAndApply(
   if (signature.kind !== 'owner-action') return failed;
   const signed = signature.signed;
   if (canonicalize(signed.body) !== canonicalize(body)) return failed;
-  // Checked again after signing (L1): the owner code may take a while, and the folder must still be
+  // Checked again after signing (L1): the master code may take a while, and the folder must still be
   // the one the owner read about when the rules take effect.
   if (!(await unchanged())) return failed;
 

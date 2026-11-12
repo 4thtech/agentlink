@@ -16,20 +16,20 @@ Send it any way you like: email, chat, in person.
 
 ## 3. Marko accepts
 
-If Marko uses the app, he chooses **Have an invite link? Paste it** (on Home or on the Invite screen), pastes the link and confirms with Touch ID. Both of you then see "You and {name} are connected" with the safety code. Or he can ask his AI:
+If Marko uses the app, he chooses **Have an invite link? Paste it** (on Home or on the Invite screen), pastes the link and confirms with Touch ID. Both of you then see "You and {name} are connected" with the 12 digits. Or he can ask his AI:
 
 Marko asks his AI: "Accept this AgentLink invite: (the link)." His AI can't accept silently: a new contact needs his approval by default. His AI tells him the approval is waiting, with a command like `npx -y @4thtech-io/agentlink@latest approve <approval ID>`.
 
-1. Marko runs that command **in his own terminal**, checks who and what, and enters his owner code.
+1. Marko runs that command **in his own terminal**, checks who and what, and enters his master code.
 2. Marko tells his AI he approved it. His AI accepts again, this time with the approval attached. (From the terminal, the same step is `npx -y @4thtech-io/agentlink@latest accept <link> --approval <approval ID>`.)
 
 If Marko does not use AgentLink yet, he can [join from the invite link](join-from-an-invite.md) in one step, or first set it up from [Get started](README.md) and then accept.
 
-## 4. Compare the safety code
+## 4. Compare the 12 digits
 
-The safety code is a 12-digit number. Its job is to catch someone pretending to be Marko: if you both see the same number, nobody is in the middle. Compare it by phone or in person, never in a chat with your AI.
+The Contact check is optional. Its job is to catch someone pretending to be Marko: if you both see the same number, nobody is in the middle. Compare them by phone or in person, never in a chat with your AI.
 
-Both of you see the safety code when the connection is made. Later, open the person on [Home](../local-app/home.md) and choose **Check safety code** in their menu. Until you have it, the other side's name shows as **Self-declared**. That means its owner chose it and nobody has checked it.
+Both of you see the 12 digits when the connection is made. Later, open the person on [Home](../local-app/home.md) and choose **Contact check** in their menu. Until you have it, the other side's name shows as **Self-declared**. That means its owner chose it and nobody has checked it.
 
 ## No one to invite yet?
 
@@ -39,7 +39,7 @@ You can try the whole path with a second ID of your own. It takes a few minutes 
 2. With your first ID open, choose **Invite someone** on Home and copy the link. Switch to the second ID, choose **Have an invite link? Paste it** and accept it with Touch ID.
 3. Ask the first ID's AI to say hello to the second, then ask the second's to answer. The conversation shows on [Home](../local-app/home.md) under the person, and the ID menu shows each AI app as Working or Ready as it moves.
 
-Two IDs of one owner show the same owner fingerprint on both sides.
+Two IDs of one owner show the same ID tag on both sides.
 
 ## Friend without AgentLink
 

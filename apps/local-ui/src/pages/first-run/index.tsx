@@ -1,27 +1,27 @@
 // First run (d1 Local-firstrun with DESIGN-ADJ-1 (a); 02 J1 step 3; D-120; 08 §1; U3-g, b11 §28):
 // Welcome, pick your AI app, one screen that names the agent and protects approvals with a passkey
-// that creates the owner key on this computer (one gesture), the owner fingerprint and the backup
+// that creates the owner key on this computer (one gesture), the ID tag and the backup
 // code, the recovery kit put off ("Later", M1-11b-3 builds the kit step), then "Connect your AI app"
 // as its own signed step that "Later" skips, and the end on Home (U3-a, D-138).
 //
 // The browser never signs: the passkey ceremony is the one gesture; the owner key is created, wrapped
-// and stored by the local server (setup routes, M1-11s-c). The owner code arrives once, lives only in
+// and stored by the local server (setup routes, M1-11s-c). The master code arrives once, lives only in
 // this component's state while the step is on screen, and is dropped when the owner moves on.
 //
 // M1-UX-FIRSTRUN-V2 (D-130 (1), (2); 08 §1 first run v2; 11 §5.5, §6.2.1; proposed, owner confirms
 // at merge): step 1 shows the folders setup creates, then one button named for the platform ("Use
 // Touch ID"); the same gesture also allows the Send folder (the server signs the first policy).
-// Step 2, "Your backup code", shows the code once as readable text and in a real form (username
-// `autocomplete="username"` = "AgentLink backup code – <computer>", code `autocomplete="new-password"`)
+// Step 2, "Your master code", shows the code once as readable text and in a real form (username
+// `autocomplete="username"` = "AgentLink master code – <computer>", code `autocomplete="new-password"`)
 // so "Save in my password manager" lets the browser's own save sheet appear; Copy is secondary with
 // the clipboard warning; only "I saved it" moves on, and the code leaves the page then. Where the
 // browser reports no passkey with PRF, the page names a browser that works, or continues with a
-// backup code only. Q-130-1 (screen readers and the shown code) stays open: the code is plain text.
+// master code only. Q-130-1 (screen readers and the shown code) stays open: the code is plain text.
 //
 // W4-WIZARD (W4 UX v2 layer 1; artboards A1 to A3): first run is Get started, four steps, each its
 // own route (`/start/app` → `/start/connect` → `/start/connected` → `/start/invite`), with a progress
 // bar and "Skip to Home" on every step (pages/start/wizard.tsx). Step 1 picks the AI app (found on
-// this computer or not yet); step 2 is the one Touch ID (D-140) and then the backup code, still shown
+// this computer or not yet); step 2 is the one Touch ID (D-140) and then the master code, still shown
 // once; step 3 is Connected ✓ (or E1: the agent is kept and Connect is offered); step 4 invites
 // someone. The same steps serve an owner who has one already: New agent when no agent is open (or
 // `?add=agent`), else Connect another AI app (the signed AI apps step with the exact entry). The page
@@ -245,7 +245,7 @@ interface Done {
   readonly passkey: boolean;
   readonly fingerprint: string;
   readonly sendFolder: SendFolderOutcome;
-  /** Present only while the "Your backup code" step is on screen. */
+  /** Present only while the "Your master code" step is on screen. */
   readonly ownerCode?: string;
   readonly computerName?: string;
   /** W4-ONE-TOUCH: the app the one gesture connected (or tried to). */
@@ -266,7 +266,7 @@ type View =
       /** M1-UX-PRF-MATRIX: the browser reports no passkey with PRF here. */
       readonly noPrf?: boolean;
     }
-  /** U3-g: the backup code is saved; deciding between "Connect your AI app" and Home. */
+  /** U3-g: the master code is saved; deciding between "Connect your AI app" and Home. */
   | { readonly k: 'leaving' }
   | {
       /** U3-g (b11 §28.4): connect the chosen AI app, a separate signed step. */
@@ -278,7 +278,7 @@ type View =
     }
   | { readonly k: 'unsupported' }
   | {
-      /** M1-UX-FIRSTRUN-V2-c (B-9): an owner without a passkey: backup code once, one gesture. */
+      /** M1-UX-FIRSTRUN-V2-c (B-9): an owner without a passkey: master code once, one gesture. */
       readonly k: 'upgrade';
       readonly values: UpgradeValues;
       readonly working: boolean;
@@ -300,7 +300,7 @@ export function setupMessage(problem: SetupError | { readonly problem: 'cancelle
   return SETUP_MESSAGES[problem.problem];
 }
 
-/** The once-shown backup code: one display (Show/Hide), a real save form, Copy, Save as file, "I saved it". */
+/** The once-shown master code: one display (Show/Hide), a real save form, Copy, Save as file, "I saved it". */
 function BackupCode({
   code,
   computer,
@@ -325,7 +325,7 @@ function BackupCode({
     setAsked(true);
   };
   return (
-    <section className="al-secret" aria-label={T.backupLabel}>
+    <section className="al-secret fr-secret" aria-label={T.backupLabel}>
       <div className="al-secret-head">
         <span className="al-text-label">{T.backupLabel}</span>
         <span className="al-text-caption al-muted">{T.shownOnce}</span>
@@ -438,7 +438,7 @@ function sendLine(outcome: SendFolderOutcome): string | undefined {
 /**
  * W4-WIZARD (A1 step 2, "Confirm it's you"): the agent card with its suggested name ("Change name"
  * opens the field), and one primary button for the one gesture (D-140: it creates the owner and the
- * agent and connects the picked app). The backup code stays the alternative. Enter in the field does
+ * agent and connects the picked app). The master code stays the alternative. Enter in the field does
  * not submit: focus moves to the button.
  */
 function ConnectFirstStep({
@@ -644,7 +644,7 @@ export function FirstRunPage({
   const step: StepId = givenStep ?? stepOf(path);
   const [view, setView] = useState<View>({ k: 'loading' });
   const [mode, setMode] = useState<Mode | undefined>(undefined);
-  // M1-UX-FIRSTRUN-V2-c: the backup code as typed, only while the switch is on screen.
+  // M1-UX-FIRSTRUN-V2-c: the master code as typed, only while the switch is on screen.
   const [code, setCode] = useState('');
   const sensor = SENSOR[platform];
   // What the person chose on earlier steps (kept in memory while the steps change; no secret).
@@ -926,7 +926,7 @@ export function FirstRunPage({
       const begun = await api.begin(label, app?.id);
       if (begun.kind === 'owner_exists') return existingOwner(undefined, true);
       if (begun.kind === 'error') return problem(begun);
-      // Without PRF here, any passkey: the gesture proves presence, the backup code approves.
+      // Without PRF here, any passkey: the gesture proves presence, the master code approves.
       const made = await createPasskey(begun.publicKey, { platform: !noPrf });
       if (made.kind === 'unsupported') return setView({ k: 'unsupported' });
       if (made.kind === 'cancelled') return again(SETUP_MESSAGES.cancelled);
@@ -984,7 +984,7 @@ export function FirstRunPage({
   );
 
   /**
-   * M1-UX-FIRSTRUN-V2-c (B-9): the backup code once, then one passkey gesture, in one owner
+   * M1-UX-FIRSTRUN-V2-c (B-9): the master code once, then one passkey gesture, in one owner
    * operation of the server (`POST /api/owner/passkey`), which checks the code (with the wrong-code
    * backoff) and keeps the same owner. The code goes only into that one body; its bytes are zeroed
    * after sending and the field is cleared once the server has answered.
@@ -996,7 +996,7 @@ export function FirstRunPage({
         setView({ k: 'upgrade', values, working: false, noPrf, message });
       };
       // F49: this computer's passkey gives no PRF. Say so plainly (no "open Chrome" in Chrome) and
-      // stop pushing the switch in this browser (a UI nudge only; the backup code keeps working).
+      // stop pushing the switch in this browser (a UI nudge only; the master code keeps working).
       const unsupportedHere = (): string => {
         rememberSwitchUnsupported();
         return UPGRADE_MESSAGES.unsupported(otherBrowser(platform), SENSOR[platform]);
@@ -1058,11 +1058,11 @@ export function FirstRunPage({
     toStep('connected');
   };
 
-  // The owner code is dropped from state when the owner leaves the step that shows it. The recovery
+  // The master code is dropped from state when the owner leaves the step that shows it. The recovery
   // kit is put off ("Later", remembered for the banner). W4-WIZARD: then Connected (A2).
   const leave = (done: Done): void => {
     rememberRecoveryKitLater();
-    // The backup code leaves the page now, whichever screen comes next (L-3).
+    // The master code leaves the page now, whichever screen comes next (L-3).
     setView({ k: 'leaving' });
     // U3-invite (08 §4, b11 §33.2): an invite left waiting by `agentlink join` comes first.
     void readJoin()
@@ -1092,7 +1092,7 @@ export function FirstRunPage({
   // earlier choices goes back to step 1; Connected without an outcome reads the real state).
   useEffect(() => {
     // Back to step 1 (the browser's Back, or "Back"): the pick shows again.
-    // IR-W4-WIZARD-SEC-1 L1: leaving step 2 while the backup code shows (Back/Forward, a typed
+    // IR-W4-WIZARD-SEC-1 L1: leaving step 2 while the master code shows (Back/Forward, a typed
     // address) is "I saved it" without the click: the code leaves the state and the page, never
     // hidden to come back; the kit is put off as with the click.
     if (view.k === 'done' && step !== 'connect') {
@@ -1329,7 +1329,7 @@ export function FirstRunPage({
           {done.passkey ? (
             <p className="st-lead">{T.doneBody}</p>
           ) : (
-            // M1-11s-c-c: without a passkey the backup code is the only way to approve here.
+            // M1-11s-c-c: without a passkey the master code is the only way to approve here.
             <div data-testid="backup-needed">
               <Banner tone="warning" title={T.doneNoPasskeyTitle}>
                 {T.doneNoPasskeyBody}

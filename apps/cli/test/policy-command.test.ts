@@ -5,11 +5,11 @@
 // (performOwnerOperation), exactly as in contacts-manage.test.ts.
 //
 // - refused without an interactive terminal or under an AI-app marker, before anything is read;
-// - a wrong owner code changes nothing and says so;
+// - a wrong master code changes nothing and says so;
 // - allow-folder stores the folder's canonical realpath in a new owner-signed `policy.set` (the
 //   signature is verified against the owner key), keeping every other rule as it was;
 // - relative paths, paths through a symbolic link, the root, the home folder or a folder above it,
-//   hidden and protected folders, and missing folders are refused before any owner code is asked;
+//   hidden and protected folders, and missing folders are refused before any master code is asked;
 // - remove-folder takes a folder out again;
 // - no MCP tool reaches any of it (I-4);
 // - after allow-folder, the core sends a file from that folder instead of returning needs_setup.
@@ -388,7 +388,7 @@ beforeEach(async () => {
     addAgent: () => Promise.reject(new Error('not used')),
     changeOwnerCode: () => Promise.reject(new Error('not used')),
     decide: () => Promise.reject(new Error('not used')),
-    // Stands in for @4thtech-io/node's performOwnerOperation: the summary is shown, the owner code is
+    // Stands in for @4thtech-io/node's performOwnerOperation: the summary is shown, the master code is
     // read once, and exactly the given object is signed. A wrong code is `presence_rejected`.
     signOwnerAction: async (_owner, item) => {
       if (item.kind !== 'owner-action') throw new Error('unexpected');
@@ -482,12 +482,12 @@ describe('owner presence and the AI (04 §2.5, §2.8; I-4; 06 §8)', () => {
     expect(await version()).toBe(1);
   });
 
-  it('a wrong owner code changes nothing and says so (one try per run; nothing signed)', async () => {
+  it('a wrong master code changes nothing and says so (one try per run; nothing signed)', async () => {
     ownerPresence = wrongPresence;
     const result = await run(['policy', 'allow-folder', join(home, 'Work')]);
     expect(result.code).toBe(1);
     expect(codeEntries).toEqual(['policy.set']);
-    expect(result.err.join('\n')).toMatch(/owner code/i);
+    expect(result.err.join('\n')).toMatch(/master code/i);
     expect(result.err.join('\n')).toMatch(/Nothing was changed/);
     expect(result.text).not.toContain('wrong horse');
     expect(await folders()).toEqual([]);
@@ -505,7 +505,7 @@ describe('policy allow-folder <path> †', () => {
     const result = await run(['policy', 'allow-folder', join(home, 'Work')]);
     expect(result.code).toBe(0);
     expect(codeEntries).toEqual(['policy.set']);
-    // The owner sees the exact folder before the owner code.
+    // The owner sees the exact folder before the master code.
     expect(summaries[0]).toContain(join(home, 'Work'));
     expect(await folders()).toEqual([join(home, 'Work')]);
     expect(await version()).toBe(2);
@@ -581,7 +581,7 @@ describe('policy allow-folder <path> †', () => {
     ['a control character', () => `${join(home, 'Work')}\u001b[31m`],
   ];
 
-  it.each(refused)('refuses %s before any owner code, changing nothing', async (_label, arg) => {
+  it.each(refused)('refuses %s before any master code, changing nothing', async (_label, arg) => {
     const result = await run(['policy', 'allow-folder', arg()]);
     expect(result.code).not.toBe(0);
     expect(codeEntries).toEqual([]);
@@ -640,7 +640,7 @@ describe('policy allow-folder <path> †', () => {
     expect(codeEntries).toEqual(['policy.set']);
   });
 
-  it('a different spelling (case): anything but y changes nothing and asks for no owner code', async (ctx) => {
+  it('a different spelling (case): anything but y changes nothing and asks for no master code', async (ctx) => {
     let caseInsensitive = false;
     try {
       caseInsensitive = statSync(join(home, 'WORK')).isDirectory();
@@ -683,7 +683,7 @@ describe('policy allow-folder <path> †', () => {
     expect(await version()).toBe(1);
   });
 
-  it('refuses a 33rd folder (06 §3 bound) before any owner code', async () => {
+  it('refuses a 33rd folder (06 §3 bound) before any master code', async () => {
     for (let i = 0; i < 33; i += 1) {
       mkdirSync(join(home, 'Many', `f${String(i)}`), { recursive: true });
     }
@@ -753,7 +753,7 @@ describe('policy remove-folder <path> †', () => {
 });
 
 describe('policy show †', () => {
-  it('lists the allowed folders without asking for the owner code', async () => {
+  it('lists the allowed folders without asking for the master code', async () => {
     const empty = await run(['policy', 'show']);
     expect(empty.code).toBe(0);
     expect(empty.text).toMatch(/No folder is allowed/);
@@ -826,7 +826,7 @@ describe('no MCP tool reaches the policy (I-4)', () => {
 describe('policy allow-send-folder † (M1-36b-2-c; D-121 D6)', () => {
   const send = (): string => join(home, 'AgentLink', 'Send');
 
-  it('adds only ~/AgentLink/Send (its real path) to the rules in force, with one owner code', async () => {
+  it('adds only ~/AgentLink/Send (its real path) to the rules in force, with one master code', async () => {
     const before = await loaded();
     const result = await run(['policy', 'allow-send-folder']);
     expect(result.code).toBe(0);
@@ -853,7 +853,7 @@ describe('policy allow-send-folder † (M1-36b-2-c; D-121 D6)', () => {
     expect(await folders()).toEqual([join(home, 'Work'), send()]);
   });
 
-  it('a Send folder that holds files is refused before any owner code, and left as it is', async () => {
+  it('a Send folder that holds files is refused before any master code, and left as it is', async () => {
     mkdirSync(send(), { recursive: true });
     writeFileSync(join(send(), 'private.txt'), 'x');
     const result = await run(['policy', 'allow-send-folder']);
@@ -865,7 +865,7 @@ describe('policy allow-send-folder † (M1-36b-2-c; D-121 D6)', () => {
     expect(await version()).toBe(1);
   });
 
-  it('a Send folder that is a link is refused before any owner code', async () => {
+  it('a Send folder that is a link is refused before any master code', async () => {
     mkdirSync(join(home, 'AgentLink'));
     symlinkSync(join(home, 'Other'), send());
     const result = await run(['policy', 'allow-send-folder']);
@@ -874,7 +874,7 @@ describe('policy allow-send-folder † (M1-36b-2-c; D-121 D6)', () => {
     expect(await version()).toBe(1);
   });
 
-  it('running it again changes nothing and asks for no owner code', async () => {
+  it('running it again changes nothing and asks for no master code', async () => {
     expect((await run(['policy', 'allow-send-folder'])).code).toBe(0);
     const again = await run(['policy', 'allow-send-folder']);
     expect(again.code).toBe(0);
@@ -882,11 +882,11 @@ describe('policy allow-send-folder † (M1-36b-2-c; D-121 D6)', () => {
     expect(codeEntries).toEqual(['policy.set']);
   });
 
-  it('a wrong owner code changes nothing and leaves no folder behind', async () => {
+  it('a wrong master code changes nothing and leaves no folder behind', async () => {
     ownerPresence = wrongPresence;
     const result = await run(['policy', 'allow-send-folder']);
     expect(result.code).toBe(1);
-    expect(result.err.join('\n')).toMatch(/owner code/i);
+    expect(result.err.join('\n')).toMatch(/master code/i);
     expect(await version()).toBe(1);
     expect(() => statSync(join(home, 'AgentLink'))).toThrow();
   });
@@ -978,7 +978,7 @@ describe('end to end: allowing a folder makes file sending work (06 §2.3)', () 
 // --- M1-9m-b (D-99): a folder that contains a protected folder ------------------------------------
 
 describe('policy allow-folder refuses a folder that contains a protected folder (D-99, 04 §4)', () => {
-  it('`~/Library` is refused before the owner code, naming ~/Library/Keychains', async () => {
+  it('`~/Library` is refused before the master code, naming ~/Library/Keychains', async () => {
     mkdirSync(join(home, 'Library', 'Keychains'), { recursive: true });
     const result = await run(['policy', 'allow-folder', '~/Library']);
     expect(result.code).toBe(1);
@@ -1114,7 +1114,7 @@ describe('policy recover † (D-100, 06 §3 G-6, §8)', () => {
     expect(await problem()).toBe('rolled_back');
   });
 
-  it('after a rollback: shows the kind and the stored rules in full, signs them at mark + 1 after y and the owner code', async () => {
+  it('after a rollback: shows the kind and the stored rules in full, signs them at mark + 1 after y and the master code', async () => {
     await workRules();
     alice.setMark(5);
     expect(await problem()).toBe('rolled_back');
@@ -1181,7 +1181,7 @@ describe('policy recover † (D-100, 06 §3 G-6, §8)', () => {
     for (const row of POLICY_REVIEW_ROWS) expect(shown).toContain(row.label);
   });
 
-  it('anything but y changes nothing and asks for no owner code', async () => {
+  it('anything but y changes nothing and asks for no master code', async () => {
     await workRules();
     alice.setMark(5);
     for (const answer of ['', 'n', 'yes please', 'Y y']) {
@@ -1194,7 +1194,7 @@ describe('policy recover † (D-100, 06 §3 G-6, §8)', () => {
     expect(await problem()).toBe('rolled_back');
   });
 
-  it('a wrong owner code changes nothing', async () => {
+  it('a wrong master code changes nothing', async () => {
     await workRules();
     alice.setMark(5);
     answers = ['y'];
@@ -1263,7 +1263,7 @@ describe('delivery receipts on from an older default (06 §3, D-109; M1-33a)', (
     expect(asked).toHaveLength(1);
     expect(asked[0]).toMatch(KEEP_QUESTION);
     expect(result.out.join('\n')).toMatch(/on from an older default/);
-    // The owner sees, before the owner code, that receipts turn off.
+    // The owner sees, before the master code, that receipts turn off.
     expect(summaries[0]).toMatch(/[Dd]elivery receipts turn off/);
     expect(await version()).toBe(3);
     expect(await folders()).toEqual([join(home, 'Work')]);
@@ -1298,7 +1298,7 @@ describe('delivery receipts on from an older default (06 §3, D-109; M1-33a)', (
     expect(alice.kept).toBe(3);
   });
 
-  it('a wrong owner code changes nothing and records no marker', async () => {
+  it('a wrong master code changes nothing and records no marker', async () => {
     await olderDefaultRules();
     answers = ['y'];
     ownerPresence = wrongPresence;

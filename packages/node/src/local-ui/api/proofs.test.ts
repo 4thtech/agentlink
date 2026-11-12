@@ -63,6 +63,8 @@ function fakeClient(
       prepareCheck: () => Promise.reject(new Error('not used')),
       prepareRename: () => Promise.reject(new Error('not used')),
       prepareRemove: () => Promise.reject(new Error('not used')),
+      prepareBlock: () => Promise.reject(new Error('not used')),
+      prepareUnblock: () => Promise.reject(new Error('not used')),
     },
   };
 }

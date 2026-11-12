@@ -68,7 +68,9 @@ function scripted(answers: string[]) {
 }
 
 const codeShown = (written: readonly string[]): string =>
-  (written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice('Your owner code: '.length);
+  (written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(
+    'Your master code: '.length,
+  );
 
 async function ready() {
   const keychain = new FakeKeychain();
@@ -371,6 +373,9 @@ describe('EIP-712 and owner-action allowlist (M1-8h; 04 §2.4, §2.5.1)', () => 
       // M1-9za: the owner renames or removes a contact.
       ['contact.rename', { contact: AGENT, alias: 'Tali laptop' }],
       ['contact.remove', { contact: AGENT }],
+      // WP-12 (F-2): the owner blocks or unblocks a contact from the People page.
+      ['contact.block', { contact: AGENT }],
+      ['contact.unblock', { contact: AGENT }],
       // W4-PAUSE (D-143 (5)): Resume ends a pause (U5 real-app journey found it missing).
       ['agent.resume', { agent: AGENT }],
     ];
@@ -400,6 +405,8 @@ describe('the owner-action op allowlist is exactly the ops owner flows sign', ()
         'contact.check',
         'contact.rename',
         'contact.remove',
+        'contact.block',
+        'contact.unblock',
         'credits.deposit',
         'credits.withdraw',
         'agent.label',
@@ -407,6 +414,8 @@ describe('the owner-action op allowlist is exactly the ops owner flows sign', ()
         'app.disconnect',
         'file.save',
         'agent.resume',
+        // WP-11 (D-117 A): signed only by the app's export gesture (backup-export-server.test.ts).
+        'backup.export',
       ].sort(),
     );
     // Pausing signs nothing: there is no pause op.

@@ -51,9 +51,9 @@ export const en = {
   'chat.status.needs_setup.storage':
     "Your settings keep files in your own storage, which isn't connected yet: {url}.",
   'chat.status.needs_setup.keychain':
-    "AgentLink can't find a system keychain on this machine. Run `npx -y @4thtech-io/agentlink doctor` in a terminal to see how to fix it.",
+    "AgentLink can't find a system keychain on this machine. Open AgentLink on this computer and it will show you how to fix it.",
   'chat.status.needs_setup.keyLocked':
-    "AgentLink's key file is locked, so I can't use it yet. Run `npx -y @4thtech-io/agentlink doctor` in a terminal to see how to set up its unlock code.",
+    "AgentLink's key file is locked, so I can't use it yet. Open AgentLink on this computer and it will show you how to unlock it.",
   'chat.status.needs_credits':
     'Adding proof costs {fee} and your credits are at {balance}. Add credits: {url}. Messages and files stay free.',
 
@@ -155,7 +155,7 @@ export const en = {
 
   // ---- Identity labels (11 §5.2) ----------------------------------------------------------
   'common.identity.selfdeclared': 'Self-declared',
-  'common.identity.checked': 'Safety code checked',
+  'common.identity.checked': 'Contact checked',
   'common.identity.registered': 'Registered',
   'common.identity.verified': 'Verified domain · {domain}',
   'common.identity.domainWarning': 'Domain no longer verified',
@@ -221,7 +221,7 @@ export const en = {
   'cli.approve.question': 'Approve, deny or later? (a/d/L)',
   'cli.approve.termsOwn': 'Decide this one on its own: `{prefix} approve {approvalId}`',
   'cli.approve.summary':
-    'Approve {approved} and deny {denied}. Your owner code or passphrase covers exactly these {total}. Anything new waits for your next review.',
+    'Approve {approved} and deny {denied}. Your master code or passphrase covers exactly these {total}. Anything new waits for your next review.',
   'cli.approve.continue': 'Continue? (y/N)',
   'cli.approve.footer': "Your AI can't approve for you.",
   'cli.approve.resultApproved': 'OK       Approved: {action}',

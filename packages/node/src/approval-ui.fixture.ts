@@ -71,7 +71,7 @@ export interface OwnerWorld {
   readonly keychain: FileKeychain;
   readonly agentId: string;
   readonly owner: OwnerPublicKeys;
-  /** The owner code shown once at setup. */
+  /** The master code shown once at setup. */
   readonly code: string;
   cleanup(): void;
 }
@@ -86,7 +86,7 @@ export async function ownerWorld(prefix: string): Promise<OwnerWorld> {
     write: (text) => void written.push(text),
     readSecret: () =>
       Promise.resolve(
-        encodeUtf8((written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(-4)),
+        encodeUtf8((written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(-4)),
       ),
     confirm: () => Promise.resolve(true),
     clearScreen: () => undefined,
@@ -97,8 +97,8 @@ export async function ownerWorld(prefix: string): Promise<OwnerWorld> {
     { backend: 'keychain', env: {} },
     { kdf: KDF },
   );
-  const code = (written.find((t) => t.startsWith('Your owner code: ')) ?? '').slice(
-    'Your owner code: '.length,
+  const code = (written.find((t) => t.startsWith('Your master code: ')) ?? '').slice(
+    'Your master code: '.length,
   );
   return {
     root,

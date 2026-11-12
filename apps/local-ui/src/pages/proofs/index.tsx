@@ -5,7 +5,7 @@
 // not on this page (PR-1: it lives in Advanced). M1-11c-a4c: where the agent can be paid (the Gnosis
 // test network now, D-123), "Add credits" opens the address, its QR code and the privacy note, and
 // "Withdraw credits" returns credits to the agent's own account; both changes are owner operations
-// behind a confirm screen and the owner code (top-up.tsx). Elsewhere the not-available line stays.
+// behind a confirm screen and the master code (top-up.tsx). Elsewhere the not-available line stays.
 // UX2-e2: inside Add credits, the three-step tracker (B-11 §23) replaces "Waiting for your credits…".
 // On load the page only reads.
 import {

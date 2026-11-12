@@ -4,18 +4,18 @@
 // the app.
 //
 // - Everything about the inviter comes from `GET /api/ui/join`: the name-rule name, Self-declared,
-//   the short owner fingerprint and the expiry, rendered as React text. Never the link: the page
+//   the short ID tag and the expiry, rendered as React text. Never the link: the page
 //   does not have it, and nothing about the invite goes into the address bar, the title or a toast.
 // - "Accept with Touch ID": the owner statement names the inviter and the agent; the passkey (or the
-//   backup code) is the presence proof of one `POST /api/ui/join/accept {inviteId}`, bound to the ID
+//   master code) is the presence proof of one `POST /api/ui/join/accept {inviteId}`, bound to the ID
 //   this screen shows (another one is `invite_changed`, and nothing is signed). The server signs.
 // - "Not now" forgets the invite (`POST /api/ui/join/dismiss`) and goes to Home.
 // - After accepting: "Waiting for {name} to answer." (the 10-minute line after 10 minutes),
-//   then "Connected with {name}." and the safety-code step on Contacts. The safety code does not
+//   then "Connected with {name}." and the safety-code step on Contacts. The 12 digits does not
 //   exist before the handshake-ack (04 §3.6.1), so it is never shown here before that.
 // W4-PEOPLE-INVITE (prototype v23 A6, A7): the card is the friend's screen, "{name} invites you to
 // connect your AIs" with one Accept with Touch ID; "Not now" says nothing was shared and the link
-// still works; once connected, the Connected moment shows the safety code for the new contact
+// still works; once connected, the Connected moment shows the 12 digits for the new contact
 // (found in this app's contacts by the inviter's fingerprint), and Done goes Home.
 import { Button, ProgressBar } from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
@@ -57,7 +57,7 @@ export interface JoinPageProps {
   readonly go?: (path: string) => void;
   readonly now?: () => number;
   readonly pollMs?: number;
-  /** This app's contacts route, for the new contact's safety code. Default: the page's own client. */
+  /** This app's contacts route, for the new contact's Contact check. Default: the page's own client. */
   readonly contacts?: ApiClient;
 }
 
@@ -298,7 +298,7 @@ export function JoinPage({
         <p className="jn-lead al-muted">{I.acceptBody(name)}</p>
       </div>
       <p className="al-text-body-sm al-muted jn-check" aria-label={S.regionLabel}>
-        {S.check(name, fingerprint)} · {S.until(until)}
+        {S.check(name)} · {S.until(until)}
         {agent === '' ? null : (
           <>
             {' · '}
@@ -335,7 +335,7 @@ export function JoinPage({
               {passkey === undefined ? S.acceptWithCode : S.acceptWith(platform)}
             </span>
           </Button>
-          {/* FB-8: the backup code is always a way to confirm, also with a passkey here. */}
+          {/* FB-8: the master code is always a way to confirm, also with a passkey here. */}
           {passkey === undefined || declined ? null : (
             <UseCodeInstead
               disabled={busy}

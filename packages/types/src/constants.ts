@@ -174,6 +174,10 @@ export const OWNER_ACTION_OPS = freeze([
   'contact.check',
   'contact.rename',
   'contact.remove',
+  // UX1112 WP-12 (F-2; proposed, owner confirms at merge): the owner blocks or unblocks one existing
+  // contact from the local app (People), behind the presence gate; no envelope carries them.
+  'contact.block',
+  'contact.unblock',
   'storage.set',
   'storage.remove',
   'backup.export',
@@ -273,6 +277,9 @@ export const OWNER_ACTION_MAX_LIFETIME_SECONDS = freeze({
   // M1-9za: applied on the agent's own machine within seconds; the default for later ops.
   'contact.rename': 600,
   'contact.remove': 600,
+  // WP-12 (F-2): applied on the agent's own machine within seconds, like contact.remove.
+  'contact.block': 600,
+  'contact.unblock': 600,
   // M1-9i-a (D-115): signed and applied on the agent's own machine within seconds.
   'storage.set': 600,
   'storage.remove': 600,

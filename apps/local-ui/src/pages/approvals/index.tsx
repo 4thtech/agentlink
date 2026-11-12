@@ -5,12 +5,12 @@
 // - "Waiting for you (n)": the pending requests, soonest to expire first, at most 20. A plain
 //   request offers Approve, Deny or Later; one button names exactly what is included. Before asking
 //   for presence the page checks the list again, leaves out what is no longer waiting (or changed),
-//   says so and shows "This covers exactly these n"; then one passkey gesture or one owner code.
+//   says so and shows "This covers exactly these n"; then one passkey gesture or one master code.
 // - A commitment (D-31) and a request that costs credits (04 §2.5.3 rule 7) are never list items:
 //   each is its own card with its own Approve and Deny; the paid one approves through the sheet.
 // - Before the owner is set up nothing can be approved, with the reason. The switch to a passkey is
 //   the layout's next-step banner (M1-UX-FIRSTRUN-V2-c); where passkeys can't work, the page says
-//   the owner code is the way.
+//   the master code is the way.
 // - Every server value is React text (I-5). The browser never signs (D-118).
 // - UI-REFRESH-o (visual only): cards on level 1, the one being decided on level 2; the shared
 //   Skeleton on first load; the approved moment after a review that approved something. What is
@@ -100,7 +100,7 @@ export function useOwner(client: ApprovalsClient, canPasskey: boolean): OwnerVie
   return owner;
 }
 
-/** Owner set up? If not, the reason; where passkeys can't work, the owner code is the way. */
+/** Owner set up? If not, the reason; where passkeys can't work, the master code is the way. */
 export function OwnerPanel({
   owner,
   canPasskey,
@@ -234,7 +234,7 @@ export function ApprovalsPage({
   readSetup = readSetupState,
 }: ApprovalsPageProps): ReactElement {
   // The owner's state, as the list showed it: not set up yet (nothing can be approved, with the
-  // reason) or no passkeys in this browser (the backup code is the way).
+  // reason) or no passkeys in this browser (the master code is the way).
   const approvals = useMemo(() => client ?? createApprovalsClient(), [client]);
   const passkeys = canPasskey ?? browserPasskeys();
   const owner = useOwner(approvals, passkeys);

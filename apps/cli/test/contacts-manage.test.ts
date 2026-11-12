@@ -320,7 +320,7 @@ beforeEach(async () => {
     addAgent: () => Promise.reject(new Error('not used')),
     changeOwnerCode: () => Promise.reject(new Error('not used')),
     decide: () => Promise.reject(new Error('not used')),
-    // Stands in for @4thtech-io/node's performOwnerOperation: the summary is shown, the owner code is
+    // Stands in for @4thtech-io/node's performOwnerOperation: the summary is shown, the master code is
     // read once, and exactly the given object is signed.
     signOwnerAction: async (_owner, item) => {
       if (item.kind !== 'owner-action') throw new Error('unexpected');

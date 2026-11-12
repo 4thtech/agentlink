@@ -1,6 +1,6 @@
 // `agentlink owner init` † (M1-9b; 04 §2.2, §2.8 "owner init rules"; 06 §7; 07 §9.3; D-67, D-68 (3)).
 //
-// Creates the owner key on this machine with a generated owner code (@4thtech-io/node `initOwner`,
+// Creates the owner key on this machine with a generated master code (@4thtech-io/node `initOwner`,
 // M1-8c): the code is shown once at this process's own terminal, re-typed and cleared; the owner
 // seed is stored only wrapped under it, never in plain text (04 §2.2, G-5). It never replaces an
 // existing owner key, nor an owner the agent's card already names. No argument, environment variable
@@ -237,7 +237,7 @@ async function addAgentOne(deps: OwnerCommandDeps, context: CommandContext): Pro
     added = await deps.addAgent({
       backend,
       // M1-9x: no other agent names an owner, so node takes the owner keys from the owner item
-      // itself (after the owner code), or refuses with `owner init` when there is none.
+      // itself (after the master code), or refuses with `owner init` when there is none.
       ...(found.status === 'one' ? { owner: found.owner } : {}),
       // Read for AI-app markers only (04 §2.8), never for a secret.
       env: terminal.env,
@@ -261,8 +261,8 @@ async function addAgentOne(deps: OwnerCommandDeps, context: CommandContext): Pro
 }
 
 /**
- * `agentlink owner change-code` † (M1-9z; 04 §2.8 "Changing the owner code"): replaces an exposed
- * owner code. The owner the machine's agents name is handed to node as the expected owner, so the
+ * `agentlink owner change-code` † (M1-9z; 04 §2.8 "Changing the master code"): replaces an exposed
+ * master code. The owner the machine's agents name is handed to node as the expected owner, so the
  * owner item must unlock to exactly that owner; node asks for the current code, shows the new one
  * and re-wraps the owner key. The owner, its fingerprint and every card stay the same.
  */

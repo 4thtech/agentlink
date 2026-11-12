@@ -8,7 +8,7 @@ export const WARNING_TEXT = Object.freeze({
   invites_auto: 'Your AI will connect with new contacts without asking you.',
   unknown_senders_queued:
     'Requests from unknown senders will be held for your review instead of dropped.',
-  contacts_allowed_widened: 'More agents will be able to message this ID.',
+  contacts_allowed_widened: 'More IDs will be able to message this ID.',
   limits_raised:
     'Some limits go up: how often contacts can message, how large files can be, or how long file links last.',
   retention_longer: 'Files will be kept longer than before.',

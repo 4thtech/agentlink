@@ -228,7 +228,7 @@ describe('the sheet: a modal dialog (b11 §19.5)', () => {
     expect(q.onCancel).not.toHaveBeenCalled();
   });
 
-  it('no passkey here: the backup code is the way, and Confirm is not offered', () => {
+  it('no passkey here: the master code is the way, and Confirm is not offered', () => {
     mount(props({ canPasskey: false, phase: 'backup' }));
     expect(buttonNamed('Confirm with Touch ID')).toBeUndefined();
     const input = dialog().querySelector<HTMLInputElement>('input');
@@ -238,7 +238,7 @@ describe('the sheet: a modal dialog (b11 §19.5)', () => {
     expect(label?.textContent).toBe(P.codeLabel);
   });
 
-  it('offers the backup code as a small secondary link', () => {
+  it('offers the master code as a small secondary link', () => {
     const p = props();
     mount(p);
     const link = buttonNamed(P.useBackup);
@@ -349,7 +349,7 @@ describe('copy (11 §5; b11 §19.6)', () => {
     expect(P.trustCredits).toBe('Your credits stay yours; 4thTech never holds them.');
     expect(P.trustAi).toBe("Your AI can't confirm this for you.");
     expect(P.cancelled).toBe('Not confirmed. Nothing was paid.');
-    expect(P.useBackup).toBe('Use backup code instead');
+    expect(P.useBackup).toBe('Use your master code instead');
   });
 
   // M1-11b-2c: the server-rendered approval page, which drew this sheet without React and copied

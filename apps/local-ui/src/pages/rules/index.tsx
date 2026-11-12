@@ -338,7 +338,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
           }}
           onKeep={(keep) => void prepare(keep)}
           onUseCode={() => {
-            // FB-8: the owner chose the backup code; this confirm then saves with the code.
+            // FB-8: the owner chose the master code; this confirm then saves with the code.
             const { error: _error, ...rest } = step;
             void _error;
             setCode('');
@@ -738,7 +738,7 @@ function ConfirmStep({
                 : S.save}
           </Button>
         </div>
-        {/* FB-8: the backup code is always a way to confirm, also with a passkey here. */}
+        {/* FB-8: the master code is always a way to confirm, also with a passkey here. */}
         {confirm.passkey === null || confirm.spending ? null : (
           <UseCodeInstead onClick={onUseCode} disabled={confirm.busy} />
         )}

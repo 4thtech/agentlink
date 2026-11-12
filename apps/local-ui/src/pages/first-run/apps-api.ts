@@ -96,7 +96,7 @@ export interface AppsApi {
   list(): Promise<AppsListResult>;
   currentAgent(): Promise<CurrentAgentResult>;
   preview(app: string, agent: string): Promise<PreviewResult>;
-  /** The stored passkey, when this browser can use it (Touch ID); otherwise the backup code. */
+  /** The stored passkey, when this browser can use it (Touch ID); otherwise the master code. */
   passkey(): Promise<PasskeyInfo | undefined>;
   apply(changeId: string, proof: PresenceProof): Promise<ApplyResult>;
 }

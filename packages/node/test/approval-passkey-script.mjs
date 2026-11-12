@@ -111,7 +111,7 @@ for (const { approvalId, digest } of job.approvals) {
   }
 }
 
-// Registering a passkey of its own (to replace or add one) needs the owner code.
+// Registering a passkey of its own (to replace or add one) needs the master code.
 const own = new Uint8Array(16).fill(7);
 for (const code of ['', 'AAAA BBBB CCCC DDDD EEEE FFFF', job.csrf]) {
   const secret = Buffer.from(code, 'utf8');

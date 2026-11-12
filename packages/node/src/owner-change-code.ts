@@ -1,13 +1,13 @@
-// M1-9z: changing the owner code, the flow behind `agentlink owner change-code` † (04 §2.8
-// "Changing the owner code"; 07 §9.3). An owner code that was exposed (typed into a shell, pasted
+// M1-9z: changing the master code, the flow behind `agentlink owner change-code` † (04 §2.8
+// "Changing the master code"; 07 §9.3). A master code that was exposed (typed into a shell, pasted
 // into a chat) can be replaced without changing the owner: the same owner seed is re-wrapped under a
-// new generated owner code, so the owner keys, the owner fingerprint and every agent card stay valid.
+// new generated master code, so the owner keys, the ID tag and every agent card stay valid.
 //
 // - Guards before anything is read: the AI-app marker (UX guard) and, in the package entry, an
 //   interactive terminal; no secret ever comes from an argument, variable, file or pipe.
-// - Owner presence: the CURRENT owner code (or opted-in passphrase), at most three tries. With an
+// - Owner presence: the CURRENT master code (or opted-in passphrase), at most three tries. With an
 //   expected owner (the one the local cards name), the item must unlock to exactly that owner.
-// - The new secret is always a generated 120-bit owner code (the `owner init` rules: shown once,
+// - The new secret is always a generated 120-bit master code (the `owner init` rules: shown once,
 //   last four characters re-typed, screen cleared, never written to a file). A chosen passphrase is
 //   not offered: moving to a generated code is the point of the change.
 // - The re-wrap never loses the seed (owner-keystore.ts replaceOwnerWrap): stage, verify the staged
@@ -60,7 +60,7 @@ export interface ChangeOwnerCodeOptions {
 export interface ChangeOwnerCodeResult {
   /** The owner's public keys: unchanged by the new code. */
   readonly owner: OwnerPublicKeys;
-  /** The short owner fingerprint (11 §5.2): unchanged by the new code. */
+  /** The short ID tag (11 §5.2): unchanged by the new code. */
   readonly fingerprint: string;
 }
 
@@ -75,39 +75,38 @@ const ATTEMPTS = 3;
 // Fixed copy (11 §5 vocabulary; no value from a file or another party is inserted, I-5).
 const COPY = {
   intro:
-    'This replaces your owner code with a new one. Your owner fingerprint stays the same, and your agents keep their cards.',
-  current: 'First, type your current owner code.',
-  wrong: "That owner code wasn't accepted. Check it and try again.",
-  refused: `The owner code wasn't accepted three times. Nothing was changed. Check the code you saved when you ran \`${CLI_COMMAND} owner init\`.`,
+    'This replaces your master code with a new one. Your ID tag stays the same, and your agents keep their cards.',
+  current: 'First, type your current master code.',
+  wrong: "That master code wasn't accepted. Check it and try again.",
+  refused: `The master code wasn't accepted three times. Nothing was changed. Check the code you saved when you ran \`${CLI_COMMAND} owner init\`.`,
   noOwner: `No owner is set up on this computer yet. Run \`${CLI_COMMAND} owner init\` yourself, in your own terminal. Don't let your AI run it or see the code it shows.`,
   fileUnavailable:
-    "This agent's identity is kept in a passphrase-locked file, which this version of AgentLink can't change an owner code for yet. Update AgentLink.",
+    "This agent's identity is kept in a passphrase-locked file, which this version of AgentLink can't change a master code for yet. Update AgentLink.",
   unknownBackend: `This agent's recorded key store is not one AgentLink knows. Check the agent's config with \`${CLI_COMMAND} doctor\`.`,
-  fingerprint: (fingerprint: string): string =>
-    `Your owner fingerprint: ${fingerprint}. It doesn't change.`,
+  fingerprint: (fingerprint: string): string => `Your ID tag: ${fingerprint}. It doesn't change.`,
   // IR-M1-9z-1 F1: the old code stays the only working code until the replace has succeeded, so the
   // owner must keep it until then; discarding it is said only in `done`.
   beforeCode:
-    'Store this new owner code off this machine, for example in your password manager. Keep your current owner code too until this finishes. Never type either into a chat or let your AI see them.',
-  code: (code: string): string => `Your new owner code: ${code}`,
+    'Store this new master code off this machine, for example in your password manager. Keep your current master code too until this finishes. Never type either into a chat or let your AI see them.',
+  code: (code: string): string => `Your new master code: ${code}`,
   retype: 'Type its last four characters to continue:',
-  retypeWrong: "That doesn't match. Check the last four characters of your new owner code.",
-  retypeFailed: `The new owner code wasn't confirmed. Nothing was changed: your current owner code still works. Run \`${CLI_COMMAND} owner change-code\` again.`,
+  retypeWrong: "That doesn't match. Check the last four characters of your new master code.",
+  retypeFailed: `The new master code wasn't confirmed. Nothing was changed: your current master code still works. Run \`${CLI_COMMAND} owner change-code\` again.`,
   done: (fingerprint: string): string =>
-    `Owner code changed. Your old owner code no longer works, so you can now discard it. Your owner fingerprint is still ${fingerprint}.`,
+    `Master code changed. Your old master code no longer works, so you can now discard it. Your ID tag is still ${fingerprint}.`,
   recoveryKit:
     "If you saved a recovery kit, it isn't changed: it still restores this owner with its own recovery code.",
   // IR-M1-9z-1 F2: a leftover `owner-next` item from an earlier change that didn't finish.
   unfinished:
-    "An earlier owner code change didn't finish. Type your current owner code, or the new owner code from that change if the current one no longer works.",
-  eitherLabel: 'Owner passphrase or new owner code:',
+    "An earlier master code change didn't finish. Type your current master code, or the new master code from that change if the current one no longer works.",
+  eitherLabel: 'Owner passphrase or new master code:',
   cleanedUp:
-    'Your current owner code still works, so the unfinished change was cleaned up. Its new owner code will never work: discard it.',
+    'Your current master code still works, so the unfinished change was cleaned up. Its new master code will never work: discard it.',
   completeAsk: (fingerprint: string): string =>
-    `That is the new owner code from the unfinished change, for owner ${fingerprint}. Finish that change now, so that this code becomes your owner code? [y/N]`,
+    `That is the new master code from the unfinished change, for owner ${fingerprint}. Finish that change now, so that this code becomes your master code? [y/N]`,
   completeDeclined: `Nothing was changed. Run \`${CLI_COMMAND} owner change-code\` again when you want to finish or clean up the earlier change.`,
   completed: (fingerprint: string): string =>
-    `Owner code change finished. Use the new owner code from now on; your old owner code no longer works, so you can now discard it. Your owner fingerprint is still ${fingerprint}.`,
+    `Master code change finished. Use the new master code from now on; your old master code no longer works, so you can now discard it. Your ID tag is still ${fingerprint}.`,
 } as const;
 
 /** Which item the typed secret opened: the `owner` item, or the staged one of an unfinished change. */
@@ -314,7 +313,7 @@ async function finishUnfinished(
 }
 
 /**
- * M1-9z: a store-only check for `doctor`: true when a leftover `owner-next` item shows an owner code
+ * M1-9z: a store-only check for `doctor`: true when a leftover `owner-next` item shows a master code
  * change that didn't finish. It reads only ciphertext, asks for nothing and unlocks nothing; the
  * bytes are wiped at once. `owner change-code` finishes or cleans it up.
  */
@@ -337,7 +336,7 @@ export function changeOwnerCode(options: ChangeOwnerCodeOptions): Promise<Change
     if (typeof options !== 'object' || options === null) {
       throw new NodeKeyStoreError(
         'owner_operation_invalid',
-        `Changing the owner code needs the agent it runs for. Run \`${CLI_COMMAND} owner change-code\`.`,
+        `Changing the master code needs the agent it runs for. Run \`${CLI_COMMAND} owner change-code\`.`,
       );
     }
     assertNoHarnessMarker(options.env ?? process.env);

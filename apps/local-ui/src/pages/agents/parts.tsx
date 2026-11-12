@@ -88,7 +88,7 @@ export function PauseSheet({
   );
 }
 
-/** Resume with Touch ID (or the owner code): signs `agent.resume` for the open agent. */
+/** Resume with Touch ID (or the master code): signs `agent.resume` for the open agent. */
 export function ResumeGate({
   row,
   api,

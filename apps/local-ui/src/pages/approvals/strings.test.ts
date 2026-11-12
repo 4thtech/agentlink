@@ -3,7 +3,7 @@
 // (packages/node cli-command.test.ts M1-36a-b, approval-page.test.ts PRE-031-FIXES) are checked
 // here: the CLI prefix is the server's, every owner step names the npx form (never a bare
 // `agentlink ...` or the dead `agentlink ui`), the paid note states no amount of its own, and the
-// local app says "backup code" (11 §5.5, UX-031-QUICKWINS).
+// local app says "master code" (11 §5.5, UX-031-QUICKWINS).
 import { lintVocabulary } from '@4thtech-io/ui';
 import { describe, expect, it } from 'vitest';
 import { APPROVAL_STRINGS, BACKUP_CODE_WORDING, CLI_PREFIX } from './strings.js';
@@ -53,12 +53,12 @@ describe('the approvals words (11 §5)', () => {
     expect(lintVocabulary(Object.values(APPROVAL_STRINGS).join('\n'))).toEqual([]);
   });
 
-  it('says "backup code", never "owner code", in the renamed keys (11 §5.5)', () => {
+  it('says "master code", never "backup code" or "owner code", in the renamed keys (11 §5.5, D-146)', () => {
     expect(BACKUP_CODE_WORDING.size).toBeGreaterThan(0);
     for (const key of BACKUP_CODE_WORDING) {
       const text = APPROVAL_STRINGS[key as keyof typeof APPROVAL_STRINGS];
-      expect(text, key).toMatch(/[Bb]ackup code/);
-      expect(text, key).not.toMatch(/[Oo]wner code/);
+      expect(text, key).toMatch(/[Mm]aster code/);
+      expect(text, key).not.toMatch(/[Oo]wner code|[Bb]ackup code/);
     }
   });
 

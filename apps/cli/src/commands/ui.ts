@@ -537,6 +537,9 @@ export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
               close: () => agent.close(),
             },
             open: (other) => openUiHostAgent(hostDeps, other),
+            // WP-13 (F45): this app's version; an AI app still running an older one gets the
+            // "Restart {app} to use the new version" hint.
+            version: cliVersion(),
             // F2: Welcome's "Which AI app" list also works when a switch left no agent open.
             aiAppsList: Object.freeze({
               list: () => createAiAppsDesk({ home: homedir(), env: process.env }).list(),

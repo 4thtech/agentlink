@@ -7,7 +7,7 @@
 // - diffContacts turns two reads into what changed: a new contact from an open invite ("{name}
 //   accepted your invite"), a pasted invite that completed ("You're connected with {name}") and a
 //   re-pair ("Connected again with {name}"); another agent's list is never a change.
-// - The toast host says it, as text only, and offers the safety code check after a re-pair.
+// - The toast host says it, as text only, and offers the Contact check after a re-pair.
 // - The paste screen asks "You're already connected to {name}. Connect again?" before Accept, and
 //   hands the page `sent` and `again`.
 // - "Someone invited you? Paste link" opens the paste screen; the clipboard is read only on a click,
@@ -226,13 +226,13 @@ describe('diffContacts: what changed between two reads', () => {
 describe('the words (11 §5)', () => {
   it('says each change in plain words, with no banned term', () => {
     expect(changeText({ kind: 'accepted', ref: REF_A, name: 'Marko' })).toBe(
-      'Marko accepted your invite',
+      'Your new contact accepted your invite',
     );
     expect(changeText({ kind: 'connected', ref: REF_A, name: 'Marko' })).toBe(
       "You're connected with Marko",
     );
     expect(changeText({ kind: 'again', ref: REF_A, name: 'Marko' })).toBe(
-      'Connected again with Marko. Check the safety code again.',
+      'Connected again with Marko. Do the Contact check again.',
     );
     expect(F.waitingOnline('Marko')).toBe(
       'Waiting for Marko to come online. This finishes on its own.',
@@ -264,14 +264,15 @@ describe('the toast host', () => {
     await act(async () => {
       emit?.({ kind: 'accepted', ref: REF_A, name: hostile });
     });
-    expect(text()).toContain(`${hostile} accepted your invite`);
+    expect(text()).toContain('Your new contact accepted your invite');
+    expect(text()).not.toContain(hostile);
     expect(host.querySelector('img')).toBeNull();
     expect(host.querySelector('[role="status"]')).not.toBeNull();
     await click('');
     expect(text()).not.toContain('accepted your invite');
   });
 
-  it('after a re-pair it offers the safety code check', async () => {
+  it('after a re-pair it offers the Contact check', async () => {
     let emit: ((c: ContactChange) => void) | undefined;
     await act(async () => {
       root.render(

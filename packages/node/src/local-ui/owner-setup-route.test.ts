@@ -11,8 +11,8 @@
 //   at most SETUP_HOLD_MS, single-use and bound to the session; it returns only public WebAuthn
 //   creation values (user.id = the owner's x-only Nostr key, 04 §2.3 step 2). `finish` checks the
 //   creation response (clientData type, challenge and origin; rpIdHash, UP, UV, AT and the attested
-//   credential ID) and the PRF output, then stores the owner under a new owner code (`ALKO`) and the
-//   passkey (`ALKP`) and signs the agent's first card, all or nothing. The owner code is returned
+//   credential ID) and the PRF output, then stores the owner under a new master code (`ALKO`) and the
+//   passkey (`ALKP`) and signs the agent's first card, all or nothing. The master code is returned
 //   once, for the page's collapsed "backup way to approve", and never logged.
 // - The pending seed is wiped on expiry, on error, on completion and when the server closes.
 import {
@@ -537,7 +537,7 @@ describe('the setup route kind (M1-11s-c; registry rules)', () => {
 });
 
 describe('owner setup on the first-run page (M1-11s-c; D-120 (1); 04 §2.2, §2.3.1, §2.5)', () => {
-  it('creates the owner with one passkey gesture, a backup owner code shown once, and a verified first card', async () => {
+  it('creates the owner with one passkey gesture, a backup master code shown once, and a verified first card', async () => {
     const agent = await initAgent();
     const h = await harness(agent);
     const s = await h.session();
@@ -581,7 +581,7 @@ describe('owner setup on the first-run page (M1-11s-c; D-120 (1); 04 §2.2, §2.
     const owner = await ownerOf(begun, agent);
     if (owner === undefined) throw new Error('no owner');
 
-    // The owner code (ALKO) and the passkey (ALKP) each unlock that owner.
+    // The master code (ALKO) and the passkey (ALKP) each unlock that owner.
     const store = await KeychainOwnerKeyStore.open(agent.keychain, owner);
     const byCode = await store.unlock(
       { kind: 'passphrase', secret: encodeUtf8(done.ownerCode) },
@@ -610,7 +610,7 @@ describe('owner setup on the first-run page (M1-11s-c; D-120 (1); 04 §2.2, §2.
     expect(setupEvents(h)).toEqual(['ready', 'done', 'not_pending']);
   }, 60_000);
 
-  it('never logs the owner code: no event, console line or stream write carries it (canary)', async () => {
+  it('never logs the master code: no event, console line or stream write carries it (canary)', async () => {
     const lines: string[] = [];
     for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const) {
       vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
@@ -645,7 +645,7 @@ describe('owner setup on the first-run page (M1-11s-c; D-120 (1); 04 §2.2, §2.
     expect(written).not.toContain(compact.slice(0, 8));
   }, 60_000);
 
-  it('stores only the owner code when the authenticator has no PRF, and still signs the card', async () => {
+  it('stores only the master code when the authenticator has no PRF, and still signs the card', async () => {
     const agent = await initAgent();
     const h = await harness(agent);
     const s = await h.session();
@@ -1114,7 +1114,7 @@ describe('IR-M1-11s-c-1 M-1: card read-back unknown keeps the owner and still ha
   }
 
   for (const prf of [true, false]) {
-    it(`returns done_unconfirmed with the owner code, which unlocks the kept owner (PRF ${String(prf)})`, async () => {
+    it(`returns done_unconfirmed with the master code, which unlocks the kept owner (PRF ${String(prf)})`, async () => {
       const agent = await initAgent();
       const h = await harness(agent, { firstCard: flakyReadBack(agent) });
       const s = await h.session();
@@ -1158,7 +1158,7 @@ describe('IR-M1-11s-c-1 M-1: card read-back unknown keeps the owner and still ha
   }
 });
 
-describe('IR-M1-11s-c-1 L-2: the done event names the owner fingerprint (for the CLI line)', () => {
+describe('IR-M1-11s-c-1 L-2: the done event names the ID tag (for the CLI line)', () => {
   it('emits done with the public fingerprint shown at begin', async () => {
     const agent = await initAgent();
     const h = await harness(agent);
@@ -1237,7 +1237,7 @@ describe('IR-M1-11s-c-1 M-2: the wrong-code backoff holds setup back first (429 
 // 06 §3 defaults with the real `~/AgentLink/Send` allowed. `begin` prepares the folders (Send, Inbox,
 // Proofs, 0700) before the gesture and refuses a Send folder that is a link (at either level), not a
 // folder, or not empty, before any seed exists. A failure after the card leaves no policy and removes
-// the folders this run created. The backup code reaches only the finish answer.
+// the folders this run created. The master code reaches only the finish answer.
 describe('M1-UX-FIRSTRUN-V2: one gesture sets up the owner, the card and the first policy', () => {
   const home = (): string => join(dir, 'home');
   const sendPath = (): string => join(home(), 'AgentLink', 'Send');
@@ -1346,7 +1346,7 @@ describe('M1-UX-FIRSTRUN-V2: one gesture sets up the owner, the card and the fir
     expect(JSON.stringify(h.events)).not.toContain(folder);
   }, 60_000);
 
-  it('without PRF the backup code is the way to approve, and the first policy is still signed', async () => {
+  it('without PRF the master code is the way to approve, and the first policy is still signed', async () => {
     await withHome();
     const agent = await initAgent();
     const { done } = await runSetup(agent, { prf: false });
@@ -1898,7 +1898,7 @@ describe('PRF only on get(): the second gesture of the same setup (M1-11s-c-c, F
     expect(setupEvents(h)).toEqual(['ready', 'done']);
   }, 60_000);
 
-  it('a creation key this build cannot verify: no passkey, the owner code only, nothing of the PRF kept', async () => {
+  it('a creation key this build cannot verify: no passkey, the master code only, nothing of the PRF kept', async () => {
     const agent = await initAgent();
     const h = await harness(agent);
     const s = await h.session();

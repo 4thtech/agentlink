@@ -1,6 +1,6 @@
 // W4-PEOPLE-INVITE: the "Connected ✓" moment, on both sides (prototype v23 A7; 04 §3.6.1).
 // Two letters meet and a check pops (U0 al-pop; a fade only under reduced motion), "You and {name}
-// are connected", and "Say hello to {name}" (a prompt to copy for your AI). The safety code (12
+// are connected", and "Say hello to {name}" (a prompt to copy for your AI). The 12 digits (12
 // digits in 0.4.6) is not shown by default (UX 2026-11-12 S-1): an optional check says in one line
 // what it is for, and only then is the code read from this app's server for the new contact. It
 // exists only once the pairing completed. "Numbers don't match?" says what to do next in plain
@@ -21,7 +21,7 @@ export interface ConnectedMomentProps {
   readonly name: string;
   /** Your own name, for the first letter (optional). */
   readonly me?: string;
-  /** The new contact's ref, for the safety code. */
+  /** The new contact's ref, for the 12 digits. */
   readonly contactRef?: string;
   readonly api?: ApiClient;
   /** The name came from the other side, not from your own alias: it is never our heading or prompt. */
@@ -94,6 +94,8 @@ export function ConnectedMoment({
     };
   }, [api, contactRef, checking]);
 
+  // While the name field shows, "Save name" is the one primary button; "Done" steps back.
+  const naming = selfDeclared && named === null && contactRef !== undefined;
   const Heading = headingLevel === 1 ? 'h1' : 'h2';
   const groups = code.kind === 'ok' ? code.code.split(' ') : [];
   return (
@@ -109,7 +111,7 @@ export function ConnectedMoment({
         </span>
         <span className="inv-meet inv-from-right">
           <span className="inv-meet al-slide-in">
-            <span className="inv-avatar inv-avatar--them inv-unflip">{letterOf(shown ?? '')}</span>
+            <span className="inv-avatar inv-avatar--them inv-unflip">{letterOf(name)}</span>
           </span>
         </span>
         <span className="inv-pair-check al-pop">
@@ -121,7 +123,7 @@ export function ConnectedMoment({
           {shown === null ? S.connectedGeneric : connectedWith(shown)}
         </Heading>
       </div>
-      {selfDeclared && named === null && contactRef !== undefined ? (
+      {naming ? (
         <NameContact
           contactRef={contactRef}
           chosen={name}
@@ -175,7 +177,12 @@ export function ConnectedMoment({
         </div>
       ) : null}
       <div className="inv-connected-actions">
-        <Button variant="primary" size="lg" className="al-press" onClick={onDone}>
+        <Button
+          variant={naming ? 'secondary' : 'primary'}
+          size="lg"
+          className="al-press"
+          onClick={onDone}
+        >
           {S.done}
         </Button>
         {mismatch || !checking ? null : (

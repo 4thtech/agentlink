@@ -69,7 +69,7 @@ export const AGENTS_STRINGS = {
   contactsTold: (label: string, n: number): string =>
     `Your ${n} ${n === 1 ? 'contact' : 'contacts'} will be told ${iso(label)} is retired.`,
   cantUndo: "This can't be undone.",
-  exportFirst: 'Export history first',
+  exportFirst: 'Save recovery kit first',
   typeName: "Type the ID's name to confirm",
   typeNameLabel: (label: string): string => `Type ${iso(label)} to confirm`,
   typeNameDisabled: 'Type the name to enable this',
@@ -133,7 +133,8 @@ export const AGENTS_STRINGS = {
   restartToFinish: (app: string): string => `Restart ${app} to finish.`,
   backupTitle: 'Recovery kit',
   backupHint: 'Save a recovery kit. Keep it somewhere safe, away from this computer.',
-  backupLink: 'Back up recovery kit',
+  // WP-11: a recovery kit is saved for the open ID.
+  backupOpenFirst: (label: string): string => `Open ${iso(label)} to save its recovery kit.`,
   switching: (label: string): string => `Opening ${iso(label)}…`,
 
   // Pause (08 §1 "Pause an ID", D-143 (5)): one click, no Touch ID; Resume with Touch ID.
@@ -220,6 +221,7 @@ export const AGENTS_STRINGS = {
   peopleOther: (label: string): string => `Open ${iso(label)} to see its people.`,
   rulesOther: (label: string): string => `Open ${iso(label)} to see its rules.`,
   openAgent: 'Open this ID',
+  openForKit: (label: string): string => `Open ${iso(label)} to save its recovery kit?`,
   seeAllActivity: 'See all activity',
   seeRules: 'Change rules',
   noActivity: 'Nothing yet while this page is open.',

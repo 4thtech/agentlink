@@ -8,7 +8,7 @@
 //   plans the app's change for the new agentId; ONE passkey create signs the card, the policy, the
 //   label and the app.connect; the entry is written last. Finish takes only `{nonce}`.
 // - New agent: begin `{label, app}` (no presence) then `POST /api/ui/agents` `{nonce}` with ONE
-//   passkey get (or the backup code) creates the agent and connects the app.
+//   passkey get (or the master code) creates the agent and connects the app.
 // - A plan cannot be replayed (single use), split (finish takes no subset) or extended (finish
 //   takes nothing but the nonce; the restricted session is unit-tested in owner-add-agent-plan).
 // - Timeout (120 s), a changed file (refused before anything is signed), a wrong proof (the plan is
@@ -526,7 +526,7 @@ async function firstRunFinish(h: Harness, s: Session, nonce: string, body: Uint8
   return h.post(FINISH, s, body, { 'X-AgentLink-Input': input({ nonce }) });
 }
 
-/** A whole first run with one gesture; the owner code and the authenticator for later steps. */
+/** A whole first run with one gesture; the master code and the authenticator for later steps. */
 async function setUp(
   h: Harness,
   s: Session,
@@ -734,7 +734,7 @@ describe('W4-ONE-TOUCH first run: one passkey create creates the owner, the agen
     expect(h.w.keychain.items.has(OWNER_ACCOUNT)).toBe(false);
   });
 
-  it('a failed entry write keeps the owner and the agent: created_not_connected, with the owner code', async () => {
+  it('a failed entry write keeps the owner and the agent: created_not_connected, with the master code', async () => {
     const h = await harness();
     const s = await h.session();
     h.w.desk.failWrite = true;
@@ -966,7 +966,7 @@ describe('W4-ONE-TOUCH New agent: one gesture creates the agent and connects its
     expect(h.w.ids.has('work')).toBe(false);
   });
 
-  it('the backup code works too; a wrong code keeps the plan', async () => {
+  it('the master code works too; a wrong code keeps the plan', async () => {
     const { h, s, code } = await owned();
     const begun = json(
       await agentBegin(h, s, { label: 'Work', app: 'claude-code' }),

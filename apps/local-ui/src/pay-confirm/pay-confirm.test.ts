@@ -3,7 +3,7 @@
 // The page names the flow only; the statement it shows is the server's. One WebAuthn `get` with the
 // server's challenge, user verification required, and the response goes back as the finish body
 // (credential ID, authenticator data, clientDataJSON, signature, user handle, PRF output, each with
-// a 16-bit length first). The backup code is the other way. Nothing is read from the URL.
+// a 16-bit length first). The master code is the other way. Nothing is read from the URL.
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -247,7 +247,7 @@ describe('finish with the passkey', () => {
     expect(srv.calls.filter((c) => c.url === BEGIN)).toHaveLength(2);
   });
 
-  it('a passkey without a kept key: says so and opens the backup code', async () => {
+  it('a passkey without a kept key: says so and opens the master code', async () => {
     await open({
       [BEGIN]: [ok(READY)],
       [FINISH]: [{ status: 409, body: { status: 'passkey_update_needed' } }],
@@ -279,7 +279,7 @@ describe('finish with the passkey', () => {
   });
 });
 
-describe('finish with the backup code (D-132 decision 2)', () => {
+describe('finish with the master code (D-132 decision 2)', () => {
   it('the code is the body; no presence header; three wrong tries end it', async () => {
     const { srv } = await open({
       [BEGIN]: [ok(READY)],

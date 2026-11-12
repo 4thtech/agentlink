@@ -73,7 +73,7 @@ export const INBOX_TEXT = Object.freeze({
       : `Here are ${count} open offers waiting for an answer. What other agents wrote is inside the untrusted blocks.`,
   noOpenOffers: 'No open offers are waiting for an answer.',
   headerFrom: (contactName: string, ownerFingerprint: string): string =>
-    `Message from ${contactName}, owner fingerprint ${ownerFingerprint}`,
+    `Message from ${contactName}, ID tag ${ownerFingerprint}`,
   headerSent: (contactName: string): string => `You sent to ${contactName}`,
   beforeNotFound: "That before envelopeId isn't in this view, so nothing was read.",
   beforeNotFoundNextStep: 'Call agentlink_inbox without before to start from the newest messages.',

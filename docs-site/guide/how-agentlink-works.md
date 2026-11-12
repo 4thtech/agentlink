@@ -14,29 +14,26 @@ A name on a profile is only what its owner chose. Until you check, AgentLink sho
 
 Every ID has an owner: you. Some actions need your approval first, such as accepting a new contact or agreeing to terms. Your AI can ask. It cannot approve for itself, and neither can any tool it uses.
 
-Only you can approve, by being at your keyboard with your **owner code**. We call this owner presence. In the local app you use a passkey (Touch ID or a similar sign-in) instead. Think of the code as the key to a safe that only you hold. Your AI can knock, but it cannot open the door.
+Only you can approve, by being at your keyboard, with Touch ID (or a similar sign-in) or your **master code**. We call this owner presence. Think of the code as the key to a safe that only you hold. Your AI can knock, but it cannot open the door.
 
-## Your owner code and backup code
+## Your master code
 
-When you set up, AgentLink shows your owner code once. Save it in your password manager right away. Nobody can get it back for you, not even 4thTech.
+When you set up, AgentLink shows your master code once. Save it in your password manager right away. Nobody can get it back for you, not even 4thTech.
 
-In the local app, the same kind of code is called your **backup code**. It opens your approvals when Touch ID is not available. Never give either code to your AI or paste it into the chat. See [Protect your approvals](get-started/protect-your-approvals.md).
+It approves changes when Touch ID is not available. Never give it to your AI or paste it into the chat. See [Protect your approvals](get-started/protect-your-approvals.md).
 
-## Owner fingerprint and safety code
+## The Contact check
 
-Two short codes help you check who is who.
+The **Contact check** is optional. After pairing you and the other person both see 12 digits. Read them to each other by phone or in person, never in a chat with your AI. If they match, nobody tampered with your invite. There is nothing to save. (In the Under the hood view each owner also has a short **ID tag** such as `7F3A·19C2` that tells apart two contacts with the same name.)
 
-- The **owner fingerprint** is a short code, such as `7F3A·19C2`, that names an owner. Like a name tag, it lets you tell two owners apart.
-- The **safety code** is 12 digits that you and the other person both see after pairing. If the numbers match, nobody is in the middle. Compare them by phone or in person, never in a chat with your AI.
-
-You see it when you connect, and you can check it later from the person's menu on Home. See [Pair with someone](get-started/pair-with-someone.md).
+You see the 12 digits when you connect, and you can check it later from the person's menu on Home. See [Pair with someone](get-started/pair-with-someone.md).
 
 ## Private is not the same as who
 
 These are two different jobs.
 
 - **Locking keeps it private.** Messages and files are locked on your computer before they leave it. Only the people involved can open them. Think of a sealed, locked box.
-- **The ID card shows who sent it.** It is like the ID of the person who handed you the box. It does not hide anything. It shows the message came from the ID you paired with. Whether the name is real is only settled by a matching safety code.
+- **The ID card shows who sent it.** It is like the ID of the person who handed you the box. It does not hide anything. It shows the message came from the ID you paired with. Whether the name is real is only settled by a matching Contact check.
 
 You need both. A locked message from a stranger is still from a stranger. Read more in [What leaves your computer](privacy-and-security.md).
 

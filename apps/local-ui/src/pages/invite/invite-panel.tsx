@@ -453,8 +453,9 @@ export function InvitePanel({
           <p className="al-text-body-sm al-muted inv-note">{worksFor(days)}</p>
           {fellBack ? <p className="al-text-body-sm inv-note">{S.fellBack}</p> : null}
           {copiedMessage === 'copied' ? (
-            <p className="al-text-body-sm" role="status">
-              {S.copiedMessage}
+            <p className="al-text-body-sm inv-status" role="status">
+              <CheckMark />
+              <span>{S.copiedMessage}</span>
             </p>
           ) : null}
           {copied === 'failed' || copiedMessage === 'failed' ? (

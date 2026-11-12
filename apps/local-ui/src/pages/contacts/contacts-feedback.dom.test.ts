@@ -195,7 +195,7 @@ describe('W6-ACCEPT-CONNECTED: the accepter reaches the Connected moment', () =>
     el.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
-  /** People `?paste`: paste the link, Continue, accept with the backup code; the accept waits. */
+  /** People `?paste`: paste the link, Continue, accept with the master code; the accept waits. */
   async function acceptOnPasteScreen(accept: Promise<AcceptOutcome>): Promise<void> {
     history.replaceState(null, '', '/contacts?paste');
     const invites: InviteApi = {
@@ -222,7 +222,7 @@ describe('W6-ACCEPT-CONNECTED: the accepter reaches the Connected moment', () =>
     if (field === null) throw new Error(`no field in ${text()}`);
     await act(async () => typeInto(field, LINK));
     await clickText('Continue');
-    await clickText('Accept with your backup code');
+    await clickText('Accept with your master code');
     const code = host.querySelector<HTMLInputElement>('input[type="password"]');
     if (code === null) throw new Error(`no code field in ${text()}`);
     await act(async () => typeInto(code, 'ABCD-EFGH-IJKL-MNOP'));

@@ -6,7 +6,7 @@
 //   timer advances a step, and no amount shows before the read that proves it.
 // - Arrived: a top-up read returns `received` above the value it had when the panel opened (or the
 //   panel opens on Arrived when `addable` is already above zero). The one button is "Add $X to your
-//   credits" (`addable`), and it opens the existing confirm screen and backup code unchanged.
+//   credits" (`addable`), and it opens the existing confirm screen and master code unchanged.
 // - Submitted is not added: after the owner operation, "Adding to your credits…" until the credits
 //   read shows a value above the one before; only then "Added to credits · $X now".
 // - A failed read keeps the step with "Couldn't check. Trying again." and never goes back a step.
@@ -511,14 +511,14 @@ describe('step 3: Adding, then Added to credits', () => {
     expect(states()).toEqual(['done', 'done', 'done']);
   });
 
-  it('a wrong backup code or a refused move never shows Adding or Added', async () => {
+  it('a wrong master code or a refused move never shows Adding or Added', async () => {
     const m = await mount({ [TOP_UP]: topUp(NET5) });
     vi.spyOn(m.api, 'owner').mockResolvedValue({ kind: 'presence_rejected' } as never);
     await press('Add credits');
     await press('Add $4.99 to your credits');
     await typeCode('0000-0000');
     await press('Confirm');
-    expect(text()).toContain("That backup code didn't work.");
+    expect(text()).toContain("That master code didn't work.");
     expect(text()).not.toContain('Adding to your credits');
     expect(text()).not.toContain('Added to credits ·');
   });

@@ -1,5 +1,5 @@
 // M1-8c: one owner operation (04 §2.5; D-68 "one entry, one owner operation, no unlock session").
-// The owner sees what is about to be signed, types the owner code (or opted-in owner passphrase)
+// The owner sees what is about to be signed, types the master code (or opted-in owner passphrase)
 // once at the TTY prompt, the seed is unwrapped, exactly one object is signed, and the session is
 // closed and its keys wiped before this returns, whatever happened. No API here keeps a session,
 // caches the secret or the seed, or offers to remember it for a time.
@@ -102,7 +102,7 @@ export function checkOwnerRequest(request: unknown): OwnerSignRequest {
 
 /** The prompt label for the stored secret (11 §5.5 names). */
 export const secretLabel = (kind: SecretKind): string =>
-  kind === 1 ? 'Owner code:' : 'Owner passphrase:';
+  kind === 1 ? 'Master code:' : 'Owner passphrase:';
 
 /** What owner flows need from the owner store beyond OwnerKeyStore: the stored secret's kind. */
 export interface PromptingOwnerKeyStore extends OwnerKeyStore {
@@ -191,7 +191,7 @@ export async function runOwnerGesture(
   if (review.question !== undefined && !(await terminal.confirm(review.question))) {
     throw new NodeKeyStoreError('owner_prompt_cancelled', 'Cancelled. Nothing was changed.');
   }
-  // The TTY reads the owner code; the localhost page hands over the code or the passkey's PRF output
+  // The TTY reads the master code; the localhost page hands over the code or the passkey's PRF output
   // (M1-8e). unlock wipes either whether or not it unlocks (OwnerKeyStore contract).
   const presence: OwnerPresence =
     terminal.readPresence === undefined

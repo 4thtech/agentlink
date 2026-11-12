@@ -705,10 +705,30 @@
   gap: var(--al-space-2);
   pointer-events: none;
 }
+/* Wide screens: the corner, so a toast never covers the page's own controls (the People sort row).
+   Narrow screens keep the centred stack. */
+@media (min-width: 900px) {
+  .al-toasts {
+    inset-inline-start: auto;
+    align-items: flex-end;
+  }
+}
 .al-toasts > .al-toast {
   pointer-events: auto;
 }
 .al-menu-note {
   display: block;
   padding: 0 10px 6px 34px;
+}
+
+/* Settings tabs: the first label's text lines up with the page title's left edge (the pill's own
+   padding hangs into the gutter), and no label wraps. */
+.al-app-main .al-subnav {
+  flex-wrap: nowrap;
+  gap: 0;
+  margin-inline-start: calc(-1 * var(--al-space-3));
+}
+.al-app-main .al-subnav a {
+  padding: var(--al-space-2) var(--al-space-3);
+  white-space: nowrap;
 }

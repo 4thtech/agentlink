@@ -1,6 +1,6 @@
 // U3-i: the change panel (b11 §30.3) and the manual steps (§30.4). The panel shows the exact
 // AgentLink entry first (the only part of an AI app's file the page ever receives), then asks for
-// Touch ID (or the backup code) once. The page never signs and never writes: it hands the proof to
+// Touch ID (or the master code) once. The page never signs and never writes: it hands the proof to
 // one request and the server does the rest (04 §2.5). Files and entries are rendered as text only.
 import { Button, Sheet, Skeleton } from '@4thtech-io/ui';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';

@@ -6,7 +6,7 @@
 import { Button, Sheet, TextField } from '@4thtech-io/ui';
 import { useEffect, useId, useState, type FormEvent, type ReactElement } from 'react';
 import { FAILURE_COPY } from '../../api/failure-reasons.js';
-import { navigate } from '../../router.js';
+import { ExportKit } from '../backup/export-kit.js';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import { AppMark } from './app-mark.js';
 import type { AgentsApi, OwnerOutcome } from './api.js';
@@ -204,14 +204,19 @@ export function RemoveSheet({
   onChanged,
   onRemoved,
   onAgentChanged,
+  onSwitch,
 }: Shared & {
   row: AgentRow;
   onClose: () => void;
   onChanged: () => void;
   onRemoved: (label: string) => void;
   onAgentChanged: () => void;
+  /** Opens another ID, since a recovery kit is saved for the open ID (WP-11). */
+  onSwitch?: (row: AgentRow) => void;
 }): ReactElement {
   const passkey = usePasskey(owner);
+  const [exporting, setExporting] = useState(false);
+  const [askOpen, setAskOpen] = useState(false);
   const [phase, setPhase] = useState<RemovePhase>({ kind: 'form' });
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
@@ -352,16 +357,43 @@ export function RemoveSheet({
         {phase.kind === 'form' ? (
           <>
             <div className="ag-actions">
-              <Button
-                variant="secondary"
-                icon="download"
-                onClick={() => {
-                  onClose();
-                  navigate('/settings/backup');
-                }}
-              >
-                {S.exportFirst}
-              </Button>
+              {exporting && row.current ? (
+                <ExportKit label={row.label} />
+              ) : (
+                <>
+                  <Button
+                    variant="secondary"
+                    icon="download"
+                    onClick={() => {
+                      if (row.current) setExporting(true);
+                      else setAskOpen(true);
+                    }}
+                  >
+                    {S.exportFirst}
+                  </Button>
+                  {askOpen && !row.current ? (
+                    <div role="group" aria-label={S.openForKit(row.label)}>
+                      <p className="al-text-body-sm">{S.openForKit(row.label)}</p>
+                      <div className="ag-actions">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => {
+                            setAskOpen(false);
+                            setExporting(true);
+                            onSwitch?.(row);
+                          }}
+                        >
+                          {S.open}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setAskOpen(false)}>
+                          {S.cancel}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              )}
             </div>
             {finishing ? null : (
               <TextField

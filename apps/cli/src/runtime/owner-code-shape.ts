@@ -1,9 +1,9 @@
-// M1-9zd: does a command line carry something shaped like a generated owner code? A UX guard only
-// (04 §2.5, §2.8; G-1, D-67): it catches an owner code typed as part of a command, which the shell
+// M1-9zd: does a command line carry something shaped like a generated master code? A UX guard only
+// (04 §2.5, §2.8; G-1, D-67): it catches a master code typed as part of a command, which the shell
 // keeps in its history, and lets the dispatcher stop before anything runs. It is a shape check, not
 // a secret check: nothing is unlocked or compared, and the argument is never stored or printed.
 //
-// A generated owner code is 24 RFC 4648 base32 characters (`A–Z2–7`), shown in upper case as six
+// A generated master code is 24 RFC 4648 base32 characters (`A–Z2–7`), shown in upper case as six
 // groups of four separated by spaces (@4thtech-io/node `grouped`). Only the forms a code is shown,
 // copied or retyped in are matched, so ordinary text is not (IR-M1-9zd-1 L-1):
 // - the 24 characters in one word, in one case;
@@ -53,7 +53,7 @@ const valueOf = (word: string): string => {
 
 /**
  * True when any argument, or six consecutive arguments that are each one group of four (a code
- * typed with spaces, which the shell splits into six words), is in a form an owner code is shown in.
+ * typed with spaces, which the shell splits into six words), is in a form a master code is shown in.
  */
 export function looksLikeOwnerCode(argv: readonly string[]): boolean {
   const words = argv.map(valueOf);

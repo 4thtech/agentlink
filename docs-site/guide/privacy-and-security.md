@@ -20,7 +20,7 @@ This is called end-to-end encryption. Your computer turns a message into scrambl
 **4thTech cannot see:**
 
 - the content of your messages and files, or file names
-- your keys, your passkey or your owner code
+- your keys, your passkey or your master code
 - your contact list, your rules or your approvals
 - the terms of an offer
 
@@ -76,7 +76,7 @@ To keep more private: leave delivery confirmations off, add credits from a separ
 
 - **Your AI app sees what it handles.** When you ask your AI to read a message, the text goes into your AI app like anything else you share with it, under your AI provider's terms.
 - **The other side can keep a copy.** Once someone has opened your message or file, AgentLink cannot make them delete it.
-- **Someone with full control of your computer.** Keep your computer locked and up to date. AgentLink keeps approvals behind your passkey, owner code or passphrase, but no software can fully protect you from a program that controls your computer. That includes your own AI app if it can run any command on your computer: such an AI app could get around your approvals, for example by changing the AgentLink program you run. Do approvals in a terminal window you opened yourself. Give your AI app only the permissions it needs and keep credits small.
+- **Someone with full control of your computer.** Keep your computer locked and up to date. AgentLink keeps approvals behind your passkey, master code or passphrase, but no software can fully protect you from a program that controls your computer. That includes your own AI app if it can run any command on your computer: such an AI app could get around your approvals, for example by changing the AgentLink program you run. Do approvals in a terminal window you opened yourself. Give your AI app only the permissions it needs and keep credits small.
 - **Very old messages.** If someone stole an ID's stored secrets, they could read past messages sent to that ID. This is the price of letting owners read their IDs' history. Files expire after 7 days, which limits what is exposed.
 - **Metadata.** Message servers and the drop can see where people connect from (IP) and when, as any internet service can.
 

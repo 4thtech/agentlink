@@ -1,15 +1,15 @@
-// M1-9z (04 §2.8 "Changing the owner code"; 07 §9.3): `agentlink owner change-code` †. An owner code
+// M1-9z (04 §2.8 "Changing the master code"; 07 §9.3): `agentlink owner change-code` †. A master code
 // that was exposed (typed into a shell or a chat) can be replaced without changing the owner.
 //
 // Against the real keychain owner store (one in-memory keychain per OS user):
-// - The current owner code is required (owner presence); three wrong entries change nothing.
+// - The current master code is required (owner presence); three wrong entries change nothing.
 // - The new code is generated, shown once, re-typed (last four characters) and the screen cleared.
 // - The owner seed is re-wrapped under the new code; the owner keys and fingerprint do not change,
 //   so a store expecting the owner a card names still unlocks (cards stay valid).
 // - Refused under an AI-app marker BEFORE the owner item is read.
 // - Crash safety: a failure between writing the new wrap and replacing the owner item leaves the
 //   old owner item, and the old code, working; the seed is never lost.
-// - No owner code appears in any output line other than the one display of the new code, nor in an
+// - No master code appears in any output line other than the one display of the new code, nor in an
 //   error.
 import { KeyStoreError, encodeUtf8, equalBytes, type OwnerPublicKeys } from '@4thtech-io/crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
@@ -27,7 +27,7 @@ import {
 import type { OwnerTerminal } from './owner-terminal.js';
 
 const KDF = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;
-const NEW_CODE_PREFIX = 'Your new owner code: ';
+const NEW_CODE_PREFIX = 'Your new master code: ';
 
 /** One OS user's keychain. Records every account read; `failSet` makes one account's writes fail. */
 class MapKeychain implements KeychainBackend {
@@ -72,8 +72,8 @@ beforeEach(() => {
 async function ownerInit(): Promise<{ code: string; owner: OwnerPublicKeys }> {
   const written: string[] = [];
   const shown = (): string =>
-    (written.find((t) => t.startsWith('Your owner code: ')) ?? '')
-      .slice('Your owner code: '.length)
+    (written.find((t) => t.startsWith('Your master code: ')) ?? '')
+      .slice('Your master code: '.length)
       .replace(/ /g, '');
   const terminal: OwnerTerminal = {
     write: (text) => void written.push(text),
@@ -180,7 +180,7 @@ describe('owner change-code (M1-9z)', () => {
     expect(keychain.items.has(OWNER_NEXT_ACCOUNT)).toBe(false);
     // Prompts: the current code once, then one re-type of the new code; the screen was cleared.
     expect(o.labels).toHaveLength(2);
-    expect(o.labels[0]).toBe('Owner code:');
+    expect(o.labels[0]).toBe('Master code:');
     expect(o.written).toContain('<clear>');
     expect(o.written.join('\n')).toContain(ownerFingerprintText(init.owner));
     // The recovery kit is never touched, and the copy says so.
@@ -352,7 +352,7 @@ describe('owner change-code (M1-9z)', () => {
     expect(keychain.accountsRead).toEqual([]);
   });
 
-  it('moves an opted-in owner passphrase to a generated owner code', async () => {
+  it('moves an opted-in owner passphrase to a generated master code', async () => {
     const passphrase = 'correct horse battery staple';
     const terminal: OwnerTerminal = {
       write: () => undefined,
@@ -380,13 +380,13 @@ describe('owner change-code (M1-9z)', () => {
     const o = owner([init.code]);
     await changeOwnerCodeWith(keychain, o.terminal, { backend: 'keychain', env: {} }, { kdf: KDF });
     const codeIndex = o.written.findIndex((t) => t.startsWith(NEW_CODE_PREFIX));
-    const keepIndex = o.written.findIndex((t) => t.includes('Keep your current owner code'));
+    const keepIndex = o.written.findIndex((t) => t.includes('Keep your current master code'));
     const discardIndex = o.written.findIndex((t) => /discard|delete/i.test(t));
     const clearIndex = o.written.indexOf('<clear>');
     expect(keepIndex).toBeGreaterThanOrEqual(0);
     expect(keepIndex).toBeLessThan(codeIndex);
     expect(discardIndex).toBeGreaterThan(clearIndex);
-    expect(o.written[discardIndex]).toMatch(/^Owner code changed\./);
+    expect(o.written[discardIndex]).toMatch(/^Master code changed\./);
     for (const line of o.written.slice(0, clearIndex)) expect(line).not.toMatch(/discard|delete/i);
   });
 
@@ -397,7 +397,7 @@ describe('owner change-code (M1-9z)', () => {
     const f = await failure(() =>
       changeOwnerCodeWith(keychain, o.terminal, { backend: 'keychain', env: {} }, { kdf: KDF }),
     );
-    expect(f.message).toMatch(/current owner code still works/);
+    expect(f.message).toMatch(/current master code still works/);
     for (const line of o.written) expect(line).not.toMatch(/discard|delete/i);
   });
 
@@ -429,7 +429,7 @@ describe('owner change-code (M1-9z)', () => {
     expect(again.newCode()).toBe('');
     expect(await unlocks(next, init.owner)).toBe(true);
     expect(keychain.items.has(OWNER_NEXT_ACCOUNT)).toBe(false);
-    expect(again.written.join('\n')).toMatch(/Owner code change finished/);
+    expect(again.written.join('\n')).toMatch(/Master code change finished/);
   });
 
   it('finish branch: declining changes nothing and keeps owner-next', async () => {

@@ -1,5 +1,5 @@
 // M1-9zb: the "Who" line of an accept-invite approval shows the inviter's self-declared name (06
-// §2.1 restrictName, untrusted, I-5) and the owner fingerprint from the verified invite card.
+// §2.1 restrictName, untrusted, I-5) and the ID tag from the verified invite card.
 import { restrictName, type AgentLinkClient } from '@4thtech-io/core';
 import { describe, expect, it } from 'vitest';
 import type { PendingRequest } from './pending.js';
@@ -50,7 +50,7 @@ const request = {
 } as unknown as PendingRequest;
 
 describe('accept-invite approval: who is inviting (M1-9zb)', () => {
-  it('shows the self-declared name and the owner fingerprint', async () => {
+  it('shows the self-declared name and the ID tag', async () => {
     const facts = await cardFacts(fakeClient('oc-test'), request);
     expect(facts.who).toBe(`“oc-test” (self-declared) · owner ${FP} · not in your contacts yet`);
     expect(cardLines(request, facts)).toContain(`Who:      ${facts.who}`);

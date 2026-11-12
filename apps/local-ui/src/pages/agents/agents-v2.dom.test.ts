@@ -332,7 +332,7 @@ describe('Agents, simple (A8)', () => {
       );
       code().dispatchEvent(new Event('input', { bubbles: true }));
     });
-    await click(button(host, 'Confirm with your backup code'));
+    await click(button(host, 'Confirm with your master code'));
     const [post] = posts('/api/ui/agents/resume');
     expect(post!.body).toBe('123456');
     expect(post!.headers.get('X-AgentLink-Input')).toBe('e30');
@@ -349,7 +349,7 @@ describe('Agents, simple (A8)', () => {
     await type(card('default').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
     await click(button(card('default'), 'Rename with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm with your backup code'));
+    await click(button(host, 'Confirm with your master code'));
     expect(plain(host)).toContain("Renamed. Your contacts will see Home next time they're online.");
 
     answers['POST /api/ui/agents/label'] = {
@@ -360,7 +360,7 @@ describe('Agents, simple (A8)', () => {
     await type(card('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Job');
     await click(button(card('work'), 'Rename with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm with your backup code'));
+    await click(button(host, 'Confirm with your master code'));
     expect(plain(host)).toMatch(/You can rename Work again at \S/);
   });
 
@@ -378,7 +378,7 @@ describe('Agents, simple (A8)', () => {
     expect(personal.textContent).toContain('Contacts still see My agent');
     await click(button(personal, 'Update contacts'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm with your backup code'));
+    await click(button(host, 'Confirm with your master code'));
     const [post] = posts('/api/ui/agents/label');
     expect(post).toBeDefined();
   });
@@ -415,13 +415,19 @@ describe('Agents, simple (A8)', () => {
     expect(manage).toBeDefined();
   });
 
-  it('Back up links to the recovery kit in Settings; Remove asks for the name', async () => {
+  it("Back up saves the open ID's kit in place, asks to open another ID first; Remove asks for the name", async () => {
     await mount();
+    // WP-11: the open ID saves its recovery kit right here (no link away, no terminal command).
+    await click(button(card('default'), 'Back up'));
+    expect(button(card('default'), 'Save recovery kit')).toBeDefined();
+    // Another ID is opened first: a kit is saved for the open ID.
     await click(button(card('work'), 'Back up'));
-    const link = [...card('work').querySelectorAll('a')].find(
-      (a) => a.textContent?.trim() === 'Back up recovery kit',
+    const panel = card('work').querySelector<HTMLElement>('[data-panel="backup"]')!;
+    expect(plain(panel)).toContain('to save its recovery kit.');
+    expect(button(panel, 'Open this ID')).toBeDefined();
+    expect([...panel.querySelectorAll('button')].map((b) => b.textContent?.trim())).not.toContain(
+      'Save recovery kit',
     );
-    expect(link?.getAttribute('href')).toBe('/settings/backup');
     await click(button(card('work'), 'Remove'));
     expect(plain(host)).toContain('Remove Work?');
     expect(host.querySelector('[role="dialog"] input[type="text"]')).not.toBeNull();
@@ -501,10 +507,9 @@ describe("one agent's page (/agents/<name>)", () => {
     }
     expect(plain(host)).toContain('Connected to Cursor');
     expect(host.querySelector('[data-sparkline]')).toBeNull();
-    const back = [...host.querySelectorAll('a')].find(
-      (a) => a.textContent?.trim() === 'Back up recovery kit',
-    );
-    expect(back?.getAttribute('href')).toBe('/settings/backup');
+    // WP-11: Work is not the open ID, so its Backup section asks to open it first.
+    const backup = host.querySelector<HTMLElement>('[data-panel="backup"]')!;
+    expect(plain(backup)).toContain('to save its recovery kit.');
   });
 
   it('draws the heartbeat bars only from reads seen in this session', async () => {

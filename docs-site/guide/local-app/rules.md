@@ -13,7 +13,7 @@ Rules decide what your AI may do without asking you. The page shows them in two 
 
 1. Change what you want. Your changes wait in an unsaved-changes bar.
 2. Before saving, the page lists in plain words everything the change lets your AI do without asking. Tick each one.
-3. Approve once with your passkey or backup code.
+3. Approve once with your passkey or master code.
 
 From 0.4.0, a change to what your AI may spend (proofs on or off, the 24-hour budget, the per-proof limit, or a limit for one contact) ends with **Continue** and a confirmation sheet instead. It shows each old and new value, and you confirm with Touch ID, Windows Hello or your passkey. See [Confirming paid actions](confirm-paid-actions.md). Other changes keep the passkey or backup-code check.
 

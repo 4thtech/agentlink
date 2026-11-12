@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// HOTFIX-045-TOUCHID: the presence sheet says why it asks for the backup code instead of Touch ID,
+// HOTFIX-045-TOUCHID: the presence sheet says why it asks for the master code instead of Touch ID,
 // and an owner without a passkey on this computer switches once inside the sheet; the operation is
 // then confirmed with its own touch (the switch signs nothing and submits nothing for the caller).
 // readPasskeyStatus parses exactly the answers of the real server (packages/node
@@ -106,13 +106,13 @@ describe('HOTFIX-045-TOUCHID: the presence sheet says why and offers the switch'
     );
     const status = host.querySelector('[role="status"]')?.textContent ?? '';
     expect(status).toMatch(/isn't set up for AgentLink on this computer yet/);
-    expect(status).toMatch(/backup code/);
+    expect(status).toMatch(/master code/);
     expect(status).not.toMatch(/wallet|gas|seed phrase|transaction/i);
     expect(button(/^Switch to /)).toBeDefined();
     expect(host.querySelector('input[type="password"]')).not.toBeNull();
   });
 
-  it('the switch: backup code once, then the operation is confirmed with its own touch', async () => {
+  it('the switch: master code once, then the operation is confirmed with its own touch', async () => {
     let reads = 0;
     const r = await render(() => {
       reads += 1;
@@ -156,7 +156,7 @@ describe('HOTFIX-045-TOUCHID: the presence sheet says why and offers the switch'
     }
   });
 
-  it('a wrong backup code in the switch says so and changes nothing', async () => {
+  it('a wrong master code in the switch says so and changes nothing', async () => {
     const r = await render(
       () =>
         Promise.resolve({ kind: 'unavailable', reason: 'not_set_up_here', switchTo: SWITCH_TO }),

@@ -240,7 +240,7 @@ describe('agentlink owner add-agent (M1-9t, D-78)', () => {
   });
 
   // M1-9x: no agent names an owner (for example after every carded agent was removed). The command
-  // hands node no owner keys; node takes them from the owner item itself after the owner code, or
+  // hands node no owner keys; node takes them from the owner item itself after the master code, or
   // refuses with `owner init` when there is no owner item (node's owner-recovery.test.ts).
   it('with no agent naming an owner, hands node no owner keys so it reads them from the owner item', async () => {
     const m = await machine(['alice', 'bob'], false);

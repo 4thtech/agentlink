@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// F49 (owner feedback, Windows): the backup code can be pasted, seen and kept.
+// F49 (owner feedback, Windows): the master code can be pasted, seen and kept.
 // - normaliseBackupCode follows the server's rule (packages/crypto secret-code.ts) and never
 //   changes a valid code, nor anything that is not a code's shape (a chosen passphrase).
 // - BackupCodeField: Show/Hide, paste is never blocked.
@@ -92,7 +92,7 @@ describe('BackupCodeField and copy', () => {
   function Harness(): ReactElement {
     const [v, setV] = useState('');
     seen = v;
-    return createElement(BackupCodeField, { label: 'Backup code', value: v, onValue: setV });
+    return createElement(BackupCodeField, { label: 'Master code', value: v, onValue: setV });
   }
 
   it('Show/Hide toggles the field between masked and visible; paste is not blocked', async () => {

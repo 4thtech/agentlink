@@ -1,6 +1,6 @@
 // W4-PAUSE fix round (U5 real-app journey): Resume end to end through the approval server's real
 // owner-presence gate and owner-action allowlist (owner-allowlist.ts), with the real owner store and
-// owner code. Core is a small fake that prepares `agent.resume` exactly as core does
+// master code. Core is a small fake that prepares `agent.resume` exactly as core does
 // (buildOwnerActionBody) and checks the owner signature on apply. Without `agent.resume` in the
 // allowlist the gate refuses before signing and the route answers `not_applied`.
 import {
@@ -114,7 +114,7 @@ async function harness() {
 }
 
 describe('Resume end to end through the real owner gate and allowlist (W4-PAUSE)', () => {
-  it('with the owner code: one agent.resume signed by the owner key, applied, resumed', async () => {
+  it('with the master code: one agent.resume signed by the owner key, applied, resumed', async () => {
     const h = await harness();
     const res = await h.resume(world.code);
     expect(JSON.parse(res.body)).toEqual({ status: 'resumed' });
@@ -128,7 +128,7 @@ describe('Resume end to end through the real owner gate and allowlist (W4-PAUSE)
     expect(h.state.paused).toBe(false);
   });
 
-  it('a wrong owner code signs nothing and the agent stays paused', async () => {
+  it('a wrong master code signs nothing and the agent stays paused', async () => {
     const h = await harness();
     const res = await h.resume('AAAA BBBB CCCC DDDD EEEE FFFF');
     expect(res.status).toBe(403);

@@ -9,7 +9,7 @@
 //   system prompt is never drawn; the sheet only waits beside it.
 // - One polite live region says Waiting, Recording, Done and notices; errors are role=alert.
 // - Done closes itself after about 1.2 s (D-132 decision 3); with reduced motion it waits for Close.
-// - The backup code is a small secondary link (D-132 decision 2).
+// - The master code is a small secondary link (D-132 decision 2).
 //
 // The local app (apps/local-ui) renders it for a paid approval; the server-rendered approval page
 // that drew a copy without React was removed in M1-11b-2c.
@@ -51,9 +51,9 @@ export const PAY_CONFIRM_STRINGS = Object.freeze({
   remember: 'Remember for this contact',
   rememberHint: 'Next time, proofs like this for {name} run without asking.',
   cancel: 'Cancel',
-  useBackup: 'Use backup code instead',
-  codeLabel: 'Backup code',
-  codeHint: 'The backup code AgentLink showed you when you set up.',
+  useBackup: 'Use your master code instead',
+  codeLabel: 'Master code',
+  codeHint: 'The master code AgentLink showed you when you set up.',
   confirmCode: 'Confirm',
   close: 'Close',
   recordingProof: 'Confirming…',
@@ -66,9 +66,9 @@ export const PAY_CONFIRM_STRINGS = Object.freeze({
   decided: 'Already decided on another screen.',
   changed: 'Something changed since you opened this. Check it again.',
   updateNeeded:
-    'Your passkey needs to be set up again for paid actions. Use your backup code this time.',
-  wrongCode: "That backup code didn't match. Nothing was paid.",
-  triesUsed: 'Too many wrong backup codes. Nothing was paid.',
+    'Your passkey needs to be set up again for paid actions. Use your master code this time.',
+  wrongCode: "That master code didn't match. Nothing was paid.",
+  triesUsed: 'Too many wrong master codes. Nothing was paid.',
   wait: 'Too many wrong tries. Wait {seconds} seconds, then try again. Nothing was paid.',
   busy: 'Another confirmation is running. Try again in a moment.',
   stillWorking: "Still working. Your AI will let you know when it's done. You can close this.",

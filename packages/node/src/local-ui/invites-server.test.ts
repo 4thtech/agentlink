@@ -5,7 +5,7 @@
 //   page's Origin, same-origin fetch metadata and an octet-stream body, with no owner presence and no
 //   owner store. No query, no operation input and no presence header. Creating is rate-limited.
 // - Accept (`presence: true`) runs only behind the central owner-presence gate: no proof or a wrong
-//   one never reaches core; with the owner code, one `approval.decide` is signed by the real owner key
+//   one never reaches core; with the master code, one `approval.decide` is signed by the real owner key
 //   and core pairs once.
 // - The invite link (its secret) appears in no event, no console output and no error answer.
 import { deflateRawSync } from 'node:zlib';
@@ -429,7 +429,7 @@ describe('accept an invite: owner presence required (UX2-d1, decision 1.1)', () 
     expect(h.core.accepted).toHaveLength(0);
   });
 
-  it('with the owner code: one approval.decide by the owner key, applied, then one pairing', async () => {
+  it('with the master code: one approval.decide by the owner key, applied, then one pairing', async () => {
     const h = await harness();
     const res = await h.post(INVITE_ACCEPT_PATH, encodeUtf8(world.code), {
       'X-AgentLink-Input': input({ invite: LINK }),

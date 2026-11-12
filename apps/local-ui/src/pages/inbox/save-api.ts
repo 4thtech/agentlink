@@ -3,7 +3,7 @@
 // - `X-AgentLink-Input`: base64url JSON of exactly `{"id":"<item ID>"}`. Never a file name, a folder
 //   or a path: the server finds the file itself, and core saves it into the Inbox folder;
 // - the body is the owner's presence, sent only after the owner clicked: the passkey assertion
-//   (`X-AgentLink-Presence: passkey`, the same four fields as an approval) or the backup code as UTF-8;
+//   (`X-AgentLink-Presence: passkey`, the same four fields as an approval) or the master code as UTF-8;
 // - the session token travels as `X-AgentLink-CSRF`; the app host's fetch guard adds the generation.
 // The browser never signs (D-118). The code and the assertion bytes are wiped after the request and
 // never logged. Answers become one outcome word (types ui-contract/inbox.ts); no answer carries a

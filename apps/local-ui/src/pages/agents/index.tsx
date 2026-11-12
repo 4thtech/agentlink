@@ -62,6 +62,17 @@ export function setAgentsMapView(view: AgentsMapView | undefined): void {
   mapView = view;
 }
 
+/**
+ * A removal changes the generation, so the shell mounts every view again (router.tsx, W4-SHELL) and
+ * the page's own state is lost: "{label} was removed." is carried here for the page that mounts next
+ * (only while fresh), so the person still reads it.
+ */
+let carriedNotice: { readonly text: string; readonly at: number } | undefined;
+function peekCarriedNotice(): string | undefined {
+  const c = carriedNotice;
+  return c !== undefined && Date.now() - c.at < 5_000 ? c.text : undefined;
+}
+
 /** "New agent" reuses the Get started steps (U2): `/start/app?add=agent` (nav.ts, W4-WIRE). */
 export { NEW_AGENT_PATH };
 
@@ -146,9 +157,11 @@ export function AgentsPage({
   const [pausing, setPausing] = useState<AgentRow | undefined>(undefined);
   const [resuming, setResuming] = useState(false);
   const [cardName, setCardName] = useState<string | undefined>(undefined);
-  const [notice, setNotice] = useState<string | undefined>(undefined);
+  const [notice, setNotice] = useState<string | undefined>(peekCarriedNotice);
 
   useEffect(() => {
+    // Consumed once: a later mount within the 5 s window must not show it again.
+    carriedNotice = undefined;
     markAgentsOpened();
   }, []);
 
@@ -511,6 +524,7 @@ export function AgentsPage({
           row={removing}
           api={api}
           owner={owner}
+          onSwitch={doSwitch}
           onClose={() => {
             setRemoveQueue([]);
             reread();
@@ -518,6 +532,7 @@ export function AgentsPage({
           onChanged={changed}
           onRemoved={(label) => {
             setRemoveQueue((q) => q.slice(1));
+            carriedNotice = { text: S.removed(label), at: Date.now() };
             setNotice(S.removed(label));
           }}
           onAgentChanged={() => {

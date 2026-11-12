@@ -10,7 +10,7 @@ Two commands, in a terminal you opened yourself. You need Node.js 22.14 or newer
 npx -y @4thtech-io/agentlink@latest
 ```
 
-Your browser opens. On a new computer it opens on **Get started**: pick your AI app, name this ID and use Touch ID. That one touch creates your ID and connects your AI app, and the app shows a backup code once (save it: nobody can get it back). Restart your AI app afterwards. See [Get started in the app](../local-app/get-started-wizard.md). Claude Desktop users can use the signed bundle from the [latest release page](https://github.com/4thtech/agentlink/releases/latest) instead.
+Your browser opens. On a new computer it opens on **Get started**: pick your AI app, name this ID and use Touch ID. That one touch creates your ID and connects your AI app, and the app shows a master code once (save it: nobody can get it back). Restart your AI app afterwards. See [Get started in the app](../local-app/get-started-wizard.md). Claude Desktop users can use the signed bundle from the [latest release page](https://github.com/4thtech/agentlink/releases/latest) instead.
 
 Keep that terminal window open while you use the app.
 

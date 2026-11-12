@@ -46,6 +46,7 @@ import type {
 } from '@4thtech-io/node';
 import { createUiApprovalSource } from '../approval/ui-source.js';
 import { newAgentFirstCard } from '../mcp/local-ui-wiring.js';
+import { cliVersion } from '../runtime/cli-version.js';
 import type { OwnerAgent, OwnerCommandDeps } from './owner/deps.js';
 
 /** The per-agent part of the local UI options: everything but the app's files. */
@@ -56,12 +57,14 @@ import type { OwnerAgent, OwnerCommandDeps } from './owner/deps.js';
  * this one path: the one open at launch (ui.ts `start`) as much as one opened by a switch.
  */
 export function hostUiOf(
-  agent: Pick<OwnerAgent, 'epochKeys'>,
+  agent: Pick<OwnerAgent, 'epochKeys' | 'recoveryKit'>,
   localUi: LocalUiOptions,
 ): Omit<LocalUiOptions, 'assets'> {
   return {
     ...withoutAssets(localUi),
     ...(agent.epochKeys === undefined ? {} : { epochKeys: agent.epochKeys }),
+    // WP-11 (D-117 A): the Back up page saves this agent's recovery kit (keychain agents only).
+    ...(agent.recoveryKit === undefined ? {} : { recoveryKit: agent.recoveryKit }),
   };
 }
 
@@ -207,6 +210,8 @@ export async function startUiWelcome(deps: UiWelcomeDeps): Promise<UiWelcomeServ
       ...(deps.handoff === undefined ? {} : { handoff: deps.handoff }),
       // U3-g-c: Welcome's "Pick your AI app" (GET /api/ui/apps) with no agent yet.
       ...(aiAppsList === undefined ? {} : { aiAppsList }),
+      // WP-13 (F45): this app's version, for the "Restart {app} to use the new version" hint.
+      version: cliVersion(),
     },
     ...(deps.onEvent === undefined ? {} : { onEvent: deps.onEvent }),
   });

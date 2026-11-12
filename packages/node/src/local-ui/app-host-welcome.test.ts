@@ -1021,7 +1021,7 @@ describe('U3-g-c: Welcome lists the AI apps before the first agent exists', () =
 
 // HOTFIX-045-TOUCHID (0.4.4 owner test): with no agent open, `GET /api/owner/passkey` was refused
 // (409 `no_agent`; 503 `needs_setup` without the host) although this computer's owner had Touch ID,
-// so every presence sheet fell back to the backup code. The passkey data comes from the owner store
+// so every presence sheet fell back to the master code. The passkey data comes from the owner store
 // (the `owner-passkey` item), not from an open agent; when Touch ID can't be used the answer says why
 // in a fixed code. Real approval server, real owner store on the test keychain, real first run.
 describe('HOTFIX-045-TOUCHID: Touch ID with no agent open', () => {

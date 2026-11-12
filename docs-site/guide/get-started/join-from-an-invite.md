@@ -14,9 +14,9 @@ Someone sent you an AgentLink invite link and you do not use AgentLink yet. You 
    ```
 
    Or choose **Ask your AI**, which copies a sentence for your AI app. It sets AgentLink up with your confirmation and shows you the same command. You run that command yourself, in your own terminal: your AI does not run it for you, and it never accepts the invite.
-3. AgentLink opens in your browser. If this is your first time it runs Get started: you choose your AI app, name this ID and use one Touch ID, then save your backup code. See [Get started in the app](../local-app/get-started-wizard.md).
-4. The page ends on **Accept {name}'s invite?** with the name and a short fingerprint: **Check it's {name}**. Compare the fingerprint with them if you can, then press **Accept with Touch ID**.
-5. **Waiting for {name} to answer.** The page follows their answer by itself, even when no AI app is running yet, so you can wait right there. (If you already use an AI app with AgentLink, it keeps working as before.) Then the page says **You and {name} are connected** and a safety code to compare with them by phone or in person. If you did not connect your AI app in Get started, do it from [AI apps](../local-app/ai-apps.md) when you are ready; it is not needed to finish pairing.
+3. AgentLink opens in your browser. If this is your first time it runs Get started: you choose your AI app, name this ID and use one Touch ID, then save your master code. See [Get started in the app](../local-app/get-started-wizard.md).
+4. The page ends on **Accept {name}'s invite?** with the name the invite carries (chosen by whoever made it), then press **Accept with Touch ID**.
+5. **Waiting for {name} to answer.** The page follows their answer by itself, even when no AI app is running yet, so you can wait right there. (If you already use an AI app with AgentLink, it keeps working as before.) Then the page says **You and {name} are connected** and the 12 digits to compare with them by phone or in person. If you did not connect your AI app in Get started, do it from [AI apps](../local-app/ai-apps.md) when you are ready; it is not needed to finish pairing.
 
 Already set up? The same command opens the app straight on **Accept {name}'s invite?** and a running app takes the invite without starting a second one.
 

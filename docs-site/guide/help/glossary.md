@@ -15,10 +15,10 @@ Applies to AgentLink 0.4.8. These are the words AgentLink uses, in the product's
 | **ID card** | What others learn about your ID when you pair: its name, its owner and how to reach it. The owner signs it. See [How AgentLink works, simply](../how-agentlink-works.md) |
 | **Contact** | Another person you have paired with |
 | **Invite link** | A short link (under 80 characters) you share to pair with someone. It works once and expires after 7 days at most. Older long links still work. See [Invite someone](../local-app/invite-someone.md) |
-| **Safety code** | A 12-digit code both sides see after pairing. Compare it by phone or in person to make sure you are talking to the right person |
-| **Owner fingerprint** | A short code, such as `7F3A·19C2`, that identifies an owner |
+| **Contact check** | The 12 digits both sides see after pairing. Compare them by phone or in person to make sure you are talking to the right person |
+| **ID tag** | Under the hood only: a short tag, such as `7F3A·19C2`, that tells apart two contacts with the same name. Nothing to save |
 | **Self-declared** | A name chosen by its owner and not checked |
-| **Safety code checked** | You compared the safety code with the other person |
+| **Contact checked** | You compared the 12 digits with the other person |
 | **Registered** | The ID's link to its owner is on the public record |
 | **Verified domain** | The owner proved control of a web domain, shown with the domain, for example "Verified domain · example.com" |
 | **Message** | Anything your AI sends: a note, request, delivery, handoff or offer |
@@ -28,10 +28,9 @@ Applies to AgentLink 0.4.8. These are the words AgentLink uses, in the product's
 | **Firm offer** | An offer sent together with its proof. It commits you if the other side accepts |
 | **Encrypted drop** | The 4thTech service that holds larger files, locked, for at most 7 days. It cannot open them |
 | **Rules** | Your limits on what your AI may do on its own |
-| **Approval** | Your decision on something your AI asked to do. Given with your owner code or passkey |
-| **Owner code** | The code you type in your own terminal to approve things. Never give it to your AI or paste it into the chat |
-| **Backup code** | In the local app, the code that opens your approvals when Touch ID is not available. Shown once: save it in your password manager. Never give it to your AI |
-| **Owner presence** | You being there to approve, with your owner code or passkey. Your AI cannot do it for you |
+| **Approval** | Your decision on something your AI asked to do. Given with your master code or passkey |
+| **Master code** | Your master code approves changes when Touch ID isn't available and unlocks your AgentLink key. Save it once. We can't recover it for you. Never give it to your AI or paste it into a chat |
+| **Owner presence** | You being there to approve, with your master code or passkey. Your AI cannot do it for you |
 | **Allowed folder** | A folder you allowed your AI to send files from, with its subfolders. Hidden files in it are never sent. See [Folders for sending files](../everyday-use/allowed-folders.md) |
 | **Send folder** | `AgentLink/Send` in your home folder, where your AI may send files from. Setup creates it |
 | **Inbox folder** | `AgentLink/Inbox` in your home folder, where files from contacts you keep are saved automatically. Created when you receive your first file |

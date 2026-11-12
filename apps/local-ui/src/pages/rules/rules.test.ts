@@ -8,7 +8,7 @@
 // - An unsaved-changes bar counts the changes and offers Save and Discard.
 // - Saving asks the server to prepare the edit, lists every warning in plain words, and the owner
 //   ticks each one before the save button works (D-119). The browser never signs: the save is one
-//   POST to the presence gate with the passkey assertion or the typed owner code as its body.
+//   POST to the presence gate with the passkey assertion or the typed master code as its body.
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -484,7 +484,7 @@ describe('saving: review every warning, then one owner operation (D-119; I-4)', 
   });
 
   const outcomes: [string, Answer, string][] = [
-    ['a wrong owner code', new Answer(403, { status: 'presence_rejected' }), S.wrongCode],
+    ['a wrong master code', new Answer(403, { status: 'presence_rejected' }), S.wrongCode],
     ['too many tries', new Answer(429, { status: 'wait', retryAfter: 30 }), S.wait(30)],
     ['a refused save', new Answer(409, { status: 'refused' }), S.refused],
     ['rules changed elsewhere', new Answer(409, { error: 'stale' }), S.stale],
@@ -578,7 +578,7 @@ describe('spending limits: confirmed on the sheet (D-132)', () => {
     expect(dialog?.textContent).toContain('$10');
     expect(srv.calls.some((c) => c.method === 'POST' && c.url === '/api/ui/rules')).toBe(false);
 
-    // No passkey here: the backup code on the sheet.
+    // No passkey here: the master code on the sheet.
     const code = document.querySelector<HTMLInputElement>('[role="dialog"] input[type="password"]');
     await type(code, 'ABCD-EFGH');
     await click(
