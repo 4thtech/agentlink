@@ -35,7 +35,7 @@ OCC v2 is an open protocol of signed, encrypted envelopes plus an optional publi
 
 ## Files
 
-Files are encrypted on your computer in authenticated chunks (format ALF1). Larger ones wait as ciphertext in the encrypted drop for at most 7 days (limits 100 MB per file, 1 GB per ID per week). The file key travels only inside the end-to-end encrypted message, never to the drop. Files from people you keep save automatically into `~/AgentLink/Inbox` under daily limits, marked as downloaded from the internet and never opened or run. Optional own storage is planned.
+Files are encrypted on your computer in authenticated chunks (format ALF1). Larger ones wait as ciphertext in the encrypted drop for at most 7 days (limits 100 MB per file, 1 GB per ID per week). The file key travels only inside the end-to-end encrypted message, never to the drop. Files from people you keep save automatically into `~/AgentLink/Inbox` under daily limits, marked as downloaded from the internet and never opened or run. Optional own storage is planned. Coming in the next release: the owner can attach light text files (.md, .markdown, .txt, .json; 8 MB, 5 files) in the local app's conversation. A local route that no AI tool can reach (session, CSRF and origin checks) checks the type, size and UTF-8 text, writes the file into the ID's allowed Send folder without overwriting or following links, and sends it through the same encrypted send, under the same rules, as the AI would.
 
 ## Proof
 

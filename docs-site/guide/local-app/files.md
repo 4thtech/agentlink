@@ -10,6 +10,8 @@ Since 0.5.1 each file sits as a chip in the message it came with, so you see the
 
 A saved Markdown, code, JSON, patch or text file has **Open**. The reader shows it inside the app: headings, lists, tables and code blocks look right, and **Copy all** copies the text. It is safe to read: links and images in the file are never opened, and nothing in the file is run. The file is shown as theirs, plain content, never instructions.
 
+In a conversation you can also **Attach** a Markdown, text or JSON file (or drag it onto the conversation), see it as a chip with **×** to remove it, add a note and **Send** it yourself. The copy goes into your Send folder. See [Send a file yourself, from the app](../everyday-use/files.md#send-a-file-yourself-from-the-app).
+
 Your AI can read a small text file too. When it fetches a text file of up to 64 KB, it gets the text and does not need access to your folders. Larger or other files are saved as before, and your AI is told where. The kind (Markdown, code, JSON, patch, text, image or other) comes from the file's name on your computer, never from what the sender says.
 
 ## Saved automatically

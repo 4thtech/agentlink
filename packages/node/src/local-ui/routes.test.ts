@@ -239,6 +239,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/backup/reveal',
       // ATT-SENDFOLDER-FIX: Home's Send folder banner (api/files.test.ts).
       '/api/ui/files/send-folder',
+      // ATT-APP-ATTACH: attach files in a conversation (local-ui/attach-server.test.ts).
+      '/api/ui/attach',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).
