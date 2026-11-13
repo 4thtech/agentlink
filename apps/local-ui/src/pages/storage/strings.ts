@@ -6,7 +6,7 @@ export const STORAGE_STRINGS = {
   loading: 'Reading sizes…',
   failed: 'The sizes could not be read just now.',
   retry: 'Try again',
-  noIds: 'There is no ID on this computer yet.',
+  noIds: 'No IDs yet — nothing stored.',
   current: 'Open now',
   messages: 'Messages',
   savedFiles: 'Saved files',

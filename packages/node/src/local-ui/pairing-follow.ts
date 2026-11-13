@@ -67,6 +67,8 @@ export interface PairingFollower {
   follow(): Promise<PairingFollowResult>;
   /** (b) and (c): after a page read; every 5 s while a pairing is pending, else every 15 s. */
   tick(): Promise<PairingFollowResult>;
+  /** UX-LEFT-1: one pass now, at once (the relays are back), without the interval wait. */
+  flush(): Promise<PairingFollowResult>;
   /** True while a host pass holds the lease. */
   readonly passing: boolean;
 }
@@ -169,6 +171,7 @@ export function pairingFollower(
 
   return Object.freeze<PairingFollower>({
     follow: () => run(() => Promise.resolve(since() >= PAIRING_FOLLOW_INTERVAL_MS)),
+    flush: () => run(() => Promise.resolve(true)),
     tick: () =>
       run(async () => {
         const elapsed = since();

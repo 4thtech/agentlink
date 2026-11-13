@@ -2092,6 +2092,8 @@ export async function startApprovalServerWith(
       now: () => now(),
       // M1-11s-a-d: the status bar's health read (fixed fields, cached, bounded).
       health: createHealthReader({
+        // UX-LEFT-1 (OUTBOX-RECONNECT): relays back: one host pass now sends what was queued.
+        onReconnect: () => hostFlush(),
         // REL051-CF2: with no source wired, the open agent's own relay check (network-health.ts),
         // so the app never says Connected while no relay can be reached.
         ...(() => {
@@ -7545,6 +7547,21 @@ export async function startApprovalServerWith(
       const hold = await slot.enter();
       try {
         if (hold.valid() && follower === bound) await bound.tick();
+      } finally {
+        hold.leave();
+      }
+    })().catch(() => undefined);
+  }
+
+  /** UX-LEFT-1: like `hostTick`, but at once (relays are reachable again). Never rejects. */
+  function hostFlush(): void {
+    const slot = host;
+    const bound = follower;
+    if (slot === undefined || bound === undefined) return;
+    void (async () => {
+      const hold = await slot.enter();
+      try {
+        if (hold.valid() && follower === bound) await bound.flush();
       } finally {
         hold.leave();
       }

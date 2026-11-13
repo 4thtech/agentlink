@@ -171,9 +171,11 @@ export function StoragePage({
             {S.retry}
           </Button>
         </div>
+      ) : // UX-LEFT-1 (STORAGE-NOID): an owner with no ID has nothing stored; a calm line, no Inbox read.
+      load.view.ids.length === 0 ? (
+        <p className="al-muted">{S.noIds}</p>
       ) : (
         <>
-          {load.view.ids.length === 0 ? <p className="al-muted">{S.noIds}</p> : null}
           {load.view.ids.map((id) => (
             <IdCard key={id.name} id={id} />
           ))}

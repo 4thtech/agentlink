@@ -140,6 +140,14 @@ describe('W4-AUTO-SAVE: what is saved, and by whom (04 §4.1)', () => {
     expect(item).toMatchObject({ state: 'saved', savedName: 'report.pdf', savedBy: 'auto' });
   });
 
+  it('UX-LEFT-1: after an automatic save the item has its savedTo path (the inbox shows it)', async () => {
+    const w = await world();
+    const envelopeId = await send(w.a, w.b, 'notes.md');
+    await w.b.client.autoSave.run();
+    const paths = await w.b.client.savedFilePaths([{ envelopeId, fileIndex: 0 }]);
+    expect(paths.get(`${envelopeId}.0`)).toMatch(/notes\.md$/);
+  });
+
   it('a blocked contact, a removed contact and an "Ask before saving" contact: not saved', async () => {
     const w = await world();
     await send(w.a, w.b, 'one.txt');

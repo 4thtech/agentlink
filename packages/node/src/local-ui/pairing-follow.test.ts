@@ -154,3 +154,14 @@ describe('a slow network gets a longer pass (R1-CLASS-10)', () => {
     expect(budgets).toEqual([3_000, 3_000, 3_000]);
   });
 });
+
+describe('UX-LEFT-1: flush runs a pass at once, past the interval', () => {
+  it('a pass just ran, flush still runs one; follow waits', async () => {
+    const { c, calls } = client(() => Promise.resolve());
+    const follower = pairingFollower(c, { nowMs: () => 0 });
+    expect(await within(follower.follow())).toBe('ran');
+    expect(await within(follower.follow())).toBe('soon');
+    expect(await within(follower.flush())).toBe('ran');
+    expect(calls.sync).toBe(2);
+  });
+});

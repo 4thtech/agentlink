@@ -45,7 +45,7 @@ const POLL_MS = 3_000;
 /** b11 §33.2: the extra line after 10 minutes with no answer. */
 export const TEN_MINUTES_MS = 10 * 60_000;
 
-const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 
 export interface JoinPageProps {
   readonly api?: JoinApi;
