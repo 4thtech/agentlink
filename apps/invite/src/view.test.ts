@@ -75,7 +75,7 @@ describe('osFor and isPhone (REL051-INV)', () => {
 });
 
 describe('config (REL051-INV)', () => {
-  it('has the Mac app switched on, the early build being released (0.5.1)', () => {
+  it('has the Mac app switched on, the early build being released (0.5.2)', () => {
     expect(MAC_APP_AVAILABLE).toBe(true);
   });
 
@@ -89,8 +89,8 @@ describe('config (REL051-INV)', () => {
 
   it('pins both Mac app links to the exact release assets of the desktop build, never latest', () => {
     expect(MAC_APP_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(macAppAsset('0.5.1', 'arm64')).toBe('AgentLink-0.5.1-mac-arm64.dmg');
-    expect(macAppAsset('0.5.1', 'x64')).toBe('AgentLink-0.5.1-mac-x64.dmg');
+    expect(macAppAsset('0.5.2', 'arm64')).toBe('AgentLink-0.5.2-mac-arm64.dmg');
+    expect(macAppAsset('0.5.2', 'x64')).toBe('AgentLink-0.5.2-mac-x64.dmg');
     for (const arch of ['arm64', 'x64'] as const) {
       const url = MAC_APP_URLS[arch];
       const match =
