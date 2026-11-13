@@ -15,6 +15,12 @@
 // W8-S5 (F7; 04 §2.8; 11 §5.8): an AI app whose entry names another ID (or one that was removed) is
 // a move. Begin then runs as soon as that app is the one to connect, and the screen shows begin's
 // own replacement line ("{app} will use {label} instead of {old}") before the one gesture.
+//
+// HOTFIX-NOID (owner report on the Mac app 0.5.1): in the desktop app the one button is the app's
+// own Touch ID (native presence, DESK051-C6; the server runs the OS prompt) once it is on; the
+// browser passkey and its one-time switch are never offered there, and no line names a browser or
+// Safari. With an owner and no ID on this computer, begin answers a plan for the master code or
+// Touch ID (04 §2.8 "No ID on this computer yet"); nothing here sends the owner to a terminal.
 import { Banner, Button } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
@@ -51,6 +57,9 @@ import {
   type CreateStatement,
 } from './create-agent-api.js';
 import { APPS_STRINGS as A } from './strings.js';
+import { desktopPlatform, nativeConfirmLabel } from '../../presence/desktop.js';
+import { readNativeStatus, type NativeStatus } from '../../presence/native-api.js';
+import { nativeOutcomeText } from '../../presence/strings.js';
 
 /** What the sheet shows after the one gesture. */
 export interface CreatedAgent {
@@ -77,11 +86,9 @@ const MESSAGES: Partial<Record<CreateFinish['kind'] | string, string>> = {
   label_invalid: SETUP_MESSAGES.label_invalid,
   session: SETUP_MESSAGES.session_expired,
   offline: SETUP_MESSAGES.offline,
-  // F4: begin's fixed 409 `no_agent` with no ID left on this computer (the owner stays after the
-  // last ID is removed). New ID builds its plan from a card naming the owner, so it can't run here
-  // yet; the terminal path (init, then owner add-agent, 04 §2.8 M1-9x) can.
-  no_agent:
-    "No ID is left on this computer, so a new one can't be made here yet. Nothing changed. In your own terminal, run `agentlink init`, then the `agentlink owner add-agent` step it shows.",
+  // HOTFIX-NOID: begin's fixed 409 `no_agent` now only while an ID folder here can't be opened or
+  // is still being removed (an owner with no ID at all gets a plan). Never a terminal step.
+  no_agent: A.noAgentCreate,
 };
 
 /** The switch's outcome in plain words, as the presence sheet says it (presence-prompt.tsx). */
@@ -138,6 +145,8 @@ export function CreateAgentGate({
   platform: givenPlatform,
   passkeyStatus = readPasskeyStatus,
   switchPasskey = switchToPasskey,
+  userAgent,
+  nativeStatus = readNativeStatus,
 }: {
   label: string;
   /** The statement line ("Add {label}"). */
@@ -160,6 +169,9 @@ export function CreateAgentGate({
   /** W8-F13 seams (tests): the passkey state read and the one-time switch. */
   passkeyStatus?: () => Promise<PasskeyStatus>;
   switchPasskey?: SwitchToPasskey;
+  /** HOTFIX-NOID seams (tests): the user agent (the desktop app's marker) and the native status. */
+  userAgent?: string;
+  nativeStatus?: () => Promise<NativeStatus>;
 }): ReactElement {
   const [api] = useState<CreateAgentApi>(() => givenApi ?? createAgentApi());
   const [appsApi] = useState<AppsApi>(() => givenApps ?? createAppsApi());
@@ -179,6 +191,9 @@ export function CreateAgentGate({
   const mounted = useRef(true);
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const sensor = SENSOR[platform];
+  // HOTFIX-NOID: inside the desktop app (and nowhere else) its own Touch ID, once it is on.
+  const [desktop] = useState(() => desktopPlatform(userAgent));
+  const [native, setNative] = useState(false);
   // The held plan's nonce for retries with the master code (Decision 45), and the app it was for.
   // W8-S5: a plan begun early to show a move keeps its challenge for the first gesture.
   const held = useRef<
@@ -208,6 +223,15 @@ export function CreateAgentGate({
     void readStatus().then((read) => {
       if (mounted.current) setStatus(read);
     });
+    if (desktop !== undefined) {
+      void nativeStatus()
+        .catch((): NativeStatus => ({ available: false, registered: false }))
+        .then((n) => {
+          if (mounted.current && n.available && n.registered && n.reason === undefined) {
+            setNative(true);
+          }
+        });
+    }
     return () => {
       mounted.current = false;
     };
@@ -275,6 +299,15 @@ export function CreateAgentGate({
     if (outcome.kind === 'passkey_update_needed') {
       setCanPasskey(false);
       setUseCode(true);
+    }
+    if (outcome.kind === 'native') {
+      // The app's own Touch ID said why (cancelled, not recognised, not on here …), in its words.
+      if (outcome.state !== 'cancelled' && outcome.state !== 'failed') {
+        setNative(false);
+        setUseCode(true);
+      }
+      setError(nativeOutcomeText(outcome, desktop ?? 'mac'));
+      return;
     }
     setError(MESSAGES[outcome.kind] ?? SETUP_MESSAGES.unknown);
   };
@@ -344,6 +377,23 @@ export function CreateAgentGate({
     }
   };
 
+  /** HOTFIX-NOID: the desktop app's own Touch ID; the server runs the OS prompt for this finish. */
+  const withNative = async (): Promise<void> => {
+    if (api.finishNative === undefined) {
+      setUseCode(true);
+      return;
+    }
+    setWorking(true);
+    setError(undefined);
+    try {
+      const begun = await plan(false);
+      if (begun === undefined || begun.renewed === true) return;
+      settle(await api.finishNative(begun.nonce));
+    } finally {
+      setWorking(false);
+    }
+  };
+
   const withCode = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     if (working) return;
@@ -367,8 +417,11 @@ export function CreateAgentGate({
   };
 
   // F49: a switch that already failed here for lack of PRF is not pushed again (UI nudge only).
+  // HOTFIX-NOID: never in the desktop app, whose window can't make a browser passkey.
   const switchTo =
-    status?.kind === 'unavailable' && !switched && !noSwitch ? status.switchTo : undefined;
+    desktop === undefined && status?.kind === 'unavailable' && !switched && !noSwitch
+      ? status.switchTo
+      : undefined;
   // The server says this computer has no passkey for this owner: the Touch ID button could only
   // fall back to the code, so the code form (with why) is shown at once. Without the switch values
   // (no ID open) the switch can't be offered here (`POST /api/owner/passkey` needs an open ID).
@@ -425,14 +478,19 @@ export function CreateAgentGate({
   };
 
   // Why the code is asked for instead of Touch ID, in plain words (HOTFIX-045-TOUCHID).
+  // HOTFIX-NOID: the desktop app is not a browser: it says how to turn its own Touch ID on.
   const why =
-    status?.kind === 'unavailable' && !switched
-      ? status.reason === 'browser'
-        ? PASSKEY_WHY.browser(sensor, otherBrowser(platform))
-        : noSwitch && status.reason === 'not_set_up_here'
-          ? PASSKEY_WHY.noSwitchHere(sensor)
-          : PASSKEY_WHY[status.reason](sensor)
-      : undefined;
+    desktop !== undefined
+      ? native
+        ? undefined
+        : PASSKEY_WHY.desktopOff(sensor)
+      : status?.kind === 'unavailable' && !switched
+        ? status.reason === 'browser'
+          ? PASSKEY_WHY.browser(sensor, otherBrowser(platform))
+          : noSwitch && status.reason === 'not_set_up_here'
+            ? PASSKEY_WHY.noSwitchHere(sensor)
+            : PASSKEY_WHY[status.reason](sensor)
+        : undefined;
   const back =
     onCancel === undefined ? null : (
       <Button variant="ghost" disabled={working} onClick={onCancel}>
@@ -520,7 +578,23 @@ export function CreateAgentGate({
             </p>
           )}
         </form>
-      ) : useCode || !canPasskey || noneHere ? (
+      ) : native && !useCode && desktop !== undefined ? (
+        <div className="ag-actions">
+          <Button
+            variant="primary"
+            icon="key-round"
+            disabled={working}
+            data-native-confirm=""
+            onClick={() => void withNative()}
+          >
+            {goLabel ?? nativeConfirmLabel(desktop)}
+          </Button>
+          <Button variant="ghost" size="sm" disabled={working} onClick={() => setUseCode(true)}>
+            {NAME.backupInstead}
+          </Button>
+          {back}
+        </div>
+      ) : useCode || !canPasskey || noneHere || desktop !== undefined ? (
         <form className="ag-code-form" autoComplete="on" onSubmit={(e) => void withCode(e)}>
           {why === undefined ? null : (
             <p className="al-text-body-sm al-muted" role="status">

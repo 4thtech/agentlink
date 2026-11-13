@@ -488,6 +488,10 @@ const SETUP_TIME = new Set([
   'POST /api/ui/agents/switch',
   // U3-e: the remove kind keeps its own gate; it needs no open agent (Remove anyway, 04 §2.5).
   'POST /api/ui/agents/remove',
+  // HOTFIX-NOID: New ID keeps its own gate: with no owner or any ID folder it answers `no_agent`,
+  // with an owner and zero IDs it makes the first ID (create-connect-server.test.ts).
+  'POST /api/ui/agents/begin',
+  'POST /api/ui/agents',
   // U3-invite: the waiting invite is the host's, not an agent's: its read and "Not now" answer
   // during first run; the handoff kind runs before the session gate. Accept needs an agent.
   'GET /api/ui/join',

@@ -2,7 +2,6 @@
 // It only wires the process to the dispatcher: argv, the TTY state and
 // the environment for the guards, and the CLI's user-output channel. Commands register their
 // handlers here as their cards land (M1-9a, M1-9b, M1-9l, M1-9m); `mcp` is M1-9c's.
-import { readFileSync } from 'node:fs';
 import process from 'node:process';
 import { isatty } from 'node:tty';
 import { acceptHandler } from './commands/accept.js';
@@ -25,21 +24,9 @@ import {
 import { createDispatcher } from './dispatch.js';
 import { mcpCommand } from './mcp/index.js';
 import { createOutput } from './output.js';
-import { setCliVersion } from './runtime/cli-version.js';
+import { readPackageVersion, setCliVersion } from './runtime/cli-version.js';
 
-function packageVersion(): string {
-  try {
-    const parsed: unknown = JSON.parse(
-      readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-    );
-    const version = (parsed as { version?: unknown }).version;
-    return typeof version === 'string' ? version : '0.0.0';
-  } catch {
-    return '0.0.0';
-  }
-}
-
-const version = packageVersion();
+const version = readPackageVersion([new URL('../package.json', import.meta.url)]);
 setCliVersion(version);
 // UX1113-R1 (D-147): `agentlink backup restore` and `agentlink restore`.
 const dispatch = createDispatcher({

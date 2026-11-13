@@ -41,6 +41,10 @@ That command only removes the "downloaded from the internet" mark from this one 
 
 The Windows desktop app is coming later. On Windows, use the browser app: one command installs AgentLink and opens it in your browser. See [Windows](../get-started/windows.md).
 
+## Closing and quitting
+
+Closing the window keeps AgentLink running in the menu bar; it comes back when you click its menu-bar or Dock icon, or when it has a page to show you. Quit it with Cmd+Q, or with **Quit AgentLink** in its menu-bar menu. Your AI app runs its own AgentLink either way.
+
 ## Updating
 
 Open **Settings**, then **Updates** (the same page as in the browser app, see [Updates](../local-app/updates.md)). It shows the version you have and a **Check for updates** button. The app checks once a day by itself, and when you press the button (at most once a minute), and only says something on this page.

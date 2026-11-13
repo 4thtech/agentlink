@@ -86,8 +86,11 @@ export interface PlanStatementApp {
 export interface PlanStatement {
   readonly label: string;
   readonly agentFingerprint: string;
-  /** With an existing owner, the owner the local cards name; on first run the new owner. */
-  readonly ownerFingerprint: string;
+  /**
+   * With an existing owner, the owner the local cards name; on first run the new owner. Absent with
+   * no card naming the owner (HOTFIX-NOID, 04 §2.8 M1-9x): it can't be known before the unlock.
+   */
+  readonly ownerFingerprint?: string;
   readonly folder: string;
   readonly app?: PlanStatementApp;
 }

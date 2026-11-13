@@ -321,6 +321,21 @@ export function TouchIdPage({
                 </h2>
                 <p className="al-text-body-sm al-muted">{S.offNativeLine}</p>
               </>
+            ) : desktop && ready === undefined ? (
+              // HOTFIX-NOID: the desktop app is not a browser: never "This browser … open
+              // AgentLink in Safari". Until its own Touch ID status arrives, the title only.
+              native === undefined ? (
+                <h2 id="ti-sensor" className="al-text-h3 al-muted">
+                  {S.title(sensor)}
+                </h2>
+              ) : (
+                <>
+                  <h2 id="ti-sensor" className="al-text-h3">
+                    {S.off(sensor)}
+                  </h2>
+                  <p className="al-text-body-sm al-muted">{PASSKEY_WHY.desktopOff(sensor)}</p>
+                </>
+              )
             ) : status === undefined ? (
               <h2 id="ti-sensor" className="al-text-h3 al-muted">
                 {S.title(sensor)}

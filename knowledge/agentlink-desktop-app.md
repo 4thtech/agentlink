@@ -35,6 +35,7 @@ Open Settings, Touch ID & master code, press **Use Touch ID for approvals**, typ
 
 ## Other things to know
 
+- Closing the window keeps AgentLink running in the menu bar; it comes back when you click its menu-bar or Dock icon, or when it has a page to show you. Quit it with Cmd+Q, or with **Quit AgentLink** in its menu-bar menu. Your AI app runs its own AgentLink either way.
 - Opening AgentLink while another copy runs brings the same app to the front; a different version says "Another AgentLink is still open" and offers to quit it and switch.
 - The app refuses to run from a temporary folder (it offers to move itself to Applications) and checks that its own files are unchanged before it starts ("Some of AgentLink was changed" otherwise). This catches broken or swapped files; it is not protection against other programs running as you.
 - To remove it, drag AgentLink to the Trash. Your IDs and messages stay in your AgentLink folder until you delete that folder.

@@ -219,19 +219,23 @@ describe('Remove in the session first run started (HOTFIX-045-REMOVE-FIRSTRUN)',
     expect(await readdir(join(pc.home, '.agentlink', 'revoked'))).toHaveLength(1);
     expect(auth.gestures).toBe(2);
 
-    // F4: the owner stays with zero IDs. First run is closed to them (an owner exists) and New ID
-    // has no card naming the owner to build its plan from, so begin is refused with the fixed
-    // no_agent before anything is created (the page maps it to the terminal add-agent path). Pinned
-    // until the zero-ID New ID design lands; nothing is signed or written here.
+    // F4 / HOTFIX-NOID: the owner stays with zero IDs. First run is closed to them (an owner exists);
+    // New ID begins a plan for the owner its presence will unlock (04 §2.8 "No ID on this computer
+    // yet"): a statement with no owner fingerprint and no passkey offered. Nothing is created yet.
     const state = await send(port, '/api/ui/first-run', { headers: base });
     expect(JSON.parse(state.body)).toEqual({ owner: 'set_up' });
     const again = await post('/api/ui/agents/begin', new Uint8Array(0), {
       'X-AgentLink-Input': input({ label: 'Ana two' }),
     });
-    expect({ status: again.status, body: JSON.parse(again.body) as unknown }).toEqual({
-      status: 409,
-      body: { status: 'no_agent' },
-    });
+    const begun = JSON.parse(again.body) as {
+      status: string;
+      statement: Record<string, unknown>;
+      publicKey: { allowCredentials: unknown[] };
+    };
+    expect(again.status).toBe(200);
+    expect(begun.status).toBe('ready');
+    expect(begun.statement['ownerFingerprint']).toBeUndefined();
+    expect(begun.publicKey.allowCredentials).toEqual([]);
     expect(await pc.directory.list()).toEqual([]);
     expect(auth.gestures).toBe(2);
   }, 60_000);

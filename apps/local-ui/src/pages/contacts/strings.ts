@@ -124,6 +124,9 @@ export const PASSKEY_WHY = {
     browser === undefined
       ? `This browser can't use ${sensor} for AgentLink yet, so this asks for your master code.`
       : `This browser can't use ${sensor} for AgentLink. Enter your master code, or open AgentLink in ${browser}.`,
+  // HOTFIX-NOID: inside the desktop app (never a browser): its own Touch ID isn't on (yet).
+  desktopOff: (sensor: string): string =>
+    `${cap(sensor)} isn't turned on for approvals in this app yet, so this asks for your master code. You can turn it on in Settings › ${cap(sensor)} & master code.`,
   // F49: a switch already failed in this browser (no PRF), so the sheet stops offering it.
   noSwitchHere: (sensor: string): string =>
     `${cap(sensor)} on this computer can't protect approvals yet, so this asks for your master code.`,
