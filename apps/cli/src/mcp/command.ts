@@ -45,6 +45,7 @@ import {
 } from '../runtime/index.js';
 import { notifyPrefsInForce } from '@4thtech-io/types/ui-contract/notifications';
 import { readUiSettingsFile } from '../runtime/agent-dir.js';
+import { osApprovalAlertsOn } from '../runtime/desktop-alerts-record.js';
 import { cliVersion } from '../runtime/cli-version.js';
 import { cliPrefix } from '../runtime/cli-prefix.js';
 import { ownerKnownAbsent } from '../runtime/owner-on-machine.js';
@@ -301,8 +302,14 @@ export const mcpCommand = (version: string): CommandHandler => {
             source,
             localUi,
             // IR-NOTIFY-1 M-1 (N6): Settings › Notifications › Approvals waiting, read on each alert.
-            approvalAlerts: async () =>
-              notifyPrefsInForce((await readUiSettingsFile(homedir()))?.notify).approvals,
+            // N7: never for the ID the running desktop app alerts for (it shows its own notification).
+            approvalAlerts: () =>
+              osApprovalAlertsOn(
+                homedir(),
+                agent.name,
+                async () =>
+                  notifyPrefsInForce((await readUiSettingsFile(homedir()))?.notify).approvals,
+              ),
             // Fixed values only (ApprovalServerEvent, I-7).
             onEvent: (event) => {
               logger.debug('approval ui event', { ...event });

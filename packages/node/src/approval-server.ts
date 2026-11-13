@@ -392,7 +392,11 @@ import {
 } from '@4thtech-io/types/ui-contract/ui-settings';
 import { createUiSettingsDesk } from './local-ui/api/ui-settings.js';
 import type { LocalUiNotificationsDesk } from './local-ui/api/notifications.js';
-import { notifyPrefsInForce } from '@4thtech-io/types/ui-contract/notifications';
+import {
+  notifyPrefsInForce,
+  type NotificationItem,
+  type NotifyPrefKey,
+} from '@4thtech-io/types/ui-contract/notifications';
 import {
   createNotificationStore,
   memoryNotificationPersistence,
@@ -1129,6 +1133,22 @@ export interface ApprovalServer {
   /** Raises the fixed OS notification for a new request and returns its approvalUrl. */
   notifyNewApproval(approvalId: string): Promise<string>;
   /**
+   * N7: the same as `openHome` for Settings › Updates (`/settings/updates`), the page a click on the
+   * desktop app's "Update ready" notification opens. A fixed path.
+   */
+  openUpdates(): Promise<boolean>;
+  /**
+   * N7 (desktop app): the open ID's notification items (brought up to date first; kind, ref, count
+   * and times only) and the Settings › Notifications switches in force. Undefined while no ID with a
+   * centre is open. In memory only; never leaves the process except as protocol `notify` codes.
+   */
+  desktopAlerts(): Promise<DesktopAlertState | undefined>;
+  /**
+   * N7: the names the OWNER gave these contacts of the open ID (nameSource 'owner'; a self-declared
+   * name is never answered, I-5). Only the refs asked for; none when no client is open.
+   */
+  ownerNames(refs: readonly string[]): Promise<ReadonlyMap<string, string>>;
+  /**
    * F25: whether the app is in use, for the `ui` command's idle limit. `lastAt` is the time (ms) of
    * the last request to the page API (`/api/ui/`), `openStreams` the open live streams (open tabs).
    * Counts and a time only. F40: `linksUsed` counts the one-shot session links used so far (each
@@ -1140,6 +1160,14 @@ export interface ApprovalServer {
     linksUsed(): number;
   };
   close(): Promise<void>;
+}
+
+/** N7: what the desktop core alerts from (ApprovalServer.desktopAlerts). */
+export interface DesktopAlertState {
+  /** The open ID's folder name (a change starts a fresh first look); in memory only. */
+  readonly scope: string;
+  readonly items: readonly NotificationItem[];
+  readonly prefs: Readonly<Record<NotifyPrefKey, boolean>>;
 }
 
 type DecisionOutcome = Extract<ApprovalServerEvent, { kind: 'decision' }>['outcome'];
@@ -1831,6 +1859,15 @@ export async function startApprovalServerWith(
    * (agentlink mcp reads ui-settings.json), else the app host's UI settings, else the D2 default (on).
    * Unreadable settings count as the default.
    */
+  /** N7: the switches in force (unreadable settings count as the D2 defaults). */
+  async function notifyPrefsNow(): Promise<Record<NotifyPrefKey, boolean>> {
+    try {
+      if (uiSettingsDesk === undefined) return notifyPrefsInForce(undefined);
+      return notifyPrefsInForce((await uiSettingsDesk.read()).notify);
+    } catch {
+      return notifyPrefsInForce(undefined);
+    }
+  }
   async function approvalAlertsOn(): Promise<boolean> {
     try {
       if (options.approvalAlerts !== undefined) return await options.approvalAlerts();
@@ -8025,7 +8062,52 @@ export async function startApprovalServerWith(
     },
     openFirstRun: async () => opener(`${origin}/first-run?t=${mintLink()}`).catch(() => false),
     openHome: async () => opener(`${origin}/settings/home?t=${mintLink()}`).catch(() => false),
+    openUpdates: async () =>
+      opener(`${origin}/settings/updates?t=${mintLink()}`).catch(() => false),
     openJoin: () => openJoinPage(false),
+    desktopAlerts: async () => {
+      const desk = notificationsPart(source).notifications;
+      if (desk === undefined) return undefined;
+      const scope = notificationsName ?? '';
+      try {
+        await desk.refresh();
+      } catch {
+        // The items stay as they were.
+      }
+      let items: readonly NotificationItem[];
+      try {
+        items = await desk.list();
+      } catch {
+        return undefined;
+      }
+      return Object.freeze({ scope, items, prefs: Object.freeze(await notifyPrefsNow()) });
+    },
+    ownerNames: async (refs: readonly string[]) => {
+      const out = new Map<string, string>();
+      const wanted = new Set(refs);
+      const contacts = (
+        agentUi?.client as { contacts?: { list?: () => Promise<unknown> } } | undefined
+      )?.contacts;
+      if (wanted.size === 0 || typeof contacts?.list !== 'function') return out;
+      let views: unknown;
+      try {
+        views = await contacts.list();
+      } catch {
+        return out;
+      }
+      if (!Array.isArray(views)) return out;
+      for (const v of views as unknown[]) {
+        if (typeof v !== 'object' || v === null) continue;
+        const { id, display } = v as { id?: unknown; display?: unknown };
+        if (typeof id !== 'string' || !wanted.has(id)) continue;
+        if (typeof display !== 'object' || display === null) continue;
+        const { name, nameSource } = display as { name?: unknown; nameSource?: unknown };
+        // I-5: only a name the owner gave; a contact's own (self-declared) name never.
+        if (nameSource !== 'owner' || typeof name !== 'string' || name.trim() === '') continue;
+        out.set(id, name.trim());
+      }
+      return out;
+    },
     notifyNewApproval: async (approvalId: string) => {
       const url = approvalUrl(approvalId);
       // IR-NOTIFY-1 M-1 (N6): Settings › Notifications › Approvals waiting governs this alert.

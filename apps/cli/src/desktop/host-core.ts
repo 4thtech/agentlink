@@ -16,6 +16,12 @@
 //   The core makes no request of its own for it.
 // - `~/.agentlink/app-host.json` is written by the server's handoff option (nodeUiDeps), so a
 //   terminal `agentlink join` hands its invite to this host unchanged; it is removed on close.
+// - N7 (PLAN-NOTIFY §3.5): the desktop app owns the OS notifications. Each tick turns the open ID's
+//   notification items and the approvals count into fixed `notify` codes (alerts.ts) for the
+//   switches the owner turned on; the shell builds the words. Its own server never runs the
+//   osascript / notify-send alert (approvalAlerts: false), and `~/.agentlink/desktop-alerts.json`
+//   ({v, pid, started, at, id}) tells `agentlink mcp` not to either, for the open ID only, while this
+//   host runs (no double alerts; mcp still alerts for every other ID).
 // - `shutdown`, the pipe closing, a stop signal or a fatal error: the server closes, `stopped`
 //   goes out, the pipe closes, and the run ends.
 //
@@ -32,6 +38,7 @@ import type {
   LocalUiAppUpdateDesk,
 } from '@4thtech-io/node';
 import { startUiServer, type UiDeps, type UiServer } from '../commands/ui.js';
+import { notifyMessages, planAlerts, refsToName, type AlertBaseline } from './alerts.js';
 import type { FatalReason } from '../runtime/ui-lifecycle.js';
 import type { DesktopPipe } from './pipe.js';
 import {
@@ -43,6 +50,9 @@ import {
   type ShowRoute,
   type StopReason,
 } from './protocol.js';
+
+/** N7 (IR-N7-1 L-2): desktop-alerts.json is written again at least this often (its lease). */
+export const RECORD_RENEW_MS = 60_000;
 
 /** How often the counts are read (a pending list read of the open agent and the open pages). */
 export const STATUS_EVERY_MS = 5_000;
@@ -75,6 +85,12 @@ export interface DesktopHostDeps {
   guard?(onFatal: (reason: FatalReason) => void): () => void;
   /** Default STATUS_EVERY_MS. */
   readonly statusEveryMs?: number;
+  /**
+   * N7: the mark that this desktop app owns the OS notifications for one ID, `scope` (the open ID;
+   * desktop-alerts-record.ts). Written after each first look at an ID and renewed every
+   * RECORD_RENEW_MS; removed when no ID is open and when the host stops. Absent: no mark (tests).
+   */
+  readonly alertsRecord?: { write(scope: string): Promise<void>; remove(): Promise<void> };
 }
 
 /** Exit codes: 0 for a clean stop, 1 when it could not start or a fatal error ended it. */
@@ -101,6 +117,9 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   /** Whether an agent was opened after the start (first run made one). */
   let openedSinceStart = false;
   let waiting = 0;
+  /** N7: the IDs of the approvals waiting, and whose they are. */
+  let waitingIds: readonly string[] = [];
+  let waitingOf: ApprovalServerSource | undefined;
   /** DESK051-UPD: the shell's last update state (undefined until it sends one). */
   let appUpdate: AppUpdateView | undefined;
 
@@ -174,6 +193,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     const wrapped: ApprovalServerOptions = {
       ...options,
       appUpdate: appUpdateDesk,
+      // N7: the shell shows native notifications; this server never runs osascript / notify-send.
+      approvalAlerts: () => Promise.resolve(false),
       ...(host === undefined
         ? {}
         : {
@@ -257,7 +278,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
 
   const show = async (route: ShowRoute): Promise<void> => {
     if (approvalServer === undefined) return;
-    if (route === 'approvals') await approvalServer.open().catch(() => false);
+    if (route === 'approvals' || route === 'inbox') await approvalServer.open().catch(() => false);
+    else if (route === 'updates') await approvalServer.openUpdates().catch(() => false);
     else if (route === 'join') await approvalServer.openJoin().catch(() => false);
     else if (server.page === 'first-run' && !openedSinceStart) {
       await approvalServer.openFirstRun().catch(() => false);
@@ -302,16 +324,87 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     queue = queue.then(() => handle(message)).catch(() => undefined);
   });
 
+  /**
+   * N7: the last look at the open ID. A failed look keeps it (IR-N7-1 L-3: a reset would make an
+   * approval that arrives meanwhile count as already there); only another ID starts a fresh one.
+   */
+  let alertBaseline: AlertBaseline | undefined;
+  /** Whose approvals the baseline holds. */
+  let baselineOf: ApprovalServerSource | undefined;
+  /**
+   * N7 (IR-N7-1 L-5, L-2): the ID this host alerts for, as told to `agentlink mcp` in
+   * desktop-alerts.json (mcp still alerts for every other ID), and when it was last written (a lease
+   * renewed every RECORD_RENEW_MS; a record that is not renewed stops counting).
+   */
+  let recordScope: string | undefined;
+  let recordAt = 0;
+  const mark = async (scope: string | undefined): Promise<void> => {
+    if (deps.alertsRecord === undefined) return;
+    if (scope === undefined || scope === '') {
+      if (recordScope !== undefined) await deps.alertsRecord.remove().catch(() => undefined);
+      recordScope = undefined;
+      return;
+    }
+    const at = Date.now();
+    if (scope === recordScope && at - recordAt < RECORD_RENEW_MS) return;
+    // After the look that set the baseline: an approval raised before this write is still alerted
+    // by mcp (it saw the old record), never swallowed.
+    await deps.alertsRecord.write(scope).then(
+      () => {
+        recordScope = scope;
+        recordAt = at;
+      },
+      () => undefined,
+    );
+  };
+  const alert = async (): Promise<void> => {
+    const server = approvalServer;
+    const source = current;
+    if (server === undefined || source === undefined) {
+      alertBaseline = undefined;
+      await mark(undefined);
+      return;
+    }
+    // The approvals of another ID not read yet: wait for the next look.
+    if (waitingOf !== source) return;
+    const state = await server.desktopAlerts().catch(() => undefined);
+    if (state === undefined) return;
+    // Another ID's approvals (a switch): a fresh first look, whatever the scope says yet.
+    const prev = baselineOf === source ? alertBaseline : undefined;
+    const { news, baseline } = planAlerts(prev, waitingIds, state);
+    alertBaseline = baseline;
+    baselineOf = source;
+    await mark(state.scope);
+    if (news.length === 0) return;
+    const refs = refsToName(news, state.prefs);
+    const names =
+      refs.length === 0
+        ? new Map<string, string>()
+        : await server.ownerNames(refs).catch(() => new Map<string, string>());
+    if (stopping) return;
+    for (const message of notifyMessages(news, state.prefs, names)) pipe.send(message);
+  };
+
   const every = deps.statusEveryMs ?? STATUS_EVERY_MS;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const tick = async (): Promise<void> => {
     const source = current;
     if (source !== undefined) {
       const list = await source.list().catch(() => undefined);
-      if (list !== undefined && source === current) waiting = list.length;
-    } else waiting = 0;
+      if (list !== undefined && source === current) {
+        waiting = list.length;
+        waitingIds = list.map((v) => v.approvalId);
+        waitingOf = source;
+      }
+    } else {
+      waiting = 0;
+      waitingIds = [];
+      waitingOf = undefined;
+    }
     if (stopping) return;
     sendStatus();
+    await alert().catch(() => undefined);
+    if (stopping) return;
     timer = setTimeout(() => void tick(), every);
   };
   await tick();
@@ -322,6 +415,7 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   sendStatus();
   await queue;
   await server.close().catch(() => undefined);
+  await deps.alertsRecord?.remove().catch(() => undefined);
   pipe.send({ v: 1, type: 'stopped', reason });
   unsubscribe();
   unguard?.();

@@ -5,6 +5,9 @@
 //  - the uninstaller removes only the install directory and its own registry keys. It never touches
 //    the user's AgentLink data folder (the shared home of the CLI and the app).
 
+/** N7: the AppUserModelID the app sets at startup (apps/desktop/src/main/notify.ts). */
+export const APP_USER_MODEL_ID = '4thTech.AgentLink';
+
 const q = (s) => String(s).replace(/\$/g, '$$$$').replace(/"/g, '$\\"');
 
 export function nsisScript({ version, sourceDir, outFile, iconFile }) {
@@ -50,8 +53,43 @@ Section "Install"
 
   CreateDirectory "$SMPROGRAMS\\AgentLink"
   CreateShortCut "$SMPROGRAMS\\AgentLink\\AgentLink.lnk" "$INSTDIR\\${exe}" "" "$INSTDIR\\${exe}" 0 SW_SHOWNORMAL "" "AgentLink"
-  ; AppUserModelID 4thTech.AgentLink is set by the app at startup (setAppUserModelId).
+  ; N7 (IR-N7-1 M-1): Windows attributes toasts through the Start menu shortcut that carries the
+  ; same AppUserModelID the app sets at startup (setAppUserModelId).
+  StrCpy $0 "$SMPROGRAMS\\AgentLink\\AgentLink.lnk"
+  Call SetShortcutAumid
 SectionEnd
+
+; N7: sets System.AppUserModel.ID (PKEY {9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3},5) on the shortcut in
+; $0 to ${APP_USER_MODEL_ID}, with the stock System plugin only (IShellLinkW, IPersistFile,
+; IPropertyStore). Best effort: a failing step leaves the shortcut as it was.
+Function SetShortcutAumid
+  System::Call 'ole32::CoCreateInstance(g "{00021401-0000-0000-C000-000000000046}", p 0, i 1, g "{000214F9-0000-0000-C000-000000000046}", *p .r2) i .r9'
+  StrCmp $9 0 0 aumid_done
+  System::Call '$2->0(g "{0000010b-0000-0000-C000-000000000046}", *p .r3) i .r9'
+  StrCmp $9 0 0 aumid_link
+  System::Call '$3->5(w r0, i 2) i .r9'
+  StrCmp $9 0 0 aumid_file
+  System::Call '$2->0(g "{886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99}", *p .r4) i .r9'
+  StrCmp $9 0 0 aumid_file
+  System::Call '*(g "{9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3}", i 5) p .r5'
+  System::Call '*(&w64 "${APP_USER_MODEL_ID}") p .r7'
+  System::Call '*(&i2 31, &i2 0, &i2 0, &i2 0, p r7, p 0) p .r6'
+  System::Call '$4->6(p r5, p r6) i .r9'
+  StrCmp $9 0 0 aumid_store
+  System::Call '$4->7() i .r9'
+  StrCmp $9 0 0 aumid_store
+  System::Call '$3->6(p 0, i 1) i .r9'
+aumid_store:
+  System::Call '$4->2()'
+  System::Free $5
+  System::Free $6
+  System::Free $7
+aumid_file:
+  System::Call '$3->2()'
+aumid_link:
+  System::Call '$2->2()'
+aumid_done:
+FunctionEnd
 
 Section "Uninstall"
   DeleteRegKey HKCU "Software\\Classes\\agentlink"

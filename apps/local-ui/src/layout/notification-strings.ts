@@ -40,5 +40,18 @@ export const NOTIFY_SETTINGS_STRINGS = {
   approvals: 'Approvals waiting',
   approvalsHint:
     'When your AI asks for an approval and AgentLink cannot open it in your browser, a short alert on this computer says one is waiting. It names no one and never approves anything.',
+  // N7: the desktop app's native notifications (fixed words; a click opens the app at that page).
+  approvalsHintDesktop:
+    'A notification says an approval is waiting. It names no one and never approves anything. Click it to open the approval in AgentLink.',
+  messages: 'New messages',
+  messagesHint:
+    'A notification when a contact sends you a message. It never shows what the message says.',
+  files: 'Files received',
+  filesHint: "A notification when a contact sends you a file. It never shows the file's name.",
+  updates: 'Updates',
+  updatesHint: 'A notification when a new version of AgentLink is ready to install.',
+  showNames: 'Show names in notifications',
+  showNamesHint:
+    'Use the names you gave your contacts on People. Off: a notification says "a contact". Anyone who can see your screen can read them.',
   saveFailed: "Couldn't save this choice. Try again.",
 } as const;

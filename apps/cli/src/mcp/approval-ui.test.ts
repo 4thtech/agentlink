@@ -83,6 +83,10 @@ function fakeServer(origin = 'http://localhost:47321'): FakeServer {
     openFirstRun: () => Promise.resolve(true),
     openHome: () => Promise.resolve(true),
     openJoin: () => Promise.resolve(true),
+    // N7: the desktop app's pages and alerts; not used here.
+    openUpdates: () => Promise.resolve(true),
+    desktopAlerts: () => Promise.resolve(undefined),
+    ownerNames: () => Promise.resolve(new Map<string, string>()),
     notifyNewApproval: (id) => {
       notified.push(id);
       return Promise.resolve(`${origin}/approve/${id}`);

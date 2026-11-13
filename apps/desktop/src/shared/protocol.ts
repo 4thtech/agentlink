@@ -20,7 +20,10 @@
 //   unknown or missing key, wrong value, oversize, bad UTF-8, bad framing) is a PROTOCOL VIOLATION.
 //   The receiver drops the message and closes the pipe; the shell then stops the core (and the
 //   supervisor may start a new one). Nothing from a rejected line is logged or echoed.
-// - Never on the pipe: keys, seeds, master codes, passphrases, message text, contact names, file names.
+// - Never on the pipe: keys, seeds, master codes, passphrases, message text, file names, links in a
+//   notification, and contact names with ONE exception: N7's `notify.name`, an alias the owner gave
+//   a contact (never a self-declared name), only while the owner turned on Show names, and only in
+//   the plain NOTIFY_NAME shape (letters, numbers, spaces, ' and -; at most 32 characters).
 //   The session link (`ready.sessionUrl`) and an invite link are the only secrets that travel here,
 //   and neither is ever logged, put in a title, a notification or a file by either side.
 //
@@ -43,6 +46,13 @@
 //   {"v":1,"type":"app-update-check"}
 //       DESK051-UPD: the person chose "Check for updates" in Settings. No other key: the shell checks
 //       its one fixed source and answers with an "app-update".
+//   {"v":1,"type":"notify","kind":<NOTIFY_KINDS>,"count":n,"name":""|<owner alias>}
+//       N7 (PLAN-NOTIFY §3.5): raise one native notification. A fixed code only: the shell builds
+//       every word from `kind` (notify.ts), opens only that kind's fixed route on a click and
+//       throttles one per kind per 30 s. `count` 1..MAX_COUNT: approvals waiting (approvals), new
+//       ones since the last notify (messages, files), 1 (update). `name` is "" except on messages
+//       and files, where it may be the owner-given alias (see "Never on the pipe" above). The core
+//       sends it only for the kinds the owner switched on (Settings > Notifications).
 //
 // Shell -> core
 //   {"v":1,"type":"invite","link":"https://agentlink.4thtech.io/i#<payload>"}
@@ -51,7 +61,7 @@
 //       long form of 1..21846 base64url characters (packages/core invite-link.ts). The core keeps it
 //       in memory as the waiting invite and answers with a "ready" for the join page.
 //   {"v":1,"type":"show","route":<SHOW_ROUTES>}
-//       The person asked for a page (tray, dock, second launch). The core answers with a "ready"
+//       The person asked for a page (tray, dock, second launch, a click on a notification). The core answers with a "ready"
 //       carrying a fresh session link for that route's fixed path.
 //   {"v":1,"type":"app-update","state":<APP_UPDATE_STATES>,"current":"<v>","latest":"<v>"|"","download":"<link>"|""}
 //       DESK051-UPD: what Settings > Updates shows. Sent after every "ready" and whenever it changes.
@@ -78,7 +88,14 @@ export const MAX_LINE_BYTES = 32 * 1024;
 export const MAX_COUNT = 1_000_000;
 
 /** The session link paths the core may send (approval-server.ts open*, invite-paths.ts). */
-export const SESSION_PATHS = ['/', '/first-run', '/settings/home', '/settings/join'] as const;
+export const SESSION_PATHS = [
+  '/',
+  '/first-run',
+  '/settings/home',
+  '/settings/join',
+  // N7: a click on an "Update ready" notification (show `updates`).
+  '/settings/updates',
+] as const;
 
 /** The core's states the tray can show (numbers and states only). */
 export const HOST_STATES = ['starting', 'running', 'closing'] as const;
@@ -131,8 +148,31 @@ export function isStartFailure(reason: StopReason): reason is StartFailureReason
 }
 
 /** The pages the shell may ask the core to open; the core maps each to a fixed path. */
-export const SHOW_ROUTES = ['home', 'approvals', 'join'] as const;
+// N7: `inbox` (a new message or file: Home, where the people are) and `updates` (Settings › Updates).
+export const SHOW_ROUTES = ['home', 'approvals', 'join', 'inbox', 'updates'] as const;
 export type ShowRoute = (typeof SHOW_ROUTES)[number];
+
+/** N7: the kinds a native notification can be about (the notification store's kinds that alert). */
+export const NOTIFY_KINDS = ['approvals', 'messages', 'files', 'update'] as const;
+export type NotifyKind = (typeof NOTIFY_KINDS)[number];
+/** N7: the kinds that may carry an owner-given name. */
+export const NOTIFY_NAME_KINDS: readonly NotifyKind[] = ['messages', 'files'];
+/** N7: the longest name, in code points (06 §2.1's restricted length). */
+export const NOTIFY_NAME_MAX_CODE_POINTS = 32;
+/**
+ * N7: a plain name: starts and ends with a letter or number; letters, marks, numbers, single spaces,
+ * apostrophes and hyphens between. No dot, slash, colon, @, angle bracket, control, bidi or
+ * zero-width character, so it cannot read as a link, an address or a second line.
+ */
+const NOTIFY_NAME = /^[\p{L}\p{N}](?:[\p{L}\p{M}\p{N}'\u2019-]| (?! ))*$/u;
+
+/** N7: true for a name the pipe may carry in `notify.name` (non-empty). */
+export function isNotifyName(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 128) return false;
+  if ([...value].length > NOTIFY_NAME_MAX_CODE_POINTS) return false;
+  if (value.endsWith(' ')) return false;
+  return NOTIFY_NAME.test(value);
+}
 
 /** The canonical invite link prefix (packages/core INVITE_LINK_PREFIX; 04 §3.6). */
 export const INVITE_LINK_PREFIX = 'https://agentlink.4thtech.io/i#';
@@ -170,7 +210,17 @@ export interface AppUpdateCheckMessage {
   readonly v: 1;
   readonly type: 'app-update-check';
 }
+/** N7: one native notification, as a fixed code (no text; see the spec above). */
+export interface NotifyMessage {
+  readonly v: 1;
+  readonly type: 'notify';
+  readonly kind: NotifyKind;
+  readonly count: number;
+  /** "" or an owner-given alias (messages, files only). */
+  readonly name: string;
+}
 export type CoreMessage =
+  | NotifyMessage
   | ReadyMessage
   | StatusMessage
   | ApprovalWaitingMessage
@@ -201,7 +251,7 @@ export type ShellMessage = InviteMessage | ShowMessage | ShutdownMessage | AppUp
 
 const TOKEN = '[A-Za-z0-9_-]{43}';
 const PORT = '([1-9][0-9]{0,4})';
-const PATH = '(/|/first-run|/settings/home|/settings/join)';
+const PATH = '(/|/first-run|/settings/home|/settings/join|/settings/updates)';
 const SESSION_URL = new RegExp(`^http://localhost:${PORT}${PATH}\\?t=${TOKEN}$`);
 
 const SHORT_INVITE = /^2\.[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/;
@@ -309,6 +359,16 @@ export function parseCoreMessage(line: string): CoreMessage | undefined {
     case 'app-update-check':
       if (!hasExactKeys(value, ['v', 'type'])) return undefined;
       return { v: 1, type: 'app-update-check' };
+    case 'notify': {
+      if (!hasExactKeys(value, ['v', 'type', 'kind', 'count', 'name'])) return undefined;
+      const { kind, count, name } = value;
+      if (!isOneOf(NOTIFY_KINDS, kind) || !isCount(count) || count < 1) return undefined;
+      if (typeof name !== 'string') return undefined;
+      if (name !== '' && (!NOTIFY_NAME_KINDS.includes(kind) || !isNotifyName(name))) {
+        return undefined;
+      }
+      return { v: 1, type: 'notify', kind, count, name };
+    }
     default:
       return undefined;
   }
@@ -414,6 +474,15 @@ export function encodeCoreMessage(message: CoreMessage): string {
       break;
     case 'app-update-check':
       line = JSON.stringify({ v: 1, type: 'app-update-check' });
+      break;
+    case 'notify':
+      line = JSON.stringify({
+        v: 1,
+        type: 'notify',
+        kind: message.kind,
+        count: message.count,
+        name: message.name,
+      });
       break;
     default:
       throw new Error('protocol: unknown core message');

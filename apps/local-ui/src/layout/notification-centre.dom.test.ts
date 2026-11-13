@@ -340,10 +340,11 @@ describe('Settings › Notifications (N6)', () => {
 
   const switches = (): HTMLElement[] => [...host.querySelectorAll<HTMLElement>('[role="switch"]')];
 
-  it('IR-NOTIFY-1 M-1: shows only the switch that works today, Approvals waiting (on); axe clean', async () => {
+  it('IR-NOTIFY-1 M-1: in a browser, only the switch that works there, Approvals waiting (on); axe clean', async () => {
     await act(async () => {
       root.render(
         h(NotificationsPage, {
+          desktop: false,
           read: () => Promise.resolve({}),
           save: () => Promise.resolve(true),
         }),
@@ -392,5 +393,64 @@ describe('Settings › Notifications (N6)', () => {
 
   it('uses plain words (11 §5)', () => {
     expect(lintVocabulary(JSON.stringify({ S, NOTIFY_SETTINGS_STRINGS }))).toEqual([]);
+  });
+
+  it('N7: in the desktop app, the five switches that work there, D2 defaults; axe clean', async () => {
+    await act(async () => {
+      root.render(
+        h(NotificationsPage, {
+          desktop: true,
+          read: () => Promise.resolve({}),
+          save: () => Promise.resolve(true),
+        }),
+      );
+    });
+    const labels = switches().map((s) =>
+      (
+        s.getAttribute('aria-label') ??
+        s.closest('label')?.textContent ??
+        s.textContent ??
+        ''
+      ).trim(),
+    );
+    expect(switches().map((s) => s.getAttribute('aria-checked'))).toEqual([
+      'true',
+      'false',
+      'false',
+      'false',
+      'false',
+    ]);
+    for (const label of [
+      NOTIFY_SETTINGS_STRINGS.approvals,
+      NOTIFY_SETTINGS_STRINGS.messages,
+      NOTIFY_SETTINGS_STRINGS.files,
+      NOTIFY_SETTINGS_STRINGS.updates,
+      NOTIFY_SETTINGS_STRINGS.showNames,
+    ]) {
+      expect(host.textContent).toContain(label);
+    }
+    expect(labels).toHaveLength(5);
+    // Still nothing that does not work: no quiet hours, no people joined or left.
+    expect(host.textContent).not.toMatch(/Quiet hours|People joined/);
+    expect((await axe.run(host, AXE)).violations).toEqual([]);
+  });
+
+  it('N7: each desktop switch saves its own key', async () => {
+    const save = vi.fn(() => Promise.resolve(true));
+    await act(async () => {
+      root.render(h(NotificationsPage, { desktop: true, read: () => Promise.resolve({}), save }));
+    });
+    for (const s of switches()) {
+      await act(async () => {
+        s.click();
+      });
+    }
+    expect(save.mock.calls.map((c) => (c as unknown[])[0])).toEqual([
+      { notify: { approvals: false } },
+      { notify: { messages: true } },
+      { notify: { files: true } },
+      { notify: { updates: true } },
+      { notify: { showNames: true } },
+    ]);
   });
 });
