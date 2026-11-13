@@ -76,7 +76,7 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 |---|---|---|
 | Product name and trademark check (D-38) | During M1 (start early) | Must precede the production-domain choice (M2-10): owner passkeys bind to that domain |
 | Apple Developer ID (organisation) and a Windows code-signing certificate (D-36) | Start in M1b; needed in M2 | Enrolment and validation take weeks; the desktop signing pipeline (M2-11) needs them |
-| Encrypted drop: R2 bucket, lifecycle rule and `drop.` hostname; counsel review of the hosting terms, terms of service and takedown process (D-48) | Start in M1a; needed before the drop goes live in M1b | The drop (M1-27) cannot serve testers without the bucket, and the terms need counsel |
+| Encrypted drop: R2 bucket, lifecycle rule and `drop.` hostname; counsel review of the hosting terms, terms of service and takedown process (D-48) | Start in M1a; the drop is open to all early users (owner 2026-11-13); terms tracked here | The drop (M1-27) cannot serve testers without the bucket, and the terms need counsel |
 | OAuth client registration and app review with Google, Dropbox and Microsoft (D-49) | Start in M1b; needed in M2 | Provider app reviews and verification take weeks; the connectors (M2-15) need them |
 
 ## M1 — Local beta on testnets (≈ 5–7 weeks, in two phases)
