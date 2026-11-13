@@ -23,7 +23,12 @@ import {
 } from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { sizeText } from '../files/io.js';
-import type { MessageItem, MessagePage, MessagesApi } from '../messages/api.js';
+import {
+  oldestFirst,
+  type MessageItem,
+  type MessagePage,
+  type MessagesApi,
+} from '../messages/api.js';
 import { AttachComposer, type AttachProps } from './attach-composer.js';
 import { MessageFiles, type FilesContext } from './file-reader.js';
 import { mergeThread } from './people-api.js';
@@ -72,7 +77,7 @@ type Thread =
 /** Newest first, one copy per ID: the fresh first page wins over what was there. */
 function mergeNewest(fresh: readonly MessageItem[], kept: readonly MessageItem[]): MessageItem[] {
   const ids = new Set(fresh.map((m) => m.id));
-  return [...fresh, ...kept.filter((m) => !ids.has(m.id))].sort((a, b) => b.at - a.at);
+  return [...fresh, ...kept.filter((m) => !ids.has(m.id))].sort((a, b) => oldestFirst(b, a));
 }
 
 function refreshBox(prev: Box | undefined, page: MessagePage): Box {

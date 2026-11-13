@@ -59,6 +59,16 @@ export interface StoreTx {
   update<T extends TableName>(table: T, where: Where<T>, patch: Partial<Row<T>>): number;
   /** Deletes every row that matches; returns the number of rows deleted. */
   delete<T extends TableName>(table: T, where: Where<T>): number;
+  /**
+   * MSG-ORDER-1: the local insertion order of the rows with these keys (undefined for a key with no
+   * row): a later insert has a larger number, and an update keeps it. Numbers compare only with
+   * each other; they are not times, not IDs and not stable across stores. Optional: a store
+   * without it gives no order, and callers then fall back to their own.
+   */
+  rowOrder?<T extends TableName>(
+    table: T,
+    keys: readonly PrimaryKey<T>[],
+  ): readonly (number | undefined)[];
 }
 
 export interface Store {
