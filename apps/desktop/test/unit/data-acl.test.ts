@@ -73,6 +73,16 @@ describe('the verdict', () => {
     expect(aclVerdict(INHERITED, USER.toLowerCase())).toBe('ok');
   });
 
+  // Seen on the windows-2022 runner (run 43490849095): the user is the built-in Administrator, and
+  // icacls /save writes its SID as the alias LA. LA is always a member of Administrators; the
+  // Guest account (LG) is not accepted.
+  it('accepts the built-in Administrator (LA), refuses Guest (LG)', () => {
+    const runner = 'D:(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;FA;;;LA)';
+    expect(aclVerdict(runner, 'S-1-5-21-1-2-3-500')).toBe('ok');
+    expect(aclVerdict(runner, USER)).toBe('ok');
+    expect(aclVerdict(`${runner}(A;OICI;FA;;;LG)`, USER)).toBe('too_open');
+  });
+
   it('accepts CREATOR OWNER only as an inherit-only entry, and ignores deny entries', () => {
     expect(aclVerdict(`D:(A;OICIIO;FA;;;CO)(A;;FA;;;${USER})`, USER)).toBe('ok');
     expect(aclVerdict(`D:(A;;FA;;;CO)(A;;FA;;;${USER})`, USER)).toBe('too_open');
