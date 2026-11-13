@@ -10,7 +10,7 @@
 //   read (session cookie, CSRF header, fetch metadata): it needs no presence and carries no body.
 //
 // REL051-UPD2: the browser app (the local app server `agentlink` / npx starts) wires its own desk
-// (apps/cli runtime/npm-update-check.ts): the npm registry's latest version, never a link. Every
+// (apps/cli/src/runtime/npm-update-check.ts): the npm registry's latest version, never a link. Every
 // answer names how this copy was installed (`install`), so the page shows the one right action: the
 // desktop app's release link, "Restart AgentLink" (the installer's command and npx run the latest at
 // every start) or the one update command (a global npm install). A server with no desk (the MCP
@@ -52,7 +52,7 @@ export const APP_UPDATE_INSTALLS = Object.freeze([
 ] as const);
 export type AppUpdateInstall = (typeof APP_UPDATE_INSTALLS)[number];
 
-/** The host's side (desktop: apps/cli/src/desktop/host-core.ts; browser: runtime/npm-update-check.ts). */
+/** The host's side (desktop: apps/cli/src/desktop/host-core.ts; browser: apps/cli/src/runtime/npm-update-check.ts). */
 export interface LocalUiAppUpdateDesk {
   /** How this copy was installed (fixed for the life of the process). */
   readonly install: AppUpdateInstall;

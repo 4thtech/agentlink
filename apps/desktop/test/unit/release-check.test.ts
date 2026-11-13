@@ -361,7 +361,19 @@ describe('the checker', () => {
   const runTimers = async (h: Harness): Promise<void> => {
     const due = h.timers.splice(0);
     for (const t of due) t.run();
-    await new Promise((r) => setTimeout(r, 20));
+    // The check ends in real file writes, so a fixed short wait is a race on a busy CI runner:
+    // once a request was made, wait until the view has stopped changing for 100 ms (at most 5 s).
+    const pause = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+    await pause(20);
+    if (h.calls.length === 0) return;
+    let last = JSON.stringify(h.checker.view());
+    let steadyMs = 0;
+    for (let waited = 0; steadyMs < 100 && waited < 5000; waited += 10) {
+      await pause(10);
+      const now = JSON.stringify(h.checker.view());
+      steadyMs = now === last ? steadyMs + 10 : 0;
+      last = now;
+    }
   };
 
   it('starts idle with the installed version and never fetches before the quiet check is due', async () => {
