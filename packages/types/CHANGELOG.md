@@ -1,5 +1,12 @@
 # @4thtech-io/types
 
+## 0.5.1
+
+### Patch Changes
+
+- 5c44229: Files sit in the message they came with; a saved Markdown, code, JSON, patch or text file opens in a safe in-app reader (D-149).
+- 5c44229: Pairing and name hardening (REL051-SF2): removed or blocked contacts complete no pairing through invites they should not reach, a second answer to a used invite is listed in Activity, invite labels follow the name rule, staged accepts lapse within 7 days, and the name rule refuses role words and look-alikes of reserved words.
+
 ## 0.5.0
 
 No changes in this release.

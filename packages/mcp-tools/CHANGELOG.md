@@ -1,5 +1,22 @@
 # @4thtech-io/mcp-tools
 
+## 0.5.1
+
+### Patch Changes
+
+- 5c44229: When a file is outside an allowed folder, the next step now points to Allow a folder in the AgentLink app first, with the terminal as the fallback (REL051-A5).
+- Updated dependencies [5c44229]
+- Updated dependencies [5c44229]
+- Updated dependencies [5c44229]
+- Updated dependencies [5c44229]
+- Updated dependencies [5c44229]
+- Updated dependencies [5c44229]
+  - @4thtech-io/crypto@0.5.1
+  - @4thtech-io/core@0.5.1
+  - @4thtech-io/types@0.5.1
+  - @4thtech-io/chain@0.5.1
+  - @4thtech-io/log@0.5.1
+
 ## 0.5.0
 
 ### Patch Changes

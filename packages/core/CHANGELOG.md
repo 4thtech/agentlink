@@ -1,5 +1,24 @@
 # @4thtech-io/core
 
+## 0.5.1
+
+### Patch Changes
+
+- 5c44229: Files sit in the message they came with; a saved Markdown, code, JSON, patch or text file opens in a safe in-app reader (D-149).
+- 5c44229: Pairing and name hardening (REL051-SF2): removed or blocked contacts complete no pairing through invites they should not reach, a second answer to a used invite is listed in Activity, invite labels follow the name rule, staged accepts lapse within 7 days, and the name rule refuses role words and look-alikes of reserved words.
+- 5c44229: The app now opens in your browser through a private file only you can read, so other people signed in to the same computer can no longer pick up its one-time link. Local server and owner-step hardening: only your open app keeps it running, a wrong handoff can no longer delay `agentlink join`, two display marks now need the full write checks, more Windows file types that run on double-click are saved with `.download`, and owner steps are refused in more AI apps' terminals (REL051-SF4).
+- Updated dependencies [5c44229]
+- Updated dependencies [5c44229]
+- Updated dependencies [5c44229]
+- Updated dependencies [5c44229]
+- Updated dependencies [5c44229]
+  - @4thtech-io/crypto@0.5.1
+  - @4thtech-io/types@0.5.1
+  - @4thtech-io/chain@0.5.1
+  - @4thtech-io/storage@0.5.1
+  - @4thtech-io/transport-nostr@0.5.1
+  - @4thtech-io/log@0.5.1
+
 ## 0.5.0
 
 ### Patch Changes
