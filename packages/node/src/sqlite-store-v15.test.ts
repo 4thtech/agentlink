@@ -132,7 +132,10 @@ describe('schema version 15 (RET-2)', () => {
         expect(after, table).toEqual(rows);
       }
       expect(
-        raw.prepare('SELECT count(*) FROM "envelopes" WHERE "deleted_at" IS NOT NULL').pluck().get(),
+        raw
+          .prepare('SELECT count(*) FROM "envelopes" WHERE "deleted_at" IS NOT NULL')
+          .pluck()
+          .get(),
       ).toBe(0);
       expect(raw.prepare('SELECT count(*) FROM "saved_files"').pluck().get()).toBe(0);
     } finally {
@@ -232,7 +235,11 @@ describe('auto_vacuum=INCREMENTAL (RET-2, 04 §4.2 "Space on disk")', () => {
     const store = await SqliteStore.open(path());
     await store.transaction((tx) => {
       for (let i = 0; i < 400; i += 1) {
-        tx.insert('seen', { kind: 'envelope', id: `x${String(i)}${'y'.repeat(2000)}`, first_seen_at: i });
+        tx.insert('seen', {
+          kind: 'envelope',
+          id: `x${String(i)}${'y'.repeat(2000)}`,
+          first_seen_at: i,
+        });
       }
     });
     await store.transaction((tx) => tx.delete('seen', {}));

@@ -10687,7 +10687,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** sizes match fixtures (store and WAL, messages per person, indexed saved files, unassigned Inbox files, drop usage); no Show in Finder (deferred to RET-4); works with 2+ IDs; no name, path or link in logs or the answer beyond 11 §5.2 names (I-7); vocabulary lint; one e2e-browser journey; screenshots.
 
 #### RET-2 · Store schema: tombstones, `saved_files`, migration (0.5.2)
-- **Status:** new · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Status:** in review (branch `ret-2`) · **Size:** M · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · `packages/core/src/store/schema.ts`, `packages/node/src/sqlite-schema.ts`, `packages/core/src/files/auto-save.ts`, `files/fetch*`
 - **Depends on:** RET-0
 - **Spec:** 07 §3, §3.8; 04 §4.2

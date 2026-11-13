@@ -449,9 +449,9 @@ describe(
       // add a migration with the next version instead (07 §3.7: forward migrations only).
       const digestOf = (i: number) =>
         encodeHex(sha256(encodeUtf8(MIGRATIONS[i]?.statements.join(';\n') ?? '')));
-      expect(STORE_SCHEMA_VERSION).toBe(14);
+      expect(STORE_SCHEMA_VERSION).toBe(15);
       expect(MIGRATIONS.map((m) => m.version)).toEqual([
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
       ]);
       // Version 1 (G-9) is unchanged by D-72.
       expect(digestOf(0)).toMatchInlineSnapshot(
@@ -597,6 +597,15 @@ describe(
       const v14 = MIGRATIONS[13]?.statements ?? [];
       expect(v14).toHaveLength(1);
       expect(v14[0]).toMatch(/^ALTER TABLE "invites" ADD COLUMN "invite_link" /);
+      // Version 15 (RET-2, D-148; 07 §3.8): `envelopes.deleted_at`, one nullable column appended,
+      // and the `saved_files` table. Versions 1 to 14 keep their statements above (version 1 is
+      // frozen without the column and the table).
+      const v15 = MIGRATIONS[14]?.statements ?? [];
+      expect(v15[0]).toMatch(/^ALTER TABLE "envelopes" ADD COLUMN "deleted_at" INTEGER /);
+      expect(v15.filter((s) => s.startsWith('CREATE TABLE')).map((s) => s.split('"')[1])).toEqual([
+        'saved_files',
+      ]);
+      expect(digestOf(14)).toBe('50902f16376634ee24fa10a2f35f4e54129ed24115fdb7f79f28d1e18a2a4681');
     });
 
     it('migrates a version 13 file to version 14 (REL051-B2): invites kept, invite_link null', async () => {
@@ -614,13 +623,13 @@ describe(
         .run('AAAAAAAAAAAAAAAAAAAAAA', 'x');
       raw.close();
       const v14 = await SqliteStore.open(path());
-      expect(v14.schemaVersion).toBe(14);
+      expect(v14.schemaVersion).toBe(STORE_SCHEMA_VERSION); // forward to the current version
       const [row] = await v14.transaction((tx) => tx.select('invites'));
       expect(row?.invite_id).toBe('AAAAAAAAAAAAAAAAAAAAAA');
       expect(row?.invite_link).toBeNull();
       await v14.close();
       const again = await SqliteStore.open(path());
-      expect(again.schemaVersion).toBe(14);
+      expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
       expect(await again.transaction((tx) => tx.select('invites'))).toHaveLength(1);
       await again.close();
     });

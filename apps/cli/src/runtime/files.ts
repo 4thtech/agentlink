@@ -472,6 +472,21 @@ async function resolveInbox(
       const entry = await lstat(entryName(real, name)).catch(() => undefined);
       return entry !== undefined && entry.isFile();
     },
+    async identify(name) {
+      // RET-2 (07 §3.8): the entry itself (lstat: a link is never followed), a regular file only.
+      if (!(await dir.stillSame())) return undefined;
+      let target: string;
+      try {
+        target = entryName(real, name);
+      } catch {
+        return undefined;
+      }
+      const entry = await lstat(target, { bigint: true }).catch(() => undefined);
+      if (entry === undefined || !entry.isFile() || entry.size > BigInt(Number.MAX_SAFE_INTEGER)) {
+        return undefined;
+      }
+      return { dev: entry.dev.toString(), ino: entry.ino.toString(), size: Number(entry.size) };
+    },
     readSaved: (name, maxBytes) => readSavedFile(real, dir, name, maxBytes),
     close: () => dir.close(),
   };

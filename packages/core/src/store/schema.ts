@@ -176,6 +176,9 @@ export const TABLES = {
   },
   // 07 §3, §3.2. refused_at and request_accepted_at (D-72, schema version 2): the local time a row
   // was stored as `refused` (its retention), and the owner's Accept of one `request` row.
+  // deleted_at (RET-2, D-148; 07 §3.8; schema version 15, appended): set when the owner deleted the
+  // envelope on this computer (RET-3). The row stays as a tombstone with its key columns, so the
+  // duplicate check (04 §3.1.1 step 9) still drops a relay replay; null on every live row.
   envelopes: {
     columns: {
       envelope_id: id,
@@ -194,6 +197,7 @@ export const TABLES = {
       delivery: optOneOf('queued', 'sent', 'not_delivered'),
       refused_at: opt('int'),
       request_accepted_at: opt('int'),
+      deleted_at: opt('int'),
     },
     primaryKey: ['envelope_id'],
   },
@@ -415,6 +419,30 @@ export const TABLES = {
   // Rows older than 24 hours are pruned.
   auto_save_log: {
     columns: { envelope_id: id, idx: int, contact_id: id, at: int, bytes: int },
+    primaryKey: ['envelope_id', 'idx'],
+  },
+  // 07 §3.8, 04 §4.2 (RET-2, D-148; schema version 15; proposed, owner confirms at merge): the
+  // saved-file index. One row per received file the core saved into the Inbox folder (auto-save, Save,
+  // `agentlink_fetch_file`), written in the transaction that records the save, and kept after the
+  // day-7 shred of the `files` row. saved_name is the single name inside the Inbox folder (never a
+  // path), sealed; sha256 the payload's plaintextSha256; dev and ino the saved file's device and inode
+  // after the move into place, as decimal text, sealed (null where the platform cannot tell, so a
+  // later delete refuses the file); trashed_at set only after a move to the OS Trash succeeded
+  // (RET-3). No file key and no URL. contact_id is the sender (null only for a row whose message has
+  // no contact).
+  saved_files: {
+    columns: {
+      envelope_id: id,
+      idx: int,
+      contact_id: opt('id'),
+      saved_name: enc,
+      size: int,
+      sha256: id,
+      dev: opt('enc'),
+      ino: opt('enc'),
+      saved_at: int,
+      trashed_at: opt('int'),
+    },
     primaryKey: ['envelope_id', 'idx'],
   },
   // 04 §4.1, 08 §1 (D-142; schema version 11): at most one row. notice: the one-time "now saved

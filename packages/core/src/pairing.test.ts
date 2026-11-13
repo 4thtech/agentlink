@@ -1097,6 +1097,7 @@ describe('the code comes from the signed messages only (04 §3.6.1)', () => {
         delivery: null,
         refused_at: null,
         request_accepted_at: null,
+        deleted_at: null,
       }),
     );
     expect(await codeOf(b, a.id)).toEqual({ status: 'unavailable', reason: 'conflict' });

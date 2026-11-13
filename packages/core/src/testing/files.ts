@@ -61,7 +61,11 @@ interface Entry {
   kind: 'file' | 'symlink' | 'folder';
   data: Uint8Array;
   mode: number;
+  /** RET-2: the entry's inode number (kept across a rename, like a real volume). */
+  ino?: number;
 }
+
+let nextIno = 1000;
 
 /** The inbox folder in memory (see the header). */
 export class MemoryInbox implements TempFileOps {
@@ -85,12 +89,25 @@ export class MemoryInbox implements TempFileOps {
     return Promise.resolve(this.entries.get(name)?.kind === 'file');
   }
 
+  /** RET-2: device, inode and size of a regular file directly inside (InboxFolder.identify). */
+  identify(name: string): Promise<{ dev: string; ino: string; size: number } | undefined> {
+    const entry = this.entries.get(name);
+    if (entry?.kind !== 'file') return Promise.resolve(undefined);
+    entry.ino ??= nextIno += 1;
+    return Promise.resolve({ dev: '16777220', ino: String(entry.ino), size: entry.data.length });
+  }
+
   /** W4-AUTO-SAVE: the next write fails for lack of space (ENOSPC). */
   failNextWriteWithNoSpace = false;
 
   create(name: string): Promise<TempFileHandle> {
     if (this.entries.has(name)) return Promise.reject(new Error('EEXIST'));
-    const entry: Entry = { kind: 'file', data: new Uint8Array(0), mode: 0o600 };
+    const entry: Entry = {
+      kind: 'file',
+      data: new Uint8Array(0),
+      mode: 0o600,
+      ino: (nextIno += 1),
+    };
     this.entries.set(name, entry);
     this.created.push(name);
     let closed = false;
@@ -288,6 +305,7 @@ export async function openFileAgent(
         realpath: INBOX,
         ops: inbox,
         isSavedFile: (name: string) => inbox.isFile(name),
+        identify: (name: string) => inbox.identify(name),
         readSaved: (name: string, maxBytes: number) => {
           const entry = inbox.entries.get(name);
           return Promise.resolve(
