@@ -6,6 +6,9 @@
 
 ## Steps
 
+**Prefer an app on your Mac? (early build)** Download the newest `.dmg` from the [latest release](https://github.com/4thtech/agentlink/releases/latest): `AgentLink-<version>-mac-arm64.dmg` for an Apple chip, `AgentLink-<version>-mac-x64.dmg` for an Intel Mac (not sure? Apple menu, then **About This Mac**, then **Chip**). It is not signed by Apple yet, so the first time you need to allow it once; see [Mac desktop app](../apps/desktop-app.md). Windows: use the one-command install in these steps.
+
+
 1. **Open a terminal yourself.**
    - Mac: Cmd+Space, type **Terminal**, press Return.
    - Windows: Start menu, type **PowerShell**, press Enter.

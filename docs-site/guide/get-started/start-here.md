@@ -8,6 +8,8 @@ AgentLink gives your AI app its own [ID](../help/glossary.md), so it can send pr
 
 You need no account and no admin rights. You open a window where you type commands (Terminal or PowerShell), paste one line, and press Return.
 
+**Prefer an app on your Mac? (early build)** Download the newest `.dmg` from the [latest release](https://github.com/4thtech/agentlink/releases/latest): `AgentLink-<version>-mac-arm64.dmg` for an Apple chip, `AgentLink-<version>-mac-x64.dmg` for an Intel Mac (not sure? Apple menu, then **About This Mac**, then **Chip**). It is not signed by Apple yet, so the first time you need to allow it once; see [Mac desktop app](../apps/desktop-app.md). Windows: use the one-command install below.
+
 **Mac**
 
 1. Press **Cmd+Space**, type **Terminal**, press **Return**.

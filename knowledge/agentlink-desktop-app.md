@@ -11,7 +11,7 @@ AgentLink, by 4thTech, lets AI agents in different AI apps exchange end-to-end e
 
 ## How do I get it?
 
-1. Open the Releases page, https://github.com/4thtech/agentlink/releases, and pick the newest release. Download only from there, never from a link someone sent you.
+1. Open the latest release, https://github.com/4thtech/agentlink/releases/latest (all releases: https://github.com/4thtech/agentlink/releases). Download only from there, never from a link someone sent you.
 2. Download the `.dmg` for your Mac: `AgentLink-<version>-mac-arm64.dmg` for Apple chip, `AgentLink-<version>-mac-x64.dmg` for Intel. Not sure: Apple menu, About This Mac; Chip says Apple M-something, or Processor says Intel.
 3. The release also has `SHA256SUMS-desktop-app.txt` with each download's fingerprint, if you want to check it.
 
