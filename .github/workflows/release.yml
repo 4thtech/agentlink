@@ -106,8 +106,12 @@
 #                   shipped yet; desktop.yml builds it only on a manual run with `windows: true`).
 #   desktop-app-release  after a green smoke-latest: checks the names and SHA256SUMS and attaches
 #                   the two DMGs and their sums to the GitHub Release v<version>
-#                   (AgentLink-<version>-mac-{arm64,x64}.dmg, SHA256SUMS-desktop-app.txt). No
-#                   environment and no secret; DEPLOY_FREEZE stops it.
+#                   (AgentLink-<version>-mac-{arm64,x64}.dmg, SHA256SUMS-desktop-app.txt), plus
+#                   same-bytes copies under the stable names AgentLink-mac-{arm64,x64}.dmg (REL-LINKS-1).
+#                   Only then, as its last step, does it mark the Release Latest, so the public links
+#                   .../releases/latest/download/AgentLink-mac-<arch>.dmg never 404 or go stale, and it
+#                   checks both with curl. The Release is created `--latest=false`. No environment and no
+#                   secret; DEPLOY_FREEZE stops it.
 #
 # RELEASE APP (OPS-UNSTICK-B)
 #   The `version` job opens the "Version packages" PR with an installation token of the release GitHub
@@ -116,6 +120,9 @@
 #   the App (variable RELEASE_BOT_LOGIN) and passes a version-shaped diff as a mechanical S0, and the
 #   job turns on auto-merge. The owner's only click per release is the `npm-publish` approval.
 #   Without the App the job falls back to GITHUB_TOKEN (the old manual path).
+#   RELEASE_HOLD (REL-HOLD-1): while the repository variable RELEASE_HOLD is `true`, the job still opens
+#   and updates the Version PR (it collects every changeset) but does not turn on auto-merge, and `pack`
+#   (so every publish job) is skipped. The owner says "ship it": clear the variable, merge the PR.
 #
 # GITHUB RELEASES (D-43)
 #   Releases exist only for the product tag `v<version>` of stable versions. The Changesets publish
@@ -489,7 +496,7 @@ jobs:
       # mechanical S0 only when the diff has the version shape; otherwise it waits for a code-owner
       # approval as before. Idempotent when the PR is only updated.
       - name: Turn on auto-merge for the Version packages pull request
-        if: steps.app.outputs.enabled == 'true' && steps.version.outputs.pr-number != ''
+        if: steps.app.outputs.enabled == 'true' && steps.version.outputs.pr-number != '' && vars.RELEASE_HOLD != 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -504,7 +511,8 @@ jobs:
     # (`ci-gate (push)`) and security gate are green. A superseded or red ci-green skips this job and
     # everything downstream (publish-next, publish-latest, desktop extension).
     needs: [select-mode, ci-green]
-    if: needs.select-mode.outputs.publish == 'true' && needs.ci-green.outputs.result == 'green'
+    # REL-HOLD-1: while RELEASE_HOLD is `true` nothing is packed, so no `npm-publish` approval waits.
+    if: needs.select-mode.outputs.publish == 'true' && needs.ci-green.outputs.result == 'green' && vars.RELEASE_HOLD != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -1566,7 +1574,9 @@ jobs:
             echo "::notice::GitHub Release v$VERSION already exists; left as it is."
             exit 0
           fi
-          if ! gh release create "v$VERSION" --repo "$REPOSITORY" --target "$COMMIT" --title "v$VERSION" --notes-file "$RUNNER_TEMP/release-notes.md"; then
+          # REL-LINKS-1: not Latest yet. desktop-app-release marks it Latest as its last step, once both
+          # stable-named DMGs are attached and verified, so `releases/latest/download/...` never 404s.
+          if ! gh release create "v$VERSION" --repo "$REPOSITORY" --target "$COMMIT" --title "v$VERSION" --latest=false --notes-file "$RUNNER_TEMP/release-notes.md"; then
             echo "::warning::GitHub Release v$VERSION could not be created. Owner: create it by hand from the CHANGELOG section (docs/process/versioning.md §6)."
             exit 1
           fi
@@ -1855,7 +1865,9 @@ jobs:
   # the invite page links to (releases/download/v<version>/AgentLink-<version>-mac-{arm64,x64}.dmg),
   # plus SHA256SUMS-desktop-app.txt listing exactly those two DMGs (the extension's SHA256SUMS stays
   # its own). Only the two DMGs ship (REL051-CIE): no zip, no Windows installer. Every file is
-  # checked against the sums written by the build jobs first.
+  # checked against the sums written by the build jobs first. REL-LINKS-1: it also uploads copies of
+  # the two DMGs named AgentLink-mac-{arm64,x64}.dmg (same bytes, listed in the sums), then marks the
+  # Release Latest (never a prerelease or draft) and checks the public latest/download links.
   desktop-app-release:
     name: desktop-app-release
     needs: [publish-latest, smoke-latest, desktop-extension-build, desktop-app-build]
@@ -1908,6 +1920,11 @@ jobs:
             printf '%s\n' "$line" >> SHA256SUMS-desktop-app.txt
           done
           rm -f SHA256SUMS
+          # REL-LINKS-1: the same bytes under names without a version, for the links that never change.
+          for arch in arm64 x64; do
+            cp -- "AgentLink-$VERSION-mac-$arch.dmg" "AgentLink-mac-$arch.dmg"
+            printf '%s  %s\n' "$(sha256sum -- "AgentLink-mac-$arch.dmg" | cut -d ' ' -f 1)" "AgentLink-mac-$arch.dmg" >> SHA256SUMS-desktop-app.txt
+          done
           sha256sum --check --strict SHA256SUMS-desktop-app.txt
           cat SHA256SUMS-desktop-app.txt
 
@@ -1927,8 +1944,8 @@ jobs:
           gh release view "v$VERSION" --repo "$REPOSITORY" > /dev/null 2>&1 ||
             { echo "::error::GitHub Release v$VERSION does not exist, so the desktop app was not attached. Owner: create the release (docs/process/versioning.md §6), then re-run this job."; exit 1; }
           shopt -s nullglob
-          # Only the two DMGs (REL051-CIE): no zip, no Windows installer.
-          files=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" )
+          # Only the two DMGs (REL051-CIE), each under its versioned and its stable name: no zip, no Windows installer.
+          files=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" "AgentLink-mac-arm64.dmg" "AgentLink-mac-x64.dmg" )
           [ "${#files[@]}" -gt 0 ] || { echo "::error::No desktop app files to attach."; exit 1; }
           for f in "${files[@]}"; do
             grep -q -F -x -e "$(sha256sum -- "$f" | cut -d ' ' -f 1)  $f" SHA256SUMS-desktop-app.txt ||
@@ -1954,10 +1971,59 @@ jobs:
             gh release upload "v$VERSION" --repo "$REPOSITORY" -- "${upload[@]}"
           fi
           attached="$(gh release view "v$VERSION" --repo "$REPOSITORY" --json assets --jq '.assets[].name')"
-          for f in "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" SHA256SUMS-desktop-app.txt; do
+          for f in "${files[@]}" SHA256SUMS-desktop-app.txt; do
             grep -q -F -x -e "$f" <<< "$attached" || { echo "::error::$f is not on v$VERSION after the upload."; exit 1; }
           done
           echo "Attached the desktop app (${#files[@]} files, ${#upload[@]} uploaded now) to v$VERSION."
+
+      # REL-LINKS-1: the last step that changes the Release. It downloads every attached file again and
+      # compares it with the sums, then marks the Release Latest. A prerelease or a draft is never marked
+      # (stable versions only reach this job; the check is belt and braces).
+      - name: Check the attached files, then mark the Release Latest
+        shell: bash
+        working-directory: ${{ runner.temp }}/desktop-app
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ needs.desktop-extension-build.outputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Unexpected CLI version."; exit 1; }
+          state="$(gh release view "v$VERSION" --repo "$REPOSITORY" --json isPrerelease,isDraft --jq '[.isPrerelease, .isDraft] | @tsv')"
+          if [ "$state" != "$(printf 'false\tfalse')" ]; then
+            echo "::error::v$VERSION is a prerelease or a draft; it is not marked Latest."
+            exit 1
+          fi
+          rm -rf ../verify-assets
+          mkdir -p ../verify-assets
+          gh release download "v$VERSION" --repo "$REPOSITORY" --dir ../verify-assets \
+            --pattern "AgentLink-$VERSION-mac-arm64.dmg" --pattern "AgentLink-$VERSION-mac-x64.dmg" \
+            --pattern AgentLink-mac-arm64.dmg --pattern AgentLink-mac-x64.dmg --pattern SHA256SUMS-desktop-app.txt
+          cd ../verify-assets
+          [ "$(wc -l < SHA256SUMS-desktop-app.txt)" -eq 4 ] || { echo "::error::SHA256SUMS-desktop-app.txt must list exactly 4 files."; exit 1; }
+          sha256sum --check --strict SHA256SUMS-desktop-app.txt
+          gh release edit "v$VERSION" --repo "$REPOSITORY" --latest
+          echo "v$VERSION is now the Latest release."
+
+      # The public links the docs and the invite page use. Red here means a link is broken right now.
+      # A HEAD request follows the redirect to the file; the size must be plausible for a Mac app.
+      - name: Check the public download links
+        shell: bash
+        run: |
+          set -euo pipefail
+          for arch in arm64 x64; do
+            url="https://github.com/$GITHUB_REPOSITORY/releases/latest/download/AgentLink-mac-$arch.dmg"
+            ok=false
+            for _ in 1 2 3 4 5 6; do
+              headers="$(curl -sIL --max-time 60 "$url" | tr -d '\r' || true)"
+              code="$(awk 'toupper($1) ~ /^HTTP/ {c=$2} END {print c}' <<< "$headers")"
+              size="$(awk 'tolower($1) == "content-length:" {s=$2} END {print s+0}' <<< "$headers")"
+              if [ "$code" = "200" ] && [ "$size" -gt 20000000 ]; then ok=true; break; fi
+              sleep 10
+            done
+            [ "$ok" = "true" ] || { echo "::error::latest/download/AgentLink-mac-$arch.dmg answered '$code' with size $size."; exit 1; }
+            echo "AgentLink-mac-$arch.dmg: 200, $size bytes."
+          done
 
   # One approval click: no unattended job can move `latest`.
   rollback-latest:

@@ -91,7 +91,7 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
   it('attaches only the two Mac DMGs and SHA256SUMS-desktop-app.txt', () => {
     const step = attach.slice(attach.indexOf('Attach the app to the GitHub Release'));
     expect(step).toContain(
-      'files=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" )',
+      'files=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" "AgentLink-mac-arm64.dmg" "AgentLink-mac-x64.dmg" )',
     );
     expect(attach).not.toMatch(/setup\.exe|win-x64|\*\.zip|\*\.dmg/);
     expect(build).not.toMatch(/windows/);
@@ -103,6 +103,45 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
     expect(step).not.toMatch(/--clobber/);
     expect(step).toMatch(/gh release download "v\$VERSION"/);
     expect(step).toMatch(/is not listed in SHA256SUMS-desktop-app\.txt/);
+  });
+
+  // REL-LINKS-1: stable names, Latest flipped last, public links checked; REL-HOLD-1: RELEASE_HOLD.
+  it('uploads stable-named copies and lists them in the sums', () => {
+    expect(attach).toContain('cp -- "AgentLink-$VERSION-mac-$arch.dmg" "AgentLink-mac-$arch.dmg"');
+    expect(attach).toMatch(/AgentLink-mac-\$arch\.dmg" >> SHA256SUMS-desktop-app\.txt/);
+  });
+
+  it('creates the Release not-Latest and marks it Latest only as the last Release change', () => {
+    const create = release.slice(release.indexOf('gh release create "v$VERSION"'));
+    expect(create.split('\n')[0]).toContain('--latest=false');
+    const flip = attach.indexOf('gh release edit "v$VERSION"');
+    expect(flip).toBeGreaterThan(attach.indexOf('gh release upload'));
+    expect(attach.slice(flip)).not.toMatch(/gh release (upload|create|delete)/);
+    expect(attach.match(/gh release edit/g)).toHaveLength(1);
+    expect(attach).toMatch(/gh release edit "v\$VERSION" [^\n]*--latest\n/);
+    // never for a prerelease or a draft; the hashes are checked again just before
+    expect(attach).toMatch(/--json isPrerelease,isDraft/);
+    expect(attach.slice(0, flip)).toMatch(
+      /sha256sum --check --strict SHA256SUMS-desktop-app\.txt\n\s+$/,
+    );
+  });
+
+  it('checks that both public latest/download links answer 200 with a plausible size', () => {
+    const check = attach.slice(attach.indexOf('Check the public download links'));
+    expect(check).toContain('releases/latest/download/AgentLink-mac-$arch.dmg');
+    expect(check).toContain('for arch in arm64 x64');
+    expect(check).toMatch(/"\$code" = "200"/);
+    expect(check).toMatch(/-gt 20000000/);
+  });
+
+  it('RELEASE_HOLD: the Version PR still updates, but auto-merge and pack are off', () => {
+    const version = job(release, 'version');
+    expect(version).toMatch(/Turn on auto-merge[^\n]*\n\s+if:[^\n]*vars\.RELEASE_HOLD != 'true'/);
+    expect(version).toContain('changesets/action/version');
+    expect(version).not.toMatch(
+      /uses: changesets[^\n]*\n(?:[^\n]*\n){0,3}\s+if:[^\n]*RELEASE_HOLD/,
+    );
+    expect(job(release, 'pack')).toMatch(/\n {4}if: [^\n]*vars\.RELEASE_HOLD != 'true'/);
   });
 
   it('pins every action to a full commit SHA', () => {
