@@ -249,6 +249,8 @@ function whereOf(direction: MessageBox, contacts: readonly string[] | 'any'): Wh
   const base = {
     direction,
     state: 'ok' as const,
+    // RET-3 (D-148; 07 §3.8): a tombstone is absent from every read.
+    deleted_at: null,
     ...(contacts === 'any' ? {} : { contact_id: { in: [...contacts] } }),
     type: { in: [...PAGE_TYPES] },
   };
@@ -301,7 +303,7 @@ async function ackedOf(
     contacts.flatMap((contactId) =>
       tx.select(
         'envelopes',
-        { direction: 'in', contact_id: contactId, state: 'ok', type: 'ack' },
+        { direction: 'in', contact_id: contactId, state: 'ok', type: 'ack', deleted_at: null },
         {
           orderBy: [
             ['created_at', 'desc'],

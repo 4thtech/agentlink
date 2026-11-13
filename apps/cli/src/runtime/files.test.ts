@@ -167,6 +167,40 @@ describe('nodeFilesPlatform', () => {
     }
   });
 
+  it('inbox trashSaved (RET-3): an unchanged file leaves for the Trash under the fake home; a changed one stays', async () => {
+    const platform = nodeFilesPlatform({ home, drop: false });
+    const inbox = await platform.inbox('~/AgentLink/Inbox');
+    try {
+      const bytes = new TextEncoder().encode('saved by AgentLink');
+      for (const name of ['keep.txt', 'go.txt']) {
+        await writeFile(path.join(inbox.realpath, name), bytes);
+      }
+      const expect_ = async (name: string) => {
+        const info = await lstat(path.join(inbox.realpath, name), { bigint: true });
+        return {
+          dev: info.dev.toString(),
+          ino: info.ino.toString(),
+          size: bytes.length,
+          sha256: encodeHex(sha256(bytes)),
+        };
+      };
+      const keep = await expect_('keep.txt');
+      await writeFile(path.join(inbox.realpath, 'keep.txt'), 'SAVED BY AGENTLINK');
+      expect(await inbox.trashSaved?.('keep.txt', keep)).toBe('changed');
+      expect(await inbox.trashSaved?.('go.txt', await expect_('go.txt'))).toBe(
+        process.platform === 'darwin' || process.platform === 'linux' ? 'trashed' : 'no_trash',
+      );
+      expect(await readFile(path.join(inbox.realpath, 'keep.txt'), 'utf8')).toBe(
+        'SAVED BY AGENTLINK',
+      );
+      if (process.platform === 'darwin' || process.platform === 'linux') {
+        await expect(lstat(path.join(inbox.realpath, 'go.txt'))).rejects.toThrow();
+      }
+    } finally {
+      await inbox.close?.();
+    }
+  });
+
   it('inbox: a hidden or protected inbox folder is refused', async () => {
     const platform = nodeFilesPlatform({ home, drop: false });
     await expect(platform.inbox('~/.hidden/Inbox')).rejects.toThrow();

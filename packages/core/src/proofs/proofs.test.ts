@@ -380,7 +380,10 @@ describe('notarize → DELIVERED → OPENED → export → verify (acceptance, t
     await deliver(a, b);
 
     for (const agent of [a, b]) {
-      const result = await agent.client.history.delete({ envelopeIds: [envelopeId], include: 'both' });
+      const result = await agent.client.history.delete({
+        envelopeIds: [envelopeId],
+        include: 'both',
+      });
       expect(result.messages).toMatchObject({ deleted: 1, notarized: 1 });
       const row = await agent.store.transaction((tx) =>
         tx.get('envelopes', { envelope_id: envelopeId }),

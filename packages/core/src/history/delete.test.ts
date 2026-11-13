@@ -103,9 +103,7 @@ describe('plan, then apply (RET-3, 04 §4.2)', () => {
       expect(r?.deleted_at).toBe(w.clock.t);
     }
     // The receiver's files row (the file key) goes with the message.
-    expect(
-      await w.b.store.transaction((tx) => tx.count('files', { envelope_id: two })),
-    ).toBe(0);
+    expect(await w.b.store.transaction((tx) => tx.count('files', { envelope_id: two }))).toBe(0);
     // Messages only: the saved file stays where it is.
     expect(w.b.inbox.files().has('plan.pdf')).toBe(true);
     expect(w.b.inbox.trashCalls).toBe(0);
@@ -262,7 +260,10 @@ describe('protected classes are kept with a fixed reason (04 §4.2)', () => {
       tx.update('outbox', { envelope_id: out.envelopeId }, { state: 'pending' });
     });
 
-    const plan = await w.b.client.history.plan({ envelopeIds: [approval, part, terms, free, out.envelopeId], include: 'both' });
+    const plan = await w.b.client.history.plan({
+      envelopeIds: [approval, part, terms, free, out.envelopeId],
+      include: 'both',
+    });
     expect(plan.envelopeIds).toEqual([free]);
     expect(plan.kept.count).toBe(4);
     expect(plan.kept.by).toMatchObject({ approval: 2, terms: 1, outbox: 1 });

@@ -36,6 +36,7 @@ import {
   type SavedFileRef,
 } from './files/incoming.js';
 import type { BackfillSavedFilesResult } from './files/saved-files.js';
+import { HistoryService } from './history/delete.js';
 import { savedNameOf } from './files/received.js';
 import { saveReceivedFile, type SaveReceivedFileResult } from './files/save.js';
 import type { FilesPlatform } from './files/platform.js';
@@ -219,6 +220,12 @@ export class AgentLinkClient {
   readonly autoSave: AutoSaver;
   /** The activity feed (M1-11r-a, M1-11r-d; the local UI): messages, files, approvals, proofs, blocks, rules. */
   readonly activity: ActivityService;
+  /**
+   * RET-3 (D-148; 04 §4.2): the owner's history delete on this computer (plan, then apply). For the
+   * owner surfaces only (the local app with presence, the owner's retention pass); no MCP tool
+   * reaches it (I-4, 06 §1).
+   */
+  readonly history: HistoryService;
   readonly #send: SendService;
   readonly #sync: SyncService;
   readonly #files: FileFetcher;
@@ -315,6 +322,7 @@ export class AgentLinkClient {
       files,
     );
     this.activity = new ActivityService(ctx, this.contacts);
+    this.history = new HistoryService(ctx, { files: this.#files });
     this.messages = new MessagesView(ctx, this.contacts);
     // MSG-FILES-IO-d: "saved as" from the sealed files.saved_name; a value that does not open shows
     // that one item without it (FilesIoView catches per row).

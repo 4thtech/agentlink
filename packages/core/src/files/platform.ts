@@ -52,6 +52,26 @@ export interface SavedFileIdentity {
   readonly size: number;
 }
 
+/**
+ * RET-3 (D-148; 04 §4.2): what an index row says a saved file is: the device and inode as decimal
+ * text, its size and the payload's plaintextSha256 (lowercase hex).
+ */
+export interface SavedFileExpectation {
+  readonly dev: string;
+  readonly ino: string;
+  readonly size: number;
+  readonly sha256: string;
+}
+
+/**
+ * RET-3: the outcome of one move to the OS Trash, as a fixed code (never a path or a name):
+ * `trashed` (moved; recoverable from the Trash), `changed` (not the file the app saved: another
+ * device, inode, size or content, a link or not a regular file; untouched), `missing` (no entry at
+ * the name), `no_trash` (no Trash on this platform or volume; untouched), `failed` (anything else;
+ * untouched as far as the platform can tell).
+ */
+export type TrashSavedOutcome = 'trashed' | 'changed' | 'missing' | 'no_trash' | 'failed';
+
 /** The inbox folder (`files.inboxFolder`) as the platform resolved it. */
 export interface InboxFolder {
   /** Its realpath (absolute). */
@@ -78,6 +98,13 @@ export interface InboxFolder {
    * followed) of at most `maxBytes`; otherwise undefined. The core re-hashes them before any use.
    */
   readSaved?(name: string, maxBytes: number): Promise<Uint8Array | undefined>;
+  /**
+   * RET-3 (D-148; 04 §4.2 "Deleting a saved file"): moves `name`, a regular file directly inside the
+   * folder, to the OS Trash only when it still has the expected device, inode, size and sha256,
+   * re-checked through the held folder handle just before the move (no link followed). Never deletes
+   * outright. Absent where the platform has no Trash.
+   */
+  trashSaved?(name: string, expected: SavedFileExpectation): Promise<TrashSavedOutcome>;
   /** W4-AUTO-SAVE: releases the held folder handle; the core calls it once the save ended. */
   close?(): Promise<void>;
 }

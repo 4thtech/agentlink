@@ -1728,6 +1728,7 @@ The D-69 link carries the whole signed invite, so it runs to well over a thousan
   - an envelope that a pending approval answers, that a live commitment scope or `commitment_parts` row references, or that the budget ledger needs to stay correct (07 §3.5);
   - an envelope still in the outbox;
   - the body of the newest envelope of a thread with open terms (an unanswered offer).
+  - in RET-3 this is every `offer`, `accept` and `reject` envelope, because the negotiation is rebuilt from all stored terms bodies and the rebuild fails closed when one is missing (proposed, owner confirms at merge); so are a notarized envelope whose budget ledger entry is still only reserved, and an envelope not yet processed.
 
   The whole delete skips these and says how many were kept ("3 kept: still needed"); it never fails half way.
 - **Notarized messages (OD-4).** A delete removes the readable body and the saved files of a notarized message and keeps its ciphertext `envelope_json`, its `proofs` row (record and salt) and its `receipts`. The on-chain record never goes away; the proof stays verifiable, and a proof pack can still be exported, without readable content (07 §8). Packs exported earlier keep verifying, because they are self-contained.
