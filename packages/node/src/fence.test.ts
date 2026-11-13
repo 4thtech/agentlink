@@ -15,7 +15,10 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'APPROVAL_SERVER_HOST',
       // REL051-UPD2: the two local route paths of the update check (fixed strings, no secret, no URL).
       'APP_UPDATE_CHECK_PATH',
+      // UPD-5: the install and restart route paths of the same update (fixed strings, no key, no store).
+      'APP_UPDATE_INSTALL_PATH',
       'APP_UPDATE_PATH',
+      'APP_UPDATE_RESTART_PATH',
       // U3-c: the folder lock's fixed-text error.
       'AgentFolderLockError',
       // M1-15: the allowed-folder and inbox file guards (fixed-text errors, no seams).

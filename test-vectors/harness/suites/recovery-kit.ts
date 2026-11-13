@@ -53,6 +53,8 @@ type RecoveryKitInput =
       agents: {
         agentId: string;
         name: string;
+        /** KIT-NAMES (v2): the ID's owner-set name, when it has one. */
+        label?: string;
         items: { name: ItemName; value: string }[];
         store: string;
       }[];
@@ -152,6 +154,12 @@ async function evaluateOpen(
   return [
     { field: 'entryNames', actual: entries.map(([name]) => name).join(',') },
     ...entries.map(([name, value]) => ({ field: `entry:${name}`, actual: bytesToHex(value) })),
+    // KIT-NAMES: each label the reader parsed from a v2 manifest (UTF-8 bytes).
+    ...kit.agents.flatMap((agent) =>
+      agent.label === undefined
+        ? []
+        : [{ field: `label:${agent.agentId}`, actual: bytesToHex(agent.label) }],
+    ),
   ];
 }
 
@@ -183,6 +191,7 @@ async function evaluateInput(input: RecoveryKitInput): Promise<readonly Comparis
             return {
               agentId: a.agentId,
               name: a.name,
+              ...(a.label === undefined ? {} : { label: a.label }),
               items: a.items.map((i) => ({ name: i.name, value: hexToBytes(i.value) })),
               store: { length: store.length, chunks: [store] },
             };
@@ -219,6 +228,7 @@ async function evaluateInput(input: RecoveryKitInput): Promise<readonly Comparis
     case 'header': {
       const header = readRecoveryKitHeader(hexToBytes(input.kit));
       return [
+        { field: 'version', actual: String(header.version) },
         { field: 'ownerNostr', actual: bytesToHex(header.ownerNostr) },
         { field: 'chunkSize', actual: String(header.chunkSize) },
         { field: 'memoryKiB', actual: String(header.kdf.memoryKiB) },

@@ -362,8 +362,9 @@ interface SummaryRow {
   readonly suggestedName?: string;
   /**
    * UX1113-QA2 N4: for an ID already on this computer, the label this computer shows for it (its
-   * config.json `label`, written only after core verified an `agent.label`); never for a new ID
-   * (the kit's manifest has no label, so step 3 stays by folder).
+   * config.json `label`, written only after core verified an `agent.label`). KIT-NAMES: for any
+   * other ID (or when this computer has none), the owner-set name a v2 kit carries; a v1 kit has
+   * none (step 3 shows the folder). Display text only.
    */
   readonly label?: string;
   /** UX1113-QA2: for `name_taken`, the label of the ID already here in that folder, when known. */
@@ -405,6 +406,21 @@ interface RestoreSessionEntry {
 const sessionKey = (token: string): string => encodeHex(sha256(encodeUtf8(token)));
 const newHandle = (): string => encodeBase64url(randomBytes(16));
 const ascii = (bytes: Uint8Array): string => String.fromCharCode(...bytes);
+
+/**
+ * KIT-NAMES: the label a v2 kit carries for an ID (UTF-8 bytes), as step 3 may show it: only when
+ * it decodes as well-formed UTF-8 and is the folder label rule (isConfigLabel); else none.
+ */
+function kitLabel(bytes: Uint8Array | undefined): string | undefined {
+  if (bytes === undefined) return undefined;
+  let text: string;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return undefined;
+  }
+  return isConfigLabel(text) ? text : undefined;
+}
 
 function objectInput(input: JsonValue | undefined): Record<string, JsonValue> | undefined {
   return typeof input === 'object' && input !== null && !Array.isArray(input)
@@ -1168,7 +1184,11 @@ function build(options: RestoreEngineOptions): TerminalRestore {
           }
         }
       }
-      const label = state === 'already_here' ? localLabels.get(agent.agentId) : undefined;
+      // KIT-NAMES: an ID already here by the label this computer shows; otherwise (and as a
+      // fallback) by the owner-set name a v2 kit carries inside it, only when it is the folder
+      // label rule. A v1 kit has none: the page shows the folder, as before. Display text only.
+      const local = state === 'already_here' ? localLabels.get(agent.agentId) : undefined;
+      const label = local ?? kitLabel(agent.label);
       // UX1113-QA2 (Fable ruling): a clash names the ID already here by the name people see.
       const takenId = state === 'name_taken' ? folders.get(name) : undefined;
       const takenLabel = takenId === undefined ? undefined : localLabels.get(takenId);
@@ -2535,7 +2555,10 @@ export async function runRestoreInTerminal(
     }
     if (opened === undefined) return 'refused';
     const summary = bodyOf(opened)['summary'] as unknown as { ids: SummaryRow[] };
-    for (const row of summary.ids) terminal.write(text.idLine(row.name, row.state, row.people));
+    // KIT-NAMES: each ID by the name a v2 kit carries (or this computer shows), else its folder.
+    for (const row of summary.ids) {
+      terminal.write(text.idLine(row.label ?? row.name, row.state, row.people));
+    }
     if (request.check) {
       terminal.write(text.checkOpens);
       return 'checked';

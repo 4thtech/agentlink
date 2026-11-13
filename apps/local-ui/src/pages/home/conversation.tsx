@@ -28,6 +28,7 @@ import { AttachComposer, type AttachProps } from './attach-composer.js';
 import { MessageFiles, type FilesContext } from './file-reader.js';
 import { mergeThread } from './people-api.js';
 import { HOME_STRINGS as S, fmt } from './people-strings.js';
+import { HISTORY_STRINGS as H } from '../history/strings.js';
 import { termsLine, termsStateWord, type TermsEvent } from './terms-trail.js';
 
 const SHORT = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
@@ -259,8 +260,11 @@ export function Conversation({
   idSeed,
   files,
   terms = [],
+  onDelete,
   attach,
 }: {
+  /** RET-4: Select mode; Delete hands the chosen message IDs to the delete sheet. */
+  readonly onDelete?: ((ids: readonly string[]) => void) | undefined;
   /**
    * ATT-APP-ATTACH: attach files and send them yourself (absent, or a removed connection: none).
    */
@@ -284,6 +288,20 @@ export function Conversation({
   readonly files?: FilesContext | undefined;
 }): ReactElement {
   const [loading, setLoading] = useState(false);
+  // RET-4: Select mode (checkboxes, then "Delete {n} messages").
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set());
+  const toggle = (id: string): void =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const stopSelecting = (): void => {
+    setSelecting(false);
+    setPicked(new Set());
+  };
   if (thread.state === 'loading') {
     return (
       <div className="hm-thread hm-c" role="status" aria-busy="true">
@@ -322,6 +340,31 @@ export function Conversation({
           <AgentIcon label={agent} seed={idSeed} />
           <span>{agent}</span>
         </p>
+      )}
+      {onDelete === undefined || timeline.length === 0 ? null : selecting ? (
+        <div className="hs-select-bar">
+          <Button
+            variant="danger"
+            size="sm"
+            disabled={picked.size === 0}
+            onClick={() => {
+              const ids = items.map(({ item }) => item.id).filter((id) => picked.has(id));
+              stopSelecting();
+              onDelete(ids);
+            }}
+          >
+            {H.deleteSelected(picked.size)}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={stopSelecting}>
+            {H.cancel}
+          </Button>
+        </div>
+      ) : (
+        <div className="hs-select-bar">
+          <Button variant="ghost" size="sm" onClick={() => setSelecting(true)}>
+            {H.select}
+          </Button>
+        </div>
       )}
       {more ? (
         <Button
@@ -376,6 +419,15 @@ export function Conversation({
                 // UI-REFRESH-k: what another party wrote never moves in; your AI's words may.
                 className={out ? 'hm-msg hm-c is-out al-reveal' : 'hm-msg hm-c is-in'}
               >
+                {selecting ? (
+                  <input
+                    type="checkbox"
+                    className="hs-pick"
+                    aria-label={H.selectMessage}
+                    checked={picked.has(item.id)}
+                    onChange={() => toggle(item.id)}
+                  />
+                ) : null}
                 {out ? (
                   <>
                     <span className="hm-msg-who">

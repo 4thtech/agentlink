@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Independent generator for the `recovery-kit` suite: the recovery kit `ALKK` v1 (M1-9i-b, D-115).
+"""Independent generator for the `recovery-kit` suite: the recovery kit `ALKK` v1 (M1-9i-b, D-115)
+and v2 (KIT-NAMES, D-147; proposed, owner confirms at merge).
 
 04 §2.3.3, exactly:
   header (74 B) = "ALKK" | u8 version=1 | u8 secretKind=1 | u8 kdf=1 | u32be m (KiB) | u8 t | u8 p
@@ -45,6 +46,17 @@ against Python's `json` module.
 `openWithKek` opens with the case's kek (the code path minus Argon2id), so the many entry-list cases
 do not each pay for a KDF run; the header, code and KDF refusals go through `open` with the code.
 
+KIT-NAMES (v2): the header's version is 2 and the manifest is
+  {"v":2,"kitId","createdAt","contents","ownerNostr","agents":[{"agentId","label"?,"name"}]}
+with `v` equal to the header's version. `label` (optional per agent) is the ID's owner-set name: 1 to
+32 Unicode code points, well-formed UTF-8, none below U+0020 and none of U+0022 ("), U+005C
+(backslash) and U+007F, so its JCS form has no escape, and none in HIDDEN (C1, bidi, zero-width and other
+invisible characters; IR-KIT-NAMES-1 L1). It is inside the encrypted body only (the AEAD
+covers it); the header is unchanged apart from its version byte. Readers accept version 1 (a label
+is refused) and 2; writers write 2 only, so the v1 kits here are open, open-kek and header cases
+(old kits keep opening) and only v2 kits have seal cases. A v1-only reader refuses a v2 kit before
+the KDF (version != 1): the `version-2` header refusal of suite version 2.
+
 Usage: python3 -I tools/vectors/generate_recovery_kit.py --check [FILE] | --write
 """
 
@@ -62,8 +74,11 @@ import generate_stream as st  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "recovery-kit"
-VERSION = 2
+VERSION = 3
 SPEC = "04 §2.3.3 ALKK v1"
+SPEC2 = "04 §2.3.3 ALKK v2 (KIT-NAMES)"
+KIT_VERSIONS = (1, 2)
+MAX_LABEL = 32
 INFO = b"agentlink/v1/recovery-kit"
 MAGIC = b"ALKK"
 HEADER_LEN = 74
@@ -119,8 +134,15 @@ def entry(name, value):
     return v.u16be(len(raw)) + raw + u64be(len(value)) + value
 
 
-def manifest_bytes(kit_id, created_at, contents, owner, agents, **extra):
-    doc = {"v": 1, "kitId": kit_id, "createdAt": created_at, "contents": contents, "ownerNostr": v.hx(owner), "agents": [{"agentId": a["agentId"], "name": a["name"]} for a in agents]}
+def manifest_agent(a, version):
+    out = {"agentId": a["agentId"], "name": a["name"]}
+    if version == 2 and a.get("label") is not None:
+        out["label"] = a["label"]
+    return out
+
+
+def manifest_bytes(kit_id, created_at, contents, owner, agents, version=1, **extra):
+    doc = {"v": version, "kitId": kit_id, "createdAt": created_at, "contents": contents, "ownerNostr": v.hx(owner), "agents": [manifest_agent(a, version) for a in agents]}
     doc.update(extra)
     return v.jcs(doc)
 
@@ -137,7 +159,7 @@ def plaintext_of(manifest, owner_seed, agents):
 def check_header(data, expected_owner=None):
     if len(data) < HEADER_LEN or data[:4] != MAGIC:
         raise ValueError("not an ALKK header")
-    if data[4] != 1 or data[5] != 1 or data[6] != 1 or data[29] != 2:
+    if data[4] not in KIT_VERSIONS or data[5] != 1 or data[6] != 1 or data[29] != 2:
         raise ValueError("version, secretKind, kdf or aead")
     m, t, p = int.from_bytes(data[7:11], "big"), data[11], data[12]
     ksf.check_params(1, m, t, p)
@@ -146,7 +168,7 @@ def check_header(data, expected_owner=None):
         raise ValueError("chunkSize outside 1..16 MiB")
     if expected_owner is not None and data[42:74] != expected_owner:
         raise ValueError("another owner")
-    return {"m": m, "t": t, "p": p, "salt": data[13:29], "chunkSize": chunk_size, "prefix": data[34:42], "owner": data[42:74]}
+    return {"version": data[4], "m": m, "t": t, "p": p, "salt": data[13:29], "chunkSize": chunk_size, "prefix": data[34:42], "owner": data[42:74]}
 
 
 def open_body(key, data, h):
@@ -188,13 +210,35 @@ def parse_entries(plaintext):
     return entries
 
 
-def check_manifest(raw, owner):
+# IR-KIT-NAMES-1 L1: code points a label never holds besides C0, " \\ and DEL (a fixed list, not a
+# Unicode category, so every reader agrees whatever its Unicode version): C1 controls, soft hyphen,
+# ALM, Mongolian vowel separator, zero-width and directional marks, line and paragraph separators,
+# bidi embeddings and isolates, invisible operators, BOM, interlinear annotation, tags.
+HIDDEN = [(0x80, 0x9F), (0xAD, 0xAD), (0x61C, 0x61C), (0x180E, 0x180E), (0x200B, 0x200F), (0x2028, 0x202E), (0x2060, 0x206F), (0xFEFF, 0xFEFF), (0xFFF9, 0xFFFB), (0xE0000, 0xE007F)]
+
+
+def hidden(cp):
+    return any(lo <= cp <= hi for lo, hi in HIDDEN)
+
+
+def check_label(label):
+    """KIT-NAMES: 1..32 code points of well-formed UTF-8, none below U+0020, none of " \\ U+007F,
+    none in HIDDEN."""
+    if not isinstance(label, str) or not 1 <= len(label) <= MAX_LABEL:
+        raise ValueError("label length")
+    label.encode("utf-8", "strict")  # a lone surrogate has no UTF-8 form
+    if any(ord(c) < 0x20 or c in ('"', "\\", "\x7f") or hidden(ord(c)) for c in label):
+        raise ValueError("label character")
+    return label
+
+
+def check_manifest(raw, owner, version=1):
     doc = json.loads(raw.decode("utf-8"))
     if v.jcs(doc) != raw:
         raise ValueError("manifest is not JCS")
     if not isinstance(doc, dict) or set(doc) != {"v", "kitId", "createdAt", "contents", "ownerNostr", "agents"}:
         raise ValueError("manifest keys")
-    if type(doc["v"]) is not int or doc["v"] != 1:
+    if type(doc["v"]) is not int or doc["v"] != version:
         raise ValueError("manifest v")
     if not isinstance(doc["kitId"], str) or not KIT_ID.fullmatch(doc["kitId"]) or len(v.unb64u(doc["kitId"])) != 16:
         raise ValueError("kitId")
@@ -209,7 +253,11 @@ def check_manifest(raw, owner):
         raise ValueError("agents")
     ids = []
     for a in agents:
-        if not isinstance(a, dict) or set(a) != {"agentId", "name"}:
+        keys = {"agentId", "name"}
+        if version == 2 and isinstance(a, dict) and "label" in a:
+            keys = {"agentId", "label", "name"}
+            check_label(a["label"])
+        if not isinstance(a, dict) or set(a) != keys:
             raise ValueError("agent keys")
         if not isinstance(a["agentId"], str) or not AGENT_ID.fullmatch(a["agentId"]):
             raise ValueError("agentId")
@@ -224,7 +272,7 @@ def check_manifest(raw, owner):
     return ids
 
 
-def check_entries(entries, owner):
+def check_entries(entries, owner, version=1):
     """Entry names and order, caps, the manifest, and the seed checks. Returns the entries."""
     for name, value in entries:
         is_store = name.startswith(b"agent/") and name.endswith(b"/store")
@@ -232,7 +280,7 @@ def check_entries(entries, owner):
             raise ValueError("entry above its cap")
     if len(entries) < 2 or entries[0][0] != b"manifest" or entries[1][0] != b"owner/seed":
         raise ValueError("manifest and owner/seed first")
-    ids = check_manifest(entries[0][1], owner)
+    ids = check_manifest(entries[0][1], owner, version)
     owner_seed = entries[1][1]
     if len(owner_seed) != 32 or owner_nostr(owner_seed) != owner:
         raise ValueError("owner seed does not derive ownerNostr")
@@ -264,13 +312,13 @@ def check_entries(entries, owner):
 
 def open_with_kek(data, key):
     h = check_header(data)
-    return check_entries(parse_entries(open_body(key, data, h)), h["owner"])
+    return check_entries(parse_entries(open_body(key, data, h)), h["owner"], h["version"])
 
 
 def open_kit(data, code, expected_owner=None, source="prompt"):
     h = check_header(data, expected_owner)
     key = kek(code, h["salt"], h["m"], h["t"], h["p"], source=source)  # password() refuses first
-    return check_entries(parse_entries(open_body(key, data, h)), h["owner"])
+    return check_entries(parse_entries(open_body(key, data, h)), h["owner"], h["version"])
 
 
 def refused(fn, *args):
@@ -509,7 +557,7 @@ def kit_id_of(label):
 class Kit:
     """One sealed kit: its inputs (for `seal` cases) and bytes."""
 
-    def __init__(self, label, owner_seed, agents, contents, chunk_size, params=FLOOR, created_at=1792540800, code=None, manifest=None, plaintext=None, info=INFO, **header_overrides):
+    def __init__(self, label, owner_seed, agents, contents, chunk_size, params=FLOOR, created_at=1792540800, code=None, manifest=None, plaintext=None, info=INFO, kit_version=1, **header_overrides):
         self.label = label
         self.code = code_of(label) if code is None else code
         self.salt = v.det(f"recovery-kit/{label}/salt", 16)
@@ -522,9 +570,11 @@ class Kit:
         self.contents = contents
         self.kit_id = kit_id_of(label)
         self.created_at = created_at
-        self.manifest = manifest_bytes(self.kit_id, created_at, contents, self.owner, self.agents) if manifest is None else manifest
+        self.kit_version = kit_version
+        self.manifest = manifest_bytes(self.kit_id, created_at, contents, self.owner, self.agents, kit_version) if manifest is None else manifest
         self.plaintext = plaintext_of(self.manifest, owner_seed, self.agents) if plaintext is None else plaintext
         self.kek = kek(self.code, self.salt, *params, info=info)
+        header_overrides.setdefault("version", kit_version)
         self.head = header(self.salt, chunk_size, self.prefix, self.owner, *params, **header_overrides)
         self.body = seal_body(self.kek, self.head, self.prefix, chunk_size, self.plaintext)
         self.data = self.head + self.body
@@ -553,15 +603,30 @@ class Kit:
             "kitId": self.kit_id,
             "createdAt": self.created_at,
             "contents": self.contents,
-            "agents": [{"agentId": a["agentId"], "name": a["name"], "items": [{"name": n, "value": v.hx(val)} for n, val in a["items"]], "store": v.hx(a["store"])} for a in self.agents],
+            "agents": [seal_agent(a) for a in self.agents],
         }
 
 
+def seal_agent(a):
+    out = {"agentId": a["agentId"], "name": a["name"]}
+    if a.get("label") is not None:
+        out["label"] = a["label"]
+    out["items"] = [{"name": n, "value": v.hx(val)} for n, val in a["items"]]
+    out["store"] = v.hx(a["store"])
+    return out
+
+
 def opened(entries):
+    """Entry names and values; for a v2 manifest also each agent's label as `label:<agentId>` (UTF-8
+    hex), so a reader's manifest parse is checked, not only its bytes."""
     names = [n.decode("ascii") for n, _ in entries]
     out = {"entryNames": ",".join(names)}
     for name, value in entries:
         out[f"entry:{name.decode('ascii')}"] = v.hx(value)
+    doc = json.loads(entries[0][1].decode("utf-8"))
+    for a in doc["agents"]:
+        if "label" in a:
+            out[f"label:{a['agentId']}"] = v.hx(a["label"].encode("utf-8"))
     return out
 
 
@@ -595,16 +660,41 @@ def build():
         (two, "two agents (sorted by agentId), several chunks, an identity manifest"),
         (exact, "two agents, several chunks with an exact last chunk (no extra empty chunk)"),
     ]
-    for kit, why in accept:
+    # KIT-NAMES: the same four kits as v2, with owner-set names (labels) on some agents.
+    l1 = dict(a1, label="Ana Novak")
+    l2 = dict(a2, label="Résumé 鍵 – Tali's 🔑 agent")  # 2-, 3- and 4-byte UTF-8, ' and an en dash
+    l3 = dict(a3, label="Work")
+    single2 = Kit("v2-one-chunk", owner_seed, [l3], "full", 4096, kit_version=2)
+    multi2 = Kit("v2-multi-chunk", owner_seed, [l1], "full", 64, kit_version=2)
+    two2 = Kit("v2-two-agents", owner_seed, [a1, l2], "identity", 64, kit_version=2)
+    pad2 = (-len(Kit("v2-exact-chunks", owner_seed, [l1, l2], "full", 64, kit_version=2).plaintext)) % 64
+    l2x = dict(l2, store=v.det("recovery-kit/agent/two/store", 37 + pad2))
+    exact2 = Kit("v2-exact-chunks", owner_seed, [l1, l2x], "full", 64, kit_version=2)
+    if len(exact2.plaintext) % 64 != 0 or len(multi2.chunks()) < 3:
+        v.fail("v2 chunk layout")
+    for kit in (single2, multi2, two2, exact2):
+        for a in kit.agents:
+            # The label is personal data: it is only inside the encrypted body, never in clear.
+            if a.get("label") is not None and a["label"].encode("utf-8") in kit.data:
+                v.fail(f"{kit.label}: a label appears in the clear")
+    accept2 = [
+        (single2, "one agent named Work, one chunk (chunkSize 4096), a full manifest"),
+        (multi2, "one agent named Ana Novak, several chunks of 64 bytes, all five items"),
+        (two2, "two agents, one named in 2-, 3- and 4-byte UTF-8 and one without a name, an identity manifest"),
+        (exact2, "two named agents, several chunks with an exact last chunk"),
+    ]
+    for (kit, why), spec in [*((k, SPEC) for k in accept), *((k, SPEC2) for k in accept2)]:
         entries = open_kit(kit.data, kit.code, kit.owner)
         if open_with_kek(kit.data, kit.kek) != entries or entries[1][1] != owner_seed:
             v.fail(f"{kit.label}: the reference opener disagrees")
-        cases.append(v.case(f"kek-{kit.label}", f"{SPEC} kek = HKDF-SHA256(Argon2id(password(code, 1), salt, m, t, p, 32), \"\", \"agentlink/v1/recovery-kit\", 32) ({why})", kek_input(kit.code, kit.salt, kit.params), {"kek": v.hx(kit.kek)}))
-        cases.append(v.case(f"seal-{kit.label}", f"{SPEC} seal: {why}", kit.seal_input(), {"kit": v.hx(kit.data), "kek": v.hx(kit.kek)}))
-        cases.append(v.case(f"open-{kit.label}", f"{SPEC} open with the code and the expected owner: {why}", open_input(kit.data, kit.code, kit.owner), opened(entries)))
-        cases.append(v.case(f"open-kek-{kit.label}", f"{SPEC} open with the kek: {why}", kek_open_input(kit.data, kit.kek), opened(entries)))
+        cases.append(v.case(f"kek-{kit.label}", f"{spec} kek = HKDF-SHA256(Argon2id(password(code, 1), salt, m, t, p, 32), \"\", \"agentlink/v1/recovery-kit\", 32) ({why})", kek_input(kit.code, kit.salt, kit.params), {"kek": v.hx(kit.kek)}))
+        if kit.kit_version == 2:
+            # Writers write v2 only: a v1 kit has no seal case (it still opens).
+            cases.append(v.case(f"seal-{kit.label}", f"{spec} seal: {why}", kit.seal_input(), {"kit": v.hx(kit.data), "kek": v.hx(kit.kek)}))
+        cases.append(v.case(f"open-{kit.label}", f"{spec} open with the code and the expected owner: {why}", open_input(kit.data, kit.code, kit.owner), opened(entries)))
+        cases.append(v.case(f"open-kek-{kit.label}", f"{spec} open with the kek: {why}", kek_open_input(kit.data, kit.kek), opened(entries)))
         m, t, p = kit.params
-        cases.append(v.case(f"header-{kit.label}", f"{SPEC} header fields, read before the code is asked for: {why}", {"op": "header", "kit": v.hx(kit.data)}, {"ownerNostr": v.hx(kit.owner), "chunkSize": str(kit.chunk_size), "memoryKiB": str(m), "iterations": str(t), "parallelism": str(p)}))
+        cases.append(v.case(f"header-{kit.label}", f"{spec} header fields, read before the code is asked for: {why}", {"op": "header", "kit": v.hx(kit.data)}, {"version": str(kit.kit_version), "ownerNostr": v.hx(kit.owner), "chunkSize": str(kit.chunk_size), "memoryKiB": str(m), "iterations": str(t), "parallelism": str(p)}))
     default_salt = v.det("recovery-kit/default/salt", 16)
     cases.append(v.case("kek-default-params", f"{SPEC} kek at the default parameters m = 64 MiB, t = 3, p = 1", kek_input(single.code, default_salt, DEFAULT), {"kek": v.hx(kek(single.code, default_salt, *DEFAULT))}))
     dup = Kit("same-name", owner_seed, [a1, dict(a2, name=a1["name"])], "full", 64)
@@ -644,7 +734,7 @@ def build():
     reject("flip-tag", "one bit flipped in the final chunk's tag", flipped(d, len(d) - 1, 0x80))
     for case_id, why, kw in [
         ("version-0", "version 0 (sealed validly)", {"version": 0}),
-        ("version-2", "version 2 (sealed validly)", {"version": 2}),
+        ("version-3", "version 3 (sealed validly)", {"version": 3}),
         ("secret-kind-2", "secretKind 2: a chosen passphrase never seals a kit (sealed validly)", {"kind": 2}),
         ("kdf-2", "kdf 2 (sealed validly)", {"kdf": 2}),
         ("aead-1", "aead 1, the single-shot value (sealed validly)", {"aead": 1}),
@@ -797,6 +887,100 @@ def build():
     entries16 = open_with_kek(ok16.data, ok16.kek)
     cases.append(v.case("open-kek-sixteen-agents", f"{SPEC} open with the kek: 16 agents, the most a kit holds", kek_open_input(ok16.data, ok16.kek), opened(entries16)))
 
+    # KIT-NAMES: v2 labels ---------------------------------------------------------------------------
+    # The version byte and the manifest's v must agree, and only v2 carries a label.
+    good2 = [("manifest", multi2.manifest), ("owner/seed", s1), *items1, store1]
+    if ents(*good2) != multi2.plaintext:
+        v.fail("v2 entry fixture")
+    v1_head_kit = Kit("v2-on-v1", owner_seed, [l1], "full", 64, plaintext=ents(*good2), kit_version=1)
+    reject_kek("v2-manifest-under-v1-header", "a v2 manifest (v = 2, a label) sealed under a version 1 header", v1_head_kit.data, v1_head_kit.kek)
+    v1_label = v.jcs({"v": 1, "kitId": multi.kit_id, "createdAt": multi.created_at, "contents": "full", "ownerNostr": v.hx(multi.owner), "agents": [{"agentId": a1["agentId"], "label": "Ana Novak", "name": a1["name"]}]})
+    entry_case("v1-manifest-with-label", "a v1 manifest with a label (only v2 carries one)", [("manifest", v1_label), *good[1:]])
+
+    def man2_case(case_id, why, raw):
+        if not refused(check_manifest, raw, multi2.owner, 2):
+            v.fail(f"{case_id}: the reference v2 manifest check accepts it")
+        reject_kek(f"v2-manifest-{case_id}", f"{SPEC2} manifest: {why}", multi2.reseal(plaintext=ents(("manifest", raw), *good2[1:])), multi2.kek)
+
+    def label_raw(label_json):
+        """The v2 manifest of multi2 with the label's JSON text (bytes, quotes included) replaced."""
+        want = b'"label":"Ana Novak"'
+        if multi2.manifest.count(want) != 1:
+            v.fail("v2 manifest fixture")
+        return multi2.manifest.replace(want, b'"label":' + label_json)
+
+    man2_case("v-1", "v = 1 under a version 2 header", multi2.manifest.replace(b'"v":2}', b'"v":1}'))
+    man2_case("label-empty", "an empty label", label_raw(b'""'))
+    man2_case("label-33", "a label of 33 code points", label_raw(('"' + "é" * 33 + '"').encode("utf-8")))
+    man2_case("label-quote", "a label with \" (JCS writes it as \\\")", label_raw(b'"Ana \\"N\\""'))
+    man2_case("label-backslash", "a label with a backslash (JCS writes it as \\\\)", label_raw(b'"Ana\\\\Novak"'))
+    man2_case("label-control", "a label with U+001F (JCS writes it as \\u001f)", label_raw(b'"Ana\\u001fNovak"'))
+    man2_case("label-raw-control", "a label with a raw U+000A", label_raw(b'"Ana\nNovak"'))
+    man2_case("label-del", "a label with U+007F (JCS writes it as itself)", label_raw(b'"Ana\x7fNovak"'))
+    # IR-KIT-NAMES-1 L1: invisible, bidi and C1 characters (JCS writes each as itself).
+    for case_id, why, ch in [
+        ("label-c1-csi", "U+009B (C1 CSI)", "\u009b"),
+        ("label-c1-nel", "U+0085 (C1 NEL)", "\u0085"),
+        ("label-soft-hyphen", "U+00AD (soft hyphen)", "­"),
+        ("label-alm", "U+061C (Arabic letter mark)", "؜"),
+        ("label-zwsp", "U+200B (zero-width space)", "​"),
+        ("label-rlm", "U+200F (right-to-left mark)", "‏"),
+        ("label-line-separator", "U+2028 (line separator)", " "),
+        ("label-rlo", "U+202E (right-to-left override)", "‮"),
+        ("label-word-joiner", "U+2060 (word joiner)", "⁠"),
+        ("label-rli", "U+2067 (right-to-left isolate)", "⁧"),
+        ("label-bom", "U+FEFF (byte order mark)", "﻿"),
+        ("label-annotation", "U+FFF9 (interlinear annotation anchor)", "￹"),
+        ("label-tag", "U+E0041 (tag latin capital A)", "\U000e0041"),
+    ]:
+        man2_case(case_id, f"a label with {why}", label_raw(('"Ana' + ch + 'Novak"').encode("utf-8")))
+    # The edges just outside the list are labels (U+00A0 and U+2030).
+    edge = dict(l1, label="Ana Novak ‰ ؛")
+    edge_kit = Kit("v2-label-edges", owner_seed, [edge], "full", 4096, kit_version=2)
+    cases.append(v.case("open-kek-v2-label-edges", f"{SPEC2} open with the kek: a label with U+00A0, U+2030 and U+061B, just outside the refused ranges", kek_open_input(edge_kit.data, edge_kit.kek), opened(open_with_kek(edge_kit.data, edge_kit.kek))))
+    man2_case("label-escape-printable", "a label with \\u0041 for A (not JCS)", label_raw(b'"\\u0041na Novak"'))
+    man2_case("label-escape-non-ascii", "a label with \\u00e9 for é (not JCS)", label_raw(b'"Ren\\u00e9e"'))
+    man2_case("label-surrogate", "a label with a lone surrogate written as \\ud800", label_raw(b'"Ana\\ud800"'))
+    man2_case("label-not-utf8", "a label with the byte 0xff", label_raw(b'"Ana\xffNovak"'))
+    man2_case("label-overlong", "a label with C0 AF, an overlong form of /", label_raw(b'"Ana\xc0\xafNovak"'))
+    man2_case("label-utf8-surrogate", "a label with ED A0 80, the UTF-8 form of U+D800", label_raw(b'"Ana\xed\xa0\x80"'))
+    man2_case("label-truncated-utf8", "a label ending in the first two bytes of a three-byte sequence", label_raw(b'"Ana\xe2\x82"'))
+    man2_case("label-number", "a label that is a number", label_raw(b"7"))
+    man2_case("label-null", "a label that is null", label_raw(b"null"))
+    man2_case("label-after-name", "the label after the name (not in JCS key order)", multi2.manifest.replace(b',"label":"Ana Novak","name":"default"', b',"name":"default","label":"Ana Novak"'))
+    max_label = dict(l1, label="🔑" * MAX_LABEL)
+    max_kit = Kit("v2-label-32", owner_seed, [max_label], "full", 4096, kit_version=2)
+    cases.append(v.case("open-kek-v2-label-32", f"{SPEC2} open with the kek: a label of 32 code points of 4-byte UTF-8, the longest", kek_open_input(max_kit.data, max_kit.kek), opened(open_with_kek(max_kit.data, max_kit.kek))))
+    for case_id, why, bad_label in [
+        ("label-33", "a label of 33 code points", "a" * (MAX_LABEL + 1)),
+        ("label-empty", "an empty label", ""),
+        ("label-quote", "a label with \"", 'Ana "N"'),
+        ("label-control", "a label with U+000A", "Ana\nNovak"),
+        ("label-del", "a label with U+007F", "Ana\x7fNovak"),
+        ("label-c1", "a label with U+009B (C1 CSI)", "Ana\u009bNovak"),
+        ("label-rlo", "a label with U+202E (right-to-left override)", "‮Ana"),
+        ("label-zwsp", "a label with U+200B (zero-width space)", "Ana​Novak"),
+    ]:
+        if not refused(check_label, bad_label):
+            v.fail(f"seal {case_id}: the reference label check accepts it")
+        bad = Kit("v2-multi-chunk", owner_seed, [dict(a1, label=None)], "full", 64, kit_version=2)
+        seal_in = bad.seal_input()
+        seal_in["agents"][0] = {"agentId": seal_in["agents"][0]["agentId"], "name": seal_in["agents"][0]["name"], "label": bad_label, "items": seal_in["agents"][0]["items"], "store": seal_in["agents"][0]["store"]}
+        cases.append(v.case(f"seal-reject-{case_id}", f"{SPEC2} seal: {why} is refused before anything is written", seal_in, {"outcome": "reject"}))
+    # Tampering: the label is under the AEAD. One bit flipped in the ciphertext byte that holds the
+    # label's first byte (the STREAM body is CTR-based: plaintext byte j of chunk c is ciphertext byte
+    # c * (chunkSize + 16) + j) fails authentication.
+    found = multi2.plaintext.find("Ana Novak".encode("utf-8"))
+    if found < 0:
+        v.fail("v2 label offset")
+    at = (found // 64) * (64 + TAG_LEN) + found % 64
+    reject_kek("v2-flip-label", "v2: one bit flipped in the ciphertext of the label", flipped(multi2.data, HEADER_LEN + at), multi2.kek)
+    reject("v2-flip-label", "v2: one bit flipped in the ciphertext of the label, opened with the code", flipped(multi2.data, HEADER_LEN + at), code=multi2.code)
+    reject("v2-version-1", "v2: the header's version rewritten from 2 to 1 (the version is in every chunk's AAD)", flipped(multi2.data, 4, 0x03), code=multi2.code)
+    # IR-KIT-NAMES-1 info 4: a v1 kit's version rewritten from 1 to 2 also fails authentication.
+    reject("v1-version-2", "v1: the header's version rewritten from 1 to 2 (the version is in every chunk's AAD)", flipped(d, 4, 0x03), code=multi.code)
+    reject_kek("v1-version-2", "v1: the header's version rewritten from 1 to 2, opened with the kek", flipped(d, 4, 0x03))
+
     # Cross-type ---------------------------------------------------------------------------------------
     blobs = prf_blobs(owner_seed)
     for name in ["ALKP", "ALKR", "ALKO", "ALKS", "ALF1"]:
@@ -856,18 +1040,19 @@ def cross_input(reader, data, code, owner_seed):
 
 
 ITEM = v.strict_object({"name": v.STRING, "value": v.HEX})
-AGENT = v.strict_object({"agentId": v.ADDRESS, "name": v.STRING, "items": {"type": "array", "items": ITEM}, "store": v.HEX})
-OPEN_OK = {"type": "object", "required": ["entryNames"], "properties": {"entryNames": v.STRING}, "patternProperties": {"^entry:": v.HEX}, "additionalProperties": False}
+AGENT = v.strict_object({"agentId": v.ADDRESS, "name": v.STRING, "label": v.STRING, "items": {"type": "array", "items": ITEM}, "store": v.HEX})
+AGENT["required"] = ["agentId", "name", "items", "store"]  # KIT-NAMES: `label` is optional
+OPEN_OK = {"type": "object", "required": ["entryNames"], "properties": {"entryNames": v.STRING}, "patternProperties": {"^entry:": v.HEX, "^label:0x[0-9a-f]{40}$": v.HEX}, "additionalProperties": False}
 KDF = {"memoryKiB": v.INTEGER, "iterations": v.INTEGER, "parallelism": v.INTEGER}
 DECIMAL = {"type": "string", "pattern": "^(0|[1-9][0-9]*)$"}
 SCHEMA = v.case_schema(
     SUITE,
-    "04 §2.3.3 recovery kit ALKK v1 (D-115). `kek`: the key-encryption key for a code, salt and "
+    "04 §2.3.3 recovery kit ALKK v1 (D-115) and v2 (KIT-NAMES: the header version 2 and a manifest whose agents may carry `label`, the ID's owner-set name; `seal` writes v2 only). `kek`: the key-encryption key for a code, salt and "
     "KDF parameters. `seal`: the whole kit and its kek for a fixed code, salt, nonce prefix and chunk "
     "size, the owner seed, the manifest fields and per agent its items (in any order) and store. "
     "`open` (with the code; an empty `expectedOwnerNostr` means no expected owner) and `openWithKek`: "
-    "entry names (comma-separated, in kit order) and each value as `entry:<name>` hex, or a rejection. "
-    "`header`: the public header fields read before the code is asked for, or a rejection. "
+    "entry names (comma-separated, in kit order), each value as `entry:<name>` hex and each agent label as `label:<agentId>` (UTF-8 hex), or a rejection. "
+    "`header`: the public header fields (with the kit version) read before the code is asked for, or a rejection. "
     "`crossType`: another format's reader (ALKP with `key` as the PRF output, ALKR and ALKS and ALKO "
     "with `code`, ALF1 with `key` as the file key) given an ALKK kit, which it refuses. "
     "`credentialDigest` (04 §2.5.1 storage.set): the digest as 64 lowercase hex and the `s3:<id>` item "
@@ -882,7 +1067,7 @@ SCHEMA = v.case_schema(
         ),
         "open": ({"kit": v.HEX, "code": v.STRING, "source": {"enum": ["prompt", "file"]}, "expectedOwnerNostr": v.HEX}, [v.REJECT]),
         "openWithKek": ({"kit": v.HEX, "kek": v.hexn(32)}, [v.REJECT]),
-        "header": ({"kit": v.HEX}, [{"ownerNostr": v.hexn(32), "chunkSize": DECIMAL, "memoryKiB": DECIMAL, "iterations": DECIMAL, "parallelism": DECIMAL}, v.REJECT]),
+        "header": ({"kit": v.HEX}, [{"version": DECIMAL, "ownerNostr": v.hexn(32), "chunkSize": DECIMAL, "memoryKiB": DECIMAL, "iterations": DECIMAL, "parallelism": DECIMAL}, v.REJECT]),
         "crossType": (
             {"reader": {"enum": ["ALKP", "ALKR", "ALKO", "ALKS", "ALF1"]}, "blob": v.HEX, "code": v.STRING, "key": v.hexn(32), "agentId": v.ADDRESS, "ownerEvm": v.ADDRESS, "ownerNostr": {"type": "string", "pattern": "^0x[0-9a-f]{64}$"}},
             [v.REJECT],
