@@ -2077,7 +2077,9 @@ describe('REL051-CF3: a reload on "Your master code" shows the same code again',
       stage: 'writing' as const,
       ownerNostr: randomBytes(32),
       item: randomBytes(32),
-      pid: 1,
+      // A run that is still alive (this process), so the start-up settle keeps it on every OS
+      // (pid 1 is not a process on Windows).
+      pid: process.pid,
       at: 1,
     };
     await writeUnsavedMarker(home(), earlier);

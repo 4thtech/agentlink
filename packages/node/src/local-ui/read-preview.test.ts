@@ -122,17 +122,21 @@ describe('in-app preview: the checked read (REL051-A34)', () => {
     });
   });
 
-  it('refuses a file swapped for another after the open', async () => {
-    const folder = inbox();
-    writeFileSync(join(folder, 'plan.md'), PLAN);
-    writeFileSync(join(folder, 'other.md'), PLAN);
-    const afterOpen = (): void => {
-      renameSync(join(folder, 'other.md'), join(folder, 'plan.md'));
-    };
-    expect(await readSavedText(folder, 'plan.md', limits(PLAN), seams({ afterOpen }))).toEqual({
-      status: 'refused',
-    });
-  });
+  // Windows refuses to replace a file while it is open, so this swap cannot happen there.
+  it.skipIf(process.platform === 'win32')(
+    'refuses a file swapped for another after the open',
+    async () => {
+      const folder = inbox();
+      writeFileSync(join(folder, 'plan.md'), PLAN);
+      writeFileSync(join(folder, 'other.md'), PLAN);
+      const afterOpen = (): void => {
+        renameSync(join(folder, 'other.md'), join(folder, 'plan.md'));
+      };
+      expect(await readSavedText(folder, 'plan.md', limits(PLAN), seams({ afterOpen }))).toEqual({
+        status: 'refused',
+      });
+    },
+  );
 
   it('an Inbox folder that does not exist is unavailable', async () => {
     expect(

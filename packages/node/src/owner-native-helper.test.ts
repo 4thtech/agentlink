@@ -19,6 +19,11 @@ import {
   type NativeHelperRunner,
 } from './owner-native-helper.js';
 
+// The stand-ins are `#!node` scripts: Windows cannot start a script as a program with shell false,
+// and it has no SIGTERM, so the tests that spawn one run on macOS and Linux only. The Windows
+// helper is an .exe; its argv, exit codes and output parsing are covered here with fakeRunner.
+const itStandIn = it.skipIf(process.platform === 'win32');
+
 const root = mkdtempSync(join(tmpdir(), 'agentlink-d12c-helper-'));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
@@ -147,7 +152,7 @@ describe('exit codes map to fixed UI states', () => {
 });
 
 describe('the spawned helper (a stand-in script; never the real helper)', () => {
-  it('passes argv as given, no shell, an empty environment, and reads stdout', async () => {
+  itStandIn('passes argv as given, no shell, an empty environment, and reads stdout', async () => {
     const out = join(root, 'seen.json');
     const script = join(root, 'stand-in');
     writeFileSync(
@@ -241,15 +246,18 @@ describe('Fable review L1: an abandoned release', () => {
     expect(seen[0]).toBe(abandoned.signal);
   });
 
-  it('the spawned helper is killed on abort (a stand-in that would wait forever)', async () => {
-    const script = join(root, 'waits');
-    writeFileSync(script, `#!${process.execPath}\nsetInterval(() => undefined, 1000);\n`);
-    chmodSync(script, 0o700);
-    const abandoned = new AbortController();
-    const pending = spawnNativeHelper(script)(['ecdh', 'approve'], undefined, abandoned.signal);
-    setTimeout(() => abandoned.abort(), 100);
-    expect((await pending).code).toBeNull();
-  });
+  itStandIn(
+    'the spawned helper is killed on abort (a stand-in that would wait forever)',
+    async () => {
+      const script = join(root, 'waits');
+      writeFileSync(script, `#!${process.execPath}\nsetInterval(() => undefined, 1000);\n`);
+      chmodSync(script, 0o700);
+      const abandoned = new AbortController();
+      const pending = spawnNativeHelper(script)(['ecdh', 'approve'], undefined, abandoned.signal);
+      setTimeout(() => abandoned.abort(), 100);
+      expect((await pending).code).toBeNull();
+    },
+  );
 });
 
 // DESK-NATIVE-DEBUG: every way a run ends has a fixed name for the core's one diagnostic line, the
@@ -270,7 +278,7 @@ describe('fixed diagnostics of a helper run (DESK-NATIVE-DEBUG)', () => {
       (e: unknown) => e as NativeHelperError,
     );
 
-  it('a refusal carries the exit code name and the helper diagnostic line', async () => {
+  itStandIn('a refusal carries the exit code name and the helper diagnostic line', async () => {
     const script = stub(
       'refuses',
       `process.stderr.write('sheet la -2\\n'); process.exitCode = 10;`,
@@ -285,7 +293,7 @@ describe('fixed diagnostics of a helper run (DESK-NATIVE-DEBUG)', () => {
     ]);
   });
 
-  it('stderr that is not exactly the fixed shape is dropped, never kept', async () => {
+  itStandIn('stderr that is not exactly the fixed shape is dropped, never kept', async () => {
     for (const text of [
       'sheet la -2 /Users/someone/secret\n',
       'Error: The operation could not be completed\n',
@@ -305,21 +313,24 @@ describe('fixed diagnostics of a helper run (DESK-NATIVE-DEBUG)', () => {
     expect(readHelperDiagnostic(new TextEncoder().encode('gate none 0'))).toBe('gate none 0');
   });
 
-  it('a prompt with no answer in time is `timeout`; a helper that cannot start is `no_start`', async () => {
-    const waits = stub('waits-long', 'setInterval(() => undefined, 1000);');
-    const timed = createNativeHelper({
-      kind: 1,
-      run: spawnNativeHelper(waits, { timeoutMs: 150 }),
-    });
-    const error = await failure(timed.release(RECORD, 'setup'));
-    expect([error.state, error.detail]).toEqual(['timeout', 'timeout']);
-    const missing = createNativeHelper({
-      kind: 1,
-      run: spawnNativeHelper(join(root, 'not-there')),
-    });
-    const none = await failure(missing.release(RECORD, 'setup'));
-    expect([none.state, none.detail]).toEqual(['error', 'no_start']);
-  });
+  itStandIn(
+    'a prompt with no answer in time is `timeout`; a helper that cannot start is `no_start`',
+    async () => {
+      const waits = stub('waits-long', 'setInterval(() => undefined, 1000);');
+      const timed = createNativeHelper({
+        kind: 1,
+        run: spawnNativeHelper(waits, { timeoutMs: 150 }),
+      });
+      const error = await failure(timed.release(RECORD, 'setup'));
+      expect([error.state, error.detail]).toEqual(['timeout', 'timeout']);
+      const missing = createNativeHelper({
+        kind: 1,
+        run: spawnNativeHelper(join(root, 'not-there')),
+      });
+      const none = await failure(missing.release(RECORD, 'setup'));
+      expect([none.state, none.detail]).toEqual(['error', 'no_start']);
+    },
+  );
 
   it('a malformed or wrong-length output and an unknown exit code are named', async () => {
     const answering = (code: number, stdout: string) =>
@@ -358,7 +369,7 @@ describe('stopping the helper and its secure-input note (DESK-TOUCHID-FIX)', () 
         `setInterval(() => undefined, 1000);`,
     );
 
-  it('cancel: SIGTERM, then core waits until the helper has exited', async () => {
+  itStandIn('cancel: SIGTERM, then core waits until the helper has exited', async () => {
     const mark = join(root, 'cancel-mark');
     const script = graceful('graceful-cancel', mark);
     const abandoned = new AbortController();
@@ -369,7 +380,7 @@ describe('stopping the helper and its secure-input note (DESK-TOUCHID-FIX)', () 
     expect(readFileSync(mark, 'utf8')).toBe('SIGTERM exited');
   });
 
-  it('timeout: SIGTERM, then core waits until the helper has exited', async () => {
+  itStandIn('timeout: SIGTERM, then core waits until the helper has exited', async () => {
     const mark = join(root, 'timeout-mark');
     const script = graceful('graceful-timeout', mark);
     const result = await spawnNativeHelper(script, { timeoutMs: 300 })(
@@ -380,7 +391,7 @@ describe('stopping the helper and its secure-input note (DESK-TOUCHID-FIX)', () 
     expect(readFileSync(mark, 'utf8')).toBe('SIGTERM exited');
   });
 
-  it('a helper that ignores SIGTERM is killed after the grace period', async () => {
+  itStandIn('a helper that ignores SIGTERM is killed after the grace period', async () => {
     const script = stub(
       'stubborn',
       `process.on('SIGTERM', () => undefined); setInterval(() => undefined, 1000);`,
@@ -404,39 +415,42 @@ describe('stopping the helper and its secure-input note (DESK-TOUCHID-FIX)', () 
     );
   });
 
-  it('secure input on at the start: one fixed core line, on success and on refusal', async () => {
-    const lines: string[] = [];
-    const ok = stub(
-      'secure-ok',
-      `process.stderr.write('note secureinput 1\\n'); process.stdout.write('ab'.repeat(32) + '\\n');`,
-    );
-    const helper = createNativeHelper({
-      kind: 1,
-      run: spawnNativeHelper(ok),
-      diagnose: (line) => lines.push(line),
-    });
-    const secret = await helper.release(RECORD, 'approve');
-    expect(secret.length).toBe(32);
-    expect(lines).toEqual(['native presence: secure input was on when the helper started']);
+  itStandIn(
+    'secure input on at the start: one fixed core line, on success and on refusal',
+    async () => {
+      const lines: string[] = [];
+      const ok = stub(
+        'secure-ok',
+        `process.stderr.write('note secureinput 1\\n'); process.stdout.write('ab'.repeat(32) + '\\n');`,
+      );
+      const helper = createNativeHelper({
+        kind: 1,
+        run: spawnNativeHelper(ok),
+        diagnose: (line) => lines.push(line),
+      });
+      const secret = await helper.release(RECORD, 'approve');
+      expect(secret.length).toBe(32);
+      expect(lines).toEqual(['native presence: secure input was on when the helper started']);
 
-    const refused = stub(
-      'secure-refused',
-      `process.stderr.write('note secureinput 1\\nsheet la -2\\n'); process.exitCode = 10;`,
-    );
-    const r = await spawnNativeHelper(refused)(['ecdh', 'approve'], undefined);
-    expect([r.code, r.diag, r.secureInput]).toEqual([10, 'sheet la -2', true]);
+      const refused = stub(
+        'secure-refused',
+        `process.stderr.write('note secureinput 1\\nsheet la -2\\n'); process.exitCode = 10;`,
+      );
+      const r = await spawnNativeHelper(refused)(['ecdh', 'approve'], undefined);
+      expect([r.code, r.diag, r.secureInput]).toEqual([10, 'sheet la -2', true]);
 
-    const quiet = stub('secure-off', `process.stdout.write('ab'.repeat(32) + '\\n');`);
-    const none: string[] = [];
-    await createNativeHelper({
-      kind: 1,
-      run: spawnNativeHelper(quiet),
-      diagnose: (line) => none.push(line),
-    }).release(RECORD, 'approve');
-    expect(none).toEqual([]);
-  });
+      const quiet = stub('secure-off', `process.stdout.write('ab'.repeat(32) + '\\n');`);
+      const none: string[] = [];
+      await createNativeHelper({
+        kind: 1,
+        run: spawnNativeHelper(quiet),
+        diagnose: (line) => none.push(line),
+      }).release(RECORD, 'approve');
+      expect(none).toEqual([]);
+    },
+  );
 
-  it('a note that is not exactly the fixed line is dropped', async () => {
+  itStandIn('a note that is not exactly the fixed line is dropped', async () => {
     const odd = stub(
       'secure-odd',
       `process.stderr.write('note secureinput 1 /Users/x\\nsheet la -2\\n'); process.exitCode = 10;`,

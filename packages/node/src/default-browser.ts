@@ -16,7 +16,11 @@
 // Every value read is checked against a strict pattern; anything unexpected (a shell, a relative or
 // odd program, a malformed id) means "unknown", and the opener falls back to the pre-0.5.1 behaviour
 // (the link itself to the OS opener; a residual recorded in 04 §2.8). Nothing here is logged.
-import { join } from 'node:path';
+// macOS and Linux paths are POSIX paths whatever the host (the tests run every platform's branch
+// on every OS), so they are joined with path.posix, never the host's separator.
+import { posix } from 'node:path';
+
+const { join } = posix;
 
 /** How to start the default browser with one launch file. */
 export interface BrowserLaunch {

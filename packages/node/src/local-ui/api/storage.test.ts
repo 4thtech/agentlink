@@ -330,7 +330,8 @@ describe('inboxUsageOf', () => {
     writeFileSync(join(inbox, 'a.txt'), Buffer.alloc(123));
     const result = await inboxUsageOf(client(inbox), home);
     expect(result).toEqual({
-      folder: '~/AgentLink/Inbox',
+      // The setting keeps its own separator (displayFolder): a backslash on Windows, as join gives.
+      folder: join('~', 'AgentLink', 'Inbox'),
       scan: { files: 1, bytes: 123, truncated: false },
     });
   });
