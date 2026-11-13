@@ -1,5 +1,18 @@
 # @4thtech-io/core
 
+## 0.5.4
+
+### Patch Changes
+
+- 5507e7d: MSG-ORDER-1 + OUTBOX-NOW-1: messages of the same second keep their order in a conversation (a local store order breaks the tie), and queued messages go out at once when the relays come back (core `outbox.retryNow()`, called on reconnect).
+- Updated dependencies [5507e7d]
+  - @4thtech-io/types@0.5.4
+  - @4thtech-io/chain@0.5.4
+  - @4thtech-io/transport-nostr@0.5.4
+  - @4thtech-io/crypto@0.5.4
+  - @4thtech-io/log@0.5.4
+  - @4thtech-io/storage@0.5.4
+
 ## 0.5.3
 
 ### Patch Changes

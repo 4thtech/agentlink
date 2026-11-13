@@ -1,6 +1,6 @@
 {
   "name": "@4thtech-io/desktop",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "AgentLink desktop app shell: the Electron main process (window, tray, deep links) around the bundled core.",
   "license": "MIT",

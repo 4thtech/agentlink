@@ -1,5 +1,18 @@
 # @4thtech-io/mcp-tools
 
+## 0.5.4
+
+### Patch Changes
+
+- 5507e7d: ATT-SENDFOLDER-FIX + ATT-ALLOW-LINK: an existing ~/AgentLink/Send that already holds files is used for a new ID (the owner is told), an unusable one falls back to a fresh Send-2 in the app, Home offers "Allow Send folder" when an ID allows no folder, and the AI's no-folder answer links to Settings > Files with the Send folder filled in instead of a terminal command.
+- Updated dependencies [5507e7d]
+- Updated dependencies [5507e7d]
+  - @4thtech-io/types@0.5.4
+  - @4thtech-io/core@0.5.4
+  - @4thtech-io/chain@0.5.4
+  - @4thtech-io/crypto@0.5.4
+  - @4thtech-io/log@0.5.4
+
 ## 0.5.3
 
 ### Patch Changes
