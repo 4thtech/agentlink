@@ -171,7 +171,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { homedir, hostname as osHostname } from 'node:os';
 import type { AddressInfo, ListenOptions } from 'node:net';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { resolveInboxFolder } from './allowed-path.js';
 import {
   PayConfirmError,
   buildPayConfirmFlow,
@@ -380,6 +381,8 @@ import type {
   LocalUiResult,
   LocalUiRevealRoute,
   LocalUiKitRevealRoute,
+  LocalUiHistoryRoute,
+  LocalUiInboxRevealRoute,
   LocalUiMarkRoute,
   LocalUiUiSettingsRoute,
   LocalUiSetupStep,
@@ -407,6 +410,8 @@ import {
 } from './notifications.js';
 import { createPeopleAllDesk } from './local-ui/api/people-all.js';
 import { createStorageDesk, inboxUsageOf } from './local-ui/api/storage.js';
+// RET-4 (D-148): the Delete history tickets (plan on begin, apply after the Undo window).
+import { HistoryDesk, type HistoryPort } from './local-ui/history-desk.js';
 import type { LocalUiAppUpdateDesk } from './local-ui/api/app-update.js';
 import {
   AppHostSlot,
@@ -592,6 +597,8 @@ const HEAD_OPEN = /<head(?:\s[^>]*)?>/i;
 const MAX_REVEAL_BODY_BYTES = 256;
 /** WP-R2b: the kit-reveal route takes no body; anything up to this is read and refused (400). */
 const MAX_KIT_REVEAL_BODY_BYTES = 256;
+/** RET-4: a history-kind body (begin names at most 500 message IDs). */
+const MAX_HISTORY_BODY_BYTES = 32_768;
 
 /**
  * ATT-SENDFOLDER-FIX (IR-ATT-SENDFOLDER-1 M-1): the Send folder a begin answer names for the page
@@ -1052,6 +1059,8 @@ export interface ApprovalServerInternals {
   readonly filesHome?: string;
   /** The clock in milliseconds (link lifetime, backoff). Default: Date.now. */
   readonly now?: () => number;
+  /** RET-4: the Undo window of Delete history in ms (tests). Default: HISTORY_UNDO_MS (10 s). */
+  readonly historyUndoMs?: number;
   /** M1-11s-b: the /api/ui/ routes. Default: createLocalUiRoutes() (the page files). */
   readonly routes?: LocalUiRouteRegistry;
   /** M1-11s-c: Argon2id parameters for the new master code's wrap. Default: the keystore defaults. */
@@ -1941,6 +1950,56 @@ export async function startApprovalServerWith(
               ? undefined
               : await inboxUsageOf(readOnlyClient(agentUi.client)),
         });
+  // RET-4 (D-148; 04 §4.2): Delete history. The open ID's own core plans and applies; a ticket is
+  // bound to its page session and to the ID it was made on (a switch applies nothing).
+  const historyDesk = new HistoryDesk({
+    current: (): HistoryPort | undefined => {
+      const client = agentUi?.client as
+        { agentId?: unknown; history?: Partial<Omit<HistoryPort, 'agentId'>> } | undefined;
+      const history = client?.history;
+      if (
+        typeof client?.agentId !== 'string' ||
+        typeof history?.plan !== 'function' ||
+        typeof history.apply !== 'function'
+      ) {
+        return undefined;
+      }
+      const plan = history.plan.bind(history);
+      const apply = history.apply.bind(history);
+      return { agentId: client.agentId, plan, apply };
+    },
+    now: () => now(),
+    ...(internals.historyUndoMs === undefined ? {} : { undoMs: internals.historyUndoMs }),
+  });
+  // RET-4 (08 §1 "Free up space"): Show in Finder for the open ID's configured Inbox folder; the
+  // folder is resolved and checked by the 04 §4.1 rules (resolveInboxFolder), never a page path.
+  const revealInbox = async (): Promise<
+    'shown' | 'not_found' | 'refused' | 'unavailable' | 'not_opened'
+  > => {
+    const client = agentUi?.client;
+    if (client === undefined) return 'unavailable';
+    const read = readOnlyClient(client);
+    let setting: unknown;
+    try {
+      const policy = await read.policy.load();
+      if (policy.mode === 'fail_closed') return 'unavailable';
+      setting = (policy.policy.files as { inboxFolder?: unknown } | undefined)?.inboxFolder;
+    } catch {
+      return 'unavailable';
+    }
+    if (typeof setting !== 'string' || setting.length === 0) return 'not_found';
+    let folder: string;
+    try {
+      folder = (await resolveInboxFolder(setting, { home: filesHome ?? homedir() })).folder;
+    } catch {
+      return 'not_found';
+    }
+    try {
+      return (await fileRevealer(folder, dirname(folder))) ? 'shown' : 'not_opened';
+    } catch {
+      return 'not_opened';
+    }
+  };
   /**
    * WP-R2b (04 §2.3.3 "Kit record"): what `GET /api/ui/backup` and Show in Finder read. Reads only;
    * it signs nothing, opens no other ID's core and reads no keychain item. Built where an ID can
@@ -2059,6 +2118,8 @@ export async function startApprovalServerWith(
       ...(options.host === undefined ? {} : { agents: { list: () => listAgents() } }),
       ...(peopleAllDesk === undefined ? {} : { peopleAll: peopleAllDesk }),
       ...(storageDesk === undefined ? {} : { storage: storageDesk }),
+      // RET-4: Show in Finder for the Inbox folder (the history desk is bound per request).
+      ...(agentUi?.client === undefined ? {} : { revealInbox }),
       // DESK051-UPD: the desktop host's update state (no agent needed).
       ...(options.appUpdate === undefined ? {} : { appUpdate: options.appUpdate }),
       // W4-SHELL-V2: the app's UI settings, in the app host only (one desk for every context).
@@ -3419,6 +3480,12 @@ export async function startApprovalServerWith(
       readonly ownerCode?: LocalUiOwnerCodeStep;
       readonly session?: string;
       /**
+       * RET-4 (D-148; 04 §4.2): the Delete history finish. Presence is verified as for every owner
+       * route; `sign` refuses everything, and the handler marks its one owner operation with
+       * `presenceChecked` before it schedules the plan bound at begin.
+       */
+      readonly history?: true;
+      /**
        * WP-R2b: the page session (its cookie value), for the recovery-kit export only: the restore
        * engine binds the export handle for Check to it (registerExportedKit).
        */
@@ -3677,6 +3744,22 @@ export async function startApprovalServerWith(
                       carriersOpen ? carrierKeysOf(session, () => carriersOpen) : undefined,
                   }
                 : {}),
+              // RET-4: the Delete history finish: one owner operation with verified presence and
+              // nothing signed (the handler schedules the plan bound at begin).
+              ...(gate.history === true
+                ? {
+                    presenceChecked: () => {
+                      if (!stillCurrent(req)) throw new AgentChanged();
+                      if (used) {
+                        throw new NodeKeyStoreError(
+                          'owner_operation_invalid',
+                          'One owner operation signs once.',
+                        );
+                      }
+                      used = true;
+                    },
+                  }
+                : {}),
               sign: async (review, requests) => {
                 // U3-c: right before acting, the open agent is still the one the page showed.
                 if (!stillCurrent(req)) throw new AgentChanged();
@@ -3689,6 +3772,8 @@ export async function startApprovalServerWith(
                 }
                 // WP-11: the export gate signs only through exportRecoveryKit.
                 if (gate.recoveryKit === true) throw ownerOperationRefused();
+                // RET-4: the history finish signs nothing (presenceChecked only).
+                if (gate.history === true) throw ownerOperationRefused();
                 used = true;
                 const frozen = checkGesture(review, requests);
                 // WP-11 (04 §2.3.3): a `backup.export` is signed only by the export gesture, right
@@ -6245,7 +6330,7 @@ export async function startApprovalServerWith(
     req: IncomingMessage,
     res: ServerResponse,
     url: URL,
-    route: LocalUiKitRevealRoute,
+    route: LocalUiKitRevealRoute | LocalUiInboxRevealRoute,
   ): Promise<void> {
     if (
       url.search !== '' ||
@@ -6525,6 +6610,56 @@ export async function startApprovalServerWith(
     } finally {
       wipe(session);
     }
+  }
+
+  /**
+   * RET-4 (D-148; 08 §1): the gate of the history kind (begin, undo, status). The caller checked the
+   * session, CSRF, Origin, fetch metadata, the octet-stream type and the generation. No query,
+   * operation input or presence header; the body must be one strict JSON object of at most
+   * MAX_HISTORY_BODY_BYTES. No owner presence, no owner store, nothing signed, nothing deleted. The
+   * handler gets that object and the desk of this request's page session only.
+   */
+  async function historyGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiHistoryRoute,
+    cookie: string,
+  ): Promise<void> {
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    const body = await boundedBody(req, res, MAX_HISTORY_BODY_BYTES);
+    if (body === undefined) return;
+    let parsed: JsonValue;
+    try {
+      parsed = parseJson(decodeUtf8(body));
+    } catch {
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    if (!stillCurrent(req)) {
+      agentChanged(res);
+      return;
+    }
+    let result: LocalUiResult;
+    try {
+      result = await route.handler(uiContext, parsed as JsonObject, historyDesk.forSession(cookie));
+    } catch (error) {
+      sendJson(res, 500, failedBody(error));
+      return;
+    }
+    sendResult(res, result);
   }
 
   async function inviteGate(
@@ -6979,9 +7114,15 @@ export async function startApprovalServerWith(
       await removeGate(req, res, url);
       return;
     }
-    if (route.presence === 'kit-reveal') {
+    if (route.presence === 'kit-reveal' || route.presence === 'inbox-reveal') {
       // WP-R2b: Show in Finder for the recovery kit has its own gate; no presence, no input.
+      // RET-4: Show in Finder for the Inbox folder takes the same checks (no input at all).
       await kitRevealGate(req, res, url, route);
+      return;
+    }
+    if (route.presence === 'history') {
+      // RET-4: Delete history's begin, undo and status; never ownerGate (no presence, no signing).
+      await historyGate(req, res, url, route, cookie);
       return;
     }
     if (route.presence === 'mark') {
@@ -7043,12 +7184,17 @@ export async function startApprovalServerWith(
         return;
       }
     }
+    // RET-4: the finish route's context carries this page session's history desk only.
+    const context: LocalUiContext =
+      route.historyFinish === true
+        ? Object.freeze({ ...uiContext, historySession: historyDesk.forSession(cookie) })
+        : uiContext;
     await ownerGate(
       req,
       res,
       (owner) =>
         route.handler(
-          uiContext,
+          context,
           { params, query: url.searchParams, ...(input === undefined ? {} : { input }) },
           owner,
         ),
@@ -7056,7 +7202,9 @@ export async function startApprovalServerWith(
         ? { recoveryKit: true, pageSession: cookie }
         : route.ownerCode !== undefined
           ? { ownerCode: route.ownerCode, session: cookie }
-          : {},
+          : route.historyFinish === true
+            ? { history: true }
+            : {},
     );
   }
 
@@ -8125,6 +8273,8 @@ export async function startApprovalServerWith(
       dropCreate();
       // WP-S2: a staged master-code change this server began is removed (the old code keeps working).
       await ownerCodes.clear();
+      // RET-4: a delete still in its Undo window is dropped (never applied).
+      historyDesk.close();
       // REL051-CF3: a held master code goes with the server (a restart never shows it again).
       codeHold.clear();
       await folderRemoval;

@@ -10701,7 +10701,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** `RED (expected):` commit first; a relay replay of a deleted envelope is dropped; a proof pack verifies after delete (OD-4); the Contact check digits still recompute; protected items refused with a fixed reason; a moved, renamed, edited or symlinked file is untouched; files go to the OS Trash on macOS, Linux and Windows (no shell); secure_delete zeroes pages; no path or name in logs.
 
 #### RET-4 · Delete sheet, Free up space and message selection in the app (0.5.2)
-- **Status:** new · **Size:** M · **Tier:** Opus build (routes), Sonnet (UI) · **Security:** S2
+- **Status:** in review · **Size:** M · **Tier:** Opus build (routes), Sonnet (UI) · **Security:** S2
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/messages/*`, `pages/settings/storage*`; node UI server routes `POST /api/ui/history/delete/begin` and `/finish`
 - **Depends on:** RET-1, RET-3
 - **Spec:** 08 §1 "Storage, archive and delete"; 04 §4.2 "Presence and undo"; 11 §5.7
@@ -10709,7 +10709,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** `RED (expected):` commit first for the routes; presence required once per sheet; the list is bound at begin; Undo within 10 s cancels the commit; copy per 11 §5.7 with the OS sensor word; integrated walkthrough screenshots.
 
 #### RET-5 · Archive conversations as a store flag (0.5.2)
-- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · core store, node UI route, `apps/local-ui` (replaces the browser-only flag)
 - **Depends on:** RET-2
 - **Spec:** 04 §4.2 "Two words, two actions"; 08 §1
