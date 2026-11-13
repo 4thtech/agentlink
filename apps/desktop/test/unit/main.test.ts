@@ -186,7 +186,7 @@ describe('runShell startup', () => {
     const { electron, proc } = setup([], {
       updateHealth: () => {
         watchdog += 1;
-        electron.app.getPath?.('userData');
+        (electron.app as unknown as { getPath: (name: string) => string }).getPath('userData');
         return { starting: () => undefined, ready: () => undefined };
       },
     });
