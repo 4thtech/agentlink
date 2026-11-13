@@ -56,6 +56,8 @@ describe('chapter 9: activity', () => {
       .filter({ hasText: 'Logo design' })
       .first();
     await card.waitFor({ timeout: 30_000 });
+    // IR-N3-1 #1: terms show Approve once Review has opened them in full.
+    await card.getByRole('button', { name: 'Review' }).first().click();
     await card
       .getByRole('button', { name: /^Approve/ })
       .first()

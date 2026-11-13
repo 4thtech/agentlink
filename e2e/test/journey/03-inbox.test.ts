@@ -339,6 +339,8 @@ describe('chapter 3: inbox', () => {
       .first();
     await card.waitFor({ timeout: 30_000 });
     const beforeApprove = b.gestures.total();
+    // IR-N3-1 #1: terms show Approve once Review has opened them in full.
+    await card.getByRole('button', { name: 'Review' }).first().click();
     await card
       .getByRole('button', { name: /^Approve/ })
       .first()

@@ -146,7 +146,13 @@ export function PersonMenu({
       }
       if (result.kind === 'rejected' || result.kind === 'required') {
         // IR-UX1113-N2-1 #2: a sensor proof the server refused was used, not "wasn't used".
-        setError(proof.kind === 'code' ? MESSAGE[result.kind] : C.sensorRefused);
+        setError(
+          proof.kind === 'code'
+            ? MESSAGE[result.kind]
+            : result.kind === 'required'
+              ? C.sensorUnavailable
+              : C.sensorRefused,
+        );
         return;
       }
       close();

@@ -82,9 +82,11 @@ export function SaveFile({
     if (!alive.current) return;
     // IR-UX1113-N2-1 #2: a sensor proof the server refused was used, not "wasn't used".
     setLine(
-      presence.kind !== 'code' && (a.kind === 'presence_rejected' || a.kind === 'presence_required')
+      presence.kind !== 'code' && a.kind === 'presence_rejected'
         ? S.sensorRefused
-        : saveAnswerText(a),
+        : presence.kind !== 'code' && a.kind === 'presence_required'
+          ? S.sensorUnavailable
+          : saveAnswerText(a),
     );
     if (a.kind === 'outcome' && (a.outcome === 'saved' || a.outcome === 'already_saved')) {
       setDone(true);

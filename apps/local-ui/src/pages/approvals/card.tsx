@@ -278,6 +278,10 @@ export function CompactHead({ item }: { item: ApprovalItem }): ReactElement {
       {/* N3: one line, never a heading or a link: the core's fixed-template line and the cost. */}
       <p className="al-approval-line al-approval-what">
         {d === undefined ? item.summary : (d.headline ?? d.what)}
+        {/* IR-N3-1 #4: a headline names who; without one, the core's who (or "a contact"). */}
+        {d === undefined || d.headline !== undefined
+          ? null
+          : ` · ${d.who.trim() === '' ? S.aContact : d.who}`}
         {d === undefined ? null : <span className="al-muted">{` · ${d.cost}`}</span>}
       </p>
       {d?.terms !== undefined && d.terms.length > 0 ? <TermsSummary lines={d.terms} /> : null}
@@ -428,8 +432,15 @@ export function useApprovalPresence(
   });
 }
 
-/** The answer to a refused sensor proof (IR-UX1113-N2-1 #2): the proof was used and refused. */
-const REFUSED_PROOF = new Set(['presence_rejected', 'presence_required']);
+/**
+ * The words for a sensor proof the server did not take: refused (IR-UX1113-N2-1 #2: it was used, not
+ * "wasn't used"), or not available here (IR-N3-1 #5: no Touch ID here now), else undefined.
+ */
+export function sensorAnswer(status: string): string | undefined {
+  if (status === 'presence_rejected') return S.sensorRefused;
+  if (status === 'presence_required') return S.sensorUnavailable;
+  return undefined;
+}
 
 /**
  * OWNERSTEP-LEFT: one owner action as one step: the button is the sensor ("Approve 2 with Touch
@@ -596,9 +607,8 @@ export function SingleApproval({
     }
     // IR-UX1113-N2-1 #2: a sensor proof the server refused was used, not "wasn't used".
     say(
-      a.kind === 'status' && by !== 'code' && REFUSED_PROOF.has(a.status)
-        ? S.sensorRefused
-        : decisionText(a),
+      (a.kind === 'status' && by !== 'code' ? sensorAnswer(a.status) : undefined) ??
+        decisionText(a),
     );
     // F32: after approving something marked Free, say in plain words what that means.
     if (
@@ -632,8 +642,12 @@ export function SingleApproval({
       flight.current = false;
     }
   };
+  // IR-N3-1 #1: terms commit the owner, so on the compact card Approve is offered only once Review
+  // shows every line of them; Deny needs no Review.
+  const termsHidden = compact && item.commitment && !reviewing;
   const open = (decision: Decision): void => {
     if (flight.current) return;
+    if (decision === 'approve' && termsHidden) return;
     // M1-PAY-CONFIRM-b: approving a request that costs credits is the confirmation sheet's.
     if (item.paid && decision === 'approve') {
       setPaying(true);
@@ -675,15 +689,17 @@ export function SingleApproval({
                 {proof === undefined ? S.deny : fmt(S.denyWith, { sensor })}
               </Button>
               {/* F30/F31: while the code step is open, its button is the one orange button. */}
-              <Button
-                {...(step === undefined ? { variant: 'primary' as const } : {})}
-                size="lg"
-                disabled={reading}
-                {...(proof?.kind === 'native' && !item.paid ? { 'data-native-confirm': '' } : {})}
-                onClick={() => open('approve')}
-              >
-                {proof !== undefined && !item.paid ? fmt(S.approveWith, { sensor }) : S.approve}
-              </Button>
+              {termsHidden ? null : (
+                <Button
+                  {...(step === undefined ? { variant: 'primary' as const } : {})}
+                  size="lg"
+                  disabled={reading}
+                  {...(proof?.kind === 'native' && !item.paid ? { 'data-native-confirm': '' } : {})}
+                  onClick={() => open('approve')}
+                >
+                  {proof !== undefined && !item.paid ? fmt(S.approveWith, { sensor }) : S.approve}
+                </Button>
+              )}
               {compact ? (
                 <Button
                   variant="ghost"

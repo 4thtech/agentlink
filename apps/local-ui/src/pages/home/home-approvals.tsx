@@ -20,6 +20,7 @@ import { announceDecided, announceWaiting } from '../approvals/badge.js';
 import {
   decisionText,
   PresenceAction,
+  sensorAnswer,
   SingleApproval,
   type OwnerState,
   type SheetOptions,
@@ -88,9 +89,7 @@ function bulkAnswerText(a: DecideAnswer, by: Presence['kind']): string | undefin
   if (a.kind === 'dismissed') return A.notUsed;
   if (a.status === 'applied') return undefined;
   if (RETRY.has(a.status)) {
-    return by !== 'code' && a.status !== 'busy' && a.status !== 'wait'
-      ? A.sensorRefused
-      : decisionText(a);
+    return (by !== 'code' ? sensorAnswer(a.status) : undefined) ?? decisionText(a);
   }
   return NOT_APPLIED[a.status] ?? A.listRefused;
 }
@@ -278,7 +277,11 @@ export function HomeApprovals({
           type="button"
           className="hm-ap-more"
           aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => {
+            // IR-N3-1 #3: closing the list drops the picks on the cards it hides.
+            if (open) setPicked((p) => new Set([...p].filter((id) => id === first.approvalId)));
+            setOpen((o) => !o);
+          }}
         >
           {fmt(open ? S.hideMore : S.moreWaiting, { count: more.length })}
           <Icon name={open ? 'chevron-down' : 'chevron-right'} size={14} />

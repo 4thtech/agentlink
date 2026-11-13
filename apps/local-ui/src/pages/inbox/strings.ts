@@ -40,6 +40,9 @@ export const INBOX_STRINGS = {
   // IR-UX1113-N2-1 #2: the sensor was used, and the server did not accept the proof.
   sensorRefused:
     "AgentLink didn't accept that confirmation. Nothing was saved. Try again, or use your master code.",
+  // IR-N3-1 #5: the server could not use Touch ID (or the passkey) here just now.
+  sensorUnavailable:
+    "That confirmation isn't available here right now. Nothing was saved. Use your master code.",
   confirmSave: 'Confirm save',
   saveStepLabel: 'Save this file to your Inbox folder',
   saving: 'Saving…',

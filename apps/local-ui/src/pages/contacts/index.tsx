@@ -564,7 +564,12 @@ function Detail({
             // IR-UX1113-N2-1 #2: a sensor proof the server refused was used, not "wasn't used".
             setError({
               key: keyOf(pending),
-              text: (proof.kind === 'code' ? MESSAGE[result.kind] : S.sensorRefused) ?? S.failed,
+              text:
+                (proof.kind === 'code'
+                  ? MESSAGE[result.kind]
+                  : result.kind === 'required'
+                    ? S.sensorUnavailable
+                    : S.sensorRefused) ?? S.failed,
             });
             return;
           }
