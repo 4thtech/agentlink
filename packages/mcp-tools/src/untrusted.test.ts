@@ -205,11 +205,18 @@ describe('IR-REL051-A12-1 M1: tag escaping is linear (no ReDoS on 64 KB of file 
     ['"< /" then 64 KB of whitespace', `< /${' \n'.repeat(32_766)}`],
     ['64 KB of "<" and whitespace runs', `<${' '.repeat(255)}`.repeat(256)],
   ];
-  it.each(inputs)('%s finishes in under 100 ms', (_label, input) => {
+  // REL051-CIE: the pattern is linear by construction (TAG: one `<`, then bounded runs); the
+  // deterministic check is that each hostile input comes back whole and unchanged (no tag, nothing
+  // dropped). The wall-clock guard is CI-tolerant: shared runners were several times slower than a
+  // laptop and failed a 100 ms bound on healthy code, while a backtracking (quadratic) pattern on
+  // 64 KB of whitespace takes far longer than this ceiling.
+  it.each(inputs)('%s comes back unchanged, under the wall-clock ceiling', (_label, input) => {
     sanitizeUntrustedText('warm up');
     const start = performance.now();
-    sanitizeUntrustedText(input);
-    expect(performance.now() - start).toBeLessThan(100);
+    const out = sanitizeUntrustedText(input);
+    const took = performance.now() - start;
+    expect(out).toBe(input);
+    expect(took).toBeLessThan(2_000);
   });
 
   it('the linear pattern still escapes spaced and slashed tags', () => {

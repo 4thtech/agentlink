@@ -46,9 +46,10 @@ const drawn = (): number => host.getElementsByTagName('*').length;
 
 // REL051-CIE: the DoS guarantees are checked by COUNTING the work (elements drawn per render or
 // slice, and slices per document), which is deterministic on any machine. Wall-clock time is only a
-// second, coarse guard: shared CI runners were 5-10x slower than a laptop and failed a 250 ms bound
-// on healthy code, while a quadratic regression on 256 KB still takes far longer than this ceiling.
-const WALL_CLOCK_CEILING_MS = 2_000;
+// second, coarse guard: shared CI runners were 10-25x slower than a laptop (one slice took 2.15 s)
+// and failed a 250 ms bound on healthy code, while a quadratic regression on 256 KB still takes far
+// longer than this ceiling.
+const WALL_CLOCK_CEILING_MS = 3_000;
 /** Elements one top-level piece may draw beyond its cost (wrappers, a link or image chip's parts). */
 const ELEMENTS_PER_COST = 2;
 /** The most elements one slice may add: a full slice plus one maximal piece, with chip parts. */
