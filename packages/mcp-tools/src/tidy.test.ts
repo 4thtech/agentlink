@@ -99,7 +99,7 @@ describe('agentlink_tidy: the tool surface (RET-7)', () => {
       additionalProperties: boolean;
     };
     expect(Object.keys(input.properties).sort()).toEqual(['contact', 'kinds', 'olderThanDays']);
-    expect(input.required.sort()).toEqual(['kinds', 'olderThanDays']);
+    expect([...input.required].sort()).toEqual(['kinds', 'olderThanDays']);
     expect(input.additionalProperties).toBe(false);
     expect(input.properties['olderThanDays']).toMatchObject({ enum: [30, 90, 365] });
     expect(input.properties['kinds']).toMatchObject({ enum: ['files', 'messages_and_files'] });
@@ -141,7 +141,7 @@ describe('agentlink_tidy always answers pending_approval with exact counts (RET-
         return linkTo(page);
       }),
     );
-    const s = r.structuredContent as Record<string, unknown>;
+    const s = r.structured as Record<string, unknown>;
     expect(s['status']).toBe('pending_approval');
     expect(s['approvalId']).toMatch(/^apr_[A-Za-z0-9_-]{22}$/);
     expect(previews).toEqual([
@@ -172,7 +172,7 @@ describe('agentlink_tidy always answers pending_approval with exact counts (RET-
       { olderThanDays: 365, kinds: 'messages_and_files' },
       context(client, linkTo),
     );
-    const s = r.structuredContent as Record<string, unknown>;
+    const s = r.structured as Record<string, unknown>;
     expect(s['status']).toBe('pending_approval');
     expect(previews).toEqual([{ before: 1_800_000_000 - 365 * 86_400, include: 'both' }]);
     expect(s['url']).toBe(`${ORIGIN}/settings/storage?tidy=both&days=365`);
@@ -187,7 +187,7 @@ describe('agentlink_tidy always answers pending_approval with exact counts (RET-
       { olderThanDays: 30, kinds: 'files' },
       context(client),
     );
-    const s = r.structuredContent as Record<string, unknown>;
+    const s = r.structured as Record<string, unknown>;
     expect(s['status']).toBe('pending_approval');
     expect(s['summary']).toContain('0 files');
     // No link provider: the fixed words point to Settings, Storage; no url, no command.
@@ -217,7 +217,7 @@ describe('agentlink_tidy always answers pending_approval with exact counts (RET-
         { olderThanDays: 90, kinds: 'files' },
         context(client, bad),
       );
-      const s = r.structuredContent as Record<string, unknown>;
+      const s = r.structured as Record<string, unknown>;
       expect(s['status']).toBe('pending_approval');
       expect(s['url']).toBeUndefined();
       expect(JSON.stringify(s)).not.toContain('CANARY-TIDY-1');
@@ -257,7 +257,7 @@ describe('injection (06 §4, §9): the AI cannot tidy anything itself (RET-7)', 
     ];
     for (const input of bad) {
       const r = await callTool('agentlink_tidy', input, context(client, linkTo));
-      expect((r.structuredContent as { code?: string }).code, JSON.stringify(input)).toBe(
+      expect((r.structured as { code?: string }).code, JSON.stringify(input)).toBe(
         'INVALID_ARGUMENT',
       );
     }
@@ -271,7 +271,7 @@ describe('injection (06 §4, §9): the AI cannot tidy anything itself (RET-7)', 
       { olderThanDays: 30, kinds: 'messages_and_files' },
       context(client, linkTo),
     );
-    const s = r.structuredContent as Record<string, unknown>;
+    const s = r.structured as Record<string, unknown>;
     expect(s['status']).toBe('pending_approval');
     expect(s['summary']).toContain('38 messages and 6 files (412 MB)');
     expect(JSON.stringify(s)).not.toContain('CANARY-TIDY-1');
@@ -284,7 +284,7 @@ describe('injection (06 §4, §9): the AI cannot tidy anything itself (RET-7)', 
       { olderThanDays: 90, kinds: 'files', contact: INJECTION },
       context(client, linkTo),
     );
-    const s = r.structuredContent as Record<string, unknown>;
+    const s = r.structured as Record<string, unknown>;
     expect(s['status']).not.toBe('pending_approval');
     expect(JSON.stringify(r)).not.toContain('CANARY-TIDY-1');
     expect(previews).toEqual([]);
@@ -298,6 +298,6 @@ describe('injection (06 §4, §9): the AI cannot tidy anything itself (RET-7)', 
       { olderThanDays: 90, kinds: 'files' },
       context(client),
     );
-    expect((r.structuredContent as { status: string }).status).toBe('pending_approval');
+    expect((r.structured as { status: string }).status).toBe('pending_approval');
   });
 });

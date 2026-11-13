@@ -413,6 +413,26 @@ export interface ProofPlatformTools {
   isFreeCreditsChain?(chainId: number): boolean;
 }
 
+/**
+ * RET-7 (D-148 (3)): what `agentlink_tidy` counts. Built by the handler from its validated filter
+ * only: an age cutoff, what to remove and, optionally, a contact resolved like every other tool's.
+ * Never message IDs (I-5).
+ */
+export interface TidyFilter {
+  /** Unix seconds: messages created before it. */
+  readonly before: number;
+  readonly include: 'files' | 'both';
+  readonly contactId?: string;
+}
+
+/** RET-7: counts and stored bytes only; never the plan, its hash or an item (I-4, I-7). */
+export interface TidyCounts {
+  readonly messages: { readonly count: number; readonly bytes: number };
+  readonly files: { readonly count: number; readonly bytes: number };
+  /** Selected messages kept because something still needs them. */
+  readonly kept: number;
+}
+
 /** The core surface the handlers use. */
 export interface ToolClient {
   /** The agent's identity, or undefined when it has none yet (needs `agentlink init`). */
@@ -471,6 +491,13 @@ export interface ToolClient {
    * "not available", and status carries no credits.
    */
   readonly proofs?: ProofTools;
+  /**
+   * RET-7 (D-148 (3); 04 §4.2): what a cleanup with this filter would remove now, for
+   * `agentlink_tidy`'s proposal (core's history plan, read-only: it writes and deletes nothing).
+   * There is no apply: only the owner, in the app with presence, deletes (I-4). Absent in a double
+   * that does not need it: the tool then answers "not available".
+   */
+  tidyPreview?(filter: TidyFilter): Promise<TidyCounts>;
 }
 
 export interface ToolContext {
@@ -503,6 +530,13 @@ export interface ToolContext {
    * needs the owner's session, and allowing a folder needs owner presence (I-4).
    */
   readonly allowFolderLink?: () => Promise<AllowFolderLink | undefined>;
+  /**
+   * RET-7: the app link to Settings › Storage with an `agentlink_tidy` filter (`page` is the fixed
+   * path and query tidy.ts built), from `agentlink mcp`; absent elsewhere. Only `url` and `origin`
+   * are used; the url must be exactly the origin plus that page. It holds no secret and grants
+   * nothing: the page needs the owner's session, and the delete needs owner presence (I-4).
+   */
+  readonly tidyLink?: (page: string) => Promise<AllowFolderLink | undefined>;
   /**
    * M1-26-e: the shipped pay page config (the chain package's `PAY_PAGE`, which is not live yet).
    * A top-up link is given only when `live`; absent means the shipped config. Production wiring
@@ -620,6 +654,19 @@ export function coreToolClient(
     ...(options.proofs === undefined
       ? {}
       : { proofs: coreProofTools(client, options.proofs, options.freeCredits) }),
+    async tidyPreview(filter) {
+      // RET-7: a plan only (it writes and deletes nothing); counts and sizes leave, nothing else.
+      const plan = await client.history.plan(
+        filter.contactId === undefined
+          ? { before: filter.before, include: filter.include }
+          : { contactId: filter.contactId, before: filter.before, include: filter.include },
+      );
+      return {
+        messages: { count: plan.messages.count, bytes: plan.messages.bytes },
+        files: { count: plan.files.count, bytes: plan.files.bytes },
+        kept: plan.kept.count,
+      };
+    },
     async storageMode() {
       const effective = await client.ownerActions.loadPolicy();
       return effective.mode !== 'fail_closed' && effective.policy.files.storage === 'own'

@@ -125,6 +125,11 @@ export function agentToolContext(
           approvalLink: (approvalId: string) => approvalUi.link(approvalId),
           // ATT-ALLOW-LINK: the no-folder result's link to Settings > Files (Send folder filled in).
           allowFolderLink: () => approvalUi.allowFolderLink(),
+          // RET-7: an agentlink_tidy proposal's link to Settings > Storage (its filter only).
+          tidyLink: (page: string) =>
+            approvalUi.tidyLink === undefined
+              ? Promise.resolve(undefined)
+              : approvalUi.tidyLink(page),
         }),
     // M1-36a-b: the no-owner text names the command that works here, and `owner init` on a
     // machine known to have no owner (folder names and file presence only; never a key).

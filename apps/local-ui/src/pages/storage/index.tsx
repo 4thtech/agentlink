@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { createHistoryApi } from '../history/api.js';
 import { HISTORY_STRINGS as H } from '../history/strings.js';
-import { FreeUpSpace } from './free-up-space.js';
+import { FreeUpSpace, parseTidyProposal } from './free-up-space.js';
 import { KeepAutomatically } from './keep.js';
 import {
   parseStorage,
@@ -28,6 +28,8 @@ export interface StoragePageProps {
   /** RET-4: the fetch and session token of the delete sheet and Show in Finder (tests). */
   readonly fetch?: typeof fetch;
   readonly token?: string;
+  /** RET-7: the page's query (default: the location's); an agentlink_tidy link fills Free up space. */
+  readonly search?: string;
 }
 
 /** macOS has Finder; Windows and Linux say "Show in folder" (11 §5.7). */
@@ -129,7 +131,11 @@ export function StoragePage({
   api: givenApi,
   fetch: givenFetch,
   token,
+  search,
 }: StoragePageProps): ReactElement {
+  const [proposal] = useState(() =>
+    parseTidyProposal(search ?? (typeof window === 'undefined' ? '' : window.location.search)),
+  );
   const [api] = useState<ApiClient>(() => givenApi ?? createApiClient());
   const [history] = useState(() =>
     createHistoryApi({
@@ -159,7 +165,13 @@ export function StoragePage({
         <p className="al-text-body al-muted">{S.lead}</p>
       </header>
 
-      <FreeUpSpace api={api} fetch={givenFetch} token={token} onApplied={read} />
+      <FreeUpSpace
+        api={api}
+        fetch={givenFetch}
+        token={token}
+        onApplied={read}
+        proposal={proposal}
+      />
 
       <KeepAutomatically api={api} fetch={givenFetch} token={token} />
 

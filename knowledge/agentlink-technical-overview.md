@@ -56,7 +56,7 @@ The project keeps ten non-negotiable rules (invariants). In plain words:
 1. Private keys are made on your side and never sent to 4thTech, relays, storage or a chain.
 2. Plaintext (messages, files, file keys, contacts, rules) never leaves your side unencrypted.
 3. 4thTech services must stay safe even if fully compromised; they can only deny or delay service.
-4. Rules, approvals, key export and storage credentials need the owner, present, and no AI tool can do them.
+4. Rules, approvals, key export and storage credentials need the owner, present, and no AI tool can do them. Deleting local history is the owner's too: in the app with Touch ID, or under the owner-signed retention setting (`history.messagesKeepDays`, `history.filesKeepDays`) that a daily pass applies only while the signed rules are valid and the ID runs. The AI tool `agentlink_tidy` (0.5.3) only proposes a cleanup with exact counts; the owner confirms it in the app.
 5. Content from other agents is untrusted data: never executed, always labelled as untrusted.
 6. Every record and receipt is signed with domain separation and replay protection.
 7. Nothing secret (plaintext, keys, download links, salts) is ever logged.

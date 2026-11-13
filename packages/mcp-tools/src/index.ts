@@ -40,6 +40,7 @@ import { sendHandler } from './send.js';
 import { statusHandler } from './status.js';
 import { TOOL_TEXT } from './text.js';
 import { verifyProofPackHandler } from './verify-proof-pack.js';
+import { runTidy, tidyHandler } from './tidy.js';
 
 export type ToolHandler = (input: unknown, context: ToolContext) => Promise<HandlerOutput>;
 
@@ -62,6 +63,7 @@ export const HANDLERS: Readonly<Partial<Record<McpToolName, ToolHandler>>> = Obj
   agentlink_get_proof: getProofHandler,
   agentlink_export_proof_pack: exportProofPackHandler,
   agentlink_verify_proof_pack: verifyProofPackHandler,
+  agentlink_tidy: tidyHandler,
 });
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -114,6 +116,18 @@ export async function callTool(
   // W4-PAUSE (06 §6 "Paused agents"): a sending or fetching tool is refused before its handler.
   if (PAUSE_REFUSED_TOOLS.has(tool.name) && (await agentPaused(env.client))) {
     return finalizeResult(agentPausedOutput(), origins);
+  }
+  // RET-7: agentlink_tidy only proposes. Its link is the app's Storage page (tidy.ts), never an
+  // approval page, and there is no approval row to wait on.
+  if (tool.name === 'agentlink_tidy') {
+    let tidied: Awaited<ReturnType<typeof runTidy>>;
+    try {
+      tidied = await runTidy(args, env);
+    } catch {
+      env.logger.warn('tool handler failed', { tool: tool.name });
+      return finalizeResult(internalError(), origins);
+    }
+    return finalizeResult(tidied.output, tidied.origins);
   }
   // M1-36i-e: one time budget per call; the time the handler spends counts against the wait.
   // Monotonic (performance.now): a wall clock that jumps back can never give the wait more time.

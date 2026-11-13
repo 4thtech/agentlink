@@ -83,6 +83,9 @@ export const HISTORY_STRINGS = {
   review: 'Review',
   removes: (messages: number, files: number, bytes: number): string =>
     `This removes ${String(messages)} messages and ${String(files)} files (${sizeWords(bytes)}).`,
+  // RET-7: opened from the AI's agentlink_tidy proposal.
+  aiSuggested: 'Your AI suggested this cleanup.',
+  aiNothingYet: 'Nothing is deleted until you confirm it here.',
   showInFinder: 'Show in Finder',
   showInFolder: 'Show in folder',
   revealFailed: "The folder didn't open. Try again.",

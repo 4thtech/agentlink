@@ -33,8 +33,10 @@
 // A later plan with `include: files` or `both` also lists the still indexed saved files of messages
 // deleted earlier (a Trash move that did not happen), so a partial apply leaves no orphans.
 //
-// No MCP tool reaches this (I-4, 06 §1): the client exposes it to the owner surfaces only. Nothing is
-// sent to the contact, a relay, the drop or any 4thTech service. Logs carry counts only (I-7).
+// No MCP tool applies this (I-4, 06 §1): the client exposes it to the owner surfaces only. RET-7's
+// `agentlink_tidy` reaches `plan` alone, through the tool layer's `tidyPreview` (counts and sizes
+// only), to propose a cleanup the owner confirms in the app. Nothing is sent to the contact, a
+// relay, the drop or any 4thTech service. Logs carry counts only (I-7).
 import { encodeHex, parseJson, sha256 } from '@4thtech-io/crypto';
 import { nowOf, open, type CoreContext } from '../context.js';
 import { CoreError } from '../errors.js';

@@ -228,9 +228,12 @@ describe('POST: the owner-signed history change (presence)', () => {
     const after = await policyOf(client);
     expect(after.version).toBe(2);
     expect(after.policy.history).toEqual({ messagesKeepDays: 730, filesKeepDays: 180 });
-    const { history: _a, ...restBefore } = before.policy as Record<string, unknown>;
-    const { history: _b, ...restAfter } = after.policy as Record<string, unknown>;
-    expect(restAfter).toEqual(restBefore);
+    const rest = (p: object): Record<string, unknown> => {
+      const copy = { ...(p as Record<string, unknown>) };
+      delete copy['history'];
+      return copy;
+    };
+    expect(rest(after.policy)).toEqual(rest(before.policy));
   });
 
   it('on a policy signed before D-148: sets history, the rest unchanged', async () => {

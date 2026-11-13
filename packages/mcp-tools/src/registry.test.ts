@@ -1,7 +1,7 @@
 // The frozen M1a tool surface (06 §2.0, §9; I-4; M1-9c). The snapshot below is the committed
 // tool-surface record: any rename, new tool, schema or annotation change fails here until the
 // snapshot is updated in a reviewed change (with M1-9e's snapshot, 06 §9).
-import { APPROVAL_TOOL_NAMES, MCP_TOOL_NAMES } from '@4thtech-io/types';
+import { APPROVAL_TOOL_NAMES, APP_APPROVAL_TOOL_NAMES, MCP_TOOL_NAMES } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { PENDING_M1A_TOOLS, TOOLS } from './registry.js';
 import { matchesSchema } from './input.js';
@@ -29,7 +29,11 @@ const M1B_TABLE: Readonly<Record<string, readonly [boolean, boolean, boolean, bo
   agentlink_export_proof_pack: [false, false, false, false],
   agentlink_verify_proof_pack: [true, false, true, true],
 };
-const TABLE = { ...M1A_TABLE, ...M1B_TABLE };
+/** RET-7 (D-148 (3); 06 §2.0): agentlink_tidy only counts and proposes. */
+const RET_TABLE: Readonly<Record<string, readonly [boolean, boolean, boolean, boolean]>> = {
+  agentlink_tidy: [true, false, true, false],
+};
+const TABLE = { ...M1A_TABLE, ...M1B_TABLE, ...RET_TABLE };
 
 /** The only path- or file-like arguments, each confined by 04 §4 (tool-surface.test.ts allowlist). */
 const FILE_ARGS: Readonly<Record<string, readonly string[]>> = {
@@ -79,7 +83,7 @@ describe('tool surface (06 §2.0, D-53)', () => {
     expect(matchesSchema(send.inputSchema, { to: 'Natasa', text: 'hi', extra: 1 })).toBe(false);
   });
 
-  it('registers exactly the nine M1a tools and the six M1b tools', () => {
+  it('registers exactly the nine M1a tools, the six M1b tools and agentlink_tidy (RET-7)', () => {
     const registered = TOOLS.map((t) => t.name);
     expect([...registered, ...Object.keys(PENDING_M1A_TOOLS)].sort()).toEqual(
       Object.keys(TABLE).sort(),
@@ -109,14 +113,17 @@ describe('tool surface (06 §2.0, D-53)', () => {
   it('every tool with an Approval entry accepts approvalId, and only those tools', () => {
     for (const tool of TOOLS) {
       const approval = (APPROVAL_TOOL_NAMES as readonly string[]).includes(tool.name);
-      expect(tool.approval, tool.name).toBe(approval);
+      // RET-7: agentlink_tidy answers pending_approval (its output has approvalId), but the owner
+      // approves and runs it in the app, so it takes no approvalId (APP_APPROVAL_TOOL_NAMES).
+      const inApp = (APP_APPROVAL_TOOL_NAMES as readonly string[]).includes(tool.name);
+      expect(tool.approval, tool.name).toBe(approval || inApp);
       const input = tool.inputSchema['properties'] as Record<string, unknown>;
       const out = tool.outputSchema['properties'] as Record<string, unknown>;
       // agentlink_get_approval takes an approvalId to read, not to proceed with.
       expect('approvalId' in input, tool.name).toBe(
         approval || tool.name === 'agentlink_get_approval',
       );
-      expect('approvalId' in out, tool.name).toBe(approval);
+      expect('approvalId' in out, tool.name).toBe(approval || inApp);
     }
   });
 

@@ -1,7 +1,8 @@
 // RET-4 (D-148; 08 §1 "Free up space"; 11 §5): Settings > Storage's Free up space. Filters by
 // person, by age and "Files only"; Review asks the server what that removes (counts and sizes, the
 // delete sheet with its fixed lines) before anything is deleted. The people list is the Messages
-// read (names as core shows them, text only, I-5).
+// read (names as core shows them, text only, I-5). RET-7: opened from the AI's agentlink_tidy link,
+// it says so, fills the filters and opens the sheet; nothing is deleted until the owner confirms.
 import { Button, Surface } from '@4thtech-io/ui';
 import { useEffect, useId, useState, type ReactElement } from 'react';
 import type { ApiClient } from '../../api/client.js';
@@ -18,28 +19,78 @@ const AGES: readonly (readonly [string, string])[] = [
   ['365', H.days365],
 ];
 
+/** RET-7: the filter of an agentlink_tidy proposal, from the page link (parseTidyProposal). */
+export interface TidyProposal {
+  readonly contact?: string;
+  readonly olderThanDays: 30 | 90 | 365;
+  readonly include: 'files' | 'both';
+}
+
+const TIDY_KEYS: ReadonlySet<string> = new Set(['tidy', 'days', 'contact']);
+const CONTACT_ID = /^0x[0-9a-f]{40}$/;
+
+/**
+ * RET-7: `?tidy=files|both&days=30|90|365[&contact=0x…]`, each key once and nothing else; anything
+ * else is no proposal (the page then opens as usual). It only fills the filters: the server plans,
+ * and the owner confirms with presence (RET-4).
+ */
+export function parseTidyProposal(search: string): TidyProposal | undefined {
+  let query: URLSearchParams;
+  try {
+    query = new URLSearchParams(search);
+  } catch {
+    return undefined;
+  }
+  const keys = [...query.keys()];
+  if (keys.length === 0 || keys.some((k) => !TIDY_KEYS.has(k))) return undefined;
+  if (new Set(keys).size !== keys.length) return undefined;
+  const tidy = query.get('tidy');
+  const days = query.get('days');
+  const contact = query.get('contact');
+  if (tidy !== 'files' && tidy !== 'both') return undefined;
+  if (days !== '30' && days !== '90' && days !== '365') return undefined;
+  if (contact !== null && !CONTACT_ID.test(contact)) return undefined;
+  return {
+    ...(contact === null ? {} : { contact }),
+    olderThanDays: Number(days) as 30 | 90 | 365,
+    include: tidy,
+  };
+}
+
 export function FreeUpSpace({
   api,
   fetch: givenFetch,
   token,
   onApplied,
+  proposal,
 }: {
   readonly api: ApiClient;
   readonly fetch?: typeof fetch | undefined;
   readonly token?: string | undefined;
   readonly onApplied: () => void;
+  /** RET-7: the AI's proposal from the page link: the filters filled and the sheet open. */
+  readonly proposal?: TidyProposal | undefined;
 }): ReactElement {
   const titleId = useId();
   const personId = useId();
   const ageId = useId();
   const filesId = useId();
   const [people, setPeople] = useState<readonly Conversation[]>([]);
-  const [person, setPerson] = useState('');
-  const [age, setAge] = useState('');
-  const [filesOnly, setFilesOnly] = useState(false);
+  const [person, setPerson] = useState(proposal?.contact ?? '');
+  const [age, setAge] = useState(proposal === undefined ? '' : String(proposal.olderThanDays));
+  const [filesOnly, setFilesOnly] = useState(proposal?.include === 'files');
   const [review, setReview] = useState<{ target: DeleteTarget; filesOnly: boolean } | undefined>(
-    undefined,
+    proposal === undefined
+      ? undefined
+      : {
+          target: {
+            ...(proposal.contact === undefined ? {} : { contact: proposal.contact }),
+            olderThanDays: proposal.olderThanDays,
+          },
+          filesOnly: proposal.include === 'files',
+        },
   );
+  const [suggested, setSuggested] = useState(proposal !== undefined);
 
   useEffect(() => {
     let live = true;
@@ -76,6 +127,12 @@ export function FreeUpSpace({
           {H.freeTitle}
         </h2>
         <p className="al-text-body-sm al-muted">{H.freeLead}</p>
+        {suggested ? (
+          <div role="status">
+            <p className="al-text-body-sm">{H.aiSuggested}</p>
+            <p className="al-text-body-sm al-muted">{H.aiNothingYet}</p>
+          </div>
+        ) : null}
         <div className="sto-filters">
           <label htmlFor={personId} className="sto-field al-text-body-sm">
             <span>{H.person}</span>
@@ -137,7 +194,10 @@ export function FreeUpSpace({
             include={review.filesOnly ? 'files' : 'both'}
             {...(givenFetch === undefined ? {} : { fetch: givenFetch })}
             {...(token === undefined ? {} : { token })}
-            onClose={() => setReview(undefined)}
+            onClose={() => {
+              setReview(undefined);
+              setSuggested(false);
+            }}
             onApplied={onApplied}
           />
         )}

@@ -10716,14 +10716,14 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** archive and unarchive are reversible and seen in every browser; `agentlink_inbox` and the AI are unaffected; DOM tests.
 
 #### RET-6 · Retention policy `history.*` and the daily pass (0.5.2)
-- **Status:** new · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2
 - **Repo/path:** agentlink · `packages/types/src/policy*`, `packages/core/src/policy*`, `files/retention.ts`, Settings › Storage, CLI `owner policy`
 - **Depends on:** RET-3
 - **Spec:** 06 §3 (`history`, absent-key rule); 04 §4.2 "Retention policy"
 - **Done when:** `RED (expected):` commit first; a pre-D-148 policy reads as `0`/`0`; new policies default `filesKeepDays: 90`; invalid policy or paused ID deletes nothing; no MCP tool can set it (I-4 test); preview before the first turn-on; the existing-install hint shows once.
 
 #### RET-7 · `agentlink_tidy`: the AI proposes a cleanup, the owner approves (0.5.2 or later)
-- **Status:** new · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (MCP surface)
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (MCP surface)
 - **Repo/path:** agentlink · `packages/mcp-tools/src`, core approvals, tool-surface snapshot, 06 §2.0 table
 - **Depends on:** RET-3; its own spec PR for the tool-surface change (06 §2.0)
 - **Spec:** D-148 (3); 06 §2.0; 04 §4.2 "The AI proposes, the owner approves"
