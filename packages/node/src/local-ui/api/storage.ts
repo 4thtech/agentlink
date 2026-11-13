@@ -17,7 +17,9 @@
 //
 // Outside the app host (an approval page opened by an MCP process) there is no desk: the read answers
 // `{status: 'ok', switchable: false, ids: [], inbox: null}`.
+import { lstat } from 'node:fs/promises';
 import { homedir } from 'node:os';
+import { isAbsolute, join } from 'node:path';
 import type { ContactView } from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
 import { resolveInboxFolder } from '../../allowed-path.js';
@@ -102,11 +104,31 @@ export async function inboxUsageOf(
     if (policy.mode === 'fail_closed') return undefined;
     const setting = (policy.policy.files as { inboxFolder?: unknown } | undefined)?.inboxFolder;
     if (typeof setting !== 'string' || setting.length === 0) return undefined;
+    // REL051-R2C (R2-UI-03): an Inbox folder that does not exist yet (nothing was saved) holds no
+    // files: 0, not "could not be read". Anything else that fails stays unknown.
+    if (await missing(setting, home)) {
+      return {
+        folder: displayFolder(setting, home),
+        scan: Object.freeze({ files: 0, bytes: 0, truncated: false }),
+      };
+    }
     const resolved = await resolveInboxFolder(setting, { home });
     const scan = await scanInbox(resolved.folder);
     return scan === undefined ? undefined : { folder: displayFolder(setting, home), scan };
   } catch {
     return undefined;
+  }
+}
+
+/** True only when the setting's folder plainly does not exist (ENOENT on the path itself). */
+async function missing(setting: string, home: string): Promise<boolean> {
+  const abs = setting.startsWith('~/') ? join(home, setting.slice(2)) : setting;
+  if (!isAbsolute(abs)) return false;
+  try {
+    await lstat(abs);
+    return false;
+  } catch (error) {
+    return (error as { code?: unknown }).code === 'ENOENT';
   }
 }
 

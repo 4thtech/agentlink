@@ -335,10 +335,20 @@ describe('inboxUsageOf', () => {
     });
   });
 
-  it('is undefined with no client, rules that fail closed, a missing folder or a bad setting', async () => {
+  it('is undefined with no client, rules that fail closed or a bad setting', async () => {
     expect(await inboxUsageOf(undefined, home)).toBeUndefined();
     expect(await inboxUsageOf(client(join(home, 'x'), 'fail_closed'), home)).toBeUndefined();
-    expect(await inboxUsageOf(client(join(home, 'nothing')), home)).toBeUndefined();
     expect(await inboxUsageOf(client(42), home)).toBeUndefined();
+    // A file where the folder should be cannot be read as a folder.
+    writeFileSync(join(home, 'afile'), 'x');
+    expect(await inboxUsageOf(client(join(home, 'afile')), home)).toBeUndefined();
+  });
+
+  // REL051-R2C (R2-UI-03): nothing saved yet is 0 files, not "could not be read".
+  it('a folder that does not exist yet holds no files', async () => {
+    expect(await inboxUsageOf(client('~/AgentLink/Inbox'), home)).toEqual({
+      folder: '~/AgentLink/Inbox',
+      scan: { files: 0, bytes: 0, truncated: false },
+    });
   });
 });
