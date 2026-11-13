@@ -234,16 +234,19 @@ describe('the file revealer (MSG-FILES-IO-h)', () => {
     ['a pipe', 'C:\\Users\\me\\AgentLink\\Inbox\\a|b.pdf'],
     ['a second colon', 'C:\\Users\\me\\AgentLink\\Inbox\\a.pdf:stream'],
     ['an empty segment', 'C:\\Users\\me\\AgentLink\\\\Inbox\\a.pdf'],
-  ])('on Windows a path with %s opens the folder instead (one quoted argument, no shell)', async (_what, file) => {
-    const folder = 'C:\\Users\\me\\AgentLink\\Inbox, 2';
-    const { seams: s, calls } = seams('win32');
-    expect(await fileRevealerWith(s)(file, folder)).toBe(true);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]?.file).toBe('C:\\Windows\\explorer.exe');
-    expect(calls[0]?.args).toEqual([`"${folder}"`]);
-    expect(calls[0]?.options['shell']).toBe(false);
-    expect(calls[0]?.options['windowsVerbatimArguments']).toBe(true);
-  });
+  ])(
+    'on Windows a path with %s opens the folder instead (one quoted argument, no shell)',
+    async (_what, file) => {
+      const folder = 'C:\\Users\\me\\AgentLink\\Inbox, 2';
+      const { seams: s, calls } = seams('win32');
+      expect(await fileRevealerWith(s)(file, folder)).toBe(true);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.file).toBe('C:\\Windows\\explorer.exe');
+      expect(calls[0]?.args).toEqual([`"${folder}"`]);
+      expect(calls[0]?.options['shell']).toBe(false);
+      expect(calls[0]?.options['windowsVerbatimArguments']).toBe(true);
+    },
+  );
 
   it('on Windows a folder explorer.exe could misread is not opened either', async () => {
     const file = `C:\\Inbox.\\${'a'.repeat(300)}.pdf`;

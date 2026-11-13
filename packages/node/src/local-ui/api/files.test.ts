@@ -397,9 +397,12 @@ describe('GET /api/ui/files/review: the 04 §4 checks before anything is prepare
     ['win32', 'D:\\Other\\.ssh', 'C:\\Users\\Ana', 'D:\\Other\\.ssh'],
     ['posix', '/Users/Ana/Library/Keychains', '/Users/Ana', '~/Library/Keychains'],
     ['posix', '/Library/Keychains', '/Users/Ana', '/Library/Keychains'],
-  ] as const)('names a protected folder (%s) in its original spelling', (flavor, root, home, shown) => {
-    expect(shownProtectedFolder(root, home, flavor)).toBe(shown);
-  });
+  ] as const)(
+    'names a protected folder (%s) in its original spelling',
+    (flavor, root, home, shown) => {
+      expect(shownProtectedFolder(root, home, flavor)).toBe(shown);
+    },
+  );
 
   it('refuses a folder already allowed, and a 33rd folder', async () => {
     const { review } = setup();

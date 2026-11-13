@@ -147,6 +147,20 @@ function lexical(
   return { ok: true, path };
 }
 
+/**
+ * CHORE-FILES-WIN-NAME-CASE: how a protected folder is named to the owner (display only). Inside the
+ * home folder it is `~` plus the root's own tail segments, taken from the root string itself: the
+ * guard parses Windows paths case-folded, so its segments would read in lower case. What is refused
+ * is decided before this and does not depend on it.
+ */
+export function shownProtectedFolder(root: string, home: string, flavor: PathFlavor): string {
+  const below = segmentsBelow(root, home, flavor);
+  if (below === undefined) return root;
+  if (below.length === 0) return '~';
+  const tail = root.split(flavor === 'posix' ? '/' : /[\\/]/).slice(-below.length);
+  return ['~', ...tail].join(flavor === 'posix' ? '/' : '\\');
+}
+
 /** The 04 §4 and D-99 checks for a folder the owner allows (see the header). */
 async function checkFolder(typed: string, home: string, flavor: PathFlavor): Promise<Checked> {
   const shaped = lexical(typed, home, flavor);
@@ -186,9 +200,7 @@ async function checkFolder(typed: string, home: string, flavor: PathFlavor): Pro
     if (rootReal !== undefined && rootReal !== root) forms.push(rootReal);
     // D-99: the real folder holds a protected folder (whether or not it exists: fail closed).
     if (forms.some((form) => segmentsBelow(form, real, flavor, ci) !== undefined)) {
-      const below = segmentsBelow(root, home, flavor);
-      const shown =
-        below === undefined ? root : ['~', ...below].join(flavor === 'posix' ? '/' : '\\');
+      const shown = shownProtectedFolder(root, home, flavor);
       return showable(shown)
         ? { ok: false, reason: 'contains_protected', protectedFolder: shown }
         : { ok: false, reason: 'protected' };
