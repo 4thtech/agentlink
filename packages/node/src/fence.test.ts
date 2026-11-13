@@ -13,6 +13,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'AGENT_OPEN_LOCK_FILE',
       // M1-8d: the local approval server's address constant (08 §1).
       'APPROVAL_SERVER_HOST',
+      // REL051-UPD2: the two local route paths of the update check (fixed strings, no secret, no URL).
+      'APP_UPDATE_CHECK_PATH',
+      'APP_UPDATE_PATH',
       // U3-c: the folder lock's fixed-text error.
       'AgentFolderLockError',
       // M1-15: the allowed-folder and inbox file guards (fixed-text errors, no seams).

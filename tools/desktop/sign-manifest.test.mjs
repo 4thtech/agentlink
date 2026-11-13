@@ -557,13 +557,22 @@ describe('the command line, end to end (real offline KDF)', () => {
       await expect(run(['generate', '--role', 'root', '--out', p('root.key')])).rejects.toThrow(
         /already exists/,
       );
-      const rootFile = JSON.parse(readFileSync(p('root.key'), 'utf8'));
-      const updateFile = JSON.parse(readFileSync(p('update.key'), 'utf8'));
+      const realRoot = JSON.parse(readFileSync(p('root.key'), 'utf8'));
+      const realUpdate = JSON.parse(readFileSync(p('update.key'), 'utf8'));
       expect(readFileSync(p('root.key'), 'utf8')).not.toContain(new TextDecoder().decode(PASS));
       await run(['public-key', p('update.key')]);
-      expect(lines.at(-1)).toBe(`update public key: ${updateFile.publicKey}`);
+      expect(lines.at(-1)).toBe(`update public key: ${realUpdate.publicKey}`);
       await run(['check', p('root.key')]);
       expect(lines.at(-1)).toMatch(/^OK: /);
+      // The offline strength above (generate, refuse to overwrite, open to check) is the part that
+      // needs 256 MiB derivations. The signing flow below opens a key file the same way whatever
+      // its derivation setting is (it is read from the file), so it uses quick-to-open files.
+      const fastRoot = await generateKeyFile({ role: 'root', passphrase: PASS, kdf: FAST_KDF });
+      const fastUpdate = await generateKeyFile({ role: 'update', passphrase: PASS, kdf: FAST_KDF });
+      writeFileSync(p('root.key'), JSON.stringify(fastRoot));
+      writeFileSync(p('update.key'), JSON.stringify(fastUpdate));
+      const rootFile = fastRoot;
+      const updateFile = fastUpdate;
       await run([
         'statement',
         '--root-key',
@@ -639,7 +648,7 @@ describe('the command line, end to end (real offline KDF)', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-    // About ten real offline-strength key derivations (256 MiB, 4 passes, ~3.5 s each on an idle
+    // Four real offline-strength key derivations (256 MiB, 4 passes: about 3.5 s each on an idle
     // laptop, several times that on a CI runner sharing its CPUs with other suites).
   }, 300_000);
 });
