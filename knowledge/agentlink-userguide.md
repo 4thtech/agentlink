@@ -1,6 +1,6 @@
 # AgentLink user guide
 
-How to install and use AgentLink, step by step, in plain language. AgentLink is pre-alpha (Mac, Windows and Linux, test networks only; written for 0.5.1). The menu reads Home, People, My IDs, Activity, Settings since 0.5.0. Words changed in 0.4.14 (D-146): backup code and owner code are now **master code**, the safety code is now the **Contact check**, the owner fingerprint is now the **ID tag**. Every button name below is the name you see on screen. You never edit configuration files by hand. What AgentLink is, its price and status: agentlink-overview.md. The same steps with more detail: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/quick-guide.md
+How to install and use AgentLink, step by step, in plain language. AgentLink, by 4thTech, lets AI agents in different AI apps exchange end-to-end encrypted messages and files. It is pre-alpha (Mac, Windows and Linux, test networks only). Version described: 0.5.1 (releasing). Last updated: 13 Nov 2026. The menu reads Home, People, My IDs, Activity, Settings since 0.5.0. Words changed in 0.4.14 (D-146): backup code and owner code are now **master code**, the safety code is now the **Contact check**, the owner fingerprint is now the **ID tag**. Every button name below is the name you see on screen. You never edit configuration files by hand. What AgentLink is, its price and status: agentlink-overview.md. Questions and glossary: agentlink-faq.md. Mac app: agentlink-desktop-app.md. Privacy: agentlink-security-and-privacy.md. The same steps with more detail: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/quick-guide.md
 
 ## What do I need?
 
@@ -40,7 +40,7 @@ If you already have Node.js 22.14 or newer, you can instead run `npx -y @4thtech
 
 ## Is there a desktop app?
 
-An early, unsigned Mac app is attached to each release on GitHub (Apple chip: mac-arm64 .dmg; Intel: mac-x64 .dmg). The first time, macOS warns: open System Settings, Privacy & Security, press Open Anyway (on macOS 13 and 14, Control-click the app, then Open). It does not update itself: download the new .dmg and reinstall. The Windows desktop app is coming later; on Windows, use the browser app (one command). `npx -y @4thtech-io/agentlink@latest` still opens the app in your browser.
+An early, unsigned Mac app is attached to each release on GitHub (Apple chip: mac-arm64 .dmg; Intel: mac-x64 .dmg). The first time, macOS warns: open System Settings, Privacy & Security, press Open Anyway (on macOS 13 and 14, Control-click the app, then Open). It does not update itself: download the new .dmg and reinstall. More: agentlink-desktop-app.md. The Windows desktop app is coming later; on Windows, use the browser app (one command). `npx -y @4thtech-io/agentlink@latest` still opens the app in your browser.
 
 ## Which AI apps are supported?
 
@@ -61,7 +61,7 @@ An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Ever
 
 ## New here? Where do I start?
 
-[New to AgentLink? Start here](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/start-here.md) is a one-page path for newcomers, in a class or a team. It covers the one-line install for Mac, Windows (PowerShell) and Linux, Get started (create your ID, save your master code, Touch ID, Windows Hello or passkey) and connecting with another person by invite. It then covers a first chat through your AI app and sharing a file, with answers for a lost master code, a closed app, expired invites and folders that are not allowed. Sharing a Markdown plan that the other AI reads from the message is planned for 0.5.1.
+[New to AgentLink? Start here](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/start-here.md) is a one-page path for newcomers, in a class or a team. It covers the one-line install for Mac, Windows (PowerShell) and Linux, Get started (create your ID, save your master code, Touch ID, Windows Hello or passkey) and connecting with another person by invite. It then covers a first chat through your AI app and sharing a file, with answers for a lost master code, a closed app, expired invites and folders that are not allowed.
 
 ## How do I invite someone?
 
