@@ -557,7 +557,6 @@ describe('the command line, end to end (real offline KDF)', () => {
       await expect(run(['generate', '--role', 'root', '--out', p('root.key')])).rejects.toThrow(
         /already exists/,
       );
-      const realRoot = JSON.parse(readFileSync(p('root.key'), 'utf8'));
       const realUpdate = JSON.parse(readFileSync(p('update.key'), 'utf8'));
       expect(readFileSync(p('root.key'), 'utf8')).not.toContain(new TextDecoder().decode(PASS));
       await run(['public-key', p('update.key')]);
