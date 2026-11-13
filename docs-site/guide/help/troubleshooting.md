@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Applies to AgentLink 0.5.1, a pre-alpha release.
+Applies to AgentLink 0.5.3, a pre-alpha release.
 
 Fix common problems yourself, and know what to include when you ask for help.
 

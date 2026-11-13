@@ -1,6 +1,6 @@
 # Home
 
-*Applies to AgentLink 0.5.1. Waiting invites, file chips with a reader in the conversation and the network status line are new in 0.5.1. In 0.4.4 and 0.4.5, Home was five tiles and a seven-step Start here.*
+*Applies to AgentLink 0.5.3. Waiting invites, file chips with a reader in the conversation and the network status line are new in 0.5.1. In 0.4.4 and 0.4.5, Home was five tiles and a seven-step Start here.*
 
 Home is the first screen. It shows what needs you, then the people your AI talks to.
 
@@ -30,7 +30,7 @@ If you have two IDs and look at **All IDs**, Home names each other ID that has p
 
 ## Open a person
 
-- **The conversation, both ways.** Each message you sent says **Sent**, **Waiting to send** or **Not delivered**. Every message has **Copy**. Earlier messages load when you ask. To reply, ask your AI.
+- **The conversation, both ways.** Messages sent or received in the same second keep their order. Each message you sent says **Sent**, **Waiting to send** or **Not delivered**. Every message has **Copy**. Earlier messages load when you ask. To reply, ask your AI.
 - **Files you exchanged.** Each file sits as a chip in the message it came with. A file that arrived and was saved shows "Saved to ~/AgentLink/Inbox" and **Show in Finder** (**Show in Explorer** on Windows, **Show in folder** on Linux). A file that arrived but was not saved reads **Arrived · not saved** with **Save with Touch ID** (one press; **Save to Inbox** opens the master code when Touch ID is not set up here). A saved Markdown, code, JSON, patch or text file also has **Open**, which shows it in a reader inside the app. See [Files](files.md).
 - **Terms.** Terms you proposed, accepted, declined or answered show in the conversation too, right where they happened.
 - **A menu** to rename the person, do the Contact check or remove them.
@@ -39,7 +39,7 @@ What other people wrote, including file names, is shown as plain text in a box m
 
 ## When the message network can't be reached
 
-If this computer can't reach the message network (a school or office network can block it), the status bar says **Can't reach the message network. Messages wait and send when it's back.** It never says **Connected** then. Your messages show **Waiting to send** and go out by themselves once the network is back. Nothing is lost.
+If this computer can't reach the message network (a school or office network can block it), the status bar says **Can't reach the message network. Messages wait and send when it's back.** It never says **Connected** then. Your messages show **Waiting to send** and go out by themselves once the network is back. Nothing is lost. If the network is down for more than 5 seconds, a notice says so on every page, and **Back online.** appears once when it is back; a short blip says nothing. Waiting messages go out at once when the network returns.
 
 ## Under the hood
 

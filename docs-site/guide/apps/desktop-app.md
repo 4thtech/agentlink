@@ -1,6 +1,6 @@
 # Mac desktop app
 
-*Applies to AgentLink 0.5.1. This is an early, unsigned build, meant for people who are happy to try it first. The Windows desktop app is coming later; on Windows, use the browser app (one command). Linux is not available yet.*
+*Applies to AgentLink 0.5.3. This is an early, unsigned build, meant for people who are happy to try it first. The Windows desktop app is an early test build and not a download yet; on Windows, use the browser app (one command). Linux is not available yet.*
 
 ## Which file do I download?
 
@@ -49,7 +49,7 @@ That command only removes the "downloaded from the internet" mark from this one 
 
 ## Windows
 
-The Windows desktop app is coming later. On Windows, use the browser app: one command installs AgentLink and opens it in your browser. See [Windows](../get-started/windows.md).
+The Windows desktop app is an early build (0.5.3 fixed its core starting) and is built by hand for testing; it is not a download yet. On Windows, use the browser app: one command installs AgentLink and opens it in your browser. See [Windows](../get-started/windows.md). Like any file few people have downloaded, a Windows app can make SmartScreen ask you to confirm it.
 
 ## Closing and quitting
 
@@ -77,7 +77,7 @@ Your IDs, people and messages stay as they are: they live in your AgentLink fold
 
 You can always get a newer version by hand too: download the new `.dmg` from the [Releases page](https://github.com/4thtech/agentlink/releases) and drag it over the old one in Applications.
 
-**Coming: Update now (not switched on yet).** A later Mac version will update itself on a click, with no download and no dragging. The steps above stay until then. When it is on, Settings › Updates shows:
+**Update now (from the next version on).** Installing 0.5.3 itself is by hand, as above. From the next version on, a Mac app can update itself on a click, with no download and no dragging, once the release carries a signed update. Until then Settings › Updates keeps the **Download update** button. When it is on, Settings › Updates shows:
 
 1. **AgentLink 0.5.4 is available** (for example) and an **Update now** button.
 2. **Downloading…** with a progress bar and the percentage, then **Checking the new version…**: the app checks that the new version is the one AgentLink published before it changes anything.
