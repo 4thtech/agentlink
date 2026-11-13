@@ -302,10 +302,11 @@ export const mcpCommand = (version: string): CommandHandler => {
             source,
             localUi,
             // IR-NOTIFY-1 M-1 (N6): Settings › Notifications › Approvals waiting, read on each alert.
-            // N7: never while the desktop app runs (it shows its own native notification).
+            // N7: never for the ID the running desktop app alerts for (it shows its own notification).
             approvalAlerts: () =>
               osApprovalAlertsOn(
                 homedir(),
+                agent.name,
                 async () =>
                   notifyPrefsInForce((await readUiSettingsFile(homedir()))?.notify).approvals,
               ),

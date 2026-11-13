@@ -38,7 +38,7 @@ When you use the AgentLink desktop app, it shows real notifications from AgentLi
 - You get at most one of each kind every 30 seconds. If more arrive in between, the next one counts them ("3 new messages from your contacts").
 - On a Mac, the number on the AgentLink icon in the Dock is how many approvals are waiting.
 - On a Mac, the first notification may ask whether AgentLink may show notifications. If you said no, turn them on in System Settings › Notifications › AgentLink.
-- While the desktop app runs, AgentLink shows no other alert for approvals, so you never get two.
+- While the desktop app runs, AgentLink shows no other alert for approvals of the ID you have open, so you never get two. Your other IDs keep their usual alert.
 
 ## Settings › Notifications
 

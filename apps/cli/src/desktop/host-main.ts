@@ -11,6 +11,7 @@ import { DROP_DEFAULT_ENDPOINT } from '@4thtech-io/storage';
 import { nodeUiDeps, onStopSignals } from '../commands/ui.js';
 import { sendHandoff } from '../runtime/app-host-record.js';
 import {
+  processStartedAt,
   removeDesktopAlertsRecord,
   writeDesktopAlertsRecord,
 } from '../runtime/desktop-alerts-record.js';
@@ -115,9 +116,15 @@ export function nodeDesktopHostDeps(pipe: DesktopPipe): DesktopHostDeps {
           link,
         ),
     }),
-    // N7: while this host runs, the desktop app owns the OS notifications (no osascript from mcp).
+    // N7: while this host runs, the desktop app owns the OS notifications for its open ID (no
+    // osascript from mcp for that ID; every other ID keeps it).
     alertsRecord: Object.freeze({
-      write: () => writeDesktopAlertsRecord(homedir(), process.pid),
+      write: (scope: string) =>
+        writeDesktopAlertsRecord(homedir(), {
+          pid: process.pid,
+          started: processStartedAt(),
+          id: scope,
+        }),
       remove: () => removeDesktopAlertsRecord(homedir(), process.pid),
     }),
     interrupt: (stop) => onStopSignals(stop),

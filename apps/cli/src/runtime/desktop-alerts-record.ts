@@ -1,35 +1,71 @@
-// N7 (PLAN-NOTIFY §3.5; S2): while the desktop app runs, it owns the OS notifications (Electron's
-// Notification in its main process). Its core host marks that in `~/.agentlink/desktop-alerts.json`
-// (`{"v":1,"pid":n}`, mode 0600, written through a fresh temporary file and a rename, removed when
-// it stops), and `agentlink mcp` then raises no osascript / notify-send alert for a new approval, so
-// the owner never gets two. The browser/CLI app keeps today's alert and its switch.
+// N7 (PLAN-NOTIFY §3.5; S2): while the desktop app runs, it owns the OS notifications for the ID it
+// has open (Electron's Notification in its main process). Its core host marks that in
+// `~/.agentlink/desktop-alerts.json`, and `agentlink mcp` for THAT ID then raises no osascript /
+// notify-send alert for a new approval, so the owner never gets two. Every other ID keeps its alert
+// (IR-N7-1 L-5), and so does the browser/CLI app, with its switch.
 //
-// The record holds a process ID only. It is read like app-host.json: opened without following a
-// link, a regular file of this user with no group or other access, at most MAX_RECORD_BYTES, exactly
-// `{v: 1, pid}`; anything else does not count. A record whose process is gone does not count either.
-// The worst a same-user process can do with it is silence the osascript alert (the approval still
-// waits on Home and in the AI app's answer), which it could already do by other means (04 §2.5).
+// The record is `{"v":1,"pid":n,"started":ms,"at":ms,"id":"<agent name>"}` (mode 0600, written
+// through a fresh temporary file and a rename, removed when the host stops or no ID is open):
+// - `id`: the open ID's folder name (an agent name), the only ID mcp stays quiet for;
+// - `started`: when the host process started; `at`: when the record was last written. The host
+//   renews it every minute (host-core.ts RECORD_RENEW_MS). A record is ignored when it is older than
+//   RECORD_LEASE_MS, when its process started before this boot, or when that pid is not alive, so a
+//   record left by a hard kill or a power loss stops counting even if the pid is reused (L-2).
+//
+// It is read like app-host.json: opened without following a link, a regular file of this user with
+// no group or other access, at most MAX_RECORD_BYTES, exactly these keys; anything else does not
+// count. The worst a same-user process can do with it is silence the osascript alert for one ID (the
+// approval still waits on Home and in the AI app's answer), which it could already do by other means
+// (04 §2.5; IR-N7-1 L-1).
 import { constants } from 'node:fs';
 import { mkdir, open, rename, unlink } from 'node:fs/promises';
+import { uptime } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
 import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { pidAlive } from './app-host-record.js';
+import { isAgentName } from './agent-name.js';
 
 /** The record's file name under `~/.agentlink`. */
 export const DESKTOP_ALERTS_FILE = 'desktop-alerts.json';
-const MAX_RECORD_BYTES = 128;
+/** A record not renewed for this long no longer counts (the host renews it every minute). */
+export const RECORD_LEASE_MS = 3 * 60_000;
+/** Clock slack for the boot comparison. */
+const BOOT_SLACK_MS = 60_000;
+const MAX_RECORD_BYTES = 256;
 const FILE_MODE = 0o600;
 const DIR_MODE = 0o700;
 const POSIX = process.platform !== 'win32';
+
+export interface DesktopAlertsRecord {
+  readonly pid: number;
+  /** When the host process started (ms since the epoch). */
+  readonly started: number;
+  /** When this record was written (ms since the epoch). */
+  readonly at: number;
+  /** The ID the desktop app alerts for (an agent name). */
+  readonly id: string;
+}
+
+/** The checks a reader makes (tests replace them). */
+export interface DesktopAlertsChecks {
+  readonly alive?: (pid: number) => boolean;
+  /** Now, ms since the epoch. */
+  readonly now?: () => number;
+  /** When this machine booted, ms since the epoch. */
+  readonly bootedAt?: () => number;
+}
 
 const recordPath = (home: string): string => join(home, '.agentlink', DESKTOP_ALERTS_FILE);
 
 const ownUid = (): number | undefined =>
   typeof process.getuid === 'function' ? process.getuid() : undefined;
 
-/** The pid in a record's text, or undefined for any other shape. */
-function parseRecord(text: string): number | undefined {
+const whole = (v: unknown): v is number =>
+  typeof v === 'number' && Number.isSafeInteger(v) && v > 0;
+
+/** The record from its text, or undefined for any other shape. */
+function parseRecord(text: string): DesktopAlertsRecord | undefined {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -38,13 +74,16 @@ function parseRecord(text: string): number | undefined {
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return undefined;
   const record = parsed as Record<string, unknown>;
-  if (Object.keys(record).sort().join(',') !== 'pid,v' || record['v'] !== 1) return undefined;
-  const pid = record['pid'];
-  return typeof pid === 'number' && Number.isSafeInteger(pid) && pid > 0 ? pid : undefined;
+  if (Object.keys(record).sort().join(',') !== 'at,id,pid,started,v' || record['v'] !== 1) {
+    return undefined;
+  }
+  const { pid, started, at, id } = record;
+  if (!whole(pid) || !whole(started) || !whole(at) || !isAgentName(id)) return undefined;
+  return Object.freeze({ pid, started, at, id });
 }
 
-/** The recorded pid, or undefined (missing, a link, not private, not ours, oversized, malformed). */
-async function readRecord(home: string): Promise<number | undefined> {
+/** The record, or undefined (missing, a link, not private, not ours, oversized, malformed). */
+async function readRecord(home: string): Promise<DesktopAlertsRecord | undefined> {
   try {
     const handle = await open(
       recordPath(home),
@@ -69,8 +108,20 @@ async function readRecord(home: string): Promise<number | undefined> {
   }
 }
 
-/** Marks that the desktop app (this pid) owns the OS notifications. */
-export async function writeDesktopAlertsRecord(home: string, pid: number): Promise<void> {
+/** When this process started (ms since the epoch). */
+export function processStartedAt(): number {
+  return Math.max(1, Math.round(Date.now() - process.uptime() * 1000));
+}
+
+/** Marks that the desktop app (this pid) owns the OS notifications for `id`. */
+export async function writeDesktopAlertsRecord(
+  home: string,
+  record: { readonly pid: number; readonly started: number; readonly id: string },
+  now: () => number = Date.now,
+): Promise<void> {
+  if (!isAgentName(record.id) || !whole(record.pid) || !whole(record.started)) {
+    throw new Error('desktop alerts record: invalid');
+  }
   const root = join(home, '.agentlink');
   await mkdir(root, { recursive: true, mode: DIR_MODE });
   const temp = join(root, `.${DESKTOP_ALERTS_FILE}.${encodeHex(randomBytes(8))}.tmp`);
@@ -81,7 +132,8 @@ export async function writeDesktopAlertsRecord(home: string, pid: number): Promi
   );
   try {
     if (POSIX) await handle.chmod(FILE_MODE);
-    await handle.writeFile(`${JSON.stringify({ v: 1, pid })}\n`, 'utf8');
+    const body = { v: 1, pid: record.pid, started: record.started, at: now(), id: record.id };
+    await handle.writeFile(`${JSON.stringify(body)}\n`, 'utf8');
     await handle.sync();
   } finally {
     await handle.close();
@@ -96,28 +148,36 @@ export async function writeDesktopAlertsRecord(home: string, pid: number): Promi
 
 /** Removes the mark only while it is still this pid's. */
 export async function removeDesktopAlertsRecord(home: string, pid: number): Promise<void> {
-  if ((await readRecord(home)) !== pid) return;
+  if ((await readRecord(home))?.pid !== pid) return;
   await unlink(recordPath(home)).catch(() => undefined);
 }
 
-/** True while a running desktop app owns the OS notifications. */
-export async function desktopOwnsAlerts(
+/** True while a running desktop app owns the OS notifications for the ID `id`. */
+export async function desktopAlertsFor(
   home: string,
-  alive: (pid: number) => boolean = pidAlive,
+  id: string,
+  checks: DesktopAlertsChecks = {},
 ): Promise<boolean> {
-  const pid = await readRecord(home);
-  return pid !== undefined && alive(pid);
+  const record = await readRecord(home);
+  if (record === undefined || record.id !== id) return false;
+  const now = (checks.now ?? Date.now)();
+  const bootedAt = (checks.bootedAt ?? (() => Date.now() - uptime() * 1000))();
+  // A record from before this boot, from a process that started before it, or not renewed.
+  if (record.started < bootedAt - BOOT_SLACK_MS) return false;
+  if (record.at < record.started || now - record.at > RECORD_LEASE_MS) return false;
+  return (checks.alive ?? pidAlive)(record.pid);
 }
 
 /**
- * Whether `agentlink mcp` may raise the osascript / notify-send approval alert: never while the
- * desktop app owns notifications; otherwise the owner's "Approvals waiting" switch (`approvalsOn`).
+ * Whether `agentlink mcp` for the ID `id` may raise the osascript / notify-send approval alert: not
+ * while the desktop app alerts for that ID; otherwise the owner's "Approvals waiting" switch.
  */
 export async function osApprovalAlertsOn(
   home: string,
+  id: string,
   approvalsOn: () => Promise<boolean>,
-  alive: (pid: number) => boolean = pidAlive,
+  checks: DesktopAlertsChecks = {},
 ): Promise<boolean> {
-  if (await desktopOwnsAlerts(home, alive)) return false;
+  if (await desktopAlertsFor(home, id, checks)) return false;
   return approvalsOn();
 }
