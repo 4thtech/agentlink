@@ -16,7 +16,8 @@
 // checks catch packaging mistakes and wrong-asset bugs; an ad-hoc signature proves consistency, not
 // who built it. Nothing here logs or returns a path, a URL or tool output.
 import { execFile } from 'node:child_process';
-import { lstat, mkdir, readdir, readFile, realpath } from 'node:fs/promises';
+import { constants as fsConstants } from 'node:fs';
+import { lstat, mkdir, open, readdir, realpath } from 'node:fs/promises';
 import { join, sep } from 'node:path';
 import { bundleFilePaths, verifyBundle } from '../bundle-check.js';
 import { hashFile } from './download.js';
@@ -186,6 +187,36 @@ function teamOf(result: RunResult): string | null {
   return m !== null && TEAM_ID.test(m[1]!.trim()) ? m[1]!.trim() : null;
 }
 
+/** No link, never blocks on a pipe (macOS defines both; 0 elsewhere, where this never runs). */
+const READ_NOFOLLOW =
+  fsConstants.O_RDONLY |
+  ((fsConstants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0) |
+  ((fsConstants as { O_NONBLOCK?: number }).O_NONBLOCK ?? 0);
+
+/**
+ * The bytes of `path`, a regular file of at most `max` bytes (CI-823: no lstat-then-read race).
+ * Opened once with O_NOFOLLOW (a link is refused, ELOOP); the type and size come from fstat of that
+ * same handle, and at most `max` + 1 bytes are read from it. Throws on anything else.
+ */
+async function readPlainFile(path: string, max: number): Promise<Uint8Array> {
+  const handle = await open(path, READ_NOFOLLOW);
+  try {
+    const st = await handle.stat();
+    if (!st.isFile() || st.size > max) throw new Error('not a small file');
+    const buf = new Uint8Array(max + 1);
+    let size = 0;
+    for (;;) {
+      const { bytesRead } = await handle.read(buf, size, buf.length - size, null);
+      if (bytesRead === 0) break;
+      size += bytesRead;
+      if (size > max) throw new Error('not a small file');
+    }
+    return buf.subarray(0, size);
+  } finally {
+    await handle.close().catch(() => undefined);
+  }
+}
+
 export interface StagedAppContext {
   /** The manifest version (already verified as strictly newer). */
   readonly version: string;
@@ -201,10 +232,9 @@ export async function verifyStagedApp(app: string, ctx: StagedAppContext): Promi
   const contents = join(app, 'Contents');
   let xml: string;
   try {
-    const plistPath = join(contents, 'Info.plist');
-    const st = await lstat(plistPath);
-    if (!st.isFile() || st.size > MAX_PLIST_BYTES) throw new Error('plist');
-    xml = new TextDecoder('utf-8', { fatal: true }).decode(await readFile(plistPath));
+    xml = new TextDecoder('utf-8', { fatal: true }).decode(
+      await readPlainFile(join(contents, 'Info.plist'), MAX_PLIST_BYTES),
+    );
   } catch {
     throw new InstallRefusal('wrong_bundle_id');
   }

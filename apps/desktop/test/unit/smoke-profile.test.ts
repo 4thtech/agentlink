@@ -22,7 +22,7 @@ interface Call {
   readonly args: string[];
   readonly home: string | undefined;
 }
-const recorder = (status = (_args: string[]) => 0 as number | null) => {
+const recorder = (status: (args: string[]) => number | null = () => 0) => {
   const calls: Call[] = [];
   return {
     calls,

@@ -8,6 +8,7 @@ import {
   lstat,
   mkdir,
   mkdtemp,
+  open,
   readFile,
   readdir,
   realpath,
@@ -212,7 +213,9 @@ describe('only the file the app saved, still unchanged (re-checked just before t
     it(`${platform}: a symlink at the saved name is refused; the link and its target stay`, async () => {
       const target = path.join(root, 'target.txt');
       await writeFile(target, BYTES);
-      const info = await lstat(target, { bigint: true });
+      // CI-823: the target's identity from an open handle (no lstat-then-read on the path below).
+      const handle = await open(target, 'r');
+      const info = await handle.stat({ bigint: true }).finally(() => handle.close());
       await symlink(target, path.join(inbox, 'link.txt'));
       const expected = {
         dev: info.dev.toString(),
