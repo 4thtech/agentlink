@@ -1,6 +1,8 @@
 // N5 (PLAN-NOTIFY §3.1, §4.1; D1, D4): the page side of the notification centre (N4's routes).
 //
-// - `readNotifications()`: `GET /api/ui/notifications`, read strictly by the shared reader
+// - `readNotifications()`: `POST /api/ui/notifications/refresh` (the server brings the store up to
+//   date; IR-NOTIFY-1 L-1: the GET only reads), then `GET /api/ui/notifications`, read strictly by the
+//   shared reader
 //   (ui-contract/notifications.ts): a kind, a contact ref, a count and times, never text, a name or a
 //   link. A failure is "nothing", never an error on screen.
 // - `markNotificationRead(id)` / `markAllNotificationsRead()`: the mark kind, an empty octet-stream
@@ -11,6 +13,7 @@
 import {
   NOTIFICATIONS_PATH,
   NOTIFICATIONS_READ_ALL_PATH,
+  NOTIFICATIONS_REFRESH_PATH,
   NOTIFICATION_READ_PATH,
   isNotificationId,
   readNotificationList,
@@ -49,6 +52,13 @@ export async function readNotifications(
   seam?: NotificationsFetch,
 ): Promise<NotificationList | undefined> {
   try {
+    // A failed refresh still reads what is stored.
+    await doFetch(seam)(NOTIFICATIONS_REFRESH_PATH, {
+      method: 'POST',
+      headers: { 'X-AgentLink-CSRF': token(), 'Content-Type': 'application/octet-stream' },
+      credentials: 'same-origin',
+      cache: 'no-store',
+    }).catch(() => undefined);
     const res = await doFetch(seam)(NOTIFICATIONS_PATH, {
       method: 'GET',
       headers: { 'X-AgentLink-CSRF': token() },

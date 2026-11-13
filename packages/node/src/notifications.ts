@@ -9,8 +9,12 @@
 //   update is available and whether the network has been down for more than 10 minutes.
 // - Kept for 30 days or 200 items, whichever is fewer; a state item (approvals, update, network) is
 //   removed once it is no longer true.
-// - The record is `{v: 1, cursor, items}`: `cursor` is the newest event time already counted, so the
-//   same event is never counted twice and nothing from before the store existed is backfilled.
+// - The record is `{v: 1, cursor, items, seen}`. `cursor` is when the last inbound read ended; the
+//   next read starts NOTIFICATION_INBOUND_OVERLAP_SECONDS before it (IR-NOTIFY-1 M-2, as flow.ts
+//   IR-U3-flow-1), so a message stored late with an older time is still counted. `seen` holds the
+//   events of that overlap already counted (kind, contact ID, time and the index among equal ones;
+//   no content), so an event is counted once. Events from before the store existed are never
+//   backfilled: the first read only notes them.
 // - One change at a time (a queue); nothing here logs.
 import {
   NOTIFICATION_KEEP_SECONDS,
@@ -27,7 +31,16 @@ export interface NotificationRecord {
   readonly v: 1;
   readonly cursor: number;
   readonly items: readonly NotificationItem[];
+  /** The inbound events of the overlap already counted (`<m|f><ref>:<at>:<n>`). */
+  readonly seen: readonly string[];
 }
+
+/** How far before the last read's end the next inbound read starts (a late-stored message). */
+export const NOTIFICATION_INBOUND_OVERLAP_SECONDS = 15 * 60;
+/** At most this many seen events are kept. */
+const MAX_SEEN = 2_000;
+const SEEN = /^[mf]0x[0-9a-f]{40}:([0-9]{1,16}):[0-9]{1,4}$/;
+const seenAt = (key: string): number => Number(SEEN.exec(key)?.[1] ?? 0);
 
 /** Where a store keeps its record (a JSON file under the ID folder, or memory). */
 export interface NotificationPersistence {
@@ -50,6 +63,8 @@ export interface NotificationSignals {
   readonly update?: boolean;
   /** The network has been down for more than 10 minutes. */
   readonly networkDown?: boolean;
+  /** When the inbound read ended (unix seconds); the cursor moves there. */
+  readonly scannedUntil?: number;
 }
 
 export interface NotificationStore {
@@ -59,8 +74,8 @@ export interface NotificationStore {
   /** False when no item has this ID. */
   markRead(id: string): Promise<boolean>;
   markAllRead(): Promise<void>;
-  /** The newest event time already counted (the next inbound read starts after it). */
-  cursor(): Promise<number>;
+  /** Where the next inbound read starts: the last read's end less the overlap. */
+  since(): Promise<number>;
 }
 
 const REF = /^0x[0-9a-f]{40}$/;
@@ -79,7 +94,13 @@ function plainObject(value: unknown): value is Record<string, unknown> {
  */
 export function readNotificationRecord(value: unknown): NotificationRecord | undefined {
   if (!plainObject(value)) return undefined;
-  if (Object.keys(value).sort().join(',') !== 'cursor,items,v') return undefined;
+  const keys = Object.keys(value).sort().join(',');
+  if (keys !== 'cursor,items,v' && keys !== 'cursor,items,seen,v') return undefined;
+  const rawSeen = value['seen'] ?? [];
+  if (!Array.isArray(rawSeen)) return undefined;
+  const seenKeys = (rawSeen as unknown[])
+    .filter((k): k is string => typeof k === 'string' && SEEN.test(k))
+    .slice(-MAX_SEEN);
   if (value['v'] !== 1 || !whole(value['cursor']) || !Array.isArray(value['items'])) {
     return undefined;
   }
@@ -91,7 +112,12 @@ export function readNotificationRecord(value: unknown): NotificationRecord | und
     seen.add(item.id);
     items.push(item);
   }
-  return Object.freeze({ v: 1, cursor: value['cursor'], items: Object.freeze(items) });
+  return Object.freeze({
+    v: 1,
+    cursor: value['cursor'],
+    items: Object.freeze(items),
+    seen: Object.freeze(seenKeys),
+  });
 }
 
 /** A store that lives only as long as the process (outside the app host, and tests). */
@@ -159,18 +185,23 @@ export function createNotificationStore(
     // No record (or an unreadable one): start now, so history from before is never backfilled.
     const found = readNotificationRecord(raw);
     if (found !== undefined) return found;
-    const started: NotificationRecord = { v: 1, cursor: now(), items: [] };
+    const started: NotificationRecord = { v: 1, cursor: now(), items: [], seen: [] };
     fresh.add(started);
     return started;
   };
-  const save = async (cursor: number, items: readonly NotificationItem[]): Promise<void> => {
-    const record: NotificationRecord = { v: 1, cursor, items: kept(items, now()) };
+  const save = async (
+    cursor: number,
+    items: readonly NotificationItem[],
+    seen: readonly string[],
+  ): Promise<void> => {
+    const record: NotificationRecord = { v: 1, cursor, items: kept(items, now()), seen };
     await persistence.write(record);
   };
 
   return Object.freeze<NotificationStore>({
     list: () => serial(async () => kept((await load()).items, now())),
-    cursor: () => serial(async () => (await load()).cursor),
+    since: () =>
+      serial(async () => Math.max(0, (await load()).cursor - NOTIFICATION_INBOUND_OVERLAP_SECONDS)),
     observe: (signals) =>
       serial(async () => {
         const record = await load();
@@ -195,25 +226,45 @@ export function createNotificationStore(
           'network',
           signals.networkDown === undefined ? undefined : signals.networkDown ? 1 : 0,
         );
-        let cursor = record.cursor;
+        const starting = fresh.has(record);
+        const windowStart = record.cursor - NOTIFICATION_INBOUND_OVERLAP_SECONDS;
+        const seen = new Set(record.seen);
+        const equal = new Map<string, number>();
         for (const e of [...(signals.inbound ?? [])].sort((a, b) => a.at - b.at)) {
-          if (!REF.test(e.contactId) || !whole(e.at) || e.at <= record.cursor) continue;
+          if (!REF.test(e.contactId) || !whole(e.at) || e.at < windowStart) continue;
           if (e.kind !== 'message' && e.kind !== 'file') continue;
+          // The event's identity: kind, person, time and its index among equal ones in this read
+          // (the read returns every event of the window, so the index is stable across reads).
+          const base = `${e.kind === 'file' ? 'f' : 'm'}${e.contactId}:${String(e.at)}`;
+          const n = equal.get(base) ?? 0;
+          equal.set(base, n + 1);
+          const key = `${base}:${String(n)}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          // The first read of a new store only notes what is already there (no backfill).
+          if (starting && e.at <= record.cursor) continue;
           const kind: NotificationKind = e.kind === 'file' ? 'files' : 'messages';
           const id = notificationId(kind, e.contactId);
           const before = byId.get(id);
           const count = before === undefined || before.read ? 1 : before.count + 1;
           const at = Math.max(e.at, before?.at ?? 0);
           byId.set(id, item(kind, count, at, false, e.contactId));
-          if (e.at > cursor) cursor = e.at;
         }
+        const until = signals.scannedUntil;
+        const cursor = whole(until) && until > record.cursor ? until : record.cursor;
+        const keepFrom = cursor - NOTIFICATION_INBOUND_OVERLAP_SECONDS;
+        const nextSeen = [...seen]
+          .filter((k) => seenAt(k) >= keepFrom)
+          .sort((a, b) => seenAt(a) - seenAt(b) || (a < b ? -1 : a > b ? 1 : 0))
+          .slice(-MAX_SEEN);
         const items = kept([...byId.values()], t);
         // Nothing changed (the usual poll): no write.
         const same =
-          !fresh.has(record) &&
+          !starting &&
           cursor === record.cursor &&
+          JSON.stringify(nextSeen) === JSON.stringify(record.seen) &&
           JSON.stringify(items) === JSON.stringify(kept(record.items, t));
-        if (!same) await save(cursor, items);
+        if (!same) await save(cursor, items, nextSeen);
       }),
     markRead: (id) =>
       serial(async () => {
@@ -226,6 +277,7 @@ export function createNotificationStore(
           await save(
             record.cursor,
             items.map((i) => (i.id === id ? item(i.kind, i.count, i.at, true, i.ref) : i)),
+            record.seen,
           );
         }
         return true;
@@ -237,6 +289,7 @@ export function createNotificationStore(
         await save(
           record.cursor,
           record.items.map((i) => (i.read ? i : item(i.kind, i.count, i.at, true, i.ref))),
+          record.seen,
         );
       }),
   });

@@ -20,20 +20,11 @@ Open the bell to see a short list in three groups:
 - With the keyboard: Tab to the bell, Enter to open, the arrow keys to move, Escape to close.
 - On a phone the list opens across the screen.
 
-The list never holds what a message says, a file's name or a link. People are named only with the names in your own People list; anyone else is "a contact". The list stays on this computer, in the ID's own folder, and keeps the last 30 days (at most 200 lines).
+The list never holds what a message says, a file's name or a link. A person is named only by a name **you** gave them on People; someone who only has the name they chose for themselves, or anyone else, is "a contact". The list stays on this computer, in the ID's own folder, and keeps the last 30 days (at most 200 lines).
 
 ## Settings › Notifications
 
-**Settings › Notifications** says what AgentLink may alert you about on this computer. Your choices are kept for this copy of AgentLink, for every ID.
-
-| Switch | Starts |
-|---|---|
-| **Approvals waiting** | On. A notification only opens the request; it never approves anything. |
-| **New messages and files** | Off |
-| **People joined or left** | Off |
-| **Problems that need you** | Off |
-| **Show names in notifications** | Off: notifications say "a contact". Message text is never shown. |
-| **Quiet hours** | Off |
+**Settings › Notifications** has one switch today, **Approvals waiting**, which starts **on**. When your AI asks for an approval and AgentLink cannot open it in your browser, a short alert on this computer says one is waiting. The alert names no one and never approves anything. Turn the switch off and AgentLink shows no such alert; the bell and Home still show the approval. Your choice is kept for this copy of AgentLink, for every ID.
 
 The bell in the app always lists what is new, whatever you choose here. Nothing on this page changes what your AI may do.
 

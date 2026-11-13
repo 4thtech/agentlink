@@ -3,7 +3,10 @@
 // route (approval-server.ts).
 //
 // - `GET /api/ui/notifications` (`presence: false`): `{items, unread, approvals}` of the open ID,
-//   newest first. Each item is built again by the one strict reader (ui-contract/notifications.ts):
+//   newest first, as stored: it reads only and never writes (IR-NOTIFY-1 L-1).
+// - `POST /api/ui/notifications/refresh` (the `mark` kind): brings the store up to date with what
+//   the server sees now (approvals waiting, inbound events, update, network) and writes it when
+//   something changed. The page sends it before each read. Each item is built again by the one strict reader (ui-contract/notifications.ts):
 //   a kind, an ID ref, a count and times, never text, a name, a file name or a link (I-5, I-7).
 // - `POST /api/ui/notifications/:id/read` and `POST /api/ui/notifications/read-all`: the `mark`
 //   kind (route-types.ts MARK_PATHS): display state only (nothing is decided from it), no owner
@@ -15,6 +18,7 @@ import type { JsonObject } from '@4thtech-io/crypto';
 import {
   NOTIFICATIONS_PATH,
   NOTIFICATIONS_READ_ALL_PATH,
+  NOTIFICATIONS_REFRESH_PATH,
   NOTIFICATION_READ_PATH,
   approvalsOf,
   isNotificationId,
@@ -32,12 +36,19 @@ import {
   type LocalUiRoute,
 } from '../route-types.js';
 
-export { NOTIFICATIONS_PATH, NOTIFICATIONS_READ_ALL_PATH, NOTIFICATION_READ_PATH };
+export {
+  NOTIFICATIONS_PATH,
+  NOTIFICATIONS_READ_ALL_PATH,
+  NOTIFICATIONS_REFRESH_PATH,
+  NOTIFICATION_READ_PATH,
+};
 
 /** The open ID's notification store, as the server binds it (approval-server.ts). Never throws text. */
 export interface LocalUiNotificationsDesk {
-  /** Brings the store up to date with what the server sees now, then lists it. */
+  /** The stored items (reads only). */
   list(): Promise<readonly NotificationItem[]>;
+  /** Brings the store up to date with what the server sees now (writes when something changed). */
+  refresh(): Promise<void>;
   markRead(id: string): Promise<boolean>;
   markAllRead(): Promise<void>;
 }
@@ -116,8 +127,25 @@ const readAllRoute: LocalUiMarkRoute = Object.freeze<LocalUiMarkRoute>({
   },
 });
 
+const refreshRoute: LocalUiMarkRoute = Object.freeze<LocalUiMarkRoute>({
+  method: 'POST',
+  path: NOTIFICATIONS_REFRESH_PATH,
+  presence: 'mark',
+  handler: async (context): Promise<LocalUiResult> => {
+    const desk = context.notifications;
+    if (desk === undefined) return DONE;
+    try {
+      await desk.refresh();
+      return DONE;
+    } catch {
+      return UI_UNAVAILABLE;
+    }
+  },
+});
+
 export const notificationsRoutes: readonly LocalUiRoute[] = Object.freeze([
   listRoute,
   readRoute,
   readAllRoute,
+  refreshRoute,
 ]);

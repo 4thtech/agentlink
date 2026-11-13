@@ -10,14 +10,17 @@
 // itself from the kind; a person's name comes from the page's own contact list by ref.
 //
 // - `GET /api/ui/notifications` (a read route): `{items, unread, approvals}`, newest first.
-// - `POST /api/ui/notifications/:id/read` and `POST /api/ui/notifications/read-all` (the `mark`
-//   kind: display state only, no input, no presence, nothing signed; every write gate applies).
+// - `POST /api/ui/notifications/:id/read`, `POST /api/ui/notifications/read-all` and
+//   `POST /api/ui/notifications/refresh` (the `mark` kind: display state only, no input, no
+//   presence, nothing signed; every write gate applies). Only these write; the GET only reads.
 // - Kept for 30 days or 200 items per ID, whichever is fewer (NOTIFICATION_KEEP_SECONDS,
 //   NOTIFICATION_MAX_ITEMS).
 
 export const NOTIFICATIONS_PATH = '/api/ui/notifications';
 export const NOTIFICATION_READ_PATH = '/api/ui/notifications/:id/read';
 export const NOTIFICATIONS_READ_ALL_PATH = '/api/ui/notifications/read-all';
+/** IR-NOTIFY-1 L-1: brings the store up to date (the GET only reads). The mark kind. */
+export const NOTIFICATIONS_REFRESH_PATH = '/api/ui/notifications/refresh';
 
 /** What an item is about (PLAN-NOTIFY §3.2). */
 export const NOTIFICATION_KINDS = ['approvals', 'messages', 'files', 'update', 'network'] as const;

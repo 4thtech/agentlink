@@ -503,6 +503,7 @@ export const MARK_PATHS: readonly string[] = Object.freeze([
   // N4: the notification centre's read marks (display state only).
   '/api/ui/notifications/:id/read',
   '/api/ui/notifications/read-all',
+  '/api/ui/notifications/refresh',
 ]);
 
 export type LocalUiRoute =

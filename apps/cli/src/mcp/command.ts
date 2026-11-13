@@ -25,6 +25,7 @@
 // - M1-11b-8: once per start, while that setup may be wired and on a machine with a display, the
 //   start opens the first-run page through the OS opener (first-run-on-start.ts); the tools answer
 //   as before and never see the link.
+import { homedir } from 'node:os';
 import { dirname } from 'node:path';
 import process from 'node:process';
 import type { Readable, Writable } from 'node:stream';
@@ -42,6 +43,8 @@ import {
   type OpenAgentResult,
   type OpenedAgent,
 } from '../runtime/index.js';
+import { notifyPrefsInForce } from '@4thtech-io/types/ui-contract/notifications';
+import { readUiSettingsFile } from '../runtime/agent-dir.js';
 import { cliVersion } from '../runtime/cli-version.js';
 import { cliPrefix } from '../runtime/cli-prefix.js';
 import { ownerKnownAbsent } from '../runtime/owner-on-machine.js';
@@ -293,6 +296,9 @@ export const mcpCommand = (version: string): CommandHandler => {
           return startApprovalServer({
             source,
             localUi,
+            // IR-NOTIFY-1 M-1 (N6): Settings › Notifications › Approvals waiting, read on each alert.
+            approvalAlerts: async () =>
+              notifyPrefsInForce((await readUiSettingsFile(homedir()))?.notify).approvals,
             // Fixed values only (ApprovalServerEvent, I-7).
             onEvent: (event) => {
               logger.debug('approval ui event', { ...event });

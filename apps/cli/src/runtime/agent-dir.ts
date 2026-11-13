@@ -850,8 +850,8 @@ export async function writeUiSettingsFile(
  * reads it strictly). Local only, never sent anywhere.
  */
 export const NOTIFICATIONS_FILE = 'notifications.json';
-/** 200 items of about 120 bytes each, with room to spare. */
-const MAX_NOTIFICATIONS_BYTES = 64 * 1024;
+/** 200 items of about 120 bytes and 2,000 seen events of about 60 bytes, with room to spare. */
+const MAX_NOTIFICATIONS_BYTES = 192 * 1024;
 
 /** N4: the parsed record, or undefined (absent, a link, non-private, oversized or malformed). */
 export async function readAgentNotifications(

@@ -346,9 +346,9 @@ describe('IR-NOTIFY-1 L-1: the GET only reads; POST …/refresh brings the store
     expect(after.items.map((i) => i.id)).toContain('update');
     expect(h.world.writes).toHaveLength(1);
     // Every write gate still applies.
-    expect((await h.mark(NOTIFICATIONS_REFRESH_PATH, { 'X-AgentLink-CSRF': undefined })).status).toBe(
-      403,
-    );
+    expect(
+      (await h.mark(NOTIFICATIONS_REFRESH_PATH, { 'X-AgentLink-CSRF': undefined })).status,
+    ).toBe(403);
     expect((await h.mark(NOTIFICATIONS_REFRESH_PATH, { Origin: undefined })).status).toBe(403);
   });
 });

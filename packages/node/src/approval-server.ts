@@ -388,6 +388,7 @@ import {
 } from '@4thtech-io/types/ui-contract/ui-settings';
 import { createUiSettingsDesk } from './local-ui/api/ui-settings.js';
 import type { LocalUiNotificationsDesk } from './local-ui/api/notifications.js';
+import { notifyPrefsInForce } from '@4thtech-io/types/ui-contract/notifications';
 import {
   createNotificationStore,
   memoryNotificationPersistence,
@@ -943,6 +944,11 @@ export type OwnerSetupFailure =
 
 export interface ApprovalServerOptions {
   readonly source: ApprovalServerSource;
+  /**
+   * IR-NOTIFY-1 M-1 (N6): whether the OS approval alert (notifyNewApproval) may show, read on each
+   * alert. Absent: the app host's UI settings (`notify.approvals`), else on (the D2 default).
+   */
+  readonly approvalAlerts?: () => Promise<boolean>;
   /** Receives fixed-value events (for the redacting logger). Exceptions in it are ignored. */
   readonly onEvent?: (event: ApprovalServerEvent) => void;
   /** M1-11s-b: the local UI app's files and the agent's core client (D-118). */
@@ -1728,6 +1734,7 @@ export async function startApprovalServerWith(
       const out: {
         approvals?: number;
         inbound?: readonly NotificationInbound[];
+        scannedUntil?: number;
         update?: boolean;
         networkDown?: boolean;
       } = {};
@@ -1740,13 +1747,17 @@ export async function startApprovalServerWith(
       }
       if (client !== undefined) {
         try {
+          // IR-NOTIFY-1 M-2: the read starts before the last one ended (store: since), so a
+          // message stored late with an older time is still seen; the store counts each once.
           const until = Math.floor(now() / 1000);
-          const since = (await kept.cursor()) + 1;
+          const since = await kept.since();
           if (since <= until) {
             const flow = await client.messages.flowEvents(since, until);
             out.inbound = flow.events
               .filter((e) => e.direction === 'in')
               .map((e) => ({ contactId: e.contactId, kind: e.kind, at: e.at }));
+            // A capped read keeps the cursor where it was (the next read covers the rest again).
+            if (!flow.capped) out.scannedUntil = until;
           }
         } catch {
           // Nothing new is counted this time; the cursor stays.
@@ -1775,14 +1786,28 @@ export async function startApprovalServerWith(
     };
     return {
       notifications: Object.freeze<LocalUiNotificationsDesk>({
-        list: async () => {
+        list: () => kept.list(),
+        refresh: async () => {
           await kept.observe(await signals());
-          return kept.list();
         },
         markRead: (id) => kept.markRead(id),
         markAllRead: () => kept.markAllRead(),
       }),
     };
+  }
+  /**
+   * IR-NOTIFY-1 M-1 (N6): whether the OS approval alert is on. The caller's answer when it gave one
+   * (agentlink mcp reads ui-settings.json), else the app host's UI settings, else the D2 default (on).
+   * Unreadable settings count as the default.
+   */
+  async function approvalAlertsOn(): Promise<boolean> {
+    try {
+      if (options.approvalAlerts !== undefined) return await options.approvalAlerts();
+      if (uiSettingsDesk === undefined) return true;
+      return notifyPrefsInForce((await uiSettingsDesk.read()).notify).approvals;
+    } catch {
+      return true;
+    }
   }
   // WP-P2: every ID's people for the People page. Read only: the open ID through its own client
   // (captured with its name and the generation in one step), every other ID as a count from the
@@ -7855,7 +7880,8 @@ export async function startApprovalServerWith(
     openJoin: () => openJoinPage(false),
     notifyNewApproval: async (approvalId: string) => {
       const url = approvalUrl(approvalId);
-      await notifier(NOTIFICATION).catch(() => false);
+      // IR-NOTIFY-1 M-1 (N6): Settings › Notifications › Approvals waiting governs this alert.
+      if (await approvalAlertsOn()) await notifier(NOTIFICATION).catch(() => false);
       return url;
     },
     close: async () => {

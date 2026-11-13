@@ -6,8 +6,10 @@
 //   bell, a click outside closes it), grouped Needs you · New · Earlier, with Mark all read, a link
 //   to Settings › Notifications and Open Activity. A row opens its page and marks it read. A waiting
 //   approval stays counted until it is decided (marking it read never decides it).
-// - Names: a person is named only from the owner's own contact list, by ref, as bold React text; an
-//   unknown ref is "a contact". Items never carry text, a file name or a link (N4).
+// - Names (IR-NOTIFY-1 H-1, I-5): a person is named only by a name the OWNER gave them
+//   (`nameSource: 'owner'`, as Start here and the connections map do), as bold React text. A name
+//   the contact chose for themselves, or an unknown ref, is "a contact". Items never carry text, a
+//   file name or a link (N4).
 // - On a phone the centre is a sheet across the width (shell.css).
 // - It also keeps the tab title's number and the favicon dot in step (attention.ts).
 import { useCallback, useEffect, useRef, useState, type ReactElement, type RefObject } from 'react';
@@ -20,7 +22,8 @@ import {
   type NotificationList,
 } from '../api/notifications.js';
 import { ACTIVITY_PATH, HOME_PATH } from '../nav.js';
-import { LIST_PATH, parseList } from '../pages/contacts/data.js';
+import { formatContactName } from '@4thtech-io/ui';
+import { LIST_PATH, parseList, type ContactRow } from '../pages/contacts/data.js';
 import { navigate } from '../router.js';
 import { setAttention } from './attention.js';
 import { NOTIFY_STRINGS as S } from './notification-strings.js';
@@ -188,12 +191,22 @@ function Group({
   );
 }
 
+/** The owner-given names by ref; a self-declared name is never kept (I-5). */
+export function ownerNames(rows: readonly ContactRow[]): ReadonlyMap<string, string> {
+  const names = new Map<string, string>();
+  for (const row of rows) {
+    if (row.nameSource !== 'owner' || row.name.trim() === '') continue;
+    names.set(row.ref, formatContactName({ alias: row.name }).text);
+  }
+  return names;
+}
+
 async function readNames(): Promise<ReadonlyMap<string, string>> {
   const answer = await createApiClient().get(LIST_PATH);
   if (answer.kind !== 'ok') return new Map();
   const list = parseList(answer.data);
   if (list.kind !== 'ok') return new Map();
-  return new Map(list.contacts.map((c) => [c.ref, c.name]));
+  return ownerNames(list.contacts);
 }
 
 export interface NotificationPanelProps {
@@ -213,6 +226,8 @@ export function NotificationPanel(props: NotificationPanelProps): ReactElement {
   const { list, names, now, onOpen } = props;
   const g = groupsOf(list.items);
   const empty = list.items.length === 0;
+  // Approvals stay counted until decided, so only other unread items can be marked read.
+  const nothingUnread = list.items.every((i) => i.kind === 'approvals' || i.read);
   return (
     <ShellMenu
       label={S.title}
@@ -226,10 +241,10 @@ export function NotificationPanel(props: NotificationPanelProps): ReactElement {
           type="button"
           role="menuitem"
           className="al-mitem al-nc-headbtn"
-          aria-disabled={
-            list.items.every((i) => i.kind === 'approvals' || i.read) ? 'true' : undefined
-          }
-          onClick={props.onMarkAll}
+          aria-disabled={nothingUnread ? 'true' : undefined}
+          onClick={() => {
+            if (!nothingUnread) props.onMarkAll();
+          }}
         >
           {S.markAll}
         </button>

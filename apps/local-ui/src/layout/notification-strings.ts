@@ -36,19 +36,9 @@ export const NOTIFY_STRINGS = {
 export const NOTIFY_SETTINGS_STRINGS = {
   title: 'Notifications',
   intro:
-    'Choose what AgentLink may alert you about on this computer. The bell in the app always lists what is new.',
-  line: 'Approvals, messages and problems',
+    'The bell at the top of the app always lists what is new. Here you choose what AgentLink may also tell you outside the app.',
   approvals: 'Approvals waiting',
-  approvalsHint: 'Opens the request. A notification never approves anything.',
-  messages: 'New messages and files',
-  messagesHint: 'Only when AgentLink is not in front.',
-  people: 'People joined or left',
-  problems: 'Problems that need you',
-  problemsHint: 'The message network down for 10 minutes, or an update that failed.',
-  showNames: 'Show names in notifications',
-  showNamesHint: 'Off: “a contact”. Message text is never shown.',
-  quietHours: 'Quiet hours',
-  quietHoursHint: 'Approvals still show in the app.',
-  onWord: 'Approvals on',
+  approvalsHint:
+    'When your AI asks for an approval and AgentLink cannot open it in your browser, a short alert on this computer says one is waiting. It names no one and never approves anything.',
   saveFailed: "Couldn't save this choice. Try again.",
 } as const;
