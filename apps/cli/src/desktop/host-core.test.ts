@@ -32,6 +32,8 @@ import {
 import { runDesktopHost, type DesktopHostDeps } from './host-core.js';
 import type { DesktopPipe } from './pipe.js';
 import type { HostMessage, ShellMessage } from './protocol.js';
+import type { DesktopAlertState } from '@4thtech-io/node';
+import { NOTIFY_DEFAULTS } from '@4thtech-io/types/ui-contract/notifications';
 
 const INVITE = `${INVITE_LINK_PREFIX}SECRETinvitePAYLOAD_abc-123`;
 const INVITE_MARK = 'SECRETinvitePAYLOAD';
@@ -118,10 +120,19 @@ function fakePipe(): {
 }
 
 /** The approval server stand-in: real loopback handoff route, links minted like the real one. */
+/** N7: what a test's server answers for the desktop alerts (undefined: no centre). */
+interface FakeAlerts {
+  state: () => DesktopAlertState | undefined;
+  names?: ReadonlyMap<string, string>;
+  /** The refs ownerNames was asked for. */
+  asked?: string[][];
+}
+
 async function fakeServer(
   options: ApprovalServerOptions,
   sink: (url: string) => Promise<boolean>,
   log: string[],
+  alerts?: FakeAlerts,
 ): Promise<ApprovalServer> {
   const token = 'H'.repeat(43);
   let joinInvite: string | undefined;
@@ -161,6 +172,12 @@ async function fakeServer(
     openHome: () => sink(`${origin}/settings/home?t=${mint()}`),
     openFirstRun: () => sink(`${origin}/first-run?t=${mint()}`),
     openJoin: () => sink(`${origin}/settings/join?t=${mint()}`),
+    openUpdates: () => sink(`${origin}/settings/updates?t=${mint()}`),
+    desktopAlerts: () => Promise.resolve(alerts?.state()),
+    ownerNames: (refs: readonly string[]) => {
+      alerts?.asked?.push([...refs]);
+      return Promise.resolve(alerts?.names ?? new Map<string, string>());
+    },
     /** Test only: the app switches to `name` (D-138). */
     switchTo: async (name: string) => {
       await current?.close();
@@ -178,10 +195,11 @@ async function fakeServer(
   return server as unknown as ApprovalServer;
 }
 
-function source(pending: number): ApprovalServerSource {
+function source(pending: number | (() => number)): ApprovalServerSource {
+  const count = (): number => (typeof pending === 'number' ? pending : pending());
   return {
     context: () => Promise.resolve(undefined),
-    list: () => Promise.resolve(new Array<PendingApprovalView>(pending).fill({} as never)),
+    list: () => Promise.resolve(new Array<PendingApprovalView>(count()).fill({} as never)),
     get: () => Promise.resolve(undefined),
     apply: () => Promise.reject(new Error('x')),
   };
@@ -197,14 +215,22 @@ interface Setup {
   };
   handoffs: { record: AppHostHandoffRecordValue; link: string }[];
   stopSignal(): void;
+  /** N7: the server options the host started the server with. */
+  options(): ApprovalServerOptions | undefined;
 }
 
 function setup(
-  over: { start?: UiDeps['start']; pending?: number; failure?: 'no_owner' } = {},
+  over: {
+    start?: UiDeps['start'];
+    pending?: number | (() => number);
+    failure?: 'no_owner';
+    alerts?: FakeAlerts;
+  } = {},
 ): Setup {
   const pipe = fakePipe();
   const log: string[] = [];
   let made: ApprovalServer | undefined;
+  let startedWith: ApprovalServerOptions | undefined;
   const handoffs: Setup['handoffs'] = [];
   let signal: () => void = () => undefined;
   const deps: DesktopHostDeps = {
@@ -251,7 +277,8 @@ function setup(
         }),
     }),
     startServer: async (options, sink) => {
-      made = await fakeServer(options, sink, log);
+      startedWith = options;
+      made = await fakeServer(options, sink, log, over.alerts);
       return made;
     },
     invite: {
@@ -276,6 +303,7 @@ function setup(
     server: () => made as never,
     handoffs,
     stopSignal: () => signal(),
+    options: () => startedWith,
   };
 }
 
@@ -595,5 +623,126 @@ describe('runDesktopHost (WP-D3)', () => {
     expect(readies(s.pipe.sent)).toEqual([]);
     s.pipe.shell({ v: 1, type: 'shutdown' });
     await run;
+  });
+});
+
+describe('N7: native notifications from the desktop host', () => {
+  const A = `0x${'a'.repeat(40)}`;
+  const notifies = (sent: HostMessage[]): HostMessage[] => sent.filter((m) => m.type === 'notify');
+
+  it('the desktop app owns notifications: its server never shows the osascript/notify-send alert', async () => {
+    const s = setup();
+    const run = runDesktopHost(s.deps);
+    await until(() => readies(s.pipe.sent).length === 1);
+    expect(await s.options()?.approvalAlerts?.()).toBe(false);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+  });
+
+  it('a new approval: one notify with the number waiting (D2: approvals on); nothing at start', async () => {
+    let pending = 1;
+    const s = setup({
+      pending: () => pending,
+      alerts: { state: () => ({ scope: 'default', items: [], prefs: { ...NOTIFY_DEFAULTS } }) },
+    });
+    const run = runDesktopHost(s.deps);
+    await until(() => s.pipe.sent.some((m) => m.type === 'approval-waiting'));
+    await new Promise((r) => setTimeout(r, 40));
+    // Already waiting at start: the window opens on Home; no alert for it.
+    expect(notifies(s.pipe.sent)).toEqual([]);
+    pending = 2;
+    await until(() => notifies(s.pipe.sent).length === 1);
+    expect(notifies(s.pipe.sent)).toEqual([
+      { v: 1, type: 'notify', kind: 'approvals', count: 2, name: '' },
+    ]);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+  });
+
+  it('the switches are respected: approvals off → no notify', async () => {
+    let pending = 0;
+    const s = setup({
+      pending: () => pending,
+      alerts: {
+        state: () => ({ scope: 'default', items: [], prefs: { ...NOTIFY_DEFAULTS, approvals: false } }),
+      },
+    });
+    const run = runDesktopHost(s.deps);
+    await until(() => s.pipe.sent.some((m) => m.type === 'approval-waiting'));
+    pending = 3;
+    await until(() => s.pipe.sent.some((m) => m.type === 'approval-waiting' && m.count === 3));
+    await new Promise((r) => setTimeout(r, 40));
+    expect(notifies(s.pipe.sent)).toEqual([]);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+  });
+
+  it('new messages with Show names on: the owner-given name, asked only for that person', async () => {
+    let count = 0;
+    const asked: string[][] = [];
+    const s = setup({
+      alerts: {
+        state: () => ({
+          scope: 'default',
+          items:
+            count === 0
+              ? []
+              : [{ id: `messages-${A}`, kind: 'messages', ref: A, count, at: 10 + count, read: false }],
+          prefs: { ...NOTIFY_DEFAULTS, messages: true, showNames: true },
+        }),
+        names: new Map([[A, 'Ana']]),
+        asked,
+      },
+    });
+    const run = runDesktopHost(s.deps);
+    await until(() => readies(s.pipe.sent).length === 1);
+    await new Promise((r) => setTimeout(r, 30));
+    count = 2;
+    await until(() => notifies(s.pipe.sent).length === 1);
+    expect(notifies(s.pipe.sent)).toEqual([
+      { v: 1, type: 'notify', kind: 'messages', count: 2, name: 'Ana' },
+    ]);
+    expect(asked).toEqual([[A]]);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+  });
+
+  it('show inbox and updates open fixed pages only', async () => {
+    const s = setup();
+    const run = runDesktopHost(s.deps);
+    await until(() => readies(s.pipe.sent).length === 1);
+    s.pipe.shell({ v: 1, type: 'show', route: 'inbox' });
+    s.pipe.shell({ v: 1, type: 'show', route: 'updates' });
+    await until(() => readies(s.pipe.sent).length === 3);
+    expect(readies(s.pipe.sent).map((u) => new URL(u).pathname)).toEqual([
+      '/settings/home',
+      '/',
+      '/settings/updates',
+    ]);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+  });
+
+  it('marks itself as owning OS alerts while it runs, and only then', async () => {
+    const s = setup();
+    const marks: string[] = [];
+    s.deps = {
+      ...s.deps,
+      alertsRecord: {
+        write: () => {
+          marks.push('write');
+          return Promise.resolve();
+        },
+        remove: () => {
+          marks.push('remove');
+          return Promise.resolve();
+        },
+      },
+    };
+    const run = runDesktopHost(s.deps);
+    await until(() => marks.includes('write'));
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+    expect(marks).toEqual(['write', 'remove']);
   });
 });

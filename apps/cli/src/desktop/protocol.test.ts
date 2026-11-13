@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { joinLinkOf } from '../commands/join.js';
 import {
   MAX_PIPE_LINE_BYTES,
+  SHOW_ROUTES,
   encodeHostMessage,
   encodeShellMessage,
   isInviteLink,
@@ -212,5 +213,32 @@ describe('app update messages', () => {
     expect(parseHostMessage(line({ v: 1, type: 'app-update-check', url: DMG }))).toBeUndefined();
     expect(parseShellMessage(line({ v: 1, type: 'app-update-check' }))).toBeUndefined();
     expect(parseHostMessage(line(ok))).toBeUndefined();
+  });
+});
+
+describe('N7: notify (core -> shell), fixed codes only', () => {
+  const l = (value: unknown): string => JSON.stringify(value);
+  it('kind, count and a name ("" unless an owner alias on messages or files)', () => {
+    expect(parseHostMessage(l({ v: 1, type: 'notify', kind: 'update', count: 1, name: '' }))).toEqual(
+      { v: 1, type: 'notify', kind: 'update', count: 1, name: '' },
+    );
+    expect(
+      parseHostMessage(l({ v: 1, type: 'notify', kind: 'files', count: 2, name: 'Ana' })),
+    ).toEqual({ v: 1, type: 'notify', kind: 'files', count: 2, name: 'Ana' });
+  });
+  it.each([
+    { v: 1, type: 'notify', kind: 'messages', count: 1, name: '', text: 'hello' },
+    { v: 1, type: 'notify', kind: 'messages', count: 1 },
+    { v: 1, type: 'notify', kind: 'network', count: 1, name: '' },
+    { v: 1, type: 'notify', kind: 'messages', count: 0, name: '' },
+    { v: 1, type: 'notify', kind: 'approvals', count: 1, name: 'Ana' },
+    { v: 1, type: 'notify', kind: 'messages', count: 1, name: 'Ana\nhttps://x' },
+    { v: 1, type: 'notify', kind: 'messages', count: 1, name: 'A'.repeat(33) },
+  ])('rejects %j', (value) => {
+    expect(parseHostMessage(l(value))).toBeUndefined();
+  });
+  it('show may also open inbox and updates; session links may land on /settings/updates', () => {
+    expect(SHOW_ROUTES).toEqual(['home', 'approvals', 'join', 'inbox', 'updates']);
+    expect(isSessionUrl(`http://localhost:4567/settings/updates?t=${TOKEN}`)).toBe(true);
   });
 });
