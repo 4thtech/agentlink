@@ -49,10 +49,15 @@ const CURRENT: AppUpdateView = { state: 'current', current: '0.5.2', latest: '',
 describe('the placeholder root key means in-app updates are off (UPD-5)', () => {
   const base = { platform: 'darwin', packaged: true, preview: false, execPath: APP_EXEC };
 
-  it('today’s root-key.json and the updates-off file turn the in-app path off', () => {
-    expect(rootKeyFile.rootPublicKey).toMatch(/^PLACEHOLDER-AGENTLINK-DESKTOP-ROOT-KEY/);
-    expect(inAppEnabled({ ...base })).toBe(false);
-    expect(inAppEnabled({ ...base, root: rootKeyFile })).toBe(false);
+  it('a placeholder root and the updates-off file turn the in-app path off; today’s root-key.json is the owner pin', () => {
+    const placeholder = {
+      rootPublicKey: 'PLACEHOLDER-AGENTLINK-DESKTOP-ROOT-KEY',
+      minimumStatementSequence: 0,
+    };
+    expect(rootKeyFile.rootPublicKey).toBe(
+      '7efc699ddc401adc0c9901f12e152397c835c825d5bc34e7f5f4de00f5f6c984',
+    );
+    expect(inAppEnabled({ ...base, root: placeholder })).toBe(false);
     expect(inAppEnabled({ ...base, root: offFile })).toBe(false);
   });
 

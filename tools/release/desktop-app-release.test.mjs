@@ -34,11 +34,11 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
   const build = job(release, 'desktop-app-build');
   const attach = job(release, 'desktop-app-release');
 
-  it('builds through desktop.yml for the published CLI version, unsigned, with updates off', () => {
+  it('builds through desktop.yml for the published CLI version, unsigned, with updates on (UPD-2)', () => {
     expect(build).not.toBe('');
     expect(build).toMatch(/uses: \.\/\.github\/workflows\/desktop\.yml\n/);
     expect(build).toMatch(/version: \$\{\{ needs\.desktop-extension-build\.outputs\.version \}\}/);
-    expect(build).toMatch(/updates: "off"/);
+    expect(build).toMatch(/updates: "on"/);
     expect(build).not.toMatch(/secrets|environment:|DESKTOP_SIGNING|OWNER_LOCAL/);
     expect(permissions(build).sort()).toEqual([
       'attestations: write',

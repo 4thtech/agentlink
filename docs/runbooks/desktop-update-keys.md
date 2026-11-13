@@ -29,6 +29,8 @@ Do the steps **in this order**: GitHub creates a missing environment with no rul
    2. compare all 64 characters with the public key the tool printed (and the first and last 8 on your paper). If any character differs, do **not** merge; tell the orchestrator.
 5. **Remove the file.** `rm ~/agentlink-update.key` (and empty the Trash if you moved it there; make sure no backup or sync folder copied it), or move it to an offline USB stick if you want a copy for changing environments later. Nothing else needs it: GitHub has the secret, the app has the public key.
 
+**Done (UPD-2):** the owner generated the key and stored the secret himself; the public key `7efc699ddc401adc0c9901f12e152397c835c825d5bc34e7f5f4de00f5f6c984` is pinned in `root-key.json` and `release.yml` builds the desktop app with updates on. Steps 1 to 4 are complete.
+
 The first release after step 4 is the first one that apps can update **to by themselves only from then on**: copies built with updates off (0.5.x up to that release) never check, so everyone installs that one release by hand once.
 
 ## Each release (one click)

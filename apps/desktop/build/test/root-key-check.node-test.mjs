@@ -33,11 +33,28 @@ const pinnedAsar = [
   { path: 'dist/main/entry.js', content: Buffer.from(`var r={rootPublicKey:"${REAL_KEY}"};`) },
 ];
 
-test('the committed root-key.json is the placeholder, and a release build refuses it', () => {
-  assert.ok(REPO_JSON.includes(ROOT_KEY_PLACEHOLDER_MARK));
-  assert.notDeepEqual(rootKeyProblems(REPO_JSON), []);
+// UPD-2: the committed root-key.json is the owner's real pin; a placeholder fixture is still refused.
+const PLACEHOLDER_JSON = JSON.stringify({
+  rootPublicKey: `${ROOT_KEY_PLACEHOLDER_MARK}-run-the-offline-key-ceremony`,
+  minimumStatementSequence: 0,
+});
+test('the committed root-key.json is the owner pin and passes; a placeholder fixture is refused', () => {
+  assert.ok(!REPO_JSON.includes(ROOT_KEY_PLACEHOLDER_MARK));
+  assert.equal(
+    JSON.parse(REPO_JSON).rootPublicKey,
+    '7efc699ddc401adc0c9901f12e152397c835c825d5bc34e7f5f4de00f5f6c984',
+  );
+  assert.deepEqual(rootKeyProblems(REPO_JSON), []);
+  const pinned = [
+    {
+      path: 'dist/main/entry.js',
+      content: Buffer.from(`var r={rootPublicKey:"${JSON.parse(REPO_JSON).rootPublicKey}"};`),
+    },
+  ];
+  assert.equal(assertRootKeyPinned({ rootKeyJson: REPO_JSON, files: pinned, env: {} }), 'pinned');
+  assert.notDeepEqual(rootKeyProblems(PLACEHOLDER_JSON), []);
   assert.throws(
-    () => assertRootKeyPinned({ rootKeyJson: REPO_JSON, files: cleanAsar, env: {} }),
+    () => assertRootKeyPinned({ rootKeyJson: PLACEHOLDER_JSON, files: cleanAsar, env: {} }),
     /release build refused/,
   );
 });
