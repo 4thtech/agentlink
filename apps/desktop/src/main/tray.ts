@@ -56,6 +56,8 @@ export interface TrayActions {
   /** Starts the core again after it could not start (only does something when it failed). */
   readonly retry: () => void;
   readonly quit: () => void;
+  /** UPD-S1 SPIKE ONLY (never merged): an extra item, present only in a spike build. */
+  readonly spike?: { readonly label: string; readonly click: () => void };
 }
 
 export class AppTray {
@@ -72,6 +74,7 @@ export class AppTray {
       electron.Menu.buildFromTemplate([
         { label: TRAY_COPY.open, click: actions.open },
         { label: TRAY_COPY.retry, click: actions.retry },
+        ...(actions.spike === undefined ? [] : [actions.spike]),
         { type: 'separator' },
         { label: TRAY_COPY.quit, click: actions.quit },
       ]),

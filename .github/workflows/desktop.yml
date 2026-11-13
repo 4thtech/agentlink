@@ -67,6 +67,18 @@ on:
         type: boolean
         required: false
         default: false
+      # UPD-S1 SPIKE ONLY (branch upd-s1-spike, never merged): adds the tray item that swaps in the
+      # zip at spike_zip_url (src/main/spike-swap.ts). Manual runs only; never in a release.
+      spike_swap:
+        description: "UPD-S1 spike: add the self-swap tray item (test builds only)"
+        type: boolean
+        required: false
+        default: false
+      spike_zip_url:
+        description: "UPD-S1 spike: zip URL (https://, or http://127.0.0.1:<port>/<file>)"
+        type: string
+        required: false
+        default: ""
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches-ignore: [sync]
@@ -142,6 +154,9 @@ jobs:
       # with updates off, the updates-off root replaces root-key.json.
       - name: Bundle the shell (release, no preview mode)
         shell: bash
+        env:
+          AGENTLINK_SPIKE_SWAP: ${{ github.event_name == 'workflow_dispatch' && inputs.spike_swap == true && '1' || '' }}
+          AGENTLINK_SPIKE_ZIP_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.spike_zip_url || '' }}
         run: AGENTLINK_DESKTOP_UPDATES="$UPDATES" pnpm --filter @4thtech-io/desktop run bundle
 
       # The owner-presence helper (WP-D12b), built from source for this target and handed to the app

@@ -20,12 +20,27 @@ const updatesOffFile = fileURLToPath(
   new URL('./src/main/updater/root-key.updates-off.json', import.meta.url),
 );
 
+// UPD-S1 SPIKE ONLY (branch upd-s1-spike, never merged): AGENTLINK_SPIKE_SWAP=1 adds the tray item
+// that downloads AGENTLINK_SPIKE_ZIP_URL and swaps it into /Applications (src/main/spike-swap.ts).
+// Unset in every release and PR build (desktop.yml passes it only on a manual run that asks for it).
+const spikeSwap = process.env['AGENTLINK_SPIKE_SWAP'] === '1';
+const spikeZipUrl = spikeSwap ? (process.env['AGENTLINK_SPIKE_ZIP_URL'] ?? '') : '';
+if (spikeSwap && !/^(https:\/\/|http:\/\/127\.0\.0\.1[:/])/.test(spikeZipUrl)) {
+  throw new Error(
+    'AGENTLINK_SPIKE_ZIP_URL must be https:// or http://127.0.0.1 with AGENTLINK_SPIKE_SWAP=1.',
+  );
+}
+
 export default defineConfig({
   configFile: false,
   publicDir: false,
   envDir: false,
   logLevel: 'warn',
-  define: { __AGENTLINK_DESKTOP_PREVIEW__: JSON.stringify(preview) },
+  define: {
+    __AGENTLINK_DESKTOP_PREVIEW__: JSON.stringify(preview),
+    __AGENTLINK_SPIKE_SWAP__: JSON.stringify(spikeSwap),
+    __AGENTLINK_SPIKE_ZIP_URL__: JSON.stringify(spikeZipUrl),
+  },
   resolve: {
     alias: updates === 'off' ? [{ find: /^\.\/root-key\.json$/, replacement: updatesOffFile }] : [],
   },

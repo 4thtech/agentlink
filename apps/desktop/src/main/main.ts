@@ -65,6 +65,7 @@ import {
   forwardedDeepLink,
 } from './switches.js';
 import type { StatusAction } from './status-page.js';
+import { SPIKE_ITEM, finishSpikeIfPending, runSpikeSwap } from './spike-swap.js';
 import { AppTray, trayImage } from './tray.js';
 import { ReleaseChecker, updateChecksAllowed } from './updater/release-check.js';
 import { scheduleUpdateChecks } from './updater/schedule.js';
@@ -73,6 +74,10 @@ import type { AppUpdateView } from '../shared/app-update.js';
 import type { InviteOutcome } from '../shared/protocol.js';
 
 declare const __AGENTLINK_DESKTOP_PREVIEW__: boolean | undefined;
+// UPD-S1 SPIKE ONLY (never merged): defined by bundle.config.mjs from AGENTLINK_SPIKE_SWAP=1 and
+// AGENTLINK_SPIKE_ZIP_URL; false/'' in every other build, so the bundler drops the spike path.
+declare const __AGENTLINK_SPIKE_SWAP__: boolean | undefined;
+declare const __AGENTLINK_SPIKE_ZIP_URL__: string | undefined;
 
 /** Exit code for a refused launch (any non-zero code; fixed so tests and CI can assert it). */
 export const LAUNCH_REFUSED_EXIT = 64;
@@ -415,10 +420,39 @@ export async function runShell(
 
   // Always a tray (the only way back after the window is closed): built-in image as a fallback.
   const icon = proc.exists(paths.trayIcon) ? paths.trayIcon : '';
+  const userDataDir = app.getPath?.('userData') ?? '';
+  const spike =
+    typeof __AGENTLINK_SPIKE_SWAP__ !== 'undefined' &&
+    __AGENTLINK_SPIKE_SWAP__ === true &&
+    proc.platform === 'darwin' &&
+    userDataDir !== '';
+  if (spike) {
+    finishSpikeIfPending(userDataDir, app.getVersion?.() ?? '', proc.execPath);
+  }
   tray = new AppTray(electron, trayImage(electron.nativeImage, icon, proc.platform), {
     open: showWindow,
     retry: () => tryAgain(),
     quit: () => app.quit(),
+    ...(spike
+      ? {
+          spike: {
+            label: SPIKE_ITEM,
+            click: (): void => {
+              void runSpikeSwap({
+                userData: userDataDir,
+                zipUrl:
+                  typeof __AGENTLINK_SPIKE_ZIP_URL__ === 'string'
+                    ? __AGENTLINK_SPIKE_ZIP_URL__
+                    : '',
+                version: app.getVersion?.() ?? '',
+                execPath: proc.execPath,
+                pid: process.pid,
+                quit: () => app.quit(),
+              });
+            },
+          },
+        }
+      : {}),
   });
 
   let approvals = 0;
