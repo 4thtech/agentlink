@@ -49,7 +49,7 @@ const REFUSED: Readonly<Record<InviteRefusal, string>> = {
   unavailable: P.unavailable,
 };
 
-const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
 
 export interface PasteInviteProps {
   readonly invites: InviteApi;

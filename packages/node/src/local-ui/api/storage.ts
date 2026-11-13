@@ -140,7 +140,12 @@ export function createStorageDesk(deps: StorageDeskDeps): LocalUiStorageDesk {
   const read = async (): Promise<LocalUiStorageRead> => {
     const open = deps.open();
     const startGeneration = deps.generation();
-    const entries = (await deps.entries()).slice(0, MAX_STORAGE_IDS);
+    // UX-LEFT-1 (STORAGE-NOID): an owner with no ID yet has no IDs folder; that is "no IDs", not a failure.
+    const listed = await deps.entries().catch((error: unknown) => {
+      if ((error as { code?: unknown }).code === 'ENOENT') return [];
+      throw error;
+    });
+    const entries = listed.slice(0, MAX_STORAGE_IDS);
     const out: LocalUiStorageIdPart[] = [];
     for (const entry of entries) {
       if (entry.removing) continue;

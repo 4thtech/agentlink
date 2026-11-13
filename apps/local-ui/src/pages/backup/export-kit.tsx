@@ -5,7 +5,7 @@
 // Downloads folder. The answer carries the file name and the new recovery code, which is shown once,
 // kept only in this component's state and dropped at "I saved it" (or when the page closes). It is
 // never logged, stored or sent anywhere. Shared by Settings › Backup and the ID card's Back up panel.
-import { Button } from '@4thtech-io/ui';
+import { Button, InlineError } from '@4thtech-io/ui';
 import { useEffect, useId, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient, type OwnerApiResult } from '../../api/client.js';
 import { useLeaveGuard } from '../../leave-guard.js';
@@ -379,11 +379,7 @@ export function ExportKit({
           {S.saving}
         </p>
       ) : null}
-      {note === undefined ? null : (
-        <p className="al-text-body-sm bk-error" role="alert">
-          {note}
-        </p>
-      )}
+      {note === undefined ? null : <InlineError>{note}</InlineError>}
     </div>
   );
 }

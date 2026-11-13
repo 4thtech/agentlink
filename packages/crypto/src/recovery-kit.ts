@@ -1,6 +1,6 @@
-// 04 §2.3.3 (D-115): the recovery kit `ALKK` v1, written by `agentlink backup export` and read by
-// `agentlink backup restore` (M1-9i-b).
-//   header (74 B) = "ALKK" ‖ u8 version=1 ‖ u8 secretKind=1 ‖ u8 kdf=1 ‖ u32be m ‖ u8 t ‖ u8 p
+// 04 §2.3.3 (D-115): the recovery kit `ALKK` v1 and v2 (KIT-NAMES), written by `agentlink backup
+// export` and read by `agentlink backup restore` (M1-9i-b).
+//   header (74 B) = "ALKK" ‖ u8 version=2 (1 read) ‖ u8 secretKind=1 ‖ u8 kdf=1 ‖ u32be m ‖ u8 t ‖ u8 p
 //                   ‖ salt (16) ‖ u8 aead=2 ‖ u32be chunkSize ‖ noncePrefix (8) ‖ ownerNostr (32)
 //   kek  = HKDF-SHA256(Argon2id(password(code, 1), salt, m, t, p, 32), "", "agentlink/v1/recovery-kit", 32)
 //   body = the 04 §4 STREAM construction of stream.ts under kek, with the 74-byte header as the AAD
@@ -8,6 +8,7 @@
 //   plaintext = entries `u16be nameLen ‖ name ‖ u64be valueLen ‖ value`: `manifest` (JCS), then
 //          `owner/seed`, then per agent in manifest order its items (seed, store-key,
 //          policy-version, receipts-kept, storage-mark; the first two required) and its store.
+//   KIT-NAMES (v2): the manifest's `v` is 2 and an agent may carry `label` (its owner-set name).
 //
 // Reading: every header refusal happens before the KDF. While the body decrypts, each chunk's
 // plaintext is framed only far enough to route it (entry boundaries, the caps): secret entries go to
@@ -72,7 +73,15 @@ export type RecoveryKitContents = 'full' | 'identity';
 
 const INFO = 'agentlink/v1/recovery-kit';
 const MAGIC = Object.freeze([0x41, 0x4c, 0x4b, 0x4b]); // "ALKK"
-const VERSION = 1;
+/**
+ * KIT-NAMES (04 §2.3.3; proposed, owner confirms at merge): readers accept versions 1 and 2;
+ * writers write 2 only. v2 differs from v1 only in its manifest: `v` is 2 and each agent may carry
+ * `label`, the ID's owner-set name, inside the encrypted body. A v1-only reader refuses a v2 kit
+ * before the KDF (its `version` check).
+ */
+type KitVersion = 1 | 2;
+const VERSION: KitVersion = 2;
+const isKitVersion = (b: number | undefined): b is KitVersion => b === 1 || b === 2;
 const SECRET_KIND_CODE = 1;
 const KDF_ARGON2ID = 1;
 const AEAD_STREAM = 2;
@@ -108,6 +117,7 @@ const argument = (message: string): CryptoInputError =>
 // --- header ---------------------------------------------------------------------------------------
 
 interface HeaderFields {
+  readonly version: KitVersion;
   readonly params: Argon2idParams;
   readonly salt: Uint8Array;
   readonly chunkSize: number;
@@ -119,8 +129,9 @@ interface HeaderFields {
 function parseHeader(bytes: Uint8Array): HeaderFields | undefined {
   if (bytes.length < RECOVERY_KIT_HEADER_LENGTH) return undefined;
   if (MAGIC.some((byte, i) => bytes[i] !== byte)) return undefined;
+  const version = bytes[4];
   if (
-    bytes[4] !== VERSION ||
+    !isKitVersion(version) ||
     bytes[H.kind] !== SECRET_KIND_CODE ||
     bytes[H.kdf] !== KDF_ARGON2ID ||
     bytes[H.aead] !== AEAD_STREAM
@@ -136,6 +147,7 @@ function parseHeader(bytes: Uint8Array): HeaderFields | undefined {
   const chunkSize = view.getUint32(H.chunkSize, false);
   if (!kdfInBounds(params) || !isStreamChunkSize(chunkSize)) return undefined;
   return {
+    version,
     params,
     salt: bytes.subarray(H.salt, H.salt + SALT_LENGTH),
     chunkSize,
@@ -181,6 +193,8 @@ function encodeHeader(
 
 /** The public header of a kit, shown before the code is asked for (04 §2.3.3 restore step 1). */
 export interface RecoveryKitHeader {
+  /** The format version: 1 (older kits) or 2 (KIT-NAMES: the manifest may carry names). */
+  readonly version: KitVersion;
   /** 32-byte x-only owner Nostr key: restore shows its fingerprint and refuses another owner. */
   readonly ownerNostr: Uint8Array;
   readonly chunkSize: number;
@@ -188,16 +202,17 @@ export interface RecoveryKitHeader {
 }
 
 /**
- * 04 §2.3.3 restore step 1: the public header of an ALKK v1 kit, from at least its first 74 bytes.
- * Refuses (`open_failed`), before any KDF, a wrong magic, `version` ≠ 1, `secretKind` ≠ 1,
- * `kdf` ≠ 1, `aead` ≠ 2, a `chunkSize` outside 1 B..16 MiB and KDF parameters outside the 04 §2.8
- * floor and cap. Nothing here is secret.
+ * 04 §2.3.3 restore step 1: the public header of an ALKK v1 or v2 kit, from at least its first 74
+ * bytes. Refuses (`open_failed`), before any KDF, a wrong magic, a `version` other than 1 and 2,
+ * `secretKind` ≠ 1, `kdf` ≠ 1, `aead` ≠ 2, a `chunkSize` outside 1 B..16 MiB and KDF parameters
+ * outside the 04 §2.8 floor and cap. Nothing here is secret.
  */
 export function readRecoveryKitHeader(kit: Uint8Array): RecoveryKitHeader {
   assertBytes(kit, 'readRecoveryKitHeader: kit');
   const fields = parseHeader(kit);
   if (fields === undefined) throw openFailed();
   return Object.freeze({
+    version: fields.version,
     ownerNostr: fields.ownerNostr.slice(),
     chunkSize: fields.chunkSize,
     kdf: Object.freeze({ ...fields.params }),
@@ -272,6 +287,82 @@ interface ManifestAgent {
   readonly agentId: Uint8Array;
   /** The local agent name, ASCII bytes (a view into the manifest). */
   readonly name: Uint8Array;
+  /** KIT-NAMES (v2 only): the owner-set name, UTF-8 bytes (a view into the manifest). */
+  readonly label?: Uint8Array;
+}
+
+/** KIT-NAMES: a label is 1 to 32 code points (at most 4 UTF-8 bytes each). */
+const LABEL_MAX_CODE_POINTS = 32;
+
+/**
+ * KIT-NAMES (IR-KIT-NAMES-1 L1, defence in depth): code points a label never holds besides C0,
+ * `"`, `\` and DEL, so a reader that prints a label as it is cannot be steered by it: the C1
+ * controls U+0080..U+009F, U+00AD, U+061C, U+180E, U+200B..U+200F (zero-width and marks),
+ * U+2028..U+202E (separators and bidi embeddings), U+2060..U+206F (word joiner, invisible
+ * operators, bidi isolates), U+FEFF, U+FFF9..U+FFFB and the tags U+E0000..U+E007F. A fixed list,
+ * not a Unicode category, so every reader and the vectors agree whatever their Unicode version.
+ */
+function isHiddenCodePoint(cp: number): boolean {
+  return (
+    (cp >= 0x80 && cp <= 0x9f) ||
+    cp === 0xad ||
+    cp === 0x61c ||
+    cp === 0x180e ||
+    (cp >= 0x200b && cp <= 0x200f) ||
+    (cp >= 0x2028 && cp <= 0x202e) ||
+    (cp >= 0x2060 && cp <= 0x206f) ||
+    cp === 0xfeff ||
+    (cp >= 0xfff9 && cp <= 0xfffb) ||
+    (cp >= 0xe0000 && cp <= 0xe007f)
+  );
+}
+
+/**
+ * KIT-NAMES: the label rule on bytes, with no string made: well-formed UTF-8 (no overlong form,
+ * surrogate or code point above U+10FFFF), 1 to 32 code points, none below U+0020, none of
+ * U+0022, U+005C and U+007F (so its JCS form has no escape and is its only spelling) and none of
+ * isHiddenCodePoint.
+ */
+function isLabelBytes(bytes: Uint8Array): boolean {
+  let points = 0;
+  let i = 0;
+  while (i < bytes.length) {
+    const b = bytes[i] as number;
+    let need: number;
+    let cp: number;
+    let min: number;
+    if (b < 0x80) {
+      if (b < 0x20 || b === 0x22 || b === 0x5c || b === 0x7f) return false;
+      need = 0;
+      cp = b;
+      min = 0;
+    } else if (b >= 0xc2 && b <= 0xdf) {
+      need = 1;
+      cp = b & 0x1f;
+      min = 0x80;
+    } else if (b >= 0xe0 && b <= 0xef) {
+      need = 2;
+      cp = b & 0x0f;
+      min = 0x800;
+    } else if (b >= 0xf0 && b <= 0xf4) {
+      need = 3;
+      cp = b & 0x07;
+      min = 0x10000;
+    } else {
+      return false;
+    }
+    for (let k = 1; k <= need; k += 1) {
+      const c = bytes[i + k];
+      if (c === undefined || (c & 0xc0) !== 0x80) return false;
+      cp = (cp << 6) | (c & 0x3f);
+    }
+    if (cp < min || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) return false;
+    if (isHiddenCodePoint(cp)) return false;
+    i += need + 1;
+    points += 1;
+    if (points > LABEL_MAX_CODE_POINTS) return false;
+  }
+  return points >= 1;
 }
 
 interface Manifest {
@@ -286,9 +377,12 @@ interface Manifest {
  * Reads the manifest exactly as JCS writes
  * `{"agents":[{"agentId":…,"name":…}…],"contents":…,"createdAt":…,"kitId":…,"ownerNostr":…,"v":1}`
  * (keys in RFC 8785 order, no whitespace, no escapes: every allowed value is plain ASCII, so this is
- * the only canonical spelling). Anything else is `undefined`. Works on bytes; makes no string.
+ * the only canonical spelling). KIT-NAMES: in a v2 kit, `v` is 2 and an agent may carry
+ * `"label":…` between `agentId` and `name` (UTF-8 under the label rule, which has no character JCS
+ * escapes, so it too has one spelling). `v` must equal the header's version. Anything else is
+ * `undefined`. Works on bytes; makes no string.
  */
-function parseManifest(bytes: Uint8Array): Manifest | undefined {
+function parseManifest(bytes: Uint8Array, version: KitVersion): Manifest | undefined {
   let at = 0;
   const lit = (text: string): boolean => {
     const want = ascii(text);
@@ -314,7 +408,14 @@ function parseManifest(bytes: Uint8Array): Manifest | undefined {
       if (agents.length === RECOVERY_KIT_LIMITS.maxAgents) return undefined;
       if (!lit('{"agentId":"0x')) return undefined;
       const hex = run(isLowerHex, 40, 40);
-      if (hex === undefined || !lit('","name":"')) return undefined;
+      if (hex === undefined || !lit('"')) return undefined;
+      let label: Uint8Array | undefined;
+      if (version === 2 && lit(',"label":"')) {
+        // Up to the next `"` (the rule refuses `"` and `\`, so no escape can hide one).
+        label = run(() => true, 1, LABEL_MAX_CODE_POINTS * 4);
+        if (label === undefined || !isLabelBytes(label) || !lit('"')) return undefined;
+      }
+      if (!lit(',"name":"')) return undefined;
       const name = run((b) => isLower(b) || isDigit(b) || b === 0x2d, 1, AGENT_NAME_MAX);
       if (name === undefined || !isLower(name[0] as number) || !lit('"}')) return undefined;
       const agentId = bytes.subarray(
@@ -325,7 +426,7 @@ function parseManifest(bytes: Uint8Array): Manifest | undefined {
       if (previous !== undefined && compareBytes(previous.agentId, agentId) >= 0) return undefined;
       // Two agents with one local name would write the same agent folder (IR-M1-9i-b-1).
       if (agents.some((a) => equalBytes(a.name, name))) return undefined;
-      agents.push({ agentId, name });
+      agents.push(label === undefined ? { agentId, name } : { agentId, name, label });
       if (lit(']')) break;
       if (!lit(',')) return undefined;
     }
@@ -348,7 +449,9 @@ function parseManifest(bytes: Uint8Array): Manifest | undefined {
   const kitIdText = run((b) => sextet(b) >= 0, KIT_ID_CHARS, KIT_ID_CHARS);
   if (kitIdText === undefined || !lit('","ownerNostr":"')) return undefined;
   const ownerHex = run(isLowerHex, 64, 64);
-  if (ownerHex === undefined || !lit('","v":1}') || at !== bytes.length) return undefined;
+  if (ownerHex === undefined || !lit(`","v":${String(version)}}`) || at !== bytes.length) {
+    return undefined;
+  }
   const kitId = decodeKitId(kitIdText);
   if (kitId === undefined) return undefined;
   const ownerNostr = new Uint8Array(OWNER_LENGTH);
@@ -405,6 +508,12 @@ export interface RecoveryKitAgentInput {
   readonly agentId: string;
   /** The local agent name (06 §6: `[a-z][a-z0-9-]{0,31}`). */
   readonly name: string;
+  /**
+   * KIT-NAMES: the ID's owner-set name, sealed inside the kit (never in the header). 1 to 32 code
+   * points, none below U+0020 and none of `"`, `\` and U+007F, no lone surrogate; omit it when the
+   * ID has no name.
+   */
+  readonly label?: string;
   /** `seed` and `store-key` required; the other three only when the item exists. Any order. */
   readonly items: readonly RecoveryKitItem[];
   readonly store: RecoveryKitStoreSource;
@@ -428,9 +537,24 @@ export type RecoveryKitWrite = (bytes: Uint8Array) => Promise<void> | void;
 const AGENT_ID = /^0x[0-9a-f]{40}$/;
 const AGENT_NAME = /^[a-z][a-z0-9-]{0,31}$/;
 
+/** KIT-NAMES: the label rule on a string (the same rule as isLabelBytes). */
+function isLabel(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  let points = 0;
+  for (const ch of value) {
+    const cp = ch.codePointAt(0) as number;
+    if (cp < 0x20 || cp === 0x22 || cp === 0x5c || cp === 0x7f) return false;
+    if (cp >= 0xd800 && cp <= 0xdfff) return false; // a lone surrogate has no UTF-8 form
+    if (isHiddenCodePoint(cp)) return false;
+    points += 1;
+  }
+  return points >= 1 && points <= LABEL_MAX_CODE_POINTS;
+}
+
 interface CheckedAgent {
   readonly agentId: string;
   readonly name: string;
+  readonly label: string | undefined;
   readonly items: readonly RecoveryKitItem[];
   readonly store: RecoveryKitStoreSource;
 }
@@ -473,6 +597,12 @@ function checkInput(input: RecoveryKitInput): CheckedAgent[] {
     if (typeof agent.name !== 'string' || !AGENT_NAME.test(agent.name)) {
       throw argument('the agent name must match [a-z][a-z0-9-]{0,31}');
     }
+    // KIT-NAMES: undefined is "no label"; anything else must pass the rule.
+    if (agent.label !== undefined && !isLabel(agent.label)) {
+      throw argument(
+        'a label must be 1 to 32 characters with no control, invisible or bidi character, quote or backslash',
+      );
+    }
     if (!Array.isArray(agent.items)) throw argument('items must be an array');
     const items: RecoveryKitItem[] = [];
     for (const name of RECOVERY_KIT_ITEM_NAMES) {
@@ -507,7 +637,7 @@ function checkInput(input: RecoveryKitInput): CheckedAgent[] {
     ) {
       throw argument('the store length must be an integer from 0 to 1 GiB');
     }
-    agents.push({ agentId: agent.agentId, name: agent.name, items, store });
+    agents.push({ agentId: agent.agentId, name: agent.name, label: agent.label, items, store });
   }
   agents.sort((a, b) => (a.agentId < b.agentId ? -1 : a.agentId > b.agentId ? 1 : 0));
   for (let i = 1; i < agents.length; i += 1) {
@@ -556,13 +686,18 @@ export async function sealRecoveryKitWithUnsafe(
   if (typeof write !== 'function') throw argument('write must be a function');
   const agents = checkInput(input);
   const ownerNostr = ownerNostrOf(input.ownerSeed);
+  // KIT-NAMES: v2; each label only here, inside the encrypted body (the AEAD covers it).
   const manifest = canonicalizeToBytes({
-    v: 1,
+    v: VERSION,
     kitId: input.kitId,
     createdAt: input.createdAt,
     contents: input.contents,
     ownerNostr: hexOf(ownerNostr),
-    agents: agents.map((a) => ({ agentId: a.agentId, name: a.name })),
+    agents: agents.map((a) =>
+      a.label === undefined
+        ? { agentId: a.agentId, name: a.name }
+        : { agentId: a.agentId, label: a.label, name: a.name },
+    ),
   });
   try {
     if (manifest.length > RECOVERY_KIT_LIMITS.maxItemBytes) throw argument('manifest above 64 KiB');
@@ -629,7 +764,7 @@ function hexOf(bytes: Uint8Array): string {
 }
 
 /**
- * 04 §2.3.3 `ALKK` v1: seals the owner seed and, per agent, its items and store into a kit under a
+ * 04 §2.3.3 `ALKK` v2: seals the owner seed and, per agent, its items and store into a kit under a
  * new generated recovery code (D-115 B), with a fresh salt and nonce prefix, 1 MiB chunks and
  * Argon2id at `params` (default m = 64 MiB, t = 3, p = 1). Every input is checked before anything is
  * written (formats, the seed of each agent derives its agentId, the caps, a kit of at most 4 GiB);
@@ -693,6 +828,11 @@ export interface OpenedRecoveryKitAgent {
   readonly agentId: string;
   /** The local agent name as ASCII bytes (`[a-z][a-z0-9-]{0,31}`), from the manifest. */
   readonly name: Uint8Array;
+  /**
+   * KIT-NAMES (v2): the ID's owner-set name as UTF-8 bytes (the label rule of the manifest), when
+   * the kit carries one; never in a v1 kit. Display text only: it decides nothing.
+   */
+  readonly label?: Uint8Array;
   /** In kit order; `seed` and `store-key` first. */
   readonly items: readonly OpenedRecoveryKitItem[];
   /** The sink that holds the agent's store snapshot, and its byte length. */
@@ -848,12 +988,13 @@ class EntrySplitter {
 function checkEntries(
   entries: readonly Entry[],
   headerOwner: Uint8Array,
+  version: KitVersion,
 ): { manifest: Manifest; agents: OpenedRecoveryKitAgent[] } | undefined {
   const [first, second] = entries;
   if (first === undefined || second === undefined) return undefined;
   if (!equalBytes(first.name, ascii('manifest')) || first.value === undefined) return undefined;
   if (!equalBytes(second.name, ascii('owner/seed')) || second.value === undefined) return undefined;
-  const manifest = parseManifest(first.value);
+  const manifest = parseManifest(first.value, version);
   if (manifest === undefined || !equalBytes(manifest.ownerNostr, headerOwner)) return undefined;
   if (second.value.length !== SEED_LENGTH || !equalBytes(ownerNostrOf(second.value), headerOwner)) {
     return undefined;
@@ -898,6 +1039,7 @@ function checkEntries(
       Object.freeze({
         agentId,
         name: agent.name.slice(),
+        ...(agent.label === undefined ? {} : { label: agent.label.slice() }),
         items: Object.freeze(items),
         store: store.store as RecoveryKitStoreSink,
         storeLength: store.length,
@@ -949,7 +1091,7 @@ export function openRecoveryKitWithKek(
 }
 
 /**
- * 04 §2.3.3: opens an `ALKK` v1 kit with its recovery code. `kit` is the whole kit or its bytes in
+ * 04 §2.3.3: opens an `ALKK` v1 or v2 kit with its recovery code. `kit` is the whole kit or its bytes in
  * order (for example a file read stream). Refused before the KDF (`open_failed`): every header
  * check of readRecoveryKitHeader and a header owner other than `expectedOwnerNostr`; a code that is
  * not 24 base32 characters is `invalid_secret`. While the body decrypts, secret entries are kept in
@@ -1043,7 +1185,7 @@ async function openWith(
       await route((await opener.finish()).output);
       // 4. Only now, with the whole kit authentic: the entry list, the manifest and the seeds.
       if (!splitter.complete()) throw openFailed();
-      const checked = checkEntries(splitter.entries, fields.ownerNostr);
+      const checked = checkEntries(splitter.entries, fields.ownerNostr, fields.version);
       if (checked === undefined) throw openFailed();
       const { manifest, agents } = checked;
       const ownerSeed = (splitter.entries[1] as Entry).value as Uint8Array;

@@ -321,7 +321,7 @@ describe('the localhost app with a PRF passkey (M1-8e, M1-31; Chromium)', () => 
 
     source.add(1);
     await page.goto(server.approvalUrl(id(1)));
-    await page.getByRole('button', { name: 'Approve', exact: true }).click();
+    // UX1113-N2: one step; the button is the passkey gesture.
     await page
       .getByRole('button', { name: /^Approve with (Touch ID|Windows Hello|your passkey)$/ })
       .click();

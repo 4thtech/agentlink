@@ -154,3 +154,59 @@ describe('a slow network gets a longer pass (R1-CLASS-10)', () => {
     expect(budgets).toEqual([3_000, 3_000, 3_000]);
   });
 });
+
+describe('UX-LEFT-1: flush runs a pass at once, past the interval', () => {
+  it('a pass just ran, flush still runs one; follow waits', async () => {
+    const { c, calls } = client(() => Promise.resolve());
+    const follower = pairingFollower(c, { nowMs: () => 0 });
+    expect(await within(follower.follow())).toBe('ran');
+    expect(await within(follower.follow())).toBe('soon');
+    expect(await within(follower.flush())).toBe('ran');
+    expect(calls.sync).toBe(2);
+  });
+});
+
+describe('OUTBOX-NOW-1: flush (relays back) retries the queued rows now', () => {
+  it('a flush calls outbox.retryNow instead of processDue; other passes do not', async () => {
+    const outbox = { due: 0, now: 0 };
+    const { c } = client(() => Promise.resolve());
+    const withRetry: PairingFollowClient = {
+      ...c,
+      outbox: {
+        processDue: () => {
+          outbox.due += 1;
+          return Promise.resolve();
+        },
+        retryNow: () => {
+          outbox.now += 1;
+          return Promise.resolve();
+        },
+      },
+    };
+    let t = 0;
+    const follower = pairingFollower(withRetry, { nowMs: () => t });
+    expect(await within(follower.follow())).toBe('ran');
+    expect(outbox).toEqual({ due: 1, now: 0 });
+    expect(await within(follower.flush())).toBe('ran');
+    expect(outbox).toEqual({ due: 1, now: 1 });
+    t += 15_000;
+    expect(await within(follower.tick())).toBe('ran');
+    expect(outbox).toEqual({ due: 2, now: 1 });
+  });
+
+  it('a client without retryNow still gets a processDue pass on flush', async () => {
+    let due = 0;
+    const { c } = client(() => Promise.resolve());
+    const plain: PairingFollowClient = {
+      ...c,
+      outbox: {
+        processDue: () => {
+          due += 1;
+          return Promise.resolve();
+        },
+      },
+    };
+    expect(await within(pairingFollower(plain, { nowMs: () => 0 }).flush())).toBe('ran');
+    expect(due).toBe(1);
+  });
+});

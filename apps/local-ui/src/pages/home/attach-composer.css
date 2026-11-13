@@ -7,7 +7,6 @@
   gap: var(--al-space-3);
   border: 1px dashed transparent;
   border-radius: var(--al-radius-md);
-  transition: border-color var(--al-duration-fast) var(--al-easing-standard);
 }
 .hm-attach-zone.is-over {
   border-color: var(--al-color-accent-default);
@@ -35,9 +34,4 @@
 }
 .hm-attach-status:empty {
   display: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .hm-attach-zone {
-    transition: none;
-  }
 }

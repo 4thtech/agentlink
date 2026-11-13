@@ -1,7 +1,7 @@
 // WP-R4 (§6.3): the three things to do after a kit is saved. Done turns on only when all three are
 // ticked. The code stays in the parent's state; this component only passes it to Print (an in-memory
 // sheet, printSheet) and Copy. Nothing here writes to disk, storage or the URL.
-import { Button, Icon } from '@4thtech-io/ui';
+import { Button, Icon, InlineError } from '@4thtech-io/ui';
 import { useState, type ReactElement } from 'react';
 import type { ApiClient } from '../../api/client.js';
 import { createRestoreApi, RESTORE_BASE } from '../restore/api.js';
@@ -177,11 +177,7 @@ export function SaveChecklist({
           {checked === 'ok' ? <Icon name="check" size={14} /> : null} {checkNote}
         </p>
       )}
-      {note === undefined ? null : (
-        <p className="al-text-body-sm bk-error" role="alert">
-          {note}
-        </p>
-      )}
+      {note === undefined ? null : <InlineError>{note}</InlineError>}
       <div className="bk-actions">
         <Button variant="primary" disabled={!allTicked} onClick={onDone}>
           {S.finish}

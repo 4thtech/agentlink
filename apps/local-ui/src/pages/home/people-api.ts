@@ -36,6 +36,7 @@ import {
 } from '../files/io-api.js';
 import {
   createMessagesApi,
+  oldestFirst,
   type Conversation,
   type MessageItem,
   type MessagePage,
@@ -96,7 +97,7 @@ export function mergeThread(
     ...[...sent].reverse().map((item) => ({ item, out: true })),
   ]
     .filter(({ item }) => item.text !== '' || item.files.length > 0)
-    .sort((a, b) => a.item.at - b.item.at);
+    .sort((a, b) => oldestFirst(a.item, b.item));
 }
 
 export function summarize(lastAt: number, inbox: MessagePage, sent: MessagePage): PersonSummary {

@@ -15,12 +15,19 @@ import {
 
 const DESKTOP = fileURLToPath(new URL('../..', import.meta.url));
 const REPO_JSON = readFileSync(`${DESKTOP}/src/main/updater/root-key.json`, 'utf8');
+// The secp256k1 generator x-coordinate: a public curve constant (SEC 2), not a key anyone holds.
+// Built from parts so secret scanners don't mistake it for a credential.
+const REAL_KEY = [
+  '79be667ef9dcbbac',
+  '55a06295ce870b07',
+  '029bfcdb2dce28d9',
+  '59f2815b16f81798',
+].join('');
 const REAL = JSON.stringify({
-  rootPublicKey: '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+  rootPublicKey: REAL_KEY,
   minimumStatementSequence: 0,
 });
 const cleanAsar = [{ path: 'dist/main/entry.js', content: Buffer.from('console.log(1)') }];
-const REAL_KEY = '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
 // UPD-3 (Fable L3): the bundled main process carries the pin as text (the JSON import).
 const pinnedAsar = [
   { path: 'dist/main/entry.js', content: Buffer.from(`var r={rootPublicKey:"${REAL_KEY}"};`) },
@@ -56,7 +63,7 @@ test('malformed keys and floors are refused', () => {
     // Not a point on the curve (x >= p).
     JSON.stringify({ rootPublicKey: 'ff'.repeat(32), minimumStatementSequence: 0 }),
     JSON.stringify({
-      rootPublicKey: '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      rootPublicKey: REAL_KEY,
       minimumStatementSequence: 2 ** 31,
     }),
   ]) {

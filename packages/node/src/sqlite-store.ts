@@ -210,6 +210,19 @@ function whereSql(table: TableName, where: unknown): Sql {
   return { text: parts.length === 0 ? '' : ` WHERE ${parts.join(' AND ')}`, params };
 }
 
+/** The where of one primary key; throws unless it names every primary-key column. */
+function keyWhere(table: TableName, key: unknown): Record<string, unknown> {
+  const where: Record<string, unknown> = {};
+  for (const column of tableSpec(table).primaryKey) {
+    const value = (key as Readonly<Record<string, unknown>> | null)?.[column];
+    if (value === undefined || value === null || typeof value === 'object') {
+      throw new StoreUsageError('store: get needs every primary-key column');
+    }
+    where[column] = value;
+  }
+  return where;
+}
+
 function checkTable(table: unknown): asserts table is TableName {
   if (typeof table !== 'string' || !Object.hasOwn(TABLES, table)) {
     throw new StoreUsageError('store: unknown table');
@@ -256,21 +269,36 @@ class SqliteTx implements StoreTx {
 
   get<T extends TableName>(table: T, key: PrimaryKey<T>): Row<T> | undefined {
     this.#ready(table);
-    const where: Record<string, unknown> = {};
-    for (const column of tableSpec(table).primaryKey) {
-      const value = (key as Readonly<Record<string, unknown>> | null)?.[column];
-      if (value === undefined || value === null || typeof value === 'object') {
-        throw new StoreUsageError('store: get needs every primary-key column');
-      }
-      where[column] = value;
-    }
-    const w = whereSql(table, where);
+    const w = whereSql(table, keyWhere(table, key));
     const rows = this.#read(
       table,
       `SELECT ${selectList(table)} FROM ${q(table)}${w.text} LIMIT 1`,
       w.params,
     );
     return rows[0] as Row<T> | undefined;
+  }
+
+  /**
+   * MSG-ORDER-1: SQLite's rowid, the local insertion order (every table has one: none is WITHOUT
+   * ROWID). A new row gets the largest rowid plus one; an update keeps it, and VACUUM keeps the
+   * relative order. Read for a few keys at a time (one page of a UI read).
+   */
+  rowOrder<T extends TableName>(
+    table: T,
+    keys: readonly PrimaryKey<T>[],
+  ): readonly (number | undefined)[] {
+    this.#ready(table);
+    return keys.map((key) => {
+      const w = whereSql(table, keyWhere(table, key));
+      const value: unknown = this.#ops.run(table, () =>
+        this.#ops
+          .statement(`SELECT rowid FROM ${q(table)}${w.text} LIMIT 1`)
+          .pluck(true)
+          .safeIntegers(false)
+          .get(...w.params),
+      );
+      return typeof value === 'number' && Number.isSafeInteger(value) ? value : undefined;
+    });
   }
 
   select<T extends TableName>(table: T, where?: Where<T>, options?: SelectOptions<T>): Row<T>[] {

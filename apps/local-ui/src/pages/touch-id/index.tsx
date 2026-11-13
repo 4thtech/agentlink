@@ -12,7 +12,7 @@
 //   Finish and at Cancel, never logged, stored or put in a URL.
 // - The desktop app's native Touch ID switch mounts in the `native-touch-id-switch` slot of card 1
 //   (`nativeSwitch` prop, or native-slot.ts).
-import { Button, Icon, PageNotice, Surface } from '@4thtech-io/ui';
+import { Button, CopyButton, Icon, PageNotice, Surface } from '@4thtech-io/ui';
 import {
   useCallback,
   useEffect,
@@ -701,7 +701,6 @@ function ReplaceCode({
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<Note>(undefined);
   const [newCode, setNewCode] = useState<string | undefined>(undefined);
-  const [copied, setCopied] = useState(false);
   // REL051-UF3 (R1-UI-06): a double click on the sensor button asks once.
   const flight = usePresenceFlight(busy);
   // IR WP-S2 M-1: the keychain may have taken the new code without confirming it. The new code stays
@@ -825,15 +824,6 @@ function ReplaceCode({
       .finally(() => setBusy(false));
   };
 
-  const copy = (code: string): void => {
-    const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
-    if (clipboard === undefined) return;
-    void clipboard.writeText(code).then(
-      () => setCopied(true),
-      () => undefined,
-    );
-  };
-
   if (newCode !== undefined) {
     return (
       <form className="ti-panel" onSubmit={submitFinish} autoComplete="off">
@@ -847,9 +837,13 @@ function ReplaceCode({
           </div>
         </section>
         <div className="ti-row">
-          <Button variant="secondary" icon="copy" onClick={() => copy(newCode)}>
-            {copied ? S.copied : S.copy}
-          </Button>
+          <CopyButton
+            text={newCode}
+            variant="secondary"
+            size="md"
+            label={S.copy}
+            copiedLabel={S.copied}
+          />
         </div>
         {/* IR WP-S2 L-2: the same clipboard warning as the first-run code (08 §1). */}
         <p className="al-text-caption al-muted">{FIRST_RUN.clipboardWarning}</p>

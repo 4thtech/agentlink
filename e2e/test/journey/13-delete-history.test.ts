@@ -27,7 +27,7 @@ async function aiReads(mcp: Parameters<typeof inboxHas>[0], needle: string): Pro
   return JSON.stringify(all.structured).includes(needle);
 }
 
-describe('chapter 12: delete a person’s history, undo, delete again', () => {
+describe('chapter 13: delete a person’s history, undo, delete again', () => {
   it('Bo deletes his history with Ana; Undo keeps it; the second delete removes it here only', async (ctx) => {
     const ready = ch.need(ctx);
     if (ready === undefined) return;

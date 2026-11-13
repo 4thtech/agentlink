@@ -36,7 +36,10 @@ import {
   type ReactNode,
 } from 'react';
 import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
+import type { ConnectionState } from '../../layout/connection.js';
 import { subscribeHealth } from '../../layout/health-feed.js';
+import { HealthBanner } from '../../layout/health-notices.js';
+import { healthWord } from '../../layout/health-word.js';
 import { HEALTH_PATH } from '../../layout/health.js';
 import { COMPACT_STRINGS } from '../compact/strings.js';
 import { openCompactWindow } from '../compact/open.js';
@@ -372,14 +375,20 @@ export function HomePage({
   const waiting = model.waiting.value;
   const soonest = waiting?.soonest ?? null;
 
+  // N2: Home's Network tile reads the same table as the status bar and the top bar.
   const networkState: { dot: LiveDotState; word: string } = useMemo(() => {
-    if (model.offline) return { dot: 'not-running', word: S.networkOffline };
-    if (health === undefined || agent === 'not_running' || agent === 'needs_setup') {
-      return { dot: 'not-running', word: S.networkNotConnected };
-    }
-    return health.relays !== null && health.relays.total > 0 && health.relays.connected === 0
-      ? { dot: 'reconnecting', word: S.networkReconnecting }
-      : { dot: 'connected', word: S.networkConnected };
+    const connection: ConnectionState = model.offline
+      ? 'offline'
+      : health === undefined
+        ? 'unknown'
+        : agent === 'not_running' || agent === 'needs_setup'
+          ? agent
+          : health.relays !== null && health.relays.total > 0 && health.relays.connected === 0
+            ? 'unreachable'
+            : agent === 'paused'
+              ? 'paused'
+              : 'connected';
+    return healthWord(connection).network;
   }, [model.offline, health, agent]);
 
   const credits = model.credits.value;
@@ -404,11 +413,9 @@ export function HomePage({
         </div>
       </header>
       <StartHere model={start} platform={platform} />
-      {model.offline ? (
-        <Banner tone="offline" compact className="hm-note">
-          {S.offlineLine}
-        </Banner>
-      ) : model.error ? (
+      {/* N2: after 5 s offline, in Home's own words; the shell says the rest. */}
+      <HealthBanner also={model.offline}>{S.offlineLine}</HealthBanner>
+      {model.error && !model.offline ? (
         <Banner tone="neutral" icon="refresh-cw" compact className="hm-note">
           {S.errorLine}
         </Banner>

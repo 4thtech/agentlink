@@ -14,7 +14,8 @@ import { subscribeHealth } from './health-feed.js';
 import { getLive, subscribeLive, LIVE_WORDS, type LiveState } from '../api/live.js';
 import { LiveDot } from './agent-switcher.js';
 import { SHELL_STRINGS as S } from '../strings.js';
-import type { ConnectionState } from './index.js';
+import type { ConnectionState } from './connection.js';
+import { healthWord } from './health-word.js';
 import { VT_CLASS } from '@4thtech-io/ui';
 
 export interface StripItem {
@@ -134,20 +135,9 @@ export function stripItems(
   }));
   // The app's own state from the health read (IR-W4-SHELL-V2-1): the relay link itself is not known
   // here until K1 reports it, so it is never claimed.
-  items.push({ label: 'AgentLink', ...APP_STATE[connection] });
+  items.push({ label: 'AgentLink', ...healthWord(connection).strip });
   return items;
 }
-
-const APP_STATE: Readonly<Record<ConnectionState, { value: string; state: LiveState }>> = {
-  connected: { value: 'running', state: 'ready' },
-  unreachable: { value: "running, can't reach the network", state: 'off' },
-  checking: { value: 'running, checking the connection', state: 'off' },
-  unknown: { value: 'checking', state: 'off' },
-  paused: { value: 'paused', state: 'paused' },
-  not_running: { value: 'not running', state: 'off' },
-  needs_setup: { value: 'needs setup', state: 'none' },
-  offline: { value: 'not connected', state: 'off' },
-};
 
 export function StatusStrip({
   connection,

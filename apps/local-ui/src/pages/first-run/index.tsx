@@ -34,7 +34,7 @@
 // begin/finish). `?add=agent` stays on every step, so an open agent never turns it into Connect
 // another AI app, and a new Add agent starts with nothing kept from an earlier run. It ends on Home
 // in the app (no reload), and the agents are read again.
-import { Banner, Button, CopyPrompt, ProgressBar, TextField } from '@4thtech-io/ui';
+import { Banner, Button, CopyPrompt, InlineError, ProgressBar, TextField } from '@4thtech-io/ui';
 import {
   useCallback,
   useEffect,
@@ -437,9 +437,7 @@ function BackupCode({
         {file === 'yes' ? ` ${T.fileSaved}` : ''}
       </p>
       {copied === 'failed' || file === 'failed' ? (
-        <p className="al-text-body-sm ct-error" role="alert">
-          {copied === 'failed' ? T.copyFailed : T.fileFailed}
-        </p>
+        <InlineError>{copied === 'failed' ? T.copyFailed : T.fileFailed}</InlineError>
       ) : null}
       {file === 'yes' ? (
         <p className="al-text-caption al-muted" aria-hidden="true">
@@ -729,7 +727,6 @@ export function FirstRunPage({
   const [takenNames, setTakenNames] = useState<ReadonlySet<string>>(() => new Set());
   // W8-S5 (F7): the owner's IDs, so the pick says which ID an AI app uses now (or a removed one).
   const [knownIds, setKnownIds] = useState<readonly KnownId[] | undefined>(undefined);
-  const [prefilled, setPrefilled] = useState('');
   const setNamed = (value: boolean): void => {
     setNamedState(value);
     rememberWizard({ named: value });
@@ -957,13 +954,7 @@ export function FirstRunPage({
               removing: a.removing === true,
             })),
           );
-          // W7-ID-B1: the person is the same owner, so the name field starts with their ID's name
-          // (never over something already typed or remembered).
-          const own = result.list.agents.find((row) => row.current) ?? result.list.agents[0];
-          if (own !== undefined && own.label.trim() !== '' && wizardMemory().name === undefined) {
-            setPrefilled(own.label);
-            setName(own.label);
-          }
+          // UX-LEFT-1 (R1-UI-21): the field stays empty; another ID's name is never filled in.
         }
       },
       () => undefined,
@@ -1544,7 +1535,7 @@ export function FirstRunPage({
           value={name}
           onChange={setName}
           onContinue={() => void submitName()}
-          taken={takenNames.has(name.trim()) && name.trim() !== prefilled}
+          taken={takenNames.has(name.trim())}
           working={naming}
           {...(nameError === undefined ? {} : { error: nameError })}
         />

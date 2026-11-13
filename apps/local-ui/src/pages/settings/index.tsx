@@ -5,6 +5,7 @@
 // value, and nothing private (key, address, path of this computer) shows. The footer's version is
 // the running package's, from the health read.
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactElement } from 'react';
+import { PageNotice } from '@4thtech-io/ui';
 import { getLive, subscribeLive } from '../../api/live.js';
 import { createApiClient, type ApiResult } from '../../api/client.js';
 import { ShellIcon } from '../../layout/shell-icons.js';
@@ -15,7 +16,6 @@ import { browserPasskeys, OwnerPanel, useOwner } from '../approvals/index.js';
 import { detectPlatform } from '../first-run/passkey.js';
 import { SENSOR } from '../first-run/strings.js';
 import { settingsGroups } from './groups.js';
-import { SettingsIcon } from './icons.js';
 import { PageIcon, titleFor } from './page-meta.js';
 import { readSettingsState, type SettingsState } from './state.js';
 import { SETTINGS_STRINGS as S } from './strings.js';
@@ -155,27 +155,25 @@ function Row(props: {
   );
 }
 
-/** The kit notice: a tinted card, icon, bold title, a line, and the primary action on the right. */
+/** The kit notice: the shared page notice, with the primary action. */
 function KitCard(props: {
   readonly title: string;
   readonly line: string;
   readonly action: string;
 }): ReactElement {
   return (
-    <section className="set-notice" aria-labelledby="set-notice-t">
-      <span className="set-notice-ic" aria-hidden="true">
-        <SettingsIcon name="shield" />
-      </span>
-      <div className="set-notice-text">
-        <p id="set-notice-t" className="set-notice-title">
-          {props.title}
-        </p>
-        <p className="set-notice-line">{props.line}</p>
-      </div>
-      <a className="al-btn al-btn-primary set-notice-act" href="/settings/backup">
-        {props.action}
-      </a>
-    </section>
+    <PageNotice
+      tone="warning"
+      icon="life-buoy"
+      title={props.title}
+      actions={
+        <a className="al-btn al-btn-primary" href="/settings/backup">
+          {props.action}
+        </a>
+      }
+    >
+      <p>{props.line}</p>
+    </PageNotice>
   );
 }
 

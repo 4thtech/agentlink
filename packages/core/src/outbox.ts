@@ -182,7 +182,7 @@ class StoreOutboxPersistence implements OutboxPersistence {
           limit: DUE_BATCH,
         },
       );
-      return due.filter(
+      const won = due.filter(
         (row) =>
           tx.update(
             'outbox',
@@ -190,14 +190,19 @@ class StoreOutboxPersistence implements OutboxPersistence {
             { next_attempt_at: claimUntil },
           ) === 1,
       );
+      // Recorded inside the transaction, so retryNow (OUTBOX-NOW-1) never sees a claimed row as free.
+      for (const row of won) this.#claims.set(row.wrap_id, claimUntil);
+      return won;
     });
     this.listed = claimed.length;
     const out: OutboxRow[] = [];
-    for (const row of claimed) {
-      this.#claims.set(row.wrap_id, claimUntil);
-      out.push(await this.#toRow(row));
-    }
+    for (const row of claimed) out.push(await this.#toRow(row));
     return out;
+  }
+
+  /** OUTBOX-NOW-1: the rows this pass holds a claim on now. */
+  claimedIds(): IterableIterator<string> {
+    return this.#claims.keys();
   }
 
   /** A row the worker can check. One that does not open gets no relays: the worker then marks it
@@ -295,6 +300,8 @@ export class OutboxService {
   /** W4-PAUSE: the agent's pause row; while paused (or unreadable) nothing is published. */
   readonly #pause: { paused(): Promise<boolean> } | undefined;
   #transportClosed = false;
+  /** OUTBOX-NOW-1: the persistence of every pass of this client still running (their claims). */
+  readonly #passes = new Set<StoreOutboxPersistence>();
   /** The agent's own relays, the only ones where NIP-42 AUTH may be signed (07 §4.3). */
   #ownRelays: ReadonlySet<string> = new Set();
 
@@ -477,6 +484,42 @@ export class OutboxService {
     return this.#run(undefined);
   }
 
+  /**
+   * OUTBOX-NOW-1: the relays are reachable again, so the rows waiting out a retry backoff go now,
+   * then one delivery pass (processDue). Only the wait is cut short: each row keeps its attempt
+   * count (the next backoff step still grows), its give_up_at (a row past it ends `not_delivered`,
+   * never sent) and its stored wrap (the same event ID is republished, never a new wrap, so no
+   * message is sent twice). Rows never tried yet (attempts 0) are left alone: they are due already
+   * or a first publish holds them. So is a row a pass of this client has claimed; a row another
+   * process claimed may be republished once more (the same wrap; claims are idempotent per row,
+   * 07 §3.2). While the agent is paused nothing changes: rows keep their deadlines.
+   */
+  async retryNow(): Promise<OutboxSummary> {
+    this.requireTransport();
+    // Paused: processDue publishes nothing, and no deadline is touched.
+    if (this.#pause !== undefined && (await this.#pause.paused())) return this.processDue();
+    const now = nowOf(this.#ctx);
+    await this.#ctx.store.transaction((tx) => {
+      // Read inside the transaction: a pass records its claims in its own claim transaction.
+      const held = new Set<string>();
+      for (const pass of this.#passes) for (const id of pass.claimedIds()) held.add(id);
+      const waiting = tx.select('outbox', {
+        state: 'pending',
+        attempts: { gt: 0 },
+        next_attempt_at: { gt: now },
+      });
+      for (const row of waiting) {
+        if (held.has(row.wrap_id)) continue;
+        tx.update(
+          'outbox',
+          { wrap_id: row.wrap_id, state: 'pending', next_attempt_at: row.next_attempt_at },
+          { next_attempt_at: now },
+        );
+      }
+    });
+    return this.processDue();
+  }
+
   /** Publishes the due rows of one envelope (the first publish of a send). */
   publishEnvelope(envelopeId: string): Promise<OutboxSummary> {
     return this.#run(envelopeId);
@@ -503,6 +546,18 @@ export class OutboxService {
       this.#ownRelays = new Set(); // no readable own list: no AUTH anywhere (07 §4.3)
     }
     const persistence = new StoreOutboxPersistence(this.#ctx, envelopeId);
+    this.#passes.add(persistence);
+    try {
+      return await this.#passWith(persistence, transport);
+    } finally {
+      this.#passes.delete(persistence);
+    }
+  }
+
+  async #passWith(
+    persistence: StoreOutboxPersistence,
+    transport: Transport,
+  ): Promise<OutboxSummary> {
     const worker = new OutboxWorker({
       persistence,
       pool: transport,

@@ -6,7 +6,7 @@
 // falling back to the master code silently, and an owner without a passkey on this computer can
 // switch once inside the sheet (passkey-switch.ts): the master code and one touch register the
 // passkey; then the operation itself is confirmed with its own touch (one entry, one operation).
-import { Button } from '@4thtech-io/ui';
+import { Button, InlineError } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
 import { detectPlatform } from '../first-run/passkey.js';
@@ -265,11 +265,7 @@ export function PresencePrompt({
               {PASSKEY_WHY.switchCancel}
             </Button>
           </div>
-          {switchNote === undefined ? null : (
-            <p className="al-text-body-sm ct-error" role="alert">
-              {switchNote}
-            </p>
-          )}
+          {switchNote === undefined ? null : <InlineError>{switchNote}</InlineError>}
         </form>
       ) : native && !useCode && desktop !== undefined ? (
         <div className="ct-actions">
@@ -313,11 +309,7 @@ export function PresencePrompt({
                 {S.cancel}
               </Button>
             </div>
-            {switchNote === undefined ? null : (
-              <p className="al-text-body-sm ct-error" role="alert">
-                {switchNote}
-              </p>
-            )}
+            {switchNote === undefined ? null : <InlineError>{switchNote}</InlineError>}
             {canSwitch ? (
               <Button
                 variant="ghost"
@@ -353,11 +345,7 @@ export function PresencePrompt({
           {S.passkeyNotUsed}
         </p>
       ) : null}
-      {error === undefined ? null : (
-        <p className="al-text-body-sm ct-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error === undefined ? null : <InlineError>{error}</InlineError>}
     </section>
   );
 }

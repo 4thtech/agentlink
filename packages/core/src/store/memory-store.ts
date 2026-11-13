@@ -271,6 +271,18 @@ class MemoryTx implements StoreTx {
     if (deleted > 0) this.#set(table, kept);
     return deleted;
   }
+
+  /** MSG-ORDER-1: the row's position (inserts append; updates keep the place; deletes keep order). */
+  rowOrder<T extends TableName>(
+    table: T,
+    keys: readonly PrimaryKey<T>[],
+  ): readonly (number | undefined)[] {
+    const rows = this.#rows(table);
+    return keys.map((key) => {
+      const row = this.get(table, key); // checks that the key names every primary-key column
+      return row === undefined ? undefined : rows.indexOf(row as unknown as AnyRow);
+    });
+  }
 }
 
 export interface MemoryStoreOptions {

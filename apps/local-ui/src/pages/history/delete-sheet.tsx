@@ -9,7 +9,7 @@
 // 4. A 10-second "Undo" toast; Undo cancels and nothing is deleted. When the window ends, the page
 //    reads the outcome and says it ("Moved 2 files to the Trash.", or the Windows note).
 // Another party's name is text only (I-5). Nothing here logs.
-import { Button } from '@4thtech-io/ui';
+import { Button, InlineError } from '@4thtech-io/ui';
 import { useEffect, useId, useMemo, useRef, useState, type ReactElement } from 'react';
 import { notify } from '../../notices/index.js';
 import { createOwnerClient, type OwnerResult, type PresenceProof } from '../contacts/owner.js';
@@ -282,18 +282,19 @@ export function DeleteSheet({
         </div>
       ) : null}
       {plan.kind === 'loading' ? (
-        <p className="al-text-body-sm al-muted" role="status">
+        <p className="al-text-body-sm al-muted" aria-busy="true">
           {S.planning}
         </p>
       ) : plan.kind === 'failed' ? (
-        <div className="hs-row">
-          <p className="al-text-body-sm" role="alert">
-            {S.planFailed}
-          </p>
-          <Button variant="ghost" size="sm" onClick={() => setVersion((v) => v + 1)}>
-            {S.retry}
-          </Button>
-        </div>
+        <InlineError
+          action={
+            <Button variant="ghost" size="sm" onClick={() => setVersion((v) => v + 1)}>
+              {S.retry}
+            </Button>
+          }
+        >
+          {S.planFailed}
+        </InlineError>
       ) : (
         <p className="al-text-body hs-counts">
           {empty
@@ -348,9 +349,7 @@ export function DeleteSheet({
             owner={owner}
           />
         ) : error === undefined ? null : (
-          <p className="al-text-body-sm ct-error" role="alert">
-            {error}
-          </p>
+          <InlineError>{error}</InlineError>
         )}
         <Button variant="ghost" size="sm" onClick={onClose}>
           {S.cancel}

@@ -2444,6 +2444,10 @@ button.al-md-chip:focus-visible {
 .al-md th {
   background: var(--al-color-bg-sunken);
   font-weight: var(--al-font-weight-semibold);
+  /* UX-LEFT-1 (R2-UI-12): a header never breaks inside a word; the table scrolls sideways instead. */
+  overflow-wrap: normal;
+  word-break: normal;
+  white-space: nowrap;
 }
 .al-md-left {
   text-align: left;

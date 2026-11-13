@@ -82,7 +82,7 @@ export const HISTORY_STRINGS = {
   filesOnly: 'Files only',
   review: 'Review',
   removes: (messages: number, files: number, bytes: number): string =>
-    `This removes ${String(messages)} messages and ${String(files)} files (${sizeWords(bytes)}).`,
+    `This removes ${plural(messages, 'message', 'messages')} and ${plural(files, 'file', 'files')} (${sizeWords(bytes)}).`,
   // RET-7: opened from the AI's agentlink_tidy proposal.
   aiSuggested: 'Your AI suggested this cleanup.',
   aiNothingYet: 'Nothing is deleted until you confirm it here.',
