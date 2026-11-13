@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-13
+
+### Added
+
+- The npm package includes THIRD-PARTY-NOTICES.md: the licences of React, react-dom, scheduler, qrcode-generator, the Geist fonts and the Lucide-derived icons inside the built-in app, generated from the installed packages at build time (REPO-CLEAN-1).
+
+### Changed
+
+- Knowledge base for the website support assistant (KNOW-1): `knowledge/` is now seven standalone files, one topic each (index, overview, user guide, desktop app, FAQ, security and privacy, technical overview); the size check gives each file a cap and the total a higher target; docs changes must include `knowledge/`.
+- CONTRIBUTING.md describes the project as it is today (pre-alpha, working on test networks), `pnpm verify`, `tools/pr/open-pr.mjs` and `changelog.d/` fragments (REPO-CLEAN-1).
+- User-guide pages checked against 0.5.1 now say "Applies to AgentLink 0.5.1" (REPO-CLEAN-1).
+- The desktop app's knowledge page describes Settings › Updates (Check for updates, Download update) (REPO-CLEAN-1).
+
+### Fixed
+
+- Two flaky tests are fixed and the test quarantine is empty again: the first-run browser test listens for the page's requests before the page loads, and the version 10 to 11 store migration test runs one case per file (REPO-CLEAN-1).
+- The Messages guide page links to current source files (REPO-CLEAN-1).
+
 ## [0.5.1] - 2026-11-13
 
 ### Added
@@ -1169,7 +1187,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/4thtech/agentlink/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/4thtech/agentlink/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/4thtech/agentlink/compare/v0.4.15...v0.5.0
 [0.4.15]: https://github.com/4thtech/agentlink/compare/v0.4.14...v0.4.15
