@@ -7,7 +7,7 @@
 import { Button, useHood } from '@4thtech-io/ui';
 import { useState, type ReactElement } from 'react';
 import type { ConnectingRow, LinkOutcome, OpenInvite } from '../contacts/invite-api.js';
-import { connectingLine, useConnectingNow } from './connecting-stage.js';
+import { cancelProminent, connectingLine, useConnectingView } from './connecting-stage.js';
 import { InviteLinkButtons, InviteLinkReveal, useInviteLink } from './invite-link-actions.js';
 import {
   FEEDBACK_STRINGS as F,
@@ -135,8 +135,9 @@ export function ConnectingInviteRow({
   const [hidden, setHidden] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
-  const shown: ConnectingRow = blocked ? { ...row, blocked: true } : row;
-  const now = useConnectingNow(shown);
+  const view = useConnectingView(blocked ? { ...row, blocked: true } : row);
+  const shown = view.row;
+  const now = view.now;
   if (hidden) return <></>;
   return (
     <li className="inv-pending inv-connecting" data-blocked={blocked ? 'true' : undefined}>
@@ -162,7 +163,7 @@ export function ConnectingInviteRow({
           {onCancel === undefined ? null : (
             <Button
               size="sm"
-              variant="ghost"
+              variant={cancelProminent(shown, now) ? 'secondary' : 'ghost'}
               disabled={busy}
               onClick={() => {
                 setBusy(true);

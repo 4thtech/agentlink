@@ -2,8 +2,9 @@
 // REL051-CF1 (R1-CLASS-01, -06; 08 §1; 04 §3.6): an accept that waits never sits on "Connecting to
 // …" for good. From when it began (`startedAt`, from the server, so it holds after a restart):
 // - the first seconds: "Connecting to {name}…";
-// - after a short wait: "Waiting for {name}'s AgentLink to come online. It connects by itself; you
-//   can close this.";
+// - after a short wait (REL051-R2C, R2-CLASS-01): "Waiting for {name}'s AgentLink. If someone else
+//   already used this invite, it won't connect: ask {name} for a new one." (never "it connects by
+//   itself": a lost race never does);
 // - after a bounded wait: "No answer from {name} yet. If this invite was already used or cancelled,
 //   it won't connect. Ask {name} for a new one." Nothing says who else answered (there is no such
 //   signal): the line is honest about what this side cannot know.
@@ -48,7 +49,7 @@ const at = (agoMs: number, over: Partial<ConnectingRow> = {}): ConnectingRow => 
 });
 
 const WAITING =
-  "Waiting for Ana Novak's AgentLink to come online. It connects by itself; you can close this.";
+  "Waiting for Ana Novak's AgentLink. If someone else already used this invite, it won't connect: ask Ana Novak for a new one.";
 const NO_ANSWER =
   "No answer from Ana Novak yet. If this invite was already used or cancelled, it won't connect. Ask Ana Novak for a new one.";
 
@@ -155,6 +156,29 @@ describe('ConnectingInviteRow: never stuck (R1-CLASS-01, -06)', () => {
         vi.advanceTimersByTime(CONNECTING_HINT_MS + 5_000);
       });
       expect(host.textContent).toContain(WAITING);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // REL051-R2C (R2-CLASS-04): a row the server has not timed yet moves on too, without a restart,
+  // and Cancel is the plain way out from then on.
+  it('a row with no start time yet is timed from when it was shown', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    try {
+      const row: ConnectingRow = { ...at(0) };
+      delete (row as { startedAt?: number }).startedAt;
+      const onCancel = vi.fn(() => Promise.resolve('cancelled' as const));
+      act(() => root.render(h(ConnectingInviteRow, { row, onCancel })));
+      expect(host.textContent).toContain('Connecting to Ana Novak…');
+      act(() => {
+        vi.advanceTimersByTime(CONNECTING_HINT_MS + 5_000);
+      });
+      expect(host.textContent).toContain(WAITING);
+      expect(host.textContent).not.toContain('connects by itself');
+      const cancel = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Cancel');
+      expect(cancel?.className).toContain('secondary');
     } finally {
       vi.useRealTimers();
     }

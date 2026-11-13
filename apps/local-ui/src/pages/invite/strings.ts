@@ -207,8 +207,10 @@ export const FEEDBACK_STRINGS = {
   waitingOnline: (name: string): string =>
     `Waiting for ${name} to come online. This finishes on its own.`,
   // REL051-CF1 (R1-CLASS-06): sent, no answer after a short wait (the inviter's app may be closed).
+  // REL051-R2C (R2-CLASS-01): honest from the start: with no refusal from the inviter, this side
+  // cannot tell "away" from "someone else already used this invite", so it says both.
   waitingAnswer: (name: string): string =>
-    `Waiting for ${name}'s AgentLink to come online. It connects by itself; you can close this.`,
+    `Waiting for ${name}'s AgentLink. If someone else already used this invite, it won't connect: ask ${name} for a new one.`,
   // REL051-CF1 (R1-CLASS-01): no answer after the bound. Honest: this side cannot know whether the
   // invite was used, cancelled or the inviter is just away, and never who else answered.
   noAnswer: (name: string): string =>

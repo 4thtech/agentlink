@@ -241,7 +241,7 @@ describe('chapter 2: contacts and invites', () => {
     await navTo(late.page, 'Home');
     await late.page
       .getByText(
-        "Waiting for Ana's AgentLink to come online. It connects by itself; you can close this.",
+        "Waiting for Ana's AgentLink. If someone else already used this invite, it won't connect: ask Ana for a new one.",
       )
       .first()
       .waitFor({ timeout: 40_000 });
