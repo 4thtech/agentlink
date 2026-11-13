@@ -2287,6 +2287,10 @@ export async function startApprovalServerWith(
               prepareBackupExport: (kitId, contents) =>
                 client.ownerActions.prepareBackupExport(kitId, contents),
               apply,
+              // KIT-NAMES: its verified label, sealed inside the kit (read during this step).
+              ...(typeof client.ownerActions.loadLabel === 'function'
+                ? { loadLabel: () => (client.ownerActions.loadLabel as () => Promise<unknown>)() }
+                : {}),
             });
           },
           {

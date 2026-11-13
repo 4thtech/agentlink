@@ -146,7 +146,7 @@ describe('KeyExportControl (04 §2.3.3 "Export: who sees the seeds")', () => {
     >();
     expectTypeOf<RecoveryKitExportRequest['contents']>().toEqualTypeOf<RecoveryKitContents>();
     expectTypeOf<RecoveryKitExportRequest['path']>().toEqualTypeOf<string>();
-    expectTypeOf<keyof RecoveryKitExportAgent>().toEqualTypeOf<'agentId' | 'name'>();
+    expectTypeOf<keyof RecoveryKitExportAgent>().toEqualTypeOf<'agentId' | 'name' | 'label'>(); // KIT-NAMES
     expectTypeOf<RecoveryKitExportAgent['agentId']>().toEqualTypeOf<string>();
     expectTypeOf<RecoveryKitExportAgent['name']>().toEqualTypeOf<string>();
     // Called by the backend under the agent's lock, after it read policy-version and receipts-kept.
@@ -181,8 +181,9 @@ describe('KeyImportControl (04 §2.3.3 restore steps 3, 5 and 6)', () => {
       'ownerNostr' | 'kitId' | 'createdAt' | 'contents' | 'agents' | 'wipe'
     >();
     expectTypeOf<MethodNames<RecoveryKitImport>>().toEqualTypeOf<'wipe'>();
+    // KIT-NAMES: the owner-set name a v2 kit carries is a public display fact like the folder name.
     expectTypeOf<keyof RecoveryKitImportAgent>().toEqualTypeOf<
-      'agentId' | 'name' | 'store' | 'storeLength'
+      'agentId' | 'name' | 'label' | 'store' | 'storeLength'
     >();
     expectTypeOf<RecoveryKitImportAgent['store']>().toEqualTypeOf<RecoveryKitStoreSink>();
   });

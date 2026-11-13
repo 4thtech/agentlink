@@ -219,6 +219,8 @@ export interface KeyExportControlOptions {
 interface ExportAgent {
   readonly agentId: string;
   readonly name: string;
+  /** KIT-NAMES: the ID's owner-set name, sealed inside the kit. */
+  readonly label?: string;
 }
 
 /** The request, read once: what is checked is what is sealed. */
@@ -247,14 +249,18 @@ function exportSnapshot(request: unknown): {
   }
   const seen = new Set<string>();
   const list = agents.map((agent: unknown): ExportAgent => {
-    const { agentId, name } = (agent ?? {}) as Record<string, unknown>;
+    const { agentId, name, label } = (agent ?? {}) as Record<string, unknown>;
     assertAgentId(agentId);
     if (typeof name !== 'string' || !AGENT_NAME.test(name)) {
       throw argument('backup export: an agent name is not valid');
     }
+    // KIT-NAMES: the label rule itself is the sealer's (refused there before anything is written).
+    if (label !== undefined && typeof label !== 'string') {
+      throw argument('backup export: an agent label is not valid');
+    }
     if (seen.has(agentId)) throw argument('backup export: an agent is listed twice');
     seen.add(agentId);
-    return Object.freeze({ agentId, name });
+    return Object.freeze(label === undefined ? { agentId, name } : { agentId, name, label });
   });
   return {
     kitId,
@@ -343,6 +349,7 @@ export function createKeyExportControl(options: KeyExportControlOptions): KeyExp
           agents.push({
             agentId: agent.agentId,
             name: agent.name,
+            ...(agent.label === undefined ? {} : { label: agent.label }),
             items: read.kitItems,
             store: read.store,
           });
@@ -579,6 +586,7 @@ export function createKeyImportControl(options: KeyImportControlOptions): KeyImp
             Object.freeze({
               agentId: agent.agentId,
               name: agent.name.slice(),
+              ...(agent.label === undefined ? {} : { label: agent.label.slice() }),
               store: agent.store,
               storeLength: agent.storeLength,
             }),
