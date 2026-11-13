@@ -502,6 +502,8 @@ describe('runDesktopHost (WP-D3)', () => {
     await until(() => readies(s.pipe.sent).length === 1);
     const desk = options?.appUpdate;
     expect(desk).toBeDefined();
+    // REL051-UPD2: the page shows the desktop app's own action (Download update).
+    expect(desk?.install).toBe('desktop');
     // Nothing yet from the shell: no state, and a check asks nothing.
     expect(desk?.view()).toBeUndefined();
     expect(desk?.check()).toBeUndefined();

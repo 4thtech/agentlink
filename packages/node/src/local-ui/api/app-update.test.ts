@@ -16,6 +16,7 @@ import {
   APP_UPDATE_PATH,
   appUpdateBody,
   appUpdateRoutes,
+  type AppUpdateInstall,
   type AppUpdateView,
   type LocalUiAppUpdateDesk,
 } from './app-update.js';
@@ -32,8 +33,13 @@ const [read, check] = appUpdateRoutes as readonly LocalUiReadRoute[];
 const req = (query = ''): LocalUiRequest => ({ params: {}, query: new URLSearchParams(query) });
 const ctx = (appUpdate?: LocalUiAppUpdateDesk): LocalUiContext =>
   (appUpdate === undefined ? {} : { appUpdate }) as unknown as LocalUiContext;
-const desk = (view: AppUpdateView | undefined, onCheck = (): void => undefined) =>
+const desk = (
+  view: AppUpdateView | undefined,
+  onCheck = (): void => undefined,
+  install: AppUpdateInstall = 'desktop',
+) =>
   ({
+    install,
     view: () => view,
     check: () => {
       onCheck();
@@ -62,7 +68,7 @@ describe('app-update routes', () => {
   it('answers the shell’s state as is', async () => {
     expect(await read?.handler(ctx(desk(AVAILABLE)), req())).toEqual({
       status: 200,
-      body: AVAILABLE,
+      body: { ...AVAILABLE, install: 'desktop' },
     });
   });
 
@@ -83,7 +89,7 @@ describe('app-update routes', () => {
       req(),
     );
     expect(asked).toBe(1);
-    expect(result).toEqual({ status: 200, body: checking });
+    expect(result).toEqual({ status: 200, body: { ...checking, install: 'desktop' } });
   });
 
   it('refuses a query', async () => {
@@ -109,17 +115,44 @@ describe('app-update routes', () => {
     ['markup in a version', { ...AVAILABLE, current: '<b>0.5.1</b>' }],
     ['a link while not available', { ...AVAILABLE, state: 'current' }],
   ])('never passes on %s', async (_label, view) => {
-    expect(appUpdateBody(view)).toBeUndefined();
+    expect(appUpdateBody(view, 'desktop')).toBeUndefined();
     expect(await read?.handler(ctx(desk(view)), req())).toEqual(UI_UNAVAILABLE);
   });
 
-  it('the body has exactly the four fields (nothing else of the desk’s object)', () => {
+  it('the body has exactly the five fields (nothing else of the desk’s object)', () => {
     const extra = { ...AVAILABLE, secret: 'x' } as AppUpdateView;
-    expect(Object.keys(appUpdateBody(extra) ?? {}).sort()).toEqual([
+    expect(Object.keys(appUpdateBody(extra, 'desktop') ?? {}).sort()).toEqual([
       'current',
       'download',
+      'install',
       'latest',
       'state',
     ]);
+  });
+
+  // REL051-UPD2: the browser app (the local app server) has its own desk: the npm registry's latest
+  // version and how this copy was installed. The page shows the action; there is never a link.
+  const BROWSER: AppUpdateView = { state: 'available', current: '0.5.1', latest: '0.5.2', download: '' };
+
+  it.each<AppUpdateInstall>(['installer', 'npx', 'global'])(
+    'browser app (%s): the version and how it was installed, no link',
+    async (install) => {
+      expect(await read?.handler(ctx(desk(BROWSER, undefined, install)), req())).toEqual({
+        status: 200,
+        body: { ...BROWSER, install },
+      });
+    },
+  );
+
+  it.each<[string, AppUpdateView, AppUpdateInstall]>([
+    ['a link in the browser app', { ...BROWSER, download: DMG }, 'npx'],
+    ['a release page in the browser app', { ...BROWSER, download: DMG }, 'global'],
+    ['no link in the desktop app', BROWSER, 'desktop'],
+    ['an unknown install', BROWSER, 'brew' as never],
+  ])('never passes on %s', async (_label, view, install) => {
+    expect(appUpdateBody(view, install)).toBeUndefined();
+    expect(await read?.handler(ctx(desk(view, undefined, install)), req())).toEqual(
+      UI_UNAVAILABLE,
+    );
   });
 });

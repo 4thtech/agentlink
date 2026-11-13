@@ -35,12 +35,19 @@ async function settle(): Promise<void> {
 const DMG =
   'https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-mac-arm64.dmg';
 const PAGE = 'https://github.com/4thtech/agentlink/releases/tag/v0.5.2';
-const AVAILABLE = { state: 'available', current: '0.5.1', latest: '0.5.2', download: DMG };
-const view = (state: string): Record<string, string> => ({
+const AVAILABLE = {
+  state: 'available',
+  current: '0.5.1',
+  latest: '0.5.2',
+  download: DMG,
+  install: 'desktop',
+};
+const view = (state: string, install = 'desktop'): Record<string, string> => ({
   state,
   current: '0.5.1',
   latest: '',
   download: '',
+  install,
 });
 const ok = (data: unknown): ApiResult<unknown> => ({ kind: 'ok', status: 200, data });
 
@@ -176,15 +183,91 @@ describe('parseUpdate', () => {
   });
 });
 
-describe('listed in the desktop app only', () => {
-  it('the Updates page is in Settings inside the app, not in a browser', () => {
-    expect(SETTINGS_PAGES.some((p) => p.path === '/settings/updates')).toBe(false);
-    expect(
-      settingsPages(true)
-        .map((p) => p.path)
-        .slice(-2),
-    ).toEqual(['/settings/updates', '/settings/advanced']);
-    expect(settingsPages(true).some((p) => p.path === '/settings/updates')).toBe(true);
-    expect(settingsPages(false).some((p) => p.path === '/settings/updates')).toBe(false);
+describe('one Updates page in Settings, in the desktop app and in the browser', () => {
+  it('is listed once, before Advanced, in both', () => {
+    for (const desktop of [true, false]) {
+      const paths = settingsPages(desktop).map((p) => p.path);
+      expect(paths.filter((p) => p === '/settings/updates')).toHaveLength(1);
+      expect(paths.slice(-2)).toEqual(['/settings/updates', '/settings/advanced']);
+    }
+    expect(SETTINGS_PAGES.filter((p) => p.path === '/settings/updates')).toHaveLength(1);
+  });
+});
+
+// REL051-UPD2: the browser app (the local app server from `agentlink` or npx). There is no file to
+// download: the page says how to get the new version for how this copy was installed.
+describe('Settings > Updates in the browser app', () => {
+  const BROWSER = (install: string): Record<string, string> => ({
+    ...AVAILABLE,
+    download: '',
+    install,
+  });
+  const code = (): string[] => [...host.querySelectorAll('code')].map((c) => c.textContent ?? '');
+
+  it('the installer’s agentlink command: a restart is the update', async () => {
+    await mount(() => Promise.resolve(ok(BROWSER('installer'))));
+    expect(text()).toContain('AgentLink 0.5.2 is ready');
+    expect(text()).toContain('Restart AgentLink to update');
+    expect(text()).toContain('press Ctrl+C');
+    expect(code()).toEqual(['agentlink']);
+    expect(host.querySelector('a')).toBeNull();
+    expect(button('Download update')).toBeUndefined();
+    expect(text()).toContain('Your IDs, people and messages stay as they are.');
+  });
+
+  it('npx: a restart with the npx command is the update', async () => {
+    await mount(() => Promise.resolve(ok(BROWSER('npx'))));
+    expect(text()).toContain('Restart AgentLink to update');
+    expect(code()).toEqual(['npx -y @4thtech-io/agentlink@latest']);
+  });
+
+  it('a global install: the one update command, then start it again', async () => {
+    await mount(() => Promise.resolve(ok(BROWSER('global'))));
+    expect(text()).toContain('Update with one command');
+    expect(text()).not.toContain('Restart AgentLink to update');
+    expect(code()).toEqual(['npm install -g @4thtech-io/agentlink@latest', 'agentlink']);
+  });
+
+  it('Copy puts the exact command on the clipboard and says Copied', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    await mount(() => Promise.resolve(ok(BROWSER('global'))));
+    const copies = [...host.querySelectorAll('button')].filter((b) => b.textContent === 'Copy');
+    expect(copies).toHaveLength(2);
+    await act(async () => {
+      copies[0]?.click();
+    });
+    await settle();
+    expect(writeText).toHaveBeenCalledWith('npm install -g @4thtech-io/agentlink@latest');
+    expect(text()).toContain('Copied');
+  });
+
+  it('idle in the browser: the same version line and check button', async () => {
+    await mount(() => Promise.resolve(ok(view('idle', 'npx'))));
+    expect(text()).toContain('You have AgentLink 0.5.1.');
+    expect(button('Check for updates')).toBeDefined();
+  });
+
+  it('a window with no update check (501) says so, without an error', async () => {
+    await mount(() => Promise.resolve({ kind: 'not_available' } as ApiResult<unknown>));
+    expect(text()).toContain('Checking for updates isn’t available in this window.');
+    expect(button('Check for updates')).toBeUndefined();
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it.each([
+    ['a link in the browser app', { ...BROWSER('npx'), download: DMG }],
+    ['no link in the desktop app', BROWSER('desktop')],
+    ['an unknown install', BROWSER('brew')],
+    ['no install', { state: 'idle', current: '0.5.1', latest: '', download: '' }],
+  ])('parseUpdate refuses %s', (_label, data) => {
+    expect(parseUpdate(data)).toBeUndefined();
+  });
+
+  it('never uses the banned words', async () => {
+    for (const install of ['installer', 'npx', 'global']) {
+      await mount(() => Promise.resolve(ok(BROWSER(install))));
+      expect(text()).not.toMatch(/wallet|\bgas\b|seed phrase|transaction/i);
+    }
   });
 });
