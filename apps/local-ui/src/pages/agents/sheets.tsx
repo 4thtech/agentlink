@@ -3,7 +3,7 @@
 // owner operation behind the presence gate: the page sends one request with the proof and the
 // server signs. The routes of U3-d and U3-e may still be stubs (501): that reads as a plain
 // "not done" sentence and nothing is claimed. Labels are rendered as text only (I-5).
-import { Button, Sheet, TextField } from '@4thtech-io/ui';
+import { Button, InlineError, Sheet, TextField } from '@4thtech-io/ui';
 import { useCallback, useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import { FAILURE_COPY } from '../../api/failure-reasons.js';
 import { ExportKit } from '../backup/export-kit.js';
@@ -149,9 +149,7 @@ export function RenameEditor({
         </Button>
       </div>
       {refusedLabel === label && error === undefined ? (
-        <p className="al-text-body-sm ag-error" role="alert">
-          {S.labelInvalid}
-        </p>
+        <InlineError>{S.labelInvalid}</InlineError>
       ) : null}
     </form>
   );

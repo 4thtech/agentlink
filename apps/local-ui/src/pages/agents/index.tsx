@@ -12,7 +12,7 @@ import {
   SkeletonGate,
   SkeletonList,
   SkeletonTable,
-  Surface,
+  Banner,
   useHood,
 } from '@4thtech-io/ui';
 import {
@@ -326,14 +326,16 @@ export function AgentsPage({
 
   let body: ReactElement;
   const errorBox = (
-    <Surface as="section" level={1} className="ag-error-box">
-      <p className="al-text-body" role="alert">
-        {S.loadError}
-      </p>
-      <Button variant="secondary" onClick={reread}>
-        {S.tryAgain}
-      </Button>
-    </Surface>
+    <Banner
+      tone="danger"
+      action={
+        <Button variant="secondary" size="sm" onClick={reread}>
+          {S.tryAgain}
+        </Button>
+      }
+    >
+      {S.loadError}
+    </Banner>
   );
   if (failed && detailName !== undefined) {
     body = errorBox;

@@ -17,7 +17,7 @@
 // connect your AIs" with one Accept with Touch ID; "Not now" says nothing was shared and the link
 // still works; once connected, the Connected moment shows the 12 digits for the new contact
 // (found in this app's contacts by the inviter's fingerprint), and Done goes Home.
-import { Button, ProgressBar } from '@4thtech-io/ui';
+import { Button, InlineError, ProgressBar } from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { ConnectedMoment } from '../invite/connected.js';
@@ -209,9 +209,7 @@ export function JoinPage({
   if (view.kind === 'offline') {
     return (
       <section className="jn-card">
-        <p className="al-text-body" role="alert">
-          {S.offline}
-        </p>
+        <InlineError>{S.offline}</InlineError>
         <Button variant="secondary" onClick={() => go(HOME)}>
           {S.goHome}
         </Button>
@@ -353,11 +351,7 @@ export function JoinPage({
             />
           )}
           {busy ? <ProgressBar label={S.connecting(name)} indeterminate /> : null}
-          {error === undefined ? null : (
-            <p className="al-text-body-sm jn-error" role="alert">
-              {error}
-            </p>
-          )}
+          {error === undefined ? null : <InlineError>{error}</InlineError>}
           {declined ? (
             <>
               <p className="jn-declined al-reveal" role="status">

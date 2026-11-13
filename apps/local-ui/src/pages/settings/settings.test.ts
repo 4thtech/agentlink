@@ -225,17 +225,17 @@ describe('Settings home', () => {
         },
       }),
     );
-    expect(host.querySelectorAll('section.al-notice, section.set-notice')).toHaveLength(1);
+    expect(host.querySelectorAll('section.al-notice')).toHaveLength(1);
     expect(host.textContent).toContain(S.notice.noKitTitle);
-    expect(host.querySelector('section.set-notice a.al-btn-primary')?.textContent).toBe(
+    expect(host.querySelector('section.al-notice a.al-btn-primary')?.textContent).toBe(
       S.notice.noKitAction,
     );
     expect(rowFor('/settings/backup')?.textContent).toContain(S.backup.notBackedUp);
 
     await mount();
-    expect(host.querySelectorAll('section.al-notice, section.set-notice')).toHaveLength(1);
+    expect(host.querySelectorAll('section.al-notice')).toHaveLength(1);
     expect(host.textContent).toContain('Your recovery kit is missing 1 ID and 2 people.');
-    expect(host.querySelector('section.set-notice a.al-btn-primary')?.textContent).toBe(
+    expect(host.querySelector('section.al-notice a.al-btn-primary')?.textContent).toBe(
       S.notice.staleAction,
     );
 
@@ -246,9 +246,7 @@ describe('Settings home', () => {
       }),
       false,
     );
-    expect(
-      host.querySelectorAll('section.al-notice, section.set-notice').length,
-    ).toBeLessThanOrEqual(1);
+    expect(host.querySelectorAll('section.al-notice').length).toBeLessThanOrEqual(1);
     expect(host.textContent).not.toContain('recovery kit is missing');
     expect(rowFor('/settings/backup')?.textContent).toContain(S.backup.upToDate);
   });
