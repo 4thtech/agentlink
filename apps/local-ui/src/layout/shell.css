@@ -693,3 +693,111 @@
   display: block;
   padding: 0 10px 6px 34px;
 }
+
+/* N5 (PLAN-NOTIFY §4.1): the bell and its centre. The menu surface, rows and heads are the shell
+   menu's own (.al-shell-menu, .al-mitem, .al-menu-head); the count is the shared tick badge. */
+.al-nc {
+  position: relative;
+}
+.al-nc-bell {
+  position: relative;
+}
+.al-nc-count {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+}
+.al-nc-menu {
+  right: 0;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(520px, calc(100vh - 96px));
+  overflow-y: auto;
+}
+.al-nc-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 2px 4px 10px;
+}
+.al-nc-title {
+  flex: 1;
+  font-weight: var(--al-font-weight-medium);
+}
+.al-nc-head .al-nc-headbtn {
+  width: auto;
+  min-height: 36px;
+  font-size: 13px;
+  color: var(--al-color-accent-fg);
+}
+.al-nc-head .al-nc-headbtn[aria-disabled='true'] {
+  color: var(--al-color-fg-subtle);
+  cursor: default;
+}
+.al-nc-head .al-nc-cog {
+  color: var(--al-color-fg-muted);
+}
+.al-nc-row {
+  align-items: flex-start;
+  min-height: 52px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.al-nc-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-status-info-bg);
+  color: var(--al-color-status-info-icon);
+}
+.al-nc-icon.is-warning {
+  background: var(--al-color-status-warning-bg);
+  color: var(--al-color-status-warning-icon);
+}
+.al-nc-icon.is-neutral {
+  background: var(--al-color-status-neutral-bg);
+  color: var(--al-color-status-neutral-icon);
+}
+.al-mitem .al-nc-icon .al-sicon {
+  color: inherit;
+}
+.al-nc-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.al-nc-line {
+  overflow-wrap: anywhere;
+}
+.al-nc-sub {
+  font-size: 12px;
+  color: var(--al-color-fg-muted);
+}
+.al-nc-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 8px;
+  border-radius: 50%;
+  background: var(--al-color-accent-default);
+}
+.al-nc-empty {
+  margin: 0;
+  padding: 12px 10px;
+  color: var(--al-color-fg-muted);
+}
+@media (max-width: 600px) {
+  /* On a phone the centre is a sheet across the width, under the top bar. */
+  .al-nc-menu {
+    position: fixed;
+    top: 60px;
+    left: 16px;
+    right: 16px;
+    width: auto;
+    max-height: calc(100vh - 80px);
+  }
+}

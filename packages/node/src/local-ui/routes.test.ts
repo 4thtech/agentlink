@@ -214,6 +214,11 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/agents/resume',
       // W4-SHELL-V2: the app's UI settings (local-ui/ui-settings-server.test.ts).
       '/api/ui/ui-settings',
+      // N4: the notification centre (local-ui/notifications-server.test.ts).
+      '/api/ui/notifications',
+      '/api/ui/notifications/:id/read',
+      '/api/ui/notifications/read-all',
+      '/api/ui/notifications/refresh',
       // UX1112 WP-12 (F-2): Block and Unblock a contact (local-ui/api/contacts.test.ts).
       '/api/ui/contacts/:ref/block',
       '/api/ui/contacts/:ref/unblock',

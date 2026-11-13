@@ -109,6 +109,8 @@ export function lineFor(
       return { line: S.updates.line };
     case '/settings/appearance':
       return { line: S.appearance.line, state: themeWord(theme), tone: 'plain' };
+    case '/settings/notifications':
+      return { line: S.notifications.line };
     case '/settings/proofs':
       return s?.credits === undefined
         ? { line: S.proofs.fallback }

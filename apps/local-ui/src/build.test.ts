@@ -62,6 +62,14 @@ describe('production build', () => {
     expect(icon?.text).toContain('prefers-color-scheme: dark');
   });
 
+  it('N5: ships the approvals-waiting icon as its own hashed file, never a data: URL', () => {
+    const dot = outputs.find((o) => /^assets\/favicon-dot-[^/]+\.svg$/.test(o.fileName));
+    expect(dot?.text).toContain('prefers-color-scheme: dark');
+    const js = outputs.filter((o) => o.type === 'chunk').map((o) => o.text);
+    expect(js.some((t) => t.includes(`/${dot?.fileName ?? 'none'}`))).toBe(true);
+    for (const t of js) expect(t).not.toMatch(/data:image\/svg/);
+  });
+
   it('links its styles as a file', () => {
     const html = outputs.find((o) => o.fileName === 'index.html')?.text ?? '';
     expect(html).toMatch(/<link[^>]+rel="stylesheet"[^>]+href="\/assets\/[^"]+\.css"/);

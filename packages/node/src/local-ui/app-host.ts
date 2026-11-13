@@ -44,6 +44,7 @@
 import type { AgentStorePeek } from '../agent-peek.js';
 import type { StorageUsage } from '../storage-usage.js';
 import type { UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
+import type { NotificationRecord } from '../notifications.js';
 import type { ApprovalServerSource } from '../approval-server.js';
 import type { LocalUiAiApps, LocalUiOptions } from './context.js';
 import type { AgentRemovalPort } from './api/agents-remove.js';
@@ -141,6 +142,13 @@ export interface AgentDirectory {
   readUiSettings?(): Promise<UiSettings | undefined>;
   /** W4-SHELL-V2: writes the allowlisted settings to `~/.agentlink/ui-settings.json` (0600, atomic). */
   writeUiSettings?(settings: UiSettings): Promise<void>;
+  /**
+   * N4: the ID's notification record from `notifications.json` in its folder, as parsed JSON, or
+   * undefined (absent, a link, a non-private or oversized file). Read strictly by the store.
+   */
+  readNotifications?(name: string): Promise<unknown>;
+  /** N4: writes the checked record to `notifications.json` in the ID folder (0600, atomic). */
+  writeNotifications?(name: string, record: NotificationRecord): Promise<void>;
 }
 
 /** One opened agent as the host serves it (the CLI's openAgent result, wired for the pages). */

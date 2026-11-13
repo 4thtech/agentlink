@@ -74,6 +74,8 @@ const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   // DESK051-UPD: Settings > Updates (listed in the desktop app only; the route always exists).
   ['/settings/updates', 'Updates', 'Settings'],
   ['/settings/appearance', 'Appearance', 'Settings'],
+  // N6: Settings › Notifications is a page now (no longer a redirect to Settings home).
+  ['/settings/notifications', 'Notifications', 'Settings'],
   ['/settings/rules', 'Rules', 'Settings'],
   ['/settings/proofs', 'Proofs & credits', 'Settings'],
   ['/advanced/rules', 'Rules', null],
@@ -169,7 +171,6 @@ describe('routes', () => {
     ['/inbox', '/'],
     ['/settings/contacts', '/people'],
     ['/settings/passkeys', '/settings/backup'],
-    ['/settings/notifications', '/settings'],
     ['/advanced', '/advanced/network'],
   ])('keeps the old path %s working: it goes to %s', (from, to) => {
     expect(REDIRECTS[from]).toBe(to);
@@ -203,6 +204,8 @@ describe('the sections (nav.ts)', () => {
       'Files folder',
       'Storage',
       'Appearance',
+      // N6.
+      'Notifications',
       'Rules',
       'Proofs & credits',
       // REL051-UPD2: one Updates page in the desktop app and the browser app.
