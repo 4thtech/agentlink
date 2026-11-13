@@ -1242,11 +1242,13 @@ jobs:
             exit 1
           fi
           # GitHub rejects a Release body over 125,000 characters (HTTP 422): swap in a short note with a link.
+          # The limit here is 123,000 so the Download section added below always fits.
           # Inline on purpose: this job holds id-token: write and runs no repository code (OPS-REL-3).
-          # Tested by tools/release/release-body.test.mjs, which runs the block between the BODY-LIMIT markers.
+          # Tested by tools/release/release-body.test.mjs, which runs the blocks between the BODY-LIMIT
+          # and DOWNLOAD markers.
           # BODY-LIMIT-BEGIN
           chars="$(LC_ALL=C.UTF-8 wc -m < "$notes" | tr -d '[:space:]')"
-          if [ "$chars" -gt 125000 ]; then
+          if [ "$chars" -gt 123000 ]; then
             base="https://github.com/$GITHUB_REPOSITORY/blob/v$version"
             if [ -f "docs/releases/v$version.md" ]; then
               what="the release note"
@@ -1257,9 +1259,29 @@ jobs:
               link="$base/CHANGELOG.md#${version//./}---$heading_date"
             fi
             printf 'The full notes for v%s are too long for a GitHub Release body. Read %s: %s\n' "$version" "$what" "$link" > "$notes"
-            echo "::warning::Release notes for v$version are over 125000 characters; using a short note with a link."
+            echo "::warning::Release notes for v$version are over 123000 characters; using a short note with a link."
           fi
           # BODY-LIMIT-END
+          # Every Release body starts with a short "Download" section (DOCS-MAC-2): which file to download
+          # for which computer, then the changes under "What's new". The two DMGs are attached later by
+          # desktop-app-release under exactly these names.
+          # DOWNLOAD-BEGIN
+          dl="https://github.com/$GITHUB_REPOSITORY/releases/download/v$version"
+          docs="https://github.com/$GITHUB_REPOSITORY/blob/main/docs-site/guide"
+          {
+            printf '## Download\n\n'
+            printf '| Your computer | Download this |\n|---|---|\n'
+            printf '| Mac with Apple chip (M1, M2, M3, M4) | [AgentLink-%s-mac-arm64.dmg](%s/AgentLink-%s-mac-arm64.dmg) |\n' "$version" "$dl" "$version"
+            printf '| Mac with Intel chip | [AgentLink-%s-mac-x64.dmg](%s/AgentLink-%s-mac-x64.dmg) |\n' "$version" "$dl" "$version"
+            printf '| Windows or Linux | No download: [one command](%s/get-started/start-fast.md) |\n\n' "$docs"
+            printf 'Not sure which Mac? Apple menu, then **About This Mac**: "Chip: Apple M..." means Apple chip, "Processor: Intel" means Intel. In the file names, **arm64 = Apple chip** and **x64 = Intel**.\n\n'
+            printf '**Mac, first time:** 1) Open the .dmg and drag AgentLink to Applications. 2) Open AgentLink from Applications; macOS blocks it the first time, press **Done**. 3) **System Settings** > **Privacy & Security**, scroll down, press **Open Anyway** next to the AgentLink message, confirm when your Mac asks (Touch ID, or what you type to unlock your Mac), then **Open**. 4) You only do this once. AgentLink isn\047t signed with an Apple Developer ID yet; this is normal for early apps. [Full steps](%s/apps/desktop-app.md#open-it-the-first-time).\n\n' "$docs"
+            printf 'The other files (`.mcpb`, `SHA256SUMS`) are for AI-app extensions and checks. You don\047t need them.\n\n'
+            printf '## What\047s new\n\n'
+            cat "$notes"
+          } > "$notes.download"
+          mv "$notes.download" "$notes"
+          # DOWNLOAD-END
           echo "Release notes for v$version found."
           echo "version=$version" >> "$GITHUB_OUTPUT"
 

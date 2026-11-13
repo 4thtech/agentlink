@@ -26,7 +26,31 @@
 
 ## Quick start
 
-**1. Install.** Paste one line into a terminal you opened yourself. It adds Node.js if you need it and opens the app in your browser.
+Pick one way to install:
+
+- **On a Mac?** [Get the app](#on-a-mac-get-the-app). No terminal needed.
+- **Windows, Linux, or prefer the terminal?** [One command](#windows-linux-or-the-terminal-one-command).
+
+### On a Mac? Get the app
+
+**[Download for Mac with Apple chip (M1, M2, M3, M4)](https://github.com/4thtech/agentlink/releases/download/v0.5.1/AgentLink-0.5.1-mac-arm64.dmg)** → file `AgentLink-0.5.1-mac-arm64.dmg`
+
+**[Download for Mac with Intel chip](https://github.com/4thtech/agentlink/releases/download/v0.5.1/AgentLink-0.5.1-mac-x64.dmg)** → file `AgentLink-0.5.1-mac-x64.dmg`
+
+Not sure which? Click the Apple menu (top left of your screen), then **About This Mac**. "Chip: Apple M…" means Apple chip; "Processor: Intel" means Intel. In the file names, **arm64 = Apple chip** and **x64 = Intel**.
+
+1. **Open the file you downloaded** and drag **AgentLink** to **Applications**.
+2. **Open AgentLink from Applications.** The first time, macOS blocks it: it says AgentLink "cannot be opened" or that it "could not verify" it. Press **Done** (or **OK**), not **Move to Trash**.
+3. **Allow it once:** open **System Settings** › **Privacy & Security**, scroll down, and next to the message that AgentLink was blocked press **Open Anyway**. Confirm when your Mac asks (Touch ID, or what you type to unlock your Mac), then press **Open**. On macOS 13 or 14 you can instead hold **Control** and click **AgentLink** in Applications, choose **Open**, then **Open**.
+4. **You only do this once.** AgentLink opens on **Get started**. Go on with [Connect your AI app](#then-connect-your-ai-app-and-talk) below.
+
+**Why step 3?** AgentLink isn't signed with an Apple Developer ID yet; this is normal for early apps. It does not mean something is wrong with the file. Never turn off your Mac's security settings for it.
+
+If macOS says the app is "damaged", and for updates: [Mac app](docs-site/guide/apps/desktop-app.md).
+
+### Windows, Linux, or the terminal? One command
+
+Paste one line into a terminal you opened yourself (Mac or Linux: Terminal; Windows: PowerShell). It adds Node.js if you need it and opens AgentLink in your browser.
 
 ```bash
 curl -fsSL https://agentlink.4thtech.io/install.sh | sh
@@ -34,11 +58,11 @@ curl -fsSL https://agentlink.4thtech.io/install.sh | sh
 
 On Windows, in PowerShell: `irm https://agentlink.4thtech.io/install.ps1 | iex` · Already have Node.js 22.14+? `npx -y @4thtech-io/agentlink@latest`
 
-**2. Connect your AI app.** The app opens on **Get started**: pick your AI app, type the name people will see, press **Connect with Touch ID** (Windows Hello on Windows, your passkey on Linux), save your master code, then restart your AI app once. If Windows Hello can't be used for approvals on your PC, AgentLink uses your master code instead.
+### Then: connect your AI app and talk
 
-**3. Invite someone and talk.** Press **Invite someone**, send the link. When they accept, ask your AI in plain words: *"Send Natasa: the slides are ready"*, *"Check my AgentLink inbox"*.
+**1. Connect your AI app.** AgentLink opens on **Get started**: pick your AI app, type the name people will see, press **Connect with Touch ID** (Windows Hello on Windows, your passkey on Linux), save your master code, then restart your AI app once. If Windows Hello can't be used for approvals on your PC, AgentLink uses your master code instead.
 
-**Prefer an app on a Mac? (early build)** Download the newest `.dmg` from the [latest release](https://github.com/4thtech/agentlink/releases/latest): `AgentLink-<version>-mac-arm64.dmg` for an Apple chip, `AgentLink-<version>-mac-x64.dmg` for an Intel Mac (not sure? Apple menu → About This Mac → Chip). Drag AgentLink to Applications. It is not signed by Apple yet, so the first time: on macOS 15, open System Settings › Privacy & Security and press **Open Anyway**; on macOS 13–14, Control-click the app and choose **Open**. Later, press **Check for updates** in Settings › Updates. Windows: use the one-command install above. [Mac app details](docs-site/guide/apps/desktop-app.md).
+**2. Invite someone and talk.** Press **Invite someone**, send the link. When they accept, ask your AI in plain words: *"Send Natasa: the slides are ready"*, *"Check my AgentLink inbox"*.
 
 Got an invite link instead? Open it: the page gives you one command that installs AgentLink and opens the invite. **[The full quick start, with a screenshot of every step →](docs-site/guide/quick-guide.md)**
 
@@ -111,7 +135,7 @@ sequenceDiagram
 
 **New in 0.5.0 (12 Nov 2026):** the app is redesigned around you, your IDs and your people. The menu reads Home, People, My IDs, Activity, Settings; Settings is grouped into Safety, Your AI and This app; one recovery kit covers all your IDs and restores in the app in four steps; a Touch ID & master code page lets you test Touch ID and check or replace your master code; Rules and Activity read as plain sentences; and your choices survive restarting the app.
 
-Not built yet, and not claimed: desktop apps for Mac and Windows (coming soon; see the [desktop app page](docs-site/guide/apps/desktop-app.md)), the always-on cloud agent (planned as 0.6.0), and proof on main networks. What changed in each release: [CHANGELOG](CHANGELOG.md).
+Not built yet, and not claimed: the Windows desktop app (coming later; the Mac app is an early build, see the [Mac app page](docs-site/guide/apps/desktop-app.md)), the always-on cloud agent (planned as 0.6.0), and proof on main networks. What changed in each release: [CHANGELOG](CHANGELOG.md).
 
 ## Private by design
 
@@ -120,7 +144,7 @@ Messages and files are encrypted on your computer. Message servers and 4thTech s
 ## Status
 
 <!-- status:start -->
-> **Version:** v0.5.0 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-12
+> **Version:** v0.5.1 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-13
 >
 > - **Components:** 78 merged, 14 in progress, 7 planned
 > - **Next:** The cloud agent and business agents as 0.6.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
@@ -135,7 +159,7 @@ Messages and files are encrypted on your computer. Message servers and 4thTech s
 |---|---|---|
 | **M0 Foundations** (nearly complete) | Repository, CI and rules in place | 0.0.x |
 | **M1a Walking skeleton: pair and talk** (released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open) | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 |
-| **M1b Files, proof, credits** (v0.2.0 to v0.5.0 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
+| **M1b Files, proof, credits** (v0.2.0 to v0.5.1 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
 | **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify page; accept in the browser (planned; today the live invite page at agentlink.4thtech.io shows how to accept in the app); verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109) | 0.6.0 (cloud agent first) and later |
 | **M3 Mainnet beta (Base, Gnosis)** | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 |
 | **M4 Expansion** | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 |

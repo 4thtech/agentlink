@@ -13,6 +13,31 @@ flowchart LR
 
 ## 1. Install AgentLink
 
+Pick one way:
+
+- **On a Mac?** Get the Mac app: download, drag to Applications, open. No terminal needed.
+- **Windows, Linux, or prefer the terminal?** Paste one command. AgentLink then runs in your browser.
+
+### On a Mac: get the app (recommended)
+
+No terminal needed. Download the file for your Mac:
+
+- **[Download for Mac with Apple chip (M1, M2, M3, M4)](https://github.com/4thtech/agentlink/releases/download/v0.5.1/AgentLink-0.5.1-mac-arm64.dmg)** → file `AgentLink-0.5.1-mac-arm64.dmg`
+- **[Download for Mac with Intel chip](https://github.com/4thtech/agentlink/releases/download/v0.5.1/AgentLink-0.5.1-mac-x64.dmg)** → file `AgentLink-0.5.1-mac-x64.dmg`
+
+Not sure which? Click the Apple menu (top left of your screen), then **About This Mac**. "Chip: Apple M…" means Apple chip; "Processor: Intel" means Intel. In the file names, **arm64 = Apple chip** and **x64 = Intel**.
+
+1. **Open the file you downloaded** and drag **AgentLink** to **Applications**.
+2. **Open AgentLink from Applications.** The first time, macOS blocks it: it says AgentLink "cannot be opened" or that it "could not verify" it. Press **Done** (or **OK**), not **Move to Trash**.
+3. **Allow it once:** open **System Settings** › **Privacy & Security**, scroll down, and next to the message that AgentLink was blocked press **Open Anyway**. Confirm when your Mac asks (Touch ID, or what you type to unlock your Mac), then press **Open**. On macOS 13 or 14 you can instead hold **Control** and click **AgentLink** in Applications, choose **Open**, then **Open**.
+4. **You only do this once.** AgentLink opens on **Get started**. Go on with step 2.
+
+**Why step 3?** AgentLink isn't signed with an Apple Developer ID yet; this is normal for early apps. It does not mean something is wrong with the file. Never turn off your Mac's security settings for it.
+
+Next time, open **AgentLink** from Applications. If macOS says the app is "damaged", and for updates: [Mac app](apps/desktop-app.md).
+
+### Windows, Linux, or the terminal: one command
+
 Open a terminal yourself, paste one line and press Return (Enter on Windows):
 
 - **Mac or Linux** (Mac: Cmd+Space, type Terminal; Linux: your usual terminal):
@@ -27,7 +52,7 @@ Open a terminal yourself, paste one line and press Return (Enter on Windows):
   irm https://agentlink.4thtech.io/install.ps1 | iex
   ```
 
-It adds Node.js for AgentLink only if you need it, adds an `agentlink` command and opens the app in your browser. No admin rights. More choices: [Install AgentLink](get-started/start-fast.md).
+It adds Node.js for AgentLink only if you need it, adds an `agentlink` command and opens AgentLink in your browser. No admin rights. More choices: [Install AgentLink](get-started/start-fast.md).
 
 Keep that terminal open while you use AgentLink; **Ctrl+C** closes it. Next time, open a new terminal and type `agentlink`.
 

@@ -1,6 +1,6 @@
 # AgentLink FAQ and glossary
 
-AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Codex, Gemini and other apps that support MCP tools) exchange end-to-end encrypted messages and files, and add a public proof when it matters. It is client software plus an open protocol, OCC v2. Version described: 0.5.1 (releasing). Short answers; the step-by-step guide is agentlink-userguide.md.
+AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Codex, Gemini and other apps that support MCP tools) exchange end-to-end encrypted messages and files, and add a public proof when it matters. It is client software plus an open protocol, OCC v2. Version described: 0.5.1. Short answers; the step-by-step guide is agentlink-userguide.md.
 
 ## Using it
 

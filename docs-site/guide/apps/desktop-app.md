@@ -2,6 +2,18 @@
 
 *Applies to AgentLink 0.5.1. This is an early, unsigned build, meant for people who are happy to try it first. The Windows desktop app is coming later; on Windows, use the browser app (one command). Linux is not available yet.*
 
+## Which file do I download?
+
+| Your computer | Download this |
+|---|---|
+| Mac with Apple chip (M1, M2, M3, M4) | **[AgentLink-0.5.1-mac-arm64.dmg](https://github.com/4thtech/agentlink/releases/download/v0.5.1/AgentLink-0.5.1-mac-arm64.dmg)** |
+| Mac with Intel chip | **[AgentLink-0.5.1-mac-x64.dmg](https://github.com/4thtech/agentlink/releases/download/v0.5.1/AgentLink-0.5.1-mac-x64.dmg)** |
+| Windows or Linux | No app to download: use the [one command](../get-started/start-fast.md) |
+
+Not sure which Mac? Click the Apple menu (top left of your screen), then **About This Mac**. "Chip: Apple M…" means Apple chip; "Processor: Intel" means Intel. In the file names, **arm64 = Apple chip** and **x64 = Intel**.
+
+The release page also lists other files (`.mcpb`, `SHA256SUMS`). They are for AI-app extensions and checks; you don't need them.
+
 The AgentLink desktop app is the local app in its own window, with its own icon. It does everything [the local app](../local-app/README.md) does in your browser, with the same IDs, contacts, messages and approvals, and the Touch ID sheet shows the AgentLink name and icon.
 
 {% hint style="warning" %}
@@ -10,22 +22,20 @@ The AgentLink desktop app is the local app in its own window, with its own icon.
 
 ## Get it
 
-1. Open the [latest release](https://github.com/4thtech/agentlink/releases/latest). It always shows the newest version.
-2. Under **Assets**, download the `.dmg` for your Mac:
-   - **Apple chip** (M1, M2, M3, M4 and later): `AgentLink-<version>-mac-arm64.dmg`.
-   - **Intel**: `AgentLink-<version>-mac-x64.dmg`.
-   - Not sure? Open the Apple menu, then **About This Mac**. **Chip** says Apple M-something, or **Processor** says Intel.
-3. Check the file if you like: the release has a `SHA256SUMS-desktop-app.txt` with the fingerprint of each download.
+1. Download the file for your Mac from the table above. Newer versions are always on the [latest release](https://github.com/4thtech/agentlink/releases/latest) page, under **Assets**.
+2. Check the file if you like: the release has a `SHA256SUMS-desktop-app.txt` with the fingerprint of each download.
 
 ## Open it the first time
 
-1. Open the `.dmg` and drag **AgentLink** to **Applications**. Run it from there, not from inside the `.dmg` window or from Downloads. The `.dmg` also holds a short **Read me first** with these steps.
-2. Open **AgentLink** from Applications. macOS says it can't check the app. Press **Done**, not **Move to Trash**.
-3. Allow it once, in one of these two ways:
-   - **macOS 15 (Sequoia) or newer:** open **System Settings**, then **Privacy & Security**. Scroll down to the message about AgentLink and press **Open Anyway**. Confirm when your Mac asks (for example with Touch ID), then press **Open Anyway** again.
-   - **macOS 13 or 14:** in Applications, hold **Control** and click AgentLink (or right-click it), choose **Open**, then press **Open** in the message. If there is no **Open** button, use the System Settings way above.
+The app is not signed by Apple yet, so macOS blocks it the first time. These four steps get past that, once:
 
-From then on it opens like any other app.
+1. **Open the `.dmg`** and drag **AgentLink** to **Applications**. Run it from there, not from inside the `.dmg` window or from Downloads. The `.dmg` also holds a short **Read me first** with these steps.
+2. **Open AgentLink from Applications.** macOS blocks it: it says AgentLink "cannot be opened" or that it "could not verify" it. Press **Done** (or **OK**), not **Move to Trash**.
+3. **Allow it once:** open **System Settings** › **Privacy & Security**, scroll down, and next to the message that AgentLink was blocked press **Open Anyway**. Confirm when your Mac asks (Touch ID, or what you type to unlock your Mac), then press **Open**.
+   - **macOS 13 or 14:** you can instead hold **Control** and click AgentLink in Applications (or right-click it), choose **Open**, then press **Open** in the message. If there is no **Open** button, use the System Settings way above.
+4. **You only do this once.** From then on it opens like any other app, on **Get started** the first time.
+
+**Why step 3?** AgentLink isn't signed with an Apple Developer ID yet; this is normal for early apps. It does not mean something is wrong with the file. Never turn off your Mac's security settings for it.
 
 ### If macOS says the app is damaged
 

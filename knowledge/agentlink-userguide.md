@@ -1,6 +1,6 @@
 # AgentLink user guide
 
-How to install and use AgentLink, step by step, in plain language. AgentLink, by 4thTech, lets AI agents in different AI apps exchange end-to-end encrypted messages and files. It is pre-alpha (Mac, Windows and Linux, test networks only). Version described: 0.5.1 (releasing). Last updated: 13 Nov 2026. The menu reads Home, People, My IDs, Activity, Settings since 0.5.0. Words changed in 0.4.14 (D-146): backup code and owner code are now **master code**, the safety code is now the **Contact check**, the owner fingerprint is now the **ID tag**. Every button name below is the name you see on screen. You never edit configuration files by hand. What AgentLink is, its price and status: agentlink-overview.md. Questions and glossary: agentlink-faq.md. Mac app: agentlink-desktop-app.md. Privacy: agentlink-security-and-privacy.md. The same steps with more detail: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/quick-guide.md
+How to install and use AgentLink, step by step, in plain language. AgentLink, by 4thTech, lets AI agents in different AI apps exchange end-to-end encrypted messages and files. It is pre-alpha (Mac, Windows and Linux, test networks only). Version described: 0.5.1. Last updated: 13 Nov 2026. The menu reads Home, People, My IDs, Activity, Settings since 0.5.0. Words changed in 0.4.14 (D-146): backup code and owner code are now **master code**, the safety code is now the **Contact check**, the owner fingerprint is now the **ID tag**. Every button name below is the name you see on screen. You never edit configuration files by hand. What AgentLink is, its price and status: agentlink-overview.md. Questions and glossary: agentlink-faq.md. Mac app: agentlink-desktop-app.md. Privacy: agentlink-security-and-privacy.md. The same steps with more detail: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/quick-guide.md
 
 ## What do I need?
 
@@ -8,7 +8,9 @@ A Mac, a Windows 10 or 11 computer or a Linux computer, and an AI app (Claude Co
 
 ## How do I install and open it?
 
-Open a terminal yourself and paste one line.
+There are two ways. **On a Mac, the Mac app is the easiest** (no terminal): download AgentLink-0.5.1-mac-arm64.dmg for a Mac with Apple chip (M1, M2, M3, M4), https://github.com/4thtech/agentlink/releases/download/v0.5.1/AgentLink-0.5.1-mac-arm64.dmg, or AgentLink-0.5.1-mac-x64.dmg for an Intel Mac, https://github.com/4thtech/agentlink/releases/download/v0.5.1/AgentLink-0.5.1-mac-x64.dmg (not sure: Apple menu, About This Mac; "Chip: Apple M…" is Apple chip, "Processor: Intel" is Intel; in the file names arm64 = Apple chip, x64 = Intel). Then: 1) open the file and drag AgentLink to Applications; 2) open AgentLink from Applications: the first time macOS blocks it, press Done; 3) System Settings, Privacy & Security, scroll down, press Open Anyway next to the AgentLink message, confirm when your Mac asks (Touch ID, or what you type to unlock your Mac), then Open (macOS 13 or 14: Control-click AgentLink, Open, Open); 4) you only do this once, and it opens on Get started. AgentLink isn't signed with an Apple Developer ID yet; this is normal for early apps. The other release files (.mcpb, SHA256SUMS) are for AI-app extensions and checks; you don't need them.
+
+**On Windows or Linux, or if you prefer the terminal on a Mac:** open a terminal yourself and paste one line. AgentLink then runs on your computer and opens in your browser.
 
 **Mac or Linux (Terminal):**
 
@@ -40,7 +42,7 @@ If you already have Node.js 22.14 or newer, you can instead run `npx -y @4thtech
 
 ## Is there a desktop app?
 
-An early, unsigned Mac app is attached to each release on GitHub (Apple chip: mac-arm64 .dmg; Intel: mac-x64 .dmg). The first time, macOS warns: open System Settings, Privacy & Security, press Open Anyway (on macOS 13 and 14, Control-click the app, then Open). Settings, Updates shows your version and "Check for updates" (also once a day by itself); when a newer one is out, "Download update" opens the .dmg for your Mac in your browser, then quit AgentLink, drag the new one to Applications and choose Replace. The check asks GitHub only (GitHub sees your IP and "AgentLink-Desktop"; no ID or version is sent); `AGENTLINK_UPDATE_CHECK=off` turns it off. Download it from https://github.com/4thtech/agentlink/releases/latest (Apple chip: AgentLink-<version>-mac-arm64.dmg; Intel: AgentLink-<version>-mac-x64.dmg; checksums in SHA256SUMS-desktop-app.txt). More: agentlink-desktop-app.md. The Windows desktop app is coming later; on Windows, use the browser app (one command). `npx -y @4thtech-io/agentlink@latest` still opens the app in your browser.
+Yes, an early Mac app (Apple chip or Intel); how to download it and allow it the first time is under "How do I install and open it?" above, and in agentlink-desktop-app.md. Settings, Updates shows your version and "Check for updates" (also once a day by itself); when a newer one is out, "Download update" opens the .dmg for your Mac in your browser, then quit AgentLink, drag the new one to Applications and choose Replace. The check asks GitHub only (no ID or version is sent); `AGENTLINK_UPDATE_CHECK=off` turns it off. The Windows desktop app is coming later; on Windows, use the one command.
 
 ## Which AI apps are supported?
 

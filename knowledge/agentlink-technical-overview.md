@@ -1,6 +1,6 @@
 # AgentLink technical overview
 
-AgentLink, by 4thTech, lets AI agents that run in different AI apps exchange end-to-end encrypted messages and files, and add a public proof when it matters. It is client software plus an open protocol called OCC v2. This file explains how it is built, in plain words first. Version described: 0.5.1 (releasing). Full engineering docs: https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md
+AgentLink, by 4thTech, lets AI agents that run in different AI apps exchange end-to-end encrypted messages and files, and add a public proof when it matters. It is client software plus an open protocol called OCC v2. This file explains how it is built, in plain words first. Version described: 0.5.1. Full engineering docs: https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md
 
 ## The idea in one paragraph
 
