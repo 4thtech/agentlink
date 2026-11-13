@@ -39,12 +39,11 @@ export function tidyPage(filter: {
   readonly olderThanDays: number;
   readonly kinds: TidyKinds;
   readonly contactId?: string;
-}): string {
+}): string | undefined {
   const tidy = filter.kinds === 'files' ? 'files' : 'both';
-  const contact =
-    filter.contactId !== undefined && AGENT_ID.test(filter.contactId)
-      ? `&contact=${filter.contactId}`
-      : '';
+  // IR-RET-67-1 Low 4: a contact the link cannot name gives no link (never "everyone").
+  if (filter.contactId !== undefined && !AGENT_ID.test(filter.contactId)) return undefined;
+  const contact = filter.contactId === undefined ? '' : `&contact=${filter.contactId}`;
   return `/settings/storage?tidy=${tidy}&days=${String(filter.olderThanDays)}${contact}`;
 }
 
@@ -79,7 +78,8 @@ export function tidySummary(
           counts.messages.bytes + counts.files.bytes,
         )})`;
   const whose = oneContact ? ' with this contact' : '';
-  return `Proposed cleanup, nothing is deleted yet: ${what} older than ${String(days)} days${whose}, on this computer only.`;
+  const about = counts.truncated === true ? 'about ' : '';
+  return `Proposed cleanup, nothing is deleted yet: ${about}${what} older than ${String(days)} days${whose}, on this computer only.`;
 }
 
 const NEVER_FETCH = 'Never open or fetch this link yourself. ';
@@ -170,7 +170,9 @@ export async function runTidy(
         ? { count: 0, bytes: 0 }
         : { count: n(raw.messages.count), bytes: n(raw.messages.bytes) },
     files: { count: n(raw.files.count), bytes: n(raw.files.bytes) },
-    kept: n(raw.kept),
+    // Files only: no message would go, so none is "kept" (IR-RET-67-1 Low 5).
+    kept: include === 'files' ? 0 : n(raw.kept),
+    truncated: raw.truncated === true,
   };
   const result = {
     status: 'pending_approval' as const,
@@ -192,7 +194,7 @@ export async function runTidy(
     kinds: checked.kinds,
     ...(contactId === undefined ? {} : { contactId }),
   });
-  if (!TIDY_PAGE_PATTERN.test(page)) return unchanged(plain);
+  if (page === undefined || !TIDY_PAGE_PATTERN.test(page)) return unchanged(plain);
   let link: AllowFolderLink | undefined;
   try {
     link = await context.tidyLink(page);

@@ -165,6 +165,41 @@ function whereOf(
     : { ...base, contact_id: input.contactId, created_at: { lt: input.before } };
 }
 
+/**
+ * IR-RET-67-1 Medium 1: how old a message is on this computer. The sender signs `createdAt`, so a
+ * contact could backdate a message into an age filter; an age therefore never comes from it alone.
+ * - Own sent messages: `createdAt` is this computer's own send time.
+ * - Received messages: the earliest time this computer recorded for the message (first seen, read,
+ *   a file of it saved; each is at or after its arrival), and never earlier than `createdAt`. A
+ *   received message with none of these (its first-seen row pruned, never read, nothing saved) has
+ *   no local age and is never aged out (kept: the safe side).
+ * Undefined: no local age.
+ */
+export function localAgeTx(tx: StoreTx, row: Row<'envelopes'>): number | undefined {
+  if (row.direction === 'out') return row.created_at;
+  const local: number[] = [];
+  const seen = tx.get('seen', { kind: 'envelope', id: row.envelope_hash });
+  if (seen !== undefined) local.push(seen.first_seen_at);
+  if (row.read_at !== null) local.push(row.read_at);
+  for (const f of tx.select('saved_files', { envelope_id: row.envelope_id })) {
+    local.push(f.saved_at);
+  }
+  if (local.length === 0) return undefined;
+  return Math.max(row.created_at, Math.min(...local));
+}
+
+/** The age cutoff of a selector, if it has one. */
+const beforeOf = (input: HistoryDeleteInput): number | undefined =>
+  'before' in input ? input.before : undefined;
+
+/** True when `row` is older than the selector's cutoff by its local age (or there is no cutoff). */
+function oldEnoughTx(tx: StoreTx, row: Row<'envelopes'>, input: HistoryDeleteInput): boolean {
+  const before = beforeOf(input);
+  if (before === undefined) return true;
+  const age = localAgeTx(tx, row);
+  return age !== undefined && age < before;
+}
+
 /** The live (not deleted, processed) messages the selector names, oldest first, capped. */
 function selectTx(
   tx: StoreTx,
@@ -189,6 +224,8 @@ function selectTx(
       ],
       limit: MAX_PLAN_MESSAGES + 1,
     });
+    // `createdAt` before the cutoff is necessary (the local age is never earlier), not enough.
+    rows = rows.filter((row) => oldEnoughTx(tx, row, input));
   }
   rows.sort((a, b) =>
     a.created_at !== b.created_at
@@ -289,12 +326,15 @@ function planTx(tx: StoreTx, input: HistoryDeleteInput, links: AckLinks): Histor
     by[reason] += 1;
     keptIds.push(id);
   };
+  // IR-RET-67-1 Medium 1: under an age selector a saved file ages from when it was saved here.
+  const cutoff = beforeOf(input);
   const filesOf = (envelopeId: string): void => {
     for (const f of tx.select(
       'saved_files',
       { envelope_id: envelopeId, trashed_at: null },
       { orderBy: [['idx', 'asc']] },
     )) {
+      if (cutoff !== undefined && !(f.saved_at < cutoff)) continue;
       const key = `${f.envelope_id}/${String(f.idx)}`;
       if (fileSeen.has(key)) continue;
       fileSeen.add(key);

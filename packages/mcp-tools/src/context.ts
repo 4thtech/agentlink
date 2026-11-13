@@ -431,6 +431,8 @@ export interface TidyCounts {
   readonly files: { readonly count: number; readonly bytes: number };
   /** Selected messages kept because something still needs them. */
   readonly kept: number;
+  /** A count was capped (one plan takes at most 20 000 messages): the summary says "about". */
+  readonly truncated?: boolean;
 }
 
 /** The core surface the handlers use. */
@@ -665,6 +667,7 @@ export function coreToolClient(
         messages: { count: plan.messages.count, bytes: plan.messages.bytes },
         files: { count: plan.files.count, bytes: plan.files.bytes },
         kept: plan.kept.count,
+        truncated: plan.truncated,
       };
     },
     async storageMode() {

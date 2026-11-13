@@ -49,13 +49,15 @@ export const KEEP_STRINGS = {
   previewing: 'Checking what this removes…',
   previewNone: 'Right now this removes nothing.',
   previewFailed: 'What this removes could not be checked just now.',
-  preview: (messages: number, files: number, size: string): string => {
+  preview: (messages: number, files: number, size: string, about = false): string => {
+    const a = about ? 'about ' : '';
     const parts: string[] = [];
-    if (messages > 0)
-      parts.push(`deletes ${String(messages)} ${messages === 1 ? 'message' : 'messages'}`);
+    if (messages > 0) {
+      parts.push(`deletes ${a}${String(messages)} ${messages === 1 ? 'message' : 'messages'}`);
+    }
     if (files > 0) {
       parts.push(
-        `moves ${String(files)} ${files === 1 ? 'file' : 'files'}${messages > 0 ? '' : ` (${size})`} to the Trash`,
+        `moves ${messages > 0 ? '' : a}${String(files)} ${files === 1 ? 'file' : 'files'}${messages > 0 ? '' : ` (${size})`} to the Trash`,
       );
     }
     const line = `Right now this ${parts.join(' and ')}`;

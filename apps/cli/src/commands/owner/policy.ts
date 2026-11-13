@@ -538,6 +538,9 @@ function current(
   if (effective.mode === 'fail_closed') return undefined;
   // A deep, plain copy: the loader's document is never changed in place.
   const policy = JSON.parse(JSON.stringify(effective.policy)) as Policy;
+  // IR-RET-67-1 Medium 2: rules not signed yet keep everything; an edit here never turns retention
+  // on (only the app's Storage editor or a new ID's first rules do).
+  if (effective.mode === 'defaults') policy.history = { ...HISTORY_PRE_D148 };
   return { policy, version: effective.mode === 'signed' ? effective.version : undefined };
 }
 

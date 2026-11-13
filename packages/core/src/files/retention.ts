@@ -203,6 +203,11 @@ export async function deleteExpiredFiles(
 
 /** The history pass runs at most once in this many seconds (04 §4.2: "a daily core pass"). */
 export const HISTORY_RETENTION_INTERVAL_SECONDS = 86_400;
+/**
+ * IR-RET-67-1 Low 6: after a failed pass the next one waits this long, doubling with each failure in
+ * a row up to a day, so a failing plan is not repeated on every loop pass.
+ */
+export const HISTORY_RETENTION_BACKOFF_SECONDS = 3_600;
 const DAY_SECONDS = 86_400;
 
 /** The owner's `history.*` limits in days (0 keeps forever). */
@@ -230,13 +235,15 @@ export type HistoryRetentionOutcome =
   | { readonly status: 'ran'; readonly messages: number; readonly files: number }
   | {
       readonly status: 'skipped';
-      readonly reason: 'not_due' | 'paused' | 'policy_not_signed' | 'off' | 'failed';
+      readonly reason: 'not_due' | 'backoff' | 'paused' | 'policy_not_signed' | 'off' | 'failed';
     };
 
 /** What limits would remove now (counts and stored bytes only; nothing is deleted). */
 export interface HistoryRetentionPreview {
   readonly messages: { readonly count: number; readonly bytes: number };
   readonly files: { readonly count: number; readonly bytes: number };
+  /** A count was capped (one plan takes MAX_PLAN_MESSAGES): the page says "about". */
+  readonly truncated: boolean;
 }
 
 export interface HistoryRetentionDeps {
@@ -257,6 +264,9 @@ export class HistoryRetention {
   readonly #deps: HistoryRetentionDeps;
   /** When the pass last ran to the end (unix seconds), in this process. */
   #lastRunAt: number | undefined;
+  /** When the last pass failed, and how many failed in a row (Low 6). */
+  #failedAt: number | undefined;
+  #failures = 0;
   #running: Promise<HistoryRetentionOutcome> | undefined;
 
   constructor(ctx: CoreContext, deps: HistoryRetentionDeps) {
@@ -284,6 +294,14 @@ export class HistoryRetention {
       const last = this.#lastRunAt;
       if (last !== undefined && now >= last && now - last < HISTORY_RETENTION_INTERVAL_SECONDS) {
         return skipped('not_due');
+      }
+      const failedAt = this.#failedAt;
+      if (failedAt !== undefined && now >= failedAt) {
+        const wait = Math.min(
+          HISTORY_RETENTION_BACKOFF_SECONDS * 2 ** Math.min(this.#failures - 1, 5),
+          HISTORY_RETENTION_INTERVAL_SECONDS,
+        );
+        if (now - failedAt < wait) return skipped('backoff');
       }
       if (await deps.paused()) return skipped('paused');
       const keep = historyKeepOf(await deps.loadPolicy());
@@ -313,9 +331,17 @@ export class HistoryRetention {
         }
       }
       this.#lastRunAt = now;
+      this.#failedAt = undefined;
+      this.#failures = 0;
       ctx.log.info('history retention', { messages, files });
       return Object.freeze({ status: 'ran', messages, files });
     } catch (error) {
+      try {
+        this.#failedAt = nowOf(ctx);
+        this.#failures += 1;
+      } catch {
+        // No valid clock: the next pass tries again (nothing was deleted by this one).
+      }
       // Codes only (I-7): never the error's text.
       ctx.log.warn('history retention not run', {
         code: error instanceof CoreError ? error.code : 'failed',
@@ -334,14 +360,20 @@ export class HistoryRetention {
       throw new CoreError('history_input_invalid', 'That retention setting is not valid.');
     }
     const now = nowOf(this.#ctx);
+    let truncated = false;
     const count = async (days: number, include: HistoryDeleteInclude) => {
       if (days === 0) return { count: 0, bytes: 0 };
       const plan = await this.#deps.history.plan({ before: cutoff(now, days), include });
+      if (plan.truncated) truncated = true;
       const part = include === 'files' ? plan.files : plan.messages;
       return { count: part.count, bytes: part.bytes };
     };
     const messages = await count(parsed.data.messagesKeepDays, 'messages');
     const files = await count(parsed.data.filesKeepDays, 'files');
-    return Object.freeze({ messages: Object.freeze(messages), files: Object.freeze(files) });
+    return Object.freeze({
+      messages: Object.freeze(messages),
+      files: Object.freeze(files),
+      truncated,
+    });
   }
 }

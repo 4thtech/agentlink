@@ -201,6 +201,9 @@ export async function setUpSendFolder(
   if (effective.mode === 'fail_closed') return notAllowed('rules_unreadable');
   const base = parseJson(canonicalize(effective.policy as unknown as JsonObject)) as Plain;
   const baseVersion = effective.mode === 'signed' ? effective.version : 0;
+  // IR-RET-67-1 Medium 2: on the defaults the Send folder never turns retention on (core signs
+  // keep forever for any first edit but the Storage editor's), so the expected body says so too.
+  if (effective.mode === 'defaults') base['history'] = { ...HISTORY_PRE_D148 };
   const existing = (base['files'] as Plain)['allowedFolders'] as string[];
 
   let realHome: string;

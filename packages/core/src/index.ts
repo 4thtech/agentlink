@@ -633,6 +633,7 @@ export {
 } from './history/delete.js';
 // RET-6 (D-148; 04 §4.2): the daily retention pass under the owner-signed `history.*`, and its preview.
 export {
+  HISTORY_RETENTION_BACKOFF_SECONDS,
   HISTORY_RETENTION_INTERVAL_SECONDS,
   HistoryRetention,
   historyKeepOf,

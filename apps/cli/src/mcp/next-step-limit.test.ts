@@ -276,7 +276,7 @@ const RENDERERS: Record<string, () => string> = {
   // RET-7: the tidy proposal link, port 65535, the longest page (a contact).
   tidyLinkNextStep: () =>
     tool_tidy.tidyLinkNextStep(
-      `${ORIGIN}${tool_tidy.tidyPage({ olderThanDays: 365, kinds: 'messages_and_files', contactId: `0x${'f'.repeat(40)}` })}`,
+      `${ORIGIN}${tool_tidy.tidyPage({ olderThanDays: 365, kinds: 'messages_and_files', contactId: `0x${'f'.repeat(40)}` }) ?? ''}`,
     ),
 };
 

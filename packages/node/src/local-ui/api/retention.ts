@@ -19,6 +19,7 @@ import type { EffectivePolicy, PreparedPolicyEdit } from '@4thtech-io/core';
 import { canonicalize, type JsonObject, type JsonValue } from '@4thtech-io/crypto';
 import {
   HISTORY_FILES_KEEP_DAYS,
+  HISTORY_PRE_D148,
   HISTORY_MESSAGES_KEEP_DAYS,
   historyOf,
   historySchema,
@@ -94,7 +95,10 @@ async function readRetention(
     return UI_UNAVAILABLE;
   }
   if (effective.mode === 'fail_closed') return answer(200, { status: 'not_valid' });
-  const keep = historySchema.safeParse(historyOf(effective.policy as Policy));
+  // IR-RET-67-1 Medium 2: on the defaults nothing runs and a first edit signs keep forever.
+  const keep = historySchema.safeParse(
+    effective.mode === 'signed' ? historyOf(effective.policy as Policy) : HISTORY_PRE_D148,
+  );
   if (!keep.success) return answer(200, { status: 'not_valid' });
   const body: Record<string, JsonValue> = {
     status: 'ok',
@@ -113,6 +117,7 @@ async function readRetention(
       body['preview'] = {
         messages: { count: n(preview.messages.count), bytes: n(preview.messages.bytes) },
         files: { count: n(preview.files.count), bytes: n(preview.files.bytes) },
+        truncated: preview.truncated === true,
       };
     } catch {
       return UI_UNAVAILABLE;

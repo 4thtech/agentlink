@@ -50,6 +50,8 @@ type Preview =
       readonly kind: 'ready';
       readonly messages: { readonly count: number; readonly bytes: number };
       readonly files: { readonly count: number; readonly bytes: number };
+      /** A count was capped: say "about" (IR-RET-67-1 Low 5). */
+      readonly truncated: boolean;
     };
 
 const MESSAGE: Readonly<Partial<Record<OwnerResult['kind'], string>>> = {
@@ -94,6 +96,7 @@ function parsePreview(data: unknown): Preview {
     kind: 'ready',
     messages: { count: count(p['messages']['count']), bytes: count(p['messages']['bytes']) },
     files: { count: count(p['files']['count']), bytes: count(p['files']['bytes']) },
+    truncated: p['truncated'] === true,
   };
 }
 
@@ -221,7 +224,12 @@ export function KeepAutomatically({
     const messages = preview.messages.count;
     const files = preview.files.count;
     if (messages === 0 && files === 0) return S.previewNone;
-    return S.preview(messages, files, sizeWords(preview.messages.bytes + preview.files.bytes));
+    return S.preview(
+      messages,
+      files,
+      sizeWords(preview.messages.bytes + preview.files.bytes),
+      preview.truncated,
+    );
   };
   const line = previewLine();
 

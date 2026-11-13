@@ -37,7 +37,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { POLICY_DEFAULTS_EFFECTIVE } from '@4thtech-io/core';
-import { AUTO_SAVE_DEFAULTS } from '@4thtech-io/types';
+import { AUTO_SAVE_DEFAULTS, HISTORY_DEFAULTS } from '@4thtech-io/types';
 import {
   canonicalize,
   encodeHex,
@@ -374,7 +374,9 @@ export async function signFirstPolicy(
       body = parseJson(canonicalize(fixedBody)) as JsonObject;
     } else {
       const prepared = await actions.preparePolicyEdit(
-        { files: { allowedFolders: [plan.folder] } },
+        // D-148 (OD-2): a new ID's first rules carry the new-ID retention defaults by name (core
+        // signs keep forever for any first edit that does not name history; IR-RET-67-1 Medium 2).
+        { files: { allowedFolders: [plan.folder] }, history: { ...HISTORY_DEFAULTS } },
         { baseVersion: 0 },
       );
       if (prepared.status !== 'prepared') return failed;

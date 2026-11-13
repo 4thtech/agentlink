@@ -1,8 +1,8 @@
 // RET-4 (D-148; 08 §1 "Free up space"; 11 §5): Settings > Storage's Free up space. Filters by
 // person, by age and "Files only"; Review asks the server what that removes (counts and sizes, the
 // delete sheet with its fixed lines) before anything is deleted. The people list is the Messages
-// read (names as core shows them, text only, I-5). RET-7: opened from the AI's agentlink_tidy link,
-// it says so, fills the filters and opens the sheet; nothing is deleted until the owner confirms.
+// read (names as core shows them, text only, I-5). RET-7: opened from a link (agentlink_tidy gives
+// one), it fills the filters only; Review, presence and Undo stay the owner's (IR-RET-67-1 Low 3).
 import { Button, Surface } from '@4thtech-io/ui';
 import { useEffect, useId, useState, type ReactElement } from 'react';
 import type { ApiClient } from '../../api/client.js';
@@ -79,16 +79,9 @@ export function FreeUpSpace({
   const [person, setPerson] = useState(proposal?.contact ?? '');
   const [age, setAge] = useState(proposal === undefined ? '' : String(proposal.olderThanDays));
   const [filesOnly, setFilesOnly] = useState(proposal?.include === 'files');
+  // IR-RET-67-1 Low 3: a link only fills the filters; the owner presses Review.
   const [review, setReview] = useState<{ target: DeleteTarget; filesOnly: boolean } | undefined>(
-    proposal === undefined
-      ? undefined
-      : {
-          target: {
-            ...(proposal.contact === undefined ? {} : { contact: proposal.contact }),
-            olderThanDays: proposal.olderThanDays,
-          },
-          filesOnly: proposal.include === 'files',
-        },
+    undefined,
   );
   const [suggested, setSuggested] = useState(proposal !== undefined);
 
@@ -129,8 +122,8 @@ export function FreeUpSpace({
         <p className="al-text-body-sm al-muted">{H.freeLead}</p>
         {suggested ? (
           <div>
-            <p className="al-text-body-sm">{H.aiSuggested}</p>
-            <p className="al-text-body-sm al-muted">{H.aiNothingYet}</p>
+            <p className="al-text-body-sm">{H.fromLink}</p>
+            <p className="al-text-body-sm al-muted">{H.fromLinkNext}</p>
           </div>
         ) : null}
         <div className="sto-filters">
