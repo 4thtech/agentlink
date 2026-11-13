@@ -169,6 +169,79 @@ describe('Get started: a reload on "Your master code"', () => {
     expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.backupTitle);
   });
 
+  // REL051-R2C (R2-UI-01): the reload forgot the ID's name and the AI app; Connected reads them.
+  it('after a reload, "I saved it" opens Connected from the real state (never "{empty} is ready")', async () => {
+    const code = fakeCode({
+      kind: 'shown',
+      which: 'first_run',
+      code: FIRST_CODE,
+      view: { outcome: 'done', passkey: true, fingerprint: '7F3A·19C2' },
+    });
+    resetWizard();
+    resetAutoShown();
+    history.replaceState(null, '', '/start/connect');
+    await act(async () => {
+      root.render(
+        h(FirstRunPage as ComponentType<FirstRunPageProps>, {
+          api: setupApi(),
+          appsApi: appsApi(),
+          masterCodeApi: code,
+          passkeysAvailable: () => true,
+          platform: 'mac',
+          prfSupport: () => Promise.resolve('yes'),
+          upgradeApi: {
+            info: () => Promise.resolve({ kind: 'ok', registered: true }),
+            register: () => Promise.reject(new Error('unused')),
+          } as unknown as NonNullable<FirstRunPageProps['upgradeApi']>,
+          go: (p: string) => {
+            history.replaceState(null, '', p);
+            window.dispatchEvent(new Event('agentlink:navigate'));
+          },
+          goHome: () => undefined,
+          readJoin: () => Promise.resolve({ kind: 'failed' }),
+          readSignal: () =>
+            Promise.resolve({ connected: true, appName: 'Claude Code' } as unknown as Awaited<
+              ReturnType<NonNullable<FirstRunPageProps['readSignal']>>
+            >),
+        }),
+      );
+    });
+    await settle();
+    await act(async () => {
+      button(FIRST_RUN.savedIt)?.click();
+    });
+    await settle();
+    expect(host.querySelector('h1')?.textContent).toBe('Connected to Claude Code');
+    expect(text()).not.toContain('No AI app is connected yet');
+  });
+
+  it('Later on a lost code goes Home, not to Get started (R2-UI-02)', async () => {
+    const home = vi.fn();
+    resetWizard();
+    resetAutoShown();
+    history.replaceState(null, '', '/start/app');
+    await act(async () => {
+      root.render(
+        h(FirstRunPage as ComponentType<FirstRunPageProps>, {
+          api: setupApi(),
+          appsApi: appsApi(),
+          masterCodeApi: fakeCode({ kind: 'lost', which: 'first_run', touchId: true }),
+          passkeysAvailable: () => true,
+          platform: 'mac',
+          prfSupport: () => Promise.resolve('yes'),
+          goHome: home,
+          readJoin: () => Promise.resolve({ kind: 'failed' }),
+        }),
+      );
+    });
+    await settle();
+    await act(async () => {
+      button(FIRST_RUN.lostLater)?.click();
+    });
+    await settle();
+    expect(home).toHaveBeenCalledTimes(1);
+  });
+
   it('a code made and never saved is named as lost: a new one is offered, never asked for', async () => {
     await mountFirstRun(fakeCode({ kind: 'lost', which: 'first_run', touchId: true }));
     expect(host.querySelector('[data-testid="code-lost"]')).not.toBeNull();

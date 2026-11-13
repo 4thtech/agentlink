@@ -79,6 +79,7 @@ import { markLeavingStart, skipToHome } from '../start/guard.js';
 import {
   forgetAbandonedAdd,
   markAutoShown,
+  forgetOutcome,
   rememberWizard,
   resetWizard,
   wizardMemory,
@@ -724,6 +725,9 @@ export function FirstRunPage({
   const [noPrfHere, setNoPrfHere] = useState(false);
   const backupTitle = useTitleFocus<HTMLHeadingElement>(view.k);
   const mounted = useRef(true);
+  // REL051-R2C (R2-UI-01): the master code step came back after a reload: this page no longer knows
+  // the ID's name or which AI app was connected, so Connected reads them from the real state.
+  const resumedCode = useRef(false);
   const tiles = useMemo(
     () =>
       list.k === 'loading'
@@ -823,6 +827,7 @@ export function FirstRunPage({
       if (!isLive()) return;
       if (held.kind === 'shown' && held.which === 'first_run') {
         const { view: shown } = held;
+        resumedCode.current = true;
         setMode({ k: 'first' });
         if (step !== 'connect') toStep('connect', true);
         setView({
@@ -1157,6 +1162,13 @@ export function FirstRunPage({
       .catch((): JoinRead => ({ kind: 'failed' }))
       .then((answer) => {
         if (answer.kind === 'ok' && answer.state !== 'none') return openJoin();
+        if (resumedCode.current && done.app === undefined) {
+          // R2-UI-01: never "{empty} is ready" or "No AI app is connected" from forgotten state.
+          forgetOutcome();
+          setView({ k: 'step' });
+          toStep('connected');
+          return;
+        }
         finishStep({ label, ...(done.app === undefined ? {} : { app: done.app }) });
       });
   };
@@ -1314,8 +1326,9 @@ export function FirstRunPage({
             <Button
               variant={view.touchId ? 'secondary' : 'primary'}
               onClick={() => {
+                // REL051-R2C (R2-UI-02): Later goes Home, not to Get started.
                 setView({ k: 'loading' });
-                void existingOwner();
+                goHome();
               }}
             >
               {T.lostLater}
