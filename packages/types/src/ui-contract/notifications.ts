@@ -148,10 +148,17 @@ export function readNotificationList(value: unknown): NotificationList | undefin
 
 // --- prefs (N6, Settings › Notifications) ----------------------------------------------------------
 
-/** The switches of Settings › Notifications (PLAN-NOTIFY §4.4), kept per install in ui-settings. */
+/**
+ * The switches of Settings › Notifications (PLAN-NOTIFY §4.4), kept per install in ui-settings. N7
+ * (desktop app): `messages`, `files` and `updates` each govern their own native notification and
+ * `showNames` an owner-given name in it; `people`, `problems` and `quietHours` are not built yet
+ * (kept in the schema, never shown).
+ */
 export const NOTIFY_PREF_KEYS = [
   'approvals',
   'messages',
+  'files',
+  'updates',
   'people',
   'problems',
   'showNames',
@@ -160,10 +167,12 @@ export const NOTIFY_PREF_KEYS = [
 export type NotifyPrefKey = (typeof NOTIFY_PREF_KEYS)[number];
 export type NotifyPrefs = { readonly [K in NotifyPrefKey]?: boolean };
 
-/** D2: approvals on; messages, people and problems off; names off; quiet hours off. */
+/** D2: approvals on; messages, files, updates, people and problems off; names off; quiet hours off. */
 export const NOTIFY_DEFAULTS: Readonly<Record<NotifyPrefKey, boolean>> = Object.freeze({
   approvals: true,
   messages: false,
+  files: false,
+  updates: false,
   people: false,
   problems: false,
   showNames: false,

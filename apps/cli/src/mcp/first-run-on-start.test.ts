@@ -58,6 +58,10 @@ function fakeServer(opens: boolean | 'throws' = true): FakeServer {
     },
     openHome: () => Promise.resolve(true),
     openJoin: () => Promise.resolve(true),
+    // N7: the desktop app's pages and alerts; not used here.
+    openUpdates: () => Promise.resolve(true),
+    desktopAlerts: () => Promise.resolve(undefined),
+    ownerNames: () => Promise.resolve(new Map<string, string>()),
     notifyNewApproval: (id) => Promise.resolve(`${ORIGIN}/approve/${id}`),
     close: () => Promise.resolve(),
   };

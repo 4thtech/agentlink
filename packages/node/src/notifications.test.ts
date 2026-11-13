@@ -104,6 +104,9 @@ describe('the notification schema (no content fields)', () => {
     expect(NOTIFY_DEFAULTS).toEqual({
       approvals: true,
       messages: false,
+      // N7: the desktop app's files and updates switches, off by default (D2).
+      files: false,
+      updates: false,
       people: false,
       problems: false,
       showNames: false,

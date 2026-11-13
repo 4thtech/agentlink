@@ -138,7 +138,7 @@ const UPDATE_READY = {
   check: () => undefined,
 };
 
-async function harness(options: { updateReady?: boolean } = {}) {
+async function harness(options: { updateReady?: boolean; client?: unknown } = {}) {
   const opened: string[] = [];
   const alerts: number[] = [];
   const ownerStores: number[] = [];
@@ -162,7 +162,7 @@ async function harness(options: { updateReady?: boolean } = {}) {
     name: 'default',
     label: 'Personal',
     source,
-    localUi: {},
+    localUi: options.client === undefined ? {} : { client: options.client as never },
     close: () => Promise.resolve(),
   };
   const server = await startApprovalServerWith(
@@ -391,5 +391,83 @@ describe('IR-NOTIFY-1 M-1: the "Approvals waiting" switch governs the OS approva
     allowed = true;
     await server.notifyNewApproval(ID);
     expect(alerts).toBe(1);
+  });
+});
+
+describe('N7: what the desktop app alerts about (desktopAlerts, ownerNames, openUpdates)', () => {
+  it('answers the open ID, its items (schema only) and the switches in force (D2 defaults)', async () => {
+    const h = await harness({ updateReady: true });
+    const state = await h.server.desktopAlerts();
+    expect(state?.scope).toBe('default');
+    expect(state?.prefs).toEqual({
+      approvals: true,
+      messages: false,
+      files: false,
+      updates: false,
+      showNames: false,
+      people: false,
+      problems: false,
+      quietHours: false,
+    });
+    expect(state?.items.map((i) => i.id)).toEqual(['update', `messages-${A}`, `files-${B}`]);
+    for (const item of state?.items ?? []) {
+      for (const key of Object.keys(item)) {
+        expect(NOTIFICATION_KEYS as readonly string[]).toContain(key);
+      }
+    }
+  });
+
+  it('the switches follow Settings › Notifications', async () => {
+    const h = await harness();
+    h.world.settings = { notify: { messages: true, files: true, updates: true, showNames: true } };
+    const state = await h.server.desktopAlerts();
+    expect(state?.prefs).toMatchObject({
+      approvals: true,
+      messages: true,
+      files: true,
+      updates: true,
+      showNames: true,
+    });
+  });
+
+  it('ownerNames: only a name the owner gave (nameSource owner), never a self-declared one', async () => {
+    const C = `0x${'c'.repeat(40)}`;
+    const view = (id: string, name: string, nameSource: string) => ({
+      id,
+      display: { name, nameSource, label: 'self-declared' },
+    });
+    const client = {
+      contacts: {
+        list: () =>
+          Promise.resolve([
+            view(A, 'Ana', 'owner'),
+            view(B, 'AgentLink Security', 'counterparty'),
+            view(C, '  ', 'owner'),
+          ]),
+      },
+    };
+    const h = await harness({ client });
+    const names = await h.server.ownerNames([A, B, C]);
+    expect([...names.entries()]).toEqual([[A, 'Ana']]);
+    // Only the refs asked for.
+    expect([...(await h.server.ownerNames([B])).entries()]).toEqual([]);
+  });
+
+  it('openUpdates opens Settings › Updates with a fresh one-shot link (a fixed path)', async () => {
+    const opened: string[] = [];
+    const server = await startApprovalServerWith(
+      { source },
+      {
+        opener: (url) => {
+          opened.push(url);
+          return Promise.resolve(true);
+        },
+      },
+    );
+    servers.push(server);
+    await server.openUpdates();
+    expect(opened[0]).toMatch(
+      new RegExp(`^${server.origin}/settings/updates\\?t=[A-Za-z0-9_-]{43}$`),
+    );
   });
 });
