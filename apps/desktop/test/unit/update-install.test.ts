@@ -3,7 +3,6 @@
 // bundles; codesign, ditto, xattr/find are stubbed (the one darwin-only case runs the real ditto on a
 // fake bundle). No packaged app is launched: the watchdog's "launcher" is a fake script.
 import { execFileSync, spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import {
   chmod,
   cp,
@@ -18,6 +17,7 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { createSha256, encodeHex } from '@4thtech-io/crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { bundleFilePaths } from '../../src/main/bundle-check.js';
 import type { UpdateAsset } from '../../src/main/updater/manifest.js';
@@ -29,6 +29,7 @@ import {
 import { downloadZip, installUpdate, ZIP_FILE } from '../../src/main/updater/install.js';
 import {
   DITTO,
+  checkZipEntries,
   inspectTree,
   plistString,
   recheckZip,
@@ -52,7 +53,12 @@ import {
 } from '../../src/main/updater/health.js';
 import { FAILED_FILE, loadFailedVersion } from '../../src/main/updater/state.js';
 
-const sha = (b: Uint8Array | string): string => createHash('sha256').update(b).digest('hex');
+const sha = (b: Uint8Array | string): string =>
+  encodeHex(
+    createSha256()
+      .update(typeof b === 'string' ? new TextEncoder().encode(b) : b)
+      .digest(),
+  );
 const ZIP_URL =
   'https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-mac-arm64.zip';
 const NODE_TEAM = 'HX7739G8FX';
@@ -145,6 +151,7 @@ function fakeTools(opts: {
   nodeTeam?: string;
   quarantined?: boolean;
   dittoFails?: boolean;
+  entries?: string[];
 }): FakeTools {
   const calls: { cmd: string; args: readonly string[] }[] = [];
   const run: RunProgram = async (cmd, args) => {
@@ -160,6 +167,16 @@ function fakeTools(opts: {
         });
       return { code: 0, stdout: '', stderr: '' };
     }
+    if (cmd === '/usr/bin/zipinfo')
+      return opts.dittoFails === true
+        ? { code: 9, stdout: '', stderr: '' }
+        : {
+            code: 0,
+            stdout: (opts.entries ?? ['AgentLink.app/', 'AgentLink.app/Contents/Info.plist']).join(
+              '\n',
+            ),
+            stderr: '',
+          };
     if (cmd === '/usr/bin/codesign' && args[0] === '--verify')
       return { code: opts.codesignOk === false ? 1 : 0, stdout: '', stderr: '' };
     if (cmd === '/usr/bin/codesign' && args[0] === '-dvv') {
@@ -198,7 +215,10 @@ const fetchBytes =
   (bytes: Uint8Array, seen?: string[]) =>
   async (url: string): Promise<Response> => {
     seen?.push(url);
-    return new Response(bytes, { status: 200, headers: { 'content-length': String(bytes.length) } });
+    return new Response(bytes, {
+      status: 200,
+      headers: { 'content-length': String(bytes.length) },
+    });
   };
 
 // --- download ---------------------------------------------------------------------------------
@@ -265,8 +285,38 @@ describe('re-check before unpacking and the unpacked tree (UPD-4 §2)', () => {
     const dest = join(root, 'unpacked');
     const tools = fakeTools({ source: src });
     const app = await unpackZip(join(root, 'a.zip'), dest, tools.run);
-    expect(tools.calls[0]).toEqual({ cmd: '/usr/bin/ditto', args: ['-x', '-k', join(root, 'a.zip'), dest] });
+    expect(tools.calls[0]).toEqual({ cmd: '/usr/bin/zipinfo', args: ['-1', join(root, 'a.zip')] });
+    expect(tools.calls[1]).toEqual({
+      cmd: '/usr/bin/ditto',
+      args: ['-x', '-k', join(root, 'a.zip'), dest],
+    });
     expect(app).toBe(join(dest, 'AgentLink.app'));
+  });
+
+  it('checks every entry name before unpacking: no absolute, .. or foreign top-level entry', async () => {
+    const zip = join(root, 'a.zip');
+    for (const bad of [
+      '../evil',
+      '/etc/passwd',
+      'AgentLink.app/../../evil',
+      'AgentLink.app/Contents/./x',
+      'Other.app/x',
+      'AgentLink.app\\..\\x',
+    ]) {
+      const tools = fakeTools({ source: join(root, 'none'), entries: ['AgentLink.app/', bad] });
+      expect(await codeOf(unpackZip(zip, join(root, `d${Math.random()}`), tools.run))).toBe(
+        'path_escape',
+      );
+      expect(tools.calls.some((c) => c.cmd === DITTO)).toBe(false);
+    }
+    const ok = fakeTools({
+      entries: [
+        'AgentLink.app/',
+        '__MACOSX/AgentLink.app/._Info.plist',
+        '__MACOSX/._AgentLink.app',
+      ],
+    });
+    await expect(checkZipEntries(zip, ok.run)).resolves.toBeUndefined();
   });
 
   it('a failing ditto is unpack_failed', async () => {
@@ -336,8 +386,8 @@ describe('re-check before unpacking and the unpacked tree (UPD-4 §2)', () => {
       execFileSync('/usr/bin/ditto', ['-c', '-k', '--sequesterRsrc', '--keepParent', app, zip]);
       const run: RunProgram = async (cmd, args) => {
         try {
-          execFileSync(cmd, [...args]);
-          return { code: 0, stdout: '', stderr: '' };
+          const stdout = execFileSync(cmd, [...args], { encoding: 'utf8' });
+          return { code: 0, stdout, stderr: '' };
         } catch {
           return { code: 1, stdout: '', stderr: '' };
         }
@@ -392,9 +442,7 @@ describe('verify the unpacked app before the swap (UPD-4 §3)', () => {
       'wrong_bundle_id',
     );
     const old = await fakeApp(join(root, 'v'), '0.5.2');
-    expect(await codeOf(verifyStagedApp(old, await ctx(old, fakeTools({}))))).toBe(
-      'wrong_version',
-    );
+    expect(await codeOf(verifyStagedApp(old, await ctx(old, fakeTools({}))))).toBe('wrong_version');
   });
 
   it('refuses a failing codesign, a wrong helper id and a node without the upstream signature', async () => {
@@ -631,7 +679,13 @@ fi
     await fakeApp(join(staging, 'unpacked'), '0.5.3');
     const tools = join(root, 'tools');
     await mkdir(tools);
-    return { current, staging, state, launcher: await fakeLauncher(tools), log: join(tools, 'log') };
+    return {
+      current,
+      staging,
+      state,
+      launcher: await fakeLauncher(tools),
+      log: join(tools, 'log'),
+    };
   }
 
   function runWatchdog(

@@ -66,6 +66,7 @@ import {
 } from './switches.js';
 import type { StatusAction } from './status-page.js';
 import { AppTray, trayImage } from './tray.js';
+import { writeHealth, writeStarting } from './updater/health.js';
 import { procTranslated, updateChannel, updaterArch } from './updater/host.js';
 import { ReleaseChecker, updateChecksAllowed } from './updater/release-check.js';
 import { scheduleUpdateChecks } from './updater/schedule.js';
@@ -156,6 +157,14 @@ export interface ShellProcess {
   readonly toInviteLink?: (deepLink: string) => string | null;
   /** The per-user folder for core.log (core-log.ts logDir). */
   readonly logDir: string;
+  /**
+   * UPD-4: the in-app update's two signals for its watchdog (updater/health.ts): this shell started,
+   * and its core is ready. Packaged release builds only. Absent: none.
+   */
+  readonly updateHealth?: (app: App) => {
+    readonly starting: () => void;
+    readonly ready: () => void;
+  };
   /** WP-D10: starts the phase-1 update checks (packaged release builds only). Absent: none. */
   readonly startUpdates?: (electron: ElectronModule) => void;
   /**
@@ -384,6 +393,8 @@ export async function runShell(
       return 'location';
     }
   }
+  const updateHealth = app.isPackaged && preview === null ? proc.updateHealth?.(app) : undefined;
+  updateHealth?.starting();
 
   const windowSession = electron.session.fromPartition(WINDOW_PARTITION, { cache: false });
   // DESK-TOUCHID-FIX: before a request that starts the presence helper reaches the core, focus
@@ -450,6 +461,7 @@ export async function runShell(
     onMessage: (message) => {
       switch (message.type) {
         case 'ready':
+          updateHealth?.ready();
           if (releaseChecker !== null) sendAppUpdate(releaseChecker.view());
           if (window?.loadSessionUrl(message.sessionUrl) === true) {
             window.show();
@@ -584,6 +596,16 @@ export function realProcess(): ShellProcess {
     toInviteLink,
     logDir: logDir(proc.platform, homedir(), proc.env),
     startUpdates: (electron) => startUpdates(electron, proc.platform, proc.arch),
+    updateHealth: (app) => {
+      const dir = app.getPath?.('userData');
+      const version = app.getVersion?.();
+      const write = (fn: typeof writeHealth): void => {
+        if (proc.platform !== 'darwin' || dir === undefined || version === undefined) return;
+        // Public data only (a version and a pid); a failed write just means no in-app update.
+        fn(dir, version, proc.pid).catch(() => undefined);
+      };
+      return { starting: () => write(writeStarting), ready: () => write(writeHealth) };
+    },
     releaseChecker: (electron, onChange) =>
       releaseCheckerFor(
         electron,
