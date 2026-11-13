@@ -183,8 +183,24 @@ export interface GoToEntry {
 
 /** Extra words a section is found by in Cmd+K ("IDs" stays a name for My IDs; "Contacts" for People). */
 const SECTION_KEYWORDS: Readonly<Record<string, string>> = {
-  people: 'contacts',
+  people: 'contacts person people',
   agents: 'ids id agents',
+  activity: 'history log recent changes',
+};
+
+/** UX-LEFT-1 (R1-UI-23): the words people type for a Settings page that its title does not hold. */
+const SETTINGS_KEYWORDS: Readonly<Record<string, string>> = {
+  '/settings/backup': 'recovery master code restore kit',
+  '/settings/touch-id': 'passkey fingerprint password code',
+  '/settings/apps': 'ai app connect claude cursor',
+  '/settings/files': 'folder inbox send',
+  '/settings/storage': 'space size disk delete',
+  '/settings/appearance': 'theme dark light mode colour color',
+  '/settings/notifications': 'alerts sounds',
+  '/settings/rules': 'allow permissions policy',
+  '/settings/proofs': 'proof credits',
+  '/settings/updates': 'version update upgrade',
+  '/settings/advanced': 'help diagnostics relay network pro technical',
 };
 
 /** Everything Cmd+K reaches, in the order it lists them (the prototype's palette). */
@@ -225,6 +241,7 @@ export function goToEntries(hood: boolean): readonly GoToEntry[] {
         label: p.label,
         hint: PAGE_TITLES.settings,
         path: p.path,
+        ...(SETTINGS_KEYWORDS[p.path] === undefined ? {} : { keywords: SETTINGS_KEYWORDS[p.path] }),
       })),
   ];
   if (hood) {

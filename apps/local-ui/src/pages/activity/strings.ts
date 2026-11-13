@@ -164,7 +164,7 @@ export const ACTIVITY_COPY = {
   pillRenamed: 'Renamed',
   // Rules, IDs, apps, backup
   rulesChanged: 'You changed your rules',
-  rulesChangedLine: 'Open Rules to see what is set now',
+  rulesChangedLine: 'The new rules apply from now on. Open Rules to see them',
   pillRules: 'Rules',
   idCreated: 'You created a new ID',
   idCreatedNamed: 'You created the ID {name}',
