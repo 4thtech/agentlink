@@ -9,14 +9,7 @@
 // feed's unit tests (packages/core activity-kinds, apps/local-ui activity).
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { until } from '../app-world.js';
-import {
-  chapter,
-  eventually,
-  journeyWorld,
-  navTo,
-  pairedOwners,
-  text,
-} from './world.js';
+import { chapter, eventually, journeyWorld, navTo, pairedOwners, text } from './world.js';
 
 const ch = chapter();
 beforeAll(() => ch.start(), 120_000);
