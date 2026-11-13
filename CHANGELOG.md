@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-11-13
+
+### Changed
+
+- The Mac app is now one of the two main ways to install (DOCS-MAC-2, S1): the README Quick start, the quick guide, Start here, Install AgentLink and the Mac app page open with a plain choice, "On a Mac? Get the app" or "Windows, Linux, or the terminal? One command", with direct download links that say which file is for an Apple chip (arm64) and which for an Intel Mac (x64). Every GitHub Release now starts with a short Download section saying which file to download, and that the other files are not needed.
+- The desktop app guide says what closing the window and quitting do (HOTFIX-NOID).
+- The invite page now offers the early Mac app (Apple chip and Intel downloads) under the Mac choice, and its "Step-by-step guide" link opens "Start here" (POST-051, S1, 08 §4).
+
+### Fixed
+
+- New ID works on a computer that has your owner but no ID yet (for example after you removed the last ID, or on a Mac that had AgentLink before): confirm with your master code, or with Touch ID in the Mac app. The app no longer tells you to run a terminal command for it (HOTFIX-NOID, S2, 04 §2.8).
+- In the Mac app, New ID confirms with the app's own Touch ID once it is on, and the New ID screen and Settings › Touch ID & master code no longer say "This browser can't use Touch ID … open AgentLink in Safari" (HOTFIX-NOID).
+- The Mac app shows its real version in the corner and on Settings › Updates instead of 0.0.0 (HOTFIX-NOID).
+
 ## [0.5.2] - 2026-11-13
 
 ### Added
@@ -1187,7 +1201,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/4thtech/agentlink/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/4thtech/agentlink/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/4thtech/agentlink/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/4thtech/agentlink/compare/v0.4.15...v0.5.0

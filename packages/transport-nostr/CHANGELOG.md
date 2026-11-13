@@ -1,5 +1,13 @@
 # @4thtech-io/transport-nostr
 
+## 0.5.3
+
+### Patch Changes
+
+- @4thtech-io/crypto@0.5.3
+  - @4thtech-io/log@0.5.3
+  - @4thtech-io/types@0.5.3
+
 ## 0.5.2
 
 ### Patch Changes

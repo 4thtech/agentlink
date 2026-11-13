@@ -1,5 +1,12 @@
 # @4thtech-io/local-ui
 
+## 0.0.22
+
+### Patch Changes
+
+- 53e25ee: HOTFIX-NOID: New ID works with an owner and no ID on this computer (master code, or Touch ID in the Mac app); the Mac app's New ID uses its own Touch ID and never shows browser or Safari wording; the desktop host reports the real version instead of 0.0.0.
+- @4thtech-io/ui@0.5.3
+
 ## 0.0.21
 
 ### Patch Changes

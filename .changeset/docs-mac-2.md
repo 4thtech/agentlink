@@ -1,4 +1,0 @@
----
----
-
-DOCS-MAC-2: The Mac app is now one of the two main install choices (On a Mac? Get the app / Windows, Linux or the terminal? One command) in the README Quick start, quick guide, Start here, Install AgentLink and the Mac app page, with direct v0.5.1 links that name each file next to its chip (arm64 = Apple chip, x64 = Intel), the About This Mac check and four numbered first-open steps (Open Anyway). release.yml now starts every GitHub Release body with a Download section (which file for which computer, short first-open steps, other files not needed) before What's new; the body limit drops to 123,000 so the section always fits, tested in tools/release/release-body.test.mjs. The release runbook gets a docs-pass step to update the versioned links each release. Sensitive path: .github/workflows/release.yml.
