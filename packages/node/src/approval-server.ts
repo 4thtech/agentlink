@@ -5811,6 +5811,14 @@ export async function startApprovalServerWith(
             finishCreate(res, 409, 'refused');
             return;
           }
+          // IR-HOTFIX-NOID-1 L2: the Touch ID path gets the same check (a passkey header naming
+          // another owner refuses), before anything is signed.
+          if (expectedNostr !== undefined && !(await sameStoredOwner(unlocked.owner))) {
+            await unlocked.session.close().catch(() => undefined);
+            await unlocked.store.close().catch(() => undefined);
+            finishCreate(res, 409, 'refused');
+            return;
+          }
           ({ store, session: ownerSession, owner } = unlocked);
         }
       } catch (error) {

@@ -39,6 +39,7 @@ import { createKeychainAgent, openRecordedKeyStore } from '../keychain-keystore.
 import { keychainAccount, type KeychainBackend } from '../keychain.js';
 import { TEST_APP } from '../local-ui-app.fixture.js';
 import { OWNER_ACCOUNT } from '../owner-keystore.js';
+import { readOwnerPasskeyHeader } from '../owner-passkey.js';
 import { defaultOwnerFiles, encodeSetupRegistration } from '../owner-setup.js';
 import { encodePayConfirmAssertion } from '../pay-confirm.js';
 import { VirtualPrfAuthenticator } from '../passkey-authenticator.fixture.js';
@@ -1255,5 +1256,85 @@ describe("HOTFIX-NOID New ID with an open ID: the desktop app's Touch ID", () =>
     const bare = await finishWith(two.nonce, { 'X-AgentLink-Presence': 'native' });
     expect(json(bare)['status']).toBe('presence_required');
     expect(h.w.entries.has('two')).toBe(false);
+  });
+});
+
+// IR-HOTFIX-NOID-1 L1/L2: with no card naming the owner, a stored Touch ID or passkey header that
+// names another owner refuses (`refused`), on the master code path and on the Touch ID path alike;
+// nothing is created or written.
+describe('HOTFIX-NOID: a stored header naming another owner refuses the first ID', () => {
+  /** This owner's passkey item with its header naming another owner key (one byte changed). */
+  async function otherOwnersPasskey(w: World): Promise<Uint8Array> {
+    const header = await readOwnerPasskeyHeader(w.keychain);
+    const item = w.keychain.items.get('owner-passkey');
+    if (header === null || item === undefined) throw new Error('no passkey item');
+    const at = Buffer.from(item).indexOf(Buffer.from(header.ownerNostr));
+    expect(at).toBeGreaterThan(-1);
+    const other = item.slice();
+    other[at] = ((other[at] as number) + 1) & 0xff;
+    const changed = await (async () => {
+      w.keychain.items.set('owner-passkey', other);
+      return readOwnerPasskeyHeader(w.keychain);
+    })();
+    expect(changed?.ownerNostr).not.toEqual(header.ownerNostr);
+    return other;
+  }
+
+  async function zeroIds(native: boolean): Promise<{
+    h: Harness;
+    s: Session;
+    code: string;
+    helper?: StandInHelper;
+  }> {
+    const helper = native ? new StandInHelper(1) : undefined;
+    const first = await harness(helper === undefined ? {} : { nativePresence: helper });
+    const s1 = await first.session();
+    const { finish } = await setUp(first, s1, { label: 'Home base' });
+    const code = String(json(finish)['ownerCode']).replace(/[^A-Za-z0-9]/g, '');
+    if (helper !== undefined) {
+      expect(json(await first.post('/api/owner/native', s1, encodeUtf8(code)))['status']).toBe(
+        'registered',
+      );
+    }
+    const w = world();
+    for (const [account, value] of first.w.keychain.items) w.keychain.items.set(account, value);
+    await otherOwnersPasskey(w);
+    const h = await harness({ w, ...(helper === undefined ? {} : { nativePresence: helper }) });
+    return { h, s: await h.session(), code, ...(helper === undefined ? {} : { helper }) };
+  }
+
+  const begin = (h: Harness, s: Session) =>
+    h.post(AGENT_BEGIN, s, new Uint8Array(0), {
+      'X-AgentLink-Input': input({ label: 'Work', app: 'claude-code' }),
+    });
+  const finishWith = (h: Harness, s: Session, nonce: string, body: Uint8Array, extra = {}) =>
+    h.post(AGENT_FINISH, s, body, { 'X-AgentLink-Input': input({ nonce }), ...extra });
+
+  it('the master code: refused, nothing created or written', async () => {
+    const { h, s, code } = await zeroIds(false);
+    const begun = json(await begin(h, s)) as unknown as Begun;
+    const res = await finishWith(h, s, begun.nonce, encodeUtf8(code));
+    expect(res.status).toBe(409);
+    expect(json(res)['status']).toBe('refused');
+    expect(h.w.entries.size).toBe(0);
+    expect(h.w.desk.writes).toBe(0);
+    expect(h.w.keychain.items.size).toBeGreaterThan(0);
+    expect([...h.w.ids.keys()]).toEqual([]);
+  });
+
+  it("the app's Touch ID: refused, nothing created or written", async () => {
+    const { h, s } = await zeroIds(true);
+    const begun = json(await begin(h, s)) as unknown as Begun;
+    const ask = await finishWith(h, s, begun.nonce, new Uint8Array(0), {
+      'X-AgentLink-Presence': 'native-challenge',
+    });
+    const res = await finishWith(h, s, begun.nonce, new Uint8Array(0), {
+      'X-AgentLink-Presence': 'native',
+      'X-AgentLink-Ceremony': String(json(ask)['ceremony']),
+    });
+    expect(res.status).toBe(409);
+    expect(json(res)['status']).toBe('refused');
+    expect(h.w.entries.size).toBe(0);
+    expect(h.w.desk.writes).toBe(0);
   });
 });
