@@ -23,7 +23,7 @@ import {
   pinnedRoot,
 } from '../../apps/desktop/src/main/updater/manifest.ts';
 import { saveFailedVersion } from '../../apps/desktop/src/main/updater/state.ts';
-import { DOCUMENT_URLS, runUpdateCheck } from '../../apps/desktop/src/main/updater/index.ts';
+import { documentUrl, runUpdateCheck } from '../../apps/desktop/src/main/updater/index.ts';
 import * as appVerifier from '../../apps/desktop/src/main/updater/manifest.ts';
 import {
   ToolError,
@@ -386,7 +386,7 @@ describe('phase 1 flow: verified download, then "Open the installer"', () => {
     const fetchImpl = async (url, init) => {
       seen.push(url);
       expect(init.redirect).toBe('manual');
-      if (url === DOCUMENT_URLS.stable)
+      if (url === documentUrl('stable', k1.publicKey))
         return new Response(JSON.stringify(document), { status: 200 });
       if (url === good.assets[0].url)
         return new Response(null, { status: 302, headers: { location: redirectTo } });
@@ -452,7 +452,7 @@ describe('phase 1 flow: verified download, then "Open the installer"', () => {
     const t = setup();
     await saveFailedVersion(t.stateDir, '0.5.0');
     expect(await runUpdateCheck(t.deps)).toEqual({ kind: 'refused', code: 'failed_version' });
-    expect(t.seen).toEqual([DOCUMENT_URLS.stable]);
+    expect(t.seen).toEqual([documentUrl('stable', k1.publicKey)]);
   });
 
   it('an older release is "up to date"; a refused document offers nothing', async () => {

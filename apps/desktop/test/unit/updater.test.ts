@@ -271,8 +271,9 @@ describe('format v2 (UPD-1): one pinned key, asset kinds, v1 refused', () => {
 });
 
 describe('channel and arch of this build (UPD-1, main.ts fix)', () => {
-  it('a pre-release version follows beta; others follow the build channel', () => {
-    expect(BUILD_CHANNEL).toBe('beta');
+  // UPD-3 (D-151): releases are signed for the `stable` channel; a pre-release still follows beta.
+  it('a pre-release version follows beta; others follow the build channel (stable)', () => {
+    expect(BUILD_CHANNEL).toBe('stable');
     expect(updateChannel('0.6.0-beta.2')).toBe('beta');
     expect(updateChannel('0.6.0-beta.2', 'stable')).toBe('beta');
     expect(updateChannel('0.6.0', 'stable')).toBe('stable');

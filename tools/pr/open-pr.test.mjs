@@ -322,3 +322,26 @@ describe('plan', () => {
     ).toThrow(/No task ID/);
   });
 });
+
+// UPD-3 (Fable L3, IR-UPD-1-1): the update pin every installed app trusts is a sensitive path, so a pin
+// change needs the independent review and the owner's "merge" (as S2 already does for apps/desktop).
+describe('the desktop update pin is a sensitive path', () => {
+  it('root-key.json and root-key.updates-off.json are sensitive; other updater files are S2 only', () => {
+    for (const path of [
+      'apps/desktop/src/main/updater/root-key.json',
+      'apps/desktop/src/main/updater/root-key.updates-off.json',
+    ]) {
+      const v = classifyFiles([path]);
+      expect(v.sensitive, path).toBe(true);
+      expect(v.cls).toBe(2);
+      expect(v.reviewRequired).toBe(true);
+    }
+    expect(classifyFiles(['apps/desktop/src/main/updater/manifest.ts']).sensitive).toBe(false);
+    expect(classifyFiles(['apps/desktop/src/main/updater/root-key.json.bak']).sensitive).toBe(false);
+  });
+
+  it('CODEOWNERS names the pin files explicitly', () => {
+    const owners = readFileSync(join(repoRoot, '.github/CODEOWNERS'), 'utf8');
+    expect(owners).toMatch(/^\/apps\/desktop\/src\/main\/updater\/root-key\*\.json\s+@talirezun/m);
+  });
+});
