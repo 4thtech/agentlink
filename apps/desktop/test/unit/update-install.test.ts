@@ -8,6 +8,7 @@ import {
   cp,
   mkdir,
   mkdtemp,
+  open,
   readFile,
   readdir,
   rm,
@@ -255,8 +256,14 @@ describe('download of the zip (UPD-4 §1)', () => {
     expect(dirname(got.dir)).toBe(updatesDir);
     expect(got.zipPath).toBe(join(got.dir, ZIP_FILE));
     expect((await stat(got.dir)).mode & 0o777).toBe(0o700);
-    expect((await stat(got.zipPath)).mode & 0o777).toBe(0o600);
-    expect(sha(await readFile(got.zipPath))).toBe(sha(bytes));
+    // CI-823: the mode and the bytes from one open handle (no stat-then-read on the path).
+    const zip = await open(got.zipPath, 'r');
+    try {
+      expect((await zip.stat()).mode & 0o777).toBe(0o600);
+      expect(sha(await zip.readFile())).toBe(sha(bytes));
+    } finally {
+      await zip.close();
+    }
     expect(progress.at(-1)).toEqual([bytes.length, bytes.length]);
     expect(progress.every(([d, t]) => d <= t && t === bytes.length)).toBe(true);
   });

@@ -18,7 +18,15 @@
 //           fails here, before the publish step uploads anything.
 //
 // Never logs the key, never puts it in an error. No network module.
-import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import {
+  closeSync,
+  constants as fsConstants,
+  fstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -41,6 +49,9 @@ export const SUMS_FILE = 'SHA256SUMS-desktop-app.txt';
 export const KEY_ENV = 'DESKTOP_UPDATE_KEY';
 export const DEFAULT_DAYS = 30;
 const HEX32 = /^[0-9a-f]{64}$/;
+/** Read only: no link, never blocking on a pipe (each flag 0 where the OS lacks it). */
+const READ_NOFOLLOW =
+  fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0) | (fsConstants.O_NONBLOCK ?? 0);
 const RELEASE_VERSION = /^(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})\.(0|[1-9][0-9]{0,5})$/;
 const CHANNELS = ['stable', 'beta'];
 const APP_VERIFIER = new URL('../../apps/desktop/dist/main/updater/manifest.js', import.meta.url);
@@ -305,8 +316,15 @@ export async function main(argv, io = {}) {
         const path = join(values.dir, name);
         let bytes;
         try {
-          if (!statSync(path).isFile()) throw new Error('not a file');
-          bytes = readFileSync(path);
+          // CI-823: one open (no link, never blocking on a pipe), then fstat and read that same
+          // descriptor: no stat-then-read race on the path.
+          const fd = openSync(path, READ_NOFOLLOW);
+          try {
+            if (!fstatSync(fd).isFile()) throw new Error('not a file');
+            bytes = readFileSync(fd);
+          } finally {
+            closeSync(fd);
+          }
         } catch {
           throw new ToolError(`${name} was not downloaded from the release`);
         }

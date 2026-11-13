@@ -19,7 +19,6 @@ import { spawn, spawnSync } from 'node:child_process';
 import {
   closeSync,
   existsSync,
-  mkdirSync,
   mkdtempSync,
   openSync,
   readdirSync,
@@ -27,10 +26,10 @@ import {
   rmSync,
 } from 'node:fs';
 import { createConnection } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { makeHome } from './profile.mjs';
 
 const fail = (reason) => {
   console.error(`desktop smoke FAILED: ${reason}`);
@@ -61,49 +60,9 @@ const nodeBin = join(resources, ...(win ? layout.node.win32 : layout.node.posix)
 const entryJs = join(resources, ...layout.hostScript.slice(0, -1), 'agentlink.js');
 const hostScript = join(resources, ...layout.hostScript);
 
-/** A fresh throw-away profile: its own home and a small, explicit environment. */
-function makeHome(opts = {}) {
-  const dir = mkdtempSync(join(tmpdir(), 'agentlink-desktop-smoke-'));
-  // No AI-app marker, nothing from the runner's secrets.
-  const e = {
-    PATH: process.env.PATH,
-    SystemRoot: process.env.SystemRoot,
-    HOME: dir,
-    USERPROFILE: dir,
-    APPDATA: join(dir, 'AppData', 'Roaming'),
-    LOCALAPPDATA: join(dir, 'AppData', 'Local'),
-    TMPDIR: dir,
-    TEMP: dir,
-    TMP: dir,
-  };
-  if (!opts.noRoaming) mkdirSync(e.APPDATA, { recursive: true });
-  mkdirSync(e.LOCALAPPDATA, { recursive: true });
-  return { home: dir, env: e };
-}
+// Every throw-away profile (this one and the fd 3 controls' own) comes from profile.mjs, which
+// gives each its own unlocked login keychain on macOS (CI-823).
 const { home, env } = makeHome();
-
-// A fresh runner has no usable keychain under a temporary HOME (the same setup as
-// tools/ci/golden-path-published.mjs): on macOS the throw-away profile gets its own unlocked login
-// keychain, the way a person's login keychain is. The app's own keychain use is unchanged. Windows
-// has the Credential Manager.
-if (process.platform === 'darwin') {
-  const keychain = join(home, 'Library', 'Keychains', 'login.keychain-db');
-  mkdirSync(join(home, 'Library', 'Keychains'), { recursive: true });
-  for (const args of [
-    ['create-keychain', '-p', 'ci', keychain],
-    ['default-keychain', '-s', keychain],
-    ['unlock-keychain', '-p', 'ci', keychain],
-    ['set-keychain-settings', keychain],
-  ]) {
-    const r = spawnSync('security', args, { env, stdio: 'ignore' });
-    if (r.status !== 0) {
-      // Only creating the keychain is fatal; the later calls can fail on a runner whose keychain
-      // is already unlocked system-wide.
-      if (args[0] === 'create-keychain') throw new Error('could not create the smoke keychain');
-      console.error(`::warning::smoke setup: security ${args[0]} exited ${r.status}`);
-    }
-  }
-}
 
 // The app's core log (core-log.ts logDir): the shell keeps only REDACTED stderr lines and its own
 // fixed notes there.
@@ -231,12 +190,19 @@ async function pipeAccepted(ctx) {
     let buffer = '';
     let ready = false;
     let exited = null;
+    let stoppedReason = null;
     child.stderr.on('data', (c) => (stderr += c));
     child.stdio[3].on('data', (c) => {
       buffer += c;
       for (const line of buffer.split('\n').slice(0, -1)) {
         try {
-          if (JSON.parse(line).type === 'ready') ready = true;
+          const message = JSON.parse(line);
+          if (message.type === 'ready') ready = true;
+          // CI-823: the host's fixed stop code (protocol.ts STOP_REASONS), so a failed start says
+          // why (e.g. `keychain`). Only a short lowercase code is kept; nothing else from the pipe.
+          if (message.type === 'stopped' && /^[a-z_]{1,32}$/.test(String(message.reason))) {
+            stoppedReason = message.reason;
+          }
         } catch {
           // not a message
         }
@@ -251,7 +217,7 @@ async function pipeAccepted(ctx) {
       if (!ready && !refused && exited === null && Date.now() - started < 60_000) return;
       clearInterval(tick);
       console.log(
-        `    the shell’s pipe: ${ready ? '`ready` received on fd 3' : refused ? 'REFUSED' : exited !== null ? `host exited (${exited})` : 'no `ready` within 60 s'}`,
+        `    the shell’s pipe: ${ready ? '`ready` received on fd 3' : refused ? 'REFUSED' : exited !== null ? `host exited (${exited}${stoppedReason ? `, stopped: ${stoppedReason}` : ''})` : 'no `ready` within 60 s'}`,
       );
       if (!ready) for (const line of stderrLines(stderr)) console.error(`      ${line}`);
       // Stop it: close our end (the host leaves on pipe close), then kill if still there.
