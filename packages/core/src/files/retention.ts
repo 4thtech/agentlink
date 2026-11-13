@@ -21,11 +21,24 @@
 // to `expiry` stops deletion, and a row stored before the snapshot existed (null) is kept until it
 // expires: deletion is irreversible, so every doubt keeps the file (I-9).
 //
+// History retention (RET-6; D-148; 04 §4.2 "Retention policy"; 06 §3 `history`; proposed, owner
+// confirms at merge): HistoryRetention below. Once a day the lease holder's background loop asks it
+// to delete what the owner's signed `history.*` says is older than kept, through RET-3's plan and
+// apply and nothing else: saved files to the OS Trash (`include: 'files'`), message bodies to
+// tombstones (`include: 'messages'`), protected items kept. It deletes nothing unless the policy in
+// force is a verified owner-signed one (never the defaults, never fail closed), while the ID is
+// paused (checked again before each apply; an unreadable pause row counts as paused), or when the
+// store cannot be read. A policy signed before D-148 reads as keep forever. No MCP tool reaches it
+// (I-4).
+//
 // Best effort, retried on the next pass: a failed chain read deletes nothing, and a failed delete
 // leaves the row as it was. Nothing about an object (locator, URL, object ID) reaches a log line,
 // an error or a result (I-7): logs carry fixed codes only.
+import { HISTORY_PRE_D148, historySchema, type HistoryPolicy } from '@4thtech-io/types';
 import { nowOf, type CoreContext } from '../context.js';
 import { CoreError } from '../errors.js';
+import type { HistoryDeleteInclude, HistoryService } from '../history/delete.js';
+import type { EffectivePolicy } from '../policy-engine.js';
 import type { Row } from '../store/schema.js';
 import type { FilesPlatform } from './platform.js';
 import { deleteFileObject } from './records.js';
@@ -184,4 +197,151 @@ export async function deleteExpiredFiles(
     deleted += 1;
   }
   return { deleted, failed };
+}
+
+// --- History retention (RET-6) --------------------------------------------------------------------
+
+/** The history pass runs at most once in this many seconds (04 §4.2: "a daily core pass"). */
+export const HISTORY_RETENTION_INTERVAL_SECONDS = 86_400;
+const DAY_SECONDS = 86_400;
+
+/** The owner's `history.*` limits in days (0 keeps forever). */
+export type HistoryKeep = Readonly<HistoryPolicy>;
+
+/**
+ * The `history.*` limits of the policy in force, only when it is a verified owner-signed policy
+ * (G-6): undefined for the defaults (no policy signed yet), under fail closed, or for a value off the
+ * 06 §3 lists. A policy signed before D-148 reads as keep forever (HISTORY_PRE_D148).
+ */
+export function historyKeepOf(effective: EffectivePolicy): HistoryKeep | undefined {
+  if (effective.mode !== 'signed') return undefined;
+  const parsed = historySchema.safeParse(
+    (effective.policy as { readonly history?: unknown }).history ?? HISTORY_PRE_D148,
+  );
+  if (!parsed.success) return undefined;
+  return Object.freeze({
+    messagesKeepDays: parsed.data.messagesKeepDays,
+    filesKeepDays: parsed.data.filesKeepDays,
+  });
+}
+
+export type HistoryRetentionOutcome =
+  /** Messages tombstoned and saved files moved to the Trash in this pass. */
+  | { readonly status: 'ran'; readonly messages: number; readonly files: number }
+  | {
+      readonly status: 'skipped';
+      readonly reason: 'not_due' | 'paused' | 'policy_not_signed' | 'off' | 'failed';
+    };
+
+/** What limits would remove now (counts and stored bytes only; nothing is deleted). */
+export interface HistoryRetentionPreview {
+  readonly messages: { readonly count: number; readonly bytes: number };
+  readonly files: { readonly count: number; readonly bytes: number };
+}
+
+export interface HistoryRetentionDeps {
+  /** The policy in force (OwnerActions.loadPolicy). */
+  loadPolicy(): Promise<EffectivePolicy>;
+  /** The ID's pause (true when the row cannot be read: fail closed). */
+  paused(): Promise<boolean>;
+  /** RET-3's plan and apply. */
+  readonly history: Pick<HistoryService, 'plan' | 'apply'>;
+}
+
+/** The cutoff for `days`: messages created before it are older than kept. */
+const cutoff = (now: number, days: number): number => Math.max(0, now - days * DAY_SECONDS);
+
+/** The daily history retention pass and its preview (see the header). */
+export class HistoryRetention {
+  readonly #ctx: CoreContext;
+  readonly #deps: HistoryRetentionDeps;
+  /** When the pass last ran to the end (unix seconds), in this process. */
+  #lastRunAt: number | undefined;
+  #running: Promise<HistoryRetentionOutcome> | undefined;
+
+  constructor(ctx: CoreContext, deps: HistoryRetentionDeps) {
+    this.#ctx = ctx;
+    this.#deps = deps;
+  }
+
+  /** One pass when due (once a day); one at a time. Never throws: a failure deletes nothing more. */
+  run(): Promise<HistoryRetentionOutcome> {
+    if (this.#running !== undefined) return this.#running;
+    const running = this.#run().finally(() => {
+      this.#running = undefined;
+    });
+    this.#running = running;
+    return running;
+  }
+
+  async #run(): Promise<HistoryRetentionOutcome> {
+    const skipped = (reason: Extract<HistoryRetentionOutcome, { status: 'skipped' }>['reason']) =>
+      Object.freeze({ status: 'skipped', reason }) as HistoryRetentionOutcome;
+    const ctx = this.#ctx;
+    const deps = this.#deps;
+    try {
+      const now = nowOf(ctx);
+      const last = this.#lastRunAt;
+      if (last !== undefined && now >= last && now - last < HISTORY_RETENTION_INTERVAL_SECONDS) {
+        return skipped('not_due');
+      }
+      if (await deps.paused()) return skipped('paused');
+      const keep = historyKeepOf(await deps.loadPolicy());
+      if (keep === undefined) return skipped('policy_not_signed');
+      if (keep.messagesKeepDays === 0 && keep.filesKeepDays === 0) return skipped('off');
+      let messages = 0;
+      let files = 0;
+      if (keep.messagesKeepDays > 0) {
+        const plan = await deps.history.plan({
+          before: cutoff(now, keep.messagesKeepDays),
+          include: 'messages',
+        });
+        if (plan.messages.count > 0) {
+          // Paused between the plan and the apply: nothing is deleted.
+          if (await deps.paused()) return skipped('paused');
+          messages = (await deps.history.apply(plan)).messages.deleted;
+        }
+      }
+      if (keep.filesKeepDays > 0) {
+        const plan = await deps.history.plan({
+          before: cutoff(now, keep.filesKeepDays),
+          include: 'files',
+        });
+        if (plan.files.count > 0) {
+          if (await deps.paused()) return skipped('paused');
+          files = (await deps.history.apply(plan)).files.trashed;
+        }
+      }
+      this.#lastRunAt = now;
+      ctx.log.info('history retention', { messages, files });
+      return Object.freeze({ status: 'ran', messages, files });
+    } catch (error) {
+      // Codes only (I-7): never the error's text.
+      ctx.log.warn('history retention not run', {
+        code: error instanceof CoreError ? error.code : 'failed',
+      });
+      return skipped('failed');
+    }
+  }
+
+  /**
+   * What `keep` would remove now (the Storage editor shows it before the owner signs; 04 §4.2).
+   * Plans only: writes and deletes nothing. A value off the 06 §3 lists is `history_input_invalid`.
+   */
+  async preview(keep: unknown): Promise<HistoryRetentionPreview> {
+    const parsed = historySchema.safeParse(keep);
+    if (!parsed.success) {
+      throw new CoreError('history_input_invalid', 'That retention setting is not valid.');
+    }
+    const now = nowOf(this.#ctx);
+    const count = async (days: number, include: HistoryDeleteInclude) => {
+      if (days === 0) return { count: 0, bytes: 0 };
+      const plan = await this.#deps.history.plan({ before: cutoff(now, days), include });
+      const part = include === 'files' ? plan.files : plan.messages;
+      return { count: part.count, bytes: part.bytes };
+    };
+    const messages = await count(parsed.data.messagesKeepDays, 'messages');
+    const files = await count(parsed.data.filesKeepDays, 'files');
+    return Object.freeze({ messages: Object.freeze(messages), files: Object.freeze(files) });
+  }
 }

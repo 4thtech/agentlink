@@ -84,6 +84,7 @@ import { OWNER_CODE_PATHS, isOwnerCodeStep } from './owner-code-paths.js';
 import { restoreRoutes } from './api/restore.js';
 // RET-4 (D-148): Delete history (begin, finish, undo, status) and Show in Finder for the Inbox.
 import { historyRoutes } from './api/history.js';
+import { retentionRoutes } from './api/retention.js';
 import {
   HISTORY_FINISH_PATH,
   HISTORY_STEP_PATHS,
@@ -542,6 +543,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     restoreRoutes,
     // RET-4 (D-148): Delete history and Show in Finder for the Inbox folder.
     historyRoutes,
+    // RET-6 (D-148): Settings > Storage > Keep automatically (a read; the save behind presence).
+    retentionRoutes,
     // ATT-APP-ATTACH: the owner attaches light text files in a conversation (the attach kind).
     [attachRoute],
   ]) {

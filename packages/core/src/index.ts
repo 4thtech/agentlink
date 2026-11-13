@@ -631,6 +631,15 @@ export {
   type HistoryDeleteResult,
   type HistoryKeptReason,
 } from './history/delete.js';
+// RET-6 (D-148; 04 §4.2): the daily retention pass under the owner-signed `history.*`, and its preview.
+export {
+  HISTORY_RETENTION_INTERVAL_SECONDS,
+  HistoryRetention,
+  historyKeepOf,
+  type HistoryKeep,
+  type HistoryRetentionOutcome,
+  type HistoryRetentionPreview,
+} from './files/retention.js';
 export type { SavedFileKey, TrashSavedCounts } from './files/incoming.js';
 export type { SavedFileExpectation, TrashSavedOutcome } from './files/platform.js';
 // RET-2 (D-148; 07 §3.8): the saved-file index, read by the history delete (RET-3).

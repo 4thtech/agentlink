@@ -21,7 +21,12 @@ describe('policyPatchSchema (M1-11r-b)', () => {
         unwrap(): { shape: Record<string, unknown> };
       };
       // Every field of the policy section, the optional `files.autoSave` (D-142) included.
-      const policySection = policySchema.shape[section] as unknown as {
+      // RET-6: `history` (D-148) is an optional section (absent in a policy signed before D-148).
+      const raw = policySchema.shape[section] as unknown as {
+        shape?: Record<string, unknown>;
+        unwrap?: () => { shape: Record<string, unknown> };
+      };
+      const policySection = (raw.shape === undefined ? raw.unwrap?.() : raw) as {
         shape: Record<string, unknown>;
       };
       expect(Object.keys(patchSection.unwrap().shape).sort()).toEqual(

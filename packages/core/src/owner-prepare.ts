@@ -15,6 +15,7 @@
 import { canonicalize, encodeBase64url, randomBytes } from '@4thtech-io/crypto';
 import {
   AUTO_SAVE_DEFAULTS,
+  HISTORY_PRE_D148,
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   PROTOCOL_VERSION,
   compareUsd,
@@ -299,6 +300,10 @@ const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
  */
 export function mergePolicyPatch(base: Policy, patch: PolicyPatch): Policy {
   const out = clone(base);
+  // D-148 (RET-6; 06 §3): every policy.set this core signs carries `history`; a base signed before
+  // D-148 has none and reads as keep forever, so the complete document gets that (an unrelated edit
+  // never starts deleting). Set before the patch, so a patch can name one of its fields.
+  if (out.history === undefined) out.history = clone(HISTORY_PRE_D148);
   const target = out as unknown as Record<string, unknown>;
   for (const [section, value] of Object.entries(patch)) {
     if (Array.isArray(value)) {
@@ -326,6 +331,8 @@ const usdRaised = (from: string, to: string): boolean => compareUsd(to, from) > 
 export type FieldLoosening = (b: Policy, n: Policy) => readonly PolicyEditWarning[];
 
 type ObjectSection = Exclude<keyof Policy, 'contactRules'>;
+/** An object section's fields (`history` is optional in the document, D-148). */
+type SectionOf<S extends ObjectSection> = NonNullable<Policy[S]>;
 
 const when = (cond: boolean, warning: PolicyEditWarning): readonly PolicyEditWarning[] =>
   cond ? [warning] : [];
@@ -489,7 +496,7 @@ const contactRulesLoosening: FieldLoosening = (b, n) => {
  * the defaults. A field whose every change can loosen (a folder, the chain) warns on any change.
  */
 export const POLICY_FIELD_LOOSENING: {
-  readonly [S in ObjectSection]: { readonly [F in keyof Policy[S]]-?: FieldLoosening };
+  readonly [S in ObjectSection]: { readonly [F in keyof SectionOf<S>]-?: FieldLoosening };
 } & { readonly contactRules: FieldLoosening } = {
   contacts: {
     acceptInvites: (b, n) =>
@@ -605,6 +612,12 @@ export const POLICY_FIELD_LOOSENING: {
     autoAcceptMaxUSD: autoAcceptLoosening,
     autoAcceptDirection: autoAcceptLoosening,
     autoAcceptMinUSD: autoAcceptLoosening,
+  },
+  // D-148 (RET-6): retention never widens what an agent or a contact can do; a shorter one deletes
+  // local copies, which the Storage editor shows ("Right now this moves …") before the owner signs.
+  history: {
+    messagesKeepDays: () => [],
+    filesKeepDays: () => [],
   },
   contactRules: contactRulesLoosening,
 };

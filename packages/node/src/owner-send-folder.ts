@@ -44,7 +44,7 @@ import {
   type JsonObject,
   type OwnerPublicKeys,
 } from '@4thtech-io/crypto';
-import { AUTO_SAVE_DEFAULTS } from '@4thtech-io/types';
+import { AUTO_SAVE_DEFAULTS, HISTORY_PRE_D148 } from '@4thtech-io/types';
 import { pinFolder, pinnedLocation, stillPinned, type FolderPin } from './allowed-path.js';
 import { assertAllowedOwnerAction } from './owner-allowlist.js';
 import {
@@ -130,7 +130,8 @@ const isObject = (value: unknown): value is JsonObject =>
 
 /**
  * The JCS forms the signed policy may have: the base plus the folder (receipts off, if allowed).
- * A base signed before D-142 gets the `files.autoSave` defaults, as every new policy.set does.
+ * A base signed before D-142 gets the `files.autoSave` defaults, as every new policy.set does; one
+ * signed before D-148 gets `history` as keep forever (RET-6).
  */
 function expectedPolicies(base: Plain, folder: string, keepReceipts: boolean): readonly string[] {
   const files = base['files'] as Plain;
@@ -141,6 +142,8 @@ function expectedPolicies(base: Plain, folder: string, keepReceipts: boolean): r
       allowedFolders: [...(files['allowedFolders'] as string[]), folder],
       autoSave: (files['autoSave'] ?? { ...AUTO_SAVE_DEFAULTS }) as Plain,
     },
+    // D-148 (RET-6): a base signed before D-148 gets keep forever, as every new policy.set does.
+    history: (base['history'] ?? { ...HISTORY_PRE_D148 }) as Plain,
   };
   const out = [canonicalize(added as JsonObject)];
   if (!keepReceipts) {

@@ -130,8 +130,7 @@ describe('Keep automatically (RET-6)', () => {
     expect(text()).toContain('Keep automatically');
     expect(selectOf('Keep messages').value).toBe('0');
     expect(selectOf('Keep saved files').value).toBe('90');
-    const values = (label: string): string[] =>
-      [...selectOf(label).options].map((o) => o.value);
+    const values = (label: string): string[] => [...selectOf(label).options].map((o) => o.value);
     expect(values('Keep messages')).toEqual(['0', '90', '365', '730']);
     expect(values('Keep saved files')).toEqual(['0', '30', '90', '180', '365']);
     expect(button(/^Save with Touch ID$/)).toBeUndefined();

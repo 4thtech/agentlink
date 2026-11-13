@@ -9,6 +9,7 @@ import { createApiClient, type ApiClient } from '../../api/client.js';
 import { createHistoryApi } from '../history/api.js';
 import { HISTORY_STRINGS as H } from '../history/strings.js';
 import { FreeUpSpace } from './free-up-space.js';
+import { KeepAutomatically } from './keep.js';
 import {
   parseStorage,
   unassignedIn,
@@ -159,6 +160,8 @@ export function StoragePage({
       </header>
 
       <FreeUpSpace api={api} fetch={givenFetch} token={token} onApplied={read} />
+
+      <KeepAutomatically api={api} fetch={givenFetch} token={token} />
 
       {load.kind === 'loading' ? (
         <div role="status" aria-label={S.loading}>

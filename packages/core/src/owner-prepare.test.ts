@@ -207,7 +207,8 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
     for (const section of Object.keys(POLICY_DEFAULTS) as (keyof Policy)[]) {
       const value = POLICY_DEFAULTS[section];
       if (Array.isArray(value)) continue;
-      expect(Object.keys(body.params.policy[section]).sort()).toEqual(
+      // RET-6: `history` is optional in the type (absent before D-148); every new policy.set has it.
+      expect(Object.keys(body.params.policy[section] ?? {}).sort()).toEqual(
         Object.keys(section === 'files' ? { ...value, autoSave: 0 } : (value as object)).sort(),
       );
     }

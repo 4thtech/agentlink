@@ -136,11 +136,14 @@ describe('Settings > Storage', () => {
       .fn()
       .mockResolvedValueOnce({ kind: 'error', status: 503 })
       .mockResolvedValueOnce({ kind: 'ok', status: 200, data: ANSWER });
-    // RET-4: Free up space also reads the people (the Messages list) for its filter.
+    // RET-4: Free up space also reads the people (the Messages list) for its filter. RET-6: Keep
+    // automatically reads its own values.
     const get = vi.fn((path: string) =>
       path === '/api/ui/messages'
         ? Promise.resolve({ kind: 'ok', status: 200, data: { conversations: [] } })
-        : (sizes() as Promise<unknown>),
+        : path.startsWith('/api/ui/storage/retention')
+          ? Promise.resolve({ kind: 'ok', status: 200, data: { status: 'not_valid' } })
+          : (sizes() as Promise<unknown>),
     );
     await mount({ get } as unknown as ApiClient);
     expect(text()).toContain('The sizes could not be read just now.');

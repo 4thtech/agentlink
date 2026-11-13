@@ -88,7 +88,7 @@ async function setup(): Promise<Setup> {
     owner: session,
     ownerKeys: await owner.getPublicKeys(),
     name: 'Agent',
-    relays: ['wss://relay.agentlink.dev'],
+    relays: ['wss://relay.agentlink.dev', 'wss://nos.lol'],
   });
   await session.close();
   const context: LocalUiContext = Object.freeze<LocalUiContext>({
@@ -101,8 +101,10 @@ async function setup(): Promise<Setup> {
   const apply = async (patch: JsonObject, drop = false): Promise<void> => {
     const prepared = await client.ownerActions.preparePolicyEdit(patch);
     if (prepared.status !== 'prepared') throw new Error(prepared.reason);
-    const body = JSON.parse(JSON.stringify(prepared.body)) as JsonObject;
-    if (drop) delete ((body['params'] as JsonObject)['policy'] as JsonObject)['history'];
+    const body = JSON.parse(JSON.stringify(prepared.body)) as {
+      params: { policy: Record<string, unknown> };
+    } & JsonObject;
+    if (drop) delete body.params.policy['history'];
     const s = await owner.unlock(passphrase());
     try {
       const out = await client.ownerActions.apply(
