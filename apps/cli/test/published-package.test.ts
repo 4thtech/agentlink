@@ -49,6 +49,7 @@ const rootManifest = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'ut
 const PACKED_FILES = [
   'LICENSE',
   'README.md',
+  'THIRD-PARTY-NOTICES.md',
   'dist/agentlink.js',
   'dist/desktop-host.js',
   'package.json',
@@ -133,8 +134,12 @@ describe('the published manifest (@4thtech-io/agentlink)', () => {
     });
   });
 
-  it('lists exactly the bundle and the desktop host bundle in `files` and exports no library entry', () => {
-    expect(manifest.files).toEqual(['dist/agentlink.js', 'dist/desktop-host.js']);
+  it('lists exactly the bundles and the third-party notices in `files` and exports no library entry', () => {
+    expect(manifest.files).toEqual([
+      'dist/agentlink.js',
+      'dist/desktop-host.js',
+      'THIRD-PARTY-NOTICES.md',
+    ]);
     expect(manifest.main).toBeUndefined();
     expect(manifest.exports).toBeUndefined();
   });

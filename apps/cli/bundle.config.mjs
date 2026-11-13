@@ -11,7 +11,7 @@
 //   from the build machine.
 // - One file: dynamic imports are inlined, so `files` in package.json can name it exactly.
 // - The publish directory (IR-OPS-REL-1-1 M-1): after the bundle is written, `stagePackage` writes
-//   dist/package/ with dist/agentlink.js, README.md, LICENSE and a GENERATED package.json that
+//   dist/package/ with dist/agentlink.js, README.md, LICENSE, THIRD-PARTY-NOTICES.md and a GENERATED package.json that
 //   holds only the allowlisted publish fields: no devDependencies, no scripts, no workspace
 //   (`@4thtech-io/*`) name. `publishConfig.directory` in apps/cli/package.json makes `pnpm pack`
 //   (Changesets in release.yml) and `npm publish` pack that directory, never apps/cli itself.
@@ -24,6 +24,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import { localUiAssetEntries } from './scripts/local-ui-embed.mjs';
+import { thirdPartyNotices } from './scripts/third-party-notices.mjs';
 
 const packageDir = fileURLToPath(new URL('.', import.meta.url));
 
@@ -75,6 +76,8 @@ export function stagePackage(dir = packageDir) {
   if (existsSync(host)) copyFileSync(host, join(stage, 'dist', 'desktop-host.js'));
   copyFileSync(join(dir, 'README.md'), join(stage, 'README.md'));
   copyFileSync(join(dir, 'LICENSE'), join(stage, 'LICENSE'));
+  // REPO-CLEAN-1 (P-2): notices for the third-party code and assets of the embedded local app.
+  writeFileSync(join(stage, 'THIRD-PARTY-NOTICES.md'), thirdPartyNotices());
   writeFileSync(
     join(stage, 'package.json'),
     `${JSON.stringify(publishedManifest(manifest), null, 2)}\n`,

@@ -33,7 +33,8 @@
   },
   "files": [
     "dist/agentlink.js",
-    "dist/desktop-host.js"
+    "dist/desktop-host.js",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "scripts": {
     "build": "tsc -b && vite build --config bundle.config.mjs && vite build --config bundle.config.mjs --mode desktop-host",
