@@ -218,6 +218,7 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/notifications',
       '/api/ui/notifications/:id/read',
       '/api/ui/notifications/read-all',
+      '/api/ui/notifications/refresh',
       // UX1112 WP-12 (F-2): Block and Unblock a contact (local-ui/api/contacts.test.ts).
       '/api/ui/contacts/:ref/block',
       '/api/ui/contacts/:ref/unblock',

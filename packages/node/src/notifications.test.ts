@@ -22,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createNotificationStore,
   memoryNotificationPersistence,
+  NOTIFICATION_INBOUND_OVERLAP_SECONDS,
   readNotificationRecord,
   type NotificationPersistence,
 } from './notifications.js';
@@ -204,6 +205,53 @@ describe('the notification store', () => {
     expect(items.some((i) => i.ref === ref(1))).toBe(false);
   });
 
+  it('IR-NOTIFY-1 M-2: counts a message stored late with an older time (the read window overlaps)', async () => {
+    const c = clock();
+    const store = createNotificationStore(memoryNotificationPersistence(), { now: c.now });
+    await store.observe({});
+    c.advance(60);
+    await store.observe({
+      scannedUntil: T0 + 60,
+      inbound: [{ contactId: A, kind: 'message', at: T0 + 30 }],
+    });
+    // The next read starts before the last one ended, so a late arrival is still in it.
+    expect(await store.since()).toBe(T0 + 60 - NOTIFICATION_INBOUND_OVERLAP_SECONDS);
+    c.advance(60);
+    // A message stamped T0+20 is stored only now (a slow sender); the overlapping read returns
+    // the one already counted too, which is not counted again.
+    await store.observe({
+      scannedUntil: T0 + 120,
+      inbound: [
+        { contactId: A, kind: 'message', at: T0 + 30 },
+        { contactId: A, kind: 'message', at: T0 + 20 },
+      ],
+    });
+    expect((await store.list()).find((i) => i.id === `messages-${A}`)?.count).toBe(2);
+    // The same window read again counts nothing new.
+    await store.observe({
+      scannedUntil: T0 + 120,
+      inbound: [
+        { contactId: A, kind: 'message', at: T0 + 30 },
+        { contactId: A, kind: 'message', at: T0 + 20 },
+      ],
+    });
+    expect((await store.list()).find((i) => i.id === `messages-${A}`)?.count).toBe(2);
+  });
+
+  it('two messages from one person in the same second are both counted, once each', async () => {
+    const c = clock();
+    const store = createNotificationStore(memoryNotificationPersistence(), { now: c.now });
+    await store.observe({});
+    c.advance(10);
+    const twice = [
+      { contactId: A, kind: 'message' as const, at: T0 + 5 },
+      { contactId: A, kind: 'message' as const, at: T0 + 5 },
+    ];
+    await store.observe({ scannedUntil: T0 + 10, inbound: twice });
+    await store.observe({ scannedUntil: T0 + 10, inbound: twice });
+    expect((await store.list())[0]?.count).toBe(2);
+  });
+
   it('drops items older than 30 days', async () => {
     const c = clock();
     const store = createNotificationStore(memoryNotificationPersistence(), { now: c.now });
@@ -240,7 +288,7 @@ describe('the notification store', () => {
     await store.observe({ approvals: 1 });
     for (const w of writes) {
       expect(readNotificationRecord(w)).toEqual(w);
-      expect(Object.keys(w as object).sort()).toEqual(['cursor', 'items', 'v']);
+      expect(Object.keys(w as object).sort()).toEqual(['cursor', 'items', 'seen', 'v']);
     }
     expect(readNotificationRecord({ v: 2, cursor: T0, items: [] })).toBeUndefined();
     expect(readNotificationRecord({ v: 1, cursor: T0, items: [], note: 'hi' })).toBeUndefined();

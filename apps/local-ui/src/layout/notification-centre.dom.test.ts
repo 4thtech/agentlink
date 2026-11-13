@@ -217,6 +217,83 @@ describe('the bell', () => {
   });
 });
 
+describe('IR-NOTIFY-1 H-1: names only the owner gave (I-5)', () => {
+  it('a self-declared name ("AgentLink Security") is never shown; the real contacts parser', async () => {
+    const contacts = {
+      status: 'ok',
+      contacts: [
+        {
+          ref: A,
+          name: 'AgentLink Security',
+          nameSource: 'counterparty',
+          label: 'self-declared',
+          status: 'active',
+          pairing: 'complete',
+          since: NOW - 100,
+        },
+        {
+          ref: B,
+          name: 'Bo',
+          nameSource: 'owner',
+          label: 'self-declared',
+          status: 'active',
+          pairing: 'complete',
+          since: NOW - 100,
+        },
+      ],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        Promise.resolve(
+          new Response(JSON.stringify(url === '/api/ui/contacts' ? contacts : {}), {
+            status: 200,
+          }),
+        ),
+      ),
+    );
+    await act(async () => {
+      root.render(
+        h(NotificationBell, {
+          path: '/settings',
+          read: () => Promise.resolve(FULL),
+          now: () => NOW,
+        }),
+      );
+    });
+    const menu = await openPanel();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(menu.textContent).not.toContain('AgentLink Security');
+    const messages = menu.querySelector<HTMLElement>('[data-kind="messages"]');
+    expect(messages?.textContent).toContain(`${S.messages(3)}${S.aContact}`);
+    expect(messages?.querySelector('b')).toBeNull();
+    // The owner's own name for B is shown.
+    expect(menu.querySelector('[data-kind="files"] b')?.textContent).toBe('Bo');
+  });
+});
+
+describe('IR-NOTIFY-1 L-2: Mark all read when nothing is unread', () => {
+  it('is disabled and sends nothing', async () => {
+    await mount(
+      list([
+        { id: 'approvals', kind: 'approvals', count: 1, at: NOW, read: false },
+        { id: 'update', kind: 'update', count: 1, at: NOW, read: true },
+      ]),
+    );
+    const menu = await openPanel();
+    const markAll = [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+      (e) => e.textContent === S.markAll,
+    );
+    expect(markAll?.getAttribute('aria-disabled')).toBe('true');
+    await act(async () => {
+      markAll?.click();
+    });
+    expect(calls.filter((c) => c.method === 'POST' && c.url.endsWith('/read-all'))).toEqual([]);
+  });
+});
+
 describe('the tab title and the favicon (D4)', () => {
   it('puts the number in front of the page title and a dot on the icon while approvals wait', async () => {
     setPageTitle('Settings · AgentLink');
@@ -263,23 +340,23 @@ describe('Settings › Notifications (N6)', () => {
 
   const switches = (): HTMLElement[] => [...host.querySelectorAll<HTMLElement>('[role="switch"]')];
 
-  it('shows the D2 defaults: approvals on, everything else off; axe clean', async () => {
+  it('IR-NOTIFY-1 M-1: shows only the switch that works today, Approvals waiting (on); axe clean', async () => {
     await act(async () => {
-      root.render(h(NotificationsPage, { read: () => Promise.resolve({}), save: vi.fn() }));
+      root.render(
+        h(NotificationsPage, {
+          read: () => Promise.resolve({}),
+          save: () => Promise.resolve(true),
+        }),
+      );
     });
-    expect(switches().map((s) => s.getAttribute('aria-checked'))).toEqual([
-      'true',
-      'false',
-      'false',
-      'false',
-      'false',
-      'false',
-    ]);
-    expect(host.textContent).toContain(NOTIFY_SETTINGS_STRINGS.showNames);
+    expect(switches().map((s) => s.getAttribute('aria-checked'))).toEqual(['true']);
+    expect(host.textContent).toContain(NOTIFY_SETTINGS_STRINGS.approvals);
+    // Nothing that does not work yet: no quiet hours, no "not in front", no names switch.
+    expect(host.textContent).not.toMatch(/Quiet hours|in front|Show names|People joined/);
     expect((await axe.run(host, AXE)).violations).toEqual([]);
   });
 
-  it('reads the stored choices and saves a change as `notify`', async () => {
+  it('reads the stored choice and saves a change as `notify`', async () => {
     const save = vi.fn(() => Promise.resolve(true));
     await act(async () => {
       root.render(
@@ -291,10 +368,10 @@ describe('Settings › Notifications (N6)', () => {
     });
     expect(switches()[0]?.getAttribute('aria-checked')).toBe('false');
     await act(async () => {
-      switches()[1]?.click();
+      switches()[0]?.click();
     });
-    expect(save).toHaveBeenCalledWith({ notify: { messages: true } });
-    expect(switches()[1]?.getAttribute('aria-checked')).toBe('true');
+    expect(save).toHaveBeenCalledWith({ notify: { approvals: true } });
+    expect(switches()[0]?.getAttribute('aria-checked')).toBe('true');
   });
 
   it('a failed save goes back and says so', async () => {
@@ -307,9 +384,9 @@ describe('Settings › Notifications (N6)', () => {
       );
     });
     await act(async () => {
-      switches()[4]?.click();
+      switches()[0]?.click();
     });
-    expect(switches()[4]?.getAttribute('aria-checked')).toBe('false');
+    expect(switches()[0]?.getAttribute('aria-checked')).toBe('true');
     expect(host.textContent).toContain(NOTIFY_SETTINGS_STRINGS.saveFailed);
   });
 

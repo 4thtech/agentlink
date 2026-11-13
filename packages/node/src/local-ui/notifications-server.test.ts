@@ -12,6 +12,7 @@ import { encodeUtf8 } from '@4thtech-io/crypto';
 import {
   NOTIFICATIONS_PATH,
   NOTIFICATIONS_READ_ALL_PATH,
+  NOTIFICATIONS_REFRESH_PATH,
   NOTIFICATION_KEYS,
   NOTIFICATION_READ_PATH,
 } from '@4thtech-io/types/ui-contract/notifications';
@@ -24,6 +25,7 @@ import {
 import type { AgentDirectory, AppHostAgent } from './app-host.js';
 import type { LocalUiAssets } from './context.js';
 import { createLocalUiRoutes } from './routes.js';
+import type { UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 
 const A = `0x${'a'.repeat(40)}`;
 const B = `0x${'b'.repeat(40)}`;
@@ -91,6 +93,8 @@ const source: ApprovalServerSource = {
 interface World {
   readonly files: Map<string, unknown>;
   readonly writes: { name: string; record: unknown }[];
+  /** ui-settings.json (N6: `notify`). */
+  settings?: UiSettings;
 }
 
 function directory(world: World): AgentDirectory {
@@ -104,6 +108,11 @@ function directory(world: World): AgentDirectory {
     removeFolder: () => Promise.reject(new Error('never')),
     readCurrent: () => Promise.resolve(undefined),
     writeCurrent: () => Promise.resolve(),
+    readUiSettings: () => Promise.resolve(world.settings),
+    writeUiSettings: (settings: UiSettings) => {
+      world.settings = settings;
+      return Promise.resolve();
+    },
     readNotifications: (name: string) => Promise.resolve(world.files.get(name)),
     writeNotifications: (name: string, record: unknown) => {
       world.writes.push({ name, record });
@@ -118,8 +127,20 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((s) => s.close()));
 });
 
-async function harness() {
+const UPDATE_READY = {
+  install: 'desktop' as const,
+  view: () => ({
+    state: 'available' as const,
+    current: '0.5.2',
+    latest: '0.5.3',
+    download: 'https://github.com/4thtech/agentlink/releases/tag/v0.5.3',
+  }),
+  check: () => undefined,
+};
+
+async function harness(options: { updateReady?: boolean } = {}) {
   const opened: string[] = [];
+  const alerts: number[] = [];
   const ownerStores: number[] = [];
   const world: World = {
     files: new Map<string, unknown>([
@@ -149,13 +170,17 @@ async function harness() {
       source,
       localUi: { assets: bundle() },
       host: { directory: directory(world), initial, open: () => Promise.resolve(initial) },
+      ...(options.updateReady === true ? { appUpdate: UPDATE_READY } : {}),
     },
     {
       opener: (url) => {
         opened.push(url);
         return Promise.resolve(true);
       },
-      notifier: () => Promise.resolve(true),
+      notifier: () => {
+        alerts.push(1);
+        return Promise.resolve(true);
+      },
       openOwnerStore: () => {
         ownerStores.push(1);
         return Promise.reject(new Error('no owner store here'));
@@ -194,13 +219,13 @@ async function harness() {
     for (const [k, v] of Object.entries(all)) if (v !== undefined) headers[k] = v;
     return send(port, path, { method: 'POST', headers, ...(body === undefined ? {} : { body }) });
   };
-  return { server, port, world, ownerStores, cookie, csrf, read, mark };
+  return { server, port, world, ownerStores, cookie, csrf, read, mark, alerts };
 }
 
 const readPath = (id: string): string => NOTIFICATION_READ_PATH.replace(':id', id);
 
 describe('the notification routes (routes.ts)', () => {
-  it('registers one read and two marks, never an owner-presence route', () => {
+  it('registers one read and three marks, never an owner-presence route', () => {
     const mine = createLocalUiRoutes()
       .routes()
       .filter((r) => r.path.startsWith(NOTIFICATIONS_PATH));
@@ -208,6 +233,7 @@ describe('the notification routes (routes.ts)', () => {
       `GET ${NOTIFICATIONS_PATH} false`,
       `POST ${NOTIFICATION_READ_PATH} mark`,
       `POST ${NOTIFICATIONS_READ_ALL_PATH} mark`,
+      `POST ${NOTIFICATIONS_REFRESH_PATH} mark`,
     ]);
   });
 });
@@ -300,5 +326,70 @@ describe('POST …/read and …/read-all (the mark kind)', () => {
     });
     expect(res.status).toBe(405);
     expect(JSON.parse((await h.read()).body).unread).toBe(2);
+  });
+});
+
+describe('IR-NOTIFY-1 L-1: the GET only reads; POST …/refresh brings the store up to date', () => {
+  it('a GET never writes the file, even when there is news', async () => {
+    const h = await harness({ updateReady: true });
+    const before = JSON.parse((await h.read()).body) as { items: { id: string }[] };
+    expect(before.items.map((i) => i.id)).not.toContain('update');
+    expect(h.world.writes).toEqual([]);
+  });
+
+  it('refresh (the mark kind) records the news, then the GET lists it', async () => {
+    const h = await harness({ updateReady: true });
+    const res = await h.mark(NOTIFICATIONS_REFRESH_PATH);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ status: 'done' });
+    const after = JSON.parse((await h.read()).body) as { items: { id: string }[] };
+    expect(after.items.map((i) => i.id)).toContain('update');
+    expect(h.world.writes).toHaveLength(1);
+    // Every write gate still applies.
+    expect((await h.mark(NOTIFICATIONS_REFRESH_PATH, { 'X-AgentLink-CSRF': undefined })).status).toBe(
+      403,
+    );
+    expect((await h.mark(NOTIFICATIONS_REFRESH_PATH, { Origin: undefined })).status).toBe(403);
+  });
+});
+
+describe('IR-NOTIFY-1 M-1: the "Approvals waiting" switch governs the OS approval alert', () => {
+  const ID = `apr_${'A'.repeat(22)}`;
+
+  it('alerts by default (D2: approvals on)', async () => {
+    const h = await harness();
+    await h.server.notifyNewApproval(ID);
+    expect(h.alerts).toHaveLength(1);
+  });
+
+  it('no OS alert once the owner turned it off; the link is still answered', async () => {
+    const h = await harness();
+    h.world.settings = { notify: { approvals: false } };
+    expect(await h.server.notifyNewApproval(ID)).toBe(`${h.server.origin}/approve/${ID}`);
+    expect(h.alerts).toEqual([]);
+    h.world.settings = { notify: { approvals: true } };
+    await h.server.notifyNewApproval(ID);
+    expect(h.alerts).toHaveLength(1);
+  });
+
+  it('outside the app host it asks the caller (agentlink mcp reads ui-settings.json)', async () => {
+    let allowed = false;
+    let alerts = 0;
+    const server = await startApprovalServerWith(
+      { source, approvalAlerts: () => Promise.resolve(allowed) },
+      {
+        opener: () => Promise.resolve(true),
+        notifier: () => {
+          alerts += 1;
+          return Promise.resolve(true);
+        },
+      },
+    );
+    servers.push(server);
+    await server.notifyNewApproval(ID);
+    expect(alerts).toBe(0);
+    allowed = true;
+    await server.notifyNewApproval(ID);
+    expect(alerts).toBe(1);
   });
 });

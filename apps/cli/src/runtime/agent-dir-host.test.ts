@@ -416,7 +416,7 @@ describe('notifications.json in the ID folder (N4; PLAN-NOTIFY §3.4)', () => {
     expect(await writeAgentNotifications(home, 'nobody', record).catch(() => 'refused')).toBe(
       'refused',
     );
-    const big = { ...record, pad: 'x'.repeat(70_000) };
+    const big = { ...record, pad: 'x'.repeat(200_000) };
     expect(
       codeOf(await writeAgentNotifications(home, 'default', big).catch((e: unknown) => e)),
     ).toBe('agent_config_invalid');
