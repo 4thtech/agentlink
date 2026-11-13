@@ -123,6 +123,32 @@ describe.each(IMPLEMENTATIONS)('%s: the Store contract (07 §3.1, §3.7)', (_nam
     await store.close();
   });
 
+  it('MSG-ORDER-1: rowOrder gives the insertion order, kept by updates', async () => {
+    await store.transaction((tx) => {
+      tx.insert('seen', seen('c', 1));
+      tx.insert('seen', seen('a', 1));
+      tx.insert('seen', seen('b', 1));
+    });
+    await store.transaction((tx) =>
+      tx.update('seen', { kind: 'wrap', id: 'c' }, { first_seen_at: 9 }),
+    );
+    const order = await store.transaction(
+      (tx) =>
+        tx.rowOrder?.('seen', [
+          { kind: 'wrap', id: 'a' },
+          { kind: 'wrap', id: 'b' },
+          { kind: 'wrap', id: 'c' },
+          { kind: 'wrap', id: 'missing' },
+        ]) ?? [],
+    );
+    expect(order).toHaveLength(4);
+    const [a, b, c, missing] = order;
+    expect(typeof a).toBe('number');
+    expect(c as number).toBeLessThan(a as number);
+    expect(a as number).toBeLessThan(b as number);
+    expect(missing).toBeUndefined();
+  });
+
   it('reports the code schema version', () => {
     expect(store.schemaVersion).toBe(STORE_SCHEMA_VERSION);
   });

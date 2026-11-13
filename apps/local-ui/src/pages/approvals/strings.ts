@@ -10,7 +10,7 @@ export const CLI_PREFIX = 'npx -y @4thtech-io/agentlink';
 
 export const APPROVAL_STRINGS = Object.freeze({
   cannotApprove: "Your AI can't approve this for you.",
-  notRunning: `AgentLink is not running. Open it again from your AI, or run ${CLI_PREFIX} approve in your own terminal.`,
+  notRunning: `AgentLink is not running. Open the AgentLink app again, or start it from your AI app.`,
   firstRunTitle: 'Protect your approvals',
   // UX1113-N2 (PRESENCE-COPY): the sensor's own word, never "passkey" on a Mac or Windows.
   get firstRun(): string {
@@ -119,7 +119,7 @@ export const APPROVAL_STRINGS = Object.freeze({
   get presenceRejected(): string {
     return `That didn't match ${sensorWord()} or your master code. Nothing was changed.`;
   },
-  wait: `Too many wrong tries. Wait {seconds} seconds, then try again. Nothing was changed. You can also run ${CLI_PREFIX} approve in your own terminal.`,
+  wait: `Too many wrong tries. Wait {seconds} seconds, then try again. Nothing was changed.`,
   notPending: 'This request is no longer waiting for you.',
   listNotPending:
     'Some of these requests are no longer waiting for you. Nothing was changed. Review the list again.',

@@ -287,6 +287,11 @@ export interface RecoveryKitExportAgent {
   readonly agentId: string;
   /** The local agent name (06 §6). */
   readonly name: string;
+  /**
+   * KIT-NAMES: the ID's owner-set name (its verified `agent.label`), sealed inside the kit so a
+   * restore can show it before anything is written. Omit it when the ID has none.
+   */
+  readonly label?: string;
 }
 
 /** What `agentlink backup export` asks the export control to seal (04 §2.3.3). */
@@ -324,7 +329,7 @@ export interface RecoveryKitExportRequest {
  *
  * sealRecoveryKit reads the owner seed and each agent's items (`seed`, `store-key` and those of
  * `policy-version`, `receipts-kept`, `storage-mark` and `key-epoch` that exist; never `s3:*`, D-115 D) inside the
- * backend, seals them with the snapshots as `ALKK` v1 under a new generated recovery code
+ * backend, seals them with the snapshots as `ALKK` v2 (KIT-NAMES; with each label given) under a new generated recovery code
  * (sealRecoveryKit of @4thtech-io/crypto/keystore) and returns that code, for display only. The
  * owner signs and the core applies one `backup.export` per included agent before this is called
  * (its nonce row is the audit record, 07 §3.4); the session check proves only that the session is
@@ -342,6 +347,8 @@ export interface RecoveryKitImportAgent {
   readonly agentId: string;
   /** The local agent name from the manifest, as ASCII bytes (`[a-z][a-z0-9-]{0,31}`). */
   readonly name: Uint8Array;
+  /** KIT-NAMES (v2 kits): the owner-set name from the manifest, UTF-8 bytes; display text only. */
+  readonly label?: Uint8Array;
   /** The sink that holds the agent's quarantined store snapshot (04 §4 quarantine rules, D-84). */
   readonly store: RecoveryKitStoreSink;
   readonly storeLength: number;

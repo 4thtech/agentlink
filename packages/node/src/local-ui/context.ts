@@ -11,6 +11,7 @@ import type { LocalUiBackupDesk } from '../kit-record.js';
 import type { LiveAgentState, LiveAppRecord } from './live-status.js';
 import type { LocalUiPeopleAllDesk } from './api/people-all.js';
 import type { LocalUiStorageDesk } from './api/storage.js';
+import type { LocalUiHistorySession } from './history-desk.js';
 import type { LocalUiAppUpdateDesk } from './api/app-update.js';
 import {
   CoreError,
@@ -783,6 +784,18 @@ export interface LocalUiContext {
   readonly peopleAll?: LocalUiPeopleAllDesk;
   /** REL051-RET1: the sizes behind `GET /api/ui/storage` (api/storage.ts); app host only. Reads only. */
   readonly storage?: LocalUiStorageDesk;
+  /**
+   * RET-4 (D-148; 04 §4.2): Delete history for this request's page session only (history-desk.ts).
+   * Set by the server on the history routes and the finish route; never on any other route.
+   */
+  readonly historySession?: LocalUiHistorySession;
+  /**
+   * RET-4 (08 §1 "Free up space"): Show in Finder for the configured Inbox folder (no input; the
+   * folder is the rules' own setting, resolved and checked; never a path from the page).
+   */
+  readonly revealInbox?: () => Promise<
+    'shown' | 'not_found' | 'refused' | 'unavailable' | 'not_opened'
+  >;
   /** DESK051-UPD: Settings > Updates (api/app-update.ts); the desktop app's host only. */
   readonly appUpdate?: LocalUiAppUpdateDesk;
   /**

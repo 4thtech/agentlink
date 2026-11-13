@@ -170,6 +170,11 @@ export interface HealthReaderOptions {
   readonly startedAt?: number;
   /** The clock in milliseconds. */
   readonly now: () => number;
+  /**
+   * UX-LEFT-1 (OUTBOX-RECONNECT): called (never awaited, never throws out) when a read sees relays
+   * reachable again after one that saw none: queued messages go at once, not at the next timer.
+   */
+  readonly onReconnect?: () => void;
 }
 
 /** One bounded, cached, single-flight health read (see the header). Never rejects. */
@@ -179,6 +184,23 @@ export function createHealthReader(options: HealthReaderOptions): () => Promise<
   const { source, now, startedAt } = options;
   let cached: { readonly at: number; readonly value: LocalUiHealthBody } | undefined;
   let inFlight: Promise<LocalUiHealthBody> | undefined;
+  let wasDown = false;
+  /** Fires `onReconnect` once when the relays come back after a read that saw none. */
+  const watch = (value: LocalUiHealthBody): LocalUiHealthBody => {
+    const relays = value.relays;
+    if (relays !== null) {
+      if (relays.connected === 0) wasDown = true;
+      else if (wasDown) {
+        wasDown = false;
+        try {
+          options.onReconnect?.();
+        } catch {
+          // A failing hook never changes the answer.
+        }
+      }
+    }
+    return value;
+  };
 
   const readSource = async (): Promise<LocalUiHealthBody> => {
     const facts: ServerFacts = { version, dataFolder, uptimeSeconds: uptimeOf(startedAt, now()) };
@@ -221,7 +243,7 @@ export function createHealthReader(options: HealthReaderOptions): () => Promise<
       return Promise.resolve(cached.value);
     }
     inFlight ??= readSource().then((value) => {
-      cached = { at: now(), value };
+      cached = { at: now(), value: watch(value) };
       inFlight = undefined;
       return value;
     });

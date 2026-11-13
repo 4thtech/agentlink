@@ -76,6 +76,8 @@ export interface TestAgent {
   readonly keychain: MemoryKeychain;
   readonly snapshot: Uint8Array;
   readonly storePath: string;
+  /** KIT-NAMES: the owner-set name the kit carries for it (its applied `agent.label`). */
+  readonly label?: string;
 }
 
 /**
@@ -171,6 +173,7 @@ export async function makeAgent(
     keychain,
     snapshot: new Uint8Array(await readFile(out)),
     storePath: path,
+    ...(extra.label === undefined ? {} : { label: extra.label }),
   };
 }
 
@@ -200,7 +203,12 @@ export async function makeKit(
     kitId,
     createdAt: 1_760_000_000,
     contents: 'full',
-    agents: agents.map((a) => ({ agentId: a.agentId, name: a.name })),
+    // KIT-NAMES: each ID's owner-set name rides inside the kit, as the app's export puts it.
+    agents: agents.map((a) => ({
+      agentId: a.agentId,
+      name: a.name,
+      ...(a.label === undefined ? {} : { label: a.label }),
+    })),
     snapshots: (agentId: string) => {
       const bytes = agents.find((a) => a.agentId === agentId)?.snapshot as Uint8Array;
       return Promise.resolve({ length: bytes.length, chunks: [bytes] });

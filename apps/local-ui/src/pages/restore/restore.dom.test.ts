@@ -540,6 +540,31 @@ describe('step 3: what comes back', () => {
     expect(text()).not.toContain(S.REVIEW.hood);
   });
 
+  it('KIT-NAMES (R2-UI-04): new IDs from a v2 kit show their real names in step 3, no folder', async () => {
+    const named: Summary = {
+      ...SUMMARY,
+      ids: [
+        // The kit carries each ID's owner-set name inside it (the server passes it as `label`).
+        { ...SUMMARY.ids[0]!, name: 'default', label: 'Ana Novak' },
+        { ...SUMMARY.ids[1]!, state: 'new', name: 'work', label: 'Work agent' },
+        // An older kit (or an ID without a name): the folder, read as a name.
+        { ...SUMMARY.ids[0]!, agentId: '0x' + '5'.repeat(40), name: 'research' },
+      ],
+    };
+    await toReview(fakeApi({ open: () => ok({ kit: 'kit-handle', summary: named }) }));
+    const rowNames = [...host.querySelectorAll('.rs-row-name')].map((n) => n.textContent);
+    expect(rowNames).toEqual(['Ana Novak', 'Work agent', 'Research']);
+    expect(text()).not.toContain(S.REVIEW.firstId);
+    expect(text()).not.toContain('default');
+    // The "name comes back" hint only on the row the kit has no name for.
+    expect(
+      [...host.querySelectorAll('.rs-row')].map((r) =>
+        (r.textContent ?? '').includes(S.REVIEW.nameHint),
+      ),
+    ).toEqual([false, false, true]);
+    expect(button('Restore 3 IDs')).toBeDefined();
+  });
+
   it('REL051-R2C (R2-CLASS-05): a new ID in another folder reads as a name, never a bare folder', () => {
     const base = SUMMARY.ids[0]!;
     expect(rowName({ ...base, name: 'work' })).toBe('Work');

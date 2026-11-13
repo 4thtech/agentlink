@@ -518,7 +518,13 @@ describe('Home simple (A4)', () => {
     await click(row('Ana'));
     await click(all('button').find((b) => b.getAttribute('aria-label') === 'More for Ana'));
     const items = all('[role="menuitem"]').map((e) => e.textContent?.trim());
-    expect(items).toEqual([S.rename, S.checkSafetyCode, S.remove]);
+    // RET-4 + RET-5: Delete history… (and Archive when an ID is open) sit before Remove.
+    expect(items.filter((i) => i !== 'Archive')).toEqual([
+      S.rename,
+      S.checkSafetyCode,
+      'Delete history…',
+      S.remove,
+    ]);
     await click(all('[role="menuitem"]').find((e) => e.textContent?.trim() === S.remove));
     const confirm = q('[role="alertdialog"]');
     expect(confirm?.textContent).toContain('Remove Ana?');
@@ -788,7 +794,7 @@ describe('W6-FLOW-FIXES: a connection the other side removed', () => {
     expect(document.body.textContent).toContain('Sending the brief.');
     await click(all('button').find((b) => b.getAttribute('aria-label') === 'More for Denis'));
     const items = all('[role="menuitem"]').map((e) => e.textContent?.trim());
-    expect(items).toEqual([S.rename, S.remove]);
+    expect(items.filter((i) => i !== 'Archive')).toEqual([S.rename, 'Delete history…', S.remove]);
   });
 
   const withId = (): Answers => ({
@@ -1211,6 +1217,10 @@ describe('Files in the conversation and the reader (REL051-A34)', () => {
       S.openFile,
       S.showInFinder,
     ]);
+    // UX-LEFT-1 (R2-UI-12): each chip's buttons carry the file's name for a screen reader.
+    expect(
+      [...(chip?.querySelectorAll('button') ?? [])].map((x) => x.getAttribute('aria-label')),
+    ).toEqual(['Open plan.md', `${S.showInFinder}, plan.md`]);
     expect(lintVocabulary(host.textContent ?? '')).toEqual([]);
   });
 

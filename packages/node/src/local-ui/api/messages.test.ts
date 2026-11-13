@@ -304,6 +304,31 @@ describe('GET /api/ui/messages/:contactId (MSG-FILES-IO-c)', () => {
     expect((bodyOf(out)['items'] as unknown[]).length).toBe(1);
   });
 
+  it('MSG-ORDER-1: passes the local order `seq` through, and leaves out an item with a bad one', async () => {
+    const base = INBOX[1] as MessageItem;
+    const items = [
+      { ...base, seq: 7 },
+      { ...base, seq: -1 },
+      { ...base, seq: 1.5 },
+      { ...base, seq: '3' },
+      base,
+    ] as MessageItem[];
+    const res = await callBox(contextWith({ list: () => Promise.resolve({ items }) }), BOB);
+    const shown = bodyOf(res)['items'] as Record<string, unknown>[];
+    expect(shown).toHaveLength(2);
+    expect(shown[0]?.['seq']).toBe(7);
+    expect(Object.keys(shown[0] ?? {}).sort()).toEqual([...IN_KEYS, 'seq'].sort());
+    expect(Object.keys(shown[1] ?? {}).sort()).toEqual(IN_KEYS);
+    const out = await callBox(
+      contextWith({
+        list: () => Promise.resolve({ items: [{ ...(SENT[1] as MessageItem), seq: 2 }] }),
+      }),
+      BOB,
+      'box=out',
+    );
+    expect((bodyOf(out)['items'] as Record<string, unknown>[])[0]?.['seq']).toBe(2);
+  });
+
   it('refuses a bad box, limit, cursor, contact or query key with bad_request, never echoing it', async () => {
     const list = vi.fn(() => Promise.resolve({ items: [] }));
     const context = contextWith({ list });

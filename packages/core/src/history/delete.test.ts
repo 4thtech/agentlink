@@ -125,6 +125,28 @@ describe('plan, then apply (RET-3, 04 §4.2)', () => {
     expect(byIds.envelopeIds).toEqual([fresh]);
   });
 
+  it('RET-4: plans one person older than a time (contact and age together)', async () => {
+    const w = await world();
+    const old = await send(w);
+    w.clock.t += 1_000;
+    const cut = w.clock.t;
+    await send(w);
+    const plan = await w.b.client.history.plan({
+      contactId: w.a.id,
+      before: cut,
+      include: 'messages',
+    });
+    expect(plan.envelopeIds).toEqual([old]);
+    const nobody = await w.b.client.history.plan({
+      contactId: `0x${'c'.repeat(40)}`,
+      before: cut,
+      include: 'messages',
+    });
+    expect(nobody.envelopeIds).toEqual([]);
+    const result = await w.b.client.history.apply(plan);
+    expect(result.messages.deleted).toBe(1);
+  });
+
   it('refuses a plan whose item set changed in between', async () => {
     const w = await world();
     await send(w);
@@ -143,7 +165,9 @@ describe('plan, then apply (RET-3, 04 §4.2)', () => {
       { contactId: w.a.id, include: 'all' },
       { before: -1, include: 'messages' },
       { envelopeIds: 'x', include: 'files' },
-      { contactId: w.a.id, before: 5, include: 'messages' },
+      { envelopeIds: ['x'], contactId: w.a.id, include: 'messages' },
+      { envelopeIds: ['x'], before: 5, include: 'messages' },
+      { contactId: w.a.id, before: -1, include: 'messages' },
     ]) {
       await expect(w.b.client.history.plan(bad as never)).rejects.toMatchObject({
         code: 'history_input_invalid',

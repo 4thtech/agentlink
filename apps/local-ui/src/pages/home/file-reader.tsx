@@ -184,6 +184,7 @@ export function MessageFiles({
                       size="sm"
                       variant="secondary"
                       className="hm-chip-open"
+                      aria-label={`${S.openFile} ${f.name}`}
                       onClick={(event) => {
                         opener.current = event.currentTarget as HTMLElement;
                         setOpened({ id, name: f.name });
@@ -192,7 +193,7 @@ export function MessageFiles({
                       {S.openFile}
                     </Button>
                   ) : null}
-                  <ShowIn id={id} reveal={files.reveal} />
+                  <ShowIn id={id} reveal={files.reveal} name={f.name} />
                 </div>
               ) : null}
             </li>

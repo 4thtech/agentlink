@@ -39,7 +39,11 @@ export interface PairingFollowClient {
   publisherLease(): { take(): Promise<boolean>; release(): Promise<boolean> };
   /** REL051-CF1: `partial` (core's FetchSummary) lengthens the next pass on a slow network. */
   syncInbox(options?: { readonly budgetMs?: number }): Promise<unknown>;
-  readonly outbox: { processDue(): Promise<unknown> };
+  readonly outbox: {
+    processDue(): Promise<unknown>;
+    /** OUTBOX-NOW-1: rows waiting out a retry backoff go now, then one delivery pass. */
+    retryNow?(): Promise<unknown>;
+  };
   readonly pairing: {
     waiting(): Promise<boolean>;
     /** W4-SHORT-INVITE (04 §3.6.2): deletes drop objects of completed, cancelled or expired invites. */
@@ -67,6 +71,8 @@ export interface PairingFollower {
   follow(): Promise<PairingFollowResult>;
   /** (b) and (c): after a page read; every 5 s while a pairing is pending, else every 15 s. */
   tick(): Promise<PairingFollowResult>;
+  /** UX-LEFT-1: one pass now, at once (the relays are back), without the interval wait. */
+  flush(): Promise<PairingFollowResult>;
   /** True while a host pass holds the lease. */
   readonly passing: boolean;
 }
@@ -106,7 +112,7 @@ export function pairingFollower(
   };
 
   /** One pass, when no other process holds the lease. Callers set `inFlight` and `lastAt`. */
-  const pass = async (): Promise<PairingFollowResult> => {
+  const pass = async (now = false): Promise<PairingFollowResult> => {
     let lease: ReturnType<PairingFollowClient['publisherLease']>;
     try {
       lease = client.publisherLease();
@@ -124,7 +130,9 @@ export function pairingFollower(
         // R1-CLASS-10: a partial fetch gets a longer next pass; anything else the base budget.
         budgetMs = partial ? Math.min(budgetMs * 2, maxBudgetMs) : baseBudgetMs;
       }
-      await client.outbox.processDue();
+      // OUTBOX-NOW-1: after a reconnect (flush), queued rows skip the rest of their backoff.
+      const retryNow = now ? client.outbox.retryNow : undefined;
+      await (retryNow === undefined ? client.outbox.processDue() : retryNow.call(client.outbox));
       // W4-SHORT-INVITE (O-L3): the drop-object sweep runs in the background, never holding the
       // pass or the lease (core dedupes a sweep in flight). A failed DELETE is retried with backoff
       // on a later pass; nothing is logged (I-7).
@@ -152,14 +160,14 @@ export function pairingFollower(
     }
   };
 
-  const run = async (due: () => Promise<boolean>): Promise<PairingFollowResult> => {
+  const run = async (due: () => Promise<boolean>, now = false): Promise<PairingFollowResult> => {
     if (inFlight) return 'busy';
     inFlight = true;
     try {
       if (await paused()) return 'paused';
       if (!(await due())) return 'soon';
       lastAt = options.nowMs();
-      return await pass();
+      return await pass(now);
     } finally {
       inFlight = false;
     }
@@ -169,6 +177,7 @@ export function pairingFollower(
 
   return Object.freeze<PairingFollower>({
     follow: () => run(() => Promise.resolve(since() >= PAIRING_FOLLOW_INTERVAL_MS)),
+    flush: () => run(() => Promise.resolve(true), true),
     tick: () =>
       run(async () => {
         const elapsed = since();

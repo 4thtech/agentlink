@@ -22,6 +22,8 @@ import type { EnvelopeKeys, JsonObject, JsonValue } from '@4thtech-io/crypto';
 import { UI_SETTINGS_PATH, type UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 import type { LocalUiContext } from './context.js';
 import type { LocalUiOwnerCodeStep } from './owner-code-paths.js';
+import type { LocalUiHistoryStep } from './history-paths.js';
+import type { LocalUiHistorySession } from './history-desk.js';
 import type { RenameSignOutcome } from '../owner-rename.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
 
@@ -170,6 +172,13 @@ export interface LocalUiOwnerRoute {
   /** UX1113 WP-S2: one owner-code step, only at its fixed path (owner-code-paths.ts). */
   readonly ownerCode?: LocalUiOwnerCodeStep;
   /**
+   * RET-4 (D-148; 04 §4.2): the Delete history finish route only, at HISTORY_FINISH_PATH. The gate
+   * verifies presence as for every owner route, `sign` refuses everything, and the handler marks the
+   * one owner operation with `presenceChecked` before it schedules the bound plan; the context
+   * carries this page session's history desk.
+   */
+  readonly historyFinish?: true;
+  /**
    * U3-invite: a read-only check run after the generation check and before the presence gate. A
    * result refuses the request with it (the owner store is never opened, nothing is signed); the
    * handler still checks again after presence. Undefined lets the request on.
@@ -283,6 +292,40 @@ export interface LocalUiKitRevealRoute {
   readonly method: 'POST';
   readonly path: string;
   readonly presence: 'kit-reveal';
+  readonly handler: (context: LocalUiContext) => Promise<LocalUiResult>;
+}
+
+/**
+ * RET-4 (D-148; 08 §1 "The delete sheet"): the history kind. Begin (plan on the server, a ticket for
+ * this page session), Undo and Status: no presence, nothing signed, nothing deleted (the delete is
+ * the finish route's, behind presence). Only POST at the step's fixed path (history-paths.ts), once
+ * each. The server's history gate runs it after the same session, CSRF, Origin, fetch-metadata and
+ * octet-stream checks as every write, refuses a query, an operation input or a presence header, and
+ * parses the body itself (one strict JSON object, at most 32 KiB). The handler gets that object and
+ * this page session's desk only.
+ */
+export interface LocalUiHistoryRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'history';
+  readonly step: LocalUiHistoryStep;
+  readonly handler: (
+    context: LocalUiContext,
+    body: JsonObject,
+    history: LocalUiHistorySession,
+  ) => Promise<LocalUiResult>;
+}
+
+/**
+ * RET-4 (08 §1 "Free up space"): Show in Finder for the Inbox folder. Like the kit-reveal kind it
+ * changes nothing and takes no input at all: only `POST /api/ui/storage/inbox/reveal`, registered
+ * once; the server runs it through the kit-reveal gate's checks (no query, input, presence header or
+ * body byte). The handler gets the context only; the folder is the rules' own setting.
+ */
+export interface LocalUiInboxRevealRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'inbox-reveal';
   readonly handler: (context: LocalUiContext) => Promise<LocalUiResult>;
 }
 
@@ -604,6 +647,8 @@ export type LocalUiRoute =
   | LocalUiCreateAgentRoute
   | LocalUiRevealRoute
   | LocalUiKitRevealRoute
+  | LocalUiHistoryRoute
+  | LocalUiInboxRevealRoute
   | LocalUiInviteRoute
   | LocalUiAttachRoute;
 

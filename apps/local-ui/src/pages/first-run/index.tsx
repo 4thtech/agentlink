@@ -727,7 +727,6 @@ export function FirstRunPage({
   const [takenNames, setTakenNames] = useState<ReadonlySet<string>>(() => new Set());
   // W8-S5 (F7): the owner's IDs, so the pick says which ID an AI app uses now (or a removed one).
   const [knownIds, setKnownIds] = useState<readonly KnownId[] | undefined>(undefined);
-  const [prefilled, setPrefilled] = useState('');
   const setNamed = (value: boolean): void => {
     setNamedState(value);
     rememberWizard({ named: value });
@@ -955,13 +954,7 @@ export function FirstRunPage({
               removing: a.removing === true,
             })),
           );
-          // W7-ID-B1: the person is the same owner, so the name field starts with their ID's name
-          // (never over something already typed or remembered).
-          const own = result.list.agents.find((row) => row.current) ?? result.list.agents[0];
-          if (own !== undefined && own.label.trim() !== '' && wizardMemory().name === undefined) {
-            setPrefilled(own.label);
-            setName(own.label);
-          }
+          // UX-LEFT-1 (R1-UI-21): the field stays empty; another ID's name is never filled in.
         }
       },
       () => undefined,
@@ -1542,7 +1535,7 @@ export function FirstRunPage({
           value={name}
           onChange={setName}
           onContinue={() => void submitName()}
-          taken={takenNames.has(name.trim()) && name.trim() !== prefilled}
+          taken={takenNames.has(name.trim())}
           working={naming}
           {...(nameError === undefined ? {} : { error: nameError })}
         />

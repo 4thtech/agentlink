@@ -33,8 +33,9 @@ describe('the approvals words name the command that works (M1-36a-b)', () => {
     // R1-UI-01: no terminal step for the first setup; the app creates the first ID.
     expect(APPROVAL_STRINGS.needsOwner).not.toContain('owner init');
     expect(APPROVAL_STRINGS.needsSetup).not.toContain('owner init');
-    expect(APPROVAL_STRINGS.notRunning).toContain(`${CLI_PREFIX} approve`);
-    expect(APPROVAL_STRINGS.wait).toContain(`${CLI_PREFIX} approve`);
+    // UX-LEFT-1: the app, never a terminal approve.
+    expect(APPROVAL_STRINGS.notRunning).not.toContain('terminal');
+    expect(APPROVAL_STRINGS.wait).not.toContain('terminal');
   });
 
   it('has no bare prefix and no dead `ui` command', () => {

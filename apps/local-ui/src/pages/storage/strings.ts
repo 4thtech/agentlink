@@ -1,16 +1,12 @@
 // Settings > Storage copy (retention plan RET-1; 11 §5: plain words, no "wallet", "gas", "seed phrase"
-// or "transaction"). This first version only shows sizes. It says so, and says what deleting will
-// and will not do when it arrives (only on this computer; the other person keeps their copy).
+// or "transaction"). RET-4: Free up space's words are in history/strings.ts.
 export const STORAGE_STRINGS = {
   title: 'Storage',
   lead: 'What AgentLink keeps on this computer.',
-  comingTitle: 'Deleting is coming',
-  coming:
-    'For now this page only shows sizes. Soon you will be able to delete old messages and files from here. Deleting will only remove them from this computer: the other person keeps their copy and is not told.',
   loading: 'Reading sizes…',
   failed: 'The sizes could not be read just now.',
   retry: 'Try again',
-  noIds: 'There is no ID on this computer yet.',
+  noIds: 'No IDs yet — nothing stored.',
   current: 'Open now',
   messages: 'Messages',
   savedFiles: 'Saved files',
