@@ -241,6 +241,35 @@ const row = (name: string): HTMLButtonElement | undefined =>
   all('button[aria-expanded]').find((b) => b.textContent?.includes(name)) as
     HTMLButtonElement | undefined;
 
+describe('ATT-SENDFOLDER-FIX: Home asks to allow the Send folder when none is allowed', () => {
+  const FILES = '/api/ui/files';
+  it('shows the calm banner with its one button when no folder is allowed', async () => {
+    await render(base({ [FILES]: ok({ folders: [], max: 32, version: 1 }) }));
+    const banner = q('[data-send-folder-banner]');
+    expect(banner).toBeTruthy();
+    expect(banner?.textContent).toContain('Allow your Send folder so your AI can send files');
+    expect(byText('[data-send-folder-banner] button', 'Allow Send folder')).toBeTruthy();
+    expect(lintVocabulary(document.body.textContent ?? '')).toEqual([]);
+  });
+
+  it('shows no banner when a folder is allowed, or when the list cannot be read', async () => {
+    await render(
+      base({
+        [FILES]: ok({
+          folders: [{ path: '/h/AgentLink/Send', resolved: null }],
+          max: 32,
+          version: 2,
+        }),
+      }),
+    );
+    expect(q('[data-send-folder-banner]')).toBeNull();
+    act(() => root.unmount());
+    root = createRoot(host);
+    await render(base());
+    expect(q('[data-send-folder-banner]')).toBeNull();
+  });
+});
+
 describe('Home simple (A4)', () => {
   it('shows Invite someone and People with the last activity; reading sends GETs only', async () => {
     const s = await render(base());

@@ -82,6 +82,7 @@ import { useTerms } from './terms-trail.js';
 import type { Preview } from './file-reader.js';
 import { HomeApprovals } from './home-approvals.js';
 import { RenameBanner } from './rename-banner.js';
+import { SendFolderBanner, createSendFolderApi, type SendFolderApi } from './send-folder-banner.js';
 import {
   createPeopleApi,
   MAX_SUMMARIES,
@@ -147,6 +148,8 @@ interface Clients {
   /** W8-S4: Finish removing (the Remove sheet's own calls). */
   readonly agents: AgentsApi;
   readonly owner: OwnerClient;
+  /** ATT-SENDFOLDER-FIX: the Send folder banner's read and set-up calls. */
+  readonly sendFolder: SendFolderApi;
 }
 
 function useClients(props: HomeScreenProps): Clients {
@@ -169,6 +172,7 @@ function useClients(props: HomeScreenProps): Clients {
       invites: createInviteApi(opts),
       agents: createAgentsApi(opts),
       owner: createOwnerClient(opts),
+      sendFolder: createSendFolderApi(opts),
     };
   }, [givenFetch, token, credentials, approvalsClient]);
 }
@@ -1047,6 +1051,11 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
               api={clients.agents}
               owner={clients.owner}
               row={liveIds.rows.find((r) => r.current && !r.removing)}
+            />
+            {/* ATT-SENDFOLDER-FIX: no folder allowed yet: one button to allow the Send folder. */}
+            <SendFolderBanner
+              api={clients.sendFolder}
+              agentKey={liveIds.rows.find((r) => r.current)?.name ?? ''}
             />
             <HomeApprovals
               items={approvals}

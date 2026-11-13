@@ -49,6 +49,7 @@ import {
   type ReactNode,
 } from 'react';
 import { lazyPart } from '../../lazy/index.js';
+import { holdsFilesNotice } from '../../api/send-folder-review.js';
 import { INVITE_PATH } from '../../nav.js';
 import { createInviteApi, type InviteApi } from '../contacts/invite-api.js';
 import { navigate } from '../../router.js';
@@ -265,6 +266,8 @@ interface Done {
   readonly passkey: boolean;
   readonly fingerprint: string;
   readonly sendFolder: SendFolderOutcome;
+  /** ATT-SENDFOLDER-FIX: the Send folder begin named (its real path), for the outcome line. */
+  readonly sendFolderPath?: string;
   /** Present only while the "Your master code" step is on screen. */
   readonly ownerCode?: string;
   readonly computerName?: string;
@@ -285,6 +288,8 @@ type View =
       readonly fieldError?: string;
       /** M1-UX-PRF-MATRIX: the browser reports no passkey with PRF here. */
       readonly noPrf?: boolean;
+      /** ATT-SENDFOLDER-FIX: the Send folder already holds files; shown before the gesture. */
+      readonly notice?: string;
     }
   /** U3-g: the master code is saved; deciding between "Connect your AI app" and Home. */
   | { readonly k: 'leaving' }
@@ -453,8 +458,9 @@ function BackupCode({
 }
 
 /** The first policy's outcome in plain words (D-130 (2)); nothing when no policy was signed. */
-function sendLine(outcome: SendFolderOutcome): string | undefined {
-  if (outcome === 'allowed') return T.sendAllowed;
+function sendLine(outcome: SendFolderOutcome, folder?: string): string | undefined {
+  // ATT-SENDFOLDER-FIX: the folder as it really is (begin named it), else the usual one.
+  if (outcome === 'allowed') return folder === undefined ? T.sendAllowed : T.sendAllowedAt(folder);
   if (outcome === 'not_allowed') return T.sendNotAllowed;
   if (outcome === 'not_confirmed') return T.sendNotConfirmed;
   return undefined;
@@ -532,6 +538,11 @@ function ConnectFirstStep({
       {noPrf ? (
         <Banner tone="warning">{T.noPrf(SENSOR[platform], otherBrowser(platform))}</Banner>
       ) : null}
+      {view.notice === undefined ? null : (
+        <div data-holds-files>
+          <Banner tone="info">{view.notice}</Banner>
+        </div>
+      )}
       {view.message === undefined ? null : <Banner tone="warning">{view.message}</Banner>}
       <div className="st-actions">
         {view.working ? (
@@ -979,6 +990,8 @@ export function FirstRunPage({
   };
 
   const label = name.trim();
+  /** ATT-SENDFOLDER-FIX: the Send folder whose "already holds files" line was shown. */
+  const sendNoticeShown = useRef<string | undefined>(undefined);
 
   const protect = useCallback(
     async (noPrf: boolean) => {
@@ -1018,6 +1031,18 @@ export function FirstRunPage({
       const begun = await api.begin(label, app?.id);
       if (begun.kind === 'owner_exists') return existingOwner(undefined, true);
       if (begun.kind === 'error') return problem(begun);
+      // ATT-SENDFOLDER-FIX (IR-1 M-1): a Send folder that already holds files is named first; the
+      // owner presses again to go on (a new begin replaces this plan), so the gesture follows it.
+      const review = begun.sendFolder;
+      if (review?.holdsFiles === true && sendNoticeShown.current !== review.folder) {
+        sendNoticeShown.current = review.folder;
+        return setView({
+          k: 'protect',
+          working: false,
+          noPrf,
+          notice: holdsFilesNotice(review.folder),
+        });
+      }
       // Without PRF here, any passkey: the gesture proves presence, the master code approves.
       const made = await createPasskey(begun.publicKey, { platform: !noPrf });
       if (made.kind === 'unsupported') return setView({ k: 'unsupported' });
@@ -1064,6 +1089,7 @@ export function FirstRunPage({
           passkey: finished.passkey,
           fingerprint: finished.fingerprint,
           sendFolder: finished.sendFolder,
+          ...(begun.sendFolder === undefined ? {} : { sendFolderPath: begun.sendFolder.folder }),
           ownerCode: finished.ownerCode,
           computerName: finished.computerName,
           ...(finished.app === undefined || app === undefined || finished.app !== app.id
@@ -1466,7 +1492,7 @@ export function FirstRunPage({
     }
     case 'done': {
       const { done } = view;
-      const line = sendLine(done.sendFolder);
+      const line = sendLine(done.sendFolder, done.sendFolderPath);
       return frame(
         <section className="st-screen st-w-560" aria-labelledby="fr-h">
           <h1 id="fr-h" ref={backupTitle} tabIndex={-1} className="st-title-2">

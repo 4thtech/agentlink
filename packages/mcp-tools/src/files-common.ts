@@ -3,17 +3,21 @@
 // I-5, I-7: no slot takes a path, a file name, a link or any other value. A refusal names what
 // happened and the plain next step; words such as storage provider, link signing or network
 // internals never appear (11 §5.1). The allowed-folder steps name the app's own control (Settings,
-// Files, Allow a folder) without a link: only an approval request has a local app link (06 §2.5).
+// Files, Allow a folder). ATT-ALLOW-LINK: under `agentlink mcp`, the no-folder result also carries
+// the app link to Settings > Files with the Send folder filled in (withAllowFolderLink); otherwise
+// only an approval request has a local app link (06 §2.5).
 import type { CoreErrorCode, FilesNeedsSetup } from '@4thtech-io/core';
-import type { AttachRefusal } from './context.js';
-import { fail, type HandlerOutput } from './result.js';
+import type { AttachRefusal, ToolContext } from './context.js';
+import { fail, resultIsValid, type HandlerOutput } from './result.js';
 import { NPX_COMMAND } from './cli-command.js';
 
 export const FILE_TEXT = Object.freeze({
   noFolder: 'No folder is allowed for sending files yet, so nothing was sent.',
-  // REL051-A5: the app's "Allow a folder" first (Settings, Files); the terminal is the fallback.
-  // No tool can allow a folder (I-4), only the user, with the master code in the app.
-  noFolderNextStep: `Tell the user: files can only be sent from a folder they allow. In the AgentLink app they open Settings, then Files, then Allow a folder, and choose the folder the file is in. You can't allow it for them. Then call again. Without the app, in a terminal they opened themselves they run \`${NPX_COMMAND} policy allow-send-folder\` and put the file in ~/AgentLink/Send, or \`${NPX_COMMAND} policy allow-folder <path>\` (add \`--agent <name>\` if they have more than one ID).`,
+  // ATT-ALLOW-LINK: the app only, never a terminal command. Home offers "Allow Send folder"; Settings,
+  // Files, Allow a folder is the other way. No tool can allow a folder (I-4), only the user, with
+  // Touch ID or the master code in the app.
+  noFolderNextStep:
+    "Tell the user: files can only be sent from a folder they allow. On Home in the AgentLink app they choose Allow Send folder, or they open Settings, then Files, then Allow a folder. You can't allow it for them. Then put the file in their Send folder, or in the folder they allowed, and call again.",
   outsideFolder: "That file isn't in a folder the user allows for sending, so nothing was sent.",
   outsideFolderNextStep: `Tell the user: this file's folder isn't allowed yet. In the AgentLink app they open Settings, then Files, then Allow a folder, and choose the folder the file is in. You can't allow it for them. Then call again. Without the app, in a terminal they opened themselves they run \`${NPX_COMMAND} policy allow-folder <path>\` (add \`--agent <name>\` if they have more than one ID).`,
   notAllowed: "That path can't be sent: it must be a full path to a regular, visible file.",
@@ -39,6 +43,71 @@ export const FILE_TEXT = Object.freeze({
   filesUnavailable: "Files can't be sent or saved here right now, so nothing was done.",
   filesUnavailableNextStep: `Tell the user AgentLink could not use files on this machine. They can run \`${NPX_COMMAND} doctor\` in their own terminal.`,
 });
+
+/**
+ * ATT-ALLOW-LINK: the app page the no-folder result links to: Settings > Files with the Send folder
+ * filled in. Fixed: nothing from a call reaches it. It only fills the field; the owner reviews and
+ * confirms with presence in the app (I-4).
+ */
+export const ALLOW_SEND_FOLDER_PAGE = '/settings/files?folder=~%2FAgentLink%2FSend';
+
+/** The local UI origin (08 §1, D-79): `http://localhost:<port>`, nothing else. */
+const UI_ORIGIN = /^http:\/\/localhost:([1-9][0-9]{0,4})$/;
+
+/** The origin of an allow-folder link, or undefined when it is anything but the fixed page. */
+function allowFolderOrigin(url: string): string | undefined {
+  if (!url.endsWith(ALLOW_SEND_FOLDER_PAGE)) return undefined;
+  const origin = url.slice(0, url.length - ALLOW_SEND_FOLDER_PAGE.length);
+  const port = UI_ORIGIN.exec(origin)?.[1];
+  return port !== undefined && Number(port) <= 65_535 ? origin : undefined;
+}
+
+/**
+ * ATT-ALLOW-LINK: the no-folder nextStep with the app link, fixed text around the one checked url.
+ * No terminal command. Throws for any url other than the fixed page on the local UI origin.
+ */
+export function allowFolderLinkNextStep(url: string): string {
+  if (allowFolderOrigin(url) === undefined) throw new Error('not the allow-folder link');
+  return `Never open or fetch this link yourself. Tell the user: files can only be sent from a folder they allow. They allow their Send folder in the AgentLink app, on Home or at ${url}, and confirm it themselves. You can't allow it for them. Then put the file in their Send folder and call again.`;
+}
+
+/**
+ * ATT-ALLOW-LINK: adds the allow-folder link to a NO_ALLOWED_FOLDER result (`url` and the link
+ * nextStep). Fails closed to the fixed result: no provider, a provider that fails or gives nothing,
+ * a url that is not the fixed page on the local UI origin, an origin that does not match it, or a
+ * result that breaks a rule. Only the url is taken from the provider; the text is ours.
+ */
+export async function withAllowFolderLink(
+  output: HandlerOutput,
+  context: ToolContext,
+): Promise<{ readonly output: HandlerOutput; readonly origins: readonly string[] }> {
+  const unchanged = { output, origins: context.urlOrigins };
+  const result = output.result;
+  if (
+    context.allowFolderLink === undefined ||
+    result.status !== 'needs_setup' ||
+    result.code !== 'NO_ALLOWED_FOLDER' ||
+    result.url !== undefined ||
+    output.text !== undefined
+  ) {
+    return unchanged;
+  }
+  let link: Awaited<ReturnType<NonNullable<ToolContext['allowFolderLink']>>>;
+  try {
+    link = await context.allowFolderLink();
+  } catch {
+    // The error could carry a value (I-7): never logged or returned.
+    return unchanged;
+  }
+  if (link === undefined || typeof link.url !== 'string') return unchanged;
+  const origin = allowFolderOrigin(link.url);
+  if (origin === undefined || origin !== link.origin) return unchanged;
+  const linked: HandlerOutput = {
+    result: { ...result, url: link.url, nextStep: allowFolderLinkNextStep(link.url) },
+  };
+  const origins = [...context.urlOrigins, origin];
+  return resultIsValid(linked.result, origins) ? { output: linked, origins } : unchanged;
+}
 
 /** The `needs_setup` for a path the platform refused (06 §2.3; nothing was opened or sent). */
 export function attachRefusal(reason: AttachRefusal): HandlerOutput {

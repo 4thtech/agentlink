@@ -133,10 +133,22 @@ interface Mounted {
 }
 async function mount(
   status: PasskeyStatus,
-  o: { onCancel?: () => void; outcome?: PasskeySwitchOutcome } = {},
+  o: {
+    onCancel?: () => void;
+    outcome?: PasskeySwitchOutcome;
+    sendFolder?: { folder: string; holdsFiles: boolean };
+  } = {},
 ): Promise<Mounted> {
   let registered = status.kind === 'ready';
   const api = fakeApi(() => registered);
+  if (o.sendFolder !== undefined) {
+    const begin = api.begin.bind(api);
+    const sendFolder = o.sendFolder;
+    api.begin = async (...args: Parameters<typeof begin>) => {
+      const begun = await begin(...args);
+      return begun.kind === 'ready' ? { ...begun, sendFolder } : begun;
+    };
+  }
   const onDone = vi.fn();
   const switches: [unknown, string][] = [];
   await act(async () => {
@@ -537,5 +549,29 @@ describe('HOTFIX-NOID: parseStatement with no owner known yet', () => {
     expect(
       parseStatement({ label: 'Side', agentFingerprint: '1111·2222', folder: 'side' }),
     ).toEqual({ label: 'Side', agentFingerprint: '1111·2222', folder: 'side' });
+  });
+});
+
+describe('ATT-SENDFOLDER-FIX (IR-1 M-1): a Send folder that already holds files is named before the gesture', () => {
+  it('the first press shows the line and asks nothing; the next press makes the one gesture', async () => {
+    const { api } = await mount(READY, {
+      sendFolder: { folder: '/Users/me/AgentLink/Send', holdsFiles: true },
+    });
+    await click('Connect with Touch ID');
+    const line = host.querySelector('[data-holds-files]')?.textContent ?? '';
+    expect(line).toContain('/Users/me/AgentLink/Send');
+    expect(line).toContain('It already holds files, and your AI can send those too.');
+    expect(api.withPasskey).toEqual([]);
+    await click('Connect with Touch ID');
+    expect(api.withPasskey).toHaveLength(1);
+  });
+
+  it('an empty Send folder adds no line and no extra press', async () => {
+    const { api } = await mount(READY, {
+      sendFolder: { folder: '/Users/me/AgentLink/Send', holdsFiles: false },
+    });
+    await click('Connect with Touch ID');
+    expect(host.querySelector('[data-holds-files]')).toBeNull();
+    expect(api.withPasskey).toHaveLength(1);
   });
 });

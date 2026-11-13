@@ -853,16 +853,13 @@ describe('policy allow-send-folder † (M1-36b-2-c; D-121 D6)', () => {
     expect(await folders()).toEqual([join(home, 'Work'), send()]);
   });
 
-  it('a Send folder that holds files is refused before any master code, and left as it is', async () => {
+  it('ATT-SENDFOLDER-FIX: a Send folder that holds files is allowed, and its files are left as they are', async () => {
     mkdirSync(send(), { recursive: true });
     writeFileSync(join(send(), 'private.txt'), 'x');
     const result = await run(['policy', 'allow-send-folder']);
-    expect(result.code).toBe(1);
-    expect(codeEntries).toEqual([]);
-    expect(result.err.join('\n')).toMatch(/already holds files/);
-    expect(result.err.join('\n')).toContain('policy allow-folder');
+    expect(result.code).toBe(0);
+    expect(await folders()).toEqual([send()]);
     expect(readdirSync(send())).toEqual(['private.txt']);
-    expect(await version()).toBe(1);
   });
 
   it('a Send folder that is a link is refused before any master code', async () => {

@@ -7,6 +7,7 @@
 // app's JSON client (api/client.ts), so this file makes its own same-origin call with the page's
 // CSRF token, exactly as that client does.
 
+import { parseSendFolderReview, type SendFolderReview } from '../../api/send-folder-review.js';
 import { FAILURE_REASON_CODES, type FailureReasonCode } from '../../api/failure-reasons.js';
 
 export const STATUS_PATH = '/api/ui/first-run';
@@ -96,6 +97,8 @@ export type BeginResult =
         readonly name: string;
         readonly kind: 'connect' | 'move';
       };
+      /** ATT-SENDFOLDER-FIX: the Send folder this gesture allows (shown before it). */
+      readonly sendFolder?: SendFolderReview;
     }
   | { readonly kind: 'owner_exists' }
   | SetupError;
@@ -150,6 +153,12 @@ const NONCE = /^[A-Za-z0-9_-]{43}$/;
 /** An AI app id of the fixed harness table (06 §7). */
 const APP_ID = /^[a-z][a-z-]{1,31}$/;
 const APP_NAME = /^[A-Za-z][A-Za-z0-9 ]{0,31}$/;
+
+/** ATT-SENDFOLDER-FIX: begin's Send folder, as fixed fields only. */
+function sendFolderOf(value: unknown): { readonly sendFolder?: SendFolderReview } {
+  const review = parseSendFolderReview(value);
+  return review === undefined ? {} : { sendFolder: review };
+}
 
 /** W4-ONE-TOUCH: the app the begin statement names, as fixed fields only. */
 function appOf(statement: unknown): {
@@ -375,7 +384,13 @@ export function createSetupApi(options: SetupApiOptions = {}): SetupApi {
         const nonce = str(answer.json?.['nonce']);
         return publicKey === undefined || nonce === undefined || !NONCE.test(nonce)
           ? { kind: 'error', problem: 'unknown' }
-          : { kind: 'ready', publicKey, nonce, ...appOf(answer.json?.['statement']) };
+          : {
+              kind: 'ready',
+              publicKey,
+              nonce,
+              ...appOf(answer.json?.['statement']),
+              ...sendFolderOf(answer.json?.['sendFolderReview']),
+            };
       }
       // W4-ONE-TOUCH: the picked app can't be written now (11 §5.8 "Quit Claude Desktop first").
       if (status === 'quit_first' || status === 'app_unavailable') {

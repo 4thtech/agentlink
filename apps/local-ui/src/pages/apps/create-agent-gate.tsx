@@ -21,6 +21,7 @@
 // browser passkey and its one-time switch are never offered there, and no line names a browser or
 // Safari. With an owner and no ID on this computer, begin answers a plan for the master code or
 // Touch ID (04 §2.8 "No ID on this computer yet"); nothing here sends the owner to a terminal.
+import { holdsFilesNotice, type SendFolderReview } from '../../api/send-folder-review.js';
 import { Banner, Button } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
@@ -207,6 +208,17 @@ export function CreateAgentGate({
   >(undefined);
   // W8-S5 (F7): begin's statement, when the screen shows its move line.
   const [statement, setStatement] = useState<CreateStatement | undefined>(undefined);
+  // ATT-SENDFOLDER-FIX (IR-1 M-1): a Send folder that already holds files, named before the gesture.
+  const [sendNotice, setSendNotice] = useState<string | undefined>(undefined);
+  /** The folder whose "already holds files" line is on screen (then the gesture may follow). */
+  const sendNoticeShown = useRef<string | undefined>(undefined);
+  const noteSendFolder = (review: SendFolderReview | undefined): boolean => {
+    if (review?.holdsFiles !== true) return false;
+    const fresh = sendNoticeShown.current !== review.folder;
+    sendNoticeShown.current = review.folder;
+    setSendNotice(holdsFilesNotice(review.folder));
+    return fresh;
+  };
   // The one button, worded as every presence sheet of the app (Contacts, Rename, Remove).
   const useLabel = C.usePasskey;
 
@@ -277,6 +289,7 @@ export function CreateAgentGate({
       held.current = { nonce: begun.nonce, app: app.id, pk: begun.publicKey, at: Date.now() };
       if (begun.publicKey.allowCredentials.length === 0) setCanPasskey(false);
       setStatement(begun.statement);
+      noteSendFolder(begun.sendFolder);
     });
     return () => {
       live = false;
@@ -352,7 +365,8 @@ export function CreateAgentGate({
     if (begun.publicKey.allowCredentials.length === 0) setCanPasskey(false);
     // Always the new plan's statement (its move line, or none for a plain connect).
     setStatement(moveLine(begun.statement) === undefined ? undefined : begun.statement);
-    if (shown !== undefined) {
+    // ATT-SENDFOLDER-FIX: a Send folder that holds files not yet on screen: show it, then wait.
+    if (noteSendFolder(begun.sendFolder) || shown !== undefined) {
       // A move line was on screen but this is another plan: it is held (fresh) for the next click.
       held.current = { nonce: begun.nonce, app: id, pk: begun.publicKey, at: Date.now() };
       return { nonce: begun.nonce, pk: begun.publicKey, renewed: true };
@@ -529,6 +543,11 @@ export function CreateAgentGate({
       {moveLine(statement) === undefined ? null : (
         <p className="al-text-body" role="status" data-move-line="">
           {moveLine(statement)}
+        </p>
+      )}
+      {sendNotice === undefined ? null : (
+        <p className="al-text-body" role="status" data-holds-files="">
+          {sendNotice}
         </p>
       )}
       {free === undefined || givenApp !== undefined ? null : (

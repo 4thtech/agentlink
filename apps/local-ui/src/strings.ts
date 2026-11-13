@@ -118,3 +118,20 @@ export const PAGE_TITLES = {
 /** Shown under every code field (F26): what the master code is, never a terminal command. */
 export const EARLIER_OWNER_CODE_HINT =
   'Your master code is the code you saved when you first set up AgentLink.';
+
+/**
+ * ATT-SENDFOLDER-FIX (IR-ATT-SENDFOLDER-1 M-1; 11 §5): shown before the owner confirms a Send folder
+ * that already holds files (first run, New ID, Settings > Files).
+ */
+export const HOLDS_FILES_LINE = 'It already holds files, and your AI can send those too.';
+
+/** ATT-SENDFOLDER-FIX: the line that names the folder the gesture allows for sending. */
+export const sendFromLine = (folder: string): string =>
+  `Your AI can send files you put in ${folder}.`;
+
+/**
+ * ATT-SENDFOLDER-FIX (IR-ATT-SENDFOLDER-1 L-2): the sessionStorage key Home's Send folder banner sets
+ * to the folder it set up, read and removed once by Files. Only then does `check=1` check the folder
+ * at once; a pasted `?folder=...&check=1` link only fills the field.
+ */
+export const SEND_FOLDER_CHECK_KEY = 'agentlink.sendFolderCheck';

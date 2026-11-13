@@ -1428,16 +1428,20 @@ describe('M1-UX-FIRSTRUN-V2: one gesture sets up the owner, the card and the fir
     });
   }
 
-  it('refuses begin when Send already holds files, and touches none of them', async () => {
+  it('ATT-SENDFOLDER-FIX: begins when Send already holds files, and touches none of them', async () => {
     await withHome();
     await mkdir(sendPath(), { recursive: true });
     await writeFile(join(sendPath(), 'tax-return.pdf'), 'private');
     const agent = await initAgent();
     const h = await harness(agent, { firstCard: withPolicy(agent) });
     const res = await post(h, BEGIN, await h.session(), new Uint8Array(0));
-    expect(res.status).toBe(409);
-    expect(JSON.parse(res.body)).toEqual({ status: 'folder_refused', reason: 'folder_not_empty' });
-    expect(h.seeds).toHaveLength(0);
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).not.toMatchObject({ status: 'folder_refused' });
+    // IR-ATT-SENDFOLDER-1 M-1: begin names the folder and that it holds files, before the gesture.
+    expect(JSON.parse(res.body).sendFolderReview).toEqual({
+      folder: await realpath(sendPath()),
+      holdsFiles: true,
+    });
     expect(await readdir(sendPath())).toEqual(['tax-return.pdf']);
     expect((await agent.client.ownerActions.loadPolicy()).mode).toBe('defaults');
   });
