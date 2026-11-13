@@ -6,6 +6,7 @@
 // never echoed, logged or answered with its content.
 import { fstatSync, type Stats } from 'node:fs';
 import { Socket } from 'node:net';
+import process from 'node:process';
 import {
   MAX_PIPE_LINE_BYTES,
   encodeHostMessage,
@@ -20,18 +21,37 @@ export const DESKTOP_PIPE_FD = 3;
 /** What is on the fd: a pipe or socket (`ok`), nothing (`missing`), or something else (`refused`). */
 export type PipeProbe = 'ok' | 'missing' | 'refused';
 
-/** Looks at `fd` without reading or writing it. */
+/** The file-type bits of `stats.mode` and the pipe type (literals: the same on every OS). */
+const S_IFMT = 0o170000;
+const S_IFIFO = 0o010000;
+
+/** What fstat gives the probe: the POSIX type helpers and, where present, the raw mode. */
+export type PipeStat = Pick<Stats, 'isFIFO' | 'isSocket'> & { readonly mode?: unknown };
+
+/**
+ * Looks at `fd` without reading or writing it.
+ *
+ * WIN-DESK-1: on Windows Node's `isFIFO()` and `isSocket()` always answer false, whatever the
+ * handle is; libuv puts the handle type in `mode` instead (a pipe or socket S_IFIFO, a file S_IFREG,
+ * a console S_IFCHR). So on win32 only a mode whose type is exactly S_IFIFO counts; a type-less,
+ * unknown or missing mode is refused. Elsewhere the helpers decide, as before. `openDesktopPipe`
+ * is the second, independent check (net.Socket accepts only a pipe or a socket).
+ */
 export function probePipeFd(
   fd: number,
-  fstat: (fd: number) => Pick<Stats, 'isFIFO' | 'isSocket'> = fstatSync,
+  fstat: (fd: number) => PipeStat = fstatSync,
+  platform: string = process.platform,
 ): PipeProbe {
-  let info: Pick<Stats, 'isFIFO' | 'isSocket'>;
+  let info: PipeStat;
   try {
     info = fstat(fd);
   } catch {
     return 'missing';
   }
   // Only a pipe or a socket: never a file (the link would land on disk) or a terminal.
+  if (platform === 'win32') {
+    return typeof info.mode === 'number' && (info.mode & S_IFMT) === S_IFIFO ? 'ok' : 'refused';
+  }
   return info.isFIFO() || info.isSocket() ? 'ok' : 'refused';
 }
 
@@ -181,7 +201,10 @@ export function desktopPipeOver(stream: PipeStream): DesktopPipe {
   };
 }
 
-/** The real pipe on fd 3 (call probePipeFd first). */
+/**
+ * The real pipe on fd 3 (call probePipeFd first). Throws (ERR_INVALID_FD_TYPE) when libuv does not
+ * see a pipe or a socket on the fd; host-main.ts turns that into its fixed line.
+ */
 export function openDesktopPipe(fd: number = DESKTOP_PIPE_FD): DesktopPipe {
   return desktopPipeOver(new Socket({ fd, readable: true, writable: true }));
 }

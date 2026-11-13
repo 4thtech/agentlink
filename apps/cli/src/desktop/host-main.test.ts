@@ -48,6 +48,18 @@ describe('desktopHostMain', () => {
     expect(d.run).toHaveBeenCalledTimes(1);
   });
 
+  it('opening the pipe throws (not a pipe after all): the fixed line, exit 1, nothing run', async () => {
+    const d = deps('ok');
+    d.openPipe.mockImplementation(() => {
+      throw Object.assign(new TypeError('Unsupported fd type: FILE'), {
+        code: 'ERR_INVALID_FD_TYPE',
+      });
+    });
+    await expect(desktopHostMain(d.main)).resolves.toBe(1);
+    expect(d.errors).toEqual([DESKTOP_HOST_TEXT.notInApp]);
+    expect(d.run).not.toHaveBeenCalled();
+  });
+
   it('the fixed line names no command, path or link', () => {
     expect(DESKTOP_HOST_TEXT.notInApp).not.toMatch(/`|http|\/|agentlink ui/);
   });

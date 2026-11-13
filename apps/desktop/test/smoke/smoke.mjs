@@ -16,7 +16,16 @@
 // check (Welcome shown, `typeof PublicKeyCredential === 'undefined'`) needs a test seam in the shell
 // (open question for WP-D2). Nothing here prints a link, token or file content.
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+} from 'node:fs';
 import { createConnection } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -91,18 +100,33 @@ if (process.platform === 'darwin') {
   }
 }
 
+// The app's core log (core-log.ts logDir): the shell keeps only REDACTED stderr lines and its own
+// fixed notes there.
+const coreLogFile = join(
+  win
+    ? join(env.LOCALAPPDATA, 'AgentLink', 'logs')
+    : process.platform === 'darwin'
+      ? join(home, 'Library', 'Logs', 'AgentLink')
+      : join(home, '.local', 'state', 'agentlink', 'logs'),
+  'core.log',
+);
+const readCoreLog = () => {
+  try {
+    return readFileSync(coreLogFile, 'utf8');
+  } catch {
+    return '';
+  }
+};
+// The host's fixed refusal line (apps/cli/src/desktop/host-main.ts DESKTOP_HOST_TEXT.notInApp).
+const NOT_IN_APP = 'runs only inside the AgentLink app';
+
 /**
  * On a failure: the tail of the app's core log (the shell keeps only REDACTED stderr lines there,
  * core-log.ts) and the names (never the contents) of what the core wrote under ~/.agentlink.
  */
 function diagnose() {
-  const logDir = win
-    ? join(env.LOCALAPPDATA, 'AgentLink', 'logs')
-    : process.platform === 'darwin'
-      ? join(home, 'Library', 'Logs', 'AgentLink')
-      : join(home, '.local', 'state', 'agentlink', 'logs');
   try {
-    const lines = readFileSync(join(logDir, 'core.log'), 'utf8').split('\n').slice(-40);
+    const lines = readFileSync(coreLogFile, 'utf8').split('\n').slice(-40);
     console.error('--- core.log (last lines, redacted by the app) ---');
     for (const line of lines) console.error(line);
   } catch {
@@ -113,42 +137,163 @@ function diagnose() {
   } catch {
     console.error('(no ~/.agentlink)');
   }
-  probeCore();
+}
+
+// WIN-DESK-1: what the bundled node sees on fd 3, as the file type of fstat's mode in octal (on
+// Windows Node's isFIFO()/isSocket() always say false; the type is in the mode). Never a handle.
+const FD3_MODE = [
+  'let s;',
+  "try { s = 'mode 0o' + (require('node:fs').fstatSync(3).mode & 0o170000).toString(8); }",
+  "catch (e) { s = 'error ' + e.code; }",
+  "process.stderr.write('fd3 ' + s + '\\n');",
+].join(' ');
+
+/** stderr lines of a finished child, cut to length (fixed lines only are expected there). */
+const stderrLines = (text) =>
+  String(text ?? '')
+    .split('\n')
+    .filter((l) => l.trim() !== '')
+    .slice(0, 10)
+    .map((l) => l.slice(0, 300));
+
+/**
+ * The fd 3 mode the bundled node sees with this stdio slot (printed, octal). Async spawn: spawnSync
+ * does not take 'overlapped'.
+ */
+function fd3Mode(label, slot) {
+  const stdio =
+    slot === undefined ? ['ignore', 'ignore', 'pipe'] : ['ignore', 'ignore', 'pipe', slot];
+  return new Promise((done) => {
+    const child = spawn(nodeBin, ['-e', FD3_MODE], { env, cwd: home, stdio, windowsHide: true });
+    let stderr = '';
+    const timer = setTimeout(() => child.kill('SIGKILL'), 20_000);
+    child.stderr.on('data', (c) => (stderr += c));
+    child.on('error', () => undefined);
+    child.on('close', () => {
+      clearTimeout(timer);
+      const line = stderrLines(stderr).find((l) => l.startsWith('fd3 ')) ?? '(none)';
+      console.log(`    ${label}: ${line}`);
+      done();
+    });
+  });
 }
 
 /**
- * The core as the shell starts it (stdio [ignore, ignore, pipe, pipe]), outside the app: what the
- * bundled node sees on fd 3, then the host's own exit code and first stderr lines (fixed lines,
- * cut to length). A host that does start is stopped after the time limit.
+ * A control: the host started directly with `slot` on fd 3 must refuse (its fixed line, exit 1)
+ * within 20 s. Returns null when it did, else the reason.
  */
-function probeCore() {
-  const run = (args) =>
-    spawnSync(nodeBin, args, {
+async function controlRefused(label, slot) {
+  await fd3Mode(label, slot);
+  const stdio =
+    slot === undefined ? ['ignore', 'ignore', 'pipe'] : ['ignore', 'ignore', 'pipe', slot];
+  const r = spawnSync(nodeBin, [hostScript], {
+    env,
+    cwd: home,
+    stdio,
+    encoding: 'utf8',
+    timeout: 20_000,
+    windowsHide: true,
+  });
+  const lines = stderrLines(r.stderr ?? r.output?.[2]);
+  const refused = r.status === 1 && lines.some((l) => l.includes(NOT_IN_APP));
+  console.log(
+    `    ${label}: host exit ${r.status ?? r.signal ?? r.error?.code} → ${refused ? 'refused' : 'NOT refused'}`,
+  );
+  if (!refused) for (const line of lines) console.error(`      ${line}`);
+  return refused ? null : `the host did not refuse fd 3 = ${label}`;
+}
+
+/**
+ * The host started directly with fd 3 as the shell gives it ('overlapped'): it must NOT refuse, and
+ * it must send `ready` on fd 3 (the pipe works in both directions). The link is never printed.
+ * The child is then stopped and must exit.
+ */
+async function pipeAccepted() {
+  await fd3Mode('the shell’s pipe (overlapped)', 'overlapped');
+  return new Promise((done) => {
+    const child = spawn(nodeBin, [hostScript], {
       env,
       cwd: home,
-      stdio: ['ignore', 'ignore', 'pipe', 'pipe'],
-      encoding: 'utf8',
-      timeout: 20_000,
+      stdio: ['ignore', 'ignore', 'pipe', 'overlapped'],
       windowsHide: true,
     });
-  const show = (label, r) => {
-    const lines = String(r.output?.[2] ?? '')
-      .split('\n')
-      .filter((l) => l.trim() !== '')
-      .slice(0, 10)
-      .map((l) => l.slice(0, 300));
-    console.error(`--- ${label}: exit ${r.status ?? r.signal ?? r.error?.code} ---`);
-    for (const line of lines) console.error(line);
-  };
-  const fd3 = [
-    'let s;',
-    "try { const t = require('node:fs').fstatSync(3);",
-    's = `fifo=${t.isFIFO()} socket=${t.isSocket()} file=${t.isFile()} char=${t.isCharacterDevice()}`; }',
-    'catch (e) { s = `error ${e.code}`; }',
-    'process.stderr.write(`fd3 ${s}\\n`);',
-  ].join(' ');
-  show('fd 3 as the bundled node sees it', run(['-e', fd3]));
-  show('the core host started directly', run([hostScript]));
+    let stderr = '';
+    let buffer = '';
+    let ready = false;
+    let exited = null;
+    child.stderr.on('data', (c) => (stderr += c));
+    child.stdio[3].on('data', (c) => {
+      buffer += c;
+      for (const line of buffer.split('\n').slice(0, -1)) {
+        try {
+          if (JSON.parse(line).type === 'ready') ready = true;
+        } catch {
+          // not a message
+        }
+      }
+      buffer = buffer.slice(buffer.lastIndexOf('\n') + 1);
+    });
+    child.stdio[3].on('error', () => undefined);
+    child.on('exit', (code) => (exited = code ?? 'signal'));
+    const started = Date.now();
+    const tick = setInterval(async () => {
+      const refused = stderr.includes(NOT_IN_APP);
+      if (!ready && !refused && exited === null && Date.now() - started < 60_000) return;
+      clearInterval(tick);
+      console.log(
+        `    the shell’s pipe: ${ready ? '`ready` received on fd 3' : refused ? 'REFUSED' : exited !== null ? `host exited (${exited})` : 'no `ready` within 60 s'}`,
+      );
+      if (!ready) for (const line of stderrLines(stderr)) console.error(`      ${line}`);
+      // Stop it: close our end (the host leaves on pipe close), then kill if still there.
+      child.stdio[3].destroy();
+      const end = Date.now() + 20_000;
+      while (exited === null && Date.now() < end) await sleep(250);
+      if (exited === null) child.kill('SIGKILL');
+      while (exited === null) await sleep(100);
+      // The direct host's record is not the app's: the app writes its own.
+      rmSync(join(home, '.agentlink', 'app-host.json'), { force: true });
+      done(ready ? null : 'the host did not send `ready` on the shell’s pipe');
+    }, 250);
+  });
+}
+
+/** WIN-DESK-1 controls before the app starts: only the shell's pipe is accepted on fd 3. */
+async function pipeControls() {
+  console.log('fd 3 controls (bundled node, host started directly):');
+  const failures = [];
+  const dir = mkdtempSync(join(home, 'fd3-'));
+  const fileFd = openSync(join(dir, 'f'), 'w');
+  let nulFd = null;
+  try {
+    nulFd = openSync(win ? '\\\\.\\NUL' : '/dev/null', 'r+');
+  } catch {
+    failures.push('could not open the null device for its control');
+  }
+  let consoleFd = null;
+  try {
+    consoleFd = openSync(win ? '\\\\.\\CONOUT$' : '/dev/tty', 'r+');
+  } catch {
+    console.log('    a console: none on this runner (control not run)');
+  }
+  try {
+    for (const [label, slot] of [
+      ['a file', fileFd],
+      ['the null device', nulFd],
+      ['a console', consoleFd],
+      ['nothing (absent)', undefined],
+      ["'ignore'", 'ignore'],
+    ]) {
+      if (slot === null) continue;
+      const reason = await controlRefused(label, slot);
+      if (reason !== null) failures.push(reason);
+    }
+  } finally {
+    for (const fd of [fileFd, nulFd, consoleFd]) if (fd !== null) closeSync(fd);
+  }
+  const accepted = await pipeAccepted();
+  if (accepted !== null) failures.push(accepted);
+  if (failures.length > 0) fail(failures.join('; '));
+  else console.log('ok  fd 3: only the shell’s pipe is accepted, and the host answers on it');
 }
 
 const pidAlive = (pid) => {
@@ -203,9 +348,20 @@ async function appStarts() {
     if (exited !== null) return fail(`the app exited (${exited}) before its core came up`);
     if (port === null) return fail(`no live app-host.json within ${timeoutMs / 1000} s`);
     if (!(await canConnect(port))) return fail('the core does not accept a loopback connection');
+    // WIN-DESK-1: the shell notes `core ready` once the session link arrived over fd 3 (both
+    // directions of the pipe work); one core, never refused.
+    const readyBy = Date.now() + 30_000;
+    while (!readCoreLog().includes('core ready') && exited === null && Date.now() < readyBy) {
+      await sleep(500);
+    }
     await sleep(2000);
     if (exited !== null) return fail(`the app exited (${exited}) after its core came up`);
-    console.log('ok  the app starts, its core listens, the record names a live pid');
+    const log = readCoreLog();
+    if (log.includes(NOT_IN_APP)) return fail('the core refused the app’s pipe');
+    if (!log.includes('core ready')) return fail('core.log has no `core ready` within 30 s');
+    const starts = log.match(/core started/g)?.length ?? 0;
+    if (starts !== 1) return fail(`core.log has ${starts} core starts (expected 1)`);
+    console.log('ok  the app starts, its core listens and is ready, the record names a live pid');
   } finally {
     child.kill('SIGTERM');
     const end = Date.now() + 20_000;
@@ -255,6 +411,7 @@ function mcpToolsList() {
 }
 
 try {
+  await pipeControls();
   await appStarts();
   const result = await mcpToolsList();
   if (!Array.isArray(result?.tools) || result.tools.length === 0) {

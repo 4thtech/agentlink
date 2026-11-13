@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { envCasesFor, runLockdown } from './lib/switch-check.mjs';
 import { parseArgs } from './lib/run.mjs';
+import { throwAwayEnv } from './lib/throwaway-env.mjs';
 
 const args = parseArgs(process.argv.slice(2), { exe: 'v', 'timeout-ms': 'v', 'warmup-ms': 'v' });
 if (!args.exe) throw new Error('--exe <binary> is required.');
@@ -25,17 +26,8 @@ const timeoutMs = Number(args['timeout-ms'] ?? 15000);
 const warmupMs = Number(args['warmup-ms'] ?? 180000);
 
 const home = mkdtempSync(join(tmpdir(), 'agentlink-lockdown-'));
-const env = {
-  PATH: process.env.PATH,
-  SystemRoot: process.env.SystemRoot,
-  HOME: home,
-  USERPROFILE: home,
-  APPDATA: join(home, 'AppData', 'Roaming'),
-  LOCALAPPDATA: join(home, 'AppData', 'Local'),
-  TMPDIR: home,
-  TEMP: home,
-  TMP: home,
-};
+// WIN-DESK-1c: with both AppData folders, as on a real Windows account (lib/throwaway-env.mjs).
+const env = throwAwayEnv(home);
 
 function launch(bin, argv, extraEnv, limitMs = timeoutMs) {
   return new Promise((resolveLaunch) => {
