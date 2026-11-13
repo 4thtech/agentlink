@@ -13,6 +13,7 @@ import {
   rm,
   stat,
   symlink,
+  utimes,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -24,9 +25,19 @@ import type { UpdateAsset } from '../../src/main/updater/manifest.js';
 import {
   INSTALL_COPY,
   InstallRefusal,
+  failedReasonCode,
   type InstallRefusalCode,
 } from '../../src/main/updater/install-refusal.js';
-import { downloadZip, installUpdate, ZIP_FILE } from '../../src/main/updater/install.js';
+import {
+  STAGING_MAX_AGE_MS,
+  ZIP_FILE,
+  downloadZip,
+  installFromProcess,
+  installUpdate,
+  readRecordFromAsar,
+  restartForUpdate,
+  sweepStaging,
+} from '../../src/main/updater/install.js';
 import {
   DITTO,
   checkZipEntries,
@@ -41,17 +52,25 @@ import {
   HEALTH_TIMEOUT_MS,
   WATCHDOG_SOURCE,
   appBundleOf,
+  detachedSpawner,
   preflightSwap,
   watchdogArgs,
 } from '../../src/main/updater/swap-mac.js';
 import {
   HEALTH_FILE,
+  PENDING_FILE,
   STARTING_FILE,
   readHealth,
-  writeHealth,
+  writeHealthIfPending,
   writeStarting,
 } from '../../src/main/updater/health.js';
-import { FAILED_FILE, loadFailedVersion } from '../../src/main/updater/state.js';
+import {
+  FAILED_FILE,
+  FAILED_REASONS,
+  loadFailedRecord,
+  loadFailedVersion,
+  saveFailedVersion,
+} from '../../src/main/updater/state.js';
 
 const sha = (b: Uint8Array | string): string =>
   encodeHex(
@@ -586,11 +605,13 @@ describe('installUpdate end to end, up to the watchdog (UPD-4)', () => {
     );
     expect(spawned[0]!.args.slice(0, 2)).toEqual(['-e', WATCHDOG_SOURCE]);
     const args = spawned[0]!.args.slice(3);
+    expect(args).toHaveLength(8);
     expect(args[0]).toBe('4242');
     expect(args[1]).toBe(current);
     expect(args[4]).toBe('0.5.3');
     expect(args[5]).toBe('/usr/bin/open');
     expect(args[6]).toBe(String(HEALTH_TIMEOUT_MS));
+    expect(args[7]).toBe('/bin/ps');
     expect(HEALTH_TIMEOUT_MS).toBe(90_000);
   });
 
@@ -620,15 +641,123 @@ describe('installUpdate end to end, up to the watchdog (UPD-4)', () => {
   });
 });
 
-// --- health file -----------------------------------------------------------------------------
+// --- the real dependencies and the quit step (IR-UPD-4-1 condition 7) ----------------------------
 
-describe('health file (UPD-4 §4)', () => {
-  it('is written by the new app after core ready and read back strictly', async () => {
+describe('real dependencies and the quit step (IR-UPD-4-1 #7)', () => {
+  it('spawns the watchdog detached with a fixed minimal env (no NODE_OPTIONS, no ELECTRON_*), cwd /', () => {
+    const seen: { cmd: string; args: readonly string[]; opts: Record<string, unknown> }[] = [];
+    let unrefs = 0;
+    const spawnDetached = detachedSpawner((cmd, args, opts) => {
+      seen.push({ cmd, args, opts: opts as Record<string, unknown> });
+      return { unref: () => (unrefs += 1), on: () => undefined };
+    });
+    const before = process.env['NODE_OPTIONS'];
+    process.env['NODE_OPTIONS'] = '--require /tmp/evil.js';
+    process.env['ELECTRON_RUN_AS_NODE'] = '1';
+    try {
+      spawnDetached('/x/node', ['-e', 'src']);
+    } finally {
+      if (before === undefined) delete process.env['NODE_OPTIONS'];
+      else process.env['NODE_OPTIONS'] = before;
+      delete process.env['ELECTRON_RUN_AS_NODE'];
+    }
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.opts).toEqual({
+      detached: true,
+      stdio: 'ignore',
+      cwd: '/',
+      env: { PATH: '/usr/bin:/bin:/usr/sbin:/sbin' },
+    });
+    expect(unrefs).toBe(1);
+  });
+
+  it('reads bundle-hashes.json from <resources>/app.asar, null when missing or oversize', async () => {
+    const res = join(root, 'Resources');
+    expect(await readRecordFromAsar(res)).toBeNull();
+    await mkdir(join(res, 'app.asar'), { recursive: true });
+    await writeFile(join(res, 'app.asar', 'bundle-hashes.json'), '{"v":1}');
+    expect(await readRecordFromAsar(res)).toBe('{"v":1}');
+    await writeFile(join(res, 'app.asar', 'bundle-hashes.json'), 'x'.repeat(70_000));
+    expect(await readRecordFromAsar(res)).toBeNull();
+  });
+
+  it('restartForUpdate quits only when the watchdog runs', async () => {
+    let quits = 0;
+    const quit = (): void => {
+      quits += 1;
+    };
+    expect(
+      await restartForUpdate(async () => ({ kind: 'fallback', code: 'not_writable' }), quit),
+    ).toEqual({ kind: 'fallback', code: 'not_writable' });
+    expect(quits).toBe(0);
+    expect(
+      await restartForUpdate(async () => ({ kind: 'restarting', version: '0.5.3' }), quit),
+    ).toEqual({ kind: 'restarting', version: '0.5.3' });
+    expect(quits).toBe(1);
+  });
+
+  it('a copy that is not an AgentLink.app bundle falls back without network', async () => {
+    const seen: string[] = [];
+    const outcome = await installFromProcess({
+      accepted: { version: '0.5.3', required: false, asset: zipAsset(new Uint8Array(4)) },
+      stateDir: join(root, 'state'),
+      execPath: '/usr/local/bin/node',
+      pid: 1,
+      fetch: fetchBytes(new Uint8Array(4), seen),
+    });
+    expect(outcome).toEqual({ kind: 'fallback', code: 'not_in_place' });
+    expect(seen).toEqual([]);
+  });
+
+  it('watchdog reasons map to fixed refusal codes', () => {
+    expect(failedReasonCode('not_permitted')).toBe('not_permitted');
+    expect(failedReasonCode('unhealthy')).toBe('did_not_start');
+    expect(failedReasonCode('not_quit')).toBe('did_not_quit');
+    expect(failedReasonCode('swap_failed')).toBe('swap_failed');
+    expect(failedReasonCode('rollback_incomplete')).toBe('rollback_incomplete');
+    expect(failedReasonCode(null)).toBe('did_not_start');
+  });
+});
+
+// --- staging sweeper (IR-UPD-4-1 #5) -------------------------------------------------------------
+
+describe('staging sweeper (IR-UPD-4-1 #5)', () => {
+  it('removes only old u-* folders; keeps fresh ones, other names and symlinks', async () => {
+    const updates = join(root, 'updates');
+    await mkdir(join(updates, 'u-old111'), { recursive: true });
+    await mkdir(join(updates, 'u-new222'), { recursive: true });
+    await mkdir(join(updates, 'keep'), { recursive: true });
+    await mkdir(join(root, 'target'));
+    await writeFile(join(root, 'target', 'f'), 'x');
+    await symlink(join(root, 'target'), join(updates, 'u-link33'));
+    const old = new Date(Date.now() - 2 * STAGING_MAX_AGE_MS);
+    await utimes(join(updates, 'u-old111'), old, old);
+    await sweepStaging(updates, Date.now());
+    expect((await readdir(updates)).sort()).toEqual(['keep', 'u-link33', 'u-new222']);
+    expect(await readFile(join(root, 'target', 'f'), 'utf8')).toBe('x');
+    await expect(sweepStaging(join(root, 'missing'), Date.now())).resolves.toBeUndefined();
+  });
+});
+
+// --- health, pending and failed records ----------------------------------------------------------
+
+describe('health, pending and failed records (IR-UPD-4-1 #4, #5)', () => {
+  it('the new app writes health only for a pending update of its own version, with its nonce', async () => {
     const dir = join(root, 'state');
     expect(await readHealth(dir)).toBeNull();
-    await writeHealth(dir, '0.5.3', 123);
-    expect(await readHealth(dir)).toEqual({ version: '0.5.3', pid: 123 });
-    await writeFile(join(dir, HEALTH_FILE), '{"version":"0.5.3","pid":1,"x":1}');
+    // No pending update: nothing written.
+    await writeHealthIfPending(dir, '0.5.3', 123);
+    expect(await readHealth(dir)).toBeNull();
+    await writeFile(
+      join(dir, PENDING_FILE),
+      JSON.stringify({ version: '0.5.3', nonce: 'n'.repeat(32) }),
+    );
+    // Another version is pending: nothing written.
+    await writeHealthIfPending(dir, '0.5.4', 123);
+    expect(await readHealth(dir)).toBeNull();
+    await writeHealthIfPending(dir, '0.5.3', 123);
+    expect(await readHealth(dir)).toEqual({ version: '0.5.3', pid: 123, nonce: 'n'.repeat(32) });
+    await writeFile(join(dir, HEALTH_FILE), '{"version":"0.5.3","pid":1,"nonce":"x","x":1}');
     expect(await readHealth(dir)).toBeNull();
     await writeStarting(dir, '0.5.3', 77);
     expect(JSON.parse(await readFile(join(dir, STARTING_FILE), 'utf8'))).toEqual({
@@ -636,27 +765,54 @@ describe('health file (UPD-4 §4)', () => {
       pid: 77,
     });
   });
+
+  it('failedVersion carries a fixed reason; the old form still reads; an unknown reason does not', async () => {
+    const dir = join(root, 'state');
+    await saveFailedVersion(dir, '0.5.3', 'not_permitted');
+    expect(await loadFailedRecord(dir)).toEqual({ version: '0.5.3', reason: 'not_permitted' });
+    expect(await loadFailedVersion(dir)).toBe('0.5.3');
+    await writeFile(join(dir, FAILED_FILE), '{"failedVersion":"0.5.3"}\n');
+    expect(await loadFailedRecord(dir)).toEqual({ version: '0.5.3', reason: null });
+    await writeFile(join(dir, FAILED_FILE), '{"failedVersion":"0.5.3","reason":"other"}\n');
+    expect(await loadFailedRecord(dir)).toBeNull();
+    for (const r of FAILED_REASONS) expect(typeof r).toBe('string');
+  });
 });
 
 // --- the detached watchdog, run for real against fake bundles ---------------------------------
 
-describe('watchdog: swap, relaunch, health or rollback (UPD-4 §4)', () => {
-  /** A fake `open`: records the app and, when its version.txt equals HEALTHY, writes health. */
-  async function fakeLauncher(dir: string): Promise<string> {
-    const p = join(dir, 'fake-open.sh');
+describe('watchdog: swap, relaunch, health or rollback (UPD-4 §4, IR-UPD-4-1 #2–#5)', () => {
+  /**
+   * A fake `open`: records the app's version; HEALTHY → acts like a good new copy (reads the
+   * pending record and writes health with its nonce); HANG → starts a long-lived process that a
+   * fake `ps` reports as the new app's executable, and never writes anything.
+   */
+  async function fakeTools2(dir: string): Promise<{ launcher: string; ps: string }> {
+    const js = join(dir, 'fake-open.cjs');
     await writeFile(
-      p,
-      `#!/bin/sh
-app="$2"
-v=$(cat "$app/version.txt")
-echo "$v" >> "$FAKE_LOG"
-if [ "$v" = "$HEALTHY" ]; then
-  printf '{"version":"%s","pid":%s}' "$v" "$$" > "$FAKE_STATE/${HEALTH_FILE}"
-fi
+      js,
+      `const fs = require('fs'); const path = require('path'); const cp = require('child_process');
+const app = process.argv[3];
+const v = fs.readFileSync(path.join(app, 'version.txt'), 'utf8');
+fs.appendFileSync(process.env.FAKE_LOG, v + '\\n');
+const state = process.env.FAKE_STATE;
+if (v === process.env.HEALTHY) {
+  const p = JSON.parse(fs.readFileSync(path.join(state, ${JSON.stringify(PENDING_FILE)}), 'utf8'));
+  fs.writeFileSync(path.join(state, ${JSON.stringify(HEALTH_FILE)}), JSON.stringify({ version: v, pid: process.pid, nonce: p.nonce }));
+}
+if (v === process.env.HANG) {
+  const c = cp.spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { detached: true, stdio: 'ignore' });
+  c.unref();
+  fs.appendFileSync(process.env.FAKE_PS, c.pid + ' 1 ' + path.join(app, 'Contents', 'MacOS', 'AgentLink') + '\\n');
+  fs.writeFileSync(process.env.FAKE_HUNG, String(c.pid));
+}
 `,
-      { mode: 0o755 },
     );
-    return p;
+    const launcher = join(dir, 'fake-open.sh');
+    await writeFile(launcher, `#!/bin/sh\nexec "$FAKE_NODE" "${js}" "$@"\n`, { mode: 0o755 });
+    const ps = join(dir, 'fake-ps.sh');
+    await writeFile(ps, `#!/bin/sh\ncat "$FAKE_PS" 2>/dev/null\nexit 0\n`, { mode: 0o755 });
+    return { launcher, ps };
   }
 
   async function deadPid(): Promise<number> {
@@ -665,27 +821,59 @@ fi
     return child.pid!;
   }
 
-  async function setup(): Promise<{
-    current: string;
-    staging: string;
-    state: string;
-    launcher: string;
-    log: string;
-  }> {
+  const sleepers: number[] = [];
+  function sleeper(): number {
+    const c = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], {
+      detached: true,
+      stdio: 'ignore',
+    });
+    c.unref();
+    sleepers.push(c.pid!);
+    return c.pid!;
+  }
+  const alive = (pid: number): boolean => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  afterEach(() => {
+    for (const pid of sleepers.splice(0)) if (alive(pid)) process.kill(pid, 'SIGKILL');
+  });
+
+  async function setup() {
     const apps = join(root, 'Applications');
     const current = await fakeApp(apps, '0.5.2');
     const state = join(root, 'state');
-    const staging = join(state, 'updates', 'abc123');
+    const staging = join(state, 'updates', 'u-abc123');
     await fakeApp(join(staging, 'unpacked'), '0.5.3');
+    await mkdir(join(staging, 'previous'), { mode: 0o700 });
     const tools = join(root, 'tools');
     await mkdir(tools);
-    return {
-      current,
-      staging,
-      state,
-      launcher: await fakeLauncher(tools),
-      log: join(tools, 'log'),
+    const { launcher, ps } = await fakeTools2(tools);
+    const env = {
+      FAKE_LOG: join(tools, 'log'),
+      FAKE_STATE: state,
+      FAKE_PS: join(tools, 'ps.txt'),
+      FAKE_HUNG: join(tools, 'hung'),
+      FAKE_NODE: process.execPath,
+      HEALTHY: 'none',
+      HANG: 'none',
     };
+    const plan = (pid: number, timeoutMs: number): string[] =>
+      watchdogArgs({
+        pid,
+        currentApp: current,
+        stagingDir: staging,
+        stateDir: state,
+        version: '0.5.3',
+        launcher,
+        timeoutMs,
+        ps,
+      });
+    return { apps, current, staging, state, env, plan, log: env.FAKE_LOG };
   }
 
   function runWatchdog(
@@ -699,60 +887,132 @@ fi
     return new Promise((r) => child.on('exit', (code) => r(code)));
   }
 
-  it('success: swaps the bundles, launches the new one, removes the old copy', async () => {
+  const versionAt = (app: string): Promise<string> => readFile(join(app, 'version.txt'), 'utf8');
+  const launched = async (log: string): Promise<string[]> =>
+    (await readFile(log, 'utf8').catch(() => '')).trim().split('\n').filter(Boolean);
+
+  it('success: swaps, the new copy answers the nonce, the old copy is removed', async () => {
     const s = await setup();
-    const args = watchdogArgs({
-      pid: await deadPid(),
-      currentApp: s.current,
-      stagingDir: s.staging,
-      stateDir: s.state,
-      version: '0.5.3',
-      launcher: s.launcher,
-      timeoutMs: 5000,
-    });
-    const code = await runWatchdog(args, {
-      FAKE_LOG: s.log,
-      FAKE_STATE: s.state,
-      HEALTHY: '0.5.3',
-    });
+    const code = await runWatchdog(s.plan(await deadPid(), 5000), { ...s.env, HEALTHY: '0.5.3' });
     expect(code).toBe(0);
-    expect(await readFile(join(s.current, 'version.txt'), 'utf8')).toBe('0.5.3');
-    expect((await readFile(s.log, 'utf8')).trim()).toBe('0.5.3');
+    expect(await versionAt(s.current)).toBe('0.5.3');
+    expect(await launched(s.log)).toEqual(['0.5.3']);
     await expect(stat(s.staging)).rejects.toThrow();
+    await expect(stat(join(s.state, PENDING_FILE))).rejects.toThrow();
     expect(await loadFailedVersion(s.state)).toBeNull();
+  });
+
+  it('a leftover health file for the same version never counts (no nonce match) → rollback', async () => {
+    const s = await setup();
+    await mkdir(s.state, { recursive: true });
+    await writeFile(
+      join(s.state, HEALTH_FILE),
+      JSON.stringify({ version: '0.5.3', pid: 999, nonce: 'stale'.padEnd(32, '0') }),
+    );
+    const code = await runWatchdog(s.plan(await deadPid(), 1500), s.env);
+    expect(code).toBe(2);
+    expect(await versionAt(s.current)).toBe('0.5.2');
+    expect(await loadFailedRecord(s.state)).toEqual({ version: '0.5.3', reason: 'unhealthy' });
   });
 
   it('health timeout: restores the old bundle, relaunches it and records failedVersion', async () => {
     const s = await setup();
-    const args = watchdogArgs({
-      pid: await deadPid(),
-      currentApp: s.current,
-      stagingDir: s.staging,
-      stateDir: s.state,
-      version: '0.5.3',
-      launcher: s.launcher,
-      timeoutMs: 1500,
-    });
-    const code = await runWatchdog(args, {
-      FAKE_LOG: s.log,
-      FAKE_STATE: s.state,
-      HEALTHY: 'never',
-    });
+    const code = await runWatchdog(s.plan(await deadPid(), 1500), s.env);
     expect(code).toBe(2);
-    expect(await readFile(join(s.current, 'version.txt'), 'utf8')).toBe('0.5.2');
-    expect((await readFile(s.log, 'utf8')).trim().split('\n')).toEqual(['0.5.3', '0.5.2']);
-    expect(await loadFailedVersion(s.state)).toBe('0.5.3');
+    expect(await versionAt(s.current)).toBe('0.5.2');
+    expect(await launched(s.log)).toEqual(['0.5.3', '0.5.2']);
+    expect(await loadFailedRecord(s.state)).toEqual({ version: '0.5.3', reason: 'unhealthy' });
     expect((await stat(join(s.state, FAILED_FILE))).mode & 0o777).toBe(0o600);
   });
 
+  it('a new copy that hangs before writing anything is found by its executable and stopped', async () => {
+    const s = await setup();
+    const code = await runWatchdog(s.plan(await deadPid(), 1500), { ...s.env, HANG: '0.5.3' });
+    expect(code).toBe(2);
+    const hung = Number(await readFile(s.env.FAKE_HUNG, 'utf8'));
+    sleepers.push(hung);
+    expect(alive(hung)).toBe(false);
+    expect(await versionAt(s.current)).toBe('0.5.2');
+    expect(await launched(s.log)).toEqual(['0.5.3', '0.5.2']);
+  });
+
+  it('a pid from update-starting.json that is not the new app is never signalled', async () => {
+    const s = await setup();
+    const other = sleeper();
+    await mkdir(s.state, { recursive: true });
+    await writeFile(join(s.state, STARTING_FILE), JSON.stringify({ version: '0.5.3', pid: other }));
+    // ps reports the pid with another executable.
+    await writeFile(s.env.FAKE_PS, `${other} 1 /usr/bin/some-other-tool\n`);
+    const code = await runWatchdog(s.plan(await deadPid(), 1500), s.env);
+    expect(code).toBe(2);
+    expect(alive(other)).toBe(true);
+  });
+
+  it('the app does not quit: nothing changes, failedVersion records not_quit, staging removed', async () => {
+    const s = await setup();
+    const running = sleeper();
+    const code = await runWatchdog(s.plan(running, 1000), s.env);
+    expect(code).toBe(3);
+    expect(await versionAt(s.current)).toBe('0.5.2');
+    expect(await launched(s.log)).toEqual([]);
+    expect(await loadFailedRecord(s.state)).toEqual({ version: '0.5.3', reason: 'not_quit' });
+    await expect(stat(s.staging)).rejects.toThrow();
+  });
+
+  it.skipIf(process.getuid?.() === 0)(
+    'the app folder refuses the rename (App Management denial): not_permitted, old copy relaunched, no loop',
+    async () => {
+      const s = await setup();
+      await chmod(s.apps, 0o555);
+      try {
+        const code = await runWatchdog(s.plan(await deadPid(), 1000), s.env);
+        expect(code).toBe(4);
+      } finally {
+        await chmod(s.apps, 0o755);
+      }
+      expect(await versionAt(s.current)).toBe('0.5.2');
+      expect(await launched(s.log)).toEqual(['0.5.2']);
+      expect(await loadFailedRecord(s.state)).toEqual({
+        version: '0.5.3',
+        reason: 'not_permitted',
+      });
+      await expect(stat(s.staging)).rejects.toThrow();
+    },
+  );
+
+  it.skipIf(process.getuid?.() === 0)(
+    'a half-done rollback still leaves a runnable app at the path',
+    async () => {
+      const s = await setup();
+      const done = runWatchdog(s.plan(await deadPid(), 3000), s.env);
+      // Once the new copy was launched, make the old copy impossible to move back.
+      for (let i = 0; i < 100 && (await launched(s.log)).length === 0; i += 1)
+        await new Promise((r) => setTimeout(r, 50));
+      await chmod(join(s.staging, 'previous'), 0o555);
+      let code: number | null;
+      try {
+        code = await done;
+      } finally {
+        await chmod(join(s.staging, 'previous'), 0o755);
+      }
+      expect(code).toBe(5);
+      expect(await versionAt(s.current)).toBe('0.5.3');
+      expect(await stat(join(s.current, 'Contents', 'MacOS', 'AgentLink'))).toBeTruthy();
+      expect(await versionAt(join(s.staging, 'previous', 'AgentLink.app'))).toBe('0.5.2');
+      expect(await loadFailedRecord(s.state)).toEqual({
+        version: '0.5.3',
+        reason: 'rollback_incomplete',
+      });
+    },
+  );
+
   it('refuses bad arguments without touching anything', async () => {
     const s = await setup();
-    const code = await runWatchdog(
-      ['1', join(root, 'Elsewhere', 'Evil.app'), s.staging, s.state, '0.5.3', s.launcher, '1000'],
-      { FAKE_LOG: s.log, FAKE_STATE: s.state, HEALTHY: '0.5.3' },
-    );
+    const args = s.plan(1, 1000);
+    args[1] = join(root, 'Elsewhere', 'Evil.app');
+    const code = await runWatchdog(args, s.env);
     expect(code).toBe(64);
-    expect(await readFile(join(s.current, 'version.txt'), 'utf8')).toBe('0.5.2');
-    await expect(stat(s.log)).rejects.toThrow();
+    expect(await versionAt(s.current)).toBe('0.5.2');
+    expect(await launched(s.log)).toEqual([]);
   });
 });
