@@ -42,6 +42,16 @@ export type InboxSaveError = 'disk_full';
  */
 export type QuarantineMark = 'marked' | 'unsupported' | 'failed';
 
+/**
+ * RET-2 (D-148; 07 §3.8): who a saved file is on its volume: the device and inode as decimal text
+ * (they can exceed 2^53), and its size in bytes. Read without following a link.
+ */
+export interface SavedFileIdentity {
+  readonly dev: string;
+  readonly ino: string;
+  readonly size: number;
+}
+
 /** The inbox folder (`files.inboxFolder`) as the platform resolved it. */
 export interface InboxFolder {
   /** Its realpath (absolute). */
@@ -57,6 +67,12 @@ export interface InboxFolder {
   mark?(name: string): Promise<QuarantineMark>;
   /** W4-AUTO-SAVE: true when `name` is a regular file directly inside the folder (no link followed). */
   isSavedFile?(name: string): Promise<boolean>;
+  /**
+   * RET-2 (D-148; 07 §3.8): the device, inode and size of `name` when it is a regular file directly
+   * inside the folder (no link followed, the folder handle still the same); otherwise undefined.
+   * Recorded in the saved-file index so a later delete touches only the file the app saved.
+   */
+  identify?(name: string): Promise<SavedFileIdentity | undefined>;
   /**
    * REL051-A12: the bytes of `name` when it is a regular file directly inside the folder (no link
    * followed) of at most `maxBytes`; otherwise undefined. The core re-hashes them before any use.

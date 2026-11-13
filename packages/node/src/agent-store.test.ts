@@ -59,6 +59,7 @@ describe('openAgentStoreWith', () => {
     expect(Object.isFrozen(opened.store)).toBe(true);
     expect(Object.keys(opened.store).sort()).toEqual([
       'close',
+      'compact',
       'schemaVersion',
       'transaction',
       'withInterProcessLock',

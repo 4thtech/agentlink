@@ -123,14 +123,18 @@ export interface AutoSaverOptions {
 
 export class AutoSaver {
   readonly #ctx: CoreContext;
-  readonly #fetcher: Pick<FileFetcher, 'fetch' | 'available'>;
+  readonly #fetcher: Pick<FileFetcher, 'fetch' | 'available'> &
+    Partial<Pick<FileFetcher, 'backfillSavedFiles'>>;
   readonly #loadPolicy: () => Promise<EffectivePolicy>;
   readonly #pause: AutoSavePause | undefined;
   #running: Promise<AutoSaveRun> | undefined;
+  /** RET-2: the saved-file index backfill ran in this process (once, with the first run). */
+  #backfilled = false;
 
   constructor(
     ctx: CoreContext,
-    fetcher: Pick<FileFetcher, 'fetch' | 'available'>,
+    fetcher: Pick<FileFetcher, 'fetch' | 'available'> &
+      Partial<Pick<FileFetcher, 'backfillSavedFiles'>>,
     loadPolicy: () => Promise<EffectivePolicy>,
     options: AutoSaverOptions = {},
   ) {
@@ -172,6 +176,16 @@ export class AutoSaver {
     const ctx = this.#ctx;
     if (!this.#fetcher.available) return NOTHING; // no file system (the cloud agent, 06 §2.3)
     if (this.#pause !== undefined && (await this.#pause.paused())) return NOTHING;
+    if (!this.#backfilled && this.#fetcher.backfillSavedFiles !== undefined) {
+      // RET-2 (07 §3.8): index the files saved before schema version 15, once per process. Best
+      // effort: a failure only leaves them unassigned (counts in the log, never a name).
+      this.#backfilled = true;
+      try {
+        await this.#fetcher.backfillSavedFiles();
+      } catch {
+        ctx.log.warn('saved files not indexed', { code: 'backfill_failed' });
+      }
+    }
     const now = nowOf(ctx);
     const due = await ctx.store.transaction((tx) =>
       tx.select(

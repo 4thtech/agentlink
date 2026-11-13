@@ -105,6 +105,7 @@ async function insertEnvelope(
         row.delivery === undefined ? (row.direction === 'out' ? 'sent' : null) : row.delivery,
       refused_at: null,
       request_accepted_at: null,
+      deleted_at: null,
     }),
   );
   return id;

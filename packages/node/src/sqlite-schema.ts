@@ -96,6 +96,10 @@ const V13_MCP_SESSIONS_COLUMNS: readonly string[] = ['version'];
 /** Invites columns added by version 14 (REL051-B2): the kept link of an open invite (sealed). */
 const V14_INVITES_COLUMNS: readonly string[] = ['invite_link'];
 
+/** Envelopes columns and tables added by version 15 (RET-2, D-148): tombstones and saved files. */
+const V15_ENVELOPE_COLUMNS: readonly string[] = ['deleted_at'];
+const V15_TABLES: readonly TableName[] = ['saved_files'];
+
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
   return {
@@ -112,7 +116,8 @@ function without(spec: TableSpec, columns: readonly string[]): TableSpec {
  */
 function v1Spec(table: TableName): TableSpec {
   const spec = tableSpec(table);
-  if (table === 'envelopes') return without(spec, V2_ENVELOPE_COLUMNS);
+  if (table === 'envelopes')
+    return without(spec, [...V2_ENVELOPE_COLUMNS, ...V15_ENVELOPE_COLUMNS]);
   if (table === 'files') {
     return without(spec, [...V4_FILES_COLUMNS, ...V6_FILES_COLUMNS, ...V11_FILES_COLUMNS]);
   }
@@ -155,6 +160,26 @@ function v14Statements(): readonly string[] {
     (column) =>
       `ALTER TABLE "invites" ADD COLUMN ${columnDef('invites', column, invites.columns[column] as ColumnSpec)}`,
   );
+}
+
+/**
+ * Version 15 (RET-2, D-148; 07 §3.8; proposed, owner confirms at merge): `envelopes.deleted_at`,
+ * appended, nullable (null on every existing row: nothing is deleted), and the `saved_files` table,
+ * empty. Its backfill from the `files` rows that still record a saved name runs in the core
+ * (FileFetcher.backfillSavedFiles), because the index seals values under its own row keys and reads
+ * each file's device and inode; SQL here cannot. The one-time `auto_vacuum=INCREMENTAL` switch is
+ * not a statement here either: it needs a VACUUM outside any transaction, under the ID lock
+ * (SqliteStore.open).
+ */
+function v15Statements(): readonly string[] {
+  const envelopes = tableSpec('envelopes');
+  return [
+    ...V15_ENVELOPE_COLUMNS.map(
+      (column) =>
+        `ALTER TABLE "envelopes" ADD COLUMN ${columnDef('envelopes', column, envelopes.columns[column] as ColumnSpec)}`,
+    ),
+    ...createSchemaStatements(V15_TABLES),
+  ];
 }
 
 /**
@@ -261,7 +286,9 @@ function v11Statements(): readonly string[] {
  * 11 adds the auto-save columns and tables (W4-AUTO-SAVE, D-142; nullable, null on existing rows),
  * version 12 adds `agent_pause` (W4-PAUSE, D-143 (5); a new table, no row: not paused), version 13
  * adds `mcp_sessions.version` (WP-13, F45; nullable, null on existing rows), version 14 adds
- * `invites.invite_link` (REL051-B2; nullable, null on existing rows). A later
+ * `invites.invite_link` (REL051-B2; nullable, null on existing rows), version 15 adds
+ * `envelopes.deleted_at` and `saved_files` (RET-2, D-148; nullable, null on existing rows, and a new
+ * table). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -278,7 +305,8 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
           !V7_TABLES.includes(t) &&
           !V10_TABLES.includes(t) &&
           !V11_TABLES.includes(t) &&
-          !V12_TABLES.includes(t),
+          !V12_TABLES.includes(t) &&
+          !V15_TABLES.includes(t),
       ),
       v1Spec,
     ),
@@ -296,6 +324,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 12, statements: createSchemaStatements(V12_TABLES) }),
   Object.freeze({ version: 13, statements: Object.freeze(v13Statements()) }),
   Object.freeze({ version: 14, statements: Object.freeze(v14Statements()) }),
+  Object.freeze({ version: 15, statements: Object.freeze(v15Statements()) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

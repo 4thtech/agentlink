@@ -618,7 +618,14 @@ export type {
   InboxSaveError,
   OutgoingFile,
   QuarantineMark,
+  SavedFileIdentity,
 } from './files/platform.js';
+// RET-2 (D-148; 07 §3.8): the saved-file index, read by the history delete (RET-3).
+export {
+  openSavedFile,
+  type BackfillSavedFilesResult,
+  type SavedFileView,
+} from './files/saved-files.js';
 export {
   AUTO_SAVE_CONCURRENCY,
   AUTO_SAVE_PAUSE_RECHECK_SECONDS,

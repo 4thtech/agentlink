@@ -146,6 +146,27 @@ describe('nodeFilesPlatform', () => {
     expect(await readFile(path.join(home, 'outside.txt'), 'utf8')).toBe('SECRET');
   });
 
+  it('inbox identify (RET-2): device, inode and size of a regular file; never a link or a folder', async () => {
+    const platform = nodeFilesPlatform({ home, drop: false });
+    const inbox = await platform.inbox('~/AgentLink/Inbox');
+    try {
+      await writeFile(path.join(inbox.realpath, 'saved.txt'), 'hello');
+      const info = await lstat(path.join(inbox.realpath, 'saved.txt'), { bigint: true });
+      expect(await inbox.identify?.('saved.txt')).toEqual({
+        dev: info.dev.toString(),
+        ino: info.ino.toString(),
+        size: 5,
+      });
+      await symlink(path.join(home, 'outside.txt'), path.join(inbox.realpath, 'link.txt'));
+      await mkdir(path.join(inbox.realpath, 'folder'));
+      for (const name of ['link.txt', 'folder', 'missing.txt', '../outside.txt', 'a/b', '']) {
+        expect(await inbox.identify?.(name), name).toBeUndefined();
+      }
+    } finally {
+      await inbox.close?.();
+    }
+  });
+
   it('inbox: a hidden or protected inbox folder is refused', async () => {
     const platform = nodeFilesPlatform({ home, drop: false });
     await expect(platform.inbox('~/.hidden/Inbox')).rejects.toThrow();

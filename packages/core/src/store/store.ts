@@ -66,6 +66,12 @@ export interface Store {
   readonly schemaVersion: number;
   /** Runs `body` as one serializable, all-or-nothing transaction (07 §3.1). */
   transaction<R>(body: (tx: StoreTx) => R): Promise<R>;
+  /**
+   * RET-2 (D-148; 04 §4.2 "Space on disk"): returns freed space to the file system after a large
+   * delete, best effort (SQLite: `PRAGMA incremental_vacuum`). Absent where there is nothing to
+   * return (in memory). Never part of a transaction.
+   */
+  compact?(): Promise<void>;
   close(): Promise<void>;
 }
 
