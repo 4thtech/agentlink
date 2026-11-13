@@ -204,6 +204,8 @@ export const HOME_STRINGS = {
   freeText: 'Free',
   selectApproval: 'Select {summary}',
   approveSelected: 'Approve {count} selected',
+  // OWNERSTEP-LEFT: the bulk approve is one step; the button is the sensor (Touch ID in the Mac app).
+  approveSelectedWith: 'Approve {count} with {sensor}',
   paidAlone: 'Approvals that cost money are always approved one at a time.',
   approvedSelected: 'Approved {count}.',
 

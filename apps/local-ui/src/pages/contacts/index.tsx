@@ -134,6 +134,9 @@ interface Pending {
   readonly summary: string;
 }
 
+/** Which owner button a pending step belongs to (its action and contact). */
+const keyOf = (pending: Pending): string => `${pending.what}:${pending.ref}`;
+
 const DATE = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
   month: 'short',
@@ -510,7 +513,8 @@ function Detail({
   const dupNoticeId = useId();
   const reduced = useReducedMotion();
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | undefined>(undefined);
+  // IR-UX1113-N2-1 #3: the error belongs to the one button that asked (Rename, Block, ...).
+  const [error, setError] = useState<{ readonly key: string; readonly text: string }>();
   const [notice, setNotice] = useState<string | undefined>(undefined);
   const wantedAlias = alias.trim();
   const aliasCheck = useAliasCheck(api, ref, wantedAlias, renaming);
@@ -553,11 +557,20 @@ function Detail({
             return;
           }
           if (result.kind === 'wait') {
-            setError(waitSeconds(result.seconds));
+            setError({ key: keyOf(pending), text: waitSeconds(result.seconds) });
             return;
           }
           if (result.kind === 'rejected' || result.kind === 'required') {
-            setError(proof.kind === 'code' ? MESSAGE[result.kind] : S.passkeyNotUsed);
+            // IR-UX1113-N2-1 #2: a sensor proof the server refused was used, not "wasn't used".
+            setError({
+              key: keyOf(pending),
+              text:
+                (proof.kind === 'code'
+                  ? MESSAGE[result.kind]
+                  : result.kind === 'required'
+                    ? S.sensorUnavailable
+                    : S.sensorRefused) ?? S.failed,
+            });
             return;
           }
           // Nothing was changed: close the step and say so; a check compares again.
@@ -587,7 +600,7 @@ function Detail({
       withCode={words.code}
       statement={pending.summary}
       busy={busy}
-      error={error}
+      error={error?.key === keyOf(pending) ? error.text : undefined}
       notUsed={S.passkeyNotUsed}
       onProof={(proof) => run(pending, proof)}
       owner={owner}

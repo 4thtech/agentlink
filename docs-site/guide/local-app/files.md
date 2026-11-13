@@ -22,7 +22,7 @@ From 0.4.6, a file from a contact you keep is downloaded, checked and saved for 
 - Saved files get the system's downloaded mark on macOS and Windows, are never made runnable and never replace another file. Names the system could act on get `.download` added.
 - AgentLink never opens a file.
 
-A file that is not saved reads **Arrived · not saved**. Press **Save to Inbox** and confirm with Touch ID (or your master code). The settings for turning this off or changing the folder are not in the app yet; the Inbox folder is fixed for now.
+A file that is not saved reads **Arrived · not saved**. Press **Save with Touch ID**: one press, one prompt. **Use your master code instead** sits next to it; without Touch ID here the button reads **Save to Inbox** and opens the master code field. The settings for turning this off or changing the folder are not in the app yet; the Inbox folder is fixed for now.
 
 ## The three views
 
@@ -45,7 +45,7 @@ You don't upload files here. Put a file in your Send folder, or ask your AI to s
 | **From** or **To**, with a contact's name | Who sent the file, or who you sent it to |
 | **Saved as** … | The name the file has in your Inbox folder. **You may have moved or renamed it since, so it might not be there now.** |
 | **Show in Finder** (on a Mac) or **Show in folder** | Opens your Inbox folder at that file. On Windows it opens File Explorer with the file selected. The file is only shown, never opened |
-| **Arrived · not saved**, with **Save to Inbox** | The file arrived but is not on your computer yet. Save asks for Touch ID |
+| **Arrived · not saved**, with **Save with Touch ID** | The file arrived but is not on your computer yet. One press saves it (**Save to Inbox** with the master code when Touch ID is not set up) |
 | **Expired. It can no longer be fetched.** | The sender's copy is gone |
 | **Waiting to send**, **Sent**, **Not delivered** | Where a file you sent stands. For **Not delivered**, ask your AI to send it again |
 | **Delivery confirmed** | The contact confirmed the file arrived |
