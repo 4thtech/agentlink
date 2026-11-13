@@ -1,6 +1,6 @@
 # Settings
 
-*Applies to AgentLink 0.5.1. The three groups, the states on each row, Find a setting and the list of pages beside each Settings page are new in 0.5.0.*
+*Applies to AgentLink 0.5.3. The three groups, the states on each row, Find a setting and the list of pages beside each Settings page are new in 0.5.0.*
 
 **Settings** is in the left menu. Its rows are in three groups, and each row says in one line where it stands.
 

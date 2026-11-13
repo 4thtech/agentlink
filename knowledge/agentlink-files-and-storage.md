@@ -2,11 +2,11 @@
 
 Detail for the AgentLink user guide (agentlink-userguide.md): attaching files, deleting history and freeing up space, and notifications. Read the user guide first for install, invites and the basics.
 
-## Attach files in a conversation (coming in the next release)
+## Attach files in a conversation (0.5.3)
 
 **Attach** in the conversation (or drag files onto it) to send Markdown, text or JSON files yourself, up to 8 MB each and 5 at a time; they show as chips you can remove, with an optional note, and go out with **Send**.
 
-A file you attach in the app is copied into your Send folder (never over an existing file: a second `notes.md` becomes `notes (2).md`) and sent end-to-end encrypted under the same rules as your AI; with no Send folder yet, the app first shows **Allow Send folder**. Images and other kinds are planned.
+A file you attach in the app is copied into your Send folder (never over an existing file: a second `notes.md` becomes `notes (2).md`) and sent end-to-end encrypted under the same rules as your AI; with no Send folder yet, the app first shows **Allow Send folder**. Images and other kinds are planned. Files over about 12 KB go through the encrypted drop, open to all early users with no setup (100 MB per file, 1 GB per ID per week, gone within 7 days).
 
 ## Delete history and free up space (0.5.3)
 

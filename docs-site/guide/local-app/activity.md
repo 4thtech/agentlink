@@ -1,6 +1,6 @@
 # Activity
 
-*Applies to AgentLink 0.5.1. Plain sentences, the counts, the filters and opened rows are new in 0.5.0; the warning for an invite someone else also answered is new in 0.5.1.*
+*Applies to AgentLink 0.5.3. Plain sentences, the counts, the filters and opened rows are new in 0.5.0; the warning for an invite someone else also answered is new in 0.5.1.*
 
 Activity is everything that was decided or changed in your name, by you or by your rules, newest first. Every row is one plain sentence with the person's name, the file and the cost where known, for example *"You approved sending Q3-plan.pdf to Natasa"* or *"You accepted Ana's invite"*. It does not show what your messages say.
 

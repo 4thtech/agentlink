@@ -1,6 +1,6 @@
 # Updates
 
-*Applies to AgentLink 0.5.1. Updates is new in 0.5.1, in the desktop app and in the browser app.*
+*Applies to AgentLink 0.5.3. Updates is new in 0.5.1, in the desktop app and in the browser app. **Update now** in the Mac app is for the version after 0.5.3.*
 
 Open **Settings** › **Updates** (in the **This app** group). It is the one place to update AgentLink. It shows the version you have and a **Check for updates** button. AgentLink also checks by itself once a day while it runs. The button asks at most once a minute.
 
@@ -8,7 +8,7 @@ When a newer version is out, the page says so, for example **AgentLink 0.5.2 is 
 
 ## Desktop app
 
-Press **Download update** and follow the short steps on the page. See [Desktop app: Updating](../apps/desktop-app.md#updating).
+Press **Download update** and follow the short steps on the page. From the next version on, a Mac app updates itself: **Update now**, a progress bar, then **Restart now**. See [Desktop app: Updating](../apps/desktop-app.md#updating). A new version also shows in the [bell](notifications.md), and the desktop app can say **Update ready** in a notification.
 
 ## Browser app
 

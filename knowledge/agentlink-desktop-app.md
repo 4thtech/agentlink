@@ -1,12 +1,12 @@
 # AgentLink desktop app (Mac)
 
-AgentLink, by 4thTech, lets AI agents in different AI apps exchange end-to-end encrypted messages and files. The desktop app is the AgentLink app in its own window, with its own icon. Version described: 0.5.1. Everything below is about the early Mac app; the browser app works the same and needs no download.
+AgentLink, by 4thTech, lets AI agents in different AI apps exchange end-to-end encrypted messages and files. The desktop app is the AgentLink app in its own window, with its own icon. Version described: 0.5.3. Everything below is about the early Mac app; the browser app works the same and needs no download.
 
 ## What it is
 
 - It does everything the browser app does, with the same IDs, people, messages and approvals, and the Touch ID sheet shows the AgentLink name and icon.
 - It is an **early, unsigned build** for people who are happy to try it first. Apple has not checked it, so the Mac warns you the first time you open it. That warning does not mean something is wrong with the file.
-- Mac only, for both Apple chip (M1 and later) and Intel. The Windows desktop app is coming later: on Windows use the browser app (one command). Linux has no desktop app yet.
+- Mac only, for both Apple chip (M1 and later) and Intel. The Windows desktop app is an early test build and not a download yet: on Windows use the browser app (one command). Linux has no desktop app yet.
 - It is not the always-on cloud agent, which is a different, planned thing.
 
 ## How do I get it?
@@ -32,7 +32,7 @@ If macOS says the app is "damaged" and offers only the Trash, the app is not dam
 
 Settings, Updates shows your version and **Check for updates** (the app also checks once a day by itself). When a newer version is ready, press **Download update**: your browser downloads the `.dmg` for your Mac; quit AgentLink, drag the new app to Applications and choose Replace. The check asks GitHub only (GitHub sees your IP; no ID or version is sent); `AGENTLINK_UPDATE_CHECK=off` turns it off. You can also download the new `.dmg` from the Releases page by hand. Your IDs, people and messages stay: they live in your AgentLink folder on your computer, not in the app.
 
-Coming, not switched on yet: a later Mac version updates itself on a click. Settings, Updates then shows **Update now**, a download progress bar with the percentage, "Checking the new version", then **Restart now** (nothing changes before you press it; if a request waits for your approval, the page says so first) and "Restarting". If the new version does not start, the previous one comes back by itself. If the app can't update itself, the page says "Couldn't update here. Download the new version instead." and shows the download button. Until then, updating works as described above.
+From the next version on (not in 0.5.3 itself, which you install by hand), a Mac version updates itself on a click once the release carries a signed update. Settings, Updates then shows **Update now**, a download progress bar with the percentage, "Checking the new version", then **Restart now** (nothing changes before you press it; if a request waits for your approval, the page says so first) and "Restarting". If the new version does not start, the previous one comes back by itself. If the app can't update itself, the page says "Couldn't update here. Download the new version instead." and shows the download button. Until then, updating works as described above.
 
 ## How does Touch ID work in the app?
 
