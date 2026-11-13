@@ -39,6 +39,9 @@
 /apps/desktop/                                  @talirezun @denisjazbec
 /apps/cli/src/desktop/                          @talirezun @denisjazbec
 /tools/desktop/                                 @talirezun @denisjazbec
+# UPD-3 (Fable L3, D-151): the update key pinned in every installed app; also a sensitive path in
+# review-gate.yml (a pin change needs the independent review and the owner's "merge").
+/apps/desktop/src/main/updater/root-key*.json   @talirezun @denisjazbec
 
 # CI, release and repository configuration (incl. this file, review-gate and release workflows)
 /.github/                                       @talirezun @denisjazbec

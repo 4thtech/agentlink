@@ -9,6 +9,11 @@
 // so the app's updater is not configured and never fetches. Allowed in CI, because nothing in it can
 // be updated; it must carry the updates-off mark and no placeholder. Switch to `--updates on` after
 // the key ceremony (then the real key is required, as before).
+//
+// UPD-3 (Fable L3, D-151): an updates-on build must also carry EXACTLY the key of root-key.json in its
+// ASAR (the bundled main process holds it as text), and the build records the pin it shipped in
+// inputs-<target>.json (`updatePinRecord`), so the release checks it once more against root-key.json
+// and against the signing key before anything is signed (tools/release/desktop-update-manifest.mjs).
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { decodeHex, isBip340PublicKey } from '@4thtech-io/crypto';
@@ -75,9 +80,24 @@ export function assertRootKeyPinned({ rootKeyJson, files, env = process.env, upd
     throw new Error(`release build refused: ${problems.join('; ')}`);
   }
   const problems = [...rootKeyProblems(rootKeyJson), ...placeholder];
-  if (problems.length === 0) return 'pinned';
+  if (problems.length === 0) {
+    const pin = Buffer.from(JSON.parse(rootKeyJson).rootPublicKey);
+    if (files.some((f) => Buffer.from(f.content).includes(pin))) return 'pinned';
+    problems.push('the release ASAR does not carry the pinned update key of root-key.json');
+  }
   if (ownerLocal(env)) return 'owner-local';
   throw new Error(`release build refused: ${problems.join('; ')}`);
 }
 
 export const readRootKeyJson = (desktopDir) => readFileSync(rootKeyJsonPath(desktopDir), 'utf8');
+
+/**
+ * What inputs-<target>.json records about updates: `{updates: 'on'|'off', updatePin}`. `updatePin` is
+ * the pinned key only for a 'pinned' build; an owner-local build records `on` with no pin, which the
+ * release refuses.
+ */
+export function updatePinRecord({ mode, rootKeyJson }) {
+  if (mode === 'updates-off') return { updates: 'off', updatePin: null };
+  if (mode === 'pinned') return { updates: 'on', updatePin: JSON.parse(rootKeyJson).rootPublicKey };
+  return { updates: 'on', updatePin: null };
+}

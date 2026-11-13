@@ -583,6 +583,10 @@ export const MARK_PATHS: readonly string[] = Object.freeze([
   '/api/ui/notifications/:id/read',
   '/api/ui/notifications/read-all',
   '/api/ui/notifications/refresh',
+  // UPD-5: "Update now" and "Restart now" in Settings › Updates (api/app-update.ts). They pass no
+  // value; the desktop shell installs only the update it verified itself.
+  '/api/ui/app-update/install',
+  '/api/ui/app-update/restart',
 ]);
 
 export type LocalUiRoute =

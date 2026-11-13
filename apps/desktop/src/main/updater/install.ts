@@ -112,6 +112,13 @@ export interface InstallDeps {
   readonly readRecord: (resourcesPath: string) => Promise<string | null>;
   readonly spawnDetached: SpawnDetached;
   readonly onProgress?: DownloadProgress;
+  /** UPD-5: the download is complete; the zip and the app are being checked now. */
+  readonly onVerifying?: () => void;
+  /**
+   * UPD-5 (OD-D option 1, on a click): resolves when the person chooses "Restart now". The staged
+   * app is checked again after it, right before the watchdog starts (it waited on disk meanwhile).
+   */
+  readonly confirmRestart?: () => Promise<void>;
   /** Tests only: replaces preflightSwap. */
   readonly preflight?: (currentApp: string, updatesDir: string) => Promise<void>;
 }
@@ -138,15 +145,22 @@ export async function installUpdate(deps: InstallDeps): Promise<InstallOutcome> 
       ...(deps.onProgress !== undefined ? { onProgress: deps.onProgress } : {}),
     });
     dir = zip.dir;
+    deps.onVerifying?.();
     await recheckZip(zip.zipPath, accepted.asset);
     const app = await unpackZip(zip.zipPath, join(dir, UNPACKED_DIR), deps.run);
-    await verifyStagedApp(app, {
+    const checks = {
       version: accepted.version,
       run: deps.run,
       installedNode: bundledNode(deps.currentApp),
       readRecord: deps.readRecord,
-    });
+    };
+    await verifyStagedApp(app, checks);
     await rm(zip.zipPath, { force: true });
+    if (deps.confirmRestart !== undefined) {
+      await deps.confirmRestart();
+      // It waited on disk for the click: the same checks again, right before the swap.
+      await verifyStagedApp(app, checks);
+    }
     await mkdir(join(dir, PREVIOUS_DIR), { mode: 0o700 });
     startWatchdog(
       {
@@ -180,6 +194,8 @@ export function installFromProcess(opts: {
   readonly pid: number;
   readonly fetch?: FetchLike;
   readonly onProgress?: DownloadProgress;
+  readonly onVerifying?: () => void;
+  readonly confirmRestart?: () => Promise<void>;
 }): Promise<InstallOutcome> {
   const currentApp = appBundleOf(opts.execPath);
   if (currentApp === null) return Promise.resolve({ kind: 'fallback', code: 'not_in_place' });
@@ -193,6 +209,8 @@ export function installFromProcess(opts: {
     readRecord: readRecordFromAsar,
     spawnDetached: realSpawnDetached,
     ...(opts.onProgress !== undefined ? { onProgress: opts.onProgress } : {}),
+    ...(opts.onVerifying !== undefined ? { onVerifying: opts.onVerifying } : {}),
+    ...(opts.confirmRestart !== undefined ? { confirmRestart: opts.confirmRestart } : {}),
   });
 }
 

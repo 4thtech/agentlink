@@ -192,7 +192,9 @@ export {
 // REL051-UPD2: and in the browser app (apps/cli/src/runtime/npm-update-check.ts).
 export {
   APP_UPDATE_CHECK_PATH,
+  APP_UPDATE_INSTALL_PATH,
   APP_UPDATE_PATH,
+  APP_UPDATE_RESTART_PATH,
   type AppUpdateInstall,
   type AppUpdateState,
   type AppUpdateView,
