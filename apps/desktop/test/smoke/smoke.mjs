@@ -15,8 +15,8 @@
 // switch (switches.ts, fuses), which is exactly what `_electron.launch` passes, so a window-level
 // check (Welcome shown, `typeof PublicKeyCredential === 'undefined'`) needs a test seam in the shell
 // (open question for WP-D2). Nothing here prints a link, token or file content.
-import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -26,6 +26,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 const fail = (reason) => {
   console.error(`desktop smoke FAILED: ${reason}`);
   process.exitCode = 1;
+  diagnose();
 };
 
 function arg(name) {
@@ -65,6 +66,53 @@ const env = {
 };
 mkdirSync(env.APPDATA, { recursive: true });
 mkdirSync(env.LOCALAPPDATA, { recursive: true });
+
+// A fresh runner has no usable keychain under a temporary HOME (the same setup as
+// tools/ci/golden-path-published.mjs): on macOS the throw-away profile gets its own unlocked login
+// keychain, the way a person's login keychain is. The app's own keychain use is unchanged. Windows
+// has the Credential Manager.
+if (process.platform === 'darwin') {
+  const keychain = join(home, 'Library', 'Keychains', 'login.keychain-db');
+  mkdirSync(join(home, 'Library', 'Keychains'), { recursive: true });
+  for (const args of [
+    ['create-keychain', '-p', 'ci', keychain],
+    ['default-keychain', '-s', keychain],
+    ['unlock-keychain', '-p', 'ci', keychain],
+    ['set-keychain-settings', keychain],
+  ]) {
+    const r = spawnSync('security', args, { env, stdio: 'ignore' });
+    if (r.status !== 0) {
+      // Only creating the keychain is fatal; the later calls can fail on a runner whose keychain
+      // is already unlocked system-wide.
+      if (args[0] === 'create-keychain') throw new Error('could not create the smoke keychain');
+      console.error(`::warning::smoke setup: security ${args[0]} exited ${r.status}`);
+    }
+  }
+}
+
+/**
+ * On a failure: the tail of the app's core log (the shell keeps only REDACTED stderr lines there,
+ * core-log.ts) and the names (never the contents) of what the core wrote under ~/.agentlink.
+ */
+function diagnose() {
+  const logDir = win
+    ? join(env.LOCALAPPDATA, 'AgentLink', 'logs')
+    : process.platform === 'darwin'
+      ? join(home, 'Library', 'Logs', 'AgentLink')
+      : join(home, '.local', 'state', 'agentlink', 'logs');
+  try {
+    const lines = readFileSync(join(logDir, 'core.log'), 'utf8').split('\n').slice(-40);
+    console.error('--- core.log (last lines, redacted by the app) ---');
+    for (const line of lines) console.error(line);
+  } catch {
+    console.error('(no core.log)');
+  }
+  try {
+    console.error(`~/.agentlink: ${readdirSync(join(home, '.agentlink')).sort().join(', ')}`);
+  } catch {
+    console.error('(no ~/.agentlink)');
+  }
+}
 
 const pidAlive = (pid) => {
   try {

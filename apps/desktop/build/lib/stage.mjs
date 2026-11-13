@@ -8,7 +8,7 @@ import { checkTgzDeps, lockRegistryProblems, treeHash } from './core-lock.mjs';
 import { sha256Hex } from './hash.mjs';
 import { PREVIEW_VAR, findPreviewString } from './preview-check.mjs';
 import { assertRootKeyPinned, readRootKeyJson } from './root-key-check.mjs';
-import { capture, run, walk } from './run.mjs';
+import { capture, npmCommand, run, tarCommand, walk } from './run.mjs';
 
 export const DESKTOP_DIR = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 export const CACHE_DIR = join(DESKTOP_DIR, '.cache');
@@ -50,14 +50,14 @@ export async function fetchRuntimes(platform) {
   return out;
 }
 
-/** Extracts a .zip or .tar.gz into an empty dir. Uses the OS `tar` (bsdtar on macOS and Windows 10+). */
+/** Extracts a .zip or .tar.gz into an empty dir. Uses the OS `tar` (bsdtar on macOS and Windows 10+, tarCommand). */
 export function extract(archive, dest) {
   rmSync(dest, { recursive: true, force: true });
   mkdirSync(dest, { recursive: true });
   if (process.platform === 'darwin' && archive.endsWith('.zip')) {
     run('ditto', ['-x', '-k', archive, dest]); // keeps symlinks and modes in the Electron framework
   } else {
-    run('tar', [archive.endsWith('.zip') ? '-xf' : '-xzf', archive, '-C', dest]);
+    run(tarCommand(), [archive.endsWith('.zip') ? '-xf' : '-xzf', archive, '-C', dest]);
   }
 }
 
@@ -155,7 +155,7 @@ export function installCore({ tgz, dest, os, cpu }) {
   const registryProblems = lockRegistryProblems(JSON.parse(lockText), REGISTRY);
   if (registryProblems.length) throw new Error(`core-lock:\n${registryProblems.join('\n')}`);
   const lockPkg = JSON.parse(readFileSync(join(CORE_LOCK_DIR, 'package.json'), 'utf8'));
-  const tgzPkg = JSON.parse(capture('tar', ['-xOzf', tgz, 'package/package.json']).stdout);
+  const tgzPkg = JSON.parse(capture(tarCommand(), ['-xOzf', tgz, 'package/package.json']).stdout);
   const depProblems = checkTgzDeps(tgzPkg.dependencies, lockPkg.dependencies);
   if (depProblems.length) throw new Error(`Core tarball vs core-lock:\n${depProblems.join('\n')}`);
 
@@ -163,7 +163,9 @@ export function installCore({ tgz, dest, os, cpu }) {
   mkdirSync(dest, { recursive: true });
   cpSync(join(CORE_LOCK_DIR, 'package.json'), join(dest, 'package.json'));
   cpSync(join(CORE_LOCK_DIR, 'package-lock.json'), join(dest, 'package-lock.json'));
-  run('npm', [
+  const [npm, ...npmLead] = npmCommand();
+  run(npm, [
+    ...npmLead,
     'ci',
     '--prefix',
     dest,
@@ -177,7 +179,7 @@ export function installCore({ tgz, dest, os, cpu }) {
   ]);
   const pkgDir = join(dest, 'node_modules', ...tgzPkg.name.split('/'));
   mkdirSync(pkgDir, { recursive: true });
-  run('tar', ['-xzf', tgz, '--strip-components=1', '-C', pkgDir]);
+  run(tarCommand(), ['-xzf', tgz, '--strip-components=1', '-C', pkgDir]);
 
   const bad = [];
   for (const e of walk(join(dest, 'node_modules'))) {

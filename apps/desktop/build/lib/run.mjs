@@ -1,7 +1,28 @@
 // Small process and path helpers shared by the build scripts. Output is never echoed with env values.
 import { spawnSync } from 'node:child_process';
-import { lstatSync, readdirSync, openSync, readSync, closeSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, lstatSync, readdirSync, openSync, readSync, closeSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
+/**
+ * The OS `tar`: on Windows the system bsdtar (System32\tar.exe) by its full path. Under Git Bash
+ * (the CI `shell: bash`) a bare `tar` is GNU tar, which reads `D:\…` as a remote host and cannot
+ * open a .zip at all.
+ */
+export function tarCommand() {
+  if (process.platform !== 'win32') return 'tar';
+  return join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
+}
+
+/**
+ * `npm` as [command, ...leading args]. On Windows npm is a .cmd shim that spawnSync cannot start
+ * without a shell, so the npm CLI script next to this Node runs directly (no shell, no quoting).
+ */
+export function npmCommand() {
+  if (process.platform !== 'win32') return ['npm'];
+  const cli = join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  if (!existsSync(cli)) throw new Error('npm-cli.js was not found next to this Node.');
+  return [process.execPath, cli];
+}
 
 export function run(cmd, args, opts = {}) {
   const r = spawnSync(cmd, args, { stdio: 'inherit', ...opts });

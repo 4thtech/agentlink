@@ -13,7 +13,7 @@ import { BUILD_FUSES } from './lib/fuses.mjs';
 import { asarIntegrity, writeWinIcon, writeWinIntegrity } from './lib/integrity.mjs';
 import { winIcoPath } from './lib/icon.mjs';
 import { nsisScript } from './lib/nsis.mjs';
-import { capture, parseArgs, run } from './lib/run.mjs';
+import { capture, parseArgs, run, tarCommand } from './lib/run.mjs';
 import { buildWinHelper } from './native.mjs';
 import {
   CACHE_DIR,
@@ -122,7 +122,7 @@ const setup = join(out, `${base}-setup.exe`);
 const nsi = join(out, `${base}.nsi`);
 rmSync(zip, { force: true });
 rmSync(setup, { force: true });
-run('tar', ['-a', '-c', '-f', zip, '-C', work, 'AgentLink']);
+run(tarCommand(), ['-a', '-c', '-f', zip, '-C', work, 'AgentLink']);
 writeFileSync(nsi, nsisScript({ version, sourceDir: dir, outFile: setup, iconFile: ico }));
 const files = [zip];
 if (!args['nsi-only']) {
