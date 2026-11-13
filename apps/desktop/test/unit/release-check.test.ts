@@ -361,7 +361,12 @@ describe('the checker', () => {
   const runTimers = async (h: Harness): Promise<void> => {
     const due = h.timers.splice(0);
     for (const t of due) t.run();
-    await new Promise((r) => setTimeout(r, 20));
+    // Every timer here is a check tick, and a tick schedules the next one only once its check has
+    // finished: wait for that (not a fixed 20 ms, which a loaded CI runner can outlast).
+    for (let waited = 0; h.timers.length < due.length && waited < 10_000; waited += 5) {
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(h.timers.length).toBeGreaterThanOrEqual(due.length);
   };
 
   it('starts idle with the installed version and never fetches before the quiet check is due', async () => {

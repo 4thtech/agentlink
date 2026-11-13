@@ -488,14 +488,18 @@ describe.runIf(POSIX)('a computer without an owner (T-1, T-10, T-12)', () => {
 });
 
 describe.runIf(POSIX)('never overwrites (04 §2.3.3 table; T-8)', () => {
-  it('already here, name taken (rename map), removed earlier; the whole map is checked before a write', async () => {
-    const owner = await makeOwner();
-    const { code: c, agents } = await kitOnDisk(
-      [{ name: 'helper' }, { name: 'work' }, { name: 'old' }],
-      owner,
-    );
+  /**
+   * PR #821 (CI load): one kit of three IDs, made once (kitOnDisk's file cache) and shared by the two
+   * halves below, on a computer where `helper` is already here (same agentId), a different `work`
+   * folder exists and `old` was removed earlier.
+   */
+  async function renameMapKit() {
+    const { code: c, agents } = await kitOnDisk([
+      { name: 'helper' },
+      { name: 'work' },
+      { name: 'old' },
+    ]);
     const [a, b, gone] = agents as [(typeof agents)[0], (typeof agents)[0], (typeof agents)[0]];
-    // `helper` is already here (same agentId); a different `work` folder exists; `old` was removed.
     for (const [name, id] of [
       ['helper', a.agentId],
       ['work', '0x' + '1'.repeat(40)],
@@ -512,13 +516,17 @@ describe.runIf(POSIX)('never overwrites (04 §2.3.3 table; T-8)', () => {
     await writeFile(join(t.home, '.agentlink', 'revoked', `${gone.agentId}.json`), '{}');
     const handle = await foundHandle();
     const opened = await openKit('S1', handle, c);
+    return { a, b, gone, opened, kit: body(opened)['kit'] as string };
+  }
+
+  it('already here, name taken (rename map), removed earlier; the whole map is checked before a write', async () => {
+    const { a, b, gone, opened, kit } = await renameMapKit();
     const ids = (body(opened)['summary'] as { ids: Record<string, unknown>[] }).ids;
     const byId = (id: string) => ids.find((r) => r['agentId'] === id) as Record<string, unknown>;
     expect(byId(a.agentId)['state']).toBe('already_here');
     expect(byId(b.agentId)['state']).toBe('name_taken');
     expect(byId(b.agentId)['suggestedName']).toBe('work-2');
     expect(byId(gone.agentId)['state']).toBe('removed_earlier');
-    const kit = body(opened)['kit'] as string;
     for (const bad of [
       { selection: [a.agentId], names: {} },
       { selection: [gone.agentId], names: {} },
@@ -533,6 +541,10 @@ describe.runIf(POSIX)('never overwrites (04 §2.3.3 table; T-8)', () => {
       expect(body(refused)['error']).toBe('invalid');
     }
     expect([...keychain.items.keys()]).toEqual([]);
+  });
+
+  it('the name-taken ID restores under its new name; the one here and the removed one are untouched', async () => {
+    const { a, b, gone, kit } = await renameMapKit();
     const done = await gestureAndFinish('S1', kit, [b.agentId], { [b.agentId]: 'work-2' });
     expect(done['ids']).toEqual([
       { agentId: b.agentId, name: 'work-2', label: 'work-2', outcome: 'restored' },
