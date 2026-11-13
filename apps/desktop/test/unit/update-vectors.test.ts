@@ -150,7 +150,11 @@ describe('shared desktop-update vectors (format v2, one pinned key)', () => {
     for (const id of ['manifest-beta-ok', 'manifest-stable-ok', 'manifest-downgrade']) {
       expect(vector(id).expected.valid, id).toBe('true');
     }
-    for (const id of ['manifest-claims-pinned-key', 'manifest-tampered', 'manifest-other-key-under-pinned']) {
+    for (const id of [
+      'manifest-claims-pinned-key',
+      'manifest-tampered',
+      'manifest-other-key-under-pinned',
+    ]) {
       expect(vector(id).expected.valid, id).toBe('false');
     }
   });

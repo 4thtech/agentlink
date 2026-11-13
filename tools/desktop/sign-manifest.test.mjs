@@ -134,9 +134,9 @@ describe('the tool stays offline and off CI', () => {
     expect(() => refuseInCi({})).not.toThrow();
     let asked = false;
     const io = { readHidden: async () => ((asked = true), PASS) };
-    await expect(main(['generate', '--out', '/nonexistent/x'], { env: { CI: '1' }, io })).rejects.toThrow(
-      /does not run in CI/,
-    );
+    await expect(
+      main(['generate', '--out', '/nonexistent/x'], { env: { CI: '1' }, io }),
+    ).rejects.toThrow(/does not run in CI/);
     expect(asked).toBe(false);
   });
 
@@ -223,9 +223,9 @@ describe('refusals (plan acceptance list)', () => {
     expect(check({ ...good, assets: [{ ...good.assets[0], sha256: '0'.repeat(64) }] })).toBe(
       'bad_signature',
     );
-    expect(check({ ...good, assets: [{ ...good.assets[0], kind: 'zip', url: zipFor('0.5.0').url }] })).toBe(
-      'bad_signature',
-    );
+    expect(
+      check({ ...good, assets: [{ ...good.assets[0], kind: 'zip', url: zipFor('0.5.0').url }] }),
+    ).toBe('bad_signature');
   });
 
   it('unsigned: no sig on the manifest', () => {
@@ -350,7 +350,10 @@ describe('refusals (plan acceptance list)', () => {
 describe('the shared vectors', () => {
   it('the tool computes the same messages as the independent generator', () => {
     const vectors = JSON.parse(
-      readFileSync(new URL('../../test-vectors/desktop-update/vectors.json', import.meta.url), 'utf8'),
+      readFileSync(
+        new URL('../../test-vectors/desktop-update/vectors.json', import.meta.url),
+        'utf8',
+      ),
     );
     let checked = 0;
     for (const c of vectors.cases) {
@@ -510,7 +513,9 @@ describe('the command line, end to end (real offline KDF)', () => {
       // Without a pinned key (root-key.json is the placeholder) and no --pinned-public: refused.
       await expect(run(signArgs(p('a.json')).slice(0, -2))).rejects.toThrow(/placeholder/);
       // A key file that is not the pinned key is refused before the passphrase is asked.
-      await expect(run(signArgs(p('c.json'), k2.publicKey))).rejects.toThrow(/not the update key pinned/);
+      await expect(run(signArgs(p('c.json'), k2.publicKey))).rejects.toThrow(
+        /not the update key pinned/,
+      );
       // The owner sees what is signed and must type yes.
       answer = 'no';
       await expect(run(signArgs(p('b.json')))).rejects.toThrow(/Not signed/);

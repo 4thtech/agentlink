@@ -66,6 +66,7 @@ import {
 } from './switches.js';
 import type { StatusAction } from './status-page.js';
 import { AppTray, trayImage } from './tray.js';
+import { procTranslated, updateChannel, updaterArch } from './updater/host.js';
 import { ReleaseChecker, updateChecksAllowed } from './updater/release-check.js';
 import { scheduleUpdateChecks } from './updater/schedule.js';
 import { MainWindow } from './window.js';
@@ -717,12 +718,22 @@ function startUpdates(electron: ElectronModule, platform: string, arch: string):
     return;
   }
   const openPath = shell.openPath.bind(shell);
+  const version = app.getVersion();
+  // UPD-1: the build's channel (not a hard-coded `stable`) and the Mac's real arch, Rosetta-aware
+  // through sysctl.proc_translated (fixed program, fixed arguments), not the raw process.arch.
+  const translated =
+    platform === 'darwin' &&
+    procTranslated((command, args) => {
+      const result = spawnSync(command, [...args], { encoding: 'utf8', timeout: 2000 });
+      if (result.status !== 0 || typeof result.stdout !== 'string') throw new Error('sysctl');
+      return result.stdout;
+    });
   scheduleUpdateChecks(
     {
-      currentVersion: app.getVersion(),
-      channel: 'stable',
+      currentVersion: version,
+      channel: updateChannel(version),
       platform,
-      arch,
+      arch: updaterArch(platform, arch, translated),
       stateDir: app.getPath('userData'),
       openPath,
       showMessageBox: (options) =>

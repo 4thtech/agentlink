@@ -1,8 +1,14 @@
 // Suite `desktop-update` (UPD-1): signed desktop update manifests, format v2, one pinned update key
-// (08 §8, D-145 (5); owner decision 2026-11-13), through @4thtech-io/crypto only. The BIP-340 message is taggedHash(tag, JCS(document without
-// `sig`)); `valid` says whether the document's `sig` verifies under `signer`. The desktop app's own
+// (08 §8, D-145 (5); owner decision 2026-11-13), through @4thtech-io/crypto only. The BIP-340
+// message is taggedHash(tag, JCS(document without `sig`)); `valid` says whether the document's `sig`
+// verifies under `signer`. The desktop app's own
 // verdicts on the same documents are checked in apps/desktop/test/unit/update-vectors.test.ts.
-import { CryptoInputError, bip340Verify, canonicalizeToBytes, taggedHash } from '@4thtech-io/crypto';
+import {
+  CryptoInputError,
+  bip340Verify,
+  canonicalizeToBytes,
+  taggedHash,
+} from '@4thtech-io/crypto';
 import { bytesToHex, hexToBytes } from '../hex';
 import type { SuiteModule } from '../suite';
 

@@ -1,27 +1,28 @@
 #!/usr/bin/env node
-// WP-D10 (plan 2026-11-12 Decision 5, Fable H3; 08 §8 "Signed updates"): the owner's OFFLINE tool for
-// the desktop update keys. Owner guide: docs/runbooks/desktop-update-keys.md (RB-23).
+// WP-D10 (plan 2026-11-12 Decision 5, Fable H3; 08 §8 "Signed updates"), format v2 (UPD-1): the
+// owner's OFFLINE tool for the desktop update key. Owner guide: docs/runbooks/desktop-update-keys.md
+// (RB-23). Since the owner decision of 2026-11-13 there is ONE update key, its public key pinned in
+// the app (root-key.json `rootPublicKey`); no root key and no key statements. Release signing moves
+// to one approved CI job (UPD-3); this tool stays for local signing and checks.
 //
-//   generate    --role root|update --out <key file>        a new key pair, sealed under a passphrase
-//   public-key  <key file>                                 prints the role and public key (no passphrase)
-//   check       <key file>                                 asks the passphrase and checks it opens (test a backup)
-//   statement   --root-key <key file> --action introduce|rotate|revoke
-//               --update-key <64 hex> --sequence <n> --out <file>
-//   sign        --update-key <key file> --statement <file> --manifest <unsigned manifest>
-//               --out <file> [--days 30] [--root-public <64 hex>]
+//   generate    --out <key file>                         a new update key pair, sealed under a passphrase
+//   public-key  <key file>                               prints the public key (no passphrase)
+//   check       <key file>                               asks the passphrase and checks it opens (test a backup)
+//   sign        --update-key <key file> --manifest <unsigned manifest> --out <file>
+//               [--days 30] [--pinned-public <64 hex>]
 //
 // Rules:
 // - It never touches the network: no network module is imported (a test checks the source), and all
 //   crypto is @4thtech-io/crypto (BIP-340, the ALKU key file, JCS, the TAGS registry).
-// - It refuses to run when CI or GITHUB_ACTIONS is set: no update key is ever on a CI runner.
+// - It refuses to run when CI or GITHUB_ACTIONS is set.
 // - Key files: JSON {format, role, publicKey, sealed}; `sealed` is an `ALKU` v1 file (its own magic,
 //   KDF label and the role in the AAD; Argon2id at 256 MiB, 4 passes → HKDF → AES-256-GCM). The
 //   public key is re-derived from the opened secret and compared, so a swapped file is refused.
 // - Passphrases are typed in the terminal with echo off, never taken from arguments, files or the
 //   environment. Output files are created new (never overwritten), mode 0600 for key files.
-// - `sign` first checks the embedded statement against the pinned root (root-key.json, or
-//   --root-public), shows what will be signed and asks for "yes", and after signing runs the APP'S
-//   OWN parser and acceptance checks (apps/desktop/dist/main/updater/manifest.js, built with
+// - `sign` first checks the key file is the pinned key (root-key.json, or --pinned-public), shows
+//   what will be signed and asks for "yes", and after signing runs the APP'S OWN parser and
+//   acceptance checks (apps/desktop/dist/main/updater/manifest.js, built with
 //   `pnpm --filter @4thtech-io/desktop build`) on the exact bytes it writes.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -50,10 +51,10 @@ import {
 } from '@4thtech-io/crypto/keystore';
 
 export const KEY_FILE_FORMAT = 'agentlink-desktop-key/v1';
-export const STATEMENT_DOMAIN = TAGS.desktopKeyStatement;
 export const MANIFEST_DOMAIN = TAGS.desktopUpdateManifest;
-export const ROLES = Object.freeze(['root', 'update']);
-export const ACTIONS = Object.freeze(['introduce', 'rotate', 'revoke']);
+/** UPD-1: one update key; the `root` role of the ALKU file format is no longer used. */
+export const ROLES = Object.freeze(['update']);
+export const CHANNELS = Object.freeze(['stable', 'beta']);
 /** The strongest setting inside the 04 §2.8 bounds (KEYSTORE_KDF_BOUNDS). */
 export const OFFLINE_KDF = Object.freeze({ memoryKiB: 262144, iterations: 4, parallelism: 1 });
 export const MIN_PASSPHRASE_CHARACTERS = 16;
@@ -66,7 +67,7 @@ const APP_VERIFIER = new URL('../../apps/desktop/dist/main/updater/manifest.js',
 
 export class ToolError extends Error {}
 
-/** No update key on a CI runner (Decision 5): any non-empty CI or GITHUB_ACTIONS stops the tool. */
+/** This offline tool never runs on a CI runner: any non-empty CI or GITHUB_ACTIONS stops it. */
 export function refuseInCi(env = process.env) {
   if ((env.CI ?? '') !== '' || (env.GITHUB_ACTIONS ?? '') !== '') {
     throw new ToolError(
@@ -116,8 +117,8 @@ const isPublicKey = (hex) =>
 // --- key files -----------------------------------------------------------------------------------
 
 /** A new key pair for `role`, sealed under `passphrase` (bytes). Returns the key file object. */
-export async function generateKeyFile({ role, passphrase, kdf = OFFLINE_KDF }) {
-  if (!ROLES.includes(role)) throw new ToolError('role must be root or update');
+export async function generateKeyFile({ role = 'update', passphrase, kdf = OFFLINE_KDF }) {
+  if (!ROLES.includes(role)) throw new ToolError('role must be update');
   checkPassphrase(passphrase);
   let secret;
   let publicKey;
@@ -190,63 +191,29 @@ export async function openKeyFile(value, role, passphrase) {
 // --- signing -------------------------------------------------------------------------------------
 
 const withoutSig = (o) => Object.fromEntries(Object.entries(o).filter(([k]) => k !== 'sig'));
-export const statementMessage = (s) =>
-  taggedHash(STATEMENT_DOMAIN, canonicalizeToBytes(withoutSig(s)));
 export const manifestMessage = (m) =>
   taggedHash(MANIFEST_DOMAIN, canonicalizeToBytes(withoutSig(m)));
 
-/** A root statement signed with the opened root key. */
-export function signStatement({ root, action, updateKey, sequence, now = Date.now() }) {
-  if (root.role !== 'root') throw new ToolError('statements are signed with the root key');
-  if (!ACTIONS.includes(action)) throw new ToolError('action must be introduce, rotate or revoke');
-  if (!isPublicKey(updateKey)) {
-    throw new ToolError('the update key must be 64 lowercase hex characters (its public key)');
-  }
-  if (updateKey === root.publicKey) throw new ToolError('the root key can never be the update key');
-  if (!Number.isSafeInteger(sequence) || sequence < 1 || sequence > 2 ** 31 - 1) {
-    throw new ToolError('the sequence must be a whole number from 1 (each statement one higher)');
-  }
-  const body = { domain: STATEMENT_DOMAIN, sequence, action, updateKey, issued: isoSeconds(now) };
-  return Object.freeze({
-    ...body,
-    sig: encodeHex(bip340Sign(root.secretKey, statementMessage(body))),
-  });
-}
-
 const UNSIGNED_KEYS = ['domain', 'channel', 'version', 'minimumVersion', 'assets'];
-const STATEMENT_KEYS = ['domain', 'sequence', 'action', 'updateKey', 'issued', 'sig'];
 
 /**
- * Signs the unsigned manifest CI produced ({domain, channel, version, minimumVersion, assets}). The
- * tool adds `released` (now), `expires` (now + days), the update key and the root statement that
- * introduces it, then the signature. `checkManifestText` (below) re-checks it as the app would.
+ * Signs the unsigned manifest CI produced ({domain, channel, version, minimumVersion, assets}, each
+ * asset with its `kind`). The tool adds `released` (now), `expires` (now + days) and the update key,
+ * then the signature. `checkManifestText` (below) re-checks it as the app would.
  */
-export function signManifest({
-  update,
-  statement,
-  unsigned,
-  now = Date.now(),
-  days = DEFAULT_VALIDITY_DAYS,
-}) {
+export function signManifest({ update, unsigned, now = Date.now(), days = DEFAULT_VALIDITY_DAYS }) {
   if (update.role !== 'update') throw new ToolError('manifests are signed with the update key');
-  const body = manifestBody({ updateKey: update.publicKey, statement, unsigned, now, days });
+  const body = manifestBody({ updateKey: update.publicKey, unsigned, now, days });
   return Object.freeze({
     ...body,
     sig: encodeHex(bip340Sign(update.secretKey, manifestMessage(body))),
   });
 }
 
-function manifestBody({ updateKey, statement, unsigned, now, days }) {
+function manifestBody({ updateKey, unsigned, now, days }) {
   const m = exactKeys(unsigned, UNSIGNED_KEYS, 'unsigned manifest');
   if (m.domain !== MANIFEST_DOMAIN) throw new ToolError('unsigned manifest: wrong domain');
-  const s = exactKeys(statement, STATEMENT_KEYS, 'statement');
-  if (s.domain !== STATEMENT_DOMAIN) throw new ToolError('statement: wrong domain');
-  if (s.action === 'revoke') {
-    throw new ToolError('statement: a revoke statement cannot carry a manifest');
-  }
-  if (s.updateKey !== updateKey) {
-    throw new ToolError('statement: it names another update key than this key file');
-  }
+  if (!CHANNELS.includes(m.channel)) throw new ToolError('unsigned manifest: unknown channel');
   if (!Number.isSafeInteger(days) || days < 1 || days > MAX_VALIDITY_DAYS) {
     throw new ToolError(`--days must be 1 to ${MAX_VALIDITY_DAYS}`);
   }
@@ -259,60 +226,45 @@ function manifestBody({ updateKey, statement, unsigned, now, days }) {
     released: isoSeconds(released),
     expires: isoSeconds(released + days * 86_400_000),
     updateKey,
-    statement: s,
     assets: m.assets,
   };
 }
 
-/** The pinned root: --root-public, else root-key.json in this checkout (refused while a placeholder). */
-export function pinnedRootFor(verifier, rootPublic) {
+/** The pinned key: --pinned-public, else root-key.json in this checkout (refused while a placeholder). */
+export function pinnedRootFor(verifier, pinnedPublic) {
   const raw =
-    rootPublic === undefined
+    pinnedPublic === undefined
       ? JSON.parse(readFileSync(ROOT_KEY_JSON, 'utf8'))
-      : { rootPublicKey: rootPublic, minimumStatementSequence: 0 };
+      : { rootPublicKey: pinnedPublic, minimumStatementSequence: 0 };
   const root = verifier.pinnedRoot(raw);
   if (root === undefined) {
     throw new ToolError(
-      'No real root public key is pinned (root-key.json is still the placeholder). Pass --root-public <your root public key>.',
+      'No real update public key is pinned (root-key.json is still the placeholder). Pass --pinned-public <the pinned public key>.',
     );
   }
   return root;
 }
 
-/** The embedded statement must verify under the pinned root and name an update key (app rules). */
-export function checkStatement(verifier, root, statement, now = Date.now()) {
-  let parsed;
-  try {
-    parsed = verifier.parseStatementValue(statement);
-    const state = verifier.applyStatement(verifier.INITIAL_KEY_STATE, parsed, root, now);
-    if (state.updateKey === null) throw new ToolError('statement: it withdraws the key');
-  } catch (error) {
-    if (error instanceof ToolError) throw error;
-    throw new ToolError(`statement refused by the app's checks (${error?.code ?? 'error'})`);
-  }
-  return parsed;
-}
-
 /**
  * Runs the app's own parser and acceptance on the exact text written: every asset must be accepted
- * for its own platform and arch by an app on version 0.0.0 of that channel.
+ * for its own platform, arch and kind by an app on version 0.0.0 of that channel.
  */
 export function checkManifestText(verifier, root, text, now = Date.now()) {
   try {
-    const doc = verifier.parseUpdateDocument(encodeUtf8(text));
-    if (doc.kind !== 'manifest') throw new ToolError('not a manifest');
-    for (const asset of doc.manifest.assets) {
-      verifier.acceptManifest(doc.manifest, {
+    const manifest = verifier.parseUpdateDocument(encodeUtf8(text));
+    for (const asset of manifest.assets) {
+      verifier.acceptManifest(manifest, {
         root,
-        state: verifier.INITIAL_KEY_STATE,
         currentVersion: '0.0.0',
-        channel: doc.manifest.channel,
+        channel: manifest.channel,
         platform: asset.platform,
         arch: asset.arch,
+        kind: asset.kind,
+        failedVersion: null,
         now,
       });
     }
-    return doc.manifest;
+    return manifest;
   } catch (error) {
     if (error instanceof ToolError) throw error;
     throw new ToolError(`the signed manifest fails the app's checks (${error?.code ?? 'error'})`);
@@ -324,10 +276,13 @@ export function describeManifest(body) {
   const lines = [
     `AgentLink ${body.version} (${body.channel}), minimum ${body.minimumVersion}`,
     `valid from ${body.released} until ${body.expires}`,
-    `update key ${body.updateKey}, statement #${body.statement.sequence} (${body.statement.action})`,
+    `update key ${body.updateKey}`,
   ];
   for (const a of body.assets) {
-    lines.push(`  ${a.platform}/${a.arch}  ${a.size} bytes  sha256 ${a.sha256}`, `    ${a.url}`);
+    lines.push(
+      `  ${a.platform}/${a.arch} ${a.kind}  ${a.size} bytes  sha256 ${a.sha256}`,
+      `    ${a.url}`,
+    );
   }
   return lines;
 }
@@ -447,11 +402,10 @@ async function withKey(path, role, io, fn) {
 }
 
 const USAGE = `Usage (offline only; guide: docs/runbooks/desktop-update-keys.md):
-  sign-manifest.mjs generate --role root|update --out <key file>
+  sign-manifest.mjs generate --out <key file>
   sign-manifest.mjs public-key <key file>
   sign-manifest.mjs check <key file>
-  sign-manifest.mjs statement --root-key <key file> --action introduce|rotate|revoke --update-key <hex> --sequence <n> --out <file>
-  sign-manifest.mjs sign --update-key <key file> --statement <file> --manifest <unsigned manifest> --out <file> [--days 30] [--root-public <hex>]`;
+  sign-manifest.mjs sign --update-key <key file> --manifest <unsigned manifest> --out <file> [--days 30] [--pinned-public <hex>]`;
 
 const defaultIo = {
   readHidden,
@@ -469,14 +423,9 @@ export async function main(
     allowPositionals: true,
     strict: true,
     options: {
-      role: { type: 'string' },
       out: { type: 'string' },
-      'root-key': { type: 'string' },
       'update-key': { type: 'string' },
-      'root-public': { type: 'string' },
-      action: { type: 'string' },
-      sequence: { type: 'string' },
-      statement: { type: 'string' },
+      'pinned-public': { type: 'string' },
       manifest: { type: 'string' },
       days: { type: 'string' },
     },
@@ -489,9 +438,8 @@ export async function main(
   };
   switch (command) {
     case 'generate': {
-      const role = need('role');
+      const role = 'update';
       const path = need('out');
-      if (!ROLES.includes(role)) throw new ToolError('--role must be root or update');
       const passphrase = await askNewPassphrase(io);
       try {
         out('Sealing the key (this takes a few seconds)...');
@@ -520,21 +468,6 @@ export async function main(
       );
       return;
     }
-    case 'statement': {
-      if (!/^[1-9][0-9]*$/.test(need('sequence'))) {
-        throw new ToolError('--sequence must be a whole number from 1');
-      }
-      const sequence = Number(values.sequence);
-      const path = need('out');
-      const action = need('action');
-      const updateKey = need('update-key');
-      const statement = await withKey(need('root-key'), 'root', io, (root) =>
-        signStatement({ root, action, updateKey, sequence }),
-      );
-      writeNew(path, JSON.stringify(statement, null, 2) + '\n', 0o644);
-      out(`Wrote the ${action} statement #${sequence} to ${path}.`);
-      return;
-    }
     case 'sign': {
       if (values.days !== undefined && !/^[1-9][0-9]*$/.test(values.days)) {
         throw new ToolError('--days must be a whole number');
@@ -542,21 +475,22 @@ export async function main(
       const days = values.days === undefined ? DEFAULT_VALIDITY_DAYS : Number(values.days);
       const path = need('out');
       const keyPath = need('update-key');
-      const statement = readJson(need('statement'), 'statement');
       const unsigned = readJson(need('manifest'), 'unsigned manifest');
       const app = verifier ?? (await loadVerifier());
-      const root = pinnedRootFor(app, values['root-public']);
-      checkStatement(app, root, statement);
+      const root = pinnedRootFor(app, values['pinned-public']);
       const key = readKeyFile(readJson(keyPath, 'key file'), 'update');
+      if (key.publicKey !== root.rootPublicKey) {
+        throw new ToolError('This key file is not the update key pinned in the app.');
+      }
       const now = Date.now();
-      const preview = manifestBody({ updateKey: key.publicKey, statement, unsigned, now, days });
+      const preview = manifestBody({ updateKey: key.publicKey, unsigned, now, days });
       out('About to sign:');
       for (const line of describeManifest(preview)) out(line);
       if (!(await confirm(io, 'Check the version, sizes and checksums. Type yes to sign: '))) {
         throw new ToolError('Not signed.');
       }
       const signed = await withKey(keyPath, 'update', io, (update) =>
-        signManifest({ update, statement, unsigned, now, days }),
+        signManifest({ update, unsigned, now, days }),
       );
       const text = JSON.stringify(signed, null, 2) + '\n';
       checkManifestText(app, root, text);

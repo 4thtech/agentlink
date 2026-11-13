@@ -24,11 +24,7 @@ import {
   pinnedRoot,
 } from '../../src/main/updater/manifest.js';
 import { macQuarantineValue } from '../../src/main/updater/quarantine.js';
-import {
-  FAILED_FILE,
-  loadFailedVersion,
-  saveFailedVersion,
-} from '../../src/main/updater/state.js';
+import { FAILED_FILE, loadFailedVersion, saveFailedVersion } from '../../src/main/updater/state.js';
 import {
   CHECK_INTERVAL_MS,
   FIRST_CHECK_DELAY_MS,
@@ -266,9 +262,7 @@ describe('format v2 (UPD-1): one pinned key, asset kinds, v1 refused', () => {
     expect(parse(manifest([asset('dmg', 'AgentLink-0.5.3-arm64.zip')]))).toBe('malformed');
     expect(parse(manifest([asset('tar', 'AgentLink-0.5.3-arm64.tar')]))).toBe('malformed');
     expect(parse(manifest([asset('zip', 'AgentLink-0.5.3.zip', 'win32')]))).toBe('malformed');
-    expect(parse(manifest([asset('nsis', 'AgentLink-0.5.3-setup.exe', 'win32')]))).toBe(
-      'accepted',
-    );
+    expect(parse(manifest([asset('nsis', 'AgentLink-0.5.3-setup.exe', 'win32')]))).toBe('accepted');
     expect(parse(manifest([asset('zip', 'A.zip'), asset('zip', 'B.zip')]))).toBe('malformed');
     const noKind = asset('zip', 'A.zip');
     delete noKind['kind'];
