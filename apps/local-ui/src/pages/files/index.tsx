@@ -7,7 +7,9 @@
 // folder that would be signed and every warning. The confirm screen shows that real folder, lists
 // each warning in plain words with its own tick, and stays off until every one is ticked (D-119).
 // Then the owner's passkey gesture or master code goes to the local server, which signs; the browser
-// never signs. A `?folder=` link (from the AI's "allow a folder" step) only fills the field.
+// never signs. A `?folder=` link (from the AI's "allow a folder" step) only fills the field;
+// ATT-SENDFOLDER-FIX: with `check=1` (Home's Send folder banner) the field is also checked once, so
+// the owner lands on the confirm step. Checking reads only; confirming still needs presence.
 //
 // Three tabs (MSG-FILES-IO-f): Received and Sent (io.tsx, read-only) and this page as Send folders.
 // Out of scope here: inbox folder and link expiry (UX audit 4b "More options"), and Storage
@@ -267,10 +269,20 @@ const prefill = (): string => {
   }
 };
 
+/** ATT-SENDFOLDER-FIX: a `?folder=…&check=1` link checks the filled-in folder once. */
+const autoCheck = (): boolean => {
+  try {
+    return new URLSearchParams(window.location.search).get('check') === '1';
+  } catch {
+    return false;
+  }
+};
+
 /** Send folders: the folders the AI may send files from (today's page, unchanged). */
 function SendFolders({ api }: { readonly api: FilesApi }): ReactElement {
   const [list, setList] = useState<ListState>({ phase: 'loading' });
   const [initial] = useState(prefill);
+  const [checkOnce, setCheckOnce] = useState(() => initial.length > 0 && autoCheck());
   const [step, setStep] = useState<Step>(
     initial.length > 0 ? { kind: 'enter', checking: false } : { kind: 'idle' },
   );
@@ -379,6 +391,14 @@ function SendFolders({ api }: { readonly api: FilesApi }): ReactElement {
       setSending(false);
     }
   };
+
+  // ATT-SENDFOLDER-FIX: once the list (and its version) is read, check the filled-in folder once.
+  useEffect(() => {
+    if (!checkOnce || list.phase !== 'ok') return;
+    setCheckOnce(false);
+    void startReview('add', initial);
+    // startReview is recreated each render; the one-shot flag keeps this to a single review.
+  }, [checkOnce, list.phase]);
 
   const cancel = (): void => {
     setStep({ kind: 'idle' });

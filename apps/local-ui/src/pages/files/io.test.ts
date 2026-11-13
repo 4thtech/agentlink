@@ -201,7 +201,11 @@ describe('tabs', () => {
 describe('ATT-SENDFOLDER-FIX: a ?folder=…&check=1 link (Home banner) checks the folder at once', () => {
   it('runs the review once and lands on the confirm step; nothing is signed without the owner', async () => {
     const before = window.location.href;
-    window.history.replaceState(null, '', '/settings/files?folder=%2FUsers%2Fme%2FAgentLink%2FSend&check=1');
+    window.history.replaceState(
+      null,
+      '',
+      '/settings/files?folder=%2FUsers%2Fme%2FAgentLink%2FSend&check=1',
+    );
     const review = `/api/ui/files/review?${new URLSearchParams({ add: '/Users/me/AgentLink/Send', version: '3' }).toString()}`;
     try {
       const s = await mount({

@@ -27,6 +27,13 @@
 //   replayed onto another edit, or onto the same edit twice. Before signing, the hash is recomputed
 //   and an added folder is checked again (a folder swapped for a link since the review is refused).
 //   Then `sign` signs exactly that body, once, and core applies it (I-4).
+// - POST /api/ui/files/send-folder (ATT-SENDFOLDER-FIX; the `mark` kind: no input, no presence):
+//   Home's "Allow your Send folder" banner. Sets up the Send folder as the first rules do
+//   (owner-first-policy prepareSendFolder with `fallback`: an existing real, owned Send even when it
+//   holds files, else a fresh Send-2 ... created 0700; never a link) and answers only its real path,
+//   which the page then reviews and confirms like any folder above. Nothing is prepared, signed or
+//   applied here, so the rules never change on this route (I-4); an unusable folder is a fixed
+//   `unavailable`.
 //
 // The browser never signs and never sees the body: only the folder, the codes and the token.
 import { realpath, stat } from 'node:fs/promises';
@@ -50,6 +57,7 @@ import {
   type JsonObject,
   type JsonValue,
 } from '@4thtech-io/crypto';
+import { prepareSendFolder } from '../../owner-first-policy.js';
 import type { LocalUiContext } from '../context.js';
 import {
   UI_INVALID_QUERY,
@@ -460,6 +468,19 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
     return applyAnswer(outcome);
   }
 
+  /** ATT-SENDFOLDER-FIX: the Send folder for Home's banner (see the header). */
+  async function sendFolder(context: LocalUiContext): Promise<LocalUiResult> {
+    if (context.client === undefined) return UI_NOT_SET_UP;
+    let plan: Awaited<ReturnType<typeof prepareSendFolder>>;
+    try {
+      plan = await prepareSendFolder(homeOf(), { fallback: true });
+    } catch {
+      return fixed(409, 'unavailable');
+    }
+    if (plan.status !== 'ready' || !showable(plan.folder)) return fixed(409, 'unavailable');
+    return result(200, { folder: plan.folder });
+  }
+
   return Object.freeze<LocalUiRoute[]>([
     Object.freeze({ method: 'GET', path: '/api/ui/files', presence: false, handler: list }),
     Object.freeze({
@@ -473,6 +494,12 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
       path: '/api/ui/files/folders',
       presence: true,
       handler: commit,
+    }),
+    Object.freeze({
+      method: 'POST',
+      path: '/api/ui/files/send-folder',
+      presence: 'mark',
+      handler: (context: LocalUiContext) => sendFolder(context),
     }),
   ]);
 }

@@ -603,6 +603,7 @@ describe('agentlink mcp starts and stops the approval UI with the server', () =>
       return {
         link: created.link,
         openSetupPage: created.openSetupPage,
+        allowFolderLink: created.allowFolderLink,
         get running() {
           return created.running;
         },

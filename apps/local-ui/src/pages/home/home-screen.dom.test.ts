@@ -253,7 +253,13 @@ describe('ATT-SENDFOLDER-FIX: Home asks to allow the Send folder when none is al
 
   it('shows no banner when a folder is allowed, or when the list cannot be read', async () => {
     await render(
-      base({ [FILES]: ok({ folders: [{ path: '/h/AgentLink/Send', resolved: null }], max: 32, version: 2 }) }),
+      base({
+        [FILES]: ok({
+          folders: [{ path: '/h/AgentLink/Send', resolved: null }],
+          max: 32,
+          version: 2,
+        }),
+      }),
     );
     expect(q('[data-send-folder-banner]')).toBeNull();
     act(() => root.unmount());

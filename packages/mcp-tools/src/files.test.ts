@@ -333,8 +333,14 @@ describe('ATT-ALLOW-LINK: agentlink_send carries the Allow a folder link end to 
   });
 
   it('core no_folder gets it too; outside_folder does not', async () => {
-    const core = fake({ send: () => Promise.resolve({ status: 'needs_setup', reason: 'no_folder' }) });
-    const a = await callTool('agentlink_send', { to: 'Marko', path: '/home/u/Work/a' }, linked(core));
+    const core = fake({
+      send: () => Promise.resolve({ status: 'needs_setup', reason: 'no_folder' }),
+    });
+    const a = await callTool(
+      'agentlink_send',
+      { to: 'Marko', path: '/home/u/Work/a' },
+      linked(core),
+    );
     expect(a.structured.url).toBe(URL_OK);
     const outside = fake({ attach: 'outside_folder' });
     const b = await callTool('agentlink_send', { to: 'Marko', path: '/home/u/a' }, linked(outside));

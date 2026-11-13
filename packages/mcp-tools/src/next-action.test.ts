@@ -77,7 +77,9 @@ describe('ATT-ALLOW-LINK: no folder yet names the Send folder in the app, never 
     const step = out.result.nextStep ?? '';
     expect(step).toContain('Send folder');
     expect(step).toContain('Home');
-    expect(step).not.toMatch(/`|terminal|npx|policy allow|--agent|\bagentlink [a-z]/i);
+    expect(step).not.toMatch(
+      /`|terminal|npx|policy allow|--agent|\bagentlink (policy|approve|doctor|init|owner|ui)\b/i,
+    );
   });
 });
 

@@ -500,6 +500,10 @@ export interface LocalUiMarkRoute {
 export const MARK_PATHS: readonly string[] = Object.freeze([
   '/api/ui/files/auto-save-notice/dismiss',
   '/api/ui/contacts/:ref/name-seen',
+  // ATT-SENDFOLDER-FIX: Home's Send folder banner sets up the folder (api/files.ts). It makes at
+  // most one empty 0700 folder under ~/AgentLink and changes no rules: allowing it is the ordinary
+  // review and the presence-gated confirm.
+  '/api/ui/files/send-folder',
 ]);
 
 export type LocalUiRoute =
