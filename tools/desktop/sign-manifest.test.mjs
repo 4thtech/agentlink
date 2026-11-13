@@ -36,6 +36,7 @@ import {
   refuseInCi,
   signManifest,
   signStatement,
+  statementMessage,
 } from './sign-manifest.mjs';
 
 const FAST_KDF = { memoryKiB: 19456, iterations: 2, parallelism: 1 };
@@ -64,13 +65,14 @@ const INSTALLER = encodeUtf8('pretend this is AgentLink-0.5.0-arm64.dmg');
 const assetFor = (version, bytes = INSTALLER, extra = {}) => ({
   platform: 'darwin',
   arch: 'arm64',
+  kind: 'dmg',
   url: `https://github.com/4thtech/agentlink/releases/download/v${version}/AgentLink-${version}-arm64.dmg`,
   sha256: encodeHex(sha256(bytes)),
   size: bytes.length,
   ...extra,
 });
 const unsignedFor = (version, extra = {}) => ({
-  domain: 'agentlink-desktop-update/v1',
+  domain: 'agentlink-desktop-update/v2',
   channel: 'stable',
   version,
   minimumVersion: '0.4.0',
@@ -80,13 +82,22 @@ const unsignedFor = (version, extra = {}) => ({
       ...assetFor(version),
       platform: 'win32',
       arch: 'x64',
+      kind: 'nsis',
       url: `https://github.com/4thtech/agentlink/releases/download/v${version}/AgentLink-${version}-setup.exe`,
     },
   ],
   ...extra,
 });
-const statement = (sequence, action, updateKey, signer = root) =>
-  signStatement({ root: signer, action, updateKey, sequence, now: NOW - DAY });
+const statement = (sequence, action, updateKey, signer = root, opts = {}) =>
+  signStatement({
+    root: signer,
+    action,
+    channel: opts.channel ?? 'stable',
+    updateKey,
+    sequence,
+    now: opts.now ?? NOW - DAY,
+    expiresDays: opts.expiresDays ?? 395,
+  });
 const manifest = (version, update, stmt, opts = {}) =>
   signManifest({
     update,
@@ -105,6 +116,8 @@ const ctx = (state = INITIAL_KEY_STATE, extra = {}) => ({
   channel: 'stable',
   platform: 'darwin',
   arch: 'arm64',
+  kind: 'dmg',
+  failedVersion: null,
   now: NOW,
   ...extra,
 });
@@ -113,7 +126,13 @@ function check(value, context = ctx()) {
   try {
     const doc = parseUpdateDocument(typeof value === 'string' ? encodeUtf8(value) : bytesOf(value));
     if (doc.kind !== 'manifest')
-      return applyStatement(context.state, doc.statement, context.root, context.now);
+      return applyStatement(
+        context.state,
+        doc.statement,
+        context.root,
+        context.now,
+        context.channel,
+      );
     return acceptManifest(doc.manifest, context);
   } catch (error) {
     if (error?.name === 'UpdateRefusal') return error.code;
@@ -247,7 +266,7 @@ describe('refusals (plan acceptance list)', () => {
 
   it('unrotated key: a statement older than the one the app has', () => {
     const s2 = statement(2, 'rotate', k2.publicKey);
-    const state = applyStatement(INITIAL_KEY_STATE, s2, ROOT, NOW);
+    const state = applyStatement(INITIAL_KEY_STATE, s2, ROOT, NOW, 'stable');
     expect(check(manifest('0.6.0', k1, s1), ctx(state))).toBe('unrotated_key');
     // The same sequence with different content is not "the statement already held".
     expect(check(manifest('0.6.0', k1, statement(2, 'rotate', k1.publicKey)), ctx(state))).toBe(
@@ -320,7 +339,7 @@ describe('refusals (plan acceptance list)', () => {
 
   it('unknown fields, at every level', () => {
     expect(check({ ...good, note: 'x' })).toBe('unknown_field');
-    expect(check({ ...good, assets: [{ ...good.assets[0], kind: 'dmg' }] })).toBe('unknown_field');
+    expect(check({ ...good, assets: [{ ...good.assets[0], note: 'x' }] })).toBe('unknown_field');
     expect(check({ ...good, statement: { ...s1, note: 'x' } })).toBe('unknown_field');
   });
 
@@ -350,11 +369,11 @@ describe('rotation rehearsal', () => {
     const dir = mkdtempSync(join(tmpdir(), 'agentlink-rotation-'));
     try {
       // 1. First release with K1 (statement #1).
-      let state = await loadKeyState(dir, ROOT, NOW);
+      let state = await loadKeyState(dir, ROOT, NOW, 'stable');
       expect(state).toEqual(INITIAL_KEY_STATE);
       const r1 = check(good, ctx(state));
       await saveKeyState(dir, r1.state);
-      state = await loadKeyState(dir, ROOT, NOW);
+      state = await loadKeyState(dir, ROOT, NOW, 'stable');
       expect(state.updateKey).toBe(k1.publicKey);
 
       // 2. The owner rotates to K2 (#2); the next release is signed by K2.
@@ -362,7 +381,7 @@ describe('rotation rehearsal', () => {
       const r2 = check(manifest('0.6.0', k2, s2), ctx(state, { currentVersion: '0.5.0' }));
       expect(r2.state.sequence).toBe(2);
       await saveKeyState(dir, r2.state);
-      state = await loadKeyState(dir, ROOT, NOW);
+      state = await loadKeyState(dir, ROOT, NOW, 'stable');
       expect(state.updateKey).toBe(k2.publicKey);
 
       // 3. K1 is no longer accepted, with either statement.
@@ -378,7 +397,7 @@ describe('rotation rehearsal', () => {
       state = check(s3, ctx(state));
       expect(state.updateKey).toBeNull();
       await saveKeyState(dir, state);
-      state = await loadKeyState(dir, ROOT, NOW);
+      state = await loadKeyState(dir, ROOT, NOW, 'stable');
       expect(state.sequence).toBe(3);
       expect(check(manifest('0.7.0', k2, s2), ctx(state, { currentVersion: '0.6.0' }))).toBe(
         'unrotated_key',
@@ -398,7 +417,7 @@ describe('rotation rehearsal', () => {
       // A tampered state file falls back to "nothing accepted", never to a forged key.
       const forged = { ...s4, updateKey: k1.publicKey };
       await saveKeyState(dir, { sequence: 4, updateKey: k1.publicKey, statement: forged });
-      expect(await loadKeyState(dir, ROOT, NOW)).toEqual(INITIAL_KEY_STATE);
+      expect(await loadKeyState(dir, ROOT, NOW, 'stable')).toEqual(INITIAL_KEY_STATE);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -494,7 +513,7 @@ describe('phase 1 flow: verified download, then "Open the installer"', () => {
     const t = setup({ document: manifest('0.5.0', k2, s2) });
     const deps = { ...t.deps, currentVersion: '0.5.0' };
     expect(await runUpdateCheck(deps)).toEqual({ kind: 'up_to_date' });
-    let state = await loadKeyState(t.stateDir, ROOT, NOW);
+    let state = await loadKeyState(t.stateDir, ROOT, NOW, 'stable');
     expect([state.sequence, state.updateKey]).toEqual([2, k2.publicKey]);
     // An expired manifest still delivers its statement.
     const s3 = statement(3, 'rotate', k3.publicKey);
@@ -503,7 +522,7 @@ describe('phase 1 flow: verified download, then "Open the installer"', () => {
       kind: 'refused',
       code: 'expired',
     });
-    state = await loadKeyState(t.stateDir, ROOT, NOW);
+    state = await loadKeyState(t.stateDir, ROOT, NOW, 'stable');
     expect(state.updateKey).toBe(k3.publicKey);
     // A manifest that embeds a revocation: refused, and the revocation is kept.
     const s4 = statement(4, 'revoke', k3.publicKey);
@@ -515,7 +534,7 @@ describe('phase 1 flow: verified download, then "Open the installer"', () => {
       kind: 'refused',
       code: 'revoked',
     });
-    state = await loadKeyState(t.stateDir, ROOT, NOW);
+    state = await loadKeyState(t.stateDir, ROOT, NOW, 'stable');
     expect([state.sequence, state.updateKey]).toEqual([4, null]);
     // Later, the old K3 manifest is refused: the app does not go back.
     const w = setup({ document: manifest('0.6.0', k3, s3) });
@@ -582,6 +601,10 @@ describe('the command line, end to end (real offline KDF)', () => {
         updateFile.publicKey,
         '--sequence',
         '1',
+        '--channel',
+        'stable',
+        '--expires-days',
+        '395',
         '--out',
         p('s1.json'),
       ]);
@@ -640,6 +663,10 @@ describe('the command line, end to end (real offline KDF)', () => {
           updateFile.publicKey,
           '--sequence',
           '2',
+          '--channel',
+          'stable',
+          '--expires-days',
+          '90',
           '--out',
           p('y.json'),
         ]),
@@ -650,4 +677,125 @@ describe('the command line, end to end (real offline KDF)', () => {
     // Four real offline-strength key derivations (256 MiB, 4 passes: about 3.5 s each on an idle
     // laptop, several times that on a CI runner sharing its CPUs with other suites).
   }, 300_000);
+});
+
+// --- UPD-1: format v2 ------------------------------------------------------------------------------
+
+describe('format v2 (UPD-1): channel-bound, expiring statements and asset kinds', () => {
+  const zipAsset = (version) => ({
+    ...assetFor(version),
+    kind: 'zip',
+    url: `https://github.com/4thtech/agentlink/releases/download/v${version}/AgentLink-${version}-arm64.zip`,
+  });
+
+  it('signs statements with channel and expires; refuses an unknown channel and > 400 days', () => {
+    const s = statement(1, 'introduce', k1.publicKey, root, { channel: 'beta', expiresDays: 90 });
+    expect(s.domain).toBe('agentlink-desktop-root/v2');
+    expect([s.channel, s.issued, s.expires]).toEqual([
+      'beta',
+      '2026-11-11T10:00:00Z',
+      '2027-02-09T10:00:00Z',
+    ]);
+    expect(() => statement(1, 'introduce', k1.publicKey, root, { channel: 'nightly' })).toThrow(
+      /channel/,
+    );
+    expect(() => statement(1, 'introduce', k1.publicKey, root, { expiresDays: 401 })).toThrow(
+      /400/,
+    );
+    expect(() => statement(1, 'introduce', k1.publicKey, root, { expiresDays: 0 })).toThrow(/400/);
+    expect(statement(1, 'introduce', k1.publicKey, root, { expiresDays: 400 }).expires).toBe(
+      '2027-12-16T10:00:00Z',
+    );
+  });
+
+  it('renew keeps the key with a higher sequence and a later expiry', () => {
+    const renew = statement(2, 'renew', k1.publicKey);
+    const r = check(manifest('0.5.0', k1, renew));
+    expect([r.state.sequence, r.state.updateKey, r.version]).toEqual([2, k1.publicKey, '0.5.0']);
+  });
+
+  it('statement_expired: a manifest whose statement has run out is refused, even if fresh', () => {
+    const old = statement(1, 'introduce', k1.publicKey, root, {
+      now: NOW - 100 * DAY,
+      expiresDays: 30,
+    });
+    expect(check(manifest('0.5.0', k1, old))).toBe('statement_expired');
+  });
+
+  it('wrong_channel: a beta key cannot sign a stable manifest; the tool refuses it too', () => {
+    const beta = statement(1, 'introduce', k1.publicKey, root, { channel: 'beta' });
+    expect(() => manifest('0.5.0', k1, beta)).toThrow(/channel/);
+    const forged = resign({ ...good, statement: beta }, k1);
+    expect(check(forged)).toBe('wrong_channel');
+    expect(check(forged, ctx(INITIAL_KEY_STATE, { channel: 'beta' }))).toBe('wrong_channel');
+    const betaManifest = manifest('0.5.0', k1, beta, { extra: { channel: 'beta' } });
+    expect(check(betaManifest, ctx(INITIAL_KEY_STATE, { channel: 'beta' })).version).toBe('0.5.0');
+    expect(check(betaManifest)).toBe('wrong_channel');
+  });
+
+  it('failed_version: a version that failed to start is never offered again', () => {
+    expect(check(good, ctx(INITIAL_KEY_STATE, { failedVersion: '0.5.0' }))).toBe('failed_version');
+    expect(check(good, ctx(INITIAL_KEY_STATE, { failedVersion: '0.4.99' })).version).toBe('0.5.0');
+  });
+
+  it('old_format: a v1 manifest is refused for install, even when its signature is good', () => {
+    const v1 = { ...good, domain: 'agentlink-desktop-update/v1' };
+    expect(check(v1)).toBe('old_format');
+    expect(check({ ...s1, domain: 'agentlink-desktop-root/v1' })).toBe('old_format');
+  });
+
+  it('kind: the in-app installer takes the zip, phase 1 the DMG; each must exist', () => {
+    const both = manifest('0.5.0', k1, s1, {
+      extra: { assets: [assetFor('0.5.0'), zipAsset('0.5.0')] },
+    });
+    expect(check(both, ctx(INITIAL_KEY_STATE, { kind: 'zip' })).asset.url).toMatch(/\.zip$/);
+    expect(check(both).asset.url).toMatch(/\.dmg$/);
+    expect(check(good, ctx(INITIAL_KEY_STATE, { kind: 'zip' }))).toBe('no_asset_for_this_computer');
+  });
+
+  it('the tool computes the same messages as the shared vectors', () => {
+    const vectors = JSON.parse(
+      readFileSync(
+        new URL('../../test-vectors/desktop-update/vectors.json', import.meta.url),
+        'utf8',
+      ),
+    );
+    let checked = 0;
+    for (const c of vectors.cases) {
+      const doc = c.input.document;
+      if (c.input.tag !== doc.domain || !doc.domain.endsWith('/v2')) continue;
+      const message = doc.domain.startsWith('agentlink-desktop-root')
+        ? statementMessage(doc)
+        : manifestMessage(doc);
+      expect(encodeHex(message), c.id).toBe(c.expected.message);
+      checked += 1;
+    }
+    expect(checked).toBeGreaterThan(10);
+  });
+
+  it('the command line needs --channel and --expires-days for a statement', async () => {
+    const io = { readHidden: async () => PASS.slice(), readLine: async () => encodeUtf8('yes') };
+    const base = [
+      'statement',
+      '--root-key',
+      '/nonexistent/root.key',
+      '--action',
+      'renew',
+      '--update-key',
+      k1.publicKey,
+      '--sequence',
+      '2',
+      '--out',
+      '/nonexistent/s.json',
+    ];
+    const run = (args) => main(args, { env: {}, io, out: () => undefined });
+    await expect(run([...base, '--expires-days', '90'])).rejects.toThrow(/--channel/);
+    await expect(run([...base, '--channel', 'beta'])).rejects.toThrow(/--expires-days/);
+    await expect(run([...base, '--channel', 'beta', '--expires-days', '401'])).rejects.toThrow(
+      /400/,
+    );
+    await expect(run([...base, '--channel', 'gamma', '--expires-days', '90'])).rejects.toThrow(
+      /channel/,
+    );
+  });
 });

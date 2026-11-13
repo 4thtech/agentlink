@@ -1,11 +1,24 @@
 // WP-D10 updater (src/main/updater): the rules that need no signature. The signed paths (every
 // refusal of the acceptance list, the rotation rehearsal and the download flow) are tested against
 // the offline signing tool in tools/desktop/sign-manifest.test.mjs, because only that zone may sign.
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import rootKeyFile from '../../src/main/updater/root-key.json' with { type: 'json' };
+import {
+  BUILD_CHANNEL,
+  installerKind,
+  procTranslated,
+  updateChannel,
+  updaterArch,
+} from '../../src/main/updater/host.js';
 import { configuredRoot, runUpdateCheck, UPDATE_COPY } from '../../src/main/updater/index.js';
 import {
+  MANIFEST_DOMAIN,
   MAX_DOCUMENT_BYTES,
+  MAX_STATEMENT_VALIDITY_MS,
+  STATEMENT_DOMAIN,
   UpdateRefusal,
   allowedDownloadUrl,
   compareVersions,
@@ -13,6 +26,11 @@ import {
   pinnedRoot,
 } from '../../src/main/updater/manifest.js';
 import { macQuarantineValue } from '../../src/main/updater/quarantine.js';
+import {
+  FAILED_FILE,
+  loadFailedVersion,
+  saveFailedVersion,
+} from '../../src/main/updater/state.js';
 import {
   CHECK_INTERVAL_MS,
   FIRST_CHECK_DELAY_MS,
@@ -143,11 +161,13 @@ describe('strict parsing before any signature check', () => {
 
   it('refuses a statement with a missing sig as unsigned and an extra field as unknown', () => {
     const body = {
-      domain: 'agentlink-desktop-root/v1',
+      domain: 'agentlink-desktop-root/v2',
       sequence: 1,
       action: 'introduce',
+      channel: 'beta',
       updateKey: GENERATOR_X,
       issued: '2026-11-12T10:00:00Z',
+      expires: '2027-02-10T10:00:00Z',
     };
     expect(code(() => parseUpdateDocument(enc(JSON.stringify(body))))).toBe('unsigned');
     expect(
@@ -205,5 +225,141 @@ describe('schedule', () => {
     await new Promise((r) => setTimeout(r, 0));
     timers[2]?.cb();
     expect(runs).toBe(2);
+  });
+});
+
+// --- UPD-1: format v2, channel and arch of this build, failed versions ---------------------------
+
+describe('format v2 (UPD-1): strict statement and asset rules', () => {
+  const statement = {
+    domain: 'agentlink-desktop-root/v2',
+    sequence: 1,
+    action: 'introduce',
+    channel: 'beta',
+    updateKey: GENERATOR_X,
+    issued: '2026-11-12T10:00:00Z',
+    expires: '2027-02-10T10:00:00Z',
+    sig: '00'.repeat(64),
+  };
+  const parse = (value: unknown): string =>
+    code(() => parseUpdateDocument(enc(JSON.stringify(value))));
+
+  it('the domain tags are /v2; v1 documents are refused as the old format', () => {
+    expect(STATEMENT_DOMAIN).toBe('agentlink-desktop-root/v2');
+    expect(MANIFEST_DOMAIN).toBe('agentlink-desktop-update/v2');
+    expect(parse({ ...statement, domain: 'agentlink-desktop-root/v1' })).toBe('old_format');
+    expect(parse({ domain: 'agentlink-desktop-update/v1' })).toBe('old_format');
+  });
+
+  it('a statement needs channel and expires, at most 400 days after issued', () => {
+    expect(parseUpdateDocument(enc(JSON.stringify(statement))).kind).toBe('statement');
+    const without = (k: string): unknown =>
+      Object.fromEntries(Object.entries(statement).filter(([x]) => x !== k));
+    expect(parse(without('channel'))).toBe('malformed');
+    expect(parse(without('expires'))).toBe('malformed');
+    expect(parse({ ...statement, channel: 'nightly' })).toBe('malformed');
+    expect(parse({ ...statement, expires: statement.issued })).toBe('malformed');
+    expect(parse({ ...statement, expires: '2026-11-11T10:00:00Z' })).toBe('malformed');
+    expect(MAX_STATEMENT_VALIDITY_MS).toBe(400 * 86_400_000);
+    expect(parse({ ...statement, expires: '2027-12-17T10:00:00Z' })).toBe('accepted');
+    expect(parse({ ...statement, expires: '2027-12-17T10:00:01Z' })).toBe('malformed');
+    expect(parse({ ...statement, action: 'renew' })).toBe('accepted');
+    expect(parse({ ...statement, action: 'extend' })).toBe('malformed');
+  });
+
+  it('an asset needs a kind that matches its platform and file name', () => {
+    const asset = (kind: string, name: string, platform = 'darwin'): Record<string, unknown> => ({
+      platform,
+      arch: platform === 'win32' ? 'x64' : 'arm64',
+      kind,
+      url: `https://github.com/4thtech/agentlink/releases/download/v0.5.3/${name}`,
+      sha256: 'ab'.repeat(32),
+      size: 10,
+    });
+    const manifest = (assets: unknown[]): unknown => ({
+      domain: 'agentlink-desktop-update/v2',
+      channel: 'beta',
+      version: '0.5.3',
+      minimumVersion: '0.5.0',
+      released: '2026-11-13T08:00:00Z',
+      expires: '2026-12-13T08:00:00Z',
+      updateKey: GENERATOR_X,
+      statement,
+      assets,
+      sig: '00'.repeat(64),
+    });
+    expect(parse(manifest([asset('zip', 'AgentLink-0.5.3-arm64.zip')]))).toBe('accepted');
+    expect(parse(manifest([asset('zip', 'A-arm64.zip'), asset('dmg', 'A-arm64.dmg')]))).toBe(
+      'accepted',
+    );
+    expect(parse(manifest([asset('zip', 'AgentLink-0.5.3-arm64.dmg')]))).toBe('malformed');
+    expect(parse(manifest([asset('dmg', 'AgentLink-0.5.3-arm64.zip')]))).toBe('malformed');
+    expect(parse(manifest([asset('tar', 'AgentLink-0.5.3-arm64.tar')]))).toBe('malformed');
+    expect(parse(manifest([asset('zip', 'AgentLink-0.5.3.zip', 'win32')]))).toBe('malformed');
+    expect(parse(manifest([asset('nsis', 'AgentLink-0.5.3-setup.exe', 'win32')]))).toBe(
+      'accepted',
+    );
+    expect(parse(manifest([asset('zip', 'A.zip'), asset('zip', 'B.zip')]))).toBe('malformed');
+    const noKind = asset('zip', 'A.zip');
+    delete noKind['kind'];
+    expect(parse(manifest([noKind]))).toBe('malformed');
+  });
+});
+
+describe('channel and arch of this build (UPD-1, main.ts fix)', () => {
+  it('a pre-release version follows beta; others follow the build channel', () => {
+    expect(BUILD_CHANNEL).toBe('beta');
+    expect(updateChannel('0.6.0-beta.2')).toBe('beta');
+    expect(updateChannel('0.6.0-beta.2', 'stable')).toBe('beta');
+    expect(updateChannel('0.6.0', 'stable')).toBe('stable');
+    expect(updateChannel('0.6.0')).toBe(BUILD_CHANNEL);
+  });
+
+  it('detects Rosetta with sysctl.proc_translated, fixed arguments only', () => {
+    const calls: [string, readonly string[]][] = [];
+    const run =
+      (out: string | Error) =>
+      (cmd: string, args: readonly string[]): string => {
+        calls.push([cmd, args]);
+        if (out instanceof Error) throw out;
+        return out;
+      };
+    expect(procTranslated(run('1\n'))).toBe(true);
+    expect(procTranslated(run('0\n'))).toBe(false);
+    expect(procTranslated(run(new Error('unknown oid')))).toBe(false); // Intel: no such key
+    expect(procTranslated(run('yes'))).toBe(false);
+    expect(calls[0]).toEqual(['/usr/sbin/sysctl', ['-n', 'sysctl.proc_translated']]);
+  });
+
+  it('an x64 copy under Rosetta is offered the Apple silicon build', () => {
+    expect(updaterArch('darwin', 'x64', true)).toBe('arm64');
+    expect(updaterArch('darwin', 'x64', false)).toBe('x64');
+    expect(updaterArch('darwin', 'arm64', false)).toBe('arm64');
+    expect(updaterArch('win32', 'x64', true)).toBe('x64');
+  });
+
+  it('phase 1 opens the DMG on a Mac and the setup program on Windows', () => {
+    expect(installerKind('darwin')).toBe('dmg');
+    expect(installerKind('win32')).toBe('nsis');
+  });
+});
+
+describe('failed version (UPD-1)', () => {
+  it('is persisted, read back strictly, and absent by default', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'agentlink-failed-'));
+    try {
+      expect(await loadFailedVersion(dir)).toBeNull();
+      await saveFailedVersion(dir, '0.5.3');
+      expect(await loadFailedVersion(dir)).toBe('0.5.3');
+      await saveFailedVersion(dir, '0.5.4-beta.1');
+      expect(await loadFailedVersion(dir)).toBe('0.5.4-beta.1');
+      await expect(saveFailedVersion(dir, 'not a version')).rejects.toThrow();
+      await writeFile(join(dir, FAILED_FILE), '{"failedVersion":"0.5.3","x":1}');
+      expect(await loadFailedVersion(dir)).toBeNull();
+      await writeFile(join(dir, FAILED_FILE), '{"failedVersion":"../../x"}');
+      expect(await loadFailedVersion(dir)).toBeNull();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

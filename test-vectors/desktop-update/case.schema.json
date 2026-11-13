@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/4thtech/agentlink/test-vectors/desktop-update/case.schema.json",
+  "title": "desktop-update case",
+  "description": "A signed desktop update document (key statement or manifest, `document`) checked under `tag` against `signer` (x-only public key): the BIP-340 message taggedHash(tag, JCS(document without sig)) and whether `sig` verifies.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "source",
+    "input",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "input": {
+      "type": "object"
+    },
+    "expected": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "input": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "tag",
+            "document",
+            "signer"
+          ],
+          "properties": {
+            "op": {
+              "const": "desktopUpdateSignature"
+            },
+            "tag": {
+              "type": "string"
+            },
+            "document": {
+              "type": "object"
+            },
+            "signer": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "message",
+            "valid"
+          ],
+          "properties": {
+            "message": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "valid": {
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}
