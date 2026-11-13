@@ -3,7 +3,7 @@
 // sheet behind presence) and Show in Finder for the Inbox folder (one fixed POST, no input).
 // Names other people chose render as plain text only (I-5). Styled from the Settings pages
 // (design-1112 §3.1): same surfaces, tokens and type.
-import { Button, Skeleton, Surface } from '@4thtech-io/ui';
+import { Button, InlineError, Skeleton, Surface } from '@4thtech-io/ui';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { createHistoryApi } from '../history/api.js';
@@ -197,11 +197,7 @@ export function StoragePage({
                   >
                     {onMac() ? H.showInFinder : H.showInFolder}
                   </Button>
-                  {revealFailed ? (
-                    <p className="al-text-body-sm" role="alert">
-                      {H.revealFailed}
-                    </p>
-                  ) : null}
+                  {revealFailed ? <InlineError>{H.revealFailed}</InlineError> : null}
                 </div>
                 <ul className="sto-list">
                   <Row
