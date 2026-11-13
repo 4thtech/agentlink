@@ -4,7 +4,7 @@
 // `peekStorageUsage` opens the store like agent-peek.ts does (SQLITE_OPEN_READONLY, no KeyStore, no
 // cipher, nothing decrypted). It reads only clear columns: the byte length of the stored (sealed or
 // signed) text per `contact_id`, and the size column of the received files that were saved to the
-// Inbox. A sealed value is measured by its stored length, never opened. Per-person names are sealed
+// Inbox (from the `saved_files` index when the store has it, RET-3). A sealed value is measured by its stored length, never opened. Per-person names are sealed
 // in the store, so a caller that may open the ID names people itself; the rows here carry the
 // contact's ID only for that join and it never leaves the server.
 //
@@ -128,16 +128,33 @@ async function readStorageUsage(storePath: string): Promise<StorageUsage | undef
           .prepare("SELECT count(*) AS n FROM pragma_table_info('files') WHERE name = 'saved_name'")
           .get() as { n?: unknown } | undefined
       )?.n === 1;
-    const files = hasSaved
+    // RET-3 (D-148; 07 §3.8): from schema 15 the saved-file index survives the day-7 shred of the
+    // `files` row, so saved files are counted from it (not yet moved to the Trash).
+    const hasIndex =
+      (
+        db
+          .prepare(
+            "SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'saved_files'",
+          )
+          .get() as { n?: unknown } | undefined
+      )?.n === 1;
+    const files = hasIndex
       ? (db
           .prepare(
-            'SELECT e.contact_id AS c, count(*) AS n, sum(f.size) AS bytes ' +
-              'FROM files f JOIN envelopes e ON e.envelope_id = f.envelope_id ' +
-              'WHERE f.saved_name IS NOT NULL ' +
-              `GROUP BY e.contact_id LIMIT ${String(MAX_GROUPS)}`,
+            'SELECT contact_id AS c, count(*) AS n, sum(size) AS bytes FROM saved_files ' +
+              `WHERE trashed_at IS NULL GROUP BY contact_id LIMIT ${String(MAX_GROUPS)}`,
           )
           .all() as { c?: unknown; n?: unknown; bytes?: unknown }[])
-      : [];
+      : hasSaved
+        ? (db
+            .prepare(
+              'SELECT e.contact_id AS c, count(*) AS n, sum(f.size) AS bytes ' +
+                'FROM files f JOIN envelopes e ON e.envelope_id = f.envelope_id ' +
+                'WHERE f.saved_name IS NOT NULL ' +
+                `GROUP BY e.contact_id LIMIT ${String(MAX_GROUPS)}`,
+            )
+            .all() as { c?: unknown; n?: unknown; bytes?: unknown }[])
+        : [];
     const byContact = new Map<string | null, Totals>();
     const slot = (c: unknown): Totals => {
       const key = typeof c === 'string' && c !== '' ? c : null;

@@ -97,6 +97,43 @@ export class MemoryInbox implements TempFileOps {
     return Promise.resolve({ dev: '16777220', ino: String(entry.ino), size: entry.data.length });
   }
 
+  /** RET-3: what went to the fake OS Trash, by the name it had in the folder. */
+  readonly trashed: string[] = [];
+  /** RET-3: how many times trashSaved was asked (the core must not ask for a refused row). */
+  trashCalls = 0;
+  /** RET-3: the outcome the next trashSaved gives regardless of the checks (`no_trash`, ...). */
+  nextTrashOutcome: 'no_trash' | 'failed' | undefined;
+
+  /**
+   * RET-3: InboxFolder.trashSaved in memory, with the checks the Node platform makes: a regular file
+   * (a link is never followed or moved), the same inode, size and sha256 as the index row. A file
+   * that passes leaves the folder for the fake Trash; anything else is left exactly as it is.
+   */
+  trashSaved(
+    name: string,
+    expected: { dev: string; ino: string; size: number; sha256: string },
+  ): Promise<'trashed' | 'changed' | 'missing' | 'no_trash' | 'failed'> {
+    this.trashCalls += 1;
+    const forced = this.nextTrashOutcome;
+    this.nextTrashOutcome = undefined;
+    if (forced !== undefined) return Promise.resolve(forced);
+    const entry = this.entries.get(name);
+    if (entry === undefined) return Promise.resolve('missing');
+    if (entry.kind !== 'file') return Promise.resolve('changed');
+    const hash = encodeHex(sha256(entry.data));
+    if (
+      expected.dev !== '16777220' ||
+      String(entry.ino) !== expected.ino ||
+      entry.data.length !== expected.size ||
+      hash !== expected.sha256
+    ) {
+      return Promise.resolve('changed');
+    }
+    this.entries.delete(name);
+    this.trashed.push(name);
+    return Promise.resolve('trashed');
+  }
+
   /** W4-AUTO-SAVE: the next write fails for lack of space (ENOSPC). */
   failNextWriteWithNoSpace = false;
 
@@ -306,6 +343,7 @@ export async function openFileAgent(
         ops: inbox,
         isSavedFile: (name: string) => inbox.isFile(name),
         identify: (name: string) => inbox.identify(name),
+        trashSaved: (name, expected) => inbox.trashSaved(name, expected),
         readSaved: (name: string, maxBytes: number) => {
           const entry = inbox.entries.get(name);
           return Promise.resolve(

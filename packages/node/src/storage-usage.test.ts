@@ -70,6 +70,26 @@ describe('peekStorageUsage', () => {
     expect(usage?.walBytes).toBe(0);
   });
 
+  it('RET-3: counts saved files from saved_files (kept after the day-7 shred), not trashed ones', async () => {
+    seed();
+    const db = new Database(store);
+    db.exec(
+      'CREATE TABLE saved_files (envelope_id TEXT, idx INTEGER, contact_id TEXT, saved_name BLOB, ' +
+        'size INTEGER, sha256 TEXT, dev BLOB, ino BLOB, saved_at INTEGER, trashed_at INTEGER)',
+    );
+    const row = db.prepare('INSERT INTO saved_files VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    // e1 is still in files too; e9's files row was shredded (day 7); e8 went to the Trash.
+    row.run('e1', 0, 'ca', Buffer.from('n'), 1000, 'h', null, null, 1, null);
+    row.run('e9', 0, 'ca', Buffer.from('n'), 4000, 'h', null, null, 1, null);
+    row.run('e8', 0, 'cb', Buffer.from('n'), 7000, 'h', null, null, 1, 5);
+    db.close();
+    const usage = await peekStorageUsage(store);
+    const by = new Map(usage?.perContact.map((p) => [p.contactId, p]));
+    expect(by.get('ca')).toMatchObject({ fileCount: 2, fileBytes: 5000 });
+    expect(by.get('cb')).toMatchObject({ fileCount: 0, fileBytes: 0 });
+    expect(usage).toMatchObject({ fileCount: 2, fileBytes: 5000 });
+  });
+
   it('reads a store from before saved names as no saved files', async () => {
     seed(false);
     const usage = await peekStorageUsage(store);
