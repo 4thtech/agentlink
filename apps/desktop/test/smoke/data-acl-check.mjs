@@ -6,7 +6,12 @@ import { execFile } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { checkDataFolderAcl } from '../../src/main/data-acl.ts';
+import {
+  ACL_SCRIPT,
+  checkDataFolderAcl,
+  parseDacl,
+  parseWhoamiSid,
+} from '../../src/main/data-acl.ts';
 
 if (process.platform !== 'win32') {
   console.log('data-acl-check: Windows only, skipped.');
@@ -43,6 +48,40 @@ for (const [name, file, args] of [
   await runner.run(file, args, process.env).then(
     () => console.log(`${name}: runs`),
     (error) => console.log(`${name}: failed (${String(error?.code ?? 'error')})`),
+  );
+}
+// Diagnosis: how long Get-Acl takes and whether its SDDL parses (entries with this user's SID shown
+// as USER; nothing else about the runner).
+{
+  const started = Date.now();
+  const env = { ...process.env, AGENTLINK_ACL_PATH: dir };
+  await Promise.all([
+    runner.run(
+      `${sys32}\\WindowsPowerShell\\v1.0\\powershell.exe`,
+      ['-NoProfile', '-NonInteractive', '-Command', ACL_SCRIPT],
+      env,
+    ),
+    runner.run(`${sys32}\\whoami.exe`, ['/user', '/fo', 'csv', '/nh'], process.env),
+  ]).then(
+    ([sddl, who]) => {
+      const sid = parseWhoamiSid(who) ?? 'none';
+      const dacl = parseDacl(sddl);
+      const shown =
+        dacl === undefined || dacl === 'null'
+          ? String(dacl)
+          : dacl
+              .map(
+                (e) =>
+                  `${e.allow ? 'allow' : 'deny'}${e.inheritOnly ? '/io' : ''}:${e.sid === sid ? 'USER' : e.sid}`,
+              )
+              .join(' ');
+      console.log(`Get-Acl: ${String(Date.now() - started)} ms; dacl: ${shown}`);
+      if (dacl === undefined) console.log(`sddl: ${sddl.trim().split(sid).join('USER')}`);
+    },
+    (error) =>
+      console.log(
+        `Get-Acl: failed after ${String(Date.now() - started)} ms (${String(error?.code ?? 'error')})`,
+      ),
   );
 }
 try {
