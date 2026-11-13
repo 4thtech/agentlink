@@ -58,14 +58,14 @@ describe('chapter 7: advanced', () => {
       'Touch ID & master code',
       'Files',
       'Appearance',
+      'Notifications',
       'Rules',
       'Proofs & credits',
     ]) {
       expect(list).toContain(row);
     }
-    // WP-7: no Notifications row, and the old address lands on Settings.
-    expect(list).not.toContain('Notifications');
-    expect(await page.locator('a[href="/settings/notifications"]').count()).toBe(0);
+    // Notifications is a real Settings page now (N4-N7): a row in the list that leads to its page.
+    expect(await page.locator('a[href="/settings/notifications"]').count()).toBeGreaterThan(0);
     // Advanced is a row that leads to its page now (the in-place list is gone).
     expect(await page.locator('a.set-row[href="/settings/advanced"]').count()).toBe(1);
     expect(
@@ -135,10 +135,10 @@ describe('chapter 7: advanced', () => {
     await expectFadesOnly(page);
     expect((await layoutShiftScore(page)) - shiftedBefore).toBeLessThanOrEqual(CLS_BUDGET);
     await probe.check();
-    // WP-7: the old Notifications address lands on Settings (a fresh load, so after the probe).
+    // Notifications is its own Settings page now (a fresh load, so after the probe).
     await page.goto(new URL('/settings/notifications', page.url()).href);
-    await page.getByRole('heading', { name: 'Settings', level: 1 }).waitFor();
-    expect(new URL(page.url()).pathname).toBe('/settings');
+    await page.getByRole('heading', { name: 'Notifications', level: 1 }).waitFor();
+    expect(new URL(page.url()).pathname).toBe('/settings/notifications');
   }, 240_000);
 
   // W4-WIRE-3 (owner walkthrough 30 Oct): on a phone (375 px) every section is one tap from the
