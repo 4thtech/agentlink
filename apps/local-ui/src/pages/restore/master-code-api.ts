@@ -8,8 +8,10 @@ import { shownLabel, type Outcome } from './api.js';
 
 export const MASTER_CODE_SHOW = '/api/ui/master-code/show';
 export const MASTER_CODE_SAVED = '/api/ui/master-code/saved';
-/** What the settings page for a new master code is called by path. */
-export const NEW_MASTER_CODE_PATH = '/settings/touch-id';
+/** REL051-R2C (R2-CLASS-03): the hash that has the settings page start making a new code at once. */
+export const NEW_MASTER_CODE_HASH = '#new-master-code';
+/** The settings page for a new master code, opened on "Make a new master code" (starts it). */
+export const NEW_MASTER_CODE_PATH = `/settings/touch-id${NEW_MASTER_CODE_HASH}`;
 
 /** The first-run step's public fields (the master code step of Get started). */
 export interface FirstRunView {
