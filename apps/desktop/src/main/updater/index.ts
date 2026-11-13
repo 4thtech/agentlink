@@ -1,7 +1,7 @@
 // WP-D10 Updater phase 1 (plan 2026-11-12 Decision 5, Fable H3; 08 §8 "Signed updates").
 //
-// One pass: fetch the channel's update document, verify it against the pinned offline root key
-// (manifest.ts), remember a newer root statement (state.ts), download the installer for this
+// One pass: fetch the channel's update manifest, verify it against the one pinned update key
+// (manifest.ts, format v2, UPD-1), skip a version recorded as failed (state.ts), download the installer for this
 // computer into a private temp folder and check its size and SHA-256 (download.ts), mark it as
 // downloaded (quarantine.ts), then ask: "Update available" → "Open the installer" or "Later".
 // The person runs the installer. There is NO silent install and no bundle swap in phase 1.
@@ -12,11 +12,11 @@
 import rootKeyFile from './root-key.json' with { type: 'json' };
 import { rm } from 'node:fs/promises';
 import { downloadInstaller, fetchDocument, hashFile, type FetchLike } from './download.js';
+import { installerKind } from './host.js';
 import {
   MAX_DOCUMENT_BYTES,
   UpdateRefusal,
   acceptManifest,
-  applyStatement,
   parseUpdateDocument,
   pinnedRoot,
   type AcceptedUpdate,
@@ -25,7 +25,7 @@ import {
   type RefusalCode,
 } from './manifest.js';
 import { markDownloaded } from './quarantine.js';
-import { loadKeyState, saveKeyState } from './state.js';
+import { loadFailedVersion } from './state.js';
 
 /**
  * Where each channel's signed document is published (WP-D11 uploads it). `stable` follows the latest
@@ -93,8 +93,9 @@ export function configuredRoot(raw: unknown = rootKeyFile): PinnedRoot | undefin
 }
 
 /**
- * Fetches and verifies the channel's document. A statement-only document (a revocation, or a
- * rotation published before the next release) updates the key state and offers nothing.
+ * Fetches the channel's manifest and verifies it under the one pinned update key (UPD-1: no key
+ * statements; a new key arrives only with a release that pins it). A version recorded as failed
+ * (state.ts) is never offered again.
  */
 export async function checkForUpdate(
   deps: UpdaterDeps,
@@ -102,28 +103,20 @@ export async function checkForUpdate(
   const root = configuredRoot(deps.root ?? rootKeyFile);
   if (root === undefined) throw new UpdateRefusal('root_not_pinned');
   const now = (deps.now ?? Date.now)();
-  const state = await loadKeyState(deps.stateDir, root, now);
+  const failedVersion = await loadFailedVersion(deps.stateDir);
   const bytes = await fetchDocument(
     DOCUMENT_URLS[deps.channel],
     MAX_DOCUMENT_BYTES,
     deps.fetch ?? defaultFetch,
   );
-  const document = parseUpdateDocument(bytes);
-  // The root statement (alone, or embedded in a manifest) is verified under the pinned root and kept
-  // BEFORE any manifest-level check, so an app that is up to date, or sees an expired manifest or one
-  // for another channel or computer, still adopts a rotation or a revocation (Fable WP-D10 M1).
-  const statement =
-    document.kind === 'statement' ? document.statement : document.manifest.statement;
-  const next = applyStatement(state, statement, root, now);
-  if (next !== state) await saveKeyState(deps.stateDir, next);
-  if (document.kind === 'statement') return { root, accepted: undefined };
-  const accepted = acceptManifest(document.manifest, {
+  const accepted = acceptManifest(parseUpdateDocument(bytes), {
     root,
-    state: next,
     currentVersion: deps.currentVersion,
     channel: deps.channel,
     platform: deps.platform,
     arch: deps.arch,
+    kind: installerKind(deps.platform),
+    failedVersion,
     now,
   });
   return { root, accepted };

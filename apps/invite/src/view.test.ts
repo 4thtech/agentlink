@@ -4,14 +4,7 @@
 // e2e/test/invite-page-*.test.ts cover the built page itself.
 import { describe, expect, it } from 'vitest';
 import pageHtml from '../site/i/index.html?raw';
-import {
-  DOCS_BASE,
-  DOCS_LINKS,
-  MAC_APP_AVAILABLE,
-  MAC_APP_URLS,
-  MAC_APP_VERSION,
-  macAppAsset,
-} from './config.js';
+import { DOCS_BASE, DOCS_LINKS, MAC_APP_AVAILABLE, MAC_APP_URLS } from './config.js';
 import type { InviteView } from './invite-state.js';
 import { buildAppLink, buildAskAi, buildCommands } from './prompt.js';
 import { strings } from './strings.js';
@@ -87,23 +80,13 @@ describe('config (REL051-INV)', () => {
       expect(url).toMatch(/^https:\/\/github\.com\/4thtech\/agentlink\/releases\//);
   });
 
-  it('pins both Mac app links to the exact release assets of the desktop build, never latest', () => {
-    expect(MAC_APP_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(macAppAsset('0.5.2', 'arm64')).toBe('AgentLink-0.5.2-mac-arm64.dmg');
-    expect(macAppAsset('0.5.2', 'x64')).toBe('AgentLink-0.5.2-mac-x64.dmg');
-    for (const arch of ['arm64', 'x64'] as const) {
-      const url = MAC_APP_URLS[arch];
-      const match =
-        /^https:\/\/github\.com\/4thtech\/agentlink\/releases\/download\/v(\d+\.\d+\.\d+)\/AgentLink-(\d+\.\d+\.\d+)-mac-(arm64|x64)\.dmg$/.exec(
-          url,
-        );
-      expect(match, url).not.toBeNull();
-      expect(match?.[1]).toBe(MAC_APP_VERSION);
-      expect(match?.[2]).toBe(MAC_APP_VERSION);
-      expect(match?.[3]).toBe(arch);
-      expect(url).not.toContain('latest');
-    }
-    expect(MAC_APP_URLS.arm64).not.toBe(MAC_APP_URLS.x64);
+  it('links both Mac app files by their stable names on the latest release', () => {
+    expect(MAC_APP_URLS.arm64).toBe(
+      'https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-arm64.dmg',
+    );
+    expect(MAC_APP_URLS.x64).toBe(
+      'https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-x64.dmg',
+    );
   });
 
   it('the page links are exactly the docs links, each in a new tab with no referrer', () => {

@@ -3,6 +3,7 @@ import { aeadEnvelope } from './aead-envelope';
 import { alkh } from './alkh';
 import { bip340 } from './bip340';
 import { cardPop } from './card-pop';
+import { desktopUpdate } from './desktop-update';
 import { dropAuth } from './drop-auth';
 import { eip3009 } from './eip3009';
 import { eip712 } from './eip712';
@@ -40,6 +41,7 @@ export const suiteModules: ReadonlyMap<string, SuiteModule> = new Map([
   ['alkh', alkh],
   ['bip340', bip340],
   ['card-pop', cardPop],
+  ['desktop-update', desktopUpdate],
   ['drop-auth', dropAuth],
   ['eip3009', eip3009],
   ['eip712', eip712],

@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApiClient, type ApiClient, type OwnerApiResult } from './api/client.js';
 import type { CheckOutcome, InviteApi } from './pages/contacts/invite-api.js';
 import type { PasskeyInfo, PresenceProof } from './pages/contacts/owner.js';
+import { PresenceButton } from './pages/contacts/presence-button.js';
 import { PresencePrompt } from './pages/contacts/presence-prompt.js';
 import type { AppChange, AppsApi } from './pages/first-run/apps-api.js';
 import { ConnectApp } from './pages/first-run/connect-app.js';
@@ -211,6 +212,30 @@ const SURFACES: readonly Surface[] = [
             sent.push(codeOf(proof));
           },
           onCancel: () => undefined,
+        }),
+      ),
+  },
+  {
+    // UX1113-N1: the step's own button is the sensor (the Connected moment's "Save with Touch ID").
+    file: 'pages/contacts/presence-button.tsx',
+    name: 'the one-gesture sensor button (Connected moment naming)',
+    submit: 'Confirm with your master code',
+    mount: (sent, gestures) =>
+      render(
+        createElement(PresenceButton, {
+          withSensor: (sensor: string) => `Save with ${sensor}`,
+          withCode: 'Save with your master code',
+          statement: 'Name this contact Marko.',
+          busy: false,
+          notUsed: 'Not saved. Try again.',
+          owner: {
+            passkey: () => Promise.resolve(PASSKEY),
+            post: () => Promise.resolve({ kind: 'done' as const }),
+          },
+          gesture: gesture(gestures),
+          onProof: (proof: PresenceProof) => {
+            sent.push(codeOf(proof));
+          },
         }),
       ),
   },
@@ -466,7 +491,8 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   // UX1113-R3: Restore here asks first on a computer that has an owner (PresenceStep offers the code).
   'pages/restore/index.tsx': { offers: /<PresenceStep\b/ },
   'pages/contacts/index.tsx': { offers: /<PresencePrompt\b/ },
-  'pages/invite/name-contact.tsx': { offers: /<PresencePrompt\b/ },
+  'pages/contacts/presence-button.tsx': { offers: /<UseCodeInstead\b/ },
+  'pages/invite/name-contact.tsx': { offers: /<PresenceButton\b/ },
   'pages/home/person-menu.tsx': { offers: /<PresencePrompt\b/ },
   // Approvals: OwnerStep draws the passkey button with the code field under it (approvals/card.tsx).
   'pages/approvals/card.tsx': { offers: /<CodeForm\b/ },

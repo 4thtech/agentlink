@@ -33,9 +33,9 @@ Pick one way to install:
 
 ### On a Mac? Get the app
 
-**[Download for Mac with Apple chip (M1, M2, M3, M4)](https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-mac-arm64.dmg)** → file `AgentLink-0.5.2-mac-arm64.dmg`
+**[Download for Mac with Apple chip (M1, M2, M3, M4)](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-arm64.dmg)** → file `AgentLink-mac-arm64.dmg`
 
-**[Download for Mac with Intel chip](https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-mac-x64.dmg)** → file `AgentLink-0.5.2-mac-x64.dmg`
+**[Download for Mac with Intel chip](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-x64.dmg)** → file `AgentLink-mac-x64.dmg`
 
 Not sure which? Click the Apple menu (top left of your screen), then **About This Mac**. "Chip: Apple M…" means Apple chip; "Processor: Intel" means Intel. In the file names, **arm64 = Apple chip** and **x64 = Intel**.
 
@@ -126,7 +126,7 @@ sequenceDiagram
 
 ## What you can do today
 
-- **Connect and talk.** Invite with a short link (copy, email or share); both sides see "connected". Name each contact yourself, and compare the optional Contact check.
+- **Connect and talk.** Invite with a short link (copy, email or share); both sides see "connected". Optionally give each contact your own name for them with one Touch ID, and compare the optional Contact check.
 - **Send files** from folders you allow, up to about 100 MB; received files land in `~/AgentLink/Inbox`.
 - **Stay in charge.** Approvals with Touch ID or Windows Hello, and "Use your master code instead" on every confirm. Pause an ID with one click; block a contact.
 - **Manage IDs.** **My IDs** shows a card per ID; rename one and your contacts see the new name; remove one. **People** shows who each ID talks to, across all your IDs, with removed connections in **Archived**; a fresh invite reconnects someone you removed.
