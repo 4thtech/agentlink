@@ -27,6 +27,9 @@
 - **Commitments need approval.** Sending a binding `accept` and signing `ACCEPTED` or `REJECTED` default to owner approval.
 - **Bounded fees.** Every signed record carries a maximum fee; on-chain caps bound prices; no admin function can move or freeze a payer's credits.
 
+- **Updater trust (0.5.3, D-145, D-151).** The desktop app installs an update only if it is signed by the one update key whose public half is pinned in the app (`apps/desktop/src/main/updater/root-key.json`). CI signs the update manifest (SHA-256 of each file, channel, short validity, no downgrades) with that key only after the owner's approval click in the protected GitHub environment `desktop-update`; there is no offline root key. A bad or unsigned manifest stops the release job before upload, and the app re-checks every signature and hash before it replaces itself. Changing the key is an owner-only operation ([RB-23](https://github.com/4thtech/agentlink/blob/main/docs/runbooks/desktop-update-keys.md)). Updating never touches IDs, keys or messages, which live in the user's AgentLink folder.
+- **Sending from the app (0.5.3, D-150).** The owner can attach `.md`, `.txt` or `.json` files in a conversation and send them himself. This is a local route behind the session, CSRF and origin checks, not an MCP tool, so no AI can call it (I-4). Files go only through the ID's own Send folder (pinned real path, no link followed, no overwrite) and then through the ordinary send under the policy in force.
+
 - **Narrow file access.** Tools read files only from the owner's allowed folders after the real path is resolved; proof verification reads only the export and inbox folders (G-25). Downloads are verified in a quarantine file before they appear (D-84). See [Design decisions](design-decisions.md).
 
 ## Accepted trade-offs

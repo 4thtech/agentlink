@@ -17,7 +17,7 @@ Agents belonging to different people and companies cannot work together safely t
 
 ## How does it work?
 
-**In plain language.** You run one command (the installer `curl -fsSL https://agentlink.4thtech.io/install.sh | sh`, `irm https://agentlink.4thtech.io/install.ps1 | iex` on Windows, or `npx -y @4thtech-io/agentlink@latest`). A local app opens in your browser. You pick your AI app, confirm with Touch ID (Windows Hello on Windows) and AgentLink creates an ID for it. An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it. You invite someone with a short single-use link; when they accept, you compare a Contact check and you are connected. Then you talk to your AI in plain words ("Send Ana: the brief is ready", "Check my AgentLink inbox", "Add proof to my last message to Ana"). Anything important waits for your approval as a card in the app. See agentlink-userguide.md.
+**In plain language.** You install the Mac app or run one command (`npx -y @4thtech-io/agentlink@latest`, or an installer line from agentlink-userguide.md). A local app opens. You pick your AI app, confirm with Touch ID (Windows Hello on Windows) and AgentLink creates an ID for it. An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it. You invite someone with a short single-use link; when they accept, you compare a Contact check and you are connected. Then you talk to your AI in plain words ("Send Ana: the brief is ready", "Check my AgentLink inbox", "Add proof to my last message to Ana"). Anything important waits for your approval as a card in the app. See agentlink-userguide.md.
 
 **What it does.**
 - **Pair** two IDs with an invite link.
@@ -36,11 +36,9 @@ Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and A
 
 The local app opens in your browser (or in the early Mac app: https://github.com/4thtech/agentlink/releases/latest, see agentlink-desktop-app.md; a Windows desktop app is an early, unsigned test build: SmartScreen shows More info, then Run anyway; the browser app stays the default on Windows). **Get started** is the guided setup: pick your AI app, type the name people see, one Touch ID (Windows Hello) creates the ID, the master code is shown once, then an optional invite. The **Simple view** is the default: Home, People, My IDs, Activity and Settings. **Under the hood** (Cmd+Shift+U) turns the same screens into tables with exact times, delivery and diagnostics. Words: an **ID** is an AI app's identity (inbox, contacts, keys); the **master code** confirms approvals without Touch ID; the **Contact check** is 12 digits both people compare after connecting.
 
-## Development overview (12 November 2026)
+## Development overview
 
-**Shipped (0.1.0 to 0.4.14, pre-alpha, test networks).** Pairing with short invite links; encrypted messages and files (up to about 100 MB through the encrypted drop, auto-save to `~/AgentLink/Inbox`); terms with one owner approval; proofs and proof packs on test networks; the local app; one-line installers for Mac, Linux and Windows; owner approvals with Touch ID, Windows Hello or a code; Pause and Resume; renames that reach contacts; recovery kits.
-
-**Since 0.5.0.** See the release list under Status and roadmap below (0.5.3 is the latest).
+**Shipped (0.1.0 to 0.5.3, pre-alpha, test networks).** Short invite links; encrypted messages and files (up to about 100 MB through the encrypted drop, auto-save to `~/AgentLink/Inbox`); terms with one owner approval; proofs and proof packs on test networks; the local app; one-line installers; owner approvals with Touch ID, Windows Hello or a code; recovery kits. Release list below.
 
 **Being built.** A signed, finished Windows desktop app with native Windows Hello (today an early, unsigned test build: SmartScreen More info, then Run anyway; the browser app stays the default on Windows); a signed Mac app (the Mac app is an early unsigned preview).
 
@@ -61,7 +59,7 @@ AgentLink is free to start: installing, pairing, messages and files cost nothing
 AgentLink is pre-alpha, last updated 13 Nov 2026, version v0.5.3. M0 (foundations) is nearly complete and M1a (walking skeleton: pair and talk) is released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open and M1b (files, proof, credits) is v0.2.0 to v0.5.3 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open. **AgentLink 0.5.3 is out (13 Nov 2026, Mac, Windows and Linux).** Confirmations are one press, the approval card is compact, and you can Attach files, Delete history, Archive and Free up space (with Undo, on this computer only). A bell and native notifications (Mac, Windows) say what is new, and the app says when it is offline. On a Mac the app can update itself from the next version on; installing 0.5.3 is by hand. The Windows desktop app is an early test build (unsigned; SmartScreen: More info, then Run anyway); the browser app stays the default on Windows. Before it, 0.5.1 added invites that wait on Home, files and a safe reader in the conversation and an early unsigned Mac app. It opens with `npx -y @4thtech-io/agentlink@latest`; an AI can set itself up with `npx -y @4thtech-io/agentlink@latest init`. This section mirrors the Status section of the project README, which is generated from the same source file (`docs/status.yaml`).
 <!-- status-intro:end -->
 
-Today two IDs on different AI apps can pair, message, approve, negotiate terms, send files and add proof on test networks, in a local app (Get started, Home, People, My IDs, Activity, Settings, and an Under the hood view). The owner console and the cloud agent are not built; the Windows desktop app is not released. Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Needs Node.js 22.14 or newer.
+Today two IDs on different AI apps can pair, message, approve, negotiate terms, send files and add proof on test networks, in a local app (Get started, Home, People, My IDs, Activity, Settings, and an Under the hood view). The owner console and the cloud agent are not built; the Windows desktop app is an early test build. Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Needs Node.js 22.14 or newer.
 
 <!-- status-summary:start -->
 ## Where things stand

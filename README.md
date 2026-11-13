@@ -137,7 +137,7 @@ sequenceDiagram
 
 **New in 0.5.0 (12 Nov 2026):** the app is redesigned around you, your IDs and your people. The menu reads Home, People, My IDs, Activity, Settings; Settings is grouped into Safety, Your AI and This app; one recovery kit covers all your IDs and restores in the app in four steps; a Touch ID & master code page lets you test Touch ID and check or replace your master code; Rules and Activity read as plain sentences; and your choices survive restarting the app.
 
-**Windows app, early build (0.5.3):** AgentLink for Windows 10 and 11 in its own window, unsigned for now, attached to each release as `AgentLink-win-x64-setup.exe` (Windows asks once: More info, then Run anyway). The browser app (one command) stays the main way on Windows. See the [desktop app page](docs-site/guide/apps/desktop-app.md#windows).
+**Windows app, early build (0.5.3):** AgentLink for Windows 10 and 11 in its own window, unsigned for now, download [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) (the link stays the same for every release) (Windows asks once: More info, then Run anyway). The browser app (one command) stays the main way on Windows. See the [desktop app page](docs-site/guide/apps/desktop-app.md#windows).
 
 Not built yet, and not claimed: a signed Windows app (the 0.5.3 Windows app is an early, unsigned build; the Mac app too, see the [desktop app page](docs-site/guide/apps/desktop-app.md)), the always-on cloud agent (planned as 0.6.0), and proof on main networks. What changed in each release: [CHANGELOG](CHANGELOG.md).
 

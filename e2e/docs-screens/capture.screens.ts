@@ -396,7 +396,7 @@ describe('docs screens', () => {
       await until('Tali has the plan', () => inboxHas(mcpA, 'workshop-plan.md'), 60_000);
       await navTo(a, 'Home');
       await a.getByText('Natasa').first().click();
-      const open = a.getByRole('button', { name: 'Open', exact: true }).first();
+      const open = a.getByRole('button', { name: 'Open workshop-plan.md' }).first();
       await open.waitFor({ timeout: 60_000 });
       await open.click();
       await a.getByText('Workshop plan').first().waitFor();
