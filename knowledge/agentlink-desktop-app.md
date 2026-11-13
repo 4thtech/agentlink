@@ -36,6 +36,10 @@ Settings, Updates shows your version and **Check for updates** (the app also che
 
 Open Settings, Touch ID & master code, press **Use Touch ID for approvals**, type your master code once and touch the sensor. **Test Touch ID** on the same page checks that it works. If you cancel or the touch fails, it goes back to off with a plain message and your master code keeps working. Each Touch ID confirmation answers a fresh single-use request, so a copied confirmation cannot be replayed.
 
+## Does the app show notifications?
+
+Yes, from 0.5.3, as real AgentLink notifications (its own name and icon). Each says one of four things: "Approval waiting", "New message", "File received" or "Update ready". Clicking one opens AgentLink at Home, or at Settings › Updates for an update. A notification never shows message text, a file's name or a link, and never approves anything. It says "From a contact" unless you turn on **Show names in notifications**, which uses only names you gave your contacts on People. At most one of each kind arrives every 30 seconds; more in between are counted into the next one. The Dock icon's number is how many approvals are waiting. Choose what you get in Settings › Notifications: Approvals waiting (on), New messages, Files received, Updates and Show names (off). While the desktop app runs, AgentLink shows no other approval alert, so you never get two. If macOS asked and you said no, turn them on in System Settings › Notifications › AgentLink.
+
 ## Other things to know
 
 - Closing the window keeps AgentLink running in the menu bar; it comes back when you click its menu-bar or Dock icon, or when it has a page to show you. Quit it with Cmd+Q, or with **Quit AgentLink** in its menu-bar menu. Your AI app runs its own AgentLink either way.

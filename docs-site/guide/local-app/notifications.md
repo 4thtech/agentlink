@@ -14,7 +14,7 @@ Open the bell to see a short list in three groups:
 | **New** | New messages and files, one line per person ("3 new messages from **Ana**"), a new version of AgentLink, and the message network when it has been unreachable for 10 minutes. |
 | **Earlier** | What you have already seen. |
 
-- Click a line to go to it (Home for approvals and people, Settings › Updates, Relays & network). It is then marked as read.
+- Click a line to go to it (Home for approvals and people, Settings › Updates, or the network page under Advanced). It is then marked as read.
 - **Mark all read** clears the dots. Approvals still count until you decide them.
 - The gear opens **Settings › Notifications**; **Open Activity** shows the full history.
 - With the keyboard: Tab to the bell, Enter to open, the arrow keys to move, Escape to close.
@@ -22,9 +22,39 @@ Open the bell to see a short list in three groups:
 
 The list never holds what a message says, a file's name or a link. A person is named only by a name **you** gave them on People; someone who only has the name they chose for themselves, or anyone else, is "a contact". The list stays on this computer, in the ID's own folder, and keeps the last 30 days (at most 200 lines).
 
+## Notifications from the desktop app
+
+When you use the AgentLink desktop app, it shows real notifications from AgentLink (its own name and icon). Each one says only one of four things:
+
+| Notification | When | A click opens |
+|---|---|---|
+| **Approval waiting** | Your AI asks for an approval | Home, with the approval |
+| **New message** | A contact sends you a message | Home |
+| **File received** | A contact sends you a file | Home |
+| **Update ready** | A new version of AgentLink is ready to install | Settings › Updates |
+
+- A notification never shows what a message says, a file's name or a link, and it never approves, accepts or replies. To decide, open AgentLink.
+- It says "From a contact" unless you turn on **Show names in notifications**. Then it uses the name **you** gave the contact on People. A name someone chose for themselves is never shown.
+- You get at most one of each kind every 30 seconds. If more arrive in between, the next one counts them ("3 new messages from your contacts").
+- On a Mac, the number on the AgentLink icon in the Dock is how many approvals are waiting.
+- On a Mac, the first notification may ask whether AgentLink may show notifications. If you said no, turn them on in System Settings › Notifications › AgentLink.
+- While the desktop app runs, AgentLink shows no other alert for approvals, so you never get two.
+
 ## Settings › Notifications
 
-**Settings › Notifications** has one switch today, **Approvals waiting**, which starts **on**. When your AI asks for an approval and AgentLink cannot open it in your browser, a short alert on this computer says one is waiting. The alert names no one and never approves anything. Turn the switch off and AgentLink shows no such alert; the bell and Home still show the approval. Your choice is kept for this copy of AgentLink, for every ID.
+The switches you see depend on where you use AgentLink. Your choices are kept for this copy of AgentLink, for every ID.
+
+**In the desktop app:**
+
+| Switch | Starts |
+|---|---|
+| **Approvals waiting** | on |
+| **New messages** | off |
+| **Files received** | off |
+| **Updates** | off |
+| **Show names in notifications** | off |
+
+**In a browser:** one switch, **Approvals waiting**, which starts **on**. When your AI asks for an approval and AgentLink cannot open it in your browser, a short alert on this computer says one is waiting. The alert names no one and never approves anything. Turn the switch off and AgentLink shows no such alert; the bell and Home still show the approval.
 
 The bell in the app always lists what is new, whatever you choose here. Nothing on this page changes what your AI may do.
 
