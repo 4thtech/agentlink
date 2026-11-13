@@ -39,9 +39,15 @@ describe('the desktop core and the CLI/browser install share one home', () => {
       createAgent: () => Promise.resolve(`0x${'11'.repeat(20)}`),
       discardKeys: () => Promise.resolve(),
     });
-    const name = await cli.create('Ana');
+    const create = cli.create;
+    expect(create).toBeDefined();
+    if (create === undefined) return;
+    const name = await create('Ana');
     const deps = nodeDesktopHostDeps(pipe).uiDeps(() => Promise.reject(new Error('not started')));
-    expect(await deps.agents()).toEqual([name]);
+    const agents = deps.agents;
+    expect(agents).toBeDefined();
+    if (agents === undefined) return;
+    expect(await agents()).toEqual([name]);
   });
 
   it('the keychain service is the one the CLI uses', () => {
