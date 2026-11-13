@@ -22,6 +22,8 @@ import { join } from 'node:path';
 import { decodeHex, encodeHex, randomBytes } from '@4thtech-io/crypto';
 
 const { O_WRONLY, O_CREAT, O_EXCL, O_NOFOLLOW } = constants;
+// Absent on Windows; 0 there, so the flag is a no-op.
+const O_NONBLOCK = (constants as { O_NONBLOCK?: number }).O_NONBLOCK ?? 0;
 const FILE_MODE = 0o600;
 const DIR_MODE = 0o700;
 export const UNSAVED_FILE = 'master-code-unsaved.json';
@@ -79,11 +81,16 @@ export async function writeUnsavedMarker(home: string, marker: UnsavedMarker): P
 export async function readUnsavedMarker(home: string): Promise<UnsavedMarker | undefined> {
   const path = markerPath(home);
   try {
-    const info = await lstat(path);
-    if (!info.isFile() || info.size > MAX_BYTES) return undefined;
-    const fh = await open(path, constants.O_RDONLY | O_NOFOLLOW);
+    // Opened first (no link followed, never blocking), then checked through the handle: no
+    // check-then-open race on the path.
+    const fh = await open(path, constants.O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
     let text: string;
     try {
+      const info = await fh.stat();
+      if (!info.isFile() || info.size > MAX_BYTES) return undefined;
+      // Where O_NOFOLLOW does not exist (Windows), the name must still be that same plain file.
+      const entry = await lstat(path);
+      if (!entry.isFile() || entry.dev !== info.dev || entry.ino !== info.ino) return undefined;
       text = await readFile(fh, 'utf8');
     } finally {
       await fh.close();

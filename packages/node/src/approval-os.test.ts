@@ -1,12 +1,18 @@
 // M1-11a-b (IR-M1-11a-b-1 L-2, L-4): the approval UI's OS opener and notifier run a fixed program
 // by absolute path through execFile with `shell: false`, the url as its own argument, and never
 // resolve a program through PATH. A missing program is not run (the opener resolves false).
+import { execFileSync } from 'node:child_process';
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import process from 'node:process';
 import { describe, expect, it } from 'vitest';
 import {
   OS_PROGRAMS,
   browserOpenerWith,
   fileRevealerWith,
   notifierWith,
+  readSmallRegularText,
   type OsSeams,
 } from './approval-os.js';
 
@@ -245,5 +251,35 @@ describe('the file revealer (MSG-FILES-IO-h)', () => {
     const { seams: s, calls } = seams('darwin', { executable: () => false });
     expect(await fileRevealerWith(s)(FILE, FOLDER)).toBe(false);
     expect(calls).toHaveLength(0);
+  });
+});
+
+// REL051-CIB (CodeQL js/file-system-race): a desktop entry is opened first and checked through the
+// open handle, so a link, a FIFO, a folder or an oversized file is never read and never hangs.
+describe('readSmallRegularText', () => {
+  it('reads a small regular file and nothing else', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'al-cib-text-'));
+    try {
+      await writeFile(join(dir, 'a.desktop'), '[Desktop Entry]\n');
+      expect(await readSmallRegularText(join(dir, 'a.desktop'), 1024)).toBe('[Desktop Entry]\n');
+      expect(await readSmallRegularText(join(dir, 'a.desktop'), 4)).toBeUndefined();
+      expect(await readSmallRegularText(join(dir, 'missing'), 1024)).toBeUndefined();
+      expect(await readSmallRegularText(dir, 1024)).toBeUndefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it.skipIf(process.platform === 'win32')('refuses a link or a FIFO', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'al-cib-text-'));
+    try {
+      await writeFile(join(dir, 'real'), 'x');
+      await symlink(join(dir, 'real'), join(dir, 'link'));
+      expect(await readSmallRegularText(join(dir, 'link'), 1024)).toBeUndefined();
+      execFileSync('mkfifo', ['-m', '600', join(dir, 'fifo')]);
+      expect(await readSmallRegularText(join(dir, 'fifo'), 1024)).toBeUndefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

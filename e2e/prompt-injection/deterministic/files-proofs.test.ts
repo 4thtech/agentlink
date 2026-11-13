@@ -215,10 +215,11 @@ describe('M1-13d: hostile inbound content over the file tools', () => {
       expect(hasTag(name), f.id).toBe(false);
       expect(name.includes('..'), f.id).toBe(false);
       expect(/^(con|prn|aux|nul|com\d|lpt\d)(\.|$)/i.test(name), f.id).toBe(false);
+      // Read first, then checked: the bytes and the plain 0600 file are the same one saved.
+      expect(await readFile(savedTo, 'utf8')).toBe(FILE_CONTENT);
       const stat = await lstat(savedTo);
       expect(stat.isFile(), f.id).toBe(true);
       expect(stat.mode & 0o777, f.id).toBe(0o600);
-      expect(await readFile(savedTo, 'utf8')).toBe(FILE_CONTENT);
       // I-5 (REL051-A12, IR-REL051-A12-1 L5): the content comes back only for a text kind derived
       // from the saved name, and then only inside an untrusted element and `untrusted.content`;
       // `contained` above already proved no needle of it is outside. Otherwise it never comes back.

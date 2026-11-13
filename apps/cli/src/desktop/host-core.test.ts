@@ -10,7 +10,7 @@ import type {
   PendingApprovalView,
 } from '@4thtech-io/node';
 import { INVITE_LINK_PREFIX } from '@4thtech-io/core';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, type Dirent } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -64,11 +64,17 @@ afterEach(async () => {
 
 /** Every file's bytes under `dir`, as text. */
 function filesUnder(dir: string): string {
-  if (!existsSync(dir)) return '';
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return '';
+  }
   let all = '';
-  for (const name of readdirSync(dir)) {
-    const path = join(dir, name);
-    all += statSync(path).isDirectory() ? filesUnder(path) : readFileSync(path, 'latin1');
+  for (const entry of entries) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) all += filesUnder(path);
+    else if (entry.isFile()) all += readFileSync(path, 'latin1');
   }
   return all;
 }
