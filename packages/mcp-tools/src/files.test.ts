@@ -310,6 +310,38 @@ describe('agentlink_send with path (06 §2.2, §2.3)', () => {
   });
 });
 
+describe('ATT-ALLOW-LINK: agentlink_send carries the Allow a folder link end to end', () => {
+  const URL_OK = 'http://localhost:47321/settings/files?folder=~%2FAgentLink%2FSend';
+  const linked = (client: ToolClient): ToolContext => ({
+    ...context(client),
+    allowFolderLink: () => Promise.resolve({ url: URL_OK, origin: 'http://localhost:47321' }),
+  });
+
+  it('no folder yet: the result has the url, and the path the AI gave is nowhere in it', async () => {
+    const client = fake({ attach: 'no_folder' });
+    const r = await callTool(
+      'agentlink_send',
+      { to: 'Marko', path: `/home/u/${PATH_CANARY}` },
+      linked(client),
+    );
+    expect(r.structured).toMatchObject({ status: 'needs_setup', code: 'NO_ALLOWED_FOLDER' });
+    expect(r.structured.url).toBe(URL_OK);
+    expect(r.structured.nextStep).toContain(URL_OK);
+    expect(r.structured.nextStep).not.toMatch(/`|terminal/);
+    expect(client.calls).not.toContain('send');
+    expectClean(r);
+  });
+
+  it('core no_folder gets it too; outside_folder does not', async () => {
+    const core = fake({ send: () => Promise.resolve({ status: 'needs_setup', reason: 'no_folder' }) });
+    const a = await callTool('agentlink_send', { to: 'Marko', path: '/home/u/Work/a' }, linked(core));
+    expect(a.structured.url).toBe(URL_OK);
+    const outside = fake({ attach: 'outside_folder' });
+    const b = await callTool('agentlink_send', { to: 'Marko', path: '/home/u/a' }, linked(outside));
+    expect(b.structured.url).toBeUndefined();
+  });
+});
+
 describe('agentlink_fetch_file (06 §2.3)', () => {
   it("ok: savedTo, name, size, integrity; the sender's name only inside the untrusted block", async () => {
     const client = fake();

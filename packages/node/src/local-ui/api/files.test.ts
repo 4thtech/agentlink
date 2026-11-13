@@ -242,6 +242,7 @@ describe('routes (M1-11c-a3)', () => {
       ['GET', '/api/ui/files', false],
       ['GET', '/api/ui/files/review', false],
       ['POST', '/api/ui/files/folders', true],
+      ['POST', '/api/ui/files/send-folder', 'mark'],
     ]);
     expect(Object.isFrozen(filesRoutes)).toBe(true);
   });
@@ -683,5 +684,54 @@ describe('POST /api/ui/files/folders: D-119, every warning acknowledged for this
       status: 200,
       body: { status: 'applied', confirmed: false },
     });
+  });
+});
+
+// ATT-SENDFOLDER-FIX (Home banner "Allow your Send folder"): `POST /api/ui/files/send-folder`
+// prepares the Send folder (owner-first-policy prepareSendFolder with fallback) and answers the folder
+// to review. A mark-kind route: no presence, no input, and nothing is prepared, signed or applied, so
+// the rules never change here (I-4). Allowing it is the ordinary review and confirm with presence.
+describe('ATT-SENDFOLDER-FIX: the Send folder for the Home banner', () => {
+  const sendHome = join(root, 'send-home');
+  mkdirSync(sendHome, { recursive: true });
+  const prepare = () => {
+    const routes = createFilesRoutes({ home: sendHome, flavor: FLAVOR });
+    const route = routes.find((r) => r.path === '/api/ui/files/send-folder');
+    if (route === undefined || route.presence !== 'mark') throw new Error('no send-folder route');
+    return (context: LocalUiContext) => route.handler(context, {});
+  };
+
+  it('is registered as a mark route in the default registry', () => {
+    const hit = createLocalUiRoutes().match('POST', '/api/ui/files/send-folder');
+    expect(hit !== undefined && hit !== 'method' && hit.route.presence).toBe('mark');
+  });
+
+  it('answers an existing Send folder that holds files, and changes no rules', async () => {
+    const send = join(sendHome, 'AgentLink', 'Send');
+    mkdirSync(send, { recursive: true });
+    writeFileSync(join(send, 'old.txt'), 'x');
+    const res = await prepare()(ctx());
+    expect(res.status).toBe(200);
+    expect(body(res)).toEqual({ folder: realpathSync.native(send) });
+    expect(fake.patches).toEqual([]);
+    expect(fake.applied).toEqual([]);
+    expect(Object.keys(body(res))).toEqual(['folder']);
+  });
+
+  it.skipIf(WIN)('falls back to a fresh folder when Send is a link, never the link', async () => {
+    const other = mkdtempSync(join(root, 'att-'));
+    const h = join(other, 'h');
+    mkdirSync(join(h, 'AgentLink'), { recursive: true });
+    symlinkSync(outside, join(h, 'AgentLink', 'Send'));
+    const routes = createFilesRoutes({ home: h, flavor: FLAVOR });
+    const route = routes.find((r) => r.path === '/api/ui/files/send-folder');
+    if (route === undefined || route.presence !== 'mark') throw new Error('no route');
+    const res = await route.handler(ctx(), {});
+    expect(res.status).toBe(200);
+    expect(body(res)['folder']).toBe(join(realpathSync.native(h), 'AgentLink', 'Send-2'));
+  });
+
+  it('without an ID answers not set up', async () => {
+    expect(await prepare()(ctx(null))).toEqual(UI_NOT_SET_UP);
   });
 });

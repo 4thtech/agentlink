@@ -399,11 +399,10 @@ describe('setUpSendFolder: an existing agent gains only the Send folder (M1-36b-
     }
   });
 
-  it('a Send folder that already holds files: nothing asked, nothing signed, nothing touched', async () => {
+  it('ATT-SENDFOLDER-FIX: a Send folder that already holds files is allowed, the summary says so, nothing touched', async () => {
     const { agent, owner, code } = await existingAgent();
     await mkdir(join(home, 'AgentLink', 'Send'), { recursive: true });
     await writeFile(join(home, 'AgentLink', 'Send', 'private.txt'), 'x');
-    const before = await rulesOf(agent);
     const owners = ownerSigning(() => code);
     const result = await setUpSendFolder({
       agent: agent.agentId,
@@ -412,9 +411,10 @@ describe('setUpSendFolder: an existing agent gains only the Send folder (M1-36b-
       sign: owners.sign,
       home,
     });
-    expect(result).toEqual({ status: 'not_allowed', reason: 'folder_not_empty' });
-    expect(owners.items).toEqual([]);
-    expect((await rulesOf(agent)).jcs).toBe(before.jcs);
+    expect(result.status).toBe('allowed');
+    expect(owners.items).toHaveLength(1);
+    expect(JSON.stringify(owners.items[0])).toMatch(/already holds files/);
+    expect(JSON.stringify(owners.items[0])).not.toMatch(/empty for now/);
     expect(await readdir(join(home, 'AgentLink', 'Send'))).toEqual(['private.txt']);
   });
 

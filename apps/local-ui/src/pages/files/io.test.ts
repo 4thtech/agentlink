@@ -198,6 +198,46 @@ describe('tabs', () => {
   });
 });
 
+describe('ATT-SENDFOLDER-FIX: a ?folder=…&check=1 link (Home banner) checks the folder at once', () => {
+  it('runs the review once and lands on the confirm step; nothing is signed without the owner', async () => {
+    const before = window.location.href;
+    window.history.replaceState(null, '', '/settings/files?folder=%2FUsers%2Fme%2FAgentLink%2FSend&check=1');
+    const review = `/api/ui/files/review?${new URLSearchParams({ add: '/Users/me/AgentLink/Send', version: '3' }).toString()}`;
+    try {
+      const s = await mount({
+        [FOLDERS]: { folders: [], max: 32, version: 3 },
+        [review]: {
+          review: 'r'.repeat(43),
+          change: 'add',
+          folder: '/Users/me/AgentLink/Send',
+          typed: '/Users/me/AgentLink/Send',
+          elsewhere: false,
+          warnings: [],
+          expiresAt: 1_900_000_000,
+        },
+      });
+      await flush();
+      expect(s.calls.filter((c) => c.url === review)).toHaveLength(1);
+      expect(host.querySelector('#fl-confirm-title')).toBeTruthy();
+      expect(host.textContent).toContain('/Users/me/AgentLink/Send');
+      expect(s.calls.every((c) => c.method === 'GET')).toBe(true);
+    } finally {
+      window.history.replaceState(null, '', before);
+    }
+  });
+
+  it('without check=1 the field is only filled in (no review)', async () => {
+    const before = window.location.href;
+    window.history.replaceState(null, '', '/settings/files?folder=%2FUsers%2Fme%2FProjects');
+    try {
+      const s = await mount({ [FOLDERS]: { folders: [], max: 32, version: 3 } });
+      expect(s.calls.map((c) => c.url)).toEqual([FOLDERS]);
+    } finally {
+      window.history.replaceState(null, '', before);
+    }
+  });
+});
+
 describe('Received', () => {
   it('shows from, when, size, the proof badge and the saved-as name with a stale note', async () => {
     await mount({ [RECEIVED]: page([received({ proof: true })]) });
