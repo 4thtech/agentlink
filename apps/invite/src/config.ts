@@ -8,8 +8,8 @@
  */
 export const DOCS_BASE = 'https://wiki.4thtech.io/products/agentlink';
 export const DOCS_LINKS = {
-  /** "Start here" (docs-site/guide/get-started/start-here.md), on the wiki since the 0.5.1 release. */
-  guide: `${DOCS_BASE}/get-started/start-here`,
+  /** "Start here" (docs-site/guide/start-here.md), on the wiki since the 0.5.1 release. */
+  guide: `${DOCS_BASE}/start-here`,
   /** "Windows" (docs-site/guide/get-started/windows.md). */
   windows: `${DOCS_BASE}/get-started/windows`,
 } as const;
