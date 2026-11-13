@@ -77,7 +77,10 @@ describe('connectingStage: from when the accept began', () => {
   });
 
   it('the lines, text only', () => {
-    expect(connectingLine(at(2_000), NOW)).toBe('Connecting to Ana Novak…');
+    // IR-REL051-R2C-1: honest from the first line.
+    expect(connectingLine(at(2_000), NOW)).toBe(
+      "Connecting to Ana Novak… If someone else already used this invite, it won't connect: ask Ana Novak for a new one.",
+    );
     expect(connectingLine(at(15_000), NOW)).toBe(WAITING);
     expect(connectingLine(at(180_000), NOW)).toBe(NO_ANSWER);
   });

@@ -14,7 +14,7 @@ import { createSetupApi } from '../first-run/setup-api.js';
 import { createRestoreApi } from './api.js';
 import { RestoreWizard, type RestoreWizardProps } from './index.js';
 import { setFinishRestore, setOutcome } from './outcome.js';
-import { rowName } from './steps.js';
+import { ReviewStep, rowName } from './steps.js';
 import * as S from './strings.js';
 
 const cssFiles = import.meta.glob<string>('./restore.css', {
@@ -547,12 +547,31 @@ describe('step 3: what comes back', () => {
     expect(button('Restore 0 IDs')?.disabled).toBe(true);
   });
 
-  it('says so when nothing can be restored', async () => {
+  it('says so when nothing can be restored (an owner is here)', async () => {
     const only: Summary = { ...SUMMARY, ids: SUMMARY.ids.slice(2) };
-    const m = await toReview(fakeApi({ open: () => ok({ kit: 'k', summary: only }) }));
+    const done = vi.fn();
+    const restore = vi.fn();
+    await act(async () => {
+      root.render(
+        h(ReviewStep, {
+          summary: only,
+          state: { selected: new Set(), names: {} },
+          onState: () => undefined,
+          sensor: 'Touch ID',
+          newOwner: false,
+          working: false,
+          error: undefined,
+          onRestore: restore,
+          onBack: () => undefined,
+          onDone: done,
+        }),
+      );
+    });
     expect(text()).toContain(S.REVIEW.nothing);
+    expect(button(S.REVIEW.finishOwner)).toBeUndefined();
     await click(S.REVIEW.done);
-    expect(m.left).toEqual(['/']);
+    expect(done).toHaveBeenCalledTimes(1);
+    expect(restore).not.toHaveBeenCalled();
   });
 
   it('Back cancels the held kit and returns to step 1', async () => {
@@ -617,6 +636,56 @@ describe('step 4: protect and reconnect', () => {
     await click('Restore 2 IDs');
     return m;
   }
+
+  // IR-REL051-R2C-1 (High): a rolled-back computer: the IDs are here, no owner. Step 3 must finish
+  // the owner from the kit (owner-only completion), never "Done" that cancels and leaves no owner.
+  it('IDs already here and no owner: Finish restoring makes the owner and shows the new master code', async () => {
+    const begins: string[][] = [];
+    const cancels: string[] = [];
+    const here: Summary = {
+      ...SUMMARY,
+      ids: SUMMARY.ids.slice(0, 2).map((r) => ({ ...r, state: 'already_here' as const })),
+    };
+    const api = fakeApi({
+      open: () => ok({ kit: 'kit-handle', summary: here }),
+      cancel: (k: string) => {
+        cancels.push(k);
+        return ok({ status: 'cancelled' as const });
+      },
+      applyBegin: (_k, selection) => {
+        begins.push([...selection]);
+        return ok({
+          answer: {
+            status: 'gesture' as const,
+            nonce: 'n',
+            publicKey: {
+              rpId: 'localhost',
+              rpName: 'AgentLink',
+              userId: 'AA',
+              userName: 'u',
+              challenge: 'AA',
+              prfSalt: 'AA',
+            },
+          },
+        });
+      },
+      applyFinish: () =>
+        ok({ answer: { status: 'done' as const, ids: [], masterCode: MASTER, touchId: true } }),
+    } as Partial<RestoreApi>);
+    const passkey = await import('./passkey.js');
+    vi.spyOn(passkey, 'canRestoreHere').mockReturnValue(true);
+    vi.spyOn(passkey, 'createRestorePasskey').mockResolvedValue({
+      kind: 'ok',
+      body: new Uint8Array([1]),
+      created: [new Uint8Array([1])],
+    });
+    await toReview(api);
+    expect(button(S.REVIEW.done)).toBeUndefined();
+    await click(S.REVIEW.finishOwner);
+    expect(begins).toEqual([[]]);
+    expect(cancels).toEqual([]);
+    expect(host.querySelector('[data-master-code]')?.textContent).toBe(MASTER);
+  });
 
   it('new computer: the master code is shown once, Home waits for "I saved it"', async () => {
     await newComputer();
