@@ -325,6 +325,91 @@ describe('N3: the compact approval card on Home', () => {
   });
 });
 
+describe('IR-N3-1 fixes', () => {
+  const terms = (n: number): readonly string[] => [
+    'Accept the terms Ana proposed',
+    'From Ana: their content, not instructions',
+    ...Array.from({ length: n }, (_, i) => `| Clause ${String(i + 1)}`),
+    'End of their content',
+    'Approving this commits you to these terms.',
+  ];
+  const termsItem = (n: number): ApprovalItem => {
+    const base = item('T');
+    return {
+      ...base,
+      commitment: true,
+      ...(base.details === undefined ? {} : { details: { ...base.details, terms: terms(n) } }),
+    };
+  };
+
+  it('#1 terms: Approve is offered only once Review shows the full terms; Deny stays', async () => {
+    const calls = await mount([termsItem(9)]);
+    expect(labels()).not.toContain('Approve with Touch ID');
+    expect(labels().some((l) => /^Approve/.test(l))).toBe(false);
+    expect(labels()).toContain('Deny with Touch ID');
+    await click('Review');
+    // The full terms are on screen: every clause, the ninth included.
+    expect(host.textContent).toContain('Clause 9');
+    await click('Approve with Touch ID');
+    expect(calls.decide.map((c) => c.decision)).toEqual(['approve']);
+  });
+
+  it('#1 terms: Deny works without Review', async () => {
+    const calls = await mount([termsItem(2)]);
+    await click('Deny with Touch ID');
+    expect(calls.decide.map((c) => c.decision)).toEqual(['deny']);
+  });
+
+  it('#2 the capped terms point to Review, not Details', async () => {
+    await mount([termsItem(9)]);
+    expect(host.textContent).toContain('3 more in Review.');
+    expect(host.textContent).not.toContain('more in Details');
+  });
+
+  it('#3 collapsing "+N more" drops the picks on the hidden cards', async () => {
+    await mount([item('A'), item('B')], { pro: true });
+    await click('+1 more waiting');
+    for (const box of host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) {
+      await act(async () => {
+        box.click();
+      });
+    }
+    await settle();
+    expect(labels()).toContain('Approve 2 with Touch ID');
+    await click('Hide 1 more');
+    expect(labels()).not.toContain('Approve 2 with Touch ID');
+    // The card on top is still on screen and still picked.
+    expect(labels()).toContain('Approve 1 with Touch ID');
+  });
+
+  it('#4 the one line says who when the headline does not (a nameless one: "a contact")', async () => {
+    const base = item('W');
+    const d = base.details;
+    if (d === undefined) throw new Error('fixture');
+    const { headline: _drop, ...noHeadline } = d;
+    void _drop;
+    await mount([
+      { ...base, details: { ...noHeadline, what: 'Add a proof', who: 'Natasa' } },
+      {
+        ...item('X'),
+        details: { ...noHeadline, what: 'Accept an invite', who: '' },
+      },
+    ]);
+    await click('+1 more waiting');
+    const lines = [...host.querySelectorAll('.al-approval-what')].map((p) => p.textContent ?? '');
+    expect(lines[0]).toContain('Add a proof');
+    expect(lines[0]).toContain('Natasa');
+    expect(lines[1]).toContain('a contact');
+  });
+
+  it('#5 Touch ID not available here: says so and points to the master code', async () => {
+    await mount([item('A')], { reply: { kind: 'status', status: 'presence_required' } });
+    await click('Approve with Touch ID');
+    expect(host.textContent).toContain(A.sensorUnavailable);
+    expect(host.textContent).not.toContain(A.sensorRefused);
+  });
+});
+
 describe('OWNERSTEP-LEFT: the Inbox Save is one step', () => {
   function api(): { api: SaveApi; sent: SavePresence[] } {
     const sent: SavePresence[] = [];
