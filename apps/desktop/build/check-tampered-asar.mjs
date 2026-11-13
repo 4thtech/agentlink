@@ -9,7 +9,15 @@
 //
 //   node check-tampered-asar.mjs --app <AgentLink.app | AgentLink.exe> [--timeout-ms 20000]
 import { spawn } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { capture, parseArgs } from './lib/run.mjs';
@@ -22,17 +30,22 @@ if (!existsSync(app)) throw new Error(`Not found: ${app}`);
 const timeoutMs = Number(args['timeout-ms'] ?? 20000);
 const controlMs = Number(args['control-ms'] ?? 6000);
 
-const tmp = mkdtempSync(join(tmpdir(), 'agentlink-tamper-'));
+// The copies must not sit in the temporary folder the app sees: the app refuses to run from one
+// (move.ts; on a CI runner the Windows refusal dialog closes at once and the control exits 0). On
+// CI they go under RUNNER_TEMP, and the app's HOME and TEMP are a separate `home` folder.
+const tmp = mkdtempSync(join(process.env.RUNNER_TEMP || tmpdir(), 'agentlink-tamper-'));
+const home = join(tmp, 'home');
+mkdirSync(home, { recursive: true });
 const env = {
   PATH: process.env.PATH,
   SystemRoot: process.env.SystemRoot,
-  HOME: tmp,
-  USERPROFILE: tmp,
-  APPDATA: join(tmp, 'AppData', 'Roaming'),
-  LOCALAPPDATA: join(tmp, 'AppData', 'Local'),
-  TMPDIR: tmp,
-  TEMP: tmp,
-  TMP: tmp,
+  HOME: home,
+  USERPROFILE: home,
+  APPDATA: join(home, 'AppData', 'Roaming'),
+  LOCALAPPDATA: join(home, 'AppData', 'Local'),
+  TMPDIR: home,
+  TEMP: home,
+  TMP: home,
 };
 
 /** Copies the build to tmp/<label>; returns {exe, asar}. */
