@@ -23,6 +23,34 @@ describe('check-download-links', () => {
     expect(checkText('a.md', 'file AgentLink-<version>-mac-x64.dmg')).toHaveLength(1);
   });
 
+  it('rejects version placeholders and names without a v', () => {
+    expect(checkText('a.md', 'AgentLink-{version}-mac-arm64.dmg')).toHaveLength(1);
+    expect(checkText('a.md', 'AgentLink-$VERSION-mac-x64.dmg')).toHaveLength(1);
+    expect(checkText('a.md', '4thtech/agentlink/releases/download/0.5.2/x.dmg')).toHaveLength(1);
+    expect(checkText('a.md', '4thtech/agentlink/releases/download/{tag}/x.dmg')).toHaveLength(1);
+  });
+
+  it('ignores another project, and allows versioned names in the process docs', () => {
+    expect(
+      checkText('a.md', 'https://github.com/electron/electron/releases/download/v1.0.0/x'),
+    ).toEqual([]);
+    expect(checkText('docs/process/versioning.md', 'AgentLink-<version>-mac-arm64.dmg')).toEqual(
+      [],
+    );
+    expect(
+      checkText('docs/runbooks/x.md', '4thtech/agentlink/releases/download/v1/x.dmg'),
+    ).toHaveLength(1);
+  });
+
+  it('covers docs/ but not docs/foundation, and more file types', () => {
+    const files = collectFiles(root).map(([f]) => f);
+    expect(files.some((f) => f.startsWith('docs/runbooks/'))).toBe(true);
+    expect(files.some((f) => f.startsWith('docs/foundation/'))).toBe(false);
+    expect(files.some((f) => f.endsWith('.json') || f.endsWith('.mjs') || f.endsWith('.js'))).toBe(
+      true,
+    );
+  });
+
   it('passes on the real files', () => {
     const problems = collectFiles(root).flatMap(([file, text]) => checkText(file, text));
     expect(problems).toEqual([]);

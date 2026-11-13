@@ -1976,12 +1976,48 @@ jobs:
           done
           echo "Attached the desktop app (${#files[@]} files, ${#upload[@]} uploaded now) to v$VERSION."
 
-      # REL-LINKS-1: the last step that changes the Release. It downloads every attached file again and
-      # compares it with the sums, then marks the Release Latest. A prerelease or a draft is never marked
-      # (stable versions only reach this job; the check is belt and braces).
-      - name: Check the attached files, then mark the Release Latest
+      # REL-LINKS-1: downloads every attached file again, compares it with the sums, and checks that the
+      # stable-named files of this very release answer over the public URL. Changes nothing.
+      - name: Check the attached files and their public links
         shell: bash
         working-directory: ${{ runner.temp }}/desktop-app
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ needs.desktop-extension-build.outputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Unexpected CLI version."; exit 1; }
+          rm -rf ../verify-assets
+          mkdir -p ../verify-assets
+          gh release download "v$VERSION" --repo "$REPOSITORY" --dir ../verify-assets \
+            --pattern "AgentLink-$VERSION-mac-arm64.dmg" --pattern "AgentLink-$VERSION-mac-x64.dmg" \
+            --pattern AgentLink-mac-arm64.dmg --pattern AgentLink-mac-x64.dmg --pattern SHA256SUMS-desktop-app.txt
+          (
+            cd ../verify-assets
+            [ "$(wc -l < SHA256SUMS-desktop-app.txt)" -eq 4 ] || { echo "::error::SHA256SUMS-desktop-app.txt must list exactly 4 files."; exit 1; }
+            sha256sum --check --strict SHA256SUMS-desktop-app.txt
+          )
+          # A HEAD request follows the redirect to the file; the size must be plausible for a Mac app.
+          for arch in arm64 x64; do
+            url="https://github.com/$REPOSITORY/releases/download/v$VERSION/AgentLink-mac-$arch.dmg"
+            ok=false
+            for _ in 1 2 3 4 5 6; do
+              headers="$(curl -sIL --max-time 60 "$url" | tr -d '\r' || true)"
+              code="$(awk 'toupper($1) ~ /^HTTP/ {c=$2} END {print c}' <<< "$headers")"
+              size="$(awk 'tolower($1) == "content-length:" {s=$2} END {print s+0}' <<< "$headers")"
+              if [ "$code" = "200" ] && [ "$size" -gt 20000000 ]; then ok=true; break; fi
+              sleep 10
+            done
+            [ "$ok" = "true" ] || { echo "::error::v$VERSION AgentLink-mac-$arch.dmg answered '$code' with size $size; the Release was not marked Latest."; exit 1; }
+            echo "v$VERSION AgentLink-mac-$arch.dmg: 200, $size bytes."
+          done
+
+      # REL-LINKS-1: the last step that changes the Release. Never a prerelease or a draft, and only the
+      # highest stable v* release (a re-run for an older version must not move the links back).
+      - name: Mark the Release Latest
+        id: latest
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -1994,20 +2030,22 @@ jobs:
             echo "::error::v$VERSION is a prerelease or a draft; it is not marked Latest."
             exit 1
           fi
-          rm -rf ../verify-assets
-          mkdir -p ../verify-assets
-          gh release download "v$VERSION" --repo "$REPOSITORY" --dir ../verify-assets \
-            --pattern "AgentLink-$VERSION-mac-arm64.dmg" --pattern "AgentLink-$VERSION-mac-x64.dmg" \
-            --pattern AgentLink-mac-arm64.dmg --pattern AgentLink-mac-x64.dmg --pattern SHA256SUMS-desktop-app.txt
-          cd ../verify-assets
-          [ "$(wc -l < SHA256SUMS-desktop-app.txt)" -eq 4 ] || { echo "::error::SHA256SUMS-desktop-app.txt must list exactly 4 files."; exit 1; }
-          sha256sum --check --strict SHA256SUMS-desktop-app.txt
+          highest="$(gh release list --repo "$REPOSITORY" --limit 200 --json tagName,isPrerelease,isDraft \
+            --jq '.[] | select(.isPrerelease == false and .isDraft == false) | .tagName' |
+            grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)"
+          if [ "$highest" != "v$VERSION" ]; then
+            echo "::notice::v$VERSION is not the highest stable release ($highest); it is not marked Latest."
+            echo "flipped=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           gh release edit "v$VERSION" --repo "$REPOSITORY" --latest
+          echo "flipped=true" >> "$GITHUB_OUTPUT"
           echo "v$VERSION is now the Latest release."
 
-      # The public links the docs and the invite page use. Red here means a link is broken right now.
-      # A HEAD request follows the redirect to the file; the size must be plausible for a Mac app.
+      # The public links the docs and the invite page use. Red here means a link is broken right now:
+      # the owner re-runs this job or fixes the Release by hand (versioning.md section 6).
       - name: Check the public download links
+        if: steps.latest.outputs.flipped == 'true'
         shell: bash
         run: |
           set -euo pipefail
