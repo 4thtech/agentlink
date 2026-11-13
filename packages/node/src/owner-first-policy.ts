@@ -37,7 +37,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { POLICY_DEFAULTS_EFFECTIVE } from '@4thtech-io/core';
-import { AUTO_SAVE_DEFAULTS, HISTORY_DEFAULTS } from '@4thtech-io/types';
+import { AUTO_SAVE_DEFAULTS, HISTORY_NEW_ID } from '@4thtech-io/types';
 import {
   canonicalize,
   encodeHex,
@@ -268,7 +268,8 @@ export function firstPolicyDocument(folder: string): JsonObject {
 
 /**
  * JCS of the 06 §3 defaults with only `files.allowedFolders` = [folder]. `files.autoSave` is the
- * defaults too: every policy.set this core signs carries it (D-142, 06 §3).
+ * defaults too: every policy.set this core signs carries it (D-142, 06 §3). `history` is a new ID's
+ * first rules, HISTORY_NEW_ID (D-148, OD-2), not the keep-forever 06 §3 defaults.
  */
 function expectedPolicyJcs(folder: string): string {
   const effective = POLICY_DEFAULTS_EFFECTIVE;
@@ -279,6 +280,7 @@ function expectedPolicyJcs(folder: string): string {
   return canonicalize({
     ...defaults,
     files: { ...files, allowedFolders: [folder], autoSave: { ...AUTO_SAVE_DEFAULTS } },
+    history: { ...HISTORY_NEW_ID },
   });
 }
 
@@ -376,7 +378,7 @@ export async function signFirstPolicy(
       const prepared = await actions.preparePolicyEdit(
         // D-148 (OD-2): a new ID's first rules carry the new-ID retention defaults by name (core
         // signs keep forever for any first edit that does not name history; IR-RET-67-1 Medium 2).
-        { files: { allowedFolders: [plan.folder] }, history: { ...HISTORY_DEFAULTS } },
+        { files: { allowedFolders: [plan.folder] }, history: { ...HISTORY_NEW_ID } },
         { baseVersion: 0 },
       );
       if (prepared.status !== 'prepared') return failed;

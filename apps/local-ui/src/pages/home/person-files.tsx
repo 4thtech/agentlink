@@ -85,7 +85,9 @@ export function ShowIn({
         size="sm"
         icon="folder"
         disabled={busy}
-        {...(name === undefined || name === '' ? {} : { 'aria-label': `${showInLabel()}, ${name}` })}
+        {...(name === undefined || name === ''
+          ? {}
+          : { 'aria-label': `${showInLabel()}, ${name}` })}
         onClick={() => void click()}
       >
         {showInLabel()}

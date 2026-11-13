@@ -4,11 +4,14 @@
 //   0, 30, 90, 180 or 365. Any other value, type or spelling is rejected (fail closed).
 // - `history` may be absent only in a policy signed before D-148; it then reads as 0 and 0, so an
 //   update never starts deleting. When present it is a strict object with both keys.
-// - The 06 §3 defaults (the first rules of a new ID) carry `filesKeepDays: 90`, `messagesKeepDays: 0`.
+// - The 06 §3 defaults keep both forever (0, 0); a new ID's first rules (HISTORY_NEW_ID) keep saved
+//   files 90 days and messages forever.
 import { describe, expect, it } from 'vitest';
 import {
+  HISTORY_DEFAULTS,
   HISTORY_FILES_KEEP_DAYS,
   HISTORY_MESSAGES_KEEP_DAYS,
+  HISTORY_NEW_ID,
   HISTORY_PRE_D148,
   POLICY_DEFAULTS,
   defaultPolicy,
@@ -72,9 +75,11 @@ describe('history.* policy keys (RET-6, 06 §3)', () => {
     expect(policySchema.safeParse({ ...defaultPolicy(), history: undefined }).success).toBe(false);
   });
 
-  it('the 06 §3 defaults (a new ID): files 90 days, messages forever', () => {
-    expect(POLICY_DEFAULTS.history).toEqual({ messagesKeepDays: 0, filesKeepDays: 90 });
-    expect(historyOf(defaultPolicy())).toEqual({ messagesKeepDays: 0, filesKeepDays: 90 });
+  it('the 06 §3 defaults keep everything; a new ID starts at files 90 days, messages forever', () => {
+    expect(POLICY_DEFAULTS.history).toEqual({ messagesKeepDays: 0, filesKeepDays: 0 });
+    expect(historyOf(defaultPolicy())).toEqual({ messagesKeepDays: 0, filesKeepDays: 0 });
+    expect(HISTORY_DEFAULTS).toEqual(HISTORY_PRE_D148);
+    expect(HISTORY_NEW_ID).toEqual({ messagesKeepDays: 0, filesKeepDays: 90 });
   });
 
   it('a patch may name history fields, each from the same list', () => {

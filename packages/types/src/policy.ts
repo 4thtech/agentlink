@@ -157,8 +157,19 @@ export const HISTORY_PRE_D148: Readonly<HistoryPolicy> = freeze({
   filesKeepDays: 0,
 });
 
-/** The 06 §3 defaults: the first rules of a policy created from 0.5.2 on (OD-2). */
+/**
+ * The 06 §3 defaults (D-148, RET-6/7; proposed, owner confirms at merge): keep messages and files
+ * forever, the same as HISTORY_PRE_D148. A first edit of rules never signed (Rules, the Send folder
+ * banner) signs these, so only a new ID's first rules (HISTORY_NEW_ID) or the Storage editor turn
+ * retention on (IR-RET-67-1 Medium 2).
+ */
 export const HISTORY_DEFAULTS: Readonly<HistoryPolicy> = freeze({
+  messagesKeepDays: 0,
+  filesKeepDays: 0,
+});
+
+/** A new ID's first rules from 0.5.2 on (OD-2): messages kept forever, saved files 90 days. */
+export const HISTORY_NEW_ID: Readonly<HistoryPolicy> = freeze({
   messagesKeepDays: 0,
   filesKeepDays: 90,
 });
@@ -332,7 +343,7 @@ function buildDefaults(): Policy {
       autoAcceptDirection: 'buy',
       autoAcceptMinUSD: null,
     },
-    // D-148 (OD-2): messages kept forever; the app's saved files 90 days (to the Trash).
+    // D-148: keep forever; a new ID's first rules carry HISTORY_NEW_ID (OD-2).
     history: { ...HISTORY_DEFAULTS },
     contactRules: [],
   };

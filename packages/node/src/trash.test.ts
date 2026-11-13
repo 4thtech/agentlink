@@ -213,26 +213,36 @@ describe('only the file the app saved, still unchanged (re-checked just before t
     it(`${platform}: a symlink at the saved name is refused; the link and its target stay`, async () => {
       const target = path.join(root, 'target.txt');
       await writeFile(target, BYTES);
-      // CI-823: the target's identity from an open handle (no lstat-then-read on the path below).
+      // CI-823: one open of the target; its identity and, at the end, its bytes come from this
+      // handle (no stat-then-read on the path).
       const handle = await open(target, 'r');
-      const info = await handle.stat({ bigint: true }).finally(() => handle.close());
-      await symlink(target, path.join(inbox, 'link.txt'));
-      const expected = {
-        dev: info.dev.toString(),
-        ino: info.ino.toString(),
-        size: BYTES.length,
-        sha256: hex(BYTES),
-      };
-      const outcome = await trashSavedFile({
-        folder: inbox,
-        name: 'link.txt',
-        expected,
-        platform,
-        home,
-      });
-      expect(outcome).toBe('changed');
-      expect((await lstat(path.join(inbox, 'link.txt'))).isSymbolicLink()).toBe(true);
-      expect(await readFile(target)).toEqual(BYTES);
+      try {
+        const info = await handle.stat({ bigint: true });
+        await symlink(target, path.join(inbox, 'link.txt'));
+        const expected = {
+          dev: info.dev.toString(),
+          ino: info.ino.toString(),
+          size: BYTES.length,
+          sha256: hex(BYTES),
+        };
+        const outcome = await trashSavedFile({
+          folder: inbox,
+          name: 'link.txt',
+          expected,
+          platform,
+          home,
+        });
+        expect(outcome).toBe('changed');
+        expect((await lstat(path.join(inbox, 'link.txt'))).isSymbolicLink()).toBe(true);
+        // The target is still at its path (same file) with the same bytes.
+        const after = await lstat(target, { bigint: true });
+        expect([after.dev, after.ino]).toEqual([info.dev, info.ino]);
+        const buf = Buffer.alloc(BYTES.length + 1);
+        const { bytesRead } = await handle.read(buf, 0, buf.length, 0);
+        expect(new Uint8Array(buf.subarray(0, bytesRead))).toEqual(new Uint8Array(BYTES));
+      } finally {
+        await handle.close();
+      }
     });
 
     it(`${platform}: a missing file is missing; a name that is not one segment is refused`, async () => {

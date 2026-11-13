@@ -1,7 +1,7 @@
 {
   "$schema": "../schema/vector-file.schema.json",
   "suite": "owner-action",
-  "version": 8,
+  "version": 9,
   "generator": {
     "tool": "python (hashlib, cryptography 50.0.2, coincurve 21.0.0, pycryptodome 3.23.0, pyhpke 0.6.5, rfc8785 0.1.4)",
     "version": "cpython 3.12.13",
@@ -1337,6 +1337,10 @@
                 "autoAcceptDirection": "buy",
                 "autoAcceptMinUSD": null
               },
+              "history": {
+                "messagesKeepDays": 0,
+                "filesKeepDays": 0
+              },
               "contactRules": []
             }
           },
@@ -1348,10 +1352,10 @@
         "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
       },
       "expected": {
-        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":\"0\",\"autoAcceptMinUSD\":null},\"contactRules\":[],\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":\"5\",\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"notarize\":\"allow\",\"perActionMaxUSD\":\"1\"},\"receipts\":{\"autoDelivered\":false,\"autoOpened\":false}},\"version\":1},\"v\":1}",
-        "bodyHash": "236489c3f9dd7995dbbeebe927ffbf591b3263d5ec36fed2331224fb317a1599",
-        "signatureInput": "f633944a96a842c5563a98fb625f5afe3f12766d725a61bec578a8d8ac3a6cae",
-        "sig": "277bbbf155a8acf8ed1afb93d1b1244f9af20798ad2452d808f2587b4c8c2cb6df4b153877aeb475ca874387f21ee25911bbde0d41502ffe6d626ac3473412f6"
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":\"0\",\"autoAcceptMinUSD\":null},\"contactRules\":[],\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"history\":{\"filesKeepDays\":0,\"messagesKeepDays\":0},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":\"5\",\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"notarize\":\"allow\",\"perActionMaxUSD\":\"1\"},\"receipts\":{\"autoDelivered\":false,\"autoOpened\":false}},\"version\":1},\"v\":1}",
+        "bodyHash": "d23710287e400cfb23eb1d1f23a094ac0afeba4d87f7da3ea2a8a0ccbde56a7d",
+        "signatureInput": "201b32b870c51d79ee63db5a8b271ec773c9e90107eb0daf10307cd148f08eeb",
+        "sig": "93089211942daa812e57c236771ba55d32c5f8946948b85e5bf74b7661ec8ec6b5599452d50340701db1b54d4cbfa6013167b86a6003469fc7491ad85f89347e"
       }
     },
     {
@@ -1405,6 +1409,10 @@
                 "autoAcceptDirection": "buy",
                 "autoAcceptMinUSD": null
               },
+              "history": {
+                "messagesKeepDays": 0,
+                "filesKeepDays": 0
+              },
               "contactRules": [
                 {
                   "proofs": {
@@ -1430,10 +1438,10 @@
         "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
       },
       "expected": {
-        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":\"0\",\"autoAcceptMinUSD\":null},\"contactRules\":[{\"contact\":\"0x16d4667155468cfe1b1cf411a1413bbb59470f01\",\"proofs\":{\"notarize\":\"allow\",\"perActionMaxUSD\":\"2.5\"}},{\"contact\":\"0x879e48ea18a3dd814b18b51e5e6e665f87c1e613\",\"proofs\":{\"perActionMaxUSD\":\"0.01\"}}],\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":\"5\",\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"notarize\":\"allow\",\"perActionMaxUSD\":\"1\"},\"receipts\":{\"autoDelivered\":false,\"autoOpened\":false}},\"version\":2},\"v\":1}",
-        "bodyHash": "3466b074c2d85694c6a09c913b44851a1d59a3e054d0ce8c78b042b38e4615e6",
-        "signatureInput": "f13638d2d6c558f2338df038bd6ee1d4180e994139daec70d9803c256b15d687",
-        "sig": "940b7b01332817baaaa107167c2bdd703b87cd54ae669557c4854afe5c8a49397c98bce11aaba917675980b6038f7067da32b2849361d094ca4a0629911f4e41"
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":\"0\",\"autoAcceptMinUSD\":null},\"contactRules\":[{\"contact\":\"0x16d4667155468cfe1b1cf411a1413bbb59470f01\",\"proofs\":{\"notarize\":\"allow\",\"perActionMaxUSD\":\"2.5\"}},{\"contact\":\"0x879e48ea18a3dd814b18b51e5e6e665f87c1e613\",\"proofs\":{\"perActionMaxUSD\":\"0.01\"}}],\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"history\":{\"filesKeepDays\":0,\"messagesKeepDays\":0},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":\"5\",\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"notarize\":\"allow\",\"perActionMaxUSD\":\"1\"},\"receipts\":{\"autoDelivered\":false,\"autoOpened\":false}},\"version\":2},\"v\":1}",
+        "bodyHash": "4ae1102b987aee91a92c0078e7bd5f9d7496be214bd5af8aae7c48bf69840413",
+        "signatureInput": "2d05ac1dba00cf0475b85ab174cf0ee6a208b39b86b6f4fedd3d040acf10de8c",
+        "sig": "fb8188b871bb2e69ab56ae66511397843b38409e1bf0d7d84cf4fcf12b9d88c35fc9bea5b5b3bdc7373bbf8ab1a72fc9dd7f0afb32b5f0c68c14e7cb69f0f904"
       }
     },
     {
@@ -1487,6 +1495,10 @@
                 "autoAcceptDirection": "buy",
                 "autoAcceptMinUSD": null
               },
+              "history": {
+                "messagesKeepDays": 0,
+                "filesKeepDays": 0
+              },
               "contactRules": [
                 {
                   "receipts": {
@@ -1505,10 +1517,10 @@
         "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
       },
       "expected": {
-        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":\"0\",\"autoAcceptMinUSD\":null},\"contactRules\":[{\"contact\":\"0x16d4667155468cfe1b1cf411a1413bbb59470f01\",\"receipts\":{\"autoDelivered\":true}}],\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":\"5\",\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"notarize\":\"allow\",\"perActionMaxUSD\":\"1\"},\"receipts\":{\"autoDelivered\":false,\"autoOpened\":false}},\"version\":3},\"v\":1}",
-        "bodyHash": "800377faa3d42d2510978bf5406349d031916999206382147976fe9d3eadce0e",
-        "signatureInput": "b23ad07db87e72ab4754f8e5ea94ce61d5b3560bc49359f5f31e9ab81fec1452",
-        "sig": "0c08313c4350d517a47c1d17ceca4b45a688375a12a7e90376988a3338b2ce1c8cee04f6849d19166afb301afb2467d4b15f1074bd106dc82a7d13e9e7f0957b"
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":\"0\",\"autoAcceptMinUSD\":null},\"contactRules\":[{\"contact\":\"0x16d4667155468cfe1b1cf411a1413bbb59470f01\",\"receipts\":{\"autoDelivered\":true}}],\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"history\":{\"filesKeepDays\":0,\"messagesKeepDays\":0},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":\"5\",\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"notarize\":\"allow\",\"perActionMaxUSD\":\"1\"},\"receipts\":{\"autoDelivered\":false,\"autoOpened\":false}},\"version\":3},\"v\":1}",
+        "bodyHash": "306b81369f375aea4a0d759e62b182ad5b8623ce911acfe59551628a47a4d541",
+        "signatureInput": "c08d612b71fc11d27bc45df2cd41147e5b49cae1dee758a83670305c7035ef33",
+        "sig": "9cbc5a7129b19d6dbac578dd7683350f0383c9202396074c7c0d235d5299e8b4f4e7f333597d097d6e7df12144bb8ae9b04706d01f4d523ce7d7fd6243a13c61"
       }
     },
     {
@@ -4687,6 +4699,10 @@
                   "autoAcceptMaxUSD": 0,
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
+                },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
                 }
               }
             },
@@ -4694,7 +4710,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "30a17fccae082799bdb64ba013b54717f385172e3245e798df5ae08be509d1bd27d0622a44acfccbd94e71fb125a4f9954cfb711f6835d6f8e37d71770b4da0d"
+          "sig": "abf229891299f5f3f5b341d881f3cc47d17543890ca824e3dac15e98c1af312b71058ebe68df7a4875d1e248b897b38c66908f9911bb2ee94c6b306c67d9508f"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -4758,6 +4774,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": []
               }
             },
@@ -4765,7 +4785,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "dfcaa2144b95aa56233a8dfe613ca07e056cf38ed2ae74b7ec192345bfa79c4db78a556f5a06ad89a81b6a283115b8275a754a145292114c334908c1ec6e3634"
+          "sig": "be316950235f445ed635397e4f49d32717c2c318c0a8761e7beed65d2013d637f5cdd3c077a2a855808b395b30fa6d6f25dd464fe8c697348c4d8d0bcee2106c"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -4829,6 +4849,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": []
               }
             },
@@ -4836,7 +4860,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "df39df6b848a98defd4e2bd30efeb4daed8a877e497457993dd6ed840f3f03faa56ee88ef126834d952fdb1d4992cbde1111694caf90cb867060aeecd6c5d9d1"
+          "sig": "e5c574dbd427e0c527b900360275c847c18e5b1a66d9c4223c31605adb06e48b9d0c96941e5f1e36d2e75d8b6306f1b30b77032d8709ee685c949936fb1902e3"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -4900,6 +4924,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": []
               }
             },
@@ -4907,7 +4935,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "c43fc623afddb4e1b148e65bffa0a57ecbb71f407f151bd688808907edeec066f837b019319c4aa41a59db857d20ab4fc71a6f844d6d15dee31497bf3379e19b"
+          "sig": "b6693c31e9b7b8267e0af8582e6ac0f9d5d1df9e0877bc167d476d9da4c42ec0cb072a273e915711294f3a3b51bdc0fcd92ff28ddbfbbb4115a411af3a7aad74"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -4974,6 +5002,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": []
               }
             },
@@ -4981,7 +5013,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "baa5702898c298cc51a67831a01cd0f586314643d63802931534ab6fd32156aa60dedb471070cc47ba63f4c080e4005cdc3dad366e694bcc5710818db96ff02f"
+          "sig": "8cdd7b45e0ab1f061cdc522eed6cd4ff9a648d4b6135d8fc8c83e1c6383c9d239840ef440ed27f5bd1dd90f5bf9da581a3aef3da5400f427bd54c3376b59a9ef"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5045,6 +5077,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": [
                   {
                     "proofs": {
@@ -5066,7 +5102,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "72b1063d7e929b5e20edfa4a34616c6014415614d83340aaf95d308a1a16f62be9f3c615ecaee60c332c325694ee363ee6fc1f0f602896387c154d203d30a1b3"
+          "sig": "6d5ffbf800ef8707e08533f2a6adf2a0deddc57f733c01e960032ca422aa3f026fad29860d533af4f7b6e48e18a2814bb48f9c32e685462c39b6f265bc108c3c"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5130,6 +5166,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": [
                   {
                     "proofs": {
@@ -5151,7 +5191,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "04dfe3c4f25348d290cf3a9d70338bac66fcd537a2dc1e77d4becd6bca86abb7177b1340d8b8bc0888d9914029940e8fada2f6cbc42ebd5fd5131b184e7ef644"
+          "sig": "955e7ce6a0168be3293096622586501b4c48745799f7eae2558f6b5c0800738445f99faae4ecbe5291ea5c4bcd4e48e3a078ce483e2fc57995ebdc3d13c3b829"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5215,6 +5255,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": [
                   {
                     "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01",
@@ -5227,7 +5271,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "76cf9034b8735267bccc48cd6c835591f8ea386ec2af1984c54afb68c75c90e2b5f18eca4db9e28b695b33a30c5df53b16c57b425fb4df321769c34584d4821a"
+          "sig": "fdb8acc620bcf05cb4c8ccb8842a5f023a0736948f503d90681441d0a7fc01685306729102019053b73b33a0b653fc94706eba86b73009be91d502c8ab7294e4"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5291,6 +5335,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": [
                   {
                     "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01",
@@ -5306,7 +5354,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "bad5bfd88f4dd273373b99d2d707abf41871f75dbd946d2c59fabc1a316d23a9b2cf44d587e0fe7e6b6f78d7573e27bbe2811a38bd4186a8482e6ffd777cd50d"
+          "sig": "36b5497c434dc7376d5821e82b537a3a611fcc11f2d619e70ed99298e51b03e667e1bb6a7678e6fbec0ecf5302b9fef04be1c03cf53b809c554c9b193811e93e"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5370,6 +5418,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": [
                   {
                     "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01"
@@ -5381,7 +5433,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "922c3b68e6ae91054c63294a44e5d5ee8de4bfb5c379b4688f363e7d45715172319d9042516f2005f309df1c6efba6b7005a8e0187cafbe7c77e7eeee49b4ee9"
+          "sig": "7b550ecd755769c4a4b11d79fa8f88a75f69c78ae905faa7cea6c58c9575293727bd0b2d8a48fcd345bcd9fe575ffca8a5259fc86c037bbb803b496b54ad13da"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5445,6 +5497,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": [
                   {
                     "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01",
@@ -5457,7 +5513,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "80c29a2e34d5484a86d73fac8b69bea90dc6267fcc5548d944f28fd1b444c2cbf8a3db7cce33f03b923da39170af900b4dab2062800a47c086e25fe94c8d70b3"
+          "sig": "288b3feae3c72f9fe1ba66d003f661a8e81c1720a99dd7fa7faf0e62d9b9583c86e7464cbe34c2342fffdbde4208c0e31b9436461094beaedc179955431925f7"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5521,6 +5577,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": [
                   {
                     "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01",
@@ -5536,7 +5596,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "84f2435382fc386db42b5a3a25ec8c4801ba8f639b15d16067f6bdafb51a20d7bf61bc5f1d8ec8c3b3c0d5ab3a23de2618cf1a6687d1281aa447b93b8ecf1917"
+          "sig": "188bb14c3d286178d1e81ea339a92ff74bc82fe26e86f25c49543f61d327af126d3ad971368f72d7661f171fe48b4a31647bf8477ae1c58c9734be747f3bc239"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5599,6 +5659,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": []
               }
             },
@@ -5606,7 +5670,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "22d379004808f607cca7bb9a6d4799c58df15b963019de2f182eb43d2cbeeb42a1689e8505940ab03f23c00e2ed65e28b77988ebe939dbdcb0686faadaf7435c"
+          "sig": "47084578b9d7d1972b0f7ba0c9f25a2859d26f920f9491ebe59f6807072ea493c40266e79ec83b2182b787a14a7b406d57712f82a7206254b4dd3a72ac45be1d"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5670,6 +5734,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": []
               }
             },
@@ -5677,7 +5745,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "277bbbf155a8acf8ed1afb93d1b1244f9af20798ad2452d808f2587b4c8c2cb6df4b153877aeb475ca874387f21ee25911bbde0d41502ffe6d626ac3473412f6"
+          "sig": "93089211942daa812e57c236771ba55d32c5f8946948b85e5bf74b7661ec8ec6b5599452d50340701db1b54d4cbfa6013167b86a6003469fc7491ad85f89347e"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5741,6 +5809,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": [
                   {
                     "proofs": {
@@ -5762,7 +5834,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "940b7b01332817baaaa107167c2bdd703b87cd54ae669557c4854afe5c8a49397c98bce11aaba917675980b6038f7067da32b2849361d094ca4a0629911f4e41"
+          "sig": "fb8188b871bb2e69ab56ae66511397843b38409e1bf0d7d84cf4fcf12b9d88c35fc9bea5b5b3bdc7373bbf8ab1a72fc9dd7f0afb32b5f0c68c14e7cb69f0f904"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5827,6 +5899,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": [
                   {
                     "proofs": {
@@ -5848,7 +5924,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "940b7b01332817baaaa107167c2bdd703b87cd54ae669557c4854afe5c8a49397c98bce11aaba917675980b6038f7067da32b2849361d094ca4a0629911f4e41"
+          "sig": "fb8188b871bb2e69ab56ae66511397843b38409e1bf0d7d84cf4fcf12b9d88c35fc9bea5b5b3bdc7373bbf8ab1a72fc9dd7f0afb32b5f0c68c14e7cb69f0f904"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5913,6 +5989,10 @@
                   "autoAcceptDirection": "buy",
                   "autoAcceptMinUSD": null
                 },
+                "history": {
+                  "messagesKeepDays": 0,
+                  "filesKeepDays": 0
+                },
                 "contactRules": []
               }
             },
@@ -5920,7 +6000,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "277bbbf155a8acf8ed1afb93d1b1244f9af20798ad2452d808f2587b4c8c2cb6df4b153877aeb475ca874387f21ee25911bbde0d41502ffe6d626ac3473412f6"
+          "sig": "93089211942daa812e57c236771ba55d32c5f8946948b85e5bf74b7661ec8ec6b5599452d50340701db1b54d4cbfa6013167b86a6003469fc7491ad85f89347e"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",

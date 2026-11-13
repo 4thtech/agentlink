@@ -25,7 +25,7 @@ import {
   emulateReducedMotion,
   expectFadesOnly,
   layoutShiftScore,
-  shiftCount,
+  shiftMark,
   shiftsSince,
   observeLayoutShift,
 } from '../helpers/motion.js';
@@ -230,8 +230,8 @@ describe('chapter 3: inbox', () => {
     // (that move once cost Home 0.024–0.037). The score counts from before Home's first load.
     expect(await b.page.locator('main a[href="/first-run"]').count()).toBe(0);
     await b.page.waitForTimeout(500);
-    const clsBeforeHome = await layoutShiftScore(b.page);
-    const seenBefore = await shiftCount(b.page);
+    // CI-823: score and count from one read, so a shift is never in the score but not in the list.
+    const { score: clsBeforeHome, count: seenBefore } = await shiftMark(b.page);
     await navTo(b.page, 'Home');
     await b.page.getByRole('heading', { name: 'People' }).waitFor();
     await b.page.waitForTimeout(500);

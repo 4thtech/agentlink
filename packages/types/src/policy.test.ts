@@ -89,7 +89,7 @@ describe('policy defaults (06 §3)', () => {
           "storage": "auto",
         },
         "history": {
-          "filesKeepDays": 90,
+          "filesKeepDays": 0,
           "messagesKeepDays": 0,
         },
         "proofs": {

@@ -97,12 +97,25 @@ export async function shiftCount(page: Page): Promise<number> {
   return (await clsState(page)).shifts.length;
 }
 
+/**
+ * The score and the shift count read together in one page read (CI-823): two separate reads let a
+ * shift land between them, so it counted in the score but was missing from `shiftsSince`.
+ */
+export async function shiftMark(page: Page): Promise<{ score: number; count: number }> {
+  const state = await clsState(page);
+  return { score: state.score, count: state.shifts.length };
+}
+
 /** The shifts counted after a `shiftCount` mark, as "value [nodes]" (for a failure message). */
 export async function shiftsSince(page: Page, mark: number): Promise<string> {
-  return (await clsState(page)).shifts
-    .slice(mark)
+  const { shifts } = await clsState(page);
+  // A reload starts the count again: say so, and list every shift of the new page.
+  const from = shifts.length < mark ? 0 : mark;
+  const list = shifts
+    .slice(from)
     .map((s) => `${s.value.toFixed(4)} [${s.nodes.join(', ')}]`)
     .join('; ');
+  return from === mark ? list : `(page reloaded) ${list}`;
 }
 
 /** Throws when the layout shifted more than `max` (default CLS_BUDGET); returns the score. */

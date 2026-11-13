@@ -194,7 +194,12 @@ describe('fail closed: nothing is deleted (RET-6, 04 §4.2)', () => {
     expect(historyKeepOf(POLICY_DEFAULTS_EFFECTIVE)).toBeUndefined();
     const closed: EffectivePolicy = { mode: 'fail_closed', problem: 'invalid' };
     expect(historyKeepOf(closed)).toBeUndefined();
-    const signed: EffectivePolicy = { mode: 'signed', version: 3, policy: defaultPolicy() };
+    // A signed policy's own `history` is used (here a new ID's first rules, 0 and 90).
+    const signedPolicy = {
+      ...defaultPolicy(),
+      history: { messagesKeepDays: 0, filesKeepDays: 90 },
+    };
+    const signed: EffectivePolicy = { mode: 'signed', version: 3, policy: signedPolicy as Policy };
     expect(historyKeepOf(signed)).toEqual({ messagesKeepDays: 0, filesKeepDays: 90 });
     const old = defaultPolicy() as Partial<Policy>;
     delete old.history;

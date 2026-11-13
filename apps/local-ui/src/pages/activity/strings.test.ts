@@ -77,9 +77,9 @@ describe('Activity copy (11 §5.1)', () => {
   });
 });
 
-describe("UX-LEFT-1 (R1-UI-25): rule rows say what happens next", () => {
-  it("the rules row says the new rules apply and where to see them", () => {
-    expect(ACTIVITY_COPY.rulesChangedLine).toContain("apply from now on");
-    expect(ACTIVITY_COPY.rulesChangedLine).toContain("Rules");
+describe('UX-LEFT-1 (R1-UI-25): rule rows say what happens next', () => {
+  it('the rules row says the new rules apply and where to see them', () => {
+    expect(ACTIVITY_COPY.rulesChangedLine).toContain('apply from now on');
+    expect(ACTIVITY_COPY.rulesChangedLine).toContain('Rules');
   });
 });
