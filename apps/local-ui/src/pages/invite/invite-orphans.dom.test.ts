@@ -177,10 +177,49 @@ describe('an invite is kept when the page goes (REL051-B2)', () => {
     expect(sessionStorage.getItem(SCREEN_KEY)).toContain(ID_1);
   });
 
-  it('leaving in the app (Done) forgets it: the next Invite someone makes a new invite', async () => {
+  // REL051-R2C (R2-UI-05): looking at Invite someone never piles up nameless waiting invites.
+  it('leaving an unnamed invite that went nowhere keeps it as the one draft: the next visit shows it again', async () => {
+    const { api, created, cancelled, linked } = fake([ID_1, 'BwcHBwcHBwcHBwcHBwcHBw'], (id) =>
+      id === ID_1
+        ? {
+            kind: 'ok',
+            inviteUrl: LINK,
+            shareText: `Add my AI agent on AgentLink: ${LINK}`,
+            format: 'short',
+            expiresAt: Date.UTC(2999, 0, 1),
+          }
+        : { kind: 'not_found' },
+    );
+    await act(async () => {
+      root.render(createElement(InvitePanel, { invites: api }));
+    });
+    await settle();
+    act(() => root.unmount());
+    root = createRoot(host);
+    await act(async () => {
+      root.render(createElement(InvitePanel, { invites: api }));
+    });
+    await settle();
+    expect(created).toEqual([ID_1]);
+    expect(linked).toEqual([ID_1]);
+    expect(cancelled).toEqual([]);
+  });
+
+  it('leaving after the link went out (Copy) forgets it: the next Invite someone makes a new invite', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: () => Promise.resolve() },
+    });
     const { api, created, cancelled } = fake([ID_1, 'BwcHBwcHBwcHBwcHBwcHBw']);
     await act(async () => {
       root.render(createElement(InvitePanel, { invites: api }));
+    });
+    await settle();
+    await act(async () => {
+      const copy = [...host.querySelectorAll('button')].find((b) =>
+        (b.textContent ?? '').includes('Copy'),
+      );
+      copy?.click();
     });
     await settle();
     act(() => root.unmount());

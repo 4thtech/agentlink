@@ -10,7 +10,8 @@
 //   link went anywhere makes a fresh link with that name and cancels the unnamed one; once the link
 //   was copied, emailed, shared or shown as a QR code, the name is fixed.
 // - REL051-B2 (owner test, 13 Nov; replaces "a link that never left the screen is cancelled when
-//   the panel goes"): leaving keeps the link, copied or not. It waits under Home and People, where
+//   the panel goes"): leaving keeps the link, copied or not. REL051-R2C (R2-UI-05): an unnamed
+//   link that went nowhere is reused by the next visit, so looking never piles up waiting invites. It waits under Home and People, where
 //   Copy link and Show link get it again (the app keeps it, sealed) and Cancel invite ends it. Only
 //   Get started's "Skip for now" (`discard`) ends a link that never left the screen.
 // - Copy (✓ moment), Email (a real `mailto:` link with our share text; a click does not count as
@@ -256,13 +257,15 @@ export function InvitePanel({
     void reuse();
     return () => {
       live.current = false;
-      // Left in the app (Done, Back): the next visit is a new invite.
-      forgetScreenInvite();
       // The link stays (Home and People can copy it again), unless the owner chose not to invite.
       const last = madeRef.current;
-      if (discard?.current === true && last !== undefined && !sharedRef.current) {
-        void invites.cancel(last.id);
-      }
+      const discarded = discard?.current === true && last !== undefined && !sharedRef.current;
+      if (discarded) void invites.cancel(last.id);
+      // REL051-R2C (R2-UI-05): an unnamed invite that never went anywhere is the one draft: the next
+      // visit shows it again instead of leaving another nameless waiting invite. One that went out or
+      // has a name is done here: the next visit is a new invite.
+      const draft = !discarded && last !== undefined && !sharedRef.current && last.label === '';
+      if (!draft) forgetScreenInvite();
     };
     // Made once per panel.
   }, []);
