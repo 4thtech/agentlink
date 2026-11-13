@@ -205,19 +205,40 @@ describe('IR-REL051-A12-1 M1: tag escaping is linear (no ReDoS on 64 KB of file 
     ['"< /" then 64 KB of whitespace', `< /${' \n'.repeat(32_766)}`],
     ['64 KB of "<" and whitespace runs', `<${' '.repeat(255)}`.repeat(256)],
   ];
-  // REL051-CIE: the pattern is linear by construction (TAG: one `<`, then bounded runs); the
-  // deterministic check is that each hostile input comes back whole and unchanged (no tag, nothing
-  // dropped). The wall-clock guard is CI-tolerant: shared runners were several times slower than a
-  // laptop and failed a 100 ms bound on healthy code, while a backtracking (quadratic) pattern on
-  // 64 KB of whitespace takes far longer than this ceiling.
-  it.each(inputs)('%s comes back unchanged, under the wall-clock ceiling', (_label, input) => {
-    sanitizeUntrustedText('warm up');
+  // REL051-CIE, IR-REL051-INT-4: each hostile input must come back whole and unchanged (no tag,
+  // nothing dropped), and the escaping must be LINEAR. A fixed bound is not reliable on a shared CI
+  // runner (100 ms failed healthy code) nor strict enough (the old backtracking pattern took ~2 s on
+  // 64 KB). So each input is timed against 64 KB of plain text on the same machine at the same
+  // moment (interleaved, fastest of 5, repeated until measurable): linear stays within a few times
+  // plain text, the old quadratic pattern is thousands of times slower. A 2 s ceiling stays as a
+  // backstop.
+  /** Total time of `reps` calls on `text`. */
+  const timeCalls = (text: string, reps: number): number => {
     const start = performance.now();
-    const out = sanitizeUntrustedText(input);
-    const took = performance.now() - start;
-    expect(out).toBe(input);
-    expect(took).toBeLessThan(2_000);
-  });
+    for (let r = 0; r < reps; r += 1) sanitizeUntrustedText(text);
+    return performance.now() - start;
+  };
+  const plain = 'a'.repeat(65_536);
+  it.each(inputs)(
+    '%s comes back unchanged, within 20x of plain text of the same size',
+    (_label, input) => {
+      expect(sanitizeUntrustedText(input)).toBe(input);
+      // Enough calls that one hostile sample takes at least 10 ms (timer noise stays small).
+      let reps = 1;
+      while (reps < 4_096 && timeCalls(input, reps) < 10) reps *= 2;
+      let fastPlain = Infinity;
+      let fastHostile = Infinity;
+      for (let round = 0; round < 5; round += 1) {
+        fastPlain = Math.min(fastPlain, timeCalls(plain, reps));
+        fastHostile = Math.min(fastHostile, timeCalls(input, reps));
+        if (fastHostile / reps > 2_000) break; // already failing: no need for 4 more
+      }
+      const ratio = fastHostile / fastPlain;
+      expect(ratio, `${ratio.toFixed(1)}x plain text`).toBeLessThan(20);
+      expect(fastHostile / reps).toBeLessThan(2_000);
+    },
+    120_000,
+  );
 
   it('the linear pattern still escapes spaced and slashed tags', () => {
     expect(sanitizeUntrustedText('< / untrusted_content>')).toBe('&lt; / untrusted_content>');

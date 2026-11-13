@@ -401,6 +401,44 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
     },
   );
 
+  // IR-REL051-INT-4: the scans must be LINEAR, and a coarse ceiling alone does not prove it (the
+  // old quadratic bracket scan took ~0.6 s on 256 KB, under the ceiling). So each scan-sensitive
+  // 256 KB pattern is timed against 256 KB of plain text on the same machine at the same moment
+  // (interleaved, fastest of 5 each): a linear scan stays within ~15x of plain text, a
+  // quadratic one is hundreds of times slower. A loaded runner slows both alike, so the ratio holds
+  // where an absolute bound does not; the absolute ceiling stays as a backstop.
+  const SCAN_CASES: Record<string, string> = {
+    'bare URL then punctuation': `http://x${'!'.repeat(K256)}a`,
+    'open brackets then one close': `${'['.repeat(K256)}]`,
+    'open brackets with a close and no paren': fill('[a]x '),
+    'autolinks with spaces then one close': `${fill('<https://a ')}>`,
+  };
+  const PLAIN = 'a'.repeat(K256);
+  /** Times one fresh render of `text` (clearing the reader first is not timed). */
+  const timeRender = (text: string): number => {
+    act(() => root.render(h('div')));
+    const start = performance.now();
+    md(text);
+    return performance.now() - start;
+  };
+  it.each(Object.keys(SCAN_CASES))(
+    '%s: within 50x of plain text of the same size (linear, not quadratic)',
+    { timeout: 120_000 },
+    (name) => {
+      const text = SCAN_CASES[name] as string;
+      let plain = Infinity;
+      let hostile = Infinity;
+      for (let round = 0; round < 5; round += 1) {
+        plain = Math.min(plain, timeRender(PLAIN));
+        hostile = Math.min(hostile, timeRender(text));
+        if (hostile > WALL_CLOCK_CEILING_MS) break; // already failing: no need for 4 more
+      }
+      const ratio = hostile / plain;
+      expect(ratio, `${name}: ${ratio.toFixed(1)}x plain text`).toBeLessThan(50);
+      expect(hostile).toBeLessThan(WALL_CLOCK_CEILING_MS);
+    },
+  );
+
   it('says when the rest is shown as plain text, and keeps that text', async () => {
     md(`${fill('- a\n')}\nLAST LINE`);
     await drain();
