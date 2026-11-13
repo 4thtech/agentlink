@@ -7,4 +7,7 @@ import { desktopHostMain, nodeDesktopHostMainDeps } from './host-main.js';
 
 const code = await desktopHostMain(nodeDesktopHostMainDeps());
 // Relay sockets and timers of a closed agent must not keep the process alive after a clean stop.
-process.exit(code);
+// The exit comes a moment later, not at once: on Windows a write to the shell's stderr pipe is
+// asynchronous, and an immediate exit lost the one fixed line (the app log showed only "exited").
+process.exitCode = code;
+setTimeout(() => process.exit(code), 500);

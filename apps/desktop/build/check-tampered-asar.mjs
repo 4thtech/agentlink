@@ -94,6 +94,28 @@ function showAppLog() {
   }
 }
 
+/**
+ * Windows: the number of AgentLink.exe processes still running. The previous step's launches can
+ * take a few seconds to go away on a runner, and while one is there the app's single-instance lock
+ * is taken, so the control quits at once ("another AgentLink is running", exit 0) as it should.
+ */
+function runningCopies() {
+  const r = capture('tasklist', ['/FI', 'IMAGENAME eq AgentLink.exe', '/NH', '/FO', 'CSV']);
+  return r.code === 0 ? (r.stdout.match(/^"AgentLink\.exe"/gim) ?? []).length : 0;
+}
+
+/** Waits (up to `ms`) until no AgentLink.exe runs; answers how many are left. */
+async function noCopyRunning(ms) {
+  if (process.platform !== 'win32') return 0;
+  const end = Date.now() + ms;
+  let left = runningCopies();
+  while (left > 0 && Date.now() < end) {
+    await new Promise((r) => setTimeout(r, 500));
+    left = runningCopies();
+  }
+  return left;
+}
+
 const fail = (msg) => {
   console.error(`TAMPERED ASAR CHECK FAILED: ${msg}`);
   process.exitCode = 1;
@@ -101,11 +123,13 @@ const fail = (msg) => {
 
 try {
   const control = copyBuild('control');
+  const before = await noCopyRunning(60_000);
   const c = await launch(control.exe, controlMs);
   if (!c.running) {
     fail(
       `the untampered control did not start (${c.spawnError ? 'spawn error' : `exit ${c.code}`}).`,
     );
+    if (before > 0) console.error(`(${before} AgentLink.exe still running before the control)`);
     showAppLog();
   } else {
     const bad = copyBuild('tampered');

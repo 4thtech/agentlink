@@ -50,6 +50,7 @@ const layout = JSON.parse(
 const nodeBin = join(resources, ...(win ? layout.node.win32 : layout.node.posix));
 // core/node_modules/@4thtech-io/agentlink/dist/agentlink.js (the host script's sibling)
 const entryJs = join(resources, ...layout.hostScript.slice(0, -1), 'agentlink.js');
+const hostScript = join(resources, ...layout.hostScript);
 
 const home = mkdtempSync(join(tmpdir(), 'agentlink-desktop-smoke-'));
 // A small, explicit environment: no AI-app marker, nothing from the runner's secrets.
@@ -112,6 +113,42 @@ function diagnose() {
   } catch {
     console.error('(no ~/.agentlink)');
   }
+  probeCore();
+}
+
+/**
+ * The core as the shell starts it (stdio [ignore, ignore, pipe, pipe]), outside the app: what the
+ * bundled node sees on fd 3, then the host's own exit code and first stderr lines (fixed lines,
+ * cut to length). A host that does start is stopped after the time limit.
+ */
+function probeCore() {
+  const run = (args) =>
+    spawnSync(nodeBin, args, {
+      env,
+      cwd: home,
+      stdio: ['ignore', 'ignore', 'pipe', 'pipe'],
+      encoding: 'utf8',
+      timeout: 20_000,
+      windowsHide: true,
+    });
+  const show = (label, r) => {
+    const lines = String(r.output?.[2] ?? '')
+      .split('\n')
+      .filter((l) => l.trim() !== '')
+      .slice(0, 10)
+      .map((l) => l.slice(0, 300));
+    console.error(`--- ${label}: exit ${r.status ?? r.signal ?? r.error?.code} ---`);
+    for (const line of lines) console.error(line);
+  };
+  const fd3 = [
+    'let s;',
+    "try { const t = require('node:fs').fstatSync(3);",
+    's = `fifo=${t.isFIFO()} socket=${t.isSocket()} file=${t.isFile()} char=${t.isCharacterDevice()}`; }',
+    'catch (e) { s = `error ${e.code}`; }',
+    'process.stderr.write(`fd3 ${s}\\n`);',
+  ].join(' ');
+  show('fd 3 as the bundled node sees it', run(['-e', fd3]));
+  show('the core host started directly', run([hostScript]));
 }
 
 const pidAlive = (pid) => {
