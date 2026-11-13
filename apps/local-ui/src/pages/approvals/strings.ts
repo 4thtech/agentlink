@@ -3,7 +3,7 @@
 // except that the local app says "master code" where that page used the older wording (11 §5.5,
 // UX-031-QUICKWINS; BACKUP_CODE_WORDING below). `{name}` marks an inserted value;
 // the result is only ever rendered as text. The sheet's words are @4thtech-io/ui PAY_CONFIRM_STRINGS.
-import { sensorWord } from '../../presence-word.js';
+import { sensorSentence, sensorWord } from '../../presence-word.js';
 
 /** The CLI prefix every command shown to the owner uses (packages/node cli-command.ts). */
 export const CLI_PREFIX = 'npx -y @4thtech-io/agentlink';
@@ -106,7 +106,11 @@ export const APPROVAL_STRINGS = Object.freeze({
   listRefused: 'These decisions were not applied. Nothing was changed. Review the list again.',
   needsSetup:
     'Finish setting up AgentLink first: create your first ID on Home and save your master code.',
-  notUsed: "The passkey wasn't used. Nothing was changed. You can enter your master code instead.",
+  // REL051-R2C (R2-UI-06): the sensor's own word (Touch ID, Windows Hello, your passkey), never
+  // "passkey" on a Mac or Windows.
+  get notUsed(): string {
+    return `${sensorSentence()} wasn't used. Nothing was changed. You can enter your master code instead.`;
+  },
   paidAlone: 'This costs credits. Approve it on its own.',
   listPaid:
     'A request in this list costs credits and is approved on its own. Nothing was changed. Review the list again.',

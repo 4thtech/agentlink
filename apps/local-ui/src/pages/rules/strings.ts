@@ -119,7 +119,7 @@ export const RULES_STRINGS = {
   failed: "Couldn't save. Try again.",
   sessionExpired: 'This page has expired. Open AgentLink again from your AI app.',
   passkeyCancelled: (sensor: string): string =>
-    `${sensor[0]?.toUpperCase() ?? ''}${sensor.slice(1)} was not used. Try again.`,
+    `${sensor[0]?.toUpperCase() ?? ''}${sensor.slice(1)} wasn't used. Nothing was changed. Try again.`,
   invalidEdit: "These changes can't be saved. Check the values and try again.",
 
   unavailable: "Your rules couldn't be loaded. Try again in a minute.",
