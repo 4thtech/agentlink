@@ -39,9 +39,11 @@ import { createKeychainAgent, openRecordedKeyStore } from '../keychain-keystore.
 import { keychainAccount, type KeychainBackend } from '../keychain.js';
 import { TEST_APP } from '../local-ui-app.fixture.js';
 import { OWNER_ACCOUNT } from '../owner-keystore.js';
+import { readOwnerPasskeyHeader } from '../owner-passkey.js';
 import { defaultOwnerFiles, encodeSetupRegistration } from '../owner-setup.js';
 import { encodePayConfirmAssertion } from '../pay-confirm.js';
 import { VirtualPrfAuthenticator } from '../passkey-authenticator.fixture.js';
+import { StandInHelper } from '../owner-native.fixture.js';
 import type { AgentDirectory, AgentDirectoryEntry, AppHostAgent } from './app-host.js';
 import type { LocalUiAiAppPlan, LocalUiAiApps } from './context.js';
 
@@ -423,8 +425,10 @@ interface Harness {
   ): Promise<Response>;
 }
 
-async function harness(): Promise<Harness> {
-  const w = world();
+async function harness(
+  options: { readonly w?: World; readonly nativePresence?: StandInHelper } = {},
+): Promise<Harness> {
+  const w = options.w ?? world();
   const opened: string[] = [];
   const h = { clock: NOW * 1000 } as { clock: number };
   const server = await startApprovalServerWith(
@@ -436,6 +440,7 @@ async function harness(): Promise<Harness> {
         apply: () => Promise.reject(new Error('never')),
       },
       localUi: { assets: TEST_APP },
+      ...(options.nativePresence === undefined ? {} : { nativePresence: options.nativePresence }),
       host: {
         directory: w.directory,
         open: (name) => w.open(name),
@@ -1076,5 +1081,279 @@ describe('W4-ONE-TOUCH New agent: one gesture creates the agent and connects its
     );
     expect(json(changed)['status']).toBe('changed');
     expect(h.w.entries.has('work')).toBe(false);
+  });
+});
+
+/**
+ * HOTFIX-NOID: one owner made by a first run (and, with `native`, Touch ID turned on), kept for the
+ * whole file: its keychain items, its master code and its authenticator. Each test copies the items
+ * into a fresh keychain with no ID (so every test still starts clean), and the slow key derivation
+ * of a first run happens once per kind instead of once per test (CI load, PR #821).
+ */
+interface MadeOwner {
+  readonly items: ReadonlyMap<string, Uint8Array>;
+  readonly code: string;
+  readonly auth: VirtualPrfAuthenticator;
+}
+const madeOwners = new Map<boolean, Promise<MadeOwner>>();
+function madeOwner(native: boolean): Promise<MadeOwner> {
+  let made = madeOwners.get(native);
+  if (made === undefined) {
+    made = (async () => {
+      const helper = native ? new StandInHelper(1) : undefined;
+      const first = await harness(helper === undefined ? {} : { nativePresence: helper });
+      const s1 = await first.session();
+      const { auth, finish } = await setUp(first, s1, { label: 'Home base' });
+      expect(json(finish)['status']).toBe('done');
+      const code = String(json(finish)['ownerCode']).replace(/[^A-Za-z0-9]/g, '');
+      if (helper !== undefined) {
+        const on = await first.post('/api/owner/native', s1, encodeUtf8(code));
+        expect(json(on)['status']).toBe('registered');
+      }
+      const items = new Map<string, Uint8Array>();
+      for (const [account, value] of first.w.keychain.items) items.set(account, value.slice());
+      return { items, code, auth };
+    })();
+    madeOwners.set(native, made);
+  }
+  return made;
+}
+
+// HOTFIX-NOID (owner report on 0.5.1, a Mac that had AgentLink before): the owner exists on this
+// computer (its keychain items) but no ID does, so the app host has none open. New ID must still
+// work from the app with the master code or the desktop app's Touch ID (04 §2.8 "No ID on this
+// computer yet"), never sending the owner to a terminal. Same gates as New ID with an open ID.
+describe('HOTFIX-NOID New ID with an owner and zero IDs on this computer', () => {
+  /** An owner made on another host (first run), then a new host over the same keychain, no IDs. */
+  async function ownerOnly(options: { readonly native?: boolean } = {}): Promise<{
+    h: Harness;
+    s: Session;
+    code: string;
+    auth: VirtualPrfAuthenticator;
+    helper?: StandInHelper;
+  }> {
+    const helper = options.native === true ? new StandInHelper(1) : undefined;
+    const { items, code, auth } = await madeOwner(options.native === true);
+    // The IDs are gone (folders removed); the owner's keychain items stay.
+    const w = world();
+    for (const [account, value] of items) w.keychain.items.set(account, value.slice());
+    const h = await harness({ w, ...(helper === undefined ? {} : { nativePresence: helper }) });
+    const s = await h.session();
+    return { h, s, code, auth, ...(helper === undefined ? {} : { helper }) };
+  }
+
+  const agentBegin = (h: Harness, s: Session, value: unknown) =>
+    h.post(AGENT_BEGIN, s, new Uint8Array(0), { 'X-AgentLink-Input': input(value) });
+  const agentFinish = (
+    h: Harness,
+    s: Session,
+    nonce: string,
+    body: Uint8Array,
+    extra: Record<string, string> = {},
+  ) => h.post(AGENT_FINISH, s, body, { 'X-AgentLink-Input': input({ nonce }), ...extra });
+  const get = (h: Harness, s: Session, path: string) =>
+    send(h.server.port, path, {
+      headers: { Cookie: s.cookie, 'X-AgentLink-CSRF': s.csrf, 'Sec-Fetch-Site': 'same-origin' },
+    });
+  const releases = (helper: StandInHelper | undefined): number =>
+    helper?.calls.filter((c) => c.startsWith('release')).length ?? 0;
+
+  it('begin is answered (no `no_agent`): the statement without an owner fingerprint, the code only', async () => {
+    const { h, s } = await ownerOnly();
+    expect(h.w.entries.size).toBe(0);
+    const begin = await agentBegin(h, s, { label: 'Claude Desktop', app: 'claude-code' });
+    expect(json(begin)['status']).toBe('ready');
+    const begun = json(begin) as unknown as Begun;
+    expect(begun.statement).toMatchObject({ label: 'Claude Desktop', folder: 'claude-desktop' });
+    // The owner can't be known before it is unlocked (the ALKO blob holds no public keys).
+    expect(begun.statement.ownerFingerprint).toBeUndefined();
+    // No plan-bound passkey challenge can be made without the owner: the master code (or Touch ID).
+    expect(begun.publicKey.allowCredentials).toEqual([]);
+  });
+
+  it('the master code creates the first ID, connects the app, and the host opens it', async () => {
+    const { h, s, code } = await ownerOnly();
+    const begun = json(
+      await agentBegin(h, s, { label: 'Claude Desktop', app: 'claude-code' }),
+    ) as unknown as Begun;
+    const wrong = await agentFinish(h, s, begun.nonce, encodeUtf8('WRONGWRONGWRONGWRONGWRON'));
+    expect(json(wrong)['status']).toBe('presence_rejected');
+    expect(h.w.entries.size).toBe(0);
+    h.clock += 30_000;
+    const res = await agentFinish(h, s, begun.nonce, encodeUtf8(code));
+    expect(res.status).toBe(200);
+    expect(json(res)).toMatchObject({
+      status: 'done',
+      name: 'claude-desktop',
+      label: 'Claude Desktop',
+      app: 'claude-code',
+    });
+    expect(h.w.ownKeys).toEqual([]);
+    expect(h.w.desk.entry).toEqual({ agent: 'claude-desktop' });
+    const client = h.w.clients.get('claude-desktop') as AgentLinkClient;
+    expect(await client.ownerActions.loadLabel()).toEqual({
+      status: 'verified',
+      label: 'Claude Desktop',
+    });
+    expect(await storeState(h, 'claude-desktop')).toEqual({ app: true, nonces: 3 });
+    // The new ID is the one open now: the host names it on every answer.
+    const agents = await get(h, s, '/api/ui/agents');
+    expect(agents.status).toBe(200);
+    expect(decodeURIComponent(String(agents.headers['x-agentlink-agent']))).toBe('Claude Desktop');
+  });
+
+  it('a passkey answer is refused before anything is created (passkey_update_needed); the plan stays', async () => {
+    const { h, s, auth, code } = await ownerOnly();
+    const begun = json(await agentBegin(h, s, { label: 'Work' })) as unknown as Begun;
+    const res = await agentFinish(h, s, begun.nonce, getResponse(auth, begun.publicKey, h.origin), {
+      'X-AgentLink-Presence': 'passkey',
+    });
+    expect(json(res)['status']).toBe('passkey_update_needed');
+    expect(h.w.entries.size).toBe(0);
+    const ok = await agentFinish(h, s, begun.nonce, encodeUtf8(code));
+    expect(json(ok)).toMatchObject({ status: 'done', name: 'work' });
+  });
+
+  it('refused while any ID folder is listed (an unreadable or half-removed ID is never bypassed)', async () => {
+    const { h, s } = await ownerOnly();
+    h.w.entries.set('old', { name: 'old', label: 'Old', available: false, removing: true });
+    const begin = await agentBegin(h, s, { label: 'Work' });
+    expect(json(begin)['status']).toBe('no_agent');
+  });
+
+  it('with no owner on this computer, begin is refused (first run makes the owner)', async () => {
+    const h = await harness();
+    const s = await h.session();
+    const begin = await agentBegin(h, s, { label: 'Work' });
+    expect(json(begin)['status']).toBe('no_agent');
+  });
+
+  it("the desktop app's Touch ID creates the first ID with one gesture", async () => {
+    const { h, s, helper } = await ownerOnly({ native: true });
+    // GET /api/owner/native names the stored Touch ID as this owner's, even with no ID open.
+    const status = json(await get(h, s, '/api/owner/native'));
+    expect(status['native']).toMatchObject({ available: true, registered: true });
+    expect((status['native'] as Record<string, unknown>)['reason']).toBeUndefined();
+    const begun = json(await agentBegin(h, s, { label: 'Work' })) as unknown as Begun;
+    const ask = await agentFinish(h, s, begun.nonce, new Uint8Array(0), {
+      'X-AgentLink-Presence': 'native-challenge',
+    });
+    expect(json(ask)['status']).toBe('ready');
+    const before = releases(helper);
+    const native = {
+      'X-AgentLink-Presence': 'native',
+      'X-AgentLink-Ceremony': String(json(ask)['ceremony']),
+    };
+    const res = await agentFinish(h, s, begun.nonce, new Uint8Array(0), native);
+    expect(json(res)).toMatchObject({ status: 'done', name: 'work' });
+    expect(releases(helper) - before).toBe(1);
+    // A replayed native request (its ceremony spent) runs no second OS prompt.
+    const again = await agentFinish(h, s, begun.nonce, new Uint8Array(0), native);
+    expect(again.status).not.toBe(200);
+    expect(releases(helper) - before).toBe(1);
+  });
+});
+
+describe("HOTFIX-NOID New ID with an open ID: the desktop app's Touch ID", () => {
+  it('native presence (with its ceremony) creates the agent with one gesture', async () => {
+    const helper = new StandInHelper(1);
+    const h = await harness({ nativePresence: helper });
+    const s = await h.session();
+    const { finish } = await setUp(h, s, { label: 'Home base' });
+    const code = String(json(finish)['ownerCode']).replace(/[^A-Za-z0-9]/g, '');
+    const on = await h.post('/api/owner/native', s, encodeUtf8(code));
+    expect(json(on)['status']).toBe('registered');
+    const begin = (label: string) =>
+      h.post(AGENT_BEGIN, s, new Uint8Array(0), { 'X-AgentLink-Input': input({ label }) });
+    const finishWith = (nonce: string, extra: Record<string, string>) =>
+      h.post(AGENT_FINISH, s, new Uint8Array(0), {
+        'X-AgentLink-Input': input({ nonce }),
+        ...extra,
+      });
+    const begun = json(await begin('Work')) as unknown as Begun;
+    const ask = await finishWith(begun.nonce, { 'X-AgentLink-Presence': 'native-challenge' });
+    expect(json(ask)['status']).toBe('ready');
+    const res = await finishWith(begun.nonce, {
+      'X-AgentLink-Presence': 'native',
+      'X-AgentLink-Ceremony': String(json(ask)['ceremony']),
+    });
+    expect(json(res)).toMatchObject({ status: 'done', name: 'work' });
+    // Without a ceremony, native presence is refused before the helper runs.
+    const two = json(await begin('Two')) as unknown as Begun;
+    const bare = await finishWith(two.nonce, { 'X-AgentLink-Presence': 'native' });
+    expect(json(bare)['status']).toBe('presence_required');
+    expect(h.w.entries.has('two')).toBe(false);
+  });
+});
+
+// IR-HOTFIX-NOID-1 L1/L2: with no card naming the owner, a stored Touch ID or passkey header that
+// names another owner refuses (`refused`), on the master code path and on the Touch ID path alike;
+// nothing is created or written.
+describe('HOTFIX-NOID: a stored header naming another owner refuses the first ID', () => {
+  /** This owner's passkey item with its header naming another owner key (one byte changed). */
+  async function otherOwnersPasskey(w: World): Promise<Uint8Array> {
+    const header = await readOwnerPasskeyHeader(w.keychain);
+    const item = w.keychain.items.get('owner-passkey');
+    if (header === null || item === undefined) throw new Error('no passkey item');
+    const at = Buffer.from(item).indexOf(Buffer.from(header.ownerNostr));
+    expect(at).toBeGreaterThan(-1);
+    const other = item.slice();
+    other[at] = ((other[at] as number) + 1) & 0xff;
+    const changed = await (async () => {
+      w.keychain.items.set('owner-passkey', other);
+      return readOwnerPasskeyHeader(w.keychain);
+    })();
+    expect(changed?.ownerNostr).not.toEqual(header.ownerNostr);
+    return other;
+  }
+
+  async function zeroIds(native: boolean): Promise<{
+    h: Harness;
+    s: Session;
+    code: string;
+    helper?: StandInHelper;
+  }> {
+    const helper = native ? new StandInHelper(1) : undefined;
+    const { items, code } = await madeOwner(native);
+    const w = world();
+    for (const [account, value] of items) w.keychain.items.set(account, value.slice());
+    await otherOwnersPasskey(w);
+    const h = await harness({ w, ...(helper === undefined ? {} : { nativePresence: helper }) });
+    return { h, s: await h.session(), code, ...(helper === undefined ? {} : { helper }) };
+  }
+
+  const begin = (h: Harness, s: Session) =>
+    h.post(AGENT_BEGIN, s, new Uint8Array(0), {
+      'X-AgentLink-Input': input({ label: 'Work', app: 'claude-code' }),
+    });
+  const finishWith = (h: Harness, s: Session, nonce: string, body: Uint8Array, extra = {}) =>
+    h.post(AGENT_FINISH, s, body, { 'X-AgentLink-Input': input({ nonce }), ...extra });
+
+  it('the master code: refused, nothing created or written', async () => {
+    const { h, s, code } = await zeroIds(false);
+    const begun = json(await begin(h, s)) as unknown as Begun;
+    const res = await finishWith(h, s, begun.nonce, encodeUtf8(code));
+    expect(res.status).toBe(409);
+    expect(json(res)['status']).toBe('refused');
+    expect(h.w.entries.size).toBe(0);
+    expect(h.w.desk.writes).toBe(0);
+    expect(h.w.keychain.items.size).toBeGreaterThan(0);
+    expect([...h.w.ids.keys()]).toEqual([]);
+  });
+
+  it("the app's Touch ID: refused, nothing created or written", async () => {
+    const { h, s } = await zeroIds(true);
+    const begun = json(await begin(h, s)) as unknown as Begun;
+    const ask = await finishWith(h, s, begun.nonce, new Uint8Array(0), {
+      'X-AgentLink-Presence': 'native-challenge',
+    });
+    const res = await finishWith(h, s, begun.nonce, new Uint8Array(0), {
+      'X-AgentLink-Presence': 'native',
+      'X-AgentLink-Ceremony': String(json(ask)['ceremony']),
+    });
+    expect(res.status).toBe(409);
+    expect(json(res)['status']).toBe('refused');
+    expect(h.w.entries.size).toBe(0);
+    expect(h.w.desk.writes).toBe(0);
   });
 });

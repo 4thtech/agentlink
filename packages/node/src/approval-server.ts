@@ -272,6 +272,7 @@ import {
 import {
   nativePresence,
   nativePresenceStatus,
+  readOwnerNativeHeader,
   type NativePresenceStatus,
   registerOwnerNative,
   replaceOwnerNative,
@@ -1194,6 +1195,11 @@ const NO_AGENT_ROUTES: ReadonlySet<string> = new Set([
   // U3-e: removal leaves no agent open after `undeliverable` ("Remove anyway?") or when none is
   // left; the remove kind keeps its own gate (owner presence, typed label) and needs no open agent.
   'POST /api/ui/agents/remove',
+  // HOTFIX-NOID (04 §2.8 "No ID on this computer yet"): New ID with an owner and zero IDs. The
+  // create-agent gate itself refuses (`no_agent`) unless no ID folder is listed and the owner item
+  // exists; it needs no open agent (the owner is unlocked by the master code or Touch ID).
+  'POST /api/ui/agents/begin',
+  'POST /api/ui/agents',
   // U3-invite (08 §4): the waiting invite is the host's, not an agent's: its read and "Not now"
   // answer during first run on a computer with no agent yet. Accepting needs the agent.
   'GET /api/ui/join',
@@ -1276,7 +1282,14 @@ interface PendingCreate {
   readonly expiresAt: number;
   readonly timer: ReturnType<typeof setTimeout>;
   readonly seed: HeldAgentSeed;
-  readonly plan: CreateConnectPlan;
+  /** The plan fixed at begin; absent with no ID on this computer (HOTFIX-NOID), see `planFor`. */
+  readonly plan?: CreateConnectPlan;
+  /**
+   * HOTFIX-NOID: with no card naming the owner, the plan is built for the owner the presence
+   * unlocked (04 §2.8 M1-9x), from exactly what begin fixed (agent keys, label, folder, Send folder,
+   * the app's changeId). Absent when `plan` is set.
+   */
+  readonly planFor?: (owner: OwnerPublicKeys) => CreateConnectPlan;
   readonly statement: PlanStatement;
   readonly app?: PlannedApp;
   /** The Send folder for the first policy, prepared at begin (removed again unless used). */
@@ -2609,6 +2622,47 @@ export async function startApprovalServerWith(
     }
   }
 
+  /**
+   * HOTFIX-NOID (04 §2.8 "No ID on this computer yet"): true when New ID may run with no card naming
+   * the owner: no ID is open, no ID folder is listed (an unreadable or half-removed one never leads
+   * here, M1-9x), and the owner item exists. Rejects on errors (callers fail closed).
+   */
+  async function firstIdForOwner(): Promise<boolean> {
+    const slot = host;
+    if (slot === undefined || slot.current !== undefined) return false;
+    if ((await slot.directory.list()).length > 0) return false;
+    return ownerItemPresent(keychainOf());
+  }
+
+  /**
+   * HOTFIX-NOID: the owner key the stored Touch ID (`owner-native` header) names, only while New ID
+   * may run with no card (firstIdForOwner). Public data; the helper's secret must still open the
+   * blob to a seed deriving exactly this key (unlockForOwnerNostr).
+   */
+  async function noCardOwnerNostr(): Promise<Uint8Array | undefined> {
+    if (!(await firstIdForOwner())) return undefined;
+    const header = await readOwnerNativeHeader(keychainOf());
+    return header === null ? undefined : header.ownerNostr;
+  }
+
+  /**
+   * HOTFIX-NOID: true unless a stored Touch ID (`owner-native`) or passkey (`owner-passkey`) header
+   * names another owner key than `found` (public headers; a damaged one refuses). Fails closed.
+   */
+  async function sameStoredOwner(found: OwnerPublicKeys): Promise<boolean> {
+    try {
+      const native = await readOwnerNativeHeader(keychainOf());
+      if (native !== null && !equalBytes(native.ownerNostr, found.ownerNostr)) return false;
+      const passkeyHeader = await readOwnerPasskeyHeader(keychainOf());
+      if (passkeyHeader !== null && !equalBytes(passkeyHeader.ownerNostr, found.ownerNostr)) {
+        return false;
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /** The native secret of a presence that was not handed to an unlock (unlock wipes its own). */
   const wipeNative = (presence: OwnerPresence | undefined): void => {
     if (presence?.kind === 'native') wipe(presence.secret);
@@ -2621,11 +2675,13 @@ export async function startApprovalServerWith(
       return;
     }
     const context = noAgentOpen() ? undefined : await source.context().catch(() => undefined);
-    const status = await nativePresenceStatus(
-      keychainOf(),
-      nativeHelper,
-      context?.owner.ownerNostr,
-    ).catch((): NativePresenceStatus => ({ available: false, registered: false }));
+    // HOTFIX-NOID: with no ID on this computer no card names the owner, so the stored Touch ID is
+    // the owner's own (the one owner item here; a gesture still has to open it to that owner).
+    const ownerNostr =
+      context?.owner.ownerNostr ?? (await noCardOwnerNostr().catch(() => undefined));
+    const status = await nativePresenceStatus(keychainOf(), nativeHelper, ownerNostr).catch(
+      (): NativePresenceStatus => ({ available: false, registered: false }),
+    );
     sendJson(res, 200, {
       native: {
         available: status.available,
@@ -5351,9 +5407,16 @@ export async function startApprovalServerWith(
     const input = operationInput(req);
     const mode = header(req, 'x-agentlink-presence');
     const passkey = mode === 'passkey';
-    if (input === 'invalid' || (mode !== undefined && !passkey)) {
+    // HOTFIX-NOID: the desktop app's own Touch ID (native presence, DESK051-C6), finish only.
+    const native = mode === 'native' && step === 'finish';
+    if (input === 'invalid' || (mode !== undefined && !passkey && !native)) {
       req.resume();
       finishCreate(res, 400, 'invalid');
+      return;
+    }
+    if (native && nativeHelper === undefined) {
+      req.resume();
+      finishCreate(res, 403, 'presence_required', NO_NATIVE);
       return;
     }
     const body = await boundedBody(
@@ -5363,6 +5426,12 @@ export async function startApprovalServerWith(
     );
     if (body === undefined) return;
     try {
+      // The native kind carries no bytes and answers this request's ceremony, spent here (before
+      // the helper runs): a replayed native request never starts a second OS prompt.
+      if (native && (body.length !== 0 || !takeNativeCeremony(req))) {
+        finishCreate(res, 403, 'presence_required');
+        return;
+      }
       sweepCreate(false);
       const sessionAt = matchIndex(cookie, sessions);
       if (sessionAt < 0) {
@@ -5379,7 +5448,15 @@ export async function startApprovalServerWith(
         return;
       }
       if (step === 'begin') await createBegin(res, input, body, session, passkey);
-      else await createFinish(req, res, input, body, session, passkey);
+      else
+        await createFinish(
+          req,
+          res,
+          input,
+          body,
+          session,
+          native ? 'native' : passkey ? 'passkey' : 'code',
+        );
     } finally {
       wipe(body);
     }
@@ -5436,10 +5513,15 @@ export async function startApprovalServerWith(
     let kept = false;
     try {
       const context = await source.context();
-      if (context === undefined) {
-        finishCreate(res, 503, 'needs_setup');
+      // HOTFIX-NOID (04 §2.8 "No ID on this computer yet"): with no ID open, only an owner with no ID
+      // folder at all gets a plan, for the owner its presence unlocks at finish.
+      const firstId = context === undefined && noAgentOpen() && (await firstIdForOwner());
+      if (context === undefined && !firstId) {
+        if (noAgentOpen()) noAgent(res);
+        else finishCreate(res, 503, 'needs_setup');
         return;
       }
+      const owner = context?.owner;
       // The folder name is reserved for as long as the plan is held (one plan at a time).
       const folder = await directory.nameFor(label, []);
       if (!HOST_AGENT_NAME.test(folder) || (await directory.read(folder)) !== undefined) {
@@ -5450,7 +5532,8 @@ export async function startApprovalServerWith(
       let planned: PlannedApp | undefined;
       let shown: PlanStatementApp | undefined;
       if (typeof app === 'string') {
-        const desk = agentUi?.aiApps;
+        // HOTFIX-NOID: with no ID open, the host's own desk (first run's, plan only, never a route).
+        const desk = agentUi?.aiApps ?? (firstId ? options.host?.firstRun?.aiApps : undefined);
         const found =
           desk === undefined
             ? ('app_unavailable' as const)
@@ -5462,30 +5545,43 @@ export async function startApprovalServerWith(
         ({ planned, shown } = found);
       }
       // The Send folder for its first policy, checked (or created) now; removed again unless used.
-      send = await prepareSendFolder(boundHome).catch((): SendFolderPlan => ({
+      send = await prepareSendFolder(
+        boundHome ?? (firstId ? options.host?.firstRun?.home : undefined),
+      ).catch((): SendFolderPlan => ({
         status: 'unavailable',
         reason: 'folder_unavailable',
       }));
-      const plan = buildCreateConnectPlan({
+      const fixed = {
         agentId: seed.agentId,
         // IR-W4-ONE-TOUCH L-1: the card keys held since begin.
         agentKeys: { agentNostr: seed.agentNostr, agentEnc: seed.agentEnc },
-        owner: context.owner,
         label,
         folder,
         ...(send.status === 'ready' ? { sendFolder: send.folder } : {}),
         ...(planned === undefined ? {} : { app: { app: planned.app, changeId: planned.changeId } }),
-        nowSeconds: Math.floor(now() / 1000),
-      });
+      };
+      const planFor = (forOwner: OwnerPublicKeys): CreateConnectPlan =>
+        buildCreateConnectPlan({
+          ...fixed,
+          owner: forOwner,
+          nowSeconds: Math.floor(now() / 1000),
+        });
+      const plan = owner === undefined ? undefined : planFor(owner);
       const statement: PlanStatement = {
         label,
         agentFingerprint: agentFingerprintOf(seed.agentId),
-        ownerFingerprint: ownerFingerprintText(context.owner),
+        // HOTFIX-NOID: no owner fingerprint before the owner is unlocked (the ALKO blob holds no
+        // public keys, 04 §2.8 M1-9x).
+        ...(owner === undefined ? {} : { ownerFingerprint: ownerFingerprintText(owner) }),
         folder,
         ...(shown === undefined ? {} : { app: shown }),
       };
       const nonce = randomBytes(CREATE_CONNECT_NONCE_BYTES);
-      const challenge = createConnectChallenge(nonce, statement, plan);
+      // HOTFIX-NOID: without the owner no plan-bound passkey challenge exists, so no passkey is
+      // offered (allowCredentials is empty); the master code's binding is the held plan, server-side,
+      // and the native gesture's is its ceremony and this held plan (04 §2.8).
+      const challenge =
+        plan === undefined ? randomBytes(32) : createConnectChallenge(nonce, statement, plan);
       const held: PendingCreate = {
         session: session.slice(),
         nonce,
@@ -5493,7 +5589,7 @@ export async function startApprovalServerWith(
         expiresAt: now() + CREATE_CONNECT_HOLD_MS,
         timer: setTimeout(() => dropCreate(held), CREATE_CONNECT_HOLD_MS),
         seed,
-        plan,
+        ...(plan === undefined ? { planFor } : { plan }),
         statement,
         ...(planned === undefined ? {} : { app: planned }),
         send,
@@ -5505,7 +5601,7 @@ export async function startApprovalServerWith(
       // Rule 5 of 04 §2.5.3: the passkey is offered only when its credential key is kept.
       let credentialId: string | undefined;
       try {
-        const stored = await readOwnerPasskeyHeader(keychainOf());
+        const stored = plan === undefined ? null : await readOwnerPasskeyHeader(keychainOf());
         if (
           stored !== null &&
           (await readOwnerPasskeyKey(keychainOf(), stored.credentialId)) !== null
@@ -5545,7 +5641,7 @@ export async function startApprovalServerWith(
     input: JsonValue | undefined,
     body: Uint8Array,
     session: Uint8Array,
-    passkey: boolean,
+    mode: 'code' | 'passkey' | 'native',
   ): Promise<void> {
     // 04 §2.8: finish takes only the begin nonce and the presence proof.
     if (!onlyKeys(input, ['nonce']) || typeof input['nonce'] !== 'string') {
@@ -5553,7 +5649,8 @@ export async function startApprovalServerWith(
       return;
     }
     const nonceText = input['nonce'];
-    if (body.length === 0) {
+    // The native kind carries no bytes (its ceremony was taken by the gate); every other needs some.
+    if (mode !== 'native' && body.length === 0) {
       finishCreate(res, 403, 'presence_required');
       return;
     }
@@ -5577,6 +5674,7 @@ export async function startApprovalServerWith(
     }
     busy = true;
     let assertion: PayConfirmAssertion | undefined;
+    let nativeHeld: OwnerPresence | undefined;
     let taken = false;
     let sendUsed = false;
     /** A rejected proof: counted (backoff and the plan's tries); the third ends the plan. */
@@ -5590,12 +5688,27 @@ export async function startApprovalServerWith(
     };
     try {
       const context = await source.context();
-      if (context === undefined) {
-        finishCreate(res, 503, 'needs_setup');
+      // HOTFIX-NOID: a plan begun with no card naming the owner (no ID on this computer) is finished
+      // only while that is still so; a plan begun for a card needs that card.
+      if (
+        held.plan === undefined
+          ? context !== undefined || !(await firstIdForOwner())
+          : context === undefined
+      ) {
+        if (held.plan === undefined) finishCreate(res, 409, 'agent_changed');
+        else finishCreate(res, 503, 'needs_setup');
         return;
       }
+      const expectedNostr =
+        context?.owner.ownerNostr ??
+        (mode === 'native' ? await noCardOwnerNostr().catch(() => undefined) : undefined);
       let presence: OwnerPresence;
-      if (passkey) {
+      if (mode === 'passkey') {
+        // HOTFIX-NOID: no plan-bound passkey challenge exists without the owner (begin offered none).
+        if (context === undefined) {
+          finishCreate(res, 409, 'passkey_update_needed');
+          return;
+        }
         assertion = parsePayConfirmAssertion(body);
         if (assertion === undefined) {
           rejected('presence_required');
@@ -5629,44 +5742,114 @@ export async function startApprovalServerWith(
           return;
         }
         presence = { kind: 'passkey-prf', prfOutput: assertion.prfOutput };
+      } else if (mode === 'native') {
+        // HOTFIX-NOID (DESK051-C6): one helper gesture for this one owner operation, after every
+        // check above; for the owner the open card names, or (no ID here) the stored Touch ID names.
+        if (expectedNostr === undefined) {
+          finishCreate(res, 403, 'presence_rejected', { native: 'not_registered' });
+          return;
+        }
+        const got = await nativeFor(expectedNostr, 'approve', req, res);
+        if (!('presence' in got)) {
+          finishCreate(res, got.http, 'presence_rejected', { native: got.state });
+          return;
+        }
+        presence = got.presence;
+        nativeHeld = presence;
+        // The page may have gone, or the plan expired, while the OS prompt was up.
+        if (pendingCreate !== held || now() >= held.expiresAt) {
+          finishCreate(res, 409, 'expired');
+          return;
+        }
       } else {
         presence = { kind: 'passphrase', secret: body };
       }
-      let store: PromptingOwnerKeyStore;
+      let store: { lock(): Promise<void>; close(): Promise<void> };
+      let ownerSession: OwnerSession;
+      let owner: OwnerPublicKeys;
       try {
-        store = await openOwnerStore(context.owner);
-      } catch {
-        finishCreate(res, 503, 'needs_setup');
+        // unlock wipes the presented bytes, whether or not they unlock.
+        nativeHeld = undefined;
+        if (context !== undefined) {
+          let opened: PromptingOwnerKeyStore;
+          try {
+            opened = await openOwnerStore(context.owner);
+          } catch {
+            wipeNative(presence);
+            finishCreate(res, 503, 'needs_setup');
+            return;
+          }
+          store = opened;
+          try {
+            ownerSession = await opened.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
+          } catch (error) {
+            await opened.close().catch(() => undefined);
+            throw error;
+          }
+          owner = context.owner;
+        } else {
+          // HOTFIX-NOID (04 §2.8 M1-9x): no card names the owner: the master code opens the owner
+          // item and the owner keys come from its seed; Touch ID opens it to the owner it names.
+          // The terminal's "Is this your owner fingerprint?" can't be asked inside one owner
+          // operation here (no unlock session, D-68), so the check is the computer's own: a stored
+          // Touch ID or passkey names an owner key, and the unwrapped owner must be that one.
+          const unlocked =
+            expectedNostr === undefined
+              ? await KeychainOwnerKeyStore.unlockWithoutCard(
+                  keychainOf(),
+                  presence,
+                  (found) => sameStoredOwner(found),
+                  { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
+                )
+              : await KeychainOwnerKeyStore.unlockForOwnerNostr(
+                  keychainOf(),
+                  expectedNostr,
+                  presence,
+                  { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
+                );
+          if (unlocked === null) {
+            finishCreate(res, 409, 'refused');
+            return;
+          }
+          // IR-HOTFIX-NOID-1 L2: the Touch ID path gets the same check (a passkey header naming
+          // another owner refuses), before anything is signed.
+          if (expectedNostr !== undefined && !(await sameStoredOwner(unlocked.owner))) {
+            await unlocked.session.close().catch(() => undefined);
+            await unlocked.store.close().catch(() => undefined);
+            finishCreate(res, 409, 'refused');
+            return;
+          }
+          ({ store, session: ownerSession, owner } = unlocked);
+        }
+      } catch (error) {
+        if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
+          if (mode === 'native') finishCreate(res, 403, 'presence_rejected', { native: 'damaged' });
+          else rejected('presence_rejected');
+        } else if (error instanceof NodeKeyStoreError && error.code === 'owner_missing') {
+          finishCreate(res, 503, 'needs_setup');
+        } else finishCreate(res, 500, 'failed');
         return;
       }
       let created: AppHostAgent | undefined;
       let outcome: Awaited<ReturnType<typeof signNewAgent>> = { status: 'failed' };
       let refusal: { readonly status: number; readonly outcome: string } | undefined;
+      const plan = held.plan ?? (held.planFor as (o: OwnerPublicKeys) => CreateConnectPlan)(owner);
       try {
-        let ownerSession: OwnerSession;
-        try {
-          // unlock wipes the presented bytes, whether or not they unlock.
-          ownerSession = await store.unlock(presence, { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS });
-        } catch (error) {
-          if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
-            rejected('presence_rejected');
-          } else finishCreate(res, 500, 'failed');
-          return;
-        }
         presenceSucceeded();
         // Single use from here: the plan is taken before the owner key signs anything.
         pendingCreate = undefined;
         clearTimeout(held.timer);
         taken = true;
         try {
-          const plan = held.plan;
           const now2 = await source.context();
           if (!stillCurrent(req)) refusal = { status: 409, outcome: 'agent_changed' };
           else if (
-            now2 === undefined ||
-            !equalBytes(now2.owner.ownerNostr, plan.owner.ownerNostr) ||
-            !equalBytes(now2.owner.ownerEvm, plan.owner.ownerEvm) ||
-            !equalBytes(now2.owner.ownerEnc, plan.owner.ownerEnc)
+            held.plan === undefined
+              ? now2 !== undefined
+              : now2 === undefined ||
+                !equalBytes(now2.owner.ownerNostr, plan.owner.ownerNostr) ||
+                !equalBytes(now2.owner.ownerEvm, plan.owner.ownerEvm) ||
+                !equalBytes(now2.owner.ownerEnc, plan.owner.ownerEnc)
           ) {
             refusal = { status: 409, outcome: 'refused' };
           } else if ((await host?.directory.read(plan.folder)) !== undefined) {
@@ -5677,7 +5860,7 @@ export async function startApprovalServerWith(
           }
           if (refusal === undefined) {
             // (2) The keys held since begin and the reserved folder, then the first parts.
-            created = await createHeldAgent(held);
+            created = await createHeldAgent(held, plan);
             const first =
               created?.firstCard === undefined ? undefined : plannedFirst(created.firstCard, plan);
             if (created === undefined || first === undefined) {
@@ -5705,7 +5888,6 @@ export async function startApprovalServerWith(
         return;
       }
       sendUsed = keepsFolder(outcome.sendFolder);
-      const plan = held.plan;
       let connected: 'connected' | 'not_connected' | undefined;
       try {
         // Display only (07 §9.1): the verified label is in the new agent's store.
@@ -5720,6 +5902,11 @@ export async function startApprovalServerWith(
       } finally {
         await created.close().catch(() => undefined);
       }
+      if (held.plan === undefined) {
+        // HOTFIX-NOID: the first ID here becomes the host's open ID, as first run's does (U3-g-b).
+        await host?.adoptFirst(created.name, requestHolds.get(req)).catch(() => false);
+        await labelReady;
+      }
       emit({ kind: 'owner_operation', outcome: 'done' });
       finishCreate(res, 200, connected === 'not_connected' ? 'created_not_connected' : 'done', {
         name: created.name,
@@ -5731,6 +5918,7 @@ export async function startApprovalServerWith(
       else finishCreate(res, 500, 'failed');
     } finally {
       busy = false;
+      wipeNative(nativeHeld);
       if (taken) {
         wipe(held.nonce, held.challenge, held.session);
         held.seed.wipe();
@@ -5752,20 +5940,23 @@ export async function startApprovalServerWith(
    * (exclusively, the directory's rules) and opens it for its first parts. Undefined, with nothing
    * left behind, when it cannot be created or opened, or is not the planned agent.
    */
-  const createHeldAgent = async (held: PendingCreate): Promise<AppHostAgent | undefined> => {
+  const createHeldAgent = async (
+    held: PendingCreate,
+    plan: CreateConnectPlan,
+  ): Promise<AppHostAgent | undefined> => {
     const slot = host;
     const directory = slot?.directory;
     if (slot === undefined || directory?.create === undefined) return undefined;
     let name: string;
     try {
-      name = await directory.create(held.plan.label, {
-        name: held.plan.folder,
+      name = await directory.create(plan.label, {
+        name: plan.folder,
         createKeys: () => held.seed.store(keychainOf()),
       });
     } catch {
       return undefined;
     }
-    if (name !== held.plan.folder) {
+    if (name !== plan.folder) {
       await directory.discardNew?.(name).catch(() => undefined);
       return undefined;
     }
@@ -5774,7 +5965,7 @@ export async function startApprovalServerWith(
       opened === undefined ||
       opened.name !== name ||
       opened.firstCard === undefined ||
-      opened.firstCard.agent !== held.plan.agentId
+      opened.firstCard.agent !== plan.agentId
     ) {
       await opened?.close().catch(() => undefined);
       await directory.discardNew?.(name).catch(() => undefined);
@@ -6460,8 +6651,11 @@ export async function startApprovalServerWith(
       // routes the central gate takes a passkey on (an owner-code step only where its one kind of
       // proof is the passkey) and Remove (which runs the central gate); never acted on.
       // DESK051-C6: the same for a native gesture, where the step takes native presence.
+      // HOTFIX-NOID: New ID's finish takes the desktop app's native gesture (its own ceremony); its
+      // passkey keeps the plan-bound challenge begin answered (04 §2.8), never a ceremony.
       const takesProof =
         route.presence === 'remove' ||
+        (route.presence === 'create-agent' && route.step === 'finish' && asked === 'native') ||
         (route.presence === true &&
           (route.ownerCode === undefined || ownerCodeProofAllowed(route.ownerCode, asked)));
       if (takesProof) await presenceChallenge(req, res);

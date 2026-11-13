@@ -3,6 +3,10 @@
 import { sensorWord } from '../../presence-word.js';
 export const APPS_STRINGS = {
   title: 'AI apps',
+  // HOTFIX-NOID (11 §5; copy proposed, owner confirms at merge): New ID refused while an ID on this
+  // computer can't be opened or is still being removed. In-app steps only, never a terminal.
+  noAgentCreate:
+    "An ID on this computer can't be opened right now, so a new one can't be made yet. Nothing changed. Open IDs to finish removing it, or quit AgentLink and open it again, then try again.",
   forAgent: (label: string): string => `for ${label}`,
   notConnected: 'Not connected',
   connectedTo: (label: string): string => `Connected to ${label}`,

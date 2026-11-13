@@ -9,6 +9,10 @@
 //   same nonce (the third wrong one ends it).
 // The PRF output and the code are wiped once sent; nothing here is logged or kept.
 
+import { nativeCeremony } from '../../api/presence-ceremony.js';
+import { nativeStateOf } from '../../presence/native-api.js';
+import type { NativeState } from '../../presence/strings.js';
+
 export const CREATE_BEGIN_PATH = '/api/ui/agents/begin';
 export const CREATE_FINISH_PATH = '/api/ui/agents';
 
@@ -23,7 +27,8 @@ const FINGERPRINT = /^[0-9A-F]{4}(·[0-9A-F]{4}){1,7}$/;
 export interface CreateStatement {
   readonly label: string;
   readonly agentFingerprint: string;
-  readonly ownerFingerprint: string;
+  /** Absent when no card names the owner yet (HOTFIX-NOID: the first ID on this computer). */
+  readonly ownerFingerprint?: string;
   readonly folder: string;
   readonly app?: {
     readonly id: string;
@@ -79,16 +84,24 @@ export type CreateFinish =
         | 'passkey_update_needed'
         | 'agent_changed'
         | 'not_applied'
+        | 'no_agent'
         | 'dismissed'
         | 'session'
         | 'offline'
         | 'failed';
-    };
+    }
+  /** HOTFIX-NOID: the desktop app's own Touch ID answered with a fixed state (native-api.ts). */
+  | { readonly kind: 'native'; readonly state: NativeState };
 
 export interface CreateAgentApi {
   begin(label: string, app?: string): Promise<CreateBegin>;
   finishPasskey(nonce: string, publicKey: CreatePublicKey): Promise<CreateFinish>;
   finishCode(nonce: string, code: string): Promise<CreateFinish>;
+  /**
+   * HOTFIX-NOID: the desktop app's own Touch ID (native presence, DESK051-C6): a ceremony for this
+   * finish, then the finish with no body; the server runs the OS prompt itself.
+   */
+  finishNative?(nonce: string): Promise<CreateFinish>;
 }
 
 export interface CreateAgentApiOptions {
@@ -156,8 +169,8 @@ export function parseStatement(value: unknown): CreateStatement | undefined {
     [...label].length > 32 ||
     typeof agentFingerprint !== 'string' ||
     !FINGERPRINT.test(agentFingerprint) ||
-    typeof ownerFingerprint !== 'string' ||
-    !FINGERPRINT.test(ownerFingerprint) ||
+    (ownerFingerprint !== undefined &&
+      (typeof ownerFingerprint !== 'string' || !FINGERPRINT.test(ownerFingerprint))) ||
     typeof folder !== 'string' ||
     !FOLDER.test(folder)
   ) {
@@ -190,7 +203,13 @@ export function parseStatement(value: unknown): CreateStatement | undefined {
       ...(oldGone === undefined ? {} : { oldGone }),
     };
   }
-  return { label, agentFingerprint, ownerFingerprint, folder, ...(shown ? { app: shown } : {}) };
+  return {
+    label,
+    agentFingerprint,
+    ...(typeof ownerFingerprint === 'string' ? { ownerFingerprint } : {}),
+    folder,
+    ...(shown ? { app: shown } : {}),
+  };
 }
 
 function publicKeyOf(value: unknown): CreatePublicKey | undefined {
@@ -223,6 +242,7 @@ const FINISH_WORDS: ReadonlySet<string> = new Set([
   'passkey_update_needed',
   'agent_changed',
   'not_applied',
+  'no_agent',
 ]);
 
 export function createAgentApi(options: CreateAgentApiOptions = {}): CreateAgentApi {
@@ -291,6 +311,8 @@ export function createAgentApi(options: CreateAgentApiOptions = {}): CreateAgent
     }
     if (status === 401) return { kind: 'session' };
     if (status === 429 || word === 'wait') return { kind: 'wait' };
+    const native = nativeStateOf(json);
+    if (native !== undefined) return { kind: 'native', state: native };
     if (word === 'presence_rejected') return { kind: 'rejected' };
     if (word === 'presence_required') return { kind: 'required' };
     if (typeof word === 'string' && FINISH_WORDS.has(word)) {
@@ -362,6 +384,38 @@ export function createAgentApi(options: CreateAgentApiOptions = {}): CreateAgent
       ]);
       prf.fill(0);
       return finished(await post(CREATE_FINISH_PATH, { nonce }, body, true));
+    },
+
+    async finishNative(nonce) {
+      const headers = new Headers({
+        'X-AgentLink-CSRF': token(),
+        'Content-Type': 'application/octet-stream',
+        'X-AgentLink-Input': toB64(new TextEncoder().encode(JSON.stringify({ nonce }))),
+      });
+      let res: Response;
+      try {
+        const ready = await nativeCeremony(doFetch, CREATE_FINISH_PATH, headers);
+        res =
+          'res' in ready
+            ? ready.res
+            : await doFetch(CREATE_FINISH_PATH, {
+                method: 'POST',
+                headers,
+                body: ready.body,
+                credentials: 'same-origin',
+                cache: 'no-store',
+              });
+      } catch {
+        return { kind: 'offline' };
+      }
+      let json: Record<string, unknown> = {};
+      try {
+        const parsed: unknown = await res.json();
+        if (isObject(parsed)) json = parsed;
+      } catch {
+        json = {};
+      }
+      return finished({ status: res.status, json });
     },
 
     async finishCode(nonce, code) {

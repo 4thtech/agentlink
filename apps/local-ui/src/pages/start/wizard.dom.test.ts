@@ -684,7 +684,9 @@ describe('W4-WIZARD: the same steps for an owner who has one already', () => {
     await click(PICK_STEP.next('Cursor'));
     await click(CONNECT_STEP.connect('Touch ID'));
     expect(text()).not.toContain("Setup didn't finish");
-    expect(text()).toContain('agentlink owner add-agent');
+    // HOTFIX-NOID: the reason names in-app steps only, never a terminal command.
+    expect(text()).toContain("An ID on this computer can't be opened right now");
+    expect(text()).not.toMatch(/terminal|agentlink init|owner add-agent/i);
   });
 });
 

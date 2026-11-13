@@ -458,3 +458,84 @@ describe('W8-S5: shown = approved', () => {
     expect(parseStatement({ ...base, app: { ...app, oldLabel: 'x'.repeat(300) } })).toBeUndefined();
   });
 });
+
+// HOTFIX-NOID: in the desktop app the gate confirms with the app's own Touch ID (native presence,
+// the server runs the gesture) when it is on, never the browser passkey; it never names a browser
+// or Safari; and no refusal sends the owner to a terminal.
+describe('HOTFIX-NOID: the New ID gate in the desktop app', () => {
+  const MAC_APP =
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Electron/39.0 AgentLinkDesktop/1';
+  const BROWSER: PasskeyStatus = { kind: 'unavailable', reason: 'browser' };
+
+  async function mountDesktop(
+    native: { available: boolean; registered: boolean; reason?: 'other_owner' },
+    begin?: CreateAgentApi['begin'],
+  ) {
+    const api = fakeApi(() => false) as ReturnType<typeof fakeApi> & {
+      withNative: string[];
+      finishNative: (nonce: string) => Promise<CreateFinish>;
+    };
+    api.withNative = [];
+    api.finishNative = (nonce: string) => {
+      api.withNative.push(nonce);
+      return Promise.resolve(DONE);
+    };
+    if (begin !== undefined) api.begin = begin;
+    const onDone = vi.fn();
+    await act(async () => {
+      root.render(
+        createElement(CreateAgentGate, {
+          label: 'Side',
+          summary: '',
+          app: null,
+          goLabel: 'Connect with Touch ID',
+          platform: 'mac',
+          api,
+          appsApi: noApps,
+          onDone,
+          userAgent: MAC_APP,
+          nativeStatus: () => Promise.resolve(native),
+          passkeyStatus: () => Promise.resolve(BROWSER),
+        }),
+      );
+    });
+    await flush();
+    return { api, onDone };
+  }
+
+  it("native Touch ID on: the one button uses the app's Touch ID, not the passkey", async () => {
+    const { api, onDone } = await mountDesktop({ available: true, registered: true });
+    expect(host.textContent).not.toContain('This browser');
+    expect(host.textContent).not.toContain('Safari');
+    await click('Connect with Touch ID');
+    expect(api.withNative).toEqual(['N'.repeat(43)]);
+    expect(api.withPasskey).toEqual([]);
+    expect(onDone).toHaveBeenCalledWith(expect.objectContaining({ label: 'Side' }));
+  });
+
+  it('native Touch ID off: the master code, with no browser or Safari words and no browser switch', async () => {
+    await mountDesktop({ available: true, registered: false });
+    expect(labels()).toContain(NAME.confirmCode);
+    expect(labels()).not.toContain(UPGRADE.bannerAction('mac'));
+    expect(host.textContent).not.toContain('This browser');
+    expect(host.textContent).not.toContain('Safari');
+  });
+
+  it('a no_agent refusal never says to use a terminal', async () => {
+    await mountDesktop({ available: true, registered: true }, () =>
+      Promise.resolve({ kind: 'refused', status: 'no_agent' } as const),
+    );
+    await click('Connect with Touch ID');
+    const said = host.textContent ?? '';
+    expect(said).toContain('Nothing changed.');
+    expect(said).not.toMatch(/terminal|agentlink init|owner add-agent/i);
+  });
+});
+
+describe('HOTFIX-NOID: parseStatement with no owner known yet', () => {
+  it('accepts a statement without an owner fingerprint (the first ID, owner not unlocked yet)', () => {
+    expect(
+      parseStatement({ label: 'Side', agentFingerprint: '1111·2222', folder: 'side' }),
+    ).toEqual({ label: 'Side', agentFingerprint: '1111·2222', folder: 'side' });
+  });
+});

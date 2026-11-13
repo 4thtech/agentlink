@@ -558,3 +558,35 @@ describe('Make a new master code (R2-CLASS-03)', () => {
     expect(proof).not.toHaveBeenCalled();
   });
 });
+
+// HOTFIX-NOID (owner report, Mac app 0.5.1 with an owner and zero IDs): the desktop app's page is
+// not a browser. Its card never says "This browser can't use Touch ID … open AgentLink in Safari",
+// whether the native status is still on its way, says another owner's, or is not available.
+describe('HOTFIX-NOID: the desktop app never shows browser wording on the Touch ID card', () => {
+  const MAC_APP =
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Electron/39.0 AgentLinkDesktop/1';
+  for (const [name, native] of [
+    ['native off', { available: true, registered: false }],
+    ['native not available', { available: false, registered: false }],
+    ['native named another owner', { available: true, registered: false, reason: 'other_owner' }],
+  ] as const) {
+    it(`${name}: no browser or Safari words`, async () => {
+      await render(
+        NO_BROWSER,
+        {},
+        { userAgent: MAC_APP, nativeStatus: () => Promise.resolve(native) },
+      );
+      expect(text()).not.toContain('This browser');
+      expect(text()).not.toContain('Safari');
+    });
+  }
+  it('while the native status is on its way: no browser or Safari words', async () => {
+    await render(
+      NO_BROWSER,
+      {},
+      { userAgent: MAC_APP, nativeStatus: () => new Promise<never>(() => undefined) },
+    );
+    expect(text()).not.toContain('This browser');
+    expect(text()).not.toContain('Safari');
+  });
+});

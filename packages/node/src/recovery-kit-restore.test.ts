@@ -3,6 +3,7 @@
 // /api/ui/restore/* routes, against a temporary HOME, an in-memory keychain and kits sealed by the
 // real KeyExportControl. Each describe names the threat rows it proves.
 import {
+  copyFile,
   lstat,
   mkdir,
   readFile,
@@ -21,7 +22,7 @@ import {
   type JsonValue,
 } from '@4thtech-io/crypto';
 import { newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
-import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { keychainAccount } from './keychain.js';
 import { readKitRecord, writeKitRecord } from './kit-record.js';
 import {
@@ -116,17 +117,58 @@ async function foundHandle(session = 'S1', name?: string): Promise<string> {
   return (row as { handle: string }).handle;
 }
 
+/**
+ * PR #821 (CI load): a kit with a new owner costs several Argon2id runs (the owner item, the export
+ * unlock, the seal), so each one is made once per file in its own folder and copied into the test's
+ * Downloads; every test still gets its own copy of the file, its own home and its own engine. A
+ * kit for a given owner (`owner` passed) is still made in the test.
+ */
+let kitCacheRoot: Promise<Awaited<ReturnType<typeof tempRoot>>> | undefined;
+type MadeKit = {
+  readonly owner: TestOwner;
+  readonly agents: Awaited<ReturnType<typeof makeAgent>>[];
+  readonly path: string;
+  readonly code: string;
+  readonly kitId: string;
+};
+const kitCache = new Map<string, Promise<MadeKit>>();
+afterAll(async () => {
+  if (kitCacheRoot !== undefined) await (await kitCacheRoot).cleanup();
+});
+
 /** A clean computer's kit of one or two agents, saved in Downloads. */
 async function kitOnDisk(
   agents: { name: string; people?: number; lastAt?: number }[] = [{ name: 'helper' }],
   owner?: TestOwner,
   file = 'agentlink-recovery-kit-2026-11-12.alkk',
-) {
-  const o = owner ?? (await makeOwner());
-  const made = [];
-  for (const a of agents) made.push(await makeAgent(t.root, o, a.name, a));
-  const kit = await makeKit(t.root, o, made, file, join(t.home, 'Downloads'));
-  return { owner: o, agents: made, ...kit };
+): Promise<MadeKit> {
+  if (owner !== undefined) {
+    const made = [];
+    for (const a of agents) made.push(await makeAgent(t.root, owner, a.name, a));
+    const kit = await makeKit(t.root, owner, made, file, join(t.home, 'Downloads'));
+    return { owner, agents: made, ...kit };
+  }
+  const key = JSON.stringify([agents, file]);
+  let cached = kitCache.get(key);
+  if (cached === undefined) {
+    const slot = String(kitCache.size);
+    cached = (async () => {
+      kitCacheRoot ??= tempRoot('al-r1-kits-');
+      const root = (await kitCacheRoot).root;
+      const dir = join(root, slot);
+      await mkdir(dir, { recursive: true });
+      const o = await makeOwner();
+      const made = [];
+      for (const a of agents) made.push(await makeAgent(dir, o, a.name, a));
+      const kit = await makeKit(dir, o, made, file, join(dir, 'kit'));
+      return { owner: o, agents: made, ...kit };
+    })();
+    kitCache.set(key, cached);
+  }
+  const made = await cached;
+  const path = join(t.home, 'Downloads', file);
+  await copyFile(made.path, path);
+  return { ...made, path };
 }
 
 async function openKit(session: string, handle: string, text: string) {
@@ -446,14 +488,18 @@ describe.runIf(POSIX)('a computer without an owner (T-1, T-10, T-12)', () => {
 });
 
 describe.runIf(POSIX)('never overwrites (04 §2.3.3 table; T-8)', () => {
-  it('already here, name taken (rename map), removed earlier; the whole map is checked before a write', async () => {
-    const owner = await makeOwner();
-    const { code: c, agents } = await kitOnDisk(
-      [{ name: 'helper' }, { name: 'work' }, { name: 'old' }],
-      owner,
-    );
+  /**
+   * PR #821 (CI load): one kit of three IDs, made once (kitOnDisk's file cache) and shared by the two
+   * halves below, on a computer where `helper` is already here (same agentId), a different `work`
+   * folder exists and `old` was removed earlier.
+   */
+  async function renameMapKit() {
+    const { code: c, agents } = await kitOnDisk([
+      { name: 'helper' },
+      { name: 'work' },
+      { name: 'old' },
+    ]);
     const [a, b, gone] = agents as [(typeof agents)[0], (typeof agents)[0], (typeof agents)[0]];
-    // `helper` is already here (same agentId); a different `work` folder exists; `old` was removed.
     for (const [name, id] of [
       ['helper', a.agentId],
       ['work', '0x' + '1'.repeat(40)],
@@ -470,13 +516,17 @@ describe.runIf(POSIX)('never overwrites (04 §2.3.3 table; T-8)', () => {
     await writeFile(join(t.home, '.agentlink', 'revoked', `${gone.agentId}.json`), '{}');
     const handle = await foundHandle();
     const opened = await openKit('S1', handle, c);
+    return { a, b, gone, opened, kit: body(opened)['kit'] as string };
+  }
+
+  it('already here, name taken (rename map), removed earlier; the whole map is checked before a write', async () => {
+    const { a, b, gone, opened, kit } = await renameMapKit();
     const ids = (body(opened)['summary'] as { ids: Record<string, unknown>[] }).ids;
     const byId = (id: string) => ids.find((r) => r['agentId'] === id) as Record<string, unknown>;
     expect(byId(a.agentId)['state']).toBe('already_here');
     expect(byId(b.agentId)['state']).toBe('name_taken');
     expect(byId(b.agentId)['suggestedName']).toBe('work-2');
     expect(byId(gone.agentId)['state']).toBe('removed_earlier');
-    const kit = body(opened)['kit'] as string;
     for (const bad of [
       { selection: [a.agentId], names: {} },
       { selection: [gone.agentId], names: {} },
@@ -491,6 +541,10 @@ describe.runIf(POSIX)('never overwrites (04 §2.3.3 table; T-8)', () => {
       expect(body(refused)['error']).toBe('invalid');
     }
     expect([...keychain.items.keys()]).toEqual([]);
+  });
+
+  it('the name-taken ID restores under its new name; the one here and the removed one are untouched', async () => {
+    const { a, b, gone, kit } = await renameMapKit();
     const done = await gestureAndFinish('S1', kit, [b.agentId], { [b.agentId]: 'work-2' });
     expect(done['ids']).toEqual([
       { agentId: b.agentId, name: 'work-2', label: 'work-2', outcome: 'restored' },
