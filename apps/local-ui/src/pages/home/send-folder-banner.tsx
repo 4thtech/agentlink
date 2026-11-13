@@ -5,13 +5,15 @@
 // - Reads `GET /api/ui/files` (a read; signs nothing). Shown only when it answers an empty list.
 // - Its one button asks the local server to set up the Send folder (`POST /api/ui/files/send-folder`,
 //   a mark-kind route: an empty octet-stream body, no input, no presence, nothing signed, no rule
-//   changed), then opens Settings > Files with that folder filled in and checked (`check=1`). There
+//   changed), then opens Settings > Files with that folder filled in and checked (`check=1`, honoured
+//   only with the one-time SEND_FOLDER_CHECK_KEY this banner sets in sessionStorage). There
 //   the owner sees the real folder and every warning and confirms with Touch ID or the master code:
 //   the existing review and presence-gated confirm (D-99, D-119). The browser never signs.
 // - The folder path is local data shown as text only; nothing from another party is shown here.
 import { Banner, Button } from '@4thtech-io/ui';
 import { useEffect, useState, type ReactElement } from 'react';
 import { navigate } from '../../router.js';
+import { SEND_FOLDER_CHECK_KEY } from '../../strings.js';
 
 export const SEND_FOLDER_PATH = '/api/ui/files/send-folder';
 const LIST_PATH = '/api/ui/files';
@@ -134,6 +136,12 @@ export function SendFolderBanner({
     if (folder === undefined) {
       setPhase('failed');
       return;
+    }
+    // IR-1 L-2: Files checks at once only for the folder this banner set up (one time, this tab).
+    try {
+      sessionStorage.setItem(SEND_FOLDER_CHECK_KEY, folder);
+    } catch {
+      // Without it, Files only fills the field.
     }
     go(filesLinkFor(folder));
   };

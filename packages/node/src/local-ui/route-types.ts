@@ -484,7 +484,10 @@ export interface LocalUiRestoreRoute {
  * gate runs after the same session, CSRF, Origin, fetch-metadata, octet-stream and generation checks
  * as every write, refuses a query, an `X-AgentLink-Input` or presence header and any body byte, and
  * hands the handler only the context and the route parameters. No owner presence, nothing signed:
- * display state only (07 §3: nothing is decided from it).
+ * display state only (07 §3: nothing is decided from it). ATT-SENDFOLDER-FIX: the one exception is
+ * `/api/ui/files/send-folder`, which may also create an empty 0700 folder under ~/AgentLink (the Send
+ * folder or a fresh Send-N, never through a link) and answers its path; it changes no rules and
+ * signs nothing, so allowing that folder is still the presence-gated Files confirm (I-4).
  */
 export interface LocalUiMarkRoute {
   readonly method: 'POST';

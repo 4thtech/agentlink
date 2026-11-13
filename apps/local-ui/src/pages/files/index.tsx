@@ -19,7 +19,12 @@ import { UnderTheHood } from '../../lazy/hood.js';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { createApiClient } from '../../api/client.js';
 import { useFileMarks } from '../moving/use-file-marks.js';
-import { EARLIER_OWNER_CODE_HINT, PAGE_TITLES } from '../../strings.js';
+import {
+  EARLIER_OWNER_CODE_HINT,
+  HOLDS_FILES_LINE,
+  PAGE_TITLES,
+  SEND_FOLDER_CHECK_KEY,
+} from '../../strings.js';
 import { BackupCodeField } from '../first-run/backup-code.js';
 import {
   COMMIT_PATH,
@@ -198,6 +203,11 @@ function Confirm({
         <p className="al-text-body-sm al-muted">{S.elsewhere(review.typed)}</p>
       ) : null}
       <p className="al-text-body-sm">{add ? S.confirmAddBody : S.confirmRemoveBody}</p>
+      {add && review.holdsFiles ? (
+        <p className="al-text-body-sm" data-holds-files>
+          {HOLDS_FILES_LINE}
+        </p>
+      ) : null}
       {review.warnings.length > 0 ? (
         <fieldset className="fl-warnings">
           <legend className="al-text-body-sm">{S.warningsTitle}</legend>
@@ -269,10 +279,17 @@ const prefill = (): string => {
   }
 };
 
-/** ATT-SENDFOLDER-FIX: a `?folder=…&check=1` link checks the filled-in folder once. */
-const autoCheck = (): boolean => {
+/**
+ * ATT-SENDFOLDER-FIX: a `?folder=...&check=1` link checks the filled-in folder once, only when Home's
+ * banner set it (IR-1 L-2: the one-time SEND_FOLDER_CHECK_KEY names this folder; it is removed
+ * here). A pasted link only fills the field.
+ */
+const autoCheck = (folder: string): boolean => {
   try {
-    return new URLSearchParams(window.location.search).get('check') === '1';
+    if (new URLSearchParams(window.location.search).get('check') !== '1') return false;
+    const set = sessionStorage.getItem(SEND_FOLDER_CHECK_KEY);
+    sessionStorage.removeItem(SEND_FOLDER_CHECK_KEY);
+    return set !== null && set === folder;
   } catch {
     return false;
   }
@@ -282,7 +299,7 @@ const autoCheck = (): boolean => {
 function SendFolders({ api }: { readonly api: FilesApi }): ReactElement {
   const [list, setList] = useState<ListState>({ phase: 'loading' });
   const [initial] = useState(prefill);
-  const [checkOnce, setCheckOnce] = useState(() => initial.length > 0 && autoCheck());
+  const [checkOnce, setCheckOnce] = useState(() => initial.length > 0 && autoCheck(initial));
   const [step, setStep] = useState<Step>(
     initial.length > 0 ? { kind: 'enter', checking: false } : { kind: 'idle' },
   );

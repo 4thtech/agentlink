@@ -1437,6 +1437,11 @@ describe('M1-UX-FIRSTRUN-V2: one gesture sets up the owner, the card and the fir
     const res = await post(h, BEGIN, await h.session(), new Uint8Array(0));
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body)).not.toMatchObject({ status: 'folder_refused' });
+    // IR-ATT-SENDFOLDER-1 M-1: begin names the folder and that it holds files, before the gesture.
+    expect(JSON.parse(res.body).sendFolderReview).toEqual({
+      folder: await realpath(sendPath()),
+      holdsFiles: true,
+    });
     expect(await readdir(sendPath())).toEqual(['tax-return.pdf']);
     expect((await agent.client.ownerActions.loadPolicy()).mode).toBe('defaults');
   });

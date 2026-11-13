@@ -117,6 +117,9 @@ describe('ATT-SENDFOLDER-FIX: the Send folder banner', () => {
     expect(s.went).toEqual([
       `/settings/files?folder=${encodeURIComponent('/Users/t/AgentLink/Send-2')}&check=1`,
     ]);
+    // IR-1 L-2: the one-time token Files needs before it checks at once.
+    expect(sessionStorage.getItem('agentlink.sendFolderCheck')).toBe('/Users/t/AgentLink/Send-2');
+    sessionStorage.clear();
   });
 
   it('a folder that could not be set up opens Files with nothing filled in, and says so', async () => {

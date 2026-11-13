@@ -12,6 +12,8 @@
 //     `~/.agentlink`, keychains), and never a folder that contains one (D-99, compared in its lexical
 //     form and its realpath, ignoring case). `elsewhere` tells the page the typed path led somewhere
 //     else (a link, or another spelling), so it shows the real folder before the owner confirms.
+//   - ATT-SENDFOLDER-FIX (IR-1 M-1): an add also answers `holdsFiles`, whether the folder already
+//     holds anything, so the confirm step says those files can be sent too.
 //   - remove: the entry exactly as the rules write it.
 //   - Then core `preparePolicyEdit` builds the unsigned `policy.set`. The server keeps that body
 //     (per server, at most MAX_REVIEWS, until it expires) under its hash, base64url SHA-256 of its
@@ -36,7 +38,7 @@
 //   `unavailable`.
 //
 // The browser never signs and never sees the body: only the folder, the codes and the token.
-import { realpath, stat } from 'node:fs/promises';
+import { readdir, realpath, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import process from 'node:process';
 import {
@@ -342,12 +344,19 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
     }
     let folder: string;
     let elsewhere = false;
+    let holdsFiles = false;
     let next: string[];
     if (parsed.change === 'add') {
       const checked = await checkFolder(parsed.path, homeOf(), flavor);
       if (!checked.ok) return refused(checked.reason, checked.protectedFolder);
       folder = checked.folder;
       elsewhere = checked.elsewhere;
+      // ATT-SENDFOLDER-FIX (IR-1 M-1): the owner reads that what is already there can be sent too.
+      // A folder that can't be listed is told as holding files (more said, never less).
+      holdsFiles = await readdir(folder).then(
+        (entries) => entries.length > 0,
+        () => true,
+      );
       if (configured.includes(folder)) return refused('already_allowed');
       if (configured.length >= MAX_FOLDERS) return refused('too_many');
       next = [...configured, folder];
@@ -418,6 +427,7 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
       folder,
       typed: parsed.path,
       elsewhere,
+      ...(parsed.change === 'add' ? { holdsFiles } : {}),
       warnings: [...codes],
       expiresAt,
     });

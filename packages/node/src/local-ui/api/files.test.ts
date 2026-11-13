@@ -408,9 +408,26 @@ describe('GET /api/ui/files/review: the 04 §4 checks before anything is prepare
     expect(b['expiresAt']).toBe(1_600);
     expect(b['review']).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(Object.keys(b).sort()).toEqual(
-      ['change', 'elsewhere', 'expiresAt', 'folder', 'review', 'typed', 'warnings'].sort(),
+      [
+        'change',
+        'elsewhere',
+        'expiresAt',
+        'folder',
+        'holdsFiles',
+        'review',
+        'typed',
+        'warnings',
+      ].sort(),
     );
+    expect(b['holdsFiles']).toBe(false);
     expectNoLeak(res);
+  });
+
+  it('ATT-SENDFOLDER-FIX (IR-1 M-1): says when the folder already holds files', async () => {
+    const { review } = setup();
+    const res = await review(q('add', '~/Documents'));
+    expect(res.status).toBe(200);
+    expect(body(res)['holdsFiles']).toBe(true);
   });
 
   it('follows a link to the real folder and says the folder is elsewhere', async () => {

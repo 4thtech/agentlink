@@ -575,6 +575,18 @@ const HEAD_OPEN = /<head(?:\s[^>]*)?>/i;
 const MAX_REVEAL_BODY_BYTES = 256;
 /** WP-R2b: the kit-reveal route takes no body; anything up to this is read and refused (400). */
 const MAX_KIT_REVEAL_BODY_BYTES = 256;
+
+/**
+ * ATT-SENDFOLDER-FIX (IR-ATT-SENDFOLDER-1 M-1): the Send folder a begin answer names for the page
+ * to show before the gesture: its real path (local data, shown as text) and whether it already
+ * holds files (then the owner reads that those can be sent too). Nothing when no folder is ready.
+ */
+function sendFolderReview(send: SendFolderPlan | undefined): {
+  sendFolderReview?: { folder: string; holdsFiles: boolean };
+} {
+  if (send?.status !== 'ready') return {};
+  return { sendFolderReview: { folder: send.folder, holdsFiles: send.holdsFiles === true } };
+}
 /** MSG-FILES-IO-h: an item ID, `<envelope ID>.<index>` (core ui-messages.ts). */
 const REVEAL_ITEM_ID = /^[A-Za-z0-9_-]{1,64}\.[0-9]{2}$/;
 
@@ -5010,6 +5022,8 @@ export async function startApprovalServerWith(
       finishSetup(res, 200, 'ready', {
         expiresInMs: SETUP_HOLD_MS,
         fingerprint,
+        // ATT-SENDFOLDER-FIX (IR-1 M-1): the Send folder the gesture allows, shown before it.
+        ...sendFolderReview(folders?.send),
         nonce: encodeBase64url(nonce),
         ...(statement === undefined ? {} : { statement: statement as unknown as JsonValue }),
         publicKey: {
@@ -5617,6 +5631,8 @@ export async function startApprovalServerWith(
       finishCreate(res, 200, 'ready', {
         nonce: encodeBase64url(nonce),
         statement: statement as unknown as JsonValue,
+        // ATT-SENDFOLDER-FIX (IR-1 M-1): the Send folder the gesture allows, shown before it.
+        ...sendFolderReview(send),
         expiresInMs: CREATE_CONNECT_HOLD_MS,
         publicKey: {
           rpId: PASSKEY_RP_ID,
