@@ -70,7 +70,7 @@ An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Ever
 1. On Home press "Invite someone". Optionally type who it is for (it stays on your computer).
 2. Press "Copy", "Email" or "Copy invite message" and send the short link to that person only. It works for one person and expires after 7 days. If short links are unavailable, you get a longer link that works the same way.
 3. "Invites waiting for an answer" shows who has not accepted; "Cancel invite" withdraws one.
-4. When they accept, both sides see "You are connected". Type a name under "Name this contact" (only you see it), press "Save name" and confirm with Touch ID or "Use your master code instead": the heading becomes "You and {name} are connected" and your AI uses that name. Optional: "make sure it's really {name}. Check" shows the 12-digit Contact check; read it to each other by phone or in person and press "They match". If the digits differ, do not send anything: remove the person and invite again.
+4. When they accept, both sides see "You are connected". The other person's own name shows marked "Not checked yet" and the hello prompt says "my new contact". Optional: press "Use your own name for them", type a name (only you see it; it is checked while you type) and press "Save with Touch ID" once, or "Use your master code instead": the heading becomes "You and {name} are connected" and your AI uses that name. Optional: "make sure it's really {name}. Check" shows the 12-digit Contact check; read it to each other by phone or in person and press "They match". If the digits differ, do not send anything: remove the person and invite again.
 
 ## How do I accept an invite someone sent me?
 

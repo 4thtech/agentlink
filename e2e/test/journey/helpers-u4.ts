@@ -73,14 +73,15 @@ export async function seesConnectedUnnamed(page: Page, chosen: string, ms = 30_0
 }
 
 /**
- * The owner names the contact ("Name this contact", confirmed with the owner's presence); only then
- * "You and {alias} are connected" and the hello prompt carry that name.
+ * The owner names the contact (UX1113-N1: "Use your own name for them", then one "Save with Touch
+ * ID", the owner's presence); only then "You and {alias} are connected" and the hello prompt carry
+ * that name.
  */
 export async function namesContact(page: Page, alias: string, ms = 30_000): Promise<void> {
-  await page.getByLabel('Name this contact').fill(alias);
-  await page.getByRole('button', { name: 'Save name', exact: true }).click();
+  await page.getByRole('button', { name: 'Use your own name for them', exact: true }).click();
+  await page.getByLabel('Your name for them').fill(alias);
   await page
-    .getByRole('button', { name: /^Confirm with (Touch ID|Windows Hello|your passkey)$/ })
+    .getByRole('button', { name: /^Save with (Touch ID|Windows Hello|your passkey)$/ })
     .click();
   await seesConnected(page, alias, ms);
   await page.getByText(`Say hello to ${alias} on AgentLink.`).first().waitFor({ timeout: ms });

@@ -6,11 +6,19 @@
 // exists only once the pairing completed. "Numbers don't match?" says what to do next in plain
 // words; nothing is signed here.
 // Marking the code as checked stays on the person (People), behind Touch ID.
-import { Button, CopyPrompt } from '@4thtech-io/ui';
+//
+// UX1113-N1 (run1113b B §3): naming is optional. The contact's own name shows once, plainly, with
+// its identity chip ("Not checked yet": the Contact check, the only "check" here); the hello prompt
+// stays generic. "Use your own name for them" opens the field with one "Save with Touch ID" (one
+// gesture, the same signed `contact.rename`); the Contact check link comes last, then Done.
+import { Button, ContactName, CopyPrompt } from '@4thtech-io/ui';
 import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { contactPath, parseCode } from '../contacts/data.js';
-import type { OwnerClient } from '../contacts/owner.js';
+import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
+import type { Gesture } from '../contacts/presence-button.js';
+import type { Platform } from '../first-run/strings.js';
+import type { NativeStatus } from '../../presence/native-api.js';
 import { CheckMark } from './icons.js';
 import { NameContact } from './name-contact.js';
 import { INVITE_STRINGS as S, codeLabel, connectedWith, helloPrompt, letterOf } from './strings.js';
@@ -31,6 +39,12 @@ export interface ConnectedMomentProps {
   readonly onDone?: () => void;
   /** 1 on a screen of its own (the join screen), 2 inside a page that has its title. */
   readonly headingLevel?: 1 | 2;
+  /** Seams (tests): the passkey gesture, the platform, native status, user agent, check delay. */
+  readonly gesture?: Gesture;
+  readonly platform?: Platform;
+  readonly nativeStatus?: () => Promise<NativeStatus>;
+  readonly userAgent?: string;
+  readonly checkDelayMs?: number;
 }
 
 type Code =
@@ -45,10 +59,17 @@ export function ConnectedMoment({
   api: givenApi,
   onDone,
   selfDeclared = true,
-  owner,
+  owner: givenOwner,
   headingLevel = 1,
+  gesture,
+  platform,
+  nativeStatus,
+  userAgent,
+  checkDelayMs,
 }: ConnectedMomentProps): ReactElement {
   const [api] = useState<ApiClient>(() => givenApi ?? createApiClient());
+  const [owner] = useState<OwnerClient>(() => givenOwner ?? createOwnerClient());
+  const [naming, setNaming] = useState(false);
   const [code, setCode] = useState<Code>(
     contactRef === undefined ? { kind: 'none' } : { kind: 'loading' },
   );
@@ -94,8 +115,14 @@ export function ConnectedMoment({
     };
   }, [api, contactRef, checking]);
 
-  // While the name field shows, "Save name" is the one primary button; "Done" steps back.
-  const naming = selfDeclared && named === null && contactRef !== undefined;
+  // The owner may give their own name only while the shown name is the contact's own.
+  const canName = selfDeclared && named === null && contactRef !== undefined;
+  const ownNameRef = useRef<HTMLButtonElement>(null);
+  const closeNaming = (): void => {
+    setNaming(false);
+    // Focus goes back to the link that opened the field (after it is drawn again).
+    setTimeout(() => ownNameRef.current?.focus(), 0);
+  };
   const Heading = headingLevel === 1 ? 'h1' : 'h2';
   const groups = code.kind === 'ok' ? code.code.split(' ') : [];
   return (
@@ -123,18 +150,46 @@ export function ConnectedMoment({
           {shown === null ? S.connectedGeneric : connectedWith(shown)}
         </Heading>
       </div>
-      {naming ? (
-        <NameContact
-          contactRef={contactRef}
-          chosen={name}
-          api={api}
-          {...(owner === undefined ? {} : { owner })}
-          onNamed={setNamed}
-        />
+      {selfDeclared && named === null ? (
+        // The contact's own name, once, as theirs: the chip is about who they are (11 §5.2).
+        <p className="al-text-body">
+          <ContactName name={name} label="selfdeclared" showLabel />
+        </p>
       ) : null}
       <div className="inv-hello">
         <CopyPrompt title={S.sayHello(shown)} prompt={helloPrompt(shown)} />
       </div>
+      {canName && naming ? (
+        <NameContact
+          contactRef={contactRef}
+          chosen={name}
+          api={api}
+          owner={owner}
+          onNamed={(alias) => {
+            setNaming(false);
+            setNamed(alias);
+          }}
+          onCancel={closeNaming}
+          {...(gesture === undefined ? {} : { gesture })}
+          {...(platform === undefined ? {} : { platform })}
+          {...(nativeStatus === undefined ? {} : { nativeStatus })}
+          {...(userAgent === undefined ? {} : { userAgent })}
+          {...(checkDelayMs === undefined ? {} : { checkDelayMs })}
+        />
+      ) : canName ? (
+        <button
+          type="button"
+          className="inv-link-button inv-optional-check"
+          ref={ownNameRef}
+          onClick={() => setNaming(true)}
+        >
+          {S.useOwnName}
+        </button>
+      ) : selfDeclared && named !== null ? (
+        <p className="al-text-body-sm al-muted" role="status">
+          {S.saved}
+        </p>
+      ) : null}
       <button
         type="button"
         className="inv-link-button inv-optional-check"
@@ -178,7 +233,7 @@ export function ConnectedMoment({
       ) : null}
       <div className="inv-connected-actions">
         <Button
-          variant={naming ? 'secondary' : 'primary'}
+          variant={canName && naming ? 'secondary' : 'primary'}
           size="lg"
           className="al-press"
           onClick={onDone}

@@ -103,7 +103,7 @@ Details: [Accept an invite](get-started/join-from-an-invite.md).
 
 ## 5. Name your contact, and check if you like
 
-Both sides now see **You are connected**. Type a name under **Name this contact** (only you see it) and press **Save name**; confirm with Touch ID. Your AI then knows the person by that name.
+Both sides now see **You are connected**. To give the person your own name for them, press **Use your own name for them**, type it (only you see it) and press **Save with Touch ID**. Your AI then knows the person by that name.
 
 <figure><img src="../assets/screens/connected.webp" alt="You and Tali are connected, with the prompt Say hello to Tali on AgentLink, and the optional Contact check: 12 digits to read to each other."><figcaption><p>Connected, named, with the optional Contact check open.</p></figcaption></figure>
 

@@ -126,7 +126,7 @@ sequenceDiagram
 
 ## What you can do today
 
-- **Connect and talk.** Invite with a short link (copy, email or share); both sides see "connected". Name each contact yourself, and compare the optional Contact check.
+- **Connect and talk.** Invite with a short link (copy, email or share); both sides see "connected". Optionally give each contact your own name for them with one Touch ID, and compare the optional Contact check.
 - **Send files** from folders you allow, up to about 100 MB; received files land in `~/AgentLink/Inbox`.
 - **Stay in charge.** Approvals with Touch ID or Windows Hello, and "Use your master code instead" on every confirm. Pause an ID with one click; block a contact.
 - **Manage IDs.** **My IDs** shows a card per ID; rename one and your contacts see the new name; remove one. **People** shows who each ID talks to, across all your IDs, with removed connections in **Archived**; a fresh invite reconnects someone you removed.
