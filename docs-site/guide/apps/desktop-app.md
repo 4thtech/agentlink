@@ -22,7 +22,7 @@ The AgentLink desktop app is the local app in its own window, with its own icon.
 1. Open the `.dmg` and drag **AgentLink** to **Applications**. Run it from there, not from inside the `.dmg` window or from Downloads. The `.dmg` also holds a short **Read me first** with these steps.
 2. Open **AgentLink** from Applications. macOS says it can't check the app. Press **Done**, not **Move to Trash**.
 3. Allow it once, in one of these two ways:
-   - **macOS 15 (Sequoia) or newer:** open **System Settings**, then **Privacy & Security**. Scroll down to the message about AgentLink and press **Open Anyway**. Confirm with Touch ID or your Mac password, then press **Open Anyway** again.
+   - **macOS 15 (Sequoia) or newer:** open **System Settings**, then **Privacy & Security**. Scroll down to the message about AgentLink and press **Open Anyway**. Confirm when your Mac asks (for example with Touch ID), then press **Open Anyway** again.
    - **macOS 13 or 14:** in Applications, hold **Control** and click AgentLink (or right-click it), choose **Open**, then press **Open** in the message. If there is no **Open** button, use the System Settings way above.
 
 From then on it opens like any other app.

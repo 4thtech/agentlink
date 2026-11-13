@@ -445,6 +445,10 @@ describe('docs screens', () => {
         .first()
         .click()
         .catch(() => undefined);
+      // An ID that is set up in an AI app keeps Remove under More (agents/simple.tsx).
+      const more = card.getByRole('button', { name: 'More about this ID', exact: true });
+      if ((await more.count()) > 0 && (await more.getAttribute('aria-expanded')) !== 'true')
+        await more.click();
       await card.getByRole('button', { name: 'Remove', exact: true }).click();
       await a.getByRole('heading', { name: /^Remove .*Tali.*\?$/ }).waitFor();
       await shot(a, 'id-remove');
@@ -483,7 +487,10 @@ describe('docs screens', () => {
       await shot(a, 'recovery-kit');
       // WP-11: save the kit (Touch ID), then the recovery code shown once. The kit is written into
       // this computer's temp home, never a real Downloads folder.
-      await a.getByRole('button', { name: 'Save recovery kit' }).first().click();
+      await a
+        .getByRole('button', { name: /^Save a (recovery|new) kit$/ })
+        .first()
+        .click();
       const confirm = a.getByRole('button', { name: CONFIRM_PASSKEY });
       const code = a.getByRole('region', { name: 'Your recovery code' });
       await confirm.or(code).first().waitFor({ timeout: 30_000 });

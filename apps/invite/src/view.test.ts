@@ -13,7 +13,7 @@ import {
   macAppAsset,
 } from './config.js';
 import type { InviteView } from './invite-state.js';
-import { buildAskAi, buildCommands } from './prompt.js';
+import { buildAppLink, buildAskAi, buildCommands } from './prompt.js';
 import { strings } from './strings.js';
 import { COMMAND_FOR, isPhone, osFor, render, type Os } from './view.js';
 
@@ -111,7 +111,9 @@ describe('config (REL051-INV)', () => {
     const anchors = [...pageHtml.matchAll(/<a\b([^>]*)>/g)].map((m) => m[1] ?? '');
     const hrefs = anchors.flatMap((a) => [...(/\bhref="([^"]*)"/.exec(a)?.slice(1) ?? [])]);
     expect(hrefs).toEqual([DOCS_LINKS.guide, DOCS_LINKS.windows]);
-    for (const a of anchors) {
+    // WP-D9's two app links are empty placeholders (no address, no text) until its build flag is
+    // on; every other link opens in a new tab with no referrer.
+    for (const a of anchors.filter((x) => !/\bid="(open|get)-app"/.test(x))) {
       expect(a).toMatch(/\btarget="_blank"/);
       expect(a).toMatch(/\brel="noopener noreferrer"/);
     }
@@ -187,6 +189,7 @@ const ready = (): InviteView => ({
   inviteUrl: LINK,
   commands: buildCommands(LINK),
   sentence: buildAskAi(LINK),
+  appLink: buildAppLink(LINK),
   inviter: {
     name: 'Marko',
     fallback: false,
