@@ -148,6 +148,43 @@ describe('runShell startup', () => {
     );
   });
 
+  // WIN-DESK-1: Electron cannot resolve the data folder (on Windows: the Roaming folder of the
+  // profile is missing or broken). Never the misleading "another AgentLink is running" line.
+  it('no data folder → its own fixed line, exit 66, no lock, no window, no core', async () => {
+    const { electron, children, proc } = setup();
+    Object.assign(electron.app, {
+      getPath: () => {
+        throw new Error("Failed to get 'userData' path");
+      },
+    });
+    expect(await runShell(electron, proc)).toBe('profile');
+    expect(electron.app.exitCode).toBe(66);
+    expect(electron.app.order).not.toContain('lock');
+    expect(FakeBrowserWindow.created).toHaveLength(0);
+    expect(children).toHaveLength(0);
+    const logged = readFileSync(join(proc.logDir, CORE_LOG_FILE), 'utf8');
+    expect(logged).toContain('app quit at start: the AgentLink data folder is not available');
+    expect(logged).not.toContain('another AgentLink is running');
+    expect(logged).not.toContain('userData');
+  });
+
+  it('a data folder that resolves → the lock is taken as before', async () => {
+    const { electron, proc } = setup();
+    Object.assign(electron.app, { getPath: () => '/Users/x/Library/Application Support/AgentLink' });
+    expect(await runShell(electron, proc)).toBe('running');
+    expect(electron.app.order).toContain('lock');
+  });
+
+  it('notes "core ready" once per ready, never the link', async () => {
+    const { electron, children, proc } = setup();
+    await runShell(electron, proc);
+    children[0]?.stream.push(readyLine());
+    const text = readFileSync(join(proc.logDir, CORE_LOG_FILE), 'utf8');
+    expect(text.match(/core ready/g)).toHaveLength(1);
+    expect(text).not.toContain(SESSION_URL);
+    expect(text).not.toContain('localhost');
+  });
+
   it('refuses a translocated location before starting the core', async () => {
     const translocated =
       '/private/var/folders/ab/T/AppTranslocation/1/d/AgentLink.app/Contents/MacOS/AgentLink';
