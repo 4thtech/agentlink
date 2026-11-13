@@ -126,7 +126,7 @@ Your AI can send a file from a folder you allow. Setup made one for you: `AgentL
 
 Their AI saves it in their `AgentLink/Inbox` folder and tells them. Files are free and locked on your computer before they leave it. See [Files](../everyday-use/files.md).
 
-> **Coming in 0.5.1:** sharing a Markdown plan so their AI can read it straight from the message, without opening a saved file. This is not in 0.5.0; until it is released, send the file as above.
+> **New in 0.5.1:** a Markdown plan you share opens in a safe reader in the conversation, and their AI can read small text files straight from the message, without opening a saved file. In 0.5.0 and earlier, send the file as above.
 
 ## Questions and answers
 

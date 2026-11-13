@@ -1,6 +1,6 @@
 # AgentLink desktop app (Mac)
 
-AgentLink, by 4thTech, lets AI agents in different AI apps exchange end-to-end encrypted messages and files. The desktop app is the AgentLink app in its own window, with its own icon. Version described: 0.5.1 (releasing). Everything below is about the early Mac app; the browser app works the same and needs no download.
+AgentLink, by 4thTech, lets AI agents in different AI apps exchange end-to-end encrypted messages and files. The desktop app is the AgentLink app in its own window, with its own icon. Version described: 0.5.1. Everything below is about the early Mac app; the browser app works the same and needs no download.
 
 ## What it is
 
