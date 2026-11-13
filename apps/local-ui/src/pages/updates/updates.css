@@ -87,3 +87,7 @@
   color: var(--al-color-fg-default);
   user-select: all;
 }
+/* UPD-5: the note before Restart now when a request waits for the owner. */
+.upd-warn {
+  color: var(--al-color-status-warning-fg);
+}

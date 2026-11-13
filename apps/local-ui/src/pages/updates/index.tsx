@@ -9,11 +9,23 @@
 // - browser app from a global npm install: the one update command with Copy, then the start command.
 // The commands are fixed strings (strings.ts), never taken from an answer. Nothing is installed from
 // the page. Styled from the Settings pages (design-1112 §3.1): same surfaces, tokens and type as Storage.
-import { Button, Skeleton, Surface } from '@4thtech-io/ui';
+// UPD-5 (the Mac app with the in-app update on): "Update now" → Downloading (progress bar, %) →
+// "Checking the new version" → "Restart now" (a note first when a request waits for the owner) →
+// "Restarting"; "Couldn't update here" keeps the download link. Both buttons are POSTs with no body
+// (owner session + CSRF); the shell installs only the update it verified itself.
+import { Button, ProgressBar, Skeleton, Surface } from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { SettingsIcon } from '../settings/icons.js';
-import { APP_UPDATE_CHECK_PATH, APP_UPDATE_PATH, parseUpdate, type UpdateView } from './data.js';
+import {
+  APP_UPDATE_CHECK_PATH,
+  APP_UPDATE_INSTALL_PATH,
+  APP_UPDATE_PATH,
+  APP_UPDATE_RESTART_PATH,
+  parseUpdate,
+  type UpdateState,
+  type UpdateView,
+} from './data.js';
 import { UPDATES_STRINGS as S } from './strings.js';
 import './updates.css';
 
@@ -35,6 +47,12 @@ type Read = UpdateView | 'not_here' | undefined;
 
 /** A check is given this many reads to finish (the shell gives up after 15 s). */
 const MAX_POLLS = 30;
+/** UPD-5: a download and its checks are followed for up to an hour of reads. */
+const MAX_INSTALL_POLLS = 3600;
+/** The states the page follows by reading again (a restart ends the page's server). */
+const FOLLOWED: readonly UpdateState[] = ['checking', 'downloading', 'verifying'];
+/** UPD-5: an in-app update is under way (no check meanwhile). */
+const RUNNING: readonly UpdateState[] = ['downloading', 'verifying', 'ready', 'restarting'];
 
 function statusLine(view: UpdateView): string | undefined {
   switch (view.state) {
@@ -118,14 +136,86 @@ function BrowserReady({ view }: { readonly view: UpdateView }): ReactElement {
   );
 }
 
+/** UPD-5: the in-app update, one card per state. */
+function InApp({
+  view,
+  onUpdate,
+  onRestart,
+  sending,
+}: {
+  readonly view: UpdateView;
+  readonly onUpdate: () => void;
+  readonly onRestart: () => void;
+  readonly sending: boolean;
+}): ReactElement {
+  const title = view.state === 'available' ? S.availableTitle(view.latest) : S.ready(view.latest);
+  return (
+    <Surface
+      as="section"
+      level={1}
+      className="upd-card upd-ready"
+      aria-labelledby="upd-ready-t"
+      data-update-state={view.state}
+    >
+      <h2 id="upd-ready-t" className="al-text-h3">
+        {title}
+      </h2>
+      {view.state === 'available' ? (
+        <>
+          <p className="al-text-body-sm al-muted">{S.availableLead}</p>
+          <div>
+            <Button variant="primary" onClick={onUpdate} disabled={sending}>
+              {S.updateNow}
+            </Button>
+          </div>
+        </>
+      ) : view.state === 'downloading' ? (
+        <ProgressBar
+          label={S.downloading}
+          value={view.percent}
+          max={100}
+          amount={S.percent(view.percent)}
+        />
+      ) : view.state === 'verifying' ? (
+        <ProgressBar label={S.verifying} indeterminate />
+      ) : view.state === 'ready' ? (
+        <>
+          <p className="al-text-body-sm al-muted">{S.readyRestartLead}</p>
+          {view.busy ? (
+            <p className="al-text-body-sm upd-warn" role="note">
+              {S.busy}
+            </p>
+          ) : null}
+          <div>
+            <Button variant="primary" onClick={onRestart} disabled={sending}>
+              {S.restartNow}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <p className="al-text-body-sm" role="status" aria-live="polite">
+          {S.restarting}
+        </p>
+      )}
+      <p className="al-text-body-sm al-muted">{S.keeps}</p>
+    </Surface>
+  );
+}
+
 function Ready({ view }: { readonly view: UpdateView }): ReactElement {
   if (view.install !== 'desktop') return <BrowserReady view={view} />;
   const steps = view.macFile ? S.macSteps : S.otherSteps;
+  const failed = view.state === 'install_failed';
   return (
     <Surface as="section" level={1} className="upd-card upd-ready" aria-labelledby="upd-ready-t">
       <h2 id="upd-ready-t" className="al-text-h3">
         {S.ready(view.latest)}
       </h2>
+      {failed ? (
+        <p className="al-text-body-sm" role="alert">
+          {S.cantUpdate}
+        </p>
+      ) : null}
       <p className="al-text-body-sm al-muted">{S.readyLead}</p>
       <div>
         <a
@@ -186,7 +276,10 @@ export function UpdatesPage({ api: givenApi, pollMs = 1000 }: UpdatesPageProps):
       if (polling.current) return;
       polling.current = true;
       try {
-        for (let i = 0; i < MAX_POLLS && view?.state === 'checking'; i += 1) {
+        const followed = (v: UpdateView | undefined): boolean =>
+          v !== undefined && FOLLOWED.includes(v.state);
+        const cap = view?.state === 'checking' ? MAX_POLLS : MAX_INSTALL_POLLS;
+        for (let i = 0; i < cap && followed(view); i += 1) {
           await new Promise((r) => setTimeout(r, pollMs));
           if (!alive.current) return;
           const next = await readOnce(APP_UPDATE_PATH);
@@ -211,9 +304,40 @@ export function UpdatesPage({ api: givenApi, pollMs = 1000 }: UpdatesPageProps):
     void readOnce(APP_UPDATE_CHECK_PATH).then(follow);
   };
 
+  // UPD-5: Update now / Restart now: one POST with no body each; the answer is the new state.
+  const [sending, setSending] = useState(false);
+  const step = (path: string): void => {
+    if (sending) return;
+    setSending(true);
+    void api
+      .post(path)
+      .then(
+        (result): Read =>
+          result.kind === 'not_available'
+            ? 'not_here'
+            : result.kind === 'ok'
+              ? parseUpdate(result.data)
+              : undefined,
+        (): Read => undefined,
+      )
+      .then(async (next) => {
+        if (alive.current) setSending(false);
+        // A refused or unreadable answer: read the state again rather than guess.
+        await follow(next === undefined ? await readOnce(APP_UPDATE_PATH) : next);
+      });
+  };
+
   const view = load.kind === 'ready' ? load.view : undefined;
   const line = view === undefined ? undefined : statusLine(view);
-  const canCheck = view !== undefined && view.state !== 'off' && view.state !== 'checking';
+  const canCheck =
+    view !== undefined &&
+    view.state !== 'off' &&
+    view.state !== 'checking' &&
+    !RUNNING.includes(view.state);
+  const inApp =
+    view !== undefined &&
+    view.install === 'desktop' &&
+    (RUNNING.includes(view.state) || (view.state === 'available' && view.installable));
 
   return (
     <div className="upd-page">
@@ -264,7 +388,16 @@ export function UpdatesPage({ api: givenApi, pollMs = 1000 }: UpdatesPageProps):
               )}
             </div>
           </Surface>
-          {load.view.state === 'available' ? <Ready view={load.view} /> : null}
+          {inApp ? (
+            <InApp
+              view={load.view}
+              sending={sending}
+              onUpdate={() => step(APP_UPDATE_INSTALL_PATH)}
+              onRestart={() => step(APP_UPDATE_RESTART_PATH)}
+            />
+          ) : load.view.state === 'available' || load.view.state === 'install_failed' ? (
+            <Ready view={load.view} />
+          ) : null}
         </>
       )}
     </div>

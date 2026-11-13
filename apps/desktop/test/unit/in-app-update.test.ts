@@ -62,9 +62,9 @@ describe('the placeholder root key means in-app updates are off (UPD-5)', () => 
     expect(inAppEnabled({ ...base, root, platform: 'win32' })).toBe(false);
     expect(inAppEnabled({ ...base, root, packaged: false })).toBe(false);
     expect(inAppEnabled({ ...base, root, preview: true })).toBe(false);
-    expect(inAppEnabled({ ...base, root, execPath: '/tmp/Other.app/Contents/MacOS/AgentLink' })).toBe(
-      false,
-    );
+    expect(
+      inAppEnabled({ ...base, root, execPath: '/tmp/Other.app/Contents/MacOS/AgentLink' }),
+    ).toBe(false);
   });
 
   it('while off, the page gets today’s view (download link, no Update now) and no install runs', async () => {
@@ -145,7 +145,11 @@ describe('the in-app update states (UPD-5)', () => {
     expect(h.u.restart()).toBe(false);
     expect(h.u.install()).toBe(true);
     expect(h.u.install()).toBe(false); // one at a time
-    expect(h.u.view(CURRENT)).toMatchObject({ state: 'downloading', percent: 0, installable: true });
+    expect(h.u.view(CURRENT)).toMatchObject({
+      state: 'downloading',
+      percent: 0,
+      installable: true,
+    });
     h.hooks().onProgress(250, 1000);
     expect(h.u.view(CURRENT)).toMatchObject({ state: 'downloading', percent: 25 });
     h.hooks().onProgress(1000, 1000);

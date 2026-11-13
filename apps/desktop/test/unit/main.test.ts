@@ -397,7 +397,11 @@ describe('runShell startup', () => {
     children[0]?.stream.push(readyLine());
     const sent = (): unknown[] =>
       (children[0]?.stream.written ?? []).map((l) => JSON.parse(l) as unknown);
-    expect(sent().at(-1)).toMatchObject({ type: 'app-update', state: 'available', installable: true });
+    expect(sent().at(-1)).toMatchObject({
+      type: 'app-update',
+      state: 'available',
+      installable: true,
+    });
     children[0]?.stream.push(`${JSON.stringify({ v: 1, type: 'app-update-install' })}\n`);
     children[0]?.stream.push(`${JSON.stringify({ v: 1, type: 'app-update-restart' })}\n`);
     await new Promise((r) => setTimeout(r, 0));

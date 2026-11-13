@@ -96,7 +96,10 @@ describe('app-update routes', () => {
       req(),
     );
     expect(asked).toBe(1);
-    expect(result).toEqual({ status: 200, body: { ...checking, install: 'desktop', ...DESK_EXTRA } });
+    expect(result).toEqual({
+      status: 200,
+      body: { ...checking, install: 'desktop', ...DESK_EXTRA },
+    });
   });
 
   it('refuses a query', async () => {
@@ -139,9 +142,13 @@ describe('app-update routes', () => {
       'state',
     ]);
     // The browser app keeps its five (its restart is the update).
-    expect(
-      Object.keys(appUpdateBody({ ...AVAILABLE, download: '' }, 'npx') ?? {}).sort(),
-    ).toEqual(['current', 'download', 'install', 'latest', 'state']);
+    expect(Object.keys(appUpdateBody({ ...AVAILABLE, download: '' }, 'npx') ?? {}).sort()).toEqual([
+      'current',
+      'download',
+      'install',
+      'latest',
+      'state',
+    ]);
   });
 
   // UPD-5: Update now and Restart now (the mark kind: session, CSRF, Origin, fetch metadata,
@@ -198,7 +205,10 @@ describe('app-update routes', () => {
   });
 
   it.each<[string, AppUpdateView]>([
-    ['downloading that is not installable', { ...IN_APP, state: 'downloading', installable: false }],
+    [
+      'downloading that is not installable',
+      { ...IN_APP, state: 'downloading', installable: false },
+    ],
     ['a percent outside downloading', { ...IN_APP, percent: 4 }],
     ['a percent over 100', { ...IN_APP, state: 'downloading', percent: 101 }],
     ['install_failed with Update now', { ...IN_APP, state: 'install_failed' }],
@@ -209,7 +219,9 @@ describe('app-update routes', () => {
 
   it('UPD-5: the in-app states never reach the browser app', () => {
     for (const state of ['downloading', 'verifying', 'ready', 'restarting', 'install_failed']) {
-      expect(appUpdateBody({ ...AVAILABLE, state, download: '' } as AppUpdateView, 'npx')).toBeUndefined();
+      expect(
+        appUpdateBody({ ...AVAILABLE, state, download: '' } as AppUpdateView, 'npx'),
+      ).toBeUndefined();
     }
   });
 

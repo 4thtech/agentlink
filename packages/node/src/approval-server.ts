@@ -1223,6 +1223,9 @@ const NO_AGENT_ROUTES: ReadonlySet<string> = new Set([
   // DESK051-UPD: the app's own version and updates are the app's, not an agent's.
   'GET /api/ui/app-update',
   'GET /api/ui/app-update/check',
+  // UPD-5: Update now and Restart now (the mark kind; desktop app only).
+  'POST /api/ui/app-update/install',
+  'POST /api/ui/app-update/restart',
 ]);
 
 /**

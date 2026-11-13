@@ -78,8 +78,10 @@ async function mount(
 const text = (): string => host.textContent ?? '';
 const button = (label: string): HTMLButtonElement | undefined =>
   [...host.querySelectorAll('button')].find((b) => b.textContent === label);
-const fixed = (state: string, extra: Record<string, unknown> = {}) => () =>
-  Promise.resolve(ok(at(state, extra)));
+const fixed =
+  (state: string, extra: Record<string, unknown> = {}) =>
+  () =>
+    Promise.resolve(ok(at(state, extra)));
 
 describe('Settings › Updates, in-app update (UPD-5)', () => {
   it('Update available: the version and Update now', async () => {

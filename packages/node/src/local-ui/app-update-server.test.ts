@@ -204,8 +204,10 @@ describe('Settings > Updates through the server (DESK051-UPD)', () => {
       'Content-Type': 'application/octet-stream',
       'X-AgentLink-Generation': h.generation,
     };
-    const { Cookie: _c, ...noCookie } = good;
-    const { 'X-AgentLink-CSRF': _x, ...noCsrf } = good;
+    const without = (name: string): Record<string, string> =>
+      Object.fromEntries(Object.entries(good).filter(([k]) => k !== name));
+    const noCookie = without('Cookie');
+    const noCsrf = without('X-AgentLink-CSRF');
     expect((await send(h.port, APP_UPDATE_INSTALL_PATH, noCookie, 'POST')).status).toBe(401);
     expect((await send(h.port, APP_UPDATE_INSTALL_PATH, noCsrf, 'POST')).status).toBe(403);
     expect(
