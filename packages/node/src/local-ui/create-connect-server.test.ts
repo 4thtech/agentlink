@@ -1084,6 +1084,41 @@ describe('W4-ONE-TOUCH New agent: one gesture creates the agent and connects its
   });
 });
 
+/**
+ * HOTFIX-NOID: one owner made by a first run (and, with `native`, Touch ID turned on), kept for the
+ * whole file: its keychain items, its master code and its authenticator. Each test copies the items
+ * into a fresh keychain with no ID (so every test still starts clean), and the slow key derivation
+ * of a first run happens once per kind instead of once per test (CI load, PR #821).
+ */
+interface MadeOwner {
+  readonly items: ReadonlyMap<string, Uint8Array>;
+  readonly code: string;
+  readonly auth: VirtualPrfAuthenticator;
+}
+const madeOwners = new Map<boolean, Promise<MadeOwner>>();
+function madeOwner(native: boolean): Promise<MadeOwner> {
+  let made = madeOwners.get(native);
+  if (made === undefined) {
+    made = (async () => {
+      const helper = native ? new StandInHelper(1) : undefined;
+      const first = await harness(helper === undefined ? {} : { nativePresence: helper });
+      const s1 = await first.session();
+      const { auth, finish } = await setUp(first, s1, { label: 'Home base' });
+      expect(json(finish)['status']).toBe('done');
+      const code = String(json(finish)['ownerCode']).replace(/[^A-Za-z0-9]/g, '');
+      if (helper !== undefined) {
+        const on = await first.post('/api/owner/native', s1, encodeUtf8(code));
+        expect(json(on)['status']).toBe('registered');
+      }
+      const items = new Map<string, Uint8Array>();
+      for (const [account, value] of first.w.keychain.items) items.set(account, value.slice());
+      return { items, code, auth };
+    })();
+    madeOwners.set(native, made);
+  }
+  return made;
+}
+
 // HOTFIX-NOID (owner report on 0.5.1, a Mac that had AgentLink before): the owner exists on this
 // computer (its keychain items) but no ID does, so the app host has none open. New ID must still
 // work from the app with the master code or the desktop app's Touch ID (04 §2.8 "No ID on this
@@ -1098,18 +1133,10 @@ describe('HOTFIX-NOID New ID with an owner and zero IDs on this computer', () =>
     helper?: StandInHelper;
   }> {
     const helper = options.native === true ? new StandInHelper(1) : undefined;
-    const first = await harness(helper === undefined ? {} : { nativePresence: helper });
-    const s1 = await first.session();
-    const { auth, finish } = await setUp(first, s1, { label: 'Home base' });
-    expect(json(finish)['status']).toBe('done');
-    const code = String(json(finish)['ownerCode']).replace(/[^A-Za-z0-9]/g, '');
-    if (helper !== undefined) {
-      const on = await first.post('/api/owner/native', s1, encodeUtf8(code));
-      expect(json(on)['status']).toBe('registered');
-    }
+    const { items, code, auth } = await madeOwner(options.native === true);
     // The IDs are gone (folders removed); the owner's keychain items stay.
     const w = world();
-    for (const [account, value] of first.w.keychain.items) w.keychain.items.set(account, value);
+    for (const [account, value] of items) w.keychain.items.set(account, value.slice());
     const h = await harness({ w, ...(helper === undefined ? {} : { nativePresence: helper }) });
     const s = await h.session();
     return { h, s, code, auth, ...(helper === undefined ? {} : { helper }) };
@@ -1287,17 +1314,9 @@ describe('HOTFIX-NOID: a stored header naming another owner refuses the first ID
     helper?: StandInHelper;
   }> {
     const helper = native ? new StandInHelper(1) : undefined;
-    const first = await harness(helper === undefined ? {} : { nativePresence: helper });
-    const s1 = await first.session();
-    const { finish } = await setUp(first, s1, { label: 'Home base' });
-    const code = String(json(finish)['ownerCode']).replace(/[^A-Za-z0-9]/g, '');
-    if (helper !== undefined) {
-      expect(json(await first.post('/api/owner/native', s1, encodeUtf8(code)))['status']).toBe(
-        'registered',
-      );
-    }
+    const { items, code } = await madeOwner(native);
     const w = world();
-    for (const [account, value] of first.w.keychain.items) w.keychain.items.set(account, value);
+    for (const [account, value] of items) w.keychain.items.set(account, value.slice());
     await otherOwnersPasskey(w);
     const h = await harness({ w, ...(helper === undefined ? {} : { nativePresence: helper }) });
     return { h, s: await h.session(), code, ...(helper === undefined ? {} : { helper }) };
