@@ -41,7 +41,7 @@ import {
   type LocalUiResult,
 } from '../route-types.js';
 import { createLocalUiRoutes } from '../routes.js';
-import { createFilesRoutes, filesRoutes } from './files.js';
+import { createFilesRoutes, filesRoutes, shownProtectedFolder } from './files.js';
 
 // The routes pick the path flavour from the platform; the tests build real paths with node:path, so
 // they must run with the same flavour (a Windows path is never a posix full path).
@@ -371,13 +371,34 @@ describe('GET /api/ui/files/review: the 04 §4 checks before anything is prepare
       body: {
         error: 'folder_refused',
         reason: 'contains_protected',
-        // Windows paths are parsed case-folded (path-guard), so the folder is named in lower case there.
-        protectedFolder: WIN
-          ? sepOut(['~', PROTECTED_TOP, ...PROTECTED_TAIL].join('/')).toLowerCase()
-          : ['~', PROTECTED_TOP, ...PROTECTED_TAIL].join('/'),
+        // CHORE-FILES-WIN-NAME-CASE: named in its original spelling on every platform (Windows
+        // paths are parsed case-folded, but the shown name comes from the root string itself).
+        protectedFolder: sepOut(['~', PROTECTED_TOP, ...PROTECTED_TAIL].join('/')),
       },
     });
     expect(fake.patches).toEqual([]);
+  });
+
+  // CHORE-FILES-WIN-NAME-CASE: display only. The shown name keeps the root's own spelling; the
+  // comparison (and so what is refused) stays case-insensitive in the guard.
+  it.each([
+    [
+      'win32',
+      'C:\\Users\\Ana\\AppData\\Roaming\\Microsoft\\Protect',
+      'C:\\Users\\Ana',
+      '~\\AppData\\Roaming\\Microsoft\\Protect',
+    ],
+    [
+      'win32',
+      'C:/Users/Ana/AppData/Local/Microsoft/Vault',
+      'c:\\users\\ana',
+      '~\\AppData\\Local\\Microsoft\\Vault',
+    ],
+    ['win32', 'D:\\Other\\.ssh', 'C:\\Users\\Ana', 'D:\\Other\\.ssh'],
+    ['posix', '/Users/Ana/Library/Keychains', '/Users/Ana', '~/Library/Keychains'],
+    ['posix', '/Library/Keychains', '/Users/Ana', '/Library/Keychains'],
+  ] as const)('names a protected folder (%s) in its original spelling', (flavor, root, home, shown) => {
+    expect(shownProtectedFolder(root, home, flavor)).toBe(shown);
   });
 
   it('refuses a folder already allowed, and a 33rd folder', async () => {
