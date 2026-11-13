@@ -14,6 +14,7 @@ import { createSetupApi } from '../first-run/setup-api.js';
 import { createRestoreApi } from './api.js';
 import { RestoreWizard, type RestoreWizardProps } from './index.js';
 import { setFinishRestore, setOutcome } from './outcome.js';
+import { rowName } from './steps.js';
 import * as S from './strings.js';
 
 const cssFiles = import.meta.glob<string>('./restore.css', {
@@ -409,7 +410,7 @@ describe('Check my kit', () => {
     await fillCode();
     await click(S.CODE.open);
     expect(text()).toContain('This kit opens.');
-    expect(text()).toContain('tali, work, macbook and demo');
+    expect(text()).toContain('Tali, Work, Macbook and Demo');
     expect(api.calls).toContain('check');
     expect(api.calls).not.toContain('open');
     expect(api.calls).not.toContain('applyBegin');
@@ -425,7 +426,7 @@ describe('Check my kit', () => {
     await click(S.KIT.next);
     await fillCode();
     await click(S.CODE.open);
-    expect(text()).toContain('tali, work, My Mac and demo');
+    expect(text()).toContain('Tali, Work, My Mac and Demo');
   });
 
   it('says a wrong code changed nothing', async () => {
@@ -527,6 +528,13 @@ describe('step 3: what comes back', () => {
     // R1-UI-26: no Under the hood block in Simple.
     expect(host.querySelector('.rs-hood')).toBeNull();
     expect(text()).not.toContain(S.REVIEW.hood);
+  });
+
+  it('REL051-R2C (R2-CLASS-05): a new ID in another folder reads as a name, never a bare folder', () => {
+    const base = SUMMARY.ids[0]!;
+    expect(rowName({ ...base, name: 'work' })).toBe('Work');
+    expect(rowName({ ...base, name: 'ana-novak' })).toBe('Ana novak');
+    expect(rowName({ ...base, name: 'work', label: 'Work' })).toBe('Work');
   });
 
   it('keeps Restore off when nothing is ticked', async () => {

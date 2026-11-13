@@ -551,7 +551,12 @@ export interface ReviewStepProps {
  */
 export function rowName(row: SummaryRow): string {
   if (row.label !== undefined) return row.label;
-  return row.name === 'default' ? REVIEW.firstId : row.name;
+  if (row.name === 'default') return REVIEW.firstId;
+  // REL051-R2C (R2-CLASS-05, R2-UI-04): never a bare folder name: the folder was made from the ID's
+  // name, so it reads as one ("work" → "Work", "ana-novak" → "Ana novak") until the read-back.
+  const words = row.name.replace(/[-_]+/g, ' ').trim();
+  if (words === '') return row.name;
+  return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 }
 
 function Row({
