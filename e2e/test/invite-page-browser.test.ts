@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { DOCS_LINKS, buildAskAi, buildCommands } from '@4thtech-io/invite';
+import { DOCS_LINKS, MAC_APP_URLS, buildAskAi, buildCommands } from '@4thtech-io/invite';
 import { CSP, headersFor } from './invite/headers.js';
 import {
   BASE_INVITE,
@@ -105,11 +105,16 @@ interface Probe {
   beacons: unknown[];
 }
 
+const LINUX_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36';
+
 async function open(
   fragment: string,
   options: { hash?: boolean } = {},
 ): Promise<{ page: Page; context: BrowserContext; probe: Probe }> {
-  const context = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  const context = await browser.newContext({
+    userAgent: LINUX_UA,
+    permissions: ['clipboard-read', 'clipboard-write'],
+  });
   const page = await context.newPage();
   const probe: Probe = { requests: [], violations: [], consoleErrors: [], beacons: [] };
   page.on('request', (r) =>
@@ -253,10 +258,15 @@ describe('a good invite (U3-invite)', () => {
     await expect(page.locator('#step-help').textContent()).resolves.toMatch(
       /^Paste it into (Terminal|the terminal \(Ctrl, Shift and V\)) and press (Return|Enter)\. It installs AgentLink, and Node\.js if needed, then opens the invite\.$/,
     );
-    // REL051-INV: the only links are the two help links; the Mac app (switch off) is not shown.
+    // REL051-INV: the only links are the Mac app's two (in the hidden Mac note here) and the two help links.
     await expect(
       page.locator('a[href]').evaluateAll((as) => as.map((a) => a.getAttribute('href'))),
-    ).resolves.toEqual([DOCS_LINKS.guide, DOCS_LINKS.windows]);
+    ).resolves.toEqual([
+      MAC_APP_URLS.arm64,
+      MAC_APP_URLS.x64,
+      DOCS_LINKS.guide,
+      DOCS_LINKS.windows,
+    ]);
     await expect(page.locator('#mac-app').isHidden()).resolves.toBe(true);
     await expect(page.locator('#phone-note').isHidden()).resolves.toBe(true);
     await expectNoAppLinks(page);
@@ -370,7 +380,7 @@ describe('a good invite (U3-invite)', () => {
         await expect(page.locator(`#${chosen}`).getAttribute('aria-pressed')).resolves.toBe('true');
       }
       await expect(page.locator('#phone-note').isVisible()).resolves.toBe(phone);
-      await expect(page.locator('#mac-app').isHidden()).resolves.toBe(true);
+      await expect(page.locator('#mac-app').isHidden()).resolves.toBe(chosen !== 'os-mac');
       expect(requests.sort()).toEqual(['/i', '/invite.css', '/invite.js']);
       await context.close();
     }
@@ -447,7 +457,12 @@ describe('a hostile invite (I-5)', () => {
       expect(await page.locator('a').count()).toBe(6);
       await expect(
         page.locator('a[href]').evaluateAll((as) => as.map((a) => a.getAttribute('href'))),
-      ).resolves.toEqual([DOCS_LINKS.guide, DOCS_LINKS.windows]);
+      ).resolves.toEqual([
+        MAC_APP_URLS.arm64,
+        MAC_APP_URLS.x64,
+        DOCS_LINKS.guide,
+        DOCS_LINKS.windows,
+      ]);
       await expectNoAppLinks(page);
       expect(await page.locator('script').count()).toBe(1);
       expect(
@@ -674,14 +689,14 @@ describe('WP-D9: desktop app links (flag-on build)', () => {
 
   it('shows "Open in the AgentLink app" and "Get the app" next to the command, 44 px each', async () => {
     const link = await futureLink({ name: 'Marko' });
-    const context = await browser.newContext();
+    const context = await browser.newContext({ userAgent: LINUX_UA });
     const page = await context.newPage();
     await page.goto(`${originOf(siteOn)}/i#${payloadOf(link)}`);
     await page.waitForFunction(() => document.getElementById('state')?.dataset.ready === 'true');
     // The two app links in the command card, besides REL051-INV's two help links (the Mac app's
-    // links have no address while its switch is off).
+    // links, hidden here, and two more with their switch on).
     expect(await page.locator('#app-links a[href]').count()).toBe(2);
-    expect(await page.locator('a[href]').count()).toBe(4);
+    expect(await page.locator('a[href]').count()).toBe(6);
     await expect(page.locator('#open-app').getAttribute('href')).resolves.toBe(
       `agentlink://join#${payloadOf(link)}`,
     );
