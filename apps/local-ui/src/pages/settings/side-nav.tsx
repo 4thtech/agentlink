@@ -3,7 +3,7 @@
 // "‹ Settings" stays as the back link. The shell wraps a page in it when `isSettingsSubpage(path)`.
 import type { ReactElement, ReactNode } from 'react';
 import { ShellIcon } from '../../layout/shell-icons.js';
-import { SETTINGS_PAGES } from '../../nav.js';
+import { settingsPages } from '../../nav.js';
 import { groupOf, settingsGroups } from './groups.js';
 import { PageIcon, titleFor } from './page-meta.js';
 import { SETTINGS_STRINGS as S } from './strings.js';
@@ -15,7 +15,7 @@ const ADVANCED_NETWORK = '/advanced/network';
 export function isSettingsSubpage(path: string): boolean {
   // Advanced › Relays & network (/advanced/network) is the page behind Settings' "Advanced" row.
   if (path === ADVANCED_NETWORK) return true;
-  return path.startsWith('/settings/') && SETTINGS_PAGES.some((p) => p.path === path);
+  return path.startsWith('/settings/') && settingsPages(true).some((p) => p.path === path);
 }
 
 export function SettingsFrame({
@@ -32,7 +32,7 @@ export function SettingsFrame({
           <ShellIcon name="chev-r" size={16} className="set-back-chev" />
           {S.back}
         </a>
-        {settingsGroups(SETTINGS_PAGES).map((g) => (
+        {settingsGroups(settingsPages()).map((g) => (
           <div key={g.id} className="set-side-group">
             <p className="set-side-title al-text-label">
               {S.groups[groupOf(g.pages[0]?.path ?? '')]}

@@ -96,6 +96,7 @@ export const PAGE_TITLES = {
   apps: 'AI apps',
   files: 'Files',
   storage: 'Storage',
+  updates: 'Updates',
   proofs: 'Proofs & credits',
   rules: 'Rules',
   backup: 'Backup',

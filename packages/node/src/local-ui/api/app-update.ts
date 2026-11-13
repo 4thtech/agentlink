@@ -1,4 +1,4 @@
-// DESK051-UPD (08 §8 "Signed updates" phase 0; I-4, I-5, I-7): Settings > Updates in the desktop app.
+// DESK051-UPD (08 §8, before the signed updater; I-4, I-5, I-7): Settings > Updates in the desktop app.
 //
 // - `GET /api/ui/app-update` (read, `presence: false`): what the desktop app's shell last told this
 //   core over its private pipe (apps/cli/src/desktop): a fixed state word, this app's version and,

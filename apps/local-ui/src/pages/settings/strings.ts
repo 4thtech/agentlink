@@ -70,6 +70,10 @@ export const SETTINGS_STRINGS = {
     state: (balance: string, n: number): string =>
       `${balance} · about ${String(n)} ${n === 1 ? 'proof' : 'proofs'}`,
   },
+  updates: {
+    title: 'Updates',
+    line: 'Your version of AgentLink, and newer ones',
+  },
   advanced: {
     title: 'Advanced',
     line: 'Network, diagnostics and the activity log. Nothing here needs changing.',

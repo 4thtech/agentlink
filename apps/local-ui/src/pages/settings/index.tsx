@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore, type ReactElement }
 import { getLive, subscribeLive } from '../../api/live.js';
 import { createApiClient, type ApiResult } from '../../api/client.js';
 import { ShellIcon } from '../../layout/shell-icons.js';
-import { SETTINGS_PAGES, type SettingsPage as SettingsPageEntry } from '../../nav.js';
+import { settingsPages, type SettingsPage as SettingsPageEntry } from '../../nav.js';
 import { usePrefs } from '../../prefs/index.js';
 import { createApprovalsClient, type ApprovalsClient } from '../approvals/client.js';
 import { browserPasskeys, OwnerPanel, useOwner } from '../approvals/index.js';
@@ -26,7 +26,7 @@ export interface SettingsPageProps {
   readonly get?: (path: string) => Promise<ApiResult<unknown>>;
   /** The approvals client for the Touch ID notice (default: the production one). */
   readonly approvals?: ApprovalsClient;
-  /** The pages (default: SETTINGS_PAGES); a test injects entries other work packages add. */
+  /** The pages (default: settingsPages()); a test injects entries other work packages add. */
   readonly pages?: readonly SettingsPageEntry[];
 }
 
@@ -105,6 +105,8 @@ export function lineFor(
     }
     case '/settings/storage':
       return { line: S.storage.line };
+    case '/settings/updates':
+      return { line: S.updates.line };
     case '/settings/appearance':
       return { line: S.appearance.line, state: themeWord(theme), tone: 'plain' };
     case '/settings/proofs':
@@ -196,7 +198,7 @@ function KitNotice({ state }: { readonly state: SettingsState | undefined }): Re
 export function SettingsPage({
   get = productionGet,
   approvals,
-  pages = SETTINGS_PAGES,
+  pages = settingsPages(),
 }: SettingsPageProps): ReactElement {
   const prefs = usePrefs();
   const [state, setState] = useState<SettingsState | undefined>(undefined);

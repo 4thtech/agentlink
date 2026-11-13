@@ -71,6 +71,8 @@ const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   ['/settings/apps', 'AI apps', 'Settings'],
   ['/settings/files', 'Files', 'Settings'],
   ['/settings/storage', 'Storage', 'Settings'],
+  // DESK051-UPD: Settings > Updates (listed in the desktop app only; the route always exists).
+  ['/settings/updates', 'Updates', 'Settings'],
   ['/settings/appearance', 'Appearance', 'Settings'],
   ['/settings/rules', 'Rules', 'Settings'],
   ['/settings/proofs', 'Proofs & credits', 'Settings'],

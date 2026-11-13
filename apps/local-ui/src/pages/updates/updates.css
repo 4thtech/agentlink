@@ -1,0 +1,66 @@
+/* Settings > Updates (DESK051-UPD; same surfaces and tokens as Settings > Storage, design-1112 §3.1). */
+.upd-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-5);
+  max-inline-size: var(--al-layout-max-content);
+}
+.upd-page h1,
+.upd-page h2,
+.upd-page p,
+.upd-page ol {
+  margin: 0;
+}
+.upd-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+}
+.upd-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding: var(--al-space-5);
+}
+.upd-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--al-space-4);
+}
+.upd-text {
+  flex: 1 1 220px;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-1);
+}
+.upd-ic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 40px;
+  block-size: 40px;
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-raised);
+  color: var(--al-color-fg-muted);
+}
+.upd-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-1);
+  padding-inline-start: var(--al-space-5);
+}
+.upd-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--al-space-4);
+}
+.upd-version {
+  font-size: 17px;
+  font-weight: 600;
+}
+.upd-page a.al-btn {
+  text-decoration: none;
+}

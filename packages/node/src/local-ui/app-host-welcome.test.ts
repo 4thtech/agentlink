@@ -510,6 +510,9 @@ const SETUP_TIME = new Set([
   // W4-SHELL-V2: the app's UI settings are the app's, not an agent's (ui-settings-server.test.ts).
   'GET /api/ui/ui-settings',
   'PUT /api/ui/ui-settings',
+  // DESK051-UPD: the app's version and updates are the app's, not an agent's.
+  'GET /api/ui/app-update',
+  'GET /api/ui/app-update/check',
 ]);
 
 describe('U3-g-b: ui with no agent at all serves Welcome', () => {

@@ -42,6 +42,8 @@ const ICONS = {
     p('m19.07 4.93-1.41 1.41'),
   ],
   bell: [p('M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9'), p('M10.3 21a1.94 1.94 0 0 0 3.4 0')],
+  // DESK051-UPD: Settings > Updates (Lucide "download").
+  download: [p('M12 15V3'), p('M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'), p('m7 10 5 5 5-5')],
 } as const satisfies Record<string, readonly Shape[]>;
 
 export type SettingsIconName = keyof typeof ICONS;

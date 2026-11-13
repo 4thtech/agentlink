@@ -41,9 +41,25 @@ That command only removes the "downloaded from the internet" mark from this one 
 
 The Windows desktop app is coming later. On Windows, use the browser app: one command installs AgentLink and opens it in your browser. See [Windows](../get-started/windows.md).
 
-## Updates
+## Updating
 
-This build does not look for updates by itself. To get a newer version, download the new `.dmg` from the Releases page and drag it over the old one in Applications (reinstall). Your IDs, people and messages stay: they live in your AgentLink folder, not in the app.
+Open **Settings**, then **Updates**. It shows the version you have and a **Check for updates** button. The app also looks for a newer version by itself, at most once a day, and only says something on this page.
+
+When a newer version is out, the page says so, for example **AgentLink 0.5.2 is ready**. Then:
+
+1. Press **Download update**. Your browser downloads the `.dmg` for your Mac (Apple chip or Intel) from the AgentLink Releases page.
+2. Open the file you downloaded.
+3. Quit AgentLink: click its icon in the menu bar and choose **Quit AgentLink**.
+4. Drag **AgentLink** to **Applications** and choose **Replace**.
+5. Open AgentLink again. The first time, macOS may ask you to allow it again, as in [Open it the first time](#open-it-the-first-time).
+
+If you open the new version while the old one is still running, AgentLink says an older AgentLink is still open and offers to quit it for you.
+
+Your IDs, people and messages stay as they are: they live in your AgentLink folder, not in the app.
+
+To check, the app asks GitHub which AgentLink release is the newest. It sends nothing about you or your IDs, and it downloads and installs nothing by itself. Offline, it doesn't check. An administrator can turn the check off for a computer by starting the app with `AGENTLINK_UPDATE_CHECK=off`.
+
+You can always get a newer version by hand too: download the new `.dmg` from the [Releases page](https://github.com/4thtech/agentlink/releases) and drag it over the old one in Applications.
 
 ## Touch ID
 

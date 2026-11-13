@@ -16,6 +16,7 @@ const GROUP_OF: Readonly<Record<string, GroupId>> = {
   '/settings/storage': 'app',
   '/settings/appearance': 'app',
   '/settings/proofs': 'app',
+  '/settings/updates': 'app',
   '/settings/advanced': 'app',
   '/advanced/network': 'app',
 };
@@ -29,6 +30,7 @@ const ORDER: readonly string[] = [
   '/settings/storage',
   '/settings/appearance',
   '/settings/proofs',
+  '/settings/updates',
   '/settings/advanced',
   '/advanced/network',
 ];
