@@ -226,22 +226,33 @@ describe('chapter 2: contacts and invites', () => {
     if (ready === undefined) return;
     const world = journeyWorld();
     const { a, b, mcpA, mcpB } = await twoOwners(ready.browser, ready.files, world, ch.closers);
-    const late = (await twoOwners(ready.browser, ready.files, world, ch.closers)).b;
+    const second = await twoOwners(ready.browser, ready.files, world, ch.closers);
+    const late = second.b;
     const link = await createInviteInApp(a);
     await checkInviteInApp(late, link);
     await late.page
       .getByText(/invites you to connect your AIs$/)
       .first()
       .waitFor();
-    // Both click Accept, one after the other (the classroom race: once the invite is used its short
-    // link stops working, so a later accept is refused at once instead). The first accept must reach
-    // Ana before the second is sent: two clicks a moment apart race to the inviter, and on a slow
-    // runner the late card's accept could arrive first and pair instead (CI flake, 13 Nov).
+    // Both click Accept, one a moment after the other (the classroom race: once the invite is used
+    // its short link stops working, so a later accept is refused at once instead). Which answer
+    // reaches Ana first is up to the network (on a slow runner the second click sometimes wins), so
+    // the winner is whichever pairs; the other one is the accepter this test follows.
     await acceptInviteInApp(b, link, 'Ana');
-    await until('Bo is paired with Ana', () => pairedWith(mcpB, 'Ana'), 30_000);
     await late.page.getByRole('button', { name: ACCEPT_WITH }).click();
-    await navTo(late.page, 'Home');
-    await late.page
+    const firstWon = await until(
+      'one Bo is paired with Ana',
+      async () => {
+        if ((await pairedWith(mcpB, 'Ana')) === true) return true;
+        if ((await pairedWith(second.mcpB, 'Ana')) === true) return false;
+        return undefined;
+      },
+      30_000,
+    );
+    const other = firstWon ? late : b;
+    const otherMcp = firstWon ? second.mcpB : mcpB;
+    await navTo(other.page, 'Home');
+    await other.page
       .getByText(
         "Waiting for Ana's AgentLink. If someone else already used this invite, it won't connect: ask Ana for a new one.",
       )
@@ -250,17 +261,18 @@ describe('chapter 2: contacts and invites', () => {
     // The inviter has exactly one Bo: the second answer connected no one.
     const listed = await mcpA.call('agentlink_list_contacts');
     expect((listed.structured['contacts'] as unknown[]).length).toBe(1);
-    await late.page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
+    expect(await pairedWith(otherMcp, 'Ana')).toBeUndefined();
+    await other.page.getByRole('button', { name: 'Cancel', exact: true }).first().click();
     await eventually(
       'the waiting row is gone',
-      async () => !(await text(late.page)).includes("Waiting for Ana's AgentLink"),
+      async () => !(await text(other.page)).includes("Waiting for Ana's AgentLink"),
       15_000,
     );
-    await late.page.reload();
-    await late.page.waitForLoadState();
+    await other.page.reload();
+    await other.page.waitForLoadState();
     await new Promise((r) => setTimeout(r, 3_000));
-    expect(await text(late.page)).not.toContain('Connecting to Ana');
-    expect(await text(late.page)).not.toContain("Waiting for Ana's AgentLink");
+    expect(await text(other.page)).not.toContain('Connecting to Ana');
+    expect(await text(other.page)).not.toContain("Waiting for Ana's AgentLink");
   }, 240_000);
 
   // Gate: the same pairing follow as the test above it ("both Contacts pages reach the 12 digits
