@@ -362,7 +362,7 @@ describe('delete on receipt after a key rotation (M1-1g-h)', () => {
 // DROP-OPEN-1 (D-129 as amended 2026-11-13: files on the drop are open to all early users). There is
 // no tester list anywhere: a fresh ID with the default policy (files.storage `auto`) and no own
 // storage sends a file over 12 KB through the drop, and the drop's own protections still hold: the
-// per-file size cap and the weekly quota per drop key (test limits: 8 MiB per file, 24 MiB a week).
+// per-file size cap and the weekly quota per drop key (those limits tests live in files.limits.worker.test.ts, with small test limits).
 
 /** A fresh sender and recipient (new seeds, so new drop keys), paired, both on the drop only. */
 async function freshPair(n: number): Promise<{ sender: FileAgent; recipient: FileAgent }> {
@@ -407,32 +407,4 @@ describe('files on the drop are open to every user, within the limits (DROP-OPEN
       integrity: 'verified',
     });
   });
-
-  it('the per-file size cap still holds: a file over it is refused with needs_setup', async () => {
-    const { sender, recipient } = await freshPair(280);
-    const sent = await sender.client.sendMessage({
-      to: recipient.id,
-      text: 'too big',
-      files: [outgoing('huge.bin', fileBytes(9 * 1024 * 1024))],
-    });
-    expect(sent).toEqual({ status: 'needs_setup', reason: 'size' });
-  }, 120_000);
-
-  it('the weekly quota per drop key still holds: the upload that would pass it is refused', async () => {
-    const { sender, recipient } = await freshPair(260);
-    for (let i = 0; i < 3; i += 1) {
-      const ok = await sender.client.sendMessage({
-        to: recipient.id,
-        text: `part ${String(i)}`,
-        files: [outgoing(`part${String(i)}.bin`, fileBytes(7_000_000))],
-      });
-      expect(ok).toMatchObject({ status: 'ok', files: [{ index: 0, delivery: 'drop' }] });
-    }
-    const over = await sender.client.sendMessage({
-      to: recipient.id,
-      text: 'over quota',
-      files: [outgoing('part3.bin', fileBytes(7_000_000))],
-    });
-    expect(over).toEqual({ status: 'needs_setup', reason: 'quota' });
-  }, 240_000);
 });

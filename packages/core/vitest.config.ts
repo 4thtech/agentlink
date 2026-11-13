@@ -17,6 +17,7 @@ import { cloudflareTest } from '@cloudflare/vitest-plugin';
 import { defineConfig } from 'vitest/config';
 
 const DROP_WORKER = 'src/**/*.worker.test.ts';
+const DROP_LIMITS = 'src/**/*.limits.worker.test.ts';
 const INTEGRATION = 'src/**/*.integration.test.ts';
 const MiB = 1024 * 1024;
 
@@ -77,6 +78,33 @@ export default defineConfig({
         test: {
           name: 'drop-worker',
           include: [DROP_WORKER],
+          exclude: [DROP_LIMITS],
+          testTimeout: 20_000,
+        },
+      },
+      {
+        plugins: [
+          cloudflareTest({
+            main: dropWorker,
+            miniflare: {
+              compatibilityDate: '2026-08-01',
+              r2Buckets: ['DROP_BUCKET'],
+              durableObjects: { DROP_STATE: 'DropState' },
+              bindings: {
+                // A fixed, obviously synthetic URL key (32 bytes of 0x5a), as in apps/drop's tests.
+                DROP_URL_KEY: 'WlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlo',
+                DROP_MAX_SIZE: String(32 * 1024),
+                DROP_PART_SIZE: String(5 * MiB),
+                DROP_WEEKLY_QUOTA: String(64 * 1024),
+                DROP_IP_NEW_KEYS_PER_DAY: '1000',
+              },
+            },
+          }),
+        ],
+        resolve: { alias },
+        test: {
+          name: 'drop-worker-limits',
+          include: [DROP_LIMITS],
           testTimeout: 20_000,
         },
       },
