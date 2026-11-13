@@ -33,6 +33,7 @@ import { readOnlyClient, type LocalUiContext } from '../context.js';
 import { createLocalUiRoutes } from '../routes.js';
 import type { LocalUiOwnerOperation, LocalUiResult } from '../route-types.js';
 import { RETENTION_PATH, retentionRoutes } from './retention.js';
+import { rulesRoutes } from './rules.js';
 
 const PREFIX = 'retention-test-sealed:';
 class TestCipher implements StoreCipher {
@@ -204,7 +205,12 @@ describe('GET: the values in force and a preview', () => {
     const r = await read(context, 'messages=90&files=30');
     expect(r.status).toBe(200);
     const preview = (r.body as { preview?: unknown }).preview;
-    expect(preview).toEqual({ messages: { count: 0, bytes: 0 }, files: { count: 0, bytes: 0 } });
+    expect(preview).toEqual({
+      messages: { count: 0, bytes: 0 },
+      files: { count: 0, bytes: 0 },
+      // IR-RET-67-1 Low 5: whether a count was capped (the page then says "about").
+      truncated: false,
+    });
   });
 
   it('a value outside the 06 §3 list, a lone key or another key is invalid_query', async () => {
@@ -271,5 +277,75 @@ describe('POST: the owner-signed history change (presence)', () => {
     }
     expect(calls).toHaveLength(0);
     expect((await policyOf(client)).version).toBe(1);
+  });
+});
+
+// IR-RET-67-1 Medium 2: on an ID with no signed rules yet (the defaults), only the Storage editor (and
+// a new ID's first rules, owner-first-policy.ts) may introduce non-zero `history` values. Any other
+// first edit (Rules, the Send folder banner: owner-send-folder.test.ts) signs keep forever (0/0).
+describe('a first edit of the defaults never turns retention on (IR-RET-67-1 Medium 2)', () => {
+  it('core: a patch without history on the defaults signs 0/0', async () => {
+    const { client } = await setup();
+    expect((await client.ownerActions.loadPolicy()).mode).toBe('defaults');
+    const prepared = await client.ownerActions.preparePolicyEdit({
+      receipts: { autoOpened: true },
+    });
+    if (prepared.status !== 'prepared') throw new Error(prepared.reason);
+    const policy = (prepared.body.params as unknown as { policy: { history?: unknown } }).policy;
+    expect(policy.history).toEqual({ messagesKeepDays: 0, filesKeepDays: 0 });
+  });
+
+  it('the Rules page on the defaults signs 0/0', async () => {
+    const { client, context, owner } = await setup();
+    const review = rulesRoutes.find((r) => r.method === 'GET' && r.path === '/api/ui/rules/review');
+    const saveRoute = rulesRoutes.find((r) => r.method === 'POST' && r.path === '/api/ui/rules');
+    if (review === undefined || review.presence || saveRoute?.presence !== true) {
+      throw new Error('no rules routes');
+    }
+    const edit = encodeBase64url(
+      encodeUtf8(JSON.stringify({ base: 0, patch: { proofs: { notarize: 'approval' } } })),
+    );
+    const reviewed = await review.handler(context, {
+      params: {},
+      query: new URLSearchParams({ edit }),
+    });
+    const body = reviewed.body as { review: string; warnings: { code: string }[] };
+    const { op } = ownerOp(owner);
+    const saved = await saveRoute.handler(
+      context,
+      {
+        params: {},
+        query: new URLSearchParams(),
+        input: { review: body.review, acknowledged: body.warnings.map((w) => w.code) },
+      },
+      op,
+    );
+    expect(saved.status).toBe(200);
+    expect((await policyOf(client)).policy.history).toEqual({
+      messagesKeepDays: 0,
+      filesKeepDays: 0,
+    });
+  });
+
+  it('the Storage editor on the defaults may turn it on (the owner chose the values)', async () => {
+    const { client, context, owner } = await setup();
+    const { op } = ownerOp(owner);
+    const r = await save(context, op, { base: 0, messagesKeepDays: 0, filesKeepDays: 90 });
+    expect(r.body).toMatchObject({ status: 'done', version: 1 });
+    expect((await policyOf(client)).policy.history).toEqual({
+      messagesKeepDays: 0,
+      filesKeepDays: 90,
+    });
+  });
+
+  it('the read on the defaults shows keep forever (what a first edit would sign)', async () => {
+    const { context } = await setup();
+    const r = await read(context);
+    expect(r.body).toMatchObject({
+      status: 'ok',
+      version: 0,
+      active: false,
+      keep: { messagesKeepDays: 0, filesKeepDays: 0 },
+    });
   });
 });

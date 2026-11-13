@@ -177,3 +177,35 @@ describe('Keep automatically (RET-6)', () => {
     expect(selectOf('Keep messages').value).toBe('365');
   });
 });
+
+describe('Keep automatically: capped preview (IR-RET-67-1 Low 5)', () => {
+  it('says "about" when the count was capped', async () => {
+    const capped = {
+      get: vi.fn((path: string): Promise<ApiResult<unknown>> => {
+        const data = path.includes('?')
+          ? {
+              ...(current as object),
+              preview: {
+                messages: { count: 0, bytes: 0 },
+                files: { count: 4, bytes: 30_000_000 },
+                truncated: true,
+              },
+            }
+          : current;
+        return Promise.resolve({ kind: 'ok', status: 200, data });
+      }),
+    } as unknown as ApiClient;
+    await act(async () => {
+      root.render(
+        createElement(
+          PresenceSeamsContext.Provider,
+          { value: { gesture, platform: 'mac', userAgent: 'Mozilla/5.0 (Macintosh)' } },
+          createElement(KeepAutomatically, { api: capped, fetch: fetchFn, token: 't' }),
+        ),
+      );
+    });
+    await settle();
+    await choose('Keep saved files', '30');
+    expect(text()).toContain('Right now this moves about 4 files (30 MB) to the Trash.');
+  });
+});

@@ -99,10 +99,30 @@ async function mount(search: string): Promise<void> {
 }
 
 describe('Settings › Storage opened from agentlink_tidy (RET-7)', () => {
-  it('says the AI suggested it and shows the exact counts; nothing is deleted yet', async () => {
+  // IR-RET-67-1 Low 3: the link only fills the filters; the owner presses Review. It never opens
+  // the delete sheet by itself, and the page does not claim who made the link.
+  it('fills the filters and waits for Review; nothing is asked of the server yet', async () => {
     await mount(`?tidy=files&days=90&contact=${MARKO}`);
-    expect(host.textContent).toContain('Your AI suggested this cleanup.');
-    expect(host.textContent).toContain('Nothing is deleted until you confirm it here.');
+    expect(host.textContent).toContain('These filters were filled in from a link.');
+    expect(host.textContent).not.toContain('Your AI suggested');
+    expect(sent).toEqual([]);
+    const value = (label: string): string | undefined =>
+      [...host.querySelectorAll('label')]
+        .find((l) => (l.textContent ?? '').includes(label))
+        ?.querySelector('select')?.value;
+    expect(value('Person')).toBe(MARKO);
+    expect(value('Older than')).toBe('90');
+    const files = [...host.querySelectorAll('label')]
+      .find((l) => (l.textContent ?? '').includes('Files only'))
+      ?.querySelector('input');
+    expect(files?.checked).toBe(true);
+    const review = [...host.querySelectorAll('button')].find(
+      (b) => (b.textContent ?? '').trim() === 'Review',
+    );
+    await act(async () => {
+      review?.click();
+    });
+    await settle();
     expect(sent).toEqual([
       {
         path: '/api/ui/history/delete/begin',
@@ -110,15 +130,13 @@ describe('Settings › Storage opened from agentlink_tidy (RET-7)', () => {
       },
     ]);
     expect(host.textContent).toContain('This removes 0 messages and 6 files (410 MB).');
-    // Only the plan was asked for: no finish without the owner's gesture.
     expect(sent.map((s) => s.path)).not.toContain('/api/ui/history/delete/finish');
   });
 
-  it('everyone, messages and files', async () => {
+  it('everyone, messages and files: prefilled, no plan until Review', async () => {
     await mount('?tidy=both&days=365');
-    expect(sent).toEqual([
-      { path: '/api/ui/history/delete/begin', body: { olderThanDays: 365, include: 'both' } },
-    ]);
+    expect(sent).toEqual([]);
+    expect(host.textContent).toContain('These filters were filled in from a link.');
   });
 
   it('any other query is ignored: no proposal and no plan', async () => {
@@ -134,7 +152,7 @@ describe('Settings › Storage opened from agentlink_tidy (RET-7)', () => {
     ]) {
       sent = [];
       await mount(search);
-      expect(host.textContent, search).not.toContain('Your AI suggested');
+      expect(host.textContent, search).not.toContain('filled in from a link');
       expect(sent, search).toEqual([]);
     }
   });

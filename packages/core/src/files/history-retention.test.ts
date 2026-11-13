@@ -22,7 +22,12 @@ import {
   pairForFiles,
   type FileAgent,
 } from '../testing/files.js';
-import { HISTORY_RETENTION_INTERVAL_SECONDS, historyKeepOf } from './retention.js';
+import {
+  HISTORY_RETENTION_BACKOFF_SECONDS,
+  HISTORY_RETENTION_INTERVAL_SECONDS,
+  historyKeepOf,
+} from './retention.js';
+import { CoreError } from '../errors.js';
 import { defaultPolicy, type Policy } from '@4thtech-io/types';
 
 const DAY = 86_400;
@@ -285,5 +290,132 @@ describe('a policy edit carries history (06 §3: every new policy.set has it)', 
     delete base.history;
     const merged = mergePolicyPatch(base as Policy, { history: { filesKeepDays: 90 } });
     expect(merged.history).toEqual({ messagesKeepDays: 0, filesKeepDays: 90 });
+  });
+});
+
+// IR-RET-67-1 Medium 1: a contact signs `createdAt`, so an age must never come from it alone. Saved
+// files age by `saved_files.saved_at`; inbound messages by the earliest local time the core recorded
+// for them (first seen, read, saved), never earlier than `createdAt`; own sent messages by the local
+// send time. An inbound message with no local time at all is not aged out (kept).
+describe('backdating: ages are local (IR-RET-67-1 Medium 1)', () => {
+  /** A sends with its clock `days` in the past (a backdated createdAt); B receives it now. */
+  async function backdated(w: World, days: number, name?: string): Promise<string> {
+    const real = w.clock.t;
+    w.clock.t = real - days * DAY;
+    const sent = await w.a.client.sendMessage({
+      to: w.b.id,
+      text: TEXT,
+      ...(name === undefined ? {} : { files: [outgoing(name, fileBytes(3_000, TEXT))] }),
+    });
+    w.clock.t = real;
+    if (sent.status !== 'ok') throw new Error('not sent');
+    await deliver(w.a, w.b);
+    if (name !== undefined) {
+      expect(await w.b.client.fetchFile({ envelopeId: sent.envelopeId })).toMatchObject({
+        status: 'ok',
+      });
+    }
+    return sent.envelopeId;
+  }
+
+  it('a message backdated two years is not removed by the next pass', async () => {
+    const w = await world(keep(90, 0));
+    const id = await backdated(w, 800);
+    w.clock.t += 10;
+    await w.b.client.historyRetention.run();
+    expect((await body(w, id))?.deleted_at).toBeNull();
+    // The owner's own age filter (Free up space, agentlink_tidy) uses the same local age.
+    const plan = await w.b.client.history.plan({
+      before: w.clock.t - 90 * DAY,
+      include: 'messages',
+    });
+    expect(plan.envelopeIds).not.toContain(id);
+  });
+
+  it('a backdated file ages from when it was saved here, not from its createdAt', async () => {
+    const w = await world(keep(0, 30));
+    await backdated(w, 5, 'back.pdf');
+    // createdAt is now 31 days old; the file was saved 26 days ago.
+    w.clock.t += 26 * DAY;
+    await w.b.client.historyRetention.run();
+    expect(w.b.inbox.files().has('back.pdf')).toBe(true);
+    expect(w.b.inbox.trashCalls).toBe(0);
+    // Once 30 days have passed since the save, it goes.
+    w.clock.t += 5 * DAY;
+    await w.b.client.historyRetention.run();
+    expect(w.b.inbox.trashed).toEqual(['back.pdf']);
+  });
+});
+
+describe('the pass under races, pauses and clocks (IR-RET-67-1 Lows 6-8)', () => {
+  it('paused between the plan and the apply: nothing is deleted', async () => {
+    const w = await world(keep(0, 30));
+    await savedFile(w);
+    w.clock.t += 31 * DAY;
+    const answers = [false, true];
+    (w.b.client.pause as { paused: () => Promise<boolean> }).paused = () =>
+      Promise.resolve(answers.shift() ?? true);
+    expect(await w.b.client.historyRetention.run()).toMatchObject({
+      status: 'skipped',
+      reason: 'paused',
+    });
+    expect(w.b.inbox.trashCalls).toBe(0);
+  });
+
+  it("the owner's own delete racing the pass: each item goes once, the pass is refused", async () => {
+    const w = await world(keep(0, 30));
+    await savedFile(w, 'race.pdf');
+    w.clock.t += 31 * DAY;
+    const history = w.b.client.history;
+    const plan = history.plan.bind(history);
+    let raced = false;
+    (history as { plan: typeof plan }).plan = async (input) => {
+      const planned = await plan(input);
+      if (!raced) {
+        raced = true;
+        await history.apply(await plan(input));
+      }
+      return planned;
+    };
+    const outcome = await w.b.client.historyRetention.run();
+    (history as { plan: typeof plan }).plan = plan;
+    expect(outcome).toMatchObject({ status: 'skipped', reason: 'failed' });
+    expect(w.b.inbox.trashed).toEqual(['race.pdf']);
+  });
+
+  it('a failing pass backs off before it plans again', async () => {
+    const w = await world(keep(0, 30));
+    await savedFile(w);
+    w.clock.t += 31 * DAY;
+    const history = w.b.client.history;
+    const plan = history.plan.bind(history);
+    let plans = 0;
+    (history as { plan: typeof plan }).plan = () => {
+      plans += 1;
+      return Promise.reject(new CoreError('history_plan_changed', 'x'));
+    };
+    expect((await w.b.client.historyRetention.run()).status).toBe('skipped');
+    expect(await w.b.client.historyRetention.run()).toMatchObject({
+      status: 'skipped',
+      reason: 'backoff',
+    });
+    expect(plans).toBe(1);
+    expect(HISTORY_RETENTION_BACKOFF_SECONDS).toBeGreaterThanOrEqual(3600);
+    (history as { plan: typeof plan }).plan = plan;
+    w.clock.t += HISTORY_RETENTION_BACKOFF_SECONDS;
+    expect((await w.b.client.historyRetention.run()).status).toBe('ran');
+    expect(w.b.inbox.trashCalls).toBe(1);
+  });
+
+  it('a clock set back deletes nothing younger than the limit', async () => {
+    const w = await world(keep(0, 30));
+    await savedFile(w, 'old.pdf');
+    w.clock.t += 31 * DAY;
+    expect((await w.b.client.historyRetention.run()).status).toBe('ran');
+    await savedFile(w, 'new.pdf');
+    w.clock.t -= 40 * DAY;
+    await w.b.client.historyRetention.run();
+    expect(w.b.inbox.trashed).toEqual(['old.pdf']);
+    expect(w.b.inbox.files().has('new.pdf')).toBe(true);
   });
 });
