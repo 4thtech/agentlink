@@ -792,15 +792,23 @@ describe('deep link to a running copy (Windows)', () => {
       },
     });
     await runShell(first.electron, first.proc);
-    first.electron.app.emit('second-instance', new FakeEvent(), ['--original-process-start-time=1'], 'C:\\', {
-      deepLink: 'agentlink://join#win',
-    });
+    first.electron.app.emit(
+      'second-instance',
+      new FakeEvent(),
+      ['--original-process-start-time=1'],
+      'C:\\',
+      {
+        deepLink: 'agentlink://join#win',
+      },
+    );
     await tick();
     expect(seen).toEqual(['agentlink://join#win']);
   });
 
   it('a Windows-style switch before the separator is refused', async () => {
-    const { electron, proc } = setup(['/inspect', '--', 'agentlink://join#x'], { platform: 'win32' });
+    const { electron, proc } = setup(['/inspect', '--', 'agentlink://join#x'], {
+      platform: 'win32',
+    });
     expect(await runShell(electron, proc)).toBe('refused');
   });
 });
@@ -821,13 +829,12 @@ describe('Windows tray icon', () => {
 
   it('the shell asks Electron for the taskbar colour', async () => {
     const { electron, proc } = setup([], { platform: 'win32' });
-    const res = join('C:', 'AgentLink', 'resources');
-    const light = join(res, 'assets', 'tray-light-taskbar.ico');
+    const light = join(RES, 'assets', 'tray-light-taskbar.ico');
     electron.imageFiles.add(light);
     (electron as { nativeTheme?: unknown }).nativeTheme = {
       shouldUseDarkColorsForSystemIntegratedUI: false,
     };
-    await runShell(electron, { ...proc, resourcesPath: res });
+    await runShell(electron, proc);
     expect((FakeTray.created[0]?.icon as { source?: string }).source).toBe(light);
   });
 });

@@ -80,14 +80,16 @@ describe('bundle tripwire on Windows', () => {
   it('knows where the three files are inside the installed Windows app', () => {
     const win = bundleFilePaths(join('C:', 'AgentLink', 'resources'), 'win32');
     expect(win.node).toBe(join('C:', 'AgentLink', 'resources', 'node', 'node.exe'));
-    expect(win.helper).toBe(join('C:', 'AgentLink', 'resources', 'native', 'agentlink-presence.exe'));
+    expect(win.helper).toBe(
+      join('C:', 'AgentLink', 'resources', 'native', 'agentlink-presence.exe'),
+    );
   });
 
   it('a changed Windows helper is caught', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'al-bundle-win-'));
     dirs.push(dir);
     const paths = bundleFilePaths(join(dir, 'resources'), 'win32');
-    for (const p of [paths.node, paths.host, paths.helper as string]) {
+    for (const p of [paths.node, paths.host, paths.helper] as string[]) {
       mkdirSync(join(p, '..'), { recursive: true });
       writeFileSync(p, 'abc');
     }

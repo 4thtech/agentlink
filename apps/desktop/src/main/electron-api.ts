@@ -275,4 +275,6 @@ export interface ElectronModule {
   readonly net?: { isOnline(): boolean };
   /** N7: native notifications (main process). */
   readonly Notification?: NotificationConstructor;
+  /** WIN-DESK-2: Windows only, whether the taskbar is dark (picks the tray icon). */
+  readonly nativeTheme?: { readonly shouldUseDarkColorsForSystemIntegratedUI?: boolean };
 }

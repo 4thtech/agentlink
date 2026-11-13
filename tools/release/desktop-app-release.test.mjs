@@ -121,10 +121,14 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
     expect(before).toContain('--pattern "AgentLink-$VERSION-win-x64-setup.exe"');
     expect(before).toContain('--pattern AgentLink-win-x64-setup.exe');
     expect(before).toMatch(/wc -l < SHA256SUMS-desktop-app\.txt\)" -eq 8/);
-    expect(before).toContain('for file in AgentLink-mac-arm64.dmg AgentLink-mac-x64.dmg AgentLink-win-x64-setup.exe');
+    expect(before).toContain(
+      'for file in AgentLink-mac-arm64.dmg AgentLink-mac-x64.dmg AgentLink-win-x64-setup.exe',
+    );
     expect(before).toContain('releases/download/v$VERSION/$file');
     const after = attach.slice(attach.indexOf('Check the public download links'));
-    expect(after).toContain('for file in AgentLink-mac-arm64.dmg AgentLink-mac-x64.dmg AgentLink-win-x64-setup.exe');
+    expect(after).toContain(
+      'for file in AgentLink-mac-arm64.dmg AgentLink-mac-x64.dmg AgentLink-win-x64-setup.exe',
+    );
     expect(after).toContain('releases/latest/download/$file');
   });
 

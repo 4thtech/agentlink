@@ -18,7 +18,7 @@ $found = $ast.FindAll({
 foreach ($statement in $found) {
   $isFunction = $statement -is [System.Management.Automation.Language.FunctionDefinitionAst]
   $isSetting = $statement -is [System.Management.Automation.Language.AssignmentStatementAst] -and
-    @('$NodeVersion', '$Package', '$DesktopReleased', '$DesktopVersion', '$DesktopReleases') -contains $statement.Left.Extent.Text
+    @('$NodeVersion', '$Package', '$DesktopReleased', '$DesktopVersion', '$DesktopReleases', '$DesktopNotYet') -contains $statement.Left.Extent.Text
   if ($isFunction -or $isSetting) { . ([scriptblock]::Create($statement.Extent.Text)) }
 }
 

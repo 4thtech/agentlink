@@ -5,23 +5,24 @@
 #
 # Triggers
 #   workflow_dispatch  a manual build (input `version`, default 0.0.0-dev; input `windows`, default
-#                      false, adds the Windows leg).
+#                      true: `windows: false` leaves the Windows leg out).
 #   workflow_call      for release.yml's desktop-app jobs (WP-D11, DESK051-C4); inputs `version`, `updates`.
 #   pull_request       only for a change under apps/desktop/**, apps/cli/src/desktop/** or this file.
 #
-# Windows (REL051-CIE, scope change for 0.5.1): the Windows desktop app is not shipped yet (its core
-# exits at start on Windows and the first start loses the single-instance lock). The win-x64 leg runs
-# only on a manual run with `windows: true`, never on pull requests or in the release, so it can be
-# fixed separately. Windows users use the browser app.
+# Windows (WIN-DESK-1d, owner 0.5.3): the Windows app ships as an unsigned early build, so the win-x64
+# leg runs on pull requests and in the release again (one job, Free-plan friendly). Only a manual run
+# with `windows: false` leaves it out. The browser app stays the Windows default.
 #
-# Jobs (3, or 4 with `windows: true`; well inside the Free-plan cap of 20 concurrent jobs)
-#   build   matrix: macos-26 arm64, macos-26 x64 (cross-build); windows-2022 x64 only with `windows: true`.
+# Jobs (4, or 3 with `windows: false`; well inside the Free-plan cap of 20 concurrent jobs)
+#   build   matrix: macos-26 arm64, macos-26 x64 (cross-build), windows-2022 x64.
 #           Builds the CLI tarball and the shell bundle, the native presence helper (macOS: the
 #           AgentLink.app helper bundle; Windows: MSVC via Enter-VsDevShell), then the app with it, then runs on the built
 #           binaries: check-fuses (fuse read-back and ASAR integrity), check-preview-string,
 #           check-switch-lockdown, check-tampered-asar, and the smoke test
 #           (apps/desktop/test/smoke/smoke.mjs). The x64 macOS binaries are launched only when
-#           Rosetta runs on the runner. Uploads the artifacts with a per-platform SHA256SUMS.
+#           Rosetta runs on the runner. On Windows it also runs the data folder ACL check on real
+#           folders (apps/desktop/test/smoke/data-acl-check.mjs). Uploads the artifacts with a
+#           per-platform SHA256SUMS.
 #   attest  not on pull requests: merges the sums into SHA256SUMS and attests build provenance.
 #
 # Updates (DESK051-C4): input `updates`, default "off" until the offline key ceremony. "off" bundles
@@ -63,10 +64,10 @@ on:
         required: false
         default: "off"
       windows:
-        description: "Also build and check the Windows app (not shipped yet; REL051-CIE)"
+        description: "Also build and check the Windows app (false leaves it out)"
         type: boolean
         required: false
-        default: false
+        default: true
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches-ignore: [sync]
@@ -98,9 +99,10 @@ jobs:
       fail-fast: false
       matrix:
         # macos-26 is the macOS label the other workflows use (ci.yml); the x64 app is
-        # cross-built on the arm64 runner. win-x64 (windows-2022) only on a manual run with
-        # `windows: true` (REL051-CIE); `inputs.windows` is unset on pull requests and workflow_call.
-        include: ${{ fromJSON(inputs.windows == true && '[{"target":"mac-arm64","os":"macos-26","arch":"arm64"},{"target":"mac-x64","os":"macos-26","arch":"x64"},{"target":"win-x64","os":"windows-2022","arch":"x64"}]' || '[{"target":"mac-arm64","os":"macos-26","arch":"arm64"},{"target":"mac-x64","os":"macos-26","arch":"x64"}]') }}
+        # cross-built on the arm64 runner. win-x64 (windows-2022) always, except on a manual run with
+        # `windows: false` (WIN-DESK-1d). `inputs.windows` is unset on pull requests and workflow_call,
+        # so the event name is checked first: an unset input never counts as false.
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.windows == false && '[{"target":"mac-arm64","os":"macos-26","arch":"arm64"},{"target":"mac-x64","os":"macos-26","arch":"x64"}]' || '[{"target":"mac-arm64","os":"macos-26","arch":"arm64"},{"target":"mac-x64","os":"macos-26","arch":"x64"},{"target":"win-x64","os":"windows-2022","arch":"x64"}]') }}
     env:
       VERSION: ${{ inputs.version || '0.0.0-dev' }}
       UPDATES: ${{ inputs.updates || 'off' }}
@@ -260,6 +262,13 @@ jobs:
           limit=20000
           if [ "$RUNNER_OS" = "macOS" ] && [ "$ARCH" = "x64" ]; then limit=180000; fi
           node apps/desktop/build/check-tampered-asar.mjs --app "$APP" --timeout-ms "$limit"
+
+      # OD-M (WIN-DESK-2): the shell's data folder ACL check against real folders on this runner: an
+      # inherited ACL is accepted, one that lets Everyone read is refused.
+      - name: Data folder ACL check (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: node --experimental-strip-types apps/desktop/test/smoke/data-acl-check.mjs
 
       # Runs even when a launch check above failed: its own result (and the app log it prints on a
       # failure) tells a launch problem of the build apart from one of the check.

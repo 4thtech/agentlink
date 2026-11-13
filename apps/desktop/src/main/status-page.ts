@@ -26,6 +26,7 @@ export const STATUS_KINDS = [
   'ai_app',
   'missing_files',
   'changed_files',
+  'shared_data_folder',
 ] as const;
 export type StatusKind = (typeof STATUS_KINDS)[number];
 
@@ -79,6 +80,12 @@ export const STATUS_COPY: Readonly<Record<StatusKind, StatusCopy>> = Object.free
   changed_files: {
     heading: 'Some of AgentLink was changed',
     body: "Parts of the AgentLink app were changed after it was built, so it didn't start. Install AgentLink again from agentlink.4thtech.io, then open it.",
+  },
+  // OD-M (WIN-DESK-2, data-acl.ts): on Windows, other people on this computer can open the folder
+  // where AgentLink keeps your IDs and messages.
+  shared_data_folder: {
+    heading: 'Your AgentLink folder is shared',
+    body: "Other people who use this computer can open the folder where AgentLink keeps your IDs and messages (.agentlink in your user folder), so AgentLink didn't start. Right-click that folder, choose Properties, then Security, and remove everyone except you, SYSTEM and Administrators. Then choose Try again.",
   },
 });
 

@@ -105,7 +105,10 @@ describe('the verdict', () => {
 });
 
 describe('checking the folder', () => {
-  const runner = (sddl: string | Error, whoami: string | Error = WHOAMI): AclRunner & {
+  const runner = (
+    sddl: string | Error,
+    whoami: string | Error = WHOAMI,
+  ): AclRunner & {
     calls: { file: string; args: readonly string[]; env: Record<string, string> }[];
   } => {
     const calls: { file: string; args: readonly string[]; env: Record<string, string> }[] = [];
@@ -128,9 +131,9 @@ describe('checking the folder', () => {
   it('runs Windows PowerShell and whoami from System32, the path only through the environment', async () => {
     const r = runner(INHERITED);
     const env = { SystemRoot: 'C:\\Windows' };
-    await expect(checkDataFolderAcl('win32', 'C:\\Users\\a"; rm\\.agentlink', env, r)).resolves.toBe(
-      'ok',
-    );
+    await expect(
+      checkDataFolderAcl('win32', 'C:\\Users\\a"; rm\\.agentlink', env, r),
+    ).resolves.toBe('ok');
     const ps = r.calls.find((c) => c.file.endsWith('powershell.exe'));
     expect(ps?.file).toBe('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
     expect(ps?.args).toEqual(['-NoProfile', '-NonInteractive', '-Command', ACL_SCRIPT]);
@@ -143,7 +146,12 @@ describe('checking the folder', () => {
 
   it('an odd SystemRoot falls back to C:\\Windows', async () => {
     const r = runner(INHERITED);
-    await checkDataFolderAcl('win32', 'C:\\Users\\ana\\.agentlink', { SystemRoot: '\\\\evil\\x' }, r);
+    await checkDataFolderAcl(
+      'win32',
+      'C:\\Users\\ana\\.agentlink',
+      { SystemRoot: '\\\\evil\\x' },
+      r,
+    );
     expect(r.calls.every((c) => c.file.startsWith('C:\\Windows\\System32\\'))).toBe(true);
   });
 

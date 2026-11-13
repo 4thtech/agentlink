@@ -33,11 +33,12 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { spawn as nodeSpawn, spawnSync } from 'node:child_process';
+import { execFile, spawn as nodeSpawn, spawnSync } from 'node:child_process';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BUNDLE_HASHES_FILE, bundleFilePaths, verifyBundle } from './bundle-check.js';
 import { CoreLog, logDir } from './core-log.js';
+import { checkDataFolderAcl, dataFolderFor, type AclVerdict } from './data-acl.js';
 import { CoreSupervisor, aiAppMarkerSet, type SpawnFn, type Timers } from './core-process.js';
 import { INVITE_RESULT_TITLE, inviteResultCopy, toInviteLink } from './deep-link.js';
 import type { App, ElectronModule } from './electron-api.js';
@@ -134,18 +135,26 @@ export interface ResourcePaths {
  * The fixed layout under `process.resourcesPath` (macOS `AgentLink.app/Contents/Resources`, Windows
  * `…\AgentLink\resources`), from src/shared/resource-layout.json, which WP-D4's packaging reads too.
  */
-export function resourcePaths(resourcesPath: string, platform: string): ResourcePaths {
+export function resourcePaths(
+  resourcesPath: string,
+  platform: string,
+  options: { readonly darkTaskbar?: boolean | undefined } = {},
+): ResourcePaths {
   const node = join(
     resourcesPath,
     ...(platform === 'win32' ? RESOURCE_LAYOUT.node.win32 : RESOURCE_LAYOUT.node.posix),
   );
+  // WIN-DESK-2: Windows has one tray icon per taskbar colour (build-win.mjs, build/lib/ico.mjs); the
+  // dark taskbar (the Windows 10 default) when the colour is unknown.
+  const winTray =
+    options.darkTaskbar === false ? 'tray-light-taskbar.ico' : 'tray-dark-taskbar.ico';
   return {
     node,
     hostScript: join(resourcesPath, ...RESOURCE_LAYOUT.hostScript),
     trayIcon: join(
       resourcesPath,
       ...RESOURCE_LAYOUT.assetsDir,
-      platform === 'darwin' ? 'trayTemplate.png' : platform === 'win32' ? 'tray.ico' : 'tray.png',
+      platform === 'darwin' ? 'trayTemplate.png' : platform === 'win32' ? winTray : 'tray.png',
     ),
   };
 }
@@ -200,6 +209,11 @@ export interface ShellProcess {
   readonly instance?: (app: App) => InstanceOps;
   /** D15-07: the startup tripwire for the bundled files (bundle-check.ts). Absent: not checked. */
   readonly verifyBundle?: () => Promise<'ok' | 'changed' | 'unchecked'>;
+  /**
+   * OD-M (WIN-DESK-2, data-acl.ts): whether the data folder's ACL lets other people on this
+   * computer open it (Windows; 'ok' elsewhere). Absent: not checked.
+   */
+  readonly checkDataFolder?: () => Promise<AclVerdict>;
 }
 
 /** UPD-5: what the shell uses of updater/in-app.ts InAppUpdater. */
@@ -481,7 +495,9 @@ export async function runShell(
   // The window comes up at once: the person sees AgentLink starting, never nothing.
   window.showStatus('starting');
 
-  const paths = resourcePaths(proc.resourcesPath, proc.platform);
+  const paths = resourcePaths(proc.resourcesPath, proc.platform, {
+    darkTaskbar: electron.nativeTheme?.shouldUseDarkColorsForSystemIntegratedUI,
+  });
   let nodePath = paths.node;
   let hostScript = paths.hostScript;
   if (preview !== null) {
@@ -613,7 +629,9 @@ export async function runShell(
     if (!proc.exists(nodePath) || !proc.exists(hostScript)) return 'missing_files';
     return null;
   };
-  const blocked = (kind: 'ai_app' | 'missing_files' | 'changed_files'): void => {
+  const blocked = (
+    kind: 'ai_app' | 'missing_files' | 'changed_files' | 'shared_data_folder',
+  ): void => {
     tray?.update('failed', approvals);
     window?.showStatus(kind);
   };
@@ -622,7 +640,8 @@ export async function runShell(
     else supervisor?.start();
   };
   // D15-07: the tripwire runs before every core start (packaged release builds; a preview runs a
-  // development core). While it runs the window shows the starting page.
+  // development core). OD-M: then, on Windows, the data folder's ACL. While they run the window
+  // shows the starting page.
   let verifying = false;
   const startCore = (): Promise<void> | undefined => {
     const problem = precheck();
@@ -632,19 +651,25 @@ export async function runShell(
     }
     window?.showStatus('starting');
     const verify = preview === null ? proc.verifyBundle : undefined;
-    if (verify === undefined) {
+    const checkFolder = proc.checkDataFolder;
+    if (verify === undefined && checkFolder === undefined) {
       launchCore();
       return undefined;
     }
     verifying = true;
-    return verify()
-      .catch((): 'changed' => 'changed')
-      .then((result) => {
-        verifying = false;
-        if (quitting) return;
-        if (result === 'changed') blocked('changed_files');
-        else launchCore();
-      });
+    return (async (): Promise<void> => {
+      const bundle = verify === undefined ? 'ok' : await verify().catch((): 'changed' => 'changed');
+      // A check that fails to run is 'unchecked' (data-acl.ts): it does not stop the start.
+      const folder =
+        bundle === 'changed' || checkFolder === undefined
+          ? 'ok'
+          : await checkFolder().catch((): 'unchecked' => 'unchecked');
+      verifying = false;
+      if (quitting) return;
+      if (bundle === 'changed') blocked('changed_files');
+      else if (folder === 'too_open') blocked('shared_data_folder');
+      else launchCore();
+    })();
   };
   const tryAgain = (): void => {
     if (quitting || verifying) return;
@@ -743,7 +768,33 @@ export function realProcess(): ShellProcess {
       }
       return verifyBundle(record, bundleFilePaths(resources, proc.platform));
     },
+    checkDataFolder: () =>
+      checkDataFolderAcl(
+        proc.platform,
+        dataFolderFor(homedir(), proc.platform, existsSync),
+        proc.env,
+        { run: runQuiet },
+      ),
   };
+}
+
+/** OD-M: runs a System32 tool without a shell, window or inherited environment; stdout only. */
+function runQuiet(
+  file: string,
+  args: readonly string[],
+  env: Record<string, string>,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      file,
+      [...args],
+      { env, windowsHide: true, timeout: 15_000, maxBuffer: 64 * 1024, encoding: 'utf8' },
+      (error, stdout) => {
+        if (error !== null) reject(new Error('check failed'));
+        else resolve(stdout);
+      },
+    );
+  });
 }
 
 /** `<size>-<mtimeMs>-<ino>` of a file, or '' (D15-01 build stamp). */
