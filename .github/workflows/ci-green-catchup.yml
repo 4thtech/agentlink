@@ -13,7 +13,7 @@
 #
 # Security posture (as ci-auto-retry.yml): `workflow_run` runs this file from the default branch with
 # a token that can write Actions state. It never checks out or executes code of the triggering run:
-# it checks out only the two decision scripts at `github.sha` (the default branch head for this
+# it checks out only the decision scripts (three files) at `github.sha` (the default branch head for this
 # event), runs them with the runner's Node (no install), and passes the event's head_sha through
 # `env:` only; the script validates it as a 40-hex commit and requires it to be main's head. Only
 # push runs of main from this repository count. No secrets; `actions: write` re-runs runs of this

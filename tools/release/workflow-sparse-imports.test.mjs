@@ -46,14 +46,18 @@ describe('workflow sparse-checkout lists', () => {
       it(`${f}: every sparse-checked-out .mjs has its relative imports listed`, () => {
         const missing = [];
         for (const entry of list.filter((e) => e.endsWith('.mjs'))) {
-          for (const dep of closure(entry)) if (!list.includes(dep)) missing.push(`${entry} -> ${dep}`);
+          for (const dep of closure(entry))
+            if (!list.includes(dep)) missing.push(`${entry} -> ${dep}`);
         }
         expect(missing).toEqual([]);
       });
     }
   }
   it('finds at least one sparse-checkout list', () => {
-    const n = files.reduce((a, f) => a + sparseLists(readFileSync(join(WORKFLOWS, f), 'utf8')).length, 0);
+    const n = files.reduce(
+      (a, f) => a + sparseLists(readFileSync(join(WORKFLOWS, f), 'utf8')).length,
+      0,
+    );
     expect(n).toBeGreaterThan(0);
   });
 });
