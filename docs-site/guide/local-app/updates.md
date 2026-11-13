@@ -27,7 +27,9 @@ After an update, an AI app still running the older version shows **Restart {app}
 
 ## What the check sends
 
-The browser app asks the npm registry (registry.npmjs.org) which version of `@4thtech-io/agentlink` is the latest, and nothing else; the desktop app asks GitHub. The registry sees your IP, as any website you visit does; no ID, contact, message, name or version number is sent. Offline, the page says so.
+The browser app asks the npm registry (registry.npmjs.org) which version of `@4thtech-io/agentlink` is the latest, and nothing else; the desktop app asks GitHub. The registry sees your IP, as any website you visit does, and the standard Node.js user agent (`node`); no ID, contact, message, name or version number is sent.
+
+**When.** The browser app checks once, about 30 seconds after AgentLink starts, then once a day while it runs, and when you press **Check for updates** (at most once a minute). It keeps the result in memory only and writes nothing to your computer. Offline, the page says so.
 
 **Turning it off.** Start AgentLink with the setting `AGENTLINK_UPDATE_CHECK=off` (for example `AGENTLINK_UPDATE_CHECK=off agentlink`). The page then says checking is turned off, and AgentLink never asks.
 
