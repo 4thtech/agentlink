@@ -239,6 +239,12 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/backup/reveal',
       // ATT-SENDFOLDER-FIX: Home's Send folder banner (api/files.test.ts).
       '/api/ui/files/send-folder',
+      // RET-4: Delete history and Show in Finder for the Inbox (local-ui/history-server.test.ts).
+      '/api/ui/history/delete/begin',
+      '/api/ui/history/delete/finish',
+      '/api/ui/history/delete/undo',
+      '/api/ui/history/delete/status',
+      '/api/ui/storage/inbox/reveal',
       // ATT-APP-ATTACH: attach files in a conversation (local-ui/attach-server.test.ts).
       '/api/ui/attach',
       // UPD-5: Update now and Restart now (api/app-update.test.ts).

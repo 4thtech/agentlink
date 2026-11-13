@@ -494,6 +494,8 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   'pages/contacts/presence-button.tsx': { offers: /<UseCodeInstead\b/ },
   'pages/invite/name-contact.tsx': { offers: /<PresenceButton\b/ },
   'pages/home/person-menu.tsx': { offers: /<PresenceButton\b/ },
+  // RET-4: the delete sheet's one button is the sensor, with the master code as a link.
+  'pages/history/delete-sheet.tsx': { offers: /<PresenceButton\b/ },
   // Approvals: OWNERSTEP-LEFT, the one-step PresenceAction offers the code (link, or the code field
   // when no sensor works here; approvals/card.tsx CodeStep).
   'pages/approvals/card.tsx': { offers: /<CodeForm\b/ },

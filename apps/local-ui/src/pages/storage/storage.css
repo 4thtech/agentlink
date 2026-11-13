@@ -106,3 +106,23 @@
   align-items: center;
   gap: var(--al-space-4);
 }
+/* RET-4: Free up space filters. */
+.sto-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--al-space-3);
+  margin-block-start: var(--al-space-2);
+}
+.sto-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-1);
+  min-inline-size: 160px;
+}
+.sto-check {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  min-block-size: 36px;
+}

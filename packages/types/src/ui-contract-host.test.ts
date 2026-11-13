@@ -89,6 +89,8 @@ describe('ui-settings kept: the page choices the app keeps', () => {
         'agentlink.prefs',
         'agentlink.notices.dismissed.v1',
         'agentlink.home.archived.v1',
+        // RET-5 (D-148): conversations archived from a person's menu.
+        'agentlink.conversations.archived.v1',
         'agentlink.recoveryKit.later',
         'agentlink.getStarted.hidden',
         'agentlink.getStarted.left',
@@ -116,6 +118,7 @@ describe('ui-settings kept: the page choices the app keeps', () => {
       }),
       'agentlink.notices.dismissed.v1': JSON.stringify(['tidy-up', 'protect-approvals:work']),
       'agentlink.home.archived.v1': JSON.stringify([`work/${REF}`]),
+      'agentlink.conversations.archived.v1': JSON.stringify([`work/${REF}`]),
       'agentlink.recoveryKit.later': '1762900000000',
       'agentlink.getStarted.hidden': '1',
       'agentlink.idsFit.hidden': '1',
@@ -156,6 +159,8 @@ describe('ui-settings kept: the page choices the app keeps', () => {
       { 'agentlink.home.archived.v1': JSON.stringify([`../x/${REF}`]) },
       { 'agentlink.home.archived.v1': JSON.stringify([`work/${REF}/x`]) },
       { 'agentlink.home.archived.v1': JSON.stringify({ a: 1 }) },
+      { 'agentlink.conversations.archived.v1': JSON.stringify(['work/Alice said hi']) },
+      { 'agentlink.conversations.archived.v1': JSON.stringify([`../x/${REF}`]) },
       {
         'agentlink.home.archived.v1': JSON.stringify(
           Array.from({ length: 201 }, (_, i) => `id${String(i)}/${REF}`),
