@@ -53,6 +53,7 @@ export interface AclEntry {
 const SYSTEM = 'S-1-5-18';
 const ADMINISTRATORS = 'S-1-5-32-544';
 const CREATOR_OWNER = 'S-1-3-0';
+const BUILTIN_ADMINISTRATOR_ALIAS = 'LA';
 
 /** SDDL aliases for well-known SIDs (the ones that matter here, and the usual wider ones). */
 const ALIASES: Readonly<Record<string, string>> = {
@@ -151,6 +152,9 @@ export function aclVerdict(sddl: string, userSid: string): AclVerdict {
     if (!entry.allow) continue;
     const sid = entry.sid.toUpperCase();
     if (sid === user || sid === SYSTEM || sid === ADMINISTRATORS) continue;
+    // LA: this computer's built-in Administrator (always in Administrators); icacls writes it by
+    // alias even when it is the user (the windows-2022 CI runner's account).
+    if (sid === BUILTIN_ADMINISTRATOR_ALIAS) continue;
     if (sid === CREATOR_OWNER && entry.inheritOnly) continue;
     return 'too_open';
   }

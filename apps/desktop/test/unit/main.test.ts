@@ -180,6 +180,27 @@ describe('runShell startup', () => {
     expect(logged).not.toContain('userData');
   });
 
+  // WIN-DESK-2: the guard runs before anything else asks for an app path (the update watchdog).
+  it('no data folder → the guard answers before the update watchdog runs', async () => {
+    let watchdog = 0;
+    const { electron, proc } = setup([], {
+      updateHealth: () => {
+        watchdog += 1;
+        electron.app.getPath?.('userData');
+        return { starting: () => undefined, ready: () => undefined };
+      },
+    });
+    Object.assign(electron.app, {
+      isPackaged: true,
+      getPath: () => {
+        throw new Error("Failed to get 'userData' path");
+      },
+    });
+    expect(await runShell(electron, proc)).toBe('profile');
+    expect(electron.app.exitCode).toBe(66);
+    expect(watchdog).toBe(0);
+  });
+
   it('a data folder that resolves → the lock is taken as before', async () => {
     const { electron, proc } = setup();
     Object.assign(electron.app, {

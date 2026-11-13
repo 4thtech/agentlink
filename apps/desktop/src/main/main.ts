@@ -254,28 +254,17 @@ export async function runShell(
     return 'refused';
   }
 
-  // UPD-4 (IR-UPD-4-1 #2): the update watchdog's start signal comes first, before the lock, whenReady
-  // and any dialog, so a new copy that hangs later can still be found and stopped.
-  const updateHealth = app.isPackaged && preview === null ? proc.updateHealth?.(app) : undefined;
-  updateHealth?.starting();
-
   // The log keeps one fixed line when the shell quits on its own at start (no window yet), so a
   // start that "does nothing" can be told apart afterwards: another copy running, or the folder.
   const coreLog = new CoreLog({ dir: proc.logDir });
 
-  // 2. Sandbox for every renderer; one instance.
-  app.enableSandbox();
-  // N7 (R-WIN): Windows attributes toasts to this ID (the installer's Start menu shortcut).
-  if (proc.platform === 'win32') {
-    try {
-      app.setAppUserModelId?.(APP_USER_MODEL_ID);
-    } catch {
-      // Without it Windows shows no toast; nothing else depends on it.
-    }
-  }
   // WIN-DESK-1: the lock lives in the data folder. When Electron cannot resolve it, getPath
   // throws and the lock would fail for that reason alone: say so (fixed line), never "another
-  // AgentLink is running". Nothing from the error is kept.
+  // AgentLink is running". Nothing from the error is kept. WIN-DESK-2: this is the first thing that
+  // asks for an app path (the update watchdog below asks for it too), so it runs before them.
+  // When the profile is so broken that Electron exits during its own native start (no shell code
+  // runs at all; the Windows smoke shows this for a profile without AppData\Roaming), this line
+  // cannot be written: the start ends with Electron's own exit code and no log line.
   let profileOk = true;
   try {
     if (app.getPath !== undefined) app.getPath('userData');
@@ -286,6 +275,22 @@ export async function runShell(
     coreLog.note('app quit at start: the AgentLink data folder is not available');
     app.exit(PROFILE_UNAVAILABLE_EXIT);
     return 'profile';
+  }
+
+  // UPD-4 (IR-UPD-4-1 #2): the update watchdog's start signal comes first, before the lock, whenReady
+  // and any dialog, so a new copy that hangs later can still be found and stopped.
+  const updateHealth = app.isPackaged && preview === null ? proc.updateHealth?.(app) : undefined;
+  updateHealth?.starting();
+
+  // 2. Sandbox for every renderer; one instance.
+  app.enableSandbox();
+  // N7 (R-WIN): Windows attributes toasts to this ID (the installer's Start menu shortcut).
+  if (proc.platform === 'win32') {
+    try {
+      app.setAppUserModelId?.(APP_USER_MODEL_ID);
+    } catch {
+      // Without it Windows shows no toast; nothing else depends on it.
+    }
   }
   let instance: InstanceOps | null = null;
   try {

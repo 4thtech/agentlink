@@ -427,7 +427,8 @@ function mcpToolsList() {
 /**
  * Windows only: a real account always has AppData\\Roaming, so this profile deliberately lacks it.
  * The app must say so in its fixed line and exit 66 (PROFILE_UNAVAILABLE_EXIT), not claim another
- * AgentLink is running. Code only here; it runs on the Windows runner.
+ * AgentLink is running. When Electron stops in its own native start (before the shell runs, so no
+ * line can be written), it must not have started anything. Code only here; it runs on Windows.
  */
 async function missingRoaming() {
   const ctx = makeHome({ noRoaming: true });
@@ -448,21 +449,30 @@ async function missingRoaming() {
     } catch {
       // no log
     }
-    if (exited !== 66) {
-      // Diagnosis (WIN-DESK-2): the code in hex, the shell's own fixed lines, and whether the
-      // app made the Roaming folder itself.
-      const hex = typeof exited === 'number' ? `0x${(exited >>> 0).toString(16)}` : String(exited);
+    const hex = typeof exited === 'number' ? `0x${(exited >>> 0).toString(16)}` : String(exited);
+    // Never the misleading line, never a clean exit, never a running app.
+    if (log.includes('another AgentLink is running')) {
+      return fail('without AppData\\Roaming the app said another AgentLink is running');
+    }
+    if (exited === 0) return fail('without AppData\\Roaming the app exited 0');
+    if (exited === 66) {
+      if (!log.includes('the AgentLink data folder is not available')) {
+        return fail('without AppData\\Roaming the fixed line is missing from core.log');
+      }
+      console.log('ok  without AppData\\Roaming the app exits 66 with its fixed line');
+      return;
+    }
+    // WIN-DESK-2 (run 43490849095): on windows-2022 Electron itself exits during its native start
+    // (code 0xffff7003) before any shell code runs, so the shell cannot write its line. Accepted
+    // when nothing of the app ran: no core.log line at all and no Roaming folder made.
+    if (log === '' && !existsSync(ctx.env.APPDATA)) {
       console.log(
-        `    exit code ${hex}; Roaming exists after: ${String(existsSync(ctx.env.APPDATA))}`,
+        `ok  without AppData\\Roaming Electron stops in its own start (exit ${hex}), before the app runs`,
       );
-      for (const l of log.split('\n').filter((x) => x.startsWith('--- '))) console.log(`    ${l}`);
-      if (log === '') console.log('    (no core.log in the profile)');
-      return fail(`without AppData\\Roaming the app exited ${exited} (expected 66)`);
+      return;
     }
-    if (!log.includes('the AgentLink data folder is not available')) {
-      return fail('without AppData\\Roaming the fixed line is missing from core.log');
-    }
-    console.log('ok  without AppData\\Roaming the app exits 66 with its fixed line');
+    for (const l of log.split('\n').filter((x) => x.startsWith('--- '))) console.log(`    ${l}`);
+    return fail(`without AppData\\Roaming the app exited ${hex} after it started (expected 66)`);
   } finally {
     rmSync(ctx.home, { recursive: true, force: true });
   }
