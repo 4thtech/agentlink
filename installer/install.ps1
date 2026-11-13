@@ -296,7 +296,7 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, [switch]$Desktop, $
   # name, no port), and only the characters a GitHub Release download or its redirect uses.
   function Test-DesktopUrl([string]$Url) {
     # Case-sensitive (the .NET default), anchored at the very start and end (\z: no line break).
-    $match = [regex]::Match([string]$Url, '\Ahttps:/{2}([a-z.]+)/[A-Za-z0-9._~/?=&%:+,;-]*\z')
+    $match = [regex]::Match([string]$Url, '\Ahttps:/{2}([a-z.-]+)/[A-Za-z0-9._~/?=&%:+,;-]*\z')
     if (-not $match.Success) { return $false }
     return @('github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com') -ccontains $match.Groups[1].Value
   }
