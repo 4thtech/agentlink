@@ -127,7 +127,7 @@ async function render(
         passkeyStatus: () => Promise.resolve(status),
         passkeyProof: proof,
         // REL051-R2C: a saved master code unless a test says otherwise.
-        masterCode: { show: () => Promise.resolve({ kind: 'none' }) },
+        masterCode: { show: () => Promise.resolve({ kind: 'none' as const }) },
         ...extra,
       }),
     );

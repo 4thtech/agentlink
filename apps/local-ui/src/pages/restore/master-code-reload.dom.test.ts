@@ -188,9 +188,9 @@ describe('Get started: a reload on "Your master code"', () => {
           masterCodeApi: code,
           passkeysAvailable: () => true,
           platform: 'mac',
-          prfSupport: () => Promise.resolve('yes'),
+          prfSupport: () => Promise.resolve('yes' as const),
           upgradeApi: {
-            info: () => Promise.resolve({ kind: 'ok', registered: true }),
+            info: () => Promise.resolve({ kind: 'ok' as const, registered: true }),
             register: () => Promise.reject(new Error('unused')),
           } as unknown as NonNullable<FirstRunPageProps['upgradeApi']>,
           go: (p: string) => {
@@ -198,7 +198,7 @@ describe('Get started: a reload on "Your master code"', () => {
             window.dispatchEvent(new Event('agentlink:navigate'));
           },
           goHome: () => undefined,
-          readJoin: () => Promise.resolve({ kind: 'failed' }),
+          readJoin: () => Promise.resolve({ kind: 'failed' as const }),
           readSignal: () =>
             Promise.resolve({ connected: true, appName: 'Claude Code' } as unknown as Awaited<
               ReturnType<NonNullable<FirstRunPageProps['readSignal']>>
@@ -228,9 +228,9 @@ describe('Get started: a reload on "Your master code"', () => {
           masterCodeApi: fakeCode({ kind: 'lost', which: 'first_run', touchId: true }),
           passkeysAvailable: () => true,
           platform: 'mac',
-          prfSupport: () => Promise.resolve('yes'),
+          prfSupport: () => Promise.resolve('yes' as const),
           goHome: home,
-          readJoin: () => Promise.resolve({ kind: 'failed' }),
+          readJoin: () => Promise.resolve({ kind: 'failed' as const }),
         }),
       );
     });

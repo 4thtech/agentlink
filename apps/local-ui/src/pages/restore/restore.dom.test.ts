@@ -565,7 +565,7 @@ describe('step 3: what comes back', () => {
       root.render(
         h(ReviewStep, {
           summary: only,
-          state: { selected: new Set(), names: {} },
+          state: { selected: new Set<string>(), names: {} },
           onState: () => undefined,
           sensor: 'Touch ID',
           newOwner: false,
