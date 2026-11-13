@@ -4,7 +4,7 @@
 // server signs. The routes of U3-d and U3-e may still be stubs (501): that reads as a plain
 // "not done" sentence and nothing is claimed. Labels are rendered as text only (I-5).
 import { Button, Sheet, TextField } from '@4thtech-io/ui';
-import { useEffect, useId, useState, type ReactElement } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import { FAILURE_COPY } from '../../api/failure-reasons.js';
 import { ExportKit } from '../backup/export-kit.js';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
@@ -250,14 +250,26 @@ export function RemoveSheet({
   // always asked before anything is signed (a failed read goes on to the Touch ID step).
   // UX1113-N2: the read happens before the one button can be pressed (once the name is typed, and
   // on "Check again"), so "Remove with Touch ID" goes straight to the sensor.
-  const checkNow = (): void => {
-    if (checking) return;
+  // IR-UX1113-N2-1 #5: one read at a time, and none answered into a closed sheet.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const reading = useRef(false);
+  const checkNow = useCallback((): void => {
+    if (reading.current) return;
+    reading.current = true;
     setChecking(true);
     setError(undefined);
     void api
       .list()
       .catch(() => ({ kind: 'error' }) as const)
       .then((read) => {
+        reading.current = false;
+        if (!alive.current) return;
         setChecking(false);
         const fresh =
           read.kind === 'ok' ? read.list.agents.find((r) => r.name === row.name) : undefined;
@@ -269,13 +281,13 @@ export function RemoveSheet({
         setPhase({ kind: 'form' });
         setReady(true);
       });
-  };
+  }, [api, row.name]);
   const [ready, setReady] = useState(false);
   useEffect(() => {
     // The name matches: look once for an AI app that still runs it.
     if (!matches || ready || phase.kind !== 'form') return;
     checkNow();
-  }, [matches, ready, phase.kind]);
+  }, [matches, ready, phase.kind, checkNow]);
   useEffect(() => {
     if (!matches) setReady(false);
   }, [matches]);

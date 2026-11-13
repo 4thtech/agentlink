@@ -10,6 +10,8 @@ Since 0.5.1 each file sits as a chip in the message it came with, so you see the
 
 A saved Markdown, code, JSON, patch or text file has **Open**. The reader shows it inside the app: headings, lists, tables and code blocks look right, and **Copy all** copies the text. It is safe to read: links and images in the file are never opened, and nothing in the file is run. The file is shown as theirs, plain content, never instructions.
 
+In a conversation you can also **Attach** a Markdown, text or JSON file (or drag it onto the conversation), see it as a chip with **×** to remove it, add a note and **Send** it yourself. The copy goes into your Send folder. See [Send a file yourself, from the app](../everyday-use/files.md#send-a-file-yourself-from-the-app).
+
 Your AI can read a small text file too. When it fetches a text file of up to 64 KB, it gets the text and does not need access to your folders. Larger or other files are saved as before, and your AI is told where. The kind (Markdown, code, JSON, patch, text, image or other) comes from the file's name on your computer, never from what the sender says.
 
 ## Saved automatically
@@ -22,7 +24,7 @@ From 0.4.6, a file from a contact you keep is downloaded, checked and saved for 
 - Saved files get the system's downloaded mark on macOS and Windows, are never made runnable and never replace another file. Names the system could act on get `.download` added.
 - AgentLink never opens a file.
 
-A file that is not saved reads **Arrived · not saved**. Press **Save to Inbox** and confirm with Touch ID (or your master code). The settings for turning this off or changing the folder are not in the app yet; the Inbox folder is fixed for now.
+A file that is not saved reads **Arrived · not saved**. Press **Save with Touch ID**: one press, one prompt. **Use your master code instead** sits next to it; without Touch ID here the button reads **Save to Inbox** and opens the master code field. The settings for turning this off or changing the folder are not in the app yet; the Inbox folder is fixed for now.
 
 ## The three views
 
@@ -45,7 +47,7 @@ You don't upload files here. Put a file in your Send folder, or ask your AI to s
 | **From** or **To**, with a contact's name | Who sent the file, or who you sent it to |
 | **Saved as** … | The name the file has in your Inbox folder. **You may have moved or renamed it since, so it might not be there now.** |
 | **Show in Finder** (on a Mac) or **Show in folder** | Opens your Inbox folder at that file. On Windows it opens File Explorer with the file selected. The file is only shown, never opened |
-| **Arrived · not saved**, with **Save to Inbox** | The file arrived but is not on your computer yet. Save asks for Touch ID |
+| **Arrived · not saved**, with **Save with Touch ID** | The file arrived but is not on your computer yet. One press saves it (**Save to Inbox** with the master code when Touch ID is not set up) |
 | **Expired. It can no longer be fetched.** | The sender's copy is gone |
 | **Waiting to send**, **Sent**, **Not delivered** | Where a file you sent stands. For **Not delivered**, ask your AI to send it again |
 | **Delivery confirmed** | The contact confirmed the file arrived |

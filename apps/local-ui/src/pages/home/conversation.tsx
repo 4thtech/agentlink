@@ -7,12 +7,16 @@
 //   a status line;
 // - Copy text on every message; earlier messages page in with the cursor ("Load earlier messages").
 //
+// ATT-APP-ATTACH: with `attach`, the owner can attach light text files (Attach, or drop them on the
+// conversation) and send them to this person (attach-composer.tsx); a removed connection has none.
+//
 // Under the hood adds each message's ID, exact time, size, sending agent, delivery receipt and
 // proof. Reading here sends GETs only and never marks anything read for the AI.
 import { AgentIcon, Banner, Button, Icon, SkeletonLine, UntrustedContent } from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { sizeText } from '../files/io.js';
 import type { MessageItem, MessagePage, MessagesApi } from '../messages/api.js';
+import { AttachComposer, type AttachProps } from './attach-composer.js';
 import { MessageFiles, type FilesContext } from './file-reader.js';
 import { mergeThread } from './people-api.js';
 import { HOME_STRINGS as S, fmt } from './people-strings.js';
@@ -289,7 +293,12 @@ export function Conversation({
   idSeed,
   files,
   terms = [],
+  attach,
 }: {
+  /**
+   * ATT-APP-ATTACH: attach files and send them yourself (absent, or a removed connection: none).
+   */
+  readonly attach?: AttachProps | undefined;
   /** B9: the terms decided with this person, shown inline by time. */
   readonly terms?: readonly TermsEvent[];
   /** The person's name, as the name rule shows it (text only). */
@@ -339,7 +348,8 @@ export function Conversation({
   ].sort((a, b) => a.at - b.at);
   const more = thread.inbox.next !== undefined || thread.sent.next !== undefined;
   const ours = app === undefined || app === '' ? S.yourAgent : fmt(S.yourAi, { name: app });
-  return (
+  const composer = attach !== undefined && !removed;
+  const body = (
     <div className="hm-thread hm-c">
       {idSeed === undefined || agent === '' ? null : (
         <p className="hm-thread-id hm-f al-text-caption al-muted" data-thread-id="">
@@ -440,8 +450,14 @@ export function Conversation({
         </ol>
       )}
       <p className="hm-note al-text-body-sm">{fmt(S.encrypted, { name })}</p>
-      <p className="hm-note al-text-body-sm">{S.replyHint}</p>
+      <p className="hm-note al-text-body-sm">{composer ? S.attachHint : S.replyHint}</p>
     </div>
+  );
+  if (!composer || attach === undefined) return body;
+  return (
+    <AttachComposer {...attach} name={name}>
+      {body}
+    </AttachComposer>
   );
 }
 

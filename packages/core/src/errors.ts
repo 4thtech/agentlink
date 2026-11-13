@@ -95,7 +95,11 @@ export type CoreErrorCode =
   | 'folder_cannot_mark'
   // W4-PAUSE (D-143 (5); 06 §6 "Paused agents"): the owner paused this agent (or its pause row
   // cannot be read: fail closed); nothing was sent, fetched or kept.
-  | 'agent_paused';
+  | 'agent_paused'
+  // RET-3 (D-148; 04 §4.2): a history delete's input is not valid, or its item set changed between
+  // the plan the owner confirmed and the apply (nothing was deleted).
+  | 'history_input_invalid'
+  | 'history_plan_changed';
 
 export class CoreError extends Error {
   readonly code: CoreErrorCode;

@@ -145,7 +145,14 @@ export function PersonMenu({
         return;
       }
       if (result.kind === 'rejected' || result.kind === 'required') {
-        setError(proof.kind === 'code' ? MESSAGE[result.kind] : C.passkeyNotUsed);
+        // IR-UX1113-N2-1 #2: a sensor proof the server refused was used, not "wasn't used".
+        setError(
+          proof.kind === 'code'
+            ? MESSAGE[result.kind]
+            : result.kind === 'required'
+              ? C.sensorUnavailable
+              : C.sensorRefused,
+        );
         return;
       }
       close();

@@ -36,6 +36,7 @@ import {
   openInboxDir,
   quarantineMark,
   resolveAllowedFile,
+  trashSavedFile,
   type AllowedPathErrorCode,
   type InboxDir,
 } from '@4thtech-io/node';
@@ -488,6 +489,10 @@ async function resolveInbox(
       return { dev: entry.dev.toString(), ino: entry.ino.toString(), size: Number(entry.size) };
     },
     readSaved: (name, maxBytes) => readSavedFile(real, dir, name, maxBytes),
+    // RET-3 (D-148; 04 §4.2): to the OS Trash only while unchanged (device, inode, size and sha256,
+    // re-checked through the held folder just before the move); never deleted outright.
+    trashSaved: (name, expected) =>
+      trashSavedFile({ folder: real, name, expected, home, stillSame: () => dir.stillSame() }),
     close: () => dir.close(),
   };
 }

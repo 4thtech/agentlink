@@ -83,6 +83,7 @@ import type { Preview } from './file-reader.js';
 import { HomeApprovals } from './home-approvals.js';
 import { RenameBanner } from './rename-banner.js';
 import { SendFolderBanner, createSendFolderApi, type SendFolderApi } from './send-folder-banner.js';
+import { createAttachApi, type AttachApi } from './attach-api.js';
 import {
   createPeopleApi,
   MAX_SUMMARIES,
@@ -150,6 +151,8 @@ interface Clients {
   readonly owner: OwnerClient;
   /** ATT-SENDFOLDER-FIX: the Send folder banner's read and set-up calls. */
   readonly sendFolder: SendFolderApi;
+  /** ATT-APP-ATTACH: attach files in a conversation and send them yourself. */
+  readonly attach: AttachApi;
 }
 
 function useClients(props: HomeScreenProps): Clients {
@@ -173,6 +176,8 @@ function useClients(props: HomeScreenProps): Clients {
       agents: createAgentsApi(opts),
       owner: createOwnerClient(opts),
       sendFolder: createSendFolderApi(opts),
+      // ATT-APP-ATTACH: attach files in a conversation and send them yourself.
+      attach: createAttachApi(opts),
     };
   }, [givenFetch, token, credentials, approvalsClient]);
 }
@@ -287,6 +292,19 @@ function PersonOpen({
   const terms = useTerms(clients.api, person.contactId, tick);
   const files = thread.state === 'ready' ? filesOf(thread.inbox.items, thread.sent.items) : [];
   const removed = contact?.status === 'revoked';
+  // ATT-APP-ATTACH: only for a connected, active contact (the server checks again).
+  const attach = useMemo(
+    () =>
+      contact !== undefined && contact.status === 'active' && contact.pairing === 'complete'
+        ? {
+            contactId: person.contactId,
+            api: clients.attach,
+            folderApi: clients.sendFolder,
+            onSent: refresh,
+          }
+        : undefined,
+    [contact, person.contactId, clients.attach, clients.sendFolder, refresh],
+  );
   const fileContext = useMemo(
     () => ({
       received: data.received,
@@ -370,6 +388,7 @@ function PersonOpen({
         terms={terms}
         removed={removed}
         files={fileContext}
+        attach={attach}
       />
       <PersonFiles
         name={person.name}

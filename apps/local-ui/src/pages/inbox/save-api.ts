@@ -20,7 +20,9 @@ const ITEM_ID = /^[A-Za-z0-9_-]{22}\.(?:0[0-9]|1[0-5])$/;
 
 export type SavePresence =
   | { readonly kind: 'code'; readonly code: string }
-  | { readonly kind: 'passkey'; readonly passkey: DecisionPasskey };
+  | { readonly kind: 'passkey'; readonly passkey: DecisionPasskey }
+  /** N3 / OWNERSTEP-LEFT: Touch ID / Windows Hello in the desktop app (the server's ceremony). */
+  | { readonly kind: 'native' };
 
 export type SaveAnswer =
   | { readonly kind: 'outcome'; readonly outcome: FileSaveOutcome }
