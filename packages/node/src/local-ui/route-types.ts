@@ -507,6 +507,10 @@ export const MARK_PATHS: readonly string[] = Object.freeze([
   // most one empty 0700 folder under ~/AgentLink and changes no rules: allowing it is the ordinary
   // review and the presence-gated confirm.
   '/api/ui/files/send-folder',
+  // UPD-5: "Update now" and "Restart now" in Settings › Updates (api/app-update.ts). They pass no
+  // value; the desktop shell installs only the update it verified itself.
+  '/api/ui/app-update/install',
+  '/api/ui/app-update/restart',
 ]);
 
 export type LocalUiRoute =

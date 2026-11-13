@@ -517,6 +517,9 @@ const SETUP_TIME = new Set([
   // DESK051-UPD: the app's version and updates are the app's, not an agent's.
   'GET /api/ui/app-update',
   'GET /api/ui/app-update/check',
+  // UPD-5: Update now and Restart now (app-update-server.test.ts).
+  'POST /api/ui/app-update/install',
+  'POST /api/ui/app-update/restart',
 ]);
 
 describe('U3-g-b: ui with no agent at all serves Welcome', () => {

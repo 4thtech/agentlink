@@ -14,6 +14,7 @@ import { rm } from 'node:fs/promises';
 import { downloadInstaller, fetchDocument, hashFile, type FetchLike } from './download.js';
 import { installerKind } from './host.js';
 import {
+  type AssetKind,
   MAX_DOCUMENT_BYTES,
   UpdateRefusal,
   acceptManifest,
@@ -110,7 +111,13 @@ export function configuredRoot(raw: unknown = rootKeyFile): PinnedRoot | undefin
  * (state.ts) is never offered again.
  */
 export async function checkForUpdate(
-  deps: UpdaterDeps,
+  deps: Pick<
+    UpdaterDeps,
+    'currentVersion' | 'channel' | 'platform' | 'arch' | 'stateDir' | 'fetch' | 'now' | 'root'
+  > & {
+    /** UPD-5: the in-app install asks for `zip`; the phase-1 flow for the installer. */
+    readonly kind?: AssetKind;
+  },
 ): Promise<{ root: PinnedRoot; accepted: AcceptedUpdate | undefined }> {
   const root = configuredRoot(deps.root ?? rootKeyFile);
   if (root === undefined) throw new UpdateRefusal('root_not_pinned');
@@ -127,7 +134,7 @@ export async function checkForUpdate(
     channel: deps.channel,
     platform: deps.platform,
     arch: deps.arch,
-    kind: installerKind(deps.platform),
+    kind: deps.kind ?? installerKind(deps.platform),
     failedVersion,
     now,
   });
