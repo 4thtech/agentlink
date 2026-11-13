@@ -227,9 +227,19 @@ export interface RestoreEngineOptions {
    * owner write may be in progress). Default: this process, or a live process with that ID.
    */
   readonly runAlive?: (pid: number) => boolean;
+  /** REL051-R2C test seam: how long `close` waits for a running restore (default 30 s). */
+  readonly closeWaitMs?: number;
   /** REL051-CF3 test seam: how the `shown` marker is written (default writeUnsavedMarker). */
   readonly writeMarker?: typeof writeUnsavedMarker;
 }
+
+/** REL051-R2C: whether an answer can still reach its page. */
+export interface RestoreDelivery {
+  readonly open: () => boolean;
+}
+
+/** REL051-R2C: how long `close` waits for a running restore to end (bounded; never forever). */
+const CLOSE_WAIT_MS = 30_000;
 
 /** REL051-CF3: what the page says about a master code that was made here and not saved. */
 export type MasterCodeState =
@@ -262,6 +272,13 @@ export interface RestoreEngine {
     session: string,
     input: JsonValue | undefined,
     body: Uint8Array,
+    /**
+     * REL051-R2C (R2-CLASS-02): whether the answer can still reach the page (its connection is
+     * open). A new master code is only answered to a page that is there: otherwise (or when the
+     * engine is closing) the owner this run wrote is rolled back and the IDs wait for "Finish
+     * restoring" with the same kit.
+     */
+    delivery?: RestoreDelivery,
   ): Promise<RestoreAnswer>;
   /**
    * WP-R2 hook (04 §2.3.3 "Check that my kit opens"): right after the export route sealed a kit,
@@ -691,6 +708,20 @@ function build(options: RestoreEngineOptions): TerminalRestore {
    * at a time, one opened kit, one apply (T-4, T-7).
    */
   let locked = false;
+  /** REL051-R2C: the running locked operation (close waits for it) and the closing flag. */
+  let running: Promise<RestoreAnswer> | undefined;
+  let closing = false;
+  /** REL051-R2C: the page connection of the running apply/finish (undefined: always open). */
+  let delivery: RestoreDelivery | undefined;
+  /** REL051-R2C: the answer of this run can no longer reach anyone (closing, or the page left). */
+  const answerGone = (): boolean => {
+    if (closing) return true;
+    try {
+      return delivery !== undefined && !delivery.open();
+    } catch {
+      return true;
+    }
+  };
   /** Bumped by `cancel` per page session; an open that finishes after a cancel wipes its kit. */
   const cancels = new Map<string, number>();
   let ready: Promise<void> | undefined;
@@ -768,18 +799,27 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     fn: () => Promise<RestoreAnswer>,
     secret?: Uint8Array,
   ): Promise<RestoreAnswer> {
-    if (locked) {
+    if (locked || closing) {
       if (secret !== undefined) wipe(secret);
       return fail('busy');
     }
     locked = true;
+    const run = (async (): Promise<RestoreAnswer> => {
+      try {
+        return await fn();
+      } catch {
+        // A failed or timed-out keychain call: a fixed answer, and the lock is released below.
+        return fail('failed');
+      } finally {
+        locked = false;
+        delivery = undefined;
+      }
+    })();
+    running = run;
     try {
-      return await fn();
-    } catch {
-      // A failed or timed-out keychain call: a fixed answer, and the lock is released below.
-      return fail('failed');
+      return await run;
     } finally {
-      locked = false;
+      if (running === run) running = undefined;
     }
   }
 
@@ -1566,6 +1606,17 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         await unlink(pendingPath).catch(() => undefined);
         return fail('failed', { ids: outcomesJson(outcomes) });
       }
+      // REL051-R2C (R2-CLASS-02): nobody would see a new master code (the app is closing or the
+      // page left): no owner is written; the restored IDs wait for "Finish restoring" (the hint and
+      // their verified cards), with the same kit.
+      if (answerGone()) {
+        if (passkey !== undefined) wipe(passkey.prfOutput);
+        if (!outcomes.some((o) => o.outcome === 'restored')) {
+          await unlink(pendingPath).catch(() => undefined);
+        }
+        await restored(outcomes);
+        return fail('failed', { ids: outcomesJson(outcomes) });
+      }
       // REL051-CF3 (T-7): the marker names the item before it is written, so a start after the
       // app closed mid-way can tell its own item apart (settle).
       let item: Uint8Array | undefined;
@@ -1600,10 +1651,23 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         await restored(outcomes);
         return fail('failed', { ids: outcomesJson(outcomes) });
       }
+      // REL051-R2C (R2-CLASS-02): the code would go to nobody: the owner this run wrote goes again.
+      if (answerGone()) {
+        if (passkey !== undefined) wipe(passkey.prfOutput);
+        await rollBackOwner(ownerNostr, item);
+        await restored(outcomes);
+        return fail('failed', { ids: outcomesJson(outcomes) });
+      }
       const touchId =
         passkey === undefined
           ? false
           : await importOwnerPasskey(current.kit, options.keychain(), passkey);
+      if (answerGone()) {
+        // The Touch ID wrap of this run goes too (no code was shown for this owner).
+        await rollBackOwner(ownerNostr, item, touchId);
+        await restored(outcomes);
+        return fail('failed', { ids: outcomesJson(outcomes) });
+      }
       // REL051-CF3: the code is in this answer now; the marker stays until "I saved it". A `writing`
       // marker must never outlive a code that was shown (a later start would roll that owner back):
       // one retry, then the marker goes; if neither works, the code is not shown (the owner is then
@@ -1748,21 +1812,78 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         }
         // Its code never left this computer's server and no Touch ID wraps it: nobody can use it.
         // The IDs stay; first run says "Finish restoring" (owner-only completion, same kit).
-        if ((await readPending()) === undefined) await writePending(marker.ownerNostr);
-        const next = await guarded(() => keychain.get(OWNER_NEXT_ACCOUNT), keychainTimeoutMs);
-        if (next !== null) {
-          if (equalBytes(sha256(next), marker.item)) {
-            await guarded(() => keychain.delete(OWNER_NEXT_ACCOUNT), keychainTimeoutMs);
-          }
-          wipe(next);
-        }
-        const removed = await removeOwnerItemIfOurs(keychain, ownerBlob, keychainTimeoutMs);
-        if (removed === 'removed' || removed === 'absent') await removeUnsavedMarker(home);
+        await removeWrittenOwner(marker.ownerNostr, marker.item, ownerBlob);
       } finally {
         wipe(ownerBlob);
       }
     } catch {
       // Fail safe: nothing is removed when anything here could not be read.
+    }
+  }
+
+  /**
+   * The owner item a restore wrote (exactly `ownerBlob`, whose hash is `item`) goes again: the hint
+   * of "Finish restoring" stays (or is written), a staged `owner-next` of the same bytes goes, and
+   * the marker goes once the owner item is gone. Throws when the keychain does not answer.
+   */
+  async function removeWrittenOwner(
+    ownerNostr: Uint8Array,
+    item: Uint8Array,
+    ownerBlob: Uint8Array,
+  ): Promise<boolean> {
+    const keychain = options.keychain();
+    if ((await readPending()) === undefined) await writePending(ownerNostr);
+    const next = await guarded(() => keychain.get(OWNER_NEXT_ACCOUNT), keychainTimeoutMs);
+    if (next !== null) {
+      if (equalBytes(sha256(next), item)) {
+        await guarded(() => keychain.delete(OWNER_NEXT_ACCOUNT), keychainTimeoutMs);
+      }
+      wipe(next);
+    }
+    const removed = await removeOwnerItemIfOurs(keychain, ownerBlob, keychainTimeoutMs);
+    if (removed !== 'removed' && removed !== 'absent') return false;
+    await removeUnsavedMarker(home);
+    return true;
+  }
+
+  /**
+   * REL051-R2C (R2-CLASS-02): this run wrote an owner whose new master code can reach nobody (the
+   * app is closing, or the page left before the answer). The owner item (still exactly the one this
+   * run wrote) and, when this run wrote one, its Touch ID wrap go again; the restored IDs wait for
+   * "Finish restoring". When this fails, the `writing` marker stays for the next start's settle.
+   */
+  async function rollBackOwner(
+    ownerNostr: Uint8Array,
+    item: Uint8Array | undefined,
+    passkeyWritten = false,
+  ): Promise<void> {
+    if (item === undefined) return;
+    try {
+      const keychain = options.keychain();
+      if (passkeyWritten) {
+        const wrap = await readOwnerPasskeyItem(keychain, keychainTimeoutMs);
+        if (wrap !== null) {
+          try {
+            await removeOwnerPasskeyItemIfOurs(keychain, wrap, keychainTimeoutMs);
+          } finally {
+            wipe(wrap);
+          }
+        }
+      }
+      const ownerBlob = await readOwnerItem(keychain, keychainTimeoutMs);
+      if (ownerBlob === null) {
+        if ((await readPending()) === undefined) await writePending(ownerNostr);
+        await removeUnsavedMarker(home);
+        return;
+      }
+      try {
+        if (!equalBytes(sha256(ownerBlob), item)) return;
+        await removeWrittenOwner(ownerNostr, item, ownerBlob);
+      } finally {
+        wipe(ownerBlob);
+      }
+    } catch {
+      // The `writing` marker stays: the next start rolls it back (settle).
     }
   }
 
@@ -2252,8 +2373,11 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       exclusive(() => openWith(sessionKey(session), input, code, 'check'), code),
     cancel: (session, input) => cancelStep(sessionKey(session), input),
     applyBegin: (session, input) => exclusive(() => begin(sessionKey(session), input, false)),
-    applyFinish: (session, input, body) =>
-      exclusive(() => finish(sessionKey(session), input, body), body),
+    applyFinish: (session, input, body, connection) =>
+      exclusive(() => {
+        delivery = connection;
+        return finish(sessionKey(session), input, body);
+      }, body),
     registerExportedKit: async (session, file) => {
       if (typeof file.kitId !== 'string' || !HANDLE.test(file.kitId)) return undefined;
       const info = await lstat(file.path).catch(() => undefined);
@@ -2267,14 +2391,25 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     masterCodeState,
     masterCodeSaved,
     sweep: sweepNow,
-    close: () => {
+    close: async () => {
+      // REL051-R2C (R2-CLASS-02): a running restore is never cut off mid-write (its kit wiped under
+      // it): it sees `closing`, rolls back an owner whose code nobody will see, and ends first.
+      closing = true;
+      const current = running;
+      if (current !== undefined) {
+        await Promise.race([
+          current.catch(() => undefined),
+          new Promise<void>((resolve) =>
+            setTimeout(resolve, options.closeWaitMs ?? CLOSE_WAIT_MS).unref(),
+          ),
+        ]);
+      }
       clearInterval(sweep);
       wipeHeld();
       pending = undefined;
       for (const [, entry] of restoreSessions) entry.hold.end();
       restoreSessions.clear();
       for (const handle of [...handles.keys()]) dropHandle(handle);
-      return Promise.resolve();
     },
     fileHandle: async (session, path) => {
       const info = await lstat(path).catch(() => undefined);

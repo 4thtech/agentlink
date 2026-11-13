@@ -5561,7 +5561,10 @@ export async function startApprovalServerWith(
           answer = await engine.applyBegin(cookie, input);
           break;
         case 'applyFinish':
-          answer = await engine.applyFinish(cookie, input, body.slice());
+          // REL051-R2C (R2-CLASS-02): a new master code is only answered to a page still there.
+          answer = await engine.applyFinish(cookie, input, body.slice(), {
+            open: () => !res.destroyed && !res.writableEnded && req.socket.destroyed !== true,
+          });
           holdRestoredCode(answer, cookie);
           break;
         default:

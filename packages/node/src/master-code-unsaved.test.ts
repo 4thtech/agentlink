@@ -66,6 +66,9 @@ function engineOf(over: Partial<RestoreEngineOptions> = {}): RestoreEngine {
     keychain: () => keychain,
     origin: ORIGIN,
     kdf: FAST,
+    // A keychain write that never answers stands for a process that was killed: close never waits
+    // for it long.
+    closeWaitMs: 1_000,
     ...over,
   });
   engines.push(e);
