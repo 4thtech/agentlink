@@ -19,6 +19,7 @@ import { resetPrefsForTests, setPref } from '../../prefs/index.js';
 import type { CreateOutcome, InviteApi } from '../contacts/invite-api.js';
 import { InviteScreen } from '../invite/invite-screen.js';
 import { HomeScreen, type HomeScreenProps } from './home-screen.js';
+import { CONTACTS_STRINGS as C } from '../contacts/strings.js';
 import { HOME_STRINGS as S } from './people-strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -488,7 +489,8 @@ describe('Home simple (A4)', () => {
     await click(all('[role="menuitem"]').find((e) => e.textContent?.trim() === S.remove));
     const confirm = q('[role="alertdialog"]');
     expect(confirm?.textContent).toContain('Remove Ana?');
-    await click(byText('[role="alertdialog"] button', S.remove));
+    // UX1113-N2: the dialog's one button is the gesture (here the master code: no passkey).
+    await click(byText('[role="alertdialog"] button', C.removeWithCode));
     // The presence step of Contacts: nothing is sent before the owner confirms.
     expect(document.body.textContent).toMatch(/master code/i);
   });
@@ -1119,7 +1121,7 @@ describe('W8-S4 (F21): a half-removed ID on Home', () => {
     const sheet = q('[role="dialog"]');
     expect(unisolated(sheet)).toContain('Finish removing Old test');
     expect(sheet?.querySelector('input[type="text"]')).toBeNull();
-    expect(byText('button', 'Finish with Touch ID')).toBeTruthy();
+    expect(byText('button', 'Finish with your master code')).toBeTruthy();
   });
 });
 

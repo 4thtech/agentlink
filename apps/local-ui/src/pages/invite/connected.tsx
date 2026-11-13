@@ -118,6 +118,11 @@ export function ConnectedMoment({
   // The owner may give their own name only while the shown name is the contact's own.
   const canName = selfDeclared && named === null && contactRef !== undefined;
   const ownNameRef = useRef<HTMLButtonElement>(null);
+  // IR-UX1113-N1-1 #8: the focused Save button goes away on success, so focus moves to "Saved.".
+  const savedRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    if (named !== null) savedRef.current?.focus();
+  }, [named]);
   const closeNaming = (): void => {
     setNaming(false);
     // Focus goes back to the link that opened the field (after it is drawn again).
@@ -186,7 +191,7 @@ export function ConnectedMoment({
           {S.useOwnName}
         </button>
       ) : selfDeclared && named !== null ? (
-        <p className="al-text-body-sm al-muted" role="status">
+        <p className="al-text-body-sm al-muted" role="status" tabIndex={-1} ref={savedRef}>
           {S.saved}
         </p>
       ) : null}

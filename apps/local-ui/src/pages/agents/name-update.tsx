@@ -8,7 +8,7 @@ import { Button } from '@4thtech-io/ui';
 import { useState, type ReactElement } from 'react';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import type { AgentsApi } from './api.js';
-import { OwnerGate, usePasskey } from './owner-gate.js';
+import { OwnerButton } from './owner-gate.js';
 import { renameProblem } from './sheets.js';
 import { AGENTS_STRINGS as S } from './strings.js';
 
@@ -33,8 +33,6 @@ export function InviteNameGate({
   onUpdated,
   onOldName,
 }: InviteNameGateProps): ReactElement {
-  const passkey = usePasskey(owner);
-  const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
 
@@ -69,26 +67,21 @@ export function InviteNameGate({
         {S.noteHint}
         <bdi>{label}</bdi>.
       </p>
-      {asking ? (
-        <OwnerGate
-          summary={S.renameStatement(cardName, label)}
-          passkey={passkey}
+      <div className="ag-actions">
+        <OwnerButton
+          owner={owner}
+          statement={S.renameStatement(cardName, label)}
+          withSensor={S.updateNameWith}
+          withCode={S.updateNameWithCode}
           busy={busy}
           error={error}
           onProof={send}
-          onCancel={() => setAsking(false)}
         />
-      ) : (
-        <div className="ag-actions">
-          <Button variant="primary" size="sm" onClick={() => setAsking(true)}>
-            {S.updateName}
-          </Button>
-          <Button variant="secondary" size="sm" onClick={onOldName}>
-            {S.inviteAs}
-            <bdi>{cardName}</bdi>
-          </Button>
-        </div>
-      )}
+        <Button variant="secondary" size="sm" onClick={onOldName} disabled={busy}>
+          {S.inviteAs}
+          <bdi>{cardName}</bdi>
+        </Button>
+      </div>
     </div>
   );
 }

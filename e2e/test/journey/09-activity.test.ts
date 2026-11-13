@@ -10,7 +10,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { until } from '../app-world.js';
 import {
-  CONFIRM_PASSKEY,
   chapter,
   eventually,
   journeyWorld,
@@ -61,7 +60,6 @@ describe('chapter 9: activity', () => {
       .getByRole('button', { name: /^Approve/ })
       .first()
       .click();
-    await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
     await eventually(
       'the approval is recorded',
       async () =>

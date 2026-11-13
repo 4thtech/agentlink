@@ -3,6 +3,7 @@
 // The statement names the agent and the change, so a prompt never approves something for another
 // agent (b11 §29.1). Reuses the Contacts presence prompt.
 import { useEffect, useState, type ReactElement } from 'react';
+import { PresenceButton } from '../contacts/presence-button.js';
 import { PresencePrompt } from '../contacts/presence-prompt.js';
 import { waitSeconds, CONTACTS_STRINGS as C } from '../contacts/strings.js';
 import type { OwnerClient, PasskeyInfo, PresenceProof } from '../contacts/owner.js';
@@ -51,6 +52,48 @@ export function usePasskey(owner: OwnerClient): PasskeyInfo | undefined {
     };
   }, [owner]);
   return info;
+}
+
+/**
+ * UX1113-N2: one owner step, one gesture. The action's own button is the sensor ("Rename with
+ * Touch ID"), with "Use your master code instead" as a link; no second box. The proof goes to the
+ * caller's one request; the gate on the server is unchanged.
+ */
+export function OwnerButton({
+  owner,
+  statement,
+  withSensor,
+  withCode,
+  busy,
+  error,
+  disabled,
+  variant,
+  onProof,
+}: {
+  owner: OwnerClient;
+  statement: string;
+  withSensor: (sensor: string) => string;
+  withCode: string;
+  busy: boolean;
+  error: string | undefined;
+  disabled?: boolean;
+  variant?: 'primary' | 'danger';
+  onProof: (proof: PresenceProof) => void;
+}): ReactElement {
+  return (
+    <PresenceButton
+      withSensor={withSensor}
+      withCode={withCode}
+      statement={statement}
+      busy={busy}
+      error={error}
+      notUsed={C.passkeyNotUsed}
+      onProof={onProof}
+      owner={owner}
+      {...(disabled === undefined ? {} : { disabled })}
+      {...(variant === undefined ? {} : { variant })}
+    />
+  );
 }
 
 export function OwnerGate({

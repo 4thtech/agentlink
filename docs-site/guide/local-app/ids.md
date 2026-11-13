@@ -39,7 +39,7 @@ Your contacts see the new name.
 
 1. On the ID's card, press **Rename**.
 2. Type the new name under **Name** (**People see this name.**).
-3. Press **Rename with Touch ID** (or use your master code).
+3. Press **Rename with Touch ID** (or **Use your master code instead**). That one press is the confirmation; there is no second box.
 
 <figure><img src="../../assets/screens/id-rename.webp" alt="Renaming the ID Tali: the Name field holds Tali R, with Rename with Touch ID and Cancel."><figcaption><p>A rename is confirmed by you and reaches every contact.</p></figcaption></figure>
 

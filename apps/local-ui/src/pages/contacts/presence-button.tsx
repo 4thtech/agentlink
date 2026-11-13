@@ -13,7 +13,15 @@
 // The statement the gesture confirms is the button's accessible description, and the line above
 // the master code field. A double click asks once (REL051-UF3).
 import { Button } from '@4thtech-io/ui';
-import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactElement,
+} from 'react';
 import { UseCodeInstead } from '../first-run/backup-code.js';
 import { detectPlatform } from '../first-run/passkey.js';
 import { SENSOR, type Platform } from '../first-run/strings.js';
@@ -37,6 +45,8 @@ export interface PresenceButtonProps {
   readonly busy: boolean;
   /** The caller's answer to a refused request (shown under the button, or the code field). */
   readonly error?: string | undefined;
+  /** UX1113-N2: a danger button for Remove and Block. */
+  readonly variant?: 'primary' | 'danger';
   /** The caller's own reason to hold the button (an invalid name). */
   readonly disabled?: boolean;
   /** Said when the sensor was cancelled; nothing was sent. */
@@ -52,6 +62,15 @@ export interface PresenceButtonProps {
   readonly userAgent?: string;
 }
 
+/** Seams for tests of the pages that mount this button deep inside (People, Home, IDs). */
+export interface PresenceSeams {
+  readonly gesture?: Gesture;
+  readonly platform?: Platform;
+  readonly nativeStatus?: () => Promise<NativeStatus>;
+  readonly userAgent?: string;
+}
+export const PresenceSeamsContext = createContext<PresenceSeams>({});
+
 type Mode =
   | { readonly kind: 'reading' }
   | { readonly kind: 'native'; readonly sensor: string }
@@ -65,14 +84,20 @@ export function PresenceButton({
   busy,
   error,
   disabled = false,
+  variant = 'primary',
   notUsed,
   onProof,
   owner,
-  gesture = passkeyProof,
-  platform: givenPlatform,
-  nativeStatus = readNativeStatus,
-  userAgent,
+  gesture: ownGesture,
+  platform: ownPlatform,
+  nativeStatus: ownNativeStatus,
+  userAgent: ownUserAgent,
 }: PresenceButtonProps): ReactElement {
+  const seams = useContext(PresenceSeamsContext);
+  const gesture = ownGesture ?? seams.gesture ?? passkeyProof;
+  const givenPlatform = ownPlatform ?? seams.platform;
+  const nativeStatus = ownNativeStatus ?? seams.nativeStatus ?? readNativeStatus;
+  const userAgent = ownUserAgent ?? seams.userAgent;
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const [mode, setMode] = useState<Mode>({ kind: 'reading' });
   const [askCode, setAskCode] = useState(false);
@@ -158,7 +183,7 @@ export function PresenceButton({
       </span>
       <div className="ct-actions">
         <Button
-          variant="primary"
+          variant={variant}
           className="al-press"
           onClick={press}
           disabled={held}
@@ -172,7 +197,7 @@ export function PresenceButton({
         </Button>
         {mode.kind === 'code' || mode.kind === 'reading' ? null : (
           <UseCodeInstead
-            disabled={busy || flight.asking}
+            disabled={busy || flight.asking || disabled}
             onClick={() => {
               setCancelled(false);
               setAskCode(true);
