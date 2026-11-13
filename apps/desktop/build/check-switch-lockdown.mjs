@@ -10,7 +10,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { runLockdown } from './lib/switch-check.mjs';
+import { envCasesFor, runLockdown } from './lib/switch-check.mjs';
 import { parseArgs } from './lib/run.mjs';
 
 const args = parseArgs(process.argv.slice(2), { exe: 'v', 'timeout-ms': 'v', 'warmup-ms': 'v' });
@@ -63,7 +63,11 @@ try {
     );
     process.exitCode = 1;
   }
-  const { checked, failures } = await runLockdown({ exe, launch });
+  const { checked, failures } = await runLockdown({
+    exe,
+    launch,
+    envCases: envCasesFor(process.platform),
+  });
   if (failures.length) {
     console.error(
       `SWITCH LOCKDOWN FAILED (${failures.length} of ${checked}):\n- ${failures.join('\n- ')}`,

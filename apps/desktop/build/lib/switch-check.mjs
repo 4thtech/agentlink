@@ -53,6 +53,17 @@ export const ENV_CASES = [
 ];
 
 /**
+ * The environment cases for `platform`. Windows variable names are case-insensitive, so there
+ * `node_options` IS NODE_OPTIONS, which Electron removes with the NodeOptions fuse off (D15-05,
+ * covered by check-fuses.mjs): the built app then starts normally, as designed. Elsewhere the
+ * lower-case spelling is a different variable that the app must refuse.
+ */
+export function envCasesFor(platform, cases = ENV_CASES) {
+  if (platform !== 'win32') return cases;
+  return cases.filter((c) => !Object.keys(c).some((k) => k.toUpperCase() === 'NODE_OPTIONS'));
+}
+
+/**
  * launch(exe, args, env?) -> Promise<{code: number|null, windowSeen: boolean}> (code null = timed
  * out); `env` holds the extra variables of an environment case, undefined for argument cases.
  * Returns {checked, failures}; failures lists every switch that did not exit non-zero with no window.

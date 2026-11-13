@@ -1,7 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { findPreviewString, PREVIEW_VAR } from '../lib/preview-check.mjs';
-import { ENV_CASES, EXTRA_CASES, FORBIDDEN_SWITCHES, runLockdown } from '../lib/switch-check.mjs';
+import {
+  ENV_CASES,
+  envCasesFor,
+  EXTRA_CASES,
+  FORBIDDEN_SWITCHES,
+  runLockdown,
+} from '../lib/switch-check.mjs';
 
 test('preview check flags the variable name anywhere in the content', () => {
   assert.equal(PREVIEW_VAR, 'AGENTLINK_DESKTOP_PREVIEW');
@@ -90,4 +96,14 @@ test('environment cases: ELECTRON_* and lowercase node_* are tried, never the fu
     launch: async (_e, _argv, env) => ({ code: env ? 0 : 64, windowSeen: false }),
   });
   assert.equal(open.failures.length, ENV_CASES.length);
+});
+
+test('envCasesFor: Windows drops only the case-insensitive NODE_OPTIONS spelling; macOS keeps all', () => {
+  assert.deepEqual(envCasesFor('darwin'), ENV_CASES);
+  assert.deepEqual(envCasesFor('linux'), ENV_CASES);
+  const win = envCasesFor('win32');
+  assert.equal(win.length, ENV_CASES.length - 1);
+  assert.ok(win.every((c) => !Object.keys(c).some((k) => k.toUpperCase() === 'NODE_OPTIONS')));
+  assert.ok(win.some((c) => 'ELECTRON_RUN_AS_NODE' in c));
+  assert.ok(win.some((c) => 'NODE_DEBUG' in c));
 });

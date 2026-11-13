@@ -249,7 +249,14 @@ jobs:
         shell: bash
         env:
           APP: ${{ steps.bin.outputs.app }}
-        run: node apps/desktop/build/check-tampered-asar.mjs --app "$APP"
+        # An x64 build under Rosetta is translated again on the first start of each new copy (the
+        # tampered copy is re-signed, so nothing is cached): a longer limit there. A tampered app
+        # that keeps running still fails.
+        run: |
+          set -euo pipefail
+          limit=20000
+          if [ "$RUNNER_OS" = "macOS" ] && [ "$ARCH" = "x64" ]; then limit=180000; fi
+          node apps/desktop/build/check-tampered-asar.mjs --app "$APP" --timeout-ms "$limit"
 
       - name: Smoke test (the app starts, the bundled node answers tools/list)
         if: steps.launch.outputs.run == 'true'
