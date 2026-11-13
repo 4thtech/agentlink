@@ -1,6 +1,6 @@
 # Proof pack format
 
-> **Status: Design.** Planned for v0.2.0 (M1). The draft below is from [07 §8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md) and may change before release. Once released, every pack version stays readable forever.
+> **Status: Released in v0.2.0 (M1).** The format below is from [07 §8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md), which is the source of truth; `agentlink verify` checks a pack. Every pack version stays readable forever.
 
 ```jsonc
 {

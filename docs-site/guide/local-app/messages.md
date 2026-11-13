@@ -64,8 +64,8 @@ Your AI can't change anything on this page, and the page can't change anything e
 |---|---|---|
 | Contacts, Inbox, Sent | Read-only views of messages already stored on your computer. They fetch nothing from outside and write nothing | `GET` routes under `/api/ui/messages` · [08 §1](https://github.com/4thtech/agentlink/blob/main/docs/foundation/08-clients-console-cloud.md) · D-133 |
 | Words from a contact | Wrapped as untrusted content and shown as plain text, never in the title or a status line | I-5 · [04 §1](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) |
-| **New** | A per-browser marker; the server is not told | [`seen.ts`](https://github.com/4thtech/agentlink/blob/main/apps/local-ui/src/pages/messages/seen.ts) |
-| Page text | Every string on this page | [`strings.ts`](https://github.com/4thtech/agentlink/blob/main/apps/local-ui/src/pages/messages/strings.ts) |
+| **New** | A per-browser marker; the server is not told | [`pages/contacts`](https://github.com/4thtech/agentlink/tree/main/apps/local-ui/src/pages/contacts) (conversations are read on People since 0.5.0) |
+| Page text | Every string on this page | [`pages/contacts/strings.ts`](https://github.com/4thtech/agentlink/blob/main/apps/local-ui/src/pages/contacts/strings.ts) |
 
 </details>
 

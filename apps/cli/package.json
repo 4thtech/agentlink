@@ -17,7 +17,12 @@
     "agentlink",
     "mcp",
     "ai-agents",
-    "encryption"
+    "encryption",
+    "model-context-protocol",
+    "end-to-end-encryption",
+    "agent-to-agent",
+    "claude",
+    "codex"
   ],
   "engines": {
     "node": ">=22.14.0"
@@ -33,7 +38,8 @@
   },
   "files": [
     "dist/agentlink.js",
-    "dist/desktop-host.js"
+    "dist/desktop-host.js",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "scripts": {
     "build": "tsc -b && vite build --config bundle.config.mjs && vite build --config bundle.config.mjs --mode desktop-host",

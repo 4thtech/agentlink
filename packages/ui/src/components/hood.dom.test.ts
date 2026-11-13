@@ -234,7 +234,7 @@ describe('hood.css', () => {
 
 // UI-REFRESH-e2: the path kind. Absolute local paths only; nothing that is a link, key, code or token.
 const PATHS: readonly string[] = [
-  '/Users/talirezun/Documents/AgentLink/Files/Contracts and Agreements/2026/October',
+  '/Users/alexandra/Documents/AgentLink/Files/Contracts and Agreements/2026/October',
   'C:\\Users\\Tali\\Documents\\AgentLink\\Files',
   '/home/tali/.local/share/agentlink/files',
 ];
@@ -295,7 +295,7 @@ describe('the path kind (UI-REFRESH-e2)', () => {
   );
 
   it('does not let a long path unlock the other kinds', () => {
-    const long = '/Users/talirezun/Documents/AgentLink/Files/Contracts and Agreements/2026';
+    const long = '/Users/alexandra/Documents/AgentLink/Files/Contracts and Agreements/2026';
     expect(acceptHoodField({ kind: 'text', label: 'Folder', value: long })).toBeNull();
     expect(acceptHoodField({ kind: 'id', label: 'Folder', value: long })).toBeNull();
   });

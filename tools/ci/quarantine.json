@@ -1,23 +1,4 @@
 {
   "$comment": "Visible, expiring test quarantine (OPS-UNSTICK-A; rules in tools/ci/quarantine.mjs and docs/process/ci-cd.md). A quarantined test still runs and is reported; its failure alone does not fail the job until `expires`. At most 5 entries, each at most 14 days. An expired entry fails CI: fix the test or delete the entry. Add only flakes with CI evidence (run and job).",
-  "entries": [
-    {
-      "id": "packages/node/src/sqlite-store.test.ts > SqliteStore: file, schema and migrations (07 §3.7) > migrates a version 10 file to version 11 (D-142): the notice only for an agent that updates",
-      "scope": "node-os",
-      "reason": "Times out on the Windows runner only: the migration chain took 26 s against the 20 s test timeout (it takes 1 to 12 s on other Windows runs). Passed on retry.",
-      "evidence": "CI run 41461928665 attempt 1, job 125333004643 node-os (windows-2025-vs2026): Test timed out in 20000ms",
-      "owner": "talirezun",
-      "added": "2026-11-02",
-      "expires": "2026-11-16"
-    },
-    {
-      "id": "packages/node/src/local-ui-first-run-browser.test.ts > the local first run in a real browser (M1-11b-1, D-120) > Welcome, pick, name with one gesture, master code, and Home (U3-g; M1-11b-1, D-120)",
-      "scope": "e2e-browser",
-      "reason": "Race in the real-browser first run: the page had not yet asked for /api/ui/apps when the test checked (expected false to be true), or the second visit's heading wait timed out. Passed on retry.",
-      "evidence": "CI run 41407105776 attempt 1, job 125152055629 checks (AssertionError: expected false to be true); CI run 41115212146, job 124273328796 checks (locator.waitFor timeout, line 386)",
-      "owner": "talirezun",
-      "added": "2026-11-02",
-      "expires": "2026-11-16"
-    }
-  ]
+  "entries": []
 }
