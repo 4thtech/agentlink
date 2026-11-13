@@ -1,7 +1,7 @@
 // The shell's startup order and wiring (src/main/main.ts) with a fake Electron: each forbidden
 // switch → exit, no window, no core; the session link only from the pipe; deep links only through
 // the (WP-D9) handler; quit stops the core.
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -133,6 +133,26 @@ describe('runShell startup', () => {
     expect(electron.app.sandboxEnabled).toBe(true);
     expect(electron.app.lockData).toEqual({ deepLink: 'agentlink://join#abc' });
     expect(electron.app.order.slice(0, 3)).toEqual(['sandbox', 'lock', 'ready']);
+  });
+
+  // REL051-CID: on a first start on Windows the user-data folder does not exist yet, and the lock
+  // then fails, so the very first start quit at once as if another copy were running.
+  it('creates the user-data folder before it takes the single-instance lock', async () => {
+    const { electron, proc } = setup();
+    const userData = join(proc.logDir, '..', '..', 'Roaming', 'AgentLink');
+    const app = electron.app as unknown as {
+      getPath?: (name: 'userData') => string;
+      requestSingleInstanceLock: (data?: Record<string, unknown>) => boolean;
+    };
+    app.getPath = () => userData;
+    const take = app.requestSingleInstanceLock.bind(electron.app);
+    let existedAtLock = false;
+    app.requestSingleInstanceLock = (data) => {
+      existedAtLock = existsSync(userData);
+      return take(data);
+    };
+    expect(await runShell(electron, proc)).toBe('running');
+    expect(existedAtLock).toBe(true);
   });
 
   it('a second instance exits without a window or a core', async () => {
