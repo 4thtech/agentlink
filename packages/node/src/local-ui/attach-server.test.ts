@@ -11,7 +11,16 @@
 // - No Send folder allowed: 409 `no_folder` (the page shows Home's Send folder banner).
 // - No path and no file name in any event, console line or error answer.
 import { readFileSync, readdirSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  symlink,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -81,9 +90,7 @@ interface Harness {
   ): Promise<{ status: number; body: string }>;
 }
 
-async function harness(
-  options: { folders?: string[]; result?: unknown } = {},
-): Promise<Harness> {
+async function harness(options: { folders?: string[]; result?: unknown } = {}): Promise<Harness> {
   const sent: SentCall[] = [];
   const folders = options.folders ?? ['~/AgentLink/Send'];
   const policy = {
@@ -116,7 +123,9 @@ async function harness(
       for (const f of input.files ?? []) {
         const opened = await f.open();
         const bytes =
-          opened instanceof Uint8Array ? opened : new Uint8Array(await new Response(opened).arrayBuffer());
+          opened instanceof Uint8Array
+            ? opened
+            : new Uint8Array(await new Response(opened).arrayBuffer());
         files.push({
           realpath: f.realpath,
           name: f.name ?? path.basename(f.realpath),
@@ -146,7 +155,7 @@ async function harness(
       Promise.resolve(
         (ownerSigValid(world.owner, signed.body, signed.sig)
           ? { status: 'applied', op: 'x' }
-          : { status: 'refused', op: 'x', reason: 'sig' }) as OwnerActionOutcome,
+          : { status: 'refused', op: 'x', reason: 'sig' }) as unknown as OwnerActionOutcome,
       ),
   };
   const events: ApprovalServerEvent[] = [];
@@ -222,7 +231,9 @@ describe('ATT-APP-ATTACH: the attach route', () => {
     expect(f?.name).toBe(`${SECRET_NAME}.md`);
     expect(f?.bytes).toBe('# Plan\n\nšđž\n');
     expect(path.dirname(f?.realpath ?? '')).toBe(sendFolder);
-    expect(await readFile(path.join(sendFolder, `${SECRET_NAME}.md`), 'utf8')).toBe('# Plan\n\nšđž\n');
+    expect(await readFile(path.join(sendFolder, `${SECRET_NAME}.md`), 'utf8')).toBe(
+      '# Plan\n\nšđž\n',
+    );
   });
 
   it('sends .txt and .json with their own types, several files in one message', async () => {
@@ -370,7 +381,9 @@ describe('ATT-APP-ATTACH: the attach route', () => {
     });
     it('with a wrong CSRF value: 403', async () => {
       const h = await harness();
-      const res = await h.post(ATTACH_PATH, one('a.md', 'x'), { 'X-AgentLink-CSRF': 'A'.repeat(43) });
+      const res = await h.post(ATTACH_PATH, one('a.md', 'x'), {
+        'X-AgentLink-CSRF': 'A'.repeat(43),
+      });
       expect(res.status).toBe(403);
     });
     it('without or with another Origin: 403', async () => {
@@ -455,20 +468,29 @@ describe('ATT-APP-ATTACH: the MCP side cannot reach the attach route (I-4)', () 
       path.join(repo, 'apps/cli/src/tools'),
       path.join(repo, 'apps/cli/src/mcp'),
     ];
+    let scanned = 0;
     for (const root of roots) {
-      let files: string[] = [];
+      let files: string[];
       try {
         files = walk(root);
       } catch {
         continue;
       }
+      scanned += files.length;
       for (const file of files) {
         const text = readFileSync(file, 'utf8');
-        for (const needle of ['/api/ui/attach', 'attachDesk', 'writeSendFolderFile', 'send-folder-file']) {
+        for (const needle of [
+          '/api/ui/attach',
+          'attachDesk',
+          'writeSendFolderFile',
+          'send-folder-file',
+        ]) {
           expect(text.includes(needle), `${path.relative(repo, file)} names ${needle}`).toBe(false);
         }
       }
     }
+    // The MCP tools were really read (the check is not vacuous).
+    expect(scanned).toBeGreaterThan(10);
   });
 
   it('the package entry exports nothing of it', async () => {

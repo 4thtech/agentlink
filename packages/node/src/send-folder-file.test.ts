@@ -41,6 +41,9 @@ describe('attachName (sanitised, allowlisted)', () => {
     expect(attachName('Plan.MARKDOWN')).toBe('Plan.MARKDOWN');
     expect(attachName('a.txt')).toBe('a.txt');
     expect(attachName('data.Json')).toBe('data.Json');
+    // Trailing dots and spaces are dropped (Windows would drop them): still a Markdown file.
+    expect(attachName('notes.md.')).toBe('notes.md');
+    expect(attachName('notes.md ')).toBe('notes.md');
   });
 
   it('refuses every other type, also behind a double extension', () => {
@@ -54,8 +57,6 @@ describe('attachName (sanitised, allowlisted)', () => {
       'a.command',
       'archive.zip',
       'README',
-      'notes.md.',
-      'notes.md ',
       'notes.mdx',
       'x.jsonl',
     ]) {

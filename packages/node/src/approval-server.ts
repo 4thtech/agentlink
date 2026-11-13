@@ -342,6 +342,8 @@ import {
   registerOwnerPasskey,
   type PasskeyAssertion,
 } from './owner-passkey.js';
+import { attachDesk } from './local-ui/attach-desk.js';
+import { ATTACH_MAX_BODY_BYTES } from './local-ui/api/attach.js';
 import {
   creditsPort,
   fileSavePort,
@@ -365,6 +367,7 @@ import { pairingFollower, type PairingFollower } from './local-ui/pairing-follow
 import { JOIN_PAGE_PATH } from './local-ui/invite-paths.js';
 import type {
   LocalUiInviteRoute,
+  LocalUiAttachRoute,
   LocalUiReadRoute,
   LocalUiRoute,
   LocalUiSwitchRoute,
@@ -600,6 +603,9 @@ const MAX_INVITE_CREATE_BODY_BYTES = 1_024;
 /** UX2-d1: at most this many invites created per window, per server (a store and spam bound). */
 const INVITE_CREATE_LIMIT = 10;
 const INVITE_CREATE_WINDOW_MS = 10 * 60_000;
+/** ATT-APP-ATTACH: at most this many attached messages per window, per server (then 429 `wait`). */
+const ATTACH_LIMIT = 20;
+const ATTACH_WINDOW_MS = 60_000;
 /** U3-invite (08 §4): at most one handoff per this many ms (then 429 `wait`). */
 const HANDOFF_INTERVAL_MS = 5_000;
 /** U3-invite (08 §4; M1-UX-OPEN-APP rules): at most one join-screen open per this many ms. */
@@ -1648,6 +1654,14 @@ export async function startApprovalServerWith(
   let invitesDesk = agentUi?.client === undefined ? undefined : inviteDesk(agentUi.client);
   /** UX2-d1: when each recent invite was created (ms), oldest first, for the create limit. */
   const invitesCreated: number[] = [];
+  /** ATT-APP-ATTACH: the attach desk of the attach route (never reachable from another route). */
+  const attachDeskOf = (ui: typeof agentUi) =>
+    ui?.client === undefined
+      ? undefined
+      : attachDesk(ui.client, filesHome === undefined ? {} : { home: filesHome });
+  let attachSendDesk = attachDeskOf(agentUi);
+  /** ATT-APP-ATTACH: when each recent attached message was sent (ms), oldest first. */
+  const attachesSent: number[] = [];
   /** M1-11s-c: the one owner setup in progress, if any. */
   let pendingSetup: PendingSetup | undefined;
   /** U3-invite (08 §4): the app host's waiting invite, in memory only; absent outside the host. */
@@ -6412,6 +6426,75 @@ export async function startApprovalServerWith(
   }
 
   /**
+   * ATT-APP-ATTACH (08 §1 "Attach a file"; proposed, owner confirms at merge): the attach kind, run
+   * after the session, CSRF, Origin, fetch-metadata, octet-stream and generation checks of every
+   * write. It refuses a query, an operation input and a presence header; takes at most ATTACH_LIMIT
+   * messages per ATTACH_WINDOW_MS (429 `wait`); reads at most ATTACH_MAX_BODY_BYTES (413); parses
+   * one strict JSON object and hands the handler only that object and the attach desk. No owner
+   * presence, no owner store, nothing signed. The body (the file bytes) is wiped after the handler;
+   * nothing here logs a name, a path or the content (I-7).
+   */
+  async function attachGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiAttachRoute,
+  ): Promise<void> {
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    const at = now();
+    while (attachesSent.length > 0 && (attachesSent[0] as number) <= at - ATTACH_WINDOW_MS) {
+      attachesSent.shift();
+    }
+    if (attachesSent.length >= ATTACH_LIMIT) {
+      const oldest = attachesSent[0] as number;
+      const retryAfter = Math.max(1, Math.ceil((oldest + ATTACH_WINDOW_MS - at) / 1000));
+      req.resume();
+      res.setHeader('Retry-After', String(retryAfter));
+      sendJson(res, 429, { error: 'wait', retryAfter });
+      return;
+    }
+    const body = await boundedBody(req, res, ATTACH_MAX_BODY_BYTES);
+    if (body === undefined) return;
+    try {
+      let parsed: JsonValue;
+      try {
+        parsed = parseJson(decodeUtf8(body));
+      } catch {
+        sendJson(res, 400, { error: 'invalid' });
+        return;
+      }
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        sendJson(res, 400, { error: 'invalid' });
+        return;
+      }
+      if (!stillCurrent(req)) {
+        agentChanged(res);
+        return;
+      }
+      attachesSent.push(now());
+      let result: LocalUiResult;
+      try {
+        result = await route.handler(uiContext, parsed as JsonObject, attachSendDesk);
+      } catch {
+        // Never the error's text: it could name a path or a file (I-7).
+        sendJson(res, 503, { error: 'unavailable' });
+        return;
+      }
+      sendResult(res, result);
+    } finally {
+      wipe(body);
+    }
+  }
+
+  /**
    * U3-invite (08 §4): opens the join screen through the OS opener, or first run while no owner
    * exists (it ends on the join screen). A fixed path and a one-shot session link; the invite is
    * never in it. At most one open per JOIN_OPEN_INTERVAL_MS for a handoff (`limited`).
@@ -6707,6 +6790,11 @@ export async function startApprovalServerWith(
     if (route.presence === 'invite') {
       // UX2-d1: creating and checking an invite have their own gate; ownerGate never runs them.
       await inviteGate(req, res, url, route);
+      return;
+    }
+    if (route.presence === 'attach') {
+      // ATT-APP-ATTACH: the owner's attached files have their own gate; ownerGate never runs it.
+      await attachGate(req, res, url, route);
       return;
     }
     if (route.presence === 'setup') {
@@ -7051,6 +7139,7 @@ export async function startApprovalServerWith(
     agentLabel = undefined;
     labelReady = refreshLabel();
     invitesDesk = agentUi?.client === undefined ? undefined : inviteDesk(agentUi.client);
+    attachSendDesk = attachDeskOf(agentUi);
     follower = followerOf(agentUi);
     uiContext = buildUiContext();
     // Approvals, a held owner setup and held paid-action confirmations belong to the old agent.

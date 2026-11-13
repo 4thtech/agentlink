@@ -66,7 +66,7 @@ async function settle(): Promise<void> {
   }
 }
 
-const file = (name: string, text: string | Uint8Array, type = 'text/markdown'): File =>
+const file = (name: string, text: string | Uint8Array<ArrayBuffer>, type = 'text/markdown'): File =>
   new File([text], name, { type });
 
 function pick(files: File[]): void {
@@ -99,7 +99,11 @@ const button = (name: RegExp): HTMLButtonElement => {
   return found as HTMLButtonElement;
 };
 
-function render(api = createAttachApi({ fetch: server({ status: 200, body: {} }).fetch, token: 't' }), onSent = () => undefined, none = false) {
+function render(
+  api = createAttachApi({ fetch: server({ status: 200, body: {} }).fetch, token: 't' }),
+  onSent = () => undefined,
+  none = false,
+) {
   act(() => {
     root.render(
       h(AttachComposer, {
@@ -180,13 +184,19 @@ describe('AttachComposer', () => {
     expect(call.headers.get('content-type')).toBe('application/octet-stream');
     expect(call.headers.get('X-AgentLink-Input')).toBeNull();
     const text = new TextDecoder().decode(call.body as Uint8Array);
-    const parsed = JSON.parse(text) as { to: string; text: string; files: { name: string; data: string }[] };
+    const parsed = JSON.parse(text) as {
+      to: string;
+      text: string;
+      files: { name: string; data: string }[];
+    };
     expect(parsed.to).toBe(CONTACT);
     expect(parsed.text).toBe('Here is the plan');
     expect(parsed.files.map((f) => f.name)).toEqual(['plan.md']);
-    expect(new TextDecoder().decode(Uint8Array.from(atob(parsed.files[0]?.data ?? ''), (c) => c.charCodeAt(0)))).toBe(
-      '# Plan šđ\n',
-    );
+    expect(
+      new TextDecoder().decode(
+        Uint8Array.from(atob(parsed.files[0]?.data ?? ''), (c) => c.charCodeAt(0)),
+      ),
+    ).toBe('# Plan šđ\n');
     expect(chips()).toHaveLength(0);
     expect(sent).toBe(1);
     expect(host.textContent).toContain('Sent to Marko');
