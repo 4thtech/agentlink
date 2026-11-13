@@ -54,7 +54,7 @@ import {
   type BuildIdentity,
   type InstanceOps,
 } from './instance.js';
-import { ensureGoodLocation } from './move.js';
+import { ensureGoodLocation, locationProblem } from './move.js';
 import RESOURCE_LAYOUT from '../shared/resource-layout.json' with { type: 'json' };
 import { OriginLock, WINDOW_PARTITION, hardenSession, lockWebContents } from './security.js';
 import {
@@ -190,6 +190,10 @@ export async function runShell(
     return 'refused';
   }
 
+  // The log keeps one fixed line when the shell quits on its own at start (no window yet), so a
+  // start that "does nothing" can be told apart afterwards: another copy running, or the folder.
+  const coreLog = new CoreLog({ dir: proc.logDir });
+
   // 2. Sandbox for every renderer; one instance.
   app.enableSandbox();
   let instance: InstanceOps | null = null;
@@ -205,6 +209,7 @@ export async function runShell(
     if (instance !== null) {
       await secondLaunch(app, electron.dialog, instance, proc.platform).catch(() => undefined);
     }
+    coreLog.note('app quit at start: another AgentLink is running');
     app.exit(0);
     return 'second-instance';
   }
@@ -340,17 +345,18 @@ export async function runShell(
 
   // 3. Location (packaged builds; a development run starts from the repository).
   if (app.isPackaged) {
-    const outcome = await ensureGoodLocation(
-      {
-        platform: proc.platform,
-        execPath: proc.execPath,
-        tmpDir: proc.tmpDir,
-        writable: proc.writable,
-      },
-      app,
-      electron.dialog,
-    );
+    const where = {
+      platform: proc.platform,
+      execPath: proc.execPath,
+      tmpDir: proc.tmpDir,
+      writable: proc.writable,
+    };
+    const outcome = await ensureGoodLocation(where, app, electron.dialog);
     if (outcome !== 'ok') {
+      // The kind only (translocated, read_only, temporary), never the path.
+      coreLog.note(
+        `app quit at start: it cannot run from this folder (${String(locationProblem(where))})`,
+      );
       quitting = true;
       removeRecord();
       app.exit(0);
@@ -365,7 +371,6 @@ export async function runShell(
     window?.blurPage();
   });
 
-  const coreLog = new CoreLog({ dir: proc.logDir });
   // Set below, once the supervisor and the checks exist.
   let onStatusAction: (action: StatusAction) => void = () => undefined;
   window = new MainWindow({

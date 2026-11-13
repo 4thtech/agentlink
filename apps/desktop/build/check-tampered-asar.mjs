@@ -77,6 +77,23 @@ function launch(exe, ms) {
   });
 }
 
+/**
+ * When the control does not start: the tail of the app's own log (the shell writes one fixed line
+ * when it quits at start, and keeps only REDACTED core lines; core-log.ts). Never the profile.
+ */
+function showAppLog() {
+  const dir = app.endsWith('.app')
+    ? join(home, 'Library', 'Logs', 'AgentLink')
+    : join(env.LOCALAPPDATA, 'AgentLink', 'logs');
+  try {
+    const lines = readFileSync(join(dir, 'core.log'), 'utf8').trimEnd().split('\n').slice(-20);
+    console.error('--- the app log (last lines, redacted by the app) ---');
+    for (const line of lines) console.error(line);
+  } catch {
+    console.error('(the app wrote no log: it quit before its own start code ran)');
+  }
+}
+
 const fail = (msg) => {
   console.error(`TAMPERED ASAR CHECK FAILED: ${msg}`);
   process.exitCode = 1;
@@ -89,6 +106,7 @@ try {
     fail(
       `the untampered control did not start (${c.spawnError ? 'spawn error' : `exit ${c.code}`}).`,
     );
+    showAppLog();
   } else {
     const bad = copyBuild('tampered');
     writeFileSync(bad.asar, tamperAsarHeader(readFileSync(bad.asar)));

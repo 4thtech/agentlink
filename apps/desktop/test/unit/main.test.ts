@@ -141,6 +141,10 @@ describe('runShell startup', () => {
     expect(await runShell(electron, proc)).toBe('second-instance');
     expect(FakeBrowserWindow.created).toHaveLength(0);
     expect(children).toHaveLength(0);
+    // One fixed line says why the start did nothing.
+    expect(readFileSync(join(proc.logDir, CORE_LOG_FILE), 'utf8')).toContain(
+      'app quit at start: another AgentLink is running',
+    );
   });
 
   it('refuses a translocated location before starting the core', async () => {
@@ -151,6 +155,10 @@ describe('runShell startup', () => {
     expect(await runShell(electron, proc)).toBe('location');
     expect(children).toHaveLength(0);
     expect(electron.dialog.shown).toHaveLength(1);
+    // The kind of problem, never the path.
+    const logged = readFileSync(join(proc.logDir, CORE_LOG_FILE), 'utf8');
+    expect(logged).toContain('app quit at start: it cannot run from this folder (translocated)');
+    expect(logged).not.toContain('AppTranslocation');
   });
 
   it('starts the bundled core and hardens the in-memory session', async () => {

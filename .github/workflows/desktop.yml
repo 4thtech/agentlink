@@ -258,8 +258,10 @@ jobs:
           if [ "$RUNNER_OS" = "macOS" ] && [ "$ARCH" = "x64" ]; then limit=180000; fi
           node apps/desktop/build/check-tampered-asar.mjs --app "$APP" --timeout-ms "$limit"
 
+      # Runs even when a launch check above failed: its own result (and the app log it prints on a
+      # failure) tells a launch problem of the build apart from one of the check.
       - name: Smoke test (the app starts, the bundled node answers tools/list)
-        if: steps.launch.outputs.run == 'true'
+        if: ${{ !cancelled() && steps.launch.outputs.run == 'true' }}
         shell: bash
         env:
           EXE: ${{ steps.bin.outputs.exe }}

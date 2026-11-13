@@ -233,11 +233,13 @@ describe('chapter 2: contacts and invites', () => {
       .getByText(/invites you to connect your AIs$/)
       .first()
       .waitFor();
-    // Both click Accept, one a moment after the other (the classroom race: once the invite is used
-    // its short link stops working, so a later accept is refused at once instead).
+    // Both click Accept, one after the other (the classroom race: once the invite is used its short
+    // link stops working, so a later accept is refused at once instead). The first accept must reach
+    // Ana before the second is sent: two clicks a moment apart race to the inviter, and on a slow
+    // runner the late card's accept could arrive first and pair instead (CI flake, 13 Nov).
     await acceptInviteInApp(b, link, 'Ana');
-    await late.page.getByRole('button', { name: ACCEPT_WITH }).click();
     await until('Bo is paired with Ana', () => pairedWith(mcpB, 'Ana'), 30_000);
+    await late.page.getByRole('button', { name: ACCEPT_WITH }).click();
     await navTo(late.page, 'Home');
     await late.page
       .getByText(
