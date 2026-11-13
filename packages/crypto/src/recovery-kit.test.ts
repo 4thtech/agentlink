@@ -279,7 +279,7 @@ describe('ALKK v1 refusals', () => {
     const kek = new Tracked(new ArrayBuffer(KEK.length));
     kek.set(KEK);
     const bad = KIT.slice();
-    bad[4] = 2;
+    bad[4] = 3; // KIT-NAMES: 1 and 2 are read; 3 is refused before the key is used
     await refusal(
       openRecoveryKitWithKek(bad, kek, { createStoreSink: () => sinks().createStoreSink() }),
     );
@@ -346,7 +346,7 @@ describe('ALKK v1 refusals', () => {
     for (const [offset, value] of [
       [0, 0x42],
       [3, 0x52],
-      [4, 2],
+      [4, 3], // KIT-NAMES: version 2 is read now
       [5, 2],
       [6, 2],
       [11, 1],
