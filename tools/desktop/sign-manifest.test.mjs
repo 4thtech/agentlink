@@ -639,5 +639,7 @@ describe('the command line, end to end (real offline KDF)', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  }, 120_000);
+    // About ten real offline-strength key derivations (256 MiB, 4 passes, ~3.5 s each on an idle
+    // laptop, several times that on a CI runner sharing its CPUs with other suites).
+  }, 300_000);
 });
