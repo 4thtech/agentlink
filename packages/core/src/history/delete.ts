@@ -2,7 +2,8 @@
 // delete, on this computer only.
 //
 // Two steps, so the owner's one presence gesture binds the exact list (04 §4.2 "Presence and undo"):
-// - `plan(input)` selects the messages (by envelope IDs, by contact, or older than a time), sets the
+// - `plan(input)` selects the messages (by envelope IDs, by contact, older than a time, or, RET-4,
+//   one contact older than a time), sets the
 //   protected ones aside with a fixed reason, lists the saved files of the rest, and answers counts,
 //   sizes and a `planHash` over the exact item set. It writes nothing.
 // - `apply(plan)` computes the plan again from the same input and refuses (`history_plan_changed`)
@@ -48,7 +49,12 @@ export type HistoryDeleteInclude = 'messages' | 'files' | 'both';
 /** Exactly one selector, and what to remove. */
 export type HistoryDeleteInput =
   | { readonly envelopeIds: readonly string[]; readonly include: HistoryDeleteInclude }
-  | { readonly contactId: string; readonly include: HistoryDeleteInclude }
+  | {
+      readonly contactId: string;
+      /** RET-4: only this person's messages whose `createdAt` is before this unix time (seconds). */
+      readonly before?: number;
+      readonly include: HistoryDeleteInclude;
+    }
   /** Messages whose `createdAt` is before this unix time (seconds). */
   | { readonly before: number; readonly include: HistoryDeleteInclude };
 
@@ -117,7 +123,9 @@ function checkInput(input: unknown): HistoryDeleteInput {
     throw invalid();
   }
   const keys = ['envelopeIds', 'contactId', 'before'].filter((k) => o[k] !== undefined);
-  if (keys.length !== 1) throw invalid();
+  // RET-4: a person and an age together are one selector ("Marko, older than 90 days").
+  const personByAge = keys.length === 2 && keys[0] === 'contactId' && keys[1] === 'before';
+  if (keys.length !== 1 && !personByAge) throw invalid();
   const inc = include as HistoryDeleteInclude;
   if (o.envelopeIds !== undefined) {
     const ids = o.envelopeIds;
@@ -133,11 +141,26 @@ function checkInput(input: unknown): HistoryDeleteInput {
   if (o.contactId !== undefined) {
     const id = o.contactId;
     if (typeof id !== 'string' || id.length === 0 || id.length > 128) throw invalid();
-    return Object.freeze({ contactId: id, include: inc });
+    if (!personByAge) return Object.freeze({ contactId: id, include: inc });
+    return Object.freeze({ contactId: id, before: checkBefore(o.before), include: inc });
   }
-  const before = o.before;
+  return Object.freeze({ before: checkBefore(o.before), include: inc });
+}
+
+function checkBefore(before: unknown): number {
   if (typeof before !== 'number' || !Number.isSafeInteger(before) || before < 0) throw invalid();
-  return Object.freeze({ before, include: inc });
+  return before;
+}
+
+/** The store filter of a contact or age selector (both for a person by age). */
+function whereOf(
+  base: Where<'envelopes'>,
+  input: Exclude<HistoryDeleteInput, { readonly envelopeIds: readonly string[] }>,
+): Where<'envelopes'> {
+  if (!('contactId' in input)) return { ...base, created_at: { lt: input.before } };
+  return input.before === undefined
+    ? { ...base, contact_id: input.contactId }
+    : { ...base, contact_id: input.contactId, created_at: { lt: input.before } };
 }
 
 /** The live (not deleted, processed) messages the selector names, oldest first, capped. */
@@ -157,11 +180,7 @@ function selectTx(
       if (row !== undefined && row.state === 'ok' && row.deleted_at === null) rows.push(row);
     }
   } else {
-    const where: Where<'envelopes'> =
-      'contactId' in input
-        ? { ...live, contact_id: input.contactId }
-        : { ...live, created_at: { lt: input.before } };
-    rows = tx.select('envelopes', where, {
+    rows = tx.select('envelopes', whereOf(live, input), {
       orderBy: [
         ['created_at', 'asc'],
         ['envelope_id', 'asc'],
@@ -236,11 +255,7 @@ function tombstonedTx(tx: StoreTx, input: HistoryDeleteInput): Row<'envelopes'>[
     }
     return out;
   }
-  const where: Where<'envelopes'> =
-    'contactId' in input
-      ? { ...gone, contact_id: input.contactId }
-      : { ...gone, created_at: { lt: input.before } };
-  return tx.select('envelopes', where, {
+  return tx.select('envelopes', whereOf(gone, input), {
     orderBy: [
       ['created_at', 'asc'],
       ['envelope_id', 'asc'],

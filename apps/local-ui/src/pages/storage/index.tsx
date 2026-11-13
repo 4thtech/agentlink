@@ -1,11 +1,14 @@
-// REL051-RET1: Settings > Storage (retention plan RET-1; 08 §1). A read-only view of how much room
-// each ID and each person takes, and of the Inbox folder. One GET, no delete call, nothing signed.
+// REL051-RET1: Settings > Storage (retention plan RET-1; 08 §1). How much room each ID and each
+// person takes, and the Inbox folder. RET-4 (D-148): Free up space (filters, Review, the delete
+// sheet behind presence) and Show in Finder for the Inbox folder (one fixed POST, no input).
 // Names other people chose render as plain text only (I-5). Styled from the Settings pages
 // (design-1112 §3.1): same surfaces, tokens and type.
-import { Button, Skeleton, Surface } from '@4thtech-io/ui';
+import { Button, InlineError, Skeleton, Surface } from '@4thtech-io/ui';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
-import { SettingsIcon } from '../settings/icons.js';
+import { createHistoryApi } from '../history/api.js';
+import { HISTORY_STRINGS as H } from '../history/strings.js';
+import { FreeUpSpace } from './free-up-space.js';
 import {
   parseStorage,
   unassignedIn,
@@ -21,6 +24,18 @@ import './storage.css';
 export interface StoragePageProps {
   /** The client (default: the production one); a test passes its own. */
   readonly api?: ApiClient;
+  /** RET-4: the fetch and session token of the delete sheet and Show in Finder (tests). */
+  readonly fetch?: typeof fetch;
+  readonly token?: string;
+}
+
+/** macOS has Finder; Windows and Linux say "Show in folder" (11 §5.7). */
+function onMac(): boolean {
+  try {
+    return /^Mac/i.test(navigator.platform);
+  } catch {
+    return false;
+  }
 }
 
 type Load =
@@ -109,9 +124,20 @@ function IdCard({ id }: { readonly id: IdUse | IdUnavailable }): ReactElement {
   );
 }
 
-export function StoragePage({ api: givenApi }: StoragePageProps): ReactElement {
+export function StoragePage({
+  api: givenApi,
+  fetch: givenFetch,
+  token,
+}: StoragePageProps): ReactElement {
   const [api] = useState<ApiClient>(() => givenApi ?? createApiClient());
+  const [history] = useState(() =>
+    createHistoryApi({
+      ...(givenFetch === undefined ? {} : { fetch: givenFetch }),
+      ...(token === undefined ? {} : { token }),
+    }),
+  );
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
+  const [revealFailed, setRevealFailed] = useState(false);
 
   const read = useCallback((): void => {
     setLoad({ kind: 'loading' });
@@ -132,17 +158,7 @@ export function StoragePage({ api: givenApi }: StoragePageProps): ReactElement {
         <p className="al-text-body al-muted">{S.lead}</p>
       </header>
 
-      <Surface as="section" level={1} className="sto-coming" aria-labelledby="sto-coming">
-        <span className="sto-ic" aria-hidden="true">
-          <SettingsIcon name="folder" />
-        </span>
-        <div className="sto-coming-text">
-          <h2 id="sto-coming" className="al-text-h3">
-            {S.comingTitle}
-          </h2>
-          <p className="al-text-body-sm al-muted">{S.coming}</p>
-        </div>
-      </Surface>
+      <FreeUpSpace api={api} fetch={givenFetch} token={token} onApplied={read} />
 
       {load.kind === 'loading' ? (
         <div role="status" aria-label={S.loading}>
@@ -170,6 +186,19 @@ export function StoragePage({ api: givenApi }: StoragePageProps): ReactElement {
             ) : (
               <>
                 <p className="al-text-body-sm al-muted">{S.inboxLine(load.view.inbox.folder)}</p>
+                <div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setRevealFailed(false);
+                      void history.revealInbox().then((r) => setRevealFailed(r !== 'shown'));
+                    }}
+                  >
+                    {onMac() ? H.showInFinder : H.showInFolder}
+                  </Button>
+                  {revealFailed ? <InlineError>{H.revealFailed}</InlineError> : null}
+                </div>
                 <ul className="sto-list">
                   <Row
                     title={S.unassigned}

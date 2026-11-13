@@ -38,7 +38,7 @@ Old links from earlier versions still work (`/contacts` and `/agents` open Peopl
 
 - [Home](home.md): approvals on top, **Invite someone**, and the people your AI talks to. Open a person to see the conversation and the files you exchanged.
 - [Get started](get-started-wizard.md): pick your AI app, one Touch ID, then invite someone.
-- [Storage](storage.md): how much room your messages and saved files take (read-only).
+- [Storage and Free up space](storage.md): how much room your messages and saved files take, and deleting old ones on this computer.
 - [Updates](updates.md): your version, Check for updates, and how to get a newer one.
 - [Invite someone](invite-someone.md): short invite links, open invites, and pasting a link you were given.
 - [People](contacts.md): the people each of your IDs talks to, across all your IDs, with Archived.
