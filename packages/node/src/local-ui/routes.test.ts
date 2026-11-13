@@ -241,6 +241,9 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/files/send-folder',
       // ATT-APP-ATTACH: attach files in a conversation (local-ui/attach-server.test.ts).
       '/api/ui/attach',
+      // UPD-5: Update now and Restart now (api/app-update.test.ts).
+      '/api/ui/app-update/install',
+      '/api/ui/app-update/restart',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).

@@ -234,6 +234,8 @@ describe('app update messages', () => {
     current: '0.5.1',
     latest: '0.5.2',
     download: DMG,
+    installable: false,
+    percent: 0,
   };
 
   it('round-trips the update state (shell -> core)', () => {
@@ -251,7 +253,15 @@ describe('app update messages', () => {
     ['an extra key', { ...ok, extra: 1 }],
     [
       'a missing key',
-      { v: 1, type: 'app-update', state: 'available', current: '0.5.1', latest: '0.5.2' },
+      {
+        v: 1,
+        type: 'app-update',
+        state: 'available',
+        current: '0.5.1',
+        latest: '0.5.2',
+        download: DMG,
+        installable: false,
+      },
     ],
     ['a bad current version', { ...ok, current: '0.5.1 <b>' }],
     ['a prerelease latest', { ...ok, latest: '0.5.2-beta.1' }],

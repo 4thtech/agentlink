@@ -21,6 +21,7 @@ import {
   OUT_DIR,
   assertNoPreviewString,
   assertPinnedRootKey,
+  updatePinFor,
   buildPayload,
   extract,
   fetchRuntimes,
@@ -141,6 +142,7 @@ writeFileSync(
       version,
       signed: false,
       placeholderMain: payload.placeholder,
+      ...updatePinFor(rootKeyMode),
       electron: {
         version: constants.electron.version,
         sha256: constants.electron.assets[platform].sha256,

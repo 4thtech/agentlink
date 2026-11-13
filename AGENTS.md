@@ -34,11 +34,11 @@ New collaborator or agent? Start at `docs/process/onboarding.md`.
 The main session is the **orchestrator**: it deploys workers and audits. **The orchestrator never implements; it keeps 8–15 workers busy.** Playbook: `docs/process/orchestrator-playbook.md`.
 
 - **Delegate** reading, implementation and verification to workers. Take back conclusions, not file dumps; reports **≤ 400 words**.
-- **Route** (owner, 2026-10-23; when in doubt, route up):
+- **Route** (owner, 2026-10-23; when in doubt, route up; always the latest model versions, owner, 2026-11-13):
   - **Haiku 5.5**: read-only, mechanical, status, verifiers; never S1/S2 builds.
   - **Sonnet 5.5**: clear-spec builds, tests, CI, docs, UI.
   - **Opus 5.5** (medium): all S2 builds, architecture, planning, every independent review.
-  - **Fable 5.1**: security audits (keys, crypto, owner presence, money, contracts, supply chain).
+  - **Fable 5.2**: security audits (keys, crypto, owner presence, money, contracts, supply chain).
 - **Audit, don't relay.** Verify with targeted checks (tests, CI status, `git diff --stat`, specific hunks). For S2 and sensitive paths, use an **independent auditor worker** that gets only the spec and the diff (Decision 54). Never call a worker's claim verified.
 - **Load only what you need.** Open specs by section; use `grep` and line ranges; keep large outputs in files; run workers in parallel.
 - **Save early.** Keep the Curator handoff and sync file current; at ~60% context, save and suggest a new session.

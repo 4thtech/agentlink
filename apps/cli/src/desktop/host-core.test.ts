@@ -557,19 +557,28 @@ describe('runDesktopHost (WP-D3)', () => {
       current: '0.5.1',
       latest: '0.5.2',
       download: DMG,
+      installable: false,
+      percent: 0,
     });
     expect(desk?.view()).toEqual({
       state: 'available',
       current: '0.5.1',
       latest: '0.5.2',
       download: DMG,
+      installable: false,
+      percent: 0,
     });
+    // UPD-5: not installable here: Update now asks nothing.
+    expect(desk?.startInstall?.()).toMatchObject({ state: 'available' });
+    expect(s.pipe.sent.some((m) => m.type === 'app-update-install')).toBe(false);
     // A check: one message with no other key, and "checking" (no link) meanwhile.
     expect(desk?.check()).toEqual({
       state: 'checking',
       current: '0.5.1',
       latest: '',
       download: '',
+      installable: false,
+      percent: 0,
     });
     expect(s.pipe.sent.filter((m) => m.type === 'app-update-check')).toEqual([
       { v: 1, type: 'app-update-check' },
@@ -582,9 +591,62 @@ describe('runDesktopHost (WP-D3)', () => {
       current: '0.5.1',
       latest: '',
       download: '',
+      installable: false,
+      percent: 0,
     });
-    expect(desk?.check()).toEqual({ state: 'off', current: '0.5.1', latest: '', download: '' });
+    expect(desk?.check()).toEqual({
+      state: 'off',
+      current: '0.5.1',
+      latest: '',
+      download: '',
+      installable: false,
+      percent: 0,
+    });
     expect(s.pipe.sent.filter((m) => m.type === 'app-update-check')).toHaveLength(1);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await expect(run).resolves.toBe(0);
+  });
+
+  it('UPD-5: Update now and Restart now go to the shell as bare messages, only in their state', async () => {
+    const s = setup();
+    let options: ApprovalServerOptions | undefined;
+    const start = s.deps.startServer;
+    const run = runDesktopHost({
+      ...s.deps,
+      startServer: (o, sink) => {
+        options = o;
+        return start(o, sink);
+      },
+    });
+    await until(() => readies(s.pipe.sent).length === 1);
+    const desk = options?.appUpdate;
+    const DMG =
+      'https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-mac-arm64.dmg';
+    const base = {
+      v: 1,
+      type: 'app-update',
+      current: '0.5.2',
+      latest: '0.5.3',
+      download: DMG,
+      installable: true,
+      percent: 0,
+    } as const;
+    // Restart before anything is ready: nothing sent.
+    s.pipe.shell({ ...base, state: 'available' });
+    expect(desk?.restart?.()).toMatchObject({ state: 'available' });
+    expect(desk?.startInstall?.()).toMatchObject({ state: 'downloading', percent: 0 });
+    expect(desk?.startInstall?.()).toMatchObject({ state: 'downloading' });
+    expect(s.pipe.sent.filter((m) => m.type === 'app-update-install')).toEqual([
+      { v: 1, type: 'app-update-install' },
+    ]);
+    s.pipe.shell({ ...base, state: 'ready' });
+    expect(desk?.restart?.()).toMatchObject({ state: 'restarting' });
+    expect(desk?.restart?.()).toMatchObject({ state: 'restarting' });
+    expect(s.pipe.sent.filter((m) => m.type === 'app-update-restart')).toEqual([
+      { v: 1, type: 'app-update-restart' },
+    ]);
+    // The safe-to-stop signal: no request waiting for the owner here.
+    expect(desk?.busy?.()).toBe(false);
     s.pipe.shell({ v: 1, type: 'shutdown' });
     await expect(run).resolves.toBe(0);
   });

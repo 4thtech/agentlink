@@ -202,8 +202,10 @@ jobs:
               // INSTALLER-1: the installers, their tests and the site that serves them (curl | sh).
               /^installer\//,
               /^tools\/installer\//,
-              // D-145 (5): desktop update-signing tooling (offline root and update keys).
+              // D-145 (5), D-151: desktop update-key tooling, and the update key pinned in every installed app
+              // (UPD-3, Fable L3: a pin change needs the independent review and the owner's "merge").
               /^tools\/desktop\//,
+              /^apps\/desktop\/src\/main\/updater\/root-key[^/]*\.json$/,
               /^apps\/invite\//,
             ];
             const isSensitive = (path) => SENSITIVE.some((re) => re.test(path));

@@ -196,11 +196,12 @@ const done = (code, reason, removeStaging) => {
 };
 // The new copy's processes, as ps shows them: its main executable, and children of those running
 // from inside the bundle (its core). Never this process; never a pid that ps does not confirm.
+// null when ps fails: unknown, never "nothing running" (IR-UPD-4-2 R2-1).
 const newCopyProcesses = () => {
   let out;
   try {
     out = cp.execFileSync(psProgram, ['-axo', 'pid=,ppid=,comm='], { encoding: 'utf8', timeout: 10000, maxBuffer: 8 * 1024 * 1024, env: { PATH: '/usr/bin:/bin' } });
-  } catch { return []; }
+  } catch { return null; }
   const rows = [];
   for (const line of out.split('\\n')) {
     const m = /^\\s*([0-9]+)\\s+([0-9]+)\\s+(.+?)\\s*$/.exec(line);
@@ -214,13 +215,14 @@ const newCopyProcesses = () => {
     .filter((r) => shells.has(r.pid) || (shells.has(r.ppid) && r.comm.startsWith(app + '/')) || (r.pid === claimed && r.comm === exe))
     .map((r) => r.pid);
 };
+const none = (list) => list !== null && list.length === 0;
 const stopNewCopy = async () => {
-  const first = newCopyProcesses();
-  for (const p of first) { try { process.kill(p, 'SIGTERM'); } catch {} }
-  for (let i = 0; i < 50 && newCopyProcesses().length > 0; i += 1) await sleep(100);
-  for (const p of newCopyProcesses()) { try { process.kill(p, 'SIGKILL'); } catch {} }
+  for (const p of newCopyProcesses() ?? []) { try { process.kill(p, 'SIGTERM'); } catch {} }
+  for (let i = 0; i < 50 && !none(newCopyProcesses()); i += 1) await sleep(100);
+  for (const p of newCopyProcesses() ?? []) { try { process.kill(p, 'SIGKILL'); } catch {} }
   await sleep(200);
-  return newCopyProcesses().length === 0;
+  // Stopped only when ps answered and showed nothing; otherwise failed/ and its folder stay.
+  return none(newCopyProcesses());
 };
 const moveBack = async (from) => {
   for (let i = 0; i < 3; i += 1) {
@@ -263,7 +265,9 @@ const moveBack = async (from) => {
   const stopped = await stopNewCopy();
   try { fs.mkdirSync(path.dirname(failedCopy), { recursive: true, mode: 0o700 }); } catch {}
   try { fs.renameSync(app, failedCopy); } catch {
-    // The new copy is still at the path (runnable); the old one stays in previous/.
+    // The new copy is still at the path (runnable); the old one stays in previous/. Start it again
+    // so the person is not left without a running app (IR-UPD-4-2 R2-2).
+    await launch(app);
     done(5, 'rollback_incomplete', false);
   }
   if (!(await moveBack(aside))) {

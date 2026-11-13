@@ -615,6 +615,73 @@ describe('installUpdate end to end, up to the watchdog (UPD-4)', () => {
     expect(HEALTH_TIMEOUT_MS).toBe(90_000);
   });
 
+  it('UPD-5: says when it verifies, waits for Restart now, and checks the app again before the watchdog', async () => {
+    const apps = join(root, 'Applications');
+    const current = await fakeApp(apps, '0.5.2');
+    const src = join(root, 'src');
+    const next = await fakeApp(src, '0.5.3');
+    const bytes = new Uint8Array(32).fill(9);
+    const spawned: string[] = [];
+    const steps: string[] = [];
+    let records = 0;
+    let release: () => void = () => undefined;
+    const done = installUpdate({
+      accepted: { version: '0.5.3', required: false, asset: zipAsset(bytes) },
+      stateDir: join(root, 'state'),
+      currentApp: current,
+      pid: 4242,
+      fetch: fetchBytes(bytes),
+      run: fakeTools({ source: src }).run,
+      readRecord: async () => {
+        records += 1;
+        return recordFor(next);
+      },
+      spawnDetached: (cmd) => spawned.push(cmd),
+      onVerifying: () => steps.push('verifying'),
+      confirmRestart: () =>
+        new Promise<void>((resolve) => {
+          steps.push('ready');
+          release = resolve;
+        }),
+    });
+    for (let i = 0; i < 200 && !steps.includes('ready'); i += 1)
+      await new Promise((r) => setTimeout(r, 5));
+    expect(steps).toEqual(['verifying', 'ready']);
+    expect(spawned).toEqual([]); // nothing starts before the click
+    expect(records).toBe(1);
+    release();
+    expect(await done).toEqual({ kind: 'restarting', version: '0.5.3' });
+    expect(records).toBe(2); // the staged app was checked again after the wait
+    expect(spawned).toHaveLength(1);
+  });
+
+  it('UPD-5: a staged app changed while waiting for Restart now is refused, nothing starts', async () => {
+    const apps = join(root, 'Applications');
+    const current = await fakeApp(apps, '0.5.2');
+    const src = join(root, 'src');
+    const next = await fakeApp(src, '0.5.3');
+    const bytes = new Uint8Array(32).fill(9);
+    const spawned: string[] = [];
+    let records = 0;
+    const outcome = await installUpdate({
+      accepted: { version: '0.5.3', required: false, asset: zipAsset(bytes) },
+      stateDir: join(root, 'state'),
+      currentApp: current,
+      pid: 4242,
+      fetch: fetchBytes(bytes),
+      run: fakeTools({ source: src }).run,
+      readRecord: async () => {
+        records += 1;
+        return records === 1 ? recordFor(next) : null;
+      },
+      spawnDetached: (cmd) => spawned.push(cmd),
+      confirmRestart: () => Promise.resolve(),
+    });
+    expect(outcome).toEqual({ kind: 'fallback', code: 'bundle_hashes' });
+    expect(spawned).toEqual([]);
+    expect(await readdir(join(root, 'state', 'updates'))).toEqual([]);
+  });
+
   it('every refusal is a fixed code with fixed words: no URL or path in what the person sees', async () => {
     const apps = join(root, 'Applications');
     const current = await fakeApp(apps, '0.5.2');
@@ -1002,6 +1069,43 @@ if (v === process.env.HANG) {
       expect(code).toBe(5);
       expect(await versionAt(s.current)).toBe('0.5.3');
       expect(await stat(join(s.current, 'Contents', 'MacOS', 'AgentLink'))).toBeTruthy();
+      expect(await versionAt(join(s.staging, 'previous', 'AgentLink.app'))).toBe('0.5.2');
+      expect(await loadFailedRecord(s.state)).toEqual({
+        version: '0.5.3',
+        reason: 'rollback_incomplete',
+      });
+    },
+  );
+
+  it('a failing ps is "unknown", never "nothing running": failed/ and its folder are kept (IR-UPD-4-2 R2-1)', async () => {
+    const s = await setup();
+    const broken = join(root, 'tools', 'broken-ps.sh');
+    await writeFile(broken, '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    const args = s.plan(await deadPid(), 1500);
+    args[7] = broken;
+    const code = await runWatchdog(args, s.env);
+    expect(code).toBe(2);
+    expect(await versionAt(s.current)).toBe('0.5.2');
+    expect(await launched(s.log)).toEqual(['0.5.3', '0.5.2']);
+    // The copy may still run from failed/: its folder stays until the sweeper.
+    expect(await versionAt(join(s.staging, 'failed', 'AgentLink.app'))).toBe('0.5.3');
+    expect(await loadFailedRecord(s.state)).toEqual({ version: '0.5.3', reason: 'unhealthy' });
+  });
+
+  it.skipIf(process.getuid?.() === 0)(
+    'when the failed copy cannot be moved aside, the stopped copy is relaunched and the reason recorded (IR-UPD-4-2 R2-2)',
+    async () => {
+      const s = await setup();
+      await mkdir(join(s.staging, 'failed'), { mode: 0o555 });
+      let code: number | null;
+      try {
+        code = await runWatchdog(s.plan(await deadPid(), 1500), s.env);
+      } finally {
+        await chmod(join(s.staging, 'failed'), 0o755);
+      }
+      expect(code).toBe(5);
+      expect(await versionAt(s.current)).toBe('0.5.3');
+      expect(await launched(s.log)).toEqual(['0.5.3', '0.5.3']);
       expect(await versionAt(join(s.staging, 'previous', 'AgentLink.app'))).toBe('0.5.2');
       expect(await loadFailedRecord(s.state)).toEqual({
         version: '0.5.3',

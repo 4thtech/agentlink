@@ -32,6 +32,8 @@ If macOS says the app is "damaged" and offers only the Trash, the app is not dam
 
 Settings, Updates shows your version and **Check for updates** (the app also checks once a day by itself). When a newer version is ready, press **Download update**: your browser downloads the `.dmg` for your Mac; quit AgentLink, drag the new app to Applications and choose Replace. The check asks GitHub only (GitHub sees your IP; no ID or version is sent); `AGENTLINK_UPDATE_CHECK=off` turns it off. You can also download the new `.dmg` from the Releases page by hand. Your IDs, people and messages stay: they live in your AgentLink folder on your computer, not in the app.
 
+Coming, not switched on yet: a later Mac version updates itself on a click. Settings, Updates then shows **Update now**, a download progress bar with the percentage, "Checking the new version", then **Restart now** (nothing changes before you press it; if a request waits for your approval, the page says so first) and "Restarting". If the new version does not start, the previous one comes back by itself. If the app can't update itself, the page says "Couldn't update here. Download the new version instead." and shows the download button. Until then, updating works as described above.
+
 ## How does Touch ID work in the app?
 
 Open Settings, Touch ID & master code, press **Use Touch ID for approvals**, type your master code once and touch the sensor. **Test Touch ID** on the same page checks that it works. If you cancel or the touch fails, it goes back to off with a plain message and your master code keeps working. Each Touch ID confirmation answers a fresh single-use request, so a copied confirmation cannot be replayed.

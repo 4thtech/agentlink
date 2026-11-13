@@ -68,12 +68,19 @@ import type { StatusAction } from './status-page.js';
 import { AppTray, trayImage } from './tray.js';
 import { APP_USER_MODEL_ID, NativeNotifier } from './notify.js';
 import { writeHealthIfPending, writeStarting } from './updater/health.js';
-import { UPDATES_DIR, sweepStaging } from './updater/install.js';
+import { InAppUpdater, inAppEnabled } from './updater/in-app.js';
+import { checkForUpdate } from './updater/index.js';
+import {
+  UPDATES_DIR,
+  installFromProcess,
+  restartForUpdate,
+  sweepStaging,
+} from './updater/install.js';
 import { procTranslated, updateChannel, updaterArch } from './updater/host.js';
 import { ReleaseChecker, updateChecksAllowed } from './updater/release-check.js';
 import { scheduleUpdateChecks } from './updater/schedule.js';
 import { MainWindow } from './window.js';
-import type { AppUpdateView } from '../shared/app-update.js';
+import { macArch, type AppUpdatePipeView, type AppUpdateView } from '../shared/app-update.js';
 import type { InviteOutcome } from '../shared/protocol.js';
 
 declare const __AGENTLINK_DESKTOP_PREVIEW__: boolean | undefined;
@@ -184,10 +191,23 @@ export interface ShellProcess {
     electron: ElectronModule,
     onChange: (view: AppUpdateView) => void,
   ) => ReleaseChecker;
+  /**
+   * UPD-5: "Update now" / "Restart now" (updater/in-app.ts), told about every change. Absent: no
+   * in-app update (the page keeps the download link).
+   */
+  readonly inAppUpdater?: (electron: ElectronModule, onChange: () => void) => InAppUpdaterPort;
   /** D15-01: this build's identity and the running-copy record (instance.ts). Absent: legacy lock. */
   readonly instance?: (app: App) => InstanceOps;
   /** D15-07: the startup tripwire for the bundled files (bundle-check.ts). Absent: not checked. */
   readonly verifyBundle?: () => Promise<'ok' | 'changed' | 'unchecked'>;
+}
+
+/** UPD-5: what the shell uses of updater/in-app.ts InAppUpdater. */
+export interface InAppUpdaterPort {
+  view(base: AppUpdateView): AppUpdatePipeView;
+  check(): Promise<void>;
+  install(): boolean;
+  restart(): boolean;
 }
 
 export type ShellOutcome = 'refused' | 'profile' | 'second-instance' | 'location' | 'running';
@@ -298,14 +318,23 @@ export async function runShell(
   const toInviteLink = proc.toInviteLink ?? ((): null => null);
   // DESK051-UPD: the update state goes to the core (Settings > Updates) after every `ready` and on
   // every change; the core can only ask for a check.
+  // UPD-5: the in-app update's view goes on top of the release check's (installable, percent).
+  let inApp: InAppUpdaterPort | null = null;
+  let releaseChecker: ReleaseChecker | null = null;
   const sendAppUpdate = (view: AppUpdateView): void => {
+    const full: AppUpdatePipeView =
+      inApp === null ? { ...view, installable: false, percent: 0 } : inApp.view(view);
     try {
-      supervisor?.send({ v: 1, type: 'app-update', ...view });
+      supervisor?.send({ v: 1, type: 'app-update', ...full });
     } catch {
       // An invalid view is never sent (the encoder checks it again).
     }
   };
-  const releaseChecker = proc.releaseChecker?.(electron, sendAppUpdate) ?? null;
+  releaseChecker = proc.releaseChecker?.(electron, sendAppUpdate) ?? null;
+  inApp =
+    proc.inAppUpdater?.(electron, () => {
+      if (releaseChecker !== null) sendAppUpdate(releaseChecker.view());
+    }) ?? null;
 
   const sendInvite = (link: string): void => {
     try {
@@ -553,8 +582,19 @@ export async function runShell(
         case 'app-update-check':
           // Always answered, even when nothing changed (the page waits for the end of "checking").
           if (releaseChecker !== null) {
-            void releaseChecker.check().then(sendAppUpdate, () => undefined);
+            const checker = releaseChecker;
+            void Promise.all([checker.check(), inApp?.check()]).then(
+              () => sendAppUpdate(checker.view()),
+              () => undefined,
+            );
           }
+          return;
+        case 'app-update-install':
+          // UPD-5: only the update this shell verified itself; its state follows on every change.
+          inApp?.install();
+          return;
+        case 'app-update-restart':
+          inApp?.restart();
           return;
       }
     },
@@ -625,6 +665,7 @@ export async function runShell(
   if (launch.deepLink !== null) handleDeepLink(launch.deepLink);
   if (app.isPackaged && preview === null) proc.startUpdates?.(electron);
   void releaseChecker?.start().catch(() => undefined);
+  void inApp?.check();
   return 'running';
 }
 
@@ -659,7 +700,11 @@ export function realProcess(): ShellProcess {
     preview: readPreview(proc.env),
     toInviteLink,
     logDir: logDir(proc.platform, homedir(), proc.env),
-    startUpdates: (electron) => startUpdates(electron, proc.platform, proc.arch),
+    // UPD-5: on a Mac the in-app update replaces the phase-1 installer dialog.
+    startUpdates: (electron) => {
+      if (proc.platform !== 'darwin') startUpdates(electron, proc.platform, proc.arch);
+    },
+    inAppUpdater: (electron, onChange) => inAppUpdaterFor(electron, proc, onChange),
     updateHealth: (app) => {
       const dir = app.getPath?.('userData');
       const version = app.getVersion?.();
@@ -801,6 +846,67 @@ function releaseCheckerFor(
     isOnline: () => net?.isOnline() ?? true,
     timers: { setTimeout: (callback, ms) => setTimeout(callback, ms).unref() },
     onChange,
+  });
+}
+
+/** UPD-5: the in-app update on the real Electron app (off while root-key.json is the placeholder). */
+function inAppUpdaterFor(
+  electron: ElectronModule,
+  proc: NodeJS.Process,
+  onChange: () => void,
+): InAppUpdater {
+  const { app } = electron;
+  const version = app.getVersion?.() ?? '0.0.0-dev';
+  const stateDir = app.getPath?.('userData');
+  const translated = proc.platform === 'darwin' && translatedNow();
+  const arch = macArch(proc.arch, translated) ?? 'arm64';
+  const enabled =
+    stateDir !== undefined &&
+    inAppEnabled({
+      platform: proc.platform,
+      packaged: app.isPackaged,
+      preview: readPreview(proc.env) !== null,
+      execPath: proc.execPath,
+    });
+  return new InAppUpdater({
+    enabled,
+    currentVersion: version,
+    arch,
+    check: async () =>
+      (
+        await checkForUpdate({
+          currentVersion: version,
+          channel: updateChannel(version),
+          platform: proc.platform,
+          arch: updaterArch(proc.platform, proc.arch, translated),
+          stateDir: stateDir ?? '',
+          kind: 'zip',
+        })
+      ).accepted,
+    install: (accepted, hooks) =>
+      restartForUpdate(
+        () =>
+          installFromProcess({
+            accepted,
+            stateDir: stateDir ?? '',
+            execPath: proc.execPath,
+            pid: proc.pid,
+            onProgress: (done, total) => hooks.onProgress(done, total),
+            onVerifying: () => hooks.onVerifying(),
+            confirmRestart: () => hooks.confirmRestart(),
+          }),
+        () => app.quit(),
+      ),
+    onChange,
+  });
+}
+
+/** Rosetta check through sysctl.proc_translated (fixed program, fixed arguments). */
+function translatedNow(): boolean {
+  return procTranslated((command, args) => {
+    const result = spawnSync(command, [...args], { encoding: 'utf8', timeout: 2000 });
+    if (result.status !== 0 || typeof result.stdout !== 'string') throw new Error('sysctl');
+    return result.stdout;
   });
 }
 

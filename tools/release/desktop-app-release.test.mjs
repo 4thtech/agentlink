@@ -90,15 +90,16 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
     }
   });
 
-  // REL051-CIE (scope change, 0.5.1): the Windows desktop app is not shipped yet. The release
-  // attaches exactly the two Mac DMGs and their sums: no Windows installer, no zip, no glob.
-  it('attaches only the two Mac DMGs and SHA256SUMS-desktop-app.txt', () => {
+  // REL051-CIE (scope change, 0.5.1): the Windows desktop app is not shipped yet. UPD-3: the release
+  // attaches the two Mac DMGs, the two Mac zips (the in-app update installs the zip) and their sums:
+  // no Windows installer, no glob.
+  it('attaches the two Mac DMGs, the two Mac zips and SHA256SUMS-desktop-app.txt', () => {
     const step = attach.slice(
       attach.indexOf('Attach the app to the GitHub Release'),
       attach.indexOf('Check the attached files and their public links'),
     );
     expect(step).toContain(
-      'files=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" "AgentLink-mac-arm64.dmg" "AgentLink-mac-x64.dmg" )',
+      'files=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" "AgentLink-$VERSION-mac-arm64.zip" "AgentLink-$VERSION-mac-x64.zip" "AgentLink-mac-arm64.dmg" "AgentLink-mac-x64.dmg" )',
     );
     expect(attach).not.toMatch(/setup\.exe|win-x64|\*\.zip|\*\.dmg/);
     expect(build).not.toMatch(/windows/);

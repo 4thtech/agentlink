@@ -13,7 +13,10 @@
 // - `show {route}`: a fixed enum, never a path; it mints a fresh one-shot link, sent as `ready`.
 // - DESK051-UPD `app-update {…}`: the shell's update state, kept in memory for Settings > Updates
 //   (node local-ui/api/app-update.ts); "Check for updates" sends `app-update-check` (no other key).
-//   The core makes no request of its own for it.
+//   The core makes no request of its own for it. UPD-5: "Update now" sends `app-update-install` and
+//   "Restart now" `app-update-restart` (no other key), each only in its state; the shell decides
+//   (it installs only what it verified). `busy` (the page warns before a restart) is the tray's
+//   count of requests waiting for the owner.
 // - `~/.agentlink/app-host.json` is written by the server's handoff option (nodeUiDeps), so a
 //   terminal `agentlink join` hands its invite to this host unchanged; it is removed on close.
 // - N7 (PLAN-NOTIFY §3.5): the desktop app owns the OS notifications. Each tick turns the open ID's
@@ -53,6 +56,14 @@ import {
 
 /** N7 (IR-N7-1 L-2): desktop-alerts.json is written again at least this often (its lease). */
 export const RECORD_RENEW_MS = 60_000;
+
+/** UPD-5: the states of a running in-app update (no check meanwhile). */
+const IN_APP_RUNNING: ReadonlySet<string> = new Set([
+  'downloading',
+  'verifying',
+  'ready',
+  'restarting',
+]);
 
 /** How often the counts are read (a pending list read of the open agent and the open pages). */
 export const STATUS_EVERY_MS = 5_000;
@@ -179,10 +190,37 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     check: () => {
       const now = appUpdate;
       if (now === undefined || now.state === 'off' || stopping) return now;
+      // Not while an in-app update runs (the shell would not check then either).
+      if (IN_APP_RUNNING.has(now.state)) return now;
       if (!pipe.send({ v: 1, type: 'app-update-check' })) return now;
-      appUpdate = Object.freeze({ ...now, state: 'checking', latest: '', download: '' });
+      appUpdate = Object.freeze({
+        ...now,
+        state: 'checking',
+        latest: '',
+        download: '',
+        installable: false,
+        percent: 0,
+      });
       return appUpdate;
     },
+    // UPD-5: Update now, only for an update the shell said it can install here.
+    startInstall: () => {
+      const now = appUpdate;
+      if (now === undefined || stopping) return now;
+      if (now.state !== 'available' || now.installable !== true) return now;
+      if (!pipe.send({ v: 1, type: 'app-update-install' })) return now;
+      appUpdate = Object.freeze({ ...now, state: 'downloading', percent: 0 });
+      return appUpdate;
+    },
+    // UPD-5: Restart now, only once the shell said the update is ready.
+    restart: () => {
+      const now = appUpdate;
+      if (now === undefined || stopping || now.state !== 'ready') return now;
+      if (!pipe.send({ v: 1, type: 'app-update-restart' })) return now;
+      appUpdate = Object.freeze({ ...now, state: 'restarting', percent: 0 });
+      return appUpdate;
+    },
+    busy: () => waiting > 0,
   });
 
   /** The server starter given to the `ui` deps: the link sink, the record and the open agent. */
@@ -251,6 +289,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
       current: message.current,
       latest: message.latest,
       download: message.download,
+      installable: message.installable,
+      percent: message.percent,
     });
   });
   sendStatus();

@@ -35,6 +35,9 @@
 //       (nameSource 'owner', never a self-declared name), in the plain NOTIFY_NAME shape. Sent only
 //       for the kinds the owner switched on (Settings > Notifications). Never message text, a file
 //       name, a link or anything inbound (I-5).
+//   {"v":1,"type":"app-update-install"} / {"v":1,"type":"app-update-restart"}  (UPD-5)
+//       "Update now" / "Restart now" in Settings (owner session + CSRF). No other key: the shell
+//       installs only the update it verified itself, and restarts only once it is ready.
 //
 // Shell -> core:
 //   {"v":1,"type":"invite","link":"https://agentlink.4thtech.io/i#…"}
@@ -49,6 +52,9 @@
 //       DESK051-UPD: what Settings > Updates shows (the shell's app-update.ts builds it). `latest` and
 //       `download` only for "available": a plain x.y.z newer than `current`, and exactly this
 //       repository's release file for it (AgentLink-<v>-mac-<arm64|x64>.dmg) or its release page.
+//       UPD-5: also `"installable":<bool>,"percent":<0..100>` and the states downloading, verifying,
+//       ready, restarting (installable) and install_failed (not), which carry the version and link
+//       as "available" does; `percent` is a whole number, only while downloading.
 
 /** The protocol version every message carries. */
 export const DESKTOP_PIPE_VERSION = 1;
@@ -137,8 +143,18 @@ export const APP_UPDATE_STATES = Object.freeze([
   'available',
   'failed',
   'offline',
+  'downloading',
+  'verifying',
+  'ready',
+  'restarting',
+  'install_failed',
 ] as const);
 export type AppUpdateState = (typeof APP_UPDATE_STATES)[number];
+
+/** UPD-5: the states of a running in-app update (always installable). */
+const IN_APP_STATES: readonly string[] = ['downloading', 'verifying', 'ready', 'restarting'];
+/** The states that carry a newer version and its link. */
+const WITH_RELEASE: readonly string[] = ['available', 'install_failed', ...IN_APP_STATES];
 
 /** DESK051-UPD: the update state the shell sends (checked field by field, see isAppUpdate). */
 export interface AppUpdateView {
@@ -146,6 +162,10 @@ export interface AppUpdateView {
   readonly current: string;
   readonly latest: string;
   readonly download: string;
+  /** UPD-5: "Update now" can run here. */
+  readonly installable: boolean;
+  /** UPD-5: the download's whole percentage (0 outside downloading). */
+  readonly percent: number;
 }
 
 const UPD_NUM = '(0|[1-9][0-9]{0,5})';
@@ -178,12 +198,18 @@ export function isUpdateLinkFor(url: unknown, version: string): boolean {
   );
 }
 
-/** The four fields fit together: a version and a link only when available. */
+/** The six fields fit together (the shell's app-update.ts isAppUpdatePipeView). */
 export function isAppUpdate(value: Readonly<Record<string, unknown>>): boolean {
-  const { state, current, latest, download } = value;
+  const { state, current, latest, download, installable, percent } = value;
   if (!isOneOf(APP_UPDATE_STATES, state)) return false;
   if (typeof current !== 'string' || !APP_VERSION.test(current)) return false;
-  if (state === 'available') {
+  if (typeof installable !== 'boolean') return false;
+  if (typeof percent !== 'number' || !Number.isSafeInteger(percent)) return false;
+  if (percent < 0 || percent > 100 || (state !== 'downloading' && percent !== 0)) return false;
+  if (IN_APP_STATES.includes(state) ? !installable : state !== 'available' && installable) {
+    return false;
+  }
+  if (WITH_RELEASE.includes(state)) {
     return (
       typeof latest === 'string' &&
       isNewerVersion(latest, current) &&
@@ -228,6 +254,8 @@ export type HostMessage =
   | { readonly v: 1; readonly type: 'invite-result'; readonly outcome: InviteOutcome }
   | { readonly v: 1; readonly type: 'stopped'; readonly reason: StopReason }
   | { readonly v: 1; readonly type: 'app-update-check' }
+  | { readonly v: 1; readonly type: 'app-update-install' }
+  | { readonly v: 1; readonly type: 'app-update-restart' }
   | NotifyMessage;
 
 /** N7: one native notification as a fixed code. */
@@ -307,7 +335,16 @@ export function parseShellMessage(line: string): ShellMessage | undefined {
       return Object.freeze({ v: 1, type: 'shutdown' });
     }
     case 'app-update': {
-      const m = exactObject(value, ['v', 'type', 'state', 'current', 'latest', 'download']);
+      const m = exactObject(value, [
+        'v',
+        'type',
+        'state',
+        'current',
+        'latest',
+        'download',
+        'installable',
+        'percent',
+      ]);
       if (m?.['v'] !== DESKTOP_PIPE_VERSION || !isAppUpdate(m)) return undefined;
       return Object.freeze({
         v: 1,
@@ -316,6 +353,8 @@ export function parseShellMessage(line: string): ShellMessage | undefined {
         current: m['current'] as string,
         latest: m['latest'] as string,
         download: m['download'] as string,
+        installable: m['installable'] as boolean,
+        percent: m['percent'] as number,
       });
     }
     default:
@@ -369,10 +408,12 @@ export function parseHostMessage(line: string): HostMessage | undefined {
       }
       return Object.freeze({ v: 1, type: 'stopped', reason: m['reason'] });
     }
-    case 'app-update-check': {
+    case 'app-update-check':
+    case 'app-update-install':
+    case 'app-update-restart': {
       const m = exactObject(value, ['v', 'type']);
       if (m?.['v'] !== DESKTOP_PIPE_VERSION) return undefined;
-      return Object.freeze({ v: 1, type: 'app-update-check' });
+      return Object.freeze({ v: 1, type: head.type });
     }
     case 'notify': {
       const m = exactObject(value, ['v', 'type', 'kind', 'count', 'name']);

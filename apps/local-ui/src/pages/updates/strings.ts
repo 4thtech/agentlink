@@ -45,4 +45,16 @@ export const UPDATES_STRINGS = {
   loading: 'Reading your version…',
   unreadable: 'Couldn’t read this just now.',
   retry: 'Try again',
+  // UPD-5: the Mac app's in-app update (11 §5: plain words; nothing about how it is checked).
+  availableTitle: (v: string): string => `AgentLink ${v} is available`,
+  availableLead: 'Update now. AgentLink downloads it and gets it ready, then you restart.',
+  updateNow: 'Update now',
+  downloading: 'Downloading…',
+  percent: (n: number): string => `${String(n)}%`,
+  verifying: 'Checking the new version…',
+  readyRestartLead: 'Restart AgentLink to finish. It closes and opens again in a moment.',
+  restartNow: 'Restart now',
+  busy: 'An AI request is waiting for your approval. If you restart now, it waits until AgentLink is back.',
+  restarting: 'Restarting…',
+  cantUpdate: 'Couldn’t update here. Download the new version instead.',
 } as const;
