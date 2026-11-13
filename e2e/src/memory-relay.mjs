@@ -14,7 +14,7 @@
 
 /**
  * @param {{ okDelayMs?: number }} [options]
- * @returns {{ connector: { open: Function }, events: () => object[], count: () => number }}
+ * @returns {{ connector: { open: Function }, events: () => object[], count: () => number, setDown: (down: boolean) => void }}
  */
 export function memoryRelays(options = {}) {
   const okDelayMs = options.okDelayMs ?? 0;
@@ -38,13 +38,28 @@ export function memoryRelays(options = {}) {
     return true;
   };
 
+  // REL051-CF2: while down, every connection is refused (closed before it opens), as on a network
+  // that blocks WebSockets; going down also ends the open ones.
+  let down = false;
+  /** @type {Map<object, () => void>} */
+  const closers = new Map();
+
   const connector = {
     open(_target, handlers) {
+      if (down) {
+        queueMicrotask(() => handlers.onClose());
+        return { send: () => {}, close: () => {} };
+      }
       const socket = {
         subs: new Map(),
         deliver: (text) => queueMicrotask(() => handlers.onMessage(text)),
       };
       sockets.add(socket);
+      closers.set(socket, () => {
+        sockets.delete(socket);
+        closers.delete(socket);
+        queueMicrotask(() => handlers.onClose());
+      });
       queueMicrotask(() => handlers.onOpen());
       return {
         send: (text) => {
@@ -89,11 +104,18 @@ export function memoryRelays(options = {}) {
           }
         },
         close: () => {
+          if (!sockets.has(socket)) return;
           sockets.delete(socket);
+          closers.delete(socket);
           queueMicrotask(() => handlers.onClose());
         },
       };
     },
   };
-  return { connector, events: () => [...store], count: () => store.length };
+  /** REL051-CF2: refuse (true) or accept (false) connections; going down closes the open ones. */
+  const setDown = (value) => {
+    down = value === true;
+    if (down) for (const close of [...closers.values()]) close();
+  };
+  return { connector, events: () => [...store], count: () => store.length, setDown };
 }

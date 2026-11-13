@@ -17,10 +17,15 @@ export interface AppRow {
   readonly quitFirst: boolean;
   /** R2: the server could not check whether the app is open (not the same as "quit first"). */
   readonly checkFailed?: boolean;
+  /** WP-D7: the entry starts the AgentLink app's own copy (else `npx`). */
+  readonly form?: 'app';
 }
+/** WP-D7: the AgentLink desktop app on this computer, usable or to be moved first. */
+export type DesktopAppWord = 'available' | 'move_first';
 export interface AppsList {
   readonly desktopRunning: boolean;
   readonly apps: readonly AppRow[];
+  readonly desktopApp?: DesktopAppWord;
 }
 
 export interface Entry {
@@ -28,7 +33,13 @@ export interface Entry {
   readonly args: readonly string[];
   readonly [key: string]: unknown;
 }
-export type ChangeKindWord = 'connect' | 'move' | 'disconnect';
+export type ChangeKindWord = 'connect' | 'move' | 'disconnect' | 'switch';
+/** WP-D7: the `agentlink` command's change, AgentLink's own text before and after. */
+export interface LauncherChange {
+  readonly path: string;
+  readonly oldText: string;
+  readonly newText: string;
+}
 export interface AppChange {
   readonly kind: ChangeKindWord;
   readonly app: string;
@@ -40,6 +51,10 @@ export interface AppChange {
   readonly oldAgent: string | null;
   readonly newAgent: string | null;
   readonly changeId: string;
+  /** WP-D7: shown and written with the entry (asked for). */
+  readonly launcher?: LauncherChange;
+  /** WP-D7: the `agentlink` command could be pointed at the app too. */
+  readonly launcherOffer?: boolean;
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
@@ -53,7 +68,7 @@ const STATES: ReadonlySet<string> = new Set([
   'not_ours',
   'unreadable',
 ]);
-const KINDS: ReadonlySet<string> = new Set(['connect', 'move', 'disconnect']);
+const KINDS: ReadonlySet<string> = new Set(['connect', 'move', 'disconnect', 'switch']);
 
 function parseRow(v: unknown): AppRow | undefined {
   if (
@@ -79,15 +94,31 @@ function parseRow(v: unknown): AppRow | undefined {
     ...(typeof agent === 'string' && v['state'] === 'connected' ? { agent } : {}),
     quitFirst: v['quitFirst'] === true,
     ...(v['checkFailed'] === true ? { checkFailed: true } : {}),
+    ...(v['form'] === 'app' && v['state'] === 'connected' ? { form: 'app' as const } : {}),
   };
 }
 
 export function parseApps(value: unknown): AppsList | undefined {
   if (!isObject(value) || !Array.isArray(value['apps'])) return undefined;
+  const app = value['desktopApp'];
   return {
     desktopRunning: value['desktopRunning'] === true,
     apps: value['apps'].map(parseRow).filter((r): r is AppRow => r !== undefined),
+    ...(app === 'available' || app === 'move_first' ? { desktopApp: app } : {}),
   };
+}
+
+function parseLauncher(v: unknown): LauncherChange | null | undefined {
+  if (v === undefined) return null;
+  if (
+    !isObject(v) ||
+    typeof v['path'] !== 'string' ||
+    typeof v['oldText'] !== 'string' ||
+    typeof v['newText'] !== 'string'
+  ) {
+    return undefined;
+  }
+  return { path: v['path'], oldText: v['oldText'], newText: v['newText'] };
 }
 
 function parseEntry(v: unknown): Entry | null | undefined {
@@ -108,6 +139,7 @@ export function parsePreview(value: unknown): ParsedPreview | undefined {
   const { kind, app, name, path, folder, changeId } = value;
   const oldEntry = parseEntry(value['oldEntry']);
   const newEntry = parseEntry(value['newEntry']);
+  const launcher = parseLauncher(value['launcher']);
   if (
     typeof kind !== 'string' ||
     !KINDS.has(kind) ||
@@ -118,7 +150,8 @@ export function parsePreview(value: unknown): ParsedPreview | undefined {
     typeof changeId !== 'string' ||
     !CHANGE_ID.test(changeId) ||
     oldEntry === undefined ||
-    newEntry === undefined
+    newEntry === undefined ||
+    launcher === undefined
   ) {
     return undefined;
   }
@@ -136,6 +169,8 @@ export function parsePreview(value: unknown): ParsedPreview | undefined {
       oldAgent: side(value['oldAgent']),
       newAgent: side(value['newAgent']),
       changeId,
+      ...(launcher === null ? {} : { launcher }),
+      ...(value['launcherOffer'] === true ? { launcherOffer: true } : {}),
     },
   };
 }

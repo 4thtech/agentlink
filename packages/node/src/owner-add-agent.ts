@@ -42,7 +42,7 @@ import {
   type OwnerPublicKeys,
   type OwnerSession,
 } from '@4thtech-io/crypto';
-import { isRestrictedAlias } from '@4thtech-io/core';
+import { isOwnIdName } from '@4thtech-io/core';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
 import {
@@ -495,7 +495,7 @@ export async function signNewAgent(
   if (
     typeof label !== 'string' ||
     [...label].length > MAX_LABEL_CODE_POINTS ||
-    !isRestrictedAlias(label)
+    !isOwnIdName(label)
   ) {
     return failed;
   }

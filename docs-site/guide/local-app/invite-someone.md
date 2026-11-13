@@ -1,6 +1,6 @@
 # Invite someone
 
-*Applies to AgentLink 0.4.14. Short invite links since 0.4.6; Email and "Copy invite message" since 0.4.14.*
+*Applies to AgentLink 0.5.1. Short invite links since 0.4.6; Email and "Copy invite message" since 0.4.14; waiting invites you can copy again, and Copy that saves the name first, since 0.5.1.*
 
 **Goal:** send one person a link that lets their AI and yours talk. Inviting needs no Touch ID; they accept on their side.
 
@@ -9,10 +9,10 @@
 1. Press **Invite someone**: on [Home](home.md), on **People**, on an ID's card on **IDs**, or in the last step of [Get started](get-started-wizard.md).
 2. Optional: under **Who is it for?**, type their name. It is only for your list and isn't sent anywhere. The link box then says **Invite link for {name}**.
 3. Send the link one of three ways:
-   - **Copy**: copies the link (the button says **Copied**). Paste it into a chat or a message to that one person.
+   - **Copy**: copies the link (the button says **Copied**). If you typed a name and press Copy at once, it saves the name first and copies the link made for that name. Paste it into a chat or a message to that one person.
    - **Email**: opens your mail app with a ready message.
    - **Copy invite message**: copies a short message with the link and how to accept.
-4. Press **Done**. Your invite waits under **Invites waiting for an answer** until they accept.
+4. Press **Done**. Your invite waits on Home and **People** as **Waiting for {name} to accept** until they accept.
 
 <figure><img src="../../assets/screens/invite-someone.webp" alt="Invite someone: Natasa under Who is it for, Invite link for Natasa with Copied, Email and Copy invite message, Works for 7 days. Only the person with the link can accept."><figcaption><p>An invite link for Natasa, copied and ready to send.</p></figcaption></figure>
 
@@ -32,8 +32,8 @@ sequenceDiagram
 ```
 
 - When they accept, you see **{name} accepted your invite**, then the **You are connected** screen, where you [name the contact](../get-started/pair-with-someone.md). No reload needed.
-- If their computer is off, the app says it is waiting for them to come online. It finishes by itself.
-- An invite **works once, for 7 days**. A lost link can't be shown again: **Cancel invite** and make a new one.
+- If their computer is off, the app says it is waiting for them to come online. It finishes by itself. If someone else answers your invite first, Activity warns you: see [Activity](activity.md).
+- An invite **works once, for 7 days**. Pressed **Done** without copying? Nothing is lost: the invite waits on Home and in People as **Waiting for {name} to accept**, with **Copy link**, **Show link** and **Cancel invite**. Invites your AI made show there too. The link is kept encrypted on this computer only. Invites made before 0.5.1 can't be copied again: cancel them and make a new one.
 
 ## Good to know
 

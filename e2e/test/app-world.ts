@@ -165,6 +165,8 @@ export function wiringOf(pc: Computer, assets: Map<string, Uint8Array>): LocalUi
         env: {},
         desktopRunning: () => Promise.resolve(false),
       }),
+    // REL051-B3b: this computer's data folder, so Under the hood shows it (as `~/.agentlink`).
+    dataFolder: () => ({ path: join(pc.home, '.agentlink'), home: pc.home }),
   };
 }
 
@@ -205,6 +207,8 @@ export function startServerOf(
         ownerKdf: KDF,
         // UX1113-R3: restore reads this computer's Downloads, never the real home.
         restore: { home: pc.home, kdf: KDF },
+        // REL051-A34: the in-app preview reads this computer's Inbox, never the real home.
+        filesHome: pc.home,
       },
     );
   };

@@ -1,6 +1,6 @@
 # MCP tools
 
-> **Status: Available since v0.1.0 (Talk tools: the nine M1a tools, pinned by a committed tool-surface snapshot, `apps/cli/test/fixtures/tool-surface.json`) and Planned for v0.2.0 (M1) (file and proof tools).** Current for v0.4.6 (31 Oct 2026): the tool surface did not change in 0.4.6; what changed is behaviour, described under "Paused agents" and "Received files" below. This page lists the tool surface from D-53 and D-55 and [06 MCP server](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md). Names and schemas may change before 1.0.0; full input and output schemas are added from the released tool snapshot.
+> **Status: Available since v0.1.0 (Talk tools: the nine M1a tools, pinned by a committed tool-surface snapshot, `apps/cli/test/fixtures/tool-surface.json`) and Planned for v0.2.0 (M1) (file and proof tools).** Current for v0.5.1: the tool names and inputs did not change in 0.5.1; what changed is results and behaviour, described under "Naming a contact", "Delivery" and "Received files" below. This page lists the tool surface from D-53 and D-55 and [06 MCP server](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md). Names and schemas may change before 1.0.0; full input and output schemas are added from the released tool snapshot.
 
 **Package:** `@4thtech-io/agentlink`, subcommand `agentlink mcp` (stdio). The self-hosted cloud agent exposes the same tools over streamable HTTP with OAuth.
 
@@ -37,12 +37,28 @@
 ## File tools (next release, M1-9d-1)
 
 - **`agentlink_send` with `path`** (06 §2.2, §2.3): `path` is the full path of one file (`~/` allowed; 1 to 4096 characters, no control character). `text`, `body` or `path` is required; `text` and `body` exclude each other. Before the core is called, the path is resolved with realpath and must be strictly inside a `files.allowedFolders` entry (04 §4); the file is not opened. Results: `needs_setup` with `NO_ALLOWED_FOLDER` or `OUTSIDE_ALLOWED_FOLDER` (also for a link that points outside); `rejected` `PATH_NOT_ALLOWED` (relative, `.` or `..`, hidden, protected, not a regular file); `not_found` `FILE_NOT_FOUND`; `needs_setup` `NEEDS_OWN_STORAGE` (above the drop's size or weekly limit, or `files.storage: own` with none set up); `rejected` `FILE_TOO_LARGE`, `PAYLOAD_TOO_LARGE`, `POLICY_DENIED`; `error` `STORAGE_UNAVAILABLE`, `STORAGE_FAILED`, `FILE_CHANGED`, `FILES_UNAVAILABLE`. On `ok`, `file` is `{name, size, plaintextSha256, delivery: inline | drop | own, expiresAt}`: never a link, a locator or a key.
-- **`agentlink_fetch_file`** (06 §2.3): `{envelopeId, fileIndex? = 0}` (0 to 15). On `ok`: `{savedTo, name, size, integrity: "verified"}`; `name` and the last segment of `savedTo` are the sender's sanitised text, so the text result shows the name only inside the untrusted block. Refusals: `not_found`; `rejected` `FILE_TOO_LARGE`, `INTEGRITY_FAILED`, `LINK_EXPIRED`, `URL_REFUSED`, `POLICY_DENIED`; `error` `INBOX_UNAVAILABLE`, `DOWNLOAD_FAILED`, `FILES_UNAVAILABLE`. Annotations: not read-only (it writes a file), not idempotent (each call saves a new copy), open world.
+- **`agentlink_fetch_file`** (06 §2.3): `{envelopeId, fileIndex? = 0}` (0 to 15). On `ok`: `{savedTo, name, size, integrity: "verified", kind, untrusted?: {content}}`; `name` and the last segment of `savedTo` are the sender's sanitised text, so the text result shows the name only inside the untrusted block. `kind` (`markdown | text | code | json | patch | image | other`) is derived from the name only, never from the sender's MIME type. Since 0.5.1, a text-kind file of at most 64 KB (valid UTF-8, no NUL, matching the payload's plaintext hash and size) also returns its text as `untrusted.content` and in a second untrusted block; larger or binary files return the path only. Refusals: `not_found`; `rejected` `FILE_TOO_LARGE`, `INTEGRITY_FAILED`, `LINK_EXPIRED`, `URL_REFUSED`, `POLICY_DENIED`; `error` `INBOX_UNAVAILABLE`, `DOWNLOAD_FAILED`, `FILES_UNAVAILABLE`. Annotations: not read-only (it writes a file), not idempotent (a file moved or changed since it was saved is saved again under a new name), open world.
+- **`agentlink_inbox` files** (since 0.5.1): each file carries `kind` (derived from the name, as above) and, once the file is saved (automatically, by Save in the app or by `agentlink_fetch_file`), `savedTo`. The file line inside the block reads `File 0: plan.md (Markdown, 97 bytes)`; the sender's stated types stay under `untrusted.fileTypes`.
+- **`agentlink_send` with `path`** labels the file's type from its extension (fixed table, since 0.5.1).
 - **`agentlink_status`**: `storage.mode` is where files above about 12 KB go under the current rules (`drop` or `own`).
 
 ## Received files and `agentlink_fetch_file` (since 0.4.6, D-142)
 
 Files from contacts you keep are now saved automatically by the agent itself, without any tool call (see [Files](../concepts/files.md#automatic-saving-since-046)). `agentlink_fetch_file` still works with the same input, output and statuses and is your request, so the automatic-saving limits, the off switch and "Ask before saving" do not hold it back. It shares one lock per file with automatic saving and with Save in the app. When the file was already saved and the saved copy still hashes to the expected SHA-256 and size, it answers `{savedTo, name, size, integrity: "verified"}` from that copy without downloading again and without writing a second copy. If the copy was moved, deleted or changed, it downloads again under a new name while the link is valid.
+
+## Naming a contact (since 0.5.1)
+
+A tool that takes a contact (`to`) resolves it on your computer from the name the user said, an invite alias or an ID, and never guesses.
+
+- **`error` `AMBIGUOUS_CONTACT`**: two or more contacts match. `candidates` lists each one with `id`, `name`, `label`, `nameSource`, `ownerFingerprint`, `shortId` and `connectedAt`, so same-named contacts can be told apart. The summary lists every option by those details and never by name alone. `nextStep` says to ask the user which one, to call again with its `id`, and that the owner can rename one on People in the AgentLink app (not in a terminal).
+- **`error` `CONTACT_RENAMED`**: no contact has that name now, but one used to. The summary names the contact's current name; `candidates` carries its `id`. A previous name never acts: ask the user, then call again with the `id`.
+- **`error` `CONTACT_BLOCKED`**: the owner blocked this contact. The text is fixed ("The owner blocked this contact, so nothing was done."), with no name and no candidates. Only the user can unblock, on People in the AgentLink app.
+
+Removed and revoked contacts stay `not_found`. No tool renames, blocks, unblocks or removes a contact (I-4).
+
+## Delivery (since 0.5.1)
+
+`agentlink_send` returns `delivery` right after the first publish: `sent` once the relays accepted the message, `queued` while it waits for them (the summary then says it is not sent yet, for example when this computer can't reach the message network; the app sends it by itself when the network is back) and `not_delivered` when it was given up. The same holds when a proof is added with the message. A repeat with the same `clientRequestId` reads the state again.
 
 ## Paused agents (since 0.4.6, D-143 (5))
 

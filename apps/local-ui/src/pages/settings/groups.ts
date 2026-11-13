@@ -13,8 +13,10 @@ const GROUP_OF: Readonly<Record<string, GroupId>> = {
   '/settings/rules': 'ai',
   '/settings/apps': 'ai',
   '/settings/files': 'ai',
+  '/settings/storage': 'app',
   '/settings/appearance': 'app',
   '/settings/proofs': 'app',
+  '/settings/updates': 'app',
   '/settings/advanced': 'app',
   '/advanced/network': 'app',
 };
@@ -25,8 +27,10 @@ const ORDER: readonly string[] = [
   '/settings/rules',
   '/settings/apps',
   '/settings/files',
+  '/settings/storage',
   '/settings/appearance',
   '/settings/proofs',
+  '/settings/updates',
   '/settings/advanced',
   '/advanced/network',
 ];

@@ -239,6 +239,11 @@ describe('the old Add contact marker', () => {
 
 describe('W4-INVITES-LIST: open invites from the server', () => {
   const rowsEl = (): HTMLElement | null => document.querySelector('.ct-invites');
+  // REL051-B2: a waiting row also has Copy link and Show link; Cancel invite is found by name.
+  const cancelButton = (): HTMLButtonElement =>
+    [...(rowsEl()?.querySelectorAll<HTMLButtonElement>('li button') ?? [])].find(
+      (b) => b.textContent?.trim() === 'Cancel invite',
+    ) as HTMLButtonElement;
   const BO = { inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ', name: 'Bo', expiresAt: '2999-01-01T00:00:00Z' };
   const NONE = {
     inviteId: 'BwcHBwcHBwcHBwcHBwcHBw',
@@ -273,7 +278,7 @@ describe('W4-INVITES-LIST: open invites from the server', () => {
   it('cancels with one octet-stream POST of the ID, then re-reads and drops the row', async () => {
     open = [BO, NONE];
     const calls = await mount();
-    const first = rowsEl()?.querySelector('li button') as HTMLButtonElement;
+    const first = cancelButton();
     const reads = calls.filter((c) => c.method === 'GET' && c.url === CREATE).length;
     await click(first);
     const [call, ...more] = posts(calls, CANCEL);
@@ -301,7 +306,7 @@ describe('W4-INVITES-LIST: open invites from the server', () => {
         return new Answer(404, { error: 'not_found' });
       },
     });
-    await click(rowsEl()?.querySelector('li button') as HTMLButtonElement);
+    await click(cancelButton());
     expect(rowsEl()).toBeNull();
     expect(document.querySelector('[role="alert"]')).toBeNull();
   });
@@ -309,7 +314,7 @@ describe('W4-INVITES-LIST: open invites from the server', () => {
   it('says so once when cancel fails, and keeps the row', async () => {
     open = [BO];
     await mount({ [`POST ${CANCEL}`]: new Answer(500, {}) });
-    await click(rowsEl()?.querySelector('li button') as HTMLButtonElement);
+    await click(cancelButton());
     expect(rowsEl()?.querySelectorAll('li').length).toBe(1);
     expect(document.querySelector('[role="alert"]')?.textContent).toContain(I.cantCancel);
   });

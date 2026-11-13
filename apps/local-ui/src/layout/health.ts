@@ -23,8 +23,15 @@ export const FIRST_ANSWER_MS = 4_000;
 /** A single read that has not answered by then counts as no answer. */
 export const READ_TIMEOUT_MS = 10_000;
 
-/** The states the health read can set (the layout adds `unknown` and the browser's `offline`). */
-export type HealthState = 'connected' | 'paused' | 'not_running' | 'needs_setup';
+/**
+ * The states the health read can set (the layout adds `unknown` and the browser's `offline`).
+ * REL051-CF2: `unreachable` is a running agent whose check found none of its relays connected
+ * (`relays: {connected: 0, total > 0}`): the message network can't be reached from this computer,
+ * so messages wait. Never Connected then. `checking`: running, but the first relay check from this
+ * computer has not finished (`network: 'checking'`): "Checking the connection…", never Connected.
+ */
+export type HealthState =
+  'connected' | 'checking' | 'unreachable' | 'paused' | 'not_running' | 'needs_setup';
 
 export interface HealthAnswer {
   readonly state: HealthState;
@@ -40,14 +47,34 @@ const AGENT_STATE: Readonly<Record<string, HealthState>> = Object.freeze({
 });
 const VERSION = /^\d{1,4}\.\d{1,4}\.\d{1,6}(?:-[0-9A-Za-z][0-9A-Za-z.-]{0,31})?$/;
 
+/** REL051-CF2: well-formed counts with relays known and none of them connected. */
+function noRelayConnected(relays: unknown): boolean {
+  if (typeof relays !== 'object' || relays === null) return false;
+  const { connected, total } = relays as { connected?: unknown; total?: unknown };
+  return (
+    connected === 0 &&
+    typeof total === 'number' &&
+    Number.isSafeInteger(total) &&
+    total > 0 &&
+    total <= 64
+  );
+}
+
 /** The answer's state and version, or undefined when it is not a well-formed health answer. */
 export function parseHealth(result: ApiResult<unknown>): HealthAnswer | undefined {
   if (result.kind !== 'ok') return undefined;
   const data = result.data;
   if (typeof data !== 'object' || data === null) return undefined;
-  const { agent, version } = data as { agent?: unknown; version?: unknown };
+  const { agent, version, relays, network } = data as {
+    agent?: unknown;
+    version?: unknown;
+    relays?: unknown;
+    network?: unknown;
+  };
   if (typeof agent !== 'string' || !Object.hasOwn(AGENT_STATE, agent)) return undefined;
-  const state = AGENT_STATE[agent] as HealthState;
+  let state = AGENT_STATE[agent] as HealthState;
+  if (state === 'connected' && network === 'checking') state = 'checking';
+  else if (state === 'connected' && noRelayConnected(relays)) state = 'unreachable';
   return typeof version === 'string' && VERSION.test(version) ? { state, version } : { state };
 }
 

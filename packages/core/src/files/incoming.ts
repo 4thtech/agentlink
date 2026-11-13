@@ -22,7 +22,20 @@
 // an automatic save: a failed mark removes it and saves nothing, `folder_cannot_mark`); an automatic
 // save first keeps 1 GiB free on the folder's volume (`disk_full`), and a write that runs out of space
 // removes its temporary file (`disk_full`).
-import { decodeBase64url, encodeBase64url, randomBytes, wipe } from '@4thtech-io/crypto';
+// REL051-A12: with `readText`, a requested save of a text-kind file (by its name, never the sender's
+// MIME type) of at most FILE_TEXT_MAX_BYTES also returns its text: the plaintext bytes this save
+// wrote, or the saved copy read back, either way only when they hash to the payload's plaintext
+// SHA-256 and size and are valid UTF-8 without NUL. Otherwise no text, and the save is unchanged.
+// The text is the sender's content (I-5): it is never logged. `savedPaths` answers where already
+// saved files are, from the record, for the inbox (06 §2.2 `FileInfo.savedTo`).
+import {
+  decodeBase64url,
+  encodeBase64url,
+  encodeHex,
+  randomBytes,
+  sha256,
+  wipe,
+} from '@4thtech-io/crypto';
 import {
   StorageError,
   alf1CiphertextSize,
@@ -33,11 +46,23 @@ import {
   type CiphertextSource,
   type TempFileOps,
 } from '@4thtech-io/storage';
-import { payloadSchema, type Payload } from '@4thtech-io/types';
+import {
+  FILE_TEXT_MAX_BYTES,
+  fileKindOf,
+  isTextKind,
+  payloadSchema,
+  textOfFile,
+  type Payload,
+} from '@4thtech-io/types';
 import { nowOf, open, seal, type CoreContext } from '../context.js';
 import { CoreError } from '../errors.js';
 import { checkFetchUrl } from '../fetch-url.js';
-import { savedFileName, withNameSuffix, withRandomNameSuffix } from '../file-name.js';
+import {
+  sanitizeFileName,
+  savedFileName,
+  withNameSuffix,
+  withRandomNameSuffix,
+} from '../file-name.js';
 import {
   isInsideFolder,
   parseAbsolutePath,
@@ -58,7 +83,26 @@ export interface FetchFileInput {
   readonly envelopeId: string;
   /** Default 0. */
   readonly fileIndex?: number;
+  /** REL051-A12: also return the verified text of a small text file (see the header). */
+  readonly readText?: boolean;
 }
+
+/** One received file, for `savedPaths`. */
+export interface SavedFileRef {
+  readonly envelopeId: string;
+  readonly fileIndex: number;
+}
+
+/** The text of `bytes` when they are exactly the payload's plaintext (size and SHA-256). */
+function verifiedText(bytes: Uint8Array, entry: Payload['files'][number]): string | undefined {
+  if (bytes.length !== entry.size) return undefined;
+  if (encodeHex(sha256(bytes)) !== entry.plaintextSha256.toLowerCase()) return undefined;
+  return textOfFile(bytes);
+}
+
+/** True when a requested save should also return the text (by the name, never the MIME type). */
+const wantsText = (entry: Payload['files'][number]): boolean =>
+  entry.size <= FILE_TEXT_MAX_BYTES && isTextKind(fileKindOf(sanitizeFileName(entry.name)));
 
 /** W4-AUTO-SAVE: how the background loop's automatic save differs from a requested one. */
 export interface AutoSaveOptions {
@@ -83,6 +127,8 @@ export type FetchFileResult =
       readonly name: string;
       readonly size: number;
       readonly integrity: 'verified';
+      /** REL051-A12: only with `readText`, for a verified small text file. Untrusted (I-5). */
+      readonly text?: string;
     }
   | { readonly status: 'not_found' }
   | {
@@ -130,6 +176,8 @@ interface WriteState {
   savedElsewhere: boolean;
   /** The name the file got when the first pick was taken at the move (IR SEC L2). */
   finalName?: string;
+  /** REL051-A12: copies of the plaintext chunks written, when the text is wanted. */
+  collected?: Uint8Array[];
 }
 
 /** What the move needs besides the folder (fix round 1). */
@@ -175,6 +223,7 @@ function markedOps(
             if (isDiskFull(error)) state.diskFull = true;
             throw error;
           }
+          state.collected?.push(chunk.slice());
         },
         async close() {
           try {
@@ -249,6 +298,39 @@ const ok = (bytes: Uint8Array): ReadableStream<Uint8Array> =>
     },
   });
 
+/** The chunks as one array. */
+function concat(chunks: readonly Uint8Array[]): Uint8Array {
+  const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}
+
+/**
+ * `{text}` of a saved copy read back (REL051-A12) when it is still exactly the payload's plaintext;
+ * `{}` otherwise (a changed copy, a platform without `readSaved`, a read that fails).
+ */
+async function savedText(
+  inbox: InboxFolder,
+  name: string,
+  entry: Payload['files'][number],
+): Promise<{ readonly text?: string }> {
+  if (inbox.readSaved === undefined) return {};
+  let bytes: Uint8Array | undefined;
+  try {
+    bytes = await inbox.readSaved(name, FILE_TEXT_MAX_BYTES);
+  } catch {
+    return {};
+  }
+  if (!(bytes instanceof Uint8Array)) return {};
+  const text = verifiedText(bytes, entry);
+  wipe(bytes);
+  return text === undefined ? {} : { text };
+}
+
 export class FileFetcher {
   readonly #ctx: CoreContext;
   readonly #platform: FilesPlatform | undefined;
@@ -287,7 +369,7 @@ export class FileFetcher {
     const before = this.#locks.get(key) ?? Promise.resolve();
     const run = before
       .catch(() => undefined)
-      .then(() => this.#fetchLocked(envelopeId, index, options));
+      .then(() => this.#fetchLocked(envelopeId, index, options, input.readText === true));
     this.#locks.set(key, run);
     try {
       return await run;
@@ -300,6 +382,7 @@ export class FileFetcher {
     envelopeId: string,
     index: number,
     options: FetchFileOptions,
+    readText: boolean,
   ): Promise<FetchFileResult> {
     const ctx = this.#ctx;
     const platform = this.#platform as FilesPlatform;
@@ -361,7 +444,19 @@ export class FileFetcher {
       throw inboxUnavailable();
     }
     try {
-      return await this.#saveInto(inbox, flavor, envelopeId, index, entry, keyRow, limits, auto);
+      // Text only for a requested save (never for auto-save), by the name's kind (REL051-A12).
+      const text = readText && auto === undefined && wantsText(entry);
+      return await this.#saveInto(
+        inbox,
+        flavor,
+        envelopeId,
+        index,
+        entry,
+        keyRow,
+        limits,
+        auto,
+        text,
+      );
     } finally {
       await inbox.close?.().catch(() => undefined);
     }
@@ -376,6 +471,7 @@ export class FileFetcher {
     keyRow: Row<'files'> | undefined,
     limits: PolicyLimits,
     auto: AutoSaveOptions | undefined,
+    wantText: boolean,
   ): Promise<FetchFileResult> {
     const ctx = this.#ctx;
     const platform = this.#platform as FilesPlatform;
@@ -392,6 +488,7 @@ export class FileFetcher {
           name: known,
           size: entry.size,
           integrity: 'verified',
+          ...(wantText ? await savedText(inbox, known, entry) : {}),
         };
       }
     }
@@ -481,7 +578,12 @@ export class FileFetcher {
       throw inboxUnavailable();
     }
     placeIn(folder, name, flavor);
-    const state: WriteState = { diskFull: false, cannotMark: false, savedElsewhere: false };
+    const state: WriteState = {
+      diskFull: false,
+      cannotMark: false,
+      savedElsewhere: false,
+      ...(wantText ? { collected: [] } : {}),
+    };
     // The record as this save found it: a different one at the move means another process saved it.
     const startRecord = keyRow?.saved_name ?? null;
     const stillUnsaved = async (): Promise<boolean> => {
@@ -522,12 +624,19 @@ export class FileFetcher {
       if (keyRow !== undefined) {
         await this.#recordSavedName(envelopeId, index, keyRow.sha256, finalName, startRecord);
       }
+      let text: string | undefined;
+      if (state.collected !== undefined) {
+        const bytes = concat(state.collected);
+        text = verifiedText(bytes, entry);
+        wipe(bytes);
+      }
       return {
         status: 'ok',
         savedTo,
         name: finalName,
         size: done.plaintextSize,
         integrity: 'verified',
+        ...(text === undefined ? {} : { text }),
       };
     } catch (error) {
       // decryptDownload has discarded the quarantine file. Fixed codes only (I-7).
@@ -547,6 +656,7 @@ export class FileFetcher {
             name: known,
             size: entry.size,
             integrity: 'verified',
+            ...(wantText ? await savedText(inbox, known, entry) : {}),
           };
         }
         throw inboxUnavailable();
@@ -568,7 +678,68 @@ export class FileFetcher {
       throw new CoreError('file_download_failed', 'The file could not be downloaded.');
     } finally {
       wipe(fileKey);
+      for (const chunk of state.collected ?? []) wipe(chunk);
     }
+  }
+
+  /**
+   * Where each already saved file is now (06 §2.2 `FileInfo.savedTo`, plan item 7 of REL051): the
+   * recorded name, when it is still a regular file directly inside the Inbox folder, placed in the
+   * folder's realpath; keyed `<envelope ID>.<index>`. A file without a record, or one moved or
+   * deleted since, has no entry. Reads only: no lock, nothing written, and the folder is resolved
+   * only when a record exists. Never throws: anything that fails leaves entries out.
+   */
+  async savedPaths(refs: readonly SavedFileRef[]): Promise<ReadonlyMap<string, string>> {
+    const out = new Map<string, string>();
+    const platform = this.#platform;
+    if (platform === undefined || !Array.isArray(refs) || refs.length === 0) return out;
+    try {
+      const rows = await this.#ctx.store.transaction((tx) =>
+        refs.map((ref) =>
+          typeof ref?.envelopeId === 'string' && Number.isSafeInteger(ref.fileIndex)
+            ? tx.get('files', { envelope_id: ref.envelopeId, idx: ref.fileIndex })
+            : undefined,
+        ),
+      );
+      const saved = rows.flatMap((row, i) =>
+        row?.saved_name == null ? [] : [{ ref: refs[i]!, row }],
+      );
+      if (saved.length === 0) return out;
+      const policy = await this.#loadPolicy();
+      if (policy.mode === 'fail_closed') return out;
+      const flavor = platform.flavor ?? 'posix';
+      const inbox = await platform.inbox(
+        policy.policy.files.inboxFolder,
+        policyLimits(policy).allowedFolders,
+      );
+      try {
+        if (typeof inbox?.realpath !== 'string' || !parseAbsolutePath(inbox.realpath, flavor)) {
+          return out;
+        }
+        for (const { ref, row } of saved) {
+          const name = await this.#stillSaved(
+            inbox,
+            ref.envelopeId,
+            ref.fileIndex,
+            row.saved_name!,
+          );
+          if (name === undefined) continue;
+          try {
+            out.set(
+              `${ref.envelopeId}.${String(ref.fileIndex)}`,
+              placeIn(inbox.realpath, name, flavor),
+            );
+          } catch {
+            // Not a single visible name inside the folder: left out.
+          }
+        }
+      } finally {
+        await inbox.close?.().catch(() => undefined);
+      }
+    } catch {
+      this.#ctx.log.info('saved file paths unavailable');
+    }
+    return out;
   }
 
   /**

@@ -1,6 +1,6 @@
 # The local app
 
-*Applies to AgentLink 0.5.0. It is not in 0.2.0. The three-layer app is new in 0.4.6; the menu Home, People, My IDs, Activity, Settings and the grouped Settings are new in 0.5.0. Desktop apps for Mac and Windows are coming soon; until then the app opens in your browser.*
+*Applies to AgentLink 0.5.1. It is not in 0.2.0. The three-layer app is new in 0.4.6; the menu Home, People, My IDs, Activity, Settings and the grouped Settings are new in 0.5.0. There is now an early Mac app (see [Mac desktop app](../apps/desktop-app.md)); otherwise the app opens in your browser.*
 
 The local app is a set of pages that open in your browser. They run on your own computer, and nothing on them is sent to 4thTech. Use them to see who your AI talks to, approve what needs you, and set up IDs and AI apps.
 
@@ -8,12 +8,12 @@ The local app is a set of pages that open in your browser. They run on your own 
 
 1. Open a terminal window yourself (not one inside your AI app).
 2. Run `npx -y @4thtech-io/agentlink@latest` with nothing after it, or `npx -y @4thtech-io/agentlink@latest ui`. They do the same.
-3. Your browser opens on [Home](home.md). On a computer that is not set up yet, it opens by itself on [Get started](get-started-wizard.md), which takes you from choosing your AI app to your first invite. Nothing else needs to be set up first.
+3. Your default web browser opens on [Home](home.md). The one-time sign-in link is never put in the command that opens the browser: AgentLink opens a private file in your own AgentLink folder instead (`~/.agentlink/open`; on Linux `~/AgentLink/open`). If your browser doesn't open by itself, open your computer's default browser once and run the command again. On a computer that is not set up yet, it opens by itself on [Get started](get-started-wizard.md), which takes you from choosing your AI app to your first invite. Nothing else needs to be set up first.
 4. Keep that terminal window open while you use the app. Press Ctrl+C when you are done. It also stops by itself after 30 minutes.
 
 It never asks which ID you mean. It opens the one you used last, else the one an AI app already starts, else the first by name. You switch IDs inside the app: see [My IDs](ids.md).
 
-If your AI runs this command, nothing opens. It tells you to run it yourself. That is on purpose: only you should see these pages.
+If your AI runs this command, nothing opens (this also holds in the terminals of more AI apps since 0.5.1, such as OpenCode, Cursor's AI and Antigravity). It tells you to run it yourself. That is on purpose: only you should see these pages.
 
 Got an invite link from a friend instead? See [Join from an invite](../get-started/join-from-an-invite.md).
 
@@ -38,6 +38,8 @@ Old links from earlier versions still work (`/contacts` and `/agents` open Peopl
 
 - [Home](home.md): approvals on top, **Invite someone**, and the people your AI talks to. Open a person to see the conversation and the files you exchanged.
 - [Get started](get-started-wizard.md): pick your AI app, one Touch ID, then invite someone.
+- [Storage](storage.md): how much room your messages and saved files take (read-only).
+- [Updates](updates.md): your version, Check for updates, and how to get a newer one.
 - [Invite someone](invite-someone.md): short invite links, open invites, and pasting a link you were given.
 - [People](contacts.md): the people each of your IDs talks to, across all your IDs, with Archived.
 - [My IDs](ids.md): a card per ID with live status, Invite someone, Rename, Pause and Resume, AI apps and Remove.

@@ -9482,7 +9482,7 @@ Source: `docs/process/proposals/BUSINESS-AGENTS.md` (§9 cards, §10 decisions).
 Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app hosting the MCP server, native approval window with OS biometrics, harness auto-setup, and every console area via `packages/ui`. M1 ships the `npx` package only.
 
 #### M2-11a · desktop: framework and architecture decision (D-36) (new)
-- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Status:** decided (D-145, Tali, 2026-11-12); work split into DESK-D0 and DESK-D1 (below) · **Size:** M · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · decision record plus spec PR (03, 08) for the desktop architecture
 - **Depends on:** M1-8d, M1-8e, M1-9c, M1-11a
 - **Spec:** D-36, D-39, D-41; 03 §3, §6; 04 §2.2 (desktop row), §2.5 (desktop app owner presence), §7; 08 §1, §8 (desktop apps; framework decision and read-unlock duration open); 06 §7
@@ -9572,6 +9572,35 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
 - **Acceptance:**
   - A flow test per area; axe-core zero WCAG 2.1 AA violations; XSS fixtures inert; every mutating action requires presence; owner confirms the match to D2.
 
+#### Desktop apps v1: the M2-11 split (D-145; decided by Tali in chat, 2026-11-12) (new)
+
+D-145 replaces the M2-11a comparison with a decision and splits M2-11a to M2-11f into the cards below (desktop plan revision 1, WP-D0 to WP-D18; one card per work package, card ID `DESK-D<n>` = plan `WP-D<n>`). Mapping: **M2-11a** = DESK-D0 + DESK-D1; **M2-11b** (macOS) and **M2-11c** (Windows) = DESK-D2 to DESK-D9, DESK-D12, DESK-D13, DESK-D14; **M2-11d** (Linux) = DESK-D17; **M2-11e** = DESK-D5, DESK-D11, DESK-D18; **M2-11f** = DESK-D10 (phase 1) and DESK-D18 (silent install); **M2-11g** unchanged. The M2-11 cards stay as the milestone view; their acceptance (a modified build cannot unlock the owner key) is met at DESK-D18 (phase 3), not before. **External-build gate (D-145 (6)):** no build to anyone but the owner until DESK-D10 and DESK-D15 have landed and the offline key ceremony (Q-145-3) is done. Every card: own branch and worktree; S2 cards start with a `RED (expected):` commit; owner previews on dev builds only, with a temp `HOME` and a `--user-data-dir` under it. Audit class: `apps/desktop/**` and `apps/cli/src/desktop/**` are S2 (audit-rules §2.2).
+
+| Card | Scope | Paths (exclusive) | Class | Build / review | Acceptance | Depends |
+|---|---|---|---|---|---|---|
+| **DESK-D0** Decision + spec | D-145 and D-146 rows; 03 §3, §6; 04 §2.2, §2.5, §7; 08 §8; 11 §5.5 (D-146); this split; audit-rules row and its mirrors | `docs/foundation/00,03,04,08,11`, `docs/process/backlog.md`, `docs/process/audit-rules.md`, `.github/CODEOWNERS`, `review-gate.yml` class rules | S2 (04) | Opus / Opus independent | Spec PR green; owner "merge" | — |
+| **DESK-D1** Spikes (scratch only) | a) Electron WebAuthn with a `localhost` passkey on macOS and Windows; b) unsigned Secure Enclave ECDH behind Touch ID from a CLI helper; c) Windows Hello `KeyCredential`: deterministic PKCS#1 v1.5 signature, TPM attestation, unpackaged Win32; d) keychain prompts when the bundled `node` reads npx-created items; e) ad-hoc DMG on macOS 15/26: Open Anyway, translocation; f) Windows 11 SmartScreen and Smart App Control for `install.ps1` and the unsigned NSIS app | none in repo | S0 | Sonnet (a, d, e, f), Opus (b, c) / Fable reads b, c | Each answers yes/no with evidence | — |
+| **DESK-D2** Shell main process | `apps/desktop` package; single instance; window lockdown (fuses config, switch allowlist exit, `-- "%1"` parsing, in-memory partition, origin lock, permission handler); preview mode as a build-time constant absent from release; translocation refusal and Move to Applications; core supervisor; strict pipe client; minimal tray | `apps/desktop/{package.json,tsconfig*}`, `apps/desktop/src/main/**`, `apps/desktop/src/shared/protocol.ts`, `apps/desktop/test/unit/**` | S2 | Opus / Opus | Unit tests for every denial; each forbidden switch → exit, no window; unknown pipe messages refused | — |
+| **DESK-D3** Core desktop host | `apps/cli/src/desktop/host.ts`: requires fd 3; app host with a pipe sink; counts-only events; invite path; `show` set; `app-host.json`; strict parsing; clean shutdown | `apps/cli/src/desktop/**`, export hook in `apps/cli/src/commands/ui-host.ts` | S2 | Opus / Opus | Link only on fd 3; without fd 3 a fixed line; invite written nowhere; `join` hands off | — |
+| **DESK-D4** Build and packaging | Committed Node and Electron per-asset SHA-256; plain-HTTPS fetch and hash check; packed tgz installed `--os/--cpu --ignore-scripts`; asar and fuses; fuse read-back, preview-string and switch-lockdown scripts; Info.plist; ad-hoc signing of our bundle and helpers only; DMG, zip, per-user NSIS (`-- "%1"`, uninstaller keeps `~/.agentlink`); signing hooks off | `apps/desktop/build/**`, `apps/desktop/assets/**` | S2 (supply chain) | Sonnet / Fable | DMG opens after Open Anyway; reproducible hashes; no install script ran; upstream signatures intact | D1e |
+| **DESK-D5** CI workflow | `desktop.yml`: macOS (arm64, x64) and Windows x64; artifacts, `SHA256SUMS`, attestation, unsigned manifest; smoke; runs the D4 checks on the built binaries | `.github/workflows/desktop.yml`, `apps/desktop/test/smoke/**` | S1 sensitive | Sonnet / Opus | Green on both OSes; no secret referenced | D2, D3, D4 |
+| **DESK-D6** Early-adopter docs | One docs-site install page (Smart App Control per D1f, never "turn it off"), README, invite page strings, release-notes template, installer pointer | `docs-site/**` (one page), `README.md`, `apps/desktop/release-notes.md`, `changelog.d/*` | S1 | Sonnet / Haiku verify | Vocabulary and link checks green | D1e, D1f |
+| **DESK-D7** AI apps point at the app | App entry form recognised and written; "Use the app for …" with the diff; refuses a translocated or temporary path | `apps/cli/src/harness/**`, `apps/local-ui/src/pages/settings/**` (AI apps section) | S2 | Opus / Opus | Configs switch after confirmation; foreign entries untouched; npx form still recognised | D3 |
+| **DESK-D8** Tray, popover, notifications | Icons, menu, b11 §25 popover (counts, names, pulses), "An approval is waiting" (UX2-i) | `apps/desktop/src/main/tray*.ts`, `notifications.ts`, `apps/desktop/src/popover/**` | S1 | Sonnet / Opus | No message text anywhere | D2, D3 |
+| **DESK-D9** Invite deep link | Reads only the argument after `--` / `open-url`; canonical rebuild and `join` pattern; forwards; invite page button and "Get the app" | `apps/desktop/src/main/deep-link.ts`, `apps/invite/**` | S2 / S1 | Opus / Opus | 08 §4 crafted list, other schemes and switch injection ignored; valid → "Accept X's invite?" | D2, D3 |
+| **DESK-D10** Updater phase 1 | Pinned offline root key; root statements; manifest fields and strict D-128 parsing; version greater than current; verified download and "Open the installer"; no silent install; `tools/desktop/sign-manifest.mjs` with sealed key file (offline use) | `apps/desktop/src/main/updater/**`, `tools/desktop/**` | S2 | Opus / Fable | Refused: tampered, unsigned, wrong key, unrotated key, downgrade, wrong channel, platform or arch, expired, wrong host, wrong hash or size, unknown field, oversize; rotation rehearsed | D2, D4 |
+| **DESK-D11** Release integration | `desktop-build` and `desktop-release` after `publish-latest`: draft release, wait for the offline-signed manifest, verify with the pinned root, publish; beta prereleases the same; signing jobs off; freeze honoured | `.github/workflows/release.yml` (desktop jobs), `tools/release/desktop-*.mjs` | S1 sensitive | Opus / Fable | No key material in any workflow or environment; forks and PRs cannot reach `desktop-signing`; a failing manifest blocks publish | D5, D10 |
+| **DESK-D11a** Owner-feedback build | Integrates D2–D5, D7, D9; dev-build DMG and exe; click list for the owner only | integration branch | — | orchestrator / Haiku verifier | Owner: Open Anyway / SmartScreen → Welcome → ID → connect Claude → invite → accept (Touch ID in the browser on Mac, Windows Hello on Windows) | D2–D5, D7, D9 |
+| **DESK-D12a** `ALKH` spec and crypto | 04 §2.3.x: per-install random peer key or challenge, HKDF info = version ‖ credential ID ‖ credential public-key hash ‖ owner public key, AEAD, TPM-backed requirement, fixed RSA padding, honest strength; `packages/crypto` seal and open; vectors | `docs/foundation/04…` (one section, after D0), `packages/crypto/src/keystore-native*.ts`, `test-vectors/alkh/**` | S2 | Opus / Fable | Vectors; wrong key, tag, version or binding refused | D0, D1b, D1c |
+| **DESK-D12b** Presence helpers | Swift (Secure Enclave, stored peer key, `.biometryCurrentSet`, reason text); C++/WinRT (`KeyCredential` with TPM attestation check, fixed padding); fixed argv; bytes-only output; caller-signature check stubbed, enforced in phase 3 | `apps/desktop/native/{macos,windows}/**`, `apps/desktop/build/native.mjs` | S2 | Opus / Fable | Deterministic across gestures; cancel → fixed code; non-TPM key refused | D1b, D1c |
+| **DESK-D12c** Native presence in core and UI | `owner-native.ts` (registration as its own owner operation), presence route "native", pay-confirm binding; "Use Touch ID" / "Use Windows Hello" in the app; master code stays | `packages/node/src/owner-native*.ts`, `packages/node/src/local-ui/**` (presence gate files), `apps/local-ui/src/presence/**` | S2 | Opus / Fable | M1-8c same-user test; one gesture = one operation; Hello machines need no master code | D12a, D12b, D3 |
+| **DESK-D13** Lifecycle | Login item toggle, window state, terminal `agentlink ui` coexistence, quit | `apps/desktop/src/main/{lifecycle,login-item}.ts`, `apps/cli/src/commands/ui.ts` (app-open branch) | S1 | Sonnet / Opus | Checklist on clean VMs | D2, D3 |
+| **DESK-D14** E2E journeys | Playwright `_electron`: first run → connect (fake AI app) → deep-link join → accept → approval notification → approve | `apps/desktop/test/e2e/**` | S1 | Sonnet / Opus | Green on macOS and Windows | D5, D7, D8, D9 |
+| **DESK-D15** Independent security audit | Spec and diff only: lockdown, pipe, scheme, updater and key model, helpers, release jobs | read-only | — | — / Fable | Highs fixed; gate for any external build | all S2 DESK cards |
+| **DESK-D16** Docs pass | README Status and Roadmap, docs-site, knowledge, CHANGELOG, X post draft | docs only | S1 | Sonnet / Haiku | Drift checks green | D11 |
+| **DESK-D17** Linux (last) | AppImage and `.deb`, libsecret, passphrase or master-code presence, weaker residual stated | `apps/desktop/build/linux/**` | S2 | Opus / Opus | Same-user test; residual stated | after Mac and Windows |
+| **DESK-D18** Signing on and phase 3 | Windows Authenticode (Azure Trusted Signing, Q-145-5) first; Apple Developer ID, hardened runtime and notarization later; owner process (Electron `utilityProcess`, fixed identity) holds owner-key unlock and owner signing; core proxies owner operations; generic `node` without entitlements; helpers enforce the caller signature; silent install after the ceremony and D15; updater OS-signature checks | `apps/desktop/src/owner-process/**`, `apps/desktop/build/sign-*`, `release.yml` signing jobs, `packages/node` owner-operation proxy (own files) | S2 | Opus / Fable | Clean VMs install without warnings; a script run by the signed bundled `node`, and a re-signed build, cannot unlock the owner key | M2-14, D0 |
+
 #### M2-12 · Domain verification for owners (D-34) (new)
 - **Status:** backlog · **Size:** L · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · packages/core, packages/chain, apps/console, apps/cli; occ-v2-contracts if the Registry records the claim hash (04 §2.7)
@@ -9607,6 +9636,7 @@ Desktop apps (D-36, D-41) are full local dashboards on the same core: tray app h
 - **Invariants:** I-7
 - **Scope:**
   - Apple Developer Program enrolment as an organisation, a Developer ID Application certificate and notarization credentials; a Windows code-signing certificate (type per M2-11a).
+  - *D-145 Q-145-5 (Tali, 2026-11-12):* start Azure Trusted Signing for Windows now; Apple Developer ID later (not needed in this phase: early-adopter Mac builds are unsigned with "Open Anyway" instructions).
   - Custody on a hardware token or a cloud signing service, never on a workstation disk.
 - **Acceptance:**
   - Certificates issued; custody recorded privately; a test signature from the CI release environment verifies (with M2-11e).
@@ -10809,3 +10839,74 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** UX1113-R1
 - **Spec:** 08 §8 "Restore from a recovery kit"; 04 §2.3.3 "Restore in the app" (T-1, T-6)
 - **Done when:** the picked path never reaches the renderer (test); native presence satisfies the restore gesture and the presence step; first run on a clean profile shows "I have a recovery kit". Fable audit; Tali's "merge".
+
+#### RET-0 · Local history management spec and decision D-148 (retention plan RET-0)
+- **Status:** in review · **Size:** S · **Tier:** Opus build, Fable security design review (04 §4.2, 06 §2.0 and §3) · **Security:** S2 (spec: owner operations, deletion, MCP surface)
+- **Repo/path:** agentlink · `docs/foundation/{00-README,04-security-and-crypto,06-mcp-server,07-sdk-transport-storage,08-clients-console-cloud,11-claude-design-brief}.md`; `docs/process/backlog.md`; `changelog.d/`
+- **Depends on:** D-148 (Tali, 2026-11-12, OD-1 to OD-6)
+- **Spec:** D-148; 04 §3.1.1 step 9, §4.1, §4.2; 06 §2.0, §3; 07 §3, §3.8; 08 §1; 11 §5.7
+- **Done when:** independent review passes; Fable signs off 04 §4.2 and the 06 changes; Tali says "merge". RET-2 to RET-7 do not start before.
+
+#### RET-1 · Read-only Storage view (0.5.1)
+- **Status:** new · **Size:** M · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · new `packages/core/src/storage-usage.ts`; `packages/node/src` UI route `GET /api/ui/storage`; `apps/local-ui/src/pages/settings/storage*`
+- **Depends on:** RET-0 copy (11 §5.7); may start before RET-0 merges, since it reads only
+- **Spec:** 04 §4.2 "Storage view"; 08 §1 "Storage, archive and delete"; 11 §5.7
+- **Done when:** sizes match fixtures (store and WAL, messages per person, indexed saved files, unassigned Inbox files, drop usage); no Show in Finder (deferred to RET-4); works with 2+ IDs; no name, path or link in logs or the answer beyond 11 §5.2 names (I-7); vocabulary lint; one e2e-browser journey; screenshots.
+
+#### RET-2 · Store schema: tombstones, `saved_files`, migration (0.5.2)
+- **Status:** new · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · `packages/core/src/store/schema.ts`, `packages/node/src/sqlite-schema.ts`, `packages/core/src/files/auto-save.ts`, `files/fetch*`
+- **Depends on:** RET-0
+- **Spec:** 07 §3, §3.8; 04 §4.2
+- **Done when:** `RED (expected):` commit first; migration from the 0.5.0 store fixture; `saved_files` written by auto-save, Save and `agentlink_fetch_file` and kept after the day-7 shred; backfill from live `files` rows; `auto_vacuum` switch only with 2× free space; changeset.
+
+#### RET-3 · Core history delete and the Inbox trash mover (0.5.2)
+- **Status:** new · **Size:** L · **Tier:** Opus build, Fable audit · **Security:** S2
+- **Repo/path:** agentlink · new `packages/core/src/history/delete.ts`, new `packages/node/src/trash.ts`
+- **Depends on:** RET-2
+- **Spec:** 04 §4.2; 07 §3.8
+- **Done when:** `RED (expected):` commit first; a relay replay of a deleted envelope is dropped; a proof pack verifies after delete (OD-4); the Contact check digits still recompute; protected items refused with a fixed reason; a moved, renamed, edited or symlinked file is untouched; files go to the OS Trash on macOS, Linux and Windows (no shell); secure_delete zeroes pages; no path or name in logs.
+
+#### RET-4 · Delete sheet, Free up space and message selection in the app (0.5.2)
+- **Status:** new · **Size:** M · **Tier:** Opus build (routes), Sonnet (UI) · **Security:** S2
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/messages/*`, `pages/settings/storage*`; node UI server routes `POST /api/ui/history/delete/begin` and `/finish`
+- **Depends on:** RET-1, RET-3
+- **Spec:** 08 §1 "Storage, archive and delete"; 04 §4.2 "Presence and undo"; 11 §5.7
+- **Also:** Show in Finder for the Inbox folder on Settings › Storage (moved from RET-1): a new reveal route kind with no presence that opens only the configured Inbox folder (04 §4 realpath rules), takes no path from the page and signs nothing; S2 review of the new route kind.
+- **Done when:** `RED (expected):` commit first for the routes; presence required once per sheet; the list is bound at begin; Undo within 10 s cancels the commit; copy per 11 §5.7 with the OS sensor word; integrated walkthrough screenshots.
+
+#### RET-5 · Archive conversations as a store flag (0.5.2)
+- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · core store, node UI route, `apps/local-ui` (replaces the browser-only flag)
+- **Depends on:** RET-2
+- **Spec:** 04 §4.2 "Two words, two actions"; 08 §1
+- **Done when:** archive and unarchive are reversible and seen in every browser; `agentlink_inbox` and the AI are unaffected; DOM tests.
+
+#### RET-6 · Retention policy `history.*` and the daily pass (0.5.2)
+- **Status:** new · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2
+- **Repo/path:** agentlink · `packages/types/src/policy*`, `packages/core/src/policy*`, `files/retention.ts`, Settings › Storage, CLI `owner policy`
+- **Depends on:** RET-3
+- **Spec:** 06 §3 (`history`, absent-key rule); 04 §4.2 "Retention policy"
+- **Done when:** `RED (expected):` commit first; a pre-D-148 policy reads as `0`/`0`; new policies default `filesKeepDays: 90`; invalid policy or paused ID deletes nothing; no MCP tool can set it (I-4 test); preview before the first turn-on; the existing-install hint shows once.
+
+#### RET-7 · `agentlink_tidy`: the AI proposes a cleanup, the owner approves (0.5.2 or later)
+- **Status:** new · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (MCP surface)
+- **Repo/path:** agentlink · `packages/mcp-tools/src`, core approvals, tool-surface snapshot, 06 §2.0 table
+- **Depends on:** RET-3; its own spec PR for the tool-surface change (06 §2.0)
+- **Spec:** D-148 (3); 06 §2.0; 04 §4.2 "The AI proposes, the owner approves"
+- **Done when:** always `pending_approval`; takes a filter only, never IDs from inbound text (I-5); protected items excluded; an injection test; the owner sees the exact list in the app.
+
+#### RET-8 · Cloud agent history delete and retention (0.5.3)
+- **Status:** new · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · `apps/cloud-agent`
+- **Depends on:** RET-3, RET-6
+- **Spec:** 04 §4.2 "Cloud agent"; 08 §3
+- **Done when:** parity tests with the local store (tombstones, protected items, `history.messagesKeepDays`).
+
+#### RET-9 · Docs for Free up space (with each release)
+- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S0
+- **Repo/path:** agentlink · `README.md` Status, `docs-site/`, `knowledge/`, `changelog.d/`
+- **Depends on:** RET-1 (0.5.1 part), RET-4 and RET-6 (0.5.2 part)
+- **Spec:** 08 §1; 11 §5.7
+- **Done when:** README Status and docs-site "Free up space" match what shipped; drift checks green; never claims an unbuilt part.

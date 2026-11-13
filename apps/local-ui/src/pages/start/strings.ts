@@ -114,9 +114,6 @@ export const INVITE_STEP = {
   create: 'Create an invite link',
   skip: 'Skip for now',
   done: 'Done, go to Home',
-  unsentWarn:
-    "You haven't copied the link yet. If you leave now it stops working. Copy it first, or leave and make a new one any time from People > Invite someone.",
-  leaveAnyway: 'Leave without copying',
 } as const;
 
 /** The Home card (A4): "Get started · 1 of 2 done", with the 12 digits as a gentle suggestion. */
@@ -139,4 +136,11 @@ export const ID_EXPLAINER = {
   title: 'What is an ID?',
   body: "An ID is your AI app's identity on AgentLink: its inbox, people and keys. Every chat in that AI app uses it.",
   hide: 'Hide this',
+} as const;
+
+/** R1-UI-01: Home before any ID exists. */
+export const FINISH_SETUP = {
+  title: 'Create your first ID',
+  body: "An ID is your AI app's identity on AgentLink. It takes one minute and you do it here, nothing to copy or paste.",
+  create: 'Create your first ID',
 } as const;

@@ -44,6 +44,22 @@
 // expiry, `sent`, `again`), check answers `alreadyContact` `{ref, name}` for an invite from a paired
 // contact, and accept answers `again` next to `sent`.
 //
+// REL051-B1 (N2; 08 §1): a `connecting` row also answers `blocked: true` while core says the person
+// is blocked here (their answer is dropped; Unblock is `POST /api/ui/contacts/:ref/unblock`), and
+// `POST /api/ui/invites/connecting/cancel`, the invite kind, step `cancel-connecting`, body exactly
+// `{"ref"}`, drops this agent's accepts that wait for that contact (core `cancelConnecting`; nothing
+// is signed or sent), as Cancel on an open invite does for the other side.
+// REL051-B2 (owner test, 13 Nov; 04 §3.6; 08 §1): `POST /api/ui/invites/link`, the invite kind, step
+// `link`, body exactly `{"inviteId"}`: core `inviteLink`, the link an open invite was handed out as
+// (kept sealed on this computer), with its share text, format and expiry, for Copy link and Show
+// link on Home and People. 404 `not_found` for a used, cancelled, expired or unknown invite; 404
+// `no_link` for one stored before links were kept. A POST behind the invite gate (session, CSRF,
+// Origin, fetch metadata), answered `no-store`; no event, no log line (I-7). No MCP tool reads it.
+//
+// REL051-CF1 (R1-CLASS-01, -06): a `connecting` row also answers `startedAt` (RFC 3339, from core's
+// staged row), so the app can move from "Connecting" to a "still waiting" hint and, after a bounded
+// time, to "no answer: ask for a new invite", with Cancel on every row.
+//
 // Only the canonical link `https://agentlink.4thtech.io/i#<payload>` or the bare payload ever reaches
 // core: any other host, scheme, path, percent-escape, whitespace or size is refused here first, and
 // nothing in these routes fetches anything (04 §4). The link holds the invite secret: it is answered
@@ -71,7 +87,9 @@ import {
   INVITE_ACCEPT_PATH,
   INVITE_CANCEL_PATH,
   INVITE_CHECK_PATH,
+  INVITE_CONNECTING_CANCEL_PATH,
   INVITE_CREATE_PATH,
+  INVITE_LINK_PATH,
   INVITES_LIST_PATH,
 } from '../invite-paths.js';
 import {
@@ -393,6 +411,7 @@ async function listInvites(
   try {
     for (const item of await port.connecting()) {
       const when = rfc3339(item.expiresAt);
+      const started = rfc3339(item.startedAt);
       const name: unknown = item.display.name;
       if (typeof item.id !== 'string' || !REF.test(item.id) || when === undefined) continue;
       if (typeof name !== 'string' || name.length === 0 || name.length > MAX_NAME_CHARS) continue;
@@ -402,6 +421,11 @@ async function listInvites(
         expiresAt: when,
         sent: item.sent === true,
         again: item.again === true,
+        // REL051-B1 (N2): only while core says this person is blocked here.
+        ...(item.blocked === true ? { blocked: true } : {}),
+        // REL051-CF1 (R1-CLASS-01, -06): when the accept began, so the app can say "still waiting"
+        // and, after a bounded time, "no answer" (also after a restart).
+        ...(started === undefined ? {} : { startedAt: started }),
       });
     }
   } catch {
@@ -430,6 +454,88 @@ async function cancelInvite(
   }
   if (outcome === 'not_found') return NOT_FOUND;
   return Object.freeze({ status: 200, body: Object.freeze({ status: 'cancelled' }) });
+}
+
+/**
+ * REL051-B1 (N2): Cancel on an accept that waits (the invite kind, step `cancel-connecting`): body
+ * exactly `{"ref"}`, the contact ID the `connecting` row carries. Core drops this agent's staged
+ * accepts for it; nothing is signed or sent. 404 when none waits.
+ */
+async function cancelConnecting(
+  _context: LocalUiContext,
+  body: JsonObject,
+  invites: LocalUiInviteDesk | undefined,
+): Promise<LocalUiResult> {
+  if (invites === undefined) return UI_NOT_SET_UP;
+  const keys = Object.keys(body);
+  const ref = body['ref'];
+  if (keys.length !== 1 || typeof ref !== 'string' || !REF.test(ref)) return INVALID;
+  let outcome: 'cancelled' | 'not_found';
+  try {
+    outcome = await invites.cancelConnecting(ref);
+  } catch (error) {
+    if (error instanceof CoreError && error.code === 'identity_missing') return UI_NOT_SET_UP;
+    return UNAVAILABLE;
+  }
+  if (outcome === 'not_found') return NOT_FOUND;
+  return Object.freeze({ status: 200, body: Object.freeze({ status: 'cancelled' }) });
+}
+
+// --- copy the link again (REL051-B2) -----------------------------------------------------------
+
+/** 404: an open invite stored before links were kept; the owner cancels it and makes a new one. */
+const NO_LINK = fixed(404, 'no_link');
+/** A short link as core makes it (04 §3.6.2). */
+const SHORT_LINK = /^2\.[A-Za-z0-9_-]{43}$/;
+
+async function inviteLink(
+  _context: LocalUiContext,
+  body: JsonObject,
+  invites: LocalUiInviteDesk | undefined,
+): Promise<LocalUiResult> {
+  if (invites === undefined) return UI_NOT_SET_UP;
+  const keys = Object.keys(body);
+  const inviteId = body['inviteId'];
+  if (keys.length !== 1 || typeof inviteId !== 'string' || !INVITE_ID.test(inviteId)) {
+    return INVALID;
+  }
+  if (invites.link === undefined) return NO_LINK;
+  let found: Awaited<ReturnType<NonNullable<LocalUiInviteDesk['link']>>>;
+  try {
+    found = await invites.link(inviteId);
+  } catch (error) {
+    if (error instanceof CoreError && error.code === 'identity_missing') return UI_NOT_SET_UP;
+    return UNAVAILABLE;
+  }
+  if (found.status === 'not_found') return NOT_FOUND;
+  if (found.status !== 'ok') return NO_LINK;
+  const { inviteUrl, format, expiresAt } = found;
+  const when = rfc3339(expiresAt);
+  // Only the canonical link, in the form its format names, ever reaches the page (fail closed).
+  if (
+    typeof inviteUrl !== 'string' ||
+    !inviteUrl.startsWith(INVITE_LINK_PREFIX) ||
+    when === undefined ||
+    (format !== 'short' && format !== 'long')
+  ) {
+    return UNAVAILABLE;
+  }
+  const code = inviteUrl.slice(INVITE_LINK_PREFIX.length);
+  const shaped =
+    format === 'short'
+      ? SHORT_LINK.test(code)
+      : code.length > 0 && code.length <= INVITE_MAX_PAYLOAD_CHARS && PAYLOAD.test(code);
+  if (!shaped) return UNAVAILABLE;
+  return Object.freeze({
+    status: 200,
+    body: Object.freeze({
+      status: 'ok',
+      inviteUrl,
+      shareText: inviteShareText(inviteUrl, expiresAt),
+      format,
+      expiresAt: when,
+    }),
+  });
 }
 
 // --- check ------------------------------------------------------------------------------------
@@ -606,10 +712,28 @@ export const inviteCancelRoute: LocalUiInviteRoute = Object.freeze<LocalUiInvite
   handler: cancelInvite,
 });
 
+export const inviteConnectingCancelRoute: LocalUiInviteRoute = Object.freeze<LocalUiInviteRoute>({
+  method: 'POST',
+  path: INVITE_CONNECTING_CANCEL_PATH,
+  presence: 'invite',
+  step: 'cancel-connecting',
+  handler: cancelConnecting,
+});
+
+export const inviteLinkRoute: LocalUiInviteRoute = Object.freeze<LocalUiInviteRoute>({
+  method: 'POST',
+  path: INVITE_LINK_PATH,
+  presence: 'invite',
+  step: 'link',
+  handler: inviteLink,
+});
+
 export const invitesRoutes: readonly LocalUiRoute[] = Object.freeze([
   inviteCreateRoute,
   inviteCheckRoute,
   inviteAcceptRoute,
   invitesListRoute,
   inviteCancelRoute,
+  inviteConnectingCancelRoute,
+  inviteLinkRoute,
 ]);

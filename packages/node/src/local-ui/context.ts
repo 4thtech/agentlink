@@ -10,6 +10,8 @@
 import type { LocalUiBackupDesk } from '../kit-record.js';
 import type { LiveAgentState, LiveAppRecord } from './live-status.js';
 import type { LocalUiPeopleAllDesk } from './api/people-all.js';
+import type { LocalUiStorageDesk } from './api/storage.js';
+import type { LocalUiAppUpdateDesk } from './api/app-update.js';
 import {
   CoreError,
   acceptInviteAction,
@@ -46,16 +48,18 @@ import type {
   SaveReceivedFileResult,
   PreparedPolicyEdit,
   ProofListItem,
+  PreviewSource,
   ReceivedFileItem,
   ResolvedFolders,
   SentFileItem,
   TopUpView,
 } from '@4thtech-io/core';
 import type { JsonObject } from '@4thtech-io/crypto';
+import type { PreviewReadLimits, PreviewReadOutcome } from './read-preview.js';
 import type { ApprovalContext } from '../owner-approval.js';
 import type { AgentEpochKeys } from '../key-epoch.js';
 import type { FirstAgentCard } from '../owner-first-card.js';
-import type { LocalUiHealthBody, LocalUiHealthSource } from './api/health.js';
+import type { LocalUiDataFolder, LocalUiHealthBody, LocalUiHealthSource } from './api/health.js';
 import type { LocalUiInviteDesk } from './route-types.js';
 import type { JoinDesk } from './join-desk.js';
 import type { LocalUiSettingsDesk } from './api/ui-settings.js';
@@ -90,6 +94,11 @@ export interface LocalUiOptions {
   readonly health?: LocalUiHealthSource;
   /** M1-11s-a-d: the app version the health read answers (a plain version, else nothing). */
   readonly version?: string;
+  /**
+   * REL051-B3b: the data folder (`~/.agentlink`) and the home folder it is under; the health read
+   * answers it home-relative only, never the absolute path (api/health.ts healthDataFolder).
+   */
+  readonly dataFolder?: LocalUiDataFolder;
   /**
    * U3-f (08 §1 "AI apps"; 06 §7 "The app as a second path"): the CLI's harness desk, the one writer
    * of AI app configs (apps/cli/src/harness/app-desk.ts). Absent: the AI apps routes answer
@@ -143,9 +152,40 @@ export interface LocalUiRecoveryKitSource {
  */
 export type LocalUiAiAppEntryState =
   | { readonly kind: 'none' }
-  | { readonly kind: 'agent'; readonly agent: string }
+  | {
+      readonly kind: 'agent';
+      readonly agent: string;
+      /** WP-D7: how the entry starts AgentLink (`npx`, or the desktop app's bundled CLI). */
+      readonly form?: LocalUiAiAppForm;
+    }
   | { readonly kind: 'foreign' }
   | { readonly kind: 'unreadable' };
+
+/** WP-D7: an entry of ours starts AgentLink with `npx`, or with the desktop app's bundled CLI. */
+export type LocalUiAiAppForm = 'npx' | 'app';
+
+/**
+ * WP-D7: whether AI apps can be pointed at the desktop app: `available`, or `move_first` (the app runs
+ * from a translocated, temporary or read-only place, which is never written into a config).
+ */
+export type LocalUiDesktopAppState = 'available' | 'move_first';
+
+/** WP-D7: the optional launcher change of a plan (the installer's `agentlink` command). */
+export interface LocalUiLauncherChange {
+  /** As shown (`~/…`). */
+  readonly path: string;
+  /** AgentLink's own launcher text, before and after (it holds no secret). */
+  readonly oldText: string;
+  readonly newText: string;
+}
+
+/** WP-D7: what the page asked the plan for. */
+export interface LocalUiAiAppPlanRequest {
+  /** `app`: the entry starts the desktop app's bundled CLI ("Use the app for …"). */
+  readonly form?: LocalUiAiAppForm;
+  /** Also point the installer's `agentlink` command at the app (app form only). */
+  readonly launcher?: boolean;
+}
 
 /** U3-f: one detected AI app. Fixed names and display paths only; never file content. */
 export interface LocalUiAiAppView {
@@ -165,12 +205,16 @@ export interface LocalUiAiAppView {
 /** U3-f: how a planned write ended. */
 export type LocalUiAiAppWrite =
   | 'written'
+  /** WP-D7: the entry is written, the `agentlink` command (asked for) could not be changed. */
+  | 'written_launcher_unchanged'
   /** The file is not the one planned (bytes or identity): nothing written. */
   | 'changed'
   /** Claude Desktop runs: nothing written. */
   | 'quit_first'
   /** The agent the entry runs is not the agent the owner signed for: nothing written. */
   | 'agent_mismatch'
+  /** WP-D7: the desktop app moved or now runs from a place that is never written: nothing written. */
+  | 'app_location'
   | 'failed';
 
 /**
@@ -183,7 +227,8 @@ export type LocalUiAiAppWrite =
 export type LocalUiAiAppPlan =
   | {
       readonly status: 'change';
-      readonly kind: 'connect' | 'move' | 'disconnect';
+      /** WP-D7 `switch`: the same agent, its entry pointed at the desktop app. */
+      readonly kind: 'connect' | 'move' | 'disconnect' | 'switch';
       readonly app: string;
       readonly name: string;
       readonly path: string;
@@ -193,11 +238,22 @@ export type LocalUiAiAppPlan =
       readonly oldAgent: string | null;
       readonly newAgent: string | null;
       readonly identity: string;
+      /** WP-D7: the launcher change written with it (asked for, app form only), else absent. */
+      readonly launcher?: LocalUiLauncherChange;
+      /** WP-D7: the installer's launcher could also be pointed at the app (not asked for yet). */
+      readonly launcherOffer?: boolean;
       commit(agentId: string): Promise<LocalUiAiAppWrite>;
     }
   | {
       readonly status:
-        'present' | 'not_connected' | 'conflict' | 'quit_first' | 'unreadable' | 'not_found';
+        | 'present'
+        | 'not_connected'
+        | 'conflict'
+        | 'quit_first'
+        | 'unreadable'
+        | 'not_found'
+        /** WP-D7: no desktop app, or one in a place that is never written into a config. */
+        | 'app_location';
       readonly app: string;
       readonly name: string;
     };
@@ -209,12 +265,18 @@ export type LocalUiAiAppPlan =
  */
 export interface LocalUiAiApps {
   /** The detected apps, entry-only, and whether Claude Desktop runs. */
-  list(): Promise<{ readonly apps: readonly LocalUiAiAppView[]; readonly desktopRunning: boolean }>;
+  list(): Promise<{
+    readonly apps: readonly LocalUiAiAppView[];
+    readonly desktopRunning: boolean;
+    /** WP-D7: the desktop app, when this computer has one. */
+    readonly desktopApp?: LocalUiDesktopAppState;
+  }>;
   /**
    * The change that makes `app` run `agent` (connect, or move from another agent), or, when it
-   * already runs `agent`, the change that disconnects it.
+   * already runs `agent`, the change that disconnects it. WP-D7: with `{form: 'app'}` and `app`
+   * already running `agent` with npx, the change that points it at the desktop app (`switch`).
    */
-  plan(app: string, agent: string): Promise<LocalUiAiAppPlan>;
+  plan(app: string, agent: string, request?: LocalUiAiAppPlanRequest): Promise<LocalUiAiAppPlan>;
   /** The agentId recorded for an agent folder (07 §9.1); undefined when it cannot be read. */
   agentIdOf(agent: string): Promise<string | undefined>;
 }
@@ -332,6 +394,12 @@ export interface LocalUiReadClient {
      * `FilesIoView.isReceived`, store only), checked before presence is asked. Optional for fakes.
      */
     isReceived?(itemId: string): Promise<boolean>;
+    /**
+     * REL051-A34 (D-149): one received item's name, stated size, plaintext hash and saved name, by
+     * its ID only (core `FilesIoView.previewSource`), for the in-app preview. Store only; never log
+     * it (I-7). Optional so page fakes without it stay valid; the server always sets it.
+     */
+    previewSource?(itemId: string): Promise<PreviewSource | null>;
   };
   /**
    * U3-d (D-138; 04 §2.5.1 `agent.label`): the agent's verified label (core `loadLabel`: the stored
@@ -437,6 +505,8 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       prepareSave: (itemId: string) => client.ownerActions.prepareFileSave(itemId),
       // W4-FILES-SAVE SEC-L1: the item is a received file (store read).
       isReceived: (itemId: string) => client.filesIo.isReceived(itemId),
+      // REL051-A34: the in-app preview's store read (no file is touched here).
+      previewSource: (itemId: string) => client.filesIo.previewSource(itemId),
     }),
     // U3-d: the verified label and the unsigned `agent.label` (reads and prepare only).
     agent: Object.freeze({
@@ -543,6 +613,9 @@ export function inviteDesk(client: AgentLinkClient): LocalUiInviteDesk {
       return Object.freeze({ contact: checked.contact, expiresAt });
     },
     cancel: (inviteId) => client.pairing.cancelInvite(inviteId),
+    cancelConnecting: (ref) => client.contacts.cancelConnecting(ref),
+    // REL051-B2: the kept link of one open invite (Copy link, Show link); never logged.
+    link: (inviteId) => client.pairing.inviteLink(inviteId),
   });
 }
 
@@ -664,6 +737,15 @@ export interface LocalUiContext {
    * it signs nothing and never answers a path. Absent: the record reads as `unreadable`.
    */
   readonly backup?: LocalUiBackupDesk;
+  /**
+   * REL051-A34: the in-app preview's checked read (local-ui/read-preview.ts with the server's home
+   * folder). Absent: the route uses readSavedText with the OS user's home.
+   */
+  readonly previewRead?: (
+    inboxFolder: string,
+    savedName: string,
+    limits: PreviewReadLimits,
+  ) => Promise<PreviewReadOutcome>;
   /** W4-FILES-SAVE: saving a received file, for the save owner route; undefined when not set up. */
   readonly fileSave?: LocalUiFileSavePort;
   /**
@@ -693,6 +775,10 @@ export interface LocalUiContext {
   readonly agents?: LocalUiAgentsDesk;
   /** WP-P2: every ID's people for `GET /api/ui/people` (api/people-all.ts); app host only. Reads only. */
   readonly peopleAll?: LocalUiPeopleAllDesk;
+  /** REL051-RET1: the sizes behind `GET /api/ui/storage` (api/storage.ts); app host only. Reads only. */
+  readonly storage?: LocalUiStorageDesk;
+  /** DESK051-UPD: Settings > Updates (api/app-update.ts); the desktop app's host only. */
+  readonly appUpdate?: LocalUiAppUpdateDesk;
   /**
    * U3-d (D-138, 08 §1): the open agent and saving a verified label, for the owner routes of
    * api/agents-manage.ts and api/apps.ts only; absent outside the app host. It signs nothing: a

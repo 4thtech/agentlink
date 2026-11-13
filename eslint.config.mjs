@@ -158,6 +158,8 @@ export default tseslint.config(
       '{packages,apps,tools,e2e,test-vectors}/*/{dist,coverage,.turbo}/**',
       '{dist,coverage,.turbo}/**',
       'docs/**',
+      // WP-D2/D4 build outputs (the release bundle, packaged app work dir, DMGs).
+      'apps/desktop/{dist-release,out,.cache}/**',
     ],
   },
   js.configs.recommended,
@@ -262,6 +264,8 @@ export default tseslint.config(
     files: [
       'tools/**',
       'apps/cli/scripts/**/*.mjs',
+      'apps/desktop/build/**/*.mjs',
+      'apps/desktop/test/smoke/**/*.mjs',
       '**/*.test.ts',
       '**/*.config.{ts,mjs}',
       'eslint.config.mjs',
@@ -271,7 +275,13 @@ export default tseslint.config(
   {
     // The console channels and the repository scripts. This turns off ALL no-restricted-syntax
     // selectors for these files, not only CONSOLE_SYNTAX: keep the list to these exact paths.
-    files: ['tools/**', 'apps/cli/scripts/**/*.mjs', ...CONSOLE_CHANNELS],
+    files: [
+      'tools/**',
+      'apps/cli/scripts/**/*.mjs',
+      'apps/desktop/build/**/*.mjs',
+      'apps/desktop/test/smoke/**/*.mjs',
+      ...CONSOLE_CHANNELS,
+    ],
     rules: { 'no-console': 'off', 'no-restricted-syntax': 'off' },
   },
 );

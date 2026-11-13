@@ -13,6 +13,7 @@ import {
   symlink,
   writeFile,
 } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { encodeHex, sha256 } from '@4thtech-io/crypto';
@@ -151,6 +152,42 @@ describe('nodeFilesPlatform', () => {
     await expect(platform.inbox('~/.agentlink/Inbox')).rejects.toThrow();
     await expect(platform.inbox('relative/Inbox')).rejects.toThrow();
   });
+
+  it('REL051-A12 readSaved: a regular file directly inside, up to the cap; never a link', async () => {
+    const platform = nodeFilesPlatform({ home, drop: false });
+    const inbox = await platform.inbox('~/AgentLink/Inbox');
+    await writeFile(path.join(inbox.realpath, 'plan.md'), '# Plan\n');
+    await writeFile(path.join(inbox.realpath, 'big.txt'), 'x'.repeat(100));
+    await symlink(path.join(home, 'outside.txt'), path.join(inbox.realpath, 'evil.md'));
+    await mkdir(path.join(inbox.realpath, 'folder.md'));
+    const read = async (name: string, max = 64) => {
+      const bytes = await inbox.readSaved?.(name, max);
+      return bytes === undefined ? undefined : new TextDecoder().decode(bytes);
+    };
+    expect(await read('plan.md')).toBe('# Plan\n');
+    expect(await read('big.txt')).toBeUndefined(); // above the cap
+    expect(await read('big.txt', 100)).toBe('x'.repeat(100));
+    expect(await read('evil.md')).toBeUndefined(); // a link is never followed
+    expect(await read('folder.md')).toBeUndefined();
+    expect(await read('missing.md')).toBeUndefined();
+    for (const bad of ['../outside.txt', 'a/b', '..', '.', '']) {
+      expect(await read(bad)).toBeUndefined();
+    }
+    await inbox.close?.();
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'IR-REL051-A12-1 L1 readSaved: a FIFO under the saved name never hangs and is never read',
+    async () => {
+      const platform = nodeFilesPlatform({ home, drop: false });
+      const inbox = await platform.inbox('~/AgentLink/Inbox');
+      execFileSync('mkfifo', [path.join(inbox.realpath, 'pipe.md')]);
+      const start = Date.now();
+      expect(await inbox.readSaved?.('pipe.md', 64)).toBeUndefined();
+      expect(Date.now() - start).toBeLessThan(2_000);
+      await inbox.close?.();
+    },
+  );
 
   it('with drop: false there is no drop; by default the drop is configured', () => {
     expect(nodeFilesPlatform({ home, drop: false }).drop).toBeUndefined();

@@ -41,7 +41,8 @@ describe('chapter 1: onboarding', () => {
       .getByText(/Step 1 of 4/)
       .first()
       .waitFor();
-    await page.getByRole('link', { name: 'Skip to Home' }).waitFor();
+    // R1-UI-01: no "Skip to Home" before the ID exists (Home would be a dead end).
+    expect(await page.getByRole('link', { name: 'Skip to Home' }).count()).toBe(0);
     await page.getByRole('button', { name: 'Continue with Claude Code' }).click();
 
     // Step 2 (A1): "Confirm it's you": the agent card (renamed), Connect with Touch ID.
@@ -98,15 +99,22 @@ describe('chapter 1: onboarding', () => {
 
     // W4-HOME (un-gated): once set up, the app opens on Home with no one in People yet, and Get
     // started does not come back.
-    // UX1113: the link was not copied, so leaving says so once (it would stop working).
+    // REL051-B2 (owner test, 13 Nov): Done without Copy keeps the invite. It waits on Home, where
+    // Show link (and Copy link) get the same link back for the student.
+    const made = (await page.locator('.inv-link[data-state="ready"]').textContent())?.trim() ?? '';
+    expect(made).toMatch(/^https:\/\/agentlink\.4thtech\.io\/i#/);
     await page.getByRole('button', { name: 'Done, go to Home' }).click();
-    await page.getByRole('alert').filter({ hasText: "haven't copied" }).waitFor();
-    await page.getByRole('button', { name: 'Leave without copying' }).first().click();
     await page.waitForURL((url) => url.pathname === '/');
     expect(await text(page)).not.toContain('Which AI app do you use?');
+    expect(await text(page)).not.toContain("haven't copied");
     await page.getByRole('heading', { name: 'People' }).first().waitFor();
     // W4-WIRE: Home shows once its Get started read has answered too (its skeleton until then).
-    await page.getByText('No one here yet.').first().waitFor();
+    await page.getByText('Waiting for them to accept').first().waitFor();
+    expect(await text(page)).not.toContain(made);
+    await page.getByRole('button', { name: 'Show link' }).first().click();
+    await page.locator('.inv-link-kept').first().waitFor();
+    expect((await page.locator('.inv-link-kept').first().textContent())?.trim()).toBe(made);
+    await page.getByRole('button', { name: 'Hide link' }).first().click();
     // W4-WIRE: Home carries the Get started card (one of the three ways back), counted from real
     // state: the AI app is connected; inviting someone is next, on the Invite screen.
     await page.getByRole('heading', { name: 'Get started · 1 of 2 done' }).waitFor();
@@ -115,10 +123,10 @@ describe('chapter 1: onboarding', () => {
     ).toBe('/contacts?invite');
   }, 180_000);
 
-  // IR-W4-WIZARD-1 H: the app opens Get started by itself only while setup is incomplete, on the
-  // real entry path (`agentlink ui` opens the session link, which lands on /settings/home); and the
+  // IR-W4-WIZARD-1 H, R1-UI-14: the app opens Get started by itself only on a first run (no ID); an
+  // ID without an AI app gets Home with the Get started card as a nudge. The real entry path (`agentlink ui` opens the session link, which lands on /settings/home); and the
   // load that Get started itself ended on Home never loops back.
-  it('no AI app yet: "Go to Home" stays on Home; the next launch opens Get started by itself', async (ctx) => {
+  it('no AI app yet: "Go to Home" stays on Home; the next launch opens Home too, with a nudge', async (ctx) => {
     const ready = ch.need(ctx);
     if (ready === undefined) return;
     const world = journeyWorld();
@@ -138,11 +146,53 @@ describe('chapter 1: onboarding', () => {
     expect(new URL(page.url()).pathname).toBe('/');
     await first.stop();
 
-    // The next launch, like the real app: the session link → /settings/home → Get started.
+    // The next launch, like the real app: the session link → /settings/home → Home (R1-UI-14: not
+    // Get started on every launch), where the card offers to connect an AI app.
     const again = await startUiRun(pc, ready.files, ch.closers);
     expect(new URL(again.link).pathname).toBe('/settings/home');
     await page.goto(again.link);
-    await page.waitForURL((url) => url.pathname === '/start/app');
+    await page.getByRole('heading', { name: /^Get started · 0 of 2 done/ }).waitFor();
+    expect(new URL(page.url()).pathname).toBe('/');
+    expect(await text(page)).not.toContain('Which AI app do you use?');
+  }, 180_000);
+
+  // REL051-CF3 (R1-CLASS-03): a reload on "Your master code" shows the same code again; after the app
+  // was closed before "I saved it", the next launch says the code was not saved and offers a new one.
+  it('a reload on "Your master code" keeps the code; a restart says it was not saved', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const pc = await world.computer();
+    const jp = await journeyPage(ready.browser);
+    const { page } = jp;
+    const first = await startUiRun(pc, ready.files, ch.closers);
+    await page.goto(first.link);
     await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
+    await page
+      .getByRole('button', { name: /^Continue with / })
+      .first()
+      .click();
+    await page.getByLabel('Name people see').fill('Reloaded');
+    await page.getByRole('button', { name: CONNECT_WITH }).click();
+    await page.getByRole('heading', { name: 'Your master code' }).waitFor();
+    const codeOf = async (): Promise<string> =>
+      (await page.locator('[data-backup-code] span').allInnerTexts()).join(' ');
+    const shown = await codeOf();
+    expect(shown).toMatch(/^[A-Z2-9]{4}( [A-Z2-9]{4}){5}$/);
+
+    await page.reload();
+    await page.getByRole('heading', { name: 'Your master code' }).waitFor();
+    expect(await codeOf()).toBe(shown);
+    expect(new URL(page.url()).pathname).toBe('/start/connect');
+    expect(jp.gestures.create).toBe(1);
+
+    // The app is closed before "I saved it": the next launch never shows or asks for that code.
+    await first.stop();
+    const again = await startUiRun(pc, ready.files, ch.closers);
+    await page.goto(again.link);
+    await page.getByRole('heading', { name: "Your master code wasn't saved" }).waitFor();
+    await page.getByRole('button', { name: 'Make a new master code' }).waitFor();
+    expect(await text(page)).not.toContain(shown);
+    expect(await page.locator('input[type="password"]').count()).toBe(0);
   }, 180_000);
 });

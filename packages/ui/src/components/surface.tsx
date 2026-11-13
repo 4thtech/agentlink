@@ -16,6 +16,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { holdInert } from './inert.js';
 import { refocusOnLoss, useLayer } from './layers.js';
 import { cx } from './util.js';
@@ -52,6 +53,16 @@ export function Surface({
     },
     children,
   );
+}
+
+/**
+ * Sheets and dialogs are drawn on <body>, never inside the page. The app's main column holds a
+ * view-transition name, which makes it a stacking context: a fixed layer inside it can never rise
+ * above the top bar (R1-UI-03). Rendering is still owned by the caller's React tree (context,
+ * events); only the DOM node moves. Without a document (a server render) it stays inline.
+ */
+function onBody(node: ReactElement): ReactElement {
+  return typeof document === 'undefined' ? node : createPortal(node, document.body);
 }
 
 const FOCUSABLE = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
@@ -134,7 +145,7 @@ export function Sheet({
   if (!open) return null;
   // The layer holds the backdrop (a click on it closes) and the sheet; the page behind is inert
   // around the layer, so the backdrop stays clickable (W5-SHEET-CLOSE).
-  return (
+  return onBody(
     <div ref={layer} className="al-sheet-layer">
       <div className="al-sheet-backdrop" onClick={onClose} />
       <aside
@@ -162,7 +173,7 @@ export function Sheet({
         </header>
         <div className="al-sheet-body">{children}</div>
       </aside>
-    </div>
+    </div>,
   );
 }
 
@@ -217,7 +228,7 @@ export function DialogFrame({
   const shown = open && holding;
   const { onKeyDown, onBlur } = useModalBehavior(shown, frame, heading, onClose);
   if (!shown) return null;
-  return (
+  return onBody(
     <div
       className="al-dialog-overlay"
       onClick={(event) => {
@@ -240,6 +251,6 @@ export function DialogFrame({
         </h2>
         <div className="al-dialog-body">{children}</div>
       </section>
-    </div>
+    </div>,
   );
 }

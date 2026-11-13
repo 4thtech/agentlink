@@ -23,6 +23,9 @@ export const GUIDE_URL = 'https://wiki.4thtech.io/products/agentlink';
 const CHIP: Readonly<Record<ConnectionState, SwitcherChip>> = {
   unknown: { state: 'checking' },
   connected: { state: 'connected' },
+  // REL051-CF2: running, but no relay can be reached from this computer.
+  unreachable: { state: 'reconnecting', label: S.networkUnreachableChip },
+  checking: { state: 'checking' },
   paused: { state: 'paused' },
   not_running: { state: 'not-running' },
   needs_setup: { state: 'needs-setup' },

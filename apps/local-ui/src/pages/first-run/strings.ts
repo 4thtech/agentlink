@@ -61,6 +61,9 @@ export const FIRST_RUN = {
   doneNoPasskeyTitle: 'Save your master code — you need it to approve.',
   doneNoPasskeyBody:
     "This browser can't protect approvals with a passkey here, so this master code is how you approve on this computer.",
+  /** R1-UI-02: leaving the once-only code screen (Skip to Home) asks first. */
+  leaveCode:
+    "Your master code is shown only once. If you leave now it is gone and we can't show it again. Copy it or save it as a file first. Leave anyway?",
   backupBody: (sensor: string): string =>
     `Your master code approves changes when ${sensor} isn't available and unlocks your AgentLink key. Save it once. We can't recover it for you. Never give it to your AI.`,
   backupLost:
@@ -71,6 +74,14 @@ export const FIRST_RUN = {
   savedAsLabel: (computer: string): string => `AgentLink master code – ${computer}`,
   clipboardWarning: 'Other apps can read your clipboard.',
   savedIt: 'I saved it',
+  // REL051-CF3 (R1-CLASS-03): the master code was made and never saved (the app closed, or too long).
+  lostTitle: "Your master code wasn't saved",
+  lostBody: (sensor: string): string =>
+    `It was shown once and can't be shown again. Make a new one now with ${sensor}. Your IDs and people are fine.`,
+  lostBodyNoSensor:
+    "It was shown once and can't be shown again. If you saved it, keep using it. If not, run `agentlink doctor` in your own terminal.",
+  lostNew: 'Make a new master code',
+  lostLater: 'Later',
   // The first policy's outcome (D-130 (2)).
   sendAllowed:
     'Your AI can send files you put in ~/AgentLink/Send. Nothing else on this computer can be sent.',

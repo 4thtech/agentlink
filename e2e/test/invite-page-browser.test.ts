@@ -44,13 +44,13 @@ const TYPES: Record<string, string> = {
 };
 
 /** Serves OUT like the static host does: `/` and `/i` are pages, with the `_headers` headers. */
-function serve(): Promise<Server> {
+function serve(out = OUT): Promise<Server> {
   const server = createServer((req, res) => {
     const path = (req.url ?? '/').split(/[?#]/)[0] ?? '/';
     const file = path === '/' ? 'index.html' : path === '/i' ? 'i/index.html' : path.slice(1);
     try {
       if (file.includes('..') || file.startsWith('_')) throw new Error('not found');
-      const body = readFileSync(`${OUT}${file}`);
+      const body = readFileSync(`${out}${file}`);
       const ext = file.slice(file.lastIndexOf('.'));
       res.writeHead(200, {
         'content-type': TYPES[ext] ?? 'text/plain',
@@ -150,6 +150,18 @@ async function open(
 const tagSequence = (page: Page): Promise<string[]> =>
   page.evaluate(() => [...document.body.querySelectorAll('*')].map((e) => e.tagName));
 
+/** WP-D9, flag off: the two app link placeholders are hidden, with no address and no text. */
+async function expectNoAppLinks(page: Page): Promise<void> {
+  // REL051-INV's two help links are the page's only addresses; the app links have none.
+  expect(await page.locator('#app-links a[href]').count()).toBe(0);
+  expect(await page.locator('#app-links').isVisible()).toBe(false);
+  await expect(page.locator('#open-app').textContent()).resolves.toBe('');
+  await expect(page.locator('#get-app').textContent()).resolves.toBe('');
+  const text = await page.locator('body').innerText();
+  expect(text).not.toContain('Open in the AgentLink app');
+  expect(text).not.toContain('Get the app');
+}
+
 const clipboard = (page: Page): Promise<string> =>
   page.evaluate(() => navigator.clipboard.readText());
 
@@ -247,6 +259,7 @@ describe('a good invite (U3-invite)', () => {
     ).resolves.toEqual([DOCS_LINKS.guide, DOCS_LINKS.windows]);
     await expect(page.locator('#mac-app').isHidden()).resolves.toBe(true);
     await expect(page.locator('#phone-note').isHidden()).resolves.toBe(true);
+    await expectNoAppLinks(page);
     await expect(page.locator('#next').textContent()).resolves.toBe(
       "AgentLink opens in your browser. Set it up, then accept Marko's invite.",
     );
@@ -428,12 +441,14 @@ describe('a hostile invite (I-5)', () => {
       // The only svg is the fixed AgentLink mark in the header.
       expect(await page.locator('img, div, svg:not(.mark), iframe').count()).toBe(0);
       expect(await page.locator('object, embed, form, input, style').count()).toBe(0);
-      // REL051-INV: no link but the three fixed ones of the HTML (two help links, the Mac app's
-      // link with no href while its switch is off); none comes from the name.
-      expect(await page.locator('a').count()).toBe(4);
+      // REL051-INV, WP-D9: no link but the fixed ones of the HTML (two help links, the Mac app's
+      // two links and the two app links, all four with no href while their switches are off);
+      // none comes from the name.
+      expect(await page.locator('a').count()).toBe(6);
       await expect(
         page.locator('a[href]').evaluateAll((as) => as.map((a) => a.getAttribute('href'))),
       ).resolves.toEqual([DOCS_LINKS.guide, DOCS_LINKS.windows]);
+      await expectNoAppLinks(page);
       expect(await page.locator('script').count()).toBe(1);
       expect(
         await page.evaluate(() => (window as unknown as { __pwned?: number }).__pwned),
@@ -489,6 +504,8 @@ describe('states with no command and no sentence', () => {
     expect(await page.locator('#next').isVisible()).toBe(false);
     expect(await page.locator('#step').evaluate((e) => (e as HTMLElement).hidden)).toBe(true);
     expect((await page.locator('#step-text').textContent()) ?? '').toBe('');
+    // WP-D9: no app link without a checked invite.
+    expect(await page.locator('#open-app').getAttribute('href')).toBeNull();
     expect(probe.violations).toEqual([]);
     expect(probe.consoleErrors).toEqual([]);
     await context.close();
@@ -632,4 +649,65 @@ describe('the one-line installers', () => {
       expect(await response.text()).toBe(want);
     });
   }
+});
+
+// WP-D9: the build with the desktop app links flag on (src/flags.ts), as the desktop release makes
+// it: both links in the command card, the app link built from the checked payload only.
+describe('WP-D9: desktop app links (flag-on build)', () => {
+  const OUT_ON = fileURLToPath(new URL('../../apps/invite/dist/site-app-links/', import.meta.url));
+  let siteOn: Server;
+
+  beforeAll(async () => {
+    await build({
+      root,
+      configFile: fileURLToPath(new URL('../../apps/invite/vite.config.ts', import.meta.url)),
+      logLevel: 'silent',
+      define: { __AGENTLINK_DESKTOP_APP_LINKS__: 'true' },
+      build: { outDir: 'dist/site-app-links' },
+    });
+    siteOn = await serve(OUT_ON);
+  }, 120_000);
+
+  afterAll(() => {
+    siteOn?.close();
+  });
+
+  it('shows "Open in the AgentLink app" and "Get the app" next to the command, 44 px each', async () => {
+    const link = await futureLink({ name: 'Marko' });
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto(`${originOf(siteOn)}/i#${payloadOf(link)}`);
+    await page.waitForFunction(() => document.getElementById('state')?.dataset.ready === 'true');
+    // The two app links in the command card, besides REL051-INV's two help links (the Mac app's
+    // links have no address while its switch is off).
+    expect(await page.locator('#app-links a[href]').count()).toBe(2);
+    expect(await page.locator('a[href]').count()).toBe(4);
+    await expect(page.locator('#open-app').getAttribute('href')).resolves.toBe(
+      `agentlink://join#${payloadOf(link)}`,
+    );
+    await expect(page.locator('#open-app').textContent()).resolves.toBe(
+      'Open in the AgentLink app',
+    );
+    await expect(page.locator('#get-app').getAttribute('href')).resolves.toBe(
+      'https://github.com/4thtech/agentlink/blob/main/docs-site/guide/apps/desktop-app.md',
+    );
+    await expect(page.locator('#get-app').getAttribute('rel')).resolves.toBe('noopener noreferrer');
+    await expect(page.locator('#get-app').textContent()).resolves.toBe('Get the app (coming soon)');
+    expect(await page.locator('#app-links').isVisible()).toBe(true);
+    for (const id of ['open-app', 'get-app']) {
+      const box = await page.locator(`#${id}`).boundingBox();
+      expect(box?.height ?? 0, id).toBeGreaterThanOrEqual(44);
+    }
+    await context.close();
+  });
+
+  it('a damaged invite shows no app link', async () => {
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    await page.goto(`${originOf(siteOn)}/i#abc%27`);
+    await page.waitForFunction(() => document.getElementById('state')?.dataset.ready === 'true');
+    expect(await page.locator('#app-links a[href]').count()).toBe(0);
+    expect(await page.locator('#app-links').isVisible()).toBe(false);
+    await context.close();
+  });
 });

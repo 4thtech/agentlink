@@ -53,6 +53,10 @@ export type NodeKeyStoreErrorCode =
   | 'receipts_kept_not_written'
   /** M1-8e: a localhost passkey is already set up for this OS user (one in M1b); never replaced. */
   | 'owner_passkey_exists'
+  /** DESK-D12c: native presence (Touch ID or Windows Hello in the app) is already turned on. */
+  | 'owner_native_exists'
+  /** DESK-D12c: native presence is not turned on, so there is nothing to turn off. */
+  | 'owner_native_missing'
   /** M1-8e: the authenticator returned no PRF output; nothing is stored, the master code stays. */
   | 'passkey_unsupported'
   /**
@@ -79,10 +83,20 @@ export type NodeKeyStoreErrorCode =
 
 export class NodeKeyStoreError extends Error {
   readonly code: NodeKeyStoreErrorCode;
+  /**
+   * DESK-NATIVE-DEBUG: a fixed word for a diagnostic line only (`timeout` or `refused` for a failed
+   * keychain call); never a native message.
+   */
+  readonly detail?: 'timeout' | 'refused' | 'unsure';
 
-  constructor(code: NodeKeyStoreErrorCode, message: string) {
+  constructor(
+    code: NodeKeyStoreErrorCode,
+    message: string,
+    detail?: 'timeout' | 'refused' | 'unsure',
+  ) {
     super(message);
     this.name = 'NodeKeyStoreError';
     this.code = code;
+    if (detail !== undefined) this.detail = detail;
   }
 }

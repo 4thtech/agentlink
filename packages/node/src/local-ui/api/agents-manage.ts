@@ -36,7 +36,7 @@
 // The generation of the page (08 §1) is checked by the server before the presence gate and again
 // right before the handler runs; it is a page guard only, never part of a signed object. Refusals are
 // fixed codes; neither a label nor a name is ever logged (I-7). No MCP tool reaches these (I-4).
-import { isRestrictedAlias } from '@4thtech-io/core';
+import { isOwnIdName } from '@4thtech-io/core';
 import type { JsonObject, JsonValue } from '@4thtech-io/crypto';
 import type { LocalUiAgentsManage, LocalUiContext, LocalUiReadClient } from '../context.js';
 import {
@@ -85,7 +85,7 @@ export function isAgentLabelText(label: unknown): label is string {
     typeof label === 'string' &&
     label.length <= MAX_LABEL_CHARS &&
     [...label].length <= MAX_LABEL_CODE_POINTS &&
-    isRestrictedAlias(label)
+    isOwnIdName(label)
   );
 }
 

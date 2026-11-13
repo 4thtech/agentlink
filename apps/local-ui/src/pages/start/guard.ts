@@ -11,6 +11,7 @@
 import { REDIRECTS } from '../../nav.js';
 import { keepInApp } from '../../prefs/app-kept.js';
 import { navigate } from '../../router.js';
+import { createMasterCodeApi, type MasterCodeAnswer } from '../restore/master-code-api.js';
 import { readSetupState, setupIncomplete, type SetupState } from './setup-state.js';
 import { markAutoShown, wasAutoShown } from './store.js';
 
@@ -24,18 +25,9 @@ export const START_LEAVING_KEY = 'agentlink.start.leaving';
 
 /**
  * Get started was left on purpose (Skip to Home, or the end of it): kept for the owner (the app's
- * kept choices), so a reload of Home, or the next launch, does not open it by itself again while an
- * owner and an ID exist. The Home card and Help → Get started still lead back to it.
+ * kept choices). The Home card and Help → Get started still lead back to it.
  */
 export const START_LEFT_KEY = 'agentlink.getStarted.left';
-
-function leftStart(): boolean {
-  try {
-    return localStorage.getItem(START_LEFT_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
 
 /** Remembers that Get started was left on purpose. */
 export function rememberLeftStart(): void {
@@ -61,10 +53,22 @@ export function shouldOpenStart(path: string, state: SetupState): boolean {
   if (!GUARDED_PATHS.includes(shown(path)) || !setupIncomplete(state) || state.waiting !== 0) {
     return false;
   }
-  // Left on purpose, with an owner and an ID in place: only a missing owner or ID (a first run)
-  // takes the page over again.
-  const firstRun = state.owner === 'missing' || state.agent === false;
-  return firstRun || !leftStart();
+  // R1-UI-14: Get started opens by itself only on a first run (no owner, or no ID). An owner with an
+  // ID but no AI app yet gets Home, where the Get started card is a gentle nudge: it must not open
+  // on every launch.
+  return state.owner === 'missing' || state.agent === false;
+}
+
+/**
+ * REL051-INTFIX (REL051-CF3 with R1-UI-14): an owner and an ID exist, so Home would stay, but the
+ * server still holds a master code step for Get started to finish: one made and never saved (`lost`:
+ * the app was closed before "I saved it"), the code of this page session's first run (`shown`), or
+ * restored IDs waiting for their owner (`finish_restore`). Get started opens and shows that screen.
+ * A restore's own code is the restore page's to show (it keeps its own path on a reload).
+ */
+export function heldStepOpensStart(answer: MasterCodeAnswer): boolean {
+  if (answer.kind === 'lost' || answer.kind === 'finish_restore') return true;
+  return answer.kind === 'shown' && answer.which === 'first_run';
 }
 
 /** Get started ends on Home with a full load: the check of that load keeps Home. */
@@ -96,6 +100,8 @@ export interface StartGuardOptions {
   readonly path?: () => string;
   readonly read?: () => Promise<SetupState>;
   readonly go?: (path: string) => void;
+  /** REL051-INTFIX: the server's held master code step (only its kind is used). */
+  readonly held?: () => Promise<MasterCodeAnswer>;
 }
 
 /**
@@ -108,6 +114,7 @@ export async function openStartIfIncomplete(options: StartGuardOptions = {}): Pr
     path = () => location.pathname,
     read = readSetupState,
     go = (to: string) => navigate(to, true),
+    held = () => createMasterCodeApi().show(),
   } = options;
   const at = shown(path());
   if (!mayOpenStart(at)) return false;
@@ -124,7 +131,19 @@ export async function openStartIfIncomplete(options: StartGuardOptions = {}): Pr
   // Decided once per page life; the person may have gone elsewhere while the reads ran.
   if (wasAutoShown() || shown(path()) !== at) return false;
   markAutoShown();
-  if (!shouldOpenStart(at, state)) return false;
+  if (!shouldOpenStart(at, state)) {
+    // REL051-INTFIX: an owner and an ID, nothing waiting: a master code step the server still
+    // holds (cf3) opens Get started, which shows it; otherwise Home stays. Only the answer's kind
+    // is read here; the code itself is never kept by the guard.
+    if (state.owner !== 'set_up' || state.agent !== true || state.waiting !== 0) return false;
+    let answer: MasterCodeAnswer;
+    try {
+      answer = await held();
+    } catch {
+      return false;
+    }
+    if (!heldStepOpensStart(answer) || shown(path()) !== at) return false;
+  }
   go(START_FIRST_STEP);
   return true;
 }

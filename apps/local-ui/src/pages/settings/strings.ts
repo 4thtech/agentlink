@@ -51,6 +51,10 @@ export const SETTINGS_STRINGS = {
     line: (n: number): string =>
       `Your AI may send from ${String(n)} ${n === 1 ? 'folder' : 'folders'}.`,
   },
+  storage: {
+    title: 'Storage',
+    line: 'How much room your messages and saved files take',
+  },
   appearance: {
     title: 'Appearance',
     line: 'Theme, motion and the Under the hood view',
@@ -65,6 +69,10 @@ export const SETTINGS_STRINGS = {
       `Messages and files are free. A public proof costs about ${price}.`,
     state: (balance: string, n: number): string =>
       `${balance} · about ${String(n)} ${n === 1 ? 'proof' : 'proofs'}`,
+  },
+  updates: {
+    title: 'Updates',
+    line: 'Your version of AgentLink, and newer ones',
   },
   advanced: {
     title: 'Advanced',

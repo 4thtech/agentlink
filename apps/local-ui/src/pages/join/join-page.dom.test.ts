@@ -166,12 +166,42 @@ describe('the waiting card (b11 §33.2; W4 A6 Friend accepts)', () => {
 
   it('Accept with Touch ID: one accept bound to the shown inviteId, then Waiting for them', async () => {
     const { api, calls } = fakeApi(['waiting', 'waiting_for_them']);
-    const proof: PresenceProof = { kind: 'passkey', body: new Uint8Array([9]) };
+    const proof: PresenceProof = {
+      kind: 'passkey',
+      gesture: () => Promise.resolve(new Uint8Array([9])),
+    };
     await render({ api, passkey: PASSKEY, gesture: () => Promise.resolve(proof) });
     await click('Accept with Touch ID');
     expect(calls.accepted).toEqual([{ id: INVITE.inviteId, proof }]);
     expect(host.querySelector('h1')?.textContent).toBe('Waiting for Marko to answer.');
     expect(text()).not.toMatch(/Contact check with Marko$/);
+  });
+
+  it('REL051-UF3 (R1-UI-06): a double click on Accept asks for Touch ID once and accepts once', async () => {
+    const { api, calls } = fakeApi(['waiting', 'waiting_for_them']);
+    const proof: PresenceProof = {
+      kind: 'passkey',
+      gesture: () => Promise.resolve(new Uint8Array([9])),
+    };
+    let asked = 0;
+    let answer: ((p: PresenceProof) => void) | undefined;
+    const gesture = (): Promise<PresenceProof | undefined> => {
+      asked += 1;
+      return new Promise((resolve) => {
+        answer = resolve;
+      });
+    };
+    await render({ api, passkey: PASSKEY, gesture });
+    const accept = button('Accept with Touch ID');
+    await act(async () => accept.click());
+    await act(async () => accept.click());
+    expect(asked).toBe(1);
+    expect(accept.disabled).toBe(true);
+    await act(async () => answer?.(proof));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(calls.accepted).toEqual([{ id: INVITE.inviteId, proof }]);
   });
 
   it('Touch ID cancelled: "Not accepted yet. Try again." and the card stays; nothing sent', async () => {
@@ -195,7 +225,8 @@ describe('the waiting card (b11 §33.2; W4 A6 Friend accepts)', () => {
     await render({
       api,
       passkey: PASSKEY,
-      gesture: () => Promise.resolve({ kind: 'passkey', body: new Uint8Array([1]) }),
+      gesture: () =>
+        Promise.resolve({ kind: 'passkey', gesture: () => Promise.resolve(new Uint8Array([1])) }),
     });
     await click('Accept with Touch ID');
     expect(text()).toContain("Your rules don't allow new contacts.");
@@ -207,7 +238,8 @@ describe('the waiting card (b11 §33.2; W4 A6 Friend accepts)', () => {
     await render({
       api,
       passkey: PASSKEY,
-      gesture: () => Promise.resolve({ kind: 'passkey', body: new Uint8Array([1]) }),
+      gesture: () =>
+        Promise.resolve({ kind: 'passkey', gesture: () => Promise.resolve(new Uint8Array([1])) }),
     });
     await click('Accept with Touch ID');
     expect(text()).toContain('The invite on this screen changed.');

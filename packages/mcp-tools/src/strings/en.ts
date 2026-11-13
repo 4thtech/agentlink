@@ -20,6 +20,14 @@ export const en = {
   // ---- Tool results: ok -------------------------------------------------------------------
   'chat.status.ok.sent':
     'Sent to {contactName}. End-to-end encrypted: only you, {contactFirstName} and your AIs can read it.',
+  // REL051-CF2: an ok send that no relay accepted yet (06 §2.2 `delivery`): never "Sent".
+  'chat.status.ok.queued':
+    "Not sent yet: AgentLink can't reach the message network right now. The message to {contactName} is saved, and AgentLink sends it on its own when the connection is back.",
+  // REL051-CF2: the same, ahead of a proof outcome (the whole summary stays under 500 characters).
+  'chat.status.ok.queuedProof':
+    "Not sent yet: AgentLink can't reach the message network. It sends it on its own when the connection is back.",
+  'chat.status.ok.notDelivered':
+    "Couldn't send this to {contactName}, and AgentLink won't try again. Send it again later.",
   'chat.status.ok.proof': 'Sent with proof. Recorded {date} at {time}. {fee} from credits.',
   'chat.status.ok.invite':
     "Invite ready: it works once, until {date}. Send it only to {contactFirstName}: whoever uses it first is connected. You'll be connected as soon as they accept.",

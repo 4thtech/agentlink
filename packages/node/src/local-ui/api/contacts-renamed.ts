@@ -2,22 +2,20 @@
 // proposed, owner confirms at merge): the seen mark of a contact's "{new} (was {old})" note.
 //
 // - `GET /api/ui/contacts` (api/contacts.ts) carries `formerName` while core says the note is due.
-// - `GET /api/ui/contacts/:ref/name-seen`: the page showed the note (the Contacts row or the Messages
+// - `POST /api/ui/contacts/:ref/name-seen`: the page showed the note (the Contacts row or the Messages
 //   header); core sets `name_change_seen`, so later reads carry no `formerName`. The page keeps
 //   showing the note until it leaves (08 §1). Display state only (07 §3: nothing is decided from it):
-//   no owner presence, nothing signed, no identity label, Contact check or key state changes. A GET,
-//   because the shell's only writes are presence-gated owner operations and this is not one; it is
+//   no owner presence, nothing signed, no identity label, Contact check or key state changes. R1-SEC-16:
+//   the `mark` kind (route-types.ts), so it keeps every write gate (a GET is a read); it is
 //   idempotent (a second call finds nothing due) and answers the same either way.
 //
 // What leaves: `{status: 'done'}` or a fixed error. Never a name.
 import type { LocalUiContext } from '../context.js';
 import {
   NOT_AVAILABLE,
-  UI_INVALID_QUERY,
   UI_NOT_SET_UP,
   UI_UNAVAILABLE,
-  type LocalUiReadRoute,
-  type LocalUiRequest,
+  type LocalUiMarkRoute,
   type LocalUiResult,
   type LocalUiRoute,
 } from '../route-types.js';
@@ -31,11 +29,13 @@ const NOT_FOUND: LocalUiResult = Object.freeze({
 });
 const DONE: LocalUiResult = Object.freeze({ status: 200, body: Object.freeze({ status: 'done' }) });
 
-async function nameSeen(context: LocalUiContext, request: LocalUiRequest): Promise<LocalUiResult> {
+async function nameSeen(
+  context: LocalUiContext,
+  params: Readonly<Record<string, string>>,
+): Promise<LocalUiResult> {
   const client = context.client;
   if (client === undefined) return UI_NOT_SET_UP;
-  if ([...request.query.keys()].length > 0) return UI_INVALID_QUERY;
-  const ref = request.params['ref'];
+  const ref = params['ref'];
   if (typeof ref !== 'string' || !REF.test(ref)) return NOT_FOUND;
   const names = client.contactNames;
   if (names === undefined) return NOT_AVAILABLE;
@@ -51,10 +51,10 @@ async function nameSeen(context: LocalUiContext, request: LocalUiRequest): Promi
   return DONE;
 }
 
-const nameSeenRoute: LocalUiReadRoute = Object.freeze({
-  method: 'GET',
+const nameSeenRoute: LocalUiMarkRoute = Object.freeze({
+  method: 'POST',
   path: '/api/ui/contacts/:ref/name-seen',
-  presence: false,
+  presence: 'mark',
   handler: nameSeen,
 });
 

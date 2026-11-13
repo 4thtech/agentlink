@@ -13,6 +13,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'AGENT_OPEN_LOCK_FILE',
       // M1-8d: the local approval server's address constant (08 §1).
       'APPROVAL_SERVER_HOST',
+      // REL051-UPD2: the two local route paths of the update check (fixed strings, no secret, no URL).
+      'APP_UPDATE_CHECK_PATH',
+      'APP_UPDATE_PATH',
       // U3-c: the folder lock's fixed-text error.
       'AgentFolderLockError',
       // M1-15: the allowed-folder and inbox file guards (fixed-text errors, no seams).
@@ -45,6 +48,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'createInboxFile',
       'createOsKeychainAgent',
       'decideReviewedApprovals',
+      // DESK-D12c: the desktop app's presence helper behind fixed commands (no path or runner seam;
+      // it releases a secret only after the owner's OS gesture, and only the approval server uses it).
+      'desktopNativeHelper',
       // U3-d: removes the keychain items of an agent the app just created (agentId-derived names
       // only; never the owner's items), when it could not be completed.
       'discardNewOsKeychainAgent',
@@ -76,6 +82,8 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'packageName',
       // U3-c: counts from clear store columns, read-only (no key, no cipher).
       'peekAgentStore',
+      // REL051-RET1: byte sizes from clear store columns, read-only (no key, no cipher, no seam).
+      'peekStorageUsage',
       'performOwnerOperation',
       // W4-LIVE-STATUS (04 §2.5): signal 0 to a valid pid, a boolean back; no key, no seam.
       'pidAlive',
@@ -93,6 +101,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'setUpSendFolder',
       // M1-8d: the local approval server entry point (no owner-store or opener seam).
       'startApprovalServer',
+      // WP-D3: the same server for the desktop host; session links go to the pipe sink, never the
+      // OS opener (approval-server-link-sink.test.ts).
+      'startApprovalServerWithLinkSink',
       'unlockFileKeyStoreAgent',
       // U3-c (card U3-e uses it): removal takes the folder lock exclusive.
       'withAgentFolderExclusive',

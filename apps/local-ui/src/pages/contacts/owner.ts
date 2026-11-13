@@ -10,10 +10,25 @@
 // PRF output is wiped once encoded.
 
 import { knownFailureReason, type FailureReasonCode } from '../../api/failure-reasons.js';
+import {
+  browserCeremonyGesture,
+  proofBody,
+  type CeremonyGesture,
+} from '../../api/presence-ceremony.js';
 
+/**
+ * The master code as typed, or the passkey: REL051-SF1, the gesture runs when the request is sent,
+ * for the challenge the server issued for exactly that request (api/presence-ceremony.ts).
+ */
 export type PresenceProof =
   | { readonly kind: 'code'; readonly code: string }
-  | { readonly kind: 'passkey'; readonly body: Uint8Array };
+  | { readonly kind: 'passkey'; readonly gesture: CeremonyGesture }
+  /**
+   * DESK-D12c: Touch ID / Windows Hello in the desktop app. No bytes: the server runs this computer's
+   * presence helper for this one operation, for a ceremony it issued for exactly this request
+   * (DESK051-C6; `X-AgentLink-Presence: native`, `X-AgentLink-Ceremony`, empty body).
+   */
+  | { readonly kind: 'native' };
 
 export type OwnerResult =
   | { readonly kind: 'done' }
@@ -55,12 +70,6 @@ function base64url(bytes: Uint8Array): string {
   let bin = '';
   for (const b of bytes) bin += String.fromCharCode(b);
   return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function fromBase64url(text: string): Uint8Array {
-  const s = text.replace(/-/g, '+').replace(/_/g, '/');
-  const bin = atob(s + '='.repeat((4 - (s.length % 4)) % 4));
-  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
 }
 
 function checkPath(path: string): void {
@@ -137,24 +146,32 @@ export function createOwnerClient(options: OwnerClientOptions = {}): OwnerClient
           base64url(new TextEncoder().encode(JSON.stringify(input))),
         );
       }
-      if (proof.kind === 'passkey') headers.set('X-AgentLink-Presence', 'passkey');
-      const body = proof.kind === 'passkey' ? proof.body : new TextEncoder().encode(proof.code);
-      let res: Response;
+      let res: Response | undefined;
+      let body: Uint8Array | undefined;
       try {
-        res = await doFetch(path, {
-          method: 'POST',
-          headers,
-          body: body as BodyInit,
-          credentials: 'same-origin',
-          cache: 'no-store',
-        });
+        const ready = await proofBody(doFetch, path, headers, proof);
+        if ('res' in ready) res = ready.res;
+        else body = ready.body;
+        if (body !== undefined) {
+          res = await doFetch(path, {
+            method: 'POST',
+            headers,
+            body: body as BodyInit,
+            credentials: 'same-origin',
+            cache: 'no-store',
+          });
+        }
       } catch {
         return { kind: 'failed' };
       } finally {
-        body.fill(0);
+        body?.fill(0);
       }
+      if (res === undefined) return { kind: 'failed' };
       const { status, reason } = await answerOf(res);
       if (res.status === 200 && status === 'done') return { kind: 'done' };
+      // DESK-D12c: a refused Touch ID / Windows Hello gesture (cancel, lockout, …) changed nothing;
+      // the screen says so and keeps "Use your master code instead".
+      if (proof.kind === 'native' && status === 'presence_rejected') return { kind: 'rejected' };
       if (res.status === 401) return { kind: 'session' };
       if (res.status === 403 && status === 'presence_rejected') return { kind: 'rejected' };
       if (res.status === 403 && status === 'presence_required') return { kind: 'required' };
@@ -174,59 +191,21 @@ export function createOwnerClient(options: OwnerClientOptions = {}): OwnerClient
   };
 }
 
-/** Bytes, each field prefixed by its 16-bit big-endian length (the approval page's passkey body). */
-function fields(list: readonly Uint8Array[]): Uint8Array {
-  const out = new Uint8Array(list.reduce((n, f) => n + 2 + f.length, 0));
-  let at = 0;
-  for (const f of list) {
-    out[at] = f.length >> 8;
-    out[at + 1] = f.length & 255;
-    out.set(f, at + 2);
-    at += 2 + f.length;
-  }
-  return out;
-}
-
-const bytes = (buffer: ArrayBuffer | null | undefined): Uint8Array =>
-  buffer ? new Uint8Array(buffer) : new Uint8Array(0);
-
 /**
- * One passkey gesture, only after the owner clicked (11 §6.2.1): RP ID `localhost`, user
- * verification required, the stored credential and the PRF extension over the owner's PRF salt.
- * Undefined when the owner cancelled or the authenticator gave no PRF output.
+ * The passkey, chosen after the owner clicked (11 §6.2.1). REL051-SF1: the gesture itself runs when
+ * the request is sent, for the challenge the server issued for exactly that request: RP ID
+ * `localhost`, user verification required, the stored credential and the PRF extension over the
+ * owner's PRF salt (api/presence-ceremony.ts). A dismissed gesture is answered `presence_required`.
  */
-export async function passkeyProof(info: PasskeyInfo): Promise<PresenceProof | undefined> {
-  const challenge = new Uint8Array(32);
-  crypto.getRandomValues(challenge);
-  try {
-    const credential = (await navigator.credentials.get({
-      publicKey: {
-        challenge,
-        rpId: 'localhost',
-        allowCredentials: [{ type: 'public-key', id: fromBase64url(info.credentialId) }],
-        userVerification: 'required',
-        timeout: 120_000,
-        extensions: { prf: { eval: { first: fromBase64url(info.prfSalt) } } },
-      } as PublicKeyCredentialRequestOptions,
-    })) as PublicKeyCredential | null;
-    if (credential === null) return undefined;
-    const ext = credential.getClientExtensionResults() as {
-      prf?: { results?: { first?: ArrayBuffer } };
-    };
-    const prf = bytes(ext.prf?.results?.first);
-    if (prf.length === 0) return undefined;
-    const response = credential.response as AuthenticatorAssertionResponse;
-    const body = fields([
-      bytes(credential.rawId),
-      bytes(response.authenticatorData),
-      bytes(response.userHandle),
-      prf,
-    ]);
-    prf.fill(0);
-    return { kind: 'passkey', body };
-  } catch {
-    return undefined;
-  }
+export function passkeyProof(info: PasskeyInfo): Promise<PresenceProof | undefined> {
+  // Only for the passkey the page offered: a ceremony naming another one is not answered.
+  return Promise.resolve({
+    kind: 'passkey',
+    gesture: (pk) =>
+      pk.allowCredentials.includes(info.credentialId)
+        ? browserCeremonyGesture(pk)
+        : Promise.resolve(undefined),
+  });
 }
 
 // --- HOTFIX-045-TOUCHID: why the passkey can't be used, and the values to switch to one ---------

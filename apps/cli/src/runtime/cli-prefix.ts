@@ -23,7 +23,7 @@ export interface LaunchInfo {
 }
 
 /** True when a file named `agentlink` on PATH resolves to the same file as `script`. */
-function defaultOnPath(script: string): boolean {
+export function isGlobalLaunch(script: string): boolean {
   let real: string;
   try {
     real = realpathSync(script);
@@ -59,7 +59,7 @@ export function cliPrefix(info?: LaunchInfo): string {
   if (process.env['npm_command'] === 'exec' || /[\\/](_npx|dlx)[\\/]/.test(script)) {
     return NPX_PREFIX;
   }
-  const onPath = info?.onPath ?? defaultOnPath;
+  const onPath = info?.onPath ?? isGlobalLaunch;
   return onPath(script) ? GLOBAL_PREFIX : NPX_PREFIX;
 }
 

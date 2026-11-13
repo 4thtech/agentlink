@@ -142,6 +142,12 @@ async function enterCode(): Promise<void> {
 }
 
 describe('the AI apps page: cards and states', () => {
+  it('R1-UI-22: the page is not a <main> of its own (the shell has the one landmark)', async () => {
+    await mountPage();
+    expect(host.querySelector('main')).toBeNull();
+    expect(host.querySelector('.ap-page')?.tagName).toBe('DIV');
+  });
+
   it('shows the open agent and one card per detected AI app', async () => {
     await mountPage();
     expect(host.querySelector('h1')?.textContent).toBe('AI apps');
@@ -318,6 +324,28 @@ describe('Review change: the exact entry, then Touch ID', () => {
     expect(s.textContent).toContain('Add the entry above');
     expect(s.textContent).toContain('Restart Windsurf');
     expect(button(s, 'Apply with Touch ID')).toBeUndefined();
+  });
+
+  it('B10: by hand names the exact file and offers Copy path', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    await mountPage();
+    await click(button(card('windsurf'), 'Show manual steps'));
+    const s = sheet();
+    expect(s.textContent).toContain('Open the file ~/.codeium/windsurf/mcp_config.json');
+    await click(button(s, 'Copy path'));
+    expect(writeText).toHaveBeenCalledWith('~/.codeium/windsurf/mcp_config.json');
+    expect(sheet().textContent).toContain('Path copied');
+  });
+
+  it('B10: the generic by-hand sheet lists the settings files we know', async () => {
+    await mountPage();
+    await click(button(host, 'Not listed? Connect it by hand'));
+    const s = sheet();
+    expect(s.textContent).toContain('Settings files we know');
+    expect(s.textContent).toContain('~/.claude.json');
+    expect(s.textContent).toContain('~/.cursor/mcp.json');
+    expect(s.querySelectorAll('button').length).toBeGreaterThan(3);
   });
 
   it('renders every file and entry as text, never as markup (I-5)', async () => {

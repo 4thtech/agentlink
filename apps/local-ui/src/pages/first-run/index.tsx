@@ -53,6 +53,11 @@ import { INVITE_PATH } from '../../nav.js';
 import { createInviteApi, type InviteApi } from '../contacts/invite-api.js';
 import { navigate } from '../../router.js';
 import { setFinishRestore } from '../restore/outcome.js';
+import {
+  NEW_MASTER_CODE_PATH,
+  createMasterCodeApi,
+  type MasterCodeApi,
+} from '../restore/master-code-api.js';
 import { announceAgentsChanged } from '../agents/use-agents.js';
 import { createAgentsApi, type AgentsApi } from '../agents/api.js';
 import {
@@ -69,10 +74,12 @@ import type { CreateAgentApi } from '../apps/create-agent-api.js';
 import { IdExplainerCard } from '../start/id-explainer.js';
 import { readAgentSignal } from '../home/start-here-api.js';
 import type { AgentSignal } from '../home/start-here.js';
+import { useLeaveGuard } from '../../leave-guard.js';
 import { markLeavingStart, skipToHome } from '../start/guard.js';
 import {
   forgetAbandonedAdd,
   markAutoShown,
+  forgetOutcome,
   rememberWizard,
   resetWizard,
   wizardMemory,
@@ -126,6 +133,7 @@ import {
   type UpgradeValues,
 } from './setup-api.js';
 import './first-run.css';
+import { NativeSetupOffer } from '../../presence/native-setup.js';
 import {
   BACKUP_CODE_FIELD,
   BackupCodeField,
@@ -239,7 +247,18 @@ export interface FirstRunPageProps {
   readonly openJoin?: () => void;
   /** W4-WIRE-2: the agents (names already used, and opening the new one). Default: the server's. */
   readonly agentsApi?: Pick<AgentsApi, 'list' | 'switchTo'>;
+  /**
+   * REL051-CF3: the master code shown once, again after a reload of its step. Default: the server's
+   * (with a test `api` and none given: nothing held).
+   */
+  readonly masterCodeApi?: MasterCodeApi;
 }
+
+/** REL051-CF3: a test seam's default when only `api` is given (nothing held). */
+const NOTHING_HELD: MasterCodeApi = {
+  show: () => Promise.resolve({ kind: 'none' }),
+  saved: () => Promise.resolve(),
+};
 
 interface Done {
   readonly confirmed: boolean;
@@ -291,6 +310,11 @@ type View =
   | { readonly k: 'expired' }
   | { readonly k: 'down' }
   | { readonly k: 'stuck'; readonly message: string }
+  /**
+   * REL051-CF3 (R1-CLASS-03): the master code was made here and never saved (the app was closed, or
+   * the 10 minutes passed): say so and offer a new one; never ask for it.
+   */
+  | { readonly k: 'lost'; readonly touchId: boolean }
   | { readonly k: 'done'; readonly done: Done };
 
 /** A fixed problem code in plain words (never server or browser text). */
@@ -439,8 +463,8 @@ function sendLine(outcome: SendFolderOutcome): string | undefined {
 /**
  * W4-WIZARD (A1 step 2, "Confirm it's you"): the agent card with its suggested name ("Change name"
  * opens the field), and one primary button for the one gesture (D-140: it creates the owner and the
- * agent and connects the picked app). The master code stays the alternative. Enter in the field does
- * not submit: focus moves to the button.
+ * agent and connects the picked app). The master code stays the alternative. Enter in the field
+ * submits (R1-UI-16), as long as the name is not empty.
  */
 function ConnectFirstStep({
   view,
@@ -468,7 +492,9 @@ function ConnectFirstStep({
   const press = (event: KeyboardEvent<HTMLInputElement>): void => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
-    document.getElementById('fr-go')?.focus();
+    // R1-UI-16: Enter submits like every other form here (the button's one gesture).
+    if (!view.working && name.trim() !== '') onGo(noPrf);
+    else document.getElementById('fr-go')?.focus();
   };
   // W7-ID-B1: the name is asked for (the owner's name is not known here); nothing goes on without it.
   const shown = name.trim() === '' ? (appName ?? T.yourAiApp) : name.trim();
@@ -633,11 +659,15 @@ export function FirstRunPage({
   readJoin = () => createJoinApi().read(),
   openJoin = () => window.location.assign(JOIN),
   agentsApi: givenAgents,
+  masterCodeApi: givenMasterCode,
 }: FirstRunPageProps = {}): ReactElement {
   // W4-WIRE-2: decided once per mount, before the remembered choices are read.
   useState(startRun);
   const goHome = givenHome ?? (wantsNewAgent() ? leaveAddAgent : openHome);
   const [api] = useState<SetupApi>(() => given ?? createSetupApi());
+  const [masterCode] = useState<MasterCodeApi>(
+    () => givenMasterCode ?? (given === undefined ? createMasterCodeApi() : NOTHING_HELD),
+  );
   const [upgradeApi] = useState<UpgradeApi>(() => givenUpgrade ?? createUpgradeApi());
   const [appsApi] = useState<AppsApi>(() => givenApps ?? createAppsApi());
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
@@ -648,6 +678,8 @@ export function FirstRunPage({
   // M1-UX-FIRSTRUN-V2-c: the master code as typed, only while the switch is on screen.
   const [code, setCode] = useState('');
   const sensor = SENSOR[platform];
+  // R1-UI-02: the once-only master code is on screen: leaving (Skip to Home, a link) asks first.
+  useLeaveGuard(view.k === 'done' ? T.leaveCode : undefined);
   // What the person chose on earlier steps (kept in memory while the steps change; no secret).
   const memory = wizardMemory();
   // W4-WIRE: step 4's invite panel (U4) loads with the first step, so it is there, in place, when
@@ -655,15 +687,16 @@ export function FirstRunPage({
   useEffect(() => {
     if (invitePanel === undefined) void INVITE_PANEL.load().catch(() => undefined);
   }, [invitePanel]);
-  // A link that never left step 4 is cancelled when the panel goes (U4's rule). "Go to Home" is a
+  // REL051-B2 (owner test, 13 Nov): Done keeps the link made on step 4, copied or not; it waits on
+  // Home (Copy link, Cancel invite). "Skip for now" and the header's "Skip to Home" mean no invite:
+  // a link that never left the screen is cancelled as the panel goes (`discard`). "Go to Home" is a
   // full load, which would cut that cancel off: the panel goes first, its cancel is answered (at
   // most 1.5 s), then Home opens.
   const stepInvites = useMemo(() => trackCancels(createInviteApi()), []);
   const [inviteGone, setInviteGone] = useState(false);
-  const [linkUnsent, setLinkUnsent] = useState(false);
-  // The warning for a link nobody has copied: raised by Done, Skip for now or the header's "Skip to Home".
-  const [leaveWarned, setLeaveWarned] = useState(false);
-  const leaveInvite = (): void => {
+  const discardInvite = useRef(false);
+  const leaveInvite = (keep: boolean): void => {
+    discardInvite.current = !keep;
     setInviteGone(true);
     window.setTimeout(() => void stepInvites.settled().then(goHome), 0);
   };
@@ -693,6 +726,9 @@ export function FirstRunPage({
   const [noPrfHere, setNoPrfHere] = useState(false);
   const backupTitle = useTitleFocus<HTMLHeadingElement>(view.k);
   const mounted = useRef(true);
+  // REL051-R2C (R2-UI-01): the master code step came back after a reload: this page no longer knows
+  // the ID's name or which AI app was connected, so Connected reads them from the real state.
+  const resumedCode = useRef(false);
   const tiles = useMemo(
     () =>
       list.k === 'loading'
@@ -780,12 +816,60 @@ export function FirstRunPage({
     [upgradeApi, available, prfSupport, appsApi, lookForApps],
   );
 
+  /**
+   * REL051-CF3 (R1-CLASS-03, R1-UI-02): an owner exists. A master code this page session was shown
+   * and has not confirmed comes back with its step (a reload of "Your master code"); a code made here
+   * and never saved is named as lost, with a new one offered; restored IDs waiting for their owner go
+   * to "Finish restoring". Otherwise Get started goes on for this owner.
+   */
+  const heldCode = useCallback(
+    async (isLive: () => boolean): Promise<void> => {
+      const held = await masterCode.show();
+      if (!isLive()) return;
+      if (held.kind === 'shown' && held.which === 'first_run') {
+        const { view: shown } = held;
+        resumedCode.current = true;
+        setMode({ k: 'first' });
+        if (step !== 'connect') toStep('connect', true);
+        setView({
+          k: 'done',
+          done: {
+            confirmed: shown.outcome !== 'done_unconfirmed',
+            passkey: shown.passkey,
+            fingerprint: shown.fingerprint,
+            sendFolder:
+              shown.sendFolder === 'allowed' ||
+              shown.sendFolder === 'not_allowed' ||
+              shown.sendFolder === 'not_confirmed'
+                ? shown.sendFolder
+                : 'none',
+            ownerCode: held.code,
+            computerName: shown.computerName ?? '',
+          },
+        });
+        return;
+      }
+      if (held.kind === 'finish_restore') {
+        setFinishRestore(true);
+        navigate('/restore/kit');
+        return;
+      }
+      if (held.kind === 'lost') {
+        setView({ k: 'lost', touchId: held.touchId });
+        return;
+      }
+      await existingOwner(isLive);
+    },
+    // toStep and step are read when the answer arrives; the call itself runs once per mount.
+    [masterCode, existingOwner],
+  );
+
   useEffect(() => {
     let live = true;
     void api.status().then((result) => {
       if (!live) return;
       if (result.kind === 'ok') {
-        if (result.owner === 'set_up') void existingOwner(() => live);
+        if (result.owner === 'set_up') void heldCode(() => live);
         // IR-M1-11b-1-1 L-1: a failed check is never "no owner": doctor, not setup.
         else if (result.owner === 'unknown') {
           setView({ k: 'stuck', message: SETUP_MESSAGES.unknown });
@@ -808,7 +892,7 @@ export function FirstRunPage({
     return () => {
       live = false;
     };
-  }, [api, available, prfSupport, existingOwner, lookForApps]);
+  }, [api, available, prfSupport, heldCode, lookForApps]);
 
   // The look's answer, when it arrived while another step was on screen.
   useEffect(() => {
@@ -1070,6 +1154,8 @@ export function FirstRunPage({
   // kit is put off ("Later", remembered for the banner). W4-WIZARD: then Connected (A2).
   const leave = (done: Done): void => {
     rememberRecoveryKitLater();
+    // REL051-CF3: "I saved it": the server forgets the code it kept for a reload.
+    void masterCode.saved();
     // The master code leaves the page now, whichever screen comes next (L-3).
     setView({ k: 'leaving' });
     // U3-invite (08 §4, b11 §33.2): an invite left waiting by `agentlink join` comes first.
@@ -1077,6 +1163,13 @@ export function FirstRunPage({
       .catch((): JoinRead => ({ kind: 'failed' }))
       .then((answer) => {
         if (answer.kind === 'ok' && answer.state !== 'none') return openJoin();
+        if (resumedCode.current && done.app === undefined) {
+          // R2-UI-01: never "{empty} is ready" or "No AI app is connected" from forgotten state.
+          forgetOutcome();
+          setView({ k: 'step' });
+          toStep('connected');
+          return;
+        }
         finishStep({ label, ...(done.app === undefined ? {} : { app: done.app }) });
       });
   };
@@ -1104,6 +1197,7 @@ export function FirstRunPage({
     // address) is "I saved it" without the click: the code leaves the state and the page, never
     // hidden to come back; the kit is put off as with the click.
     if (view.k === 'done' && step !== 'connect') {
+      // REL051-CF3: the code leaves the page, but the server keeps it (Back is not "I saved it").
       rememberRecoveryKitLater();
       rememberWizard({
         outcome: { label, ...(view.done.app === undefined ? {} : { app: view.done.app }) },
@@ -1149,11 +1243,25 @@ export function FirstRunPage({
   }, [step]);
 
   const sensorWords = S.connect(sensor);
-  const unsentLink = step === 'invite' && linkUnsent && invitePanel === undefined;
-  // "Skip to Home" warns like Done does while the link on screen has not been copied (once).
-  const guardedSkip = unsentLink && !leaveWarned ? (): void => setLeaveWarned(true) : onSkip;
+  // On step 4 "Skip to Home" means no invite, as "Skip for now" does (REL051-B2).
+  const guardedSkip =
+    step === 'invite' && invitePanel === undefined
+      ? (): void => {
+          discardInvite.current = true;
+          if (onSkip !== undefined) onSkip();
+          else skipToHome();
+        }
+      : onSkip;
+  // R1-UI-01: before an ID exists (first run, the pick and the connect step) there is no Home to
+  // skip to: it would be a dead end. From the master code on, the ID exists.
+  const noIdYet =
+    mode?.k === 'first' && view.k !== 'done' && (step === 'app' || step === 'connect');
   const frame = (body: ReactElement, at: StepId = step): ReactElement => (
-    <WizardFrame step={at} {...(guardedSkip === undefined ? {} : { onSkip: guardedSkip })}>
+    <WizardFrame
+      step={at}
+      {...(guardedSkip === undefined ? {} : { onSkip: guardedSkip })}
+      {...(noIdYet ? { hideSkip: true } : {})}
+    >
       {body}
     </WizardFrame>
   );
@@ -1182,16 +1290,14 @@ export function FirstRunPage({
     return frame(
       <InviteStep
         inviteHref={INVITE_PATH}
-        unsent={linkUnsent && invitePanel === undefined}
-        warned={leaveWarned}
-        onWarn={() => setLeaveWarned(true)}
-        onHome={invitePanel === undefined ? leaveInvite : goHome}
+        onHome={invitePanel === undefined ? () => leaveInvite(true) : goHome}
+        onSkip={invitePanel === undefined ? () => leaveInvite(false) : goHome}
         panel={
           invitePanel ??
           (inviteGone ? (
             <></>
           ) : (
-            <INVITE_PANEL.Part invites={stepInvites.api} onUnsent={setLinkUnsent} />
+            <INVITE_PANEL.Part invites={stepInvites.api} discard={discardInvite} />
           ))
         }
       />,
@@ -1205,6 +1311,32 @@ export function FirstRunPage({
       return <LinkExpiredState />;
     case 'down':
       return <NotRunningState />;
+    case 'lost':
+      return frame(
+        <section className="st-screen st-w-560" aria-labelledby="fr-h" data-testid="code-lost">
+          <h1 id="fr-h" className="st-title-2">
+            {T.lostTitle}
+          </h1>
+          <Banner tone="warning">{view.touchId ? T.lostBody(sensor) : T.lostBodyNoSensor}</Banner>
+          <div className="st-actions">
+            {view.touchId ? (
+              <Button variant="primary" onClick={() => navigate(NEW_MASTER_CODE_PATH)}>
+                {T.lostNew}
+              </Button>
+            ) : null}
+            <Button
+              variant={view.touchId ? 'secondary' : 'primary'}
+              onClick={() => {
+                // REL051-R2C (R2-UI-02): Later goes Home, not to Get started.
+                setView({ k: 'loading' });
+                goHome();
+              }}
+            >
+              {T.lostLater}
+            </Button>
+          </div>
+        </section>,
+      );
     case 'stuck':
       return frame(
         <section className="st-screen st-w-560" aria-labelledby="fr-h">
@@ -1358,6 +1490,8 @@ export function FirstRunPage({
           {line === undefined ? null : (
             <Banner tone={done.sendFolder === 'allowed' ? 'success' : 'warning'}>{line}</Banner>
           )}
+          {/* DESK-D12c: in the desktop app, "Turn on Touch ID for approvals" (one gesture). */}
+          {done.ownerCode === undefined ? null : <NativeSetupOffer backupCode={done.ownerCode} />}
           <BackupCode
             code={done.ownerCode ?? ''}
             computer={done.computerName ?? ''}

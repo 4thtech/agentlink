@@ -360,6 +360,63 @@ function inboxOps(folder: string, dir?: InboxDir): TempFileOps {
   });
 }
 
+/**
+ * REL051-A12: the bytes of `name`, a regular file directly inside the held folder, when it has at
+ * most `maxBytes`; undefined otherwise (a link, a folder, a missing or larger file, any failure). The
+ * final link is never followed (O_NOFOLLOW), and the opened file must be the entry at its name. The
+ * core re-hashes the bytes before using them.
+ */
+async function readSavedFile(
+  folder: string,
+  dir: InboxDir,
+  name: string,
+  maxBytes: number,
+): Promise<Uint8Array | undefined> {
+  const noFollow = (constants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0;
+  let target: string;
+  try {
+    target = entryName(folder, name);
+  } catch {
+    return undefined;
+  }
+  if (name.startsWith('.') || !Number.isSafeInteger(maxBytes) || maxBytes < 0) return undefined;
+  if (!(await dir.stillSame())) return undefined;
+  // IR-REL051-A12-1 L1: opened without following a link and never blocking, then checked through
+  // the open handle (no check-then-open race), so a FIFO or a device planted under the saved name
+  // can neither hang the read nor be read.
+  const noBlock = (constants as { O_NONBLOCK?: number }).O_NONBLOCK ?? 0;
+  const handle = await open(target, constants.O_RDONLY | noFollow | noBlock).catch(() => undefined);
+  if (handle === undefined) return undefined;
+  try {
+    const opened = await handle.stat();
+    const entry = await lstat(target).catch(() => undefined);
+    if (
+      !opened.isFile() ||
+      entry === undefined ||
+      !entry.isFile() ||
+      opened.dev !== entry.dev ||
+      opened.ino !== entry.ino ||
+      opened.size > maxBytes
+    ) {
+      return undefined;
+    }
+    // One byte more than the cap, so a file that grew since the stat is refused too.
+    const buffer = new Uint8Array(maxBytes + 1);
+    let length = 0;
+    for (;;) {
+      const { bytesRead } = await handle.read(buffer, length, buffer.length - length, null);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+      if (length > maxBytes) return undefined;
+    }
+    return buffer.slice(0, length);
+  } catch {
+    return undefined;
+  } finally {
+    await handle.close().catch(() => undefined);
+  }
+}
+
 /** The default Inbox folder: the only one the core creates when it is missing (04 §4.1). */
 const DEFAULT_INBOX_FOLDER = '~/AgentLink/Inbox';
 
@@ -415,6 +472,7 @@ async function resolveInbox(
       const entry = await lstat(entryName(real, name)).catch(() => undefined);
       return entry !== undefined && entry.isFile();
     },
+    readSaved: (name, maxBytes) => readSavedFile(real, dir, name, maxBytes),
     close: () => dir.close(),
   };
 }

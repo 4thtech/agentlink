@@ -1,0 +1,48 @@
+// Settings > Updates copy (DESK051-UPD; 11 §5: plain words, no "wallet", "gas", "seed phrase" or
+// "transaction"). Short steps; nothing about how the check works.
+export const UPDATES_STRINGS = {
+  title: 'Updates',
+  lead: 'Keep AgentLink up to date to get the latest fixes and features.',
+  version: (v: string): string => `You have AgentLink ${v}.`,
+  check: 'Check for updates',
+  checking: 'Checking…',
+  idle: 'AgentLink looks for a newer version once a day.',
+  current: 'AgentLink is up to date.',
+  ready: (v: string): string => `AgentLink ${v} is ready`,
+  readyLead: 'Download it and replace the AgentLink you have now.',
+  download: 'Download update',
+  stepsLabel: 'How to update',
+  macSteps: [
+    'Open the file you downloaded.',
+    'Quit AgentLink: click its icon in the menu bar and choose Quit AgentLink.',
+    'Drag AgentLink to the Applications folder and choose Replace.',
+    'Open AgentLink again.',
+  ],
+  otherSteps: [
+    'On the page that opens, download AgentLink for your computer.',
+    'Open the file and follow its steps.',
+    'Open AgentLink again.',
+  ],
+  keeps: 'Your IDs, people and messages stay as they are.',
+  // REL051-UPD2: the browser app. The installer's `agentlink` and npx start the newest version every
+  // time, so a restart is the update; a global npm install needs the one update command first.
+  restartLead: 'Restart AgentLink to update. It starts with the newest version.',
+  commandLead: 'Update with one command, then start AgentLink again.',
+  stopStep: 'In the terminal window where AgentLink is running, press Ctrl+C.',
+  startStep: 'Start it again with this command:',
+  updateStep: 'Run this command to update:',
+  installerCommand: 'agentlink',
+  npxCommand: 'npx -y @4thtech-io/agentlink@latest',
+  globalCommand: 'npm install -g @4thtech-io/agentlink@latest',
+  reopen: 'AgentLink opens in your browser again.',
+  copy: 'Copy',
+  copied: 'Copied',
+  copyFailed: 'Couldn’t copy. Select the command and copy it yourself.',
+  notHere: 'Checking for updates isn’t available in this window.',
+  failed: 'Couldn’t check for updates just now. Try again later.',
+  offline: 'You’re offline. Connect to the internet, then check again.',
+  off: 'Checking for updates is turned off on this computer.',
+  loading: 'Reading your version…',
+  unreadable: 'Couldn’t read this just now.',
+  retry: 'Try again',
+} as const;

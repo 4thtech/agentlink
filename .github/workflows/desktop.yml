@@ -1,0 +1,330 @@
+# Desktop app build (WP-D5; plan 2026-11-12 Decisions 2 and 3): builds the AgentLink app (macOS DMG and
+# zip for arm64 and x64, Windows NSIS installer and zip), runs the launch-time hardening checks on the
+# BUILT binaries, smoke-tests them and attests build provenance. Early builds are UNSIGNED (owner
+# decision); the signing hooks in apps/desktop/build stay off (DESKTOP_SIGNING is never set here).
+#
+# Triggers
+#   workflow_dispatch  a manual build (input `version`, default 0.0.0-dev; input `windows`, default
+#                      false, adds the Windows leg).
+#   workflow_call      for release.yml's desktop-app jobs (WP-D11, DESK051-C4); inputs `version`, `updates`.
+#   pull_request       only for a change under apps/desktop/**, apps/cli/src/desktop/** or this file.
+#
+# Windows (REL051-CIE, scope change for 0.5.1): the Windows desktop app is not shipped yet (its core
+# exits at start on Windows and the first start loses the single-instance lock). The win-x64 leg runs
+# only on a manual run with `windows: true`, never on pull requests or in the release, so it can be
+# fixed separately. Windows users use the browser app.
+#
+# Jobs (3, or 4 with `windows: true`; well inside the Free-plan cap of 20 concurrent jobs)
+#   build   matrix: macos-26 arm64, macos-26 x64 (cross-build); windows-2022 x64 only with `windows: true`.
+#           Builds the CLI tarball and the shell bundle, the native presence helper (macOS: the
+#           AgentLink.app helper bundle; Windows: MSVC via Enter-VsDevShell), then the app with it, then runs on the built
+#           binaries: check-fuses (fuse read-back and ASAR integrity), check-preview-string,
+#           check-switch-lockdown, check-tampered-asar, and the smoke test
+#           (apps/desktop/test/smoke/smoke.mjs). The x64 macOS binaries are launched only when
+#           Rosetta runs on the runner. Uploads the artifacts with a per-platform SHA256SUMS.
+#   attest  not on pull requests: merges the sums into SHA256SUMS and attests build provenance.
+#
+# Updates (DESK051-C4): input `updates`, default "off" until the offline key ceremony. "off" bundles
+# the shell with AGENTLINK_DESKTOP_UPDATES=off (src/main/updater/root-key.updates-off.json: no key, so
+# the app's updater is not configured and never fetches) and builds with `--updates off`, which the
+# build accepts only when the ASAR has the updates-off mark and no root-key placeholder. "on" needs
+# the real pinned root key (build/lib/root-key-check.mjs). No owner-local flag is ever set here.
+#
+# Security posture (docs/foundation/04 section 7, docs/process/ci-cd.md): `permissions: {}` at the top,
+# `contents: read` for the build, the attestation permissions only in `attest`; every action pinned to
+# a full commit SHA; no secret is referenced anywhere; no pnpm store cache (the job produces
+# artifacts); `--ignore-scripts` installs; event data reaches shell only through `env:`; the build
+# runs with a temporary HOME and never touches a real profile.
+name: Desktop
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "App version in the file names (x.y.z or x.y.z-suffix); default 0.0.0-dev"
+        type: string
+        required: false
+        default: "0.0.0-dev"
+      updates:
+        description: "Update checks in the app: off (no update root key in the app) or on (needs the pinned root key)"
+        type: string
+        required: false
+        default: "off"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "App version in the file names (x.y.z or x.y.z-suffix); default 0.0.0-dev"
+        type: string
+        required: false
+        default: "0.0.0-dev"
+      updates:
+        description: "Update checks in the app: off (no update root key in the app) or on (needs the pinned root key)"
+        type: string
+        required: false
+        default: "off"
+      windows:
+        description: "Also build and check the Windows app (not shipped yet; REL051-CIE)"
+        type: boolean
+        required: false
+        default: false
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches-ignore: [sync]
+    paths:
+      - "apps/desktop/**"
+      - "apps/cli/src/desktop/**"
+      - ".github/workflows/desktop.yml"
+
+permissions: {}
+
+concurrency:
+  group: desktop-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  TURBO_TELEMETRY_DISABLED: "1"
+  DO_NOT_TRACK: "1"
+
+jobs:
+  build:
+    name: build-${{ matrix.target }}
+    # A draft pull request waits for ready_for_review, like ci.yml.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-26 is the macOS label the other workflows use (ci.yml); the x64 app is
+        # cross-built on the arm64 runner. win-x64 (windows-2022) only on a manual run with
+        # `windows: true` (REL051-CIE); `inputs.windows` is unset on pull requests and workflow_call.
+        include: ${{ fromJSON(inputs.windows == true && '[{"target":"mac-arm64","os":"macos-26","arch":"arm64"},{"target":"mac-x64","os":"macos-26","arch":"x64"},{"target":"win-x64","os":"windows-2022","arch":"x64"}]' || '[{"target":"mac-arm64","os":"macos-26","arch":"arm64"},{"target":"mac-x64","os":"macos-26","arch":"x64"}]') }}
+    env:
+      VERSION: ${{ inputs.version || '0.0.0-dev' }}
+      UPDATES: ${{ inputs.updates || 'off' }}
+      TARGET: ${{ matrix.target }}
+      ARCH: ${{ matrix.arch }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the version
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "::error::Unexpected version."; exit 1; }
+          [[ "$UPDATES" == "on" || "$UPDATES" == "off" ]] || { echo "::error::updates must be on or off."; exit 1; }
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Build the CLI
+        shell: bash
+        run: pnpm exec turbo run build --filter='@4thtech-io/agentlink...'
+
+      # The publish directory (apps/cli/dist/package) is what `npm publish` ships; the app embeds
+      # exactly this tarball (its dependencies come from the committed core-lock, never resolved here).
+      - name: Pack the CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/pack"
+          (cd apps/cli/dist/package && npm pack --pack-destination "$RUNNER_TEMP/pack")
+          ls "$RUNNER_TEMP/pack"/*.tgz
+
+      # The release bundle of the shell: the preview constant is defined false (bundle.config.mjs);
+      # with updates off, the updates-off root replaces root-key.json.
+      - name: Bundle the shell (release, no preview mode)
+        shell: bash
+        run: AGENTLINK_DESKTOP_UPDATES="$UPDATES" pnpm --filter @4thtech-io/desktop run bundle
+
+      # The owner-presence helper (WP-D12b), built from source for this target and handed to the app
+      # build with --helper. native.mjs takes --arch and --out (it has no --target).
+      # macOS: swiftc from the runner's Xcode; the result is the AgentLink.app helper bundle.
+      - name: Build the native presence helper (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node apps/desktop/build/native.mjs --arch "$ARCH" --out "$RUNNER_TEMP/native"
+          test -d "$RUNNER_TEMP/native/AgentLink.app"
+
+      # Windows: cl.exe needs the MSVC environment. The step finds Visual Studio with vswhere and enters
+      # its developer shell (Enter-VsDevShell, x64), both part of the runner's Visual Studio install,
+      # then runs native.mjs in that PowerShell session (pwsh, not cmd: a failure stops the step).
+      - name: Build the native presence helper (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'Visual Studio with the x64 C++ tools was not found.' }
+          Import-Module (Join-Path $vs 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll')
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
+          node apps/desktop/build/native.mjs --arch x64 --out (Join-Path $env:RUNNER_TEMP 'native')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path (Join-Path $env:RUNNER_TEMP 'native\agentlink-presence.exe'))) { throw 'agentlink-presence.exe was not built.' }
+
+      - name: Build the app (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tgz="$(ls "$RUNNER_TEMP"/pack/*.tgz)"
+          node apps/desktop/build/build-mac.mjs --arch "$ARCH" --tgz "$tgz" --version "$VERSION" --updates "$UPDATES" --helper "$RUNNER_TEMP/native/AgentLink.app" --out apps/desktop/out
+
+      # windows-2022 ships NSIS; makensis is put on PATH for build-win.mjs.
+      - name: Build the app (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tgz="$(ls "$RUNNER_TEMP"/pack/*.tgz)"
+          echo "C:\\Program Files (x86)\\NSIS" >> "$GITHUB_PATH"
+          export PATH="/c/Program Files (x86)/NSIS:$PATH"
+          node apps/desktop/build/build-win.mjs --tgz "$tgz" --version "$VERSION" --updates "$UPDATES" --helper "$RUNNER_TEMP/native/agentlink-presence.exe" --out apps/desktop/out
+
+      # Where build-mac.mjs and build-win.mjs leave the unpacked app (apps/desktop/.cache/work-*).
+      - name: Locate the built binary
+        id: bin
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            app="$PWD/apps/desktop/.cache/work-darwin-$ARCH/AgentLink.app"
+            {
+              echo "app=$app"
+              echo "exe=$app/Contents/MacOS/AgentLink"
+              echo "resources=$app/Contents/Resources"
+            } >> "$GITHUB_OUTPUT"
+          else
+            dir="$PWD/apps/desktop/.cache/work-win32-x64/AgentLink"
+            {
+              echo "app=$dir/AgentLink.exe"
+              echo "exe=$dir/AgentLink.exe"
+              echo "resources=$dir/resources"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      # The x64 build on the arm64 macOS runner can only be launched under Rosetta.
+      - name: Check that the binary can be launched here
+        id: launch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$RUNNER_OS" = "macOS" ] && [ "$ARCH" = "x64" ] && ! arch -x86_64 /usr/bin/true 2> /dev/null; then
+            echo "::notice::Rosetta is not available on this runner; the x64 binary is checked statically only (fuses, preview string)."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # D4 checks on the built binaries. Read-only checks first, then the ones that launch the app
+      # (each with a throw-away HOME; none touches a real profile or the keychain).
+      - name: Fuse read-back and ASAR integrity
+        shell: bash
+        env:
+          APP: ${{ steps.bin.outputs.app }}
+        run: node apps/desktop/build/check-fuses.mjs --app "$APP"
+
+      - name: Preview string absent from the ASAR
+        shell: bash
+        env:
+          APP: ${{ steps.bin.outputs.app }}
+        run: node apps/desktop/build/check-preview-string.mjs --app "$APP"
+
+      - name: Switch lockdown (every forbidden switch exits at once)
+        if: steps.launch.outputs.run == 'true'
+        shell: bash
+        env:
+          EXE: ${{ steps.bin.outputs.exe }}
+        run: node apps/desktop/build/check-switch-lockdown.mjs --exe "$EXE"
+
+      - name: Tampered ASAR is refused
+        if: steps.launch.outputs.run == 'true'
+        shell: bash
+        env:
+          APP: ${{ steps.bin.outputs.app }}
+        # An x64 build under Rosetta is translated again on the first start of each new copy (the
+        # tampered copy is re-signed, so nothing is cached): a longer limit there. A tampered app
+        # that keeps running still fails.
+        run: |
+          set -euo pipefail
+          limit=20000
+          if [ "$RUNNER_OS" = "macOS" ] && [ "$ARCH" = "x64" ]; then limit=180000; fi
+          node apps/desktop/build/check-tampered-asar.mjs --app "$APP" --timeout-ms "$limit"
+
+      # Runs even when a launch check above failed: its own result (and the app log it prints on a
+      # failure) tells a launch problem of the build apart from one of the check.
+      - name: Smoke test (the app starts, the bundled node answers tools/list)
+        if: ${{ !cancelled() && steps.launch.outputs.run == 'true' }}
+        shell: bash
+        env:
+          EXE: ${{ steps.bin.outputs.exe }}
+          RESOURCES: ${{ steps.bin.outputs.resources }}
+        run: node apps/desktop/test/smoke/smoke.mjs --exe "$EXE" --resources "$RESOURCES"
+
+      - name: Upload the build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-app-${{ matrix.target }}
+          path: |
+            apps/desktop/out/*.dmg
+            apps/desktop/out/*.zip
+            apps/desktop/out/*-setup.exe
+            apps/desktop/out/SHA256SUMS-*
+            apps/desktop/out/inputs-*.json
+          if-no-files-found: error
+          retention-days: 14
+
+  attest:
+    name: attest
+    needs: build
+    if: needs.build.result == 'success' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write # the provenance attestation is signed with this job's OIDC identity
+      attestations: write
+    steps:
+      - name: Download the builds
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: desktop-app-*
+          path: ${{ runner.temp }}/desktop
+          merge-multiple: true
+
+      - name: Write SHA256SUMS
+        shell: bash
+        working-directory: ${{ runner.temp }}/desktop
+        run: |
+          set -euo pipefail
+          cat SHA256SUMS-* | sort -k2 > SHA256SUMS
+          rm -f SHA256SUMS-*
+          # Every listed file must exist and match: the sums were written by the build jobs.
+          sha256sum --check --strict SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            ${{ runner.temp }}/desktop/*.dmg
+            ${{ runner.temp }}/desktop/*.zip
+            ${{ runner.temp }}/desktop/*-setup.exe
+
+      - name: Upload the checked sums
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-app-sha256sums
+          path: ${{ runner.temp }}/desktop/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14

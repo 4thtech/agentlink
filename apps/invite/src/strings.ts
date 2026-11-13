@@ -72,6 +72,9 @@ export const strings = {
       which: 'Not sure? Apple menu → About This Mac → Chip.',
       note: 'This early build is not signed by Apple yet. The first time, right-click the app and choose Open.',
     },
+    /** WP-D9: next to the command, the desktop app link and its download page. */
+    openApp: 'Open in the AgentLink app',
+    getApp: 'Get the app (coming soon)',
     link: 'Already have AgentLink? Open it and paste the link',
     linkHelp: 'In AgentLink, choose “Have an invite link? Paste it” and paste this link.',
     copy: 'Copy',

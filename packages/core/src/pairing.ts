@@ -35,6 +35,7 @@ import {
   decodeHex,
   generateShortInviteSecret,
   pairingProof,
+  parseJson,
   randomBytes,
   sealShortInvite,
   safetyCodeCommit,
@@ -46,6 +47,7 @@ import {
   type JsonValue,
 } from '@4thtech-io/crypto';
 import {
+  CLOCK_SKEW_SECONDS,
   INVITE_DEFAULT_EXPIRY_DAYS,
   type ContactDisplayName,
   type Invite,
@@ -79,6 +81,7 @@ import {
   encodeInviteLink,
   encodeInvitePayload,
   encodeShortInviteLink,
+  INVITE_LINK_PREFIX,
   resolveInviteLink,
   type ShortInviteFetch,
 } from './invite-link.js';
@@ -89,6 +92,8 @@ import { openStoredPairingMessage, recomputeStoredPairing } from './stored-envel
 
 /** Seconds per day, for invite expiry. */
 const DAY_SECONDS = 86_400;
+/** The longest an invite lives (04 §3.6: 1 to 7 days). */
+const INVITE_MAX_SECONDS = INVITE_DEFAULT_EXPIRY_DAYS * DAY_SECONDS;
 const INVITE_ID_BYTES = 16;
 const SECRET_BYTES = 32;
 const NONCE_BYTES = 32;
@@ -258,6 +263,20 @@ export interface OpenInvite {
   readonly expiresAt: number;
 }
 
+/** A short link's code after the prefix (04 §3.6.2): `2.` and 43 base64url characters. */
+const SHORT_LINK = /^2\.[A-Za-z0-9_-]{43}$/;
+
+/** REL051-B2: what `inviteLink` answers. The link carries the invite secret: never log it. */
+export type InviteLinkResult =
+  | {
+      readonly status: 'ok';
+      readonly inviteUrl: string;
+      readonly format: 'short' | 'long';
+      readonly expiresAt: number;
+    }
+  | { readonly status: 'not_found' }
+  | { readonly status: 'no_link' };
+
 /** Retry delays for a failed drop object delete (04 §3.6.2: retried with backoff). */
 /**
  * O-L1: the short invite upload is given up after this (then the format 1 link), well before the
@@ -293,6 +312,17 @@ export function shortInviteFetcher(drop: DropConfig | undefined): ShortInviteFet
 }
 
 /**
+ * R1-SEC-10 (06 §2.1 rule 1): an invite label as an owner surface may show it, the restricted form,
+ * or null when the name rule would fall back (a fallback names no one: it would carry this agent's
+ * own fingerprint). `·` never appears in a restricted name, so the fallback is told apart exactly.
+ */
+function shownLabel(label: string): string | null {
+  const restricted = restrictName(label, LABEL_FALLBACK_MARK);
+  return restricted === restrictName(undefined, LABEL_FALLBACK_MARK) ? null : restricted;
+}
+const LABEL_FALLBACK_MARK = '\u00b7';
+
+/**
  * Accept step 1 (04 §3.6): the one D-69 codec and the strict schema, the expiry, both card
  * signatures, the name and relays against the card and the relay URL rule (04 §4). No agent, no
  * store. Throws core's fixed errors only; none carries anything from the link (I-5, I-7).
@@ -309,6 +339,11 @@ async function acceptStepOne(
   // B's expiry check is advisory (A enforces the expiry it stored, 04 §3.6).
   if (invite.expiresAt <= now) {
     throw new CoreError('invite_expired', 'The invite has expired. Ask for a new one.');
+  }
+  // R1-SEC-11 (04 §3.6): no invite lives longer than 7 days. `expiresAt` is not signed, so a link
+  // that claims more (beyond the clock skew allowance) is not one this protocol makes.
+  if (invite.expiresAt > now + INVITE_MAX_SECONDS + CLOCK_SKEW_SECONDS) {
+    throw new CoreError('invite_invalid', 'The invite link is not valid.');
   }
   const checked = checkReceivedCard(
     {
@@ -522,6 +557,8 @@ export class PairingService implements PairingHandler {
             ? null
             : await seal(ctx, 'invites', 'drop_key_epoch', key, String(sealed.epoch)),
         cancelled_at: null,
+        // REL051-B2: set below, once it is known which link is handed out.
+        invite_link: null,
       };
       await ctx.store.transaction((tx) => {
         tx.insert('invites', row);
@@ -554,6 +591,22 @@ export class PairingService implements PairingHandler {
           });
         }
       }
+      // REL051-B2 (04 §3.6): keep the link handed out, sealed like proof_key, so the owner can copy
+      // it again while the invite is open (inviteLink). Whoever reads the store can already answer
+      // this invite with proof_key, so this adds no reach; the link never leaves this computer
+      // except to the owner's own page. A failed write only means it cannot be copied again.
+      try {
+        const kept = await seal(ctx, 'invites', 'invite_link', key, inviteUrl);
+        await ctx.store.transaction((tx) => {
+          tx.update(
+            'invites',
+            { invite_id: id, used_at: null, cancelled_at: null },
+            { invite_link: kept },
+          );
+        });
+      } catch {
+        ctx.log.info('invite link not kept');
+      }
       ctx.log.info('invite created', { expiresAt, format });
       return {
         inviteId: id,
@@ -574,7 +627,9 @@ export class PairingService implements PairingHandler {
 
   /**
    * The open invites (not used, not cancelled, not expired), newest first: ID, label and expiry
-   * only. Never a link, a secret or a lookup ID (I-1, I-7).
+   * only. Never a link, a secret or a lookup ID (I-1, I-7). R1-SEC-10 (06 §2.1 rule 1): the label
+   * may be the AI's text, a suggested alias, so it is given only in its restricted form, and as
+   * null when the name rule leaves nothing of it.
    */
   async openInvites(): Promise<readonly OpenInvite[]> {
     const ctx = this.#ctx;
@@ -590,7 +645,7 @@ export class PairingService implements PairingHandler {
       let label: string | null = null;
       if (row.label != null) {
         try {
-          label = await open(ctx, 'invites', 'label', [row.invite_id], row.label);
+          label = shownLabel(await open(ctx, 'invites', 'label', [row.invite_id], row.label));
         } catch {
           label = null;
         }
@@ -598,6 +653,34 @@ export class PairingService implements PairingHandler {
       out.push({ inviteId: row.invite_id, label, expiresAt: row.expires_at });
     }
     return out;
+  }
+
+  /**
+   * REL051-B2 (owner test, 13 Nov; 04 §3.6; 08 §1): the link an open invite (not used, not
+   * cancelled, not expired) was handed out as, for the owner's Copy link and Show link on the
+   * local page only (no MCP tool reads it). `not_found` for any other ID; `no_link` for an open
+   * invite stored before links were kept. The link carries the invite secret: never log it (I-7).
+   */
+  async inviteLink(inviteId: string): Promise<InviteLinkResult> {
+    const ctx = this.#ctx;
+    if (typeof inviteId !== 'string' || !/^[A-Za-z0-9_-]{22}$/.test(inviteId)) {
+      return { status: 'not_found' };
+    }
+    const now = nowOf(ctx);
+    const row = await ctx.store.transaction((tx) => tx.get('invites', { invite_id: inviteId }));
+    if (
+      row === undefined ||
+      row.used_at != null ||
+      row.cancelled_at != null ||
+      row.expires_at <= now
+    ) {
+      return { status: 'not_found' };
+    }
+    if (row.invite_link == null) return { status: 'no_link' };
+    const inviteUrl = await open(ctx, 'invites', 'invite_link', [inviteId], row.invite_link);
+    if (!inviteUrl.startsWith(INVITE_LINK_PREFIX)) return { status: 'no_link' };
+    const format = SHORT_LINK.test(inviteUrl.slice(INVITE_LINK_PREFIX.length)) ? 'short' : 'long';
+    return { status: 'ok', inviteUrl, format, expiresAt: row.expires_at };
   }
 
   /**
@@ -619,7 +702,12 @@ export class PairingService implements PairingHandler {
       ) {
         return false;
       }
-      tx.update('invites', { invite_id: inviteId, cancelled_at: null }, { cancelled_at: now });
+      // REL051-B2: a cancelled invite's link is no longer kept.
+      tx.update(
+        'invites',
+        { invite_id: inviteId, cancelled_at: null },
+        { cancelled_at: now, invite_link: null },
+      );
       return true;
     });
     if (!done) return 'not_found';
@@ -644,9 +732,22 @@ export class PairingService implements PairingHandler {
 
   async #sweep(): Promise<void> {
     const ctx = this.#ctx;
+    const now = nowOf(ctx);
+    // REL051-B2 (IR-REL051-B2-1): an expired invite's kept link is cleared too (used and cancelled
+    // ones are cleared when that happens), with or without a drop.
+    try {
+      await ctx.store.transaction((tx) => {
+        for (const r of tx.select('invites')) {
+          if (r.invite_link != null && r.expires_at <= now) {
+            tx.update('invites', { invite_id: r.invite_id }, { invite_link: null });
+          }
+        }
+      });
+    } catch {
+      ctx.log.info('invite link clear failed');
+    }
     const adapter = this.#dropAdapter();
     if (adapter === undefined) return;
-    const now = nowOf(ctx);
     const nowMs = now * 1000;
     let rows: Row<'invites'>[];
     try {
@@ -718,7 +819,8 @@ export class PairingService implements PairingHandler {
       name: invite.name,
       relays: invite.relays,
       role: 'invitee',
-      expiresAt: invite.expiresAt,
+      // R1-SEC-11 (04 §2.9): a staged accept lapses at the invite's expiry, never past 7 days.
+      expiresAt: Math.min(invite.expiresAt, now + INVITE_MAX_SECONDS),
     });
     // M1-9ze: the counterparty staged (and sealed to, below) must be the contact this invite names,
     // the one step 1 verified and the approval showed. M1-9zf: that binds the owner too (step 2
@@ -858,6 +960,76 @@ export class PairingService implements PairingHandler {
     return drop('type_unhandled', inbound.contactId);
   }
 
+  /**
+   * R1-SEC-03 (04 §3.6): a second valid answer to a used invite is refused, and the owner is told in
+   * the activity feed under the contact the invite connected (its owner alias or restricted name,
+   * never the second party's text). The refused row is filed under that contact, so it is kept with
+   * the contact (07 §3.2: only unknown senders' refused rows are pruned) and lists as
+   * `invite_answered_twice`. One warning per use of the invite: a later answer adds no row. When the
+   * contact cannot be found (its handshake is no longer stored), the refusal stays as before.
+   */
+  async #secondAnswer(
+    inviteId: string,
+    usedAt: number,
+    senderContactId: string | undefined,
+  ): Promise<PairingOutcome> {
+    const refused = (id: string | undefined, filedForOwner = false): PairingOutcome => ({
+      kind: 'refuse',
+      reason: 'invite_used',
+      ...(id === undefined ? {} : { contactId: id }),
+      flagged: false,
+      ...(filedForOwner ? { filedForOwner: true as const } : {}),
+    });
+    let paired: string | undefined;
+    try {
+      paired = await this.#invitePairedContact(inviteId);
+    } catch {
+      paired = undefined;
+    }
+    if (paired === undefined) return refused(senderContactId);
+    const warned = await this.#ctx.store.transaction((tx) =>
+      tx
+        .select('envelopes', {
+          direction: 'in',
+          type: 'handshake',
+          state: 'refused',
+          refused_reason: 'invite_used',
+          contact_id: paired,
+        })
+        .some((r) => (r.refused_at ?? 0) >= usedAt),
+    );
+    if (warned) return drop('invite_used', senderContactId);
+    // REL051-CF1 (R2-6): filed under the invite's contact; it spends that contact's rate only when
+    // that contact sent it.
+    return refused(paired, paired !== senderContactId);
+  }
+
+  /** The contact whose stored, processed `handshake` used `inviteId` (this agent as inviter). */
+  async #invitePairedContact(inviteId: string): Promise<string | undefined> {
+    const ctx = this.#ctx;
+    const rows = await ctx.store.transaction((tx) =>
+      tx.select(
+        'envelopes',
+        { direction: 'in', type: 'handshake', state: 'ok' },
+        { orderBy: [['created_at', 'desc']] },
+      ),
+    );
+    for (const row of rows) {
+      if (row.contact_id === null || row.payload_json === null) continue;
+      let used: unknown;
+      try {
+        const payload = parseJson(
+          await open(ctx, 'envelopes', 'payload_json', [row.envelope_id], row.payload_json),
+        ) as { readonly body?: { readonly inviteId?: unknown } };
+        used = payload.body?.inviteId;
+      } catch {
+        continue;
+      }
+      if (used === inviteId) return row.contact_id;
+    }
+    return undefined;
+  }
+
   /** A, on a `handshake` (04 §3.6 Complete, agent A). */
   async #onHandshake(inbound: InboundPairing): Promise<PairingOutcome> {
     const ctx = this.#ctx;
@@ -894,12 +1066,7 @@ export class PairingService implements PairingHandler {
     if (!proofOk) return drop('pairing_invalid', contactId);
     // A second valid answer: the link leaked or someone raced the intended contact (04 §3.6).
     if (invite.used_at !== null) {
-      return {
-        kind: 'refuse',
-        reason: 'invite_used',
-        ...(contactId === undefined ? {} : { contactId }),
-        flagged: false,
-      };
+      return this.#secondAnswer(invite.invite_id, invite.used_at, contactId);
     }
     const now = nowOf(ctx);
     if (invite.expires_at <= now) return drop('invite_expired', contactId);
@@ -962,6 +1129,7 @@ export class PairingService implements PairingHandler {
       });
       return await this.#complete(inbound, staged.staged, ack, {
         invite: invite.invite_id,
+        inviteCreatedAt: invite.created_at,
         stage: staged.apply,
         now,
       });
@@ -1052,6 +1220,8 @@ export class PairingService implements PairingHandler {
     context: {
       readonly now: number;
       readonly invite?: string;
+      /** R1-SEC-02: when the invite was made (a remove after it binds it). */
+      readonly inviteCreatedAt?: number;
       readonly stage?: (tx: Parameters<PairingHandler['screen']>[0]) => void;
       readonly handshake?: Awaited<ReturnType<typeof openStoredPairingMessage>>;
     },
@@ -1074,7 +1244,11 @@ export class PairingService implements PairingHandler {
     }
     let completion: Awaited<ReturnType<ContactBook['prepareCompletion']>>;
     try {
-      completion = await this.#contacts.prepareCompletion(staged, transcript);
+      completion = await this.#contacts.prepareCompletion(
+        staged,
+        transcript,
+        context.inviteCreatedAt,
+      );
     } catch (error) {
       return classify(error, contactId);
     }
@@ -1104,7 +1278,7 @@ export class PairingService implements PairingHandler {
       request_accepted_at: null,
     };
     const ackRow = ack === undefined ? undefined : await outboundRow(ctx, ack, id);
-    let result: 'claimed_elsewhere' | 'invite_used' | 'done';
+    let result: 'claimed_elsewhere' | { readonly usedAt: number } | 'done';
     try {
       result = await ctx.store.transaction((tx) => {
         if (!inbound.claim(tx)) return 'claimed_elsewhere';
@@ -1118,11 +1292,12 @@ export class PairingService implements PairingHandler {
           ) {
             throw new CoreError('pairing_expired', 'The pairing has expired.');
           }
-          if (current.used_at !== null) return 'invite_used';
+          if (current.used_at !== null) return { usedAt: current.used_at };
           tx.update(
             'invites',
             { invite_id: context.invite, used_at: null },
-            { used_at: context.now },
+            // REL051-B2: a used invite's link is no longer kept.
+            { used_at: context.now, invite_link: null },
           );
         }
         inbound.write(tx, inboundRow);
@@ -1134,13 +1309,8 @@ export class PairingService implements PairingHandler {
     } catch (error) {
       return classify(error, contactId);
     }
-    if (result === 'invite_used') {
-      return {
-        kind: 'refuse',
-        reason: 'invite_used',
-        ...(contactId === undefined ? {} : { contactId }),
-        flagged: false,
-      };
+    if (typeof result === 'object' && context.invite !== undefined) {
+      return this.#secondAnswer(context.invite, result.usedAt, contactId);
     }
     if (result === 'claimed_elsewhere') return { kind: 'done' };
     ctx.log.info('pairing completed', { role: transcript.role });

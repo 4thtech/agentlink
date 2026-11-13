@@ -126,6 +126,7 @@ function desk(over: Partial<LocalUiInviteDesk> = {}): {
         });
       },
       cancel: () => Promise.resolve('not_found'),
+      cancelConnecting: () => Promise.resolve('not_found'),
       ...over,
     },
   };

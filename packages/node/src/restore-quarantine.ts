@@ -12,6 +12,9 @@
 // - discard() deletes the file (and the `-wal` and `-shm` files the check may leave); a failure
 //   anywhere discards every sink of the kit. Stale files from a crash are removed at start-up
 //   (removeStaleRestoreFiles).
+// - REL051-SF3 (T-7): every quarantine and upload file is named with the process that made it, and
+//   this process tracks the ones still in use, so a sweep (a second engine, the terminal's
+//   `agentlink restore`) removes only files of runs that are gone, never a live engine's kit.
 //
 // Errors are fixed sentences that never contain a path or a value (I-7).
 import { constants } from 'node:fs';
@@ -36,10 +39,44 @@ import { createAgentStoreCipher } from './store-cipher.js';
 const { O_WRONLY, O_CREAT, O_EXCL, O_NOFOLLOW } = constants;
 const FILE_MODE = 0o600;
 const DIR_MODE = 0o700;
-/** The quarantine file names: `.restore-<16 hex>.sqlite`. */
-const RESTORE_FILE = /^\.restore-[0-9a-f]{16}\.sqlite(?:-wal|-shm)?$/;
-/** UX1113-R1 (04 §2.3.3 "Upload"): a kit uploaded from the page, `.upload-<16 hex>.alkk`. */
-export const UPLOAD_FILE = /^\.upload-[0-9a-f]{16}\.alkk$/;
+/**
+ * The quarantine file names: `.restore-<pid>-<16 hex>.sqlite` (REL051-SF3; the name of earlier
+ * builds, without the pid, is matched too and always counts as stale).
+ */
+const RESTORE_FILE = /^(\.restore-(?:(\d{1,10})-)?[0-9a-f]{16}\.sqlite)(?:-wal|-shm)?$/;
+/** UX1113-R1 (04 §2.3.3 "Upload"): a kit uploaded from the page, `.upload-<pid>-<16 hex>.alkk`. */
+export const UPLOAD_FILE = /^(\.upload-(?:(\d{1,10})-)?[0-9a-f]{16}\.alkk)$/;
+/**
+ * A file of another live process older than this is stale all the same (a reused pid): an opened
+ * kit lives 10 minutes, an apply far less than a day.
+ */
+const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+
+/** The quarantine and upload files this process made and still uses, by path. */
+const LIVE = new Set<string>();
+
+/** A new restore file name of this process: `.restore-<pid>-<hex>.sqlite` or `.upload-…`. */
+export function restoreFileName(kind: 'restore' | 'upload'): string {
+  const id = `${String(process.pid)}-${encodeHex(randomBytes(8))}`;
+  return kind === 'restore' ? `.restore-${id}.sqlite` : `.upload-${id}.alkk`;
+}
+
+/** Marks `path` as in use by this process (a sweep keeps it) or, with `false`, no longer. */
+export function trackRestoreFile(path: string, live = true): void {
+  if (live) LIVE.add(path);
+  else LIVE.delete(path);
+}
+
+/** True while a process with this ID runs (EPERM: it runs as another user). */
+export function processAlive(pid: number): boolean {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as { code?: unknown }).code === 'EPERM';
+  }
+}
 
 type SinkState = 'open' | 'committed' | 'checked' | 'installed' | 'discarded';
 
@@ -60,6 +97,7 @@ const restoreFailed = (): CryptoInputError =>
   new CryptoInputError('invalid_argument', 'restore: the restored store cannot be used');
 
 function removeFiles(path: string): void {
+  LIVE.delete(path);
   for (const suffix of ['', '-wal', '-shm']) {
     try {
       unlinkSync(`${path}${suffix}`);
@@ -81,8 +119,15 @@ export function createRestoreQuarantine(dir: string): {
       await mkdir(dir, { recursive: true, mode: DIR_MODE });
       const info = await lstat(dir);
       if (!info.isDirectory()) throw restoreFailed();
-      const path = join(dir, `.restore-${encodeHex(randomBytes(8))}.sqlite`);
-      const handle = await open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, FILE_MODE);
+      const path = join(dir, restoreFileName('restore'));
+      LIVE.add(path);
+      let handle: FileHandle;
+      try {
+        handle = await open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, FILE_MODE);
+      } catch (error) {
+        LIVE.delete(path);
+        throw error;
+      }
       const file: QuarantinedFile = { path, state: 'open', handle };
       let offset = 0;
       const sink: RecoveryKitStoreSink = Object.freeze({
@@ -244,6 +289,7 @@ export async function installRestoredStore(
     throw restoreFailed();
   }
   file.state = 'installed';
+  LIVE.delete(file.path);
   await unlink(file.path).catch(() => undefined);
 }
 
@@ -288,8 +334,16 @@ export function peekQuarantinedSnapshot(
   }
 }
 
-/** 04 §4 (D-84): removes quarantine files a crashed restore left in `dir`. */
-export async function removeStaleRestoreFiles(dir: string): Promise<void> {
+/**
+ * 04 §4 (D-84), T-7: removes the quarantine and upload files of restores that are gone from `dir`:
+ * files of an earlier build (no pid in the name), of a process that has ended, of this process that
+ * it no longer uses, and any older than a day. A file another live process (or this one) still uses
+ * is kept. Never follows a link (unlink removes the name only).
+ */
+export async function removeStaleRestoreFiles(
+  dir: string,
+  now: number = Date.now(),
+): Promise<void> {
   let names: string[];
   try {
     names = await readdir(dir);
@@ -297,8 +351,22 @@ export async function removeStaleRestoreFiles(dir: string): Promise<void> {
     return;
   }
   for (const name of names) {
-    if (RESTORE_FILE.test(name) || UPLOAD_FILE.test(name)) {
-      await unlink(join(dir, name)).catch(() => undefined);
+    const match = RESTORE_FILE.exec(name) ?? UPLOAD_FILE.exec(name);
+    if (match === null) continue;
+    const path = join(dir, name);
+    const base = join(dir, match[1] as string);
+    const pidText = match[2];
+    let stale: boolean;
+    if (pidText === undefined) stale = true;
+    else {
+      const pid = Number(pidText);
+      if (pid === process.pid) stale = !LIVE.has(base);
+      else if (!processAlive(pid)) stale = true;
+      else {
+        const info = await lstat(path).catch(() => undefined);
+        stale = info === undefined || now - info.mtimeMs > STALE_AFTER_MS;
+      }
     }
+    if (stale) await unlink(path).catch(() => undefined);
   }
 }

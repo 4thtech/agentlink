@@ -2,8 +2,8 @@
 //
 // I-5, I-7: no slot takes a path, a file name, a link or any other value. A refusal names what
 // happened and the plain next step; words such as storage provider, link signing or network
-// internals never appear (11 §5.1). Local settings links (11 §6.1 `{url}`) are not offered: the
-// local settings page has not landed, so the next step says who can act instead.
+// internals never appear (11 §5.1). The allowed-folder steps name the app's own control (Settings,
+// Files, Allow a folder) without a link: only an approval request has a local app link (06 §2.5).
 import type { CoreErrorCode, FilesNeedsSetup } from '@4thtech-io/core';
 import type { AttachRefusal } from './context.js';
 import { fail, type HandlerOutput } from './result.js';
@@ -11,10 +11,11 @@ import { NPX_COMMAND } from './cli-command.js';
 
 export const FILE_TEXT = Object.freeze({
   noFolder: 'No folder is allowed for sending files yet, so nothing was sent.',
-  // M1-36b-2-c: the quickest fix is the Send folder; no tool can set it up (I-4), only the user.
-  noFolderNextStep: `Tell the user: files can only be sent from a folder they allow. The quickest way: in a terminal they opened themselves, they run \`${NPX_COMMAND} policy allow-send-folder\` and put the file in ~/AgentLink/Send. To allow another folder instead, they run \`${NPX_COMMAND} policy allow-folder <path>\`. Add \`--agent <name>\` to either if they have more than one ID. Then call again.`,
+  // REL051-A5: the app's "Allow a folder" first (Settings, Files); the terminal is the fallback.
+  // No tool can allow a folder (I-4), only the user, with the master code in the app.
+  noFolderNextStep: `Tell the user: files can only be sent from a folder they allow. In the AgentLink app they open Settings, then Files, then Allow a folder, and choose the folder the file is in. You can't allow it for them. Then call again. Without the app, in a terminal they opened themselves they run \`${NPX_COMMAND} policy allow-send-folder\` and put the file in ~/AgentLink/Send, or \`${NPX_COMMAND} policy allow-folder <path>\` (add \`--agent <name>\` if they have more than one ID).`,
   outsideFolder: "That file isn't in a folder the user allows for sending, so nothing was sent.",
-  outsideFolderNextStep: `Ask the user to put the file in a folder they allow for sending, or to allow its folder: in a terminal they opened themselves, they run \`${NPX_COMMAND} policy allow-folder <path>\`, with \`--agent <name>\` if they have more than one ID. Then call again.`,
+  outsideFolderNextStep: `Tell the user: this file's folder isn't allowed yet. In the AgentLink app they open Settings, then Files, then Allow a folder, and choose the folder the file is in. You can't allow it for them. Then call again. Without the app, in a terminal they opened themselves they run \`${NPX_COMMAND} policy allow-folder <path>\` (add \`--agent <name>\` if they have more than one ID).`,
   notAllowed: "That path can't be sent: it must be a full path to a regular, visible file.",
   notAllowedNextStep:
     "Use the file's full path. Hidden files and protected private folders can never be sent.",

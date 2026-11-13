@@ -16,6 +16,8 @@ export type Get = (path: string) => Promise<ApiResult<unknown>>;
 
 export const BACKUP_READ = '/api/ui/backup';
 export const OWNER_PASSKEY_READ = '/api/owner/passkey';
+/** DESK051-C2: the desktop app's own Touch ID (public GET; `available: false` outside the app). */
+export const OWNER_NATIVE_READ = '/api/owner/native';
 export const APPS_READ = '/api/ui/apps';
 
 const isObject = (v: unknown): v is Record<string, unknown> =>
@@ -69,6 +71,18 @@ export function parseTouchId(r: ApiResult<unknown>): boolean | undefined {
   return isObject(p) && p['registered'] === true;
 }
 
+/**
+ * DESK051-C2: true when the desktop app's own Touch ID (native presence) is on and usable; false
+ * otherwise, including a registration that must be turned on again, and anything shaped wrong.
+ */
+export function parseNativeOn(r: ApiResult<unknown>): boolean {
+  if (r.kind !== 'ok' || !isObject(r.data)) return false;
+  const n = r.data['native'];
+  return (
+    isObject(n) && n['available'] === true && n['registered'] === true && n['reason'] === undefined
+  );
+}
+
 // --- rules ---------------------------------------------------------------------------------------
 
 /** The things the Rules page lets the owner decide, and how many of them ask first. */
@@ -87,6 +101,8 @@ export function askCounts(v: RulesView): { readonly asks: number; readonly total
 export interface SettingsState {
   readonly backup?: BackupState;
   readonly touchId?: boolean;
+  /** DESK051-C2: the desktop app's own Touch ID is on. */
+  readonly nativeOn?: true;
   readonly rules?: { readonly asks: number; readonly total: number };
   readonly apps?: AppsList;
   readonly folders?: number;
@@ -102,9 +118,10 @@ const safe = (get: Get, path: string): Promise<ApiResult<unknown>> =>
 
 /** Reads everything once; every read is independent and a failure only blanks its own row. */
 export async function readSettingsState(get: Get): Promise<SettingsState> {
-  const [backup, owner, rules, apps, files, received, credits, health] = await Promise.all([
+  const [backup, owner, native, rules, apps, files, received, credits, health] = await Promise.all([
     safe(get, BACKUP_READ),
     safe(get, OWNER_PASSKEY_READ),
+    safe(get, OWNER_NATIVE_READ),
     safe(get, RULES_PATH),
     safe(get, APPS_READ),
     safe(get, FILES_PATH),
@@ -120,8 +137,12 @@ export async function readSettingsState(get: Get): Promise<SettingsState> {
     const k = parseKitStatus(backup.data).state;
     setKitRecordState(k === 'unknown' ? undefined : k);
   }
+  // DESK051-C2: the passkey of this browser, or the desktop app's own Touch ID.
   const t = parseTouchId(owner);
-  if (t !== undefined) out.touchId = t;
+  if (parseNativeOn(native)) {
+    out.touchId = true;
+    out.nativeOn = true;
+  } else if (t !== undefined) out.touchId = t;
   const r = parseRules(okData(rules));
   if (r.kind === 'ok') out.rules = askCounts(r.rules);
   const a = parseApps(okData(apps));
@@ -135,7 +156,8 @@ export async function readSettingsState(get: Get): Promise<SettingsState> {
   const h = parseHealth(health);
   if (h !== undefined) {
     if (h.state === 'connected') out.health = 'working';
-    else if (h.state === 'not_running') out.health = 'reconnecting';
+    // REL051-CF2: no relay reachable is never "All working".
+    else if (h.state === 'not_running' || h.state === 'unreachable') out.health = 'reconnecting';
     if (h.version !== undefined) out.version = h.version;
   }
   return out;

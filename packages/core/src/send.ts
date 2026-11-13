@@ -72,6 +72,9 @@ export const PAYLOAD_TOO_LARGE = 'PAYLOAD_TOO_LARGE' as const;
 /** A file above `files.maxSendSizeMB`. Nothing was read or sent. */
 export const FILE_TOO_LARGE = 'FILE_TOO_LARGE' as const;
 
+/** REL051-CF2: an outbound message's delivery state (07 §3.2). */
+export type SendDelivery = 'queued' | 'sent' | 'not_delivered';
+
 export type SendMessageResult =
   | {
       readonly status: 'ok';
@@ -81,6 +84,13 @@ export type SendMessageResult =
       readonly sentAt: string;
       /** Where each attached file went (only when files were attached). */
       readonly files?: readonly SentFile[];
+      /**
+       * REL051-CF2: where the message is right after the first publish (07 §3.2 `delivery`):
+       * `sent` once the relays accepted it (07 §4.2), `queued` while it waits for them (the outbox
+       * sends it on its own when they are back), `not_delivered` when it was given up. Read from the
+       * envelope at answer time, also for a repeat with the same clientRequestId; never stored.
+       */
+      readonly delivery?: SendDelivery;
     }
   | {
       readonly status: 'rejected';
@@ -198,7 +208,7 @@ export class SendService {
     if (clientRequestId === undefined) {
       const done = await this.#run(request, undefined);
       await this.#publish(done);
-      return done.result;
+      return this.#withDelivery(done.result);
     }
     const { idempotency } = this.#deps;
     const start = await idempotency.begin({ tool: SEND_TOOL, clientRequestId, args: request.args });
@@ -207,7 +217,7 @@ export class SendService {
         if (!isSendResult(start.result)) {
           throw new CoreError('store_unreadable', 'A stored value could not be read.');
         }
-        return start.result;
+        return this.#withDelivery(start.result);
       case 'key_reused':
         return { status: 'rejected', code: IDEMPOTENCY_KEY_REUSED };
       case 'in_progress':
@@ -219,7 +229,7 @@ export class SendService {
         const done = await this.#resume(start.run);
         await idempotency.finish(start.run, done.result);
         await this.#publish(done);
-        return done.result;
+        return this.#withDelivery(done.result);
       }
       case 'run': {
         let done: { result: SendMessageResult; envelopeId?: string };
@@ -242,7 +252,7 @@ export class SendService {
         }
         await idempotency.finish(start.run, done.result);
         await this.#publish(done);
-        return done.result;
+        return this.#withDelivery(done.result);
       }
     }
   }
@@ -390,6 +400,27 @@ export class SendService {
       await this.#deps.outbox.publishEnvelope(done.envelopeId);
     } catch {
       this.#ctx.log.warn('first publish failed; the outbox retries', { envelopes: 1 });
+    }
+  }
+
+  /**
+   * REL051-CF2: an `ok` result with the envelope's delivery state now (07 §3.2), so the caller can
+   * tell sent from queued. Not stored with the idempotency row: a repeat reads it again. A row that
+   * cannot be read leaves the result as it was (no claim either way).
+   */
+  async #withDelivery(result: SendMessageResult): Promise<SendMessageResult> {
+    if (result.status !== 'ok') return result;
+    try {
+      const row = await this.#ctx.store.transaction((tx) =>
+        tx.get('envelopes', { envelope_id: result.envelopeId }),
+      );
+      const delivery = row?.direction === 'out' ? row.delivery : undefined;
+      if (delivery !== 'queued' && delivery !== 'sent' && delivery !== 'not_delivered') {
+        return result;
+      }
+      return { ...result, delivery };
+    } catch {
+      return result;
     }
   }
 }

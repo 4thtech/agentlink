@@ -15,6 +15,7 @@ import type { AppsApi, AppsListResult, ApplyResult, DetectedApp } from '../first
 import { FirstRunPage, type FirstRunPageProps } from '../first-run/index.js';
 import { encodeRegistration } from '../first-run/passkey.js';
 import type { FinishResult, SetupApi, StatusResult } from '../first-run/setup-api.js';
+import { mayLeave } from '../../leave-guard.js';
 import { appTiles, defaultChoice } from './wizard.js';
 import { rememberWizard, resetAutoShown, resetWizard, wasAutoShown } from './store.js';
 import { RECOVERY_KIT_LATER_KEY } from '../../states/index.js';
@@ -254,7 +255,11 @@ async function mount(extra: Partial<FirstRunPageProps> = {}): Promise<Mounted> {
       passkeysAvailable: () => true,
       platform: 'mac',
       prfSupport: () => Promise.resolve('yes'),
-      passkeyProof: () => Promise.resolve({ kind: 'passkey', body: new Uint8Array([1, 2, 3]) }),
+      passkeyProof: () =>
+        Promise.resolve({
+          kind: 'passkey',
+          gesture: () => Promise.resolve(new Uint8Array([1, 2, 3])),
+        }),
       goHome: home,
       onSkip: skip,
       readSignal: () => Promise.resolve(undefined),
@@ -280,14 +285,33 @@ async function mount(extra: Partial<FirstRunPageProps> = {}): Promise<Mounted> {
 }
 
 describe('W4-WIZARD: the frame of every step (A1–A3)', () => {
-  it('shows the four-segment progress with "Step 1 of 4 · Pick your AI app" and Skip to Home', async () => {
-    const { skip } = await mount();
+  it('shows the four-segment progress with "Step 1 of 4 · Pick your AI app"', async () => {
+    await mount();
     const bar = host.querySelector('[role="progressbar"]');
     expect(bar?.getAttribute('aria-valuenow')).toBe('1');
     expect(bar?.getAttribute('aria-valuemax')).toBe('4');
     expect(text()).toContain(WIZARD.stepLabel(1, WIZARD.stepNames.app));
     const segs = [...host.querySelectorAll('.st-seg')].map((s) => s.getAttribute('data-state'));
     expect(segs).toEqual(['current', 'todo', 'todo', 'todo']);
+  });
+
+  it('R1-UI-01: a first run has no "Skip to Home" before the ID exists (it would be a dead end)', async () => {
+    await mount();
+    const skipLink = (): HTMLAnchorElement | undefined =>
+      [...host.querySelectorAll('a')].find((a) => a.textContent === WIZARD.skip);
+    expect(skipLink()).toBeUndefined();
+    await click(PICK_STEP.next('Claude Code'));
+    expect(h1()).toBe(CONNECT_STEP.title);
+    expect(skipLink()).toBeUndefined();
+  });
+
+  it('"Skip to Home" is there once the ID exists (step 3), and goes Home', async () => {
+    const { skip } = await mount();
+    await click(PICK_STEP.next('Claude Code'));
+    await click(CONNECT_STEP.connect('Touch ID'));
+    // R1-UI-02: while the once-only master code shows, leaving asks first (the guard is on).
+    await click('I saved it');
+    expect(h1()).toBe(CONNECTED_STEP.title('Claude Code'));
     const skipLink = [...host.querySelectorAll('a')].find((a) => a.textContent === WIZARD.skip);
     expect(skipLink).toBeDefined();
     await act(async () => {
@@ -295,6 +319,28 @@ describe('W4-WIZARD: the frame of every step (A1–A3)', () => {
       await Promise.resolve();
     });
     expect(skip).toHaveBeenCalledTimes(1);
+  });
+
+  it('R1-UI-02: Skip to Home on the master code screen asks first, and says it is shown once', async () => {
+    await mount();
+    await click(PICK_STEP.next('Claude Code'));
+    await click(CONNECT_STEP.connect('Touch ID'));
+    expect(text()).toContain('Your master code');
+    const confirm = vi.spyOn(window, 'confirm');
+    confirm.mockReturnValue(false);
+    expect(mayLeave()).toBe(false);
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(String(confirm.mock.calls[0]?.[0])).toMatch(/only once/);
+    expect(String(confirm.mock.calls[0]?.[0])).toMatch(/Copy it or save it as a file first/);
+    confirm.mockReturnValue(true);
+    expect(mayLeave()).toBe(true);
+    confirm.mockRestore();
+    // Saved: nothing to ask any more.
+    await click('I saved it');
+    const never = vi.spyOn(window, 'confirm');
+    expect(mayLeave()).toBe(true);
+    expect(never).not.toHaveBeenCalled();
+    never.mockRestore();
   });
 
   it('opening Get started stops it from opening by itself again in this page life', async () => {

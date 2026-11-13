@@ -94,11 +94,21 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
   { label: PAGE_TITLES.touchId, path: '/settings/touch-id' },
   { label: PAGE_TITLES.apps, path: '/settings/apps' },
   { label: PAGE_TITLES.filesFolder, path: '/settings/files' },
+  // REL051-RET1: sizes only (retention plan RET-1).
+  { label: PAGE_TITLES.storage, path: '/settings/storage' },
   { label: PAGE_TITLES.appearance, path: '/settings/appearance' },
   { label: PAGE_TITLES.rules, path: '/settings/rules' },
   { label: PAGE_TITLES.proofs, path: '/settings/proofs' },
+  // DESK051-UPD, REL051-UPD2: the app's version and "Check for updates", the one update surface in
+  // the desktop app and in the browser app alike (before Advanced).
+  { label: PAGE_TITLES.updates, path: '/settings/updates' },
   { label: PAGE_TITLES.advanced, path: '/settings/advanced' },
 ];
+
+/** The Settings pages. REL051-UPD2: the same in the desktop app and in the browser. */
+export function settingsPages(): readonly SettingsPage[] {
+  return SETTINGS_PAGES;
+}
 
 /** The agent name segment of `/agents/<name>` (the folder name rule: lower case, digits, dashes). */
 const AGENT_PAGE = /^\/(?:agents|ids)\/([a-z0-9]+(?:-[a-z0-9]+)*)$/;
@@ -126,7 +136,7 @@ export function titleOf(path: string): string {
   if (path.startsWith('/start/')) return PAGE_TITLES.getStarted;
   if (path === INTERIM_PEOPLE_PATH || path === PEOPLE_PATH) return PAGE_TITLES.people;
   if (agentNameOf(path) !== undefined) return PAGE_TITLES.agents;
-  const settings = SETTINGS_PAGES.find((p) => p.path === path);
+  const settings = settingsPages().find((p) => p.path === path);
   if (settings !== undefined && path.startsWith('/settings/')) return settings.label;
   const section = [...SECTIONS, ...ADVANCED_SECTIONS].find((s) => s.path === path);
   if (section !== undefined) return section.label;
@@ -152,7 +162,6 @@ export const REDIRECTS: Readonly<Record<string, string>> = {
   // real now, so `/settings/touch-id` is no longer redirected.
   '/settings/advanced': ADVANCED_HOME,
   '/settings/about': '/advanced/diagnostics',
-  '/settings/storage': '/settings/files',
   '/settings/notifications': SETTINGS_HOME,
   '/settings/passkeys': '/settings/backup',
   '/advanced': ADVANCED_HOME,
@@ -209,11 +218,13 @@ export function goToEntries(hood: boolean): readonly GoToEntry[] {
       keywords: 'pro details technical',
     },
     { label: 'Keyboard shortcuts', hint: '⌘/', action: 'shortcuts', keywords: 'keys' },
-    ...SETTINGS_PAGES.filter((p) => p.path.startsWith('/settings/')).map((p) => ({
-      label: p.label,
-      hint: PAGE_TITLES.settings,
-      path: p.path,
-    })),
+    ...settingsPages()
+      .filter((p) => p.path.startsWith('/settings/'))
+      .map((p) => ({
+        label: p.label,
+        hint: PAGE_TITLES.settings,
+        path: p.path,
+      })),
   ];
   if (hood) {
     for (const s of ADVANCED_SECTIONS) {

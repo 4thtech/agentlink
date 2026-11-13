@@ -58,6 +58,7 @@ import {
   createOsKeychainAgent,
   discardNewOsKeychainAgent,
   peekAgentStore,
+  peekStorageUsage,
   type AgentDirectory,
   type AgentDirectoryEntry,
   type KeyStoreBackendKind,
@@ -888,6 +889,17 @@ export function agentDirectory(
         const found = await readAgentConfig(home, name, check);
         if (found === undefined) return undefined;
         return peekAgentStore(found.paths.store, now());
+      } catch {
+        return undefined;
+      }
+    },
+    // REL051-RET1: the sizes of an ID's store (read-only; never a path or a name).
+    storage: async (name) => {
+      if (!isAgentName(name)) return undefined;
+      try {
+        const found = await readAgentConfig(home, name, check);
+        if (found === undefined) return undefined;
+        return await peekStorageUsage(found.paths.store);
       } catch {
         return undefined;
       }

@@ -1,0 +1,11 @@
+{
+  "_comment": "THE one place for the packaged app's layout under process.resourcesPath (macOS AgentLink.app/Contents/Resources, Windows <install>/resources). Read by src/main/main.ts (resourcePaths) and by build/lib/stage.mjs + build-mac/win.mjs. The core is the packed CLI tarball installed with npm --prefix core, so its desktop host is the CLI's second bundle dist/desktop-host.js (vite build --mode desktop-host). Paths are path segments.",
+  "node": {
+    "posix": ["node", "bin", "node"],
+    "win32": ["node", "node.exe"]
+  },
+  "coreDir": ["core"],
+  "hostScript": ["core", "node_modules", "@4thtech-io", "agentlink", "dist", "desktop-host.js"],
+  "assetsDir": ["assets"],
+  "asarMain": ["dist", "main", "entry.js"]
+}

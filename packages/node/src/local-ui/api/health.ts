@@ -7,16 +7,23 @@
 // One fixed, allowlisted answer, built field by field (nothing of the source object is passed on):
 //   { agent: 'running' | 'paused' | 'not_running' | 'needs_setup',
 //     relays: { connected, total } | null,   // counts only: never an address
-//     lastSyncAt: number | null,             // unix seconds
-//     version: string | null }               // a plain x.y.z[-pre] version
-// Never a relay address, key, token, path, agent ID or error text, whatever the source holds.
+//     lastSyncAt: number | null,             // unix seconds: the last time a relay answered a
+//                                            // check from this computer (REL051-CF2; "Last checked")
+//     network: 'checking' | null,            // REL051-CF2: the first relay check has not finished
+//     version: string | null,                // a plain x.y.z[-pre] version
+//     dataFolder: string | null,             // REL051-B3b: home-relative (`~/.agentlink`) only
+//     uptimeSeconds: number | null }         // REL051-B3b: whole seconds since the server started
+// Never a relay address, key, token, agent ID or error text, whatever the source holds, and no path
+// but the data folder with the home folder shown as `~` (the account name never shows): a folder
+// outside the home folder, or one that is not showable, answers null, never the path.
 //
-// Cheap and bounded: the source (in-process state the caller already keeps, never a network read
-// per request) is asked at most once per HEALTH_CACHE_MS, one read in flight shared by every
-// concurrent request, and a read that takes longer than HEALTH_SOURCE_TIMEOUT_MS or throws answers
-// `not_running` (fail closed: never "running" without evidence). With no agent set up the answer is
-// `needs_setup` and the source is not asked. With no source wired, an opened agent is `running`:
-// the agent is open in the process that answers.
+// Cheap and bounded: the source is asked at most once per HEALTH_CACHE_MS, one read in flight shared
+// by every concurrent request, and a read that takes longer than HEALTH_SOURCE_TIMEOUT_MS or throws
+// answers `not_running` (fail closed: never "running" without evidence). With no agent set up the
+// answer is `needs_setup` and the source is not asked. REL051-CF2: the server wires the open agent's
+// relay check (network-health.ts) when the caller gives no source; it answers from its last result
+// and starts at most one bounded check (connect only, the agent's own relays) per 5 s, so a request
+// never waits on the network beyond a short bound. With neither, an opened agent is `running`.
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { LocalUiContext } from '../context.js';
 import type { LocalUiReadRoute, LocalUiResult, LocalUiRoute } from '../route-types.js';
@@ -28,8 +35,10 @@ export type LocalUiAgentState = 'running' | 'paused' | 'not_running' | 'needs_se
 export interface LocalUiHealthSnapshot {
   readonly agent: 'running' | 'paused' | 'not_running';
   readonly relays?: { readonly connected: number; readonly total: number };
-  /** Unix seconds of the last completed sync. */
+  /** Unix seconds of the last time a relay answered a check from this computer (REL051-CF2). */
   readonly lastSyncAt?: number;
+  /** REL051-CF2: true until the first relay check finished (the app shows "Checking…"). */
+  readonly checking?: boolean;
 }
 
 /** The caller's health source (LocalUiOptions.health). */
@@ -40,7 +49,19 @@ export interface LocalUiHealthBody extends JsonObject {
   readonly agent: LocalUiAgentState;
   readonly relays: { readonly connected: number; readonly total: number } | null;
   readonly lastSyncAt: number | null;
+  /** REL051-CF2: `checking` until the first relay check finished, else null. */
+  readonly network: 'checking' | null;
   readonly version: string | null;
+  /** REL051-B3b: the data folder with the home folder as `~`; null when it is not under home. */
+  readonly dataFolder: string | null;
+  /** REL051-B3b: whole seconds since the server started. */
+  readonly uptimeSeconds: number | null;
+}
+
+/** REL051-B3b: the data folder the caller passes (absolute), with the home folder it is under. */
+export interface LocalUiDataFolder {
+  readonly path: string;
+  readonly home: string;
 }
 
 /** The source is asked at most this often; requests in between get the cached answer. */
@@ -53,6 +74,12 @@ const MAX_RELAYS = 32;
 const FUTURE_SLACK_SECONDS = 300;
 const VERSION = /^\d{1,4}\.\d{1,4}\.\d{1,6}(?:-[0-9A-Za-z][0-9A-Za-z.-]{0,31})?$/;
 const SOURCE_STATES: ReadonlySet<string> = new Set(['running', 'paused', 'not_running']);
+/** A data folder longer than this is not answered. */
+const MAX_FOLDER_LENGTH = 200;
+// Control, format and bidi characters: a folder holding one is not showable.
+const UNSHOWABLE =
+  // eslint-disable-next-line no-control-regex
+  /[\u0000-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff]/u;
 
 const count = (value: unknown): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_RELAYS;
@@ -74,12 +101,61 @@ export function healthVersion(value: unknown): string | null {
   return typeof value === 'string' && VERSION.test(value) ? value : null;
 }
 
+/**
+ * REL051-B3b: the data folder with the home folder shown as `~` (the trimming of files-io.ts
+ * displayFolder and the AI apps page), or null: never an absolute path, never any other path.
+ */
+export function healthDataFolder(value: LocalUiDataFolder | undefined): string | null {
+  if (value === undefined) return null;
+  const { path, home } = value;
+  if (typeof path !== 'string' || typeof home !== 'string') return null;
+  const h = home.endsWith('/') || home.endsWith('\\') ? home.slice(0, -1) : home;
+  // A home of `/` (or empty) would show every path: nothing is answered then.
+  if (h.length === 0 || UNSHOWABLE.test(path) || UNSHOWABLE.test(h)) return null;
+  let shown: string | undefined;
+  if (path === h) shown = '~';
+  for (const sep of ['/', '\\']) {
+    if (shown === undefined && path.startsWith(`${h}${sep}`)) {
+      shown = `~${sep}${path.slice(h.length + 1)}`;
+    }
+  }
+  return shown !== undefined && shown.length <= MAX_FOLDER_LENGTH ? shown : null;
+}
+
+function uptimeOf(startedAt: number | undefined, nowMs: number): number | null {
+  if (startedAt === undefined || !Number.isFinite(startedAt) || nowMs < startedAt) return null;
+  return Math.floor((nowMs - startedAt) / 1000);
+}
+
+/** The server facts every answer carries (REL051-B3b). */
+interface ServerFacts {
+  readonly version: string | null;
+  readonly dataFolder: string | null;
+  readonly uptimeSeconds: number | null;
+}
+
+const NO_FACTS: ServerFacts = Object.freeze({
+  version: null,
+  dataFolder: null,
+  uptimeSeconds: null,
+});
+
 const body = (
   agent: LocalUiAgentState,
+  facts: ServerFacts = NO_FACTS,
   relays: LocalUiHealthBody['relays'] = null,
   lastSyncAt: number | null = null,
-  version: string | null = null,
-): LocalUiHealthBody => Object.freeze({ agent, relays, lastSyncAt, version });
+  network: 'checking' | null = null,
+): LocalUiHealthBody =>
+  Object.freeze({
+    agent,
+    relays,
+    lastSyncAt,
+    network,
+    version: facts.version,
+    dataFolder: facts.dataFolder,
+    uptimeSeconds: facts.uptimeSeconds,
+  });
 
 export interface HealthReaderOptions {
   /** The caller's in-process health state; absent: an opened agent is `running`. */
@@ -88,6 +164,10 @@ export interface HealthReaderOptions {
   readonly hasClient: boolean;
   /** The app version (checked; anything but a plain version is null). */
   readonly version?: string;
+  /** REL051-B3b: the data folder (answered home-relative only, see healthDataFolder). */
+  readonly dataFolder?: LocalUiDataFolder;
+  /** REL051-B3b: when the server started, in milliseconds (for the uptime). */
+  readonly startedAt?: number;
   /** The clock in milliseconds. */
   readonly now: () => number;
 }
@@ -95,13 +175,15 @@ export interface HealthReaderOptions {
 /** One bounded, cached, single-flight health read (see the header). Never rejects. */
 export function createHealthReader(options: HealthReaderOptions): () => Promise<LocalUiHealthBody> {
   const version = healthVersion(options.version);
-  const { source, now } = options;
+  const dataFolder = healthDataFolder(options.dataFolder);
+  const { source, now, startedAt } = options;
   let cached: { readonly at: number; readonly value: LocalUiHealthBody } | undefined;
   let inFlight: Promise<LocalUiHealthBody> | undefined;
 
   const readSource = async (): Promise<LocalUiHealthBody> => {
-    if (!options.hasClient) return body('needs_setup', null, null, version);
-    if (source === undefined) return body('running', null, null, version);
+    const facts: ServerFacts = { version, dataFolder, uptimeSeconds: uptimeOf(startedAt, now()) };
+    if (!options.hasClient) return body('needs_setup', facts);
+    if (source === undefined) return body('running', facts);
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const timeout = new Promise<undefined>((resolve) => {
@@ -112,21 +194,22 @@ export function createHealthReader(options: HealthReaderOptions): () => Promise<
         timeout,
       ]);
       if (typeof snapshot !== 'object' || snapshot === null) {
-        return body('not_running', null, null, version);
+        return body('not_running', facts);
       }
-      const { agent, relays, lastSyncAt } = snapshot as Record<string, unknown>;
+      const { agent, relays, lastSyncAt, checking } = snapshot as Record<string, unknown>;
       if (typeof agent !== 'string' || !SOURCE_STATES.has(agent)) {
-        return body('not_running', null, null, version);
+        return body('not_running', facts);
       }
       return body(
         agent as LocalUiAgentState,
+        facts,
         relaysOf(relays),
         lastSyncOf(lastSyncAt, now()),
-        version,
+        checking === true && agent === 'running' ? 'checking' : null,
       );
     } catch {
       // Fixed answer: the error (and its text) is never passed on.
-      return body('not_running', null, null, version);
+      return body('not_running', facts);
     } finally {
       if (timer !== undefined) clearTimeout(timer);
     }

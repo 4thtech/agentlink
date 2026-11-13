@@ -9,7 +9,12 @@
 import { describe, expect, it } from 'vitest';
 
 const files = import.meta.glob(
-  ['./client.ts', '../first-run/passkey.ts', '../first-run/setup-api.ts'],
+  [
+    './client.ts',
+    '../../api/presence-ceremony.ts',
+    '../first-run/passkey.ts',
+    '../first-run/setup-api.ts',
+  ],
   {
     query: '?raw',
     import: 'default',
@@ -27,11 +32,16 @@ function source(name: string): string {
 describe('the app asks for the passkey with the localhost rules (11 §6.2.1; M1-8e)', () => {
   it('a decision: RP ID localhost, the PRF extension, user verification and the stored credential', () => {
     const client = source('./client.ts');
-    expect(client).toContain("rpId: 'localhost'");
-    expect(client).toContain("userVerification: 'required'");
-    expect(client).toContain('allowCredentials');
-    expect(client).toContain('prf: { eval: { first:');
-    expect(client).toContain("'X-AgentLink-Presence': 'passkey'");
+    // REL051-SF1: the gesture is the shared ceremony gesture, for the server's challenge.
+    const gesture = source('/api/presence-ceremony.ts');
+    expect(client).toContain('browserCeremonyGesture');
+    expect(gesture).toContain("rpId: 'localhost'");
+    expect(gesture).toContain("userVerification: 'required'");
+    expect(gesture).toContain('allowCredentials');
+    expect(gesture).toContain('prf: { eval: { first:');
+    expect(gesture).toContain("headers.set(PRESENCE_HEADER, 'passkey')");
+    expect(gesture).toContain('headers.set(CEREMONY_HEADER, ceremony)');
+    expect(gesture).toContain('challenge: fromBase64url(publicKey.challenge)');
     expect(client).toContain("'/api/owner/passkey'");
     // Only a passkey the server keeps for localhost is offered.
     expect(client).toContain("p['rpId'] !== 'localhost'");

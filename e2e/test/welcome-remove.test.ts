@@ -17,10 +17,22 @@ import { join } from 'node:path';
 import { decodeBase64url, encodeBase64url, encodeUtf8 } from '@4thtech-io/crypto';
 import { newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
 import { afterAll, describe, expect, it } from 'vitest';
-import { encodePasskeyAssertion } from '../../packages/node/dist/owner-passkey.js';
 import { encodeSetupRegistration } from '../../packages/node/dist/owner-setup.js';
 import { VirtualPrfAuthenticator } from '../../packages/node/src/passkey-authenticator.fixture.js';
 import { newComputer, uiDepsOf } from './app-world.js';
+
+/** REL051-SF1: the page's passkey body, each field after its 16-bit big-endian length. */
+function lengthPrefixed(list: readonly Uint8Array[]): Uint8Array {
+  const out = new Uint8Array(list.reduce((n, f) => n + 2 + f.length, 0));
+  let at = 0;
+  for (const f of list) {
+    out[at] = f.length >> 8;
+    out[at + 1] = f.length & 0xff;
+    out.set(f, at + 2);
+    at += 2 + f.length;
+  }
+  return out;
+}
 
 /** The shell's index.html with the empty CSRF meta the server fills in (no script: HTTP only). */
 const APP = new Map<string, Uint8Array>([
@@ -164,10 +176,39 @@ describe('Remove in the session first run started (HOTFIX-045-REMOVE-FIRSTRUN)',
     expect(existsSync(folder)).toBe(true);
 
     // Remove, in the same session and the same host: the typed label and one passkey gesture.
-    const removed = await post('/api/ui/agents/remove', encodePasskeyAssertion(auth.get(salt)), {
-      'X-AgentLink-Input': input({ name: 'default', typedLabel: 'Ana' }),
-      'X-AgentLink-Presence': 'passkey',
+    // REL051-SF1: the gesture answers the ceremony the route issued for this removal.
+    const removeInput = { 'X-AgentLink-Input': input({ name: 'default', typedLabel: 'Ana' }) };
+    const ask = await post('/api/ui/agents/remove', new Uint8Array(0), {
+      ...removeInput,
+      'X-AgentLink-Presence': 'challenge',
     });
+    expect(ask.status).toBe(200);
+    const ready = JSON.parse(ask.body) as { ceremony: string; publicKey: { challenge: string } };
+    const got = auth.get(salt);
+    const signedData = encodeUtf8(
+      JSON.stringify({
+        type: 'webauthn.get',
+        challenge: ready.publicKey.challenge,
+        origin,
+        crossOrigin: false,
+      }),
+    );
+    const removed = await post(
+      '/api/ui/agents/remove',
+      lengthPrefixed([
+        got.credentialId,
+        got.authenticatorData,
+        signedData,
+        auth.sign(got.authenticatorData, signedData),
+        got.userHandle,
+        got.prfOutput,
+      ]),
+      {
+        ...removeInput,
+        'X-AgentLink-Presence': 'passkey',
+        'X-AgentLink-Ceremony': ready.ceremony,
+      },
+    );
     expect({ status: removed.status, body: JSON.parse(removed.body) as unknown }).toEqual({
       status: 200,
       body: { status: 'removed' },

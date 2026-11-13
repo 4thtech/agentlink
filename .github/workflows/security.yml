@@ -93,7 +93,11 @@ jobs:
           #   nothing ships): BSD-2-Clause AND BSD-3-Clause AND Unlicense, plus public-domain
           #   files (LicenseRef-scancode-public-domain) that the allowlist cannot name. It is
           #   the generators' independent Keccak-256.
-          allow-dependencies-licenses: pkg:pypi/pycryptodome@3.23.0
+          # - json-schema-typed 8.0.2 (apps/desktop/build/core-lock/package-lock.json). Owner approved
+          #   2026-11-13 (Tali, chat): BSD-2-Clause per npm; graph also lists JSON.
+          allow-dependencies-licenses: >-
+            pkg:pypi/pycryptodome@3.23.0,
+            pkg:npm/json-schema-typed@8.0.2
 
   # gitleaks scan; the implementation is the reusable workflow secret-scan.yml (official release
   # binary, checksum-verified; see that file). Pull requests and pushes to main scan the full

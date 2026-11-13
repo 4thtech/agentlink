@@ -3,6 +3,8 @@
 // to the open agent. An AI app serves one agent at a time; an agent may serve several apps. The page
 // never signs and never sends a path: the server takes paths from its fixed table (06 §7). Names and
 // paths are rendered as text only (I-5).
+// WP-D7: a card connected to the open ID with npx offers "Use the app for …" when the AgentLink app
+// is on this computer (or says to move it first when it runs from a place that is never written).
 import { Button, EmptyState, Icon, Skeleton, Surface, useHood } from '@4thtech-io/ui';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { createAgentsApi, type AgentsApi } from '../agents/api.js';
@@ -11,7 +13,14 @@ import type { AgentsList } from '../agents/data.js';
 import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
 import { createAppsApi, type AppsApi } from './api.js';
 import { tildePath } from './tilde.js';
-import { cardState, type AppChange, type AppRow, type AppsList, type Entry } from './data.js';
+import {
+  cardState,
+  type AppChange,
+  type AppRow,
+  type AppsList,
+  type DesktopAppWord,
+  type Entry,
+} from './data.js';
 import { ChangePanel, ManualPanel, type Labels } from './panel.js';
 import { APPS_STRINGS as S } from './strings.js';
 import './apps.css';
@@ -23,7 +32,7 @@ export interface AppsPageProps {
 }
 
 type Panel =
-  | { readonly kind: 'change'; readonly app: AppRow }
+  | { readonly kind: 'change'; readonly app: AppRow; readonly form?: 'app' }
   | {
       readonly kind: 'manual';
       readonly app: AppRow | undefined;
@@ -47,7 +56,9 @@ function Card({
   restart,
   running,
   primary,
+  desktopApp,
   onReview,
+  onUseApp,
   onManual,
   onRecheck,
 }: {
@@ -57,7 +68,9 @@ function Card({
   restart: boolean;
   running: boolean;
   primary: boolean;
+  desktopApp: DesktopAppWord | undefined;
   onReview: () => void;
+  onUseApp: () => void;
   onManual: () => void;
   onRecheck: () => void;
 }): ReactElement {
@@ -77,15 +90,24 @@ function Card({
       } else {
         mark = <Icon name="check" size={14} />;
         if (running) detail = S.running;
+        else if (row.form === 'app') detail = S.runsFromApp;
+        else if (desktopApp === 'move_first') detail = S.moveAppFirst;
       }
       actions = restart ? (
         <button type="button" className="ap-link al-text-body-sm" onClick={onRecheck}>
           {S.checkAgain}
         </button>
       ) : (
-        <Button variant="secondary" onClick={onReview}>
-          {S.disconnect}
-        </Button>
+        <>
+          {row.form !== 'app' && desktopApp === 'available' ? (
+            <Button variant="secondary" onClick={onUseApp}>
+              {S.useApp(row.name)}
+            </Button>
+          ) : null}
+          <Button variant="secondary" onClick={onReview}>
+            {S.disconnect}
+          </Button>
+        </>
       );
       if (restart) word = `${S.connectedTo(labels.label)}. ${S.needsRestart}`;
       break;
@@ -243,7 +265,7 @@ export function AppsPage({ api, agents, owner }: AppsPageProps): ReactElement {
     setNotice(S.agentChanged);
     read();
   }, [read]);
-  const done = (change: AppChange): void => {
+  const done = (change: AppChange, launcherUnchanged = false): void => {
     setPanel(undefined);
     if (change.kind !== 'disconnect') setRestart((s) => new Set(s).add(change.app));
     else
@@ -252,11 +274,11 @@ export function AppsPage({ api, agents, owner }: AppsPageProps): ReactElement {
         next.delete(change.app);
         return next;
       });
-    setNotice(
+    const said =
       change.kind === 'disconnect'
         ? S.willStop(change.name, labels.label)
-        : S.restartToFinish(change.name),
-    );
+        : S.restartToFinish(change.name);
+    setNotice(launcherUnchanged ? `${said}. ${S.launcherNotChanged}` : said);
     read();
     announceAgentsChanged();
   };
@@ -273,7 +295,7 @@ export function AppsPage({ api, agents, owner }: AppsPageProps): ReactElement {
   };
 
   return (
-    <main className="ap-page">
+    <div className="ap-page">
       <div className="ap-head">
         <h1 className="al-text-title-1">{S.title}</h1>
         {labels.label === '' ? null : (
@@ -340,7 +362,9 @@ export function AppsPage({ api, agents, owner }: AppsPageProps): ReactElement {
                   connectedHere[0]?.app === row.app
                 }
                 primary={i === firstPrimary}
+                desktopApp={list?.desktopApp}
                 onReview={() => setPanel({ kind: 'change', app: row })}
+                onUseApp={() => setPanel({ kind: 'change', app: row, form: 'app' })}
                 onManual={() => setPanel({ kind: 'manual', app: row, entry: undefined })}
                 onRecheck={() => {
                   setNotice(undefined);
@@ -363,6 +387,7 @@ export function AppsPage({ api, agents, owner }: AppsPageProps): ReactElement {
       {panel?.kind === 'change' && open !== null ? (
         <ChangePanel
           app={panel.app}
+          {...(panel.form === 'app' ? { form: 'app' as const } : {})}
           labels={labels}
           api={appsApi}
           owner={ownerClient}
@@ -377,9 +402,10 @@ export function AppsPage({ api, agents, owner }: AppsPageProps): ReactElement {
           app={panel.app}
           folder={open ?? 'default'}
           entry={panel.entry}
+          known={list?.apps ?? []}
           onClose={closePanel}
         />
       ) : null}
-    </main>
+    </div>
   );
 }

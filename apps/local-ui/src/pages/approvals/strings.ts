@@ -3,7 +3,7 @@
 // except that the local app says "master code" where that page used the older wording (11 §5.5,
 // UX-031-QUICKWINS; BACKUP_CODE_WORDING below). `{name}` marks an inserted value;
 // the result is only ever rendered as text. The sheet's words are @4thtech-io/ui PAY_CONFIRM_STRINGS.
-import { sensorWord } from '../../presence-word.js';
+import { sensorSentence, sensorWord } from '../../presence-word.js';
 
 /** The CLI prefix every command shown to the owner uses (packages/node cli-command.ts). */
 export const CLI_PREFIX = 'npx -y @4thtech-io/agentlink';
@@ -14,6 +14,9 @@ export const APPROVAL_STRINGS = Object.freeze({
   firstRunTitle: 'Protect your approvals',
   firstRun:
     'Approvals need you: each approval, or each list of approvals you review together, asks for your passkey or master code, and only after you click Approve. Never give them to your AI.',
+  checkFailedTitle: "Couldn't check how approvals are protected",
+  checkFailed: "AgentLink didn't answer just now. Nothing was changed.",
+  retry: 'Try again',
   desktopNote: 'The desktop app protects approvals more strongly.',
   // UX 2026-11-12 (notices): the desktop app's own words (it is never "this browser").
   protectedTitle: 'Approvals use your master code',
@@ -25,7 +28,8 @@ export const APPROVAL_STRINGS = Object.freeze({
   nativeAction: 'Turn on {sensor}',
   hideNotice: 'Hide this',
   needsOwnerTitle: 'Set up AgentLink',
-  needsOwner: `Set up your master code first: run ${CLI_PREFIX} owner init in your own terminal. Until then, nothing can be approved here.`,
+  needsOwner:
+    'Finish setting up AgentLink first: create your first ID on Home and save your master code. Until then, nothing can be approved here.',
   noPasskeys: "Passkeys aren't available in this browser. Approve with your master code.",
   appTitle: 'Approvals',
   // UX2-a (B-11 §26.2): the Grid/List control.
@@ -100,8 +104,13 @@ export const APPROVAL_STRINGS = Object.freeze({
   busy: 'Another approval is being confirmed. Try again in a moment.',
   refused: 'This decision was not applied. Nothing was changed.',
   listRefused: 'These decisions were not applied. Nothing was changed. Review the list again.',
-  needsSetup: `Set up your master code first: run ${CLI_PREFIX} owner init in your own terminal.`,
-  notUsed: "The passkey wasn't used. Nothing was changed. You can enter your master code instead.",
+  needsSetup:
+    'Finish setting up AgentLink first: create your first ID on Home and save your master code.',
+  // REL051-R2C (R2-UI-06): the sensor's own word (Touch ID, Windows Hello, your passkey), never
+  // "passkey" on a Mac or Windows.
+  get notUsed(): string {
+    return `${sensorSentence()} wasn't used. Nothing was changed. You can enter your master code instead.`;
+  },
   paidAlone: 'This costs credits. Approve it on its own.',
   listPaid:
     'A request in this list costs credits and is approved on its own. Nothing was changed. Review the list again.',

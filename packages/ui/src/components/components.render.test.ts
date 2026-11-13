@@ -41,6 +41,8 @@ describe('the 31 components (D-116)', () => {
     'TextField',
     'Toast',
     'TrayMenu',
+    'SafeCode',
+    'SafeMarkdown',
     'UntrustedContent',
     'Wordmark',
   ];
@@ -49,7 +51,7 @@ describe('the 31 components (D-116)', () => {
   });
   it('exports the name rule and the icon names', () => {
     expect(typeof ui.formatContactName).toBe('function');
-    expect(ui.iconNames).toHaveLength(57);
+    expect(ui.iconNames).toHaveLength(61);
   });
   it('has a fixture for every component', () => {
     const covered = new Set(Object.keys(fixtures).map((k) => k.split('/')[0]));

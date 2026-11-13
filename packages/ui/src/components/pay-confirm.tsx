@@ -22,6 +22,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactElement,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { Button, TextField } from './forms.js';
 import { holdInert } from './inert.js';
 import { refocusOnLoss, useLayer } from './layers.js';
@@ -419,7 +420,7 @@ export function PayConfirmSheet(props: PayConfirmSheetProps): ReactElement {
   const amountId = `${id}-amount`;
   const forId = `${id}-for`;
 
-  return (
+  const node = (
     <div
       className="al-pay-overlay"
       onClick={(event) => {
@@ -567,4 +568,5 @@ export function PayConfirmSheet(props: PayConfirmSheetProps): ReactElement {
       </div>
     </div>
   );
+  return typeof document === 'undefined' ? node : createPortal(node, document.body);
 }

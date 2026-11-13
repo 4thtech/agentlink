@@ -82,6 +82,7 @@ import {
   type SetupFolders,
 } from '../owner-setup.js';
 import { LocalUiRouteRegistry, createLocalUiRoutes } from './routes.js';
+import { readUnsavedMarker, writeUnsavedMarker } from '../master-code-unsaved.js';
 import { TEST_APP } from '../local-ui-app.fixture.js';
 
 const KDF = { memoryKiB: 19456, iterations: 2, parallelism: 1 } as const;
@@ -689,7 +690,12 @@ describe('setup is refused when any owner exists, including a partial one (D-78;
       const s = await h.session();
       const res = await post(h, BEGIN, s, new Uint8Array(0));
       expect(res.status).toBe(409);
-      expect(JSON.parse(res.body)).toEqual({ status: 'owner_exists' });
+      // REL051-SF3 (R1-SEC-04): a lone `owner-passkey` item (no `owner` item) holds first run as
+      // "Finish restoring" (the page opens Restore, which replaces a leftover of the same owner);
+      // still refused, nothing made or written.
+      expect(JSON.parse(res.body)).toEqual({
+        status: what === 'only an owner-passkey item' ? 'finish_restore' : 'owner_exists',
+      });
       expect(h.seeds).toHaveLength(0);
       expect(agent.keychain.items).toEqual(before);
     });
@@ -724,7 +730,8 @@ describe('setup is refused when any owner exists, including a partial one (D-78;
       new Authenticator().create(begun.publicKey, { origin: h.origin }),
     );
     expect(res.status).toBe(409);
-    expect(JSON.parse(res.body)).toEqual({ status: 'owner_exists' });
+    // REL051-SF3 (R1-SEC-04): the lone `owner-passkey` item now holds first run as "Finish restoring".
+    expect(JSON.parse(res.body)).toEqual({ status: 'finish_restore' });
     expect(agent.keychain.items.get(OWNER_PASSKEY_ACCOUNT)).toEqual(planted);
     expect(agent.keychain.items.has(OWNER_ACCOUNT)).toBe(false);
     expect(allZero(h.seeds[0] as Uint8Array)).toBe(true);
@@ -1969,4 +1976,140 @@ describe('PRF only on get(): the second gesture of the same setup (M1-11s-c-c, F
       expect((JSON.parse(right.body) as { passkey: boolean }).passkey).toBe(true);
     }, 60_000);
   }
+});
+
+// REL051-CF3 (R1-CLASS-03, R1-UI-02; 04 §2.3.3 T-12, §2.5; 08 §1): the master code shown once
+// survives a reload of "Your master code" until the owner says "I saved it": the server keeps it in
+// memory only, for this page session, for MASTER_CODE_HOLD_MS. After a restart it is gone and the
+// page is told so (never asked for it), with whether Touch ID can make a new one.
+describe('REL051-CF3: a reload on "Your master code" shows the same code again', () => {
+  const SHOW = '/api/ui/master-code/show';
+  const SAVED = '/api/ui/master-code/saved';
+  const home = (): string => join(dir, 'home');
+  const withHome = (): ApprovalServerInternals => ({ restore: { home: home(), kdf: KDF } });
+
+  async function setUp(agent: Agent, prf = true) {
+    const h = await harness(agent, { internals: withHome() });
+    const s = await h.session();
+    const begun = await begin(h, s);
+    const res = await post(
+      h,
+      FINISH,
+      s,
+      new Authenticator({ prf }).create(begun.publicKey, { origin: h.origin }),
+    );
+    expect(res.status).toBe(200);
+    const done = JSON.parse(res.body) as { ownerCode: string; fingerprint: string };
+    return { h, s, done };
+  }
+
+  const show = async (h: Harness, s: Session) => {
+    const res = await post(h, SHOW, s, new Uint8Array(0));
+    return { status: res.status, json: JSON.parse(res.body) as Record<string, unknown> };
+  };
+
+  it('the same page session gets the same code and step back; another session never does', async () => {
+    const agent = await initAgent();
+    const { h, s, done } = await setUp(agent);
+    const again = await show(h, s);
+    expect(again.status).toBe(200);
+    expect(again.json).toMatchObject({
+      status: 'shown',
+      kind: 'first_run',
+      code: done.ownerCode,
+      passkey: true,
+      fingerprint: done.fingerprint,
+    });
+    const other = await h.session();
+    const elsewhere = await show(h, other);
+    expect(elsewhere.json).toEqual({ status: 'none' });
+    expect(JSON.stringify(elsewhere.json)).not.toContain(done.ownerCode);
+    // Never in an event.
+    expect(JSON.stringify(h.events)).not.toContain(done.ownerCode);
+  }, 60_000);
+
+  it('"I saved it" ends it: the code is wiped, the marker goes, nothing is shown again', async () => {
+    const agent = await initAgent();
+    const { h, s, done } = await setUp(agent);
+    const saved = await post(h, SAVED, s, new Uint8Array(0));
+    expect(saved.status).toBe(200);
+    const after = await show(h, s);
+    expect(after.json).toEqual({ status: 'none' });
+    expect(JSON.stringify(after.json)).not.toContain(done.ownerCode);
+  }, 60_000);
+
+  it('the hold ends after MASTER_CODE_HOLD_MS: then the page is told the code was not saved', async () => {
+    const agent = await initAgent();
+    const { h, s, done } = await setUp(agent);
+    h.clock += 10 * 60 * 1000 + 1;
+    const late = await show(h, s);
+    expect(late.json).toEqual({ status: 'lost', kind: 'first_run', touchId: true });
+    expect(JSON.stringify(late.json)).not.toContain(done.ownerCode);
+  }, 60_000);
+
+  it('after a restart the code is gone and the page is told so, never asked for it', async () => {
+    const agent = await initAgent();
+    const { h, done } = await setUp(agent);
+    await h.server.close();
+    const next = await harness(agent, { setup: false, internals: withHome() });
+    const s2 = await next.session();
+    const lost = await show(next, s2);
+    expect(lost.json).toEqual({ status: 'lost', kind: 'first_run', touchId: true });
+    expect(JSON.stringify(lost.json)).not.toContain(done.ownerCode);
+    // Saved elsewhere (or replaced in Settings): nothing more to say.
+    expect((await post(next, SAVED, s2, new Uint8Array(0))).status).toBe(200);
+    expect((await show(next, s2)).json).toEqual({ status: 'none' });
+  }, 60_000);
+
+  it('without Touch ID the restart says so too (touchId false)', async () => {
+    const agent = await initAgent();
+    const { h } = await setUp(agent, false);
+    await h.server.close();
+    const next = await harness(agent, { setup: false, internals: withHome() });
+    const lost = await show(next, await next.session());
+    expect(lost.json).toEqual({ status: 'lost', kind: 'first_run', touchId: false });
+  }, 60_000);
+
+  it('IR-REL051-CF3-1 (4): a failed setup never overwrites or removes an earlier marker', async () => {
+    const agent = await initAgent();
+    const earlier = {
+      kind: 'restore' as const,
+      stage: 'writing' as const,
+      ownerNostr: randomBytes(32),
+      item: randomBytes(32),
+      // A run that is still alive (this process), so the start-up settle keeps it on every OS
+      // (pid 1 is not a process on Windows).
+      pid: process.pid,
+      at: 1,
+    };
+    await writeUnsavedMarker(home(), earlier);
+    agent.keychain.failSet.add(OWNER_ACCOUNT);
+    const h = await harness(agent, { internals: withHome() });
+    const s = await h.session();
+    const begun = await begin(h, s);
+    const res = await post(
+      h,
+      FINISH,
+      s,
+      new Authenticator().create(begun.publicKey, { origin: h.origin }),
+    );
+    expect(res.status).not.toBe(200);
+    const kept = await readUnsavedMarker(home());
+    expect(kept?.kind).toBe('restore');
+    expect(kept?.item).toEqual(earlier.item);
+  }, 60_000);
+
+  it('the show and saved routes need the session, CSRF, Origin and fetch metadata', async () => {
+    const agent = await initAgent();
+    const { h, s } = await setUp(agent);
+    expect((await post(h, SHOW, s, new Uint8Array(0), { Cookie: undefined })).status).toBe(401);
+    expect((await post(h, SHOW, s, new Uint8Array(0), { 'X-AgentLink-CSRF': 'x' })).status).toBe(
+      403,
+    );
+    expect((await post(h, SHOW, s, new Uint8Array(0), { Origin: undefined })).status).toBe(403);
+    expect(
+      (await post(h, SHOW, s, new Uint8Array(0), { 'Sec-Fetch-Site': 'cross-site' })).status,
+    ).toBe(403);
+    expect((await send(h.port, SHOW, { headers: { Cookie: s.cookie } })).status).toBe(405);
+  }, 60_000);
 });

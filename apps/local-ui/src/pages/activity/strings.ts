@@ -152,6 +152,13 @@ export const ACTIVITY_COPY = {
   contactRevokedLine: 'You are no longer connected',
   contactRenamed: '{former} is now called {new}',
   contactRenamedLine: 'Shown under the new name in People',
+  // R1-SEC-03 (04 §3.6, 11 §6): never the second party's name, only the contact the invite connected.
+  inviteAnsweredTwice: [
+    'Someone else also answered your invite. Compare the 12 digits with {who} before you trust this contact.',
+    'Someone else also answered your invite. Do the Contact check before you trust this contact.',
+  ] as Pair,
+  inviteAnsweredTwiceLine: 'Their answer was refused. Nobody else was connected',
+  pillAnsweredTwice: 'Answered twice',
   pillConnected: 'Connected',
   pillRemoved: 'Removed',
   pillRenamed: 'Renamed',
@@ -204,7 +211,7 @@ export const ACTIVITY_COPY = {
   sessionTitle: 'This page has ended.',
   sessionBody: 'Ask your AI to open AgentLink again.',
   notSetUpTitle: "AgentLink isn't set up on this computer yet.",
-  notSetUpPrompt: 'ask your AI to set up AgentLink',
+  notSetUpPrompt: 'create your first ID on Home',
 } as const;
 
 /** The AI apps by the ids the feed carries (06 §7), as the owner knows them. */

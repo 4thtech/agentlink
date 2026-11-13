@@ -7,8 +7,9 @@
 // - `check` (Check my master code): the master code only (a passkey proof is `presence_required`).
 //   It is an oracle for the code, so it is exactly as limited as every presence route: the same
 //   backoff and wait, and a wrong code is the same 403 `presence_rejected`. Signs nothing.
-// - `test` (Test Touch ID): a passkey assertion only. The gate checks it and opens the owner store
-//   with it, closes that session at once, and the handler gets no way to sign or read anything.
+// - `test` (Test Touch ID): a passkey assertion or, in the desktop app, native presence (DESK051-C2);
+//   never the master code. The gate checks it and opens the owner store with it, closes that session
+//   at once, and the handler gets no way to sign or read anything.
 // - `replace`: either proof. The gate opens the owner store for this one request and the handler's
 //   `replaceOwnerCode` stages a new generated master code in `owner-next` for this page session
 //   (OwnerCodeChanges below; owner-change-code.ts). The `owner` item is untouched, so the current code

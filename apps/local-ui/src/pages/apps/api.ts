@@ -7,6 +7,7 @@
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import type { PresenceProof } from '../contacts/owner.js';
 import { parseApps, parsePreview, type AppChange, type AppsList } from './data.js';
+import { sendWithProof } from '../../api/presence-ceremony.js';
 
 export type ReadOutcome =
   { readonly kind: 'ok'; readonly list: AppsList } | { readonly kind: 'error' };
@@ -25,6 +26,8 @@ export type ChangeKind =
   | 'quit_first'
   | 'agent_changed'
   | 'write_failed'
+  /** WP-D7: the AgentLink app sits where an AI app must not point (moved meanwhile). */
+  | 'app_location'
   | 'not_applied'
   | 'rejected'
   | 'required'
@@ -36,11 +39,19 @@ export type ChangeKind =
   | 'failed';
 export interface ChangeOutcome {
   readonly kind: ChangeKind;
+  /** WP-D7: done, but the `agentlink` command (asked for) was not changed. */
+  readonly launcherUnchanged?: true;
+}
+
+/** WP-D7: "Use the app for …" (`form: 'app'`), with the `agentlink` command too (`launcher`). */
+export interface PreviewRequest {
+  readonly form?: 'app';
+  readonly launcher?: boolean;
 }
 
 export interface AppsApi {
   list(): Promise<ReadOutcome>;
-  preview(app: string, agent: string): Promise<PreviewOutcome>;
+  preview(app: string, agent: string, request?: PreviewRequest): Promise<PreviewOutcome>;
   apply(changeId: string, proof: PresenceProof): Promise<ChangeOutcome>;
   disconnect(changeId: string, proof: PresenceProof): Promise<ChangeOutcome>;
 }
@@ -58,6 +69,7 @@ const WORDS: ReadonlySet<string> = new Set([
   'write_failed',
   'not_applied',
   'busy',
+  'app_location',
 ]);
 
 function pageToken(): string {
@@ -73,15 +85,20 @@ function base64url(text: string): string {
 }
 
 /** A route answers `{status}` (the presence gate, the preview) or `{error}` (a route's refusal). */
-async function word(res: Response): Promise<string | undefined> {
+async function word(res: Response): Promise<{ said?: string; launcherUnchanged?: true }> {
   try {
     const body: unknown = await res.json();
-    if (typeof body !== 'object' || body === null) return undefined;
-    const { status, error } = body as { status?: unknown; error?: unknown };
-    if (typeof status === 'string') return status;
-    return typeof error === 'string' ? error : undefined;
+    if (typeof body !== 'object' || body === null) return {};
+    const { status, error, launcher } = body as {
+      status?: unknown;
+      error?: unknown;
+      launcher?: unknown;
+    };
+    const extra = launcher === 'not_changed' ? { launcherUnchanged: true as const } : {};
+    if (typeof status === 'string') return { said: status, ...extra };
+    return typeof error === 'string' ? { said: error } : {};
   } catch {
-    return undefined;
+    return {};
   }
 }
 
@@ -103,26 +120,18 @@ export function createAppsApi(options: AppsApiOptions = {}): AppsApi {
       'Content-Type': 'application/octet-stream',
       'X-AgentLink-Input': base64url(JSON.stringify({ changeId })),
     });
-    if (proof.kind === 'passkey') headers.set('X-AgentLink-Presence', 'passkey');
-    const body = proof.kind === 'passkey' ? proof.body : new TextEncoder().encode(proof.code);
     let res: Response;
     try {
-      res = await doFetch(path, {
-        method: 'POST',
-        headers,
-        body: body as BodyInit,
-        credentials: 'same-origin',
-        cache: 'no-store',
-      });
+      res = await sendWithProof(doFetch, path, headers, proof);
     } catch {
       return { kind: 'offline' };
-    } finally {
-      body.fill(0);
     }
     if (res.status === 501) return { kind: 'not_available' };
     if (res.status === 401) return { kind: 'session' };
-    const said = await word(res);
-    if (res.status === 200 && said === 'done') return { kind: 'done' };
+    const { said, launcherUnchanged } = await word(res);
+    if (res.status === 200 && said === 'done') {
+      return launcherUnchanged === true ? { kind: 'done', launcherUnchanged } : { kind: 'done' };
+    }
     if (said === 'presence_rejected') return { kind: 'rejected' };
     if (said === 'presence_required') return { kind: 'required' };
     if (said === 'wait' || res.status === 429) return { kind: 'wait' };
@@ -139,8 +148,12 @@ export function createAppsApi(options: AppsApiOptions = {}): AppsApi {
       const list = parseApps(result.data);
       return list === undefined ? { kind: 'error' } : { kind: 'ok', list };
     },
-    async preview(app, agent) {
+    async preview(app, agent, request = {}) {
       const query = new URLSearchParams({ app, agent });
+      if (request.form === 'app') {
+        query.set('form', 'app');
+        if (request.launcher === true) query.set('launcher', '1');
+      }
       const result = await client.get(`${APPS}/preview?${query.toString()}`);
       if (result.kind === 'not_available') return { kind: 'not_available' };
       if (result.kind === 'error' && result.status === 409) return { kind: 'agent_changed' };

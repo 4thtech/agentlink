@@ -91,11 +91,6 @@ const ALLOWED = [
       "names the user's own saved passwords in ~/Library/Keychains, not one of our codes (§5.5)",
   },
   {
-    page: 'apps/desktop-app.md',
-    terms: ['password'],
-    reason: "the operating system's device password, not one of our codes (§5.5)",
-  },
-  {
     page: 'get-started/protect-your-approvals.md',
     terms: ['owner key'],
     reason:
