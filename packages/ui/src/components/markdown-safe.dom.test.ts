@@ -13,7 +13,13 @@
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SafeCode, SafeMarkdown } from './markdown-safe.js';
+import {
+  MARKDOWN_PIECE_MAX,
+  MARKDOWN_SLICE,
+  MARKDOWN_TOTAL,
+  SafeCode,
+  SafeMarkdown,
+} from './markdown-safe.js';
 import rendererText from './markdown-safe.tsx?raw';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -35,22 +41,46 @@ const md = (text: string): void => {
   act(() => root.render(h(SafeMarkdown, { text })));
 };
 
+/** Elements drawn so far (a live collection: no copy of the tree per count). */
+const drawn = (): number => host.getElementsByTagName('*').length;
+
+// REL051-CIE: the DoS guarantees are checked by COUNTING the work (elements drawn per render or
+// slice, and slices per document), which is deterministic on any machine. Wall-clock time is only a
+// second, coarse guard: shared CI runners were 5-10x slower than a laptop and failed a 250 ms bound
+// on healthy code, while a quadratic regression on 256 KB still takes far longer than this ceiling.
+const WALL_CLOCK_CEILING_MS = 2_000;
+/** Elements one top-level piece may draw beyond its cost (wrappers, a link or image chip's parts). */
+const ELEMENTS_PER_COST = 2;
+/** The most elements one slice may add: a full slice plus one maximal piece, with chip parts. */
+const SLICE_ELEMENTS_MAX = (MARKDOWN_SLICE + MARKDOWN_PIECE_MAX) * ELEMENTS_PER_COST;
+/**
+ * The most slices one document may take. A slice stops only when the next piece would take it past
+ * MARKDOWN_SLICE, so any two slices in a row draw more than MARKDOWN_SLICE: at most two slices per
+ * MARKDOWN_SLICE of the drawn budget, plus the plain-text rest.
+ */
+const SLICES_MAX = 2 * Math.ceil(MARKDOWN_TOTAL / MARKDOWN_SLICE) + 2;
+/** A drain test draws up to SLICES_MAX slices; give a loaded CI runner room for every one. */
+const DRAIN_TIMEOUT_MS = SLICES_MAX * WALL_CLOCK_CEILING_MS;
+
 /**
  * Lets the later slices draw (each in its own task) until the document is complete; answers how
- * long the slowest slice took and how many slices there were.
+ * long the slowest slice took, how many slices there were and the most elements one slice added.
  */
-async function drain(): Promise<{ slowest: number; slices: number }> {
+async function drain(): Promise<{ slowest: number; slices: number; mostAdded: number }> {
   let slowest = 0;
   let slices = 0;
+  let mostAdded = 0;
   while (host.querySelector('.al-md[aria-busy="true"]') !== null && slices < 1_000) {
+    const before = drawn();
     const start = performance.now();
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
     });
     slowest = Math.max(slowest, performance.now() - start);
+    mostAdded = Math.max(mostAdded, drawn() - before);
     slices += 1;
   }
-  return { slowest, slices };
+  return { slowest, slices, mostAdded };
 }
 
 const FORBIDDEN_TAGS = [
@@ -192,24 +222,32 @@ function realisticPlan(): { text: string; sections: number } {
 }
 
 describe('SafeMarkdown: a real 60 KB plan draws fully formatted (IR-REL051-A34-1)', () => {
-  it('every heading, list, table and code block is drawn; nothing falls to plain text', async () => {
-    const { text, sections } = realisticPlan();
-    expect(text.length).toBeGreaterThan(59_000);
-    const start = performance.now();
-    md(text);
-    expect(performance.now() - start).toBeLessThan(250);
-    const { slowest } = await drain();
-    expect(slowest).toBeLessThan(250);
-    expect(host.querySelector('.al-md-rest')).toBeNull();
-    expect(host.querySelectorAll('h4')).toHaveLength(sections);
-    expect(host.querySelectorAll('h5')).toHaveLength(sections);
-    expect(host.querySelectorAll('table')).toHaveLength(sections);
-    expect(host.querySelectorAll('pre code')).toHaveLength(sections);
-    expect(host.querySelectorAll('blockquote')).toHaveLength(sections);
-    expect(host.querySelectorAll('ol > li > ul > li > ul > li')).toHaveLength(2 * sections);
-    expect(host.textContent).toContain(`Keep module ${String(sections)} small`);
-    assertInert();
-  });
+  it(
+    'every heading, list, table and code block is drawn; nothing falls to plain text',
+    { timeout: DRAIN_TIMEOUT_MS },
+    async () => {
+      const { text, sections } = realisticPlan();
+      expect(text.length).toBeGreaterThan(59_000);
+      const start = performance.now();
+      md(text);
+      const took = performance.now() - start;
+      expect(drawn()).toBeLessThanOrEqual(SLICE_ELEMENTS_MAX);
+      const { slowest, slices, mostAdded } = await drain();
+      expect(slices).toBeLessThanOrEqual(SLICES_MAX);
+      expect(mostAdded).toBeLessThanOrEqual(SLICE_ELEMENTS_MAX);
+      expect(took).toBeLessThan(WALL_CLOCK_CEILING_MS);
+      expect(slowest).toBeLessThan(WALL_CLOCK_CEILING_MS);
+      expect(host.querySelector('.al-md-rest')).toBeNull();
+      expect(host.querySelectorAll('h4')).toHaveLength(sections);
+      expect(host.querySelectorAll('h5')).toHaveLength(sections);
+      expect(host.querySelectorAll('table')).toHaveLength(sections);
+      expect(host.querySelectorAll('pre code')).toHaveLength(sections);
+      expect(host.querySelectorAll('blockquote')).toHaveLength(sections);
+      expect(host.querySelectorAll('ol > li > ul > li > ul > li')).toHaveLength(2 * sections);
+      expect(host.textContent).toContain(`Keep module ${String(sections)} small`);
+      assertInert();
+    },
+  );
 });
 
 describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
@@ -314,8 +352,9 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
     expect(host.textContent).toContain('level 299');
   });
 
-  // IR-REL051-A34-1 (M1, M2, lows): every pathological 256 KB input renders in under 250 ms and
+  // IR-REL051-A34-1 (M1, M2, lows): every pathological 256 KB input draws a bounded first slice and
   // under 50 000 elements; past the document budget the rest is plain text with a short note.
+  // REL051-CIE: the bound is counted (elements), with a coarse wall-clock ceiling as a second guard.
   const K256 = 256 * 1024;
   const fill = (unit: string): string => unit.repeat(Math.floor(K256 / unit.length));
   const table = `| a | b |\n| - | - |\n${'| 1 | 2 |\n'.repeat(2_000)}\n`;
@@ -347,15 +386,19 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
     links: fill('[a](https://a.example) '),
     images: fill('![a](https://a.example/i.png) '),
   };
-  it.each(Object.keys(BUDGET_CASES))('%s: under 250 ms and 50 000 elements', (name) => {
-    const text = BUDGET_CASES[name] as string;
-    const start = performance.now();
-    md(text);
-    const took = performance.now() - start;
-    expect(took).toBeLessThan(250);
-    expect(host.querySelectorAll('*').length).toBeLessThan(50_000);
-    assertInert();
-  });
+  it.each(Object.keys(BUDGET_CASES))(
+    '%s: a bounded first slice, under 50 000 elements, under the wall-clock ceiling',
+    (name) => {
+      const text = BUDGET_CASES[name] as string;
+      const start = performance.now();
+      md(text);
+      const took = performance.now() - start;
+      expect(drawn()).toBeLessThanOrEqual(SLICE_ELEMENTS_MAX);
+      expect(drawn()).toBeLessThan(50_000);
+      expect(took).toBeLessThan(WALL_CLOCK_CEILING_MS);
+      assertInert();
+    },
+  );
 
   it('says when the rest is shown as plain text, and keeps that text', async () => {
     md(`${fill('- a\n')}\nLAST LINE`);
@@ -367,13 +410,17 @@ describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
   // IR-REL051-A34-1 follow-up: the rest of a document draws in later slices; every slice is
   // bounded too, and the whole stays under the hard cap.
   it.each(['list items', 'repeated 2000-row tables', 'links', 'paragraphs', 'emphasis'])(
-    '%s, drawn to the end: each slice under 250 ms, the whole under 50 000 elements',
+    '%s, drawn to the end: each slice bounded, few slices, the whole under 50 000 elements',
+    { timeout: DRAIN_TIMEOUT_MS },
     async (name) => {
       md(BUDGET_CASES[name] as string);
+      expect(drawn()).toBeLessThanOrEqual(SLICE_ELEMENTS_MAX);
       // One long paragraph is one piece (capped by itself); the others draw in several slices.
-      const { slowest } = await drain();
-      expect(slowest).toBeLessThan(250);
-      expect(host.querySelectorAll('*').length).toBeLessThan(50_000);
+      const { slowest, slices, mostAdded } = await drain();
+      expect(slices).toBeLessThanOrEqual(SLICES_MAX);
+      expect(mostAdded).toBeLessThanOrEqual(SLICE_ELEMENTS_MAX);
+      expect(slowest).toBeLessThan(WALL_CLOCK_CEILING_MS);
+      expect(drawn()).toBeLessThan(50_000);
       expect(host.querySelector('.al-md')?.getAttribute('aria-busy')).toBe('false');
       assertInert();
     },
@@ -447,11 +494,11 @@ describe('SafeCode: code, JSON and patches as text with line numbers (REL051-A34
     assertInert();
   });
 
-  it('renders 256 KB of empty lines in under 250 ms and 50 000 elements', () => {
+  it('renders 256 KB of empty lines under 50 000 elements and the wall-clock ceiling', () => {
     for (const kind of ['text', 'patch'] as const) {
       const start = performance.now();
       act(() => root.render(h(SafeCode, { text: '\n'.repeat(256 * 1024), kind })));
-      expect(performance.now() - start, kind).toBeLessThan(250);
+      expect(performance.now() - start, kind).toBeLessThan(WALL_CLOCK_CEILING_MS);
       expect(host.querySelectorAll('*').length, kind).toBeLessThan(50_000);
       expect(host.querySelector('.al-code-gutter')?.getAttribute('data-lines'), kind).toBe(
         String(256 * 1024),
