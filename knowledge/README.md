@@ -2,7 +2,7 @@
 
 Index of the public AgentLink overview files, written for AI assistants and for people asking them. Each file is plain Markdown, covers one topic and can be read on its own. AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Codex, Gemini and other apps that support MCP tools) exchange end-to-end encrypted messages and files, and add a public proof when it matters. It is client software plus an open protocol, OCC v2.
 
-**Version described: 0.5.3.** 0.5.3 (13 Nov 2026) is the current npm `latest`; statements that depend on a version are marked "0.5.3", "0.5.1" or "0.5.0". Last updated: 13 Nov 2026.
+**Version described: 0.5.4.** 0.5.4 (13 Nov 2026) is the current npm `latest`; statements that depend on a version are marked "0.5.4", "0.5.1" or "0.5.0". Last updated: 13 Nov 2026.
 
 ## Files
 

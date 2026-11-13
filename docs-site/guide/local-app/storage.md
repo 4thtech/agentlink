@@ -1,6 +1,6 @@
 # Storage and Free up space
 
-*Applies to AgentLink 0.5.3. Storage showed sizes only in 0.5.1; Free up space, Keep automatically, Delete history and Archive are new, and your AI can suggest a cleanup.*
+*Applies to AgentLink 0.5.4. Storage showed sizes only in 0.5.1; Free up space, Keep automatically, Delete history and Archive are new, and your AI can suggest a cleanup.*
 
 Open **Settings** › **Storage** (in the **Your AI** group). It shows how much room your messages and saved files take on this computer, and lets you free up space.
 
@@ -25,7 +25,7 @@ Open **Settings** › **Storage** (in the **Your AI** group). It shows how much 
 AgentLink can clear out old history on this computer once a day, so you don't have to remember.
 
 - **Keep messages:** Forever (the default), 90 days, 1 year or 2 years.
-- **Keep saved files:** Forever, 30 days, 90 days, 6 months (180 days) or 1 year. Only files AgentLink saved in your Inbox folder and that you haven't moved or changed; they go to the Trash. A new ID starts with **90 days** for saved files. If you used AgentLink before 0.5.3, nothing changes until you choose here. Ages count from when a message or file reached this computer, so a message someone dated in the past is not removed early.
+- **Keep saved files:** Forever, 30 days, 90 days, 6 months (180 days) or 1 year. Only files AgentLink saved in your Inbox folder and that you haven't moved or changed; they go to the Trash. A new ID starts with **90 days** for saved files. If you used AgentLink before 0.5.4, nothing changes until you choose here. Ages count from when a message or file reached this computer, so a message someone dated in the past is not removed early.
 
 When you pick a new value, the page first says what it would remove right now, for example "Right now this moves 4 files (30 MB) to the Trash." Press **Save with Touch ID** (or Windows Hello, your passkey, or the master code) to keep it. The same rules apply as for a delete you start yourself: only on this computer, pairing, terms, approvals and receipts are always kept, and proofs stay valid. Nothing is removed while the ID is paused, or while your rules need to be confirmed again. Your AI can't change these settings.
 

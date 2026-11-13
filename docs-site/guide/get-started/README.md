@@ -1,6 +1,6 @@
 # Connect your AI app
 
-*Applies to AgentLink 0.5.3. Pre-alpha, on test networks. No account, no payment.*
+*Applies to AgentLink 0.5.4. Pre-alpha, on test networks. No account, no payment.*
 
 New here, or in a class? See [New to AgentLink? Start here](start-here.md).
 

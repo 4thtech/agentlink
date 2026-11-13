@@ -133,13 +133,13 @@ sequenceDiagram
 - **Back up and restore.** One recovery kit holds all your IDs, saved in one step with a short checklist and **Check that my kit opens**. Bring everything back on a new computer with **I have a recovery kit** (or `agentlink restore` in your terminal).
 - **Agree and prove.** Your AI negotiates terms you approve once; add a public proof to a message, file or agreement, and check it with `agentlink verify` (test networks).
 
-**New in 0.5.3 (13 Nov 2026):** every confirmation is one press ("Approve with Touch ID", the master code as a link) and the approval card is compact, with terms shown on Review; the "You are connected" screen is simpler, with optional naming; you can **Attach** files in a conversation; files over the encrypted drop are open to all early users; **Delete history**, **Archive** and **Free up space** (with Undo, on this computer only); a notification bell in the top bar and native notifications on Mac and Windows; recovery kits keep your ID names; messages keep their order; the app says when it is offline; and the Mac download links no longer change with each release. On a Mac the app can update itself (**Update now**, then **Restart now**) from the next version on; installing 0.5.3 itself is manual.
+**New in 0.5.4 (13 Nov 2026):** every confirmation is one press ("Approve with Touch ID", the master code as a link) and the approval card is compact, with terms shown on Review; the "You are connected" screen is simpler, with optional naming; you can **Attach** files in a conversation; files over the encrypted drop are open to all early users; **Delete history**, **Archive** and **Free up space** (with Undo, on this computer only); a notification bell in the top bar and native notifications on Mac and Windows; recovery kits keep your ID names; messages keep their order; the app says when it is offline; and the Mac download links no longer change with each release. On a Mac the app can update itself (**Update now**, then **Restart now**) from the next version on; installing 0.5.4 itself is manual.
 
 **New in 0.5.0 (12 Nov 2026):** the app is redesigned around you, your IDs and your people. The menu reads Home, People, My IDs, Activity, Settings; Settings is grouped into Safety, Your AI and This app; one recovery kit covers all your IDs and restores in the app in four steps; a Touch ID & master code page lets you test Touch ID and check or replace your master code; Rules and Activity read as plain sentences; and your choices survive restarting the app.
 
-**Windows app, early build (0.5.3):** AgentLink for Windows 10 and 11 in its own window, unsigned for now, download [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) (the link stays the same for every release) (Windows asks once: More info, then Run anyway). The browser app (one command) stays the main way on Windows. See the [desktop app page](docs-site/guide/apps/desktop-app.md#windows).
+**Windows app, early build (0.5.4):** AgentLink for Windows 10 and 11 in its own window, unsigned for now, download [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) (the link stays the same for every release) (Windows asks once: More info, then Run anyway). The browser app (one command) stays the main way on Windows. See the [desktop app page](docs-site/guide/apps/desktop-app.md#windows).
 
-Not built yet, and not claimed: a signed Windows app (the 0.5.3 Windows app is an early, unsigned build; the Mac app too, see the [desktop app page](docs-site/guide/apps/desktop-app.md)), the always-on cloud agent (planned as 0.6.0), and proof on main networks. What changed in each release: [CHANGELOG](CHANGELOG.md).
+Not built yet, and not claimed: a signed Windows app (the 0.5.4 Windows app is an early, unsigned build; the Mac app too, see the [desktop app page](docs-site/guide/apps/desktop-app.md)), the always-on cloud agent (planned as 0.6.0), and proof on main networks. What changed in each release: [CHANGELOG](CHANGELOG.md).
 
 ## Private by design
 
@@ -148,7 +148,7 @@ Messages and files are encrypted on your computer. Message servers and 4thTech s
 ## Status
 
 <!-- status:start -->
-> **Version:** v0.5.3 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-13
+> **Version:** v0.5.4 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-13
 >
 > - **Components:** 78 merged, 14 in progress, 7 planned
 > - **Next:** Proofs end to end, then the cloud agent and business agents as 0.6.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
@@ -163,7 +163,7 @@ Messages and files are encrypted on your computer. Message servers and 4thTech s
 |---|---|---|
 | **M0 Foundations** (nearly complete) | Repository, CI and rules in place | 0.0.x |
 | **M1a Walking skeleton: pair and talk** (released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open) | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 |
-| **M1b Files, proof, credits** (v0.2.0 to v0.5.3 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
+| **M1b Files, proof, credits** (v0.2.0 to v0.5.4 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
 | **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify page; accept in the browser (planned; today the live invite page at agentlink.4thtech.io shows how to accept in the app); verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109) | 0.6.0 (cloud agent first) and later |
 | **M3 Mainnet beta (Base, Gnosis)** | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 |
 | **M4 Expansion** | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 |

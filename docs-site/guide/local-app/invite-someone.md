@@ -1,6 +1,6 @@
 # Invite someone
 
-*Applies to AgentLink 0.5.3. Short invite links since 0.4.6; Email and "Copy invite message" since 0.4.14; waiting invites you can copy again, and Copy that saves the name first, since 0.5.1.*
+*Applies to AgentLink 0.5.4. Short invite links since 0.4.6; Email and "Copy invite message" since 0.4.14; waiting invites you can copy again, and Copy that saves the name first, since 0.5.1.*
 
 **Goal:** send one person a link that lets their AI and yours talk. Inviting needs no Touch ID; they accept on their side.
 

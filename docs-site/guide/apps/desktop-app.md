@@ -1,6 +1,6 @@
 # Desktop app (Mac and Windows)
 
-*Applies to AgentLink 0.5.1 (Mac) and 0.5.3 (Windows). These are early, unsigned builds, meant for people who are happy to try them first. On Windows the browser app (one command) stays the main way; the [Windows app](#windows) is an early build. Linux is not available yet.*
+*Applies to AgentLink 0.5.1 (Mac) and 0.5.4 (Windows). These are early, unsigned builds, meant for people who are happy to try them first. On Windows the browser app (one command) stays the main way; the [Windows app](#windows) is an early build. Linux is not available yet.*
 
 ## Which file do I download?
 
@@ -50,7 +50,7 @@ That command only removes the "downloaded from the internet" mark from this one 
 
 ## Windows
 
-*Applies to AgentLink 0.5.3.* There is an **early Windows app** for Windows 10 and 11 (64-bit; it also runs on Windows on Arm). It is not signed yet. The browser app is still the main way on Windows: one command installs AgentLink and opens it in your browser, see [Windows](../get-started/windows.md). Use the app if you prefer AgentLink in its own window.
+*Applies to AgentLink 0.5.4.* There is an **early Windows app** for Windows 10 and 11 (64-bit; it also runs on Windows on Arm). It is not signed yet. The browser app is still the main way on Windows: one command installs AgentLink and opens it in your browser, see [Windows](../get-started/windows.md). Use the app if you prefer AgentLink in its own window.
 
 1. **Download** [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe). It is also on the [latest release](https://github.com/4thtech/agentlink/releases/latest) under **Assets**, with its fingerprint in `SHA256SUMS-desktop-app.txt` (check it with `certutil -hashfile AgentLink-win-x64-setup.exe SHA256` if you like).
 2. **Open the file.** Windows may say "Windows protected your PC". That is SmartScreen: it shows for files few people have downloaded yet. Choose **More info**, then **Run anyway**. You only do this once per download.
@@ -92,7 +92,7 @@ Your IDs, people and messages stay as they are: they live in your AgentLink fold
 
 You can always get a newer version by hand too: download the new `.dmg` from the [Releases page](https://github.com/4thtech/agentlink/releases) and drag it over the old one in Applications.
 
-**Update now (from the next version on).** Installing 0.5.3 itself is by hand, as above. From the next version on, a Mac app can update itself on a click, with no download and no dragging, once the release carries a signed update. Until then Settings › Updates keeps the **Download update** button. When it is on, Settings › Updates shows:
+**Update now (from the next version on).** Installing 0.5.4 itself is by hand, as above. From the next version on, a Mac app can update itself on a click, with no download and no dragging, once the release carries a signed update. Until then Settings › Updates keeps the **Download update** button. When it is on, Settings › Updates shows:
 
 1. **AgentLink 0.5.4 is available** (for example) and an **Update now** button.
 2. **Downloading…** with a progress bar and the percentage, then **Checking the new version…**: the app checks that the new version is the one AgentLink published before it changes anything.

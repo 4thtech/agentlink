@@ -1,6 +1,6 @@
 # People page
 
-*Applies to AgentLink 0.5.3. **People** is in the menu since 0.5.0, with its own link `/people` (the old `/contacts` link still works). People across all your IDs, the Archived group and Check contact are new in 0.5.0; waiting invites that you can copy again, the connecting hints and the same-name help are new in 0.5.1.*
+*Applies to AgentLink 0.5.4. **People** is in the menu since 0.5.0, with its own link `/people` (the old `/contacts` link still works). People across all your IDs, the Archived group and Check contact are new in 0.5.0; waiting invites that you can copy again, the connecting hints and the same-name help are new in 0.5.1.*
 
 **People** lists the people your AI can message: *"The people your AI can message. You connect by invite, and only you and they can read what is sent."* Each row shows the name, **Last message … · connected …**, and **Check contact** (or **Contact checked**). The top line counts people and invites waiting. For how contacts work, see [Manage contacts](../everyday-use/contacts.md).
 

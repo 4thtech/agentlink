@@ -1,6 +1,6 @@
 # Notifications
 
-*Applies to AgentLink 0.5.3. The bell and Settings › Notifications are new in 0.5.3.*
+*Applies to AgentLink 0.5.4. The bell and Settings › Notifications are new in 0.5.4.*
 
 ## The bell
 

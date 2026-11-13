@@ -1,6 +1,6 @@
 # Folders for sending files
 
-*Applies to AgentLink 0.5.3. Allowing a folder in the app is the way to do it; the terminal commands below still work.*
+*Applies to AgentLink 0.5.4. Allowing a folder in the app is the way to do it; the terminal commands below still work.*
 
 Your AI can send a file only from a folder you have allowed. This keeps it from sending things you never meant to share.
 

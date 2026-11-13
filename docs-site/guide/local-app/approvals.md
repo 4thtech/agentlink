@@ -1,6 +1,6 @@
 # Approvals
 
-*Applies to AgentLink 0.5.3. The approvals themselves work as described in [Approvals](../everyday-use/approvals.md).*
+*Applies to AgentLink 0.5.4. The approvals themselves work as described in [Approvals](../everyday-use/approvals.md).*
 
 Requests wait for you as cards at the top of [Home](home.md). The old Approvals link still works. Your AI can ask, but only you can approve.
 
