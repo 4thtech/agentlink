@@ -125,7 +125,7 @@ describe('restore from a recovery kit', () => {
     expect(c.gestures.create).toBe(1);
     const goHome = page.getByRole('button', { name: 'Go to Home' });
     expect(await goHome.isDisabled()).toBe(true);
-    await page.getByLabel('I saved it').check();
+    await page.getByLabel('Type or paste your new master code to continue').fill(master);
     // The codes are in no storage, no URL and no attribute.
     const leaks = await page.evaluate(
       ({ recovery, masterCode }) => {

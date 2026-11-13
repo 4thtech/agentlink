@@ -1022,7 +1022,7 @@ describe('resolveContact (06 §2: ID, name; AMBIGUOUS_CONTACT with candidates)',
     expect(result.structured.status).toBe('error');
     expect(result.structured.code).toBe('AMBIGUOUS_CONTACT');
     expect(result.structured.summary).toBe(
-      'More than one contact has that name, so nothing was done. They are: 1) owner 1111\u00b72222, id 0xbbbbbbbb, connected 2025-10-09; 2) owner 3333\u00b74444, id 0xcccccccc, connected 2025-10-09.',
+      'More than one contact has that name, so nothing was done. They are: 1) owner 1111\u00b72222, id 0xbbbbbbbb, connected Oct 9, 2025; 2) owner 3333\u00b74444, id 0xcccccccc, connected Oct 9, 2025.',
     );
     expect(String(result.structured.summary)).not.toMatch(/Bo|Ana/);
   });

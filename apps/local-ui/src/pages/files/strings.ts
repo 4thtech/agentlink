@@ -1,7 +1,7 @@
 // Files page copy (11 §5: plain words; the owner's settings are "rules", never "policy"; no
 // "wallet", "gas", "seed phrase" or "transaction"; DESIGN-ADJ-1 FI-3; D-99, D-119). Commands in
 // backticks are typed by the owner in their own terminal and are shown exactly.
-import { sensorWord } from '../../presence-word.js';
+import { sensorSentence, sensorWord } from '../../presence-word.js';
 export { FILES_IO_STRINGS, asOf } from './io-strings.js';
 
 export const FILES_STRINGS = {
@@ -50,10 +50,17 @@ export const FILES_STRINGS = {
   changed: 'Your rules changed in the meantime. Nothing was changed. Check the folder again.',
   expired: 'This check timed out. Nothing was changed. Check the folder again.',
   refused: "That didn't go through. Nothing was changed. Check the folder again.",
-  presenceRejected: "That didn't match your passkey or master code. Nothing was changed.",
-  presenceRequired: 'Enter your master code, or use your passkey. Nothing was changed.',
-  passkeyNotUsed:
-    "The passkey wasn't used. Nothing was changed. You can enter your master code instead.",
+  get presenceRejected(): string {
+    return `That didn't match ${sensorWord()} or your master code. Nothing was changed.`;
+  },
+  // REL051-R2C (R2-UI-06): the sensor's own word (Touch ID, Windows Hello, your passkey), never
+  // "passkey" on a Mac or Windows.
+  get presenceRequired(): string {
+    return `Enter your master code, or use ${sensorWord()}. Nothing was changed.`;
+  },
+  get passkeyNotUsed(): string {
+    return `${sensorSentence()} wasn't used. Nothing was changed. You can enter your master code instead.`;
+  },
   busy: 'Another change is being confirmed. Try again in a moment.',
   offline: "AgentLink isn't answering on this computer. Check that it's running, then try again.",
   sessionExpired: 'This page has expired. Ask your AI to open AgentLink again.',

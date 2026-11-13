@@ -67,7 +67,7 @@ import {
   type InviteApi,
   type OpenInvite,
 } from '../contacts/invite-api.js';
-import { connectingLine, useConnectingNow } from '../invite/connecting-stage.js';
+import { cancelProminent, connectingLine, useConnectingView } from '../invite/connecting-stage.js';
 import { FEEDBACK_STRINGS as F, linkLabel } from '../invite/strings.js';
 import {
   InviteLinkButtons,
@@ -494,7 +494,7 @@ function PendingInviteRow({
  * People. Text only (I-5).
  */
 function ConnectingRowView({
-  row,
+  row: given,
   api,
 }: {
   readonly row: ConnectingRow;
@@ -503,7 +503,9 @@ function ConnectingRowView({
   const [hidden, setHidden] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
-  const now = useConnectingNow(row);
+  const view = useConnectingView(given);
+  const row = view.row;
+  const now = view.now;
   if (hidden) return <></>;
   return (
     <div className="hm-invite-row hm-f" data-blocked={row.blocked === true ? 'true' : undefined}>
@@ -527,7 +529,7 @@ function ConnectingRowView({
       {api.cancelConnecting === undefined ? null : (
         <Button
           size="sm"
-          variant="ghost"
+          variant={cancelProminent(row, now) ? 'secondary' : 'ghost'}
           disabled={busy}
           onClick={() => {
             const cancel = api.cancelConnecting;

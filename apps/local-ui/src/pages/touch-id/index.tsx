@@ -47,6 +47,11 @@ import { detectPlatform } from '../first-run/passkey.js';
 import { otherBrowser } from '../first-run/passkey-nudge.js';
 import { FIRST_RUN, SENSOR, UPGRADE_MESSAGES, type Platform } from '../first-run/strings.js';
 import { SettingsIcon } from '../settings/icons.js';
+import {
+  createMasterCodeApi,
+  NEW_MASTER_CODE_HASH,
+  type MasterCodeApi,
+} from '../restore/master-code-api.js';
 import { nativeTouchIdSwitch } from './native-slot.js';
 import { desktopPlatform } from '../../presence/desktop.js';
 import type { NativeRegistration, NativeStatus } from '../../presence/native-api.js';
@@ -107,6 +112,19 @@ export interface TouchIdPageProps {
   readonly userAgent?: string;
   readonly nativeStatus?: () => Promise<NativeStatus>;
   readonly nativeOps?: Readonly<Record<NativeOp, (code: string) => Promise<NativeRegistration>>>;
+  /** REL051-R2C (R2-CLASS-03): whether the master code made here was never saved (seam: tests). */
+  readonly masterCode?: Pick<MasterCodeApi, 'show'>;
+}
+
+/** REL051-R2C (R2-CLASS-03): opened by "Make a new master code": start replacing at once. */
+function takeNewCodeHash(): boolean {
+  if (typeof location === 'undefined' || location.hash !== NEW_MASTER_CODE_HASH) return false;
+  try {
+    history.replaceState(history.state, '', location.pathname);
+  } catch {
+    // The hash stays; the page still starts once.
+  }
+  return true;
 }
 
 /** DESK051-C2: the desktop app's own Touch ID, as a presence proof (no bytes; the server's helper). */
@@ -169,8 +187,28 @@ export function TouchIdPage({
   userAgent,
   nativeStatus,
   nativeOps,
+  masterCode,
 }: TouchIdPageProps): ReactElement {
   const [api] = useState<ApiClient>(() => givenApi ?? createApiClient());
+  // REL051-R2C (R2-CLASS-03): "Make a new master code" opens the replace flow, and the card never
+  // says "You saved it" while the code made here was not saved.
+  const [newCodeAsked] = useState<boolean>(takeNewCodeHash);
+  const [autoStart, setAutoStart] = useState(false);
+  const [unsaved, setUnsaved] = useState(newCodeAsked);
+  useEffect(() => {
+    let live = true;
+    const source = masterCode ?? createMasterCodeApi();
+    void source
+      .show()
+      .then((answer) => {
+        // Only whether it was saved is used here; a code in the answer is never kept or shown.
+        if (live && (answer.kind === 'lost' || answer.kind === 'shown')) setUnsaved(true);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [masterCode]);
   const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
   const sensor = SENSOR[platform];
   const [status, setStatus] = useState<PasskeyStatus | undefined>(undefined);
@@ -194,6 +232,14 @@ export function TouchIdPage({
     );
   }, [passkeyStatus]);
   useEffect(readStatus, [readStatus]);
+  // The replace flow opens once the sensor's state is known (Touch ID first when it is ready).
+  const statusKnown = status !== undefined;
+  const readyNow = status?.kind === 'ready' || nativeOn;
+  useEffect(() => {
+    if (!newCodeAsked || !statusKnown) return;
+    setPanel('replace');
+    setAutoStart(readyNow);
+  }, [newCodeAsked, statusKnown, readyNow]);
 
   const ready = status?.kind === 'ready' ? status.info : undefined;
   // The browser's one-time switch is never offered in the desktop app: its own switch is the way.
@@ -367,9 +413,15 @@ export function TouchIdPage({
             <h2 id="ti-code" className="al-text-h3">
               {S.codeTitle}
             </h2>
-            <p className="al-text-body-sm al-muted">{S.codeLine(sensor)}</p>
+            <p className="al-text-body-sm al-muted">
+              {unsaved ? S.codeLineUnsaved(sensor) : S.codeLine(sensor)}
+            </p>
           </div>
-          <span className="ti-state is-good">{S.codeSet}</span>
+          {unsaved ? (
+            <span className="ti-state">{S.codeNotSaved}</span>
+          ) : (
+            <span className="ti-state is-good">{S.codeSet}</span>
+          )}
         </div>
         <div className="ti-code-actions">
           <Button
@@ -413,9 +465,12 @@ export function TouchIdPage({
             api={api}
             sensor={sensor}
             sensorProof={sensorProof}
+            autoStart={autoStart}
             onEnd={(note) => {
+              setAutoStart(false);
               setPanel('none');
               setCodeNote(note);
+              if (note?.tone === 'good') setUnsaved(false);
             }}
           />
         ) : null}
@@ -615,12 +670,15 @@ function ReplaceCode({
   api,
   sensor,
   sensorProof,
+  autoStart = false,
   onEnd,
 }: {
   readonly api: ApiClient;
   readonly sensor: string;
   /** The sensor's gesture (the desktop app's own Touch ID, or the passkey); none: the code only. */
   readonly sensorProof: (() => Promise<PresenceProof | undefined>) | undefined;
+  /** REL051-R2C (R2-CLASS-03): ask for the sensor at once (opened by "Make a new master code"). */
+  readonly autoStart?: boolean;
   readonly onEnd: (note: Note) => void;
 }): ReactElement {
   const [useCode, setUseCode] = useState(sensorProof === undefined);
@@ -687,6 +745,16 @@ function ReplaceCode({
         else begin(proof);
       });
   };
+  // REL051-R2C (R2-CLASS-03): opened by "Make a new master code": the sensor is asked once at once
+  // (the button stays for a second try).
+  const started = useRef(false);
+  const usePasskeyRef = useRef(usePasskey);
+  usePasskeyRef.current = usePasskey;
+  useEffect(() => {
+    if (!autoStart || started.current || sensorProof === undefined) return;
+    started.current = true;
+    usePasskeyRef.current();
+  }, [autoStart, sensorProof]);
 
   const submitFinish = (event: FormEvent): void => {
     event.preventDefault();

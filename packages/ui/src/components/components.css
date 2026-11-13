@@ -2394,6 +2394,19 @@ button.al-md-chip:focus-visible {
 .al-md-table.al-md-cont table {
   margin-top: -1px;
 }
+/* REL051-R2C (R2-CLASS-07): a task-list item: a read-only box in place of the bullet. */
+.al-md li.al-md-task {
+  list-style: none;
+}
+.al-md .al-md-box {
+  display: inline-block;
+  margin-inline: calc(-1 * var(--al-space-5)) var(--al-space-2);
+  width: var(--al-space-4);
+  color: var(--al-color-fg-muted);
+}
+.al-md .al-md-box[data-checked='true'] {
+  color: var(--al-color-fg-default);
+}
 .al-md-rest,
 .al-code-rest {
   display: block;

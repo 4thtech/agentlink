@@ -48,6 +48,13 @@ export function forgetAbandonedAdd(): void {
   memory = apps === undefined ? {} : { apps };
 }
 
+/** REL051-R2C (R2-UI-01): Connected reads the real state (the outcome is not known here). */
+export function forgetOutcome(): void {
+  const next: { -readonly [K in keyof WizardMemory]: WizardMemory[K] } = { ...memory };
+  delete next.outcome;
+  memory = next;
+}
+
 /** Forgets the choices (a new run of Get started, and tests). */
 export function resetWizard(): void {
   memory = {};

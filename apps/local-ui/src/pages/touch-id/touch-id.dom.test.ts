@@ -126,6 +126,8 @@ async function render(
         platform: 'mac',
         passkeyStatus: () => Promise.resolve(status),
         passkeyProof: proof,
+        // REL051-R2C: a saved master code unless a test says otherwise.
+        masterCode: { show: () => Promise.resolve({ kind: 'none' }) },
         ...extra,
       }),
     );
@@ -507,5 +509,52 @@ describe('Touch ID & master code in the desktop app (DESK051-C2)', () => {
     await render(OFF);
     expect(labels()).toContain('Turn on Touch ID');
     expect(host.querySelector('[data-slot="native-touch-id-switch"]')).toBeNull();
+  });
+});
+
+// REL051-R2C (R2-CLASS-03): "Make a new master code" (the code made at setup was never saved) opens
+// this page and starts the replace flow at once: the sensor, the new code shown once, typed back.
+describe('Make a new master code (R2-CLASS-03)', () => {
+  const lost = {
+    show: () =>
+      Promise.resolve({ kind: 'lost' as const, which: 'first_run' as const, touchId: true }),
+  };
+  afterEach(() => {
+    history.replaceState(null, '', '/');
+  });
+
+  it('opened by Make a new master code: asks for the sensor at once, shows the new code, typed back to finish', async () => {
+    history.replaceState(null, '', '/settings/touch-id#new-master-code');
+    const { calls, proof } = await render(
+      READY,
+      { '/api/ui/owner-code/replace': [STAGED], '/api/ui/owner-code/replace/finish': [DONE] },
+      { masterCode: lost },
+    );
+    expect(proof).toHaveBeenCalledTimes(1);
+    expect(calls[0]?.path).toBe('/api/ui/owner-code/replace');
+    expect(text()).toContain(NEW);
+    expect(text()).not.toContain('You saved it');
+    expect(location.hash).toBe('');
+    await typeIn(NEW);
+    await submit();
+    expect(text()).toContain('Master code replaced.');
+    expect(text()).not.toContain(NEW);
+  });
+
+  it('a code that was never saved is never called saved', async () => {
+    const { proof } = await render(READY, {}, { masterCode: lost });
+    expect(text()).not.toContain('You saved it');
+    expect(text()).toContain('Not saved');
+    expect(proof).not.toHaveBeenCalled();
+  });
+
+  it('a saved code still says Set, and nothing starts by itself', async () => {
+    const { proof } = await render(
+      READY,
+      {},
+      { masterCode: { show: () => Promise.resolve({ kind: 'none' as const }) } },
+    );
+    expect(text()).toContain('You saved it');
+    expect(proof).not.toHaveBeenCalled();
   });
 });

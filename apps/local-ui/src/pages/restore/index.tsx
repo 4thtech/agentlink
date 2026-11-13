@@ -37,6 +37,7 @@ import {
   PresenceStep,
   ProtectStep,
   ReviewStep,
+  rowName,
   formatDate,
   type ReviewState,
 } from './steps.js';
@@ -356,9 +357,14 @@ export function RestoreWizard({
     code: string | undefined,
     withTouchId: boolean,
   ): void => {
+    // IR-REL051-R2C-2: "Finish restoring" restores no ID: the IDs already here are the ones ready.
+    const here = (summary?.ids ?? []).filter((r) => r.state === 'already_here');
     setOutcome({
       restored: ids.filter((i) => i.outcome === 'restored').map((i) => i.label ?? i.name),
       restoredFolders: ids.filter((i) => i.outcome === 'restored').map((i) => i.name),
+      ...(ids.length === 0 && here.length > 0
+        ? { ready: here.map((r) => rowName(r)), readyFolders: here.map((r) => r.name) }
+        : {}),
       failed: ids.filter((i) => i.outcome === 'failed').map((i) => i.label ?? i.name),
       masterCode: code,
       touchId: withTouchId,
@@ -432,11 +438,12 @@ export function RestoreWizard({
 
   if (outcome !== undefined) {
     // The restore is done; this survives the page being mounted again for the ID that opened.
-    const first = outcome.restoredFolders[0] ?? '';
-    const firstLabel = outcome.restored[0] ?? first;
+    const first = outcome.restoredFolders[0] ?? outcome.readyFolders?.[0] ?? '';
+    const firstLabel = outcome.restored[0] ?? outcome.ready?.[0] ?? first;
     return frame(
       <ProtectStep
         restored={outcome.restored}
+        {...(outcome.ready === undefined ? {} : { ready: outcome.ready })}
         failed={outcome.failed}
         masterCode={outcome.masterCode}
         sensor={sensor}

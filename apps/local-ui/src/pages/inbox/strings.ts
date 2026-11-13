@@ -2,7 +2,7 @@
 // "seed phrase", "transaction", no link, key or path talk. Other people's words and file names are
 // never part of these strings; the page shows them only inside the untrusted container (I-5).
 import type { FileSaveOutcome } from '@4thtech-io/types/ui-contract/inbox';
-import { sensorWord } from '../../presence-word.js';
+import { sensorSentence, sensorWord } from '../../presence-word.js';
 
 export const INBOX_STRINGS = {
   title: 'Inbox',
@@ -56,9 +56,14 @@ export const INBOX_STRINGS = {
     not_set_up: "AgentLink isn't set up on this computer yet. Create your first ID on Home.",
     unavailable: "Couldn't save it. Try again.",
   } satisfies Readonly<Record<FileSaveOutcome, string>>,
-  presenceRejected: "That didn't match your passkey or master code. Nothing was saved.",
-  presenceNotUsed:
-    "The passkey wasn't used. Nothing was saved. You can enter your master code instead.",
+  // REL051-R2C (R2-UI-06): the sensor's own word (Touch ID, Windows Hello, your passkey), never
+  // "passkey" on a Mac or Windows.
+  get presenceRejected(): string {
+    return `That didn't match ${sensorWord()} or your master code. Nothing was saved.`;
+  },
+  get presenceNotUsed(): string {
+    return `${sensorSentence()} wasn't used. Nothing was saved. You can enter your master code instead.`;
+  },
   busy: 'Another change is in progress. Try again in a moment.',
   wait: 'Too many wrong tries. Wait {seconds} seconds, then try again. Nothing was saved.',
   offline: "AgentLink isn't answering. Nothing was saved. Try again.",

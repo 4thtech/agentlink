@@ -13,7 +13,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useTitleFocus } from '../welcome/index.js';
-import { UseCodeInstead, copyBackupCode } from '../first-run/backup-code.js';
+import { BackupCodeField, UseCodeInstead, copyBackupCode } from '../first-run/backup-code.js';
 import type { DetectedApp } from '../first-run/apps-api.js';
 import type { FoundKit, Summary, SummaryRow } from './api.js';
 import { CodeField, isComplete } from './code-field.js';
@@ -551,7 +551,12 @@ export interface ReviewStepProps {
  */
 export function rowName(row: SummaryRow): string {
   if (row.label !== undefined) return row.label;
-  return row.name === 'default' ? REVIEW.firstId : row.name;
+  if (row.name === 'default') return REVIEW.firstId;
+  // REL051-R2C (R2-CLASS-05, R2-UI-04): never a bare folder name: the folder was made from the ID's
+  // name, so it reads as one ("work" → "Work", "ana-novak" → "Ana novak") until the read-back.
+  const words = row.name.replace(/[-_]+/g, ' ').trim();
+  if (words === '') return row.name;
+  return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
 }
 
 function Row({
@@ -656,7 +661,7 @@ export function ReviewStep(p: ReviewStepProps): ReactElement {
         ))}
       </ul>
       {choosable.length === 0 ? (
-        <Banner tone="info">{REVIEW.nothing}</Banner>
+        <Banner tone="info">{p.newOwner ? REVIEW.finishNeeded : REVIEW.nothing}</Banner>
       ) : (
         <div className="rs-cols">
           <div>
@@ -704,7 +709,17 @@ export function ReviewStep(p: ReviewStepProps): ReactElement {
         </p>
       ) : null}
       <div className="rs-actions">
-        {choosable.length === 0 ? (
+        {choosable.length === 0 && p.newOwner ? (
+          // IR-REL051-R2C-1: no owner here: owner-only completion (nothing chosen) with the sensor,
+          // then the new master code. Never a Done that cancels and leaves no owner.
+          <Button variant="primary" size="lg" disabled={p.working} onClick={p.onRestore}>
+            {p.working
+              ? REVIEW.restoring
+              : p.error === undefined
+                ? REVIEW.finishOwner
+                : REVIEW.tryAgain}
+          </Button>
+        ) : choosable.length === 0 ? (
           <Button variant="primary" size="lg" onClick={p.onDone}>
             {REVIEW.done}
           </Button>
@@ -750,6 +765,8 @@ export interface AppRow {
 
 export interface ProtectStepProps {
   readonly restored: readonly string[];
+  /** IR-REL051-R2C-2: the IDs already here that "Finish restoring" completed. */
+  readonly ready?: readonly string[];
   readonly failed: readonly string[];
   readonly masterCode: string | undefined;
   readonly sensor: string;
@@ -811,20 +828,34 @@ function Code({
   );
 }
 
+/** The code without spaces, dashes or case: what a typed-back code is compared by. */
+const compactCode = (value: string): string => value.replace(/[\s-]+/g, '').toUpperCase();
+
 export function ProtectStep(p: ProtectStepProps): ReactElement {
   const code = p.masterCode;
   const ready = code === undefined || p.saved;
+  const [typed, setTyped] = useState('');
+  const typedWrong =
+    code !== undefined &&
+    !p.saved &&
+    compactCode(typed).length >= compactCode(code).length &&
+    compactCode(typed) !== compactCode(code);
+  const shown = p.restored.length > 0 ? p.restored : (p.ready ?? []);
   return (
     <section className="rs-screen rs-wide" aria-labelledby="rs-h">
       <div className="rs-done-mark" aria-hidden="true">
         <Icon name="check" size={36} />
       </div>
       <div className="rs-intro">
-        <Title id="rs-h">{PROTECT.title(p.restored.length)}</Title>
-        {p.restored.length === 0 ? null : (
+        <Title id="rs-h">
+          {p.restored.length === 0 && shown.length > 0
+            ? PROTECT.titleReady(shown.length)
+            : PROTECT.title(p.restored.length)}
+        </Title>
+        {shown.length === 0 ? null : (
           <p className="rs-lead">
-            <NameList names={p.restored} />
-            {PROTECT.leadRest(p.restored.length)}
+            <NameList names={shown} />
+            {PROTECT.leadRest(shown.length)}
           </p>
         )}
       </div>
@@ -840,17 +871,31 @@ export function ProtectStep(p: ProtectStepProps): ReactElement {
             body={p.touchId ? PROTECT.codeBody(p.sensor) : PROTECT.codeBodyNoSensor}
             onPrint={() => window.print()}
           />
-          <label className="rs-saved">
-            <input
-              type="checkbox"
-              checked={p.saved}
-              onChange={(e) => p.onSaved(e.currentTarget.checked)}
+          {/* IR-REL051-R2C-2: typed back, as Replace master code: proof it was saved. */}
+          <div className="rs-typeback" data-saved={p.saved ? 'true' : 'false'}>
+            <BackupCodeField
+              label={PROTECT.typeBack}
+              name="restore-new-master-code"
+              value={typed}
+              disabled={p.saved}
+              onValue={(value) => {
+                const match = compactCode(value) === compactCode(code);
+                // The matched code leaves the field at once (no code in the page's attributes).
+                setTyped(match ? '' : value);
+                if (match !== p.saved) p.onSaved(match);
+              }}
             />
-            <span className="rs-tick" aria-hidden="true">
-              <Icon name="check" size={16} />
-            </span>
-            <span>{PROTECT.saved}</span>
-          </label>
+            {p.saved ? (
+              <p className="rs-hint" role="status">
+                {PROTECT.typedBackOk}
+              </p>
+            ) : null}
+            {typedWrong ? (
+              <p className="rs-error" role="alert">
+                {PROTECT.typeBackWrong}
+              </p>
+            ) : null}
+          </div>
           {/* Rendered here in memory for the printer only; never written to disk. */}
           <div className="rs-print-sheet" aria-hidden="true">
             <h1>{PROTECT.printTitle}</h1>
