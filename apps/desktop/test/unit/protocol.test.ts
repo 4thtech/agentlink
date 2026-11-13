@@ -221,3 +221,61 @@ describe('shell -> core messages', () => {
     expect(parseShellMessage(text)).toBeUndefined();
   });
 });
+
+// DESK051-UPD: the update state travels shell -> core (fixed words, versions and a link the shell
+// built itself); the core may only ask the shell to check. Nothing else about updates is on the pipe.
+describe('app update messages', () => {
+  const DMG =
+    'https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-mac-arm64.dmg';
+  const ok = {
+    v: 1,
+    type: 'app-update',
+    state: 'available',
+    current: '0.5.1',
+    latest: '0.5.2',
+    download: DMG,
+  };
+
+  it('round-trips the update state (shell -> core)', () => {
+    const message = parseShellMessage(line(ok));
+    expect(message).toEqual(ok);
+    expect(encodeShellMessage(message as ShellMessage)).toBe(`${line(ok)}\n`);
+    const idle = { ...ok, state: 'idle', latest: '', download: '' };
+    expect(parseShellMessage(line(idle))).toEqual(idle);
+    const dev = { ...ok, state: 'off', current: '0.0.0-dev', latest: '', download: '' };
+    expect(parseShellMessage(line(dev))).toEqual(dev);
+  });
+
+  it.each([
+    ['an unknown state', { ...ok, state: 'installing' }],
+    ['an extra key', { ...ok, extra: 1 }],
+    [
+      'a missing key',
+      { v: 1, type: 'app-update', state: 'available', current: '0.5.1', latest: '0.5.2' },
+    ],
+    ['a bad current version', { ...ok, current: '0.5.1 <b>' }],
+    ['a prerelease latest', { ...ok, latest: '0.5.2-beta.1' }],
+    ['a link for another version', { ...ok, download: DMG.replaceAll('0.5.2', '0.5.3') }],
+    ['a link elsewhere', { ...ok, download: 'https://evil.example/AgentLink-0.5.2-mac-arm64.dmg' }],
+    ['available without a link', { ...ok, download: '' }],
+    ['available without a version', { ...ok, latest: '', download: '' }],
+    ['a link while not available', { ...ok, state: 'current' }],
+    ['a version while not available', { ...ok, state: 'current', download: '' }],
+    ['a number state', { ...ok, state: 1 }],
+  ])('refuses %s', (_label, value) => {
+    expect(parseShellMessage(line(value))).toBeUndefined();
+  });
+
+  it('the core may only ask for a check (core -> shell), with no other key', () => {
+    expect(parseCoreMessage(line({ v: 1, type: 'app-update-check' }))).toEqual({
+      v: 1,
+      type: 'app-update-check',
+    });
+    expect(encodeCoreMessage({ v: 1, type: 'app-update-check' })).toBe(
+      `${line({ v: 1, type: 'app-update-check' })}\n`,
+    );
+    expect(parseCoreMessage(line({ v: 1, type: 'app-update-check', url: DMG }))).toBeUndefined();
+    expect(parseCoreMessage(line(ok))).toBeUndefined();
+    expect(parseShellMessage(line({ v: 1, type: 'app-update-check' }))).toBeUndefined();
+  });
+});

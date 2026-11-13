@@ -66,8 +66,10 @@ import {
 } from './switches.js';
 import type { StatusAction } from './status-page.js';
 import { AppTray, trayImage } from './tray.js';
+import { ReleaseChecker, updateChecksAllowed } from './updater/release-check.js';
 import { scheduleUpdateChecks } from './updater/schedule.js';
 import { MainWindow } from './window.js';
+import type { AppUpdateView } from '../shared/app-update.js';
 import type { InviteOutcome } from '../shared/protocol.js';
 
 declare const __AGENTLINK_DESKTOP_PREVIEW__: boolean | undefined;
@@ -155,6 +157,14 @@ export interface ShellProcess {
   readonly logDir: string;
   /** WP-D10: starts the phase-1 update checks (packaged release builds only). Absent: none. */
   readonly startUpdates?: (electron: ElectronModule) => void;
+  /**
+   * DESK051-UPD: "Check for updates" (updater/release-check.ts), told about every change. Absent:
+   * Settings > Updates gets no state (tests).
+   */
+  readonly releaseChecker?: (
+    electron: ElectronModule,
+    onChange: (view: AppUpdateView) => void,
+  ) => ReleaseChecker;
   /** D15-01: this build's identity and the running-copy record (instance.ts). Absent: legacy lock. */
   readonly instance?: (app: App) => InstanceOps;
   /** D15-07: the startup tripwire for the bundled files (bundle-check.ts). Absent: not checked. */
@@ -239,6 +249,16 @@ export async function runShell(
   let tray: AppTray | null = null;
   let pendingInvite: string | null = null;
   const toInviteLink = proc.toInviteLink ?? ((): null => null);
+  // DESK051-UPD: the update state goes to the core (Settings > Updates) after every `ready` and on
+  // every change; the core can only ask for a check.
+  const sendAppUpdate = (view: AppUpdateView): void => {
+    try {
+      supervisor?.send({ v: 1, type: 'app-update', ...view });
+    } catch {
+      // An invalid view is never sent (the encoder checks it again).
+    }
+  };
+  const releaseChecker = proc.releaseChecker?.(electron, sendAppUpdate) ?? null;
 
   const sendInvite = (link: string): void => {
     try {
@@ -429,6 +449,7 @@ export async function runShell(
     onMessage: (message) => {
       switch (message.type) {
         case 'ready':
+          if (releaseChecker !== null) sendAppUpdate(releaseChecker.view());
           if (window?.loadSessionUrl(message.sessionUrl) === true) {
             window.show();
             if (pendingInvite !== null) {
@@ -451,6 +472,12 @@ export async function runShell(
           return;
         case 'stopped':
           // The exit follows; the supervisor's exit handler decides on a restart.
+          return;
+        case 'app-update-check':
+          // Always answered, even when nothing changed (the page waits for the end of "checking").
+          if (releaseChecker !== null) {
+            void releaseChecker.check().then(sendAppUpdate, () => undefined);
+          }
           return;
       }
     },
@@ -520,6 +547,7 @@ export async function runShell(
   await startCore();
   if (launch.deepLink !== null) handleDeepLink(launch.deepLink);
   if (app.isPackaged && preview === null) proc.startUpdates?.(electron);
+  void releaseChecker?.start().catch(() => undefined);
   return 'running';
 }
 
@@ -555,6 +583,15 @@ export function realProcess(): ShellProcess {
     toInviteLink,
     logDir: logDir(proc.platform, homedir(), proc.env),
     startUpdates: (electron) => startUpdates(electron, proc.platform, proc.arch),
+    releaseChecker: (electron, onChange) =>
+      releaseCheckerFor(
+        electron,
+        proc.platform,
+        proc.arch,
+        proc.env,
+        readPreview(proc.env),
+        onChange,
+      ),
     instance: (app) => realInstanceOps(app, proc.platform, proc.execPath, proc.resourcesPath ?? ''),
     verifyBundle: () => {
       const resources = proc.resourcesPath ?? '';
@@ -643,6 +680,34 @@ function realInstanceOps(
     },
     sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   };
+}
+
+/** DESK051-UPD: "Check for updates" on the real Electron app (main process only). */
+function releaseCheckerFor(
+  electron: ElectronModule,
+  platform: string,
+  arch: string,
+  env: Readonly<Record<string, string | undefined>>,
+  preview: PreviewSettings | null,
+  onChange: (view: AppUpdateView) => void,
+): ReleaseChecker {
+  const { app, net } = electron;
+  const version = app.getVersion?.() ?? '0.0.0-dev';
+  const stateDir = app.getPath?.('userData');
+  return new ReleaseChecker({
+    currentVersion: version,
+    platform,
+    arch,
+    translated: app.runningUnderARM64Translation === true,
+    enabled:
+      stateDir !== undefined &&
+      updateChecksAllowed({ packaged: app.isPackaged, preview: preview !== null, env }),
+    stateDir: stateDir ?? '',
+    // No way to tell: assume online; a failed request is then a quiet failure.
+    isOnline: () => net?.isOnline() ?? true,
+    timers: { setTimeout: (callback, ms) => setTimeout(callback, ms).unref() },
+    onChange,
+  });
 }
 
 /** WP-D10: the phase-1 updater on the real Electron app (index.ts does nothing without a pinned root). */

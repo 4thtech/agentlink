@@ -15,6 +15,7 @@ import {
   type ShellProcess,
 } from '../../src/main/main.js';
 import { WINDOW_PARTITION } from '../../src/main/security.js';
+import type { ReleaseChecker } from '../../src/main/updater/release-check.js';
 import {
   INSTANCE_COPY,
   instanceRecord,
@@ -274,6 +275,31 @@ describe('runShell startup', () => {
     // A link on another origin from the same core is refused.
     children[0]?.stream.push(readyLine(`http://localhost:1/?t=${'B'.repeat(43)}`));
     expect(window?.loaded).toEqual([statusPageUrl('starting'), SESSION_URL]);
+  });
+
+  it('DESK051-UPD: sends the update state after ready, and checks only when the core asks', async () => {
+    const view = { state: 'current', current: '0.5.1', latest: '', download: '' } as const;
+    let checks = 0;
+    const fake = {
+      view: () => view,
+      start: () => Promise.resolve(),
+      check: () => {
+        checks += 1;
+        return Promise.resolve(view);
+      },
+    } as unknown as ReleaseChecker;
+    const { electron, children, proc } = setup([], { releaseChecker: () => fake });
+    await runShell(electron, proc);
+    const line = `${JSON.stringify({ v: 1, type: 'app-update', ...view })}\n`;
+    expect(children[0]?.stream.written).toEqual([]);
+    children[0]?.stream.push(readyLine());
+    expect(children[0]?.stream.written).toEqual([line]);
+    expect(checks).toBe(0);
+    children[0]?.stream.push(`${JSON.stringify({ v: 1, type: 'app-update-check' })}\n`);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(checks).toBe(1);
+    // Answered even though nothing changed (the page waits for "checking" to end).
+    expect(children[0]?.stream.written).toEqual([line, line]);
   });
 
   it('locks every webContents that is ever created', async () => {

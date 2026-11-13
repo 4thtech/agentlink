@@ -40,6 +40,9 @@
 //       What happened to the shell's last "invite" (a fixed word; never the link or a name).
 //   {"v":1,"type":"stopped","reason":<STOP_REASONS>}
 //       The last message before the core exits.
+//   {"v":1,"type":"app-update-check"}
+//       DESK051-UPD: the person chose "Check for updates" in Settings. No other key: the shell checks
+//       its one fixed source and answers with an "app-update".
 //
 // Shell -> core
 //   {"v":1,"type":"invite","link":"https://agentlink.4thtech.io/i#<payload>"}
@@ -50,12 +53,20 @@
 //   {"v":1,"type":"show","route":<SHOW_ROUTES>}
 //       The person asked for a page (tray, dock, second launch). The core answers with a "ready"
 //       carrying a fresh session link for that route's fixed path.
+//   {"v":1,"type":"app-update","state":<APP_UPDATE_STATES>,"current":"<v>","latest":"<v>"|"","download":"<link>"|""}
+//       DESK051-UPD: what Settings > Updates shows. Sent after every "ready" and whenever it changes.
+//       `current` is this app's version (x.y.z, optionally a short build suffix); `latest` and
+//       `download` are set only for "available": `latest` is a plain x.y.z newer than `current`
+//       and `download` is exactly the release file for this Mac (or the release page) that the
+//       shell built from it (app-update.ts). Both are empty otherwise.
 //   {"v":1,"type":"shutdown"}
 //       Close cleanly (close the agent, the server and the relays) and exit 0. The shell kills the
 //       core if it has not exited within its grace period.
 // ------------------------------------------------------------------------------------------------
 //
 // This module is pure (no Node or Electron APIs) so both sides and their tests can use it.
+
+import { isAppUpdateView, type AppUpdateView } from './app-update.js';
 
 /** Protocol version carried in every message as `"v": 1`. */
 export const PROTOCOL_VERSION = 1;
@@ -154,8 +165,18 @@ export interface StoppedMessage {
   readonly type: 'stopped';
   readonly reason: StopReason;
 }
+/** DESK051-UPD: the person asked for an update check (no other key). */
+export interface AppUpdateCheckMessage {
+  readonly v: 1;
+  readonly type: 'app-update-check';
+}
 export type CoreMessage =
-  ReadyMessage | StatusMessage | ApprovalWaitingMessage | InviteResultMessage | StoppedMessage;
+  | ReadyMessage
+  | StatusMessage
+  | ApprovalWaitingMessage
+  | InviteResultMessage
+  | StoppedMessage
+  | AppUpdateCheckMessage;
 
 export interface InviteMessage {
   readonly v: 1;
@@ -171,7 +192,12 @@ export interface ShutdownMessage {
   readonly v: 1;
   readonly type: 'shutdown';
 }
-export type ShellMessage = InviteMessage | ShowMessage | ShutdownMessage;
+/** DESK051-UPD: Settings > Updates (app-update.ts isAppUpdateView). */
+export interface AppUpdateMessage extends AppUpdateView {
+  readonly v: 1;
+  readonly type: 'app-update';
+}
+export type ShellMessage = InviteMessage | ShowMessage | ShutdownMessage | AppUpdateMessage;
 
 const TOKEN = '[A-Za-z0-9_-]{43}';
 const PORT = '([1-9][0-9]{0,4})';
@@ -280,6 +306,9 @@ export function parseCoreMessage(line: string): CoreMessage | undefined {
       if (!isOneOf(STOP_REASONS, reason)) return undefined;
       return { v: 1, type: 'stopped', reason };
     }
+    case 'app-update-check':
+      if (!hasExactKeys(value, ['v', 'type'])) return undefined;
+      return { v: 1, type: 'app-update-check' };
     default:
       return undefined;
   }
@@ -305,6 +334,19 @@ export function parseShellMessage(line: string): ShellMessage | undefined {
     case 'shutdown':
       if (!hasExactKeys(value, ['v', 'type'])) return undefined;
       return { v: 1, type: 'shutdown' };
+    case 'app-update': {
+      if (!hasExactKeys(value, ['v', 'type', 'state', 'current', 'latest', 'download'])) {
+        return undefined;
+      }
+      const view = {
+        state: value['state'],
+        current: value['current'],
+        latest: value['latest'],
+        download: value['download'],
+      };
+      if (!isAppUpdateView(view)) return undefined;
+      return { v: 1, type: 'app-update', ...view };
+    }
     default:
       return undefined;
   }
@@ -325,6 +367,16 @@ export function encodeShellMessage(message: ShellMessage): string {
       break;
     case 'shutdown':
       line = JSON.stringify({ v: 1, type: 'shutdown' });
+      break;
+    case 'app-update':
+      line = JSON.stringify({
+        v: 1,
+        type: 'app-update',
+        state: message.state,
+        current: message.current,
+        latest: message.latest,
+        download: message.download,
+      });
       break;
     default:
       throw new Error('protocol: unknown shell message');
@@ -359,6 +411,9 @@ export function encodeCoreMessage(message: CoreMessage): string {
       break;
     case 'stopped':
       line = JSON.stringify({ v: 1, type: 'stopped', reason: message.reason });
+      break;
+    case 'app-update-check':
+      line = JSON.stringify({ v: 1, type: 'app-update-check' });
       break;
     default:
       throw new Error('protocol: unknown core message');

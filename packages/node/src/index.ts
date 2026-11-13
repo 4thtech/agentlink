@@ -178,6 +178,13 @@ export {
 } from './agent-peek.js';
 // REL051-RET1: the read-only sizes of an ID's store and of the Inbox folder (Settings, Storage).
 export { peekStorageUsage, type StoragePerContact, type StorageUsage } from './storage-usage.js';
+// DESK051-UPD: Settings > Updates in the desktop app (the desktop host builds the desk).
+export {
+  APP_UPDATE_CHECK_PATH,
+  APP_UPDATE_PATH,
+  type AppUpdateView,
+  type LocalUiAppUpdateDesk,
+} from './local-ui/api/app-update.js';
 // W4-LIVE-STATUS (04 §2.5): the signal-0 check of an MCP session row's pid.
 export { pidAlive } from './pid-alive.js';
 // M1-11s-a-d: the caller's health source for the status bar's health read.

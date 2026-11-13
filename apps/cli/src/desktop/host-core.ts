@@ -11,6 +11,9 @@
 //   record it holds in memory. The server's join desk keeps it in memory; accepting still needs the
 //   owner's presence. The link is never logged, printed, written or echoed back.
 // - `show {route}`: a fixed enum, never a path; it mints a fresh one-shot link, sent as `ready`.
+// - DESK051-UPD `app-update {…}`: the shell's update state, kept in memory for Settings > Updates
+//   (node local-ui/api/app-update.ts); "Check for updates" sends `app-update-check` (no other key).
+//   The core makes no request of its own for it.
 // - `~/.agentlink/app-host.json` is written by the server's handoff option (nodeUiDeps), so a
 //   terminal `agentlink join` hands its invite to this host unchanged; it is removed on close.
 // - `shutdown`, the pipe closing, a stop signal or a fatal error: the server closes, `stopped`
@@ -25,6 +28,8 @@ import type {
   ApprovalServer,
   ApprovalServerOptions,
   ApprovalServerSource,
+  AppUpdateView,
+  LocalUiAppUpdateDesk,
 } from '@4thtech-io/node';
 import { startUiServer, type UiDeps, type UiServer } from '../commands/ui.js';
 import type { FatalReason } from '../runtime/ui-lifecycle.js';
@@ -96,6 +101,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   /** Whether an agent was opened after the start (first run made one). */
   let openedSinceStart = false;
   let waiting = 0;
+  /** DESK051-UPD: the shell's last update state (undefined until it sends one). */
+  let appUpdate: AppUpdateView | undefined;
 
   let stopWith: (reason: StopReason) => void = () => undefined;
   const stopped = new Promise<StopReason>((resolve) => {
@@ -146,6 +153,18 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     });
   };
 
+  /** DESK051-UPD: Settings > Updates. A check is the shell's; meanwhile the page sees "checking". */
+  const appUpdateDesk: LocalUiAppUpdateDesk = Object.freeze<LocalUiAppUpdateDesk>({
+    view: () => appUpdate,
+    check: () => {
+      const now = appUpdate;
+      if (now === undefined || now.state === 'off' || stopping) return now;
+      if (!pipe.send({ v: 1, type: 'app-update-check' })) return now;
+      appUpdate = Object.freeze({ ...now, state: 'checking', latest: '', download: '' });
+      return appUpdate;
+    },
+  });
+
   /** The server starter given to the `ui` deps: the link sink, the record and the open agent. */
   const startServer = async (options: ApprovalServerOptions): Promise<ApprovalServer> => {
     const host = options.host;
@@ -153,6 +172,7 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     current = initial?.source ?? options.source;
     const wrapped: ApprovalServerOptions = {
       ...options,
+      appUpdate: appUpdateDesk,
       ...(host === undefined
         ? {}
         : {
@@ -201,6 +221,16 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   const unsubscribe = deps.interrupt(() => stop('signal'));
   const unguard = deps.guard?.(() => stop('fatal'));
   pipe.onClose(() => stop('pipe_closed'));
+  // DESK051-UPD: kept at once (the first one follows the first `ready`, before the queue below).
+  pipe.onMessage((message) => {
+    if (message.type !== 'app-update') return;
+    appUpdate = Object.freeze({
+      state: message.state,
+      current: message.current,
+      latest: message.latest,
+      download: message.download,
+    });
+  });
   sendStatus();
 
   let started: { ok: true; server: UiServer } | { ok: false; failure: StopReason };
@@ -260,6 +290,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     if (stopping) return;
     if (message.type === 'shutdown') stop('shutdown');
     else if (message.type === 'show') await show(message.route);
+    else if (message.type === 'app-update')
+      return; // kept by its own listener above
     else {
       const outcome = await invite(message.link);
       pipe.send({ v: 1, type: 'invite-result', outcome });

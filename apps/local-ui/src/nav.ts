@@ -4,6 +4,7 @@
 // Activity and Settings; the Advanced group appears only while Under the hood is on. Get started is
 // a guided layer over the app (`/start/<step>`), reached from Help, Cmd+K and Home. Every route
 // points at today's page; the section builders replace the page bodies in their own folders.
+import { inDesktopApp } from './desktop.js';
 import { PAGE_TITLES } from './strings.js';
 
 export const HOME_PATH = '/';
@@ -85,6 +86,8 @@ export const ADVANCED_SECTIONS: readonly Section[] = [
 export interface SettingsPage {
   readonly label: string;
   readonly path: string;
+  /** DESK051-UPD: listed only inside the desktop app (settingsPages). */
+  readonly desktopOnly?: true;
 }
 
 /** Settings (A9), in order; "Advanced" leads to the Advanced pages. */
@@ -101,6 +104,23 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
   { label: PAGE_TITLES.proofs, path: '/settings/proofs' },
   { label: PAGE_TITLES.advanced, path: '/settings/advanced' },
 ];
+
+/** DESK051-UPD: the app's version and "Check for updates" (desktop app only, before Advanced). */
+export const UPDATES_PAGE: SettingsPage = Object.freeze({
+  label: PAGE_TITLES.updates,
+  path: '/settings/updates',
+  desktopOnly: true,
+});
+const DESKTOP_SETTINGS_PAGES: readonly SettingsPage[] = [
+  ...SETTINGS_PAGES.filter((p) => p.path !== '/settings/advanced'),
+  UPDATES_PAGE,
+  ...SETTINGS_PAGES.filter((p) => p.path === '/settings/advanced'),
+];
+
+/** DESK051-UPD: the Settings pages this window lists (desktop-only pages only in the desktop app). */
+export function settingsPages(desktop: boolean = inDesktopApp()): readonly SettingsPage[] {
+  return desktop ? DESKTOP_SETTINGS_PAGES : SETTINGS_PAGES;
+}
 
 /** The agent name segment of `/agents/<name>` (the folder name rule: lower case, digits, dashes). */
 const AGENT_PAGE = /^\/(?:agents|ids)\/([a-z0-9]+(?:-[a-z0-9]+)*)$/;
@@ -128,7 +148,7 @@ export function titleOf(path: string): string {
   if (path.startsWith('/start/')) return PAGE_TITLES.getStarted;
   if (path === INTERIM_PEOPLE_PATH || path === PEOPLE_PATH) return PAGE_TITLES.people;
   if (agentNameOf(path) !== undefined) return PAGE_TITLES.agents;
-  const settings = SETTINGS_PAGES.find((p) => p.path === path);
+  const settings = settingsPages(true).find((p) => p.path === path);
   if (settings !== undefined && path.startsWith('/settings/')) return settings.label;
   const section = [...SECTIONS, ...ADVANCED_SECTIONS].find((s) => s.path === path);
   if (section !== undefined) return section.label;
@@ -210,11 +230,13 @@ export function goToEntries(hood: boolean): readonly GoToEntry[] {
       keywords: 'pro details technical',
     },
     { label: 'Keyboard shortcuts', hint: '⌘/', action: 'shortcuts', keywords: 'keys' },
-    ...SETTINGS_PAGES.filter((p) => p.path.startsWith('/settings/')).map((p) => ({
-      label: p.label,
-      hint: PAGE_TITLES.settings,
-      path: p.path,
-    })),
+    ...settingsPages()
+      .filter((p) => p.path.startsWith('/settings/'))
+      .map((p) => ({
+        label: p.label,
+        hint: PAGE_TITLES.settings,
+        path: p.path,
+      })),
   ];
   if (hood) {
     for (const s of ADVANCED_SECTIONS) {

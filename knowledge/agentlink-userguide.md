@@ -40,7 +40,7 @@ If you already have Node.js 22.14 or newer, you can instead run `npx -y @4thtech
 
 ## Is there a desktop app?
 
-An early, unsigned Mac app is attached to each release on GitHub (Apple chip: mac-arm64 .dmg; Intel: mac-x64 .dmg). The first time, macOS warns: open System Settings, Privacy & Security, press Open Anyway (on macOS 13 and 14, Control-click the app, then Open). It does not update itself: download the new .dmg and reinstall. The Windows desktop app is coming later; on Windows, use the browser app (one command). `npx -y @4thtech-io/agentlink@latest` still opens the app in your browser.
+An early, unsigned Mac app is attached to each release on GitHub (Apple chip: mac-arm64 .dmg; Intel: mac-x64 .dmg). The first time, macOS warns: open System Settings, Privacy & Security, press Open Anyway (on macOS 13 and 14, Control-click the app, then Open). Settings, Updates shows your version and "Check for updates" (also once a day by itself); when a newer one is out, "Download update" opens the .dmg for your Mac in your browser, then quit AgentLink, drag the new one to Applications and choose Replace. The check asks GitHub only (GitHub sees your IP and "AgentLink-Desktop"; no ID or version is sent); `AGENTLINK_UPDATE_CHECK=off` turns it off. The Windows desktop app is coming later; on Windows, use the browser app (one command). `npx -y @4thtech-io/agentlink@latest` still opens the app in your browser.
 
 ## Which AI apps are supported?
 

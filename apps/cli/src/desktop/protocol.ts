@@ -26,6 +26,8 @@
 //       What happened to the shell's last `invite` (a fixed word; never the link or the name).
 //   {"v":1,"type":"stopped","reason":<STOP_REASONS>}                      (proposed at WP-D3)
 //       The last message before the core exits.
+//   {"v":1,"type":"app-update-check"}                                       (DESK051-UPD)
+//       The person chose "Check for updates" in Settings. No other key.
 //
 // Shell -> core:
 //   {"v":1,"type":"invite","link":"https://agentlink.4thtech.io/i#…"}
@@ -35,6 +37,10 @@
 //       Open a page in the window (a fresh `ready` follows). A fixed enum, never a path.
 //   {"v":1,"type":"shutdown"}
 //       Close the server (which removes app-host.json) and exit 0.
+//   {"v":1,"type":"app-update","state":<APP_UPDATE_STATES>,"current":"<v>","latest":"<v>"|"","download":"<link>"|""}
+//       DESK051-UPD: what Settings > Updates shows (the shell's app-update.ts builds it). `latest` and
+//       `download` only for "available": a plain x.y.z newer than `current`, and exactly this
+//       repository's release file for it (AgentLink-<v>-mac-<arm64|x64>.dmg) or its release page.
 
 /** The protocol version every message carries. */
 export const DESKTOP_PIPE_VERSION = 1;
@@ -87,6 +93,71 @@ export const STOP_REASONS = Object.freeze([
 ] as const);
 export type StopReason = (typeof STOP_REASONS)[number];
 
+/** DESK051-UPD: what Settings > Updates can show (the shell's app-update.ts APP_UPDATE_STATES). */
+export const APP_UPDATE_STATES = Object.freeze([
+  'off',
+  'idle',
+  'checking',
+  'current',
+  'available',
+  'failed',
+  'offline',
+] as const);
+export type AppUpdateState = (typeof APP_UPDATE_STATES)[number];
+
+/** DESK051-UPD: the update state the shell sends (checked field by field, see isAppUpdate). */
+export interface AppUpdateView {
+  readonly state: AppUpdateState;
+  readonly current: string;
+  readonly latest: string;
+  readonly download: string;
+}
+
+const UPD_NUM = '(0|[1-9][0-9]{0,5})';
+const RELEASE_VERSION = new RegExp(`^${UPD_NUM}\\.${UPD_NUM}\\.${UPD_NUM}$`);
+const APP_VERSION = new RegExp(
+  `^${UPD_NUM}\\.${UPD_NUM}\\.${UPD_NUM}(?:-[0-9A-Za-z][0-9A-Za-z.]{0,31})?$`,
+);
+const RELEASES = 'https://github.com/4thtech/agentlink/releases';
+
+/** True only when both are plain x.y.z and `latest` is strictly greater. */
+export function isNewerVersion(latest: string, current: string): boolean {
+  const a = RELEASE_VERSION.exec(latest);
+  const b = RELEASE_VERSION.exec(current);
+  if (a === null || b === null) return false;
+  for (let i = 1; i <= 3; i += 1) {
+    const x = Number(a[i]);
+    const y = Number(b[i]);
+    if (x !== y) return x > y;
+  }
+  return false;
+}
+
+/** True when `url` is exactly one of the links the shell builds for `version`. */
+export function isUpdateLinkFor(url: unknown, version: string): boolean {
+  if (typeof url !== 'string' || !RELEASE_VERSION.test(version)) return false;
+  return (
+    url === `${RELEASES}/download/v${version}/AgentLink-${version}-mac-arm64.dmg` ||
+    url === `${RELEASES}/download/v${version}/AgentLink-${version}-mac-x64.dmg` ||
+    url === `${RELEASES}/tag/v${version}`
+  );
+}
+
+/** The four fields fit together: a version and a link only when available. */
+export function isAppUpdate(value: Readonly<Record<string, unknown>>): boolean {
+  const { state, current, latest, download } = value;
+  if (!isOneOf(APP_UPDATE_STATES, state)) return false;
+  if (typeof current !== 'string' || !APP_VERSION.test(current)) return false;
+  if (state === 'available') {
+    return (
+      typeof latest === 'string' &&
+      isNewerVersion(latest, current) &&
+      isUpdateLinkFor(download, latest)
+    );
+  }
+  return latest === '' && download === '';
+}
+
 /** The session link paths the core may send (approval-server.ts open*, invite-paths.ts). */
 export const SESSION_PATHS = Object.freeze([
   '/',
@@ -118,12 +189,14 @@ export type HostMessage =
     }
   | { readonly v: 1; readonly type: 'approval-waiting'; readonly count: number }
   | { readonly v: 1; readonly type: 'invite-result'; readonly outcome: InviteOutcome }
-  | { readonly v: 1; readonly type: 'stopped'; readonly reason: StopReason };
+  | { readonly v: 1; readonly type: 'stopped'; readonly reason: StopReason }
+  | { readonly v: 1; readonly type: 'app-update-check' };
 
 export type ShellMessage =
   | { readonly v: 1; readonly type: 'invite'; readonly link: string }
   | { readonly v: 1; readonly type: 'show'; readonly route: ShowRoute }
-  | { readonly v: 1; readonly type: 'shutdown' };
+  | { readonly v: 1; readonly type: 'shutdown' }
+  | ({ readonly v: 1; readonly type: 'app-update' } & AppUpdateView);
 
 /** True for a session link the core may send (and the shell may load). */
 export function isSessionUrl(value: unknown): value is string {
@@ -185,6 +258,18 @@ export function parseShellMessage(line: string): ShellMessage | undefined {
       if (m?.['v'] !== DESKTOP_PIPE_VERSION) return undefined;
       return Object.freeze({ v: 1, type: 'shutdown' });
     }
+    case 'app-update': {
+      const m = exactObject(value, ['v', 'type', 'state', 'current', 'latest', 'download']);
+      if (m?.['v'] !== DESKTOP_PIPE_VERSION || !isAppUpdate(m)) return undefined;
+      return Object.freeze({
+        v: 1,
+        type: 'app-update',
+        state: m['state'] as AppUpdateState,
+        current: m['current'] as string,
+        latest: m['latest'] as string,
+        download: m['download'] as string,
+      });
+    }
     default:
       return undefined;
   }
@@ -235,6 +320,11 @@ export function parseHostMessage(line: string): HostMessage | undefined {
         return undefined;
       }
       return Object.freeze({ v: 1, type: 'stopped', reason: m['reason'] });
+    }
+    case 'app-update-check': {
+      const m = exactObject(value, ['v', 'type']);
+      if (m?.['v'] !== DESKTOP_PIPE_VERSION) return undefined;
+      return Object.freeze({ v: 1, type: 'app-update-check' });
     }
     default:
       return undefined;

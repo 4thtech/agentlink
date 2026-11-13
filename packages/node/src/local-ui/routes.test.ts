@@ -140,6 +140,9 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
     // A built page's own test covers its routes (files: api/files.test.ts, M1-11c-a3; contacts: api/contacts.test.ts, M1-11c-a2; proofs:
     // api/proofs.test.ts, M1-11c-a4; top-up and withdraw: api/proofs-top-up.test.ts, M1-11c-a4c).
     const built = new Set([
+      // DESK051-UPD: Settings > Updates in the desktop app (api/app-update.test.ts).
+      '/api/ui/app-update',
+      '/api/ui/app-update/check',
       '/api/ui/rules',
       '/api/ui/rules/review',
       '/api/ui/files',
