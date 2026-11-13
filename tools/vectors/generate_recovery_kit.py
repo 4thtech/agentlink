@@ -50,7 +50,8 @@ KIT-NAMES (v2): the header's version is 2 and the manifest is
   {"v":2,"kitId","createdAt","contents","ownerNostr","agents":[{"agentId","label"?,"name"}]}
 with `v` equal to the header's version. `label` (optional per agent) is the ID's owner-set name: 1 to
 32 Unicode code points, well-formed UTF-8, none below U+0020 and none of U+0022 ("), U+005C
-(backslash) and U+007F, so its JCS form has no escape. It is inside the encrypted body only (the AEAD
+(backslash) and U+007F, so its JCS form has no escape, and none in HIDDEN (C1, bidi, zero-width and other
+invisible characters; IR-KIT-NAMES-1 L1). It is inside the encrypted body only (the AEAD
 covers it); the header is unchanged apart from its version byte. Readers accept version 1 (a label
 is refused) and 2; writers write 2 only, so the v1 kits here are open, open-kek and header cases
 (old kits keep opening) and only v2 kits have seal cases. A v1-only reader refuses a v2 kit before
@@ -209,12 +210,24 @@ def parse_entries(plaintext):
     return entries
 
 
+# IR-KIT-NAMES-1 L1: code points a label never holds besides C0, " \\ and DEL (a fixed list, not a
+# Unicode category, so every reader agrees whatever its Unicode version): C1 controls, soft hyphen,
+# ALM, Mongolian vowel separator, zero-width and directional marks, line and paragraph separators,
+# bidi embeddings and isolates, invisible operators, BOM, interlinear annotation, tags.
+HIDDEN = [(0x80, 0x9F), (0xAD, 0xAD), (0x61C, 0x61C), (0x180E, 0x180E), (0x200B, 0x200F), (0x2028, 0x202E), (0x2060, 0x206F), (0xFEFF, 0xFEFF), (0xFFF9, 0xFFFB), (0xE0000, 0xE007F)]
+
+
+def hidden(cp):
+    return any(lo <= cp <= hi for lo, hi in HIDDEN)
+
+
 def check_label(label):
-    """KIT-NAMES: 1..32 code points of well-formed UTF-8, none below U+0020, none of " \\ U+007F."""
+    """KIT-NAMES: 1..32 code points of well-formed UTF-8, none below U+0020, none of " \\ U+007F,
+    none in HIDDEN."""
     if not isinstance(label, str) or not 1 <= len(label) <= MAX_LABEL:
         raise ValueError("label length")
     label.encode("utf-8", "strict")  # a lone surrogate has no UTF-8 form
-    if any(ord(c) < 0x20 or c in ('"', "\\", "\x7f") for c in label):
+    if any(ord(c) < 0x20 or c in ('"', "\\", "\x7f") or hidden(ord(c)) for c in label):
         raise ValueError("label character")
     return label
 
@@ -904,6 +917,27 @@ def build():
     man2_case("label-control", "a label with U+001F (JCS writes it as \\u001f)", label_raw(b'"Ana\\u001fNovak"'))
     man2_case("label-raw-control", "a label with a raw U+000A", label_raw(b'"Ana\nNovak"'))
     man2_case("label-del", "a label with U+007F (JCS writes it as itself)", label_raw(b'"Ana\x7fNovak"'))
+    # IR-KIT-NAMES-1 L1: invisible, bidi and C1 characters (JCS writes each as itself).
+    for case_id, why, ch in [
+        ("label-c1-csi", "U+009B (C1 CSI)", "\u009b"),
+        ("label-c1-nel", "U+0085 (C1 NEL)", "\u0085"),
+        ("label-soft-hyphen", "U+00AD (soft hyphen)", "­"),
+        ("label-alm", "U+061C (Arabic letter mark)", "؜"),
+        ("label-zwsp", "U+200B (zero-width space)", "​"),
+        ("label-rlm", "U+200F (right-to-left mark)", "‏"),
+        ("label-line-separator", "U+2028 (line separator)", " "),
+        ("label-rlo", "U+202E (right-to-left override)", "‮"),
+        ("label-word-joiner", "U+2060 (word joiner)", "⁠"),
+        ("label-rli", "U+2067 (right-to-left isolate)", "⁧"),
+        ("label-bom", "U+FEFF (byte order mark)", "﻿"),
+        ("label-annotation", "U+FFF9 (interlinear annotation anchor)", "￹"),
+        ("label-tag", "U+E0041 (tag latin capital A)", "\U000e0041"),
+    ]:
+        man2_case(case_id, f"a label with {why}", label_raw(('"Ana' + ch + 'Novak"').encode("utf-8")))
+    # The edges just outside the list are labels (U+00A0 and U+2030).
+    edge = dict(l1, label="Ana Novak ‰ ؛")
+    edge_kit = Kit("v2-label-edges", owner_seed, [edge], "full", 4096, kit_version=2)
+    cases.append(v.case("open-kek-v2-label-edges", f"{SPEC2} open with the kek: a label with U+00A0, U+2030 and U+061B, just outside the refused ranges", kek_open_input(edge_kit.data, edge_kit.kek), opened(open_with_kek(edge_kit.data, edge_kit.kek))))
     man2_case("label-escape-printable", "a label with \\u0041 for A (not JCS)", label_raw(b'"\\u0041na Novak"'))
     man2_case("label-escape-non-ascii", "a label with \\u00e9 for é (not JCS)", label_raw(b'"Ren\\u00e9e"'))
     man2_case("label-surrogate", "a label with a lone surrogate written as \\ud800", label_raw(b'"Ana\\ud800"'))
@@ -923,6 +957,9 @@ def build():
         ("label-quote", "a label with \"", 'Ana "N"'),
         ("label-control", "a label with U+000A", "Ana\nNovak"),
         ("label-del", "a label with U+007F", "Ana\x7fNovak"),
+        ("label-c1", "a label with U+009B (C1 CSI)", "Ana\u009bNovak"),
+        ("label-rlo", "a label with U+202E (right-to-left override)", "‮Ana"),
+        ("label-zwsp", "a label with U+200B (zero-width space)", "Ana​Novak"),
     ]:
         if not refused(check_label, bad_label):
             v.fail(f"seal {case_id}: the reference label check accepts it")
@@ -940,6 +977,9 @@ def build():
     reject_kek("v2-flip-label", "v2: one bit flipped in the ciphertext of the label", flipped(multi2.data, HEADER_LEN + at), multi2.kek)
     reject("v2-flip-label", "v2: one bit flipped in the ciphertext of the label, opened with the code", flipped(multi2.data, HEADER_LEN + at), code=multi2.code)
     reject("v2-version-1", "v2: the header's version rewritten from 2 to 1 (the version is in every chunk's AAD)", flipped(multi2.data, 4, 0x03), code=multi2.code)
+    # IR-KIT-NAMES-1 info 4: a v1 kit's version rewritten from 1 to 2 also fails authentication.
+    reject("v1-version-2", "v1: the header's version rewritten from 1 to 2 (the version is in every chunk's AAD)", flipped(d, 4, 0x03), code=multi.code)
+    reject_kek("v1-version-2", "v1: the header's version rewritten from 1 to 2, opened with the kek", flipped(d, 4, 0x03))
 
     # Cross-type ---------------------------------------------------------------------------------------
     blobs = prf_blobs(owner_seed)

@@ -639,6 +639,12 @@ describe('ALKK v2: owner-set names', () => {
       'Ana\u001fNovak',
       'Ana\u007fNovak',
       'Ana\ud800',
+      // IR-KIT-NAMES-1 L1: C1, bidi and zero-width characters.
+      'Ana\u009bNovak',
+      '\u202eAna',
+      'Ana\u200bNovak',
+      'Ana\u2067Novak',
+      'Ana\ufeff',
       7 as unknown as string,
       null as unknown as string,
     ]) {

@@ -295,9 +295,33 @@ interface ManifestAgent {
 const LABEL_MAX_CODE_POINTS = 32;
 
 /**
+ * KIT-NAMES (IR-KIT-NAMES-1 L1, defence in depth): code points a label never holds besides C0,
+ * `"`, `\` and DEL, so a reader that prints a label as it is cannot be steered by it: the C1
+ * controls U+0080..U+009F, U+00AD, U+061C, U+180E, U+200B..U+200F (zero-width and marks),
+ * U+2028..U+202E (separators and bidi embeddings), U+2060..U+206F (word joiner, invisible
+ * operators, bidi isolates), U+FEFF, U+FFF9..U+FFFB and the tags U+E0000..U+E007F. A fixed list,
+ * not a Unicode category, so every reader and the vectors agree whatever their Unicode version.
+ */
+function isHiddenCodePoint(cp: number): boolean {
+  return (
+    (cp >= 0x80 && cp <= 0x9f) ||
+    cp === 0xad ||
+    cp === 0x61c ||
+    cp === 0x180e ||
+    (cp >= 0x200b && cp <= 0x200f) ||
+    (cp >= 0x2028 && cp <= 0x202e) ||
+    (cp >= 0x2060 && cp <= 0x206f) ||
+    cp === 0xfeff ||
+    (cp >= 0xfff9 && cp <= 0xfffb) ||
+    (cp >= 0xe0000 && cp <= 0xe007f)
+  );
+}
+
+/**
  * KIT-NAMES: the label rule on bytes, with no string made: well-formed UTF-8 (no overlong form,
- * surrogate or code point above U+10FFFF), 1 to 32 code points, none below U+0020 and none of
- * U+0022, U+005C and U+007F (so its JCS form has no escape and is its only spelling).
+ * surrogate or code point above U+10FFFF), 1 to 32 code points, none below U+0020, none of
+ * U+0022, U+005C and U+007F (so its JCS form has no escape and is its only spelling) and none of
+ * isHiddenCodePoint.
  */
 function isLabelBytes(bytes: Uint8Array): boolean {
   let points = 0;
@@ -333,6 +357,7 @@ function isLabelBytes(bytes: Uint8Array): boolean {
       cp = (cp << 6) | (c & 0x3f);
     }
     if (cp < min || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff)) return false;
+    if (isHiddenCodePoint(cp)) return false;
     i += need + 1;
     points += 1;
     if (points > LABEL_MAX_CODE_POINTS) return false;
@@ -520,6 +545,7 @@ function isLabel(value: unknown): value is string {
     const cp = ch.codePointAt(0) as number;
     if (cp < 0x20 || cp === 0x22 || cp === 0x5c || cp === 0x7f) return false;
     if (cp >= 0xd800 && cp <= 0xdfff) return false; // a lone surrogate has no UTF-8 form
+    if (isHiddenCodePoint(cp)) return false;
     points += 1;
   }
   return points >= 1 && points <= LABEL_MAX_CODE_POINTS;
@@ -574,7 +600,7 @@ function checkInput(input: RecoveryKitInput): CheckedAgent[] {
     // KIT-NAMES: undefined is "no label"; anything else must pass the rule.
     if (agent.label !== undefined && !isLabel(agent.label)) {
       throw argument(
-        'a label must be 1 to 32 characters with no control character, quote or backslash',
+        'a label must be 1 to 32 characters with no control, invisible or bidi character, quote or backslash',
       );
     }
     if (!Array.isArray(agent.items)) throw argument('items must be an array');

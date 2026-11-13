@@ -1151,7 +1151,8 @@ describe.runIf(POSIX)('UX1113-R1-LABEL: the done answer names IDs by their verif
     const kit = await makeKit(
       t.root,
       owner,
-      [{ ...plain, label: '‮evil‬' }],
+      // Within the kit's label rule, outside the folder label rule (bidi is refused by the kit itself).
+      [{ ...plain, label: '<b>Ana</b>' }],
       'agentlink-recovery-kit-hl.alkk',
       join(t.home, 'Downloads'),
     );
