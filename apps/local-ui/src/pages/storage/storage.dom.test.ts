@@ -129,6 +129,19 @@ describe('Settings > Storage', () => {
     expect(text()).not.toMatch(/wallet|\bgas\b|seed phrase|transaction/i);
   });
 
+  it('an owner with no ID sees a calm empty state, not a failure or an Inbox read', async () => {
+    await mount(
+      api({
+        kind: 'ok',
+        status: 200,
+        data: { status: 'ok', switchable: true, ids: [], inbox: null },
+      }),
+    );
+    expect(text()).toContain('No IDs yet — nothing stored.');
+    expect(text()).not.toContain('could not be read');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+  });
+
   it('a failed read says so and Try again reads once more', async () => {
     const get = vi
       .fn()
