@@ -242,12 +242,22 @@ function renamedOutput(views: readonly ContactView[]): HandlerOutput {
   });
 }
 
+/**
+ * REL051-R2C (R2-CLASS-08): the day as the app shows it ("Nov 13, 2026"), on this computer's
+ * calendar, never a UTC date that can be a day off from what the user sees.
+ */
+function plainDay(at: string): string {
+  const date = new Date(at);
+  if (Number.isNaN(date.getTime())) return at.slice(0, 10);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 /** At most this many options are spelled out in an ambiguous summary; `candidates` has them all. */
 const SUMMARY_OPTIONS = 5;
 
 /**
  * REL051-B1 (N12): "More than one contact has that name … They are: 1) owner 1111·2222, id
- * 0xbbbbbbbb, connected 2025-10-09; 2) …". Only what tells them apart and is not counterparty text
+ * 0xbbbbbbbb, connected Oct 9, 2025; 2) …". Only what tells them apart and is not counterparty text
  * (I-5): the ID tag from the verified card, the short contact ID and the day the pairing was made.
  * Never a name, so never the query (IR-M1-9g-1 L1). A value of another shape is left out.
  */
@@ -258,7 +268,7 @@ function ambiguousSummary(matches: readonly ContactView[]): string {
     const parts = [
       ...(typeof tag === 'string' && TAG.test(tag) ? [`owner ${tag}`] : []),
       ...(ID.test(view.id) ? [`id ${shortIdOf(view.id)}`] : []),
-      ...(at === undefined ? [] : [`connected ${at.slice(0, 10)}`]),
+      ...(at === undefined ? [] : [`connected ${plainDay(at)}`]),
     ];
     return `${String(i + 1)}) ${parts.join(', ')}`;
   });
