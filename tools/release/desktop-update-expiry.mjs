@@ -17,7 +17,7 @@ const TIMESTAMP = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/;
 const HEX32 = /^[0-9a-f]{64}$/;
 
 export const RENEW =
-  'Renew it: ship a release, or re-run the job sign-update-manifest of the last release run and approve it (docs/runbooks/desktop-update-keys.md, "Renew").';
+  'Renew it: ship a release, or run Actions > "Desktop update renew" (desktop-update-renew.yml) on main and approve it (docs/runbooks/desktop-update-keys.md, "Renew").';
 
 /** {level: 'ok'|'warn'|'expired'|'error', message} for the text of desktop-update.json. */
 export function expiryStatus(text, now, warnDays) {

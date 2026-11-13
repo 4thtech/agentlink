@@ -620,8 +620,8 @@ describe('the desktop-update environment check (IR-UPD-8-1 #2)', () => {
   const envJob = job(release, 'desktop-update-environment');
   it('runs in release.yml without a secret, read-only, before the manifest job', () => {
     expect(envJob).not.toBe('');
-    expect(envJob).not.toMatch(/secrets\.|environment:/);
-    expect(permissions(envJob)).toEqual(['actions: read']);
+    expect(envJob).not.toMatch(/secrets\.|\n {4}environment:/);
+    expect(permissions(envJob)).toEqual(['actions: read', 'contents: read']);
     expect(envJob).toMatch(/gh api [^\n]*environments\/desktop-update/);
     expect(envJob).toMatch(/deployment-branch-policies/);
     expect(envJob).toMatch(/desktop-update-environment\.mjs/);

@@ -12,6 +12,9 @@
 //   time; `restart()` only once that update is ready. OD-D option 1: the restart waits for the click.
 // - In-app updates are offered only for a plain x.y.z newer than this version (the link the page
 //   shows is built from it); anything else stays with the release check.
+// - IR-UPD-8-1 #9: the offer may be days old. "Update now" checks the signed manifest again and
+//   installs only when it still names exactly the same update (version, URL, SHA-256, size);
+//   "Restart now" checks it once more, and the swap goes ahead only if it still does.
 import { appBundleOf } from './swap-mac.js';
 import { configuredRoot } from './index.js';
 import type { InstallOutcome } from './install.js';
@@ -59,6 +62,20 @@ export interface InAppUpdaterDeps {
 }
 
 type Phase = 'idle' | 'downloading' | 'verifying' | 'ready' | 'restarting' | 'failed';
+
+/** The same signed update: version and the exact installer (URL, SHA-256, size, form). */
+export function sameUpdate(a: AcceptedUpdate | undefined, b: AcceptedUpdate): boolean {
+  return (
+    a !== undefined &&
+    a.version === b.version &&
+    a.asset.url === b.asset.url &&
+    a.asset.sha256 === b.asset.sha256 &&
+    a.asset.size === b.asset.size &&
+    a.asset.kind === b.asset.kind &&
+    a.asset.platform === b.asset.platform &&
+    a.asset.arch === b.asset.arch
+  );
+}
 
 export class InAppUpdater {
   readonly #deps: InAppUpdaterDeps;
@@ -140,10 +157,17 @@ export class InAppUpdater {
         new Promise<void>((resolve) => {
           this.#confirm = resolve;
           this.#set('ready', 0);
+        }).then(async () => {
+          // Right before the swap: the signed manifest must still name this update.
+          if (!(await this.#stillOffered(offered))) throw new Error('update no longer offered');
         }),
     };
-    void this.#deps
-      .install(offered, hooks)
+    void this.#stillOffered(offered)
+      .then((same) =>
+        same
+          ? this.#deps.install(offered, hooks)
+          : ({ kind: 'fallback', code: 'swap_failed' } as InstallOutcome),
+      )
       .catch((): InstallOutcome => ({ kind: 'fallback', code: 'swap_failed' }))
       .then((outcome) => {
         this.#confirm = undefined;
@@ -161,6 +185,15 @@ export class InAppUpdater {
     this.#set('restarting', 0);
     confirm();
     return true;
+  }
+
+  /** The signed manifest checked again now; false when it is gone, refused or names another update. */
+  async #stillOffered(offered: AcceptedUpdate): Promise<boolean> {
+    try {
+      return sameUpdate(await this.#deps.check(), offered);
+    } catch {
+      return false;
+    }
   }
 
   #set(phase: Phase, percent: number): void {

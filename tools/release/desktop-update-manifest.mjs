@@ -205,7 +205,7 @@ export function verifyDocument({ text, verifier, pin, version, channel, now = Da
 
 const USAGE = [
   'Usage:',
-  '  desktop-update-manifest.mjs build  --version <x.y.z> --channel stable --dir <assets> --root-key <root-key.json> --repository <owner/repo> --out <unsigned.json>',
+  '  desktop-update-manifest.mjs build  --version <x.y.z> --channel stable --dir <assets> --root-key <root-key.json> --repository <owner/repo> (--build-sums <file> | --renewal) --out <unsigned.json>',
   '  desktop-update-manifest.mjs sign   --in <unsigned.json> --root-key <root-key.json> --out-dir <dir> [--days 30]   (key in DESKTOP_UPDATE_KEY)',
   '  desktop-update-manifest.mjs verify --dir <dir> --root-key <root-key.json> --version <x.y.z> --channel stable',
 ].join('\n');
@@ -262,6 +262,8 @@ export async function main(argv, io = {}) {
         in: { type: 'string' },
         'out-dir': { type: 'string' },
         days: { type: 'string' },
+        'build-sums': { type: 'string' },
+        renewal: { type: 'boolean' },
       },
       strict: true,
       allowPositionals: false,
@@ -272,18 +274,31 @@ export async function main(argv, io = {}) {
   switch (command) {
     case 'build': {
       required(values, ['version', 'channel', 'dir', 'root-key', 'repository', 'out']);
+      // A release run passes this run's own build sums and build records. A renewal
+      // (desktop-update-renew.yml) has neither: its anchor is the attestation bound to the release
+      // commit on main, checked by the workflow before this runs (IR-UPD-8-1 #1, #4).
+      const renewal = values.renewal === true;
+      if (renewal === (typeof values['build-sums'] === 'string')) {
+        throw new ToolError(
+          'pass --build-sums <this run’s build sums> for a release, or --renewal alone for a renewal',
+        );
+      }
       const pin = pinFromRootKeyJson(readText(values['root-key'], 'root-key.json'));
-      const inputs = ['arm64', 'x64'].map((arch) => {
-        try {
-          return JSON.parse(
-            readText(join(values.dir, `inputs-mac-${arch}.json`), 'a build record'),
-          );
-        } catch (error) {
-          if (error instanceof ToolError) throw error;
-          throw new ToolError(`inputs-mac-${arch}.json is not JSON`);
-        }
-      });
-      checkBuildInputs(inputs, pin);
+      let buildSums;
+      if (!renewal) {
+        const inputs = ['arm64', 'x64'].map((arch) => {
+          try {
+            return JSON.parse(
+              readText(join(values.dir, `inputs-mac-${arch}.json`), 'a build record'),
+            );
+          } catch (error) {
+            if (error instanceof ToolError) throw error;
+            throw new ToolError(`inputs-mac-${arch}.json is not JSON`);
+          }
+        });
+        checkBuildInputs(inputs, pin);
+        buildSums = parseSums(readText(values['build-sums'], "this run's build sums"));
+      }
       const sums = parseSums(readText(join(values.dir, SUMS_FILE), SUMS_FILE));
       const sizes = new Map();
       for (const { name } of releaseAssets(values.version)) {
@@ -296,8 +311,13 @@ export async function main(argv, io = {}) {
           throw new ToolError(`${name} was not downloaded from the release`);
         }
         // The workflow ran sha256sum --check already; checked here again, through @4thtech-io/crypto.
-        if (sums.get(name) !== encodeHex(sha256(bytes))) {
+        const digest = encodeHex(sha256(bytes));
+        if (sums.get(name) !== digest) {
           throw new ToolError(`${name} does not match ${SUMS_FILE}`);
+        }
+        // IR-UPD-8-1 #1: the file on the Release must be the one this run built.
+        if (buildSums !== undefined && buildSums.get(name) !== digest) {
+          throw new ToolError(`${name} on the Release is not the file this run's build made`);
         }
         sizes.set(name, bytes.length);
       }

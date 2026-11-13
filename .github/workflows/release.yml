@@ -1883,6 +1883,9 @@ jobs:
       contents: write # attach the app to the GitHub Release v<version>
     outputs:
       updates: ${{ steps.mode.outputs.updates }}
+      # IR-UPD-8-1 #1: the SHA-256 of the versioned zips and DMGs as this run's build wrote them (checked
+      # against the build's own SHA256SUMS). The update manifest job compares the Release files with it.
+      build-sums: ${{ steps.names.outputs.build-sums }}
     steps:
       - name: Stop if DEPLOY_FREEZE is set
         shell: bash
@@ -1928,6 +1931,7 @@ jobs:
           echo "Update mode of the Mac builds: $a."
 
       - name: Check the names and the sums
+        id: names
         shell: bash
         working-directory: ${{ runner.temp }}/desktop-app
         env:
@@ -1949,6 +1953,11 @@ jobs:
             printf '%s\n' "$line" >> SHA256SUMS-desktop-app.txt
           done
           rm -f SHA256SUMS
+          {
+            echo 'build-sums<<BUILD_SUMS_EOF'
+            cat SHA256SUMS-desktop-app.txt
+            echo 'BUILD_SUMS_EOF'
+          } >> "$GITHUB_OUTPUT"
           # REL-LINKS-1: the same bytes under names without a version, for the links that never change.
           for arch in arm64 x64; do
             cp -- "AgentLink-$VERSION-mac-$arch.dmg" "AgentLink-mac-$arch.dmg"
@@ -2110,11 +2119,47 @@ jobs:
   #                            step runs the app's own parser on the exact bytes, so a bad or unsigned
   #                            manifest stops the job before the publish step. Publishes
   #                            desktop-update-<key id>.json (Fable M1) and desktop-update.json.
-  # Renewal: a manifest is valid 30 days; desktop-update-expiry.yml warns 7 days ahead (RB-23).
+  # Renewal: a manifest is valid 30 days; desktop-update-expiry.yml warns 7 days ahead and
+  # desktop-update-renew.yml (dispatch only, same environment) re-signs the Latest release (RB-23).
+  # IR-UPD-8-1: the attestations must come from desktop.yml at this commit of main, the Release files
+  # must equal this run's build (job output build-sums), and desktop-update-environment checks the
+  # environment's rules before any job can reach the key.
+  # IR-UPD-8-1 #2: GitHub creates a missing environment with NO rules the first time a job names it.
+  # Before any job can reach the key, this job (no secret, read-only) checks that `desktop-update`
+  # exists with a required reviewer, a main-only branch rule and no admin bypass; the jobs below need it.
+  desktop-update-environment:
+    name: desktop-update-environment
+    needs: [desktop-app-release]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.desktop-app-release.result == 'success' && needs.desktop-app-release.outputs.updates == 'on'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read # read the environment's rules (gh api)
+      contents: read # check out the checker
+    steps:
+      - name: Check out this commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Check the environment desktop-update
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$REPOSITORY/environments/desktop-update" > "$RUNNER_TEMP/env.json" 2> /dev/null ||
+            echo null > "$RUNNER_TEMP/env.json"
+          gh api "repos/$REPOSITORY/environments/desktop-update/deployment-branch-policies" > "$RUNNER_TEMP/policies.json" 2> /dev/null ||
+            echo null > "$RUNNER_TEMP/policies.json"
+          node tools/release/desktop-update-environment.mjs --environment "$RUNNER_TEMP/env.json" --policies "$RUNNER_TEMP/policies.json"
+
   desktop-update-manifest:
     name: desktop-update-manifest
-    needs: [desktop-extension-build, desktop-app-release]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.desktop-app-release.result == 'success' && needs.desktop-app-release.outputs.updates == 'on' && vars.DEPLOY_FREEZE != 'true'
+    needs: [desktop-extension-build, desktop-app-release, desktop-update-environment]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.desktop-app-release.result == 'success' && needs.desktop-update-environment.result == 'success' && needs.desktop-app-release.outputs.updates == 'on' && vars.DEPLOY_FREEZE != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -2168,23 +2213,27 @@ jobs:
             --pattern AgentLink-mac-arm64.dmg --pattern AgentLink-mac-x64.dmg --pattern SHA256SUMS-desktop-app.txt
           sha256sum --check --strict SHA256SUMS-desktop-app.txt
           for f in "AgentLink-$VERSION-mac-arm64.zip" "AgentLink-$VERSION-mac-x64.zip" "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg"; do
-            gh attestation verify "$f" --repo "$REPOSITORY" --signer-workflow "$REPOSITORY/.github/workflows/desktop.yml" --deny-self-hosted-runners > /dev/null ||
-              { echo "::error::$f has no valid build provenance attestation from desktop.yml. Nothing is signed."; exit 1; }
+            gh attestation verify "$f" --repo "$REPOSITORY" --signer-workflow "$REPOSITORY/.github/workflows/desktop.yml" --signer-digest "$GITHUB_SHA" --source-digest "$GITHUB_SHA" --source-ref refs/heads/main --deny-self-hosted-runners > /dev/null ||
+              { echo "::error::$f has no build provenance attestation from desktop.yml at this commit of main. Nothing is signed."; exit 1; }
           done
           echo "The Release assets of v$VERSION match their sums and attestations."
 
+      # IR-UPD-8-1 #1: each Release file must also equal the file this run built (job output, not a
+      # Release file), so a file swapped on the Release after desktop-app-release is refused.
       - name: Build the unsigned manifest
         shell: bash
         env:
           REPOSITORY: ${{ github.repository }}
           VERSION: ${{ needs.desktop-extension-build.outputs.version }}
           DIR: ${{ runner.temp }}/update-assets
+          BUILD_SUMS: ${{ needs.desktop-app-release.outputs.build-sums }}
         run: |
           set -euo pipefail
+          printf '%s\n' "$BUILD_SUMS" > "$RUNNER_TEMP/build-sums.txt"
           mkdir -p "$RUNNER_TEMP/desktop-update"
           node tools/release/desktop-update-manifest.mjs build --version "$VERSION" --channel stable \
             --dir "$DIR" --root-key apps/desktop/src/main/updater/root-key.json \
-            --repository "$REPOSITORY" --out "$RUNNER_TEMP/desktop-update/desktop-update.unsigned.json"
+            --repository "$REPOSITORY" --build-sums "$RUNNER_TEMP/build-sums.txt" --out "$RUNNER_TEMP/desktop-update/desktop-update.unsigned.json"
 
       - name: Upload the unsigned manifest
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -2240,6 +2289,19 @@ jobs:
         with:
           name: desktop-update-unsigned
           path: ${{ runner.temp }}/desktop-update
+
+      # IR-UPD-8-1 #5: a re-run never signs a release that is no longer the Latest one.
+      - name: Check the release is still Latest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ needs.desktop-extension-build.outputs.version }}
+        run: |
+          set -euo pipefail
+          latest="$(gh api "repos/$REPOSITORY/releases/latest" --jq .tag_name)"
+          [ "$latest" = "v$VERSION" ] ||
+            { echo "::error::v$VERSION is no longer the Latest release. Nothing is signed."; exit 1; }
 
       # The only step that reads the key: one env var, masked by the script before anything else and
       # removed from its environment; never printed, never written to a file. The key must be the one

@@ -12,28 +12,31 @@ Tali (owner) only. Agents never hold the private key, never create the environme
 
 You need this repository at a reviewed commit of `main` with `pnpm install` done (`git status` shows no changes).
 
-1. **Create the key on your own computer.** In a normal terminal (not a CI shell):
+Do the steps **in this order**: GitHub creates a missing environment with no rules the first time a job names it, so the environment and its rules come first, the pin PR last. The release also checks the rules before any job can reach the key (`desktop-update-environment`) and stops if they are missing.
+
+1. **Create the environment.** GitHub › `4thtech/agentlink` › Settings › Environments › **New environment** › name `desktop-update`:
+   - **Required reviewers:** you (tick "Prevent self-review" off, you are the one approving).
+   - **Deployment branches and tags:** "Selected branches and tags", add the branch `main` only (no pattern, no tag, no other branch).
+   - Turn "Allow administrators to bypass configured protection rules" **off**.
+2. **Create the key on your own computer.** In a normal terminal (not a CI shell):
    ```bash
    node tools/desktop/new-update-key.mjs --out ~/agentlink-update.key
    ```
    It writes only the private key (one line, 64 characters) to that new file, readable only by you, and never overwrites a file. It prints the **public key** (64 characters) and the next steps. Write the first and last 8 characters of the public key on paper.
-2. **Create the environment.** GitHub › `4thtech/agentlink` › Settings › Environments › **New environment** › name `desktop-update`:
-   - **Required reviewers:** you (tick "Prevent self-review" off, you are the one approving).
-   - **Deployment branches and tags:** "Selected branches and tags", add `main` only.
-   - Leave "Allow administrators to bypass" **off**.
-3. **Add the secret.** In the same environment › **Environment secrets** › **Add secret**. Name `DESKTOP_UPDATE_KEY`. Value: open `~/agentlink-update.key` in a text editor and copy the one line. Paste it there and nowhere else. Save.
-4. **Pin the public key.** Send the orchestrator the **public key** only (never the file). The orchestrator opens a PR that sets `"rootPublicKey"` in `apps/desktop/src/main/updater/root-key.json` to it and switches the release build to updates on. This file is a sensitive path: the PR needs the independent review and your "merge". Before you say "merge":
+3. **Add the secret.** In the environment `desktop-update` › **Environment secrets** › **Add secret**. Name `DESKTOP_UPDATE_KEY`. Value: open `~/agentlink-update.key` in a text editor and copy the one line. Paste it there and nowhere else. Save.
+4. **Pin the public key** (last). Send the orchestrator the **public key** only (never the file). The orchestrator opens a PR that sets `"rootPublicKey"` in `apps/desktop/src/main/updater/root-key.json` to it and switches the release build to updates on. This file is a sensitive path: the PR needs the independent review and your "merge". Before you say "merge":
    1. open the PR's `root-key.json` on GitHub;
    2. compare all 64 characters with the public key the tool printed (and the first and last 8 on your paper). If any character differs, do **not** merge; tell the orchestrator.
-5. **Remove the file.** `rm -P ~/agentlink-update.key`, or move it to an offline USB stick if you want a copy for changing environments later. Nothing else needs it: GitHub has the secret, the app has the public key.
+5. **Remove the file.** `rm ~/agentlink-update.key` (and empty the Trash if you moved it there; make sure no backup or sync folder copied it), or move it to an offline USB stick if you want a copy for changing environments later. Nothing else needs it: GitHub has the secret, the app has the public key.
 
 The first release after step 4 is the first one that apps can update **to by themselves only from then on**: copies built with updates off (0.5.x up to that release) never check, so everyone installs that one release by hand once.
 
 ## Each release (one click)
 
 After you approve npm `latest` and the app is attached to the GitHub Release, two jobs run in `release.yml`:
-- `desktop-update-manifest` (no secret) downloads the app files from the Release, checks their checksums and their build provenance, checks that both built apps carry exactly the key in `root-key.json`, and writes the unsigned update document.
-- `sign-update-manifest` waits for **your approval** (environment `desktop-update`). Approve it when the release is the one you just approved. One step reads the key, signs, and the next step checks the result with the app's own checks; a bad or unsigned document stops the job before anything is uploaded. It publishes `desktop-update-<key id>.json` (the first 16 characters of the public key) and the same file as `desktop-update.json` on the Release.
+- `desktop-update-environment` (no secret) checks that `desktop-update` still has you as required reviewer, `main` only and no admin bypass.
+- `desktop-update-manifest` (no secret) downloads the app files from the Release, checks that each is the file this run built, that its build provenance was made by `desktop.yml` at this very commit of `main`, that both built apps carry exactly the key in `root-key.json`, and writes the unsigned update document.
+- `sign-update-manifest` waits for **your approval** (environment `desktop-update`). Approve it when the release is the one you just approved. It checks the release is still the Latest one; then one step reads the key, signs, and the next step checks the result with the app's own checks; a bad or unsigned document stops the job before anything is uploaded. It publishes `desktop-update-<key id>.json` (the first 16 characters of the public key) and the same file as `desktop-update.json` on the Release.
 
 If you do not approve, the Release is still there and people can download it; apps just do not offer it in-app.
 
@@ -41,7 +44,7 @@ If you do not approve, the Release is still there and people can download it; ap
 
 An update document is valid for 30 days. The daily check `Desktop update expiry` goes red 7 days before it expires (and when it has expired or is missing while a key is pinned). GitHub emails you the red run. To renew:
 - **ship a release** (any release signs a new document), or
-- open the last release run in Actions › Release, choose **Re-run jobs** › `desktop-update-manifest` and `sign-update-manifest` (GitHub allows a re-run up to 30 days after the run), and approve `sign-update-manifest`. It signs the same release again with a new 30-day window.
+- open Actions › **Desktop update renew** › **Run workflow** on `main`, and approve its `renew-sign` job. It re-signs the **current Latest** release with a new 30-day window. It uses only what is on the Release: the release tag must point at a commit on `main` whose `root-key.json` equals main's, and each file needs its build provenance from `desktop.yml` at that commit. It needs no build files, so it works at any time (unlike re-running the release jobs, which needs build files GitHub keeps only 14 days). If the pinned key changed since that release, it refuses: ship a release instead.
 
 If it expires anyway, nothing breaks: apps stop offering in-app updates and keep showing the download link (release check) until a new document is published.
 
@@ -65,6 +68,7 @@ Because the document name carries the key id, an app with an old pin never fetch
 ## Known limits (for reviewers)
 - **No field revocation.** A key cannot be withdrawn from installed apps; it is replaced only by a release that pins a new one (D-151).
 - **Same trust as npm `latest`.** The key sits in GitHub's secret store and is used by one CI step after the owner's approval click. Someone with the key and write access to the Releases could ship code to apps that trust it.
+- **The approval click is a process rule against agents, not a technical one.** Agents work under your GitHub account (D-51): that token could approve the pending job, change the environment, replace the secret or upload Release files. Only AGENTS.md ("never approve deployments") stops it, as for npm `latest`. A separate agent token without these rights is the real fix (later).
 - **Clock.** Expiry and "dated in the future" use the computer's clock. A wrong clock can make the app refuse a good update or accept an expired one; it never makes it accept an unsigned or wrongly signed one.
 - **Freeze window.** Someone who controls the download path can keep showing the last valid document until it expires (at most 31 days). They cannot make the app install anything older or unsigned.
 - **`tools/desktop/sign-manifest.mjs`** stays for local checks and signing with a sealed key file; releases no longer need it.
