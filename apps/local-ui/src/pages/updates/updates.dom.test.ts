@@ -88,6 +88,23 @@ describe('Settings > Updates', () => {
     expect(text()).toContain('Your IDs, people and messages stay as they are.');
   });
 
+  // WIN-DESK-2: the Windows app links the exact setup.exe and says how to get past SmartScreen.
+  it('the Windows setup file gets the Windows steps', async () => {
+    const exe =
+      'https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-win-x64-setup.exe';
+    await mount(() => Promise.resolve(ok({ ...AVAILABLE, download: exe })));
+    const link = [...host.querySelectorAll('a')].find((a) => a.textContent === 'Download update');
+    expect(link?.getAttribute('href')).toBe(exe);
+    expect(text()).toContain('Quit AgentLink: right-click its icon near the clock');
+    expect(text()).toContain('More info');
+    expect(text()).toContain('Run anyway');
+    expect(text()).not.toContain('Applications folder');
+    expect(parseUpdate({ ...AVAILABLE, download: exe })?.winFile).toBe(true);
+    expect(parseUpdate({ ...AVAILABLE, download: exe.replace('win-x64', 'win-arm64') })).toBe(
+      undefined,
+    );
+  });
+
   it('the release page (not a Mac file) gets its own steps', async () => {
     await mount(() => Promise.resolve(ok({ ...AVAILABLE, download: PAGE })));
     const link = [...host.querySelectorAll('a')].find((a) => a.textContent === 'Download update');

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CORE_LOG_FILE } from '../../src/main/core-log.js';
-import { STATUS_ACTION_URLS, statusPageUrl } from '../../src/main/status-page.js';
+import { STATUS_ACTION_URLS, STATUS_COPY, statusPageUrl } from '../../src/main/status-page.js';
 import {
   LAUNCH_REFUSED_EXIT,
   readPreview,
@@ -740,5 +740,94 @@ describe('bundle tripwire (D15-07)', () => {
     const { electron, children, proc } = setup([], { verifyBundle: () => Promise.resolve('ok') });
     await runShell(electron, proc);
     expect(children).toHaveLength(1);
+  });
+});
+
+// OD-M (WIN-DESK-2): the data folder's ACL is checked before every core start on Windows.
+describe('data folder access (Windows)', () => {
+  it('a data folder others can open → the fixed page, no core', async () => {
+    const { electron, children, proc } = setup([], {
+      checkDataFolder: () => Promise.resolve('too_open'),
+    });
+    await runShell(electron, proc);
+    expect(children).toHaveLength(0);
+    expect(lastPage()).toBe(statusPageUrl('shared_data_folder'));
+  });
+
+  it('ok or unchecked → the core starts', async () => {
+    for (const result of ['ok', 'unchecked'] as const) {
+      const { electron, children, proc } = setup([], {
+        checkDataFolder: () => Promise.resolve(result),
+      });
+      await runShell(electron, proc);
+      expect(children, result).toHaveLength(1);
+    }
+  });
+
+  it('the copy says what to do, in plain words', () => {
+    const copy = STATUS_COPY.shared_data_folder;
+    expect(copy.heading).toBe('Your AgentLink folder is shared');
+    expect(copy.body).toContain('Properties');
+    expect(copy.body).toContain('Try again');
+    expect(copy.body).not.toMatch(/ACL|SID|DACL|wallet|seed/i);
+  });
+});
+
+// WIN-DESK-3 (R-WIN §6 item 12): a browser click on Windows starts `"<exe>" -- "<link>"` (the NSIS
+// registration); while AgentLink runs, that second start forwards only the checked link.
+describe('deep link to a running copy (Windows)', () => {
+  it('the second start hands the link over and exits; the first opens it', async () => {
+    const second = setup(['--', 'agentlink://join#win'], { platform: 'win32' });
+    second.electron.app.lockGranted = false;
+    expect(await runShell(second.electron, second.proc)).toBe('second-instance');
+    expect(second.electron.app.lockData).toEqual({ deepLink: 'agentlink://join#win' });
+    expect(second.children).toHaveLength(0);
+
+    const seen: string[] = [];
+    const first = setup([], {
+      platform: 'win32',
+      toInviteLink: (link) => {
+        seen.push(link);
+        return null;
+      },
+    });
+    await runShell(first.electron, first.proc);
+    first.electron.app.emit('second-instance', new FakeEvent(), ['--original-process-start-time=1'], 'C:\\', {
+      deepLink: 'agentlink://join#win',
+    });
+    await tick();
+    expect(seen).toEqual(['agentlink://join#win']);
+  });
+
+  it('a Windows-style switch before the separator is refused', async () => {
+    const { electron, proc } = setup(['/inspect', '--', 'agentlink://join#x'], { platform: 'win32' });
+    expect(await runShell(electron, proc)).toBe('refused');
+  });
+});
+
+// WIN-DESK-2 (R-WIN §6 item 6): the Windows tray icon follows the taskbar (light or dark).
+describe('Windows tray icon', () => {
+  it('picks the icon for the taskbar colour; dark by default', () => {
+    const res = join('C:', 'AgentLink', 'resources');
+    expect(resourcePaths(res, 'win32').trayIcon).toBe(join(res, 'assets', 'tray-dark-taskbar.ico'));
+    expect(resourcePaths(res, 'win32', { darkTaskbar: false }).trayIcon).toBe(
+      join(res, 'assets', 'tray-light-taskbar.ico'),
+    );
+    expect(resourcePaths(res, 'win32', { darkTaskbar: true }).trayIcon).toBe(
+      join(res, 'assets', 'tray-dark-taskbar.ico'),
+    );
+    expect(resourcePaths(RES, 'darwin').trayIcon).toBe(join(RES, 'assets', 'trayTemplate.png'));
+  });
+
+  it('the shell asks Electron for the taskbar colour', async () => {
+    const { electron, proc } = setup([], { platform: 'win32' });
+    const res = join('C:', 'AgentLink', 'resources');
+    const light = join(res, 'assets', 'tray-light-taskbar.ico');
+    electron.imageFiles.add(light);
+    (electron as { nativeTheme?: unknown }).nativeTheme = {
+      shouldUseDarkColorsForSystemIntegratedUI: false,
+    };
+    await runShell(electron, { ...proc, resourcesPath: res });
+    expect((FakeTray.created[0]?.icon as { source?: string }).source).toBe(light);
   });
 });
