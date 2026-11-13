@@ -3,7 +3,6 @@ import { CoreError } from '@4thtech-io/core';
 import { createLogger } from '@4thtech-io/log';
 import { describe, expect, it } from 'vitest';
 import type { ToolClient, ToolContext } from './context.js';
-import { NPX_COMMAND } from './cli-command.js';
 import { FILE_TEXT, attachRefusal } from './files-common.js';
 import { INVITE_TEXT, inviteFailure } from './invite-common.js';
 import { pendingApproval } from './result.js';
@@ -46,20 +45,22 @@ describe('pending_approval points at agentlink_get_approval (F5a)', () => {
 });
 
 describe('the folder-not-allowed results point to the app first (REL051-A5)', () => {
-  it('no_folder and outside_folder name Allow a folder in the app, then the terminal', () => {
+  it('no_folder and outside_folder name Allow a folder in the app', () => {
     for (const reason of ['no_folder', 'outside_folder'] as const) {
       const out = attachRefusal(reason);
       const step = out.result.nextStep ?? '';
       expect(out.result.status, reason).toBe('needs_setup');
       expect(step, reason).toContain('AgentLink app');
       expect(step, reason).toContain('Allow a folder');
-      expect(step, reason).toContain('agentlink policy allow-folder');
-      expect(step, reason).toMatch(/terminal they opened themselves/);
-      // The app comes first, the terminal is the fallback.
-      expect(step.indexOf('Allow a folder'), reason).toBeLessThan(step.indexOf('terminal'));
       expect(step.length, reason).toBeLessThanOrEqual(500);
     }
     expect(FILE_TEXT.noFolderNextStep).not.toMatch(/AgentLink rules/);
+  });
+  it('outside_folder keeps the terminal as the fallback, after the app', () => {
+    const step = attachRefusal('outside_folder').result.nextStep ?? '';
+    expect(step).toContain('agentlink policy allow-folder');
+    expect(step).toMatch(/terminal they opened themselves/);
+    expect(step.indexOf('Allow a folder')).toBeLessThan(step.indexOf('terminal'));
   });
   it('never allows the folder itself and uses plain words (11 §5)', () => {
     for (const text of [FILE_TEXT.noFolderNextStep, FILE_TEXT.outsideFolderNextStep]) {
@@ -69,22 +70,25 @@ describe('the folder-not-allowed results point to the app first (REL051-A5)', ()
   });
 });
 
-describe('no folder yet still names the Send folder setup (M1-36b-2-c)', () => {
-  it('offers the Send folder command second, with the npx prefix', () => {
+describe('ATT-ALLOW-LINK: no folder yet names the Send folder in the app, never a terminal command', () => {
+  it('names Home and the Send folder, with no command, backtick or terminal', () => {
     const out = attachRefusal('no_folder');
     expect(out.result.code).toBe('NO_ALLOWED_FOLDER');
-    expect(out.result.nextStep).toContain(`${NPX_COMMAND} policy allow-send-folder`);
-    expect(out.result.nextStep).toContain('~/AgentLink/Send');
+    const step = out.result.nextStep ?? '';
+    expect(step).toContain('Send folder');
+    expect(step).toContain('Home');
+    expect(step).not.toMatch(
+      /`|terminal|npx|policy allow|--agent|\bagentlink (policy|approve|doctor|init|owner|ui)\b/i,
+    );
   });
 });
 
 describe('the file path hints are exact (L-2)', () => {
   it('say <path> and the --agent hint for allow-folder', () => {
-    for (const text of [FILE_TEXT.noFolderNextStep, FILE_TEXT.outsideFolderNextStep]) {
-      expect(text).toContain('agentlink policy allow-folder <path>');
-      expect(text).toContain('--agent <name>');
-      expect(text).not.toContain('<folder>');
-    }
+    const text = FILE_TEXT.outsideFolderNextStep;
+    expect(text).toContain('agentlink policy allow-folder <path>');
+    expect(text).toContain('--agent <name>');
+    expect(text).not.toContain('<folder>');
   });
 });
 

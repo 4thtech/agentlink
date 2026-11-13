@@ -8,35 +8,16 @@
 //   with the code that was shown (`contact.check`); "They don't match" signs nothing and explains.
 // - Remove: asks first in plain words, then presence → `…/remove`.
 //
-// The presence step is Contacts' own PresencePrompt (the passkey, or the master code). U4 may
-// replace this menu with its PersonMenu; the routes and the steps stay the same.
+// UX1113-N2: one owner step, one gesture. Each action's own button is the sensor ("Rename with
+// Touch ID", "They match · Touch ID", "Remove with Touch ID"), with the master code as a link:
+// Contacts' PresenceButton. The routes and the signed objects are unchanged.
 import { Banner, Button, Icon } from '@4thtech-io/ui';
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactElement,
-} from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactElement } from 'react';
 import type { ApiClient } from '../../api/client.js';
-import {
-  contactPath,
-  parseCode,
-  parseRenameCheck,
-  renameCheckPath,
-  type CodeAnswer,
-  type ContactRow,
-} from '../contacts/data.js';
-import {
-  createOwnerClient,
-  type OwnerResult,
-  type PasskeyInfo,
-  type PresenceProof,
-} from '../contacts/owner.js';
-import { PresencePrompt } from '../contacts/presence-prompt.js';
+import { contactPath, parseCode, type CodeAnswer, type ContactRow } from '../contacts/data.js';
+import { createOwnerClient, type OwnerResult, type PresenceProof } from '../contacts/owner.js';
+import { useAliasCheck } from '../contacts/alias-check.js';
+import { PresenceButton } from '../contacts/presence-button.js';
 import { CONTACTS_STRINGS as C, SUMMARY, mismatchBody, waitSeconds } from '../contacts/strings.js';
 import { HOME_STRINGS as S, fmt } from './people-strings.js';
 
@@ -90,14 +71,13 @@ export function PersonMenu({
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>('none');
   const [alias, setAlias] = useState(name);
-  const [aliasError, setAliasError] = useState<string | undefined>(undefined);
   const [code, setCode] = useState<CodeAnswer | 'loading'>('loading');
   const [mismatch, setMismatch] = useState(false);
-  const [pending, setPending] = useState<Pending | undefined>(undefined);
-  const [passkey, setPasskey] = useState<PasskeyInfo | undefined>(undefined);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState<string | undefined>(undefined);
+  const wantedAlias = alias.trim();
+  const aliasCheck = useAliasCheck(api, contact?.ref ?? '', wantedAlias, mode === 'rename');
 
   // The menu closes on Escape or a click outside, and gives the focus back to its button.
   useEffect(() => {
@@ -136,28 +116,14 @@ export function PersonMenu({
     };
   }, [api, contact, mode]);
 
-  const ask = useCallback(
-    (next: Pending): void => {
-      setError(undefined);
-      setNotice(undefined);
-      void owner.passkey().then((info) => {
-        setPasskey(info);
-        setPending(next);
-      });
-    },
-    [owner],
-  );
-
   const close = (): void => {
     setMode('none');
-    setPending(undefined);
     setError(undefined);
     setMismatch(false);
-    setAliasError(undefined);
   };
 
-  const submit = (proof: PresenceProof): void => {
-    if (pending === undefined || contact === undefined) return;
+  const run = (pending: Pending, proof: PresenceProof): void => {
+    if (contact === undefined) return;
     setBusy(true);
     setError(undefined);
     void owner.post(contactPath(contact.ref, pending.what), pending.input, proof).then((result) => {
@@ -179,49 +145,42 @@ export function PersonMenu({
         return;
       }
       if (result.kind === 'rejected' || result.kind === 'required') {
-        setError(MESSAGE[result.kind]);
+        setError(proof.kind === 'code' ? MESSAGE[result.kind] : C.passkeyNotUsed);
         return;
       }
-      setPending(undefined);
+      close();
       setNotice(MESSAGE[result.kind] ?? C.failed);
     });
   };
 
-  const saveName = (event: FormEvent): void => {
-    event.preventDefault();
-    if (contact === undefined) return;
-    const wanted = alias.trim();
-    if (wanted === '') {
-      setAliasError(C.aliasInvalid);
-      return;
-    }
-    setAliasError(undefined);
-    void api.get(renameCheckPath(contact.ref, wanted)).then((res) => {
-      const check =
-        res.kind === 'ok'
-          ? parseRenameCheck(res.data)
-          : ({ kind: 'refused', reason: 'unavailable' } as const);
-      if (check.kind === 'ok') {
-        ask({ what: 'rename', input: { alias: wanted }, summary: SUMMARY.rename(name, wanted) });
-        return;
-      }
-      setAliasError(
-        check.reason === 'alias_taken'
-          ? C.aliasTaken
-          : check.reason === 'alias_invalid'
-            ? C.aliasInvalid
-            : check.reason === 'contact_unknown'
-              ? C.contactUnknown
-              : C.renameUnavailable,
-      );
-    });
-  };
+  const step = (
+    pending: Pending,
+    words: {
+      readonly with: (sensor: string) => string;
+      readonly code: string;
+      readonly variant?: 'primary' | 'danger';
+      readonly disabled?: boolean;
+    },
+  ): ReactElement => (
+    <PresenceButton
+      withSensor={words.with}
+      withCode={words.code}
+      statement={pending.summary}
+      busy={busy}
+      error={error}
+      notUsed={C.passkeyNotUsed}
+      onProof={(proof) => run(pending, proof)}
+      owner={owner}
+      {...(words.variant === undefined ? {} : { variant: words.variant })}
+      {...(words.disabled === undefined ? {} : { disabled: words.disabled })}
+    />
+  );
 
   if (contact === undefined) return null;
   const start = (next: Mode): void => {
     setOpen(false);
     setNotice(undefined);
-    setPending(undefined);
+    setError(undefined);
     setMismatch(false);
     if (next === 'rename') setAlias(name);
     setMode(next);
@@ -278,8 +237,8 @@ export function PersonMenu({
         ) : null}
       </span>
       <div className="hm-menu-panel hm-c">
-        {mode === 'rename' && pending === undefined ? (
-          <form className="hm-inline hm-f al-reveal" onSubmit={saveName}>
+        {mode === 'rename' ? (
+          <form className="hm-inline hm-f al-reveal" onSubmit={(event) => event.preventDefault()}>
             <label htmlFor={fieldId} className="al-text-body-sm">
               {S.nameInList}
             </label>
@@ -291,24 +250,33 @@ export function PersonMenu({
                 value={alias}
                 maxLength={64}
                 autoComplete="off"
-                aria-invalid={aliasError === undefined ? undefined : true}
+                aria-invalid={aliasCheck.kind === 'refused' ? true : undefined}
                 onChange={(e) => setAlias(e.target.value)}
               />
             </span>
-            <Button type="submit" size="sm">
-              {S.save}
-            </Button>
+            {step(
+              {
+                what: 'rename',
+                input: { alias: wantedAlias },
+                summary: SUMMARY.rename(name, wantedAlias),
+              },
+              {
+                with: C.renameWith,
+                code: C.renameWithCode,
+                disabled: wantedAlias === '' || (aliasCheck.kind === 'refused' && aliasCheck.hold),
+              },
+            )}
             <Button variant="ghost" size="sm" onClick={close}>
               {S.cancel}
             </Button>
-            {aliasError === undefined ? null : (
+            {aliasCheck.kind === 'refused' ? (
               <p role="alert" className="hm-inline-error al-text-body-sm">
-                {aliasError}
+                {aliasCheck.message}
               </p>
-            )}
+            ) : null}
           </form>
         ) : null}
-        {mode === 'check' && pending === undefined ? (
+        {mode === 'check' ? (
           <div className="hm-inline hm-f hm-code al-reveal">
             {contact.label === 'safety-code-checked' ? (
               <p className="al-text-body-sm">{fmt(S.alreadyChecked, { name })}</p>
@@ -324,14 +292,10 @@ export function PersonMenu({
               <>
                 <p className="al-text-body-sm">{fmt(S.codeLead, { name })}</p>
                 <p className="al-text-code-lg">{code.code}</p>
-                <Button
-                  size="sm"
-                  onClick={() =>
-                    ask({ what: 'check', input: { code: code.code }, summary: SUMMARY.check(name) })
-                  }
-                >
-                  {S.theyMatch}
-                </Button>
+                {step(
+                  { what: 'check', input: { code: code.code }, summary: SUMMARY.check(name) },
+                  { with: C.matchWith, code: C.matchWithCode },
+                )}
                 <Button variant="ghost" size="sm" onClick={() => setMismatch(true)}>
                   {S.theyDontMatch}
                 </Button>
@@ -342,35 +306,22 @@ export function PersonMenu({
             </Button>
           </div>
         ) : null}
-        {mode === 'remove' && pending === undefined ? (
+        {mode === 'remove' ? (
           <div
             role="alertdialog"
             aria-label={S.removeLabel}
             className="hm-inline hm-f hm-remove al-reveal"
           >
             <span className="al-text-body-sm">{fmt(S.removeText, { name })}</span>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => ask({ what: 'remove', summary: SUMMARY.remove(name) })}
-            >
-              {S.remove}
-            </Button>
+            {step(
+              { what: 'remove', summary: SUMMARY.remove(name) },
+              { with: C.removeWith, code: C.removeWithCode, variant: 'danger' },
+            )}
             <Button variant="ghost" size="sm" onClick={close}>
               {S.cancel}
             </Button>
           </div>
         ) : null}
-        {pending === undefined ? null : (
-          <PresencePrompt
-            summary={pending.summary}
-            passkey={passkey}
-            busy={busy}
-            error={error}
-            onSubmit={submit}
-            onCancel={close}
-          />
-        )}
         {notice === undefined ? null : (
           <Banner
             tone="success"

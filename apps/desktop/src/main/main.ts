@@ -78,6 +78,13 @@ declare const __AGENTLINK_DESKTOP_PREVIEW__: boolean | undefined;
 /** Exit code for a refused launch (any non-zero code; fixed so tests and CI can assert it). */
 export const LAUNCH_REFUSED_EXIT = 64;
 
+/**
+ * WIN-DESK-1: exit code when Electron cannot resolve the app's data folder (on Windows: the
+ * profile's Roaming folder is missing or broken). Without it the single-instance lock fails, and
+ * the start must not be reported as "another AgentLink is running".
+ */
+export const PROFILE_UNAVAILABLE_EXIT = 66;
+
 /** The preview settings of a development build (owner-feedback loop). */
 export interface PreviewSettings {
   /** An absolute node binary to run the core with (a development checkout). */
@@ -172,7 +179,7 @@ export interface ShellProcess {
   readonly verifyBundle?: () => Promise<'ok' | 'changed' | 'unchecked'>;
 }
 
-export type ShellOutcome = 'refused' | 'second-instance' | 'location' | 'running';
+export type ShellOutcome = 'refused' | 'profile' | 'second-instance' | 'location' | 'running';
 
 /** Starts the shell. Resolves once started (or refused); the app then runs on events. */
 export async function runShell(
@@ -207,6 +214,20 @@ export async function runShell(
 
   // 2. Sandbox for every renderer; one instance.
   app.enableSandbox();
+  // WIN-DESK-1: the lock lives in the data folder. When Electron cannot resolve it, getPath
+  // throws and the lock would fail for that reason alone: say so (fixed line), never "another
+  // AgentLink is running". Nothing from the error is kept.
+  let profileOk = true;
+  try {
+    if (app.getPath !== undefined) app.getPath('userData');
+  } catch {
+    profileOk = false;
+  }
+  if (!profileOk) {
+    coreLog.note('app quit at start: the AgentLink data folder is not available');
+    app.exit(PROFILE_UNAVAILABLE_EXIT);
+    return 'profile';
+  }
   let instance: InstanceOps | null = null;
   try {
     instance = proc.instance?.(app) ?? null;
@@ -450,6 +471,8 @@ export async function runShell(
     onMessage: (message) => {
       switch (message.type) {
         case 'ready':
+          // WIN-DESK-1: proof the pipe works both ways (fixed text, never the link).
+          coreLog.note('core ready');
           if (releaseChecker !== null) sendAppUpdate(releaseChecker.view());
           if (window?.loadSessionUrl(message.sessionUrl) === true) {
             window.show();

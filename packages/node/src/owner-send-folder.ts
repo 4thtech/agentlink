@@ -6,9 +6,9 @@
 //
 // - The folder, before any owner secret is asked: the same rules as the first rules
 //   (owner-first-policy.ts `prepareSendFolder`): `<realpath(home)>/AgentLink/Send`, created 0700
-//   when missing (never through a link), or an existing real, empty folder. A link at either level,
-//   a non-folder, a path that isn't its own realpath, or a folder that already holds anything is not
-//   used, so no existing file ever becomes sendable.
+//   when missing (never through a link), or an existing real folder owned by this OS user, also one
+//   that already holds files (ATT-SENDFOLDER-FIX: the summary the owner reads before the master code
+//   says so). A link at either level, a non-folder or a path that isn't its own realpath is not used.
 // - The rules only gain that one folder. The base is the verified policy in force (core's G-6
 //   loader); while it fails closed nothing is done (never rebuilt from the defaults, D-100). Core
 //   `preparePolicyEdit` builds the body with `baseVersion` = the version read, so a newer policy is
@@ -108,8 +108,10 @@ export type SendFolderSetupResult =
 const MAX_ALLOWED_FOLDERS = 32;
 
 const COPY = {
-  summary: (folder: string, receiptsOff: boolean): string =>
-    `Allow your AI to send files you put in ${folder} (empty for now) to your contacts.${
+  summary: (folder: string, receiptsOff: boolean, holdsFiles: boolean): string =>
+    `Allow your AI to send files you put in ${folder}${
+      holdsFiles ? ' (it already holds files, and your AI can send those too)' : ' (empty for now)'
+    } to your contacts.${
       receiptsOff ? ' Delivery receipts turn off.' : ''
     } Nothing else in your rules changes.`,
 } as const;
@@ -239,9 +241,9 @@ async function signAndApply(
   const { actions, agent, owner } = options;
   const { folder } = plan;
   const failed = notAllowed('failed');
-  /** Still the pinned folder: the same real folder (path, device, inode), and still empty. */
+  /** Still the pinned folder: the same real folder (path, device, inode), still empty if it was. */
   const unchanged = async (): Promise<boolean> =>
-    (await stillPinned(pin)) && (await stillReady(folder));
+    (await stillPinned(pin)) && (await stillReady(folder, plan.holdsFiles !== true));
 
   // D-109: asked only when the rules in force have delivery receipts on from an older default.
   let keepReceipts = false;
@@ -291,7 +293,7 @@ async function signAndApply(
   const signature = await options.sign(owner, {
     kind: 'owner-action',
     action: body,
-    summary: COPY.summary(folder, receiptsOff),
+    summary: COPY.summary(folder, receiptsOff, plan.holdsFiles === true),
   });
   if (signature.kind !== 'owner-action') return failed;
   const signed = signature.signed;

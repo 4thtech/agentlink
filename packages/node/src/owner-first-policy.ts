@@ -7,9 +7,13 @@
 // folder).
 //
 // - The folder, before any owner secret is asked: `<realpath(home)>/AgentLink/Send`, created 0700
-//   when missing (never through a link), or an existing real, empty folder. A link at either level,
-//   a non-folder, a path that isn't its own realpath, or a folder that already holds anything is not
-//   used: then no rules are signed, so no existing file ever becomes sendable.
+//   when missing (never through a link), or an existing real folder owned by this OS user.
+//   ATT-SENDFOLDER-FIX: an existing Send that already holds files is used too (an earlier ID on this
+//   computer shares it); the owner reads that it holds files, and that they can be sent, before the
+//   gesture (`holdsFiles`). A link at either level, a non-folder, a folder owned by another user or a
+//   path that isn't its own realpath is never used. With `fallback` (the app's New ID and Home's Send
+//   folder banner), a fresh `Send-2` ... `Send-9` beside it is used instead: created 0700 when
+//   missing, or an existing real, owned, EMPTY one. Otherwise no rules are signed.
 // - After the card is stored and verified, still inside the one unlocked owner session: core
 //   `preparePolicyEdit` builds the body on the defaults (`baseVersion` 0). Node does not trust what
 //   was prepared: it signs only a `policy.set` for exactly this agent and this owner whose policy is,
@@ -22,7 +26,8 @@
 // - One folder from the check to the rules (M1-UX-FIRSTRUN-V2-b, IR-M1-36b-2-d-1): the agent runs
 //   as the same OS user and can rename, replace or link the folder at any moment. The folder checked
 //   is pinned (allowed-path `pinFolder`: its real path, device and inode; the plan's `pin`) and must
-//   still be that same real, empty folder just before signing AND after signing, just before the
+//   still be that same real folder (still empty when it was empty at the check, so what the owner
+//   read stays true) just before signing AND after signing, just before the
 //   rules are applied; otherwise nothing is applied. This holds for `owner init`, `owner add-agent`
 //   and the first run, which all sign through signFirstPolicy.
 // - I-4: nothing here is reachable from MCP. The owner session never leaves node; core only receives
@@ -30,6 +35,7 @@
 import { lstat, mkdir, readdir, realpath, rmdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import process from 'node:process';
 import { POLICY_DEFAULTS_EFFECTIVE } from '@4thtech-io/core';
 import { AUTO_SAVE_DEFAULTS } from '@4thtech-io/types';
 import {
@@ -49,6 +55,18 @@ import type { FirstAgentCard, FirstPolicy } from './owner-first-card.js';
 
 /** Where the Send folder lives under the home folder (D-121 D6). */
 export const SEND_FOLDER_SEGMENTS: readonly string[] = Object.freeze(['AgentLink', 'Send']);
+
+/** ATT-SENDFOLDER-FIX: the fresh folders tried beside an unusable Send, in order (`Send-2` ...). */
+export const SEND_FOLDER_FALLBACKS: readonly string[] = Object.freeze(
+  Array.from({ length: 8 }, (_, i) => `Send-${String(i + 2)}`),
+);
+
+export interface PrepareSendFolderOptions {
+  /** Try a fresh `Send-2` ... `Send-9` when Send itself can't be used (the app's New ID, Home). */
+  readonly fallback?: boolean;
+  /** The OS user an existing folder must belong to; default this process's (tests only). */
+  readonly uid?: number;
+}
 
 /** What happened to the first rules (the Send folder). */
 export type SendFolderResult =
@@ -71,6 +89,11 @@ export type SendFolderPlan =
       readonly created: readonly string[];
       /** M1-UX-FIRSTRUN-V2-b: the folder as checked (real path, device, inode). */
       readonly pin: FolderPin;
+      /**
+       * ATT-SENDFOLDER-FIX: the folder already held files at the check (the owner is told). Absent
+       * or false: it was empty and must still be empty when the rules are signed and applied.
+       */
+      readonly holdsFiles?: boolean;
     }
   | { readonly status: 'unavailable'; readonly reason: 'folder_unavailable' | 'folder_not_empty' };
 
@@ -78,6 +101,8 @@ export type SendFolderPlan =
 const COPY = {
   review: (folder: string): string =>
     `Your master code also sets your first rule: your AI can send files you put in ${folder} (empty for now). Nothing else on this computer can be sent. To remove it later, run \`${CLI_COMMAND} policy remove-folder ${folder}\`.`,
+  reviewHoldsFiles: (folder: string): string =>
+    `Your master code also sets your first rule: your AI can send files you put in ${folder}. It already holds files, and your AI can send those too. Nothing else on this computer can be sent. To remove it later, run \`${CLI_COMMAND} policy remove-folder ${folder}\`.`,
   notEmpty: `The folder AgentLink/Send in your home folder already holds files, so it is not allowed for sending. To send files later, run \`${CLI_COMMAND} policy allow-folder <path>\` yourself.`,
   unavailable: `AgentLink couldn't set up the folder AgentLink/Send in your home folder, so no folder is allowed for sending. To send files later, run \`${CLI_COMMAND} policy allow-folder <path>\` yourself.`,
   allowed: (folder: string): string => `OK       Your AI can send files you put in ${folder}.`,
@@ -112,8 +137,12 @@ async function removeFolders(created: readonly string[]): Promise<void> {
  * The Send folder under `home` (default: the OS user's), checked or created before the owner secret
  * is asked (see the header). Never follows a link, never deletes anything it did not create.
  */
-export async function prepareSendFolder(home: string = homedir()): Promise<SendFolderPlan> {
+export async function prepareSendFolder(
+  home: string = homedir(),
+  options: PrepareSendFolderOptions = {},
+): Promise<SendFolderPlan> {
   const unavailable = { status: 'unavailable', reason: 'folder_unavailable' } as const;
+  const uid = options.uid ?? (typeof process.getuid === 'function' ? process.getuid() : undefined);
   let base: string;
   try {
     base = await realpath(home);
@@ -121,50 +150,93 @@ export async function prepareSendFolder(home: string = homedir()): Promise<SendF
     return unavailable;
   }
   const created: string[] = [];
-  const giveUp = async (
-    result: Extract<SendFolderPlan, { status: 'unavailable' }>,
-  ): Promise<SendFolderPlan> => {
+  const giveUp = async (): Promise<SendFolderPlan> => {
     await removeFolders(created);
-    return result;
+    return unavailable;
   };
-  let current = base;
-  for (const segment of SEND_FOLDER_SEGMENTS) {
-    current = path.join(current, segment);
-    try {
-      const stats = await lstat(current);
-      if (stats.isSymbolicLink() || !stats.isDirectory()) return giveUp(unavailable);
-      continue;
-    } catch (error) {
-      if (!isMissing(error)) return giveUp(unavailable);
-    }
-    try {
-      // Not recursive: each level is created here, so none is ever a link this run followed.
-      await mkdir(current, { mode: 0o700 });
-      created.push(current);
-    } catch {
-      return giveUp(unavailable);
-    }
+  const [parentName, sendName] = SEND_FOLDER_SEGMENTS as readonly [string, string];
+  // The parent (`AgentLink`): a real, owned folder, never a link, created here when missing.
+  const parent = path.join(base, parentName);
+  if ((await realFolder(parent, uid, created)) === 'unusable') return giveUp();
+  const names = options.fallback === true ? [sendName, ...SEND_FOLDER_FALLBACKS] : [sendName];
+  for (const name of names) {
+    // Only Send itself may already hold files; a fallback is used only while fresh (empty).
+    const plan = await candidate(path.join(parent, name), uid, created, name === sendName);
+    if (plan === 'unprintable') return giveUp();
+    if (plan !== undefined) return plan;
   }
+  return giveUp();
+}
+
+/** An existing real folder owned by `uid` ('exists'), one made here ('made'), or 'unusable'. */
+async function realFolder(
+  folder: string,
+  uid: number | undefined,
+  created: string[],
+): Promise<'exists' | 'made' | 'unusable'> {
+  try {
+    const stats = await lstat(folder);
+    if (stats.isSymbolicLink() || !stats.isDirectory()) return 'unusable';
+    if (uid !== undefined && stats.uid !== uid) return 'unusable';
+    return 'exists';
+  } catch (error) {
+    if (!isMissing(error)) return 'unusable';
+  }
+  try {
+    // Not recursive: each level is created here, so none is ever a link this run followed.
+    await mkdir(folder, { mode: 0o700 });
+    created.push(folder);
+    return 'made';
+  } catch {
+    return 'unusable';
+  }
+}
+
+/** One Send folder candidate as a ready plan; undefined when it can't be used (see the header). */
+async function candidate(
+  folder: string,
+  uid: number | undefined,
+  created: string[],
+  mayHoldFiles: boolean,
+): Promise<SendFolderPlan | 'unprintable' | undefined> {
+  const before = created.length;
+  if ((await realFolder(folder, uid, created)) === 'unusable') return undefined;
+  const drop = async (): Promise<undefined> => {
+    // Only what this candidate created (rmdir: only while empty).
+    await removeFolders(created.splice(before));
+    return undefined;
+  };
   // M1-UX-FIRSTRUN-V2-b: pinned here, before the owner secret is asked; also its realpath check.
-  const pin = await pinFolder(current);
-  if (pin === undefined) return giveUp(unavailable);
+  const pin = await pinFolder(folder);
+  if (pin === undefined) return drop();
   // W1: from here on the folder is named as it really is (an existing `agentlink` answers to
   // `AgentLink` where the file system ignores case), so the rules name its real path.
-  const folder = pin.path;
+  const real = pin.path;
+  let holdsFiles: boolean;
   try {
-    if ((await readdir(folder)).length > 0) {
-      return giveUp({ status: 'unavailable', reason: 'folder_not_empty' });
-    }
+    holdsFiles = (await readdir(real)).length > 0;
   } catch {
-    return giveUp(unavailable);
+    return drop();
   }
-  if (UNPRINTABLE.test(folder)) return giveUp(unavailable);
-  return Object.freeze({ status: 'ready', folder, created: Object.freeze(created), pin });
+  if (holdsFiles && !mayHoldFiles) return drop();
+  if (UNPRINTABLE.test(real)) {
+    await drop();
+    return 'unprintable';
+  }
+  return Object.freeze({
+    status: 'ready',
+    folder: real,
+    created: Object.freeze([...created]),
+    pin,
+    holdsFiles,
+  });
 }
 
 /** The line the owner reads before the owner secret is asked. */
 export function sendFolderReview(plan: SendFolderPlan): string {
-  if (plan.status === 'ready') return COPY.review(plan.folder);
+  if (plan.status === 'ready') {
+    return plan.holdsFiles === true ? COPY.reviewHoldsFiles(plan.folder) : COPY.review(plan.folder);
+  }
   return plan.reason === 'folder_not_empty' ? COPY.notEmpty : COPY.unavailable;
 }
 
@@ -234,13 +306,16 @@ function isFirstPolicyBody(
   return canonicalize(params['policy']) === expectedPolicyJcs(folder);
 }
 
-/** The folder is still a real, empty folder at its own real path (see stillTheCheckedFolder). */
-export async function stillReady(folder: string): Promise<boolean> {
+/**
+ * The folder is still a real folder at its own real path, and still empty unless `requireEmpty` is
+ * false (ATT-SENDFOLDER-FIX: a folder that already held files at the check; stillTheCheckedFolder).
+ */
+export async function stillReady(folder: string, requireEmpty = true): Promise<boolean> {
   try {
     const stats = await lstat(folder);
     if (stats.isSymbolicLink() || !stats.isDirectory()) return false;
     if ((await realpath(folder)) !== folder) return false;
-    return (await readdir(folder)).length === 0;
+    return !requireEmpty || (await readdir(folder)).length === 0;
   } catch {
     return false;
   }
@@ -253,7 +328,7 @@ export async function stillReady(folder: string): Promise<boolean> {
 async function stillTheCheckedFolder(
   plan: Extract<SendFolderPlan, { status: 'ready' }>,
 ): Promise<boolean> {
-  return (await stillPinned(plan.pin)) && (await stillReady(plan.folder));
+  return (await stillPinned(plan.pin)) && (await stillReady(plan.folder, plan.holdsFiles !== true));
 }
 
 /** A verified stored card for exactly this agent naming exactly this owner. */

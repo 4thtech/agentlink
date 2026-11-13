@@ -462,7 +462,7 @@ const sourceOf = (file: string): string => {
 
 /** What makes a .tsx an owner-presence file: it reads, asks for or hands on a presence proof. */
 const PRESENCE_SIGNAL =
-  /PasskeyInfo|PresenceProof|PasskeyStatus|kind: 'passkey'|\.passkey\(\)|credentials\.get|passkeyProof|withPasskey|<PresencePrompt|<OwnerGate|<OwnerStep/;
+  /PasskeyInfo|PresenceProof|PasskeyStatus|kind: 'passkey'|\.passkey\(\)|credentials\.get|passkeyProof|withPasskey|<PresencePrompt|<OwnerGate|<OwnerButton|<OwnerStep/;
 
 type Entry =
   /** A confirm screen: `offers` must be in its source (the code option or a shared prompt with it). */
@@ -480,9 +480,9 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   'pages/proofs/top-up.tsx': { offers: /<UseCodeInstead\b/ },
   // Screens that confirm through the shared prompt (presence-prompt.tsx offers the code).
   'pages/agents/owner-gate.tsx': { offers: /<PresencePrompt\b/ },
-  'pages/agents/name-update.tsx': { offers: /<OwnerGate\b/ },
-  'pages/agents/parts.tsx': { offers: /<OwnerGate\b/ },
-  'pages/agents/sheets.tsx': { offers: /<OwnerGate\b/ },
+  'pages/agents/name-update.tsx': { offers: /<OwnerButton\b/ },
+  'pages/agents/parts.tsx': { offers: /<OwnerButton\b/ },
+  'pages/agents/sheets.tsx': { offers: /<OwnerButton\b/ },
   'pages/apps/panel.tsx': { offers: /<OwnerGate\b/ },
   // WP-11: Save recovery kit (Settings › Backup and the ID card's Back up panel).
   'pages/backup/export-kit.tsx': { offers: /<OwnerGate\b/ },
@@ -490,10 +490,10 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   'pages/touch-id/index.tsx': { offers: /<UseCodeInstead\b/ },
   // UX1113-R3: Restore here asks first on a computer that has an owner (PresenceStep offers the code).
   'pages/restore/index.tsx': { offers: /<PresenceStep\b/ },
-  'pages/contacts/index.tsx': { offers: /<PresencePrompt\b/ },
+  'pages/contacts/index.tsx': { offers: /<PresenceButton\b/ },
   'pages/contacts/presence-button.tsx': { offers: /<UseCodeInstead\b/ },
   'pages/invite/name-contact.tsx': { offers: /<PresenceButton\b/ },
-  'pages/home/person-menu.tsx': { offers: /<PresencePrompt\b/ },
+  'pages/home/person-menu.tsx': { offers: /<PresenceButton\b/ },
   // Approvals: OwnerStep draws the passkey button with the code field under it (approvals/card.tsx).
   'pages/approvals/card.tsx': { offers: /<CodeForm\b/ },
   'pages/approvals/board.tsx': { offers: /<OwnerStep\b/ },

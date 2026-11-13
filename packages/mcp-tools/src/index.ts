@@ -15,6 +15,7 @@ import type { HandlerEnvironment, ToolContext } from './context.js';
 import { createInviteHandler } from './create-invite.js';
 import { exportProofPackHandler } from './export-proof-pack.js';
 import { fetchFileHandler } from './fetch-file.js';
+import { withAllowFolderLink } from './files-common.js';
 import { getApprovalHandler } from './get-approval.js';
 import { getProofHandler } from './get-proof.js';
 import { inboxHandler } from './inbox.js';
@@ -125,8 +126,11 @@ export async function callTool(
     env.logger.warn('tool handler failed', { tool: tool.name });
     output = internalError();
   }
+  // ATT-ALLOW-LINK: under `agentlink mcp`, a no-folder result gets the Allow a folder link.
+  const withFolderLink = await withAllowFolderLink(output, env);
   // M1-11a-b: under `agentlink mcp`, a pending_approval gets the local approval UI link.
-  const linked = await withApprovalLink(output, env);
+  const approvalLinked = await withApprovalLink(withFolderLink.output, env);
+  const linked = approvalLinked.output === withFolderLink.output ? withFolderLink : approvalLinked;
   // M1-36j (D4): with the page open, wait briefly for the owner's decision (read-only).
   const waited = await waitForApprovalDecision(linked.output, env, {
     waitMs: approvalWaitLeft(options.approvalWaitMs ?? 0, performance.now() - started),
@@ -152,6 +156,7 @@ export {
 } from './registry.js';
 export {
   coreToolClient,
+  type AllowFolderLink,
   type ApprovalLink,
   type AttachedFile,
   type AttachOutcome,

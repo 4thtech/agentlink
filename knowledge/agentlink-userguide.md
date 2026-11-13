@@ -119,7 +119,7 @@ The master code is shown once at setup; keep it in a password manager. Every con
 
 ## How do approvals work?
 
-Your AI can ask for an approval; it cannot give one. Approvals appear as cards on Home and say who is asking, for example "Tali · Claude Code is asking", and you approve with Touch ID or Windows Hello, or Deny. By default these wait for you: accepting a new contact, accepting terms, adding a proof and spending above your limit. Once paired, ordinary messages with a contact need no approval. Free requests can be approved together; anything that costs money is approved one at a time. Pause (one click, no Touch ID) stops the ID in every AI app: your AI can still read, but sending, offers, proof, invites and file fetches are refused until you Resume with Touch ID.
+Your AI can ask for an approval; it cannot give one. Approvals appear as cards on Home and say who is asking, for example "Tali · Claude Code is asking", and you approve with Touch ID or Windows Hello, or Deny. By default these wait for you: accepting a new contact, accepting terms, adding a proof and spending above your limit. Once paired, ordinary messages with a contact need no approval. Free requests can be approved together; anything that costs money is approved one at a time. Pause (one click, no Touch ID) stops the ID in every AI app: your AI can still read, but sending, offers, proof, invites and file fetches are refused until you Resume with Touch ID. Every owner action is one step: its own button is the Touch ID ("Rename with Touch ID", "Approve with Touch ID"; Windows Hello, or "your passkey" in a browser), with "Use your master code instead" as a link.
 
 ## What are proofs, and how do the free test credits work?
 

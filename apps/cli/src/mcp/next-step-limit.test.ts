@@ -266,6 +266,11 @@ const RENDERERS: Record<string, () => string> = {
   approvedNeedsIdStep: () => approvedNeedsIdStep(APPROVAL),
   approvalNextStep: () => approvalNextStep(APPROVAL, LONG_NAME, NPX_PREFIX),
   approvalLinkNextStep: () => approvalLinkNextStep(APPROVAL, URL_, LONG_NAME, NPX_PREFIX),
+  // ATT-ALLOW-LINK: the no-folder link, port 65535.
+  allowFolderLinkNextStep: () =>
+    tool_files_common.allowFolderLinkNextStep(
+      `${ORIGIN}${tool_files_common.ALLOW_SEND_FOLDER_PAGE}`,
+    ),
 };
 
 describe('nextStep builders', () => {

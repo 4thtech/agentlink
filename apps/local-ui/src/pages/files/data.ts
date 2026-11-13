@@ -22,6 +22,8 @@ export interface Review {
   readonly folder: string;
   readonly typed: string;
   readonly elsewhere: boolean;
+  /** ATT-SENDFOLDER-FIX: an add whose folder already holds files (the confirm says so). */
+  readonly holdsFiles: boolean;
   /** Every warning code for this change, in the server's order. */
   readonly warnings: readonly string[];
   /** Seconds. */
@@ -65,7 +67,8 @@ export function parseReview(data: unknown): Review | undefined {
   if (!Array.isArray(warnings) || warnings.length > 64) return undefined;
   if (!warnings.every((w): w is string => typeof w === 'string' && CODE.test(w))) return undefined;
   if (typeof expiresAt !== 'number' || !Number.isSafeInteger(expiresAt)) return undefined;
-  return { review, change, folder, typed, elsewhere, warnings, expiresAt };
+  const holdsFiles = data['holdsFiles'] === true;
+  return { review, change, folder, typed, elsewhere, holdsFiles, warnings, expiresAt };
 }
 
 /** A review the server refused: the fixed reason, and the protected folder it names (D-99). */

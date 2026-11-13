@@ -4066,14 +4066,14 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `actionlint` is a required check; the 100 MB staging round trip passes and its measurement is recorded; the `ci-cd.md` row matches the workflow.
 
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
-- **Status:** in progress (owner, D-129: the owner creates the R2 drop buckets and the 7-day lifecycle rule; limits 100 MB per file and 1 GB per key per week confirmed, the download limit per object as in 07 §5.4 is 16, owner-confirmed 23 Oct 2026 (D-129); counsel brief drafted in agentlink-ops; the drop stays internal-testers-only until counsel's written sign-off) · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
+- **Status:** in progress (owner, D-129: the owner creates the R2 drop buckets and the 7-day lifecycle rule; limits 100 MB per file and 1 GB per key per week confirmed, the download limit per object as in 07 §5.4 is 16, owner-confirmed 23 Oct 2026 (D-129); counsel brief drafted in agentlink-ops; the drop is open to all early users, owner 2026-11-13; counsel's written sign-off stays tracked here) · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink-ops · legal/ (counsel brief and sign-off, private); Cloudflare account (buckets, lifecycle rule, hostname)
-- **Depends on:** M0-2g · **Due:** start during M1a; buckets needed before M1-27b, terms before anyone outside the internal testers uses the drop for files (short-invite objects are open to every user: D-129 as amended by D-139 (7))
+- **Depends on:** M0-2g · **Due:** start during M1a; buckets needed before M1-27b, files open to all early users (owner 2026-11-13; short-invite objects open to every user: D-129 as amended by D-139 (7)); terms tracked here
 - **Spec:** D-48; 04 §4 (encrypted drop), §7; 07 §5.4; 08 §6; 12 §2
 - **Invariants:** I-3
 - **Scope:**
   - Create staging and production R2 buckets for the drop with a lifecycle rule deleting every object after 7 days; the `drop.agentlink.4thtech.io` hostname.
-  - Counsel reviews the hosting terms: terms of service for the drop, a takedown and abuse-report process for content that cannot be inspected (ciphertext), and the privacy notice for drop metadata (drop key, sizes, times, IPs; Cloudflare as processor). **Interim (D-129):** counsel is the owner's choice; the drop stays internal-testers-only until written sign-off. **DECISION NEEDED (owner):** terms of service and takedown process.
+  - Counsel reviews the hosting terms: terms of service for the drop, a takedown and abuse-report process for content that cannot be inspected (ciphertext), and the privacy notice for drop metadata (drop key, sizes, times, IPs; Cloudflare as processor). **Interim (D-129):** counsel is the owner's choice; the drop is open to all early users (owner 2026-11-13); written sign-off stays tracked. **DECISION NEEDED (owner):** terms of service and takedown process.
   - Limits (D-129): 100 MB per file and 1 GB per drop key per week confirmed; downloads per object: 16 (owner-confirmed 23 Oct 2026).
   - (IR-D48-1 F15g) Word the retention promise in 04 §4, 07 §5.4 and the privacy notice precisely: GET is refused at `expiresAt` by the Worker, while the R2 lifecycle rule deletes objects asynchronously, so physical deletion can lag the expiry (state the maximum observed lag after reading it back). No document promises deletion at an exact time.
 - **Acceptance:**

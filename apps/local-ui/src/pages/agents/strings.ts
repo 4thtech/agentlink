@@ -78,6 +78,21 @@ export const AGENTS_STRINGS = {
   typeName: "Type the ID's name to confirm",
   typeNameLabel: (label: string): string => `Type ${iso(label)} to confirm`,
   typeNameDisabled: 'Type the name to enable this',
+  // UX1113-N2: the one button is the gesture; the sensor's word comes from the platform.
+  renameWith: (sensor: string): string => `Rename with ${sensor}`,
+  renameWithCode: 'Rename with your master code',
+  removeWith: (sensor: string): string => `Remove with ${sensor}`,
+  removeWithCode: 'Remove with your master code',
+  finishWith: (sensor: string): string => `Finish with ${sensor}`,
+  finishWithCode: 'Finish with your master code',
+  removeAnywayWith: (sensor: string): string => `Remove anyway with ${sensor}`,
+  removeAnywayWithCode: 'Remove anyway with your master code',
+  resumeWith: (sensor: string): string => `Resume with ${sensor}`,
+  resumeWithCode: 'Resume with your master code',
+  updateContactsWith: (sensor: string): string => `Update contacts with ${sensor}`,
+  updateContactsWithCode: 'Update contacts with your master code',
+  updateNameWith: (sensor: string): string => `Update name with ${sensor}`,
+  updateNameWithCode: 'Update name with your master code',
   get removeTouchId(): string {
     return `Remove with ${sensorWord()}`;
   },

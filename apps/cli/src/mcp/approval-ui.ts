@@ -26,12 +26,20 @@
 //   the started server has owner setup wired (`firstRunWired`); the start step of `agentlink mcp`
 //   (first-run-on-start.ts) is its only caller, never a tool. The same opener and link rules apply.
 //
+// - ATT-ALLOW-LINK: `allowFolderLink` gives a NO_ALLOWED_FOLDER result the app link to Settings >
+//   Files with the Send folder filled in: `<origin>` plus the fixed ALLOW_SEND_FOLDER_PAGE, nothing
+//   from the call. Like an approval link it is given only while a browser holds this server's
+//   session; when none does yet, Home opens once (the same one-shot rules and the same interval as
+//   approvals), where the "Allow your Send folder" banner waits. The link fills the field only:
+//   allowing the folder is the owner's review and confirm with presence (I-4).
+//
 // Accepted (G-1, D-67; 04 §2.5): a same-user process can read the opener's argv for the one-shot
 // link and get a view-only session; it still cannot approve without owner presence.
 import type { Logger } from '@4thtech-io/log';
 import type { ApprovalServer } from '@4thtech-io/node';
 import { approveCommand, isApprovalId } from '../approval/next-step.js';
-import type { ApprovalLink } from '@4thtech-io/mcp-tools';
+import type { AllowFolderLink, ApprovalLink } from '@4thtech-io/mcp-tools';
+import { ALLOW_SEND_FOLDER_PAGE } from '@4thtech-io/mcp-tools/files-common.js';
 
 /** The shortest time between two browser windows the server opens by itself. */
 export const BROWSER_OPEN_INTERVAL_MS = 30_000;
@@ -73,6 +81,12 @@ export interface ApprovalUi {
    * answers only whether a browser was opened. Never throws.
    */
   openSetupPage(): Promise<boolean>;
+  /**
+   * ATT-ALLOW-LINK: the Allow a folder link (Settings > Files, Send folder filled in); starts the
+   * server on first use and opens Home once when no browser holds the session yet. Undefined: no
+   * link (the fixed result). Never throws.
+   */
+  allowFolderLink(): Promise<AllowFolderLink | undefined>;
   /** True while a server is running. */
   readonly running: boolean;
   /** Stops the server (if one started) and gives no link afterwards. Idempotent. */
@@ -213,6 +227,36 @@ export function createApprovalUi(options: ApprovalUiOptions): ApprovalUi {
         return opened && !closed;
       } catch {
         return false;
+      }
+    },
+    allowFolderLink: async () => {
+      if (closed) return undefined;
+      try {
+        const running = await ensure();
+        if (running === undefined || closed) return undefined;
+        const origin = running.origin;
+        const port = typeof origin === 'string' ? UI_ORIGIN.exec(origin)?.[1] : undefined;
+        if (port === undefined || Number(port) > 65_535) return undefined;
+        if (!browserOpened && !openerFailed) {
+          const at = now();
+          if (at - lastAlertAt >= BROWSER_OPEN_INTERVAL_MS) {
+            lastAlertAt = at;
+            // Home, a fixed path: its banner offers the Send folder. The one-shot link goes only
+            // to the OS opener.
+            const opened = (await running.openHome().catch(() => false)) === true;
+            if (opened) browserOpened = true;
+            else {
+              openerFailed = true;
+              logger.warn('approval ui: no browser could be opened');
+            }
+          } else if (lastOpen !== undefined && (await lastOpen)) {
+            browserOpened = true;
+          }
+        }
+        if (!browserOpened || closed) return undefined;
+        return Object.freeze({ url: `${origin}${ALLOW_SEND_FOLDER_PAGE}`, origin });
+      } catch {
+        return undefined;
       }
     },
     get running() {

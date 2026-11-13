@@ -536,7 +536,6 @@ async function soak(
         await agentCard(a.page, cur).getByRole('button', { name: 'Rename', exact: true }).click();
         await agentCard(a.page, cur).getByLabel('Name', { exact: true }).fill(to);
         await a.page.getByRole('button', { name: 'Rename with Touch ID' }).click();
-        await a.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
         // Done: the card carries the new name; limited (3 a day); or "Couldn't rename it" (F23: the
         // fan-out to contacts counts a partly failed set as failure).
         const renamed = agentCard(a.page, to);
@@ -579,7 +578,6 @@ async function soak(
         await verify('pause');
         clock.advance(120);
         await a.page.getByRole('button', { name: 'Resume with Touch ID' }).first().click();
-        await a.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
         await eventually(
           'resumed',
           async () => !(await text(a.page)).includes(' is paused'),

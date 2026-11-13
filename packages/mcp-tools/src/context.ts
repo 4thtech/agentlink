@@ -497,6 +497,13 @@ export interface ToolContext {
    */
   readonly approvalLink?: (approvalId: string) => Promise<ApprovalLink | undefined>;
   /**
+   * ATT-ALLOW-LINK: the app link to Settings > Files with the Send folder filled in, for a
+   * NO_ALLOWED_FOLDER result, built by `agentlink mcp`; absent elsewhere. Only `url` and `origin`
+   * are used (the text is fixed, files-common.ts). It holds no secret and grants nothing: the page
+   * needs the owner's session, and allowing a folder needs owner presence (I-4).
+   */
+  readonly allowFolderLink?: () => Promise<AllowFolderLink | undefined>;
+  /**
    * M1-26-e: the shipped pay page config (the chain package's `PAY_PAGE`, which is not live yet).
    * A top-up link is given only when `live`; absent means the shipped config. Production wiring
    * never sets it; tests do, to exercise a live page.
@@ -525,6 +532,13 @@ export interface ApprovalLink {
   readonly origin: string;
   /** The nextStep text with the link, which replaces the M1a `approvalNextStep` text. */
   readonly nextStep: string;
+}
+
+/** ATT-ALLOW-LINK: `http://localhost:<port>/settings/files?folder=~%2FAgentLink%2FSend`. */
+export interface AllowFolderLink {
+  readonly url: string;
+  /** `http://localhost:<port>`: the only origin the result `url` may use. */
+  readonly origin: string;
 }
 
 /** When the server runs for an agent that is not set up: every tool answers `needs_setup`. */

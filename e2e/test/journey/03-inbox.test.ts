@@ -343,7 +343,6 @@ describe('chapter 3: inbox', () => {
       .getByRole('button', { name: /^Approve/ })
       .first()
       .click();
-    await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
     await eventually(
       'the approval is recorded',
       async () =>

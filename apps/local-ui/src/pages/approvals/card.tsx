@@ -49,7 +49,7 @@ import type {
 } from './client.js';
 import { APPROVAL_ID } from './client.js';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
-import { normaliseBackupCode } from '../first-run/backup-code.js';
+import { normaliseBackupCode, UseCodeInstead } from '../first-run/backup-code.js';
 import { APPROVAL_STRINGS as S, fmt } from './strings.js';
 import { isPlumbing, TermsDetails, TermsSummary } from './terms-view.js';
 
@@ -496,10 +496,26 @@ export function SingleApproval({
     if (a.kind === 'status' && RETRY.has(a.status)) setActions(true);
   };
 
+  // UX1113-N2 (R2-UI-13): with a passkey (or Touch ID in the Mac app) the Approve / Deny button is
+  // the gesture ("Approve with Touch ID"): one press, one gesture, one request. The master code is
+  // the link under the buttons; with it the buttons open the code field as before.
+  const [codeMode, setCodeMode] = useState(false);
+  const direct = owner.passkey !== undefined && !codeMode;
+  const decideNow = async (decision: Decision): Promise<void> => {
+    if (owner.passkey === undefined) return;
+    setActions(false);
+    const a = await client.decide(item, decision, { kind: 'passkey', passkey: owner.passkey });
+    answer(a);
+    if (a.kind === 'dismissed') setActions(true);
+  };
   const open = (decision: Decision): void => {
     // M1-PAY-CONFIRM-b: approving a request that costs credits is the confirmation sheet's.
     if (item.paid && decision === 'approve') {
       setPaying(true);
+      return;
+    }
+    if (direct) {
+      void decideNow(decision);
       return;
     }
     setActions(false);
@@ -530,7 +546,7 @@ export function SingleApproval({
             // Deny first, Approve as the wider primary (D1); neither is a default button (11 §8).
             <div className="al-approval-actions">
               <Button size="lg" onClick={() => open('deny')}>
-                {S.deny}
+                {direct ? S.denyWithPasskey : S.deny}
               </Button>
               {/* F30/F31: while the confirm step is open, its button is the one orange button. */}
               <Button
@@ -538,15 +554,16 @@ export function SingleApproval({
                 size="lg"
                 onClick={() => open('approve')}
               >
-                {S.approve}
+                {direct && !item.paid ? S.approveWithPasskey : S.approve}
               </Button>
+              {direct ? <UseCodeInstead onClick={() => setCodeMode(true)} /> : null}
             </div>
           ) : null}
           {outcome === 'approved' ? <ApprovedMoment /> : null}
           <Statuses lines={lines} />
           {step === undefined ? null : (
             <OwnerStep
-              passkey={owner.passkey !== undefined}
+              passkey={owner.passkey !== undefined && !codeMode}
               passkeyLabel={
                 passkeyLabel ?? (step === 'approve' ? S.approveWithPasskey : S.denyWithPasskey)
               }

@@ -563,6 +563,50 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     expect(text()).not.toMatch(BANNED);
   });
 
+  it('ATT-SENDFOLDER-FIX (IR-1 M-1): a Send folder that holds files is named before the gesture', async () => {
+    const folder = '/Users/ana/AgentLink/Send';
+    const api = fakeApi({
+      begin: {
+        kind: 'ready',
+        publicKey: VALUES,
+        nonce: 'N'.repeat(43),
+        sendFolder: { folder, holdsFiles: true },
+      },
+    });
+    const seen: CreationValues[] = [];
+    await mount(api, (v) => {
+      seen.push(v);
+      return Promise.resolve({ kind: 'ok', body: BODY.slice() });
+    });
+    await click(GO.other);
+    const line = host.querySelector('[data-holds-files]')?.textContent ?? '';
+    expect(line).toContain(folder);
+    expect(line).toContain('It already holds files, and your AI can send those too.');
+    expect(seen).toEqual([]);
+    await click(GO.other);
+    expect(seen).toHaveLength(1);
+    // The outcome names the folder as it really is.
+    expect(text()).toContain(FIRST_RUN.sendAllowedAt(folder));
+    expect(text()).not.toMatch(BANNED);
+  });
+
+  it('the outcome names the real Send folder begin gave (e.g. Send-2), with no extra press when empty', async () => {
+    const folder = '/Users/ana/AgentLink/Send-2';
+    const api = fakeApi({
+      begin: {
+        kind: 'ready',
+        publicKey: VALUES,
+        nonce: 'N'.repeat(43),
+        sendFolder: { folder, holdsFiles: false },
+      },
+    });
+    await mount(api);
+    await click(GO.other);
+    expect(host.querySelector('[data-holds-files]')).toBeNull();
+    expect(api.finished).toHaveLength(1);
+    expect(text()).toContain(FIRST_RUN.sendAllowedAt(folder));
+  });
+
   it('no PRF in this browser: names a browser that works, or continues with a master code only', async () => {
     const asked: unknown[] = [];
     await mount(

@@ -176,7 +176,7 @@ describe('WP-1: the note shows wherever the owner looks', () => {
   it('Simple: on the open card, and one gesture posts the same rename with the current label', async () => {
     await mountAgents();
     expect(plain(host)).toContain('Contacts still see cc-test');
-    await click(button(host, 'Update contacts'));
+    await click(button(host, 'Update contacts with your master code'));
     await confirmWithCode();
     const [post] = posts('/api/ui/agents/label');
     expect(post).toBeDefined();
@@ -190,14 +190,14 @@ describe('WP-1: the note shows wherever the owner looks', () => {
     };
     await mountAgents();
     expect(plain(host)).toContain('New invites still show cc-test');
-    expect(button(host, 'Update name')).toBeDefined();
+    expect(button(host, 'Update name with your master code')).toBeDefined();
     expect(plain(host)).not.toContain('Contacts still see');
   });
 
   it('Under the hood: the fleet shows the note for the open ID', async () => {
     await mountAgents(true);
     expect(plain(host)).toContain('Contacts still see cc-test');
-    expect(button(host, 'Update contacts')).toBeDefined();
+    expect(button(host, 'Update contacts with your master code')).toBeDefined();
   });
 
   it("the ID's own page shows the note", async () => {
@@ -225,7 +225,7 @@ describe('WP-1: the note shows wherever the owner looks', () => {
       }),
     );
     expect(plain(host)).toContain('Contacts still see cc-test');
-    await click(button(host, 'Update contacts'));
+    await click(button(host, 'Update contacts with your master code'));
     await confirmWithCode();
     expect(posts('/api/ui/agents/label')).toHaveLength(1);
     expect(plain(host)).not.toContain('still see cc-test');
@@ -263,7 +263,7 @@ describe('WP-1: Update contacts says what went wrong, never one generic sentence
     it(what, async () => {
       answers['POST /api/ui/agents/label'] = answer;
       await mountAgents();
-      await click(button(host, 'Update contacts'));
+      await click(button(host, 'Update contacts with your master code'));
       await confirmWithCode();
       expect(plain(host)).toMatch(said);
       expect(plain(host)).not.toContain("Couldn't rename it. Try again.");
@@ -276,7 +276,7 @@ describe('WP-1 R-5: Rename takes the same name when only the card differs', () =
     await mountAgents();
     const card = host.querySelector<HTMLElement>('[data-agent="cc-test"]')!;
     await click(button(card, 'Rename'));
-    const submit = button(card, 'Rename with Touch ID');
+    const submit = button(card, 'Rename with your master code');
     expect(submit?.disabled).toBe(false);
     await click(submit);
     await confirmWithCode();
@@ -304,7 +304,7 @@ describe('WP-1 R-2: an invite while the names differ asks for the update first',
     expect(plain(host)).toContain('Your invites still show cc-test');
     expect(plain(host)).not.toContain(LINK);
     answers['POST /api/ui/invites'] = { status: 200, body: MADE };
-    await click(button(host, 'Update name'));
+    await click(button(host, 'Update name with your master code'));
     await confirmWithCode();
     expect(posts('/api/ui/agents/label')).toHaveLength(1);
     expect(posts('/api/ui/invites').length).toBe(2);

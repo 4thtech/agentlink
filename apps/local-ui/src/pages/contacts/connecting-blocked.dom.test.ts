@@ -188,6 +188,8 @@ describe('People: a waiting accept on a person blocked and then removed (N2)', (
     });
     expect(host.textContent).toContain(F.youBlocked('Bo'));
     await click(F.unblockAction);
+    // UX1113-N2: the panel's one button is the gesture (here the master code, no passkey).
+    await click(S.unblockWithCode);
     expect(calls.filter((c) => c.method === 'POST')).toEqual([]);
     expect(host.textContent).toContain('Unblock Bo.');
     const input = host.querySelector<HTMLInputElement>('input[name="owner-code"]');

@@ -146,7 +146,9 @@ describe('CoreSupervisor', () => {
     expect(child?.args).toEqual([HOST]);
     expect(child?.options).toEqual({
       env: { HOME: '/Users/x' },
-      stdio: ['ignore', 'ignore', 'pipe', 'pipe'],
+      // WIN-DESK-1: 'overlapped' (the same as 'pipe' outside Windows) so the core can read and
+      // write fd 3 at the same time on Windows.
+      stdio: ['ignore', 'ignore', 'pipe', 'overlapped'],
       windowsHide: true,
       shell: false,
       detached: false,

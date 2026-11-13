@@ -6,7 +6,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Duplex } from 'node:stream';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createLineReader, desktopPipeOver, probePipeFd, type PipeStream } from './pipe.js';
+import {
+  createLineReader,
+  desktopPipeOver,
+  openDesktopPipe,
+  probePipeFd,
+  type PipeStream,
+} from './pipe.js';
 import type { ShellMessage } from './protocol.js';
 
 const dirs: string[] = [];
@@ -48,9 +54,65 @@ describe('probePipeFd', () => {
       isFIFO: () => fifo,
       isSocket: () => socket,
     });
-    expect(probePipeFd(3, stat(false, true))).toBe('ok');
-    expect(probePipeFd(3, stat(true, false))).toBe('ok');
-    expect(probePipeFd(3, stat(false, false))).toBe('refused');
+    expect(probePipeFd(3, stat(false, true), 'darwin')).toBe('ok');
+    expect(probePipeFd(3, stat(true, false), 'linux')).toBe('ok');
+    expect(probePipeFd(3, stat(false, false), 'darwin')).toBe('refused');
+  });
+
+  // WIN-DESK-1: Node's isFIFO()/isSocket() always answer false on Windows; libuv puts the handle
+  // type in `mode` (a pipe or socket S_IFIFO, a file S_IFREG, a console S_IFCHR). Only a proven
+  // pipe is accepted; a type-less or unknown mode is refused.
+  const winStat = (mode: number | undefined) => () => ({
+    isFIFO: () => false,
+    isSocket: () => false,
+    ...(mode === undefined ? {} : { mode }),
+  });
+
+  it('win32: ok only for a pipe (mode S_IFIFO)', () => {
+    expect(probePipeFd(3, winStat(0o010000), 'win32')).toBe('ok');
+    expect(probePipeFd(3, winStat(0o010666), 'win32')).toBe('ok');
+  });
+
+  it.each([
+    ['type-less (mode 0)', 0],
+    ['a file', 0o100666],
+    ['a console or NUL device', 0o020666],
+    ['a folder', 0o040777],
+    ['a block device', 0o060666],
+    ['a socket type (never reported on Windows)', 0o140666],
+    ['no mode at all', undefined],
+  ])('win32: refused for %s', (_label, mode) => {
+    expect(probePipeFd(3, winStat(mode), 'win32')).toBe('refused');
+  });
+
+  it('win32: a mode that is not a number is refused', () => {
+    const bad = () => ({ isFIFO: () => true, isSocket: () => true, mode: '4096' as never });
+    expect(probePipeFd(3, bad, 'win32')).toBe('refused');
+  });
+
+  it('POSIX: the mode alone never makes a pipe (the helpers decide there)', () => {
+    expect(probePipeFd(3, winStat(0o010000), 'darwin')).toBe('refused');
+    expect(probePipeFd(3, winStat(0o010000), 'linux')).toBe('refused');
+  });
+
+  it('win32: missing when fstat throws', () => {
+    const throws = () => {
+      throw Object.assign(new Error('bad fd'), { code: 'EBADF' });
+    };
+    expect(probePipeFd(3, throws, 'win32')).toBe('missing');
+  });
+});
+
+describe('openDesktopPipe', () => {
+  it('throws for a regular file (net.Socket accepts only a pipe or socket)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'al-d3-'));
+    dirs.push(dir);
+    const fd = openSync(join(dir, 'f'), 'w');
+    try {
+      expect(() => openDesktopPipe(fd)).toThrow();
+    } finally {
+      closeSync(fd);
+    }
   });
 });
 

@@ -48,6 +48,31 @@ describe('desktopHostMain', () => {
     expect(d.run).toHaveBeenCalledTimes(1);
   });
 
+  it('opening the pipe throws (not a pipe after all): the fixed line, exit 1, nothing run', async () => {
+    const d = deps('ok');
+    d.openPipe.mockImplementation(() => {
+      throw Object.assign(new TypeError('Unsupported fd type: FILE'), {
+        code: 'ERR_INVALID_FD_TYPE',
+      });
+    });
+    await expect(desktopHostMain(d.main)).resolves.toBe(1);
+    expect(d.errors).toEqual([DESKTOP_HOST_TEXT.notInApp]);
+    expect(d.run).not.toHaveBeenCalled();
+  });
+
+  // macOS: with fd 3 absent, the child's fd 3 is the process's own kqueue, which stats as a FIFO,
+  // so the probe says `ok`; then net.Socket throws ENOTTY. That must end in the fixed line and
+  // exit 1 (no stack trace with install paths), with nothing run.
+  it('fd 3 stats as a FIFO but opening it throws ENOTTY (macOS kqueue): the fixed line, exit 1', async () => {
+    const d = deps('ok');
+    d.openPipe.mockImplementation(() => {
+      throw Object.assign(new Error('open ENOTTY'), { code: 'ENOTTY', syscall: 'open' });
+    });
+    await expect(desktopHostMain(d.main)).resolves.toBe(1);
+    expect(d.errors).toEqual([DESKTOP_HOST_TEXT.notInApp]);
+    expect(d.run).not.toHaveBeenCalled();
+  });
+
   it('the fixed line names no command, path or link', () => {
     expect(DESKTOP_HOST_TEXT.notInApp).not.toMatch(/`|http|\/|agentlink ui/);
   });

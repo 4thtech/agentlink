@@ -23,7 +23,7 @@ Or ask your AI: "Who are my AgentLink contacts?"
 
 1. Open the person on **People** and choose **Rename** from the **⋯** menu.
 2. Type the **New name** (**Up to 32 letters. Only you see it.**).
-3. Confirm with Touch ID or your master code. The app says **Renamed.**, and your AI uses the new name from now on.
+3. Press **Rename with Touch ID** (Windows Hello, or your passkey in a browser). That one press is the confirmation; **Use your master code instead** is the link under it. The app says **Renamed.**, and your AI uses the new name from now on.
 
 ## Block or unblock
 

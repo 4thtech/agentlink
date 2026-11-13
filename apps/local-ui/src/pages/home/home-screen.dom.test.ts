@@ -19,6 +19,7 @@ import { resetPrefsForTests, setPref } from '../../prefs/index.js';
 import type { CreateOutcome, InviteApi } from '../contacts/invite-api.js';
 import { InviteScreen } from '../invite/invite-screen.js';
 import { HomeScreen, type HomeScreenProps } from './home-screen.js';
+import { CONTACTS_STRINGS as C } from '../contacts/strings.js';
 import { HOME_STRINGS as S } from './people-strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -239,6 +240,35 @@ async function click(el: Element | null | undefined): Promise<void> {
 const row = (name: string): HTMLButtonElement | undefined =>
   all('button[aria-expanded]').find((b) => b.textContent?.includes(name)) as
     HTMLButtonElement | undefined;
+
+describe('ATT-SENDFOLDER-FIX: Home asks to allow the Send folder when none is allowed', () => {
+  const FILES = '/api/ui/files';
+  it('shows the calm banner with its one button when no folder is allowed', async () => {
+    await render(base({ [FILES]: ok({ folders: [], max: 32, version: 1 }) }));
+    const banner = q('[data-send-folder-banner]');
+    expect(banner).toBeTruthy();
+    expect(banner?.textContent).toContain('Allow your Send folder so your AI can send files');
+    expect(byText('[data-send-folder-banner] button', 'Allow Send folder')).toBeTruthy();
+    expect(lintVocabulary(document.body.textContent ?? '')).toEqual([]);
+  });
+
+  it('shows no banner when a folder is allowed, or when the list cannot be read', async () => {
+    await render(
+      base({
+        [FILES]: ok({
+          folders: [{ path: '/h/AgentLink/Send', resolved: null }],
+          max: 32,
+          version: 2,
+        }),
+      }),
+    );
+    expect(q('[data-send-folder-banner]')).toBeNull();
+    act(() => root.unmount());
+    root = createRoot(host);
+    await render(base());
+    expect(q('[data-send-folder-banner]')).toBeNull();
+  });
+});
 
 describe('Home simple (A4)', () => {
   it('shows Invite someone and People with the last activity; reading sends GETs only', async () => {
@@ -488,7 +518,8 @@ describe('Home simple (A4)', () => {
     await click(all('[role="menuitem"]').find((e) => e.textContent?.trim() === S.remove));
     const confirm = q('[role="alertdialog"]');
     expect(confirm?.textContent).toContain('Remove Ana?');
-    await click(byText('[role="alertdialog"] button', S.remove));
+    // UX1113-N2: the dialog's one button is the gesture (here the master code: no passkey).
+    await click(byText('[role="alertdialog"] button', C.removeWithCode));
     // The presence step of Contacts: nothing is sent before the owner confirms.
     expect(document.body.textContent).toMatch(/master code/i);
   });
@@ -1119,7 +1150,7 @@ describe('W8-S4 (F21): a half-removed ID on Home', () => {
     const sheet = q('[role="dialog"]');
     expect(unisolated(sheet)).toContain('Finish removing Old test');
     expect(sheet?.querySelector('input[type="text"]')).toBeNull();
-    expect(byText('button', 'Finish with Touch ID')).toBeTruthy();
+    expect(byText('button', 'Finish with your master code')).toBeTruthy();
   });
 });
 
