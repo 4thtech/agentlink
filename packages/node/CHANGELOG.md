@@ -1,5 +1,20 @@
 # @4thtech-io/node
 
+## 0.5.4
+
+### Patch Changes
+
+- 5507e7d: ATT-SENDFOLDER-FIX + ATT-ALLOW-LINK: an existing ~/AgentLink/Send that already holds files is used for a new ID (the owner is told), an unusable one falls back to a fresh Send-2 in the app, Home offers "Allow Send folder" when an ID allows no folder, and the AI's no-folder answer links to Settings > Files with the Send folder filled in instead of a terminal command.
+- 5507e7d: CI-823 (RET-6/7): the 06 §3 policy defaults keep history forever (`history: {messagesKeepDays: 0, filesKeepDays: 0}`), so a first edit of rules never signed never starts deleting; a new ID's first rules still keep saved files 90 days (`HISTORY_NEW_ID`). The owner-action signing vectors (version 9) carry the same defaults.
+- 5507e7d: MSG-ORDER-1 + OUTBOX-NOW-1: messages of the same second keep their order in a conversation (a local store order breaks the tie), and queued messages go out at once when the relays come back (core `outbox.retryNow()`, called on reconnect).
+- 5507e7d: UPD-5: Settings › Updates in the Mac app gets Update now, download progress, Restart now and a "Couldn't update here" fallback with the download link (off while no update key is pinned). UPD-4b: the update helper treats a failing process list as unknown and starts the app again when a failed copy cannot be moved aside.
+- 5507e7d: WIN-DESK-2: Settings › Updates accepts the Windows app's exact setup link (`AgentLink-<version>-win-x64-setup.exe` of the newer release) from the desktop app.
+- 5507e7d: CHORE-WIN-REVEAL-ARGS + CHORE-FILES-WIN-NAME-CASE: on Windows, Show in folder opens the Inbox folder when a file's path is one explorer.exe could misread (over MAX_PATH, a trailing dot or space, a character no Windows name holds) instead of selecting the wrong thing; the Files page names a protected folder in its original spelling instead of lower case.
+- Updated dependencies [5507e7d]
+  - @4thtech-io/core@0.5.4
+  - @4thtech-io/transport-nostr@0.5.4
+  - @4thtech-io/crypto@0.5.4
+
 ## 0.5.3
 
 ### Patch Changes

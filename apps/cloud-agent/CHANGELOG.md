@@ -1,5 +1,15 @@
 # @4thtech-io/cloud-agent
 
+## 0.0.22
+
+### Patch Changes
+
+- Updated dependencies [5507e7d]
+  - @4thtech-io/core@0.5.4
+  - @4thtech-io/transport-nostr@0.5.4
+  - @4thtech-io/crypto@0.5.4
+  - @4thtech-io/log@0.5.4
+
 ## 0.0.21
 
 ### Patch Changes

@@ -1,5 +1,20 @@
 # @4thtech-io/local-ui
 
+## 0.0.23
+
+### Patch Changes
+
+- 5507e7d: ATT-APP-ATTACH: in the app's conversation the owner can attach light text files (Markdown first; .md, .markdown, .txt, .json, up to 8 MB and 5 files) with Attach or drag-and-drop, see them as chips, remove them, add a note and send them to that person. The files go into the ID's allowed Send folder (never overwriting, never through a link) and travel through the ordinary encrypted send with their own type. Without a Send folder the app shows the Allow your Send folder banner.
+- 5507e7d: ATT-SENDFOLDER-FIX + ATT-ALLOW-LINK: an existing ~/AgentLink/Send that already holds files is used for a new ID (the owner is told), an unusable one falls back to a fresh Send-2 in the app, Home offers "Allow Send folder" when an ID allows no folder, and the AI's no-folder answer links to Settings > Files with the Send folder filled in instead of a terminal command.
+- 5507e7d: N3 + OWNERSTEP-LEFT: a compact approval card on Home (Approve with Touch ID, Deny with Touch ID, Review), Touch ID in the Mac app for approvals and Save, and one-step bulk approve and Save to Inbox.
+- 5507e7d: N7: native notifications in the desktop app. The core sends fixed codes over its private pipe (`notify {kind, count, name}`: approvals, messages, files, update); the app shows "Approval waiting", "New message", "File received" or "Update ready" as a real AgentLink notification, at most one per kind every 30 seconds, and a click opens that page. The dock badge shows the approvals waiting; on Windows the app sets its AppUserModelID for toasts. While the desktop app runs, `agentlink mcp` shows no osascript or notify-send alert. Settings › Notifications in the desktop app has five switches (approvals on; new messages, files received, updates and Show names off); a name is only one you gave the contact. The browser app keeps its one switch.
+- 5507e7d: N4–N6: a notification centre. The local app has a bell in the top bar with the number of new things for the open ID (also in the tab title, with a favicon dot while approvals wait), a small centre (Needs you, New, Earlier; Mark all read) and Settings › Notifications with one switch, Approvals waiting (on), that governs the OS approval alert. Only names the owner gave are shown. The store keeps only kinds, contact IDs, counts and times per ID, in the ID folder, for 30 days or 200 items.
+- 5507e7d: N1 and N2 (notifications): the app's own notice lines move to the shared Banner, PageNotice and InlineError, with one CopyButton; one health word is shared by the status bar, the top bar, the status strip and Home; the offline banner shows only after 5 s offline and "Back online" appears once as a toast.
+- 5507e7d: UX1113-N1: the "You are connected" screen asks nothing by default; "Use your own name for them" opens the name field with one "Save with Touch ID" (one gesture, the master code as a link).
+- 5507e7d: UX1113-N2: one gesture per owner action on People, Home, IDs and Approvals (the action's own button is the Touch ID, the master code a link).
+- Updated dependencies [5507e7d]
+  - @4thtech-io/ui@0.5.4
+
 ## 0.0.22
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @4thtech-io/ui
 
+## 0.5.4
+
+### Patch Changes
+
+- 5507e7d: N1 and N2 (notifications): the app's own notice lines move to the shared Banner, PageNotice and InlineError, with one CopyButton; one health word is shared by the status bar, the top bar, the status strip and Home; the offline banner shows only after 5 s offline and "Back online" appears once as a toast.
+
 ## 0.5.3
 
 No changes in this release.
