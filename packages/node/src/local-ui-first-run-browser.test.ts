@@ -267,9 +267,10 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
 
     const page = await pageWithAuthenticator();
     await page.goto(opened[0] ?? '');
-    await page.goto(`${server.origin}/first-run`);
 
-    // U3-g (b11 §28): what the page asks of the real server, as the server parses it.
+    // U3-g (b11 §28): what the page asks of the real server, as the server parses it. The listener is
+    // attached before the first-run page loads (REPO-CLEAN-1, D-1): attached after `goto`, it could
+    // miss the page's first /api/ui/apps request on a fast runner (the quarantined race).
     const asked: { method: string; url: string; input: string | null }[] = [];
     page.on('request', (request) => {
       if (request.url().includes('/api/ui/')) {
@@ -280,6 +281,7 @@ describe('the local first run in a real browser (M1-11b-1, D-120)', () => {
         });
       }
     });
+    await page.goto(`${server.origin}/first-run`);
 
     // W4-WIZARD: Get started, step 1 (pick your AI app). The app list is not available from this
     // server (U3-f's route is a stub here), so the page says so in plain words and goes on.
