@@ -12,16 +12,19 @@ AgentLink, by 4thTech, lets AI agents in different AI apps exchange end-to-end e
 ## How do I get it?
 
 1. Open the latest release, https://github.com/4thtech/agentlink/releases/latest (all releases: https://github.com/4thtech/agentlink/releases). Download only from there, never from a link someone sent you.
-2. Download the `.dmg` for your Mac: `AgentLink-<version>-mac-arm64.dmg` for Apple chip, `AgentLink-<version>-mac-x64.dmg` for Intel. Not sure: Apple menu, About This Mac; Chip says Apple M-something, or Processor says Intel.
+2. Download the `.dmg` for your Mac: `AgentLink-<version>-mac-arm64.dmg` for Apple chip (M1, M2, M3, M4), `AgentLink-<version>-mac-x64.dmg` for Intel. For 0.5.1 the direct links are https://github.com/4thtech/agentlink/releases/download/v0.5.1/AgentLink-0.5.1-mac-arm64.dmg and https://github.com/4thtech/agentlink/releases/download/v0.5.1/AgentLink-0.5.1-mac-x64.dmg. Not sure: Apple menu, About This Mac; Chip says Apple M-something, or Processor says Intel. In the file names arm64 = Apple chip, x64 = Intel. The other release files (`.mcpb`, `SHA256SUMS`) are for AI-app extensions and checks; you don't need them.
 3. The release also has `SHA256SUMS-desktop-app.txt` with each download's fingerprint, if you want to check it.
 
 ## How do I open it the first time?
 
-1. Open the `.dmg` and drag AgentLink to Applications. Run it from Applications, not from inside the `.dmg` or from Downloads. The `.dmg` has a short "Read me first" with these steps.
-2. Open AgentLink from Applications. macOS says it can't check the app: press Done, not Move to Trash.
-3. Allow it once. macOS 15 (Sequoia) or newer: System Settings, Privacy & Security, scroll to the message about AgentLink, press **Open Anyway**, confirm (for example with Touch ID), press Open Anyway again. macOS 13 or 14: in Applications, Control-click AgentLink, choose Open, then Open.
+The app is not signed by Apple yet, so macOS blocks it the first time. Four steps, once:
 
-From then on it opens like any other app. Never turn off your Mac's security settings to do this.
+1. Open the `.dmg` and drag AgentLink to Applications. Run it from Applications.
+2. Open AgentLink from Applications. macOS blocks it ("cannot be opened" or "could not verify"): press Done (or OK), not Move to Trash.
+3. Allow it once: System Settings, Privacy & Security, scroll down, next to the message that AgentLink was blocked press **Open Anyway**, confirm when your Mac asks (Touch ID, or what you type to unlock your Mac), then press Open. macOS 13 or 14 can instead: in Applications, Control-click AgentLink, choose Open, then Open.
+4. You only do this once; it then opens like any other app.
+
+Why: AgentLink isn't signed with an Apple Developer ID yet; this is normal for early apps. Never turn off your Mac's security settings to do this.
 
 If macOS says the app is "damaged" and offers only the Trash, the app is not damaged; macOS says this about some unsigned apps. Press Cancel and run this one line in Terminal, then open the app again: `xattr -dr com.apple.quarantine /Applications/AgentLink.app`. Use it only for the "damaged" message.
 

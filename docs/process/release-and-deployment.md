@@ -343,7 +343,7 @@ Agents prepare every item except the npm `latest` approval click; services deplo
 - [ ] **Owner's approval click** on the waiting `publish-latest` for a stable npm release (D-52).
 - [ ] Post-release: health check and smoke tests green, or rolled back with `DEPLOY_FREEZE` set.
 - [ ] Deploy record completed and filed; owner's sync file and Curator handoff updated.
-- [ ] Public docs pass done for this release (patches and M4/M5 included): `docs-site/` updated per `docs-site/MAINTAINING.md` §4 and merged (§4.9).
+- [ ] Public docs pass done for this release (patches and M4/M5 included): `docs-site/` updated per `docs-site/MAINTAINING.md` §4 and merged (§4.9); the versioned Mac download links in the README and guides point at this release ([RB-09](../runbooks/merge-and-release.md) step 11).
 
 ### 5.2 Deploy record
 

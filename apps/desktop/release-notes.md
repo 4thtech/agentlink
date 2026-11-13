@@ -4,6 +4,22 @@
 
 ## AgentLink desktop preview <version>
 
+Every release body starts with this Download section (the release workflow adds it to GitHub Releases by itself; keep it first here too):
+
+## Download
+
+| Your computer | Download this |
+|---|---|
+| Mac with Apple chip (M1, M2, M3, M4) | `AgentLink-<version>-mac-arm64.dmg` |
+| Mac with Intel chip | `AgentLink-<version>-mac-x64.dmg` |
+| Windows or Linux | No download: one command (see the Install AgentLink guide) |
+
+Not sure which Mac? Apple menu, then **About This Mac**: "Chip: Apple M…" means Apple chip, "Processor: Intel" means Intel. In the file names, **arm64 = Apple chip** and **x64 = Intel**.
+
+The other files (`.mcpb`, `SHA256SUMS`) are for AI-app extensions and checks. You don't need them.
+
+## What's new
+
 **Who this is for:** early adopters on a Mac who accept an unsigned build. The Windows desktop app is coming later; on Windows, use the browser app (one command).
 
 ### What is new
