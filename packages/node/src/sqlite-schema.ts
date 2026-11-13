@@ -93,6 +93,9 @@ const V12_TABLES: readonly TableName[] = ['agent_pause'];
 /** mcp_sessions columns added by version 13 (WP-13, F45): the AgentLink version a process runs. */
 const V13_MCP_SESSIONS_COLUMNS: readonly string[] = ['version'];
 
+/** Invites columns added by version 14 (REL051-B2): the kept link of an open invite (sealed). */
+const V14_INVITES_COLUMNS: readonly string[] = ['invite_link'];
+
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
   return {
@@ -113,7 +116,7 @@ function v1Spec(table: TableName): TableSpec {
   if (table === 'files') {
     return without(spec, [...V4_FILES_COLUMNS, ...V6_FILES_COLUMNS, ...V11_FILES_COLUMNS]);
   }
-  if (table === 'invites') return without(spec, V8_INVITES_COLUMNS);
+  if (table === 'invites') return without(spec, [...V8_INVITES_COLUMNS, ...V14_INVITES_COLUMNS]);
   if (table === 'contacts') return without(spec, V9_CONTACTS_COLUMNS);
   return spec;
 }
@@ -138,6 +141,19 @@ function v13Statements(): readonly string[] {
   return V13_MCP_SESSIONS_COLUMNS.map(
     (column) =>
       `ALTER TABLE "mcp_sessions" ADD COLUMN ${columnDef('mcp_sessions', column, sessions.columns[column] as ColumnSpec)}`,
+  );
+}
+
+/**
+ * Version 14 (REL051-B2; 07 §3): `invites.invite_link`, appended, nullable, sealed. Every existing
+ * row keeps null: an invite made before version 14 cannot be copied again (`no_link`); the owner
+ * cancels it and makes a new one. Nothing is rewritten.
+ */
+function v14Statements(): readonly string[] {
+  const invites = tableSpec('invites');
+  return V14_INVITES_COLUMNS.map(
+    (column) =>
+      `ALTER TABLE "invites" ADD COLUMN ${columnDef('invites', column, invites.columns[column] as ColumnSpec)}`,
   );
 }
 
@@ -244,7 +260,8 @@ function v11Statements(): readonly string[] {
  * version 10 adds `mcp_sessions` and `mcp_last_seen` (W4-LIVE-STATUS, D-143; new tables only), version
  * 11 adds the auto-save columns and tables (W4-AUTO-SAVE, D-142; nullable, null on existing rows),
  * version 12 adds `agent_pause` (W4-PAUSE, D-143 (5); a new table, no row: not paused), version 13
- * adds `mcp_sessions.version` (WP-13, F45; nullable, null on existing rows). A later
+ * adds `mcp_sessions.version` (WP-13, F45; nullable, null on existing rows), version 14 adds
+ * `invites.invite_link` (REL051-B2; nullable, null on existing rows). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -278,6 +295,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 11, statements: Object.freeze(v11Statements()) }),
   Object.freeze({ version: 12, statements: createSchemaStatements(V12_TABLES) }),
   Object.freeze({ version: 13, statements: Object.freeze(v13Statements()) }),
+  Object.freeze({ version: 14, statements: Object.freeze(v14Statements()) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

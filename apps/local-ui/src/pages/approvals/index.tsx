@@ -26,9 +26,13 @@
 //   full list above stays as `ApprovalsBoard` in board.tsx (its tests keep the review-together
 //   rules); nothing imports it at runtime, so neither it nor board.css is in the app bundle.
 import { HomeScreen } from '../home/home-screen.js';
+import { CONTACTS_CHANGED } from '../../api/contact-changes.js';
 import { GetStartedCard } from '../start/get-started-card.js';
+import { FinishSetupCard } from '../start/finish-setup-card.js';
 import {
+  invitedBefore,
   readSetupState,
+  rememberInvited,
   startProgress,
   type Progress,
   type SetupState,
@@ -81,17 +85,29 @@ export function browserPasskeys(): boolean {
 export interface OwnerView extends OwnerState {
   /** The server offers a localhost passkey (registered or not). */
   readonly offered: boolean;
+  /** R1-UI-13: the read failed, so nothing is known about the passkey (not "no passkey here"). */
+  readonly unknown?: boolean;
+  /** Reads again (the notice's Try again). */
+  readonly retry?: () => void;
 }
 
 /** Reads the owner and the decision passkey once; undefined while loading. */
 export function useOwner(client: ApprovalsClient, canPasskey: boolean): OwnerView | undefined {
   const [owner, setOwner] = useState<OwnerView | undefined>(undefined);
+  const [again, setAgain] = useState(0);
   useEffect(() => {
     let live = true;
     void client.passkey().then((answer) => {
       if (!live) return;
       if (answer.kind === 'needs_owner') setOwner({ ready: false, offered: false });
-      else {
+      else if (answer.kind === 'unknown') {
+        setOwner({
+          ready: true,
+          offered: false,
+          unknown: true,
+          retry: () => setAgain((n) => n + 1),
+        });
+      } else {
         setOwner({
           ready: true,
           offered: answer.offered,
@@ -102,7 +118,7 @@ export function useOwner(client: ApprovalsClient, canPasskey: boolean): OwnerVie
     return () => {
       live = false;
     };
-  }, [client, canPasskey]);
+  }, [client, canPasskey, again]);
   return owner;
 }
 
@@ -149,6 +165,27 @@ export function OwnerPanel({
     return (
       <PageNotice tone="warning" icon="key-round" title={S.needsOwnerTitle}>
         <p>{S.needsOwner}</p>
+      </PageNotice>
+    );
+  }
+  // R1-UI-13: a failed read says so and offers a retry; it never claims passkeys are missing.
+  if (owner.unknown === true) {
+    return (
+      <PageNotice
+        tone="warning"
+        icon="key-round"
+        title={S.checkFailedTitle}
+        {...(owner.retry === undefined
+          ? {}
+          : {
+              actions: (
+                <Button size="sm" onClick={owner.retry}>
+                  {S.retry}
+                </Button>
+              ),
+            })}
+      >
+        <p>{S.checkFailed}</p>
       </PageNotice>
     );
   }
@@ -283,18 +320,43 @@ export function useStartProgress(read: () => Promise<SetupState>): Progress | nu
     const settle = (p: Progress | null): void => {
       if (live) setProgress((now) => (now === undefined ? p : now));
     };
+    // R1-UI-10: the card follows the real state (a person accepted while Home is open); an answer
+    // that came later replaces the first one, an unanswered read keeps what is shown.
+    const again = (): void => {
+      read().then(
+        (state) => {
+          const p = startProgress(state, invitedBefore());
+          if (p.steps.find((s) => s.id === 'invite')?.done === true) rememberInvited();
+          if (live) setProgress(p);
+        },
+        () => undefined,
+      );
+    };
     const timer = setTimeout(() => settle(null), START_READ_WAIT_MS);
     read().then(
-      (state) => settle(startProgress(state)),
+      (state) => {
+        const p = startProgress(state, invitedBefore());
+        if (p.steps.find((s) => s.id === 'invite')?.done === true) rememberInvited();
+        settle(p);
+      },
       () => settle(null),
     );
+    const every = setInterval(() => {
+      if (typeof document === 'undefined' || !document.hidden) again();
+    }, START_REFRESH_MS);
+    window.addEventListener(CONTACTS_CHANGED, again);
     return () => {
       live = false;
       clearTimeout(timer);
+      clearInterval(every);
+      window.removeEventListener(CONTACTS_CHANGED, again);
     };
   }, [read]);
   return progress;
 }
+
+/** R1-UI-10: how often the Get started card reads the real state again while Home is open. */
+export const START_REFRESH_MS = 10_000;
 
 /** `/`: Home (W4-HOME), with the approvals as the card on top. */
 export function ApprovalsPage({
@@ -318,7 +380,9 @@ export function ApprovalsPage({
       holding={started === undefined}
       {...(started === null || started === undefined
         ? {}
-        : { getStarted: <GetStartedCard progress={started} /> })}
+        : started.needsFirstId
+          ? { noId: <FinishSetupCard /> }
+          : { getStarted: <GetStartedCard progress={started} /> })}
       {...(owner === undefined
         ? {}
         : {

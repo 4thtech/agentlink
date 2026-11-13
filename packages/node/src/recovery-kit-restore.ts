@@ -32,7 +32,7 @@ import {
 } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { AgentLinkClient, isRestrictedAlias, type ApprovalChannel } from '@4thtech-io/core';
+import { AgentLinkClient, isOwnIdName, type ApprovalChannel } from '@4thtech-io/core';
 import {
   CryptoInputError,
   KeyStoreError,
@@ -49,6 +49,7 @@ import {
   equalBytes,
   ownerPrfSalt,
   randomBytes,
+  readPasskeyBlobHeader,
   readRecoveryKitHeader,
   sha256,
   verifyWebauthnSignature,
@@ -65,6 +66,7 @@ import {
   createKeyImportControl,
   discardImportedAgent,
   importOwnerPasskey,
+  importRestoredOwner,
   inOwnersRevokedList,
   unlockForRestore,
   type RestoreOwnerSessionHold,
@@ -74,12 +76,25 @@ import { markKitRecordChecked } from './kit-record.js';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded, openRecordedKeyStore } from './keychain-keystore.js';
 import { ttyOwnerTerminal } from './owner-terminal.js';
-import { OWNER_ACCOUNT, OWNER_NEXT_ACCOUNT } from './owner-keystore.js';
+import {
+  OWNER_ACCOUNT,
+  OWNER_NEXT_ACCOUNT,
+  readOwnerItem,
+  removeOwnerItemIfOurs,
+} from './owner-keystore.js';
+import {
+  readUnsavedMarker,
+  removeUnsavedMarker,
+  writeUnsavedMarker,
+  type UnsavedKind,
+} from './master-code-unsaved.js';
 import {
   PASSKEY_RP_ID,
   assertPasskeyAssertion,
   parsePasskeyAssertion,
   readOwnerPasskeyHeader,
+  readOwnerPasskeyItem,
+  removeOwnerPasskeyItemIfOurs,
 } from './owner-passkey.js';
 import {
   checkSetupRegistration,
@@ -92,7 +107,10 @@ import {
   installRestoredStore,
   peekQuarantinedSnapshot,
   quarantineAuthenticated,
+  processAlive,
   removeStaleRestoreFiles,
+  restoreFileName,
+  trackRestoreFile,
 } from './restore-quarantine.js';
 
 const { O_RDONLY, O_WRONLY, O_CREAT, O_EXCL, O_NOFOLLOW, O_NONBLOCK } = constants;
@@ -190,12 +208,46 @@ export interface RestoreEngineOptions {
   readonly keychainUsable?: () => Promise<boolean>;
   /** After a restore wrote IDs (folder names, kit order): the app host opens one. */
   readonly onRestored?: (names: readonly string[]) => Promise<void> | void;
+  /**
+   * REL051-SF3 (04 §2.5): the server's shared presence backoff. When given, a wrong proof on the
+   * restore presence step counts there (and its wait holds this step), not on a counter of its own.
+   */
+  readonly presenceBackoff?: {
+    readonly waitSeconds: () => number;
+    readonly failed: () => void;
+    readonly succeeded: () => void;
+  };
   /** Test seams. */
   readonly maxUploadBytes?: number;
   /** Limit of each native keychain read (default KEYCHAIN_CALL_TIMEOUT_MS). */
   readonly keychainTimeoutMs?: number;
   readonly freeBytes?: (dir: string) => Promise<number | undefined>;
+  /**
+   * REL051-CF3 (T-7): whether the run that wrote the unsaved-master-code marker still runs (its
+   * owner write may be in progress). Default: this process, or a live process with that ID.
+   */
+  readonly runAlive?: (pid: number) => boolean;
+  /** REL051-R2C test seam: how long `close` waits for a running restore (default 30 s). */
+  readonly closeWaitMs?: number;
+  /** REL051-CF3 test seam: how the `shown` marker is written (default writeUnsavedMarker). */
+  readonly writeMarker?: typeof writeUnsavedMarker;
 }
+
+/** REL051-R2C: whether an answer can still reach its page. */
+export interface RestoreDelivery {
+  readonly open: () => boolean;
+}
+
+/** REL051-R2C: how long `close` waits for a running restore to end (bounded; never forever). */
+const CLOSE_WAIT_MS = 30_000;
+
+/** REL051-CF3: what the page says about a master code that was made here and not saved. */
+export type MasterCodeState =
+  | { readonly status: 'none' }
+  /** Restored IDs wait for their owner: "Finish restoring" with the same kit. */
+  | { readonly status: 'finish_restore' }
+  /** The code was made and never saved; `touchId`: a passkey can approve making a new one. */
+  | { readonly status: 'lost'; readonly kind: UnsavedKind; readonly touchId: boolean };
 
 /** The route-facing restore engine. No member writes an owner without the gesture or a session. */
 export interface RestoreEngine {
@@ -220,6 +272,13 @@ export interface RestoreEngine {
     session: string,
     input: JsonValue | undefined,
     body: Uint8Array,
+    /**
+     * REL051-R2C (R2-CLASS-02): whether the answer can still reach the page (its connection is
+     * open). A new master code is only answered to a page that is there: otherwise (or when the
+     * engine is closing) the owner this run wrote is rolled back and the IDs wait for "Finish
+     * restoring" with the same kit.
+     */
+    delivery?: RestoreDelivery,
   ): Promise<RestoreAnswer>;
   /**
    * WP-R2 hook (04 §2.3.3 "Check that my kit opens"): right after the export route sealed a kit,
@@ -238,6 +297,23 @@ export interface RestoreEngine {
    * undefined.
    */
   firstRunHold(): Promise<FirstRunHold | undefined>;
+  /**
+   * REL051-CF3 (R1-CLASS-04; T-7): at start-up, an owner item that a restore which is gone wrote and
+   * whose master code never left the server (marker `writing`, exactly that item, no passkey item) is
+   * removed again, so first run says "Finish restoring" instead of asking for a code nobody has. A
+   * marker with no owner item goes. Anything else is kept. Never throws.
+   */
+  settle(): Promise<void>;
+  /** REL051-CF3: the unsaved master code's state for the page (never the code). */
+  masterCodeState(): Promise<MasterCodeState>;
+  /** REL051-CF3: "I saved it" (or the code was replaced): the marker goes. */
+  masterCodeSaved(): Promise<void>;
+  /**
+   * REL051-SF3 (T-7): removes the quarantine and upload files of restores that are gone (the engine
+   * runs it after every apply and cancel; the server sweeps the folder itself when it starts).
+   * Never a live engine's.
+   */
+  sweep(): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -388,6 +464,34 @@ async function* chunksOf(fh: FileHandle, size: number): AsyncGenerator<Uint8Arra
   }
 }
 
+/**
+ * REL051-SF3 (T-2, T-4): passes `chunks` through, checking that their first bytes are exactly `head`
+ * (the header read, hashed and bound from the same descriptor). On a difference it sets
+ * `state.changed` and stops the stream.
+ */
+async function* sameHead(
+  chunks: AsyncIterable<Uint8Array>,
+  head: Uint8Array,
+  state: { changed: boolean },
+): AsyncGenerator<Uint8Array> {
+  let seen = 0;
+  for await (const chunk of chunks) {
+    if (seen < head.length) {
+      const n = Math.min(chunk.length, head.length - seen);
+      if (!equalBytes(chunk.subarray(0, n), head.subarray(seen, seen + n))) {
+        state.changed = true;
+        throw new CryptoInputError('open_failed', 'restore: the kit changed while it was read');
+      }
+      seen += n;
+    }
+    yield chunk;
+  }
+  if (seen < head.length) {
+    state.changed = true;
+    throw new CryptoInputError('open_failed', 'restore: the kit changed while it was read');
+  }
+}
+
 type HeaderOutcome = 'ok' | 'not_a_kit' | 'newer_version';
 
 function headerOutcome(head: Uint8Array): { outcome: HeaderOutcome; ownerNostr?: Uint8Array } {
@@ -480,7 +584,7 @@ export function restoredLabel(reading: LabelReadingLike | undefined, folder: str
   if (reading?.status !== 'verified') return folder;
   const label = reading.label;
   if (typeof label !== 'string' || [...label].length > 32) return folder;
-  if (!LABEL_CHARS.test(label) || label.includes('  ') || !isRestrictedAlias(label)) return folder;
+  if (!LABEL_CHARS.test(label) || label.includes('  ') || !isOwnIdName(label)) return folder;
   return label;
 }
 
@@ -549,6 +653,10 @@ export function createRestoreEngine(options: RestoreEngineOptions): RestoreEngin
     registerExportedKit,
     restorePending,
     firstRunHold,
+    settle,
+    masterCodeState,
+    masterCodeSaved,
+    sweep,
     close,
   } = full;
   return Object.freeze({
@@ -564,6 +672,10 @@ export function createRestoreEngine(options: RestoreEngineOptions): RestoreEngin
     registerExportedKit,
     restorePending,
     firstRunHold,
+    settle,
+    masterCodeState,
+    masterCodeSaved,
+    sweep,
     close,
   });
 }
@@ -596,6 +708,20 @@ function build(options: RestoreEngineOptions): TerminalRestore {
    * at a time, one opened kit, one apply (T-4, T-7).
    */
   let locked = false;
+  /** REL051-R2C: the running locked operation (close waits for it) and the closing flag. */
+  let running: Promise<RestoreAnswer> | undefined;
+  let closing = false;
+  /** REL051-R2C: the page connection of the running apply/finish (undefined: always open). */
+  let delivery: RestoreDelivery | undefined;
+  /** REL051-R2C: the answer of this run can no longer reach anyone (closing, or the page left). */
+  const answerGone = (): boolean => {
+    if (closing) return true;
+    try {
+      return delivery !== undefined && !delivery.open();
+    } catch {
+      return true;
+    }
+  };
   /** Bumped by `cancel` per page session; an open that finishes after a cancel wipes its kit. */
   const cancels = new Map<string, number>();
   let ready: Promise<void> | undefined;
@@ -606,8 +732,29 @@ function build(options: RestoreEngineOptions): TerminalRestore {
 
   /** Stale uploads and quarantine files of a crashed run go at start-up (T-7). */
   function start(): Promise<void> {
-    ready ??= removeStaleRestoreFiles(restoreDir);
+    ready ??= removeStaleRestoreFiles(restoreDir, now());
     return ready;
+  }
+
+  /** REL051-SF3: a sweep now (start-up and after an operation ended); live files stay. */
+  async function sweepNow(): Promise<void> {
+    await start();
+    await removeStaleRestoreFiles(restoreDir, now()).catch(() => undefined);
+  }
+
+  /** REL051-SF3 (04 §2.5): the shared presence backoff when the server gives one, else our own. */
+  function presenceWait(): number {
+    if (options.presenceBackoff !== undefined) return options.presenceBackoff.waitSeconds();
+    const left = presenceFails.until - now();
+    return left > 0 ? Math.ceil(left / 1000) : 0;
+  }
+  function presenceFailed(): void {
+    if (options.presenceBackoff !== undefined) options.presenceBackoff.failed();
+    else countFail(presenceFails);
+  }
+  function presenceSucceeded(): void {
+    if (options.presenceBackoff !== undefined) options.presenceBackoff.succeeded();
+    else presenceFails = { count: 0, until: 0 };
   }
 
   function dropHandle(handle: string): void {
@@ -615,7 +762,12 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     handles.delete(handle);
     if (entry?.file.kind === 'upload') {
       for (const [session, up] of uploads) if (up.handle === handle) uploads.delete(session);
-      void unlink(entry.file.path).catch(() => undefined);
+      const path = entry.file.path;
+      void unlink(path)
+        .catch(() => undefined)
+        .finally(() => {
+          trackRestoreFile(path, false);
+        });
     }
   }
 
@@ -647,18 +799,27 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     fn: () => Promise<RestoreAnswer>,
     secret?: Uint8Array,
   ): Promise<RestoreAnswer> {
-    if (locked) {
+    if (locked || closing) {
       if (secret !== undefined) wipe(secret);
       return fail('busy');
     }
     locked = true;
+    const run = (async (): Promise<RestoreAnswer> => {
+      try {
+        return await fn();
+      } catch {
+        // A failed or timed-out keychain call: a fixed answer, and the lock is released below.
+        return fail('failed');
+      } finally {
+        locked = false;
+        delivery = undefined;
+      }
+    })();
+    running = run;
     try {
-      return await fn();
-    } catch {
-      // A failed or timed-out keychain call: a fixed answer, and the lock is released below.
-      return fail('failed');
+      return await run;
     } finally {
-      locked = false;
+      if (running === run) running = undefined;
     }
   }
 
@@ -746,6 +907,44 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     return false;
   }
 
+  /**
+   * REL051-SF3 (R1-SEC-04): the `owner-passkey` item on a computer with no `owner` item. `none`: no
+   * item; `foreign`: a well-formed item of another owner (never replaced); else the item's bytes,
+   * a leftover of this owner (the kit holds the same seed) or not an owner key at all (a damaged
+   * item opens to nothing), which this apply replaces. The caller wipes `blob`.
+   */
+  async function lonePasskey(
+    kitOwner: Uint8Array,
+  ): Promise<'none' | 'foreign' | { readonly blob: Uint8Array }> {
+    const blob = await readOwnerPasskeyItem(options.keychain(), keychainTimeoutMs);
+    if (blob === null) return 'none';
+    let owner: Uint8Array | undefined;
+    try {
+      owner = readPasskeyBlobHeader(blob).ownerNostr;
+    } catch {
+      owner = undefined;
+    }
+    if (owner !== undefined && !equalBytes(owner, kitOwner)) {
+      wipe(blob);
+      return 'foreign';
+    }
+    return { blob };
+  }
+
+  /** The owner a well-formed `owner-passkey` item names, or undefined (none, or damaged). */
+  async function passkeyOwner(): Promise<Uint8Array | undefined> {
+    // A keychain that does not answer rejects (the operation fails closed).
+    const blob = await readOwnerPasskeyItem(options.keychain(), keychainTimeoutMs);
+    if (blob === null) return undefined;
+    try {
+      return readPasskeyBlobHeader(blob).ownerNostr;
+    } catch {
+      return undefined;
+    } finally {
+      wipe(blob);
+    }
+  }
+
   async function fileOwnerPresent(): Promise<boolean> {
     for (const path of defaultOwnerFiles(home)) {
       try {
@@ -811,6 +1010,11 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     } finally {
       await fh.close().catch(() => undefined);
     }
+    return parseHead(head);
+  }
+
+  /** The header checks on `head`, the first bytes of one descriptor (never read by path). */
+  async function parseHead(head: Uint8Array): Promise<ParsedHeader> {
     const ownerPresent = (await keychainOwnerPresent()) || (await fileOwnerPresent());
     const parsed = headerOutcome(head);
     if (parsed.outcome !== 'ok' || parsed.ownerNostr === undefined) {
@@ -825,12 +1029,16 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     } else {
       // A crash between the agents and the owner: only the same owner's kit finishes it (T-7):
       // the owner the verified cards here name, or the marker's.
+      // REL051-SF3 (R1-SEC-04): a leftover `owner-passkey` item of another owner is never
+      // replaced, so that kit is refused before a code is asked and before anything is written.
       const marker = await readPending();
       const owners = await verifiedCardOwners();
       const kitOwner = parsed.ownerNostr;
+      const passkey = await passkeyOwner();
       if (
         (marker !== undefined && !equalBytes(marker, kitOwner)) ||
-        owners.some((o) => !equalBytes(o, kitOwner))
+        owners.some((o) => !equalBytes(o, kitOwner)) ||
+        (passkey !== undefined && !equalBytes(passkey, kitOwner))
       ) {
         return { outcome: 'other_owner', ownerPresent, ownerNostr: parsed.ownerNostr, headerHash };
       }
@@ -1013,121 +1221,153 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       // The same page session opening again replaces its kit exactly as `cancel` does (wipe, and
       // its quarantine files deleted); never while another operation runs (the lock).
       if (held !== undefined) wipeHeld();
-      const parsed = await parseHeaderOf(entry.file);
-      if (parsed === undefined) {
-        dropHandle(handle);
-        return fail('expired');
-      }
-      if (parsed.outcome !== 'ok') return fail(parsed.outcome);
-      const headerHash = parsed.headerHash as Uint8Array;
-      if (parsed.ownerPresent && (await fileOwnerPresent()) && !(await keychainOwnerPresent())) {
-        return fail('needs_terminal');
-      }
-      if (options.keychainUsable !== undefined && !(await options.keychainUsable())) {
-        return fail('needs_terminal');
-      }
-      let restore: RestoreOwnerSessionHold | undefined;
-      if (mode === 'open' && parsed.ownerPresent) {
-        const entrySession = restoreSessions.get(session);
-        if (entrySession === undefined || !entrySession.hold.boundTo(headerHash)) {
-          return fail('presence_required');
-        }
-        restore = entrySession.hold;
-      }
-      const key = encodeHex(headerHash);
-      const wait = waitFor(key);
-      if (wait > 0) return fail('wait', { retryAfter: wait });
+      // REL051-SF3 (04 §2.3.3 "found", T-2, T-4): one descriptor per request. The header that is
+      // hashed, bound and counted is read from it, and the kit is streamed from it; the streamed
+      // header must be those very bytes.
       const fh = await openRef(entry.file);
       if (fh === undefined) {
         dropHandle(handle);
         return fail('expired');
       }
-      if (entry.file.kind === 'export') dropHandle(handle);
-      const sinks: RecoveryKitStoreSink[] = [];
-      let kit: RecoveryKitImport;
       try {
-        const control = createKeyImportControl({
-          backend: 'keychain',
-          keychain: options.keychain(),
-          ...(restore === undefined ? {} : { ownerStore: restore.store }),
-          revokedDir,
-        });
-        const quarantine = createRestoreQuarantine(restoreDir);
-        // Case and spaces do not matter; the code's own form is checked by the KDF's normaliser.
-        for (let i = 0; i < code.length; i += 1) {
-          const c = code[i] as number;
-          if (c >= 0x61 && c <= 0x7a) code[i] = c - 0x20;
-        }
-        kit = await control.openRecoveryKit(
-          chunksOf(fh, entry.file.size),
-          { secret: code.slice(), source: 'prompt' },
-          {
-            ...(parsed.ownerNostr === undefined ? {} : { expectedOwnerNostr: parsed.ownerNostr }),
-            createStoreSink: async () => {
-              const sink = await quarantine.createStoreSink();
-              sinks.push(sink);
-              return sink;
-            },
-          },
-        );
-      } catch (error) {
-        // UX1113-QA2 N5: a store sink is only created for plaintext of a chunk that authenticated
-        // under this code, so the code was right and the file is damaged (a half-copied kit). Not
-        // an oracle: a wrong code never authenticates a chunk, and anyone holding the file can test
-        // a code offline the same way; a wrong code still counts toward the wait below. A kit of one
-        // chunk cannot tell a cut file from a wrong code (one tag), and says wrong_code.
-        if (sinks.length > 0 || sinks.some((s) => quarantineAuthenticated(s))) {
-          return fail('damaged');
-        }
-        if (error instanceof CryptoInputError || error instanceof KeyStoreError) {
-          const counter = fails.get(key) ?? { count: 0, until: 0 };
-          fails.set(key, counter);
-          countFail(counter);
-          return fail('wrong_code');
-        }
-        return fail('damaged');
+        return await openFrom(session, handle, entry, fh, code, mode, cancelAt);
       } finally {
         await fh.close().catch(() => undefined);
       }
-      fails.delete(key);
-      if (entry.file.kitId !== undefined && encodeBase64url(kit.kitId) !== entry.file.kitId) {
-        kit.wipe();
-        return fail('damaged');
-      }
-      let rows: SummaryRow[];
-      try {
-        rows = await summaryOf(kit);
-      } catch {
-        kit.wipe();
-        return fail('failed');
-      }
-      const summary = summaryBody(kit, rows);
-      if (mode === 'check') {
-        // UX1113-QA2 N14: this very kit opened with its code; the kit record of the same kitId (and
-        // only it) now counts as backed up. A display aid (G-1): a failure changes nothing here.
-        await markKitRecordChecked(agentlinkDir, encodeBase64url(kit.kitId)).catch(() => false);
-        kit.wipe();
-        return ok({ summary });
-      }
-      // Cancelled while the kit was opening (the page left): never held.
-      if ((cancels.get(session) ?? 0) !== cancelAt) {
-        kit.wipe();
-        return fail('expired');
-      }
-      const kitHandle = newHandle();
-      held = Object.freeze({
-        handle: kitHandle,
-        session,
-        kit,
-        headerHash,
-        rows: Object.freeze(rows),
-        ...(restore === undefined ? {} : { restore }),
-        expiresAt: now() + RESTORE_HANDLE_TTL_MS,
-      });
-      return ok({ kit: kitHandle, summary });
     } finally {
       wipe(code);
     }
+  }
+
+  async function openFrom(
+    session: string,
+    handle: string,
+    entry: HandleEntry,
+    fh: FileHandle,
+    code: Uint8Array,
+    mode: 'open' | 'check',
+    cancelAt: number,
+  ): Promise<RestoreAnswer> {
+    let head: Uint8Array;
+    try {
+      head = await readHead(fh, HEADER_LENGTH);
+    } catch {
+      dropHandle(handle);
+      return fail('expired');
+    }
+    const parsed = await parseHead(head);
+    if (parsed.outcome !== 'ok') return fail(parsed.outcome);
+    const headerHash = parsed.headerHash as Uint8Array;
+    if (parsed.ownerPresent && (await fileOwnerPresent()) && !(await keychainOwnerPresent())) {
+      return fail('needs_terminal');
+    }
+    if (options.keychainUsable !== undefined && !(await options.keychainUsable())) {
+      return fail('needs_terminal');
+    }
+    let restore: RestoreOwnerSessionHold | undefined;
+    if (mode === 'open' && parsed.ownerPresent) {
+      const entrySession = restoreSessions.get(session);
+      if (entrySession === undefined || !entrySession.hold.boundTo(headerHash)) {
+        return fail('presence_required');
+      }
+      restore = entrySession.hold;
+    }
+    const key = encodeHex(headerHash);
+    const wait = waitFor(key);
+    if (wait > 0) return fail('wait', { retryAfter: wait });
+    if (entry.file.kind === 'export') dropHandle(handle);
+    const sinks: RecoveryKitStoreSink[] = [];
+    const stream = { changed: false };
+    let kit: RecoveryKitImport;
+    try {
+      const control = createKeyImportControl({
+        backend: 'keychain',
+        keychain: options.keychain(),
+        ...(restore === undefined ? {} : { ownerStore: restore.store }),
+        revokedDir,
+      });
+      const quarantine = createRestoreQuarantine(restoreDir);
+      // Case and spaces do not matter; the code's own form is checked by the KDF's normaliser.
+      for (let i = 0; i < code.length; i += 1) {
+        const c = code[i] as number;
+        if (c >= 0x61 && c <= 0x7a) code[i] = c - 0x20;
+      }
+      kit = await control.openRecoveryKit(
+        sameHead(chunksOf(fh, entry.file.size), head, stream),
+        { secret: code.slice(), source: 'prompt' },
+        {
+          ...(parsed.ownerNostr === undefined ? {} : { expectedOwnerNostr: parsed.ownerNostr }),
+          createStoreSink: async () => {
+            const sink = await quarantine.createStoreSink();
+            sinks.push(sink);
+            return sink;
+          },
+        },
+      );
+    } catch (error) {
+      // REL051-SF3: the bytes changed under the descriptor after the header was read: not the
+      // kit presence was given for; nothing is held or counted.
+      if (stream.changed) {
+        dropHandle(handle);
+        return fail('expired');
+      }
+      // UX1113-QA2 N5: a store sink is only created for plaintext of a chunk that authenticated
+      // under this code, so the code was right and the file is damaged (a half-copied kit). Not
+      // an oracle: a wrong code never authenticates a chunk, and anyone holding the file can test
+      // a code offline the same way; a wrong code still counts toward the wait below. A kit of one
+      // chunk cannot tell a cut file from a wrong code (one tag), and says wrong_code.
+      if (sinks.length > 0 || sinks.some((s) => quarantineAuthenticated(s))) {
+        return fail('damaged');
+      }
+      if (error instanceof CryptoInputError || error instanceof KeyStoreError) {
+        const counter = fails.get(key) ?? { count: 0, until: 0 };
+        fails.set(key, counter);
+        countFail(counter);
+        return fail('wrong_code');
+      }
+      return fail('damaged');
+    }
+    if (stream.changed) {
+      kit.wipe();
+      dropHandle(handle);
+      return fail('expired');
+    }
+    fails.delete(key);
+    if (entry.file.kitId !== undefined && encodeBase64url(kit.kitId) !== entry.file.kitId) {
+      kit.wipe();
+      return fail('damaged');
+    }
+    let rows: SummaryRow[];
+    try {
+      rows = await summaryOf(kit);
+    } catch {
+      kit.wipe();
+      return fail('failed');
+    }
+    const summary = summaryBody(kit, rows);
+    if (mode === 'check') {
+      // UX1113-QA2 N14: this very kit opened with its code; the kit record of the same kitId (and
+      // only it) now counts as backed up. A display aid (G-1): a failure changes nothing here.
+      await markKitRecordChecked(agentlinkDir, encodeBase64url(kit.kitId)).catch(() => false);
+      kit.wipe();
+      return ok({ summary });
+    }
+    // Cancelled while the kit was opening (the page left): never held.
+    if ((cancels.get(session) ?? 0) !== cancelAt) {
+      kit.wipe();
+      return fail('expired');
+    }
+    const kitHandle = newHandle();
+    held = Object.freeze({
+      handle: kitHandle,
+      session,
+      kit,
+      headerHash,
+      rows: Object.freeze(rows),
+      ...(restore === undefined ? {} : { restore }),
+      expiresAt: now() + RESTORE_HANDLE_TTL_MS,
+    });
+    return ok({ kit: kitHandle, summary });
   }
 
   /** The plan of apply/begin, checked against the summary before anything else (rename map). */
@@ -1332,18 +1572,76 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     let code: Uint8Array | undefined;
     try {
       if (await keychainOwnerPresent()) return fail('busy');
+      // REL051-SF3 (R1-SEC-04): the owner write below refuses while any owner item exists, so its
+      // preconditions are settled before anything is written. A leftover `owner-passkey` item of
+      // another owner refuses here; one of this owner (or one that is no owner key) is replaced,
+      // only while it is still the bytes read.
+      const stray = await lonePasskey(current.kit.ownerNostr);
+      if (stray === 'foreign') {
+        if (passkey !== undefined) wipe(passkey.prfOutput);
+        return fail('other_owner');
+      }
+      if (stray !== 'none') {
+        let removed: string;
+        try {
+          removed = await removeOwnerPasskeyItemIfOurs(
+            options.keychain(),
+            stray.blob,
+            keychainTimeoutMs,
+          );
+        } finally {
+          wipe(stray.blob);
+        }
+        if (removed !== 'removed' && removed !== 'absent') {
+          if (passkey !== undefined) wipe(passkey.prfOutput);
+          return fail('failed');
+        }
+      }
       if (plan.selection.length > 0) await writePending(current.kit.ownerNostr);
       const outcomes = await writeIds(current, plan, undefined);
-      const control = createKeyImportControl({
-        backend: 'keychain',
-        keychain: options.keychain(),
-        ownerKeychain: options.keychain(),
-        revokedDir,
-        ...(options.kdf === undefined ? {} : { kdf: options.kdf }),
-      });
+      // REL051-SF3 (R1-SEC-07): IDs were chosen and none of them was restored (the opened kit's
+      // files are gone, say): no owner is created and the answer is never `done`.
+      if (plan.selection.length > 0 && !outcomes.some((o) => o.outcome === 'restored')) {
+        if (passkey !== undefined) wipe(passkey.prfOutput);
+        await unlink(pendingPath).catch(() => undefined);
+        return fail('failed', { ids: outcomesJson(outcomes) });
+      }
+      // REL051-R2C (R2-CLASS-02): nobody would see a new master code (the app is closing or the
+      // page left): no owner is written; the restored IDs wait for "Finish restoring" (the hint and
+      // their verified cards), with the same kit.
+      if (answerGone()) {
+        if (passkey !== undefined) wipe(passkey.prfOutput);
+        if (!outcomes.some((o) => o.outcome === 'restored')) {
+          await unlink(pendingPath).catch(() => undefined);
+        }
+        await restored(outcomes);
+        return fail('failed', { ids: outcomesJson(outcomes) });
+      }
+      // REL051-CF3 (T-7): the marker names the item before it is written, so a start after the
+      // app closed mid-way can tell its own item apart (settle).
+      let item: Uint8Array | undefined;
+      const ownerNostr = current.kit.ownerNostr.slice();
       try {
-        code = new Uint8Array(await control.importOwner(current.kit));
+        code = new Uint8Array(
+          await importRestoredOwner(current.kit, options.keychain(), {
+            ...(options.kdf === undefined ? {} : { kdf: options.kdf }),
+            timeoutMs: keychainTimeoutMs,
+            beforeWrite: async (blob) => {
+              item = sha256(blob);
+              wipe(blob);
+              await writeUnsavedMarker(home, {
+                kind: 'restore',
+                stage: 'writing',
+                ownerNostr,
+                item,
+                pid: process.pid,
+                at: now(),
+              });
+            },
+          }),
+        );
       } catch {
+        if (item !== undefined) await removeUnsavedMarker(home);
         if (passkey !== undefined) wipe(passkey.prfOutput);
         // Nothing of this kit was written: no hint is left behind (an ID that was restored keeps
         // it, with its verified card, for owner-only completion).
@@ -1353,10 +1651,31 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         await restored(outcomes);
         return fail('failed', { ids: outcomesJson(outcomes) });
       }
+      // REL051-R2C (R2-CLASS-02): the code would go to nobody: the owner this run wrote goes again.
+      if (answerGone()) {
+        if (passkey !== undefined) wipe(passkey.prfOutput);
+        await rollBackOwner(ownerNostr, item);
+        await restored(outcomes);
+        return fail('failed', { ids: outcomesJson(outcomes) });
+      }
       const touchId =
         passkey === undefined
           ? false
           : await importOwnerPasskey(current.kit, options.keychain(), passkey);
+      if (answerGone()) {
+        // The Touch ID wrap of this run goes too (no code was shown for this owner).
+        await rollBackOwner(ownerNostr, item, touchId);
+        await restored(outcomes);
+        return fail('failed', { ids: outcomesJson(outcomes) });
+      }
+      // REL051-CF3: the code is in this answer now; the marker stays until "I saved it". A `writing`
+      // marker must never outlive a code that was shown (a later start would roll that owner back):
+      // one retry, then the marker goes; if neither works, the code is not shown (the owner is then
+      // rolled back to "Finish restoring" at the next start, or replaced with Touch ID).
+      if (!(await markShown(ownerNostr, item))) {
+        await restored(outcomes);
+        return fail('failed', { ids: outcomesJson(outcomes) });
+      }
       await unlink(pendingPath).catch(() => undefined);
       await restored(outcomes);
       return ok({
@@ -1369,6 +1688,7 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       wipe(code);
       if (held === current) wipeHeld();
       pending = undefined;
+      await sweepNow();
     }
   }
 
@@ -1378,6 +1698,10 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     try {
       const outcomes = await writeIds(current, plan, owner);
       await restored(outcomes);
+      // REL051-SF3 (R1-SEC-07): never `done` when no chosen ID was restored.
+      if (!outcomes.some((o) => o.outcome === 'restored')) {
+        return fail('failed', { ids: outcomesJson(outcomes) });
+      }
       return ok({ status: 'done', ids: outcomesJson(outcomes), touchId: 'unchanged' });
     } finally {
       owner.end();
@@ -1385,6 +1709,7 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         if (entry.hold === owner) restoreSessions.delete(session);
       }
       if (held === current) wipeHeld();
+      await sweepNow();
     }
   }
 
@@ -1399,7 +1724,11 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     const marker = await readPending();
     const kitOwner = current.kit.ownerNostr;
     if (owners.some((o) => !equalBytes(o, kitOwner))) return false;
-    return owners.length > 0 || (marker !== undefined && equalBytes(marker, kitOwner));
+    if (owners.length > 0 || (marker !== undefined && equalBytes(marker, kitOwner))) return true;
+    // REL051-SF3 (R1-SEC-04): a leftover `owner-passkey` item of this kit's owner with no `owner`
+    // item: the owner key alone is finished from the kit.
+    const passkey = await passkeyOwner();
+    return passkey !== undefined && equalBytes(passkey, kitOwner);
   }
 
   /**
@@ -1409,14 +1738,176 @@ function build(options: RestoreEngineOptions): TerminalRestore {
    */
   async function firstRunHold(): Promise<FirstRunHold | undefined> {
     let ownerHere: boolean;
+    let passkeyLeft: boolean;
     try {
       ownerHere = await keychainOwnerPresent();
+      if (ownerHere) return undefined;
+      // REL051-SF3 (R1-SEC-04): an `owner-passkey` item with no `owner` item holds first run (it is
+      // never overwritten) and sends the owner to "Finish restoring" with their kit, which replaces
+      // a leftover of the same owner; never a dead end.
+      const item = await readOwnerPasskeyItem(options.keychain(), keychainTimeoutMs);
+      passkeyLeft = item !== null;
+      wipe(item ?? undefined);
     } catch {
       return 'keychain_unavailable';
     }
-    if (ownerHere) return undefined;
+    if (passkeyLeft) return 'finish_restore';
     if ((await readPending()) !== undefined) return 'finish_restore';
     return (await verifiedCardOwners()).length > 0 ? 'finish_restore' : undefined;
+  }
+
+  const runAlive = options.runAlive ?? ((pid: number) => pid === process.pid || processAlive(pid));
+
+  /** REL051-CF3: the restore's marker moves to `shown` (or goes); false when neither worked. */
+  async function markShown(ownerNostr: Uint8Array, item: Uint8Array | undefined): Promise<boolean> {
+    const write = options.writeMarker ?? writeUnsavedMarker;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await write(home, {
+          kind: 'restore',
+          stage: 'shown',
+          ownerNostr,
+          ...(item === undefined ? {} : { item }),
+          pid: process.pid,
+          at: now(),
+        });
+        return true;
+      } catch {
+        // Tried again once.
+      }
+    }
+    try {
+      await removeUnsavedMarker(home);
+      return (await readUnsavedMarker(home)) === undefined;
+    } catch {
+      return false;
+    }
+  }
+
+  async function settle(): Promise<void> {
+    try {
+      const marker = await readUnsavedMarker(home);
+      if (marker === undefined || runAlive(marker.pid)) return;
+      const keychain = options.keychain();
+      const ownerBlob = await readOwnerItem(keychain, keychainTimeoutMs);
+      if (ownerBlob === null) {
+        // No owner was written (or it went since): restored IDs, if any, wait for "Finish
+        // restoring" through restore-pending.json and their cards; nothing is unsaved.
+        await removeUnsavedMarker(home);
+        return;
+      }
+      try {
+        if (
+          marker.kind !== 'restore' ||
+          marker.stage !== 'writing' ||
+          marker.item === undefined ||
+          !equalBytes(sha256(ownerBlob), marker.item)
+        ) {
+          return;
+        }
+        const passkey = await readOwnerPasskeyItem(keychain, keychainTimeoutMs);
+        if (passkey !== null) {
+          wipe(passkey);
+          return;
+        }
+        // Its code never left this computer's server and no Touch ID wraps it: nobody can use it.
+        // The IDs stay; first run says "Finish restoring" (owner-only completion, same kit).
+        await removeWrittenOwner(marker.ownerNostr, marker.item, ownerBlob);
+      } finally {
+        wipe(ownerBlob);
+      }
+    } catch {
+      // Fail safe: nothing is removed when anything here could not be read.
+    }
+  }
+
+  /**
+   * The owner item a restore wrote (exactly `ownerBlob`, whose hash is `item`) goes again: the hint
+   * of "Finish restoring" stays (or is written), a staged `owner-next` of the same bytes goes, and
+   * the marker goes once the owner item is gone. Throws when the keychain does not answer.
+   */
+  async function removeWrittenOwner(
+    ownerNostr: Uint8Array,
+    item: Uint8Array,
+    ownerBlob: Uint8Array,
+  ): Promise<boolean> {
+    const keychain = options.keychain();
+    if ((await readPending()) === undefined) await writePending(ownerNostr);
+    const next = await guarded(() => keychain.get(OWNER_NEXT_ACCOUNT), keychainTimeoutMs);
+    if (next !== null) {
+      if (equalBytes(sha256(next), item)) {
+        await guarded(() => keychain.delete(OWNER_NEXT_ACCOUNT), keychainTimeoutMs);
+      }
+      wipe(next);
+    }
+    const removed = await removeOwnerItemIfOurs(keychain, ownerBlob, keychainTimeoutMs);
+    if (removed !== 'removed' && removed !== 'absent') return false;
+    await removeUnsavedMarker(home);
+    return true;
+  }
+
+  /**
+   * REL051-R2C (R2-CLASS-02): this run wrote an owner whose new master code can reach nobody (the
+   * app is closing, or the page left before the answer). The owner item (still exactly the one this
+   * run wrote) and, when this run wrote one, its Touch ID wrap go again; the restored IDs wait for
+   * "Finish restoring". When this fails, the `writing` marker stays for the next start's settle.
+   */
+  async function rollBackOwner(
+    ownerNostr: Uint8Array,
+    item: Uint8Array | undefined,
+    passkeyWritten = false,
+  ): Promise<void> {
+    if (item === undefined) return;
+    try {
+      const keychain = options.keychain();
+      if (passkeyWritten) {
+        const wrap = await readOwnerPasskeyItem(keychain, keychainTimeoutMs);
+        if (wrap !== null) {
+          try {
+            await removeOwnerPasskeyItemIfOurs(keychain, wrap, keychainTimeoutMs);
+          } finally {
+            wipe(wrap);
+          }
+        }
+      }
+      const ownerBlob = await readOwnerItem(keychain, keychainTimeoutMs);
+      if (ownerBlob === null) {
+        if ((await readPending()) === undefined) await writePending(ownerNostr);
+        await removeUnsavedMarker(home);
+        return;
+      }
+      try {
+        if (!equalBytes(sha256(ownerBlob), item)) return;
+        await removeWrittenOwner(ownerNostr, item, ownerBlob);
+      } finally {
+        wipe(ownerBlob);
+      }
+    } catch {
+      // The `writing` marker stays: the next start rolls it back (settle).
+    }
+  }
+
+  async function masterCodeState(): Promise<MasterCodeState> {
+    if ((await firstRunHold()) === 'finish_restore') return { status: 'finish_restore' };
+    const marker = await readUnsavedMarker(home);
+    if (marker === undefined) return { status: 'none' };
+    const keychain = options.keychain();
+    const owner = await readOwnerItem(keychain, keychainTimeoutMs);
+    if (owner === null) return { status: 'none' };
+    wipe(owner);
+    // A marker of another owner than the one here now is stale: it goes, and nothing is said.
+    const present = await knownOwner().catch(() => undefined);
+    if (present !== undefined && !equalBytes(present, marker.ownerNostr)) {
+      await removeUnsavedMarker(home);
+      return { status: 'none' };
+    }
+    const passkey = await readOwnerPasskeyItem(keychain, keychainTimeoutMs);
+    wipe(passkey ?? undefined);
+    return { status: 'lost', kind: marker.kind, touchId: passkey !== null };
+  }
+
+  async function masterCodeSaved(): Promise<void> {
+    await removeUnsavedMarker(home);
   }
 
   function gestureChallenge(
@@ -1650,8 +2141,8 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       if (entry === undefined || handle === undefined || entry.file.kind === 'export') {
         return fail('expired');
       }
-      const left = presenceFails.until - now();
-      if (left > 0) return fail('wait', { retryAfter: Math.ceil(left / 1000) });
+      const left = presenceWait();
+      if (left > 0) return fail('wait', { retryAfter: left });
       if (proof.length === 0) return fail('presence_required');
       const parsed = await parseHeaderOf(entry.file);
       if (parsed === undefined) return fail('expired');
@@ -1667,7 +2158,7 @@ function build(options: RestoreEngineOptions): TerminalRestore {
           assertPasskeyAssertion(stored, { ownerNostr }, assertion);
           presence = { kind: 'passkey-prf', prfOutput: assertion.prfOutput };
         } catch {
-          countFail(presenceFails);
+          presenceFailed();
           return fail('presence_rejected');
         }
       } else {
@@ -1682,12 +2173,12 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         });
       } catch (error) {
         if (error instanceof KeyStoreError && error.code === 'presence_rejected') {
-          countFail(presenceFails);
+          presenceFailed();
           return fail('presence_rejected');
         }
         return fail('failed');
       }
-      presenceFails = { count: 0, until: 0 };
+      presenceSucceeded();
       // Cancelled while presence ran (the page left): the new session never stays.
       if ((cancels.get(session) ?? 0) !== cancelAt) {
         hold.end();
@@ -1741,11 +2232,13 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       await mkdir(restoreDir, { recursive: true, mode: DIR_MODE });
       const free = await freeSpace();
       if (free !== undefined && free - (declared ?? 0) < FREE_MARGIN) return fail('too_large');
-      path = join(restoreDir, `.upload-${encodeHex(randomBytes(8))}.alkk`);
+      path = join(restoreDir, restoreFileName('upload'));
+      trackRestoreFile(path);
       let fh: FileHandle;
       try {
         fh = await open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, FILE_MODE);
       } catch {
+        trackRestoreFile(path, false);
         path = undefined;
         return fail('failed');
       }
@@ -1783,7 +2276,10 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     } finally {
       if (!kept) {
         if (uploads.get(session) === mine) uploads.delete(session);
-        if (path !== undefined) await unlink(path).catch(() => undefined);
+        if (path !== undefined) {
+          await unlink(path).catch(() => undefined);
+          trackRestoreFile(path, false);
+        }
       }
     }
   }
@@ -1861,7 +2357,8 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     }
     restoreSessions.get(session)?.hold.end();
     restoreSessions.delete(session);
-    return Promise.resolve(ok({ status: 'cancelled' }));
+    if (!locked) await sweepNow();
+    return ok({ status: 'cancelled' });
   }
 
   return {
@@ -1876,8 +2373,11 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       exclusive(() => openWith(sessionKey(session), input, code, 'check'), code),
     cancel: (session, input) => cancelStep(sessionKey(session), input),
     applyBegin: (session, input) => exclusive(() => begin(sessionKey(session), input, false)),
-    applyFinish: (session, input, body) =>
-      exclusive(() => finish(sessionKey(session), input, body), body),
+    applyFinish: (session, input, body, connection) =>
+      exclusive(() => {
+        delivery = connection;
+        return finish(sessionKey(session), input, body);
+      }, body),
     registerExportedKit: async (session, file) => {
       if (typeof file.kitId !== 'string' || !HANDLE.test(file.kitId)) return undefined;
       const info = await lstat(file.path).catch(() => undefined);
@@ -1887,14 +2387,29 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     },
     restorePending: async () => (await firstRunHold()) === 'finish_restore',
     firstRunHold,
-    close: () => {
+    settle,
+    masterCodeState,
+    masterCodeSaved,
+    sweep: sweepNow,
+    close: async () => {
+      // REL051-R2C (R2-CLASS-02): a running restore is never cut off mid-write (its kit wiped under
+      // it): it sees `closing`, rolls back an owner whose code nobody will see, and ends first.
+      closing = true;
+      const current = running;
+      if (current !== undefined) {
+        await Promise.race([
+          current.catch(() => undefined),
+          new Promise<void>((resolve) =>
+            setTimeout(resolve, options.closeWaitMs ?? CLOSE_WAIT_MS).unref(),
+          ),
+        ]);
+      }
       clearInterval(sweep);
       wipeHeld();
       pending = undefined;
       for (const [, entry] of restoreSessions) entry.hold.end();
       restoreSessions.clear();
       for (const handle of [...handles.keys()]) dropHandle(handle);
-      return Promise.resolve();
     },
     fileHandle: async (session, path) => {
       const info = await lstat(path).catch(() => undefined);
@@ -2057,6 +2572,8 @@ export async function runRestoreInTerminal(
       terminal.write(master);
       await terminal.confirm(text.savedIt);
       terminal.clearScreen();
+      // REL051-CF3: shown in the terminal and confirmed there; the app has nothing to add.
+      await engine.masterCodeSaved();
     }
     terminal.write(text.nextSteps);
     return 'restored';

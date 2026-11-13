@@ -15,3 +15,4 @@ export * from './proof.js';
 export * from './tool-result.js';
 export * from './names.js';
 export * from './encoding-paths.js';
+export * from './file-kind.js';

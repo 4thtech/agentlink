@@ -30,7 +30,7 @@ export const INVITE_STRINGS = {
   done: 'Done',
   cantCreate: "Couldn't make the link. Try again in a minute.",
   tryAgain: 'Try again',
-  notSetUp: "AgentLink isn't set up on this computer yet. Ask your AI to set up AgentLink.",
+  notSetUp: "AgentLink isn't set up on this computer yet. Create your first ID on Home.",
   sessionExpired: 'This page has expired. Ask your AI to open AgentLink again.',
   fellBack: "Short links aren't available right now, so this is a long link. It works the same.",
   // Under the hood (pro): the long link, the QR code and the invite's facts.
@@ -52,6 +52,14 @@ export const INVITE_STRINGS = {
   cancelled: 'Invite cancelled. The link no longer works.',
   cantCancel: "Couldn't cancel the invite. Try again in a minute.",
   pendingLabel: 'Invites waiting for an answer',
+  // REL051-B2 (owner test, 13 Nov): a waiting invite's link, again, only on a click.
+  copyLink: 'Copy link',
+  linkCopied: 'Copied',
+  showLink: 'Show link',
+  hideLink: 'Hide link',
+  noLinkKept: 'This invite was made before AgentLink kept links. Cancel it and make a new one.',
+  linkGone: 'This invite was just accepted, cancelled or ran out.',
+  cantGetLink: "Couldn't get the link. Try again in a minute.",
   // The person menu.
   rename: 'Rename',
   checkCode: 'Contact check',
@@ -191,11 +199,25 @@ export const FEEDBACK_STRINGS = {
   connected: (name: string): string => `You're connected with ${name}`,
   again: (name: string): string => `Connected again with ${name}. Do the Contact check again.`,
   connecting: (name: string): string => `Connecting to ${name}…`,
+  // IR-REL051-R2C-1 (R2-CLASS-01): a waiting accept is honest from its first line.
+  connectingHonest: (name: string): string =>
+    `Connecting to ${name}… If someone else already used this invite, it won't connect: ask ${name} for a new one.`,
   youBlocked: (name: string): string => `You blocked ${name}. Unblock to connect.`,
   unblockAction: 'Unblock',
   cancelConnecting: 'Cancel',
+  // REL051-B1 (N2): Cancel on a waiting accept reached the server but nothing was cancelled.
+  cancelConnectingFailed: "Couldn't cancel. Try again in a minute.",
   waitingOnline: (name: string): string =>
     `Waiting for ${name} to come online. This finishes on its own.`,
+  // REL051-CF1 (R1-CLASS-06): sent, no answer after a short wait (the inviter's app may be closed).
+  // REL051-R2C (R2-CLASS-01): honest from the start: with no refusal from the inviter, this side
+  // cannot tell "away" from "someone else already used this invite", so it says both.
+  waitingAnswer: (name: string): string =>
+    `Waiting for ${name}'s AgentLink. If someone else already used this invite, it won't connect: ask ${name} for a new one.`,
+  // REL051-CF1 (R1-CLASS-01): no answer after the bound. Honest: this side cannot know whether the
+  // invite was used, cancelled or the inviter is just away, and never who else answered.
+  noAnswer: (name: string): string =>
+    `No answer from ${name} yet. If this invite was already used or cancelled, it won't connect. Ask ${name} for a new one.`,
   already: (name: string): string => `You're already connected to ${name}. Connect again?`,
   againResets: 'Connecting again starts the Contact check over.',
   checkAction: 'Check the code',

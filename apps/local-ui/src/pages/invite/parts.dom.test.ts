@@ -109,6 +109,63 @@ describe('PendingInviteRow', () => {
     );
   });
 
+  // REL051-B2 (owner test, 13 Nov): the owner can copy or show a waiting invite's link again.
+  it('Copy link copies the kept link; Show link shows it; Hide link hides it', async () => {
+    const LINK = `https://agentlink.4thtech.io/i#2.${'A'.repeat(43)}`;
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const onLink = vi.fn(() =>
+      Promise.resolve({
+        kind: 'ok' as const,
+        inviteUrl: LINK,
+        shareText: `Hi ${LINK}`,
+        format: 'short' as const,
+        expiresAt: NOW + 6 * DAY,
+      }),
+    );
+    await show(
+      createElement(
+        'ul',
+        null,
+        createElement(PendingInviteRow, {
+          invite: { inviteId: ID, name: 'Marko', expiresAt: NOW + 6 * DAY },
+          now: NOW,
+          onCancel: () => Promise.resolve('cancelled' as const),
+          onLink,
+        }),
+      ),
+    );
+    // The link is never on the page until the owner asks for it.
+    expect(text()).not.toContain(LINK);
+    await click(byText('Copy link'));
+    expect(onLink).toHaveBeenCalledWith(ID);
+    expect(writeText).toHaveBeenCalledWith(LINK);
+    expect(text()).not.toContain(LINK);
+    await click(byText('Show link'));
+    expect(text()).toContain(LINK);
+    await click(byText('Hide link'));
+    expect(text()).not.toContain(LINK);
+    expect(lintVocabulary(text())).toEqual([]);
+  });
+
+  it('an invite made before links were kept says so; Cancel stays', async () => {
+    await show(
+      createElement(
+        'ul',
+        null,
+        createElement(PendingInviteRow, {
+          invite: { inviteId: ID, name: 'Marko', expiresAt: NOW + 6 * DAY },
+          now: NOW,
+          onCancel: () => Promise.resolve('cancelled' as const),
+          onLink: () => Promise.resolve({ kind: 'no_link' as const }),
+        }),
+      ),
+    );
+    await click(byText('Copy link'));
+    expect(text()).toContain(S.noLinkKept);
+    expect(byText(S.cancelInvite)).toBeTruthy();
+  });
+
   it('a row with no name says Someone; a failed cancel says so and keeps the button', async () => {
     await show(
       createElement(

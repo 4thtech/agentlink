@@ -3,7 +3,7 @@
 #   PowerShell:  irm https://agentlink.4thtech.io/install.ps1 | iex
 #   cmd.exe:     powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 | iex"
 #   Options:     & ([scriptblock]::Create((irm https://agentlink.4thtech.io/install.ps1))) -DryRun
-#                (or -Uninstall, -NoStart)
+#                (or -Uninstall, -NoStart, -Desktop)
 #   From an invite page: & ([scriptblock]::Create((irm https://agentlink.4thtech.io/install.ps1))) -Invite '<invite link>'
 #
 # What it does, and nothing more:
@@ -16,11 +16,16 @@
 #      invite page), it opens AgentLink on that invite: `agentlink join` with the link. The link is
 #      checked first, with the same patterns as `agentlink join`; anything else is refused with one
 #      fixed line, and the link is never printed or stored by this script.
+# With -Desktop (refused until the desktop app is released, $DesktopReleased below), it does none of
+# the above. It downloads the AgentLink desktop app's per-user setup ($DesktopVersion below) from the
+# AgentLink GitHub Release, checks its SHA-256 against the release's SHA256SUMS AND against the hash
+# written in this file, and runs it (no admin: it installs into %LOCALAPPDATA%\Programs\AgentLink).
+# It never removes the mark of the web from anything and never changes SmartScreen.
 # No admin rights, no telemetry. It never asks for or prints a secret. Run it again to update.
 # Your IDs and messages (in %USERPROFILE%\.agentlink) are never touched, not even by -Uninstall.
 # Works on Windows PowerShell 5.1 and PowerShell 7. Source: installer/ in
 # https://github.com/4thtech/agentlink (MIT).
-param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite, [Parameter(ValueFromRemainingArguments = $true)]$Rest)
+param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, [switch]$Desktop, $Invite, [Parameter(ValueFromRemainingArguments = $true)]$Rest)
 
 # Everything below runs as one script block: nothing it defines stays in your PowerShell session,
 # and a download cut off midway does not parse, so none of it runs.
@@ -29,6 +34,12 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite, [Parameter
 
   $NodeVersion = '22.23.4'
   $Package = '@4thtech-io/agentlink@latest'
+  # The desktop app (-Desktop). Off until the desktop app is released: until then -Desktop is refused
+  # before anything happens, and nothing else changes. Releasing it sets $DesktopReleased = $true,
+  # $DesktopVersion and the hashes in Get-DesktopPinnedSha (installer/README.md, "For maintainers").
+  $DesktopReleased = $false
+  $DesktopVersion = '0.0.0'
+  $DesktopReleases = 'https://github.com/4thtech/agentlink/releases/download'
 
   function Get-AgentLinkPlatform([string]$Arch) {
     switch ($Arch) {
@@ -268,6 +279,224 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite, [Parameter
     }
   }
 
+  # --- the desktop app (-Desktop) ------------------------------------------------------------------
+
+  # The SHA-256 of each desktop setup.exe of $DesktopVersion, taken from the owner-verified build
+  # output or its provenance attestation, never from the release's own SHA256SUMS
+  # (installer/README.md). With no mark of the web, SmartScreen never checks it: this hash is the
+  # check. Empty: no desktop app for that computer.
+  function Get-DesktopPinnedSha([string]$Platform) {
+    switch ($Platform) {
+      'win-x64' { return '' }
+      default { return '' }
+    }
+  }
+
+  # True when $Url may be fetched for the desktop app: https, exactly one of these hosts (no user
+  # name, no port), and only the characters a GitHub Release download or its redirect uses.
+  function Test-DesktopUrl([string]$Url) {
+    # Case-sensitive (the .NET default), anchored at the very start and end (\z: no line break).
+    $match = [regex]::Match([string]$Url, '\Ahttps:/{2}([a-z.-]+)/[A-Za-z0-9._~/?=&%:+,;-]*\z')
+    if (-not $match.Success) { return $false }
+    return @('github.com', 'objects.githubusercontent.com', 'release-assets.githubusercontent.com') -ccontains $match.Groups[1].Value
+  }
+
+  # One HTTPS request that follows no redirect. A 200 is saved to $OutFile (at most 1 GiB, counted
+  # byte by byte; Content-Length only stops it earlier), within 30 minutes; returns the status code
+  # and, for a redirect, the Location header.
+  function Get-HttpHop([string]$Url, [string]$OutFile) {
+    $request = [Net.WebRequest]::Create($Url)
+    $request.AllowAutoRedirect = $false
+    $request.Timeout = 60000
+    $request.ReadWriteTimeout = 60000
+    $deadline = [DateTime]::UtcNow.AddMinutes(30)
+    try {
+      $response = $request.GetResponse()
+    } catch {
+      # A 4xx/5xx (and, on some .NET versions, a 3xx) comes as a WebException holding the response.
+      $failure = $_.Exception
+      if ($failure.InnerException -is [Net.WebException]) { $failure = $failure.InnerException }
+      if (-not ($failure -is [Net.WebException]) -or -not $failure.Response) { throw }
+      $response = $failure.Response
+    }
+    try {
+      $status = [int]$response.StatusCode
+      if ($status -ne 200) { return @{ Status = $status; Location = [string]$response.Headers['Location'] } }
+      $limit = 1GB
+      if ($response.ContentLength -gt $limit) { throw 'The download is too large.' }
+      $in = $response.GetResponseStream()
+      $out = [IO.File]::Create($OutFile)
+      try {
+        $buffer = New-Object byte[] 81920
+        $total = 0
+        while (($read = $in.Read($buffer, 0, $buffer.Length)) -gt 0) {
+          $total += $read
+          if ($total -gt $limit) { throw 'The download is too large.' }
+          if ([DateTime]::UtcNow -gt $deadline) { throw 'The download took too long.' }
+          $out.Write($buffer, 0, $read)
+        }
+      } finally {
+        $out.Dispose()
+        $in.Dispose()
+      }
+      return @{ Status = 200; Location = '' }
+    } finally {
+      $response.Close()
+    }
+  }
+
+  # Downloads $Url into $OutFile, following at most 5 redirects itself and checking every address
+  # (the first and each hop) with Test-DesktopUrl. Only $Url, a fixed address, is ever printed.
+  function Save-ReleaseFile([string]$Url, [string]$OutFile) {
+    $next = $Url
+    for ($hop = 0; $hop -le 5; $hop++) {
+      if (-not (Test-DesktopUrl $next)) {
+        throw 'The desktop app download was sent to an unexpected address, so nothing was installed.'
+      }
+      try {
+        $reply = Get-HttpHop $next $OutFile
+      } catch {
+        throw "Could not download $Url. Check your internet connection and run the installer again."
+      }
+      if ($reply.Status -eq 200) { return }
+      if (@(301, 302, 303, 307, 308) -notcontains $reply.Status) {
+        throw "Could not download $Url. Check your internet connection and run the installer again."
+      }
+      $next = [string]$reply.Location
+    }
+    throw 'The desktop app download was redirected too often, so nothing was installed.'
+  }
+
+  # Throws unless the file's SHA-256 equals both its SHA256SUMS line (exactly one line for the file)
+  # and the pinned hash.
+  function Assert-DesktopSetup([string]$Path, [string]$Sums, [string]$FileName, [string]$Pinned) {
+    $listed = ''
+    $count = 0
+    foreach ($line in ($Sums -split "`n")) {
+      $parts = $line.Trim() -split '\s+'
+      if ($parts.Count -eq 2 -and $parts[1] -eq $FileName) { $listed = $parts[0].ToLowerInvariant(); $count++ }
+    }
+    if ($count -ne 1) { $listed = '' }
+    $actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    if (-not $Pinned -or $actual -ne $listed -or $actual -ne $Pinned) {
+      throw 'The desktop app download did not pass its safety check (SHA-256 mismatch), so nothing was installed. Please try again later.'
+    }
+  }
+
+  # Gives the per-run download folder an ACL of its own: only this user, nothing inherited.
+  function Protect-Directory([string]$Path) {
+    $me = [Security.Principal.WindowsIdentity]::GetCurrent().User
+    $acl = New-Object Security.AccessControl.DirectorySecurity
+    $acl.SetAccessRuleProtection($true, $false)
+    $acl.SetOwner($me)
+    $rule = New-Object Security.AccessControl.FileSystemAccessRule($me, 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')
+    $acl.AddAccessRule($rule)
+    Set-Acl -LiteralPath $Path -AclObject $acl
+  }
+
+  # Opens the file so nobody can change it while it stays open (read sharing only) and hashes it
+  # through that handle; throws unless it is the pinned hash. The caller keeps it open while the
+  # setup runs, then closes it.
+  function Open-VerifiedFile([string]$Path, [string]$Pinned) {
+    $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+      $sha = [Security.Cryptography.SHA256]::Create()
+      try { $hash = $sha.ComputeHash($stream) } finally { $sha.Dispose() }
+      $actual = ([BitConverter]::ToString($hash) -replace '-', '').ToLowerInvariant()
+    } catch {
+      $stream.Dispose()
+      throw
+    }
+    if (-not $Pinned -or $actual -ne $Pinned) {
+      $stream.Dispose()
+      throw 'The desktop app download did not pass its safety check (SHA-256 mismatch), so nothing was installed. Please try again later.'
+    }
+    return $stream
+  }
+
+  # Runs the per-user setup silently (/S) and waits; returns its exit code.
+  function Invoke-DesktopSetup([string]$Setup) {
+    $process = Start-Process -FilePath $Setup -ArgumentList '/S' -Wait -PassThru
+    return $process.ExitCode
+  }
+
+  # Starts the installed app, with these arguments, without waiting for it.
+  function Start-DesktopApp([string]$Exe, [string[]]$Arguments) {
+    if ($Arguments.Count -gt 0) { Start-Process -FilePath $Exe -ArgumentList $Arguments } else { Start-Process -FilePath $Exe }
+  }
+
+  # -Desktop: the desktop app (per user). No Node.js, no agentlink command, no PATH change: the app
+  # brings its own. Nothing here touches the mark of the web or SmartScreen.
+  function Install-AgentLinkDesktop {
+    param([string]$ProgramsDir, [string]$Arch, [switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, [switch]$Interactive, [string]$Invite)
+    if (-not $DesktopReleased) { throw 'The AgentLink desktop app is not released yet. Run the installer without -Desktop.' }
+    if ($Uninstall) { throw "-Desktop can't be used with -Uninstall. To remove the app, use Settings, Apps, AgentLink, Uninstall." }
+    if ($Invite) { Assert-InviteLink $Invite }
+    $platform = Get-AgentLinkPlatform $Arch
+    $pinned = Get-DesktopPinnedSha $platform
+    if (-not $pinned) { throw 'The desktop app is not available for this computer yet. Run the installer without -Desktop.' }
+    $setupName = "AgentLink-$DesktopVersion-$platform-setup.exe"
+    $sumsName = "SHA256SUMS-$platform"
+    $release = "$DesktopReleases/v$DesktopVersion"
+    $exe = Join-Path (Join-Path $ProgramsDir 'AgentLink') 'AgentLink.exe'
+    Write-Host "Installing the AgentLink desktop app $DesktopVersion for Windows."
+    Write-Host 'Downloading it from the AgentLink release on GitHub.'
+    if ($DryRun) {
+      Write-Host "  would download $release/$setupName and $sumsName, check SHA-256 $pinned,"
+      Write-Host "  and run it (it installs AgentLink for you only)"
+      if ($Invite) { Write-Host '  would open the invite in AgentLink' }
+      Write-Host 'Dry run: nothing was changed.'
+      return
+    }
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) ('agentlink-install-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $tmp | Out-Null
+    try {
+      try {
+        Protect-Directory $tmp
+      } catch {
+        throw 'Could not make a private temporary folder, so nothing was installed.'
+      }
+      $setup = Join-Path $tmp $setupName
+      $sums = Join-Path $tmp $sumsName
+      Save-ReleaseFile "$release/$setupName" $setup
+      Save-ReleaseFile "$release/$sumsName" $sums
+      Assert-DesktopSetup $setup ([IO.File]::ReadAllText($sums)) $setupName $pinned
+      Write-Host 'Checked: the download matches the release and this installer.'
+      # Checked again through a handle that keeps the file unchanged until the setup has run.
+      $lock = Open-VerifiedFile $setup $pinned
+      try {
+        $code = Invoke-DesktopSetup $setup
+      } finally {
+        $lock.Dispose()
+      }
+      if ($code -ne 0) { throw "The desktop app setup stopped (exit code $code). Run the installer again." }
+    } finally {
+      Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if (-not (Test-Path -LiteralPath $exe)) { throw 'The desktop app setup finished, but AgentLink is not in its folder. Run the installer again.' }
+    Write-Host 'AgentLink is installed.'
+    $nextTime = 'Next time, open AgentLink from the Start menu.'
+    if ($Interactive -and -not $NoStart) {
+      if ($Invite) {
+        Write-Host 'Opening AgentLink on the invite.'
+        # The app's own link (08 section 8): agentlink://join# and the checked payload, after "--".
+        $payload = $Invite.Substring('https://agentlink.4thtech.io/i#'.Length)
+        Start-DesktopApp $exe @('--', "agentlink://join#$payload")
+      } else {
+        Write-Host 'Opening AgentLink.'
+        Start-DesktopApp $exe @()
+      }
+      Write-Host $nextTime
+    } else {
+      Write-Host $nextTime
+      if ($Invite) {
+        Write-Host 'To open the invite, run the command from the invite page again in your own terminal.'
+      } else {
+        Write-Host "To open it now, run: & '$($exe.Replace("'", "''"))'"
+      }
+    }
+  }
+
   # --- main: skipped when the tests load the functions above ---------------------------------------
   $ErrorActionPreference = 'Stop'
   $ProgressPreference = 'SilentlyContinue' # the progress bar slows downloads in Windows PowerShell 5.1
@@ -294,6 +523,11 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, $Invite, [Parameter
       }
       $arch = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
       $interactive = [Environment]::UserInteractive -and -not [Console]::IsOutputRedirected
+      if ($Desktop) {
+        Install-AgentLinkDesktop -ProgramsDir (Join-Path $env:LOCALAPPDATA 'Programs') -Arch $arch `
+          -DryRun:$DryRun -Uninstall:$Uninstall -NoStart:$NoStart -Interactive:$interactive -Invite $inviteLink
+        return
+      }
       Install-AgentLink -Root (Join-Path $env:LOCALAPPDATA 'AgentLink') -Arch $arch `
         -DryRun:$DryRun -Uninstall:$Uninstall -NoStart:$NoStart -Interactive:$interactive -Invite $inviteLink
     } finally {

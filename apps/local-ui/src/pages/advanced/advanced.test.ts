@@ -59,6 +59,22 @@ describe('Relays & network', () => {
       new Date(1700000000 * 1000).toISOString(),
     );
   });
+  it('REL051-CF2: before the first relay check says Checking, never Working', async () => {
+    await mount(async () =>
+      ok({ agent: 'running', relays: null, lastSyncAt: null, network: 'checking' }),
+    );
+    expect(host.textContent).toContain(S.checking);
+    expect(host.textContent).not.toContain(S.relaysWorking);
+    expect(S.lastSync).toBe('Last checked');
+  });
+  it('REL051-CF2: with no relay reachable shows "0 of 3 connected" and the network line, never Working', async () => {
+    await mount(async () =>
+      ok({ agent: 'running', relays: { connected: 0, total: 3 }, lastSyncAt: null }),
+    );
+    expect(host.textContent).toContain('0 of 3 connected');
+    expect(host.textContent).not.toContain(S.relaysWorking);
+    expect(host.textContent).toContain(S.unreachable);
+  });
   it('says so when there is no answer, and never shows an address or a latency', async () => {
     await mount(async () => ({ kind: 'offline' }));
     expect(host.textContent).toContain(S.unknown);

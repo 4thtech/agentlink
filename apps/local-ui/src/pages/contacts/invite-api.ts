@@ -11,12 +11,17 @@
 // Everything goes to this same-origin server only (never a 4thTech service, never a shortener). An
 // answer is read through an allowlist: only the named fields, each checked for type and size. The
 // link and the share text are never logged, and no error here carries them (I-7, b11 §21.5).
+import { sendWithProof } from '../../api/presence-ceremony.js';
 import type { PresenceProof } from './owner.js';
 
 export const INVITE_CREATE_PATH = '/api/ui/invites';
 export const INVITE_CHECK_PATH = '/api/ui/invites/check';
 export const INVITE_ACCEPT_PATH = '/api/ui/invites/accept';
 export const INVITE_CANCEL_PATH = '/api/ui/invites/cancel';
+/** REL051-B1 (N2): cancel this agent's accepts that wait on one person (the invite kind, `{ref}`). */
+export const CONNECTING_CANCEL_PATH = '/api/ui/invites/connecting/cancel';
+/** REL051-B2: the kept link of one open invite (Copy link, Show link). */
+export const INVITE_LINK_PATH = '/api/ui/invites/link';
 /** The open invites are read with a GET on the create path (W4-INVITES-LIST). */
 export const INVITES_LIST_PATH = '/api/ui/invites';
 
@@ -53,6 +58,23 @@ export interface OpenInvite {
   readonly expiresAt: number;
 }
 
+/**
+ * REL051-B2: an open invite's kept link, on the owner's click only. `no_link`: the invite was made
+ * before the app kept links; `not_found`: it was accepted, cancelled or expired meanwhile.
+ */
+export type LinkOutcome =
+  | {
+      readonly kind: 'ok';
+      readonly inviteUrl: string;
+      readonly shareText: string;
+      readonly format: 'short' | 'long';
+      /** Unix milliseconds. */
+      readonly expiresAt: number;
+    }
+  | {
+      readonly kind: 'no_link' | 'not_found' | 'session_expired' | 'offline' | 'failed';
+    };
+
 export type CancelOutcome = {
   readonly kind: 'cancelled' | 'not_found' | 'session_expired' | 'offline' | 'failed';
 };
@@ -84,6 +106,8 @@ export interface ConnectingRow {
   readonly again: boolean;
   /** The server says this person is blocked here: the accept can't finish until they are unblocked. */
   readonly blocked?: boolean;
+  /** REL051-CF1 (R1-CLASS-01, -06): when the accept began, unix milliseconds (from the server). */
+  readonly startedAt?: number;
 }
 
 export type CreateOutcome =
@@ -135,6 +159,13 @@ export interface InviteApi {
   cancel(inviteId: string, options?: { readonly keepalive?: boolean }): Promise<CancelOutcome>;
   check(invite: string): Promise<CheckOutcome>;
   accept(invite: string, proof: PresenceProof): Promise<AcceptOutcome>;
+  /**
+   * REL051-B1 (N2): Cancel on an accept that waits for `ref`'s answer. Optional so older fakes stay
+   * valid; the page offers no Cancel without it.
+   */
+  cancelConnecting?(ref: string): Promise<CancelOutcome>;
+  /** REL051-B2: the kept link of one open invite. Optional so older fakes stay valid. */
+  link?(inviteId: string): Promise<LinkOutcome>;
 }
 
 export interface InviteApiOptions {
@@ -161,6 +192,17 @@ function timeOf(value: unknown): number | undefined {
   if (typeof value !== 'string' || !RFC3339.test(value)) return undefined;
   const ms = Date.parse(value);
   return Number.isFinite(ms) ? ms : undefined;
+}
+
+/** A link of the canonical host in the form its format names; else undefined. */
+function linkOf(inviteUrl: unknown, format: unknown): string | undefined {
+  if (format !== 'short' && format !== 'long') return undefined;
+  if (typeof inviteUrl !== 'string' || !inviteUrl.startsWith(LINK_PREFIX)) return undefined;
+  const shaped =
+    format === 'short'
+      ? SHORT_LINK.test(inviteUrl)
+      : PAYLOAD.test(inviteUrl.slice(LINK_PREFIX.length));
+  return shaped ? inviteUrl : undefined;
 }
 
 function created(json: Record<string, unknown>): CreatedInvite | undefined {
@@ -211,6 +253,7 @@ export function parseConnecting(data: unknown): readonly ConnectingRow[] {
     if (!isObject(item)) continue;
     const { ref, name, sent, again } = item;
     const expiresAt = timeOf(item['expiresAt']);
+    const startedAt = timeOf(item['startedAt']);
     if (typeof ref !== 'string' || !REF.test(ref) || expiresAt === undefined) continue;
     if (typeof name !== 'string' || name.length === 0 || name.length > MAX_NAME_CHARS) continue;
     if (typeof sent !== 'boolean' || typeof again !== 'boolean') continue;
@@ -221,6 +264,7 @@ export function parseConnecting(data: unknown): readonly ConnectingRow[] {
       sent,
       again,
       ...(item['blocked'] === true ? { blocked: true } : {}),
+      ...(startedAt === undefined ? {} : { startedAt }),
     });
   }
   return out;
@@ -270,20 +314,24 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
 
   async function call(
     path: string,
-    init: { headers: Headers; body: Uint8Array; keepalive?: boolean },
+    init: { headers: Headers; body: Uint8Array; keepalive?: boolean; proof?: PresenceProof },
   ): Promise<
     { kind: 'answer'; status: number; json: Record<string, unknown> } | { kind: 'offline' }
   > {
     let res: Response;
     try {
-      res = await doFetch(path, {
-        method: 'POST',
-        headers: init.headers,
-        body: init.body as BodyInit,
-        credentials: 'same-origin',
-        cache: 'no-store',
-        ...(init.keepalive === true ? { keepalive: true } : {}),
-      });
+      // REL051-SF1: an owner proof goes through its ceremony (api/presence-ceremony.ts).
+      res =
+        init.proof !== undefined
+          ? await sendWithProof(doFetch, path, init.headers, init.proof)
+          : await doFetch(path, {
+              method: 'POST',
+              headers: init.headers,
+              body: init.body as BodyInit,
+              credentials: 'same-origin',
+              cache: 'no-store',
+              ...(init.keepalive === true ? { keepalive: true } : {}),
+            });
     } catch {
       return { kind: 'offline' };
     } finally {
@@ -353,6 +401,52 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
       return { kind: 'failed' };
     },
 
+    async cancelConnecting(ref) {
+      if (!REF.test(ref)) return { kind: 'failed' };
+      const answer = await call(CONNECTING_CANCEL_PATH, {
+        headers: inviteHeaders(),
+        body: encode({ ref }),
+      });
+      if (answer.kind === 'offline') return { kind: 'offline' };
+      const { status, json } = answer;
+      if (status === 200 && json['status'] === 'cancelled') return { kind: 'cancelled' };
+      if (status === 401) return { kind: 'session_expired' };
+      if (status === 404 && json['error'] === 'not_found') return { kind: 'not_found' };
+      return { kind: 'failed' };
+    },
+
+    async link(inviteId) {
+      if (!INVITE_ID.test(inviteId)) return { kind: 'failed' };
+      const answer = await call(INVITE_LINK_PATH, {
+        headers: inviteHeaders(),
+        body: encode({ inviteId }),
+      });
+      if (answer.kind === 'offline') return { kind: 'offline' };
+      const { status, json } = answer;
+      if (status === 200 && json['status'] === 'ok') {
+        const format = json['format'];
+        const inviteUrl = linkOf(json['inviteUrl'], format);
+        const shareText = json['shareText'];
+        const expiresAt = timeOf(json['expiresAt']);
+        if (
+          inviteUrl === undefined ||
+          (format !== 'short' && format !== 'long') ||
+          expiresAt === undefined ||
+          typeof shareText !== 'string' ||
+          shareText.length > MAX_SHARE_CHARS ||
+          // Our template around this very link (11 §6.1 J7), nothing else.
+          !shareText.endsWith(inviteUrl)
+        ) {
+          return { kind: 'failed' };
+        }
+        return { kind: 'ok', inviteUrl, shareText, format, expiresAt };
+      }
+      if (status === 401) return { kind: 'session_expired' };
+      if (status === 404 && json['error'] === 'not_found') return { kind: 'not_found' };
+      if (status === 404 && json['error'] === 'no_link') return { kind: 'no_link' };
+      return { kind: 'failed' };
+    },
+
     async check(invite) {
       const body = encode({ invite });
       const answer = await call(INVITE_CHECK_PATH, { headers: inviteHeaders(), body });
@@ -375,9 +469,7 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
         'content-type': 'application/octet-stream',
         'X-AgentLink-Input': toBase64url(encode({ invite })),
       });
-      if (proof.kind === 'passkey') headers.set('X-AgentLink-Presence', 'passkey');
-      const body = proof.kind === 'passkey' ? proof.body : new TextEncoder().encode(proof.code);
-      const answer = await call(INVITE_ACCEPT_PATH, { headers, body });
+      const answer = await call(INVITE_ACCEPT_PATH, { headers, body: new Uint8Array(0), proof });
       if (answer.kind === 'offline') return { kind: 'offline' };
       const { status, json } = answer;
       if (status === 200 && json['status'] === 'pending') {

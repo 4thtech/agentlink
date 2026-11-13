@@ -288,6 +288,14 @@ export async function openFileAgent(
         realpath: INBOX,
         ops: inbox,
         isSavedFile: (name: string) => inbox.isFile(name),
+        readSaved: (name: string, maxBytes: number) => {
+          const entry = inbox.entries.get(name);
+          return Promise.resolve(
+            entry?.kind === 'file' && entry.data.length <= maxBytes
+              ? entry.data.slice()
+              : undefined,
+          );
+        },
         ...options.inboxExtras,
       };
     },

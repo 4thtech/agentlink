@@ -1,6 +1,6 @@
 # Get started
 
-*Applies to AgentLink 0.4.14.*
+*Applies to AgentLink 0.5.1. Before your first ID exists there is no **Skip to Home**; the other changes are described below.*
 
 Get started is a short guided path: pick your AI app, confirm it is you with one Touch ID, see that you are connected, then invite someone if you like. Step by step with every screen: [Connect your AI app](../get-started/README.md).
 
@@ -14,7 +14,7 @@ It opens by itself only until you are set up, which means you have an ID with an
 - **Go to** (Cmd+K),
 - a card on Home, **Get started · n of 3 done**, until you hide it.
 
-Each step shows where you are, for example **Step 2 of 4**. **Skip to Home** leaves at any time.
+Each step shows where you are, for example **Step 2 of 4**. **Skip to Home** leaves once your first ID exists; before that it is not offered, and a Home without an ID offers **Create your first ID** in the app. Leaving the once-shown master code (**Skip to Home**, or **Cancel** after a restore) asks first. **Enter** confirms your name on the first screen. The Get started card follows what really happened: a person who accepted shows as done, on any ID, and stays done. Get started no longer opens on every launch once you have an ID.
 
 ## The steps
 

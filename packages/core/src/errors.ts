@@ -40,6 +40,8 @@ export type CoreErrorCode =
   | 'pairing_not_found'
   | 'pairing_expired'
   | 'pairing_evidence_missing'
+  // R1-SEC-02: a pairing a remove or block does not allow (07 §3 `removed`; 04 §2.9).
+  | 'pairing_not_allowed'
   // Envelopes (04 §3.1–§3.4; M1-7b)
   | 'contact_not_active'
   | 'type_not_sendable'

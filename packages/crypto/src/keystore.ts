@@ -65,6 +65,14 @@ export {
   sealPasskeySeed,
   sealRecoverySeed,
 } from './owner-seed-wrap.js';
+// DESK-D12a (04 §2.3.4): the native presence wrap `ALKH`. It takes the helper's secret or the seed,
+// so only KeyStore backends (the desktop owner-native path in packages/node) reach it.
+export {
+  deriveNativeWrapKey,
+  openNativeSeed,
+  sealNativeSeed,
+  type NativePresenceKind,
+} from './keystore-native.js';
 // M1-8b (07 §3.1): the cipher of the local store's `enc` columns and its index key. It takes the store
 // key, so only KeyStore backends (packages/node; the Durable Object in M2-3a) reach it.
 export {
@@ -91,3 +99,11 @@ export {
 // M1-9i-b2 (04 §2.2): the s3:<id> item holds the storage secret, so only KeyStore backends (the
 // StorageCredentialControl and the credentials provider) write or read it.
 export { encodeStorageCredentialItem, parseStorageCredentialItem } from './credential-digest.js';
+// WP-D10 (D-145 (5), 08 §8): the desktop update key file `ALKU` v1. It takes and returns an offline
+// root or update secret key, so only the owner's offline signing tool (tools/desktop) reaches it.
+export {
+  openUpdateKeyFile,
+  readUpdateKeyFileRole,
+  sealUpdateKeyFile,
+  type UpdateKeyRole,
+} from './update-key-file.js';

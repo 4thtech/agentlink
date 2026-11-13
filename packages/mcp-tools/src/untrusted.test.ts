@@ -197,3 +197,63 @@ describe('untrustedBlock and untrustedText (06 \u00a74 format)', () => {
     expect(hostile).toContain('envelope="&quot;&gt;&lt;b&gt;"');
   });
 });
+
+describe('IR-REL051-A12-1 M1: tag escaping is linear (no ReDoS on 64 KB of file text)', () => {
+  const inputs: [string, string][] = [
+    ['one "<" then 64 KB of spaces', `<${' '.repeat(65_535)}`],
+    ['one "<" then 64 KB of spaces and newlines', `<${' \n'.repeat(32_767)} `],
+    ['"< /" then 64 KB of whitespace', `< /${' \n'.repeat(32_766)}`],
+    ['64 KB of "<" and whitespace runs', `<${' '.repeat(255)}`.repeat(256)],
+  ];
+  // REL051-CIE, IR-REL051-INT-4: each hostile input must come back whole and unchanged (no tag,
+  // nothing dropped), and the escaping must be LINEAR. A fixed bound is not reliable on a shared CI
+  // runner (100 ms failed healthy code) nor strict enough (the old backtracking pattern took ~2 s on
+  // 64 KB). So each input is timed against 64 KB of plain text on the same machine at the same
+  // moment (interleaved, fastest of 5, repeated until measurable): linear stays within a few times
+  // plain text, the old quadratic pattern is thousands of times slower. A 2 s ceiling stays as a
+  // backstop.
+  /** Total time of `reps` calls on `text`. */
+  const timeCalls = (text: string, reps: number): number => {
+    const start = performance.now();
+    for (let r = 0; r < reps; r += 1) sanitizeUntrustedText(text);
+    return performance.now() - start;
+  };
+  const plain = 'a'.repeat(65_536);
+  it.each(inputs)(
+    '%s comes back unchanged, within 20x of plain text of the same size',
+    (_label, input) => {
+      expect(sanitizeUntrustedText(input)).toBe(input);
+      // Enough calls that one hostile sample takes at least 10 ms (timer noise stays small).
+      let reps = 1;
+      while (reps < 4_096 && timeCalls(input, reps) < 10) reps *= 2;
+      let fastPlain = Infinity;
+      let fastHostile = Infinity;
+      for (let round = 0; round < 5; round += 1) {
+        fastPlain = Math.min(fastPlain, timeCalls(plain, reps));
+        fastHostile = Math.min(fastHostile, timeCalls(input, reps));
+        if (fastHostile / reps > 2_000) break; // already failing: no need for 4 more
+      }
+      const ratio = fastHostile / fastPlain;
+      expect(ratio, `${ratio.toFixed(1)}x plain text`).toBeLessThan(20);
+      expect(fastHostile / reps).toBeLessThan(2_000);
+    },
+    120_000,
+  );
+
+  it('the linear pattern still escapes spaced and slashed tags', () => {
+    expect(sanitizeUntrustedText('< / untrusted_content>')).toBe('&lt; / untrusted_content>');
+    expect(sanitizeUntrustedText('<\n/\nuntrusted content')).toBe('&lt;\n/\nuntrusted content');
+    expect(sanitizeUntrustedText('<   untrusted--content')).toBe('&lt;   untrusted--content');
+  });
+});
+
+describe('IR-REL051-A12-1 L3: tabs kept in file content only', () => {
+  it('keepTabs keeps a tab; the default still makes it a space', () => {
+    expect(sanitizeUntrustedText('a\tb')).toBe('a b');
+    expect(sanitizeUntrustedText('func main() {\n\treturn\n}', { keepTabs: true })).toBe(
+      'func main() {\n\treturn\n}',
+    );
+    // Every other control character is still removed.
+    expect(sanitizeUntrustedText('a\t\u001b[31mb‮', { keepTabs: true })).toBe('a\t[31mb');
+  });
+});

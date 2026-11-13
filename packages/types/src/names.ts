@@ -30,6 +30,33 @@ export const RESERVED_NAME_WORDS = freeze([
   'owner',
 ] as const);
 
+/**
+ * R1-SEC-12 (06 §2.1): words the tools and the app use for a party or a role. A name that is, as a
+ * whole (case, spaces and look-alikes folded), one of these falls back, so it cannot pass for our
+ * own "you", "unknown sender" or "a contact". Whole name only: "Youssef" or "Mei" stay as they are.
+ */
+export const RESERVED_NAME_ROLES = freeze([
+  'you',
+  'me',
+  'user',
+  'the user',
+  'assistant',
+  'the assistant',
+  'human',
+  'developer',
+  'model',
+  'tool',
+  'agent',
+  'this agent',
+  'your agent',
+  'your ai',
+  'someone',
+  'unknown',
+  'unknown sender',
+  'a contact',
+  'contact',
+] as const);
+
 /** The fallback name, followed by the short owner fingerprint (06 §2.1). */
 export const RESTRICTED_NAME_FALLBACK = 'Contact';
 /** Maximum length of a restricted name, in code points after NFKC (06 §2.1). */

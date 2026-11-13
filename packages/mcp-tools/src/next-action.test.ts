@@ -45,23 +45,35 @@ describe('pending_approval points at agentlink_get_approval (F5a)', () => {
   });
 });
 
-describe('the folder-not-allowed results name the exact step (F12)', () => {
-  it('no_folder and outside_folder name the terminal command', () => {
+describe('the folder-not-allowed results point to the app first (REL051-A5)', () => {
+  it('no_folder and outside_folder name Allow a folder in the app, then the terminal', () => {
     for (const reason of ['no_folder', 'outside_folder'] as const) {
       const out = attachRefusal(reason);
-      expect(out.result.nextStep, reason).toContain('agentlink policy allow-folder');
-      expect(out.result.nextStep, reason).toMatch(/terminal/);
+      const step = out.result.nextStep ?? '';
+      expect(out.result.status, reason).toBe('needs_setup');
+      expect(step, reason).toContain('AgentLink app');
+      expect(step, reason).toContain('Allow a folder');
+      expect(step, reason).toContain('agentlink policy allow-folder');
+      expect(step, reason).toMatch(/terminal they opened themselves/);
+      // The app comes first, the terminal is the fallback.
+      expect(step.indexOf('Allow a folder'), reason).toBeLessThan(step.indexOf('terminal'));
+      expect(step.length, reason).toBeLessThanOrEqual(500);
     }
     expect(FILE_TEXT.noFolderNextStep).not.toMatch(/AgentLink rules/);
   });
+  it('never allows the folder itself and uses plain words (11 §5)', () => {
+    for (const text of [FILE_TEXT.noFolderNextStep, FILE_TEXT.outsideFolderNextStep]) {
+      expect(text).toContain("You can't allow it for them");
+      expect(text).not.toMatch(/wallet|gas|seed phrase|transaction/i);
+    }
+  });
 });
 
-describe('no folder yet names the Send folder setup (M1-36b-2-c)', () => {
-  it('names the exact owner-terminal command, with the npx prefix', () => {
+describe('no folder yet still names the Send folder setup (M1-36b-2-c)', () => {
+  it('offers the Send folder command second, with the npx prefix', () => {
     const out = attachRefusal('no_folder');
     expect(out.result.code).toBe('NO_ALLOWED_FOLDER');
     expect(out.result.nextStep).toContain(`${NPX_COMMAND} policy allow-send-folder`);
-    expect(out.result.nextStep).toMatch(/terminal they opened themselves/);
     expect(out.result.nextStep).toContain('~/AgentLink/Send');
   });
 });

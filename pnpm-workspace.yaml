@@ -1,6 +1,7 @@
 packages:
   - packages/*
   - apps/*
+  - apps/desktop/build
   - test-vectors
   - e2e
   - tools
@@ -32,3 +33,7 @@ overrides:
   # WP-10: miniflare (dev-only, Workers test-vector pool) pins undici 7.29.1; 7.30.1 is the first patched
   # version. Remove when miniflare ships a patched pin.
   'miniflare>undici': 7.30.2
+  # REL051-CIC: @electron/asar 4.3.1 (desktop build tooling, dev-only) pulls glob 13.0.7, affected by
+  # GHSA-3g3m-2fjr-6pw4 (first patched 14.0.2). @electron/asar 4.3.2 moves to glob ^14.0.2; remove this
+  # once the pin moves to 4.3.2 (still inside the minimumReleaseAge cooldown).
+  '@electron/asar>glob': 14.0.4

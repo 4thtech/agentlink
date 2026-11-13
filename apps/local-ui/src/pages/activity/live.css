@@ -1,6 +1,7 @@
 /* Live activity stream (W4-SETTINGS-ADVANCED): a mono log in a sunken well, newest line on top.
    Tokens only; no motion of its own (a new line just appears; the live dot is the U0 Pulse). */
 .ls-page {
+  min-inline-size: 0;
   display: flex;
   flex-direction: column;
   gap: var(--al-space-4);
@@ -47,6 +48,9 @@
   padding: var(--al-space-2) 0;
   min-block-size: 160px;
   overflow-x: auto;
+  /* R1-UI-19: long lines scroll inside the log; they never widen the page (472 px at 390). */
+  min-inline-size: 0;
+  contain: inline-size;
 }
 .ls-empty {
   margin: 0;

@@ -423,6 +423,53 @@ describe('binding and the session token (08 §1)', () => {
     expect(page.body).toContain('<div id="root"></div>');
   });
 
+  // R1-SEC-05: the OS opener hands the browser a private launch file, so the link arrives as a
+  // navigation from a file page (fetch metadata other than `none`). Browsers then drop the
+  // SameSite=Strict cookie on a redirect, so the server answers a same-origin continue page.
+  it('a link opened from the launch file gets the cookie and a same-origin continue page', async () => {
+    for (const site of ['cross-site', 'same-site', 'same-origin']) {
+      const h = await harness();
+      const res = await send(h.port, `/approve/${id(1)}?t=${h.token}`, {
+        headers: { 'Sec-Fetch-Site': site },
+      });
+      expect(res.status, site).toBe(200);
+      expect(res.headers.location).toBeUndefined();
+      expect(res.headers['content-type']).toBe('text/html; charset=utf-8');
+      const set = res.headers['set-cookie']?.[0] ?? '';
+      expect(set).toContain(`agentlink_${String(h.port)}=`);
+      expect(set).toContain('HttpOnly');
+      expect(set).toContain('SameSite=Strict');
+      expect(res.body).toContain(`<meta http-equiv="refresh" content="0;url=/approve/${id(1)}">`);
+      expect(res.body).not.toContain(h.token);
+      expect(res.body).not.toContain('<script');
+      // One-shot as before.
+      const again = await send(h.port, `/approve/${id(1)}?t=${h.token}`, {
+        headers: { 'Sec-Fetch-Site': site },
+      });
+      expect(again.status).toBe(401);
+    }
+    // A navigation the OS started itself (`none`) keeps the redirect.
+    const h = await harness();
+    const res = await send(h.port, `/?t=${h.token}`, { headers: { 'Sec-Fetch-Site': 'none' } });
+    expect(res.status).toBe(303);
+  });
+
+  // R1-SEC-15: only a page with a session keeps `ui` open; any other local caller does not.
+  it('API activity counts only with a session', async () => {
+    const h = await harness();
+    const start = h.server.activity.lastAt();
+    const later = start + 60_000;
+    vi.spyOn(Date, 'now').mockReturnValue(later);
+    expect((await send(h.port, '/api/ui/x')).status).not.toBe(200);
+    expect((await send(h.port, '/api/ui/health')).status).toBe(401);
+    expect(h.server.activity.lastAt()).toBe(start);
+    // With the session cookie it counts.
+    const cookie = await h.cookie();
+    await send(h.port, '/api/ui/health', { headers: { Cookie: cookie } });
+    expect(h.server.activity.lastAt()).toBe(later);
+    vi.restoreAllMocks();
+  });
+
   it('sends no-store, no-referrer, no framing and a strict CSP on every answer', async () => {
     const h = await harness();
     const cookie = await h.cookie();

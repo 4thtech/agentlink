@@ -103,10 +103,12 @@ export {
   type ReviewedApproval,
 } from './owner-approval.js';
 // M1-8d: the local approval server (08 §1). Only the entry point and its types: the owner store,
-// browser opener and notifier seams stay inside the package (startApprovalServerWith).
+// browser opener and notifier seams stay inside the package (startApprovalServerWith). WP-D3: the
+// desktop app's core passes a link sink (its private pipe) in place of the OS browser opener.
 export {
   APPROVAL_SERVER_HOST,
   startApprovalServer,
+  startApprovalServerWithLinkSink,
   type ApprovalDetails,
   type ApprovalForDecision,
   type ApprovalServer,
@@ -133,6 +135,10 @@ export type {
   LocalUiAiApps,
   LocalUiAiAppView,
   LocalUiAiAppWrite,
+  LocalUiAiAppForm,
+  LocalUiAiAppPlanRequest,
+  LocalUiDesktopAppState,
+  LocalUiLauncherChange,
 } from './local-ui/context.js';
 // U3-c (D-138, 08 §1): the app host's seams the CLI implements (the agent folders, opening an agent);
 // the generation, the switch gate and the route stubs stay inside the package.
@@ -170,10 +176,26 @@ export {
   type AgentLiveSession,
   type AgentStorePeek,
 } from './agent-peek.js';
+// REL051-RET1: the read-only sizes of an ID's store and of the Inbox folder (Settings, Storage).
+export { peekStorageUsage, type StoragePerContact, type StorageUsage } from './storage-usage.js';
+// DESK051-UPD: Settings > Updates in the desktop app (the desktop host builds the desk);
+// REL051-UPD2: and in the browser app (apps/cli/src/runtime/npm-update-check.ts).
+export {
+  APP_UPDATE_CHECK_PATH,
+  APP_UPDATE_PATH,
+  type AppUpdateInstall,
+  type AppUpdateState,
+  type AppUpdateView,
+  type LocalUiAppUpdateDesk,
+} from './local-ui/api/app-update.js';
 // W4-LIVE-STATUS (04 §2.5): the signal-0 check of an MCP session row's pid.
 export { pidAlive } from './pid-alive.js';
 // M1-11s-a-d: the caller's health source for the status bar's health read.
-export type { LocalUiHealthSnapshot, LocalUiHealthSource } from './local-ui/api/health.js';
+export type {
+  LocalUiDataFolder,
+  LocalUiHealthSnapshot,
+  LocalUiHealthSource,
+} from './local-ui/api/health.js';
 // M1-8b: the agent's local SQLite store and the cipher of its `enc` columns (07 §3). The store key
 // stays inside the package: the entry returns only the Store and the cipher (fence.test.ts).
 export { NodeStoreError, type NodeStoreErrorCode } from './store-errors.js';
@@ -236,3 +258,11 @@ export {
   type SendFolderSetupOptions,
   type SendFolderSetupResult,
 } from './owner-send-folder.js';
+// DESK-D12c (04 §2.3.4, D-145 phase 2): the desktop app's native presence helper, for the desktop
+// host (apps/cli/src/desktop/host-main.ts passes it to the approval server as `nativePresence`).
+export {
+  desktopNativeHelper,
+  type NativeHelper,
+  type NativeReason,
+  type NativeUiState,
+} from './owner-native-helper.js';

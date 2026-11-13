@@ -16,6 +16,8 @@ import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resetPrefsForTests, setPref } from '../../prefs/index.js';
+import type { CreateOutcome, InviteApi } from '../contacts/invite-api.js';
+import { InviteScreen } from '../invite/invite-screen.js';
 import { HomeScreen, type HomeScreenProps } from './home-screen.js';
 import { HOME_STRINGS as S } from './people-strings.js';
 
@@ -220,8 +222,9 @@ async function render(answers: Answers, props: Partial<HomeScreenProps> = {}) {
   return s;
 }
 
-const q = <T extends Element = HTMLElement>(sel: string): T | null => host.querySelector<T>(sel);
-const all = (sel: string): HTMLElement[] => [...host.querySelectorAll<HTMLElement>(sel)];
+const q = <T extends Element = HTMLElement>(sel: string): T | null =>
+  document.body.querySelector<T>(sel);
+const all = (sel: string): HTMLElement[] => [...document.body.querySelectorAll<HTMLElement>(sel)];
 const byText = (sel: string, text: string | RegExp): HTMLElement | undefined =>
   all(sel).find((e) =>
     typeof text === 'string' ? e.textContent?.trim() === text : text.test(e.textContent ?? ''),
@@ -252,7 +255,71 @@ describe('Home simple (A4)', () => {
     expect(denis?.textContent).toContain(S.notDelivered);
     expect(row('Ana')).toBeTruthy();
     expect(s.calls.every((c) => c.method === 'GET')).toBe(true);
+    expect(lintVocabulary(document.body.textContent ?? '')).toEqual([]);
+  });
+
+  it('B9: terms decided with a person appear inline in their conversation (what, who, state, when)', async () => {
+    const feed = ok({
+      items: [
+        {
+          kind: 'approval_decided',
+          at: AT + 52,
+          decision: 'approved',
+          action: 'offer_terms',
+          contactId: DENIS.contactId,
+        },
+        {
+          kind: 'approval_decided',
+          at: AT + 58,
+          decision: 'approved',
+          action: 'accept_terms',
+          contactId: DENIS.contactId,
+        },
+        {
+          kind: 'approval_decided',
+          at: AT + 57,
+          decision: 'denied',
+          action: 'reject_terms',
+          contactId: DENIS.contactId,
+        },
+        {
+          kind: 'approval_decided',
+          at: AT + 59,
+          decision: 'approved',
+          action: 'accept_terms',
+          contactId: ANA.contactId,
+        },
+        {
+          kind: 'approval_decided',
+          at: AT + 56,
+          decision: 'approved',
+          action: 'send_message',
+          contactId: DENIS.contactId,
+        },
+      ],
+    });
+    const s = await render(base({ '/api/ui/activity?limit=100': feed }));
+    await click(row('Denis'));
+    const lines = all('[data-terms]').map((e) => e.textContent ?? '');
+    expect(lines).toHaveLength(3);
+    expect(lines[0]).toContain('You proposed terms to Denis');
+    expect(lines[0]).toContain('Proposed');
+    expect(lines[1]).toContain('Your answer to the terms from Denis was not sent');
+    expect(lines[1]).toContain('Not sent');
+    expect(lines[2]).toContain('You accepted the terms from Denis');
+    expect(lines[2]).toContain('Accepted');
+    // Placed by time among the messages (AT+52 sits between 45/50 and 55).
+    const order = all('.hm-msgs > li').map((e) => (e.hasAttribute('data-terms') ? 'T' : 'm'));
+    expect(order.indexOf('T')).toBeGreaterThan(0);
+    expect(s.calls.every((c) => c.method === 'GET')).toBe(true);
     expect(lintVocabulary(host.textContent ?? '')).toEqual([]);
+  });
+
+  it('B9: no terms read (or an unreadable one) leaves the conversation as it was', async () => {
+    await render(base());
+    await click(row('Denis'));
+    expect(all('[data-terms]')).toHaveLength(0);
+    expect(all('.hm-msgs > li').length).toBeGreaterThan(0);
   });
 
   it('opens a row in place to the conversation, both directions, with delivery words and Copy', async () => {
@@ -261,36 +328,36 @@ describe('Home simple (A4)', () => {
     await render(base());
     await click(row('Denis'));
     expect(row('Denis')?.getAttribute('aria-expanded')).toBe('true');
-    expect(host.textContent).toContain(S.conversationTitle);
+    expect(document.body.textContent).toContain(S.conversationTitle);
     // Inbound words only inside the untrusted container.
     const inbound = all('figure.al-untrusted').map((f) => f.textContent ?? '');
     expect(inbound.some((t) => t.includes('Got them. Here is a first sketch.'))).toBe(true);
     const heads = all('h1, h2, h3, button, [role="status"]').map((e) => e.textContent ?? '');
     expect(heads.some((t) => t.includes('Got them'))).toBe(false);
     // Outbound: Sent / Waiting to send / Not delivered.
-    expect(host.textContent).toContain('Sending the brief.');
+    expect(document.body.textContent).toContain('Sending the brief.');
     expect(byText('span', S.sent)).toBeTruthy();
     expect(byText('span', S.waitingToSend)).toBeTruthy();
     expect(byText('span', S.notDelivered)).toBeTruthy();
-    expect(host.textContent).toContain(S.notDeliveredRetry);
+    expect(document.body.textContent).toContain(S.notDeliveredRetry);
     // Oldest first: the brief comes before the reply.
-    const text = host.textContent ?? '';
+    const text = document.body.textContent ?? '';
     expect(text.indexOf('Sending the brief.')).toBeLessThan(text.indexOf('Got them.'));
     // Copy writes the message text and says Copied.
     const copy = all('button').find((b) => b.getAttribute('aria-label') === S.copyLabel);
     await click(copy);
     expect(writeText).toHaveBeenCalledTimes(1);
     expect(byText('span', S.copied)).toBeTruthy();
-    expect(host.textContent).toContain(fmtName(S.encrypted, 'Denis'));
+    expect(document.body.textContent).toContain(fmtName(S.encrypted, 'Denis'));
   });
 
   it('loads earlier messages with the cursor', async () => {
     const s = await render(base());
     await click(row('Denis'));
-    expect(host.textContent).not.toContain('Hi, Denis here.');
+    expect(document.body.textContent).not.toContain('Hi, Denis here.');
     await click(byText('button', S.loadEarlier));
     expect(s.calls.some((c) => c.url === box(DENIS, 'in', 'cur-in-1'))).toBe(true);
-    expect(host.textContent).toContain('Hi, Denis here.');
+    expect(document.body.textContent).toContain('Hi, Denis here.');
     expect(byText('button', S.loadEarlier)).toBeUndefined();
   });
 
@@ -390,7 +457,7 @@ describe('Home simple (A4)', () => {
       }),
     );
     await click(row('Denis'));
-    expect(host.textContent).toContain(S.arrivedNotSaved);
+    expect(document.body.textContent).toContain(S.arrivedNotSaved);
     expect(byText('button', 'Save to Inbox')).toBeTruthy();
   });
 
@@ -423,7 +490,7 @@ describe('Home simple (A4)', () => {
     expect(confirm?.textContent).toContain('Remove Ana?');
     await click(byText('[role="alertdialog"] button', S.remove));
     // The presence step of Contacts: nothing is sent before the owner confirms.
-    expect(host.textContent).toMatch(/master code/i);
+    expect(document.body.textContent).toMatch(/master code/i);
   });
 
   it('lists invites that wait to be accepted, never the link, with Cancel', async () => {
@@ -436,11 +503,151 @@ describe('Home simple (A4)', () => {
         '/api/ui/invites/cancel': ok({ status: 'cancelled' }),
       }),
     );
-    expect(host.textContent).toContain('Waiting for Marko to accept · link works 7 more days');
-    expect(host.textContent).not.toMatch(/https?:\/\//);
+    expect(document.body.textContent).toContain(
+      'Waiting for Marko to accept · link works 7 more days',
+    );
+    expect(document.body.textContent).not.toMatch(/https?:\/\//);
     await click(byText('button', S.cancelInvite));
     const post = s.calls.find((c) => c.url === '/api/ui/invites/cancel');
     expect(post?.method).toBe('POST');
+  });
+
+  it('R1-CLASS-01 (REL051-CF1): an accept with no answer after the bound says so, with a real Cancel', async () => {
+    const expires = new Date(Date.now() + 6.5 * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z');
+    const started = new Date(Date.now() - 5 * 60_000).toISOString().replace(/\.\d+Z$/, 'Z');
+    const ana = '0x' + 'a1'.repeat(20);
+    const s = await render(
+      base({
+        '/api/ui/invites': ok({
+          invites: [],
+          connecting: [
+            {
+              ref: ana,
+              name: 'Ana',
+              expiresAt: expires,
+              startedAt: started,
+              sent: true,
+              again: false,
+            },
+          ],
+        }),
+        '/api/ui/invites/connecting/cancel': ok({ status: 'cancelled' }),
+      }),
+    );
+    expect(host.textContent).toContain(
+      "No answer from Ana yet. If this invite was already used or cancelled, it won't connect. Ask Ana for a new one.",
+    );
+    expect(host.textContent).not.toContain('Connecting to Ana…');
+    await click(byText('button', 'Cancel'));
+    const post = s.calls.find((c) => c.url === '/api/ui/invites/connecting/cancel');
+    expect(JSON.parse(new TextDecoder().decode(post?.body))).toEqual({ ref: ana });
+  });
+
+  it('N2 (REL051-B1): an accept waiting on a person blocked here says so; Cancel posts the server route', async () => {
+    const expires = new Date(Date.now() + 6.5 * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z');
+    const bo = '0x' + 'b0'.repeat(20);
+    const s = await render(
+      base({
+        '/api/ui/invites': ok({
+          invites: [],
+          connecting: [
+            { ref: bo, name: 'Bo', expiresAt: expires, sent: true, again: false, blocked: true },
+          ],
+        }),
+        '/api/ui/invites/connecting/cancel': ok({ status: 'cancelled' }),
+      }),
+    );
+    expect(host.textContent).toContain('You blocked Bo. Unblock to connect.');
+    await click(byText('button', 'Cancel'));
+    const post = s.calls.find((c) => c.url === '/api/ui/invites/connecting/cancel');
+    expect(post?.method).toBe('POST');
+    expect(JSON.parse(new TextDecoder().decode(post?.body))).toEqual({ ref: bo });
+  });
+
+  // REL051-B2 (owner test, 13 Nov): a waiting invite's link can be copied or shown again.
+  const KEPT_ID = 'AQEBAQEBAQEBAQEBAQEBAQ';
+  const KEPT_LINK = `https://agentlink.4thtech.io/i#2.${'K'.repeat(43)}`;
+  const waitingFor = (name: string | null) => ({
+    invites: [
+      {
+        inviteId: KEPT_ID,
+        name,
+        expiresAt: new Date(Date.now() + 6.5 * 86_400_000).toISOString().replace(/\.\d+Z$/, 'Z'),
+      },
+    ],
+  });
+  const linkAnswer = ok({
+    status: 'ok',
+    inviteUrl: KEPT_LINK,
+    shareText: `Connect with me on AgentLink: ${KEPT_LINK}`,
+    format: 'short',
+    expiresAt: '2999-01-01T00:00:00Z',
+  });
+
+  it('a waiting invite: Copy link and Show link get the kept link from this app only', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+    const s = await render(
+      base({ '/api/ui/invites': ok(waitingFor('Marko')), '/api/ui/invites/link': linkAnswer }),
+    );
+    expect(host.textContent).toContain('Waiting for Marko');
+    // The list read carries no link, and the page shows none until asked.
+    expect(host.textContent).not.toContain(KEPT_LINK);
+    await click(byText('button', 'Copy link'));
+    const post = s.calls.find((c) => c.url === '/api/ui/invites/link');
+    expect(post?.method).toBe('POST');
+    expect(post?.headers.get('X-AgentLink-CSRF')).toBe('t');
+    expect(writeText).toHaveBeenCalledWith(KEPT_LINK);
+    expect(host.textContent).not.toContain(KEPT_LINK);
+    await click(byText('button', 'Show link'));
+    expect(host.textContent).toContain(KEPT_LINK);
+    await click(byText('button', 'Hide link'));
+    expect(host.textContent).not.toContain(KEPT_LINK);
+    expect(lintVocabulary(host.textContent ?? '')).toEqual([]);
+  });
+
+  it('Done without Copy, then Copy link from Home: the student still gets the link', async () => {
+    const cancelled: string[] = [];
+    const invites: InviteApi = {
+      create: () =>
+        Promise.resolve<CreateOutcome>({
+          kind: 'ok',
+          invite: {
+            inviteUrl: KEPT_LINK,
+            shareText: `Connect with me on AgentLink: ${KEPT_LINK}`,
+            expiresAt: Date.UTC(2999, 0, 1),
+            format: 'short',
+            inviteId: KEPT_ID,
+          },
+        }),
+      cancel: (id) => {
+        cancelled.push(id);
+        return Promise.resolve({ kind: 'cancelled' });
+      },
+      check: () => Promise.resolve({ kind: 'failed' }),
+      accept: () => Promise.resolve({ kind: 'failed' }),
+    };
+    let done = false;
+    await act(async () => {
+      root.render(h(InviteScreen, { invites, sender: 'Tali', onDone: () => (done = true) }));
+    });
+    await settle();
+    expect(host.textContent).toContain(KEPT_LINK);
+    // Done, never Copy: the panel goes away.
+    await click(byText('button', 'Done'));
+    expect(done).toBe(true);
+    act(() => root.unmount());
+    root = createRoot(host);
+    await settle();
+    expect(cancelled).toEqual([]);
+    // Home lists the invite (from the server) and Copy link gets the same link back.
+    const writeText = vi.fn(() => Promise.resolve());
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+    await render(
+      base({ '/api/ui/invites': ok(waitingFor(null)), '/api/ui/invites/link': linkAnswer }),
+    );
+    await click(byText('button', 'Copy link'));
+    expect(writeText).toHaveBeenCalledWith(KEPT_LINK);
   });
 
   it('shows only the stretch both boxes cover: a reply older than the other side’s oldest loaded message waits for Load earlier (IR-W4-HOME-1)', async () => {
@@ -458,10 +665,10 @@ describe('Home simple (A4)', () => {
     await click(row('Denis'));
     // The inbox still has older messages (it has `next`), so nothing older than its oldest loaded
     // message shows yet: a gap would hide their side of that stretch.
-    expect(host.textContent).toContain('Newest from us.');
-    expect(host.textContent).not.toContain('An old reply from long ago.');
+    expect(document.body.textContent).toContain('Newest from us.');
+    expect(document.body.textContent).not.toContain('An old reply from long ago.');
     await click(byText('button', S.loadEarlier));
-    const text = host.textContent ?? '';
+    const text = document.body.textContent ?? '';
     expect(text).toContain('An old reply from long ago.');
     expect(text.indexOf('Hi, Denis here.')).toBeLessThan(
       text.indexOf('An old reply from long ago.'),
@@ -484,7 +691,7 @@ describe('Home simple (A4)', () => {
   it('shows names with no direction-changing or invisible characters, isolated (Fable g)', async () => {
     const SPOOF = { ...ANA, name: 'An\u202Ea\u200B' };
     await render(base({ [MESSAGES]: ok({ conversations: [DENIS, SPOOF] }) }));
-    expect(host.textContent).not.toMatch(/[\u202A-\u202E\u2066-\u2069\u200B-\u200F]/);
+    expect(document.body.textContent).not.toMatch(/[\u202A-\u202E\u2066-\u2069\u200B-\u200F]/);
     const names = all('bdi.hm-name');
     expect(names.length).toBeGreaterThanOrEqual(2);
     for (const n of names) expect(n.getAttribute('dir')).toBe('auto');
@@ -533,7 +740,7 @@ describe('W6-FLOW-FIXES: a connection the other side removed', () => {
     await click(row('Denis'));
     // UX 2026-11-12 (notices): one calm line on Home, no warning; the full words are on the
     // contact's own page, one link away.
-    expect(host.textContent).not.toContain(fmtName(S.connectionRemovedBody, 'Denis'));
+    expect(document.body.textContent).not.toContain(fmtName(S.connectionRemovedBody, 'Denis'));
     const gone = q('.hm-gone');
     expect(gone?.className).toContain('al-tone-neutral');
     expect(gone?.textContent).toContain(fmtName(S.connectionRemoved, 'Denis'));
@@ -541,9 +748,9 @@ describe('W6-FLOW-FIXES: a connection the other side removed', () => {
     expect(gone?.querySelector('a')?.getAttribute('href')).toBe(
       `/contacts?check=${encodeURIComponent(DENIS.contactId)}`,
     );
-    expect(host.textContent).not.toContain(S.notDeliveredRetry);
+    expect(document.body.textContent).not.toContain(S.notDeliveredRetry);
     // The history stays readable.
-    expect(host.textContent).toContain('Sending the brief.');
+    expect(document.body.textContent).toContain('Sending the brief.');
     await click(all('button').find((b) => b.getAttribute('aria-label') === 'More for Denis'));
     const items = all('[role="menuitem"]').map((e) => e.textContent?.trim());
     expect(items).toEqual([S.rename, S.remove]);
@@ -669,7 +876,7 @@ describe('Home pro (A10, Under the hood on)', () => {
     });
     await settle();
     expect(s.calls.some((c) => c.url === '/api/approvals/review')).toBe(true);
-    expect(host.textContent).toContain('A request in this list changed.');
+    expect(document.body.textContent).toContain('A request in this list changed.');
   });
 
   it('shows People as a table with search and the agent filter; search filters', async () => {
@@ -701,13 +908,13 @@ describe('Home pro (A10, Under the hood on)', () => {
   it('shows message details and contact facts in the conversation', async () => {
     await render(base());
     await click(row('Denis'));
-    expect(host.textContent).toContain(S.fingerprint);
-    expect(host.textContent).toContain('7F3A');
-    expect(host.textContent).toContain(S.identityChecked);
-    expect(host.textContent).toContain(S.paired);
-    expect(host.textContent).toContain(ENV_OUT1);
-    expect(host.textContent).toContain(`${S.receipt} ${S.receiptYes}`);
-    expect(host.textContent).toContain(`${S.proof} ${S.proofYes}`);
+    expect(document.body.textContent).toContain(S.fingerprint);
+    expect(document.body.textContent).toContain('7F3A');
+    expect(document.body.textContent).toContain(S.identityChecked);
+    expect(document.body.textContent).toContain(S.paired);
+    expect(document.body.textContent).toContain(ENV_OUT1);
+    expect(document.body.textContent).toContain(`${S.receipt} ${S.receiptYes}`);
+    expect(document.body.textContent).toContain(`${S.proof} ${S.proofYes}`);
   });
 
   it('approvals show ID, kind and expiry; only free plain requests can be picked for a bulk approve', async () => {
@@ -730,7 +937,7 @@ describe('Home pro (A10, Under the hood on)', () => {
     expect(boxes).toHaveLength(1);
     await click(boxes[0]);
     expect(byText('button', fmtCount(S.approveSelected, 1))).toBeTruthy();
-    expect(host.textContent).toContain(S.paidAlone);
+    expect(document.body.textContent).toContain(S.paidAlone);
   });
 });
 
@@ -817,6 +1024,21 @@ describe('W7-ID-X1: ID chips, grouping, colour and who is asking', () => {
     expect(row('Denis')).toBeFalsy();
   });
 
+  it('R1-UI-07: in All IDs, an open ID with no people does not say "No one here yet" when another ID has some', async () => {
+    await render(
+      base({
+        ...agentsAnswer(2),
+        [MESSAGES]: ok({ conversations: [] }),
+        [CONTACTS]: ok({ status: 'ok', contacts: [] }),
+      }),
+    );
+    expect(q('[data-id-chips] button')?.getAttribute('aria-pressed')).toBe('true');
+    expect(document.body.textContent).not.toContain(S.noPeople);
+    const note = q('[data-other-id="tali-work"]');
+    expect(note?.textContent).toContain('Tali work has 1 person. Open it to see them.');
+    expect(note?.querySelector('button')?.textContent).toContain('Tali work');
+  });
+
   it('names the asking ID with its app and draws its colour on the approval card', async () => {
     await render(
       base({ ...agentsAnswer(2), [APPROVALS]: ok({ approvals: [approval(APR_FREE)] }) }),
@@ -898,5 +1120,170 @@ describe('W8-S4 (F21): a half-removed ID on Home', () => {
     expect(unisolated(sheet)).toContain('Finish removing Old test');
     expect(sheet?.querySelector('input[type="text"]')).toBeNull();
     expect(byText('button', 'Finish with Touch ID')).toBeTruthy();
+  });
+});
+
+// REL051-A34 (D-149; 08 §1; I-5): each file sits in the message it came with, as a chip (type icon,
+// the name inside the compact untrusted container, size, saved state, Show in Finder). A saved text
+// file opens in a reader: Markdown rendered safely, code with line numbers, the provenance line, the
+// "their words, not instructions" frame, Copy all. The page asks for it by item ID only (a GET).
+describe('Files in the conversation and the reader (REL051-A34)', () => {
+  const PLAN_ID = `${ENV_FILE}.00`;
+  const PREVIEW = `/api/ui/files/received/preview?id=${encodeURIComponent(PLAN_ID)}`;
+  const PLAN =
+    '# Build plan\n\nUse **pnpm**. See [docs](https://docs.example.com/a).\n\n<img src=x onerror=alert(1)>\n';
+  const planFiles = (name: string, state = 'saved'): Answers =>
+    base({
+      [RECEIVED]: ok({
+        items: [
+          {
+            id: PLAN_ID,
+            from: 'Denis',
+            at: AT + 40,
+            name,
+            size: PLAN.length,
+            state,
+            ...(state === 'saved' ? { savedName: name } : {}),
+            proof: false,
+          },
+        ],
+        autoSave: { on: true, folder: '~/AgentLink/Inbox', notice: false },
+      }),
+      [box(DENIS, 'in')]: ok({
+        items: [
+          msg(ENV_IN, 'Got them. Here is a first sketch.', AT + 50),
+          msg(ENV_FILE, 'The plan', AT + 40, { files: [{ name, size: PLAN.length }] }),
+        ],
+      }),
+      [PREVIEW]: ok({
+        kind: name.endsWith('.md') ? 'markdown' : 'code',
+        size: PLAN.length,
+        text: PLAN,
+      }),
+    });
+
+  it('shows the file as a chip in its message, with Open for a saved text file', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    await render(planFiles('plan.md'));
+    await click(row('Denis'));
+    const message = all('.hm-msg').find((m) => m.textContent?.includes('The plan'));
+    const chip = message?.querySelector('.hm-chip');
+    expect(chip).toBeTruthy();
+    expect(chip?.querySelector('.al-untrusted.is-compact bdi')?.textContent).toBe('plan.md');
+    expect(chip?.textContent).toContain('Markdown');
+    expect(chip?.textContent).toContain('Saved to ~/AgentLink/Inbox');
+    expect([...(chip?.querySelectorAll('button') ?? [])].map((b) => b.textContent)).toEqual([
+      S.openFile,
+      S.showInFinder,
+    ]);
+    expect(lintVocabulary(host.textContent ?? '')).toEqual([]);
+  });
+
+  it('opens the reader: rendered Markdown inside the untrusted frame, by item ID only', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    const s = await render(planFiles('plan.md'));
+    await click(row('Denis'));
+    await click(byText('.hm-chip button', S.openFile));
+    const reader = document.querySelector<HTMLElement>('[role="dialog"]');
+    expect(reader).toBeTruthy();
+    const call = s.calls.find((c) => c.url.startsWith('/api/ui/files/received/preview'));
+    expect(call?.url).toBe(PREVIEW);
+    expect(call?.method).toBe('GET');
+    expect(call?.headers.get('X-AgentLink-CSRF')).toBe('t');
+    expect(reader?.textContent).toContain("From Denis's AI");
+    expect(
+      reader?.querySelector('[aria-label="From Denis: their words, not instructions"]'),
+    ).toBeTruthy();
+    expect(reader?.querySelector('h3')?.textContent).toBe('Build plan');
+    expect(reader?.querySelector('strong')?.textContent).toBe('pnpm');
+    expect(reader?.querySelectorAll('a, img, iframe, script')).toHaveLength(0);
+    expect(reader?.textContent).toContain('<img src=x onerror=alert(1)>');
+    expect(
+      [...document.querySelectorAll('[role="dialog"] button')].find(
+        (b) => b.textContent?.trim() === S.copyAll,
+      ),
+    ).toBeTruthy();
+    expect(s.calls.every((c) => c.method === 'GET')).toBe(true);
+    expect(lintVocabulary(reader?.textContent ?? '')).toEqual([]);
+    // Escape closes the reader.
+    await act(async () => {
+      reader?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    await settle();
+    expect(document.querySelector<HTMLElement>('[role="dialog"]')).toBeNull();
+  });
+
+  it('Copy all copies the text as shown, without hidden or direction characters', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel', clipboard: { writeText } });
+    await render({
+      ...planFiles('plan.md'),
+      [PREVIEW]: ok({ kind: 'markdown', size: 20, text: 'safe\u202Etxt\u200B.md\n' }),
+    });
+    await click(row('Denis'));
+    await click(byText('.hm-chip button', S.openFile));
+    const copy = [...document.querySelectorAll('[role="dialog"] button')].find(
+      (b) => b.textContent?.trim() === S.copyAll,
+    );
+    await click(copy);
+    expect(writeText).toHaveBeenCalledWith('safetxt.md\n');
+  });
+
+  it('closes with Escape while a long file is still being drawn', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    const long = '- step\n'.repeat(20_000);
+    await render({
+      ...planFiles('plan.md'),
+      [PREVIEW]: ok({ kind: 'markdown', size: long.length, text: long }),
+    });
+    await click(row('Denis'));
+    const open = byText('.hm-chip button', S.openFile);
+    await act(async () => {
+      (open as HTMLElement).click();
+      await new Promise((r) => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const reader = document.querySelector<HTMLElement>('[role="dialog"]');
+    expect(reader?.querySelector('.al-md')?.getAttribute('aria-busy')).toBe('true');
+    await act(async () => {
+      reader?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    await settle();
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('shows code with line numbers', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    await render(planFiles('main.ts'));
+    await click(row('Denis'));
+    await click(byText('.hm-chip button', S.openFile));
+    expect(
+      document.querySelector('[role="dialog"] .al-code-gutter')?.getAttribute('data-lines'),
+    ).toBe(String(PLAN.split('\n').length - 1));
+  });
+
+  it('offers no Open for a file that is not text or not saved', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    await render(planFiles('tool.exe'));
+    await click(row('Denis'));
+    expect(byText('.hm-chip button', S.openFile)).toBeUndefined();
+    root.render(h('div'));
+    await settle();
+    await render(planFiles('plan.md', 'not_saved'));
+    await click(row('Denis'));
+    expect(byText('.hm-chip button', S.openFile)).toBeUndefined();
+  });
+
+  it('explains a file that changed since it arrived, and never shows its text', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    await render({
+      ...planFiles('plan.md'),
+      [PREVIEW]: { status: 409, body: { error: 'changed' } },
+    });
+    await click(row('Denis'));
+    await click(byText('.hm-chip button', S.openFile));
+    const reader = document.querySelector<HTMLElement>('[role="dialog"]');
+    expect(reader?.textContent).toContain(S.previewChanged);
+    expect(reader?.textContent).not.toContain('Build plan');
   });
 });

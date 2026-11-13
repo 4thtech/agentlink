@@ -74,6 +74,16 @@ export function withoutAssets(options: LocalUiOptions): Omit<LocalUiOptions, 'as
   return copy;
 }
 
+/**
+ * WP-D3 (desktop host; 08 §1): the export hook. `ui` and `join` start the approval server with
+ * startApprovalServer (links to the OS browser opener); the desktop app's core passes its own
+ * starter, startApprovalServerWithLinkSink, so every session link goes only to its private pipe.
+ * Everything else about the host (agents, first run, removal, the handoff record) is unchanged.
+ */
+export interface UiHostHooks {
+  readonly startServer?: (options: ApprovalServerOptions) => Promise<ApprovalServer>;
+}
+
 /** What the host needs to open one agent for the pages. */
 export interface UiHostDeps {
   readonly owner: Pick<OwnerCommandDeps, 'open'>;

@@ -4,7 +4,7 @@
 // then confirmed with its own touch (the switch signs nothing and submits nothing for the caller).
 // readPasskeyStatus parses exactly the answers of the real server (packages/node
 // app-host-welcome.test.ts "HOTFIX-045-TOUCHID", owner-passkey.test.ts other_owner).
-import { act, createElement } from 'react';
+import { act, createElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readPasskeyStatus, type PasskeyStatus, type PresenceProof } from './owner.js';
@@ -92,6 +92,109 @@ async function render(
   await flush();
   return { submitted, switches };
 }
+
+describe('REL051-UF3 (R1-UI-06): one sensor question per press', () => {
+  // REL051-SF1: the sensor is asked inside the ceremony, by the caller's request (the proof carries
+  // the gesture). A real caller (contacts, join, paste invite, person menu, name contact) sets `busy`
+  // in the same callback that receives the proof and runs the gesture with the server's challenge.
+  // Single flight holds across that hand-over: one press, one proof, one sensor question.
+  const PUBLIC_KEY = {
+    challenge: 'Y2hhbGxlbmdl',
+    allowCredentials: ['Y3JlZA'],
+    prfSalt: 'c2FsdA',
+    timeoutMs: 60_000,
+  } as const;
+
+  function Caller({
+    onProof,
+    ceremony,
+  }: {
+    onProof: () => void;
+    ceremony: (run: () => Promise<Uint8Array | undefined>) => Promise<void>;
+  }): ReturnType<typeof createElement> {
+    const [busy, setBusy] = useState(false);
+    return createElement(PresencePrompt, {
+      summary: "Accept Marko's invite",
+      passkey: undefined,
+      busy,
+      error: undefined,
+      onSubmit: (proof) => {
+        onProof();
+        setBusy(true);
+        const run = (): Promise<Uint8Array | undefined> =>
+          proof.kind === 'passkey' ? proof.gesture(PUBLIC_KEY) : Promise.resolve(undefined);
+        void ceremony(run).finally(() => setBusy(false));
+      },
+      onCancel: () => undefined,
+      passkeyStatus: () => Promise.resolve(READY),
+    });
+  }
+
+  it('a double click on "Confirm with …" hands over one proof and asks the sensor once, held until the request settles', async () => {
+    let asked = 0;
+    let proofs = 0;
+    let finish: ((value: null) => void) | undefined;
+    let settle: (() => void) | undefined;
+    Object.defineProperty(navigator, 'credentials', {
+      configurable: true,
+      value: {
+        get: () => {
+          asked += 1;
+          return new Promise((resolve) => {
+            finish = resolve;
+          });
+        },
+      },
+    });
+    try {
+      await act(async () => {
+        root.render(
+          createElement(Caller, {
+            onProof: () => {
+              proofs += 1;
+            },
+            // The ceremony: the challenge answer comes first, then the gesture, then the request.
+            ceremony: async (run) => {
+              await Promise.resolve();
+              await run();
+              await new Promise<void>((resolve) => {
+                settle = resolve;
+              });
+            },
+          }),
+        );
+      });
+      await flush();
+      const confirm = button(S.usePasskeyOn(SENSOR[detectPlatform()]));
+      // Both clicks land before React draws the held button (the ref guard), then a late third.
+      await act(async () => {
+        confirm.click();
+        confirm.click();
+      });
+      await flush();
+      await act(async () => confirm.click());
+      expect(proofs).toBe(1);
+      expect(asked).toBe(1);
+      expect(confirm.disabled).toBe(true);
+      // Cancelled at the sensor: still held while the request answers (nothing was sent).
+      await act(async () => finish?.(null));
+      await flush();
+      await act(async () => confirm.click());
+      expect(asked).toBe(1);
+      expect(confirm.disabled).toBe(true);
+      // The request settled: the button opens again, and the next press asks once more.
+      await act(async () => settle?.());
+      await flush();
+      expect(confirm.disabled).toBe(false);
+      await act(async () => confirm.click());
+      await flush();
+      expect(proofs).toBe(2);
+      expect(asked).toBe(2);
+    } finally {
+      Reflect.deleteProperty(navigator, 'credentials');
+    }
+  });
+});
 
 describe('HOTFIX-045-TOUCHID: the presence sheet says why and offers the switch', () => {
   it('a passkey the caller missed is still offered (owner store answered after all)', async () => {

@@ -31,7 +31,7 @@
 // Zero access: nothing here talks to any network. Nothing is logged; failures are fixed outcomes
 // that never carry a path, a code or an error's text (I-7). The code leaves as display text only.
 import { constants } from 'node:fs';
-import { chmod, lstat, mkdtemp, open, rm, stat } from 'node:fs/promises';
+import { chmod, lstat, mkdtemp, open, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
@@ -216,10 +216,17 @@ async function exists(path: string): Promise<boolean> {
 }
 
 /** The Downloads folder when it is a folder, else the home folder. */
-async function kitFolder(home: string): Promise<{ path: string; shown: 'Downloads' | 'Home' }> {
+/**
+ * Where the kit is saved: the user's Downloads folder, else the home folder (04 §2.3.3). REL051-SF3
+ * (04 §4, no link following): a Downloads that is a link (to a synced or shared folder, say) is not
+ * followed; the kit then goes to the home folder, where Restore finds it too.
+ */
+export async function kitFolder(
+  home: string,
+): Promise<{ path: string; shown: 'Downloads' | 'Home' }> {
   const downloads = join(home, 'Downloads');
   try {
-    if ((await stat(downloads)).isDirectory()) return { path: downloads, shown: 'Downloads' };
+    if ((await lstat(downloads)).isDirectory()) return { path: downloads, shown: 'Downloads' };
   } catch {
     // No Downloads folder: the home folder.
   }
@@ -250,6 +257,26 @@ async function* fileChunks(path: string): AsyncIterable<Uint8Array> {
   }
 }
 
+/**
+ * REL051-B2 (IR-REL051-B2-1; 04 §3.6): the kept links of open invites never leave this computer, so
+ * the snapshot drops them before it is sealed into a kit. With `secure_delete` and a VACUUM, the
+ * sealed values are not left on free pages either. A store from before schema 14 has no column.
+ */
+export function stripInviteLinks(snapshotPath: string): void {
+  const db = new Database(snapshotPath, { fileMustExist: true });
+  try {
+    const columns = db.prepare("SELECT name FROM pragma_table_info('invites')").all() as {
+      name?: unknown;
+    }[];
+    if (!columns.some((c) => c.name === 'invite_link')) return;
+    db.pragma('secure_delete = ON');
+    db.prepare('UPDATE "invites" SET "invite_link" = NULL WHERE "invite_link" IS NOT NULL').run();
+    db.exec('VACUUM');
+  } finally {
+    db.close();
+  }
+}
+
 /** 04 §2.3.3 "Snapshot": `VACUUM INTO` a private file (run under the agent's lock by the control). */
 async function snapshotOf(storePath: string, into: string): Promise<RecoveryKitStoreSource> {
   const db = new Database(storePath, { readonly: true, fileMustExist: true });
@@ -258,6 +285,7 @@ async function snapshotOf(storePath: string, into: string): Promise<RecoveryKitS
   } finally {
     db.close();
   }
+  stripInviteLinks(into);
   await chmod(into, 0o600);
   const { size } = await lstat(into);
   return { length: size, chunks: fileChunks(into) };

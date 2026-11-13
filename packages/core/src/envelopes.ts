@@ -255,6 +255,12 @@ export type PairingOutcome =
       readonly reason: InboundReason;
       readonly contactId?: string;
       readonly flagged: boolean;
+      /**
+       * R1-SEC-03, REL051-CF1 (R2-6): the refusal is filed under a contact that did not send it (the
+       * one a used invite connected), so it spends no rate of that contact. A refusal filed under
+       * the sender's own contact never sets it and counts as usual.
+       */
+      readonly filedForOwner?: true;
     };
 
 /** The pairing flow as the envelope pipeline sees it (M1-7c). */
@@ -431,6 +437,8 @@ type Final =
       readonly reason: InboundReason;
       readonly contactId?: string;
       readonly flagged: boolean;
+      /** R2-6: filed under a contact that did not send it (see PairingOutcome). */
+      readonly filedForOwner?: true;
     };
 
 type Disposition =
@@ -1746,9 +1754,13 @@ export class EnvelopeService {
         effective = { kind: 'drop', reason: REQUESTS_FULL };
       }
       // 07 §3.2 rate_counters: a contact's refused envelope counts too; above the limit it is dropped.
+      // R1-SEC-03: a second answer filed under the contact its invite connected is the owner's
+      // warning, kept once per use of the invite (pairing.ts); it never spends that contact's rate.
+      // REL051-CF1 (R2-6): only when someone else sent it; the contact's own answer counts.
       if (
         effective.kind === 'refuse' &&
         effective.contactId !== undefined &&
+        effective.filedForOwner !== true &&
         !this.#countRate(tx, effective.contactId)
       ) {
         effective = { kind: 'drop', reason: 'rate_limited', contactId: effective.contactId };

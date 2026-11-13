@@ -23,12 +23,15 @@
 // - A path is fixed segments `[a-z0-9-]` and `:name` parameters; a parameter matches only
 //   `[A-Za-z0-9_-]{1,128}` (no dot, no percent-escape, no slash), so no handler sees `..` or an
 //   encoded separator. Duplicates throw.
-// - UX1113-R1 (D-147): a `presence: 'restore'` route is one of the nine fixed RESTORE_PATHS, each
+// - UX1113-R1 (D-147): a `presence: 'restore'` route is one of the eleven fixed RESTORE_PATHS, each
 //   registered once, `found` a GET and every other step a POST, with no handler; the server's restore
 //   gate runs it (recovery-kit-restore.ts). No other path, method or route can use the kind.
 // - WP-R2b (04 §2.3.3 "Kit record"): a `presence: 'kit-reveal'` route (Show in Finder for the
 //   recovery kit) is only a POST at BACKUP_REVEAL_PATH with a handler, registered once; the server's
 //   kit-reveal gate runs it with no input at all. No other path, method or route can use the kind.
+// - R1-SEC-16: a `presence: 'mark'` route (a display mark: the auto-save notice's dismiss, a former
+//   name's seen mark) is only a POST at one of MARK_PATHS with a handler, each registered once; the
+//   server's mark gate runs it with no input at all. A GET is always a read.
 // - The page files in api/ each own their routes; this file only lists them.
 import { activityRoutes } from './api/activity.js';
 // U3-c: the Agents list and the switch kind; the stubs of U3-d, U3-e, U3-f and U3-flow.
@@ -46,6 +49,7 @@ import { contactsRoutes } from './api/contacts.js';
 import { filesRoutes } from './api/files.js';
 // MSG-FILES-IO-d: Files, Received and Sent (read-only); MSG-FILES-IO-h: Show in Finder.
 import { filesIoRoutes, filesRevealRoute } from './api/files-io.js';
+import { filesPreviewRoute } from './api/files-preview.js';
 import { filesSaveRoute } from './api/files-save.js';
 import { firstRunRoutes } from './api/first-run.js';
 // M1-11s-a-d: the status bar's health read (read-only).
@@ -57,6 +61,8 @@ import { messagesRoutes } from './api/messages.js';
 import { pulseRoute } from './api/messages-pulse.js';
 import { payConfirmRoutes } from './api/pay-confirm.js';
 import { peopleAllRoutes } from './api/people-all.js';
+import { storageRoutes } from './api/storage.js';
+import { appUpdateRoutes } from './api/app-update.js';
 import { proofsRoutes } from './api/proofs.js';
 import { rulesRoutes } from './api/rules.js';
 // UX1113 WP-S2: Settings › Touch ID & master code (check, test, replace; the owner-code kind).
@@ -72,6 +78,7 @@ import {
   BACKUP_EXPORT_PATH,
   BACKUP_PATH,
   CREATE_AGENT_PATHS,
+  MARK_PATHS,
   RESTORE_PATHS,
   UI_SETTINGS_WRITE_PATH,
   type LocalUiRoute,
@@ -84,7 +91,9 @@ import { BACKUP_REVEAL_PATH, REVEAL_PATH } from './reveal-path.js';
 import {
   INVITE_ACCEPT_PATH,
   INVITE_CANCEL_PATH,
+  INVITE_LINK_PATH,
   INVITE_CHECK_PATH,
+  INVITE_CONNECTING_CANCEL_PATH,
   INVITE_CREATE_PATH,
   JOIN_ACCEPT_PATH,
   JOIN_DISMISS_PATH,
@@ -116,6 +125,8 @@ const INVITE_STEP_PATHS: Readonly<Record<string, string>> = Object.freeze({
   check: INVITE_CHECK_PATH,
   dismiss: JOIN_DISMISS_PATH,
   cancel: INVITE_CANCEL_PATH,
+  'cancel-connecting': INVITE_CONNECTING_CANCEL_PATH,
+  link: INVITE_LINK_PATH,
 });
 export const LOCAL_UI_API_PREFIX = '/api/ui/';
 /** M1-11s-c: setup routes live only under the first-run page's API. */
@@ -238,6 +249,14 @@ export class LocalUiRouteRegistry {
       if (this.#entries.some((e) => e.route.presence === 'handoff')) {
         throw invalid('the handoff route is already registered');
       }
+    } else if (presence === 'mark') {
+      // R1-SEC-16: the display marks; the server's mark gate runs them (no input, no presence).
+      if (method !== 'POST') throw invalid('a mark route is a POST');
+      if (!MARK_PATHS.includes(route.path)) throw invalid('a mark route is only at a mark path');
+      if (typeof handler !== 'function') throw invalid('a mark route needs a handler');
+      if (this.#entries.some((e) => e.route.presence === 'mark' && e.route.path === route.path)) {
+        throw invalid('this mark route is already registered');
+      }
     } else if (presence === 'ui-settings') {
       // W4-SHELL-V2: the app's own UI settings; the server's ui-settings gate runs it (no presence).
       if (method !== 'PUT') throw invalid('a ui-settings route is a PUT');
@@ -330,7 +349,14 @@ export class LocalUiRouteRegistry {
     } else if (presence === 'invite') {
       // UX2-d1 (decision 1.1): create and check an invite only; the server's invite gate runs it.
       if (method !== 'POST') throw invalid('an invite route is a POST');
-      if (step !== 'create' && step !== 'check' && step !== 'dismiss' && step !== 'cancel') {
+      if (
+        step !== 'create' &&
+        step !== 'check' &&
+        step !== 'dismiss' &&
+        step !== 'cancel' &&
+        step !== 'cancel-connecting' &&
+        step !== 'link'
+      ) {
         throw invalid('unknown invite step');
       }
       if (route.path !== INVITE_STEP_PATHS[step]) {
@@ -411,6 +437,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     filesIoRoutes,
     // MSG-FILES-IO-h: Show in Finder (the one reveal route, D-134).
     [filesRevealRoute],
+    // REL051-A34 (D-149): the in-app preview of a received text file (read, by item ID only).
+    [filesPreviewRoute],
     proofsRoutes,
     rulesRoutes,
     payConfirmRoutes,
@@ -435,6 +463,10 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     uiSettingsRoutes,
     // WP-P2: People across all IDs (read only).
     peopleAllRoutes,
+    // REL051-RET1: Settings > Storage, sizes only (read only).
+    storageRoutes,
+    // DESK051-UPD: Settings > Updates in the desktop app (reads; the shell checks).
+    appUpdateRoutes,
     // UX1113 WP-S2: Touch ID & master code.
     ownerPresenceRoutes,
     // UX1113-R1 (D-147): restore from a recovery kit, in the app.

@@ -25,6 +25,8 @@ export * from './shell.js';
 export * from './skeleton.js';
 export * from './surface.js';
 export * from './trust.js';
+// REL051-A34 (D-149): the safe Markdown and code renderer for received text files.
+export * from './markdown-safe.js';
 export * from './waiting-mark.js';
 export type {
   ApprovalState,

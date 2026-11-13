@@ -206,6 +206,23 @@ describe('GET /api/ui/activity: people, ID, AI app and backup kinds (WP-A1)', ()
     ]);
   });
 
+  // R1-SEC-03 (04 §3.6): the warning names the contact the invite connected, by reference only.
+  it('sends invite_answered_twice with its contact reference, and nothing else', async () => {
+    expect(
+      await call([
+        {
+          kind: 'invite_answered_twice',
+          id: 'invite_answered_twice:x',
+          at: 21,
+          contactId: CONTACT,
+          name: 'carol ‮',
+          fromKey: 'f'.repeat(64),
+        },
+        { kind: 'invite_answered_twice', id: 'invite_answered_twice:y', at: 20, contactId: 'Eve' },
+      ]),
+    ).toEqual([{ kind: 'invite_answered_twice', at: 21, contactId: CONTACT }]);
+  });
+
   it('leaves out a people entry without a valid contact reference', async () => {
     expect(
       await call([

@@ -14,6 +14,12 @@ export const TOUCH_ID_STRINGS = {
   onLine: 'Set up on this computer. AgentLink asks for it before every change that needs you.',
   off: (sensor: string): string => `${cap(sensor)} is off`,
   offLine: 'You confirm with your master code.',
+  /** DESK051-C2: in the desktop app, its own switch below turns it on. */
+  offNativeLine: 'You confirm with your master code. Turn it on with the switch below.',
+  couldntCheckTitle: (sensor: string): string => `Couldn't check ${sensor}`,
+  couldntCheckLine:
+    "AgentLink didn't answer just now. Try again. Your master code works meanwhile.",
+  tryAgain: 'Try again',
   cantTitle: (sensor: string): string => `${cap(sensor)} can't be used here`,
   test: (sensor: string): string => `Test ${sensor}`,
   testing: 'Waiting for you…',
@@ -32,6 +38,10 @@ export const TOUCH_ID_STRINGS = {
   codeLine: (sensor: string): string =>
     `Your 24-character backup for when ${sensor} can't be used. You saved it when you set up AgentLink.`,
   codeSet: 'Set',
+  // REL051-R2C (R2-CLASS-03): the code made at setup or a restore was never saved.
+  codeLineUnsaved: (sensor: string): string =>
+    `Your 24-character backup for when ${sensor} can't be used. The one made for you wasn't saved: make a new one now.`,
+  codeNotSaved: 'Not saved',
   check: 'Check my master code',
   checkLabel: 'Your master code',
   checkSubmit: 'Check',

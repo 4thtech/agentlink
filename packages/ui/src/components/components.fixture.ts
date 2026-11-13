@@ -58,6 +58,12 @@ export const fixtures: Record<string, () => ReactElement> = {
       state: 'flagged',
     }),
   'ContactCard/unknown': () => h(ui.ContactCard, { unknownSender: true, fingerprint: '2B9E·04D1' }),
+  // REL051-A34: the safe renderer for received text files (every class it draws has a rule).
+  'SafeMarkdown/all': () =>
+    h(ui.SafeMarkdown, {
+      text: '# Plan\n\n## Part\n\n### Sub\n\n#### Small\n\nUse **x**, *y*, ~~z~~ and `pnpm`. See [docs](https://example.com/a) and ![d](https://example.com/i.png).\n\n- a\n- b\n\n> q\n\n| a | b | c |\n| :- | :-: | -: |\n| 1 | 2 | 3 |\n\n```ts\nconst a = 1;\n```\n\n---\n\n[bad](javascript:x)',
+    }),
+  'SafeCode/patch': () => h(ui.SafeCode, { text: '@@ -1 +1 @@\n-a\n+b\n--- x', kind: 'patch' }),
   'UntrustedContent/message': () =>
     h(ui.UntrustedContent, { from: 'Marko', kind: 'message' }, 'Hello https://example.com/a?b=c'),
   'UntrustedContent/unknown': () =>

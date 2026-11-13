@@ -6,8 +6,15 @@
 //
 // I-5: a contact name the other side chose is never shown; only an owner-confirmed alias is.
 import { formatContactName } from '@4thtech-io/ui';
+import { keepInApp } from '../../prefs/app-kept.js';
 import { createApiClient, type ApiClient } from '../../api/client.js';
-import { LIST_PATH, parseList, type ContactRow } from '../contacts/data.js';
+import {
+  LIST_PATH,
+  PEOPLE_ALL_PATH,
+  parseList,
+  parsePeopleAll,
+  type ContactRow,
+} from '../contacts/data.js';
 import { AGENTS_READ, APPS_READ, parseAgentSignal } from '../home/start-here-api.js';
 import { STATUS_PATH } from '../first-run/setup-api.js';
 
@@ -23,6 +30,8 @@ export interface SetupState {
   readonly appConnected: boolean | undefined;
   /** The contacts (any state), or undefined when the read gave no answer. */
   readonly contacts: readonly ContactRow[] | undefined;
+  /** UF1 (R1-UI-10): people of the owner's other IDs (counts only); undefined when not read. */
+  readonly otherPeople?: number | undefined;
   /** Approvals waiting on Home (`GET /api/approvals`); undefined when the read gave no answer. */
   readonly waiting?: number | undefined;
 }
@@ -66,6 +75,28 @@ export interface Progress {
   readonly complete: boolean;
   /** Some step is not done and its read gave no answer. */
   readonly unknown: boolean;
+  /** R1-UI-01: there is no ID yet (no owner, or no ID open at all). */
+  readonly needsFirstId: boolean;
+}
+
+/** R1-UI-10: "someone is connected" has happened once in this app; it never unticks. */
+export const INVITED_KEY = 'agentlink.getStarted.invited';
+
+export function invitedBefore(): boolean {
+  try {
+    return localStorage.getItem(INVITED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function rememberInvited(): void {
+  try {
+    localStorage.setItem(INVITED_KEY, '1');
+    keepInApp(INVITED_KEY);
+  } catch {
+    // Not remembered: the reads decide.
+  }
 }
 
 function ownerAlias(row: ContactRow): string | null {
@@ -75,10 +106,13 @@ function ownerAlias(row: ContactRow): string | null {
 }
 
 /** The Home card (A4): two steps, connect your AI app and invite someone; the 12 digits are a suggestion. */
-export function startProgress(state: SetupState): Progress {
+export function startProgress(state: SetupState, invitedBefore = false): Progress {
   const rows = state.contacts?.filter((r) => r.status === 'active');
   const connect = state.owner === 'set_up' && state.agent === true && state.appConnected === true;
-  const invite = rows !== undefined && rows.length > 0;
+  // R1-UI-10: connected with anyone, on any ID, counts, and once it has happened it stays done
+  // (removing the person, or opening another ID, does not bring the step back).
+  const invite =
+    invitedBefore || (rows !== undefined && rows.length > 0) || (state.otherPeople ?? 0) > 0;
   const check = rows?.some((r) => r.label === 'safety-code-checked') === true;
   const toCheck = rows?.find((r) => r.pairing === 'complete' && r.label !== 'safety-code-checked');
   const steps: CardStep[] = [
@@ -97,7 +131,17 @@ export function startProgress(state: SetupState): Progress {
         state.agent === undefined ||
         state.appConnected === undefined)) ||
     (!invite && state.contacts === undefined);
-  return { steps, suggestion, done, total: steps.length, complete: done === steps.length, unknown };
+  // R1-UI-01: no owner or no ID at all: Home offers "Create your first ID", not this card.
+  const needsFirstId = state.owner === 'missing' || state.agent === false;
+  return {
+    steps,
+    suggestion,
+    done,
+    total: steps.length,
+    complete: done === steps.length,
+    unknown,
+    needsFirstId,
+  };
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -136,8 +180,13 @@ export async function readSetupState(reads: SetupReads = {}): Promise<SetupState
   }
   // Approvals need an owner: before setup the server answers 409, so this read is never made while
   // the owner is missing (no console error on Get started).
-  const approvals =
-    owner === 'missing' ? undefined : await safe(client.get<unknown>(APPROVALS_READ));
+  const [approvals, everyone] =
+    owner === 'missing'
+      ? [undefined, undefined]
+      : await Promise.all([
+          safe(client.get<unknown>(APPROVALS_READ)),
+          safe(client.get<unknown>(PEOPLE_ALL_PATH)),
+        ]);
   const agentsData = agents?.kind === 'ok' ? agents.data : undefined;
   let agent = parseAgentOpen(agentsData);
   // No owner yet: there is no agent either, whatever the agents list says.
@@ -164,5 +213,12 @@ export async function readSetupState(reads: SetupReads = {}): Promise<SetupState
     const list = approvals.data['approvals'];
     if (Array.isArray(list)) waiting = list.length;
   }
-  return { owner, agent, appConnected, contacts: rows, waiting };
+  let otherPeople: number | undefined;
+  if (everyone?.kind === 'ok') {
+    const ids = parsePeopleAll(everyone.data);
+    if (ids !== undefined) {
+      otherPeople = ids.reduce((n, id) => n + (id.current ? 0 : (id.count ?? 0)), 0);
+    }
+  }
+  return { owner, agent, appConnected, contacts: rows, otherPeople, waiting };
 }

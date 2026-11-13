@@ -1,0 +1,108 @@
+/* Settings > Storage (REL051-RET1; same surfaces and tokens as the Settings pages, design-1112 §3.1). */
+.sto-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-5);
+  max-inline-size: var(--al-layout-max-content);
+}
+.sto-page h1,
+.sto-page h2,
+.sto-page h3,
+.sto-page p {
+  margin: 0;
+}
+.sto-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+}
+.sto-coming {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--al-space-4);
+  padding: var(--al-space-5);
+}
+.sto-coming-text {
+  flex: 1 1 260px;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-1);
+}
+.sto-ic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  inline-size: 40px;
+  block-size: 40px;
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-raised);
+  color: var(--al-color-fg-muted);
+}
+.sto-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding: var(--al-space-5);
+}
+.sto-id-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--al-space-3);
+}
+.sto-tag {
+  font-size: 13px;
+  padding: 2px var(--al-space-3);
+  border-radius: 999px;
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  color: var(--al-color-fg-muted);
+}
+.sto-sub {
+  font-weight: 600;
+  margin-block-start: var(--al-space-2);
+}
+.sto-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+  overflow: hidden;
+}
+.sto-row {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-4);
+  min-block-size: 56px;
+  padding: var(--al-space-3) var(--al-space-4);
+  border-block-end: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.sto-row:last-child {
+  border-block-end: 0;
+}
+.sto-row-text {
+  flex: 1;
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-wrap: anywhere;
+}
+.sto-row-title {
+  font-weight: 600;
+  font-size: 15px;
+}
+.sto-size {
+  flex: none;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--al-color-fg-default);
+}
+.sto-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--al-space-4);
+}

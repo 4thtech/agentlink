@@ -30,6 +30,9 @@
 //   (`app_connected` / `app_disconnected`) and `backup.export` (`backup_saved`). A rename names the
 //   label, and an app change the app, only while that nonce's signed action is still the one
 //   `local_owner_actions` keeps (the latest per record); otherwise null.
+// - R1-SEC-03 (04 §3.6): `envelopes` refused as `invite_used` and filed under a contact (the one the
+//   invite connected; pairing.ts): "Someone else also answered your invite" (`invite_answered_twice`),
+//   at `refused_at`, a contact reference only;
 // - UX1113-QA2-ACTIVITY (QA finding N7): first run is part of creating the ID, so the ID's first
 //   `agent.label` applied within FIRST_RUN_SECONDS of its creation is not a rename (`id_created` carries
 //   that label while it is still the stored one), and the rules at version 1 applied in that window (the
@@ -197,6 +200,15 @@ export type ActivityEntry =
       readonly contactId: string;
       /** Null when the handshake is not stored. */
       readonly via: ActivityConnectedVia | null;
+    })
+  | (EntryBase & {
+      /**
+       * R1-SEC-03 (04 §3.6): someone else also answered the invite this contact used; the answer
+       * was refused. At the local time it was refused. A contact reference only, as for
+       * `contact_connected`; nothing of the second answer.
+       */
+      readonly kind: 'invite_answered_twice';
+      readonly contactId: string;
     })
   | (EntryBase & {
       /** WP-A1: `removed`, the owner removed the contact; `revoked`, its agent was revoked. */
@@ -777,6 +789,36 @@ export class ActivityService {
             }),
           };
         });
+      }
+      // R1-SEC-03 (04 §3.6): a second answer to a used invite, filed by the pairing flow under the
+      // contact the invite connected, at its local refusal time (never the sender's createdAt).
+      const answeredTwice = candidatesTx(
+        tx,
+        'envelopes',
+        {
+          direction: 'in',
+          type: 'handshake',
+          state: 'refused',
+          refused_reason: 'invite_used',
+          // Any contact (an operator never matches null): unknown senders' refusals stay out.
+          contact_id: { gte: '' },
+        },
+        'refused_at',
+        'envelope_id',
+        'invite_answered_twice:',
+        cursor,
+        limit,
+      );
+      for (const r of answeredTwice) {
+        const at = r.refused_at;
+        const contactId = r.contact_id;
+        if (at === null || contactId === null) continue;
+        const id = `invite_answered_twice:${r.envelope_id}`;
+        add(
+          at,
+          id,
+          plain(() => ({ kind: 'invite_answered_twice', id, at, contactId })),
+        );
       }
       for (const kind of ['contact_removed', 'contact_revoked'] as const) {
         const status = kind === 'contact_removed' ? 'removed' : 'revoked';

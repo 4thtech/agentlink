@@ -1,6 +1,6 @@
 # Your master code and recovery kit
 
-*Applies to AgentLink 0.5.0. Saving a recovery kit in the app is new in 0.4.14; one kit for all your IDs, the save checklist and restoring in the app are new in 0.5.0. The words "backup code" and "owner code" became **master code** in 0.4.14; it is the same code.*
+*Applies to AgentLink 0.5.1. Saving a recovery kit in the app is new in 0.4.14; one kit for all your IDs, the save checklist and restoring in the app are new in 0.5.0. The words "backup code" and "owner code" became **master code** in 0.4.14; it is the same code.*
 
 Two things keep you in charge of your IDs when your fingerprint reader or your computer is not there: your **master code** and your **recovery kit**.
 
@@ -17,6 +17,8 @@ Two things keep you in charge of your IDs when your fingerprint reader or your c
 The master code is shown once, right after the Touch ID that creates your first ID.
 
 <figure><img src="../../assets/screens/master-code.webp" alt="The master code screen: Approvals on this computer are protected. The code in groups of four, Shown once, Hide, Save in my password manager, Copy, Save as file and I saved it."><figcaption><p>Shown once. Save it before you press I saved it.</p></figcaption></figure>
+
+If you reload the page before you press **I saved it**, you see the same code again, not a new one. The app keeps it in its memory for this window only, for at most 10 minutes, and never writes it to disk. If the app was closed before you saved it, it says **Your master code wasn't saved** and offers a new one with Touch ID (or your passkey), instead of asking for a code you never saw. Leaving the screen with **Skip to Home** or **Cancel** asks first, because the code is shown once.
 
 1. Press **Save in my password manager**, **Copy** (it says **Copied**) or **Save as file**. **Hide** covers it if someone is looking.
 2. Press **I saved it**.

@@ -222,8 +222,8 @@ describe('OwnerKeyStore (type level)', () => {
     expectTypeOf<EpochTaking<OwnerSession>>().toEqualTypeOf<'nip44Decrypt' | 'unwrapCek'>();
   });
 
-  it('accepts only the two presence kinds of 04 §2.5', () => {
-    expectTypeOf<OwnerPresence['kind']>().toEqualTypeOf<'passphrase' | 'passkey-prf'>();
+  it('accepts only the presence kinds of 04 §2.5 (DESK-D12c: plus the native helper secret)', () => {
+    expectTypeOf<OwnerPresence['kind']>().toEqualTypeOf<'passphrase' | 'passkey-prf' | 'native'>();
   });
 });
 

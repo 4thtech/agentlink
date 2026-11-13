@@ -17,6 +17,7 @@ import type {
   PresenceProof,
   PreviewResult,
 } from './apps-api.js';
+import { usePresenceFlight } from '../contacts/presence-flight.js';
 import { AppMark } from './pick-app.js';
 import { BackupCodeField, UseCodeInstead } from './backup-code.js';
 import { CONNECT as T, FIRST_RUN, SETUP_MESSAGES } from './strings.js';
@@ -85,6 +86,8 @@ export function ConnectApp({
   const [codeChosen, setCodeChosen] = useState(false);
   const [message, setMessage] = useState<string | undefined>(undefined);
   const live = useRef(true);
+  // REL051-UF3 (R1-UI-06): a double click on the sensor button asks once.
+  const flight = usePresenceFlight(view.k === 'working');
   const title = useTitleFocus<HTMLHeadingElement>(view.k);
 
   const show = useCallback(
@@ -149,14 +152,16 @@ export function ConnectApp({
   };
 
   const apply = async (change: AppChange): Promise<void> => {
+    if (!flight.start()) return;
     setMessage(undefined);
     let proof: PresenceProof | undefined;
     if (info !== 'unknown' && info !== undefined && !codeChosen) {
-      proof = await passkeyProof(info);
+      proof = await passkeyProof(info).catch(() => undefined);
     } else if (info !== 'unknown' && code !== '') {
       proof = { kind: 'code', code };
       setCode('');
     }
+    flight.done();
     if (proof === undefined) {
       setMessage(T.notYet);
       return;
@@ -306,7 +311,7 @@ export function ConnectApp({
             variant="primary"
             size="lg"
             icon="key-round"
-            disabled={info === 'unknown' || (useCode && code === '')}
+            disabled={info === 'unknown' || (useCode && code === '') || flight.asking}
             onClick={() => void apply(change)}
           >
             {useCode ? T.applyCode : T.apply(sensor)}

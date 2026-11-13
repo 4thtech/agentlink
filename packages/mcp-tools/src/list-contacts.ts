@@ -3,7 +3,7 @@
 // (the core's `display`); no Contact check is ever returned (04 §3.6.1).
 import { MAX_TOOL_TEXT_CHARS } from '@4thtech-io/types';
 import { copy, renderCopy } from './strings/index.js';
-import { activeContacts, refsById, renderRef } from './contacts.js';
+import { activeContacts, connectedAtField, refsById, renderRef, shortIdOf } from './contacts.js';
 import type { ToolContext } from './context.js';
 import { ok, type HandlerOutput } from './result.js';
 import { TOOL_TEXT } from './text.js';
@@ -25,8 +25,11 @@ export async function listContactsHandler(
   const contacts = views.map((view) => ({
     ...refs.get(view.id)!,
     ownerFingerprint: view.ownerFingerprint.short,
+    // REL051-B1 (N12): what tells same-named contacts apart, on every contact.
+    shortId: shortIdOf(view.id),
     pairing: view.pairing,
     safetyCodeChecked: view.safetyCodeChecked,
+    ...connectedAtField(view),
     lastActivity: rfc3339(view.updatedAt),
     unread: unreadById.get(view.id) ?? 0,
   }));

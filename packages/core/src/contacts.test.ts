@@ -624,6 +624,8 @@ describe('block and remove (02 F-14) and the inbound screen', () => {
     const v0 = await peerCard(2, ownerB);
     await pair(s, v0);
     await s.client.contacts.remove(v0.card.agentEvm);
+    // R1-SEC-02: only a pairing begun after the removal (07 §3 `removed`).
+    clock.t += 1;
     const back = await pair(s, await peerCard(2, ownerB, { keyEpoch: 1 }));
     expect(back.status).toBe('active');
     expect(back.keyEpoch).toBe(1);
@@ -704,13 +706,19 @@ describe('block and remove (02 F-14) and the inbound screen', () => {
     });
   }
 
-  it('a blocked contact stays blocked across a re-pair', async () => {
+  // R1-SEC-02 (07 §3.2, 04 §2.9): a blocked contact completes no pairing, from any key, until the
+  // owner unblocks it; the row stays exactly as it was.
+  it('a blocked contact stays blocked: a re-pair from a new key completes nothing', async () => {
     const s = await self();
     const v0 = await peerCard(2, ownerB);
     await pair(s, v0);
     await s.client.contacts.block(v0.card.agentEvm);
-    const again = await pair(s, await peerCard(2, ownerB, { keyEpoch: 1 }));
-    expect(again.status).toBe('blocked');
+    const before = await contactRow(s, v0.card.agentEvm);
+    clock.t += 1;
+    await expect(pair(s, await peerCard(2, ownerB, { keyEpoch: 1 }))).rejects.toMatchObject({
+      code: 'pairing_not_allowed',
+    });
+    expect(await contactRow(s, v0.card.agentEvm)).toEqual(before);
   });
 
   it('drops envelopes from any key of a revoked agent, also after removal', async () => {

@@ -2,7 +2,7 @@
 // address or a hash in the default view; 11 §5.2 names and labels; 04 §3.6.1 Contact check; UX audit
 // 3b, 10a). A contact's name is never part of a fixed string: the helpers below take the name as
 // formatted by the ui name rule and the page renders the result as text.
-import { sensorWord } from '../../presence-word.js';
+import { sensorSentence, sensorWord } from '../../presence-word.js';
 export const CONTACTS_STRINGS = {
   listLabel: 'Your people',
   lead: 'The people your AI can message. You connect by invite, and only you and they can read what is sent.',
@@ -23,7 +23,7 @@ export const CONTACTS_STRINGS = {
   emptyTitle:
     'No people yet. Ask your AI to create an invite and send it to someone you work with.',
   emptyPrompt: 'Create an AgentLink invite for Marko.',
-  notSetUp: "AgentLink isn't set up on this computer yet. Ask your AI to set up AgentLink.",
+  notSetUp: "AgentLink isn't set up on this computer yet. Create your first ID on Home.",
   listUnavailable: "Your people can't be loaded right now. Try again in a minute.",
   blocked: 'Blocked',
   blockedDetail: 'Blocked. Messages from this person are dropped.',
@@ -87,9 +87,17 @@ export const CONTACTS_STRINGS = {
   confirm: 'Confirm',
   // F49: the one primary action when no passkey is set up here (the master code confirms).
   confirmWithCode: 'Confirm with your master code',
-  presenceRejected: "That didn't match your master code or passkey. Nothing was changed.",
-  presenceRequired: 'Enter your master code or use your passkey. Nothing was changed.',
-  passkeyNotUsed: "The passkey wasn't used. Nothing was changed. You can enter your master code.",
+  // REL051-R2C (R2-UI-06): the sensor's own word (Touch ID, Windows Hello, your passkey), never
+  // "passkey" on a Mac or Windows.
+  get presenceRejected(): string {
+    return `That didn't match your master code or ${sensorWord()}. Nothing was changed.`;
+  },
+  get presenceRequired(): string {
+    return `Enter your master code or use ${sensorWord()}. Nothing was changed.`;
+  },
+  get passkeyNotUsed(): string {
+    return `${sensorSentence()} wasn't used. Nothing was changed. You can enter your master code.`;
+  },
   busy: 'Another change is in progress. Try again in a moment.',
   refused:
     'Nothing was changed. If you were comparing the 12 digits, they may have changed: compare them again.',

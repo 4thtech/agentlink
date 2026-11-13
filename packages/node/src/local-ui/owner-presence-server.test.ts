@@ -13,6 +13,7 @@
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { encodeUtf8, ownerPrfSalt, type JsonObject } from '@4thtech-io/crypto';
+import { newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   startApprovalServerWith,
@@ -26,6 +27,7 @@ import { TEST_APP } from '../local-ui-app.fixture.js';
 import { KeychainOwnerKeyStore, OWNER_NEXT_ACCOUNT, readOwnerItem } from '../owner-keystore.js';
 import { encodePasskeyAssertion, registerOwnerPasskey } from '../owner-passkey.js';
 import { VirtualPrfAuthenticator } from '../passkey-authenticator.fixture.js';
+import { ceremonyMaker, withCeremony, type CeremonyMaker } from '../presence-ceremony.fixture.js';
 import type { LocalUiOwnerRoute, LocalUiRoute } from './route-types.js';
 import { LocalUiRouteRegistry, createLocalUiRoutes } from './routes.js';
 
@@ -53,7 +55,15 @@ interface Harness {
   readonly world: OwnerWorld;
   readonly events: ApprovalServerEvent[];
   readonly applied: JsonObject[];
-  post(path: string, body: string | Uint8Array, options?: { passkey?: boolean }): Promise<Answer>;
+  /**
+   * One request; with a ceremony maker (REL051-SF1) the page's two requests: the ceremony ask, then
+   * the passkey body answering its challenge.
+   */
+  post(
+    path: string,
+    body: string | Uint8Array | CeremonyMaker,
+    options?: { passkey?: boolean },
+  ): Promise<Answer>;
   /** A second page session of the same server (another tab). */
   otherSession(): Promise<Harness['post']>;
 }
@@ -110,7 +120,11 @@ async function harness(wrap?: (k: KeychainBackend) => KeychainBackend): Promise<
     const page = await send(server.port, '/', { headers: { Cookie: cookie } });
     const csrf =
       /<meta name="agentlink-csrf" content="([A-Za-z0-9_-]+)">/.exec(page.body)?.[1] ?? '';
-    return async (path, body, options = {}) => {
+    const one = async (
+      path: string,
+      body: Uint8Array,
+      extra: Record<string, string>,
+    ): Promise<Answer> => {
       const res = await send(server.port, path, {
         method: 'POST',
         headers: {
@@ -120,9 +134,9 @@ async function harness(wrap?: (k: KeychainBackend) => KeychainBackend): Promise<
           'Content-Type': 'application/octet-stream',
           'Sec-Fetch-Site': 'same-origin',
           'X-AgentLink-Input': 'e30', // base64url of `{}`
-          ...(options.passkey === true ? { 'X-AgentLink-Presence': 'passkey' } : {}),
+          ...extra,
         },
-        body: typeof body === 'string' ? encodeUtf8(body) : body,
+        body,
       });
       let json: Record<string, unknown> = {};
       try {
@@ -137,21 +151,39 @@ async function harness(wrap?: (k: KeychainBackend) => KeychainBackend): Promise<
         retryAfter: Array.isArray(retry) ? retry[0] : retry,
       };
     };
+    return async (path, body, options = {}) => {
+      if (typeof body === 'function') {
+        return withCeremony((extra, bytes) => one(path, bytes, extra), body, server.origin);
+      }
+      return one(
+        path,
+        typeof body === 'string' ? encodeUtf8(body) : body,
+        options.passkey === true ? { 'X-AgentLink-Presence': 'passkey' } : {},
+      );
+    };
   };
   const post = await session();
   return { world, events, applied, post, otherSession: session };
 }
 
-async function withPasskey(world: OwnerWorld): Promise<() => Uint8Array> {
+/**
+ * A registered passkey (with its credential key kept). The result makes a gesture for one ceremony
+ * (REL051-SF1); `mutate` changes the finished body. `bare()` is the pre-ceremony four-field body.
+ */
+async function withPasskey(
+  world: OwnerWorld,
+): Promise<((mutate?: (body: Uint8Array) => void) => CeremonyMaker) & { bare(): Uint8Array }> {
   const salt = ownerPrfSalt();
-  const auth = new VirtualPrfAuthenticator();
+  const auth = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
   await registerOwnerPasskey(
     world.keychain,
     world.owner,
     encodeUtf8(world.code),
     auth.create(world.owner.ownerNostr, salt),
   );
-  return () => encodePasskeyAssertion(auth.get(salt));
+  return Object.assign((mutate?: (body: Uint8Array) => void) => ceremonyMaker(auth, salt, mutate), {
+    bare: () => encodePasskeyAssertion(auth.get(salt)),
+  });
 }
 
 const noCodeIn = (h: Harness, ...codes: string[]): void => {
@@ -192,7 +224,7 @@ describe('Check my master code (WP-S2): an oracle behind the shared gate', () =>
   it('takes only the master code: a passkey assertion is refused before anything is checked', async () => {
     const h = await harness();
     const assertion = await withPasskey(h.world);
-    const res = await h.post(CHECK, assertion(), { passkey: true });
+    const res = await h.post(CHECK, assertion.bare(), { passkey: true });
     expect(res.status).toBe(403);
     expect(res.json).toEqual({ status: 'presence_required' });
   });
@@ -246,8 +278,10 @@ describe('Test Touch ID (WP-S2): signs nothing, unlocks nothing', () => {
   it('a bad assertion is presence_rejected and counts towards the shared backoff', async () => {
     const h = await harness();
     const assertion = await withPasskey(h.world);
-    const bad = assertion();
-    bad[bad.length - 1] = (bad[bad.length - 1] ?? 0) ^ 1; // flip a bit of the PRF output
+    // The PRF output (the last bytes) with one bit flipped, in a well-signed gesture.
+    const bad = assertion((body) => {
+      body[body.length - 1] = (body[body.length - 1] ?? 0) ^ 1;
+    });
     for (let i = 0; i < 3; i += 1) {
       const res = await h.post(TEST, bad, { passkey: true });
       expect(res.status).toBe(403);

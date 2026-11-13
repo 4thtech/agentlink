@@ -128,6 +128,9 @@ export const REVIEW = {
   comesBack: 'Comes back',
   /** UX1113-R1-LABEL: the kit names an ID by its folder; the label is inside, read after restore. */
   nameHint: 'Its name comes back with it',
+  /** REL051-UF3 (R1-UI-08): a new ID from the first-run folder (`default`), whose label is inside. */
+  firstId: 'Your first ID',
+  hoodFolder: (folder: string): string => `folder ${folder}`,
   comes: ['People and messages', 'Rules, proofs and credits'] as const,
   comesSince: (date: string): string =>
     `Messages sent to you since ${date} arrive in a minute or two`,
@@ -139,6 +142,11 @@ export const REVIEW = {
   ],
   restore: (n: number): string => `Restore ${n} ${n === 1 ? 'ID' : 'IDs'}`,
   nothing: 'Everything in this kit is already on this computer. Nothing to restore.',
+  // IR-REL051-R2C-1: the IDs are here but their owner is not (a restore that did not finish): the
+  // kit finishes it with a new master code.
+  finishNeeded:
+    'Your IDs are already on this computer, but restoring did not finish. Finish it now: AgentLink makes a new master code for you.',
+  finishOwner: 'Finish restoring',
   done: 'Done',
   progress: (name: string, i: number, n: number): string => `Restoring ${name}… ${i} of ${n}`,
   restoring: 'Restoring…',
@@ -155,6 +163,9 @@ export const REVIEW = {
 
 export const PROTECT = {
   title: (n: number): string => `You're back. ${n} ${n === 1 ? 'ID' : 'IDs'} restored.`,
+  // IR-REL051-R2C-2: "Finish restoring": the IDs were already here; the owner was finished.
+  titleReady: (n: number): string =>
+    n === 1 ? "You're back. Your ID is ready." : `You're back. Your ${n} IDs are ready.`,
   /** After the names (each in its own <bdi>). */
   leadRest: (n: number): string =>
     ` ${n === 1 ? 'is' : 'are'} on this computer with their people and messages. Two short things left.`,
@@ -169,11 +180,15 @@ export const PROTECT = {
   copyFailed: "Couldn't copy. Select the code and copy it yourself.",
   print: 'Print',
   saved: 'I saved it',
+  // IR-REL051-R2C-2: the same type-back confirm as Replace master code.
+  typeBack: 'Type or paste your new master code to continue',
+  typeBackWrong: "That isn't the new code. Check it and try again.",
+  typedBackOk: 'That matches. Keep it somewhere safe.',
   unchanged: (sensor: string): string => `${sensor} and your master code are unchanged.`,
   reconnect: 'Reconnect your AI apps',
   appFound: 'Found on this computer',
   appUses: (id: string): string => `Found on this computer · will use your ID ${id}`,
-  connect: (id: string): string => `Connect to ${id}`,
+  connect: (id: string): string => (id === '' ? 'Connect an AI app' : `Connect to ${id}`),
   connected: 'Connected',
   noApps: 'No AI app found on this computer. You can connect one later in Settings.',
   looking: 'Looking for AI apps…',
@@ -184,7 +199,10 @@ export const PROTECT = {
   tip: (date: string): string =>
     `Tip: this kit is from ${date}. Save a fresh one from Settings when you are settled.`,
   home: 'Go to Home',
-  needSaved: 'Tick "I saved it" to continue.',
+  needSaved: 'Type your new master code back to continue.',
+  /** R1-UI-02: Cancel while the new master code (shown once) is not saved. */
+  leaveUnsaved:
+    "Your new master code is shown only once. If you leave now it is gone and we can't show it again. Copy it or print it first. Leave anyway?",
   partial: (names: string): string =>
     `Couldn't finish restoring ${names}. Nothing of it was kept. Your other IDs are fine.`,
   printTitle: 'AgentLink master code',

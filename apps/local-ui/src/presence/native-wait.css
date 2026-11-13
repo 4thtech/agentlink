@@ -1,0 +1,35 @@
+/* DESK-TOUCHID-FIX: "Rest your finger on the Touch ID key" and Cancel while a request waits for the
+   presence helper. App-wide: the toast look (components.css .al-toast), fixed at the bottom centre
+   above the page; inline: a plain row inside the screen's own card. Tokens only; no motion. */
+.al-native-wait {
+  position: fixed;
+  inset-block-end: var(--al-space-6);
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  z-index: var(--al-z-toast);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  padding: var(--al-space-2) var(--al-space-2) var(--al-space-2) var(--al-space-4);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-raised);
+  border: var(--al-border-width-thin) solid var(--al-color-border-strong);
+  box-shadow: var(--al-shadow-4);
+  color: var(--al-color-fg-default);
+  max-inline-size: min(440px, calc(100vw - 2 * var(--al-space-4)));
+}
+.al-native-wait > p {
+  margin: 0;
+}
+.al-native-wait.is-inline {
+  position: static;
+  transform: none;
+  z-index: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  max-inline-size: none;
+  justify-content: space-between;
+}

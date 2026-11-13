@@ -313,6 +313,23 @@ export {
   type PasskeyBlobHeader,
   type RecoveryCodeSecret,
 } from './owner-seed-wrap.js';
+// DESK-D12a (04 §2.3.4, D-145 phase 2): the kinds and the public header of an `ALKH` blob (owner key,
+// helper credential and per-install challenge). Sealing and opening are in @4thtech-io/crypto/keystore.
+export {
+  NATIVE_PRESENCE_MACOS,
+  NATIVE_PRESENCE_WINDOWS,
+  encodeNativeHelperRecord,
+  readNativeBlobHeader,
+  readNativeCreateOutput,
+  readNativeHelperRecord,
+  type ExpectedNativeBlob,
+  type NativeCreateOutput,
+  type NativeBlobHeader,
+  type NativeHelperCredential,
+  type NativePresenceKind,
+  type NativeSealInput,
+  type NativeWrapKeyInput,
+} from './keystore-native.js';
 // M1-9i-b (04 §2.3.3, D-115): the public header of a recovery kit `ALKK` (owner key, read before the
 // code is asked for), its constants and types. Sealing and opening are in @4thtech-io/crypto/keystore.
 export {

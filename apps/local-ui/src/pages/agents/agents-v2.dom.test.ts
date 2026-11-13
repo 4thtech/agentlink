@@ -147,7 +147,7 @@ async function mount(hood = false, props: Partial<AgentsPageProps> = {}): Promis
   await settle();
 }
 const card = (name: string): HTMLElement =>
-  host.querySelector<HTMLElement>(`[data-agent="${name}"]`)!;
+  document.body.querySelector<HTMLElement>(`[data-agent="${name}"]`)!;
 const button = (scope: ParentNode, text: string): HTMLButtonElement | undefined =>
   [...scope.querySelectorAll<HTMLButtonElement>('button')].find(
     (b) => b.textContent?.trim() === text,
@@ -182,15 +182,20 @@ async function choose(el: HTMLSelectElement, value: string): Promise<void> {
   await settle();
 }
 const code = (): HTMLInputElement =>
-  host.querySelector<HTMLInputElement>('input[name="owner-code"]')!;
+  document.body.querySelector<HTMLInputElement>('input[name="owner-code"]')!;
 /** Text without the bidi isolates the page puts around labels (U+2068, U+2069). */
 const plain = (el: Element): string => (el.textContent ?? '').replace(/[\u2068\u2069]/g, '');
 const posts = (url: string): Call[] => calls.filter((c) => c.method === 'POST' && c.url === url);
 
 describe('Agents, simple (A8)', () => {
+  it('R1-UI-22: the page is not a <main> of its own (the shell has the one landmark)', async () => {
+    await mount();
+    expect(document.body.querySelector('main')).toBeNull();
+    expect(document.body.querySelector('.ag-page')?.tagName).toBe('DIV');
+  });
   it('lists each agent with its letter icon, its label isolated, and its live line', async () => {
     await mount();
-    expect(host.querySelector('h1')?.textContent).toBe('My IDs');
+    expect(document.body.querySelector('h1')?.textContent).toBe('My IDs');
     const personal = card('default');
     expect(personal.querySelector('.al-agent-icon')?.textContent).toBe('P');
     expect(personal.querySelector('.al-agent-icon-dot.is-working')).not.toBeNull();
@@ -200,7 +205,9 @@ describe('Agents, simple (A8)', () => {
     expect(card('work').textContent).toContain('Cursor');
     expect(card('research').textContent).toContain('Not used by any AI app yet');
     expect(card('invoices').textContent).toContain('Paused');
-    const add = [...host.querySelectorAll('a')].find((a) => a.textContent?.trim() === 'New ID');
+    const add = [...document.body.querySelectorAll('a')].find(
+      (a) => a.textContent?.trim() === 'New ID',
+    );
     expect(add?.getAttribute('href')).toBe('/start/app?add=agent');
   });
 
@@ -210,7 +217,7 @@ describe('Agents, simple (A8)', () => {
       body: list([agent('x', '‮<img src=x onerror=alert(1)>', { current: true })]),
     };
     await mount();
-    expect(host.querySelector('img')).toBeNull();
+    expect(document.body.querySelector('img')).toBeNull();
     expect(card('x').querySelector('bdi')?.textContent).toBe('‮<img src=x onerror=alert(1)>');
   });
 
@@ -218,12 +225,12 @@ describe('Agents, simple (A8)', () => {
     answers['POST /api/ui/agents/pause'] = { status: 200, body: { status: 'paused' } };
     await mount();
     await click(button(card('default'), 'Pause'));
-    expect(plain(host)).toContain('Pause Personal?');
-    expect(plain(host)).toContain(
+    expect(plain(document.body)).toContain('Pause Personal?');
+    expect(plain(document.body)).toContain(
       "Your AI apps can't send or receive messages as Personal until you resume it. Nothing is deleted.",
     );
     const reads = calls.filter((c) => c.url === '/api/ui/agents').length;
-    await click(button(host.querySelector('[role="dialog"]')!, 'Pause'));
+    await click(button(document.body.querySelector('[role="dialog"]')!, 'Pause'));
     const [post] = posts('/api/ui/agents/pause');
     expect(JSON.parse(post!.body)).toEqual({ generation: 7 });
     expect(post!.headers.has('X-AgentLink-Presence')).toBe(false);
@@ -299,7 +306,7 @@ describe('Agents, simple (A8)', () => {
       ),
     };
     await mount();
-    expect(plain(host)).toContain('Pause Work?');
+    expect(plain(document.body)).toContain('Pause Work?');
     expect(sessionStorage.getItem(INTENT_KEY)).toBeNull();
   });
 
@@ -310,7 +317,7 @@ describe('Agents, simple (A8)', () => {
     );
     // The router mounts the page again while the shared store still holds the old agent.
     await mount();
-    expect(plain(host)).not.toContain('Pause Work?');
+    expect(plain(document.body)).not.toContain('Pause Work?');
     expect(sessionStorage.getItem(INTENT_KEY)).not.toBeNull();
     answers['GET /api/ui/agents'] = {
       status: 200,
@@ -323,7 +330,7 @@ describe('Agents, simple (A8)', () => {
       window.dispatchEvent(new Event('agentlink:agents-changed'));
     });
     await settle();
-    expect(plain(host)).toContain('Pause Work?');
+    expect(plain(document.body)).toContain('Pause Work?');
     expect(sessionStorage.getItem(INTENT_KEY)).toBeNull();
   });
 
@@ -333,7 +340,7 @@ describe('Agents, simple (A8)', () => {
       JSON.stringify({ name: 'invoices', action: 'resume', at: Date.now() }),
     );
     await mount();
-    expect(plain(host)).not.toContain('Resume Invoices');
+    expect(plain(document.body)).not.toContain('Resume Invoices');
     answers['GET /api/ui/agents'] = {
       status: 200,
       body: list(
@@ -345,8 +352,8 @@ describe('Agents, simple (A8)', () => {
       window.dispatchEvent(new Event('agentlink:agents-changed'));
     });
     await settle();
-    expect(plain(host)).toContain('Resume Invoices');
-    expect(host.querySelector('input[name="owner-code"]')).not.toBeNull();
+    expect(plain(document.body)).toContain('Resume Invoices');
+    expect(document.body.querySelector('input[name="owner-code"]')).not.toBeNull();
   });
 
   it('isolates the label in the Pause title and body and the Resume statement (U+2068 … U+2069)', async () => {
@@ -357,7 +364,7 @@ describe('Agents, simple (A8)', () => {
     };
     await mount();
     await click(button(card('default'), 'Resume'));
-    expect(host.textContent).toContain(`Resume \u2068${rtl}\u2069`);
+    expect(document.body.textContent).toContain(`Resume \u2068${rtl}\u2069`);
     answers['GET /api/ui/agents'] = {
       status: 200,
       body: list([agent('default', rtl, { current: true, state: 'ready' })], { label: rtl }),
@@ -367,7 +374,7 @@ describe('Agents, simple (A8)', () => {
     });
     await settle();
     await click(button(card('default'), 'Pause'));
-    const sheet = host.querySelector('[role="dialog"]')!;
+    const sheet = document.body.querySelector('[role="dialog"]')!;
     expect(sheet.textContent).toContain(`Pause \u2068${rtl}\u2069?`);
     expect(sheet.textContent).toContain(`messages as \u2068${rtl}\u2069 until`);
   });
@@ -379,10 +386,10 @@ describe('Agents, simple (A8)', () => {
     };
     answers['POST /api/ui/agents/resume'] = { status: 200, body: { status: 'resumed' } };
     await mount();
-    const banner = host.querySelector<HTMLElement>('[data-paused-banner]')!;
+    const banner = document.body.querySelector<HTMLElement>('[data-paused-banner]')!;
     expect(banner.textContent).toContain('Personal is paused');
     await click(button(banner, 'Resume with Touch ID'));
-    expect(plain(host)).toContain('Resume Personal');
+    expect(plain(document.body)).toContain('Resume Personal');
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
         code(),
@@ -390,7 +397,7 @@ describe('Agents, simple (A8)', () => {
       );
       code().dispatchEvent(new Event('input', { bubbles: true }));
     });
-    await click(button(host, 'Confirm with your master code'));
+    await click(button(document.body, 'Confirm with your master code'));
     const [post] = posts('/api/ui/agents/resume');
     expect(post!.body).toBe('123456');
     expect(post!.headers.get('X-AgentLink-Input')).toBe('e30');
@@ -407,8 +414,10 @@ describe('Agents, simple (A8)', () => {
     await type(card('default').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
     await click(button(card('default'), 'Rename with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm with your master code'));
-    expect(plain(host)).toContain("Renamed. Your contacts will see Home next time they're online.");
+    await click(button(document.body, 'Confirm with your master code'));
+    expect(plain(document.body)).toContain(
+      "Renamed. Your contacts will see Home next time they're online.",
+    );
 
     answers['POST /api/ui/agents/label'] = {
       status: 409,
@@ -419,8 +428,8 @@ describe('Agents, simple (A8)', () => {
     await type(card('default').querySelector<HTMLInputElement>('input[type="text"]')!, 'Job');
     await click(button(card('default'), 'Rename with Touch ID'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm with your master code'));
-    expect(plain(host)).toMatch(/You can rename Personal again at \S/);
+    await click(button(document.body, 'Confirm with your master code'));
+    expect(plain(document.body)).toMatch(/You can rename Personal again at \S/);
   });
 
   it('renamed before D-141: "Contacts still see {name}" with Update contacts, once', async () => {
@@ -437,7 +446,7 @@ describe('Agents, simple (A8)', () => {
     expect(personal.textContent).toContain('Contacts still see My agent');
     await click(button(personal, 'Update contacts'));
     await type(code(), '123456');
-    await click(button(host, 'Confirm with your master code'));
+    await click(button(document.body, 'Confirm with your master code'));
     const [post] = posts('/api/ui/agents/label');
     expect(post).toBeDefined();
   });
@@ -487,70 +496,77 @@ describe('Agents, simple (A8)', () => {
       expect(panel.querySelectorAll('button')).toHaveLength(0);
     }
     await click(await inMore(card('work'), 'Remove'));
-    expect(plain(host)).toContain('Remove Work?');
-    expect(host.querySelector('[role="dialog"] input[type="text"]')).not.toBeNull();
+    expect(plain(document.body)).toContain('Remove Work?');
+    expect(document.body.querySelector('[role="dialog"] input[type="text"]')).not.toBeNull();
   });
 });
 
 describe('Agents, Under the hood: the fleet (A11)', () => {
   const rowNames = (): string[] =>
-    [...host.querySelectorAll<HTMLElement>('tbody tr[data-agent]')].map((r) => r.dataset['agent']!);
+    [...document.body.querySelectorAll<HTMLElement>('tbody tr[data-agent]')].map(
+      (r) => r.dataset['agent']!,
+    );
 
   it('is a table sorted by activity, with a count and a summary', async () => {
     await mount(true);
-    expect(host.querySelector('table')).not.toBeNull();
+    expect(document.body.querySelector('table')).not.toBeNull();
     expect(rowNames()).toEqual(['default', 'work', 'research', 'invoices']);
-    expect(plain(host)).toContain('1 working · 1 ready · 2 not running or paused');
+    expect(plain(document.body)).toContain('1 working · 1 ready · 2 not running or paused');
   });
 
   it('labels the AI-app column "AI app (harness)" with the hint', async () => {
     await mount(true);
-    expect(host.querySelectorAll('thead th')[2]?.textContent).toBe('AI app (harness)');
-    expect(host.querySelector('[data-harness-hint]')?.textContent).toBe(
+    expect(document.body.querySelectorAll('thead th')[2]?.textContent).toBe('AI app (harness)');
+    expect(document.body.querySelector('[data-harness-hint]')?.textContent).toBe(
       'AI apps: developers call them harnesses, the program that runs your AI and connects it to AgentLink.',
     );
   });
 
   it('keeps "harness" out of the simple list (Under the hood only)', async () => {
     await mount(false);
-    expect(plain(host)).not.toMatch(/harness/i);
+    expect(plain(document.body)).not.toMatch(/harness/i);
   });
 
   it('searches, filters by status and by AI app, and sorts by name', async () => {
     await mount(true);
-    await type(host.querySelector<HTMLInputElement>('input[type="search"]')!, 'cur');
+    await type(document.body.querySelector<HTMLInputElement>('input[type="search"]')!, 'cur');
     expect(rowNames()).toEqual(['work']);
-    await type(host.querySelector<HTMLInputElement>('input[type="search"]')!, '');
-    await choose(host.querySelector<HTMLSelectElement>('select[name="status"]')!, 'paused');
+    await type(document.body.querySelector<HTMLInputElement>('input[type="search"]')!, '');
+    await choose(
+      document.body.querySelector<HTMLSelectElement>('select[name="status"]')!,
+      'paused',
+    );
     expect(rowNames()).toEqual(['invoices']);
-    await choose(host.querySelector<HTMLSelectElement>('select[name="status"]')!, 'all');
-    await choose(host.querySelector<HTMLSelectElement>('select[name="app"]')!, 'codex');
+    await choose(document.body.querySelector<HTMLSelectElement>('select[name="status"]')!, 'all');
+    await choose(document.body.querySelector<HTMLSelectElement>('select[name="app"]')!, 'codex');
     expect(rowNames()).toEqual(['default']);
-    await choose(host.querySelector<HTMLSelectElement>('select[name="app"]')!, 'all');
-    await choose(host.querySelector<HTMLSelectElement>('select[name="sort"]')!, 'name');
+    await choose(document.body.querySelector<HTMLSelectElement>('select[name="app"]')!, 'all');
+    await choose(document.body.querySelector<HTMLSelectElement>('select[name="sort"]')!, 'name');
     expect(rowNames()).toEqual(['invoices', 'default', 'research', 'work']);
-    await type(host.querySelector<HTMLInputElement>('input[type="search"]')!, 'nobody');
-    expect(plain(host)).toContain('No IDs match.');
+    await type(document.body.querySelector<HTMLInputElement>('input[type="search"]')!, 'nobody');
+    expect(plain(document.body)).toContain('No IDs match.');
   });
 
   it('bulk select: Remove goes one agent at a time, each with its name typed', async () => {
     await mount(true);
     const box = (name: string) =>
-      host.querySelector<HTMLInputElement>(`tr[data-agent="${name}"] input[type="checkbox"]`)!;
+      document.body.querySelector<HTMLInputElement>(
+        `tr[data-agent="${name}"] input[type="checkbox"]`,
+      )!;
     await click(box('research'));
-    expect(plain(host)).toContain('1 ID selected');
-    expect(button(host, 'Pause')).toBeDefined();
+    expect(plain(document.body)).toContain('1 ID selected');
+    expect(button(document.body, 'Pause')).toBeDefined();
     await click(box('invoices'));
-    expect(plain(host)).toContain('2 IDs selected');
+    expect(plain(document.body)).toContain('2 IDs selected');
     // Pause applies to the open agent (08 §1): several at once is not offered.
-    expect(button(host.querySelector('[data-bulk]')!, 'Pause')).toBeUndefined();
-    await click(await inMore(host.querySelector('[data-bulk]')!, 'Remove'));
-    expect(plain(host)).toContain('Remove Research?');
+    expect(button(document.body.querySelector('[data-bulk]')!, 'Pause')).toBeUndefined();
+    await click(await inMore(document.body.querySelector('[data-bulk]')!, 'Remove'));
+    expect(plain(document.body)).toContain('Remove Research?');
   });
 
   it('a row opens the agent page', async () => {
     await mount(true);
-    await click(button(host.querySelector('tr[data-agent="work"]')!, 'Work'));
+    await click(button(document.body.querySelector('tr[data-agent="work"]')!, 'Work'));
     expect(location.pathname).toBe('/agents/work');
   });
 });
@@ -559,14 +575,14 @@ describe("one agent's page (/agents/<name>)", () => {
   it('shows the AI apps, people, rules, activity and backup; no history bars without data', async () => {
     history.replaceState(null, '', '/agents/work');
     await mount(true);
-    expect(host.querySelector('h1')?.textContent).toBe('Work');
+    expect(document.body.querySelector('h1')?.textContent).toBe('Work');
     for (const h of ['AI apps', 'People', 'Rules', 'Activity', 'Backup']) {
-      expect([...host.querySelectorAll('h2')].map((x) => x.textContent)).toContain(h);
+      expect([...document.body.querySelectorAll('h2')].map((x) => x.textContent)).toContain(h);
     }
-    expect(plain(host)).toContain('Connected to Cursor');
-    expect(host.querySelector('[data-sparkline]')).toBeNull();
+    expect(plain(document.body)).toContain('Connected to Cursor');
+    expect(document.body.querySelector('[data-sparkline]')).toBeNull();
     // One kit covers every ID: the Backup section leads to Backup & restore, no ID is opened first.
-    const backup = host.querySelector<HTMLElement>('[data-panel="backup"]')!;
+    const backup = document.body.querySelector<HTMLElement>('[data-panel="backup"]')!;
     expect(plain(backup)).toContain('One recovery kit covers all your IDs.');
     expect(backup.querySelector('a[href="/settings/backup"]')).not.toBeNull();
   });
@@ -591,13 +607,13 @@ describe("one agent's page (/agents/<name>)", () => {
       },
     };
     await mount(true);
-    expect(plain(host)).toContain('Denis');
+    expect(plain(document.body)).toContain('Denis');
     // A second read of the live store adds a second sample.
     await act(async () => {
       window.dispatchEvent(new Event('agentlink:agents-changed'));
     });
     await settle();
-    const spark = host.querySelector('[data-sparkline="claude-code"]');
+    const spark = document.body.querySelector('[data-sparkline="claude-code"]');
     expect(spark?.getAttribute('role')).toBe('img');
     expect(spark?.querySelectorAll('span').length).toBeGreaterThanOrEqual(2);
   });
@@ -605,6 +621,6 @@ describe("one agent's page (/agents/<name>)", () => {
   it('says plainly when there is no such agent', async () => {
     history.replaceState(null, '', '/agents/nobody');
     await mount();
-    expect(plain(host)).toContain('No ID called that on this computer.');
+    expect(plain(document.body)).toContain('No ID called that on this computer.');
   });
 });

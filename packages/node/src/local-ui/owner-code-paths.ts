@@ -31,17 +31,26 @@ export function isOwnerCodeStep(value: unknown): value is LocalUiOwnerCodeStep {
   return typeof value === 'string' && (OWNER_CODE_STEPS as readonly string[]).includes(value);
 }
 
+/** The kind of proof a request carries: the typed master code, a passkey, or native presence. */
+export type OwnerCodeProofKind = 'code' | 'passkey' | 'native';
+
 /**
- * Which proof each step takes (one kind only): Test Touch ID a passkey assertion; Check, finish and
- * cancel never a passkey (Check and finish take a typed code; cancel takes none); Replace either.
+ * Which proof each step takes. Test Touch ID: a passkey assertion or, in the desktop app, native
+ * presence (DESK051-C2: one helper gesture that opens `ALKH`, so "works" means native approvals
+ * will work), never the master code. Replace: any presence. Check and finish are about the typed
+ * master code itself, so only a typed code; cancel takes none (the gate answers it first). Native
+ * presence carries no typed code, so it is never accepted where a typed code is the point.
  */
-export function ownerCodeProofAllowed(step: LocalUiOwnerCodeStep, passkey: boolean): boolean {
+export function ownerCodeProofAllowed(
+  step: LocalUiOwnerCodeStep,
+  kind: OwnerCodeProofKind,
+): boolean {
   switch (step) {
     case 'test':
-      return passkey;
+      return kind === 'passkey' || kind === 'native';
     case 'replace':
       return true;
     default:
-      return !passkey;
+      return kind === 'code';
   }
 }

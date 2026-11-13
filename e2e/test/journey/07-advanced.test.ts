@@ -89,7 +89,10 @@ describe('chapter 7: advanced', () => {
     }
 
     // Shifts count from the Advanced pages on: the shell's live status strip fills in first.
-    await page.getByRole('region', { name: 'Live status' }).getByText('AgentLink').waitFor();
+    await page
+      .getByRole('region', { name: 'Live status' })
+      .getByText('AgentLink', { exact: true })
+      .waitFor();
     await page.waitForTimeout(1500);
     expect((await layoutShiftScore(page)) - beforeHood).toBeLessThanOrEqual(0.01);
     // The observer replays earlier shifts (the shell's own, when the switch turned): count the walk.
@@ -175,5 +178,42 @@ describe('chapter 7: advanced', () => {
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
     await probe.check();
+  }, 180_000);
+
+  it('REL051-CF2: with every relay refused the app says it cannot reach the network, and recovers on its own', async (ctx) => {
+    const ready = ch.need(ctx);
+    if (ready === undefined) return;
+    const world = journeyWorld();
+    const pc = await world.computer();
+    const jp = await journeyPage(ready.browser);
+    const first = await startUiRun(pc, ready.files, ch.closers);
+    await firstRunWithTouchId(jp, first.link, 'Ana');
+    await first.stop();
+    await jp.page.goto(await startUi(pc, ready.files, ch.closers));
+    const { page } = jp;
+    await skipGetStartedIfShown(page);
+    const bar = page.locator('footer.al-statusbar');
+    await bar.getByText('Connected', { exact: true }).waitFor({ timeout: 30_000 });
+
+    // A network that blocks the relays: never "Connected", never "Working".
+    world.relays.setDown(true);
+    await bar.getByText("Can't reach the message network", { exact: false }).waitFor({
+      timeout: 30_000,
+    });
+    expect(await bar.textContent()).not.toContain('Connected');
+    await page.goto(new URL('/advanced/network', page.url()).href);
+    await page.getByRole('heading', { name: 'Relays & network', level: 1 }).waitFor();
+    await page.getByText(/^0 of \d+ connected$/).waitFor({ timeout: 30_000 });
+    const advanced = await text(page);
+    expect(advanced).not.toContain('Working');
+    expect(advanced).not.toMatch(/wss?:\/\//);
+
+    // The relays come back: the app says so without a reload or a click.
+    world.relays.setDown(false);
+    await bar.getByText('Connected', { exact: true }).waitFor({ timeout: 30_000 });
+    // Relays & network reads once per visit: open it again for the new count.
+    await page.reload();
+    await page.getByRole('heading', { name: 'Relays & network', level: 1 }).waitFor();
+    await page.getByText(/^[1-9]\d* of \d+ connected$/).waitFor({ timeout: 30_000 });
   }, 180_000);
 });

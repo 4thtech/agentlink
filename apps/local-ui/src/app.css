@@ -68,3 +68,17 @@ main.al-first-run {
   color: var(--al-color-status-warning-fg);
   border-color: var(--al-color-status-warning-border);
 }
+
+/* R1-UI-12: the app stopped (or the link expired): a titled page with plain steps to open it again. */
+.al-host-closed {
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 4rem var(--al-space-4);
+}
+.al-reopen ul {
+  margin: var(--al-space-2) 0 var(--al-space-4);
+  padding-left: 1.25rem;
+}
+.al-reopen li + li {
+  margin-top: var(--al-space-1);
+}

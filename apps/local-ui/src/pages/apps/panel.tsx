@@ -2,6 +2,9 @@
 // AgentLink entry first (the only part of an AI app's file the page ever receives), then asks for
 // Touch ID (or the master code) once. The page never signs and never writes: it hands the proof to
 // one request and the server does the rest (04 §2.5). Files and entries are rendered as text only.
+// WP-D7: `form="app"` ("Use the app for …") shows the entry before and after, and offers to point the
+// `agentlink` command at the app too; ticking it previews again, so the change shown (and bound by
+// its changeId) always includes exactly what will be written.
 import { Button, Sheet, Skeleton } from '@4thtech-io/ui';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import { CONTACTS_STRINGS as C, waitSeconds } from '../contacts/strings.js';
@@ -68,8 +71,25 @@ type Preview =
   | { readonly kind: 'none'; readonly status: string }
   | { readonly kind: 'error' };
 
+function TextBlock({
+  label,
+  text,
+  removed,
+}: {
+  label: string;
+  text: string;
+  removed?: boolean;
+}): ReactElement {
+  return (
+    <div role="region" aria-label={label} tabIndex={0}>
+      <pre className={removed === true ? 'ap-entry ap-entry-removed' : 'ap-entry'}>{text}</pre>
+    </div>
+  );
+}
+
 export function ChangePanel({
   app,
+  form,
   labels,
   api,
   owner,
@@ -79,11 +99,13 @@ export function ChangePanel({
   onAgentChanged,
 }: {
   app: AppRow;
+  /** WP-D7: "Use the app for …". */
+  form?: 'app';
   labels: Labels;
   api: AppsApi;
   owner: OwnerClient;
   onClose: () => void;
-  onDone: (change: AppChange) => void;
+  onDone: (change: AppChange, launcherUnchanged?: boolean) => void;
   onManual: (entry: Entry | undefined) => void;
   onAgentChanged: () => void;
 }): ReactElement {
@@ -93,16 +115,18 @@ export function ChangePanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [tried, setTried] = useState(false);
+  const [launcher, setLauncher] = useState(false);
 
   const read = useCallback((): void => {
     setPreview({ kind: 'loading' });
-    void api.preview(app.app, labels.folder).then((out) => {
+    const request = form === 'app' ? { form, ...(launcher ? { launcher: true } : {}) } : {};
+    void api.preview(app.app, labels.folder, request).then((out) => {
       if (out.kind === 'change') setPreview({ kind: 'change', change: out.change });
       else if (out.kind === 'none') setPreview({ kind: 'none', status: out.status });
       else if (out.kind === 'agent_changed') onAgentChanged();
       else setPreview({ kind: 'error' });
     });
-  }, [api, app.app, labels.folder, onAgentChanged]);
+  }, [api, app.app, labels.folder, onAgentChanged, form, launcher]);
   useEffect(read, [read]);
 
   const change = preview.kind === 'change' ? preview.change : undefined;
@@ -113,7 +137,9 @@ export function ChangePanel({
         ? S.connectTitle(app.name, labels.label)
         : change.kind === 'move'
           ? S.moveTitle(app.name, labels.label)
-          : S.disconnectTitle(app.name, labels.label);
+          : change.kind === 'switch'
+            ? S.switchTitle(app.name)
+            : S.disconnectTitle(app.name, labels.label);
 
   const send = (proof: PresenceProof): void => {
     if (busy || change === undefined) return;
@@ -123,7 +149,7 @@ export function ChangePanel({
     void run(change.changeId, proof).then((outcome) => {
       setBusy(false);
       const kind = outcome.kind;
-      if (kind === 'done') return onDone(change);
+      if (kind === 'done') return onDone(change, outcome.launcherUnchanged === true);
       const said = gateMessage(kind);
       if (said !== undefined) {
         setError(said);
@@ -137,6 +163,10 @@ export function ChangePanel({
       }
       if (kind === 'quit_first') {
         setError(S.quitFirst(app.name));
+        return read();
+      }
+      if (kind === 'app_location') {
+        setError(S.appLocation);
         return read();
       }
       if (kind === 'agent_changed') {
@@ -155,7 +185,9 @@ export function ChangePanel({
         ? S.statementConnect(app.name, labels.label)
         : change.kind === 'move'
           ? S.statementMove(app.name, labels.label, labels.labelOf(change.oldAgent ?? ''))
-          : S.statementDisconnect(app.name, labels.label);
+          : change.kind === 'switch'
+            ? S.statementSwitch(app.name, labels.label)
+            : S.statementDisconnect(app.name, labels.label);
 
   return (
     <Sheet open title={title} onClose={onClose} closeLabel={S.close} className="ap-sheet">
@@ -200,13 +232,16 @@ export function ChangePanel({
                   ? S.willUse(app.name, labels.label, labels.labelOf(change.oldAgent ?? ''))
                   : change?.kind === 'disconnect'
                     ? S.willStop(app.name, labels.label)
-                    : S.addsOne(app.name)}
+                    : change?.kind === 'switch'
+                      ? S.switchIntro(app.name)
+                      : S.addsOne(app.name)}
               </p>
               <dl className="ap-facts">
                 <dt className="al-text-body-sm">{S.file}</dt>
                 <dd className="al-text-body-sm">{change?.path}</dd>
               </dl>
-              {change?.kind === 'move' && change.oldEntry !== null ? (
+              {(change?.kind === 'move' || change?.kind === 'switch') &&
+              change.oldEntry !== null ? (
                 <div className="ap-entries">
                   <EntryBlock label={S.removedRegion} entry={change.oldEntry} removed />
                   {change.newEntry === null ? null : (
@@ -218,6 +253,36 @@ export function ChangePanel({
               ) : change?.newEntry != null ? (
                 <EntryBlock label={S.entryRegion} entry={change.newEntry} />
               ) : null}
+              {change?.launcherOffer === true || change?.launcher !== undefined ? (
+                <label className="al-text-body-sm">
+                  <input
+                    type="checkbox"
+                    checked={launcher}
+                    disabled={busy}
+                    onChange={(e) => {
+                      setError(undefined);
+                      setLauncher(e.currentTarget.checked);
+                    }}
+                  />{' '}
+                  {S.launcherOption}
+                </label>
+              ) : null}
+              {change?.launcher === undefined ? null : (
+                <>
+                  <dl className="ap-facts">
+                    <dt className="al-text-body-sm">{S.file}</dt>
+                    <dd className="al-text-body-sm">{change.launcher.path}</dd>
+                  </dl>
+                  <div className="ap-entries">
+                    <TextBlock
+                      label={S.launcherRemovedRegion}
+                      text={change.launcher.oldText}
+                      removed
+                    />
+                    <TextBlock label={S.launcherRegion} text={change.launcher.newText} />
+                  </div>
+                </>
+              )}
               <p className="al-text-body-sm al-muted">
                 {S.folder(change?.folder ?? labels.folder)} {S.backup}
               </p>
@@ -283,6 +348,20 @@ function NoChange({
       </>
     );
   }
+  if (status === 'app_location') {
+    return (
+      <>
+        <p className="al-text-body" role="status">
+          {S.appLocation}
+        </p>
+        <div className="ap-card-actions">
+          <Button variant="secondary" onClick={onCheck}>
+            {S.checkAgain}
+          </Button>
+        </div>
+      </>
+    );
+  }
   if (status === 'conflict') {
     return (
       <>
@@ -318,15 +397,28 @@ export function ManualPanel({
   app,
   folder,
   entry,
+  known = [],
   onClose,
 }: {
   app: AppRow | undefined;
   folder: string;
+  known?: readonly AppRow[];
   entry: Entry | undefined;
   onClose: () => void;
 }): ReactElement {
   const [copied, setCopied] = useState(false);
+  const [pathCopied, setPathCopied] = useState<string | null>(null);
   const text = entryText(entry ?? genericEntry(folder));
+  const copyPath = (path: string): void => {
+    try {
+      void navigator.clipboard.writeText(path).then(
+        () => setPathCopied(path),
+        () => undefined,
+      );
+    } catch {
+      // No clipboard: the path is selectable.
+    }
+  };
   const name = app?.name;
   const copy = (): void => {
     try {
@@ -348,10 +440,34 @@ export function ManualPanel({
     >
       <div className="ap-sheet-body">
         <p className="al-text-body">{S.manualIntro}</p>
-        {app === undefined ? null : (
+        {app === undefined ? (
+          <section aria-label={S.manualFileHeading} className="ap-manual-files">
+            <p className="al-text-body-sm">
+              {known.length === 0 ? S.manualFileUnknown : S.manualFileKnown}
+            </p>
+            {known.length === 0 ? null : (
+              <ul className="ap-manual-list">
+                {known.map((k) => (
+                  <li key={k.app}>
+                    <span className="al-text-body-sm">{k.name}</span>{' '}
+                    <code className="al-text-code">{k.path}</code>{' '}
+                    <Button variant="ghost" onClick={() => copyPath(k.path)}>
+                      {pathCopied === k.path ? S.pathCopied : S.copyPath}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : (
           <dl className="ap-facts">
             <dt className="al-text-body-sm">{S.file}</dt>
-            <dd className="al-text-body-sm">{app.path}</dd>
+            <dd className="al-text-body-sm">
+              <code className="al-text-code">{app.path}</code>{' '}
+              <Button variant="ghost" onClick={() => copyPath(app.path)}>
+                {pathCopied === app.path ? S.pathCopied : S.copyPath}
+              </Button>
+            </dd>
           </dl>
         )}
         <div role="region" aria-label={S.entryRegion} tabIndex={0}>

@@ -47,13 +47,24 @@ export const TOOL_TEXT = Object.freeze({
   contactNotFound: "I couldn't find that contact, so nothing was done.",
   contactNotFoundNextStep:
     "Call agentlink_list_contacts to see the user's contacts, then use a contact's id or name.",
+  // REL051-CF1 (R1-CLASS-11; IR-REL051-CF1-1 CF1-B1): only a previous name matched; never acted on.
+  // Slot: the current name under 06 §2.1 (never the query or the previous name).
+  contactRenamed:
+    'No contact has that name now. Did you mean {contactName}, which used to have it?',
+  contactRenamedMany:
+    'No contact has that name now. More than one contact used to have it; they are listed in candidates.',
+  contactRenamedNextStep:
+    'Ask the user which contact they mean; never pick one yourself. Then call the tool again with its id from candidates.',
+  // REL051-CF1 (R1-CLASS-11): a blocked contact is not "not found". Fixed text, no slot (I-5).
+  contactBlocked: 'The owner blocked this contact, so nothing was done.',
+  contactBlockedNextStep:
+    'Tell the user this contact is blocked. Only the user can unblock it, on People in the AgentLink app.',
   contactAmbiguous: 'More than one contact matches that name, so nothing was done.',
+  // REL051-B1 (N12): the options, each by ID tag, short id and day connected (never a name).
+  contactAmbiguousOptions:
+    'More than one contact has that name, so nothing was done. They are: {options}.',
   contactAmbiguousNextStep:
-    'Ask the user which of these contacts they mean, then call the tool again with its id. If two contacts share a name, the user can rename or remove one in their own terminal with `' +
-    DEFAULT_PREFIX +
-    ' contacts rename` or `' +
-    DEFAULT_PREFIX +
-    ' contacts remove`.',
+    'Show the user these options and ask the user which one they mean; never pick one yourself. Then call the tool again with its id from candidates. To tell them apart for good, the user can rename one on People in the AgentLink app.',
 
   // agentlink_get_approval (06 §2.5)
   approvalPending: "The owner hasn't decided on this request yet.",

@@ -99,7 +99,16 @@ describe('contacts.connecting (W5-INVITE-FEEDBACK)', () => {
     const rows = await b.client.contacts.connecting();
     expect(rows).toHaveLength(1);
     const [row] = rows;
-    expect(Object.keys(row ?? {}).sort()).toEqual(['again', 'display', 'expiresAt', 'id', 'sent']);
+    expect(Object.keys(row ?? {}).sort()).toEqual([
+      'again',
+      'blocked',
+      'display',
+      'expiresAt',
+      'id',
+      'sent',
+      // REL051-CF1: when the accept began (the staged row's time), for the waiting hints.
+      'startedAt',
+    ]);
     expect(row?.id).toBe(a.id);
     expect(row?.display.name).toBe('alice');
     expect(row?.display.label).toBe('self-declared');

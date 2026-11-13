@@ -2,7 +2,7 @@
 // page (UX1113-R3; spec §6.4 to §6.6). They draw only what their props hold: the page (index.tsx)
 // owns the calls. Names from a kit are rendered as text. The master code is held in a prop for as
 // long as the card is on screen: never stored, never put in an attribute or a URL.
-import { Banner, Button, Icon, Lockup } from '@4thtech-io/ui';
+import { Banner, Button, Icon, Lockup, useHood } from '@4thtech-io/ui';
 import {
   useEffect,
   useId,
@@ -13,7 +13,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useTitleFocus } from '../welcome/index.js';
-import { UseCodeInstead, copyBackupCode } from '../first-run/backup-code.js';
+import { BackupCodeField, UseCodeInstead, copyBackupCode } from '../first-run/backup-code.js';
 import type { DetectedApp } from '../first-run/apps-api.js';
 import type { FoundKit, Summary, SummaryRow } from './api.js';
 import { CodeField, isComplete } from './code-field.js';
@@ -261,7 +261,7 @@ export function KitStep(p: KitStepProps): ReactElement {
       </div>
       <Assure>{KIT.assurance}</Assure>
       {p.error === undefined ? null : (
-        <div id={errId} role="alert">
+        <div id={errId}>
           <Banner tone="warning">
             {p.error}
             {p.errorHint === undefined ? null : <> {p.errorHint}</>}
@@ -369,7 +369,7 @@ export function PresenceStep(p: PresenceStepProps): ReactElement {
         </div>
       )}
       {p.error === undefined ? null : (
-        <div role="alert">
+        <div>
           <Banner tone="warning">{p.error}</Banner>
         </div>
       )}
@@ -426,7 +426,7 @@ export function CodeStep(p: CodeStepProps): ReactElement {
       </Banner>
       <Assure>{CODE.assurance}</Assure>
       {p.error === undefined ? null : (
-        <div role="alert">
+        <div>
           <Banner tone="danger">{p.error}</Banner>
         </div>
       )}
@@ -484,7 +484,7 @@ export function CheckedStep({
   readonly onAnother: () => void;
 }): ReactElement {
   // UX1113-QA2 N4: an ID already on this computer by its label; a new one by its folder name.
-  const names = summary.ids.map((r) => r.label ?? r.name);
+  const names = summary.ids.map(rowName);
   const people = summary.ids.reduce((n, r) => n + r.people, 0);
   const last = summary.ids.reduce<number | null>(
     (m, r) => (r.lastMessageAt === null ? m : Math.max(m ?? 0, r.lastMessageAt)),
@@ -543,6 +543,22 @@ export interface ReviewStepProps {
   readonly onDone: () => void;
 }
 
+/**
+ * REL051-UF3 (R1-UI-08): the name a kit row shows. An ID already on this computer has its label (the
+ * name people see). A new one has no label yet: the kit's manifest names it only by its folder, and
+ * its label is sealed inside its store, read back once restored. The first-run folder `default` then
+ * reads "Your first ID"; any other folder shows as it is. Text only.
+ */
+export function rowName(row: SummaryRow): string {
+  if (row.label !== undefined) return row.label;
+  if (row.name === 'default') return REVIEW.firstId;
+  // REL051-R2C (R2-CLASS-05, R2-UI-04): never a bare folder name: the folder was made from the ID's
+  // name, so it reads as one ("work" → "Work", "ana-novak" → "Ana novak") until the read-back.
+  const words = row.name.replace(/[-_]+/g, ' ').trim();
+  if (words === '') return row.name;
+  return `${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+}
+
 function Row({
   row,
   state,
@@ -569,7 +585,8 @@ function Row({
     else next.add(row.agentId);
     onState({ ...state, selected: next });
   };
-  const initial = [...row.name][0]?.toUpperCase() ?? '?';
+  const shown = rowName(row);
+  const initial = [...shown][0]?.toUpperCase() ?? '?';
   return (
     <li className="rs-row" data-state={row.state} data-off={off}>
       <label className="rs-pick">
@@ -577,7 +594,7 @@ function Row({
           type="checkbox"
           checked={checked}
           disabled={off || disabled}
-          aria-label={REVIEW.pick(row.name)}
+          aria-label={REVIEW.pick(shown)}
           onChange={toggle}
         />
         <span className="rs-tick" aria-hidden="true">
@@ -588,8 +605,10 @@ function Row({
         {initial}
       </span>
       <span className="rs-row-text">
-        <bdi className="rs-row-name">{row.name}</bdi>
-        <span className="rs-row-line">{REVIEW.nameHint}</span>
+        <bdi className="rs-row-name">{shown}</bdi>
+        {row.label === undefined && row.state !== 'already_here' ? (
+          <span className="rs-row-line">{REVIEW.nameHint}</span>
+        ) : null}
         <span className="rs-row-line">
           {row.state === 'new'
             ? summary.contents === 'identity'
@@ -621,8 +640,7 @@ export function ReviewStep(p: ReviewStepProps): ReactElement {
   const choosable = summary.ids.filter((r) => r.state === 'new' || r.state === 'name_taken');
   const count = choosable.filter((r) => p.state.selected.has(r.agentId)).length;
   const date = formatDate(summary.createdAt);
-  const names = summary.ids.filter((r) => r.state === 'new' || r.state === 'name_taken').length;
-  void names;
+  const hood = useHood();
   return (
     <section className="rs-screen rs-wide" aria-labelledby="rs-h">
       <div className="rs-intro">
@@ -643,7 +661,7 @@ export function ReviewStep(p: ReviewStepProps): ReactElement {
         ))}
       </ul>
       {choosable.length === 0 ? (
-        <Banner tone="info">{REVIEW.nothing}</Banner>
+        <Banner tone="info">{p.newOwner ? REVIEW.finishNeeded : REVIEW.nothing}</Banner>
       ) : (
         <div className="rs-cols">
           <div>
@@ -674,21 +692,34 @@ export function ReviewStep(p: ReviewStepProps): ReactElement {
         </div>
       )}
       {p.error === undefined ? null : (
-        <div role="alert">
+        <div>
           <Banner tone="danger">{p.error}</Banner>
         </div>
       )}
       {p.working ? (
         <p className="rs-spin" role="status">
           {REVIEW.progress(
-            choosable.find((r) => p.state.selected.has(r.agentId))?.name ?? '',
+            (() => {
+              const first = choosable.find((r) => p.state.selected.has(r.agentId));
+              return first === undefined ? '' : rowName(first);
+            })(),
             1,
             Math.max(1, count),
           )}
         </p>
       ) : null}
       <div className="rs-actions">
-        {choosable.length === 0 ? (
+        {choosable.length === 0 && p.newOwner ? (
+          // IR-REL051-R2C-1: no owner here: owner-only completion (nothing chosen) with the sensor,
+          // then the new master code. Never a Done that cancels and leaves no owner.
+          <Button variant="primary" size="lg" disabled={p.working} onClick={p.onRestore}>
+            {p.working
+              ? REVIEW.restoring
+              : p.error === undefined
+                ? REVIEW.finishOwner
+                : REVIEW.tryAgain}
+          </Button>
+        ) : choosable.length === 0 ? (
           <Button variant="primary" size="lg" onClick={p.onDone}>
             {REVIEW.done}
           </Button>
@@ -710,15 +741,18 @@ export function ReviewStep(p: ReviewStepProps): ReactElement {
           {WIZARD.back}
         </Button>
       </div>
-      <details className="rs-hood">
-        <summary>{REVIEW.hood}</summary>
-        <p>{REVIEW.hoodKit(summary.kitId, summary.contents)}</p>
-        {summary.ids.map((r) => (
-          <p key={r.agentId}>
-            <bdi>{r.name}</bdi> · <code>{r.agentId}</code>
-          </p>
-        ))}
-      </details>
+      {/* R1-UI-26: the kit's facts are for Under the hood only; the folder name lives here. */}
+      {hood ? (
+        <details className="rs-hood">
+          <summary>{REVIEW.hood}</summary>
+          <p>{REVIEW.hoodKit(summary.kitId, summary.contents)}</p>
+          {summary.ids.map((r) => (
+            <p key={r.agentId}>
+              <bdi>{rowName(r)}</bdi> · {REVIEW.hoodFolder(r.name)} · <code>{r.agentId}</code>
+            </p>
+          ))}
+        </details>
+      ) : null}
     </section>
   );
 }
@@ -731,6 +765,8 @@ export interface AppRow {
 
 export interface ProtectStepProps {
   readonly restored: readonly string[];
+  /** IR-REL051-R2C-2: the IDs already here that "Finish restoring" completed. */
+  readonly ready?: readonly string[];
   readonly failed: readonly string[];
   readonly masterCode: string | undefined;
   readonly sensor: string;
@@ -792,20 +828,34 @@ function Code({
   );
 }
 
+/** The code without spaces, dashes or case: what a typed-back code is compared by. */
+const compactCode = (value: string): string => value.replace(/[\s-]+/g, '').toUpperCase();
+
 export function ProtectStep(p: ProtectStepProps): ReactElement {
   const code = p.masterCode;
   const ready = code === undefined || p.saved;
+  const [typed, setTyped] = useState('');
+  const typedWrong =
+    code !== undefined &&
+    !p.saved &&
+    compactCode(typed).length >= compactCode(code).length &&
+    compactCode(typed) !== compactCode(code);
+  const shown = p.restored.length > 0 ? p.restored : (p.ready ?? []);
   return (
     <section className="rs-screen rs-wide" aria-labelledby="rs-h">
       <div className="rs-done-mark" aria-hidden="true">
         <Icon name="check" size={36} />
       </div>
       <div className="rs-intro">
-        <Title id="rs-h">{PROTECT.title(p.restored.length)}</Title>
-        {p.restored.length === 0 ? null : (
+        <Title id="rs-h">
+          {p.restored.length === 0 && shown.length > 0
+            ? PROTECT.titleReady(shown.length)
+            : PROTECT.title(p.restored.length)}
+        </Title>
+        {shown.length === 0 ? null : (
           <p className="rs-lead">
-            <NameList names={p.restored} />
-            {PROTECT.leadRest(p.restored.length)}
+            <NameList names={shown} />
+            {PROTECT.leadRest(shown.length)}
           </p>
         )}
       </div>
@@ -821,17 +871,31 @@ export function ProtectStep(p: ProtectStepProps): ReactElement {
             body={p.touchId ? PROTECT.codeBody(p.sensor) : PROTECT.codeBodyNoSensor}
             onPrint={() => window.print()}
           />
-          <label className="rs-saved">
-            <input
-              type="checkbox"
-              checked={p.saved}
-              onChange={(e) => p.onSaved(e.currentTarget.checked)}
+          {/* IR-REL051-R2C-2: typed back, as Replace master code: proof it was saved. */}
+          <div className="rs-typeback" data-saved={p.saved ? 'true' : 'false'}>
+            <BackupCodeField
+              label={PROTECT.typeBack}
+              name="restore-new-master-code"
+              value={typed}
+              disabled={p.saved}
+              onValue={(value) => {
+                const match = compactCode(value) === compactCode(code);
+                // The matched code leaves the field at once (no code in the page's attributes).
+                setTyped(match ? '' : value);
+                if (match !== p.saved) p.onSaved(match);
+              }}
             />
-            <span className="rs-tick" aria-hidden="true">
-              <Icon name="check" size={16} />
-            </span>
-            <span>{PROTECT.saved}</span>
-          </label>
+            {p.saved ? (
+              <p className="rs-hint" role="status">
+                {PROTECT.typedBackOk}
+              </p>
+            ) : null}
+            {typedWrong ? (
+              <p className="rs-error" role="alert">
+                {PROTECT.typeBackWrong}
+              </p>
+            ) : null}
+          </div>
           {/* Rendered here in memory for the printer only; never written to disk. */}
           <div className="rs-print-sheet" aria-hidden="true">
             <h1>{PROTECT.printTitle}</h1>

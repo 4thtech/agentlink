@@ -58,7 +58,7 @@ export interface RevealSeams {
 const MAX_NAME_BYTES = 255;
 
 /** One plain segment, exactly as core's sanitizeFileName leaves a name. */
-function plainName(name: unknown): name is string {
+export function plainName(name: unknown): name is string {
   if (typeof name !== 'string' || name.length === 0) return false;
   if (name === '.' || name === '..' || /[/\\\0]/.test(name)) return false;
   if (Buffer.byteLength(name, 'utf8') > MAX_NAME_BYTES) return false;
@@ -69,11 +69,14 @@ function plainName(name: unknown): name is string {
   }
 }
 
-const O_NOFOLLOW = (constants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0;
-const O_NONBLOCK = (constants as { O_NONBLOCK?: number }).O_NONBLOCK ?? 0;
+export const O_NOFOLLOW = (constants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0;
+export const O_NONBLOCK = (constants as { O_NONBLOCK?: number }).O_NONBLOCK ?? 0;
 
 /** The open's failure as an outcome: no file is `not_found`; anything else fails closed. */
-async function openFailure(error: unknown, target: string): Promise<RevealOutcome> {
+export async function openFailure(
+  error: unknown,
+  target: string,
+): Promise<'not_found' | 'refused' | 'unavailable'> {
   const code = (error as NodeJS.ErrnoException | undefined)?.code;
   if (code === 'ENOENT') {
     // Without O_NOFOLLOW the open followed a final link: something still has the saved name (a
@@ -93,7 +96,7 @@ async function openFailure(error: unknown, target: string): Promise<RevealOutcom
 }
 
 /** Step 5: the opened handle is a regular file that `target` still names. */
-async function sameRegularFile(handle: FileHandle, target: string): Promise<boolean> {
+export async function sameRegularFile(handle: FileHandle, target: string): Promise<boolean> {
   let opened: Stats;
   let current: Stats;
   let real: string;

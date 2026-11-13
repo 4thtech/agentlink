@@ -1,6 +1,6 @@
 # INSTALLER-1: script-level tests of installer/install.ps1, run by install-ps1.test.mjs with pwsh
-# (on Linux in CI). It loads the installer's functions and its two settings ($NodeVersion, $Package)
-# from the parsed file, without running its main block, then replaces the parts that touch the
+# (on Linux in CI). It loads the installer's functions and its settings ($NodeVersion, $Package and
+# the $Desktop* ones) from the parsed file, without running its main block, then replaces the parts that touch the
 # network or the Windows registry: Invoke-WebRequest serves files from a folder, the user PATH is a
 # variable. Prints "ok: <name>" per check; the first failed check throws (exit code 1).
 param([string]$Script, [string]$Work)
@@ -18,7 +18,7 @@ $found = $ast.FindAll({
 foreach ($statement in $found) {
   $isFunction = $statement -is [System.Management.Automation.Language.FunctionDefinitionAst]
   $isSetting = $statement -is [System.Management.Automation.Language.AssignmentStatementAst] -and
-    @('$NodeVersion', '$Package') -contains $statement.Left.Extent.Text
+    @('$NodeVersion', '$Package', '$DesktopReleased', '$DesktopVersion', '$DesktopReleases') -contains $statement.Left.Extent.Text
   if ($isFunction -or $isSetting) { . ([scriptblock]::Create($statement.Extent.Text)) }
 }
 
@@ -275,4 +275,242 @@ Check 'the launcher tells AgentLink it was started by the installer (D4)' {
   $set = [array]::IndexOf($lines, 'set "AGENTLINK_LAUNCHER=installer"')
   $set -gt [array]::IndexOf($lines, 'setlocal') -and $set -lt ($lines.Count - 1)
 }
+# --- -Desktop (the desktop app) -------------------------------------------------------------------
+# The shipped script has it switched off. The checks below switch it on with version 9.9.9 and the
+# fixture setup's hash pinned, and replace the parts that touch the network (Get-HttpHop), run the
+# setup (Invoke-DesktopSetup) or start the app (Start-DesktopApp).
+$script:Hops = @()
+function Get-HttpHop([string]$Url, [string]$OutFile) {
+  $script:Hops += $Url
+  if ($script:Redirects.ContainsKey($Url)) { return @{ Status = 302; Location = $script:Redirects[$Url] } }
+  $file = Join-Path $deskServe (($Url -split '\?')[0].Split('/')[-1])
+  if (-not (Test-Path -LiteralPath $file)) { return @{ Status = 404; Location = '' } }
+  Copy-Item -LiteralPath $file -Destination $OutFile
+  return @{ Status = 200; Location = '' }
+}
+function Invoke-DesktopSetup([string]$Setup) {
+  $script:SetupRuns += [IO.File]::ReadAllText($Setup)
+  if ($script:SetupExit -eq 0) {
+    $dir = Join-Path $script:Programs 'AgentLink'
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $dir 'AgentLink.exe') -Value 'app'
+  }
+  return $script:SetupExit
+}
+function Start-DesktopApp([string]$Exe, [string[]]$Arguments) {
+  Write-Host 'STARTED'
+  $script:Started += , (@($Exe) + @($Arguments))
+}
+function Get-DesktopPinnedSha([string]$Platform) { if ($Platform -eq 'win-x64') { return $script:DeskPinned } return '' }
+# Windows ACLs do not exist on the Linux CI runner: records the folder instead.
+$script:Protected = @()
+function Protect-Directory([string]$Path) {
+  if (@(Get-ChildItem -LiteralPath $Path -Force).Count -ne 0) { throw 'FAILED: the folder must be protected while still empty' }
+  $script:Protected += $Path
+}
+function New-Programs { $script:roots++; $script:Programs = Join-Path $Work "programs$($script:roots)"; return $script:Programs }
+
+Check 'the desktop app ships switched off' { $DesktopReleased -eq $false }
+Expect-Throw 'switched off: -Desktop is refused with one fixed line' '^The AgentLink desktop app is not released yet\. Run the installer without -Desktop\.$' {
+  Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64' -Invite $short
+}
+Check '... before anything is downloaded or run' {
+  $script:Hops.Count -eq 0 -and -not (Test-Path -LiteralPath $script:Programs)
+}
+
+$DesktopReleased = $true
+$DesktopVersion = '9.9.9'
+$release = "$DesktopReleases/v9.9.9"
+$setupName = 'AgentLink-9.9.9-win-x64-setup.exe'
+$sumsName = 'SHA256SUMS-win-x64'
+$deskServe = Join-Path $Work 'desk-serve'
+New-Item -ItemType Directory -Path $deskServe | Out-Null
+Set-Content -LiteralPath (Join-Path $deskServe $setupName) -Value 'the AgentLink setup 9.9.9' -NoNewline
+$deskSha = (Get-FileHash -LiteralPath (Join-Path $deskServe $setupName) -Algorithm SHA256).Hash.ToLowerInvariant()
+$deskSums = "$('1' * 64)  AgentLink-9.9.9-win-x64.zip`n$deskSha  $setupName`n"
+function Reset-Desktop {
+  $script:Protected = @()
+  $script:Downloads = @()
+  $script:Hops = @()
+  $script:Redirects = @{}
+  $script:SetupRuns = @()
+  $script:SetupExit = 0
+  $script:Started = @()
+  $script:DeskPinned = $deskSha
+  Set-Content -LiteralPath (Join-Path $deskServe $setupName) -Value 'the AgentLink setup 9.9.9' -NoNewline
+  Set-Content -LiteralPath (Join-Path $deskServe $sumsName) -Value $deskSums -NoNewline
+}
+function Get-TempCount { return @(Get-ChildItem -LiteralPath ([IO.Path]::GetTempPath()) -Directory -Filter 'agentlink-install-*' -ErrorAction SilentlyContinue).Count }
+
+Check 'a desktop download address must be https on a GitHub Release host, nothing else' {
+  $good = @(
+    "$release/$setupName",
+    'https://objects.githubusercontent.com/github-production-release-asset/1/x?a=1&b=x%3D',
+    'https://release-assets.githubusercontent.com/github-production-release-asset/1/x?sp=r&sig=a%2Bb%3D&rsct=application%2Foctet-stream'
+  )
+  $bad = @(
+    '', 'https://evil.example/x', 'http://github.com/4thtech/agentlink', 'https://github.com@evil.example/x',
+    'https://github.com:8443/x', 'https://objects.githubusercontent.com.evil.example/x', 'https://GitHub.com/x',
+    'https://github.com', '/relative/x', 'https://github.com/x y', 'https://github.com/x"y', "https://github.com/x`n",
+    'https://github.com/x\y', "https://github.com/x$([char]0x00e9)", 'file:///etc/passwd'
+  )
+  @($good | Where-Object { -not (Test-DesktopUrl $_) }).Count -eq 0 -and
+  @($bad | Where-Object { Test-DesktopUrl $_ }).Count -eq 0
+}
+
+Reset-Desktop
+$programs = New-Programs
+$tempBefore = Get-TempCount
+$out = Install-AgentLinkDesktop -ProgramsDir $programs -Arch 'AMD64' 6>&1 | Out-String
+Check 'desktop: downloads the setup and SHA256SUMS from the release, checks both hashes, runs the setup' {
+  $script:Hops.Count -eq 2 -and $script:Hops[0] -eq "$release/$setupName" -and $script:Hops[1] -eq "$release/$sumsName" -and
+  $script:SetupRuns.Count -eq 1 -and $script:SetupRuns[0] -eq 'the AgentLink setup 9.9.9' -and
+  $out -match 'Checked: the download matches the release and this installer\.' -and $out -match 'AgentLink is installed\.'
+}
+Check 'desktop: app only (no Node.js, no command), temporary folder removed, not started without a terminal' {
+  $script:Downloads.Count -eq 0 -and (Get-TempCount) -eq $tempBefore -and $script:Started.Count -eq 0 -and
+  $out -match 'Next time, open AgentLink from the Start menu\.' -and $out -match 'To open it now, run:'
+}
+Check 'desktop: the setup is downloaded into a fresh per-run folder made private before anything is in it' {
+  $script:Protected.Count -eq 1 -and
+  (Split-Path -Leaf $script:Protected[0]) -match '\Aagentlink-install-[0-9a-f]{32}\z' -and
+  -not (Test-Path -LiteralPath $script:Protected[0])
+}
+
+Reset-Desktop
+$line = "$deskSha  $setupName`n"
+Set-Content -LiteralPath (Join-Path $deskServe $sumsName) -Value ($line + $line) -NoNewline
+Expect-Throw 'desktop: a SHA256SUMS listing the setup twice is refused' 'SHA-256 mismatch' {
+  Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64'
+}
+Check '... and runs nothing' { $script:SetupRuns.Count -eq 0 }
+
+Check 'desktop: the setup is hashed again right before it runs, through a handle kept open' {
+  $file = Join-Path $Work 'verify-me.exe'
+  Set-Content -LiteralPath $file -Value 'the AgentLink setup 9.9.9' -NoNewline
+  $stream = Open-VerifiedFile $file $deskSha
+  $open = $stream.CanRead
+  $stream.Dispose()
+  $m = $null
+  try { Open-VerifiedFile $file ('4' * 64) } catch { $m = $_.Exception.Message }
+  $open -and $m -match 'SHA-256 mismatch'
+}
+
+# A setup swapped after the first check (the first check is skipped here) is caught by the second.
+Reset-Desktop
+$realAssert = ${function:Assert-DesktopSetup}
+function Assert-DesktopSetup([string]$Path, [string]$Sums, [string]$FileName, [string]$Pinned) {
+  Set-Content -LiteralPath $Path -Value 'swapped' -NoNewline
+}
+Expect-Throw 'desktop: a setup changed after the first check is not run' 'SHA-256 mismatch' {
+  Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64'
+}
+Check '... and runs nothing' { $script:SetupRuns.Count -eq 0 }
+${function:Assert-DesktopSetup} = $realAssert
+
+Reset-Desktop
+$hop1 = "https://objects.githubusercontent.com/github-production-release-asset/1/$setupName" + '?a=1'
+$hop2 = "https://release-assets.githubusercontent.com/github-production-release-asset/1/$setupName" + '?sp=r&sig=abc%3D'
+$script:Redirects[$release + '/' + $setupName] = $hop1
+$script:Redirects[$hop1] = $hop2
+$out = Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64' 6>&1 | Out-String
+Check 'desktop: follows GitHub redirects itself, checking each hop, printing none of them' {
+  $script:Hops.Count -eq 4 -and $script:Hops[1] -eq $hop1 -and $script:Hops[2] -eq $hop2 -and
+  $script:SetupRuns.Count -eq 1 -and $out -notmatch 'githubusercontent'
+}
+
+$badHops = @(
+  'https://evil.example/x.exe', "http://objects.githubusercontent.com/$setupName", "https://github.com@evil.example/$setupName",
+  "https://github.com:8443/$setupName", "https://objects.githubusercontent.com.evil.example/$setupName", '', "/x/$setupName"
+)
+Check 'desktop: a redirect anywhere else is refused before it is fetched, and nothing runs' {
+  $ok = $true
+  foreach ($to in $badHops) {
+    Reset-Desktop
+    $script:Redirects[$release + '/' + $setupName] = $to
+    $m = $null
+    try { Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64' *> $null } catch { $m = $_.Exception.Message }
+    if ($m -ne 'The desktop app download was sent to an unexpected address, so nothing was installed.' -or
+      $script:Hops.Count -ne 1 -or $script:SetupRuns.Count -ne 0) { $ok = $false }
+  }
+  $ok
+}
+
+Reset-Desktop
+$script:Redirects[$release + '/' + $setupName] = 'https://objects.githubusercontent.com/hop1'
+foreach ($n in 1..5) { $script:Redirects["https://objects.githubusercontent.com/hop$n"] = "https://objects.githubusercontent.com/hop$($n + 1)" }
+Expect-Throw 'desktop: stops after 5 redirects' 'redirected too often' {
+  Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64'
+}
+Check '... and runs nothing' { $script:SetupRuns.Count -eq 0 }
+
+Reset-Desktop
+Set-Content -LiteralPath (Join-Path $deskServe $sumsName) -Value "$('2' * 64)  $setupName`n" -NoNewline
+Expect-Throw 'desktop: a setup that does not match SHA256SUMS stops the install' 'SHA-256 mismatch' {
+  Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64'
+}
+Check '... and runs nothing' { $script:SetupRuns.Count -eq 0 }
+
+Reset-Desktop
+$script:DeskPinned = '3' * 64
+Expect-Throw 'desktop: a setup that matches SHA256SUMS but not the pinned hash stops the install' 'SHA-256 mismatch' {
+  Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64'
+}
+Check '... and runs nothing' { $script:SetupRuns.Count -eq 0 }
+
+Reset-Desktop
+Remove-Item -LiteralPath (Join-Path $deskServe $sumsName)
+Expect-Throw 'desktop: a failed download says so plainly, naming only the fixed address' ([regex]::Escape("Could not download $release/$sumsName. Check your internet connection")) {
+  Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64'
+}
+
+Reset-Desktop
+$script:SetupExit = 2
+Expect-Throw 'desktop: a setup that fails says so' 'exit code 2' {
+  Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64'
+}
+
+Reset-Desktop
+$out = Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64' -DryRun -Invite $short 6>&1 | Out-String
+Check 'desktop: dry run prints the plan, downloads and runs nothing, never prints the link' {
+  $script:Hops.Count -eq 0 -and $script:SetupRuns.Count -eq 0 -and -not (Test-Path -LiteralPath $script:Programs) -and
+  $out -match ([regex]::Escape("would download $release/$setupName and $sumsName")) -and
+  $out -match 'would open the invite in AgentLink' -and $out -notmatch 'aaaa'
+}
+
+Reset-Desktop
+Expect-Throw 'desktop: -Uninstall is refused' "-Desktop can't be used with -Uninstall" {
+  Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64' -Uninstall
+}
+Expect-Throw 'desktop: a malformed invite is refused with the fixed line' $refused {
+  Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64' -Invite "$short;calc"
+}
+Expect-Throw 'desktop: no pinned app for this processor' 'not available for this computer yet' {
+  Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'ARM64'
+}
+Check '... all before anything is downloaded' { $script:Hops.Count -eq 0 }
+
+Reset-Desktop
+$out = Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64' -Interactive -Invite $short 6>&1 | Out-String
+Check 'desktop, in a terminal, with an invite: starts the app with -- and the agentlink:// link' {
+  $exe = Join-Path (Join-Path $script:Programs 'AgentLink') 'AgentLink.exe'
+  $payload = $short.Substring('https://agentlink.4thtech.io/i#'.Length)
+  $script:Started.Count -eq 1 -and $script:Started[0].Count -eq 3 -and $script:Started[0][0] -eq $exe -and
+  $script:Started[0][1] -eq '--' -and $script:Started[0][2] -eq "agentlink://join#$payload" -and $out -notmatch 'aaaa'
+}
+
+Reset-Desktop
+$out = Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64' -Interactive 6>&1 | Out-String
+Check 'desktop, in a terminal, without an invite: starts the app with no arguments' {
+  $script:Started.Count -eq 1 -and $script:Started[0].Count -eq 1 -and $out -match 'Opening AgentLink\.'
+}
+
+Reset-Desktop
+$out = Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64' -Invite $long 6>&1 | Out-String
+Check 'desktop, not in a terminal, with an invite: starts nothing, says how to open it, never prints it' {
+  $script:Started.Count -eq 0 -and $out -notmatch 'Ab9_-' -and
+  $out -match 'To open the invite, run the command from the invite page again in your own terminal\.'
+}
+$DesktopReleased = $false
+
 Write-Output 'all install.ps1 checks passed'

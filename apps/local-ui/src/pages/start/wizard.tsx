@@ -8,13 +8,7 @@
 // kit turns every one into a fade. Names from the server (an app, the agent) are rendered as text.
 import { IdExplainerCard } from './id-explainer.js';
 import { Button, Icon, Lockup, Skeleton, TextField } from '@4thtech-io/ui';
-import {
-  useState,
-  type FormEvent,
-  type MouseEvent,
-  type ReactElement,
-  type ReactNode,
-} from 'react';
+import { type FormEvent, type MouseEvent, type ReactElement, type ReactNode } from 'react';
 import { useTitleFocus } from '../welcome/index.js';
 import type { DetectedApp } from '../first-run/apps-api.js';
 import { skipToHome } from './guard.js';
@@ -62,10 +56,18 @@ export interface WizardFrameProps {
   readonly onSkip?: () => void;
   /** W4-WIRE-2: the step's name when it is not the route's own (Add agent's "Name your agent"). */
   readonly stepName?: string;
+  /** R1-UI-01: no "Skip to Home" while there is no ID (Home would be a dead end). */
+  readonly hideSkip?: boolean;
 }
 
 /** The focused column's header and the step under it. */
-export function WizardFrame({ step, children, onSkip, stepName }: WizardFrameProps): ReactElement {
+export function WizardFrame({
+  step,
+  children,
+  onSkip,
+  stepName,
+  hideSkip = false,
+}: WizardFrameProps): ReactElement {
   const n = STEP_IDS.indexOf(step) + 1;
   const label = W.stepLabel(n, stepName ?? W.stepNames[step]);
   const skip = (event: MouseEvent<HTMLAnchorElement>): void => {
@@ -91,9 +93,16 @@ export function WizardFrame({ step, children, onSkip, stepName }: WizardFramePro
             <Segments step={step} />
             <span className="st-eyebrow">{label}</span>
           </span>
-          <a className="st-skip al-text-body-sm" href="/" onClick={skip}>
-            {W.skip}
-          </a>
+          {hideSkip ? (
+            // Keeps its room (no layout shift when the mode is known), but is not there to use.
+            <span className="st-skip st-skip-gone al-text-body-sm" aria-hidden="true">
+              {W.skip}
+            </span>
+          ) : (
+            <a className="st-skip al-text-body-sm" href="/" onClick={skip}>
+              {W.skip}
+            </a>
+          )}
         </div>
       </header>
       <div className="st-body">{children}</div>
@@ -582,12 +591,10 @@ export interface InviteStepProps {
   readonly panel?: ReactNode;
   /** Where invites are made today (People). */
   readonly inviteHref: string;
+  /** Done: the link made here stays and waits on Home, copied or not (REL051-B2). */
   readonly onHome: () => void;
-  /** A link is on screen that has not been copied or sent: leaving cancels it, so warn first. */
-  readonly unsent?: boolean;
-  /** The warning is showing (the page holds this, so "Skip to Home" in the header can raise it too). */
-  readonly warned?: boolean;
-  readonly onWarn?: () => void;
+  /** Skip for now: no invite (the page ends a link that never left the screen). Default: onHome. */
+  readonly onSkip?: () => void;
 }
 
 /** A3, step 4 (optional): invite someone; "Skip for now" and "Done, go to Home". */
@@ -595,22 +602,9 @@ export function InviteStep({
   panel,
   inviteHref,
   onHome,
-  unsent = false,
-  warned: givenWarned,
-  onWarn,
+  onSkip = onHome,
 }: InviteStepProps): ReactElement {
   const title = useTitleFocus<HTMLHeadingElement>();
-  const [ownWarned, setOwnWarned] = useState(false);
-  const warned = givenWarned ?? ownWarned;
-  // Leaving with a link nobody has: say so once, then let the person go.
-  const leave = (): void => {
-    if (unsent && !warned) {
-      if (onWarn === undefined) setOwnWarned(true);
-      else onWarn();
-      return;
-    }
-    onHome();
-  };
   return (
     <section className="st-screen st-w-600" aria-labelledby="st-h">
       <div className="st-intro">
@@ -627,19 +621,12 @@ export function InviteStep({
           </a>
         </div>
       )}
-      {unsent && warned ? (
-        <p className="st-unsent al-text-body-sm" role="alert">
-          {I.unsentWarn}
-        </p>
-      ) : null}
       <div className="st-row st-end">
-        {unsent && warned ? null : (
-          <Button variant="ghost" size="lg" onClick={leave}>
-            {I.skip}
-          </Button>
-        )}
-        <Button variant="secondary" size="lg" onClick={leave}>
-          {unsent && warned ? I.leaveAnyway : I.done}
+        <Button variant="ghost" size="lg" onClick={onSkip}>
+          {I.skip}
+        </Button>
+        <Button variant="secondary" size="lg" onClick={onHome}>
+          {I.done}
         </Button>
       </div>
     </section>

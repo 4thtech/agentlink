@@ -22,6 +22,14 @@
 //   signed object; only then the seam writes (and checks again: the bytes and identity, Claude
 //   Desktop, the folder's agentId).
 //
+// WP-D7 (plan 2026-11-12 Decision 2 "AI apps"): `preview?app=&agent=&form=app` asks for the app form
+// (the AgentLink desktop app's bundled CLI): for an app that already runs the open agent with npx it
+// is a `switch` of that entry, signed as `app.connect` ("Claude Code will use the AgentLink app for
+// Work"). `&launcher=1` (app form only) adds the installer's `agentlink` command, bound by the
+// changeId too. The list says whether the desktop app is there (`desktopApp`) and each entry's form.
+// The form and the launcher choice are kept with the preview, so the plan recomputed after the
+// gesture is the same request.
+//
 // The page never sends a path: the seam takes paths only from the fixed harness table (06 §7). Every
 // answer holds only fixed words, fixed app names, display paths, AgentLink's own entries and valid
 // agent names: never another entry of a config file or anything else read from it (I-7). Nothing
@@ -35,10 +43,12 @@ import {
 } from '@4thtech-io/crypto';
 import type {
   LocalUiAiAppPlan,
+  LocalUiAiAppPlanRequest,
   LocalUiAiApps,
   LocalUiAiAppView,
   LocalUiAiAppWrite,
   LocalUiContext,
+  LocalUiLauncherChange,
 } from '../context.js';
 import {
   NOT_AVAILABLE,
@@ -87,21 +97,27 @@ const CHANGED = fixed(409, 'changed');
 /** 409: signed, but core did not apply it. */
 const NOT_APPLIED = fixed(409, 'not_applied');
 
-const WRITE_ANSWERS: Readonly<Record<Exclude<LocalUiAiAppWrite, 'written'>, LocalUiResult>> =
-  Object.freeze({
-    changed: CHANGED,
-    quit_first: fixed(409, 'quit_first'),
-    agent_mismatch: AGENT_MISMATCH,
-    failed: fixed(409, 'write_failed'),
-  });
+const WRITE_ANSWERS: Readonly<
+  Record<Exclude<LocalUiAiAppWrite, 'written' | 'written_launcher_unchanged'>, LocalUiResult>
+> = Object.freeze({
+  changed: CHANGED,
+  quit_first: fixed(409, 'quit_first'),
+  agent_mismatch: AGENT_MISMATCH,
+  app_location: fixed(409, 'app_location'),
+  failed: fixed(409, 'write_failed'),
+});
 
-/** The `changeId` of 04 §2.5.1: SHA-256 (through @4thtech-io/crypto) of the JCS of the change. */
+/**
+ * The `changeId` of 04 §2.5.1: SHA-256 (through @4thtech-io/crypto) of the JCS of the change. WP-D7:
+ * a launcher change is bound too (absent otherwise, so every earlier changeId is unchanged).
+ */
 export function appChangeId(change: {
   readonly app: string;
   readonly path: string;
   readonly oldEntry: JsonObject | null;
   readonly newEntry: JsonObject | null;
   readonly agent: string;
+  readonly launcher?: LocalUiLauncherChange | undefined;
 }): string {
   const text = canonicalize({
     app: change.app,
@@ -109,8 +125,27 @@ export function appChangeId(change: {
     oldEntry: change.oldEntry,
     newEntry: change.newEntry,
     agent: change.agent,
+    ...(change.launcher === undefined
+      ? {}
+      : {
+          launcher: {
+            path: change.launcher.path,
+            oldText: change.launcher.oldText,
+            newText: change.launcher.newText,
+          },
+        }),
   });
   return encodeHex(sha256(new TextEncoder().encode(text)));
+}
+
+/** A launcher change as plain strings (AgentLink's own text), or undefined. */
+function launcherCopy(launcher: unknown): LocalUiLauncherChange | undefined {
+  if (typeof launcher !== 'object' || launcher === null) return undefined;
+  const { path, oldText, newText } = launcher as Record<string, unknown>;
+  if (typeof path !== 'string' || typeof oldText !== 'string' || typeof newText !== 'string') {
+    return undefined;
+  }
+  return { path, oldText, newText };
 }
 
 type Change = Extract<LocalUiAiAppPlan, { status: 'change' }>;
@@ -123,6 +158,8 @@ interface Pending {
   readonly name: string;
   readonly oldAgent: string | null;
   readonly identity: string;
+  /** WP-D7: what was asked for, so the plan after the gesture is the same request. */
+  readonly request: LocalUiAiAppPlanRequest;
   readonly expiresAt: number;
 }
 
@@ -171,7 +208,32 @@ function coherent(plan: Change, app: string, agent: string): boolean {
       );
     case 'disconnect':
       return plan.oldAgent === agent && plan.newAgent === null && plan.newEntry === null;
+    case 'switch':
+      return (
+        plan.oldAgent === agent &&
+        plan.newAgent === agent &&
+        plan.oldEntry !== null &&
+        plan.newEntry !== null &&
+        canonicalize(plan.oldEntry) !== canonicalize(plan.newEntry)
+      );
+    default:
+      return false;
   }
+}
+
+/** WP-D7: the plan request in a preview query (`form=app`, `launcher=1`), or undefined if invalid. */
+function planRequest(query: URLSearchParams): LocalUiAiAppPlanRequest | undefined {
+  const keys = [...query.keys()];
+  const allowed = new Set(['app', 'agent', 'form', 'launcher']);
+  if (keys.some((k) => !allowed.has(k)) || new Set(keys).size !== keys.length) return undefined;
+  const form = query.get('form');
+  const launcher = query.get('launcher');
+  if (form !== null && form !== 'app') return undefined;
+  if (launcher !== null && (launcher !== '1' || form !== 'app')) return undefined;
+  return Object.freeze({
+    ...(form === 'app' ? { form: 'app' as const } : {}),
+    ...(launcher === '1' ? { launcher: true } : {}),
+  });
 }
 
 const STATE_WORDS = Object.freeze({
@@ -189,12 +251,15 @@ function appView(view: LocalUiAiAppView): JsonObject | undefined {
   if (word === undefined) return undefined;
   const agent = state.kind === 'agent' && AGENT_NAME.test(state.agent) ? state.agent : undefined;
   if (state.kind === 'agent' && agent === undefined) return undefined;
+  // WP-D7: only the app form is named (an entry without `form` is the npx form, as before).
+  const appForm = state.kind === 'agent' && state.form === 'app';
   return {
     app: view.app,
     name: String(view.name),
     path: String(view.path),
     state: word,
     ...(agent === undefined ? {} : { agent }),
+    ...(appForm ? { form: 'app' } : {}),
     quitFirst: view.quitFirst === true,
     ...(view.checkFailed === true ? { checkFailed: true } : {}),
   };
@@ -211,7 +276,15 @@ async function listApps(context: LocalUiContext, request: LocalUiRequest): Promi
       const shown = appView(view);
       return shown === undefined ? [] : [shown];
     });
-    return { status: 200, body: { desktopRunning: listed.desktopRunning === true, apps } };
+    const app = listed.desktopApp;
+    return {
+      status: 200,
+      body: {
+        desktopRunning: listed.desktopRunning === true,
+        apps,
+        ...(app === 'available' || app === 'move_first' ? { desktopApp: app } : {}),
+      },
+    };
   } catch {
     return UI_UNAVAILABLE;
   }
@@ -223,7 +296,7 @@ function only(query: URLSearchParams, key: string): string | undefined {
   return values.length === 1 ? values[0] : undefined;
 }
 
-/** GET /api/ui/apps/preview?app=&agent= */
+/** GET /api/ui/apps/preview?app=&agent=[&form=app[&launcher=1]] */
 async function previewChange(
   context: LocalUiContext,
   request: LocalUiRequest,
@@ -231,11 +304,11 @@ async function previewChange(
   const desk = context.aiApps;
   const manage = context.agentsManage;
   if (desk === undefined || manage === undefined) return NOT_AVAILABLE;
-  const keys = [...request.query.keys()];
   const app = only(request.query, 'app');
   const agent = only(request.query, 'agent');
+  const asked = planRequest(request.query);
   if (
-    keys.length !== 2 ||
+    asked === undefined ||
     app === undefined ||
     agent === undefined ||
     !AI_APP_IDS.includes(app) ||
@@ -250,11 +323,17 @@ async function previewChange(
     // 04 §2.5: only the open agent (its agentId is what the signed op binds).
     if (manage.current() !== agent) return NOT_OPEN;
     if ((await desk.agentIdOf(agent)) !== client.agentId) return AGENT_MISMATCH;
-    const plan = await desk.plan(app, agent);
+    // An empty request is passed as before (no third argument), so older seams see no change.
+    const plan =
+      asked.form === undefined ? await desk.plan(app, agent) : await desk.plan(app, agent, asked);
     if (plan.status !== 'change') {
       return { status: 200, body: { status: plan.status, app, name: String(plan.name) } };
     }
     if (!coherent(plan, app, agent)) return UI_UNAVAILABLE;
+    // A switch is only ever the answer to `form=app`; a launcher change only to `launcher=1`.
+    if (plan.kind === 'switch' && asked.form !== 'app') return UI_UNAVAILABLE;
+    const launcher = launcherCopy(plan.launcher);
+    if ((launcher !== undefined) !== (asked.launcher === true)) return UI_UNAVAILABLE;
     const oldEntry = entryCopy(plan.oldEntry);
     const newEntry = entryCopy(plan.newEntry);
     const changeId = appChangeId({
@@ -263,6 +342,7 @@ async function previewChange(
       oldEntry,
       newEntry,
       agent: client.agentId,
+      launcher,
     });
     remember(
       desk,
@@ -274,6 +354,7 @@ async function previewChange(
         name: String(plan.name),
         oldAgent: plan.oldAgent,
         identity: plan.identity,
+        request: asked,
         expiresAt: context.now() + PREVIEW_TTL_MS,
       },
       context.now(),
@@ -293,6 +374,16 @@ async function previewChange(
         oldAgent: plan.oldAgent,
         newAgent: plan.newAgent,
         changeId,
+        ...(launcher === undefined
+          ? {}
+          : {
+              launcher: {
+                path: launcher.path,
+                oldText: launcher.oldText,
+                newText: launcher.newText,
+              },
+            }),
+        ...(plan.launcherOffer === true && launcher === undefined ? { launcherOffer: true } : {}),
       },
     };
   } catch {
@@ -347,6 +438,8 @@ function statement(
       return `${appName} will use ${shown} instead of ${old ?? ''}`;
     case 'disconnect':
       return `${appName} will stop using ${shown}`;
+    case 'switch':
+      return `${appName} will use the AgentLink app for ${shown}`;
   }
 }
 
@@ -397,10 +490,15 @@ async function changeApp(
   // recomputed from the file as it is now.
   let fresh: LocalUiAiAppPlan;
   try {
-    fresh = await desk.plan(pending.app, pending.agent);
+    fresh =
+      pending.request.form === undefined
+        ? await desk.plan(pending.app, pending.agent)
+        : await desk.plan(pending.app, pending.agent, pending.request);
   } catch {
     return CHANGED;
   }
+  // WP-D7: the desktop app moved to a place that is never written (or went away) meanwhile.
+  if (fresh.status === 'app_location') return WRITE_ANSWERS.app_location;
   if (
     fresh.status !== 'change' ||
     fresh.kind !== pending.kind ||
@@ -412,6 +510,7 @@ async function changeApp(
       oldEntry: entryCopy(fresh.oldEntry),
       newEntry: entryCopy(fresh.newEntry),
       agent: client.agentId,
+      launcher: launcherCopy(fresh.launcher),
     }) !== changeId
   ) {
     return CHANGED;
@@ -420,6 +519,10 @@ async function changeApp(
   const outcome = await context.applyOwnerAction(first.signed);
   if (outcome.status !== 'applied' || outcome.op !== op) return NOT_APPLIED;
   const written = await fresh.commit(client.agentId).catch((): LocalUiAiAppWrite => 'failed');
+  // WP-D7: the entry is written (done), but the page must say the command was not changed.
+  if (written === 'written_launcher_unchanged') {
+    return { status: 200, body: { status: 'done', app: pending.app, launcher: 'not_changed' } };
+  }
   if (written !== 'written') return WRITE_ANSWERS[written] ?? WRITE_ANSWERS.failed;
   // "Restart {app} to finish" (b11 §30.3).
   return { status: 200, body: { status: 'done', app: pending.app } };

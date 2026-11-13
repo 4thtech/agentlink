@@ -181,7 +181,7 @@ export function checkPayConfirmAssertion(
     readonly passkey: PasskeyBlobHeader;
     /** The stored credential public key (COSE_Key) for that passkey, or null (rule 5). */
     readonly publicKey: Uint8Array | null;
-    readonly owner: OwnerPublicKeys;
+    readonly owner: Pick<OwnerPublicKeys, 'ownerNostr'>;
   },
 ): PayConfirmAssertionCheck {
   let clientData: unknown;

@@ -112,6 +112,11 @@ export interface HarnessDef {
         readonly kind: 'json';
         readonly key: 'mcpServers' | 'mcp';
         readonly entry: (args: readonly string[], platform?: NodeJS.Platform) => Plain;
+        /**
+         * WP-D7: the same entry for any program and its arguments (the app form starts the app's
+         * bundled Node with its CLI: `<node> <cli> mcp …`, never through a shell).
+         */
+        readonly shape: (command: string, args: readonly string[]) => Plain;
       }
     | { readonly kind: 'toml' };
   readonly edit: (
@@ -152,27 +157,34 @@ const split = (args: readonly string[], platform: NodeJS.Platform) => {
   return { command, args: rest };
 };
 
-// The entries each harness gets (06 §7): one builder per form, shared by `edit` and `format`.
-const claudeCodeEntry = (args: readonly string[], platform = process.platform): Plain => ({
+// The entries each harness gets (06 §7): one shape per harness (any program and its arguments),
+// and the npx form built from it, shared by `edit` and `format`.
+type Shape = (command: string, args: readonly string[]) => Plain;
+const claudeCodeShape: Shape = (command, args) => ({
   type: 'stdio',
-  ...split(args, platform),
+  command,
+  args: [...args],
   env: {},
 });
-const stdioEntry = (args: readonly string[], platform = process.platform): Plain =>
-  split(args, platform);
-const openCodeEntry = (args: readonly string[], platform = process.platform): Plain => ({
+const stdioShape: Shape = (command, args) => ({ command, args: [...args] });
+const openCodeShape: Shape = (command, args) => ({
   type: 'local',
-  command: startWords(args, platform),
+  command: [command, ...args],
   enabled: true,
 });
-const cursorEntry = (args: readonly string[], platform = process.platform): Plain => ({
-  type: 'stdio',
-  ...split(args, platform),
-});
-const json = (
-  key: 'mcpServers' | 'mcp',
-  entry: (args: readonly string[], platform?: NodeJS.Platform) => Plain,
-) => Object.freeze({ kind: 'json', key, entry }) as HarnessDef['format'];
+const cursorShape: Shape = (command, args) => ({ type: 'stdio', command, args: [...args] });
+const npxForm =
+  (shape: Shape) =>
+  (args: readonly string[], platform: NodeJS.Platform = process.platform): Plain => {
+    const { command, args: rest } = split(args, platform);
+    return shape(command, rest);
+  };
+const claudeCodeEntry = npxForm(claudeCodeShape);
+const stdioEntry = npxForm(stdioShape);
+const openCodeEntry = npxForm(openCodeShape);
+const cursorEntry = npxForm(cursorShape);
+const json = (key: 'mcpServers' | 'mcp', shape: Shape) =>
+  Object.freeze({ kind: 'json', key, entry: npxForm(shape), shape }) as HarnessDef['format'];
 
 export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
   {
@@ -182,7 +194,7 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     parts: ['.claude.json'],
     installedMarks: [['.claude'], ['.claude.json']],
     binary: 'claude',
-    format: json('mcpServers', claudeCodeEntry),
+    format: json('mcpServers', claudeCodeShape),
     edit: (text, args) => addJsonMcpServer(text, claudeCodeEntry(args)),
   },
   {
@@ -204,7 +216,7 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
       },
     },
     installedMarks: [],
-    format: json('mcpServers', stdioEntry),
+    format: json('mcpServers', stdioShape),
     edit: (text, args) => addJsonMcpServer(text, stdioEntry(args)),
   },
   {
@@ -224,7 +236,7 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     // `gemini` binary on PATH or its settings file means Gemini CLI.
     installedMarks: [['.gemini', 'settings.json']],
     binary: 'gemini',
-    format: json('mcpServers', stdioEntry),
+    format: json('mcpServers', stdioShape),
     edit: (text, args) => addJsonMcpServer(text, stdioEntry(args)),
   },
   {
@@ -235,7 +247,7 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     parts: ['.config', 'opencode', 'opencode.json'],
     installedMarks: [['.config', 'opencode']],
     binary: 'opencode',
-    format: json('mcp', openCodeEntry),
+    format: json('mcp', openCodeShape),
     edit: (text, args) => addJsonMcpServer(text, openCodeEntry(args), 'mcp'),
   },
   {
@@ -249,7 +261,7 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
       ['.gemini', 'config', 'mcp_config.json'],
     ],
     binary: 'antigravity',
-    format: json('mcpServers', stdioEntry),
+    format: json('mcpServers', stdioShape),
     edit: (text, args) => addJsonMcpServer(text, stdioEntry(args)),
   },
   {
@@ -260,7 +272,7 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     parts: ['.cursor', 'mcp.json'],
     installedMarks: [['.cursor']],
     binary: 'cursor',
-    format: json('mcpServers', cursorEntry),
+    format: json('mcpServers', cursorShape),
     edit: (text, args) => addJsonMcpServer(text, cursorEntry(args)),
   },
   {
@@ -298,7 +310,7 @@ export const HARNESSES: readonly HarnessDef[] = Object.freeze<HarnessDef[]>([
     },
     installedMarks: [],
     binary: 'windsurf',
-    format: json('mcpServers', stdioEntry),
+    format: json('mcpServers', stdioShape),
     edit: (text, args) => addJsonMcpServer(text, stdioEntry(args)),
   },
 ]);

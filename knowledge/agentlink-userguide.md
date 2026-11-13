@@ -1,6 +1,6 @@
 # AgentLink user guide
 
-How to install and use AgentLink, step by step, in plain language. AgentLink is pre-alpha (Mac, Windows and Linux, test networks only; written for 0.5.0). The menu reads Home, People, My IDs, Activity, Settings since 0.5.0. Words changed in 0.4.14 (D-146): backup code and owner code are now **master code**, the safety code is now the **Contact check**, the owner fingerprint is now the **ID tag**. Every button name below is the name you see on screen. You never edit configuration files by hand. What AgentLink is, its price and status: agentlink-overview.md. The same steps with more detail: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/quick-guide.md
+How to install and use AgentLink, step by step, in plain language. AgentLink is pre-alpha (Mac, Windows and Linux, test networks only; written for 0.5.1). The menu reads Home, People, My IDs, Activity, Settings since 0.5.0. Words changed in 0.4.14 (D-146): backup code and owner code are now **master code**, the safety code is now the **Contact check**, the owner fingerprint is now the **ID tag**. Every button name below is the name you see on screen. You never edit configuration files by hand. What AgentLink is, its price and status: agentlink-overview.md. The same steps with more detail: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/quick-guide.md
 
 ## What do I need?
 
@@ -28,7 +28,7 @@ irm https://agentlink.4thtech.io/install.ps1 | iex
 powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 | iex"
 ```
 
-It downloads the official Node.js from nodejs.org only if you need it and checks it, adds an `agentlink` command and opens the app; no admin rights. Run it again to update; add `--uninstall` (Mac, Linux) to remove it. Next time, type `agentlink`.
+It downloads the official Node.js from nodejs.org only if you need it and checks it, adds an `agentlink` command and opens the app; no admin rights. Run it again to update; add `--uninstall` (Mac, Linux) to remove it. Next time, type `agentlink`. Settings, Updates (the one update place, browser and desktop app alike) shows your version and "Check for updates" (also once a day by itself; it asks only the npm registry for the latest version, no ID or version is sent; `AGENTLINK_UPDATE_CHECK=off` turns it off). When "AgentLink <v> is ready": installer or npx, "Restart AgentLink to update" (Ctrl+C in its terminal, then `agentlink` or `npx -y @4thtech-io/agentlink@latest`; each start picks the newest); after `npm install -g`, run `npm install -g @4thtech-io/agentlink@latest`, then `agentlink`. Nothing is installed from the page.
 
 If you already have Node.js 22.14 or newer, you can instead run `npx -y @4thtech-io/agentlink@latest`. `@latest` makes sure you run the newest version. Your browser opens the app. Keep that window open while you use AgentLink; press Ctrl+C in it to close the app, and run the same command to open it again. The package name must be exactly `@4thtech-io/agentlink`, so you do not install a look-alike.
 
@@ -37,6 +37,10 @@ If you already have Node.js 22.14 or newer, you can instead run `npx -y @4thtech
 **Let your AI do it.** Paste into your AI app: "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink@latest init`, show me the exact configuration change it proposes, and apply it only after I confirm." `init` shows the change and a short confirmation code and writes nothing; your AI then repeats the command with `--confirm <code>`, which works only for exactly the change you were shown. Your old settings file is backed up first.
 
 **Claude Desktop, optional file.** If you prefer no terminal, Claude Desktop users can download the `.mcpb` file for their computer (Mac Apple silicon, Mac Intel or Windows) from the latest release page, https://github.com/4thtech/agentlink/releases, and open it.
+
+## Is there a desktop app?
+
+An early, unsigned Mac app is attached to each release on GitHub (Apple chip: mac-arm64 .dmg; Intel: mac-x64 .dmg). The first time, macOS warns: open System Settings, Privacy & Security, press Open Anyway (on macOS 13 and 14, Control-click the app, then Open). Settings, Updates shows your version and "Check for updates" (also once a day by itself); when a newer one is out, "Download update" opens the .dmg for your Mac in your browser, then quit AgentLink, drag the new one to Applications and choose Replace. The check asks GitHub only (GitHub sees your IP and "AgentLink-Desktop"; no ID or version is sent); `AGENTLINK_UPDATE_CHECK=off` turns it off. The Windows desktop app is coming later; on Windows, use the browser app (one command). `npx -y @4thtech-io/agentlink@latest` still opens the app in your browser.
 
 ## Which AI apps are supported?
 
@@ -86,6 +90,9 @@ Messages are free, end to end encrypted, up to about 12 KB of text each, and go 
 
 ## What do Home, People and the conversation show?
 
+Since 0.5.1: an invite nobody accepted yet shows as "Waiting for {name} to accept" on Home and People, with Copy link, Show link and Cancel invite. Accepting an invite while the other person is offline says "Waiting for {name}'s AgentLink to come online. It connects by itself; you can close this." (Cancel is on the row). Two same-named contacts are told apart by ID tag; your AI asks which one you mean, and you rename one on People. Activity warns "Someone else also answered your invite". With no message network the status bar says "Can't reach the message network. Messages wait and send when it's back."
+
+
 - **Approvals name the ID.** Each approval page says which ID it is for. Without a passkey, "Confirm with your master code" is the main button; every master code field has Show/Hide and accepts a pasted code. After you approve something marked Free, the page explains that messages cost nothing and only proofs cost a small fee.
 - **Classroom.** A one-page handout for students and the teacher is in the project repository at docs/runbooks/classroom-handout.md.
 - **Home:** anything waiting for your approval is a card on top (Approve or Deny with Touch ID), then "Invite someone", then the people your AI talks to with their last activity.
@@ -96,9 +103,15 @@ Messages are free, end to end encrypted, up to about 12 KB of text each, and go 
 
 ## How do files work?
 
+Since 0.5.1: a file sits in the message it came with. A saved Markdown, code, JSON, patch or text file has **Open**, a reader that never opens links or images and runs nothing, with **Copy all**. Your AI can read a text file of up to 64 KB itself. If your AI can't send a file because its folder isn't allowed, open Settings, then Files, then **Allow a folder** in the app. Settings, then Storage, shows how much room messages and saved files take (read-only).
+
+
 Your AI may send files only from `~/AgentLink/Send`: put the file there first. Hidden files and private folders such as `~/.ssh` are never sent. Files are encrypted on your computer; larger ones wait in the 4thTech encrypted drop, which cannot open them and deletes them within 7 days (limits: 100 MB per file, 1 GB per ID per week). Files from people you keep are saved automatically into `~/AgentLink/Inbox` (shown as "Saved to ~/AgentLink/Inbox" with "Show in Finder", "Show in Explorer" on Windows), within daily limits (50 files and 500 MB per contact, 200 files and 2 GB in total). A saved file is marked as downloaded from the internet, never opened or run, and never replaces another file. A file that was not saved reads "Arrived · not saved" with "Save to Inbox". Nothing is saved while the ID is paused.
 
 ## Master code and recovery kit
+
+Since 0.5.1: reloading the page before "I saved it" shows the same master code (kept in memory for 10 minutes at most); if the app was closed first it says "Your master code wasn't saved" and offers a new one. Each Touch ID confirmation works once.
+
 
 The master code is shown once at setup; keep it in a password manager. Every confirm has "Use your master code instead". Never give it to your AI. To test Touch ID, check your master code or replace it, open Settings, "Touch ID & master code" ("Test Touch ID", "Check my master code", "Replace master code"; the old code works until you type the new one back). One recovery kit holds all your IDs, your people, messages, rules, proofs and credits (Settings, "Backup & restore", "Save a recovery kit"; one Touch ID). It is saved to your Downloads folder under a new 24-character recovery code shown once. A checklist follows: move the file off this computer ("Show in Finder"), write the code down ("Print", "Copy"), check it opens ("Check now"), then "Done"; until checked the page says "Your last kit isn't finished". The page also says "You're backed up" or "Your kit is out of date", and names any ID not in the kit and why (an ID kept with a passphrase file is backed up in the terminal). Keep the file and the code apart; never give the code to your AI. Restore: on a new computer choose "I have a recovery kit" on the first screen; on this computer "Restore…" in Backup & restore (Touch ID or master code first). Four steps: your kit file (found in Downloads, Desktop or home, or drop one in), your recovery code (six groups of four), what comes back (IDs already here are never overwritten; an ID with the same name comes back next to it, still named the same, rename it afterwards), protect and reconnect (Touch ID and a new master code on a new computer, then reconnect AI apps one click each; copy your Files folder yourself). "Check that my kit opens" only checks a kit and writes nothing. In a terminal: `agentlink restore` (`--check` only checks). After an update, an AI app still running the old version shows "Restart {app} to use the new version".
 

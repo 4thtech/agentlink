@@ -123,23 +123,23 @@ async function mount(routes: Routes): Promise<Call[]> {
   await settle();
   // The detail opens in a side sheet when a row is chosen (UI-REFRESH-i); choose the first one.
   await act(async () => {
-    host.querySelector<HTMLButtonElement>('.ct-row')?.click();
+    document.body.querySelector<HTMLButtonElement>('.ct-row')?.click();
   });
   await settle();
   return s.calls;
 }
 
-const text = (): string => host.textContent ?? '';
+const text = (): string => document.body.textContent ?? '';
 
 /** W4-PEOPLE-INVITE: Rename and Remove sit in the person ⋯ menu. */
 async function openMenu(): Promise<void> {
   await act(async () => {
-    host.querySelector<HTMLButtonElement>('button[aria-label^="More for"]')?.click();
+    document.body.querySelector<HTMLButtonElement>('button[aria-label^="More for"]')?.click();
   });
 }
 
 function button(label: string): HTMLButtonElement {
-  const found = [...host.querySelectorAll('button')].find(
+  const found = [...document.body.querySelectorAll('button')].find(
     (b) => (b.textContent ?? '').trim() === label,
   );
   if (found === undefined) throw new Error(`no button "${label}" in: ${text()}`);
@@ -154,7 +154,7 @@ async function click(label: string): Promise<void> {
 }
 
 async function type(selector: string, value: string): Promise<void> {
-  const input = host.querySelector<HTMLInputElement>(selector);
+  const input = document.body.querySelector<HTMLInputElement>(selector);
   if (input === null) throw new Error(`no input ${selector}`);
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
@@ -182,8 +182,8 @@ async function confirmWithCode(code = 'ABCD-EFGH'): Promise<void> {
 describe('ContactsPage: the list', () => {
   it('shows one next step when there are no contacts', async () => {
     await mount({ [LIST]: { status: 'ok', contacts: [] } });
-    expect(host.querySelector('h1')?.textContent).toBe('People');
-    const empty = host.querySelector('.al-empty');
+    expect(document.body.querySelector('h1')?.textContent).toBe('People');
+    const empty = document.body.querySelector('.al-empty');
     expect(empty?.textContent).toContain(S.emptyTitle);
     expect(empty?.textContent).toContain(`Try: ${S.emptyPrompt}`);
   });
@@ -191,17 +191,17 @@ describe('ContactsPage: the list', () => {
   it('D-141 (08 §1 C2): a renamed contact shows "(was {old})" as plain text in <bdi>', async () => {
     const renamed = { ...marko, name: 'Marko Studio', formerName: '<b>Marko</b>' };
     await mount({ [LIST]: { status: 'ok', contacts: [renamed, ana] } });
-    const bdi = host.querySelector('.ct-former bdi');
+    const bdi = document.body.querySelector('.ct-former bdi');
     expect(bdi?.textContent).toBe('(was <b>Marko</b>)');
-    expect(host.querySelector('.ct-former b')).toBeNull();
+    expect(document.body.querySelector('.ct-former b')).toBeNull();
     expect(text()).toMatch(/Marko Studio.*\(was /);
-    expect(host.querySelectorAll('.ct-former').length).toBe(1);
+    expect(document.body.querySelectorAll('.ct-former').length).toBe(1);
   });
 
   it('shows names as text and never an ID or key', async () => {
     const evil = { ...marko, name: '<img src=x onerror=alert(1)>' };
     await mount({ [LIST]: { status: 'ok', contacts: [evil, ana] } });
-    expect(host.querySelector('img')).toBeNull();
+    expect(document.body.querySelector('img')).toBeNull();
     expect(text()).toContain('Ana');
     expect(text()).not.toContain(MARKO);
     expect(text()).not.toContain(ANA);
@@ -254,7 +254,7 @@ describe('ContactsPage: the 12 digits (04 §3.6.1)', () => {
 
   it('nudges with the code and three choices on an unchecked contact', async () => {
     await mount(routes());
-    expect(host.querySelector('.al-sc-code')?.textContent?.replace(/\s/g, '')).toBe(
+    expect(document.body.querySelector('.al-sc-code')?.textContent?.replace(/\s/g, '')).toBe(
       CODE.replace(/\s/g, ''),
     );
     expect(text()).toContain('Want to be sure it’s really Marko Novak?');
@@ -273,11 +273,11 @@ describe('ContactsPage: the 12 digits (04 §3.6.1)', () => {
   it('Skip hides the nudge and keeps the label Not checked yet; it can come back', async () => {
     const calls = await mount(routes());
     await click(S.skip);
-    expect(host.querySelector('.al-sc-code')).toBeNull();
+    expect(document.body.querySelector('.al-sc-code')).toBeNull();
     expect(text()).toContain('Not checked yet');
     expect(posts(calls)).toHaveLength(0);
     await click(S.compareCode);
-    expect(host.querySelector('.al-sc-code')).not.toBeNull();
+    expect(document.body.querySelector('.al-sc-code')).not.toBeNull();
   });
 
   it('They match: asks for presence, then posts the shown code for the server to sign', async () => {
@@ -286,7 +286,7 @@ describe('ContactsPage: the 12 digits (04 §3.6.1)', () => {
     );
     await click(S.theyMatch);
     expect(posts(calls)).toHaveLength(0);
-    expect(host.querySelector('input[name="owner-code"]')).not.toBeNull();
+    expect(document.body.querySelector('input[name="owner-code"]')).not.toBeNull();
     await confirmWithCode('ABCD-EFGH');
     const sent = posts(calls);
     expect(sent).toHaveLength(1);
@@ -339,7 +339,7 @@ describe('ContactsPage: the 12 digits (04 §3.6.1)', () => {
 
   it('shows no code while the other agent has not answered', async () => {
     await mount({ [LIST]: { status: 'ok', contacts: [{ ...marko, pairing: 'pending' }] } });
-    expect(host.querySelector('.al-sc-code')).toBeNull();
+    expect(document.body.querySelector('.al-sc-code')).toBeNull();
     expect(text()).toContain(S.waiting);
   });
 });
@@ -374,7 +374,7 @@ describe('ContactsPage: rename and remove', () => {
     await type('input[name="alias"]', 'Marko');
     await click(S.saveName);
     expect(text()).toContain(S.aliasTaken);
-    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
     expect(posts(calls)).toHaveLength(0);
   });
 
@@ -399,7 +399,7 @@ describe('ContactsPage: rename and remove', () => {
     await click(S.removeContact);
     await click(S.cancel);
     expect(posts(calls)).toHaveLength(0);
-    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
   });
 });
 
@@ -432,7 +432,9 @@ describe('ContactsPage: block and unblock (WP-12)', () => {
     });
     expect(text()).toContain(S.blockedDetail);
     await openMenu();
-    const items = [...host.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent);
+    const items = [...document.body.querySelectorAll('[role="menuitem"]')].map(
+      (i) => i.textContent,
+    );
     expect(items).toContain(S.unblock);
     expect(items).not.toContain(S.block);
     await click(S.unblock);
@@ -445,7 +447,9 @@ describe('ContactsPage: block and unblock (WP-12)', () => {
   it('a revoked contact offers neither Block nor Unblock', async () => {
     await mount({ [LIST]: { status: 'ok', contacts: [{ ...ana, status: 'revoked' }] } });
     await openMenu();
-    const items = [...host.querySelectorAll('[role="menuitem"]')].map((i) => i.textContent);
+    const items = [...document.body.querySelectorAll('[role="menuitem"]')].map(
+      (i) => i.textContent,
+    );
     expect(items).not.toContain(S.block);
     expect(items).not.toContain(S.unblock);
   });
@@ -461,7 +465,7 @@ describe('ContactsPage: block and unblock (WP-12)', () => {
     await click(S.blockContact);
     await click(S.cancel);
     expect(posts(calls)).toHaveLength(0);
-    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
   });
 
   it('the copy follows 11 §5: plain words, no wallet, key or address', () => {
@@ -484,7 +488,7 @@ describe('the page markup', () => {
       [LIST]: { status: 'ok', contacts: [marko, ana] },
       [`/api/ui/contacts/${MARKO}/safety-code`]: { status: 'ok', code: CODE },
     });
-    expect(host.querySelector('[style]')).toBeNull();
+    expect(document.body.querySelector('[style]')).toBeNull();
   });
 });
 
@@ -501,11 +505,11 @@ describe('ContactsPage: same names (UX 2026-11-12 §5)', () => {
         ],
       },
     });
-    expect(host.querySelectorAll('.ct-row').length).toBe(2);
+    expect(document.body.querySelectorAll('.ct-row').length).toBe(2);
     expect(text()).not.toContain(SAME);
-    const lines = [...host.querySelectorAll('.ct-line')].map((l) => l.textContent);
+    const lines = [...document.body.querySelectorAll('.ct-line')].map((l) => l.textContent);
     expect(new Set(lines).size).toBe(2);
-    expect(host.querySelector('.ct-row bdi')?.textContent).toBe('oc-test');
+    expect(document.body.querySelector('.ct-row bdi')?.textContent).toBe('oc-test');
   });
 
   it('moves a removed person to Archived with the removed copy; no same-name text anywhere', async () => {
@@ -518,8 +522,10 @@ describe('ContactsPage: same names (UX 2026-11-12 §5)', () => {
         ],
       },
     });
-    expect(host.querySelectorAll('.ct-list:not(.ct-list-archived) .ct-row').length).toBe(1);
-    const archived = host.querySelector('details.ct-archived');
+    expect(document.body.querySelectorAll('.ct-list:not(.ct-list-archived) .ct-row').length).toBe(
+      1,
+    );
+    const archived = document.body.querySelector('details.ct-archived');
     expect(archived?.hasAttribute('open')).toBe(false);
     expect(archived?.querySelector('summary')?.textContent).toBe('Archived (1)');
     expect(archived?.querySelectorAll('.ct-row').length).toBe(1);
@@ -534,7 +540,7 @@ describe('ContactsPage: same names (UX 2026-11-12 §5)', () => {
 
   it('shows no Archived group when nobody was removed', async () => {
     await mount({ [LIST]: { status: 'ok', contacts: [marko, ana] } });
-    expect(host.querySelector('.ct-archived')).toBeNull();
+    expect(document.body.querySelector('.ct-archived')).toBeNull();
     expect(text()).not.toContain(SAME);
   });
 });
@@ -557,7 +563,7 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
   });
 
   async function selectNewer(): Promise<void> {
-    const rows = host.querySelectorAll<HTMLButtonElement>('.ct-row');
+    const rows = document.body.querySelectorAll<HTMLButtonElement>('.ct-row');
     await act(async () => {
       rows[1]?.click();
     });
@@ -571,7 +577,7 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
     expect(text()).toContain(
       `${NOTICE_START}oc-test (paired ${paired}). Keep both, or remove the older one?`,
     );
-    expect(host.querySelectorAll('.ct-dup')).toHaveLength(1);
+    expect(document.body.querySelectorAll('.ct-dup')).toHaveLength(1);
     button(S.keepBoth);
     button(S.removeOlder);
   });
@@ -585,11 +591,11 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
     await click(S.removeOlder);
     // PRE-031-FIXES: the same confirm step as Remove comes first, then presence.
     expect(posts(calls)).toHaveLength(0);
-    expect(host.querySelector('.ct-confirm')?.textContent).toContain(S.removeExplain);
-    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(document.body.querySelector('.ct-confirm')?.textContent).toContain(S.removeExplain);
+    expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
     await click(S.removeContact);
     expect(posts(calls)).toHaveLength(0);
-    expect(host.querySelector('input[name="owner-code"]')).not.toBeNull();
+    expect(document.body.querySelector('input[name="owner-code"]')).not.toBeNull();
     await confirmWithCode();
     expect(posts(calls).map((c) => c.url)).toEqual([`/api/ui/contacts/${ANA}/remove`]);
   });
@@ -599,7 +605,7 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
     await selectNewer();
     await click(S.removeOlder);
     await click(S.removeContact);
-    expect(host.querySelector('input[name="owner-code"]')).not.toBeNull();
+    expect(document.body.querySelector('input[name="owner-code"]')).not.toBeNull();
     await click(S.cancel);
     expect(posts(calls)).toHaveLength(0);
   });
@@ -609,11 +615,11 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
     await selectNewer();
     await click(S.removeOlder);
     expect(text()).toContain(S.removeExplain);
-    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
-    expect(host.querySelector('.ct-dup')).toBeNull(); // one step at a time
+    expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(document.body.querySelector('.ct-dup')).toBeNull(); // one step at a time
     await click(S.cancel);
     expect(text()).not.toContain(S.removeExplain);
-    expect(host.querySelector('input[name="owner-code"]')).toBeNull();
+    expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
     expect(text()).toContain(NOTICE_START); // back to the notice
     expect(posts(calls)).toHaveLength(0);
   });
@@ -623,9 +629,9 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
     await selectNewer();
     const id = button(S.removeOlder).getAttribute('aria-describedby');
     expect(id).toBeTruthy();
-    const described = host.querySelector(`[id="${id ?? ''}"]`);
+    const described = document.body.querySelector(`[id="${id ?? ''}"]`);
     expect(described?.textContent).toContain(NOTICE_START);
-    expect(host.querySelector('.ct-dup')?.contains(described ?? null)).toBe(true);
+    expect(document.body.querySelector('.ct-dup')?.contains(described ?? null)).toBe(true);
   });
 
   it('Keep both hides the notice and remembers it in this browser only', async () => {
@@ -669,7 +675,7 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
     await selectNewer();
     expect(text()).not.toContain('Another person has the same name.');
     expect(text()).not.toContain(NOTICE_START);
-    expect(host.querySelector('.ct-dup')).toBeNull();
+    expect(document.body.querySelector('.ct-dup')).toBeNull();
   });
 
   it('ignores a link to a contact that is not in the list, or of the wrong shape', async () => {
@@ -698,8 +704,8 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
       },
     });
     await selectNewer();
-    expect(host.querySelector('.ct-dup')).not.toBeNull();
-    expect(host.querySelector('.ct-dup img')).toBeNull();
+    expect(document.body.querySelector('.ct-dup')).not.toBeNull();
+    expect(document.body.querySelector('.ct-dup img')).toBeNull();
   });
 });
 
@@ -723,8 +729,8 @@ describe('ContactsPage: the Home link to the 12 digits (W5-SAFETY-STEP)', () => 
 
   it('?check=<ref> opens that contact panel at the code, and cleans the address', async () => {
     await open(`?check=${MARKO}`);
-    expect(host.querySelector('[role="dialog"]')).not.toBeNull();
-    expect(host.querySelector('.al-sc-code')?.textContent?.replace(/\s/g, '')).toBe(
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(document.body.querySelector('.al-sc-code')?.textContent?.replace(/\s/g, '')).toBe(
       CODE.replace(/\s/g, ''),
     );
     expect(location.search).toBe('');
@@ -734,10 +740,10 @@ describe('ContactsPage: the Home link to the 12 digits (W5-SAFETY-STEP)', () => 
 
   it('without the marker, or with a stranger ref, no panel opens by itself', async () => {
     await open('');
-    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
     act(() => root.unmount());
     root = createRoot(host);
     await open('?check=0x0000000000000000000000000000000000000009');
-    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull();
   });
 });

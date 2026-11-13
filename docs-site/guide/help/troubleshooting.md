@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Applies to AgentLink 0.4.8, a pre-alpha release; the recovery kit section applies to 0.5.0.
+Applies to AgentLink 0.5.1, a pre-alpha release.
 
 Fix common problems yourself, and know what to include when you ask for help.
 
@@ -31,7 +31,7 @@ Run `npx -y @4thtech-io/agentlink@latest` (from 0.4.4; before that `npx -y @4tht
 ## Pairing and contacts
 
 **The invite expired or was already used.**
-Invites work once and expire after 7 days at most. Ask for a new one. If you made the invite and lost the link, open Invite someone, cancel the open invite and create a new one: a lost link cannot be shown again.
+Invites work once and expire after 7 days at most. Ask for a new one. If you made the invite and lost the link, find it on Home or in People under **Waiting for … to accept** and press **Copy link**.
 
 **The invite link I got is very long.**
 If the encrypted drop could not be reached within 10 seconds, you get the long link instead. It works the same. Older long links keep working.
@@ -43,7 +43,22 @@ The link was cut off or changed on the way, for example by a chat app. Ask the s
 Stop. Check with the other person by phone or in person before you go on.
 
 **My AI says more than one contact matches a name (`AMBIGUOUS_CONTACT`).**
-Two contacts have the same name. Tell your AI which one you mean, or fix it for good in a terminal you opened yourself. Run `npx -y @4thtech-io/agentlink@latest contacts` to see each contact's ID. Then run `npx -y @4thtech-io/agentlink@latest contacts rename <ID> "New name"` to rename one, or `npx -y @4thtech-io/agentlink@latest contacts remove <ID>` to remove one you no longer need.
+Two contacts have the same name. Your AI lists both with their ID tag, a short ID and the day you connected, and asks you which one you mean. Tell it which one, or rename one for good on **People** in the AgentLink app (open the person, then **Rename**). In a terminal you opened yourself you can also run `npx -y @4thtech-io/agentlink@latest contacts` to see each contact's ID. Then run `npx -y @4thtech-io/agentlink@latest contacts rename <ID> "New name"` to rename one, or `npx -y @4thtech-io/agentlink@latest contacts remove <ID>` to remove one you no longer need.
+
+**My AI says no contact has that name now, or that a contact is blocked (`CONTACT_RENAMED`, `CONTACT_BLOCKED`).**
+Either the contact renamed its ID (your AI is told the new name and asks you before doing anything) or you blocked them. Only you can unblock a person, on **People** in the AgentLink app.
+
+**Accepting an invite stays on "Connecting…".**
+After a few seconds the app says it is waiting for the other person's AgentLink to come online; it connects by itself. After two minutes it says there has been no answer: the invite may be used or cancelled, so ask for a new one. **Cancel** is on every waiting row.
+
+**The status bar says "Can't reach the message network".**
+This computer can't reach it, for example on a school or office network that blocks it. Messages wait and send by themselves when it is back. Try another network, such as a phone hotspot. Your AI is told a message is queued, not sent.
+
+**Activity says "Someone else also answered your invite".**
+Compare the 12 digits with the contact it names, by phone or in person. If they don't match, remove that contact.
+
+**A waiting invite can't be copied.**
+Invites made before 0.5.1 can't be copied again. Cancel it and make a new one.
 
 ## Messages
 
@@ -102,6 +117,9 @@ The storage can refuse a link before it expires. The receiving ID can ask the se
 - **"This kit belongs to a different owner".** Restore it on another computer or another user account.
 - **An ID is "Not in this kit".** The saved kit says why: an ID kept with a passphrase file is backed up in the terminal, and an ID that couldn't be opened just now is included when you save again in a moment.
 - **"This computer can't finish restoring here".** The browser has no Touch ID, Windows Hello or passkey to protect this computer. Run `agentlink restore` in a terminal you opened yourself.
+
+- **"Your master code wasn't saved".** The app was closed before you pressed **I saved it**. Choose the new code it offers and save it.
+- **A restore stopped halfway.** Start AgentLink again: it goes back to **Finish restoring**. Choose the same kit; it finishes with Touch ID and a new master code.
 
 ## Getting help
 

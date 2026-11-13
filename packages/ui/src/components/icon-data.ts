@@ -3,7 +3,7 @@
 // elements and never through innerHTML (Trusted Types, 08 §4).
 //
 // Sources: the 21 icons in CUSTOM_ICONS are AgentLink's own (docs/design/brand/icons/ui/);
-// the other 36 are Lucide (ISC), see THIRD-PARTY-NOTICES.md.
+// the others are Lucide (ISC), see THIRD-PARTY-NOTICES.md.
 
 export type IconShape = readonly [
   tag: 'path' | 'circle' | 'rect' | 'polyline' | 'polygon' | 'line' | 'ellipse',
@@ -61,6 +61,32 @@ export const ICON_SHAPES: Readonly<Record<string, readonly IconShape[]>> = {
   file: [
     ['path', { d: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z' }],
     ['path', { d: 'M14 2v4a2 2 0 0 0 2 2h4' }],
+  ],
+  // REL051-A34: file type icons for the conversation's file chips (Lucide file-text, file-code,
+  // braces, file-diff).
+  'file-text': [
+    ['path', { d: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z' }],
+    ['path', { d: 'M14 2v4a2 2 0 0 0 2 2h4' }],
+    ['path', { d: 'M10 9H8' }],
+    ['path', { d: 'M16 13H8' }],
+    ['path', { d: 'M16 17H8' }],
+  ],
+  'file-code': [
+    ['path', { d: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z' }],
+    ['path', { d: 'M14 2v4a2 2 0 0 0 2 2h4' }],
+    ['path', { d: 'm10 13-2 2 2 2' }],
+    ['path', { d: 'm14 17 2-2-2-2' }],
+  ],
+  braces: [
+    ['path', { d: 'M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1' }],
+    ['path', { d: 'M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1' }],
+  ],
+  'file-diff': [
+    ['path', { d: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z' }],
+    ['path', { d: 'M14 2v4a2 2 0 0 0 2 2h4' }],
+    ['path', { d: 'M9 10h6' }],
+    ['path', { d: 'M12 13V7' }],
+    ['path', { d: 'M9 17h6' }],
   ],
   folder: [
     [

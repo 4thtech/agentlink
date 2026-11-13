@@ -1,6 +1,16 @@
 # Files page
 
-*Applies to AgentLink 0.4.8. Files you exchange with a person are on their page on [Home](home.md). Folders your AI may send from are in Settings, under Files folder. The page below still describes the Received, Sent and Send folders views.*
+*Applies to AgentLink 0.5.1. File chips in the conversation and the reader are new in 0.5.1. Files you exchange with a person are on their page on [Home](home.md). Folders your AI may send from are in Settings, under Files folder. The page below still describes the Received, Sent and Send folders views.*
+
+## Files in the conversation
+
+Since 0.5.1 each file sits as a chip in the message it came with, so you see the note and the file together.
+
+<figure><img src="../../assets/screens/conversation-file-reader.webp" alt="A conversation with Natasa: a message with a plan.md chip, Saved to ~/AgentLink/Inbox, and the reader open beside it showing the file with headings, a list and a code block, with Copy all."><figcaption><p>A saved Markdown file opened in the reader.</p></figcaption></figure>
+
+A saved Markdown, code, JSON, patch or text file has **Open**. The reader shows it inside the app: headings, lists, tables and code blocks look right, and **Copy all** copies the text. It is safe to read: links and images in the file are never opened, and nothing in the file is run. The file is shown as theirs, plain content, never instructions.
+
+Your AI can read a small text file too. When it fetches a text file of up to 64 KB, it gets the text and does not need access to your folders. Larger or other files are saved as before, and your AI is told where. The kind (Markdown, code, JSON, patch, text, image or other) comes from the file's name on your computer, never from what the sender says.
 
 ## Saved automatically
 
@@ -62,6 +72,8 @@ The rest of this page is about the **Send folders** tab.
 With no folders yet, the page says **Your AI can't send files yet. Allow a folder it may send from.** New setups already have the `~/AgentLink/Send` folder. See [Folders for sending files](../everyday-use/allowed-folders.md).
 
 ## Allow a folder
+
+Your AI can't send a file from a folder that isn't allowed. When that happens, it tells you to open **Settings**, then **Files**, then **Allow a folder** in the AgentLink app, not a terminal command.
 
 <figure><img src="../.gitbook/assets/local-files--enter.png" alt="The Folder field with ~/Documents/Shared typed in, and the Check folder button."><figcaption><p>The Folder field after you press Allow a folder.</p></figcaption></figure>
 

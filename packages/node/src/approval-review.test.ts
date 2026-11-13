@@ -373,7 +373,7 @@ describe('the session link is one-shot (IR-M1-8d-1 L-3)', () => {
     const second = await send(h.server.port, path);
     expect(second.status).toBe(401);
     expect(second.headers['set-cookie']).toBeUndefined();
-    expect(second.body).toContain('This link has expired.');
+    expect(second.body).toContain('This link has expired');
     // The cookie from the first exchange keeps the page open.
     const cookie = (first.headers['set-cookie']?.[0] ?? '').split(';')[0] ?? '';
     expect((await send(h.server.port, '/', { headers: { Cookie: cookie } })).status).toBe(200);

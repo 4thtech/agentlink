@@ -23,8 +23,9 @@
 // carries `savedBy: 'auto'` (saved automatically) or `reason` (one fixed code, never error text) when
 // it was not saved; the received page carries `autoSave: {on, folder, notice}`, where `folder` is the
 // owner's own Inbox folder setting with the home folder shown as `~` (never inbound text, never a
-// resolved path). `GET /api/ui/files/auto-save-notice/dismiss` dismisses the one-time notice: display
+// resolved path). `POST /api/ui/files/auto-save-notice/dismiss` dismisses the one-time notice: display
 // state only, like the former-name seen mark (D-141); no presence, nothing signed, no setting changes.
+// R1-SEC-16: the `mark` kind (route-types.ts), so it keeps every write gate (a GET is a read).
 import { homedir } from 'node:os';
 import {
   CoreError,
@@ -38,6 +39,7 @@ import type { LocalUiContext, LocalUiReadClient } from '../context.js';
 import {
   UI_NOT_SET_UP,
   UI_UNAVAILABLE,
+  type LocalUiMarkRoute,
   type LocalUiReadRoute,
   type LocalUiRequest,
   type LocalUiResult,
@@ -250,13 +252,9 @@ const DISMISSED: LocalUiResult = Object.freeze({
   body: Object.freeze({ status: 'dismissed' }),
 });
 
-async function dismissNotice(
-  context: LocalUiContext,
-  request: LocalUiRequest,
-): Promise<LocalUiResult> {
+async function dismissNotice(context: LocalUiContext): Promise<LocalUiResult> {
   const client = context.client;
   if (client === undefined) return UI_NOT_SET_UP;
-  if ([...request.query.keys()].length > 0) return BAD_REQUEST;
   const notice = client.autoSaveNotice;
   if (notice === undefined) return UI_UNAVAILABLE;
   try {
@@ -268,17 +266,17 @@ async function dismissNotice(
   return DISMISSED;
 }
 
-export const filesIoRoutes: readonly LocalUiReadRoute[] = Object.freeze([
+export const filesIoRoutes: readonly (LocalUiReadRoute | LocalUiMarkRoute)[] = Object.freeze([
   pageRoute<ReceivedFileItem>(
     '/api/ui/files/received',
     (client, query) => client.filesIo.received(query),
     receivedView,
     autoSaveBlock,
   ),
-  Object.freeze<LocalUiReadRoute>({
-    method: 'GET',
+  Object.freeze<LocalUiMarkRoute>({
+    method: 'POST',
     path: AUTO_SAVE_NOTICE_PATH,
-    presence: false,
+    presence: 'mark',
     handler: dismissNotice,
   }),
   pageRoute<SentFileItem>(
