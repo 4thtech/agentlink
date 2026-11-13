@@ -204,6 +204,16 @@ async function paste(index: number, value: string): Promise<void> {
     input.dispatchEvent(event);
   });
 }
+/** IR-REL051-R2C-2: step 4's type-back confirm (as Replace master code). */
+async function typeBack(value: string): Promise<void> {
+  const input = host.querySelector<HTMLInputElement>('.rs-typeback input');
+  if (input === null) throw new Error('no type-back field');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
 async function fillCode(): Promise<void> {
   await paste(0, CODE);
 }
@@ -685,6 +695,17 @@ describe('step 4: protect and reconnect', () => {
     expect(begins).toEqual([[]]);
     expect(cancels).toEqual([]);
     expect(host.querySelector('[data-master-code]')?.textContent).toBe(MASTER);
+    // IR-REL051-R2C-2: step 4 names the IDs that are ready, never "0 IDs restored".
+    expect(host.querySelector('h1')?.textContent).toBe(S.PROTECT.titleReady(2));
+    expect(text()).not.toContain('0 IDs restored');
+    expect(button(S.PROTECT.home)?.disabled).toBe(true);
+    await typeBack(MASTER);
+    expect(button(S.PROTECT.home)?.disabled).toBe(false);
+  });
+
+  it('IR-REL051-R2C-2: an AI app button never reads "Connect to" with no name', () => {
+    expect(S.PROTECT.connect('')).toBe('Connect an AI app');
+    expect(S.PROTECT.connect('Work')).toBe('Connect to Work');
   });
 
   it('new computer: the master code is shown once, Home waits for "I saved it"', async () => {
@@ -696,10 +717,11 @@ describe('step 4: protect and reconnect', () => {
     expect(button(S.PROTECT.copy)).toBeDefined();
     expect(button(S.PROTECT.print)).toBeDefined();
     expect(button(S.PROTECT.home)?.disabled).toBe(true);
-    const box = host.querySelector<HTMLInputElement>('.rs-saved input') as HTMLInputElement;
-    await act(async () => {
-      box.click();
-    });
+    // A wrong code never counts as saved.
+    await typeBack('AAAA-AAAA-AAAA-AAAA-AAAA-AAAA');
+    expect(button(S.PROTECT.home)?.disabled).toBe(true);
+    expect(text()).toContain(S.PROTECT.typeBackWrong);
+    await typeBack(MASTER.toLowerCase().replace(/-/g, ' '));
     expect(button(S.PROTECT.home)?.disabled).toBe(false);
   });
 
@@ -717,12 +739,9 @@ describe('step 4: protect and reconnect', () => {
     confirm.mockRestore();
   });
 
-  it('R1-UI-02: once "I saved it" is ticked, Cancel leaves without asking', async () => {
+  it('R1-UI-02: once the new code is typed back, Cancel leaves without asking', async () => {
     const { left } = await newComputer();
-    const box = host.querySelector<HTMLInputElement>('.rs-saved input') as HTMLInputElement;
-    await act(async () => {
-      box.click();
-    });
+    await typeBack(MASTER);
     const confirm = vi.spyOn(window, 'confirm');
     await click(S.WIZARD.cancel);
     expect(confirm).not.toHaveBeenCalled();

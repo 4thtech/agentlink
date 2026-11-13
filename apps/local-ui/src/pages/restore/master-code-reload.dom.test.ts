@@ -293,10 +293,14 @@ describe('Restore step 4: a reload', () => {
     await settle();
     expect(text()).toContain('Tali');
     expect(host.querySelector('[data-master-code]')?.textContent).toBe(RESTORE_CODE);
-    const saved = host.querySelector<HTMLInputElement>('.rs-saved input');
-    expect(saved).not.toBeNull();
+    const field = host.querySelector<HTMLInputElement>('.rs-typeback input');
+    expect(field).not.toBeNull();
     await act(async () => {
-      saved?.click();
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+        field,
+        RESTORE_CODE,
+      );
+      field?.dispatchEvent(new Event('input', { bubbles: true }));
     });
     const home = [...host.querySelectorAll('button')].find((b) => /Home/.test(b.textContent ?? ''));
     await act(async () => {

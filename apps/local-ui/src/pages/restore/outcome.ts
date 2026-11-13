@@ -11,6 +11,9 @@ export interface RestoreOutcome {
   readonly restored: readonly string[];
   /** The restored IDs' folder names, in the same order. */
   readonly restoredFolders: readonly string[];
+  /** IR-REL051-R2C-2: "Finish restoring": the IDs already here (labels, then folders). */
+  readonly ready?: readonly string[];
+  readonly readyFolders?: readonly string[];
   /** The IDs that were not restored, by their label. */
   readonly failed: readonly string[];
   /** Shown once, only when a new owner was made. */
