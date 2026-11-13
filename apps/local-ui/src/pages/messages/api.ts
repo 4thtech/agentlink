@@ -39,6 +39,17 @@ export interface MessageItem {
   readonly receipt: boolean;
   readonly proof: boolean;
   readonly size: number;
+  /** MSG-ORDER-1: the local order of one second, both boxes on one scale (core `seq`). */
+  readonly seq?: number;
+}
+
+/** MSG-ORDER-1: oldest first by time, then by the local order (stable where it is absent). */
+export function oldestFirst(
+  a: Pick<MessageItem, 'at' | 'seq'>,
+  b: Pick<MessageItem, 'at' | 'seq'>,
+): number {
+  if (a.at !== b.at) return a.at - b.at;
+  return a.seq === undefined || b.seq === undefined ? 0 : a.seq - b.seq;
 }
 
 export interface MessagePage {
@@ -70,7 +81,7 @@ function parseFile(raw: unknown): MessageFile | undefined {
 
 function parseItem(raw: unknown): MessageItem | undefined {
   if (!isRecord(raw)) return undefined;
-  const { id, at, text, files, status, receipt, proof, size } = raw;
+  const { id, at, text, files, status, receipt, proof, size, seq } = raw;
   if (typeof id !== 'string' || !ID_RE.test(id)) return undefined;
   if (!isTime(at) || !isTime(size)) return undefined;
   if (typeof text !== 'string' || text.length > MAX_TEXT) return undefined;
@@ -82,6 +93,7 @@ function parseItem(raw: unknown): MessageItem | undefined {
   }
   if (status !== undefined && (typeof status !== 'string' || !STATUSES.has(status)))
     return undefined;
+  if (seq !== undefined && !isTime(seq)) return undefined;
   const base = {
     id,
     at,
@@ -90,6 +102,7 @@ function parseItem(raw: unknown): MessageItem | undefined {
     receipt: receipt === true,
     proof: proof === true,
     size,
+    ...(seq === undefined ? {} : { seq }),
   };
   return status === undefined ? base : { ...base, status: status as SentStatus };
 }
