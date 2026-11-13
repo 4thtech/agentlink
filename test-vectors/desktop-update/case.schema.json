@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/4thtech/agentlink/test-vectors/desktop-update/case.schema.json",
   "title": "desktop-update case",
-  "description": "A signed desktop update document (key statement or manifest, `document`) checked under `tag` against `signer` (x-only public key): the BIP-340 message taggedHash(tag, JCS(document without sig)) and whether `sig` verifies.",
+  "description": "A signed desktop update manifest (`document`) checked under `tag` against `signer` (x-only public key): the BIP-340 message taggedHash(tag, JCS(document without sig)) and whether `sig` verifies.",
   "type": "object",
   "additionalProperties": false,
   "required": [

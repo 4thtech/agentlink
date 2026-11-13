@@ -9,169 +9,8 @@
   },
   "cases": [
     {
-      "id": "statement-introduce-beta",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; root introduces the beta key for 90 days",
-      "input": {
-        "op": "desktopUpdateSignature",
-        "tag": "agentlink-desktop-root/v2",
-        "document": {
-          "domain": "agentlink-desktop-root/v2",
-          "sequence": 1,
-          "action": "introduce",
-          "channel": "beta",
-          "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-          "issued": "2026-11-01T09:00:00Z",
-          "expires": "2027-01-30T09:00:00Z",
-          "sig": "d03d73b7ab9607057094d4ae8dd282026ad300c0240d6d76054b3dd4f163e86cd86c5e829e42fa52cc0429757542daee88b6cf81324b49f60d1631d6d437419b"
-        },
-        "signer": "d1e9026d6710beadfafb90692b40ef236f93df2b1b9b0670c6d51edbb8730d6b"
-      },
-      "expected": {
-        "message": "bce588e874822fadb82bf08dc6df38a838f42b8ca045d3e8164ecba98292b177",
-        "valid": "true"
-      }
-    },
-    {
-      "id": "statement-renew-beta",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; renew: same key, higher sequence, later expiry",
-      "input": {
-        "op": "desktopUpdateSignature",
-        "tag": "agentlink-desktop-root/v2",
-        "document": {
-          "domain": "agentlink-desktop-root/v2",
-          "sequence": 2,
-          "action": "renew",
-          "channel": "beta",
-          "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-          "issued": "2026-11-10T09:00:00Z",
-          "expires": "2027-02-08T09:00:00Z",
-          "sig": "475784c4b956b95e1169c210d1c8173e191b8174ee45fb4b2b491d218324dc8fbe411130d2510941c7747133d6fa10d64efe186343e7bdbf9d6ede05972bc45d"
-        },
-        "signer": "d1e9026d6710beadfafb90692b40ef236f93df2b1b9b0670c6d51edbb8730d6b"
-      },
-      "expected": {
-        "message": "c30609fdda895c62aea3e3c974e79872b82c6f56d5ea45763a81658db308c6a2",
-        "valid": "true"
-      }
-    },
-    {
-      "id": "statement-introduce-stable",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; root introduces the stable key for 395 days",
-      "input": {
-        "op": "desktopUpdateSignature",
-        "tag": "agentlink-desktop-root/v2",
-        "document": {
-          "domain": "agentlink-desktop-root/v2",
-          "sequence": 3,
-          "action": "introduce",
-          "channel": "stable",
-          "updateKey": "46b35a98a1329fb5a6a75fc84f1f7f74a3a3700edda434d0c8cc4eaa7c9e1c39",
-          "issued": "2026-11-10T09:30:00Z",
-          "expires": "2027-12-10T09:30:00Z",
-          "sig": "2ecfa00b79c99782c0f3a718aa39b2ea8b11696f3da2413ea14aa248dadf9a2c46d6314cd05903a53e24a37cc58a02b1ec5742122fd1b9f29897692bf058c423"
-        },
-        "signer": "d1e9026d6710beadfafb90692b40ef236f93df2b1b9b0670c6d51edbb8730d6b"
-      },
-      "expected": {
-        "message": "5017a973b9db67835bfabc709496f7abfe809ef461d66d52dc1321811ff07467",
-        "valid": "true"
-      }
-    },
-    {
-      "id": "statement-revoke-beta",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; root withdraws the beta key",
-      "input": {
-        "op": "desktopUpdateSignature",
-        "tag": "agentlink-desktop-root/v2",
-        "document": {
-          "domain": "agentlink-desktop-root/v2",
-          "sequence": 4,
-          "action": "revoke",
-          "channel": "beta",
-          "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-          "issued": "2026-11-12T09:00:00Z",
-          "expires": "2027-02-10T09:00:00Z",
-          "sig": "48c1cb68bb90d7cf2ab2a10dc15718f8b7d9c4d18797ac67b4f6f6bcd8997f0d41125e0c4147526eac9fb74c0b607e9c00144734b785f20b617df295fd815d82"
-        },
-        "signer": "d1e9026d6710beadfafb90692b40ef236f93df2b1b9b0670c6d51edbb8730d6b"
-      },
-      "expected": {
-        "message": "8860ac3d85b56e669888bc66c923b4931a95d7c6edd80b81c9277fbf1e83d77e",
-        "valid": "true"
-      }
-    },
-    {
-      "id": "statement-expired-beta",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; a beta statement whose expiry has passed",
-      "input": {
-        "op": "desktopUpdateSignature",
-        "tag": "agentlink-desktop-root/v2",
-        "document": {
-          "domain": "agentlink-desktop-root/v2",
-          "sequence": 5,
-          "action": "renew",
-          "channel": "beta",
-          "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-          "issued": "2026-01-01T09:00:00Z",
-          "expires": "2026-04-01T09:00:00Z",
-          "sig": "3130b89c95c333da08ef19e1de98288317545c63bd1c1bc462c599fa2988532e7b5cd91015d802b85b854778d5580d855799ee8622a5af7591f585ede4b54bb9"
-        },
-        "signer": "d1e9026d6710beadfafb90692b40ef236f93df2b1b9b0670c6d51edbb8730d6b"
-      },
-      "expected": {
-        "message": "5fa8e8df00b64a89b1049a73c5e77c31e253ff4dc6b0b9557034064768bd5b9f",
-        "valid": "true"
-      }
-    },
-    {
-      "id": "statement-v2-under-v1-tag",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; a v2 statement checked under the v1 tag never verifies",
-      "input": {
-        "op": "desktopUpdateSignature",
-        "tag": "agentlink-desktop-root/v1",
-        "document": {
-          "domain": "agentlink-desktop-root/v2",
-          "sequence": 1,
-          "action": "introduce",
-          "channel": "beta",
-          "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-          "issued": "2026-11-01T09:00:00Z",
-          "expires": "2027-01-30T09:00:00Z",
-          "sig": "d03d73b7ab9607057094d4ae8dd282026ad300c0240d6d76054b3dd4f163e86cd86c5e829e42fa52cc0429757542daee88b6cf81324b49f60d1631d6d437419b"
-        },
-        "signer": "d1e9026d6710beadfafb90692b40ef236f93df2b1b9b0670c6d51edbb8730d6b"
-      },
-      "expected": {
-        "message": "29bd20c2eb22672e66a5a2e69b0324dfe8cbadee9c05ef4c604af15b101b48c8",
-        "valid": "false"
-      }
-    },
-    {
-      "id": "statement-under-update-key",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; a statement checked against the update key never verifies",
-      "input": {
-        "op": "desktopUpdateSignature",
-        "tag": "agentlink-desktop-root/v2",
-        "document": {
-          "domain": "agentlink-desktop-root/v2",
-          "sequence": 1,
-          "action": "introduce",
-          "channel": "beta",
-          "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-          "issued": "2026-11-01T09:00:00Z",
-          "expires": "2027-01-30T09:00:00Z",
-          "sig": "d03d73b7ab9607057094d4ae8dd282026ad300c0240d6d76054b3dd4f163e86cd86c5e829e42fa52cc0429757542daee88b6cf81324b49f60d1631d6d437419b"
-        },
-        "signer": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709"
-      },
-      "expected": {
-        "message": "bce588e874822fadb82bf08dc6df38a838f42b8ca045d3e8164ecba98292b177",
-        "valid": "false"
-      }
-    },
-    {
       "id": "manifest-beta-ok",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; a beta manifest by the beta key (zip and dmg per arch)",
+      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2, one pinned update key; a beta manifest by the pinned key (zip and dmg per arch)",
       "input": {
         "op": "desktopUpdateSignature",
         "tag": "agentlink-desktop-update/v2",
@@ -182,17 +21,7 @@
           "minimumVersion": "0.5.0",
           "released": "2026-11-13T08:00:00Z",
           "expires": "2026-12-13T08:00:00Z",
-          "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-          "statement": {
-            "domain": "agentlink-desktop-root/v2",
-            "sequence": 1,
-            "action": "introduce",
-            "channel": "beta",
-            "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-            "issued": "2026-11-01T09:00:00Z",
-            "expires": "2027-01-30T09:00:00Z",
-            "sig": "d03d73b7ab9607057094d4ae8dd282026ad300c0240d6d76054b3dd4f163e86cd86c5e829e42fa52cc0429757542daee88b6cf81324b49f60d1631d6d437419b"
-          },
+          "updateKey": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220",
           "assets": [
             {
               "platform": "darwin",
@@ -227,219 +56,18 @@
               "size": 28
             }
           ],
-          "sig": "9230aa61b1b7e4370aaadb3187085ab29188e27ed23c44b2a641d200bacb7a15e43a618a94a04455289961fcdfa100e31c905705a7d8eafbfdce7c4ea17a9265"
+          "sig": "9133261ffea9e645a5e345e9dc7851b55ccf6bf824c18c872202f1c4812a892fd470c03621777d6413d7dc67f1da19fc0b7b6296e05a3e9e8c4cc45844951adc"
         },
-        "signer": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709"
+        "signer": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220"
       },
       "expected": {
-        "message": "1696b393b64792b08dbe4fc221dd4413e5c883b3286576f26425986acab93070",
-        "valid": "true"
-      }
-    },
-    {
-      "id": "manifest-beta-renewed",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; a beta manifest carrying the renew statement",
-      "input": {
-        "op": "desktopUpdateSignature",
-        "tag": "agentlink-desktop-update/v2",
-        "document": {
-          "domain": "agentlink-desktop-update/v2",
-          "channel": "beta",
-          "version": "0.5.3",
-          "minimumVersion": "0.5.0",
-          "released": "2026-11-13T08:00:00Z",
-          "expires": "2026-12-13T08:00:00Z",
-          "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-          "statement": {
-            "domain": "agentlink-desktop-root/v2",
-            "sequence": 2,
-            "action": "renew",
-            "channel": "beta",
-            "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-            "issued": "2026-11-10T09:00:00Z",
-            "expires": "2027-02-08T09:00:00Z",
-            "sig": "475784c4b956b95e1169c210d1c8173e191b8174ee45fb4b2b491d218324dc8fbe411130d2510941c7747133d6fa10d64efe186343e7bdbf9d6ede05972bc45d"
-          },
-          "assets": [
-            {
-              "platform": "darwin",
-              "arch": "arm64",
-              "kind": "zip",
-              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.zip",
-              "sha256": "babac274b7394d40f58e5bd60c4e45bdb50e8048fc8dbfd70b7aa87df4c0cfc9",
-              "size": 30
-            },
-            {
-              "platform": "darwin",
-              "arch": "arm64",
-              "kind": "dmg",
-              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.dmg",
-              "sha256": "8aea3681b76d72892aa54e82cad4a0c2a9cb95e253b02432f8969556f8ff048b",
-              "size": 30
-            },
-            {
-              "platform": "darwin",
-              "arch": "x64",
-              "kind": "zip",
-              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.zip",
-              "sha256": "66e76899640cf2c3ba6294e35b6e330ba6ce4942ac3aef39c811064c16c67103",
-              "size": 28
-            },
-            {
-              "platform": "darwin",
-              "arch": "x64",
-              "kind": "dmg",
-              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.dmg",
-              "sha256": "dd5f489b70be1a80993d53f12131f953d10ad754060be637ca63c4ad7b5b0fd8",
-              "size": 28
-            }
-          ],
-          "sig": "01e2d76dc772851bfd9258908f1282154b032afe3bae22abb44cfc2aeaabf473f153e585e577bd25edb8693f260ba862e9fb6c95e0a5b7b7b8bc2b040b92d0c5"
-        },
-        "signer": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709"
-      },
-      "expected": {
-        "message": "7cfdbeee6300cd9c6770603c2c6f27b1718c4ca5dba4a786bd20b062eb660d5b",
-        "valid": "true"
-      }
-    },
-    {
-      "id": "manifest-statement-expired",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; a beta manifest whose statement has expired",
-      "input": {
-        "op": "desktopUpdateSignature",
-        "tag": "agentlink-desktop-update/v2",
-        "document": {
-          "domain": "agentlink-desktop-update/v2",
-          "channel": "beta",
-          "version": "0.5.3",
-          "minimumVersion": "0.5.0",
-          "released": "2026-11-13T08:00:00Z",
-          "expires": "2026-12-13T08:00:00Z",
-          "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-          "statement": {
-            "domain": "agentlink-desktop-root/v2",
-            "sequence": 5,
-            "action": "renew",
-            "channel": "beta",
-            "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-            "issued": "2026-01-01T09:00:00Z",
-            "expires": "2026-04-01T09:00:00Z",
-            "sig": "3130b89c95c333da08ef19e1de98288317545c63bd1c1bc462c599fa2988532e7b5cd91015d802b85b854778d5580d855799ee8622a5af7591f585ede4b54bb9"
-          },
-          "assets": [
-            {
-              "platform": "darwin",
-              "arch": "arm64",
-              "kind": "zip",
-              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.zip",
-              "sha256": "babac274b7394d40f58e5bd60c4e45bdb50e8048fc8dbfd70b7aa87df4c0cfc9",
-              "size": 30
-            },
-            {
-              "platform": "darwin",
-              "arch": "arm64",
-              "kind": "dmg",
-              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.dmg",
-              "sha256": "8aea3681b76d72892aa54e82cad4a0c2a9cb95e253b02432f8969556f8ff048b",
-              "size": 30
-            },
-            {
-              "platform": "darwin",
-              "arch": "x64",
-              "kind": "zip",
-              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.zip",
-              "sha256": "66e76899640cf2c3ba6294e35b6e330ba6ce4942ac3aef39c811064c16c67103",
-              "size": 28
-            },
-            {
-              "platform": "darwin",
-              "arch": "x64",
-              "kind": "dmg",
-              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.dmg",
-              "sha256": "dd5f489b70be1a80993d53f12131f953d10ad754060be637ca63c4ad7b5b0fd8",
-              "size": 28
-            }
-          ],
-          "sig": "4dc543b3373c9641c58fedf9eb2ebbc45ac31fb1efb3a0fad714bb063e54c5a8c2e3fc07f261cd323c3179228f2b8fccc602144536d4fba690e5f7ce61fa5a1d"
-        },
-        "signer": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709"
-      },
-      "expected": {
-        "message": "13919ce7a227aea69a2d206fea215fbc3ee6d457947d07a5e2ac6b63d107704e",
-        "valid": "true"
-      }
-    },
-    {
-      "id": "manifest-stable-by-beta-key",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; a stable manifest under a beta-only statement",
-      "input": {
-        "op": "desktopUpdateSignature",
-        "tag": "agentlink-desktop-update/v2",
-        "document": {
-          "domain": "agentlink-desktop-update/v2",
-          "channel": "stable",
-          "version": "0.5.3",
-          "minimumVersion": "0.5.0",
-          "released": "2026-11-13T08:00:00Z",
-          "expires": "2026-12-13T08:00:00Z",
-          "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-          "statement": {
-            "domain": "agentlink-desktop-root/v2",
-            "sequence": 1,
-            "action": "introduce",
-            "channel": "beta",
-            "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-            "issued": "2026-11-01T09:00:00Z",
-            "expires": "2027-01-30T09:00:00Z",
-            "sig": "d03d73b7ab9607057094d4ae8dd282026ad300c0240d6d76054b3dd4f163e86cd86c5e829e42fa52cc0429757542daee88b6cf81324b49f60d1631d6d437419b"
-          },
-          "assets": [
-            {
-              "platform": "darwin",
-              "arch": "arm64",
-              "kind": "zip",
-              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.zip",
-              "sha256": "babac274b7394d40f58e5bd60c4e45bdb50e8048fc8dbfd70b7aa87df4c0cfc9",
-              "size": 30
-            },
-            {
-              "platform": "darwin",
-              "arch": "arm64",
-              "kind": "dmg",
-              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.dmg",
-              "sha256": "8aea3681b76d72892aa54e82cad4a0c2a9cb95e253b02432f8969556f8ff048b",
-              "size": 30
-            },
-            {
-              "platform": "darwin",
-              "arch": "x64",
-              "kind": "zip",
-              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.zip",
-              "sha256": "66e76899640cf2c3ba6294e35b6e330ba6ce4942ac3aef39c811064c16c67103",
-              "size": 28
-            },
-            {
-              "platform": "darwin",
-              "arch": "x64",
-              "kind": "dmg",
-              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.dmg",
-              "sha256": "dd5f489b70be1a80993d53f12131f953d10ad754060be637ca63c4ad7b5b0fd8",
-              "size": 28
-            }
-          ],
-          "sig": "85a4136210453a394d5c16cd1479daa3f2f21496c9489a97f1bdfe1e50827ca755d462b6bb6f7cdd5d72a7be98e4f6d76e1387e58778781f7425d0c1033a6e91"
-        },
-        "signer": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709"
-      },
-      "expected": {
-        "message": "4a667b0b71f584ed8e14a6c64122a86bb2d1d6ef76dc097eec7cff39dd909576",
+        "message": "072187be1abe6d4e4b320244ceb7d2643cd3e7cef1e9d7d1a49b1301942799da",
         "valid": "true"
       }
     },
     {
       "id": "manifest-stable-ok",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; a stable manifest by the stable key",
+      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2, one pinned update key; a stable manifest by the pinned key",
       "input": {
         "op": "desktopUpdateSignature",
         "tag": "agentlink-desktop-update/v2",
@@ -450,17 +78,7 @@
           "minimumVersion": "0.5.0",
           "released": "2026-11-13T08:00:00Z",
           "expires": "2026-12-13T08:00:00Z",
-          "updateKey": "46b35a98a1329fb5a6a75fc84f1f7f74a3a3700edda434d0c8cc4eaa7c9e1c39",
-          "statement": {
-            "domain": "agentlink-desktop-root/v2",
-            "sequence": 3,
-            "action": "introduce",
-            "channel": "stable",
-            "updateKey": "46b35a98a1329fb5a6a75fc84f1f7f74a3a3700edda434d0c8cc4eaa7c9e1c39",
-            "issued": "2026-11-10T09:30:00Z",
-            "expires": "2027-12-10T09:30:00Z",
-            "sig": "2ecfa00b79c99782c0f3a718aa39b2ea8b11696f3da2413ea14aa248dadf9a2c46d6314cd05903a53e24a37cc58a02b1ec5742122fd1b9f29897692bf058c423"
-          },
+          "updateKey": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220",
           "assets": [
             {
               "platform": "darwin",
@@ -495,18 +113,75 @@
               "size": 28
             }
           ],
-          "sig": "4eec1d06e26ae92ebd8127b424eee10bb5ee2976f4292728650914941ad58823af33b8dc2f45c60a04e7fc0fe821fa18622038e5037610758a0c0bda12df5510"
+          "sig": "18e673c3bc8e2e327662375af047715568cb428d4d7437dc69ddd37602054b5f972f98930db67c63072c6b6617b5d735003e980446bdf026e8e6f07f3339e4e8"
         },
-        "signer": "46b35a98a1329fb5a6a75fc84f1f7f74a3a3700edda434d0c8cc4eaa7c9e1c39"
+        "signer": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220"
       },
       "expected": {
-        "message": "86825549a5f3ebf735d779db8220c2a86631b3b87c56f73d0c49d392ad16c109",
+        "message": "9b936f1715fe5ad2beddc2ef153c70e84f1e01b647423eb34adb90f61fae8eb6",
+        "valid": "true"
+      }
+    },
+    {
+      "id": "manifest-expired",
+      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2, one pinned update key; a manifest past its expiry",
+      "input": {
+        "op": "desktopUpdateSignature",
+        "tag": "agentlink-desktop-update/v2",
+        "document": {
+          "domain": "agentlink-desktop-update/v2",
+          "channel": "beta",
+          "version": "0.5.3",
+          "minimumVersion": "0.5.0",
+          "released": "2026-10-01T08:00:00Z",
+          "expires": "2026-10-31T08:00:00Z",
+          "updateKey": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220",
+          "assets": [
+            {
+              "platform": "darwin",
+              "arch": "arm64",
+              "kind": "zip",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.zip",
+              "sha256": "babac274b7394d40f58e5bd60c4e45bdb50e8048fc8dbfd70b7aa87df4c0cfc9",
+              "size": 30
+            },
+            {
+              "platform": "darwin",
+              "arch": "arm64",
+              "kind": "dmg",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.dmg",
+              "sha256": "8aea3681b76d72892aa54e82cad4a0c2a9cb95e253b02432f8969556f8ff048b",
+              "size": 30
+            },
+            {
+              "platform": "darwin",
+              "arch": "x64",
+              "kind": "zip",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.zip",
+              "sha256": "66e76899640cf2c3ba6294e35b6e330ba6ce4942ac3aef39c811064c16c67103",
+              "size": 28
+            },
+            {
+              "platform": "darwin",
+              "arch": "x64",
+              "kind": "dmg",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.dmg",
+              "sha256": "dd5f489b70be1a80993d53f12131f953d10ad754060be637ca63c4ad7b5b0fd8",
+              "size": 28
+            }
+          ],
+          "sig": "7bb3d2e537f285b0c8aa83fe6af1839805544b4c0e860c526775e797a31091e1869face9535ef7bf72e107e6647ff89dd65b83c141084bfa598b5039ad974c4c"
+        },
+        "signer": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220"
+      },
+      "expected": {
+        "message": "6d3e32d105cd2b79474384b8b8f46a07852b71fa3e6e40480032b1ab730c5fac",
         "valid": "true"
       }
     },
     {
       "id": "manifest-downgrade",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; a validly signed older version",
+      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2, one pinned update key; a validly signed older version",
       "input": {
         "op": "desktopUpdateSignature",
         "tag": "agentlink-desktop-update/v2",
@@ -517,17 +192,7 @@
           "minimumVersion": "0.5.0",
           "released": "2026-11-13T08:00:00Z",
           "expires": "2026-12-13T08:00:00Z",
-          "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-          "statement": {
-            "domain": "agentlink-desktop-root/v2",
-            "sequence": 1,
-            "action": "introduce",
-            "channel": "beta",
-            "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-            "issued": "2026-11-01T09:00:00Z",
-            "expires": "2027-01-30T09:00:00Z",
-            "sig": "d03d73b7ab9607057094d4ae8dd282026ad300c0240d6d76054b3dd4f163e86cd86c5e829e42fa52cc0429757542daee88b6cf81324b49f60d1631d6d437419b"
-          },
+          "updateKey": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220",
           "assets": [
             {
               "platform": "darwin",
@@ -562,68 +227,21 @@
               "size": 28
             }
           ],
-          "sig": "01807f6cbc07d00c2bd3bba6bb31e8444f872ccf3359c7508ffc9cb661e3f04b01878c7deafe71c26fcb578cef0f2668800d3e2c9a60972edfaa15b1b3b7af8a"
+          "sig": "cb1ace22d0c20621e2ae3d89271869b992bc94a532db3b81d88c6a52a26ffc6b56870b11975372985da9cfd29a60d79c0a18f0a2211a56908ef4ca4fc11df775"
         },
-        "signer": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709"
+        "signer": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220"
       },
       "expected": {
-        "message": "b33d521a72e586c38b305845517827041f309f0610c817d6a048ba6529d0b285",
+        "message": "fba2ab905a7eee249d955c535603469699783543ea55db531c74a220500e4d8f",
         "valid": "true"
       }
     },
     {
-      "id": "manifest-v1",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; a format v1 manifest under the v1 tags (refused for install)",
+      "id": "manifest-other-key",
+      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2, one pinned update key; signed by and naming a key that is not pinned",
       "input": {
         "op": "desktopUpdateSignature",
-        "tag": "agentlink-desktop-update/v1",
-        "document": {
-          "domain": "agentlink-desktop-update/v1",
-          "channel": "beta",
-          "version": "0.5.3",
-          "minimumVersion": "0.5.0",
-          "released": "2026-11-13T08:00:00Z",
-          "expires": "2026-12-13T08:00:00Z",
-          "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-          "statement": {
-            "domain": "agentlink-desktop-root/v1",
-            "sequence": 1,
-            "action": "introduce",
-            "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-            "issued": "2026-11-01T09:00:00Z",
-            "sig": "45f2bb4406d15bfe2ef9fd885b5cc301c78f6022de5e898538b83aecdcb5e6920737388573f246278daa2d09fe3396c044fcc260ec42324da411efd4fb89bd3d"
-          },
-          "assets": [
-            {
-              "platform": "darwin",
-              "arch": "arm64",
-              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.dmg",
-              "sha256": "8aea3681b76d72892aa54e82cad4a0c2a9cb95e253b02432f8969556f8ff048b",
-              "size": 30
-            },
-            {
-              "platform": "darwin",
-              "arch": "x64",
-              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.dmg",
-              "sha256": "dd5f489b70be1a80993d53f12131f953d10ad754060be637ca63c4ad7b5b0fd8",
-              "size": 28
-            }
-          ],
-          "sig": "d126ed963c87de31416585c6236ddb5e8312e3d392dccc2cdb01dd62409a23353771c9d9a9891a7192b4981cd7d4f799e9ac165567b664a8c1399a1dcf36edb2"
-        },
-        "signer": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709"
-      },
-      "expected": {
-        "message": "c8a8a8421deacbc3382109233248609568e59c383e7685c2f83613ea76f65bf8",
-        "valid": "true"
-      }
-    },
-    {
-      "id": "manifest-v2-under-v1-tag",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; a v2 manifest checked under the v1 tag never verifies",
-      "input": {
-        "op": "desktopUpdateSignature",
-        "tag": "agentlink-desktop-update/v1",
+        "tag": "agentlink-desktop-update/v2",
         "document": {
           "domain": "agentlink-desktop-update/v2",
           "channel": "beta",
@@ -631,17 +249,7 @@
           "minimumVersion": "0.5.0",
           "released": "2026-11-13T08:00:00Z",
           "expires": "2026-12-13T08:00:00Z",
-          "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-          "statement": {
-            "domain": "agentlink-desktop-root/v2",
-            "sequence": 1,
-            "action": "introduce",
-            "channel": "beta",
-            "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-            "issued": "2026-11-01T09:00:00Z",
-            "expires": "2027-01-30T09:00:00Z",
-            "sig": "d03d73b7ab9607057094d4ae8dd282026ad300c0240d6d76054b3dd4f163e86cd86c5e829e42fa52cc0429757542daee88b6cf81324b49f60d1631d6d437419b"
-          },
+          "updateKey": "0454538d36b8da3a7be6c244772a7f2b7eb1e24c73760a9941a8ed1d18074c66",
           "assets": [
             {
               "platform": "darwin",
@@ -676,18 +284,18 @@
               "size": 28
             }
           ],
-          "sig": "9230aa61b1b7e4370aaadb3187085ab29188e27ed23c44b2a641d200bacb7a15e43a618a94a04455289961fcdfa100e31c905705a7d8eafbfdce7c4ea17a9265"
+          "sig": "dcc699e6403164a8a57ea9df9ae7fcf48a35298a5221891197c22bc79238efc8e4dda614aa01ec956eaff6e7926ba267702c86fa2ed6d95028d5350484ce854f"
         },
-        "signer": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709"
+        "signer": "0454538d36b8da3a7be6c244772a7f2b7eb1e24c73760a9941a8ed1d18074c66"
       },
       "expected": {
-        "message": "b53159cd71ba3a2b88351648fc1bc9f0dba53d1fc987e835c6a433a9c043f164",
-        "valid": "false"
+        "message": "d494cf96a20fe520d01db9776fb07be08943634aec8a98acb7a5ce2558f14413",
+        "valid": "true"
       }
     },
     {
-      "id": "manifest-tampered",
-      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2; an asset hash changed after signing",
+      "id": "manifest-other-key-under-pinned",
+      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2, one pinned update key; the same document checked under the pinned key",
       "input": {
         "op": "desktopUpdateSignature",
         "tag": "agentlink-desktop-update/v2",
@@ -698,17 +306,217 @@
           "minimumVersion": "0.5.0",
           "released": "2026-11-13T08:00:00Z",
           "expires": "2026-12-13T08:00:00Z",
-          "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-          "statement": {
-            "domain": "agentlink-desktop-root/v2",
-            "sequence": 1,
-            "action": "introduce",
-            "channel": "beta",
-            "updateKey": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709",
-            "issued": "2026-11-01T09:00:00Z",
-            "expires": "2027-01-30T09:00:00Z",
-            "sig": "d03d73b7ab9607057094d4ae8dd282026ad300c0240d6d76054b3dd4f163e86cd86c5e829e42fa52cc0429757542daee88b6cf81324b49f60d1631d6d437419b"
-          },
+          "updateKey": "0454538d36b8da3a7be6c244772a7f2b7eb1e24c73760a9941a8ed1d18074c66",
+          "assets": [
+            {
+              "platform": "darwin",
+              "arch": "arm64",
+              "kind": "zip",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.zip",
+              "sha256": "babac274b7394d40f58e5bd60c4e45bdb50e8048fc8dbfd70b7aa87df4c0cfc9",
+              "size": 30
+            },
+            {
+              "platform": "darwin",
+              "arch": "arm64",
+              "kind": "dmg",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.dmg",
+              "sha256": "8aea3681b76d72892aa54e82cad4a0c2a9cb95e253b02432f8969556f8ff048b",
+              "size": 30
+            },
+            {
+              "platform": "darwin",
+              "arch": "x64",
+              "kind": "zip",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.zip",
+              "sha256": "66e76899640cf2c3ba6294e35b6e330ba6ce4942ac3aef39c811064c16c67103",
+              "size": 28
+            },
+            {
+              "platform": "darwin",
+              "arch": "x64",
+              "kind": "dmg",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.dmg",
+              "sha256": "dd5f489b70be1a80993d53f12131f953d10ad754060be637ca63c4ad7b5b0fd8",
+              "size": 28
+            }
+          ],
+          "sig": "dcc699e6403164a8a57ea9df9ae7fcf48a35298a5221891197c22bc79238efc8e4dda614aa01ec956eaff6e7926ba267702c86fa2ed6d95028d5350484ce854f"
+        },
+        "signer": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220"
+      },
+      "expected": {
+        "message": "d494cf96a20fe520d01db9776fb07be08943634aec8a98acb7a5ce2558f14413",
+        "valid": "false"
+      }
+    },
+    {
+      "id": "manifest-claims-pinned-key",
+      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2, one pinned update key; names the pinned key but is signed by another",
+      "input": {
+        "op": "desktopUpdateSignature",
+        "tag": "agentlink-desktop-update/v2",
+        "document": {
+          "domain": "agentlink-desktop-update/v2",
+          "channel": "beta",
+          "version": "0.5.3",
+          "minimumVersion": "0.5.0",
+          "released": "2026-11-13T08:00:00Z",
+          "expires": "2026-12-13T08:00:00Z",
+          "updateKey": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220",
+          "assets": [
+            {
+              "platform": "darwin",
+              "arch": "arm64",
+              "kind": "zip",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.zip",
+              "sha256": "babac274b7394d40f58e5bd60c4e45bdb50e8048fc8dbfd70b7aa87df4c0cfc9",
+              "size": 30
+            },
+            {
+              "platform": "darwin",
+              "arch": "arm64",
+              "kind": "dmg",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.dmg",
+              "sha256": "8aea3681b76d72892aa54e82cad4a0c2a9cb95e253b02432f8969556f8ff048b",
+              "size": 30
+            },
+            {
+              "platform": "darwin",
+              "arch": "x64",
+              "kind": "zip",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.zip",
+              "sha256": "66e76899640cf2c3ba6294e35b6e330ba6ce4942ac3aef39c811064c16c67103",
+              "size": 28
+            },
+            {
+              "platform": "darwin",
+              "arch": "x64",
+              "kind": "dmg",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.dmg",
+              "sha256": "dd5f489b70be1a80993d53f12131f953d10ad754060be637ca63c4ad7b5b0fd8",
+              "size": 28
+            }
+          ],
+          "sig": "6af165452511ee9788a77c0ad567fc6dcbdeb92f25dc97c8032966dd8f12747341cb186f26779625d5ea8ea289e94b3cd549926c1ba6e5db7e0acad8199ea9f2"
+        },
+        "signer": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220"
+      },
+      "expected": {
+        "message": "072187be1abe6d4e4b320244ceb7d2643cd3e7cef1e9d7d1a49b1301942799da",
+        "valid": "false"
+      }
+    },
+    {
+      "id": "manifest-v1",
+      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2, one pinned update key; a format v1 manifest under the v1 tag (refused for install)",
+      "input": {
+        "op": "desktopUpdateSignature",
+        "tag": "agentlink-desktop-update/v1",
+        "document": {
+          "domain": "agentlink-desktop-update/v1",
+          "channel": "beta",
+          "version": "0.5.3",
+          "minimumVersion": "0.5.0",
+          "released": "2026-11-13T08:00:00Z",
+          "expires": "2026-12-13T08:00:00Z",
+          "updateKey": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220",
+          "assets": [
+            {
+              "platform": "darwin",
+              "arch": "arm64",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.dmg",
+              "sha256": "8aea3681b76d72892aa54e82cad4a0c2a9cb95e253b02432f8969556f8ff048b",
+              "size": 30
+            },
+            {
+              "platform": "darwin",
+              "arch": "x64",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.dmg",
+              "sha256": "dd5f489b70be1a80993d53f12131f953d10ad754060be637ca63c4ad7b5b0fd8",
+              "size": 28
+            }
+          ],
+          "sig": "4b32922fe0c01b1609e93305383bf857a16836451cd672bb901ef80623d87d62f1f3ca910f98a71ce441c187c2307ba43ac0eea590bd71e64e3f07bf6174fdae"
+        },
+        "signer": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220"
+      },
+      "expected": {
+        "message": "a719a7b59eef9fb9a6506ee6e6a6e96a54f7d587042a1ba273c6511d1db9dfce",
+        "valid": "true"
+      }
+    },
+    {
+      "id": "manifest-v2-under-v1-tag",
+      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2, one pinned update key; a v2 manifest checked under the v1 tag never verifies",
+      "input": {
+        "op": "desktopUpdateSignature",
+        "tag": "agentlink-desktop-update/v1",
+        "document": {
+          "domain": "agentlink-desktop-update/v2",
+          "channel": "beta",
+          "version": "0.5.3",
+          "minimumVersion": "0.5.0",
+          "released": "2026-11-13T08:00:00Z",
+          "expires": "2026-12-13T08:00:00Z",
+          "updateKey": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220",
+          "assets": [
+            {
+              "platform": "darwin",
+              "arch": "arm64",
+              "kind": "zip",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.zip",
+              "sha256": "babac274b7394d40f58e5bd60c4e45bdb50e8048fc8dbfd70b7aa87df4c0cfc9",
+              "size": 30
+            },
+            {
+              "platform": "darwin",
+              "arch": "arm64",
+              "kind": "dmg",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.dmg",
+              "sha256": "8aea3681b76d72892aa54e82cad4a0c2a9cb95e253b02432f8969556f8ff048b",
+              "size": 30
+            },
+            {
+              "platform": "darwin",
+              "arch": "x64",
+              "kind": "zip",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.zip",
+              "sha256": "66e76899640cf2c3ba6294e35b6e330ba6ce4942ac3aef39c811064c16c67103",
+              "size": 28
+            },
+            {
+              "platform": "darwin",
+              "arch": "x64",
+              "kind": "dmg",
+              "url": "https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-x64.dmg",
+              "sha256": "dd5f489b70be1a80993d53f12131f953d10ad754060be637ca63c4ad7b5b0fd8",
+              "size": 28
+            }
+          ],
+          "sig": "9133261ffea9e645a5e345e9dc7851b55ccf6bf824c18c872202f1c4812a892fd470c03621777d6413d7dc67f1da19fc0b7b6296e05a3e9e8c4cc45844951adc"
+        },
+        "signer": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220"
+      },
+      "expected": {
+        "message": "02a6b454f131e24d76b9db39a21cb363e378c456d21d882c186a3f64a6b7c0bb",
+        "valid": "false"
+      }
+    },
+    {
+      "id": "manifest-tampered",
+      "source": "08 \u00a78 Signed updates (D-145 (5)); UPD-1 format v2, one pinned update key; an asset hash changed after signing",
+      "input": {
+        "op": "desktopUpdateSignature",
+        "tag": "agentlink-desktop-update/v2",
+        "document": {
+          "domain": "agentlink-desktop-update/v2",
+          "channel": "beta",
+          "version": "0.5.3",
+          "minimumVersion": "0.5.0",
+          "released": "2026-11-13T08:00:00Z",
+          "expires": "2026-12-13T08:00:00Z",
+          "updateKey": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220",
           "assets": [
             {
               "platform": "darwin",
@@ -743,12 +551,12 @@
               "size": 28
             }
           ],
-          "sig": "9230aa61b1b7e4370aaadb3187085ab29188e27ed23c44b2a641d200bacb7a15e43a618a94a04455289961fcdfa100e31c905705a7d8eafbfdce7c4ea17a9265"
+          "sig": "9133261ffea9e645a5e345e9dc7851b55ccf6bf824c18c872202f1c4812a892fd470c03621777d6413d7dc67f1da19fc0b7b6296e05a3e9e8c4cc45844951adc"
         },
-        "signer": "2a37b0040aee8f99091d1740954d592895009d0c9a030e95e6666bd1b550d709"
+        "signer": "80af7cd74ef9e9058d65f2835d98299ca3f6912952bad4c403645554eca86220"
       },
       "expected": {
-        "message": "1021e3b71174f3b4428e247a16f493083d386ba1b069cdb6ad48df318ab2536a",
+        "message": "044c13f186515d79e70e0a64e67895971853d1e3285379c65799117fe5d070ac",
         "valid": "false"
       }
     }

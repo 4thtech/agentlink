@@ -17,8 +17,6 @@ import { configuredRoot, runUpdateCheck, UPDATE_COPY } from '../../src/main/upda
 import {
   MANIFEST_DOMAIN,
   MAX_DOCUMENT_BYTES,
-  MAX_STATEMENT_VALIDITY_MS,
-  STATEMENT_DOMAIN,
   UpdateRefusal,
   allowedDownloadUrl,
   compareVersions,
@@ -40,6 +38,27 @@ import {
 // The x coordinate of the secp256k1 generator point G: a public, well-known valid x-only key.
 const GENERATOR_X = '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
 const enc = (s: string): Uint8Array => new TextEncoder().encode(s);
+/** A well-formed v2 manifest (its signature is not checked by the parser). */
+const MANIFEST: Record<string, unknown> = {
+  domain: 'agentlink-desktop-update/v2',
+  channel: 'beta',
+  version: '0.5.3',
+  minimumVersion: '0.5.0',
+  released: '2026-11-13T08:00:00Z',
+  expires: '2026-12-13T08:00:00Z',
+  updateKey: GENERATOR_X,
+  assets: [
+    {
+      platform: 'darwin',
+      arch: 'arm64',
+      kind: 'zip',
+      url: 'https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-arm64.zip',
+      sha256: 'ab'.repeat(32),
+      size: 10,
+    },
+  ],
+  sig: '00'.repeat(64),
+};
 const code = (fn: () => unknown): string => {
   try {
     fn();
@@ -159,35 +178,22 @@ describe('strict parsing before any signature check', () => {
     expect(code(() => parseUpdateDocument(Uint8Array.of(0x7b, 0xff, 0x7d)))).toBe('malformed');
   });
 
-  it('refuses a statement with a missing sig as unsigned and an extra field as unknown', () => {
-    const body = {
-      domain: 'agentlink-desktop-root/v2',
-      sequence: 1,
-      action: 'introduce',
-      channel: 'beta',
-      updateKey: GENERATOR_X,
-      issued: '2026-11-12T10:00:00Z',
-      expires: '2027-02-10T10:00:00Z',
-    };
+  it('refuses a manifest with a missing sig as unsigned and an extra field as unknown', () => {
+    const body = { ...MANIFEST };
+    delete body['sig'];
     expect(code(() => parseUpdateDocument(enc(JSON.stringify(body))))).toBe('unsigned');
-    expect(
-      code(() => parseUpdateDocument(enc(JSON.stringify({ ...body, sig: '00'.repeat(64), x: 1 })))),
-    ).toBe('unknown_field');
-    expect(
-      code(() =>
-        parseUpdateDocument(enc(JSON.stringify({ ...body, sig: '00'.repeat(64), sequence: 0 }))),
-      ),
-    ).toBe('malformed');
-    expect(
-      code(() =>
-        parseUpdateDocument(
-          enc(JSON.stringify({ ...body, sig: '00'.repeat(64), issued: '2026-02-30T10:00:00Z' })),
-        ),
-      ),
-    ).toBe('malformed');
-    expect(parseUpdateDocument(enc(JSON.stringify({ ...body, sig: '00'.repeat(64) }))).kind).toBe(
-      'statement',
+    expect(code(() => parseUpdateDocument(enc(JSON.stringify({ ...MANIFEST, x: 1 }))))).toBe(
+      'unknown_field',
     );
+    expect(
+      code(() => parseUpdateDocument(enc(JSON.stringify({ ...MANIFEST, version: '0.5' })))),
+    ).toBe('malformed');
+    expect(
+      code(() =>
+        parseUpdateDocument(enc(JSON.stringify({ ...MANIFEST, released: '2026-02-30T10:00:00Z' }))),
+      ),
+    ).toBe('malformed');
+    expect(parseUpdateDocument(enc(JSON.stringify(MANIFEST))).version).toBe('0.5.3');
   });
 });
 
@@ -230,41 +236,16 @@ describe('schedule', () => {
 
 // --- UPD-1: format v2, channel and arch of this build, failed versions ---------------------------
 
-describe('format v2 (UPD-1): strict statement and asset rules', () => {
-  const statement = {
-    domain: 'agentlink-desktop-root/v2',
-    sequence: 1,
-    action: 'introduce',
-    channel: 'beta',
-    updateKey: GENERATOR_X,
-    issued: '2026-11-12T10:00:00Z',
-    expires: '2027-02-10T10:00:00Z',
-    sig: '00'.repeat(64),
-  };
+describe('format v2 (UPD-1): one pinned key, asset kinds, v1 refused', () => {
   const parse = (value: unknown): string =>
     code(() => parseUpdateDocument(enc(JSON.stringify(value))));
 
-  it('the domain tags are /v2; v1 documents are refused as the old format', () => {
-    expect(STATEMENT_DOMAIN).toBe('agentlink-desktop-root/v2');
+  it('the manifest tag is /v2; v1 manifests and v1 key statements are the old format', () => {
     expect(MANIFEST_DOMAIN).toBe('agentlink-desktop-update/v2');
-    expect(parse({ ...statement, domain: 'agentlink-desktop-root/v1' })).toBe('old_format');
-    expect(parse({ domain: 'agentlink-desktop-update/v1' })).toBe('old_format');
-  });
-
-  it('a statement needs channel and expires, at most 400 days after issued', () => {
-    expect(parseUpdateDocument(enc(JSON.stringify(statement))).kind).toBe('statement');
-    const without = (k: string): unknown =>
-      Object.fromEntries(Object.entries(statement).filter(([x]) => x !== k));
-    expect(parse(without('channel'))).toBe('malformed');
-    expect(parse(without('expires'))).toBe('malformed');
-    expect(parse({ ...statement, channel: 'nightly' })).toBe('malformed');
-    expect(parse({ ...statement, expires: statement.issued })).toBe('malformed');
-    expect(parse({ ...statement, expires: '2026-11-11T10:00:00Z' })).toBe('malformed');
-    expect(MAX_STATEMENT_VALIDITY_MS).toBe(400 * 86_400_000);
-    expect(parse({ ...statement, expires: '2027-12-17T10:00:00Z' })).toBe('accepted');
-    expect(parse({ ...statement, expires: '2027-12-17T10:00:01Z' })).toBe('malformed');
-    expect(parse({ ...statement, action: 'renew' })).toBe('accepted');
-    expect(parse({ ...statement, action: 'extend' })).toBe('malformed');
+    expect(parse({ ...MANIFEST, domain: 'agentlink-desktop-update/v1' })).toBe('old_format');
+    expect(parse({ domain: 'agentlink-desktop-root/v1' })).toBe('old_format');
+    expect(parse({ domain: 'agentlink-desktop-root/v2' })).toBe('malformed');
+    expect(parse({ ...MANIFEST, statement: {} })).toBe('unknown_field');
   });
 
   it('an asset needs a kind that matches its platform and file name', () => {
@@ -276,18 +257,7 @@ describe('format v2 (UPD-1): strict statement and asset rules', () => {
       sha256: 'ab'.repeat(32),
       size: 10,
     });
-    const manifest = (assets: unknown[]): unknown => ({
-      domain: 'agentlink-desktop-update/v2',
-      channel: 'beta',
-      version: '0.5.3',
-      minimumVersion: '0.5.0',
-      released: '2026-11-13T08:00:00Z',
-      expires: '2026-12-13T08:00:00Z',
-      updateKey: GENERATOR_X,
-      statement,
-      assets,
-      sig: '00'.repeat(64),
-    });
+    const manifest = (assets: unknown[]): unknown => ({ ...MANIFEST, assets });
     expect(parse(manifest([asset('zip', 'AgentLink-0.5.3-arm64.zip')]))).toBe('accepted');
     expect(parse(manifest([asset('zip', 'A-arm64.zip'), asset('dmg', 'A-arm64.dmg')]))).toBe(
       'accepted',
