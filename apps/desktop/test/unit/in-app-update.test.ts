@@ -150,6 +150,7 @@ describe('the in-app update states (UPD-5)', () => {
       percent: 0,
       installable: true,
     });
+    await tick(); // IR-UPD-8-1 #9: the signed manifest is checked again before the download
     h.hooks().onProgress(250, 1000);
     expect(h.u.view(CURRENT)).toMatchObject({ state: 'downloading', percent: 25 });
     h.hooks().onProgress(1000, 1000);
@@ -168,6 +169,7 @@ describe('the in-app update states (UPD-5)', () => {
     expect(confirmed).toBe(false); // waits for the click (OD-D option 1)
     expect(h.u.restart()).toBe(true);
     await tick();
+    await tick();
     expect(confirmed).toBe(true);
     expect(h.u.view(CURRENT)).toMatchObject({ state: 'restarting' });
     h.finish();
@@ -181,6 +183,7 @@ describe('the in-app update states (UPD-5)', () => {
     const h = harness({ kind: 'fallback', code: 'not_writable' });
     await h.u.check();
     expect(h.u.install()).toBe(true);
+    await tick();
     h.finish();
     await tick();
     expect(h.u.view(CURRENT)).toEqual({
@@ -212,6 +215,81 @@ describe('the in-app update states (UPD-5)', () => {
       expect(u.view(CURRENT)).toEqual({ ...CURRENT, installable: false, percent: 0 });
       expect(u.install()).toBe(false);
     }
+  });
+});
+
+// IR-UPD-8-1 #9: an update offered (and checked) a while ago is checked again against the signed
+// manifest when the person clicks Update now, and again on Restart now, right before the swap.
+describe('the offered update is checked again before install (IR-UPD-8-1 #9)', () => {
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  const other = (): AcceptedUpdate => ({
+    ...accepted(),
+    asset: { ...accepted().asset, sha256: '1'.repeat(64) },
+  });
+
+  function setup(answers: (() => Promise<AcceptedUpdate | undefined>)[]) {
+    let calls = 0;
+    let installs = 0;
+    let hooks: InstallHooks | undefined;
+    const u = new InAppUpdater({
+      enabled: true,
+      currentVersion: '0.5.2',
+      arch: 'arm64',
+      check: () => {
+        const answer = answers[Math.min(calls, answers.length - 1)] as () => Promise<
+          AcceptedUpdate | undefined
+        >;
+        calls += 1;
+        return answer();
+      },
+      install: (_a, h) => {
+        installs += 1;
+        hooks = h;
+        return new Promise<InstallOutcome>(() => undefined);
+      },
+      onChange: () => undefined,
+    });
+    return { u, calls: () => calls, installs: () => installs, hooks: () => hooks };
+  }
+
+  it('Update now re-checks; a changed, gone or refused update is not installed', async () => {
+    for (const later of [
+      () => Promise.resolve(other()),
+      () => Promise.resolve(accepted('0.5.4')),
+      () => Promise.resolve(undefined),
+      () => Promise.reject(new Error('expired')),
+    ]) {
+      const t = setup([() => Promise.resolve(accepted()), later]);
+      await t.u.check();
+      expect(t.u.install()).toBe(true);
+      await tick();
+      expect(t.calls()).toBe(2);
+      expect(t.installs()).toBe(0);
+      expect(t.u.view(CURRENT)).toMatchObject({ state: 'install_failed', installable: false });
+    }
+  });
+
+  it('Restart now re-checks; the swap goes ahead only for the same signed update', async () => {
+    const same = () => Promise.resolve(accepted());
+    const ok = setup([same, same, same]);
+    await ok.u.check();
+    ok.u.install();
+    await tick();
+    expect(ok.installs()).toBe(1);
+    const confirmed = ok.hooks()!.confirmRestart();
+    await tick();
+    expect(ok.u.restart()).toBe(true);
+    await expect(confirmed).resolves.toBeUndefined();
+    expect(ok.calls()).toBe(3);
+
+    const changed = setup([same, same, () => Promise.resolve(other())]);
+    await changed.u.check();
+    changed.u.install();
+    await tick();
+    const refused = changed.hooks()!.confirmRestart();
+    await tick();
+    expect(changed.u.restart()).toBe(true);
+    await expect(refused).rejects.toThrow();
   });
 });
 

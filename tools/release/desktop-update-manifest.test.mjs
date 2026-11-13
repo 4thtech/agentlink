@@ -27,7 +27,8 @@ import {
   signFromEnv,
   verifyDocument,
 } from './desktop-update-manifest.mjs';
-import { expiryStatus } from './desktop-update-expiry.mjs';
+import { RENEW, expiryStatus } from './desktop-update-expiry.mjs';
+import { EnvironmentError, checkEnvironment } from './desktop-update-environment.mjs';
 
 const root = resolve(import.meta.dirname, '../..');
 const release = readFileSync(join(root, '.github/workflows/release.yml'), 'utf8');
@@ -290,6 +291,9 @@ describe('command line', () => {
       lines.push(`${encodeHex(sha256(bytes))}  ${name}`);
     }
     writeFileSync(join(assets, 'SHA256SUMS-desktop-app.txt'), `${lines.join('\n')}\n`);
+    // IR-UPD-8-1 #1: this run's own build sums (a job output), not a file from the Release.
+    const buildSums = join(d, 'build-sums.txt');
+    writeFileSync(buildSums, `${lines.join('\n')}\n`);
     for (const arch of ['arm64', 'x64']) {
       writeFileSync(
         join(assets, `inputs-mac-${arch}.json`),
@@ -313,6 +317,8 @@ describe('command line', () => {
         rk,
         '--repository',
         '4thtech/agentlink',
+        '--build-sums',
+        buildSums,
         '--out',
         join(d, 'unsigned.json'),
       ],
@@ -340,6 +346,43 @@ describe('command line', () => {
     const a = readFileSync(join(d, 'signed', names.keyed));
     const b = readFileSync(join(d, 'signed', names.stable));
     expect(a.equals(b)).toBe(true);
+
+    // IR-UPD-8-1 #1: a Release file that differs from this run's build is refused; so is a build
+    // without this run's sums (only a renewal, bound to the release commit's attestation, has none).
+    const buildArgs = (extra, out) => [
+      'build',
+      '--version',
+      VERSION,
+      '--channel',
+      'stable',
+      '--dir',
+      assets,
+      '--root-key',
+      rk,
+      '--repository',
+      '4thtech/agentlink',
+      ...extra,
+      '--out',
+      join(d, out),
+    ];
+    const swapped = join(d, 'swapped-sums.txt');
+    writeFileSync(
+      swapped,
+      `${lines.map((l, i) => (i === 0 ? `${'f'.repeat(64)}${l.slice(64)}` : l)).join('\n')}\n`,
+    );
+    await expect(main(buildArgs(['--build-sums', swapped], 'u2.json'), io)).rejects.toThrow(
+      /this run's build/,
+    );
+    await expect(main(buildArgs([], 'u3.json'), io)).rejects.toThrow(ToolError);
+    // Renewal: no build records and no build sums; the release assets and the pin only.
+    rmSync(join(assets, 'inputs-mac-arm64.json'));
+    await main(buildArgs(['--renewal'], 'u4.json'), io);
+    expect(JSON.parse(readFileSync(join(d, 'u4.json'), 'utf8'))).toEqual(
+      JSON.parse(readFileSync(join(d, 'unsigned.json'), 'utf8')),
+    );
+    await expect(
+      main(buildArgs(['--renewal', '--build-sums', buildSums], 'u5.json'), io),
+    ).rejects.toThrow(ToolError);
     expect(out.join('\n')).not.toContain(k1.secretHex);
     // A changed stable copy is refused by verify.
     writeFileSync(join(d, 'signed', names.stable), `${b.toString()} `);
@@ -409,6 +452,13 @@ describe('release.yml: desktop-app-release attaches the zips and reports the upd
     expect(attach).toMatch(/inputs-mac-arm64\.json/);
     expect(attach).not.toMatch(/secrets\./);
   });
+  // IR-UPD-8-1 #1: the build's own sums leave this job as an output, never as a Release file.
+  it('outputs the build sums of the zips and DMGs it checked against the build', () => {
+    expect(attach).toMatch(/\n {6}build-sums: \$\{\{ steps\.names\.outputs\.build-sums \}\}/);
+    const step = attach.slice(attach.indexOf('- name: Check the names and the sums'));
+    expect(step).toMatch(/\n {8}id: names\n/);
+    expect(step).toMatch(/build-sums<<[A-Z_]+/);
+  });
 });
 
 describe('release.yml: desktop-update-manifest (no secret)', () => {
@@ -424,6 +474,15 @@ describe('release.yml: desktop-update-manifest (no secret)', () => {
   });
   it('verifies the attestations and the sums of the release assets, then builds the manifest', () => {
     expect(prep).toMatch(/gh attestation verify [^\n]*--signer-workflow/);
+    // IR-UPD-8-1 #1: bound to this commit on main, signed by desktop.yml at this commit.
+    const verify = prep.match(/gh attestation verify [^\n]*/)[0];
+    expect(verify).toContain('--source-digest "$GITHUB_SHA"');
+    expect(verify).toContain('--source-ref refs/heads/main');
+    expect(verify).toContain('--signer-digest "$GITHUB_SHA"');
+    expect(prep).toMatch(/BUILD_SUMS: \$\{\{ needs\.desktop-app-release\.outputs\.build-sums \}\}/);
+    expect(prep).toMatch(/--build-sums "\$RUNNER_TEMP\/build-sums\.txt"/);
+    expect(prep).not.toMatch(/--renewal/);
+    expect(prep).toMatch(/needs: \[[^\]]*desktop-update-environment[^\]]*\]/);
     expect(prep).toMatch(/sha256sum --check --strict SHA256SUMS-desktop-app\.txt/);
     expect(prep).toMatch(/desktop-update-manifest\.mjs build/);
     expect(prep).toMatch(/--root-key apps\/desktop\/src\/main\/updater\/root-key\.json/);
@@ -477,6 +536,11 @@ describe('release.yml: sign-update-manifest (the one job with the key)', () => {
     expect(all[publishAt]).not.toMatch(/secrets\./);
     // Builds the app's verifier before the key is read; nothing after the sign step installs code.
     expect(at('Build the verifier')).toBeLessThan(signAt);
+    // IR-UPD-8-1 #5: a re-run never signs a release that is no longer Latest.
+    const latestAt = at('Check the release is still Latest');
+    expect(latestAt).toBeGreaterThan(0);
+    expect(latestAt).toBeLessThan(signAt);
+    expect(all[latestAt]).toMatch(/releases\/latest/);
     for (const s of all.slice(signAt)) expect(s).not.toMatch(/pnpm install|setup-node-pnpm|turbo/);
   });
 });
@@ -489,5 +553,125 @@ describe('desktop-update-expiry.yml: renewal warning 7 days before expiry', () =
     expect(wf).not.toMatch(/secrets\.|environment:/);
     expect(wf).toMatch(/desktop-update-expiry\.mjs[^\n]*--warn-days 7/);
     expect(wf).toContain('releases/latest/download/desktop-update.json');
+  });
+});
+
+// IR-UPD-8-1 #2: GitHub creates a missing environment with no rules on first use. Before any job can
+// reach the key, a job without a secret checks that `desktop-update` exists with a required reviewer,
+// a main-only branch rule and no admin bypass.
+describe('the desktop-update environment check (IR-UPD-8-1 #2)', () => {
+  const good = {
+    name: 'desktop-update',
+    can_admins_bypass: false,
+    protection_rules: [
+      {
+        type: 'required_reviewers',
+        reviewers: [{ type: 'User', reviewer: { login: 'talirezun' } }],
+      },
+      { type: 'branch_policy' },
+    ],
+    deployment_branch_policy: { protected_branches: false, custom_branch_policies: true },
+  };
+  const mainOnly = { total_count: 1, branch_policies: [{ name: 'main', type: 'branch' }] };
+
+  it('passes the protected environment', () => {
+    expect(() => checkEnvironment(good, mainOnly)).not.toThrow();
+  });
+
+  it.each([
+    ['missing', null],
+    ['admin bypass', { ...good, can_admins_bypass: true }],
+    ['no bypass field', { ...good, can_admins_bypass: undefined }],
+    ['no reviewer', { ...good, protection_rules: [{ type: 'branch_policy' }] }],
+    [
+      'an empty reviewer list',
+      { ...good, protection_rules: [{ type: 'required_reviewers', reviewers: [] }] },
+    ],
+    ['no branch rule', { ...good, deployment_branch_policy: null }],
+    [
+      'protected branches instead of main',
+      {
+        ...good,
+        deployment_branch_policy: { protected_branches: true, custom_branch_policies: false },
+      },
+    ],
+  ])('fails when %s', (_label, env) => {
+    expect(() => checkEnvironment(env, mainOnly)).toThrow(EnvironmentError);
+  });
+
+  it.each([
+    ['no branch', { total_count: 0, branch_policies: [] }],
+    [
+      'another branch too',
+      {
+        total_count: 2,
+        branch_policies: [
+          { name: 'main', type: 'branch' },
+          { name: 'wave-4', type: 'branch' },
+        ],
+      },
+    ],
+    ['a pattern', { total_count: 1, branch_policies: [{ name: '*', type: 'branch' }] }],
+    ['a tag', { total_count: 1, branch_policies: [{ name: 'main', type: 'tag' }] }],
+  ])('fails when the branch rule has %s', (_label, policies) => {
+    expect(() => checkEnvironment(good, policies)).toThrow(EnvironmentError);
+  });
+
+  const envJob = job(release, 'desktop-update-environment');
+  it('runs in release.yml without a secret, read-only, before the manifest job', () => {
+    expect(envJob).not.toBe('');
+    expect(envJob).not.toMatch(/secrets\.|environment:/);
+    expect(permissions(envJob)).toEqual(['actions: read']);
+    expect(envJob).toMatch(/gh api [^\n]*environments\/desktop-update/);
+    expect(envJob).toMatch(/deployment-branch-policies/);
+    expect(envJob).toMatch(/desktop-update-environment\.mjs/);
+  });
+});
+
+// IR-UPD-8-1 #4/#5: renewal is its own dispatch-only workflow that re-signs the CURRENT Latest
+// release, rebuilt from the Release assets and their attestations bound to the release commit on
+// main (no build artifacts), under the same environment and the same environment check.
+describe('desktop-update-renew.yml (IR-UPD-8-1 #4)', () => {
+  const wf = readFileSync(join(root, '.github/workflows/desktop-update-renew.yml'), 'utf8');
+  it('is dispatch-only, on main, with permissions {} at the top', () => {
+    const on = wf.slice(wf.indexOf('\non:'), wf.indexOf('\npermissions:'));
+    expect(on).toMatch(/workflow_dispatch:/);
+    expect(on).not.toMatch(/push:|schedule:|pull_request|workflow_run|workflow_call/);
+    expect(wf).toMatch(/\npermissions: \{\}\n/);
+    expect(wf).toMatch(/github\.ref == 'refs\/heads\/main'/);
+  });
+  it('checks the environment, the Latest release and the attestations bound to its commit', () => {
+    expect(wf).toMatch(/desktop-update-environment\.mjs/);
+    expect(wf).toMatch(/releases\/latest/);
+    const verify = wf.match(/gh attestation verify [^\n]*/)[0];
+    expect(verify).toContain('--source-digest "$RELEASE_SHA"');
+    expect(verify).toContain('--source-ref refs/heads/main');
+    expect(verify).toContain('--signer-digest "$RELEASE_SHA"');
+    expect(wf).toMatch(/desktop-update-manifest\.mjs build [^\n]*--renewal/);
+    expect(wf).not.toMatch(/pattern: desktop-app-|name: desktop-app-/);
+  });
+  it('signs in one step of a job in environment desktop-update, checks, then publishes', () => {
+    expect(wf.match(/secrets\.DESKTOP_UPDATE_KEY/g)).toHaveLength(1);
+    expect(wf.match(/secrets\./g)).toHaveLength(1);
+    const signJob = job(wf, 'renew-sign');
+    expect(signJob).toMatch(/\n {4}environment: desktop-update\n/);
+    expect(permissions(signJob)).toEqual(['contents: write']);
+    const all = steps(signJob);
+    const at = (name) => all.findIndex((st) => st.includes(`- name: ${name}`));
+    const checkName = "Check the signed manifest with the app's own checks";
+    expect(at('Check the release is still Latest')).toBeGreaterThan(0);
+    expect(at('Check the release is still Latest')).toBeLessThan(at('Sign the update manifest'));
+    expect(at('Sign the update manifest')).toBeLessThan(at(checkName));
+    expect(at(checkName)).toBeLessThan(at('Publish the update manifest'));
+    for (const st of all.slice(at('Sign the update manifest'))) {
+      expect(st).not.toMatch(/pnpm install|setup-node-pnpm|turbo/);
+    }
+    expect(permissions(job(wf, 'renew-manifest')).sort()).toEqual([
+      'attestations: read',
+      'contents: read',
+    ]);
+  });
+  it('the expiry warning points at the renewal workflow', () => {
+    expect(RENEW).toContain('desktop-update-renew');
   });
 });
