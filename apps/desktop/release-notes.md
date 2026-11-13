@@ -4,7 +4,7 @@
 
 ## AgentLink desktop preview <version>
 
-**Who this is for:** early adopters on Mac or Windows who accept an unsigned build.
+**Who this is for:** early adopters on a Mac who accept an unsigned build. The Windows desktop app is coming later; on Windows, use the browser app (one command).
 
 ### What is new
 
@@ -15,8 +15,7 @@
 The one canonical page is [Desktop app](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/apps/desktop-app.md). Short version:
 
 - **Mac:** open the `.dmg`, drag AgentLink to Applications and open it. macOS says it cannot check the app: click **Done**, then **System Settings**, **Privacy & Security**, **Open Anyway** (on macOS 13 or 14 you can also Control-click the app and choose **Open**). If macOS says the app is "damaged", run `xattr -dr com.apple.quarantine /Applications/AgentLink.app` in Terminal and open it again. The preview is not signed by Apple yet; the `.dmg` has a short "Read me first" file with these steps.
-- **Windows:** run the installer, **More info**, **Run anyway**.
-- **Windows with Smart App Control on:** the preview cannot run yet. Use the browser version until the signed build. Do not turn Smart App Control off.
+- **Windows:** the desktop app is coming later. Use the browser app (one command; see the Windows guide).
 
 ### Known limits
 

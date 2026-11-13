@@ -1,6 +1,6 @@
 # Mac desktop app
 
-*Applies to AgentLink 0.5.1. This is an early, unsigned build, meant for people who are happy to try it first. Windows has an early installer too; Linux is not available yet.*
+*Applies to AgentLink 0.5.1. This is an early, unsigned build, meant for people who are happy to try it first. The Windows desktop app is coming later; on Windows, use the browser app (one command). Linux is not available yet.*
 
 The AgentLink desktop app is the local app in its own window, with its own icon. It does everything [the local app](../local-app/README.md) does in your browser, with the same IDs, contacts, messages and approvals, and the Touch ID sheet shows the AgentLink name and icon.
 
@@ -39,9 +39,7 @@ That command only removes the "downloaded from the internet" mark from this one 
 
 ## Windows
 
-Run `AgentLink-<version>-win-x64-setup.exe` from the same Releases page. If Windows says **Windows protected your PC**, press **More info**, then **Run anyway**. Windows lists the publisher as unknown, because the build is not signed yet.
-
-Some new Windows 11 PCs have **Smart App Control** turned on. It blocks apps that are not signed and has no **Run anyway** button, so the early build cannot run there yet. Use the [one-line install](../get-started/windows.md), which opens AgentLink in your browser. Do not turn Smart App Control off: once it is off, Windows does not let you turn it back on without a reset.
+The Windows desktop app is coming later. On Windows, use the browser app: one command installs AgentLink and opens it in your browser. See [Windows](../get-started/windows.md).
 
 ## Updates
 
@@ -53,7 +51,7 @@ Turning on Touch ID in the desktop app is guided: open **Settings**, then **Touc
 
 ## Removing it
 
-Mac: drag AgentLink from Applications to the Trash. Windows: Settings, then Apps, then AgentLink, then Uninstall. Your IDs and messages stay in your AgentLink folder until you delete that folder.
+Drag AgentLink from Applications to the Trash. Your IDs and messages stay in your AgentLink folder until you delete that folder.
 
 ## Good to know
 
