@@ -22,7 +22,7 @@ export const DOCS_LINKS = {
 export const MAC_APP_AVAILABLE = true;
 
 /** The release the Mac app link names (its GitHub Release tag is `v` plus this). */
-export const MAC_APP_VERSION = '0.5.1';
+export const MAC_APP_VERSION = '0.5.2';
 
 /**
  * The Mac app's file name, as the desktop build writes it (apps/desktop/build/build-mac.mjs on

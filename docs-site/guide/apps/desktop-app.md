@@ -6,8 +6,8 @@
 
 | Your computer | Download this |
 |---|---|
-| Mac with Apple chip (M1, M2, M3, M4) | **[AgentLink-0.5.1-mac-arm64.dmg](https://github.com/4thtech/agentlink/releases/download/v0.5.1/AgentLink-0.5.1-mac-arm64.dmg)** |
-| Mac with Intel chip | **[AgentLink-0.5.1-mac-x64.dmg](https://github.com/4thtech/agentlink/releases/download/v0.5.1/AgentLink-0.5.1-mac-x64.dmg)** |
+| Mac with Apple chip (M1, M2, M3, M4) | **[AgentLink-0.5.2-mac-arm64.dmg](https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-mac-arm64.dmg)** |
+| Mac with Intel chip | **[AgentLink-0.5.2-mac-x64.dmg](https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-mac-x64.dmg)** |
 | Windows or Linux | No app to download: use the [one command](../get-started/start-fast.md) |
 
 Not sure which Mac? Click the Apple menu (top left of your screen), then **About This Mac**. "Chip: Apple M…" means Apple chip; "Processor: Intel" means Intel. In the file names, **arm64 = Apple chip** and **x64 = Intel**.
