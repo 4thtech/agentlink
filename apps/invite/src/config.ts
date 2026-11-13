@@ -8,9 +8,8 @@
  */
 export const DOCS_BASE = 'https://wiki.4thtech.io/products/agentlink';
 export const DOCS_LINKS = {
-  /** "Install AgentLink" (docs-site/guide/get-started/start-fast.md), live on the wiki today. */
-  // switch to …/get-started/start-here at the 0.5.1 release (with MAC_APP_AVAILABLE)
-  guide: `${DOCS_BASE}/get-started/start-fast`,
+  /** "Start here" (docs-site/guide/start-here.md), on the wiki since the 0.5.1 release. */
+  guide: `${DOCS_BASE}/start-here`,
   /** "Windows" (docs-site/guide/get-started/windows.md). */
   windows: `${DOCS_BASE}/get-started/windows`,
 } as const;
@@ -20,7 +19,7 @@ export const DOCS_LINKS = {
  * released: while it is false the page never mentions the app and its link has no `href`. Turn it on
  * in the release PR, after checking that both `MAC_APP_URLS` download the released files.
  */
-export const MAC_APP_AVAILABLE = false;
+export const MAC_APP_AVAILABLE = true;
 
 /** The release the Mac app link names (its GitHub Release tag is `v` plus this). */
 export const MAC_APP_VERSION = '0.5.1';

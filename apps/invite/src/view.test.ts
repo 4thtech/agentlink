@@ -75,15 +75,14 @@ describe('osFor and isPhone (REL051-INV)', () => {
 });
 
 describe('config (REL051-INV)', () => {
-  it('keeps the Mac app switched off until the early build is released', () => {
-    expect(MAC_APP_AVAILABLE).toBe(false);
+  it('has the Mac app switched on, the early build being released (0.5.1)', () => {
+    expect(MAC_APP_AVAILABLE).toBe(true);
   });
 
   it('links only to 4thTech Docs and the project’s GitHub releases, over https', () => {
     for (const url of Object.values(DOCS_LINKS)) expect(url.startsWith(`${DOCS_BASE}/`)).toBe(true);
     expect(DOCS_BASE).toBe('https://wiki.4thtech.io/products/agentlink');
-    // Live on the wiki today; start-here only after the 0.5.1 release tag syncs.
-    expect(DOCS_LINKS.guide).toBe(`${DOCS_BASE}/get-started/start-fast`);
+    expect(DOCS_LINKS.guide).toBe(`${DOCS_BASE}/start-here`);
     for (const url of Object.values(MAC_APP_URLS))
       expect(url).toMatch(/^https:\/\/github\.com\/4thtech\/agentlink\/releases\//);
   });
@@ -293,10 +292,10 @@ describe('render (REL051-INV)', () => {
     expect(two.el('phone-note').hidden).toBe(true);
   });
 
-  it('switch off (the default): no Mac app, and its link has no href, on every computer', () => {
+  it('switch off: no Mac app, and its link has no href, on every computer', () => {
     for (const os of ['mac', 'windows', 'linux', 'node'] as Os[]) {
       const { doc, el } = fakeDocument();
-      render(doc, ready(), noCopy, undefined, { os });
+      render(doc, ready(), noCopy, undefined, { os, macApp: false });
       expect(el('mac-app').hidden).toBe(true);
       for (const arch of ['arm64', 'x64']) {
         expect(el(`mac-app-${arch}`).getAttribute('href')).toBeNull();
