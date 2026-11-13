@@ -20,7 +20,7 @@ flowchart LR
 | [`docs-site/guide/`](../../docs-site/guide/README.md) | People who use AgentLink through an AI app | Quick start, step-by-step pages, one page per screen, help | Every user-facing how-to and every UI word (copied from `strings.ts`) |
 | [`docs-site/technical/`](../../docs-site/technical/README.md) | Builders, reviewers, verifiers | Concepts, guides, reference | Tool, CLI, format and network reference (specs win) |
 | [`docs-site/assets/screens/`](../../docs-site/assets/screens/) | Both of the above, and the README | Screenshots of the real app | Generated only by `pnpm docs:screens` (§3) |
-| [`knowledge/`](../../knowledge/agentlink-overview.md) | AI assistants and people asking them | Development overview (shipped, next, being built, later) and a compact user guide | Nothing new: condensed from the guide and Status; its status block is generated |
+| [`knowledge/`](../../knowledge/agentlink-overview.md) | AI assistants and people asking them | Development overview (shipped, next, being built, later), a compact user guide, desktop app, FAQ, security and privacy and a technical overview (one topic per file, fed whole to Lumina) | Nothing new: condensed from the guide and Status; its status block is generated |
 | [`llms.txt`](../../llms.txt) | AI crawlers and assistants | Index of the above | Nothing new |
 | [`docs/`](../README.md) | Contributors and agents | Specs, process, runbooks | Specs (`docs/foundation/`) are the source of truth for behaviour |
 | GitBook ([wiki.4thtech.io](https://wiki.4thtech.io)) | Public | Published copy of `docs-site/` | Nothing: a copy, never edited there |
