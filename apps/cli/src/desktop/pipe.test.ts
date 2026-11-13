@@ -52,19 +52,6 @@ describe('probePipeFd', () => {
     expect(probePipeFd(3, stat(true, false))).toBe('ok');
     expect(probePipeFd(3, stat(false, false))).toBe('refused');
   });
-
-  // REL051-CID: on Windows the shell's fd 3 is a named pipe, and Node's fstat reports it with no
-  // file type at all (isFIFO and isSocket both false), so the core refused every start there.
-  it('on Windows, ok for a named pipe (no file type); a file, terminal or folder stays refused', () => {
-    const stat = (mode: number) => () => ({ isFIFO: () => false, isSocket: () => false, mode });
-    expect(probePipeFd(3, stat(0), 'win32')).toBe('ok');
-    expect(probePipeFd(3, stat(constants.S_IFREG | 0o666), 'win32')).toBe('refused');
-    expect(probePipeFd(3, stat(constants.S_IFCHR | 0o666), 'win32')).toBe('refused');
-    expect(probePipeFd(3, stat(constants.S_IFDIR | 0o777), 'win32')).toBe('refused');
-    // Elsewhere a pipe always says so: no type is refused.
-    expect(probePipeFd(3, stat(0), 'darwin')).toBe('refused');
-    expect(probePipeFd(3, stat(0), 'linux')).toBe('refused');
-  });
 });
 
 describe('createLineReader', () => {

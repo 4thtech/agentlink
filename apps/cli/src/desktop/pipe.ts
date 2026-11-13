@@ -4,8 +4,7 @@
 // (host-main.ts prints its fixed line). Reading is bounded (MAX_PIPE_LINE_BYTES per line, strict
 // UTF-8) and every line goes through parseShellMessage; a rejected line is dropped and counted,
 // never echoed, logged or answered with its content.
-import { constants as fsConstants, fstatSync, type Stats } from 'node:fs';
-import process from 'node:process';
+import { fstatSync, type Stats } from 'node:fs';
 import { Socket } from 'node:net';
 import {
   MAX_PIPE_LINE_BYTES,
@@ -24,25 +23,16 @@ export type PipeProbe = 'ok' | 'missing' | 'refused';
 /** Looks at `fd` without reading or writing it. */
 export function probePipeFd(
   fd: number,
-  fstat: (
-    fd: number,
-  ) => Pick<Stats, 'isFIFO' | 'isSocket'> & { readonly mode?: number } = fstatSync,
-  platform: string = process.platform,
+  fstat: (fd: number) => Pick<Stats, 'isFIFO' | 'isSocket'> = fstatSync,
 ): PipeProbe {
-  let info: Pick<Stats, 'isFIFO' | 'isSocket'> & { readonly mode?: number };
+  let info: Pick<Stats, 'isFIFO' | 'isSocket'>;
   try {
     info = fstat(fd);
   } catch {
     return 'missing';
   }
   // Only a pipe or a socket: never a file (the link would land on disk) or a terminal.
-  if (info.isFIFO() || info.isSocket()) return 'ok';
-  // Windows: the shell's fd 3 is a named pipe, which Node's fstat reports with no file type at all.
-  // A file, a terminal (character device) or a folder always has one, so they stay refused.
-  if (platform === 'win32' && info.mode !== undefined && (info.mode & fsConstants.S_IFMT) === 0) {
-    return 'ok';
-  }
-  return 'refused';
+  return info.isFIFO() || info.isSocket() ? 'ok' : 'refused';
 }
 
 /** Splits bytes into lines; an over-long or non-UTF-8 line is dropped and reported. */
