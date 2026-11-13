@@ -56,6 +56,7 @@ jobs:
           sparse-checkout: |
             tools/release/ci-green-catchup.mjs
             tools/release/wait-for-ci.mjs
+            tools/release/version-only.mjs
           sparse-checkout-cone-mode: false
 
       - name: Re-run releases and deploys of this commit whose ci-green gave up
