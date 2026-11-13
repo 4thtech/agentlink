@@ -9,7 +9,7 @@
 //   exactly `{base, messagesKeepDays, filesKeepDays}` to the presence route; the server signs the
 //   `policy.set` that changes `history` and nothing else. The daily pass does the deleting later.
 // Nothing here deletes, and no AI can reach it (I-4). Nothing here logs.
-import { Button, Surface } from '@4thtech-io/ui';
+import { Button, InlineError, Surface } from '@4thtech-io/ui';
 import { useCallback, useEffect, useId, useMemo, useState, type ReactElement } from 'react';
 import type { ApiClient } from '../../api/client.js';
 import { createOwnerClient, type OwnerResult, type PresenceProof } from '../contacts/owner.js';
@@ -32,6 +32,8 @@ interface Keep {
 type Load =
   | { readonly kind: 'loading' }
   | { readonly kind: 'failed' }
+  /** No ID set up here (or an answer of another shape): the section is not shown. */
+  | { readonly kind: 'hidden' }
   | { readonly kind: 'not_valid' }
   | {
       readonly kind: 'ready';
@@ -128,7 +130,13 @@ export function KeepAutomatically({
     setLoad({ kind: 'loading' });
     void api.get(RETENTION_PATH).then(
       (result) => {
-        const parsed = result.kind === 'ok' ? parseRetention(result.data) : undefined;
+        // No ID yet (409 not_set_up) or another shape: nothing to keep, so the section hides.
+        const parsed =
+          result.kind === 'ok'
+            ? (parseRetention(result.data) ?? { kind: 'hidden' as const })
+            : result.kind === 'error' && result.status === 409
+              ? { kind: 'hidden' as const }
+              : undefined;
         setLoad(parsed ?? { kind: 'failed' });
         setChoice(parsed?.kind === 'ready' ? parsed.keep : undefined);
         setPreview({ kind: 'none' });
@@ -217,6 +225,8 @@ export function KeepAutomatically({
   };
   const line = previewLine();
 
+  if (load.kind === 'hidden') return <></>;
+
   return (
     <Surface as="section" level={1} className="sto-coming" aria-labelledby={titleId}>
       <span className="sto-ic" aria-hidden="true">
@@ -228,22 +238,16 @@ export function KeepAutomatically({
         </h2>
         <p className="al-text-body-sm al-muted">{S.lead}</p>
         {load.kind === 'loading' ? (
-          <p className="al-text-body-sm al-muted" role="status">
-            {S.loading}
-          </p>
+          <p className="al-text-body-sm al-muted">{S.loading}</p>
         ) : load.kind === 'failed' ? (
           <div className="sto-filters">
-            <p className="al-text-body-sm" role="alert">
-              {S.failed}
-            </p>
+            <InlineError>{S.failed}</InlineError>
             <Button variant="ghost" size="sm" onClick={read}>
               {S.retry}
             </Button>
           </div>
         ) : load.kind === 'not_valid' || choice === undefined ? (
-          <p className="al-text-body-sm" role="alert">
-            {S.notValid}
-          </p>
+          <InlineError>{S.notValid}</InlineError>
         ) : (
           <>
             <div className="sto-filters">
@@ -282,11 +286,7 @@ export function KeepAutomatically({
             {ready?.active === false ? (
               <p className="al-text-body-sm al-muted">{S.notActive}</p>
             ) : null}
-            {line === undefined ? null : (
-              <p className="al-text-body-sm" role="status">
-                {line}
-              </p>
-            )}
+            {line === undefined ? null : <p className="al-text-body-sm">{line}</p>}
             {changed ? (
               <>
                 <p className="al-text-body-sm al-muted">{S.onlyHere}</p>
@@ -305,15 +305,9 @@ export function KeepAutomatically({
                 </div>
               </>
             ) : error === undefined ? null : (
-              <p className="al-text-body-sm" role="alert">
-                {error}
-              </p>
+              <InlineError>{error}</InlineError>
             )}
-            {saved ? (
-              <p className="al-text-body-sm" role="status">
-                {S.saved}
-              </p>
-            ) : null}
+            {saved ? <p className="al-text-body-sm">{S.saved}</p> : null}
           </>
         )}
       </div>

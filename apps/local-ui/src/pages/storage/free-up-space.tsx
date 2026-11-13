@@ -128,7 +128,7 @@ export function FreeUpSpace({
         </h2>
         <p className="al-text-body-sm al-muted">{H.freeLead}</p>
         {suggested ? (
-          <div role="status">
+          <div>
             <p className="al-text-body-sm">{H.aiSuggested}</p>
             <p className="al-text-body-sm al-muted">{H.aiNothingYet}</p>
           </div>
