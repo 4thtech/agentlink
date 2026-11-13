@@ -213,6 +213,18 @@ describe('SafeMarkdown: a real 60 KB plan draws fully formatted (IR-REL051-A34-1
 });
 
 describe('SafeMarkdown: hostile input stays inert (REL051-A34, I-5)', () => {
+  it('REL051-R2C (R2-CLASS-07): task-list items show a read-only box, never a form element', () => {
+    md(['- [ ] todo one', '- [x] done two', '- plain three'].join('\n'));
+    const boxes = [...host.querySelectorAll('[role="checkbox"]')];
+    expect(boxes.map((b) => b.getAttribute('aria-checked'))).toEqual(['false', 'true']);
+    for (const b of boxes) expect(b.getAttribute('aria-disabled')).toBe('true');
+    expect(host.textContent).not.toContain('[ ]');
+    expect(host.textContent).not.toContain('[x]');
+    expect(host.textContent).toContain('todo one');
+    expect(host.querySelectorAll('li')).toHaveLength(3);
+    assertInert();
+  });
+
   it('raw HTML is text, never markup', () => {
     md(
       [

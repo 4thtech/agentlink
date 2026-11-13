@@ -134,6 +134,8 @@ type Block =
       readonly ordered: boolean;
       readonly start: number;
       readonly items: readonly (readonly Block[])[];
+      /** REL051-R2C (R2-CLASS-07): per item, a task-list box (`[ ]` / `[x]`), else undefined. */
+      readonly tasks?: readonly (boolean | undefined)[];
       /** A later run of the same list (split for drawing). */
       readonly cont?: true;
     }
@@ -168,6 +170,8 @@ const FENCE = /^( {0,3})(`{3,}|~{3,})(.*)$/;
 const HEADING = /^ {0,3}(#{1,6})(?:[ \t]+|$)/;
 const QUOTE = /^ {0,3}> ?/;
 const LIST = /^( *)([-*+]|[0-9]{1,9}[.)])([ \t]+|$)/;
+/** REL051-R2C (R2-CLASS-07): a task-list item's box at the start of a bullet item. */
+const TASK = /^\[([ xX])\](?:[ \t]+|$)/;
 const SETEXT_1 = /^ {0,3}=+[ \t]*$/;
 const SETEXT_2 = /^ {0,3}-+[ \t]*$/;
 
@@ -355,13 +359,24 @@ function parseLevel(
       const kind = ordered ? (list[2] ?? '').slice(-1) : (list[2] ?? '');
       const start = ordered ? Math.min(Number.parseInt(list[2] ?? '1', 10), 1e9) : 1;
       let items: Block[][] = [];
+      let tasks: (boolean | undefined)[] = [];
       let first = start;
       let runs = 0;
+      const taskPart = (): { tasks?: (boolean | undefined)[] } =>
+        tasks.some((x) => x !== undefined) ? { tasks } : {};
       const flushRun = (): void => {
         if (items.length === 0) return;
-        push({ t: 'list', ordered, start: first, items, ...(runs > 0 ? { cont: true } : {}) });
+        push({
+          t: 'list',
+          ordered,
+          start: first,
+          items,
+          ...taskPart(),
+          ...(runs > 0 ? { cont: true } : {}),
+        });
         first += items.length;
         items = [];
+        tasks = [];
         runs += 1;
       };
       budget.left -= 1;
@@ -405,6 +420,12 @@ function parseLevel(
           break;
         }
         budget.left -= 1;
+        const box = ordered ? null : TASK.exec(body[0] ?? '');
+        if (box === null) tasks.push(undefined);
+        else {
+          tasks.push(box[1] !== ' ');
+          body[0] = (body[0] ?? '').slice(box[0].length);
+        }
         const part = sub(budget, top ? MARKDOWN_PIECE_MAX : Infinity);
         items.push(
           depth >= MARKDOWN_MAX_DEPTH
@@ -419,7 +440,7 @@ function parseLevel(
         if (j < lines.length && LIST.test(lines[j] as string)) i = j;
       }
       if (top) flushRun();
-      else if (items.length > 0) push({ t: 'list', ordered, start, items });
+      else if (items.length > 0) push({ t: 'list', ordered, start, items, ...taskPart() });
       continue;
     }
 
@@ -964,8 +985,23 @@ function renderBlock(b: Block, k: number, labels: MarkdownLabels): ReactNode {
     case 'list': {
       const items = b.items.map((item, j) => {
         const lead = item[0];
+        const task = b.tasks?.[j];
         return (
-          <li key={j}>
+          <li key={j} {...(task === undefined ? {} : { className: 'al-md-task' })}>
+            {task === undefined ? null : (
+              // Read only, and no form element (the inert output has none): a box the reader shows,
+              // never changes.
+              <span
+                className="al-md-box"
+                role="checkbox"
+                aria-checked={task}
+                aria-disabled="true"
+                aria-readonly="true"
+                data-checked={task ? 'true' : 'false'}
+              >
+                {task ? '\u2611' : '\u2610'}
+              </span>
+            )}
             {item.length === 1 && lead?.t === 'p'
               ? renderInline(lead.nodes, labels)
               : lead?.t === 'p'
