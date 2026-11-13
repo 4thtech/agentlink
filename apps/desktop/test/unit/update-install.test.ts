@@ -1010,6 +1010,43 @@ if (v === process.env.HANG) {
     },
   );
 
+  it('a failing ps is "unknown", never "nothing running": failed/ and its folder are kept (IR-UPD-4-2 R2-1)', async () => {
+    const s = await setup();
+    const broken = join(root, 'tools', 'broken-ps.sh');
+    await writeFile(broken, '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    const args = s.plan(await deadPid(), 1500);
+    args[7] = broken;
+    const code = await runWatchdog(args, s.env);
+    expect(code).toBe(2);
+    expect(await versionAt(s.current)).toBe('0.5.2');
+    expect(await launched(s.log)).toEqual(['0.5.3', '0.5.2']);
+    // The copy may still run from failed/: its folder stays until the sweeper.
+    expect(await versionAt(join(s.staging, 'failed', 'AgentLink.app'))).toBe('0.5.3');
+    expect(await loadFailedRecord(s.state)).toEqual({ version: '0.5.3', reason: 'unhealthy' });
+  });
+
+  it.skipIf(process.getuid?.() === 0)(
+    'when the failed copy cannot be moved aside, the stopped copy is relaunched and the reason recorded (IR-UPD-4-2 R2-2)',
+    async () => {
+      const s = await setup();
+      await mkdir(join(s.staging, 'failed'), { mode: 0o555 });
+      let code: number | null;
+      try {
+        code = await runWatchdog(s.plan(await deadPid(), 1500), s.env);
+      } finally {
+        await chmod(join(s.staging, 'failed'), 0o755);
+      }
+      expect(code).toBe(5);
+      expect(await versionAt(s.current)).toBe('0.5.3');
+      expect(await launched(s.log)).toEqual(['0.5.3', '0.5.3']);
+      expect(await versionAt(join(s.staging, 'previous', 'AgentLink.app'))).toBe('0.5.2');
+      expect(await loadFailedRecord(s.state)).toEqual({
+        version: '0.5.3',
+        reason: 'rollback_incomplete',
+      });
+    },
+  );
+
   it('refuses bad arguments without touching anything', async () => {
     const s = await setup();
     const args = s.plan(1, 1000);
