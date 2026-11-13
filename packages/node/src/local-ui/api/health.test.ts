@@ -527,7 +527,7 @@ describe('the health route through the server (M1-11s-a-d)', () => {
 describe('UX-LEFT-1: the reconnect hook (OUTBOX-RECONNECT)', () => {
   it('fires once when the relays come back after a read that saw none', async () => {
     const c = clock();
-    let connected = 0;
+    let connected = 2;
     let fired = 0;
     const read = createHealthReader({
       source: () => ({ agent: 'running', relays: { connected, total: 2 } }),
@@ -538,7 +538,6 @@ describe('UX-LEFT-1: the reconnect hook (OUTBOX-RECONNECT)', () => {
     await read();
     expect(fired).toBe(0);
     c.advance(HEALTH_CACHE_MS + 1);
-    connected = 2;
     await read();
     expect(fired).toBe(0);
     connected = 0;

@@ -157,9 +157,7 @@ export function StoragePage({ api: givenApi }: StoragePageProps): ReactElement {
         </div>
       ) : // UX-LEFT-1 (STORAGE-NOID): an owner with no ID has nothing stored; a calm line, no Inbox read.
       load.view.ids.length === 0 ? (
-        <p className="al-muted" role="status">
-          {S.noIds}
-        </p>
+        <p className="al-muted">{S.noIds}</p>
       ) : (
         <>
           {load.view.ids.map((id) => (
