@@ -179,6 +179,42 @@ function removeLater(path: string): void {
 /** R2-10: the most a read-only command may print (a plist as JSON, a registry value). */
 const MAX_OUTPUT_BYTES = 1 << 20;
 
+/**
+ * A small regular file's text, or undefined. Opened first (no link followed, never blocking) and
+ * checked through the open handle, so nothing can swap the file between the check and the read;
+ * where O_NOFOLLOW does not exist (Windows) the name must still be that same plain file.
+ */
+export async function readSmallRegularText(
+  path: string,
+  maxBytes: number,
+): Promise<string | undefined> {
+  const flags =
+    constants.O_RDONLY |
+    ((constants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0) |
+    ((constants as { O_NONBLOCK?: number }).O_NONBLOCK ?? 0);
+  const handle = await open(path, flags).catch(() => undefined);
+  if (handle === undefined) return undefined;
+  try {
+    const info = await handle.stat();
+    if (!info.isFile() || info.size > maxBytes) return undefined;
+    const entry = await lstat(path).catch(() => undefined);
+    if (
+      entry === undefined ||
+      !entry.isFile() ||
+      entry.dev !== info.dev ||
+      entry.ino !== info.ino
+    ) {
+      return undefined;
+    }
+    const text = await readFile(handle, 'utf8');
+    return text.length > maxBytes ? undefined : text;
+  } catch {
+    return undefined;
+  } finally {
+    await handle.close().catch(() => undefined);
+  }
+}
+
 const nodeSeams = (): OsSeams => ({
   platform: process.platform,
   env: process.env,
@@ -196,11 +232,7 @@ const nodeSeams = (): OsSeams => ({
         resolve(undefined);
       }
     }),
-  readText: async (path) => {
-    const info = await lstat(path).catch(() => undefined);
-    if (info === undefined || !info.isFile() || info.size > 256 * 1024) return undefined;
-    return readFile(path, 'utf8').catch(() => undefined);
-  },
+  readText: (path) => readSmallRegularText(path, 256 * 1024),
   exists: (path) =>
     access(path).then(
       () => true,

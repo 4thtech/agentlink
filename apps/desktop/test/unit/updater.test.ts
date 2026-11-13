@@ -19,6 +19,8 @@ import {
   scheduleUpdateChecks,
 } from '../../src/main/updater/schedule.js';
 
+// The x coordinate of the secp256k1 generator point G: a public, well-known valid x-only key.
+const GENERATOR_X = '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
 const enc = (s: string): Uint8Array => new TextEncoder().encode(s);
 const code = (fn: () => unknown): string => {
   try {
@@ -37,7 +39,7 @@ describe('pinned root', () => {
   });
 
   it('accepts only a valid x-only key and a whole-number floor', () => {
-    const g = '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
+    const g = GENERATOR_X;
     expect(pinnedRoot({ rootPublicKey: g, minimumStatementSequence: 0 })).toEqual({
       rootPublicKey: g,
       minimumStatementSequence: 0,
@@ -144,7 +146,7 @@ describe('strict parsing before any signature check', () => {
       domain: 'agentlink-desktop-root/v1',
       sequence: 1,
       action: 'introduce',
-      updateKey: '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',
+      updateKey: GENERATOR_X,
       issued: '2026-11-12T10:00:00Z',
     };
     expect(code(() => parseUpdateDocument(enc(JSON.stringify(body))))).toBe('unsigned');

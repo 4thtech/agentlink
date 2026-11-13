@@ -11,12 +11,15 @@
 //   says "Finish restoring" (owner-only completion with the same kit gives a new master code).
 // - Anything else is kept: an owner with Touch ID (the page then offers a new master code), an owner
 //   item that is not the restore's, a live run's marker.
-import { readFile, readdir, writeFile } from 'node:fs/promises';
+import { execFileSync } from 'node:child_process';
+import { readFile, readdir, rename, symlink, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import process from 'node:process';
 import { encodeUtf8, randomBytes, type JsonValue } from '@4thtech-io/crypto';
 import { newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  UNSAVED_FILE,
   readUnsavedMarker,
   removeUnsavedMarker,
   writeUnsavedMarker,
@@ -390,4 +393,51 @@ describe('R2-CLASS-02: the app closed right after "Restore 2 IDs"', () => {
     expect(await readUnsavedMarker(t.home)).toBeUndefined();
     expect(await engine.firstRunHold()).toBe('finish_restore');
   });
+});
+
+// REL051-CIB (CodeQL js/file-system-race): the marker is opened first and checked through the open
+// handle, so a link, a FIFO or an oversized file under its name is never read and never hangs.
+describe('REL051-CIB: reading the marker never follows a link or opens a non-file', () => {
+  const marker = {
+    kind: 'first_run' as const,
+    stage: 'writing' as const,
+    ownerNostr: new Uint8Array(32).fill(7),
+    pid: 4242,
+    at: 1_700_000_000_000,
+  };
+
+  it('reads a well-formed regular marker', async () => {
+    const r = await tempRoot('al-cib-marker-');
+    try {
+      await writeUnsavedMarker(r.home, marker);
+      const read = await readUnsavedMarker(r.home);
+      expect(read?.pid).toBe(4242);
+      expect(read?.kind).toBe('first_run');
+    } finally {
+      await r.cleanup();
+    }
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'a link, a FIFO or an oversized file is ignored',
+    async () => {
+      const r = await tempRoot('al-cib-marker-');
+      try {
+        await writeUnsavedMarker(r.home, marker);
+        const path = join(r.home, '.agentlink', UNSAVED_FILE);
+        const real = join(r.home, 'real.json');
+        await rename(path, real);
+        await symlink(real, path);
+        expect(await readUnsavedMarker(r.home)).toBeUndefined();
+        await unlink(path);
+        execFileSync('mkfifo', ['-m', '600', path]);
+        expect(await readUnsavedMarker(r.home)).toBeUndefined();
+        await unlink(path);
+        await writeFile(path, ' '.repeat(2048));
+        expect(await readUnsavedMarker(r.home)).toBeUndefined();
+      } finally {
+        await r.cleanup();
+      }
+    },
+  );
 });
