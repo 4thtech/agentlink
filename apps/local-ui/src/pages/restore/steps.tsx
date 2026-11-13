@@ -2,7 +2,7 @@
 // page (UX1113-R3; spec §6.4 to §6.6). They draw only what their props hold: the page (index.tsx)
 // owns the calls. Names from a kit are rendered as text. The master code is held in a prop for as
 // long as the card is on screen: never stored, never put in an attribute or a URL.
-import { Banner, Button, Icon, Lockup, useHood } from '@4thtech-io/ui';
+import { Banner, Button, Icon, InlineError, Lockup, useHood } from '@4thtech-io/ui';
 import {
   useEffect,
   useId,
@@ -545,9 +545,10 @@ export interface ReviewStepProps {
 
 /**
  * REL051-UF3 (R1-UI-08): the name a kit row shows. An ID already on this computer has its label (the
- * name people see). A new one has no label yet: the kit's manifest names it only by its folder, and
- * its label is sealed inside its store, read back once restored. The first-run folder `default` then
- * reads "Your first ID"; any other folder shows as it is. Text only.
+ * name people see). KIT-NAMES (R2-UI-04): a new ID from a v2 kit has the owner-set name the kit
+ * carries inside it (the server's `label`). A kit made before that names it only by its folder (its
+ * label comes back from its store once restored): the first-run folder `default` then reads "Your
+ * first ID"; any other folder reads as a name. Text only.
  */
 export function rowName(row: SummaryRow): string {
   if (row.label !== undefined) return row.label;
@@ -819,11 +820,7 @@ function Code({
           {PROTECT.print}
         </Button>
       </div>
-      {copied === 'failed' ? (
-        <p className="rs-error" role="alert">
-          {PROTECT.copyFailed}
-        </p>
-      ) : null}
+      {copied === 'failed' ? <InlineError>{PROTECT.copyFailed}</InlineError> : null}
     </>
   );
 }
@@ -890,11 +887,7 @@ export function ProtectStep(p: ProtectStepProps): ReactElement {
                 {PROTECT.typedBackOk}
               </p>
             ) : null}
-            {typedWrong ? (
-              <p className="rs-error" role="alert">
-                {PROTECT.typeBackWrong}
-              </p>
-            ) : null}
+            {typedWrong ? <InlineError>{PROTECT.typeBackWrong}</InlineError> : null}
           </div>
           {/* Rendered here in memory for the printer only; never written to disk. */}
           <div className="rs-print-sheet" aria-hidden="true">

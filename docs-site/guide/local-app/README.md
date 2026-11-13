@@ -1,6 +1,6 @@
 # The local app
 
-*Applies to AgentLink 0.5.1. It is not in 0.2.0. The three-layer app is new in 0.4.6; the menu Home, People, My IDs, Activity, Settings and the grouped Settings are new in 0.5.0. There is now an early Mac app (see [Mac desktop app](../apps/desktop-app.md)); otherwise the app opens in your browser.*
+*Applies to AgentLink 0.5.3. It is not in 0.2.0. The three-layer app is new in 0.4.6; the menu Home, People, My IDs, Activity, Settings and the grouped Settings are new in 0.5.0. There is now an early Mac app (see [Mac desktop app](../apps/desktop-app.md)); otherwise the app opens in your browser.*
 
 The local app is a set of pages that open in your browser. They run on your own computer, and nothing on them is sent to 4thTech. Use them to see who your AI talks to, approve what needs you, and set up IDs and AI apps.
 
@@ -38,7 +38,7 @@ Old links from earlier versions still work (`/contacts` and `/agents` open Peopl
 
 - [Home](home.md): approvals on top, **Invite someone**, and the people your AI talks to. Open a person to see the conversation and the files you exchanged.
 - [Get started](get-started-wizard.md): pick your AI app, one Touch ID, then invite someone.
-- [Storage](storage.md): how much room your messages and saved files take (read-only).
+- [Storage and Free up space](storage.md): how much room your messages and saved files take, and deleting old ones on this computer.
 - [Updates](updates.md): your version, Check for updates, and how to get a newer one.
 - [Invite someone](invite-someone.md): short invite links, open invites, and pasting a link you were given.
 - [People](contacts.md): the people each of your IDs talks to, across all your IDs, with Archived.

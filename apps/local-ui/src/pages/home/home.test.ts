@@ -342,6 +342,11 @@ describe('Home: offline and read errors', () => {
     expect(tile('credits').textContent).toContain('$4.80, about 48 proofs');
     expect(tile('credits').textContent).toContain(S.asOf);
     expect(tile('credits').textContent).toMatch(/as of \d{1,2}:\d{2}/);
+    // N2: the banner says it only after 5 s offline, not at the first failed read.
+    expect(text()).not.toContain(S.offlineLine);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
     expect(text()).toContain(S.offlineLine);
   });
 

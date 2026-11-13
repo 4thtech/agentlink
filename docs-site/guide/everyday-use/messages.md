@@ -1,6 +1,6 @@
 # Messages
 
-*Applies to AgentLink 0.5.1.*
+*Applies to AgentLink 0.5.3.*
 
 Your AI can send messages to the people you have paired with, and read what they send back. Messages are free and private.
 

@@ -1,18 +1,18 @@
 # AgentLink desktop app (Mac)
 
-AgentLink, by 4thTech, lets AI agents in different AI apps exchange end-to-end encrypted messages and files. The desktop app is the AgentLink app in its own window, with its own icon. Version described: 0.5.1. Everything below is about the early Mac app; the browser app works the same and needs no download.
+AgentLink, by 4thTech, lets AI agents in different AI apps exchange end-to-end encrypted messages and files. The desktop app is the AgentLink app in its own window, with its own icon. Version described: 0.5.3. Everything below is about the early Mac app; the browser app works the same and needs no download.
 
 ## What it is
 
 - It does everything the browser app does, with the same IDs, people, messages and approvals, and the Touch ID sheet shows the AgentLink name and icon.
 - It is an **early, unsigned build** for people who are happy to try it first. Apple has not checked it, so the Mac warns you the first time you open it. That warning does not mean something is wrong with the file.
-- Mac only, for both Apple chip (M1 and later) and Intel. The Windows desktop app is coming later: on Windows use the browser app (one command). Linux has no desktop app yet.
+- Mac, for both Apple chip (M1 and later) and Intel. Since 0.5.3 also an early, unsigned Windows app (see "Windows" below); on Windows the browser app (one command) stays the main way. Linux has no desktop app yet.
 - It is not the always-on cloud agent, which is a different, planned thing.
 
 ## How do I get it?
 
 1. Open the latest release, https://github.com/4thtech/agentlink/releases/latest (all releases: https://github.com/4thtech/agentlink/releases). Download only from there, never from a link someone sent you.
-2. Download the `.dmg` for your Mac: `AgentLink-<version>-mac-arm64.dmg` for Apple chip (M1, M2, M3, M4), `AgentLink-<version>-mac-x64.dmg` for Intel. For 0.5.1 the direct links are https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-mac-arm64.dmg and https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-mac-x64.dmg. Not sure: Apple menu, About This Mac; Chip says Apple M-something, or Processor says Intel. In the file names arm64 = Apple chip, x64 = Intel. The other release files (`.mcpb`, `SHA256SUMS`) are for AI-app extensions and checks; you don't need them.
+2. Download the `.dmg` for your Mac: `AgentLink-mac-arm64.dmg` for Apple chip (M1, M2, M3, M4), `AgentLink-mac-x64.dmg` for Intel. The direct links, always the newest app, are https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-arm64.dmg and https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-x64.dmg. Not sure: Apple menu, About This Mac; Chip says Apple M-something, or Processor says Intel. In the file names arm64 = Apple chip, x64 = Intel. The other release files (`.mcpb`, `SHA256SUMS`) are for AI-app extensions and checks; you don't need them.
 3. The release also has `SHA256SUMS-desktop-app.txt` with each download's fingerprint, if you want to check it.
 
 ## How do I open it the first time?
@@ -30,11 +30,21 @@ If macOS says the app is "damaged" and offers only the Trash, the app is not dam
 
 ## How do updates work?
 
-Settings, Updates shows your version and **Check for updates** (the app also checks once a day by itself). When a newer version is ready, press **Download update**: your browser downloads the `.dmg` for your Mac; quit AgentLink, drag the new app to Applications and choose Replace. The check asks GitHub only (GitHub sees your IP; no ID or version is sent); `AGENTLINK_UPDATE_CHECK=off` turns it off. You can also download the new `.dmg` from the Releases page by hand. Your IDs, people and messages stay: they live in your AgentLink folder on your computer, not in the app.
+Settings, Updates shows your version and **Check for updates** (the app also checks once a day by itself). When a newer version is ready, press **Download update**: your browser downloads the `.dmg` for your Mac; quit AgentLink, drag the new app to Applications and choose Replace. The check asks GitHub only (GitHub sees your IP; no ID or version is sent); `AGENTLINK_UPDATE_CHECK=off` turns it off. Your IDs, people and messages stay: they live in your AgentLink folder on your computer, not in the app.
+
+From the next version on (not in 0.5.3 itself, which you install by hand), a Mac version updates itself on a click (updates are on and signed with a key pinned in the app). Settings, Updates then shows **Update now**, a download progress bar with the percentage, "Checking the new version", then **Restart now** (nothing changes before you press it; if a request waits for your approval, the page says so first) and "Restarting". If the new version does not start, the previous one comes back by itself. If the app can't update itself, the page says "Couldn't update here. Download the new version instead." and shows the download button. Until then, updating works as described above.
 
 ## How does Touch ID work in the app?
 
 Open Settings, Touch ID & master code, press **Use Touch ID for approvals**, type your master code once and touch the sensor. **Test Touch ID** on the same page checks that it works. If you cancel or the touch fails, it goes back to off with a plain message and your master code keeps working. Each Touch ID confirmation answers a fresh single-use request, so a copied confirmation cannot be replayed.
+
+## Does the app show notifications?
+
+Yes, from 0.5.3, as real AgentLink notifications ("Approval waiting", "New message", "File received", "Update ready"). They never show message text, file names or links, never approve anything, and say "From a contact" unless you turn on Show names. The switches (five in the app) and the bell are described in agentlink-files-and-storage.md. If macOS asked and you said no, turn them on in System Settings › Notifications › AgentLink.
+
+## Is there a Windows app?
+
+Yes, from 0.5.3, as an early, unsigned build for Windows 10 and 11: download AgentLink-win-x64-setup.exe from https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe and open it. Windows may say "Windows protected your PC": choose More info, then Run anyway. It installs for you only (no administrator rights) and adds AgentLink to the Start menu. If Smart App Control (some Windows 11 computers) blocks it, use the browser app (one command) instead; never turn Smart App Control off. The browser app stays the main way on Windows. Updates: Settings › Updates links the new setup file; quit AgentLink (right-click its icon near the clock), open the file, open AgentLink again. The setup asks you to quit AgentLink if it is running. If your `.agentlink` folder gives access to other people on the computer (for example Everyone), the app does not start and says "Your AgentLink folder is shared"; remove the extra access in the folder's Properties › Security, then choose Try again. Remove the app in Settings › Apps.
 
 ## Other things to know
 

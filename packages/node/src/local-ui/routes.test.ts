@@ -214,6 +214,11 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/agents/resume',
       // W4-SHELL-V2: the app's UI settings (local-ui/ui-settings-server.test.ts).
       '/api/ui/ui-settings',
+      // N4: the notification centre (local-ui/notifications-server.test.ts).
+      '/api/ui/notifications',
+      '/api/ui/notifications/:id/read',
+      '/api/ui/notifications/read-all',
+      '/api/ui/notifications/refresh',
       // UX1112 WP-12 (F-2): Block and Unblock a contact (local-ui/api/contacts.test.ts).
       '/api/ui/contacts/:ref/block',
       '/api/ui/contacts/:ref/unblock',
@@ -232,6 +237,21 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/owner-code/replace/cancel',
       // WP-R2b: Show in Finder for the recovery kit (local-ui/backup-host-server.test.ts).
       '/api/ui/backup/reveal',
+      // ATT-SENDFOLDER-FIX: Home's Send folder banner (api/files.test.ts).
+      '/api/ui/files/send-folder',
+      // RET-4: Delete history and Show in Finder for the Inbox (local-ui/history-server.test.ts).
+      '/api/ui/history/delete/begin',
+      '/api/ui/history/delete/finish',
+      '/api/ui/history/delete/undo',
+      '/api/ui/history/delete/status',
+      '/api/ui/storage/inbox/reveal',
+      // RET-6: Keep automatically, a read and the save (local-ui/api/retention.test.ts).
+      '/api/ui/storage/retention',
+      // ATT-APP-ATTACH: attach files in a conversation (local-ui/attach-server.test.ts).
+      '/api/ui/attach',
+      // UPD-5: Update now and Restart now (api/app-update.test.ts).
+      '/api/ui/app-update/install',
+      '/api/ui/app-update/restart',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).

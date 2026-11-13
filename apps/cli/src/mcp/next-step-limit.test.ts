@@ -52,6 +52,7 @@ import * as tool_send from '@4thtech-io/mcp-tools/send.js';
 import * as tool_status from '@4thtech-io/mcp-tools/status.js';
 import * as tool_terms_common from '@4thtech-io/mcp-tools/terms-common.js';
 import * as tool_text from '@4thtech-io/mcp-tools/text.js';
+import * as tool_tidy from '@4thtech-io/mcp-tools/tidy.js';
 import * as tool_untrusted from '@4thtech-io/mcp-tools/untrusted.js';
 import * as tool_verify_proof_pack from '@4thtech-io/mcp-tools/verify-proof-pack.js';
 import * as approval_next_step from '../approval/next-step.js';
@@ -179,6 +180,7 @@ const modules: Record<string, Exports> = {
   '../tools/status.ts': tool_status,
   '../tools/terms-common.ts': tool_terms_common,
   '../tools/text.ts': tool_text,
+  '../tools/tidy.ts': tool_tidy,
   '../tools/untrusted.ts': tool_untrusted,
   '../tools/verify-proof-pack.ts': tool_verify_proof_pack,
   '../approval/next-step.ts': approval_next_step,
@@ -266,6 +268,16 @@ const RENDERERS: Record<string, () => string> = {
   approvedNeedsIdStep: () => approvedNeedsIdStep(APPROVAL),
   approvalNextStep: () => approvalNextStep(APPROVAL, LONG_NAME, NPX_PREFIX),
   approvalLinkNextStep: () => approvalLinkNextStep(APPROVAL, URL_, LONG_NAME, NPX_PREFIX),
+  // ATT-ALLOW-LINK: the no-folder link, port 65535.
+  allowFolderLinkNextStep: () =>
+    tool_files_common.allowFolderLinkNextStep(
+      `${ORIGIN}${tool_files_common.ALLOW_SEND_FOLDER_PAGE}`,
+    ),
+  // RET-7: the tidy proposal link, port 65535, the longest page (a contact).
+  tidyLinkNextStep: () =>
+    tool_tidy.tidyLinkNextStep(
+      `${ORIGIN}${tool_tidy.tidyPage({ olderThanDays: 365, kinds: 'messages_and_files', contactId: `0x${'f'.repeat(40)}` }) ?? ''}`,
+    ),
 };
 
 describe('nextStep builders', () => {

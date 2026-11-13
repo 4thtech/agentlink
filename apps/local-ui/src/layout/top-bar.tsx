@@ -11,31 +11,20 @@ import { setUnderTheHood, usePrefs } from '../prefs/index.js';
 import { SHELL_STRINGS as S } from '../strings.js';
 import { AgentSwitcher, type SwitcherChip } from './agent-switcher.js';
 import { goToKeys, openGoTo } from './go-to.js';
-import type { ConnectionState } from './index.js';
+import type { ConnectionState } from './connection.js';
+import { healthWord } from './health-word.js';
 import { VT_CLASS } from '@4thtech-io/ui';
 import { openShellDialog } from './shell-dialogs.js';
 import { ShellIcon } from './shell-icons.js';
 import { ShellMenu } from './shell-menu.js';
+import { NotificationBell } from './notification-centre.js';
 
 /** The user guide (the same address as About › Read the guides). */
 export const GUIDE_URL = 'https://wiki.4thtech.io/products/agentlink';
 
-const CHIP: Readonly<Record<ConnectionState, SwitcherChip>> = {
-  unknown: { state: 'checking' },
-  connected: { state: 'connected' },
-  // REL051-CF2: running, but no relay can be reached from this computer.
-  unreachable: { state: 'reconnecting', label: S.networkUnreachableChip },
-  checking: { state: 'checking' },
-  paused: { state: 'paused' },
-  not_running: { state: 'not-running' },
-  needs_setup: { state: 'needs-setup' },
-  // The browser lost its connection: the same shape as "not running", in the status bar's words.
-  offline: { state: 'not-running', label: S.offlineChip },
-};
-
 /** The chip's one status for the app's connection state. */
 export function connectionChip(connection: ConnectionState): SwitcherChip {
-  return CHIP[connection];
+  return healthWord(connection).chip;
 }
 
 /** The "?" Help menu. */
@@ -156,9 +145,11 @@ export interface TopBarProps {
   readonly connection: ConnectionState;
   /** Turns Under the hood on or off (the shell wraps it in the morph). */
   readonly onHood: (on: boolean) => void;
+  /** N5: the page's path (the bell reads the centre again on every page change). */
+  readonly path?: string;
 }
 
-export function TopBar({ connection, onHood }: TopBarProps): ReactElement {
+export function TopBar({ connection, onHood, path = '/' }: TopBarProps): ReactElement {
   const goTo = useRef<HTMLButtonElement>(null);
   return (
     <header className={`al-top al-chrome ${VT_CLASS.top}`}>
@@ -167,6 +158,8 @@ export function TopBar({ connection, onHood }: TopBarProps): ReactElement {
       </span>
       <AgentSwitcher chip={connectionChip(connection)} />
       <div className="al-top-end">
+        {/* N5 (PLAN-NOTIFY §4.1): the bell, left of Go to. */}
+        <NotificationBell path={path} />
         <button
           ref={goTo}
           type="button"

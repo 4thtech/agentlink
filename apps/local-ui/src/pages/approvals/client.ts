@@ -61,7 +61,12 @@ export type OneAnswer =
 /** The owner's presence for one decision or one review. */
 export type Presence =
   | { readonly kind: 'code'; readonly code: string }
-  | { readonly kind: 'passkey'; readonly passkey: DecisionPasskey };
+  | { readonly kind: 'passkey'; readonly passkey: DecisionPasskey }
+  /**
+   * N3: Touch ID / Windows Hello in the desktop app (DESK051-C6): no bytes; the server runs the
+   * gesture for the native ceremony it issued for exactly this decision or review.
+   */
+  | { readonly kind: 'native' };
 
 export type DecideAnswer =
   | {
@@ -158,7 +163,10 @@ export async function sendWithPresence(
   container: CredentialsContainer | undefined,
   path: string,
   headers: Headers,
-  presence: { readonly kind: 'code'; readonly code: string } | { readonly kind: 'passkey' },
+  presence:
+    | { readonly kind: 'code'; readonly code: string }
+    | { readonly kind: 'passkey' }
+    | { readonly kind: 'native' },
 ): Promise<Response | 'dismissed' | undefined> {
   let dismissed = false;
   try {
@@ -166,7 +174,7 @@ export async function sendWithPresence(
       doFetch,
       path,
       headers,
-      presence.kind === 'code'
+      presence.kind === 'code' || presence.kind === 'native'
         ? presence
         : {
             kind: 'passkey',

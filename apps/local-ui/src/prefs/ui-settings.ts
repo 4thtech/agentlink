@@ -74,6 +74,11 @@ async function read(): Promise<UiSettings | undefined> {
   }
 }
 
+/** N6: the app's stored settings now (Settings › Notifications reads its switches). Never throws. */
+export function readStoredUiSettings(): Promise<UiSettings | undefined> {
+  return read();
+}
+
 /** Saves a change; resolves true when the app stored it. Never throws. */
 export async function saveUiSettings(change: UiSettings): Promise<boolean> {
   const checked = readUiSettings({ ...change }, 1);

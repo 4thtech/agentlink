@@ -5,9 +5,23 @@
 // the desktop app ever has a link (the browser app shows a restart or a fixed command instead).
 export const APP_UPDATE_PATH = '/api/ui/app-update';
 export const APP_UPDATE_CHECK_PATH = '/api/ui/app-update/check';
+// UPD-5: "Update now" and "Restart now" (POST, no body; the Mac app only).
+export const APP_UPDATE_INSTALL_PATH = '/api/ui/app-update/install';
+export const APP_UPDATE_RESTART_PATH = '/api/ui/app-update/restart';
 
 export type UpdateState =
-  'off' | 'idle' | 'checking' | 'current' | 'available' | 'failed' | 'offline';
+  | 'off'
+  | 'idle'
+  | 'checking'
+  | 'current'
+  | 'available'
+  | 'failed'
+  | 'offline'
+  | 'downloading'
+  | 'verifying'
+  | 'ready'
+  | 'restarting'
+  | 'install_failed';
 const STATES: readonly UpdateState[] = [
   'off',
   'idle',
@@ -16,7 +30,21 @@ const STATES: readonly UpdateState[] = [
   'available',
   'failed',
   'offline',
+  'downloading',
+  'verifying',
+  'ready',
+  'restarting',
+  'install_failed',
 ];
+/** UPD-5: a running in-app update (always installable). */
+export const IN_APP_STATES: readonly UpdateState[] = [
+  'downloading',
+  'verifying',
+  'ready',
+  'restarting',
+];
+/** The states that carry a newer version and the download link. */
+const WITH_RELEASE: readonly UpdateState[] = ['available', 'install_failed', ...IN_APP_STATES];
 
 export type UpdateInstall = 'desktop' | 'installer' | 'npx' | 'global';
 const INSTALLS: readonly UpdateInstall[] = ['desktop', 'installer', 'npx', 'global'];
@@ -30,6 +58,14 @@ export interface UpdateView {
   readonly download: string;
   /** The link is this Mac's file (else the release page). */
   readonly macFile: boolean;
+  /** WIN-DESK-2: the link is the Windows setup file. */
+  readonly winFile: boolean;
+  /** UPD-5: "Update now" can run here (the Mac app with the in-app update on). */
+  readonly installable: boolean;
+  /** UPD-5: the download's whole percentage (0 outside downloading). */
+  readonly percent: number;
+  /** UPD-5: a request is waiting for the owner (warn before Restart now). */
+  readonly busy: boolean;
 }
 
 const NUM = '(0|[1-9][0-9]{0,5})';
@@ -50,39 +86,70 @@ function newer(latest: string, current: string): boolean {
 const isObject = (v: unknown): v is Readonly<Record<string, unknown>> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** The answer as a view, or undefined when any field breaks the rules. */
+/**
+ * The answer as a view, or undefined when any field breaks the rules. UPD-5: `installable`,
+ * `percent` and `busy` come only from the desktop app (absent: false, 0, false), with the same rules
+ * as the pipe: installable in the running states, never in install_failed or without a release; a
+ * whole percentage only while downloading.
+ */
 export function parseUpdate(data: unknown): UpdateView | undefined {
   if (!isObject(data)) return undefined;
   const { state, current, latest, download, install } = data;
+  const installable = data['installable'] ?? false;
+  const percent = data['percent'] ?? 0;
+  const busy = data['busy'] ?? false;
   if (typeof state !== 'string' || !(STATES as readonly string[]).includes(state)) return undefined;
   if (typeof current !== 'string' || !APP.test(current)) return undefined;
   if (typeof install !== 'string' || !(INSTALLS as readonly string[]).includes(install)) {
     return undefined;
   }
+  if (typeof installable !== 'boolean' || typeof busy !== 'boolean') return undefined;
+  if (typeof percent !== 'number' || !Number.isSafeInteger(percent)) return undefined;
+  if (percent < 0 || percent > 100 || (state !== 'downloading' && percent !== 0)) return undefined;
+  const st = state as UpdateState;
+  if (IN_APP_STATES.includes(st) ? !installable : st !== 'available' && installable) {
+    return undefined;
+  }
   const how = install as UpdateInstall;
-  if (state !== 'available') {
+  const extra = { installable, percent, busy };
+  if (!WITH_RELEASE.includes(st)) {
     if (latest !== '' || download !== '') return undefined;
     return {
-      state: state as UpdateState,
+      state: st,
       install: how,
       current,
       latest: '',
       download: '',
       macFile: false,
+      winFile: false,
+      ...extra,
     };
   }
   if (typeof latest !== 'string' || !newer(latest, current) || typeof download !== 'string') {
     return undefined;
   }
   if (how !== 'desktop') {
-    if (download !== '') return undefined;
-    return { state: 'available', install: how, current, latest, download: '', macFile: false };
+    // The in-app update is the Mac app's alone.
+    if (download !== '' || st !== 'available' || installable) return undefined;
+    return {
+      state: 'available',
+      install: how,
+      current,
+      latest,
+      download: '',
+      macFile: false,
+      winFile: false,
+      ...extra,
+    };
   }
   const mac = [
     `${RELEASES}/download/v${latest}/AgentLink-${latest}-mac-arm64.dmg`,
     `${RELEASES}/download/v${latest}/AgentLink-${latest}-mac-x64.dmg`,
   ];
   const macFile = mac.includes(download);
-  if (!macFile && download !== `${RELEASES}/tag/v${latest}`) return undefined;
-  return { state: 'available', install: how, current, latest, download, macFile };
+  // WIN-DESK-2: the Windows app's setup (x64 only).
+  const winFile =
+    download === `${RELEASES}/download/v${latest}/AgentLink-${latest}-win-x64-setup.exe`;
+  if (!macFile && !winFile && download !== `${RELEASES}/tag/v${latest}`) return undefined;
+  return { state: st, install: how, current, latest, download, macFile, winFile, ...extra };
 }

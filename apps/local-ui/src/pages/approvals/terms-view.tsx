@@ -9,12 +9,12 @@
 // inside a figure marked as their content, never as an instruction (I-5). The raw fingerprint is
 // kept for Under the hood; the Simple card shows the headline, their terms and the fixed lines.
 import type { ReactElement } from 'react';
-import { APPROVAL_STRINGS as S } from './strings.js';
+import { APPROVAL_STRINGS as S, fmt } from './strings.js';
 
 const REGION_PREFIX = '| ';
 const REGION_END = 'End of their content';
 const ADVANCED = /^Advanced:/;
-/** The most of their terms the Simple card shows; the rest stays in Details. */
+/** The most of their terms the Simple card shows; the rest stays under Review. */
 const SUMMARY_LINES = 6;
 
 export interface TermsLines {
@@ -87,7 +87,9 @@ export function TermsSummary({ lines }: { lines: readonly string[] }): ReactElem
             ))}
           </ul>
           {t.theirs.length > shown.length ? (
-            <p className="al-note">{`${String(t.theirs.length - shown.length)} more in Details.`}</p>
+            <p className="al-note">
+              {fmt(S.moreInReview, { count: t.theirs.length - shown.length })}
+            </p>
           ) : null}
         </figure>
       )}

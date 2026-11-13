@@ -37,17 +37,8 @@ import {
 import { UnderTheHood } from '../../lazy/hood.js';
 import { ShellIcon } from '../../layout/shell-icons.js';
 import type { IdentityKind } from '@4thtech-io/ui';
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactElement,
-} from 'react';
-import { createApiClient, type ApiClient, type ApiResult } from '../../api/client.js';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement } from 'react';
+import { createApiClient, type ApiClient } from '../../api/client.js';
 import { usePrefs } from '../../prefs/index.js';
 import { ActivitySort, compareMostActive, sortKey, usePulse, type Pulse } from '../pulse/index.js';
 import { PAGE_TITLES } from '../../strings.js';
@@ -61,8 +52,6 @@ import {
   parseList,
   idMissing,
   parsePeopleAll,
-  parseRenameCheck,
-  renameCheckPath,
   type CodeAnswer,
   type ContactRow,
   type IdPeople,
@@ -90,7 +79,8 @@ import {
   type PasskeyInfo,
   type PresenceProof,
 } from './owner.js';
-import { PresencePrompt } from './presence-prompt.js';
+import { PresenceButton } from './presence-button.js';
+import { useAliasCheck } from './alias-check.js';
 import { canCompareCode, clearCheckParam, peekCheckRef } from './safety.js';
 import { useInviteFirst } from '../home/start-here-empty.js';
 import { ConnectedMoment, type ConnectedMomentProps } from '../invite/connected.js';
@@ -143,6 +133,9 @@ interface Pending {
   readonly input?: unknown;
   readonly summary: string;
 }
+
+/** Which owner button a pending step belongs to (its action and contact). */
+const keyOf = (pending: Pending): string => `${pending.what}:${pending.ref}`;
 
 const DATE = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
@@ -421,13 +414,14 @@ type CodeState = { readonly kind: 'loading' } | CodeAnswer;
 function SafetyCodeBlock({
   contact,
   code,
-  onMatch,
+  renderMatch,
   onMismatch,
   onSkip,
 }: {
   contact: ContactRow;
   code: CodeState;
-  onMatch: (code: string) => void;
+  /** UX1113-N2: "They match" is the gesture itself (a PresenceButton). */
+  renderMatch: (code: string) => ReactElement;
   onMismatch: () => void;
   onSkip: () => void;
 }): ReactElement {
@@ -463,9 +457,7 @@ function SafetyCodeBlock({
         ))}
       </div>
       <div className="al-sc-actions ct-actions">
-        <Button icon="check" onClick={() => onMatch(code.code)}>
-          {S.theyMatch}
-        </Button>
+        {renderMatch(code.code)}
         <Button variant="ghost" icon="x" onClick={onMismatch}>
           {S.theyDontMatch}
         </Button>
@@ -491,7 +483,6 @@ function Detail({
   contact,
   api,
   owner,
-  passkey,
   older,
   onKeepBoth,
   onChanged,
@@ -499,7 +490,6 @@ function Detail({
   contact: ContactRow;
   api: ApiClient;
   owner: OwnerClient;
-  passkey: PasskeyInfo | undefined;
   /** An older contact with the same owner, not yet kept (M1-UX3-DUP-CONTACTS). */
   older: ContactRow | undefined;
   onKeepBoth: () => void;
@@ -516,17 +506,18 @@ function Detail({
   const [matched, setMatched] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [alias, setAlias] = useState('');
-  const [aliasError, setAliasError] = useState<string | undefined>(undefined);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [confirmBlock, setConfirmBlock] = useState(false);
   // PRE-031-FIXES: "Remove older" goes through the same confirm step as Remove.
   const [confirmOlder, setConfirmOlder] = useState(false);
   const dupNoticeId = useId();
   const reduced = useReducedMotion();
-  const [pending, setPending] = useState<Pending | undefined>(undefined);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | undefined>(undefined);
+  // IR-UX1113-N2-1 #3: the error belongs to the one button that asked (Rename, Block, ...).
+  const [error, setError] = useState<{ readonly key: string; readonly text: string }>();
   const [notice, setNotice] = useState<string | undefined>(undefined);
+  const wantedAlias = alias.trim();
+  const aliasCheck = useAliasCheck(api, ref, wantedAlias, renaming);
 
   useEffect(() => {
     if (!compare || skipped) return;
@@ -540,23 +531,20 @@ function Detail({
     };
   }, [api, ref, compare, skipped, codeTick]);
 
-  const ask = (next: Pending): void => {
-    setError(undefined);
-    setNotice(undefined);
-    setPending(next);
-  };
-
-  const submit = useCallback(
-    (proof: PresenceProof) => {
-      if (pending === undefined) return;
+  // UX1113-N2: each owner step is one PresenceButton; its proof goes to its one route, once.
+  const run = useCallback(
+    (pending: Pending, proof: PresenceProof) => {
       setBusy(true);
       setError(undefined);
+      setNotice(undefined);
       void owner
         .post(contactPath(pending.ref, pending.what), pending.input, proof)
         .then((result) => {
           setBusy(false);
           if (result.kind === 'done') {
-            setPending(undefined);
+            setConfirmRemove(false);
+            setConfirmOlder(false);
+            setConfirmBlock(false);
             if (pending.what === 'check') setMatched(true);
             if (pending.what === 'rename') {
               setRenaming(false);
@@ -569,66 +557,81 @@ function Detail({
             return;
           }
           if (result.kind === 'wait') {
-            setError(waitSeconds(result.seconds));
+            setError({ key: keyOf(pending), text: waitSeconds(result.seconds) });
             return;
           }
           if (result.kind === 'rejected' || result.kind === 'required') {
-            setError(MESSAGE[result.kind]);
+            // IR-UX1113-N2-1 #2: a sensor proof the server refused was used, not "wasn't used".
+            setError({
+              key: keyOf(pending),
+              text:
+                (proof.kind === 'code'
+                  ? MESSAGE[result.kind]
+                  : result.kind === 'required'
+                    ? S.sensorUnavailable
+                    : S.sensorRefused) ?? S.failed,
+            });
             return;
           }
-          // Nothing was changed: close the prompt and say so; a check compares again.
-          setPending(undefined);
+          // Nothing was changed: close the step and say so; a check compares again.
+          setConfirmRemove(false);
+          setConfirmOlder(false);
+          setConfirmBlock(false);
           setNotice(result.kind === 'failed' ? failureCopy(result.reason) : MESSAGE[result.kind]);
           if (pending.what === 'check') setCodeTick((n) => n + 1);
         });
     },
-    [owner, pending, onChanged],
+    [owner, onChanged],
   );
 
-  const saveName = (event: FormEvent): void => {
-    event.preventDefault();
-    const wanted = alias.trim();
-    if (wanted === '') {
-      setAliasError(S.aliasInvalid);
-      return;
-    }
-    setAliasError(undefined);
-    void api.get(renameCheckPath(ref, wanted)).then((res: ApiResult<unknown>) => {
-      const check =
-        res.kind === 'ok'
-          ? parseRenameCheck(res.data)
-          : ({ kind: 'refused', reason: 'unavailable' } as const);
-      if (check.kind === 'ok') {
-        ask({
-          what: 'rename',
-          ref,
-          input: { alias: wanted },
-          summary: SUMMARY.rename(name, wanted),
-        });
-        return;
-      }
-      setAliasError(
-        check.reason === 'alias_taken'
-          ? S.aliasTaken
-          : check.reason === 'alias_invalid'
-            ? S.aliasInvalid
-            : check.reason === 'contact_unknown'
-              ? S.contactUnknown
-              : S.renameUnavailable,
-      );
-    });
-  };
+  // One owner step: the action's own button is the sensor (Touch ID, Windows Hello, your passkey),
+  // with "Use your master code instead" as a link. The statement is what the gesture confirms.
+  const step = (
+    pending: Pending,
+    words: {
+      readonly with: (sensor: string) => string;
+      readonly code: string;
+      readonly variant?: 'primary' | 'danger';
+      readonly disabled?: boolean;
+    },
+  ): ReactElement => (
+    <PresenceButton
+      withSensor={words.with}
+      withCode={words.code}
+      statement={pending.summary}
+      busy={busy}
+      error={error?.key === keyOf(pending) ? error.text : undefined}
+      notUsed={S.passkeyNotUsed}
+      onProof={(proof) => run(pending, proof)}
+      owner={owner}
+      {...(words.variant === undefined ? {} : { variant: words.variant })}
+      {...(words.disabled === undefined ? {} : { disabled: words.disabled })}
+    />
+  );
 
-  const removeNow = (): void => ask({ what: 'remove', ref, summary: SUMMARY.remove(name) });
+  const renameStep = (): ReactElement =>
+    step(
+      {
+        what: 'rename',
+        ref,
+        input: { alias: wantedAlias },
+        summary: SUMMARY.rename(name, wantedAlias),
+      },
+      {
+        with: S.renameWith,
+        code: S.renameWithCode,
+        disabled: wantedAlias === '' || (aliasCheck.kind === 'refused' && aliasCheck.hold),
+      },
+    );
+  const removeStep = (target: { ref: string; name: string }): ReactElement =>
+    step(
+      { what: 'remove', ref: target.ref, summary: SUMMARY.remove(target.name) },
+      { with: S.removeWith, code: S.removeWithCode, variant: 'danger' },
+    );
 
   // The same Remove as above, for the older contact: the existing presence route, nothing new.
   const duplicate =
-    older === undefined ||
-    pending !== undefined ||
-    renaming ||
-    confirmRemove ||
-    confirmBlock ||
-    confirmOlder ? null : (
+    older === undefined || renaming || confirmRemove || confirmBlock || confirmOlder ? null : (
       <Surface level={3} className="ct-dup">
         <Banner tone="info" icon="users">
           <p className="al-text-body" id={dupNoticeId}>
@@ -681,11 +684,9 @@ function Detail({
             <strong>{S.mismatchTitle}</strong>
           </p>
           <p className="al-text-body-sm al-muted">{mismatchBody(name)}</p>
-          {pending === undefined ? (
+          {
             <div className="ct-actions">
-              <Button variant="danger" onClick={removeNow}>
-                {S.removeContact}
-              </Button>
+              {removeStep({ ref, name })}
               <Button
                 variant="ghost"
                 onClick={() => {
@@ -696,7 +697,7 @@ function Detail({
                 {S.keep}
               </Button>
             </div>
-          ) : null}
+          }
         </div>
       </div>
     );
@@ -706,13 +707,16 @@ function Detail({
         {S.compareCode}
       </Button>
     );
-  } else if (compare && pending === undefined) {
+  } else if (compare) {
     safety = (
       <SafetyCodeBlock
         contact={contact}
         code={code}
-        onMatch={(shown) =>
-          ask({ what: 'check', ref, input: { code: shown }, summary: SUMMARY.check(name) })
+        renderMatch={(shown) =>
+          step(
+            { what: 'check', ref, input: { code: shown }, summary: SUMMARY.check(name) },
+            { with: S.matchWith, code: S.matchWithCode },
+          )
         }
         onMismatch={() => setMismatch(true)}
         onSkip={() => setSkipped(true)}
@@ -726,7 +730,7 @@ function Detail({
         <h2 className="al-text-title-2">
           <ContactName {...nameInput(contact)} label={labelKind(contact)} showLabel />
         </h2>
-        {pending === undefined && !renaming && !confirmRemove && !confirmBlock && !confirmOlder ? (
+        {!renaming && !confirmRemove && !confirmBlock && !confirmOlder ? (
           <PersonMenu
             name={name}
             onRename={() => setRenaming(true)}
@@ -747,9 +751,6 @@ function Detail({
                   },
                 }
               : {})}
-            {...(contact.status === 'blocked'
-              ? { onUnblock: () => ask({ what: 'unblock', ref, summary: SUMMARY.unblock(name) }) }
-              : {})}
             {...(contact.status === 'revoked' ? {} : { onRemove: () => setConfirmRemove(true) })}
           />
         ) : null}
@@ -768,7 +769,15 @@ function Detail({
         </dl>
       ) : null}
       {duplicate}
-      {contact.status === 'blocked' ? <p className="al-text-body">{S.blockedDetail}</p> : null}
+      {contact.status === 'blocked' ? (
+        <>
+          <p className="al-text-body">{S.blockedDetail}</p>
+          {step(
+            { what: 'unblock', ref, summary: SUMMARY.unblock(name) },
+            { with: S.unblockWith, code: S.unblockWithCode },
+          )}
+        </>
+      ) : null}
       {contact.status === 'revoked' ? (
         <Banner tone="neutral" icon="minus" title={S.revokedTitle}>
           {S.revokedDetail} {S.revokedMore}
@@ -779,8 +788,8 @@ function Detail({
           {notice}
         </p>
       )}
-      {renaming && pending === undefined ? (
-        <form className="ct-rename" onSubmit={saveName}>
+      {renaming ? (
+        <form className="ct-rename" onSubmit={(event) => event.preventDefault()}>
           <TextField
             label={S.renameLabel}
             hint={S.renameHint}
@@ -789,17 +798,15 @@ function Detail({
             maxLength={32}
             value={alias}
             onChange={(e) => setAlias(e.currentTarget.value)}
-            {...(aliasError === undefined ? {} : { error: aliasError })}
+            {...(aliasCheck.kind === 'refused' ? { error: aliasCheck.message } : {})}
           />
           <div className="ct-actions">
-            <Button type="submit" variant="primary">
-              {S.saveName}
-            </Button>
+            {renameStep()}
             <Button
               variant="ghost"
               onClick={() => {
                 setRenaming(false);
-                setAliasError(undefined);
+                setError(undefined);
               }}
             >
               {S.cancel}
@@ -807,52 +814,33 @@ function Detail({
           </div>
         </form>
       ) : null}
-      {confirmBlock && pending === undefined ? (
+      {confirmBlock ? (
         <div className="ct-confirm">
           <p className="al-text-body">{S.blockExplain}</p>
           <div className="ct-actions">
-            <Button
-              variant="danger"
-              onClick={() => {
-                setConfirmBlock(false);
-                ask({ what: 'block', ref, summary: SUMMARY.block(name) });
-              }}
-            >
-              {S.blockContact}
-            </Button>
+            {step(
+              { what: 'block', ref, summary: SUMMARY.block(name) },
+              { with: S.blockWith, code: S.blockWithCode, variant: 'danger' },
+            )}
             <Button variant="ghost" onClick={() => setConfirmBlock(false)}>
               {S.cancel}
             </Button>
           </div>
         </div>
       ) : null}
-      {(confirmRemove || (confirmOlder && older !== undefined)) && pending === undefined ? (
+      {confirmRemove || (confirmOlder && older !== undefined) ? (
         <div className="ct-confirm">
           <p className="al-text-body">{S.removeExplain}</p>
           <div className="ct-actions">
-            <Button
-              variant="danger"
-              onClick={() => {
-                if (confirmOlder && older !== undefined) {
-                  setConfirmOlder(false);
-                  ask({
-                    what: 'remove',
-                    ref: older.ref,
-                    summary: SUMMARY.remove(shownName(older)),
-                  });
-                  return;
-                }
-                setConfirmRemove(false);
-                removeNow();
-              }}
-            >
-              {S.removeContact}
-            </Button>
+            {confirmOlder && older !== undefined
+              ? removeStep({ ref: older.ref, name: shownName(older) })
+              : removeStep({ ref, name })}
             <Button
               variant="ghost"
               onClick={() => {
                 setConfirmRemove(false);
                 setConfirmOlder(false);
+                setError(undefined);
               }}
             >
               {S.cancel}
@@ -860,19 +848,6 @@ function Detail({
           </div>
         </div>
       ) : null}
-      {pending === undefined ? null : (
-        <PresencePrompt
-          summary={pending.summary}
-          passkey={passkey}
-          busy={busy}
-          error={error}
-          onSubmit={submit}
-          onCancel={() => {
-            setPending(undefined);
-            setError(undefined);
-          }}
-        />
-      )}
       {safety}
     </section>
   );
@@ -1448,17 +1423,27 @@ export function ContactsPage({
         onCancelConnecting={cancelConnecting}
       />
       {unblocking === undefined ? null : (
-        <PresencePrompt
-          summary={SUMMARY.unblock(unblocking.name)}
-          passkey={passkey}
-          busy={unblockBusy}
-          error={unblockError}
-          onSubmit={submitUnblock}
-          onCancel={() => {
-            setUnblocking(undefined);
-            setUnblockError(undefined);
-          }}
-        />
+        <div className="ct-confirm">
+          <PresenceButton
+            withSensor={S.unblockWith}
+            withCode={S.unblockWithCode}
+            statement={SUMMARY.unblock(unblocking.name)}
+            busy={unblockBusy}
+            error={unblockError}
+            notUsed={S.passkeyNotUsed}
+            onProof={submitUnblock}
+            owner={owner}
+          />
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setUnblocking(undefined);
+              setUnblockError(undefined);
+            }}
+          >
+            {S.cancel}
+          </Button>
+        </div>
       )}
     </>
   );
@@ -1739,7 +1724,6 @@ export function ContactsPage({
               contact={current}
               api={api}
               owner={owner}
-              passkey={passkey}
               older={older}
               onKeepBoth={() => {
                 if (olderRef !== undefined) setKept(keep(kept, current.ref, olderRef));

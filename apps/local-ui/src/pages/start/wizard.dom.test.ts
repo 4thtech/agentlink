@@ -862,9 +862,10 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
   it('IR-W4-WIRE-2X-1: a name another agent has says so (a hint; it may still be used)', async () => {
     const agentsApi = fakeAgents();
     await mount(asAdd({ agentsApi }));
-    // The person is the same owner: the field starts with their ID's name, with no hint on it.
-    expect(host.querySelector<HTMLInputElement>('input[name="agent-name"]')?.value).toBe('Work');
-    expect(text()).not.toContain('You already have an ID with this name.');
+    // UX-LEFT-1 (R1-UI-21): another ID's name is never prefilled; the field starts empty.
+    expect(host.querySelector<HTMLInputElement>('input[name="agent-name"]')?.value).toBe('');
+    await typeName('Work');
+    expect(text()).toContain('You already have an ID with this name.');
     await typeName('Side');
     expect(text()).toContain('You already have an ID with this name.');
     await typeName('Side project');

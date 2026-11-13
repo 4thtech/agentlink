@@ -9,7 +9,7 @@ import { encodeHex, randomBytes, sha256 } from '@4thtech-io/crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { until } from '../app-world.js';
 import {
-  CONFIRM_PASSKEY,
+  SAVE_WITH_PASSKEY,
   chapter,
   eventually,
   inboxHas,
@@ -25,7 +25,7 @@ import {
   emulateReducedMotion,
   expectFadesOnly,
   layoutShiftScore,
-  shiftCount,
+  shiftMark,
   shiftsSince,
   observeLayoutShift,
 } from '../helpers/motion.js';
@@ -174,8 +174,8 @@ describe('chapter 3: inbox', () => {
     // Save into the linked folder: refused, nothing written.
     expect(readdirSync(planted)).toEqual([]);
     const before1 = b.gestures.total();
-    await b.page.getByRole('button', { name: 'Save to Inbox' }).first().click();
-    await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
+    // OWNERSTEP-LEFT: the Save button is the sensor; one press, one gesture.
+    await b.page.getByRole('button', { name: SAVE_WITH_PASSKEY }).first().click();
     await b.page
       .getByText(/Inbox folder can't take files/)
       .first()
@@ -189,8 +189,8 @@ describe('chapter 3: inbox', () => {
     const outside = join(pcB.home, 'outside-target.txt');
     await symlink(outside, join(inboxFolder, FILE_NAME));
     const before2 = b.gestures.total();
-    await b.page.getByRole('button', { name: 'Save to Inbox' }).first().click();
-    await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
+    // OWNERSTEP-LEFT: the Save button is the sensor; one press, one gesture.
+    await b.page.getByRole('button', { name: SAVE_WITH_PASSKEY }).first().click();
     await eventually('the file is saved', async () => (await text(b.page)).includes('Saved as'));
     expect(b.gestures.total() - before2).toBe(1);
     expect(existsSync(outside)).toBe(false);
@@ -200,7 +200,7 @@ describe('chapter 3: inbox', () => {
     expect(sha(readFileSync(join(inboxFolder, savedName)))).toBe(sha(file.bytes));
     expect(await text(b.page)).toContain(savedName);
     // Saved once: no Save button for it any more.
-    expect(await b.page.getByRole('button', { name: 'Save to Inbox' }).count()).toBe(0);
+    expect(await b.page.getByRole('button', { name: SAVE_WITH_PASSKEY }).count()).toBe(0);
     dropHoldsNoPlaintext(world.drop, file.bytes);
     await bProbe.check();
   }, 240_000);
@@ -230,8 +230,8 @@ describe('chapter 3: inbox', () => {
     // (that move once cost Home 0.024–0.037). The score counts from before Home's first load.
     expect(await b.page.locator('main a[href="/first-run"]').count()).toBe(0);
     await b.page.waitForTimeout(500);
-    const clsBeforeHome = await layoutShiftScore(b.page);
-    const seenBefore = await shiftCount(b.page);
+    // CI-823: score and count from one read, so a shift is never in the score but not in the list.
+    const { score: clsBeforeHome, count: seenBefore } = await shiftMark(b.page);
     await navTo(b.page, 'Home');
     await b.page.getByRole('heading', { name: 'People' }).waitFor();
     await b.page.waitForTimeout(500);
@@ -339,11 +339,12 @@ describe('chapter 3: inbox', () => {
       .first();
     await card.waitFor({ timeout: 30_000 });
     const beforeApprove = b.gestures.total();
+    // IR-N3-1 #1: terms show Approve once Review has opened them in full.
+    await card.getByRole('button', { name: 'Review' }).first().click();
     await card
       .getByRole('button', { name: /^Approve/ })
       .first()
       .click();
-    await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
     await eventually(
       'the approval is recorded',
       async () =>

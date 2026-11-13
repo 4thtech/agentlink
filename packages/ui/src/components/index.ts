@@ -15,6 +15,8 @@ export * from './identity.js';
 export * from './motion.js';
 export * from './motion-optimistic.js';
 export * from './motion-vt.js';
+export * from './copy.js';
+export * from './notice-timing.js';
 export * from './notice.js';
 export * from './pay-confirm.js';
 export * from './progress.js';

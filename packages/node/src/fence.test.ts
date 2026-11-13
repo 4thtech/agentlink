@@ -15,7 +15,10 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'APPROVAL_SERVER_HOST',
       // REL051-UPD2: the two local route paths of the update check (fixed strings, no secret, no URL).
       'APP_UPDATE_CHECK_PATH',
+      // UPD-5: the install and restart route paths of the same update (fixed strings, no key, no store).
+      'APP_UPDATE_INSTALL_PATH',
       'APP_UPDATE_PATH',
+      'APP_UPDATE_RESTART_PATH',
       // U3-c: the folder lock's fixed-text error.
       'AgentFolderLockError',
       // M1-15: the allowed-folder and inbox file guards (fixed-text errors, no seams).
@@ -68,6 +71,8 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'holdAgentFolderShared',
       'inboxFolderProblem',
       'initOwner',
+      // RET-3 (04 §4.2): a file move into the OS Trash (no key, no store, no cipher).
+      'moveToTrash',
       'nodeHostResolver',
       'nodeNip11Fetcher',
       'nodeRelayConnector',
@@ -87,6 +92,8 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'performOwnerOperation',
       // W4-LIVE-STATUS (04 §2.5): signal 0 to a valid pid, a boolean back; no key, no seam.
       'pidAlive',
+      // RET-3: a no-replace rename used by the Trash mover (no key, no store).
+      'placeNoReplace',
       'probeOsKeychain',
       'quarantineMark',
       'resolveAllowedFile',
@@ -104,6 +111,8 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // WP-D3: the same server for the desktop host; session links go to the pipe sink, never the
       // OS opener (approval-server-link-sink.test.ts).
       'startApprovalServerWithLinkSink',
+      // RET-3: one saved Inbox file to the Trash, only while unchanged (no key, no store).
+      'trashSavedFile',
       'unlockFileKeyStoreAgent',
       // U3-c (card U3-e uses it): removal takes the folder lock exclusive.
       'withAgentFolderExclusive',

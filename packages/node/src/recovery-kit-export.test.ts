@@ -146,6 +146,8 @@ async function harness(
     /** WP-R2b: the host's walk itself (default: `visitor` over `others`). */
     walk?: (peers: readonly RecoveryKitPeer[]) => RecoveryKitOthers;
     now?: () => number;
+    /** KIT-NAMES: what each ID's core `loadLabel` answers (absent: the core has no loadLabel). */
+    labels?: { readonly first?: unknown; readonly second?: unknown };
   } = {},
 ) {
   homes += 1;
@@ -165,6 +167,9 @@ async function harness(
     source: { agentId: second, name: 'work', storePath: secondStore },
     prepareBackupExport: secondCore.prepareBackupExport,
     apply: secondCore.apply,
+    ...(over.labels?.second === undefined
+      ? {}
+      : { loadLabel: () => Promise.resolve(over.labels?.second as never) }),
   };
   // WP-R2b: the export handle comes from the restore engine (registerExportedKit); recorded here.
   const registered: { path: string; kitId: string }[] = [];
@@ -176,7 +181,12 @@ async function harness(
       source: { agentId: world.agentId, name: 'default', storePath: firstStore, home, kdf: KDF },
       client: {
         agentId: world.agentId,
-        ownerActions: { prepareBackupExport: firstCore.prepareBackupExport },
+        ownerActions: {
+          prepareBackupExport: firstCore.prepareBackupExport,
+          ...(over.labels?.first === undefined
+            ? {}
+            : { loadLabel: () => Promise.resolve(over.labels?.first as never) }),
+        },
       },
       review: { lines: ['Save a recovery kit'] },
       // As the gate does: one checked request per call, signed with this gesture's session.
@@ -294,6 +304,64 @@ describe('exportRecoveryKit: one kit for every ID (WP-R2)', () => {
       warn.mockRestore();
       error.mockRestore();
       await h.close();
+    }
+  });
+
+  it("KIT-NAMES: the kit carries each ID's verified label inside it; none otherwise", async () => {
+    const cases: [unknown, unknown, string | undefined, string | undefined][] = [
+      [
+        { status: 'verified', label: 'Ana Novak' },
+        { status: 'verified', label: 'Work' },
+        'Ana Novak',
+        'Work',
+      ],
+      // Unverified, none, or a label outside the folder label rule: no label (the folder shows).
+      [{ status: 'unverified' }, { status: 'none' }, undefined, undefined],
+      [
+        { status: 'verified', label: 'Ana  Novak' },
+        { status: 'verified', label: 'Wörk' },
+        undefined,
+        'Wörk',
+      ],
+    ];
+    for (const [first, secondLabel, wantFirst, wantSecond] of cases) {
+      const h = await harness({ labels: { first, second: secondLabel } });
+      try {
+        const outcome = await h.run();
+        expect(outcome.status).toBe('saved');
+        if (outcome.status !== 'saved') return;
+        const bytes = new Uint8Array(readFileSync(join(h.home, 'Downloads', outcome.file)));
+        // Never in the clear: the names are personal data (04 §2.3.3, KIT-NAMES).
+        for (const want of [wantFirst, wantSecond]) {
+          if (want !== undefined) {
+            expect(Buffer.from(bytes).includes(Buffer.from(want, 'utf8'))).toBe(false);
+          }
+        }
+        const kit = await openRecoveryKit(
+          bytes,
+          { secret: encodeUtf8(outcome.code), source: 'prompt' },
+          { createStoreSink: () => memorySink([]), expectedOwnerNostr: world.owner.ownerNostr },
+        );
+        try {
+          const labels = new Map(
+            kit.agents.map((a) => [
+              a.agentId,
+              a.label === undefined ? undefined : Buffer.from(a.label).toString('utf8'),
+            ]),
+          );
+          expect(labels.get(world.agentId)).toBe(wantFirst);
+          expect(labels.get(second)).toBe(wantSecond);
+        } finally {
+          kit.wipe();
+        }
+        // The outcome and the kit record carry no label.
+        expect(JSON.stringify(outcome)).not.toContain('Ana');
+        expect(readFileSync(join(h.home, '.agentlink', 'kit-record.json'), 'utf8')).not.toContain(
+          'Ana',
+        );
+      } finally {
+        await h.close();
+      }
     }
   });
 

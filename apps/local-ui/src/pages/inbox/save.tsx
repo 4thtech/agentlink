@@ -1,15 +1,15 @@
 // W4-FILES-SAVE: "Save to Inbox" on a received file (08 §1; b11 §34.4; 11 §5.7; 04 §2.5, §4). Shared
 // by the Inbox (Needs you and the conversation) and Files, Received.
 //
-// Click "Save to Inbox", then the presence step: "Confirm with your passkey" when this computer has
-// one, the master code below it (the same step as an approval, approvals/card.tsx OwnerStep). The
-// passkey is asked only after the click (11 §6.2.1). Only the item's ID is sent (save-api.ts); the
+// OWNERSTEP-LEFT: one step. The button is the sensor ("Save with Touch ID": Touch ID in the Mac app
+// when it is turned on there, else the passkey here), with "Use your master code instead" as a link;
+// with neither, "Save to Inbox" opens the master code (approvals/card.tsx PresenceAction). The
+// gesture is asked only after the click (11 §6.2.1). Only the item's ID is sent (save-api.ts); the
 // saved name shows when the list is read again ("Saved as", untrusted text). Status lines are fixed
 // strings: never the sender's file name (I-5).
-import { Button } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
-import type { DecisionPasskey } from '../approvals/client.js';
-import { OwnerStep } from '../approvals/card.js';
+import type { DecisionPasskey, Presence } from '../approvals/client.js';
+import { PresenceAction, type OwnerState } from '../approvals/card.js';
 import type { SaveAnswer, SaveApi } from './save-api.js';
 import { INBOX_STRINGS as S, fmt } from './strings.js';
 
@@ -36,6 +36,24 @@ export function saveAnswerText(answer: SaveAnswer): string {
   }
 }
 
+/** How long one read of the passkey serves every Save button on the page (one GET, not one per row). */
+const PASSKEY_READ_MS = 30_000;
+const reads = new WeakMap<
+  PasskeyReader,
+  { at: number; read: Promise<DecisionPasskey | undefined> }
+>();
+function sharedRead(reader: PasskeyReader): Promise<DecisionPasskey | undefined> {
+  const now = Date.now();
+  const hit = reads.get(reader);
+  if (hit !== undefined && now - hit.at < PASSKEY_READ_MS) return hit.read;
+  const read = reader().catch(() => undefined);
+  reads.set(reader, { at: now, read });
+  return read;
+}
+
+/** Owner state for the Save button: the passkey is read by the button itself. */
+const SAVE_OWNER: OwnerState = Object.freeze({ ready: true });
+
 export function SaveFile({
   id,
   api,
@@ -48,10 +66,8 @@ export function SaveFile({
   /** The file was saved: the caller reads its list again (for "Saved as"). */
   readonly onSaved?: () => void;
 }): ReactElement {
-  const [step, setStep] = useState<{ passkey: DecisionPasskey | undefined } | undefined>(undefined);
   const [line, setLine] = useState<string | undefined>(undefined);
   const [done, setDone] = useState(false);
-  const [busy, setBusy] = useState(false);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -60,52 +76,37 @@ export function SaveFile({
     };
   }, []);
 
-  const open = async (): Promise<void> => {
-    setBusy(true);
+  const send = async (presence: Presence): Promise<void> => {
     setLine(undefined);
-    let found: DecisionPasskey | undefined;
-    try {
-      found = await passkey();
-    } catch {
-      found = undefined;
-    }
+    const a = await api.save(id, presence);
     if (!alive.current) return;
-    setBusy(false);
-    setStep({ passkey: found });
-  };
-
-  const answer = (a: SaveAnswer): void => {
-    if (!alive.current) return;
-    setLine(saveAnswerText(a));
+    // IR-UX1113-N2-1 #2: a sensor proof the server refused was used, not "wasn't used".
+    setLine(
+      presence.kind !== 'code' && a.kind === 'presence_rejected'
+        ? S.sensorRefused
+        : presence.kind !== 'code' && a.kind === 'presence_required'
+          ? S.sensorUnavailable
+          : saveAnswerText(a),
+    );
     if (a.kind === 'outcome' && (a.outcome === 'saved' || a.outcome === 'already_saved')) {
-      setStep(undefined);
       setDone(true);
       onSaved?.();
-      return;
     }
-    // A dismissed passkey prompt keeps the step open for the master code; anything else brings the
-    // button back so the owner can try again.
-    if (a.kind !== 'dismissed') setStep(undefined);
   };
 
   return (
     <div className="ib-save" data-save={id}>
-      {!done && step === undefined ? (
-        <Button size="sm" icon="inbox" disabled={busy} onClick={() => void open()}>
-          {S.saveToInbox}
-        </Button>
-      ) : null}
-      {step === undefined ? null : (
-        <OwnerStep
-          passkey={step.passkey !== undefined}
-          passkeyLabel={S.confirmPasskey}
+      {done ? null : (
+        <PresenceAction
+          owner={SAVE_OWNER}
+          readPasskey={() => sharedRead(passkey)}
+          size="sm"
+          icon="inbox"
+          withSensor={(sensor) => fmt(S.saveWith, { sensor })}
+          withCode={S.saveToInbox}
           codeSubmit={S.confirmSave}
-          label={S.saveStepLabel}
-          onPasskey={async () => {
-            if (step.passkey === undefined) return;
-            answer(await api.save(id, { kind: 'passkey', passkey: step.passkey }));
-          }}
-          onCode={async (code) => answer(await api.save(id, { kind: 'code', code }))}
+          statement={S.saveStepLabel}
+          send={send}
         />
       )}
       <p role="status" className="al-text-body-sm al-muted">

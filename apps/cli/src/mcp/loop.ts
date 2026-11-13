@@ -110,6 +110,12 @@ export interface LoopClient {
    * each pass and after live delivery stored something. Optional for older fakes.
    */
   readonly autoSave?: { run(): Promise<unknown> };
+  /**
+   * RET-6 (D-148, 04 §4.2): the daily history retention pass under the owner-signed `history.*`
+   * (core runs it at most once a day and deletes nothing unless the signed policy says so and the
+   * ID is running). Run by the lease holder after each pass. Optional for older fakes.
+   */
+  readonly historyRetention?: { run(): Promise<unknown> };
   /** Live delivery (M1-9s). Optional: without it the loop polls with `syncInbox`. */
   subscribeInbox?(options?: {
     readonly onProcessed?: (result: {
@@ -402,7 +408,20 @@ export class BackgroundLoop {
     }
     if (!this.holding) return partial;
     await this.#runAutoSave();
+    if (!this.holding) return partial;
+    await this.#runHistoryRetention();
     return partial;
+  }
+
+  /** RET-6: the daily history retention pass (core decides whether it is due). Codes only. */
+  async #runHistoryRetention(): Promise<void> {
+    const retention = this.#client.historyRetention;
+    if (retention === undefined) return;
+    try {
+      await retention.run();
+    } catch (error) {
+      this.#log.warn('history retention failed', errorCode(error));
+    }
   }
 
   /** W4-AUTO-SAVE: one automatic-save run (core runs one at a time). Never rejects; codes only. */

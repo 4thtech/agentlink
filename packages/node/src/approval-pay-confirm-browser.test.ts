@@ -339,7 +339,8 @@ describe('the confirmation sheet in the app (M1-PAY-CONFIRM-b, M1-11b-2; Chromiu
     expect(await page.getByRole('checkbox', { name: /Record a proof/ }).count()).toBe(0);
     const paidCard = page.locator(`[data-approval="${id(2)}"]`);
     await page.getByText('Costs money · approve one at a time').first().waitFor();
-    await paidCard.locator('details > summary').click();
+    // N3: Home's compact card opens the full approval with Review.
+    await paidCard.getByRole('button', { name: 'Review', exact: true }).click();
     await paidCard.getByText(T.paidAlone).waitFor();
     // Details (and its Under the hood panel) fade in: check once settled.
     await page.waitForTimeout(600);

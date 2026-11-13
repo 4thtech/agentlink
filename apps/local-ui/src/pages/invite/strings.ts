@@ -81,9 +81,16 @@ export const INVITE_STRINGS = {
   sayHello: (name: string | null): string => (name === null ? 'Say hello' : `Say hello to ${name}`),
   connectedGeneric: 'You are connected',
   thisContact: 'your new contact',
-  nameThisContact: 'Name this contact',
-  nameThisContactHint:
-    'Only you see it. Check the name, then confirm it to use it in your AI prompts.',
+  // UX1113-N1 (run1113b B §3): naming is optional and one gesture; "check" means only the Contact
+  // check (the identity), never the name.
+  useOwnName: 'Use your own name for them',
+  yourNameForThem: 'Your name for them',
+  yourNameHint: 'Only you see it. Your AI uses this name.',
+  saveWith: (sensor: string): string => `Save with ${sensor}`,
+  saveWithCode: 'Save with your master code',
+  cancelNaming: 'Cancel',
+  notSaved: 'Not saved. Try again.',
+  saved: 'Saved.',
   nameSummary: (alias: string): string => `Name this contact ${alias}.`,
   optionalCheck: (name: string): string =>
     `Optional: make sure it's really ${name}. Contact check →`,

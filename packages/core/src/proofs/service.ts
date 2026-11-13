@@ -305,7 +305,12 @@ export type ProofCode =
    * A terms Record (M1-9d-3): the fee now quoted is above the commitment's `maxFeeUsd`, so the
    * approval does not cover it (04 §3.4.2). Nothing is signed or charged.
    */
-  | 'FEE_ABOVE_APPROVED';
+  | 'FEE_ABOVE_APPROVED'
+  /**
+   * RET-3 (IR-RET-3-1 Medium 2; 04 §4.2 OD-4): the owner deleted this message on this computer, so
+   * its content is never disclosed (no content key); the pack without the content still exports.
+   */
+  | 'CONTENT_DELETED';
 
 /** What one `processInbound` pass did (M1-7g-c). */
 export interface ProofInboundResult {
@@ -2533,6 +2538,9 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     const envelopeRow = await this.#envelope(row.envelope_id);
     if (envelopeRow?.envelope_json == null) return rejected('ENVELOPE_NOT_FOUND');
     if (envelopeRow.direction !== (received ? 'in' : 'out')) return rejected('RECORD_UNAVAILABLE');
+    if (input.includeContentKey === true && envelopeRow.deleted_at !== null) {
+      return rejected('CONTENT_DELETED');
+    }
 
     let contentKey: string | undefined;
     if (input.includeContentKey === true) {

@@ -15,6 +15,7 @@ import type { HandlerEnvironment, ToolContext } from './context.js';
 import { createInviteHandler } from './create-invite.js';
 import { exportProofPackHandler } from './export-proof-pack.js';
 import { fetchFileHandler } from './fetch-file.js';
+import { withAllowFolderLink } from './files-common.js';
 import { getApprovalHandler } from './get-approval.js';
 import { getProofHandler } from './get-proof.js';
 import { inboxHandler } from './inbox.js';
@@ -39,6 +40,7 @@ import { sendHandler } from './send.js';
 import { statusHandler } from './status.js';
 import { TOOL_TEXT } from './text.js';
 import { verifyProofPackHandler } from './verify-proof-pack.js';
+import { runTidy, tidyHandler } from './tidy.js';
 
 export type ToolHandler = (input: unknown, context: ToolContext) => Promise<HandlerOutput>;
 
@@ -61,6 +63,7 @@ export const HANDLERS: Readonly<Partial<Record<McpToolName, ToolHandler>>> = Obj
   agentlink_get_proof: getProofHandler,
   agentlink_export_proof_pack: exportProofPackHandler,
   agentlink_verify_proof_pack: verifyProofPackHandler,
+  agentlink_tidy: tidyHandler,
 });
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -114,6 +117,18 @@ export async function callTool(
   if (PAUSE_REFUSED_TOOLS.has(tool.name) && (await agentPaused(env.client))) {
     return finalizeResult(agentPausedOutput(), origins);
   }
+  // RET-7: agentlink_tidy only proposes. Its link is the app's Storage page (tidy.ts), never an
+  // approval page, and there is no approval row to wait on.
+  if (tool.name === 'agentlink_tidy') {
+    let tidied: Awaited<ReturnType<typeof runTidy>>;
+    try {
+      tidied = await runTidy(args, env);
+    } catch {
+      env.logger.warn('tool handler failed', { tool: tool.name });
+      return finalizeResult(internalError(), origins);
+    }
+    return finalizeResult(tidied.output, tidied.origins);
+  }
   // M1-36i-e: one time budget per call; the time the handler spends counts against the wait.
   // Monotonic (performance.now): a wall clock that jumps back can never give the wait more time.
   const started = performance.now();
@@ -125,8 +140,11 @@ export async function callTool(
     env.logger.warn('tool handler failed', { tool: tool.name });
     output = internalError();
   }
+  // ATT-ALLOW-LINK: under `agentlink mcp`, a no-folder result gets the Allow a folder link.
+  const withFolderLink = await withAllowFolderLink(output, env);
   // M1-11a-b: under `agentlink mcp`, a pending_approval gets the local approval UI link.
-  const linked = await withApprovalLink(output, env);
+  const approvalLinked = await withApprovalLink(withFolderLink.output, env);
+  const linked = approvalLinked.output === withFolderLink.output ? withFolderLink : approvalLinked;
   // M1-36j (D4): with the page open, wait briefly for the owner's decision (read-only).
   const waited = await waitForApprovalDecision(linked.output, env, {
     waitMs: approvalWaitLeft(options.approvalWaitMs ?? 0, performance.now() - started),
@@ -152,6 +170,7 @@ export {
 } from './registry.js';
 export {
   coreToolClient,
+  type AllowFolderLink,
   type ApprovalLink,
   type AttachedFile,
   type AttachOutcome,

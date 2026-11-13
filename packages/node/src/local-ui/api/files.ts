@@ -12,6 +12,8 @@
 //     `~/.agentlink`, keychains), and never a folder that contains one (D-99, compared in its lexical
 //     form and its realpath, ignoring case). `elsewhere` tells the page the typed path led somewhere
 //     else (a link, or another spelling), so it shows the real folder before the owner confirms.
+//   - ATT-SENDFOLDER-FIX (IR-1 M-1): an add also answers `holdsFiles`, whether the folder already
+//     holds anything, so the confirm step says those files can be sent too.
 //   - remove: the entry exactly as the rules write it.
 //   - Then core `preparePolicyEdit` builds the unsigned `policy.set`. The server keeps that body
 //     (per server, at most MAX_REVIEWS, until it expires) under its hash, base64url SHA-256 of its
@@ -27,9 +29,16 @@
 //   replayed onto another edit, or onto the same edit twice. Before signing, the hash is recomputed
 //   and an added folder is checked again (a folder swapped for a link since the review is refused).
 //   Then `sign` signs exactly that body, once, and core applies it (I-4).
+// - POST /api/ui/files/send-folder (ATT-SENDFOLDER-FIX; the `mark` kind: no input, no presence):
+//   Home's "Allow your Send folder" banner. Sets up the Send folder as the first rules do
+//   (owner-first-policy prepareSendFolder with `fallback`: an existing real, owned Send even when it
+//   holds files, else a fresh Send-2 ... created 0700; never a link) and answers only its real path,
+//   which the page then reviews and confirms like any folder above. Nothing is prepared, signed or
+//   applied here, so the rules never change on this route (I-4); an unusable folder is a fixed
+//   `unavailable`.
 //
 // The browser never signs and never sees the body: only the folder, the codes and the token.
-import { realpath, stat } from 'node:fs/promises';
+import { readdir, realpath, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import process from 'node:process';
 import {
@@ -50,6 +59,7 @@ import {
   type JsonObject,
   type JsonValue,
 } from '@4thtech-io/crypto';
+import { prepareSendFolder } from '../../owner-first-policy.js';
 import type { LocalUiContext } from '../context.js';
 import {
   UI_INVALID_QUERY,
@@ -137,6 +147,20 @@ function lexical(
   return { ok: true, path };
 }
 
+/**
+ * CHORE-FILES-WIN-NAME-CASE: how a protected folder is named to the owner (display only). Inside the
+ * home folder it is `~` plus the root's own tail segments, taken from the root string itself: the
+ * guard parses Windows paths case-folded, so its segments would read in lower case. What is refused
+ * is decided before this and does not depend on it.
+ */
+export function shownProtectedFolder(root: string, home: string, flavor: PathFlavor): string {
+  const below = segmentsBelow(root, home, flavor);
+  if (below === undefined) return root;
+  if (below.length === 0) return '~';
+  const tail = root.split(flavor === 'posix' ? '/' : /[\\/]/).slice(-below.length);
+  return ['~', ...tail].join(flavor === 'posix' ? '/' : '\\');
+}
+
 /** The 04 §4 and D-99 checks for a folder the owner allows (see the header). */
 async function checkFolder(typed: string, home: string, flavor: PathFlavor): Promise<Checked> {
   const shaped = lexical(typed, home, flavor);
@@ -176,9 +200,7 @@ async function checkFolder(typed: string, home: string, flavor: PathFlavor): Pro
     if (rootReal !== undefined && rootReal !== root) forms.push(rootReal);
     // D-99: the real folder holds a protected folder (whether or not it exists: fail closed).
     if (forms.some((form) => segmentsBelow(form, real, flavor, ci) !== undefined)) {
-      const below = segmentsBelow(root, home, flavor);
-      const shown =
-        below === undefined ? root : ['~', ...below].join(flavor === 'posix' ? '/' : '\\');
+      const shown = shownProtectedFolder(root, home, flavor);
       return showable(shown)
         ? { ok: false, reason: 'contains_protected', protectedFolder: shown }
         : { ok: false, reason: 'protected' };
@@ -334,12 +356,19 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
     }
     let folder: string;
     let elsewhere = false;
+    let holdsFiles = false;
     let next: string[];
     if (parsed.change === 'add') {
       const checked = await checkFolder(parsed.path, homeOf(), flavor);
       if (!checked.ok) return refused(checked.reason, checked.protectedFolder);
       folder = checked.folder;
       elsewhere = checked.elsewhere;
+      // ATT-SENDFOLDER-FIX (IR-1 M-1): the owner reads that what is already there can be sent too.
+      // A folder that can't be listed is told as holding files (more said, never less).
+      holdsFiles = await readdir(folder).then(
+        (entries) => entries.length > 0,
+        () => true,
+      );
       if (configured.includes(folder)) return refused('already_allowed');
       if (configured.length >= MAX_FOLDERS) return refused('too_many');
       next = [...configured, folder];
@@ -410,6 +439,7 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
       folder,
       typed: parsed.path,
       elsewhere,
+      ...(parsed.change === 'add' ? { holdsFiles } : {}),
       warnings: [...codes],
       expiresAt,
     });
@@ -460,6 +490,19 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
     return applyAnswer(outcome);
   }
 
+  /** ATT-SENDFOLDER-FIX: the Send folder for Home's banner (see the header). */
+  async function sendFolder(context: LocalUiContext): Promise<LocalUiResult> {
+    if (context.client === undefined) return UI_NOT_SET_UP;
+    let plan: Awaited<ReturnType<typeof prepareSendFolder>>;
+    try {
+      plan = await prepareSendFolder(homeOf(), { fallback: true });
+    } catch {
+      return fixed(409, 'unavailable');
+    }
+    if (plan.status !== 'ready' || !showable(plan.folder)) return fixed(409, 'unavailable');
+    return result(200, { folder: plan.folder });
+  }
+
   return Object.freeze<LocalUiRoute[]>([
     Object.freeze({ method: 'GET', path: '/api/ui/files', presence: false, handler: list }),
     Object.freeze({
@@ -473,6 +516,12 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
       path: '/api/ui/files/folders',
       presence: true,
       handler: commit,
+    }),
+    Object.freeze({
+      method: 'POST',
+      path: '/api/ui/files/send-folder',
+      presence: 'mark',
+      handler: (context: LocalUiContext) => sendFolder(context),
     }),
   ]);
 }

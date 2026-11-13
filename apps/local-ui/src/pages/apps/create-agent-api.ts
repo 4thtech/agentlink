@@ -9,6 +9,7 @@
 //   same nonce (the third wrong one ends it).
 // The PRF output and the code are wiped once sent; nothing here is logged or kept.
 
+import { parseSendFolderReview, type SendFolderReview } from '../../api/send-folder-review.js';
 import { nativeCeremony } from '../../api/presence-ceremony.js';
 import { nativeStateOf } from '../../presence/native-api.js';
 import type { NativeState } from '../../presence/strings.js';
@@ -57,6 +58,8 @@ export type CreateBegin =
       readonly nonce: string;
       readonly statement: CreateStatement;
       readonly publicKey: CreatePublicKey;
+      /** ATT-SENDFOLDER-FIX: the Send folder this gesture allows (shown before it). */
+      readonly sendFolder?: SendFolderReview;
     }
   | { readonly kind: 'refused'; readonly status: string }
   | { readonly kind: 'session' | 'offline' | 'failed' };
@@ -341,7 +344,14 @@ export function createAgentApi(options: CreateAgentApiOptions = {}): CreateAgent
         if (typeof nonce !== 'string' || !NONCE.test(nonce) || !statement || !publicKey) {
           return { kind: 'failed' };
         }
-        return { kind: 'ready', nonce, statement, publicKey };
+        const sendFolder = parseSendFolderReview(answer.json['sendFolderReview']);
+        return {
+          kind: 'ready',
+          nonce,
+          statement,
+          publicKey,
+          ...(sendFolder === undefined ? {} : { sendFolder }),
+        };
       }
       return typeof word === 'string' ? { kind: 'refused', status: word } : { kind: 'failed' };
     },

@@ -129,6 +129,57 @@ export const autoSaveSchema = z.strictObject({
 
 export type AutoSavePolicy = z.infer<typeof autoSaveSchema>;
 
+// --- history (D-148, RET-6) ----------------------------------------------------------------------
+
+/** `history.messagesKeepDays` (06 §3, D-148): 0 keeps messages forever. */
+export const HISTORY_MESSAGES_KEEP_DAYS = freeze([0, 90, 365, 730] as const);
+/** `history.filesKeepDays` (06 §3, D-148): 0 keeps the app's saved files forever. */
+export const HISTORY_FILES_KEEP_DAYS = freeze([0, 30, 90, 180, 365] as const);
+
+/**
+ * `history` (D-148; 06 §3, 04 §4.2; proposed, owner confirms at merge): local history retention,
+ * changed only by an owner-signed `policy.set` from the app with presence, never by an MCP tool
+ * (I-4). Like `files.autoSave` it may be absent, but only in a policy signed before D-148, which
+ * reads as HISTORY_PRE_D148 (keep everything), so an update never starts deleting. When present it
+ * is a strict object with both keys.
+ */
+export const historySchema = z.strictObject({
+  // A JSON integer from the list (never a string, a fraction or another number).
+  messagesKeepDays: z.literal([...HISTORY_MESSAGES_KEEP_DAYS]),
+  filesKeepDays: z.literal([...HISTORY_FILES_KEEP_DAYS]),
+});
+
+export type HistoryPolicy = z.infer<typeof historySchema>;
+
+/** How a policy signed before D-148 (no `history`) reads: keep messages and files forever. */
+export const HISTORY_PRE_D148: Readonly<HistoryPolicy> = freeze({
+  messagesKeepDays: 0,
+  filesKeepDays: 0,
+});
+
+/**
+ * The 06 §3 defaults (D-148, RET-6/7; proposed, owner confirms at merge): keep messages and files
+ * forever, the same as HISTORY_PRE_D148. A first edit of rules never signed (Rules, the Send folder
+ * banner) signs these, so only a new ID's first rules (HISTORY_NEW_ID) or the Storage editor turn
+ * retention on (IR-RET-67-1 Medium 2).
+ */
+export const HISTORY_DEFAULTS: Readonly<HistoryPolicy> = freeze({
+  messagesKeepDays: 0,
+  filesKeepDays: 0,
+});
+
+/** A new ID's first rules from 0.5.2 on (OD-2): messages kept forever, saved files 90 days. */
+export const HISTORY_NEW_ID: Readonly<HistoryPolicy> = freeze({
+  messagesKeepDays: 0,
+  filesKeepDays: 90,
+});
+
+/** The `history` of a policy: its own, or HISTORY_PRE_D148 for one signed before D-148. */
+export function historyOf(policy: { readonly history?: HistoryPolicy | undefined }): HistoryPolicy {
+  const h = policy.history ?? HISTORY_PRE_D148;
+  return { messagesKeepDays: h.messagesKeepDays, filesKeepDays: h.filesKeepDays };
+}
+
 /** The 06 §3 `files.autoSave` defaults (D-142, Decision 51): on, 50/500 per contact, 200/2048. */
 export const AUTO_SAVE_DEFAULTS: Readonly<AutoSavePolicy> = freeze({
   on: true,
@@ -232,6 +283,8 @@ export const policySchema = z.strictObject({
     autoAcceptDirection: z.enum(AUTO_ACCEPT_DIRECTIONS),
     autoAcceptMinUSD: usdAmountSchema.nullable(),
   }),
+  // D-148: may be absent only in a policy signed before D-148 (read as HISTORY_PRE_D148).
+  history: historySchema.exactOptional(),
   contactRules: contactRulesSchema,
 });
 
@@ -290,6 +343,8 @@ function buildDefaults(): Policy {
       autoAcceptDirection: 'buy',
       autoAcceptMinUSD: null,
     },
+    // D-148: keep forever; a new ID's first rules carry HISTORY_NEW_ID (OD-2).
+    history: { ...HISTORY_DEFAULTS },
     contactRules: [],
   };
 }
@@ -335,6 +390,7 @@ export const policyPatchSchema = z.strictObject({
   proofs: exactPartial(sections.proofs.shape).exactOptional(),
   receipts: exactPartial(sections.receipts.shape).exactOptional(),
   commitments: exactPartial(sections.commitments.shape).exactOptional(),
+  history: exactPartial(historySchema.shape).exactOptional(),
   contactRules: sections.contactRules.exactOptional(),
 });
 

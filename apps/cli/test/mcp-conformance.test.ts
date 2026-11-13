@@ -43,6 +43,8 @@ const VALID_ARGS: Record<string, Record<string, unknown>> = {
   agentlink_get_proof: { envelopeId: 'AAAAAAAAAAAAAAAAAAAAAA' },
   agentlink_export_proof_pack: { envelopeId: 'AAAAAAAAAAAAAAAAAAAAAA' },
   agentlink_verify_proof_pack: { json: {} },
+  // RET-7: a filter only.
+  agentlink_tidy: { olderThanDays: 90, kinds: 'files' },
 };
 
 describe('MCP conformance over stdio (06 §9)', () => {

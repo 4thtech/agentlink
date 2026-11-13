@@ -3,15 +3,15 @@
 // owner operation behind the presence gate: the page sends one request with the proof and the
 // server signs. The routes of U3-d and U3-e may still be stubs (501): that reads as a plain
 // "not done" sentence and nothing is claimed. Labels are rendered as text only (I-5).
-import { Button, Sheet, TextField } from '@4thtech-io/ui';
-import { useEffect, useId, useState, type FormEvent, type ReactElement } from 'react';
+import { Button, InlineError, Sheet, TextField } from '@4thtech-io/ui';
+import { useCallback, useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import { FAILURE_COPY } from '../../api/failure-reasons.js';
 import { ExportKit } from '../backup/export-kit.js';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import { AppMark } from './app-mark.js';
 import type { AgentsApi, OwnerOutcome } from './api.js';
 import type { AgentRow } from './data.js';
-import { gateMessage, OwnerGate, RETRY_IN_PLACE, usePasskey } from './owner-gate.js';
+import { gateMessage, OwnerButton } from './owner-gate.js';
 import { AGENTS_STRINGS as S } from './strings.js';
 
 /** The label rule the person sees: 1 to 32 characters, no control characters (06 §6). */
@@ -69,13 +69,31 @@ export function RenameEditor({
   /** W4-AGENTS (D-141): the new label, and whether contacts will be told. */
   onRenamed?: (label: string, told: boolean) => void;
 }): ReactElement {
-  const passkey = usePasskey(owner);
   const [text, setText] = useState(row.label);
-  const [step, setStep] = useState<'edit' | 'presence'>('edit');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  // UX1113-N2: the label is checked while typing (`labelCheck`, debounced), never between the click
+  // and the gesture, so "Rename with Touch ID" goes straight to the sensor.
+  const [refusedLabel, setRefusedLabel] = useState<string | undefined>(undefined);
   const label = text.trim();
   const unchanged = label === row.label && (cardName === undefined || cardName === label);
+  const problem = labelProblem(text);
+  useEffect(() => {
+    if (problem || unchanged) return undefined;
+    let live = true;
+    const timer = setTimeout(() => {
+      void api.labelCheck(label).then(
+        (checked) => {
+          if (live) setRefusedLabel(checked === 'refused' ? label : undefined);
+        },
+        () => undefined,
+      );
+    }, 300);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [api, label, problem, unchanged]);
 
   const send = (proof: PresenceProof): void => {
     if (busy) return;
@@ -91,35 +109,11 @@ export function RenameEditor({
       }
       if (outcome.kind === 'agent_changed') onChanged();
       setError(renameProblem(outcome, row.label));
-      if (!RETRY_IN_PLACE.has(outcome.kind) && outcome.kind !== 'agent_changed') setStep('edit');
     });
   };
 
-  if (step === 'presence') {
-    return (
-      <OwnerGate
-        summary={S.renameStatement(row.label, label)}
-        passkey={passkey}
-        busy={busy}
-        error={error}
-        onProof={send}
-        onCancel={() => setStep('edit')}
-      />
-    );
-  }
-  const submit = (event: FormEvent): void => {
-    event.preventDefault();
-    if (labelProblem(text) || unchanged || busy) return;
-    setError(undefined);
-    setBusy(true);
-    void api.labelCheck(label).then((checked) => {
-      setBusy(false);
-      if (checked === 'refused') return setError(S.labelInvalid);
-      setStep('presence');
-    });
-  };
   return (
-    <form className="ag-rename" onSubmit={submit}>
+    <form className="ag-rename" onSubmit={(event) => event.preventDefault()}>
       <p className="al-text-body-sm al-muted">{S.renameHint}</p>
       <TextField
         label={S.renameField}
@@ -128,7 +122,10 @@ export function RenameEditor({
         maxLength={LABEL_MAX}
         autoComplete="off"
         value={text}
-        onChange={(e) => setText(e.currentTarget.value)}
+        onChange={(e) => {
+          setText(e.currentTarget.value);
+          setError(undefined);
+        }}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {
             e.stopPropagation();
@@ -137,23 +134,23 @@ export function RenameEditor({
         }}
       />
       <div className="ag-actions">
-        <Button
-          type="submit"
-          variant="primary"
-          icon="approval"
-          disabled={labelProblem(text) || unchanged}
-        >
-          {S.renameTouchId}
-        </Button>
+        <OwnerButton
+          owner={owner}
+          statement={S.renameStatement(row.label, label)}
+          withSensor={S.renameWith}
+          withCode={S.renameWithCode}
+          busy={busy}
+          error={error}
+          disabled={problem || unchanged || refusedLabel === label}
+          onProof={send}
+        />
         <Button variant="ghost" onClick={onCancel}>
           {S.cancel}
         </Button>
       </div>
-      {error === undefined ? null : (
-        <p className="al-text-body-sm ag-error" role="alert">
-          {error}
-        </p>
-      )}
+      {refusedLabel === label && error === undefined ? (
+        <InlineError>{S.labelInvalid}</InlineError>
+      ) : null}
     </form>
   );
 }
@@ -191,7 +188,6 @@ function quitSentence(quit: QuitApps, label: string): string {
 
 type RemovePhase =
   | { readonly kind: 'form' }
-  | { readonly kind: 'presence'; readonly anyway: boolean }
   | { readonly kind: 'in_use' }
   | { readonly kind: 'anyway' }
   | { readonly kind: 'failed' };
@@ -214,7 +210,6 @@ export function RemoveSheet({
   /** Opens another ID, since a recovery kit is saved for the open ID (WP-11). */
   onSwitch?: (row: AgentRow) => void;
 }): ReactElement {
-  const passkey = usePasskey(owner);
   const [exporting, setExporting] = useState(false);
   const [askOpen, setAskOpen] = useState(false);
   const [phase, setPhase] = useState<RemovePhase>({ kind: 'form' });
@@ -251,14 +246,28 @@ export function RemoveSheet({
   // `in_use` after the Touch ID. The page reads the agents first and says "Quit {app} first" before
   // any gesture. This is a hint only: the server's folder lock still decides, and presence is
   // always asked before anything is signed (a failed read goes on to the Touch ID step).
-  const checkThenAsk = (): void => {
-    if (checking) return;
+  // UX1113-N2: the read happens before the one button can be pressed (once the name is typed, and
+  // on "Check again"), so "Remove with Touch ID" goes straight to the sensor.
+  // IR-UX1113-N2-1 #5: one read at a time, and none answered into a closed sheet.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+  const reading = useRef(false);
+  const checkNow = useCallback((): void => {
+    if (reading.current) return;
+    reading.current = true;
     setChecking(true);
     setError(undefined);
     void api
       .list()
       .catch(() => ({ kind: 'error' }) as const)
       .then((read) => {
+        reading.current = false;
+        if (!alive.current) return;
         setChecking(false);
         const fresh =
           read.kind === 'ok' ? read.list.agents.find((r) => r.name === row.name) : undefined;
@@ -267,8 +276,22 @@ export function RemoveSheet({
           setPhase({ kind: 'in_use' });
           return;
         }
-        setPhase({ kind: 'presence', anyway: false });
+        setPhase({ kind: 'form' });
+        setReady(true);
       });
+  }, [api, row.name]);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    // The name matches: look once for an AI app that still runs it.
+    if (!matches || ready || phase.kind !== 'form') return;
+    checkNow();
+  }, [matches, ready, phase.kind, checkNow]);
+  useEffect(() => {
+    if (!matches) setReady(false);
+  }, [matches]);
+  const checkThenAsk = (): void => {
+    setReady(false);
+    checkNow();
   };
 
   const send =
@@ -316,7 +339,7 @@ export function RemoveSheet({
         });
     };
 
-  const inProgress = busy && phase.kind === 'presence';
+  const inProgress = busy && phase.kind === 'form';
   const title = inProgress
     ? S.removingTitle(row.label)
     : finishing
@@ -333,7 +356,7 @@ export function RemoveSheet({
       className="ag-sheet"
     >
       <div className="ag-sheet-body">
-        {phase.kind === 'form' || phase.kind === 'presence' ? (
+        {phase.kind === 'form' ? (
           <>
             {finishing ? <p className="al-text-body">{S.removalReason}</p> : null}
             <p className="al-text-body">{S.removeIntro}</p>
@@ -409,15 +432,17 @@ export function RemoveSheet({
               />
             )}
             <div className="ag-actions">
-              <Button
+              <OwnerButton
+                owner={owner}
+                statement={finishing ? S.finishStatement(row.label) : S.removeStatement(row.label)}
+                withSensor={finishing ? S.finishWith : S.removeWith}
+                withCode={finishing ? S.finishWithCode : S.removeWithCode}
+                busy={busy}
+                error={error}
                 variant="danger"
-                icon="approval"
-                disabled={!matches || checking}
-                aria-describedby={matches ? undefined : `${nameId}-why`}
-                onClick={checkThenAsk}
-              >
-                {finishing ? S.finishTouchId : S.removeTouchId}
-              </Button>
+                disabled={!matches || checking || !ready}
+                onProof={send(false)}
+              />
               <Button variant="ghost" onClick={onClose}>
                 {S.cancel}
               </Button>
@@ -428,17 +453,6 @@ export function RemoveSheet({
               </p>
             )}
           </>
-        ) : null}
-
-        {phase.kind === 'presence' ? (
-          <OwnerGate
-            summary={finishing ? S.finishStatement(row.label) : S.removeStatement(row.label)}
-            passkey={passkey}
-            busy={busy}
-            error={error}
-            onProof={send(phase.anyway)}
-            onCancel={() => setPhase({ kind: 'form' })}
-          />
         ) : null}
 
         {phase.kind === 'in_use' ? (
@@ -472,15 +486,16 @@ export function RemoveSheet({
               <strong>{S.removeAnywayQ}</strong>
             </p>
             <div className="ag-actions">
-              <Button
+              <OwnerButton
+                owner={owner}
+                statement={S.removeStatement(row.label)}
+                withSensor={S.removeAnywayWith}
+                withCode={S.removeAnywayWithCode}
+                busy={busy}
+                error={error}
                 variant="danger"
-                onClick={() => {
-                  setError(undefined);
-                  setPhase({ kind: 'presence', anyway: true });
-                }}
-              >
-                {S.removeAnyway}
-              </Button>
+                onProof={send(true)}
+              />
               <Button
                 variant="secondary"
                 onClick={() => {

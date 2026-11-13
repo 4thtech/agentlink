@@ -1,6 +1,6 @@
 # Backup & restore
 
-*Applies to AgentLink 0.5.1. One recovery kit for all your IDs, the save checklist, Check that my kit opens and restoring in the app are new in 0.5.0. In 0.4.14 a kit was saved per ID and restore was not in the app yet.*
+*Applies to AgentLink 0.5.3. One recovery kit for all your IDs, the save checklist, Check that my kit opens and restoring in the app are new in 0.5.0. In 0.4.14 a kit was saved per ID and restore was not in the app yet.*
 
 A recovery kit is everything you need to get AgentLink back on any computer: **one locked file with all your IDs**, opened by a **recovery code** of 24 characters that is shown once. Open **Settings** › **Backup & restore** (in the **Safety** group); **Back up** under **More** on an ID's card in [My IDs](ids.md) leads here too.
 
@@ -50,7 +50,7 @@ On a new computer, install AgentLink and choose **I have a recovery kit** on the
 
 1. **Your kit file.** AgentLink looks for kits in Downloads, Desktop and your home folder (their names start with *agentlink-recovery-kit*), or you drop one in or **Choose a file…**. The file is opened on this computer only; nothing is uploaded, and your AI is not part of this.
 2. **Your recovery code.** Type the 24 characters in six groups of four (capital or small letters both work, and you can paste the whole code). This is the kit's recovery code, not your master code.
-3. **What comes back.** A list of the IDs in the kit, each with its people and how recent its messages are. Nothing has changed on this computer yet. IDs that are already here are never overwritten (*Already here*); an ID you removed can't come back. Press **Restore 1 ID** (or **Restore {n} IDs**).
+3. **What comes back.** A list of the IDs in the kit, each by the name you gave it, with its people and how recent its messages are (a kit saved by an older version shows each ID by its folder until it is restored; an older version given a newer kit says it was made by a newer version). Nothing has changed on this computer yet. IDs that are already here are never overwritten (*Already here*); an ID you removed can't come back. Press **Restore 1 ID** (or **Restore {n} IDs**).
 4. **Protect and reconnect.** On a new computer you turn on Touch ID and get a new master code, shown once with **Copy** and **Print**; tick **I saved it**. Then **Reconnect your AI apps** with one click each, and **Go to Home**.
 
 <figure><img src="../../assets/screens/restore-1-kit.webp" alt="Restore step 1 of 4, Your kit file: Choose your kit file. Found on this computer: agentlink-recovery-kit-2026-11-12.alkk in Downloads, saved 12 Nov 2026, 373 KB, selected. Or drop a kit file here, Choose a file. The file is opened on this computer only. Continue, and I don't have my kit file."><figcaption><p>Step 1: the kit file, found in Downloads.</p></figcaption></figure>

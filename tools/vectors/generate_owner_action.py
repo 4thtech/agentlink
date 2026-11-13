@@ -78,6 +78,11 @@ escaped name that equals another name after unescaping) or repeats a member name
 parsing to exactly the validly signed object, so only the text rule refuses it; and accepted texts
 with escapes inside string values and in JCS form.
 
+`history` (D-148, RET-6/7; 06 §3, 04 §4.2; proposed, owner confirms at merge), version 9: the 06 §3
+defaults carry `history: {messagesKeepDays: 0, filesKeepDays: 0}` (keep forever), so every
+`policy.set` vector built from them has this seventh top-level key. A first edit of rules never
+signed signs these defaults; only a new ID's first rules or Settings › Storage set other values.
+
 Usage: python3 -I tools/vectors/generate_owner_action.py --check [FILE] | --write
 """
 
@@ -95,7 +100,7 @@ import generate_safety_code as safety  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "owner-action"
-VERSION = 8
+VERSION = 9
 TAG = "agentlink/owner-action/v1"
 ENVELOPE_TAG = "agentlink/envelope/v1"
 SPEC = "04 §2.5.1"
@@ -279,6 +284,8 @@ def build():
         # D-109 (M1-33a, owner-action version 6): delivery receipts are off by default.
         "receipts": {"autoDelivered": False, "autoOpened": False},
         "commitments": {"accept": "approval", "autoAcceptContacts": [], "autoAcceptMaxUSD": "0", "autoAcceptDirection": "buy", "autoAcceptMinUSD": None},
+        # D-148 (RET-6/7, owner-action version 9): local history is kept forever by default.
+        "history": {"messagesKeepDays": 0, "filesKeepDays": 0},
         "contactRules": [],
     }
 

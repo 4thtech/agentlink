@@ -25,6 +25,7 @@
 // - M1-11b-8: once per start, while that setup may be wired and on a machine with a display, the
 //   start opens the first-run page through the OS opener (first-run-on-start.ts); the tools answer
 //   as before and never see the link.
+import { homedir } from 'node:os';
 import { dirname } from 'node:path';
 import process from 'node:process';
 import type { Readable, Writable } from 'node:stream';
@@ -42,6 +43,9 @@ import {
   type OpenAgentResult,
   type OpenedAgent,
 } from '../runtime/index.js';
+import { notifyPrefsInForce } from '@4thtech-io/types/ui-contract/notifications';
+import { readUiSettingsFile } from '../runtime/agent-dir.js';
+import { osApprovalAlertsOn } from '../runtime/desktop-alerts-record.js';
 import { cliVersion } from '../runtime/cli-version.js';
 import { cliPrefix } from '../runtime/cli-prefix.js';
 import { ownerKnownAbsent } from '../runtime/owner-on-machine.js';
@@ -117,7 +121,16 @@ export function agentToolContext(
     urlOrigins: Object.freeze([]),
     ...(approvalUi === undefined
       ? {}
-      : { approvalLink: (approvalId: string) => approvalUi.link(approvalId) }),
+      : {
+          approvalLink: (approvalId: string) => approvalUi.link(approvalId),
+          // ATT-ALLOW-LINK: the no-folder result's link to Settings > Files (Send folder filled in).
+          allowFolderLink: () => approvalUi.allowFolderLink(),
+          // RET-7: an agentlink_tidy proposal's link to Settings > Storage (its filter only).
+          tidyLink: (page: string) =>
+            approvalUi.tidyLink === undefined
+              ? Promise.resolve(undefined)
+              : approvalUi.tidyLink(page),
+        }),
     // M1-36a-b: the no-owner text names the command that works here, and `owner init` on a
     // machine known to have no owner (folder names and file presence only; never a key).
     cliPrefix: cliPrefix(),
@@ -293,6 +306,15 @@ export const mcpCommand = (version: string): CommandHandler => {
           return startApprovalServer({
             source,
             localUi,
+            // IR-NOTIFY-1 M-1 (N6): Settings › Notifications › Approvals waiting, read on each alert.
+            // N7: never for the ID the running desktop app alerts for (it shows its own notification).
+            approvalAlerts: () =>
+              osApprovalAlertsOn(
+                homedir(),
+                agent.name,
+                async () =>
+                  notifyPrefsInForce((await readUiSettingsFile(homedir()))?.notify).approvals,
+              ),
             // Fixed values only (ApprovalServerEvent, I-7).
             onEvent: (event) => {
               logger.debug('approval ui event', { ...event });

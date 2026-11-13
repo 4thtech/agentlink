@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -33,11 +34,11 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
   const build = job(release, 'desktop-app-build');
   const attach = job(release, 'desktop-app-release');
 
-  it('builds through desktop.yml for the published CLI version, unsigned, with updates off', () => {
+  it('builds through desktop.yml for the published CLI version, unsigned, with updates on (UPD-2)', () => {
     expect(build).not.toBe('');
     expect(build).toMatch(/uses: \.\/\.github\/workflows\/desktop\.yml\n/);
     expect(build).toMatch(/version: \$\{\{ needs\.desktop-extension-build\.outputs\.version \}\}/);
-    expect(build).toMatch(/updates: "off"/);
+    expect(build).toMatch(/updates: "on"/);
     expect(build).not.toMatch(/secrets|environment:|DESKTOP_SIGNING|OWNER_LOCAL/);
     expect(permissions(build).sort()).toEqual([
       'attestations: write',
@@ -74,7 +75,10 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
 
   // D15-03: a missing release or a missing asset is a red job, never a warning on a green run.
   it('fails when Release v<version> does not exist, and checks what got attached', () => {
-    const step = attach.slice(attach.indexOf('Attach the app to the GitHub Release'));
+    const step = attach.slice(
+      attach.indexOf('Attach the app to the GitHub Release'),
+      attach.indexOf('Check the attached files and their public links'),
+    );
     expect(step).not.toBe('');
     expect(step).not.toMatch(/::warning::/);
     expect(step).toMatch(/gh release view "v\$VERSION"[^\n]*\|\|[^\n]*\n?[^\n]*::error::/);
@@ -86,23 +90,124 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
     }
   });
 
-  // REL051-CIE (scope change, 0.5.1): the Windows desktop app is not shipped yet. The release
-  // attaches exactly the two Mac DMGs and their sums: no Windows installer, no zip, no glob.
-  it('attaches only the two Mac DMGs and SHA256SUMS-desktop-app.txt', () => {
-    const step = attach.slice(attach.indexOf('Attach the app to the GitHub Release'));
-    expect(step).toContain(
-      'files=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" )',
+  // UPD-3: the release attaches the two Mac DMGs, the two Mac zips (the in-app update installs the
+  // zip) and their sums. WIN-DESK-1d (owner, 0.5.3): plus the Windows setup.exe (unsigned early
+  // build), versioned and under a stable name. No Windows zip, no glob.
+  it('attaches the Mac DMGs and zips, the Windows setup.exe and SHA256SUMS-desktop-app.txt', () => {
+    const step = attach.slice(
+      attach.indexOf('Attach the app to the GitHub Release'),
+      attach.indexOf('Check the attached files and their public links'),
     );
-    expect(attach).not.toMatch(/setup\.exe|win-x64|\*\.zip|\*\.dmg/);
+    expect(step).toContain(
+      'files=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" "AgentLink-$VERSION-mac-arm64.zip" "AgentLink-$VERSION-mac-x64.zip" "AgentLink-$VERSION-win-x64-setup.exe" "AgentLink-mac-arm64.dmg" "AgentLink-mac-x64.dmg" "AgentLink-win-x64-setup.exe" )',
+    );
+    expect(attach).not.toMatch(/win-x64\.zip|\*\.zip|\*\.dmg|\*\.exe/);
     expect(build).not.toMatch(/windows/);
+  });
+
+  // WIN-DESK-1d: the setup.exe is in the build's sums, gets a stable-named copy in the release sums,
+  // is checked over its public link before the Latest flip and over the latest link after it.
+  it('treats the Windows setup.exe like the Mac DMGs: sums, stable copy, link checks', () => {
+    const names = attach.slice(attach.indexOf('Check the names and the sums'));
+    expect(names).toContain('"AgentLink-$VERSION-win-x64-setup.exe"');
+    expect(attach).toContain(
+      'cp -- "AgentLink-$VERSION-win-x64-setup.exe" "AgentLink-win-x64-setup.exe"',
+    );
+    expect(attach).toMatch(/"AgentLink-win-x64-setup\.exe" >> SHA256SUMS-desktop-app\.txt/);
+    const before = attach.slice(
+      attach.indexOf('Check the attached files and their public links'),
+      attach.indexOf('Mark the Release Latest'),
+    );
+    expect(before).toContain('--pattern "AgentLink-$VERSION-win-x64-setup.exe"');
+    expect(before).toContain('--pattern AgentLink-win-x64-setup.exe');
+    expect(before).toMatch(/wc -l < SHA256SUMS-desktop-app\.txt\)" -eq 8/);
+    expect(before).toContain(
+      'for file in AgentLink-mac-arm64.dmg AgentLink-mac-x64.dmg AgentLink-win-x64-setup.exe',
+    );
+    expect(before).toContain('releases/download/v$VERSION/$file');
+    const after = attach.slice(attach.indexOf('Check the public download links'));
+    expect(after).toContain(
+      'for file in AgentLink-mac-arm64.dmg AgentLink-mac-x64.dmg AgentLink-win-x64-setup.exe',
+    );
+    expect(after).toContain('releases/latest/download/$file');
   });
 
   // D15-10: a re-run never silently replaces a published installer with other bytes.
   it('never clobbers; an existing asset must have the same hash; every uploaded file is in the sums', () => {
-    const step = attach.slice(attach.indexOf('Attach the app to the GitHub Release'));
+    const step = attach.slice(
+      attach.indexOf('Attach the app to the GitHub Release'),
+      attach.indexOf('Check the attached files and their public links'),
+    );
     expect(step).not.toMatch(/--clobber/);
     expect(step).toMatch(/gh release download "v\$VERSION"/);
     expect(step).toMatch(/is not listed in SHA256SUMS-desktop-app\.txt/);
+  });
+
+  // REL-LINKS-1: stable names, Latest flipped last, public links checked; REL-HOLD-1: RELEASE_HOLD.
+  it('uploads stable-named copies and lists them in the sums', () => {
+    expect(attach).toContain('cp -- "AgentLink-$VERSION-mac-$arch.dmg" "AgentLink-mac-$arch.dmg"');
+    expect(attach).toMatch(/AgentLink-mac-\$arch\.dmg" >> SHA256SUMS-desktop-app\.txt/);
+  });
+
+  it('creates the Release not-Latest and marks it Latest only as the last Release change', () => {
+    const create = release.slice(release.indexOf('gh release create "v$VERSION"'));
+    expect(create.split('\n')[0]).toContain('--latest=false');
+    const flip = attach.indexOf('gh release edit "v$VERSION"');
+    expect(flip).toBeGreaterThan(attach.indexOf('gh release upload'));
+    expect(attach.slice(flip)).not.toMatch(/gh release (upload|create|delete)/);
+    expect(attach.match(/gh release edit/g)).toHaveLength(1);
+    expect(attach).toMatch(/gh release edit "v\$VERSION" [^\n]*--latest\n/);
+    // never for a prerelease or a draft
+    expect(attach).toMatch(/--json isPrerelease,isDraft/);
+    // the hashes and the public links of this release are checked before the flip
+    const checkAt = attach.indexOf('Check the attached files and their public links');
+    expect(checkAt).toBeGreaterThan(attach.indexOf('gh release upload'));
+    expect(checkAt).toBeLessThan(attach.indexOf('Mark the Release Latest'));
+    expect(attach.slice(checkAt, flip)).toMatch(
+      /sha256sum --check --strict SHA256SUMS-desktop-app\.txt/,
+    );
+  });
+
+  it('checks the versioned release links before the flip and the latest links after it', () => {
+    const before = attach.slice(
+      attach.indexOf('Check the attached files and their public links'),
+      attach.indexOf('Mark the Release Latest'),
+    );
+    expect(before).toContain('releases/download/v$VERSION/$file');
+    expect(before).toMatch(/"\$code" = "200"/);
+    expect(before).toMatch(/-gt 20000000/);
+    const after = attach.slice(attach.indexOf('Check the public download links'));
+    expect(after).toContain('releases/latest/download/$file');
+    expect(after).toMatch(/if: steps\.latest\.outputs\.flipped == 'true'/);
+    expect(after).toMatch(/"\$code" = "200"/);
+  });
+
+  // The pipeline of the "Mark the Release Latest" step, run on a sample `gh release list` output.
+  it('flips Latest only for the highest stable v* release', () => {
+    const step = attach.slice(attach.indexOf('Mark the Release Latest'));
+    expect(step).toMatch(/gh release list [^\n]*--json tagName,isPrerelease,isDraft/);
+    expect(step).toMatch(/select\(\.isPrerelease == false and \.isDraft == false\)/);
+    expect(step).toMatch(/sort -V \| tail -n 1/);
+    expect(step).toMatch(/\$highest" != "v\$VERSION"[\s\S]*flipped=false[\s\S]*exit 0/);
+    const highest = (tags) =>
+      execFileSync('bash', ['-c', "grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$' | sort -V | tail -n 1"], {
+        input: tags.join('\n'),
+        encoding: 'utf8',
+      }).trim();
+    expect(highest(['v0.5.2', 'v0.5.10', 'v0.5.9', 'v0.5.11-next.1', 'desktop-beta'])).toBe(
+      'v0.5.10',
+    );
+    expect(highest(['v0.9.0', 'v0.10.0', 'v0.5.2'])).toBe('v0.10.0');
+  });
+
+  it('RELEASE_HOLD: the Version PR still updates, but auto-merge and pack are off', () => {
+    const version = job(release, 'version');
+    expect(version).toMatch(/Turn on auto-merge[^\n]*\n\s+if:[^\n]*vars\.RELEASE_HOLD != 'true'/);
+    expect(version).toContain('changesets/action/version');
+    expect(version).not.toMatch(
+      /uses: changesets[^\n]*\n(?:[^\n]*\n){0,3}\s+if:[^\n]*RELEASE_HOLD/,
+    );
+    expect(job(release, 'pack')).toMatch(/\n {4}if: [^\n]*vars\.RELEASE_HOLD != 'true'/);
   });
 
   it('pins every action to a full commit SHA', () => {
@@ -116,15 +221,16 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
 });
 
 describe('desktop.yml release inputs (WP-D11)', () => {
-  // REL051-CIE: the win-x64 leg runs only on a manual run with `windows: true` (boolean, default
-  // false); pull requests and workflow_call (the release) build the two Mac targets only.
-  it('builds Windows only on a manual run with windows: true', () => {
+  // WIN-DESK-1d (owner, 0.5.3): the win-x64 leg (one job) runs on pull requests and in the release
+  // again; a manual run can leave it out with `windows: false` (boolean, default true). An unset input
+  // (pull_request, workflow_call) never counts as false.
+  it('builds Windows on pull requests and in the release; a manual run may leave it out', () => {
     const dispatch = desktop.slice(
       desktop.indexOf('  workflow_dispatch:'),
       desktop.indexOf('  pull_request:'),
     );
     expect(dispatch).toMatch(
-      /windows:\n {8}description:[^\n]*\n {8}type: boolean\n {8}required: false\n {8}default: false/,
+      /windows:\n {8}description:[^\n]*\n {8}type: boolean\n {8}required: false\n {8}default: true/,
     );
     const call = desktop.slice(
       desktop.indexOf('  workflow_call:'),
@@ -132,13 +238,14 @@ describe('desktop.yml release inputs (WP-D11)', () => {
     );
     expect(call).not.toMatch(/windows/);
     const include = desktop.match(
-      /\n {8}include: \$\{\{ fromJSON\(inputs\.windows == true && '(\[.*?\])' \|\| '(\[.*?\])'\) \}\}\n/,
+      /\n {8}include: \$\{\{ fromJSON\(github\.event_name == 'workflow_dispatch' && inputs\.windows == false && '(\[.*?\])' \|\| '(\[.*?\])'\) \}\}\n/,
     );
     expect(include).not.toBeNull();
-    const withWindows = JSON.parse(include[1]);
-    const macOnly = JSON.parse(include[2]);
+    const macOnly = JSON.parse(include[1]);
+    const withWindows = JSON.parse(include[2]);
     expect(macOnly.map((t) => t.target)).toEqual(['mac-arm64', 'mac-x64']);
     expect(withWindows.map((t) => t.target)).toEqual(['mac-arm64', 'mac-x64', 'win-x64']);
+    expect(withWindows.filter((t) => t.os.startsWith('windows'))).toHaveLength(1);
     expect(macOnly.every((t) => t.os === 'macos-26')).toBe(true);
   });
 

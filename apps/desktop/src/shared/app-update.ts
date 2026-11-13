@@ -8,7 +8,8 @@
 //   development build says `0.0.0-dev`); such a build is never offered anything.
 // - Links: built here from a checked version and a fixed architecture word, never taken from the
 //   network. The Mac file names are the ones the release attaches (release.yml, build-mac.mjs):
-//   AgentLink-<version>-mac-<arm64|x64>.dmg. Other platforms get the release page.
+//   AgentLink-<version>-mac-<arm64|x64>.dmg; Windows (WIN-DESK-2) AgentLink-<version>-win-x64-setup.exe.
+//   Other platforms get the release page.
 
 /** What the Settings page can show (fixed words; the copy lives in the page). */
 export const APP_UPDATE_STATES = [
@@ -19,8 +20,21 @@ export const APP_UPDATE_STATES = [
   'available',
   'failed',
   'offline',
+  // UPD-5: the in-app update on a Mac (updater/in-app.ts). "install_failed" is "Couldn't update
+  // here": the download link stays.
+  'downloading',
+  'verifying',
+  'ready',
+  'restarting',
+  'install_failed',
 ] as const;
 export type AppUpdateState = (typeof APP_UPDATE_STATES)[number];
+
+/** UPD-5: the states of a running in-app update (always installable). */
+export const IN_APP_STATES = ['downloading', 'verifying', 'ready', 'restarting'] as const;
+
+/** The states that carry a newer version and its download link. */
+const WITH_RELEASE: readonly string[] = ['available', 'install_failed', ...IN_APP_STATES];
 
 /** What the shell tells the core (and the core the page). `latest`/`download` only when available. */
 export interface AppUpdateView {
@@ -87,6 +101,19 @@ export function macDownloadUrl(version: string, arch: MacArch): string {
   return `${RELEASES}/download/v${checked(version)}/${macAssetName(version, arch)}`;
 }
 
+/**
+ * WIN-DESK-2: the Windows setup the release attaches (release.yml, build-win.mjs). x64 only: Windows
+ * on Arm runs the x64 app emulated. No in-app update on Windows in this release: the link only.
+ */
+export function winAssetName(version: string): string {
+  return `AgentLink-${checked(version)}-win-x64-setup.exe`;
+}
+
+/** The exact release file for Windows. */
+export function winDownloadUrl(version: string): string {
+  return `${RELEASES}/download/v${checked(version)}/${winAssetName(version)}`;
+}
+
 /** The release page (other platforms). */
 export function releasePageUrl(version: string): string {
   return `${RELEASES}/tag/v${checked(version)}`;
@@ -98,11 +125,45 @@ export function isDownloadUrlFor(url: unknown, version: string): boolean {
   return (
     url === macDownloadUrl(version, 'arm64') ||
     url === macDownloadUrl(version, 'x64') ||
+    url === winDownloadUrl(version) ||
     url === releasePageUrl(version)
   );
 }
 
-/** True when the three fields fit together: a version and a link only when available. */
+/**
+ * UPD-5: what the shell sends the core (the pipe's `app-update`): the view plus whether "Update now"
+ * can run here and the download's whole percentage. No free text: fixed words, versions, the link the
+ * shell built, a flag and a number.
+ */
+export interface AppUpdatePipeView extends AppUpdateView {
+  readonly installable: boolean;
+  readonly percent: number;
+}
+
+/**
+ * UPD-5: the six fields fit together. `installable` is true in the running states and false in
+ * "install_failed" and every state without a release; `percent` is a whole 0..100 while downloading
+ * and 0 otherwise.
+ */
+export function isAppUpdatePipeView(value: {
+  readonly state: unknown;
+  readonly current: unknown;
+  readonly latest: unknown;
+  readonly download: unknown;
+  readonly installable: unknown;
+  readonly percent: unknown;
+}): value is AppUpdatePipeView {
+  const { state, installable, percent } = value;
+  if (!isAppUpdateView(value)) return false;
+  if (typeof installable !== 'boolean') return false;
+  if (typeof percent !== 'number' || !Number.isSafeInteger(percent)) return false;
+  if (percent < 0 || percent > 100 || (state !== 'downloading' && percent !== 0)) return false;
+  if ((IN_APP_STATES as readonly unknown[]).includes(state)) return installable;
+  if (state === 'available') return true;
+  return !installable;
+}
+
+/** True when the fields fit together: a version and a link only with a release. */
 export function isAppUpdateView(value: {
   readonly state: unknown;
   readonly current: unknown;
@@ -114,7 +175,7 @@ export function isAppUpdateView(value: {
     return false;
   }
   if (!isAppVersion(current)) return false;
-  if (state === 'available') {
+  if (WITH_RELEASE.includes(state)) {
     return (
       typeof latest === 'string' &&
       isNewerVersion(latest, current) &&

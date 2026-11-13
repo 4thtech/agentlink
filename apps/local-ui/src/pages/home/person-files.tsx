@@ -50,9 +50,12 @@ export type Reveal = (id: string) => Promise<RevealOutcome>;
 export function ShowIn({
   id,
   reveal,
+  name,
 }: {
   readonly id: string;
   readonly reveal: Reveal;
+  /** UX-LEFT-1 (R2-UI-12): the file's name, so each button has its own accessible name. */
+  readonly name?: string;
 }): ReactElement {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | undefined>(undefined);
@@ -78,7 +81,15 @@ export function ShowIn({
   };
   return (
     <span className="hm-file-actions hm-f">
-      <Button size="sm" icon="folder" disabled={busy} onClick={() => void click()}>
+      <Button
+        size="sm"
+        icon="folder"
+        disabled={busy}
+        {...(name === undefined || name === ''
+          ? {}
+          : { 'aria-label': `${showInLabel()}, ${name}` })}
+        onClick={() => void click()}
+      >
         {showInLabel()}
       </Button>
       <span role="status" className="hm-file-problem al-text-body-sm">

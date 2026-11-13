@@ -498,6 +498,89 @@ describe('sendMessage: store before publish (07 §3.2 "Transaction", "On failure
   });
 });
 
+describe('OUTBOX-NOW-1: retryNow sends rows in backoff at once (relays back)', () => {
+  it('republishes the same stored wraps at once, without waiting for the backoff', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    a.spy.mode = 'none';
+    await a.client.sendMessage({ to: b.id, text: 'one' });
+    await a.client.sendMessage({ to: b.id, text: 'two' });
+    const firstIds = [...a.spy.ids].sort();
+    expect(firstIds).toHaveLength(8);
+    a.spy.mode = 'ack';
+    expect((await a.client.outbox.processDue()).sent).toBe(0); // still backing off
+    const summary = await a.client.outbox.retryNow();
+    expect(summary.sent).toBe(8);
+    expect([...a.spy.ids.slice(8)].sort()).toEqual(firstIds); // same wraps: no duplicate message
+    const stored = await rows(a.store);
+    expect(stored.out.every((r) => r.delivery === 'sent')).toBe(true);
+    expect(stored.outbox.every((r) => r.state === 'sent')).toBe(true);
+    // Nothing is left to send: a second call publishes nothing.
+    expect((await a.client.outbox.retryNow()).sent).toBe(0);
+    expect(a.spy.published).toHaveLength(16);
+  });
+
+  it('keeps the attempt count, so the next backoff step still grows', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    a.spy.mode = 'none';
+    await a.client.sendMessage({ to: b.id, text: 'hello' });
+    expect((await rows(a.store)).outbox.map((r) => r.attempts)).toEqual([1, 1, 1, 1]);
+    const summary = await a.client.outbox.retryNow();
+    expect(summary.retrying).toBe(4);
+    const outbox = (await rows(a.store)).outbox;
+    expect(outbox.map((r) => r.attempts)).toEqual([2, 2, 2, 2]);
+    // The second step is 60 s (plus up to 25 % jitter), from now.
+    for (const r of outbox) expect(r.next_attempt_at).toBeGreaterThanOrEqual(clock.t + 60);
+  });
+
+  it('never sends a row past its give-up time: it ends not delivered', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    a.spy.mode = 'none';
+    await a.client.sendMessage({ to: b.id, text: 'hello' });
+    const giveUp = Math.max(...(await rows(a.store)).outbox.map((r) => r.give_up_at));
+    clock.t = giveUp;
+    a.spy.mode = 'ack';
+    const summary = await a.client.outbox.retryNow();
+    expect(summary.sent).toBe(0);
+    expect(summary.notDelivered).toBe(4);
+    expect(a.spy.published).toHaveLength(4);
+  });
+
+  it('does not take a row that a pass of this client is publishing now', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    a.spy.mode = 'none';
+    await a.client.sendMessage({ to: b.id, text: 'hello' });
+    clock.t += 40; // due again
+    a.spy.mode = 'hang';
+    void a.client.outbox.processDue().catch(() => undefined);
+    await until(() => a.spy.published.length === 8);
+    a.spy.mode = 'ack';
+    expect((await a.client.outbox.retryNow()).sent).toBe(0);
+    expect(a.spy.published).toHaveLength(8);
+  });
+
+  it('publishes nothing while the agent is paused, and keeps every deadline', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    a.spy.mode = 'none';
+    await a.client.sendMessage({ to: b.id, text: 'hello' });
+    const before = (await rows(a.store)).outbox.map((r) => r.next_attempt_at);
+    expect(await a.client.pause.pause()).toBe('paused');
+    a.spy.mode = 'ack';
+    expect((await a.client.outbox.retryNow()).sent).toBe(0);
+    expect(a.spy.published).toHaveLength(4);
+    expect((await rows(a.store)).outbox.map((r) => r.next_attempt_at)).toEqual(before);
+  });
+});
+
 describe('outbox: notices for rows that cannot reach 2 relays (07 §4.2, §4.3; M1-5b-c)', () => {
   it('passes the transport notices through to the caller with a fixed reason', async () => {
     const a = await openAgent(1, ownerA, 'alice', RELAYS_A);

@@ -33,11 +33,13 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { spawn as nodeSpawn, spawnSync } from 'node:child_process';
+import { execFile, spawn as nodeSpawn, spawnSync } from 'node:child_process';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BUNDLE_HASHES_FILE, bundleFilePaths, verifyBundle } from './bundle-check.js';
 import { CoreLog, logDir } from './core-log.js';
+import { checkDataFolderAcl, dataFolderFor, type AclScratch, type AclVerdict } from './data-acl.js';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { CoreSupervisor, aiAppMarkerSet, type SpawnFn, type Timers } from './core-process.js';
 import { INVITE_RESULT_TITLE, inviteResultCopy, toInviteLink } from './deep-link.js';
 import type { App, ElectronModule } from './electron-api.js';
@@ -66,16 +68,34 @@ import {
 } from './switches.js';
 import type { StatusAction } from './status-page.js';
 import { AppTray, trayImage } from './tray.js';
+import { APP_USER_MODEL_ID, NativeNotifier } from './notify.js';
+import { writeHealthIfPending, writeStarting } from './updater/health.js';
+import { InAppUpdater, inAppEnabled } from './updater/in-app.js';
+import { checkForUpdate } from './updater/index.js';
+import {
+  UPDATES_DIR,
+  installFromProcess,
+  restartForUpdate,
+  sweepStaging,
+} from './updater/install.js';
+import { procTranslated, updateChannel, updaterArch } from './updater/host.js';
 import { ReleaseChecker, updateChecksAllowed } from './updater/release-check.js';
 import { scheduleUpdateChecks } from './updater/schedule.js';
 import { MainWindow } from './window.js';
-import type { AppUpdateView } from '../shared/app-update.js';
+import { macArch, type AppUpdatePipeView, type AppUpdateView } from '../shared/app-update.js';
 import type { InviteOutcome } from '../shared/protocol.js';
 
 declare const __AGENTLINK_DESKTOP_PREVIEW__: boolean | undefined;
 
 /** Exit code for a refused launch (any non-zero code; fixed so tests and CI can assert it). */
 export const LAUNCH_REFUSED_EXIT = 64;
+
+/**
+ * WIN-DESK-1: exit code when Electron cannot resolve the app's data folder (on Windows: the
+ * profile's Roaming folder is missing or broken). Without it the single-instance lock fails, and
+ * the start must not be reported as "another AgentLink is running".
+ */
+export const PROFILE_UNAVAILABLE_EXIT = 66;
 
 /** The preview settings of a development build (owner-feedback loop). */
 export interface PreviewSettings {
@@ -116,18 +136,26 @@ export interface ResourcePaths {
  * The fixed layout under `process.resourcesPath` (macOS `AgentLink.app/Contents/Resources`, Windows
  * `…\AgentLink\resources`), from src/shared/resource-layout.json, which WP-D4's packaging reads too.
  */
-export function resourcePaths(resourcesPath: string, platform: string): ResourcePaths {
+export function resourcePaths(
+  resourcesPath: string,
+  platform: string,
+  options: { readonly darkTaskbar?: boolean | undefined } = {},
+): ResourcePaths {
   const node = join(
     resourcesPath,
     ...(platform === 'win32' ? RESOURCE_LAYOUT.node.win32 : RESOURCE_LAYOUT.node.posix),
   );
+  // WIN-DESK-2: Windows has one tray icon per taskbar colour (build-win.mjs, build/lib/ico.mjs); the
+  // dark taskbar (the Windows 10 default) when the colour is unknown.
+  const winTray =
+    options.darkTaskbar === false ? 'tray-light-taskbar.ico' : 'tray-dark-taskbar.ico';
   return {
     node,
     hostScript: join(resourcesPath, ...RESOURCE_LAYOUT.hostScript),
     trayIcon: join(
       resourcesPath,
       ...RESOURCE_LAYOUT.assetsDir,
-      platform === 'darwin' ? 'trayTemplate.png' : platform === 'win32' ? 'tray.ico' : 'tray.png',
+      platform === 'darwin' ? 'trayTemplate.png' : platform === 'win32' ? winTray : 'tray.png',
     ),
   };
 }
@@ -155,6 +183,14 @@ export interface ShellProcess {
   readonly toInviteLink?: (deepLink: string) => string | null;
   /** The per-user folder for core.log (core-log.ts logDir). */
   readonly logDir: string;
+  /**
+   * UPD-4: the in-app update's two signals for its watchdog (updater/health.ts): this shell started,
+   * and its core is ready. Packaged release builds only. Absent: none.
+   */
+  readonly updateHealth?: (app: App) => {
+    readonly starting: () => void;
+    readonly ready: () => void;
+  };
   /** WP-D10: starts the phase-1 update checks (packaged release builds only). Absent: none. */
   readonly startUpdates?: (electron: ElectronModule) => void;
   /**
@@ -165,13 +201,31 @@ export interface ShellProcess {
     electron: ElectronModule,
     onChange: (view: AppUpdateView) => void,
   ) => ReleaseChecker;
+  /**
+   * UPD-5: "Update now" / "Restart now" (updater/in-app.ts), told about every change. Absent: no
+   * in-app update (the page keeps the download link).
+   */
+  readonly inAppUpdater?: (electron: ElectronModule, onChange: () => void) => InAppUpdaterPort;
   /** D15-01: this build's identity and the running-copy record (instance.ts). Absent: legacy lock. */
   readonly instance?: (app: App) => InstanceOps;
   /** D15-07: the startup tripwire for the bundled files (bundle-check.ts). Absent: not checked. */
   readonly verifyBundle?: () => Promise<'ok' | 'changed' | 'unchecked'>;
+  /**
+   * OD-M (WIN-DESK-2, data-acl.ts): whether the data folder's ACL lets other people on this
+   * computer open it (Windows; 'ok' elsewhere). Absent: not checked.
+   */
+  readonly checkDataFolder?: () => Promise<AclVerdict>;
 }
 
-export type ShellOutcome = 'refused' | 'second-instance' | 'location' | 'running';
+/** UPD-5: what the shell uses of updater/in-app.ts InAppUpdater. */
+export interface InAppUpdaterPort {
+  view(base: AppUpdateView): AppUpdatePipeView;
+  check(): Promise<void>;
+  install(): boolean;
+  restart(): boolean;
+}
+
+export type ShellOutcome = 'refused' | 'profile' | 'second-instance' | 'location' | 'running';
 
 /** Starts the shell. Resolves once started (or refused); the app then runs on events. */
 export async function runShell(
@@ -204,8 +258,40 @@ export async function runShell(
   // start that "does nothing" can be told apart afterwards: another copy running, or the folder.
   const coreLog = new CoreLog({ dir: proc.logDir });
 
+  // WIN-DESK-1: the lock lives in the data folder. When Electron cannot resolve it, getPath
+  // throws and the lock would fail for that reason alone: say so (fixed line), never "another
+  // AgentLink is running". Nothing from the error is kept. WIN-DESK-2: this is the first thing that
+  // asks for an app path (the update watchdog below asks for it too), so it runs before them.
+  // When the profile is so broken that Electron exits during its own native start (no shell code
+  // runs at all; the Windows smoke shows this for a profile without AppData\Roaming), this line
+  // cannot be written: the start ends with Electron's own exit code and no log line.
+  let profileOk = true;
+  try {
+    if (app.getPath !== undefined) app.getPath('userData');
+  } catch {
+    profileOk = false;
+  }
+  if (!profileOk) {
+    coreLog.note('app quit at start: the AgentLink data folder is not available');
+    app.exit(PROFILE_UNAVAILABLE_EXIT);
+    return 'profile';
+  }
+
+  // UPD-4 (IR-UPD-4-1 #2): the update watchdog's start signal comes first, before the lock, whenReady
+  // and any dialog, so a new copy that hangs later can still be found and stopped.
+  const updateHealth = app.isPackaged && preview === null ? proc.updateHealth?.(app) : undefined;
+  updateHealth?.starting();
+
   // 2. Sandbox for every renderer; one instance.
   app.enableSandbox();
+  // N7 (R-WIN): Windows attributes toasts to this ID (the installer's Start menu shortcut).
+  if (proc.platform === 'win32') {
+    try {
+      app.setAppUserModelId?.(APP_USER_MODEL_ID);
+    } catch {
+      // Without it Windows shows no toast; nothing else depends on it.
+    }
+  }
   let instance: InstanceOps | null = null;
   try {
     instance = proc.instance?.(app) ?? null;
@@ -247,18 +333,28 @@ export async function runShell(
   let supervisor: CoreSupervisor | null = null;
   let window: MainWindow | null = null;
   let tray: AppTray | null = null;
+  let notifier: NativeNotifier | null = null;
   let pendingInvite: string | null = null;
   const toInviteLink = proc.toInviteLink ?? ((): null => null);
   // DESK051-UPD: the update state goes to the core (Settings > Updates) after every `ready` and on
   // every change; the core can only ask for a check.
+  // UPD-5: the in-app update's view goes on top of the release check's (installable, percent).
+  let inApp: InAppUpdaterPort | null = null;
+  let releaseChecker: ReleaseChecker | null = null;
   const sendAppUpdate = (view: AppUpdateView): void => {
+    const full: AppUpdatePipeView =
+      inApp === null ? { ...view, installable: false, percent: 0 } : inApp.view(view);
     try {
-      supervisor?.send({ v: 1, type: 'app-update', ...view });
+      supervisor?.send({ v: 1, type: 'app-update', ...full });
     } catch {
       // An invalid view is never sent (the encoder checks it again).
     }
   };
-  const releaseChecker = proc.releaseChecker?.(electron, sendAppUpdate) ?? null;
+  releaseChecker = proc.releaseChecker?.(electron, sendAppUpdate) ?? null;
+  inApp =
+    proc.inAppUpdater?.(electron, () => {
+      if (releaseChecker !== null) sendAppUpdate(releaseChecker.view());
+    }) ?? null;
 
   const sendInvite = (link: string): void => {
     try {
@@ -354,6 +450,7 @@ export async function runShell(
     event.preventDefault();
     const stop = supervisor?.stop() ?? Promise.resolve();
     void stop.then(() => {
+      notifier?.dispose();
       removeRecord();
       tray?.destroy();
       window?.destroy();
@@ -404,7 +501,9 @@ export async function runShell(
   // The window comes up at once: the person sees AgentLink starting, never nothing.
   window.showStatus('starting');
 
-  const paths = resourcePaths(proc.resourcesPath, proc.platform);
+  const paths = resourcePaths(proc.resourcesPath, proc.platform, {
+    darkTaskbar: electron.nativeTheme?.shouldUseDarkColorsForSystemIntegratedUI,
+  });
   let nodePath = paths.node;
   let hostScript = paths.hostScript;
   if (preview !== null) {
@@ -422,6 +521,27 @@ export async function runShell(
   });
 
   let approvals = 0;
+  // N7: the dock badge is the number of approvals waiting (never unread messages).
+  let badge: number | undefined;
+  const setBadge = (count: number): void => {
+    if (badge === count) return;
+    badge = count;
+    try {
+      app.setBadgeCount?.(count);
+    } catch {
+      // Best effort (an OS without a badge).
+    }
+  };
+  // N7: native notifications from the core's fixed codes; a click focuses the window and opens the
+  // kind's fixed route (a `show` enum, a fresh one-shot link from the core).
+  notifier = new NativeNotifier({
+    ...(electron.Notification === undefined ? {} : { Notification: electron.Notification }),
+    timers: proc.timers,
+    onClick: (route) => {
+      window?.show();
+      supervisor?.send({ v: 1, type: 'show', route });
+    },
+  });
   supervisor = new CoreSupervisor({
     nodePath,
     hostScript,
@@ -449,6 +569,9 @@ export async function runShell(
     onMessage: (message) => {
       switch (message.type) {
         case 'ready':
+          // WIN-DESK-1: proof the pipe works both ways (fixed text, never the link).
+          coreLog.note('core ready');
+          updateHealth?.ready();
           if (releaseChecker !== null) sendAppUpdate(releaseChecker.view());
           if (window?.loadSessionUrl(message.sessionUrl) === true) {
             window.show();
@@ -462,10 +585,15 @@ export async function runShell(
         case 'status':
           approvals = message.counts.waitingApprovals;
           tray?.update(message.state, approvals);
+          setBadge(approvals);
           return;
         case 'approval-waiting':
-          // WP-D8 adds the text-free notification; the tray shows the number.
+          // The tray and the dock badge show the number; N7's `notify` raises the notification.
           approvals = message.count;
+          setBadge(approvals);
+          return;
+        case 'notify':
+          notifier?.handle(message);
           return;
         case 'invite-result':
           showInviteResult(message.outcome);
@@ -476,8 +604,19 @@ export async function runShell(
         case 'app-update-check':
           // Always answered, even when nothing changed (the page waits for the end of "checking").
           if (releaseChecker !== null) {
-            void releaseChecker.check().then(sendAppUpdate, () => undefined);
+            const checker = releaseChecker;
+            void Promise.all([checker.check(), inApp?.check()]).then(
+              () => sendAppUpdate(checker.view()),
+              () => undefined,
+            );
           }
+          return;
+        case 'app-update-install':
+          // UPD-5: only the update this shell verified itself; its state follows on every change.
+          inApp?.install();
+          return;
+        case 'app-update-restart':
+          inApp?.restart();
           return;
       }
     },
@@ -496,7 +635,9 @@ export async function runShell(
     if (!proc.exists(nodePath) || !proc.exists(hostScript)) return 'missing_files';
     return null;
   };
-  const blocked = (kind: 'ai_app' | 'missing_files' | 'changed_files'): void => {
+  const blocked = (
+    kind: 'ai_app' | 'missing_files' | 'changed_files' | 'shared_data_folder',
+  ): void => {
     tray?.update('failed', approvals);
     window?.showStatus(kind);
   };
@@ -505,7 +646,8 @@ export async function runShell(
     else supervisor?.start();
   };
   // D15-07: the tripwire runs before every core start (packaged release builds; a preview runs a
-  // development core). While it runs the window shows the starting page.
+  // development core). OD-M: then, on Windows, the data folder's ACL. While they run the window
+  // shows the starting page.
   let verifying = false;
   const startCore = (): Promise<void> | undefined => {
     const problem = precheck();
@@ -515,19 +657,29 @@ export async function runShell(
     }
     window?.showStatus('starting');
     const verify = preview === null ? proc.verifyBundle : undefined;
-    if (verify === undefined) {
+    const checkFolder = proc.checkDataFolder;
+    if (verify === undefined && checkFolder === undefined) {
       launchCore();
       return undefined;
     }
     verifying = true;
-    return verify()
-      .catch((): 'changed' => 'changed')
-      .then((result) => {
-        verifying = false;
-        if (quitting) return;
-        if (result === 'changed') blocked('changed_files');
-        else launchCore();
-      });
+    return (async (): Promise<void> => {
+      const bundle = verify === undefined ? 'ok' : await verify().catch((): 'changed' => 'changed');
+      // A check that fails to run is 'unchecked' (data-acl.ts): it does not stop the start.
+      const folder =
+        bundle === 'changed' || checkFolder === undefined
+          ? 'ok'
+          : await checkFolder().catch((): 'unchecked' => 'unchecked');
+      verifying = false;
+      if (quitting) return;
+      if (bundle === 'changed') blocked('changed_files');
+      else if (folder === 'too_open') blocked('shared_data_folder');
+      else {
+        // OD-M: a check that could not run still starts (Fable rules), with one fixed line.
+        if (folder === 'unchecked') coreLog.note('data folder access could not be checked');
+        launchCore();
+      }
+    })();
   };
   const tryAgain = (): void => {
     if (quitting || verifying) return;
@@ -548,6 +700,7 @@ export async function runShell(
   if (launch.deepLink !== null) handleDeepLink(launch.deepLink);
   if (app.isPackaged && preview === null) proc.startUpdates?.(electron);
   void releaseChecker?.start().catch(() => undefined);
+  void inApp?.check();
   return 'running';
 }
 
@@ -582,7 +735,28 @@ export function realProcess(): ShellProcess {
     preview: readPreview(proc.env),
     toInviteLink,
     logDir: logDir(proc.platform, homedir(), proc.env),
-    startUpdates: (electron) => startUpdates(electron, proc.platform, proc.arch),
+    // UPD-5: on a Mac the in-app update replaces the phase-1 installer dialog.
+    startUpdates: (electron) => {
+      if (proc.platform !== 'darwin') startUpdates(electron, proc.platform, proc.arch);
+    },
+    inAppUpdater: (electron, onChange) => inAppUpdaterFor(electron, proc, onChange),
+    updateHealth: (app) => {
+      const dir = app.getPath?.('userData');
+      const version = app.getVersion?.();
+      const write = (fn: typeof writeStarting): void => {
+        if (proc.platform !== 'darwin' || dir === undefined || version === undefined) return;
+        // Public data only (a version and a pid); a failed write just means no in-app update.
+        fn(dir, version, proc.pid).catch(() => undefined);
+      };
+      return {
+        starting: () => write(writeStarting),
+        ready: () => {
+          write(writeHealthIfPending);
+          if (proc.platform === 'darwin' && dir !== undefined)
+            void sweepStaging(join(dir, UPDATES_DIR), Date.now());
+        },
+      };
+    },
     releaseChecker: (electron, onChange) =>
       releaseCheckerFor(
         electron,
@@ -604,6 +778,45 @@ export function realProcess(): ShellProcess {
       }
       return verifyBundle(record, bundleFilePaths(resources, proc.platform));
     },
+    checkDataFolder: () =>
+      checkDataFolderAcl(
+        proc.platform,
+        dataFolderFor(homedir(), proc.platform, existsSync),
+        proc.env,
+        { run: runQuiet, scratch: aclScratch },
+      ),
+  };
+}
+
+/** OD-M: runs a System32 tool without a shell, window or inherited environment; stdout only. */
+function runQuiet(
+  file: string,
+  args: readonly string[],
+  env: Record<string, string>,
+  ms: number,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = execFile(
+      file,
+      [...args],
+      { env, windowsHide: true, timeout: ms, maxBuffer: 64 * 1024, encoding: 'utf8' },
+      (error, stdout) => {
+        if (error !== null) reject(new Error('check failed'));
+        else resolve(stdout);
+      },
+    );
+    // A tool that reads its input would wait for a pipe to end: close it at once.
+    child.stdin?.end();
+  });
+}
+
+/** OD-M: a new private folder in this user's temp folder for icacls's output; removed after. */
+async function aclScratch(): Promise<AclScratch> {
+  const dir = await mkdtemp(join(tmpdir(), 'agentlink-acl-'));
+  return {
+    dir,
+    read: (name) => readFile(join(dir, name)),
+    dispose: () => rm(dir, { recursive: true, force: true }),
   };
 }
 
@@ -710,6 +923,67 @@ function releaseCheckerFor(
   });
 }
 
+/** UPD-5: the in-app update on the real Electron app (off while root-key.json is the placeholder). */
+function inAppUpdaterFor(
+  electron: ElectronModule,
+  proc: NodeJS.Process,
+  onChange: () => void,
+): InAppUpdater {
+  const { app } = electron;
+  const version = app.getVersion?.() ?? '0.0.0-dev';
+  const stateDir = app.getPath?.('userData');
+  const translated = proc.platform === 'darwin' && translatedNow();
+  const arch = macArch(proc.arch, translated) ?? 'arm64';
+  const enabled =
+    stateDir !== undefined &&
+    inAppEnabled({
+      platform: proc.platform,
+      packaged: app.isPackaged,
+      preview: readPreview(proc.env) !== null,
+      execPath: proc.execPath,
+    });
+  return new InAppUpdater({
+    enabled,
+    currentVersion: version,
+    arch,
+    check: async () =>
+      (
+        await checkForUpdate({
+          currentVersion: version,
+          channel: updateChannel(version),
+          platform: proc.platform,
+          arch: updaterArch(proc.platform, proc.arch, translated),
+          stateDir: stateDir ?? '',
+          kind: 'zip',
+        })
+      ).accepted,
+    install: (accepted, hooks) =>
+      restartForUpdate(
+        () =>
+          installFromProcess({
+            accepted,
+            stateDir: stateDir ?? '',
+            execPath: proc.execPath,
+            pid: proc.pid,
+            onProgress: (done, total) => hooks.onProgress(done, total),
+            onVerifying: () => hooks.onVerifying(),
+            confirmRestart: () => hooks.confirmRestart(),
+          }),
+        () => app.quit(),
+      ),
+    onChange,
+  });
+}
+
+/** Rosetta check through sysctl.proc_translated (fixed program, fixed arguments). */
+function translatedNow(): boolean {
+  return procTranslated((command, args) => {
+    const result = spawnSync(command, [...args], { encoding: 'utf8', timeout: 2000 });
+    if (result.status !== 0 || typeof result.stdout !== 'string') throw new Error('sysctl');
+    return result.stdout;
+  });
+}
+
 /** WP-D10: the phase-1 updater on the real Electron app (index.ts does nothing without a pinned root). */
 function startUpdates(electron: ElectronModule, platform: string, arch: string): void {
   const { app, dialog, shell } = electron;
@@ -717,12 +991,22 @@ function startUpdates(electron: ElectronModule, platform: string, arch: string):
     return;
   }
   const openPath = shell.openPath.bind(shell);
+  const version = app.getVersion();
+  // UPD-1: the build's channel (not a hard-coded `stable`) and the Mac's real arch, Rosetta-aware
+  // through sysctl.proc_translated (fixed program, fixed arguments), not the raw process.arch.
+  const translated =
+    platform === 'darwin' &&
+    procTranslated((command, args) => {
+      const result = spawnSync(command, [...args], { encoding: 'utf8', timeout: 2000 });
+      if (result.status !== 0 || typeof result.stdout !== 'string') throw new Error('sysctl');
+      return result.stdout;
+    });
   scheduleUpdateChecks(
     {
-      currentVersion: app.getVersion(),
-      channel: 'stable',
+      currentVersion: version,
+      channel: updateChannel(version),
       platform,
-      arch,
+      arch: updaterArch(platform, arch, translated),
       stateDir: app.getPath('userData'),
       openPath,
       showMessageBox: (options) =>

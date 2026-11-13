@@ -209,6 +209,8 @@ describe('a 0.2.0 owner switches to a passkey in the local app (M1-UX-FIRSTRUN-V
     source.add(1);
     await page.goto(server.approvalUrl(approvalId(1)));
     expect(await page.getByRole('link', { name: SWITCH }).count()).toBe(0);
+    // UX1113-N2: with the passkey on, Approve is the passkey gesture; the code is the link under it.
+    await page.getByRole('button', { name: 'Use your master code instead' }).click();
     await page.getByRole('button', { name: 'Approve', exact: true }).click();
     await page.locator('input[type=password]').fill(world.code);
     await page.getByRole('button', { name: 'Confirm approval' }).click();

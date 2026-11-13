@@ -17,13 +17,31 @@
 // server's page, first run in a terminal) answers 501 `not_available` and the page says so. Every answer is rebuilt field by field and
 // checked again here (the same rules as the pipe), so nothing but those fixed forms ever reaches the
 // page. Not an MCP tool (I-4).
+//
+// UPD-5 (desktop app only): `POST /api/ui/app-update/install` ("Update now") and
+// `POST /api/ui/app-update/restart` ("Restart now"), routes of the mark kind: the server's mark gate
+// runs them after the session cookie, CSRF, Origin, fetch-metadata, octet-stream and generation
+// checks, with no query, input, presence header or body byte. They pass no value: the desk sends the
+// shell one bare message, and the shell installs only the update it verified itself (signed manifest,
+// zip hash, bundle checks) and restarts only once that update is ready. No owner presence: the trust
+// anchor is the shell's verification, not the page (I-4: nothing here changes a policy, a key or an
+// approval). Every desktop answer also carries `installable`, `percent` and `busy` (a request is
+// waiting for the owner: the page warns before Restart now).
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { LocalUiContext } from '../context.js';
-import type { LocalUiReadRoute, LocalUiResult, LocalUiRoute } from '../route-types.js';
+import type {
+  LocalUiMarkRoute,
+  LocalUiReadRoute,
+  LocalUiResult,
+  LocalUiRoute,
+} from '../route-types.js';
 import { NOT_AVAILABLE, UI_INVALID_QUERY, UI_UNAVAILABLE } from '../route-types.js';
 
 export const APP_UPDATE_PATH = '/api/ui/app-update';
 export const APP_UPDATE_CHECK_PATH = '/api/ui/app-update/check';
+/** UPD-5: "Update now" and "Restart now" (the mark kind, route-types.ts MARK_PATHS). */
+export const APP_UPDATE_INSTALL_PATH = '/api/ui/app-update/install';
+export const APP_UPDATE_RESTART_PATH = '/api/ui/app-update/restart';
 
 export const APP_UPDATE_STATES = Object.freeze([
   'off',
@@ -33,14 +51,29 @@ export const APP_UPDATE_STATES = Object.freeze([
   'available',
   'failed',
   'offline',
+  // UPD-5: the desktop app's in-app update.
+  'downloading',
+  'verifying',
+  'ready',
+  'restarting',
+  'install_failed',
 ] as const);
 export type AppUpdateState = (typeof APP_UPDATE_STATES)[number];
+
+/** UPD-5: the states of a running in-app update (always installable; desktop only). */
+const IN_APP_STATES: readonly string[] = ['downloading', 'verifying', 'ready', 'restarting'];
+/** The states that carry a newer version (and, in the desktop app, its link). */
+const WITH_RELEASE: readonly string[] = ['available', 'install_failed', ...IN_APP_STATES];
 
 export interface AppUpdateView {
   readonly state: AppUpdateState;
   readonly current: string;
   readonly latest: string;
   readonly download: string;
+  /** UPD-5 (desktop): "Update now" can run here. Absent: false. */
+  readonly installable?: boolean;
+  /** UPD-5 (desktop): the download's whole percentage, only while downloading. Absent: 0. */
+  readonly percent?: number;
 }
 
 /** How this copy of AgentLink was installed (what the page offers to update it). */
@@ -60,6 +93,12 @@ export interface LocalUiAppUpdateDesk {
   view(): AppUpdateView | undefined;
   /** Asks the shell to check now; returns the state to show meanwhile. */
   check(): AppUpdateView | undefined;
+  /** UPD-5 (desktop): "Update now"; returns the state to show meanwhile. */
+  startInstall?(): AppUpdateView | undefined;
+  /** UPD-5 (desktop): "Restart now"; returns the state to show meanwhile. */
+  restart?(): AppUpdateView | undefined;
+  /** UPD-5 (desktop): a request is waiting for the owner (the page warns before a restart). */
+  busy?(): boolean;
 }
 
 const NUM = '(0|[1-9][0-9]{0,5})';
@@ -81,6 +120,8 @@ function linkFor(url: unknown, version: string): boolean {
   return (
     url === `${RELEASES}/download/v${version}/AgentLink-${version}-mac-arm64.dmg` ||
     url === `${RELEASES}/download/v${version}/AgentLink-${version}-mac-x64.dmg` ||
+    // WIN-DESK-2: the Windows app's setup (x64; no in-app update on Windows).
+    url === `${RELEASES}/download/v${version}/AgentLink-${version}-win-x64-setup.exe` ||
     url === `${RELEASES}/tag/v${version}`
   );
 }
@@ -92,21 +133,35 @@ function linkFor(url: unknown, version: string): boolean {
 export function appUpdateBody(
   view: AppUpdateView | undefined,
   install: AppUpdateInstall,
+  busy = false,
 ): JsonObject | undefined {
   if (view === undefined) return undefined;
   if (!(APP_UPDATE_INSTALLS as readonly string[]).includes(install)) return undefined;
   const { state, current, latest, download } = view;
+  const installable = view.installable ?? false;
+  const percent = view.percent ?? 0;
   if (!(APP_UPDATE_STATES as readonly string[]).includes(state)) return undefined;
   if (typeof current !== 'string' || !APP_VERSION.test(current)) return undefined;
-  if (state === 'available') {
+  if (typeof installable !== 'boolean' || typeof busy !== 'boolean') return undefined;
+  if (typeof percent !== 'number' || !Number.isSafeInteger(percent)) return undefined;
+  if (percent < 0 || percent > 100 || (state !== 'downloading' && percent !== 0)) return undefined;
+  if (IN_APP_STATES.includes(state) ? !installable : state !== 'available' && installable) {
+    return undefined;
+  }
+  if (WITH_RELEASE.includes(state)) {
+    // The in-app update is the desktop app's alone (the browser app's restart is its update).
+    if (install !== 'desktop' && (state !== 'available' || installable)) return undefined;
     if (typeof latest !== 'string' || !newer(latest, current)) return undefined;
     if (install === 'desktop' ? !linkFor(download, latest) : download !== '') return undefined;
   } else if (latest !== '' || download !== '') return undefined;
-  return { state, current, latest, download, install };
+  if (install !== 'desktop') return { state, current, latest, download, install };
+  return { state, current, latest, download, install, installable, percent, busy };
 }
 
+const busyOf = (desk: LocalUiAppUpdateDesk): boolean => desk.busy?.() === true;
+
 const answer = (desk: LocalUiAppUpdateDesk, view: AppUpdateView | undefined): LocalUiResult => {
-  const body = appUpdateBody(view, desk.install);
+  const body = appUpdateBody(view, desk.install, busyOf(desk));
   return body === undefined ? UI_UNAVAILABLE : { status: 200, body };
 };
 
@@ -142,4 +197,29 @@ const checkRoute: LocalUiReadRoute = Object.freeze<LocalUiReadRoute>({
   },
 });
 
-export const appUpdateRoutes: readonly LocalUiRoute[] = Object.freeze([readRoute, checkRoute]);
+/** UPD-5: one in-app step (desktop app only; 501 elsewhere). */
+const stepRoute = (path: string, step: 'startInstall' | 'restart'): LocalUiMarkRoute =>
+  Object.freeze<LocalUiMarkRoute>({
+    method: 'POST',
+    path,
+    presence: 'mark',
+    handler: (context: LocalUiContext): Promise<LocalUiResult> => {
+      const desk = context.appUpdate;
+      const run = desk?.[step];
+      if (desk === undefined || desk.install !== 'desktop' || run === undefined) {
+        return Promise.resolve(NOT_AVAILABLE);
+      }
+      try {
+        return Promise.resolve(answer(desk, run.call(desk)));
+      } catch {
+        return Promise.resolve(UI_UNAVAILABLE);
+      }
+    },
+  });
+
+export const appUpdateRoutes: readonly LocalUiRoute[] = Object.freeze([
+  readRoute,
+  checkRoute,
+  stepRoute(APP_UPDATE_INSTALL_PATH, 'startInstall'),
+  stepRoute(APP_UPDATE_RESTART_PATH, 'restart'),
+]);

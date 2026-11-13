@@ -10,10 +10,13 @@
 // approval-server.ts), apps/cli (agent-dir.ts, the file) and apps/local-ui (prefs/ui-settings.ts,
 // prefs/app-kept.ts).
 
+import { readNotifyPrefs, type NotifyPrefs } from './notifications.js';
+
 export const UI_SETTINGS_PATH = '/api/ui/ui-settings';
 
 /** The only keys the route reads, writes or stores. */
-export const UI_SETTINGS_KEYS = ['underTheHood', 'menuExpanded', 'kept'] as const;
+// N6: `notify`, the switches of Settings › Notifications (booleans of fixed keys, notifications.ts).
+export const UI_SETTINGS_KEYS = ['underTheHood', 'menuExpanded', 'kept', 'notify'] as const;
 export type UiSettingKey = (typeof UI_SETTINGS_KEYS)[number];
 
 // --- kept page choices ---------------------------------------------------------------------------
@@ -100,6 +103,11 @@ const KEPT: Readonly<Record<string, (raw: string) => string | undefined>> = Obje
     const [id, ref, rest] = v.split('/');
     return rest === undefined && ID_NAME.test(id ?? '') && REF.test(ref ?? '');
   }),
+  /** RET-5 (D-148): conversations archived from a person's menu: `<ID name>/<contact ref>`. */
+  'agentlink.conversations.archived.v1': list((v) => {
+    const [id, ref, rest] = v.split('/');
+    return rest === undefined && ID_NAME.test(id ?? '') && REF.test(ref ?? '');
+  }),
   /** The recovery kit was put off ("Later"): a time in ms only. */
   'agentlink.recoveryKit.later': (raw) => (/^[0-9]{1,16}$/.test(raw) ? raw : undefined),
   'agentlink.getStarted.hidden': fixed('1'),
@@ -131,6 +139,8 @@ export interface UiSettings {
   readonly underTheHood?: boolean;
   readonly menuExpanded?: boolean;
   readonly kept?: UiKept;
+  /** N6: Settings › Notifications; a key is absent until set (the D2 default applies). */
+  readonly notify?: NotifyPrefs;
 }
 
 /** The longest kept value (the largest list of the largest entries fits). */
@@ -171,7 +181,12 @@ export function readUiSettings(value: unknown, minKeys = 0): UiSettings | undefi
   if (!plainObject(value)) return undefined;
   const keys = Object.keys(value);
   if (keys.length < minKeys || keys.length > UI_SETTINGS_KEYS.length) return undefined;
-  const out: { underTheHood?: boolean; menuExpanded?: boolean; kept?: UiKept } = {};
+  const out: {
+    underTheHood?: boolean;
+    menuExpanded?: boolean;
+    kept?: UiKept;
+    notify?: NotifyPrefs;
+  } = {};
   for (const key of keys) {
     const v = value[key];
     if (key === 'underTheHood' || key === 'menuExpanded') {
@@ -181,6 +196,10 @@ export function readUiSettings(value: unknown, minKeys = 0): UiSettings | undefi
       const kept = readKept(v);
       if (kept === undefined) return undefined;
       out.kept = kept;
+    } else if (key === 'notify') {
+      const notify = readNotifyPrefs(v);
+      if (notify === undefined) return undefined;
+      out.notify = notify;
     } else {
       return undefined;
     }
@@ -190,10 +209,18 @@ export function readUiSettings(value: unknown, minKeys = 0): UiSettings | undefi
 
 /** Merges a change into stored settings: `kept` key by key, a null forgets that key. */
 export function mergeUiSettings(stored: UiSettings, change: UiSettings): UiSettings {
-  const next: { underTheHood?: boolean; menuExpanded?: boolean; kept?: UiKept } = {
+  const next: {
+    underTheHood?: boolean;
+    menuExpanded?: boolean;
+    kept?: UiKept;
+    notify?: NotifyPrefs;
+  } = {
     ...stored,
     ...change,
   };
+  if (change.notify !== undefined) {
+    next.notify = Object.freeze({ ...stored.notify, ...change.notify });
+  }
   if (change.kept !== undefined) {
     const kept: Record<string, string | null> = { ...stored.kept, ...change.kept };
     for (const key of Object.keys(kept)) if (kept[key] === null) delete kept[key];

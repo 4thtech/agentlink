@@ -1,6 +1,6 @@
 # MCP tools
 
-> **Status: Available since v0.1.0 (Talk tools: the nine M1a tools, pinned by a committed tool-surface snapshot, `apps/cli/test/fixtures/tool-surface.json`) and Planned for v0.2.0 (M1) (file and proof tools).** Current for v0.5.1: the tool names and inputs did not change in 0.5.1; what changed is results and behaviour, described under "Naming a contact", "Delivery" and "Received files" below. This page lists the tool surface from D-53 and D-55 and [06 MCP server](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md). Names and schemas may change before 1.0.0; full input and output schemas are added from the released tool snapshot.
+> **Status: Available since v0.1.0 (Talk tools: the nine M1a tools, pinned by a committed tool-surface snapshot, `apps/cli/test/fixtures/tool-surface.json`) and Planned for v0.2.0 (M1) (file and proof tools).** Current for v0.5.3: 16 tools. 0.5.3 added `agentlink_tidy` (propose a cleanup; the owner approves in the app); 0.5.1 changed no names or inputs; what changed is results and behaviour, described under "Naming a contact", "Delivery" and "Received files" below. This page lists the tool surface from D-53 and D-55 and [06 MCP server](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md). Names and schemas may change before 1.0.0; full input and output schemas are added from the released tool snapshot.
 
 **Package:** `@4thtech-io/agentlink`, subcommand `agentlink mcp` (stdio). The self-hosted cloud agent exposes the same tools over streamable HTTP with OAuth.
 
@@ -33,6 +33,7 @@
 | `agentlink_get_proof` | yes | — | next release |
 | `agentlink_export_proof_pack` | no (writes a file) | `proofs.allowKeyDisclosure` | next release |
 | `agentlink_verify_proof_pack` | yes | — | next release |
+| `agentlink_tidy` | yes (counts only) | In the app: the owner approves the exact list with Touch ID | 0.5.3 |
 
 ## File tools (next release, M1-9d-1)
 
@@ -76,6 +77,15 @@ Proofs run on test networks only. They need the 4thTech proof submitter and test
 - **`agentlink_export_proof_pack`** (06 §2.4, 07 §8): exactly one of `envelopeId` and `recordId`, plus `includeContentKey?` (default false; needs the owner's approval, `proofs.allowKeyDisclosure`) and `includeRecipient?` (default false). Writes a new file into `proofs.exportFolder` (`~/AgentLink/Proofs` by default); nothing is written before the approval. On `ok`: `{savedTo, recordId}`, never the pack or a key. Refusals: `not_found` `NOT_RECORDED`, `ENVELOPE_NOT_FOUND`; `error` `RECORD_UNAVAILABLE` (a record a contact made), `EXPORT_FOLDER_UNAVAILABLE`; `rejected` `POLICY_DENIED`, `APPROVAL_INVALID`.
 - **`agentlink_verify_proof_pack`** (06 §2.4, D-87): exactly one of `path` and `json`. `path` must be strictly inside `proofs.exportFolder` or `files.inboxFolder` (a relative path is below the proofs folder): a path outside both is refused before the disk is touched; then realpath, no hidden or protected files, no links, a regular file of at most 256 KiB. Refusals are `rejected` `PATH_NOT_ALLOWED`, `PACK_TOO_LARGE`, `PACK_INVALID`, with no path or content echoed. On `ok`: `{valid, verdict: verified | record_only | failed, advanced: {chain}, recordId, signer, signerName?, signerLabel?, timestamp, envelopeHash, receipts, contentVerified}`. `signerName` follows the contact-name rule: the contact's alias or restricted name, otherwise "Contact" with the short ID tag. `record_only` is never shown as a full pass (D-95). Disclosed content appears only inside the untrusted block. `error` `NETWORK` when the public record does not answer.
 - **`agentlink_status`**: `credits` `[{usd, advanced: {chain, token, amount}}]` (network and token names only under `advanced`, D-40), `prices` `[{action: "notarize", usd, protocolUsd, integratorUsd, payFrom: "credits"}]` (the AgentLink part and the app part shown separately, G-43), `agentAddress` and `topUpUrl`. Read within about 3 seconds; left out when no network answers.
+
+## Free up space: `agentlink_tidy` (since 0.5.3, RET-7, D-148)
+
+`agentlink_tidy({olderThanDays: 30 | 90 | 365, kinds: "files" | "messages_and_files", contact?})` lets the AI **propose** a cleanup when the user asks to free up space. It never deletes anything:
+
+- It counts what that filter would remove on this computer now (nothing is written or deleted) and always answers `pending_approval` with `proposal: {olderThanDays, kinds, messages: {count, bytes}, files: {count, bytes}, kept}`.
+- The `url` opens the app's Settings › Storage with the same filter (`/settings/storage?tidy=files|both&days=…[&contact=0x…]`). The app shows the exact counts, and the delete runs only after the owner's Touch ID (or master code) and a 10-second Undo.
+- Its `approvalId` names the proposal only: the tool takes no `approvalId`, there is nothing to call again, and `agentlink_get_approval` answers `not_found` for it.
+- The filter is the only input: never message IDs or text from a message. A message asking the AI to "tidy everything" can at most produce a proposal the owner sees with its exact counts. No tool changes how long AgentLink keeps history; that is the owner's setting in Settings › Storage (`history.*`, owner-signed).
 
 ## Outline (filled in at release)
 

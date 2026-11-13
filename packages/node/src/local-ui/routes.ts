@@ -30,10 +30,21 @@
 //   recovery kit) is only a POST at BACKUP_REVEAL_PATH with a handler, registered once; the server's
 //   kit-reveal gate runs it with no input at all. No other path, method or route can use the kind.
 // - R1-SEC-16: a `presence: 'mark'` route (a display mark: the auto-save notice's dismiss, a former
-//   name's seen mark) is only a POST at one of MARK_PATHS with a handler, each registered once; the
-//   server's mark gate runs it with no input at all. A GET is always a read.
+//   name's seen mark; ATT-SENDFOLDER-FIX: Home's Send folder set-up, which may also create an empty
+//   0700 folder under ~/AgentLink and changes no rules) is only a POST at one of MARK_PATHS with a
+//   handler, each registered once; the server's mark gate runs it with no input at all. A GET is
+//   always a read.
+// - RET-4 (D-148; 08 §1 "The delete sheet"): a `presence: 'history'` route (Delete history's begin,
+//   undo and status) is only a POST at its step's fixed path (history-paths.ts) with a handler, each
+//   registered once; the server's history gate runs it. The finish is an ordinary `presence: true`
+//   POST that declares `historyFinish`, only at HISTORY_FINISH_PATH, once. A `presence:
+//   'inbox-reveal'` route (Show in Finder for the Inbox folder) is only a POST at INBOX_REVEAL_PATH
+//   with a handler, once; it takes no input at all.
+// - ATT-APP-ATTACH: a `presence: 'attach'` route is only a POST at ATTACH_PATH with a handler,
+//   registered once; the server's attach gate runs it.
 // - The page files in api/ each own their routes; this file only lists them.
 import { activityRoutes } from './api/activity.js';
+import { attachRoute } from './api/attach.js';
 // U3-c: the Agents list and the switch kind; the stubs of U3-d, U3-e, U3-f and U3-flow.
 import { agentsRoutes } from './api/agents.js';
 import { eventsRoutes } from './api/events.js';
@@ -49,6 +60,7 @@ import { contactsRoutes } from './api/contacts.js';
 import { filesRoutes } from './api/files.js';
 // MSG-FILES-IO-d: Files, Received and Sent (read-only); MSG-FILES-IO-h: Show in Finder.
 import { filesIoRoutes, filesRevealRoute } from './api/files-io.js';
+import { notificationsRoutes } from './api/notifications.js';
 import { filesPreviewRoute } from './api/files-preview.js';
 import { filesSaveRoute } from './api/files-save.js';
 import { firstRunRoutes } from './api/first-run.js';
@@ -70,11 +82,21 @@ import { ownerPresenceRoutes } from './api/owner-presence.js';
 import { OWNER_CODE_PATHS, isOwnerCodeStep } from './owner-code-paths.js';
 // UX1113-R1: restore from a recovery kit (the restore kind).
 import { restoreRoutes } from './api/restore.js';
+// RET-4 (D-148): Delete history (begin, finish, undo, status) and Show in Finder for the Inbox.
+import { historyRoutes } from './api/history.js';
+import { retentionRoutes } from './api/retention.js';
+import {
+  HISTORY_FINISH_PATH,
+  HISTORY_STEP_PATHS,
+  INBOX_REVEAL_PATH,
+  isHistoryStep,
+} from './history-paths.js';
 import {
   AGENTS_PAUSE_PATH,
   AGENTS_REMOVE_PATH,
   AGENTS_RESUME_PATH,
   AGENTS_SWITCH_PATH,
+  ATTACH_PATH,
   BACKUP_EXPORT_PATH,
   BACKUP_PATH,
   CREATE_AGENT_PATHS,
@@ -221,6 +243,22 @@ export class LocalUiRouteRegistry {
         throw invalid('an owner-code step is only its one POST route at its fixed path');
       }
     }
+    // RET-4: only the one finish route at its fixed path declares `historyFinish`, once.
+    const historyFinish = (route as { historyFinish?: unknown }).historyFinish;
+    if (historyFinish !== undefined || route.path === HISTORY_FINISH_PATH) {
+      if (
+        historyFinish !== true ||
+        presence !== true ||
+        method !== 'POST' ||
+        route.path !== HISTORY_FINISH_PATH ||
+        recoveryKit !== undefined ||
+        ownerCode !== undefined ||
+        stub !== undefined ||
+        this.#entries.some((e) => (e.route as { historyFinish?: unknown }).historyFinish === true)
+      ) {
+        throw invalid('the history finish is only its one POST owner route at its fixed path');
+      }
+    }
     // U3-c: only an owner route (POST, presence) can be a stub; the flag is `true` or absent.
     if (stub !== undefined && (stub !== true || presence !== true || method !== 'POST')) {
       throw invalid('only a POST owner route can be a stub');
@@ -250,7 +288,8 @@ export class LocalUiRouteRegistry {
         throw invalid('the handoff route is already registered');
       }
     } else if (presence === 'mark') {
-      // R1-SEC-16: the display marks; the server's mark gate runs them (no input, no presence).
+      // R1-SEC-16: the display marks (and the Send folder set-up, ATT-SENDFOLDER-FIX); the server's
+      // mark gate runs them (no input, no presence).
       if (method !== 'POST') throw invalid('a mark route is a POST');
       if (!MARK_PATHS.includes(route.path)) throw invalid('a mark route is only at a mark path');
       if (typeof handler !== 'function') throw invalid('a mark route needs a handler');
@@ -346,6 +385,27 @@ export class LocalUiRouteRegistry {
       if (this.#entries.some((e) => e.route.presence === 'kit-reveal')) {
         throw invalid('the kit-reveal route is already registered');
       }
+    } else if (presence === 'history') {
+      // RET-4: Delete history's begin, undo and status; the server's history gate runs them.
+      if (method !== 'POST') throw invalid('a history route is a POST');
+      if (!isHistoryStep(step)) throw invalid('unknown history step');
+      if (route.path !== HISTORY_STEP_PATHS[step]) {
+        throw invalid('a history route is only at its fixed path');
+      }
+      if (typeof handler !== 'function') throw invalid('a history route needs a handler');
+      if (this.#entries.some((e) => e.route.presence === 'history' && e.route.step === step)) {
+        throw invalid('this history step is already registered');
+      }
+    } else if (presence === 'inbox-reveal') {
+      // RET-4: Show in Finder for the Inbox folder only; no input, no presence.
+      if (method !== 'POST') throw invalid('an inbox-reveal route is a POST');
+      if (route.path !== INBOX_REVEAL_PATH) {
+        throw invalid('an inbox-reveal route is only at its fixed path');
+      }
+      if (typeof handler !== 'function') throw invalid('an inbox-reveal route needs a handler');
+      if (this.#entries.some((e) => e.route.presence === 'inbox-reveal')) {
+        throw invalid('the inbox-reveal route is already registered');
+      }
     } else if (presence === 'invite') {
       // UX2-d1 (decision 1.1): create and check an invite only; the server's invite gate runs it.
       if (method !== 'POST') throw invalid('an invite route is a POST');
@@ -365,6 +425,14 @@ export class LocalUiRouteRegistry {
       if (typeof handler !== 'function') throw invalid('an invite route needs a handler');
       if (this.#entries.some((e) => e.route.presence === 'invite' && e.route.step === step)) {
         throw invalid('this invite step is already registered');
+      }
+    } else if (presence === 'attach') {
+      // ATT-APP-ATTACH: the owner's attached files only; the server's attach gate runs it.
+      if (method !== 'POST') throw invalid('an attach route is a POST');
+      if (route.path !== ATTACH_PATH) throw invalid('an attach route is only at the attach path');
+      if (typeof handler !== 'function') throw invalid('an attach route needs a handler');
+      if (this.#entries.some((e) => e.route.presence === 'attach')) {
+        throw invalid('the attach route is already registered');
       }
     } else if (typeof handler !== 'function') {
       throw invalid('no handler');
@@ -461,6 +529,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     // W4-PAUSE (D-143 (5)): Pause and Resume.
     agentsPauseRoutes,
     uiSettingsRoutes,
+    // N4: the notification centre (a read and two display marks).
+    notificationsRoutes,
     // WP-P2: People across all IDs (read only).
     peopleAllRoutes,
     // REL051-RET1: Settings > Storage, sizes only (read only).
@@ -471,6 +541,12 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     ownerPresenceRoutes,
     // UX1113-R1 (D-147): restore from a recovery kit, in the app.
     restoreRoutes,
+    // RET-4 (D-148): Delete history and Show in Finder for the Inbox folder.
+    historyRoutes,
+    // RET-6 (D-148): Settings > Storage > Keep automatically (a read; the save behind presence).
+    retentionRoutes,
+    // ATT-APP-ATTACH: the owner attaches light text files in a conversation (the attach kind).
+    [attachRoute],
   ]) {
     for (const route of routes) registry.register(route);
   }

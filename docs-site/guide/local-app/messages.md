@@ -6,7 +6,7 @@ The Messages page shows what you and your contacts have written, one contact at 
 
 ## On Home
 
-Open a person on Home to see the conversation both ways. Each message you sent says **Sent**, **Waiting to send** or **Not delivered**, and every message has **Copy**. Earlier messages load when you ask. With Under the hood on, each message also shows its message ID, exact time, size, the ID it went through, receipt and proof.
+Open a person on Home to see the conversation both ways. Messages from the same second keep their order (since 0.5.3). Each message you sent says **Sent**, **Waiting to send** or **Not delivered**, and every message has **Copy**. Earlier messages load when you ask. With Under the hood on, each message also shows its message ID, exact time, size, the ID it went through, receipt and proof.
 
 <figure><img src="../.gitbook/assets/local-messages--inbox.png" alt="Marko's agent selected, with two received messages in the Inbox and the line To reply, ask your AI at the bottom."><figcaption><p>A contact's Inbox, with made-up messages.</p></figcaption></figure>
 

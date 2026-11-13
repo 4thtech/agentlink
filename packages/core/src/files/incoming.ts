@@ -76,8 +76,56 @@ import {
   type PolicyLimits,
 } from '../policy-engine.js';
 import type { Row } from '../store/schema.js';
-import type { FilesPlatform, InboxFolder } from './platform.js';
+import type {
+  FilesPlatform,
+  InboxFolder,
+  SavedFileIdentity,
+  TrashSavedOutcome,
+} from './platform.js';
 import { SHREDDED_FILE_KEY } from './received.js';
+import {
+  openSavedFile,
+  putSavedFileTx,
+  sealSavedFile,
+  type BackfillSavedFilesResult,
+  type SavedFileFacts,
+} from './saved-files.js';
+
+/** RET-3: one saved file named for the Trash, by its index row key. */
+export interface SavedFileKey {
+  readonly envelopeId: string;
+  readonly index: number;
+}
+
+/**
+ * RET-3 (D-148; 04 §4.2): what one Trash pass did, counts only. `refused`: the index row has no
+ * recorded device or inode, or its name is not one visible segment, so the file is never touched.
+ */
+export interface TrashSavedCounts {
+  trashed: number;
+  changed: number;
+  missing: number;
+  refused: number;
+  noTrash: number;
+  failed: number;
+}
+
+type TrashOutcomeOrRefused = TrashSavedOutcome | 'refused';
+
+const TRASH_OUTCOMES: readonly TrashSavedOutcome[] = Object.freeze([
+  'trashed',
+  'changed',
+  'missing',
+  'no_trash',
+  'failed',
+]);
+
+/** A single visible name directly inside the Inbox folder; never a path, never a hidden name. */
+const isOneVisibleSegment = (name: string): boolean =>
+  name.length > 0 && !name.startsWith('.') && !/[\\/\0]/.test(name);
+
+/** RET-2: recorded saves the backfill looks at in one run (receiver rows live at most 7 days). */
+const BACKFILL_MAX = 1_000;
 
 export interface FetchFileInput {
   readonly envelopeId: string;
@@ -136,6 +184,31 @@ export type FetchFileResult =
       readonly code:
         'FILE_TOO_LARGE' | 'INTEGRITY_FAILED' | 'LINK_EXPIRED' | 'URL_REFUSED' | 'POLICY_DENIED';
     };
+
+/**
+ * RET-2: the device, inode and size of a saved file, through the folder handle (no link followed);
+ * undefined when the platform cannot tell or the entry is not a regular file. Never throws.
+ */
+async function identifySaved(
+  inbox: InboxFolder,
+  name: string,
+): Promise<SavedFileIdentity | undefined> {
+  if (inbox.identify === undefined) return undefined;
+  try {
+    const id = await inbox.identify(name);
+    if (
+      id === undefined ||
+      typeof id.dev !== 'string' ||
+      typeof id.ino !== 'string' ||
+      !Number.isSafeInteger(id.size)
+    ) {
+      return undefined;
+    }
+    return id;
+  } catch {
+    return undefined;
+  }
+}
 
 /** How many ` (n)` suffixes are tried before the save gives up. */
 const MAX_NAME_ATTEMPTS = 1_000;
@@ -622,7 +695,18 @@ export class FileFetcher {
       const finalName = state.finalName ?? name;
       const savedTo = placeIn(folder, finalName, flavor);
       if (keyRow !== undefined) {
-        await this.#recordSavedName(envelopeId, index, keyRow.sha256, finalName, startRecord);
+        // RET-2: the device and inode the file got after its move, for the saved-file index.
+        const identity = await identifySaved(inbox, finalName);
+        await this.#recordSavedName(envelopeId, index, keyRow.sha256, finalName, startRecord, {
+          facts: {
+            envelopeId,
+            index,
+            size: done.plaintextSize,
+            sha256: entry.plaintextSha256,
+            savedAt: nowOf(ctx),
+          },
+          identity,
+        });
       }
       let text: string | undefined;
       if (state.collected !== undefined) {
@@ -680,6 +764,239 @@ export class FileFetcher {
       wipe(fileKey);
       for (const chunk of state.collected ?? []) wipe(chunk);
     }
+  }
+
+  /**
+   * RET-2 (D-148; 07 §3.8 "Migration"): indexes files saved before schema version 15 whose receiver
+   * `files` row still records a saved name (files received in the last 7 days). Best effort and
+   * idempotent: a row already in the index is kept; a recorded file that is missing, is not a regular
+   * file directly inside the Inbox folder (a link is never followed, 04 §4 realpath rules) or whose
+   * message no longer opens is skipped and left unassigned, never deleted. Writes only the index;
+   * never touches a file. Logs counts only (I-7).
+   */
+  async backfillSavedFiles(): Promise<BackfillSavedFilesResult> {
+    const ctx = this.#ctx;
+    const platform = this.#platform;
+    const none: BackfillSavedFilesResult = Object.freeze({ indexed: 0, skipped: 0 });
+    if (platform === undefined) return none;
+    const candidates = await ctx.store.transaction((tx) => {
+      const out: { file: Row<'files'>; message: Row<'envelopes'> }[] = [];
+      for (const file of tx.select('files', {}, { limit: BACKFILL_MAX * 4 })) {
+        if (out.length >= BACKFILL_MAX) break;
+        if (file.saved_name === null) continue;
+        if (tx.get('saved_files', { envelope_id: file.envelope_id, idx: file.idx }) !== undefined) {
+          continue;
+        }
+        const message = tx.get('envelopes', { envelope_id: file.envelope_id });
+        if (message === undefined) continue;
+        out.push({ file, message });
+      }
+      return out;
+    });
+    if (candidates.length === 0) return none;
+    let indexed = 0;
+    let skipped = 0;
+    const done = (): BackfillSavedFilesResult => {
+      ctx.log.info('saved files indexed', { indexed, skipped });
+      return Object.freeze({ indexed, skipped });
+    };
+    const policy = await this.#loadPolicy();
+    if (policy.mode === 'fail_closed') {
+      skipped = candidates.length;
+      return done();
+    }
+    const flavor = platform.flavor ?? 'posix';
+    let inbox: InboxFolder;
+    try {
+      inbox = await platform.inbox(
+        policy.policy.files.inboxFolder,
+        policyLimits(policy).allowedFolders,
+      );
+    } catch {
+      skipped = candidates.length;
+      return done();
+    }
+    try {
+      if (typeof inbox?.realpath !== 'string' || !parseAbsolutePath(inbox.realpath, flavor)) {
+        skipped = candidates.length;
+        return done();
+      }
+      for (const { file, message } of candidates) {
+        const ok = await this.#backfillOne(inbox, file, message).catch(() => false);
+        if (ok) indexed += 1;
+        else skipped += 1;
+      }
+    } finally {
+      await inbox.close?.().catch(() => undefined);
+    }
+    return done();
+  }
+
+  /** One recorded save into the index (see backfillSavedFiles); false when it is skipped. */
+  async #backfillOne(
+    inbox: InboxFolder,
+    file: Row<'files'>,
+    message: Row<'envelopes'>,
+  ): Promise<boolean> {
+    const ctx = this.#ctx;
+    const recorded = file.saved_name;
+    if (recorded === null || message.direction !== 'in' || message.payload_json === null) {
+      return false;
+    }
+    // The recorded name, still a regular file directly inside the folder (no link followed).
+    const name = await this.#stillSaved(inbox, file.envelope_id, file.idx, recorded);
+    if (name === undefined) return false;
+    let identity: SavedFileIdentity | undefined;
+    if (inbox.identify !== undefined) {
+      identity = await identifySaved(inbox, name);
+      if (identity === undefined) return false;
+    }
+    // The size and plaintext hash the sender stated, from the stored payload.
+    const text = await open(
+      ctx,
+      'envelopes',
+      'payload_json',
+      [message.envelope_id],
+      message.payload_json,
+    );
+    const payload = payloadSchema.safeParse(JSON.parse(text));
+    const entry = payload.success ? payload.data.files[file.idx] : undefined;
+    if (entry === undefined) return false;
+    const facts: SavedFileFacts = {
+      envelopeId: file.envelope_id,
+      index: file.idx,
+      size: entry.size,
+      sha256: entry.plaintextSha256,
+      savedAt: nowOf(ctx),
+    };
+    const sealed = await sealSavedFile(ctx, file.envelope_id, file.idx, name, identity);
+    return ctx.store.transaction((tx) => {
+      const key = { envelope_id: file.envelope_id, idx: file.idx };
+      // Only for the record read above, and never over a row a save wrote meanwhile.
+      if (tx.get('files', key)?.saved_name !== recorded) return false;
+      if (tx.get('saved_files', key) !== undefined) return false;
+      putSavedFileTx(tx, facts, sealed);
+      return true;
+    });
+  }
+
+  /**
+   * RET-3 (D-148; 04 §4.2 "Deleting a saved file"): moves the named saved files to the OS Trash,
+   * each only when its `saved_files` row records a device and inode and the file at the recorded name
+   * still has them, the recorded size and the recorded sha256. The core checks the device, inode and
+   * size through the folder handle first (a changed or replaced file is never handed to the
+   * platform); the platform checks all four again just before the move. The row is marked
+   * `trashed_at` only after the move succeeded. The file is named only by its index row, never by a
+   * path from a caller. Never deletes outright; counts only in logs (I-7).
+   */
+  async trashSavedFiles(keys: readonly SavedFileKey[]): Promise<TrashSavedCounts> {
+    const ctx = this.#ctx;
+    const counts: TrashSavedCounts = {
+      trashed: 0,
+      changed: 0,
+      missing: 0,
+      refused: 0,
+      noTrash: 0,
+      failed: 0,
+    };
+    if (keys.length === 0) return counts;
+    const rows = await ctx.store.transaction((tx) =>
+      keys.map((k) => tx.get('saved_files', { envelope_id: k.envelopeId, idx: k.index })),
+    );
+    const live = rows.filter(
+      (r): r is Row<'saved_files'> => r !== undefined && r.trashed_at === null,
+    );
+    if (live.length === 0) return counts;
+    const platform = this.#platform;
+    if (platform === undefined) {
+      counts.noTrash += live.length;
+      return counts;
+    }
+    const policy = await this.#loadPolicy();
+    if (policy.mode === 'fail_closed') {
+      counts.failed += live.length;
+      return counts;
+    }
+    const flavor = platform.flavor ?? 'posix';
+    let inbox: InboxFolder;
+    try {
+      inbox = await platform.inbox(
+        policy.policy.files.inboxFolder,
+        policyLimits(policy).allowedFolders,
+      );
+    } catch {
+      counts.failed += live.length;
+      return counts;
+    }
+    try {
+      if (typeof inbox?.realpath !== 'string' || !parseAbsolutePath(inbox.realpath, flavor)) {
+        counts.failed += live.length;
+        return counts;
+      }
+      let names: ReadonlySet<string> | undefined;
+      const present = async (name: string): Promise<boolean> => {
+        if (names === undefined) {
+          names = new Set(await inbox.ops.list().catch((): readonly string[] => []));
+        }
+        return names.has(name);
+      };
+      for (const row of live) {
+        const outcome = await this.#trashOne(inbox, row, present).catch(
+          (): TrashOutcomeOrRefused => 'failed',
+        );
+        if (outcome === 'trashed') {
+          const marked = await ctx.store
+            .transaction((tx) =>
+              tx.update(
+                'saved_files',
+                { envelope_id: row.envelope_id, idx: row.idx, trashed_at: null },
+                { trashed_at: nowOf(ctx) },
+              ),
+            )
+            .catch(() => 0);
+          // Moved, but not recorded: the file is in the Trash; the row reads "moved or changed".
+          if (marked !== 1) ctx.log.warn('trashed file not recorded', { code: 'store_failed' });
+          counts.trashed += 1;
+        } else if (outcome === 'no_trash') counts.noTrash += 1;
+        else counts[outcome] += 1;
+      }
+    } finally {
+      await inbox.close?.().catch(() => undefined);
+    }
+    return counts;
+  }
+
+  /** One index row to the Trash (see trashSavedFiles). */
+  async #trashOne(
+    inbox: InboxFolder,
+    row: Row<'saved_files'>,
+    present: (name: string) => Promise<boolean>,
+  ): Promise<TrashOutcomeOrRefused> {
+    // IR-RET-2-1 Low 1: a row whose identity was never recorded is never deletable.
+    if (row.dev === null || row.ino === null) return 'refused';
+    let view;
+    try {
+      view = await openSavedFile(this.#ctx, row);
+    } catch {
+      return 'failed';
+    }
+    if (view.dev === null || view.ino === null) return 'refused';
+    if (!isOneVisibleSegment(view.name)) return 'refused';
+    if (inbox.trashSaved === undefined) return 'no_trash';
+    // IR-RET-2-1 Low 2: the identity is checked again here and by the platform at the move.
+    if (inbox.identify !== undefined) {
+      const now = await identifySaved(inbox, view.name);
+      if (now === undefined) return (await present(view.name)) ? 'changed' : 'missing';
+      if (now.dev !== view.dev || now.ino !== view.ino || now.size !== view.size) return 'changed';
+    }
+    // IR-RET-2-1 Info 7: the platform hashes the file itself before the move.
+    const outcome: TrashSavedOutcome = await inbox.trashSaved(view.name, {
+      dev: view.dev,
+      ino: view.ino,
+      size: view.size,
+      sha256: view.sha256,
+    });
+    return TRASH_OUTCOMES.includes(outcome) ? outcome : 'failed';
   }
 
   /**
@@ -783,10 +1100,13 @@ export class FileFetcher {
     sha256: string,
     name: string,
     startRecord: Row<'files'>['saved_name'],
+    index_: { readonly facts: SavedFileFacts; readonly identity: SavedFileIdentity | undefined },
   ): Promise<void> {
     const ctx = this.#ctx;
     try {
       const sealed = await seal(ctx, 'files', 'saved_name', [envelopeId, index], name);
+      // RET-2 (07 §3.8): the saved-file index row, in the same transaction as the record.
+      const indexed = await sealSavedFile(ctx, envelopeId, index, name, index_.identity);
       await ctx.store.transaction((tx) => {
         const key = { envelope_id: envelopeId, idx: index };
         const row = tx.get('files', key);
@@ -794,6 +1114,7 @@ export class FileFetcher {
         // Only over the record this save found: another process's newer record is kept.
         if ((row.saved_name ?? null) !== startRecord) return;
         tx.update('files', key, { saved_name: sealed });
+        putSavedFileTx(tx, index_.facts, indexed);
       });
     } catch {
       ctx.log.warn('saved name not recorded', { code: 'store_failed' });

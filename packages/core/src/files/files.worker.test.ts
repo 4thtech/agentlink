@@ -59,6 +59,23 @@ function dropFetch(): FetchLike {
   };
 }
 
+/** The recipient's download: the signed GET URL from the payload, read to the byte cap. */
+const dropDownload =
+  (url: string) =>
+  async (maxBytes: number, onChunk: (chunk: Uint8Array) => Promise<void>): Promise<void> => {
+    const response = await SELF.fetch(new Request(url, { redirect: 'manual' }));
+    if (response.status !== 200 || response.body === null) throw new Error('download failed');
+    const reader = response.body.getReader();
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.length;
+      await onChunk(value);
+      if (total > maxBytes) break;
+    }
+  };
+
 let clock: FakeClock;
 let a: FileAgent;
 let b: FileAgent;
@@ -74,20 +91,7 @@ beforeEach(async () => {
   b = await openFileAgent(clock, new MemoryKeyStore(seed(22)), ownerB, 'bob', {
     relays: RELAYS_B,
     drop: { endpoint: ORIGIN, fetch: dropFetch() },
-    // The recipient's download: the signed GET URL from the payload, read to the byte cap.
-    download: (url) => async (maxBytes, onChunk) => {
-      const response = await SELF.fetch(new Request(url, { redirect: 'manual' }));
-      if (response.status !== 200 || response.body === null) throw new Error('download failed');
-      const reader = response.body.getReader();
-      let total = 0;
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        total += value.length;
-        await onChunk(value);
-        if (total > maxBytes) break;
-      }
-    },
+    download: dropDownload,
   });
   await pairForFiles(clock, a, b);
 });
@@ -352,5 +356,55 @@ describe('delete on receipt after a key rotation (M1-1g-h)', () => {
     for (const line of a.lines) {
       for (const canary of [url, objectId]) expect(line).not.toContain(canary);
     }
+  });
+});
+
+// DROP-OPEN-1 (D-129 as amended 2026-11-13: files on the drop are open to all early users). There is
+// no tester list anywhere: a fresh ID with the default policy (files.storage `auto`) and no own
+// storage sends a file over 12 KB through the drop, and the drop's own protections still hold: the
+// per-file size cap and the weekly quota per drop key (those limits tests live in files.limits.worker.test.ts, with small test limits).
+
+/** A fresh sender and recipient (new seeds, so new drop keys), paired, both on the drop only. */
+async function freshPair(n: number): Promise<{ sender: FileAgent; recipient: FileAgent }> {
+  const open = (i: number, name: string): Promise<FileAgent> =>
+    openFileAgent(
+      clock,
+      new MemoryKeyStore(seed(n + i)),
+      new MemoryOwnerKeyStore(seed(n + 10 + i), passphrase()),
+      name,
+      {
+        relays: i === 0 ? RELAYS_A : RELAYS_B,
+        drop: { endpoint: ORIGIN, fetch: dropFetch() },
+        download: dropDownload,
+      },
+    );
+  const sender = await open(0, 'carol');
+  const recipient = await open(1, 'dave');
+  await pairForFiles(clock, sender, recipient);
+  return { sender, recipient };
+}
+
+describe('files on the drop are open to every user, within the limits (DROP-OPEN-1, D-129)', () => {
+  it('a fresh ID with the default policy sends a 50 KB .md file through the drop', async () => {
+    const { sender, recipient } = await freshPair(240);
+    const sent = await sender.client.sendMessage({
+      to: recipient.id,
+      text: 'notes',
+      files: [outgoing('notes.md', fileBytes(50_000, 'DROP-OPEN-1-PLAINTEXT'))],
+    });
+    expect(sent).toMatchObject({ status: 'ok', files: [{ index: 0, delivery: 'drop' }] });
+    if (sent.status !== 'ok') return;
+    expect(seen.length).toBeGreaterThan(0);
+    for (const r of seen) {
+      expect(r.body).not.toContain('notes.md');
+      expect(r.body).not.toContain('DROP-OPEN-1-PLAINTEXT');
+    }
+    await deliver(sender, recipient);
+    expect(await recipient.client.fetchFile({ envelopeId: sent.envelopeId })).toMatchObject({
+      status: 'ok',
+      name: 'notes.md',
+      size: 50_000,
+      integrity: 'verified',
+    });
   });
 });

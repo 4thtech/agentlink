@@ -3,7 +3,7 @@
 // every browser; where the record is unreadable the page says so in plain words and never invents a
 // state. The kit is saved right here, behind Touch ID or the master code (export-kit.tsx). Restore is
 // the wizard of WP-R3 (/restore/*); these rows only link to it.
-import { Icon, Surface, useHood } from '@4thtech-io/ui';
+import { Icon, InlineError, Surface, useHood } from '@4thtech-io/ui';
 import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { setKitRecordState } from '../../states/index.js';
@@ -215,11 +215,7 @@ export function BackupPage({ api: given, ...rest }: BackupPageProps): ReactEleme
                 {S.showInFinder}
               </button>
             ) : null}
-            {shown === undefined ? null : (
-              <p className="al-text-body-sm bk-error" role="alert">
-                {shown}
-              </p>
-            )}
+            {shown === undefined ? null : <InlineError>{shown}</InlineError>}
           </li>
           <li className="bk-col">
             <h3 className="al-text-label">

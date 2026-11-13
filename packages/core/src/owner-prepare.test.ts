@@ -202,12 +202,15 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
     expected.files.allowedFolders = [FOLDER];
     // D-142: every policy.set this core signs carries files.autoSave (the defaults here).
     expected.files.autoSave = { ...AUTO_SAVE_DEFAULTS };
+    // IR-RET-67-1 Medium 2: a first edit of the defaults that does not name history keeps everything.
+    expected.history = { messagesKeepDays: 0, filesKeepDays: 0 };
     expect(body.params.policy).toEqual(expected);
     // Every section and field is present: the whole document, never a partial patch.
     for (const section of Object.keys(POLICY_DEFAULTS) as (keyof Policy)[]) {
       const value = POLICY_DEFAULTS[section];
       if (Array.isArray(value)) continue;
-      expect(Object.keys(body.params.policy[section]).sort()).toEqual(
+      // RET-6: `history` is optional in the type (absent before D-148); every new policy.set has it.
+      expect(Object.keys(body.params.policy[section] ?? {}).sort()).toEqual(
         Object.keys(section === 'files' ? { ...value, autoSave: 0 } : (value as object)).sort(),
       );
     }

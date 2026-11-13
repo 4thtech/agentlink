@@ -387,15 +387,15 @@ describe('a friend joins from an invite link on a fresh home (U3-k)', () => {
     await page.getByText('Connected with Ana.').first().waitFor({ timeout: 60_000 });
     // W4-PEOPLE-INVITE (A7): the Connected moment with the 12-digit Contact check.
     // WP-3: Ana's own name is not trusted yet: "You are connected", nothing she chose in the hello
-    // prompt, then the owner names the contact and confirms it with the passkey.
+    // prompt, then the owner names the contact with one gesture (UX1113-N1: "Save with Touch ID").
     await page.getByRole('heading', { name: 'You are connected', exact: true }).waitFor();
     const before = await page.locator('body').innerText();
     expect(before).toContain('Say hello to my new contact on AgentLink.');
     expect(before).not.toContain('Say hello to Ana');
-    await page.getByLabel('Name this contact').fill('Ana');
-    await page.getByRole('button', { name: 'Save name', exact: true }).click();
+    await page.getByRole('button', { name: 'Use your own name for them', exact: true }).click();
+    await page.getByLabel('Your name for them').fill('Ana');
     await page
-      .getByRole('button', { name: /^Confirm with (Touch ID|Windows Hello|your passkey)$/ })
+      .getByRole('button', { name: /^Save with (Touch ID|Windows Hello|your passkey)$/ })
       .click();
     await page.getByRole('heading', { name: /^You and “?Ana”? are connected$/ }).waitFor();
     await page.getByText('Say hello to Ana on AgentLink.').first().waitFor();

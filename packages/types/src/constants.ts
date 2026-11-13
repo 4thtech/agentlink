@@ -126,7 +126,10 @@ export type McpStatus = (typeof MCP_STATUSES)[number];
 export const APPROVAL_STATUSES = freeze(['pending', 'approved', 'denied', 'expired'] as const);
 export type ApprovalStatus = (typeof APPROVAL_STATUSES)[number];
 
-/** The 15 tool names frozen at 0.1.0 (06 §2.0: 13 from D-53, two terms tools from D-55). */
+/**
+ * The 15 tool names frozen at 0.1.0 (06 §2.0: 13 from D-53, two terms tools from D-55), and from
+ * 0.5.2 `agentlink_tidy` (RET-7, D-148 (3); proposed, owner confirms at merge): it only proposes.
+ */
 export const MCP_TOOL_NAMES = freeze([
   'agentlink_status',
   'agentlink_create_invite',
@@ -143,6 +146,7 @@ export const MCP_TOOL_NAMES = freeze([
   'agentlink_get_proof',
   'agentlink_export_proof_pack',
   'agentlink_verify_proof_pack',
+  'agentlink_tidy',
 ] as const);
 export type McpToolName = (typeof MCP_TOOL_NAMES)[number];
 
@@ -157,6 +161,15 @@ export const APPROVAL_TOOL_NAMES = freeze([
   'agentlink_export_proof_pack',
 ] as const satisfies readonly McpToolName[]);
 export type ApprovalToolName = (typeof APPROVAL_TOOL_NAMES)[number];
+
+/**
+ * RET-7 (D-148 (3); 06 §2.0): tools whose `pending_approval` the owner approves and runs in the app
+ * (with presence), never through an `approval-request` row: the AI cannot resume them with an
+ * `approvalId` (they take none) and `agentlink_get_approval` does not know their ID.
+ */
+export const APP_APPROVAL_TOOL_NAMES = freeze([
+  'agentlink_tidy',
+] as const satisfies readonly McpToolName[]);
 
 // --- Owner actions (04 §2.5.1, §3.4.1) -----------------------------------------------------------
 

@@ -39,7 +39,10 @@ interface TableRow {
   readonly name: string;
   readonly annotations: readonly [boolean, boolean, boolean, boolean];
   readonly approval: boolean;
-  readonly phase: 'M1a' | 'M1b';
+  /** RET-7: the owner approves in the app; the tool takes no approvalId (06 §2.0, §2.6). */
+  readonly inApp: boolean;
+  /** M1a, M1b, or a later release's tool (RET-7: `0.5.2`). */
+  readonly phase: 'M1a' | 'M1b' | 'later';
 }
 
 function readTable(): TableRow[] {
@@ -55,12 +58,14 @@ function readTable(): TableRow[] {
     const flags = cells.slice(2, 6).map((c) => /^(true|false)\b/.exec(c)?.[1]);
     if (flags.some((f) => f === undefined)) throw new Error(`unreadable annotation cells: ${name}`);
     const phase = /^M1([ab])\b/.exec(cells[7] ?? '')?.[1];
-    if (phase === undefined) throw new Error(`unreadable phase: ${name}`);
+    const later = /^[0-9]+\.[0-9]+\.[0-9]+\b/.test(cells[7] ?? '');
+    if (phase === undefined && !later) throw new Error(`unreadable phase: ${name}`);
     rows.push({
       name,
       annotations: flags.map((f) => f === 'true') as unknown as TableRow['annotations'],
       approval: cells[6] !== '—',
-      phase: phase === 'a' ? 'M1a' : 'M1b',
+      inApp: /^In the app\b/.test(cells[6] ?? ''),
+      phase: later ? 'later' : phase === 'a' ? 'M1a' : 'M1b',
     });
   }
   return rows;
@@ -244,8 +249,12 @@ export function auditSurface(
     const inputProps = (tool.inputSchema['properties'] ?? {}) as Record<string, unknown>;
     // Every tool's `status` enum lists pending_approval (the common result shape), so the tools
     // that can actually return it are the table's "Approval" column.
-    if (row?.approval === true && !('approvalId' in inputProps)) {
+    if (row?.approval === true && row.inApp !== true && !('approvalId' in inputProps)) {
       bad.push(`${name}: can return pending_approval but accepts no approvalId`);
+    }
+    // RET-7: a tool the owner approves in the app never takes an approvalId to resume with.
+    if (row?.inApp === true && 'approvalId' in inputProps) {
+      bad.push(`${name}: is approved in the app but accepts an approvalId`);
     }
     for (const [word, pattern] of BANNED_WORDS) {
       for (const [where, text] of [
@@ -405,8 +414,9 @@ describe('tool-surface snapshot', () => {
 });
 
 describe('06 §2.0 table (D-53, D-55)', () => {
-  it('lists the 15 tools, 9 in M1a and 6 in M1b', () => {
-    expect(table).toHaveLength(15);
+  it('lists the 15 tools, 9 in M1a and 6 in M1b, and agentlink_tidy (RET-7)', () => {
+    expect(table).toHaveLength(16);
+    expect(table.filter((r) => r.phase === 'later').map((r) => r.name)).toEqual(['agentlink_tidy']);
     expect(table.filter((r) => r.phase === 'M1a')).toHaveLength(9);
     expect(table.filter((r) => r.phase === 'M1b')).toHaveLength(6);
   });
@@ -427,7 +437,8 @@ describe('06 §2.0 table (D-53, D-55)', () => {
     for (const name of REGISTERED_M1B) {
       expect(table.find((r) => r.name === name)?.phase).toBe('M1b');
     }
-    expect(surface.map((t) => t.name).sort()).toEqual([...m1a, ...REGISTERED_M1B].sort());
+    const later = table.filter((r) => r.phase === 'later').map((r) => r.name);
+    expect(surface.map((t) => t.name).sort()).toEqual([...m1a, ...REGISTERED_M1B, ...later].sort());
     const pending = table
       .filter((r) => r.phase === 'M1b' && !REGISTERED_M1B.includes(r.name))
       .map((r) => r.name);
@@ -449,7 +460,7 @@ describe('06 §2.0 table (D-53, D-55)', () => {
     ]);
   });
 
-  it('the registry holds exactly the 15 tools of the table, in its order (D-53, D-55)', () => {
+  it('the registry holds exactly the 16 tools of the table, in its order (D-53, D-55, RET-7)', () => {
     expect(surface.map((t) => t.name)).toEqual(table.map((r) => r.name));
   });
 

@@ -261,12 +261,16 @@ async function rulesOf(agent: Agent): Promise<{ jcs: string; version: number; do
   };
 }
 
-/** `doc` with only `files.allowedFolders` replaced. */
-function withFolders(doc: MutableJson, folders: readonly string[]): string {
+/**
+ * `doc` with only `files.allowedFolders` replaced. IR-RET-67-1 Medium 2: on the defaults (version
+ * 0) the first edit signs `history` as keep forever, never the new-ID default.
+ */
+function withFolders(doc: MutableJson, folders: readonly string[], version = 1): string {
   const files = doc['files'] as MutableJson;
   // D-142: a base signed before it gets the files.autoSave defaults, as every new policy.set does.
   return canonicalize({
     ...doc,
+    ...(version === 0 ? { history: { messagesKeepDays: 0, filesKeepDays: 0 } } : {}),
     files: {
       ...files,
       allowedFolders: [...folders],
@@ -307,8 +311,10 @@ describe('setUpSendFolder: an existing agent gains only the Send folder (M1-36b-
     expect(owners.items).toHaveLength(1);
     const after = await rulesOf(agent);
     expect(after.version).toBe(before.version + 1);
-    // Only that one folder was added.
-    expect(after.jcs).toBe(withFolders(before.doc, [folder]));
+    // Only that one folder was added (and, on the defaults, history as keep forever).
+    expect(before.version).toBe(0);
+    expect(after.jcs).toBe(withFolders(before.doc, [folder], before.version));
+    expect(after.doc['history']).toEqual({ messagesKeepDays: 0, filesKeepDays: 0 });
     const stats = await lstat(folder);
     expect(stats.isDirectory()).toBe(true);
     expect(stats.isSymbolicLink()).toBe(false);
@@ -399,11 +405,10 @@ describe('setUpSendFolder: an existing agent gains only the Send folder (M1-36b-
     }
   });
 
-  it('a Send folder that already holds files: nothing asked, nothing signed, nothing touched', async () => {
+  it('ATT-SENDFOLDER-FIX: a Send folder that already holds files is allowed, the summary says so, nothing touched', async () => {
     const { agent, owner, code } = await existingAgent();
     await mkdir(join(home, 'AgentLink', 'Send'), { recursive: true });
     await writeFile(join(home, 'AgentLink', 'Send', 'private.txt'), 'x');
-    const before = await rulesOf(agent);
     const owners = ownerSigning(() => code);
     const result = await setUpSendFolder({
       agent: agent.agentId,
@@ -412,9 +417,10 @@ describe('setUpSendFolder: an existing agent gains only the Send folder (M1-36b-
       sign: owners.sign,
       home,
     });
-    expect(result).toEqual({ status: 'not_allowed', reason: 'folder_not_empty' });
-    expect(owners.items).toEqual([]);
-    expect((await rulesOf(agent)).jcs).toBe(before.jcs);
+    expect(result.status).toBe('allowed');
+    expect(owners.items).toHaveLength(1);
+    expect(JSON.stringify(owners.items[0])).toMatch(/already holds files/);
+    expect(JSON.stringify(owners.items[0])).not.toMatch(/empty for now/);
     expect(await readdir(join(home, 'AgentLink', 'Send'))).toEqual(['private.txt']);
   });
 

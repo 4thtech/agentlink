@@ -930,6 +930,8 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
       'messages',
       'policy',
       'proofs',
+      // RET-6: what a history.* setting would remove now (a plan; deletes nothing).
+      'retention',
     ]);
     expect(Object.isFrozen(client)).toBe(true);
     // UX2-f1 adds only the pulse's exchange times (contact and time, no content) to the view;

@@ -31,6 +31,8 @@ describe('status page', () => {
         'ai_app',
         'missing_files',
         'changed_files',
+        // OD-M (WIN-DESK-2): the Windows data folder is open to other people.
+        'shared_data_folder',
       ].sort(),
     );
     for (const kind of STATUS_KINDS) {

@@ -4066,14 +4066,14 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - `actionlint` is a required check; the 100 MB staging round trip passes and its measurement is recorded; the `ci-cd.md` row matches the workflow.
 
 #### M1-28 · Encrypted drop: R2 buckets, lifecycle rule and hosting terms (D-48) (new)
-- **Status:** in progress (owner, D-129: the owner creates the R2 drop buckets and the 7-day lifecycle rule; limits 100 MB per file and 1 GB per key per week confirmed, the download limit per object as in 07 §5.4 is 16, owner-confirmed 23 Oct 2026 (D-129); counsel brief drafted in agentlink-ops; the drop stays internal-testers-only until counsel's written sign-off) · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
+- **Status:** in progress (owner, D-129: the owner creates the R2 drop buckets and the 7-day lifecycle rule; limits 100 MB per file and 1 GB per key per week confirmed, the download limit per object as in 07 §5.4 is 16, owner-confirmed 23 Oct 2026 (D-129); counsel brief drafted in agentlink-ops; the drop is open to all early users, owner 2026-11-13; counsel's written sign-off stays tracked here) · **Size:** S · **Tier:** Owner (Sonnet drafts the counsel brief) · **Security:** S1 · **Phase:** M1b
 - **Repo/path:** agentlink-ops · legal/ (counsel brief and sign-off, private); Cloudflare account (buckets, lifecycle rule, hostname)
-- **Depends on:** M0-2g · **Due:** start during M1a; buckets needed before M1-27b, terms before anyone outside the internal testers uses the drop for files (short-invite objects are open to every user: D-129 as amended by D-139 (7))
+- **Depends on:** M0-2g · **Due:** start during M1a; buckets needed before M1-27b, files open to all early users (owner 2026-11-13; short-invite objects open to every user: D-129 as amended by D-139 (7)); terms tracked here
 - **Spec:** D-48; 04 §4 (encrypted drop), §7; 07 §5.4; 08 §6; 12 §2
 - **Invariants:** I-3
 - **Scope:**
   - Create staging and production R2 buckets for the drop with a lifecycle rule deleting every object after 7 days; the `drop.agentlink.4thtech.io` hostname.
-  - Counsel reviews the hosting terms: terms of service for the drop, a takedown and abuse-report process for content that cannot be inspected (ciphertext), and the privacy notice for drop metadata (drop key, sizes, times, IPs; Cloudflare as processor). **Interim (D-129):** counsel is the owner's choice; the drop stays internal-testers-only until written sign-off. **DECISION NEEDED (owner):** terms of service and takedown process.
+  - Counsel reviews the hosting terms: terms of service for the drop, a takedown and abuse-report process for content that cannot be inspected (ciphertext), and the privacy notice for drop metadata (drop key, sizes, times, IPs; Cloudflare as processor). **Interim (D-129):** counsel is the owner's choice; the drop is open to all early users (owner 2026-11-13); written sign-off stays tracked. **DECISION NEEDED (owner):** terms of service and takedown process.
   - Limits (D-129): 100 MB per file and 1 GB per drop key per week confirmed; downloads per object: 16 (owner-confirmed 23 Oct 2026).
   - (IR-D48-1 F15g) Word the retention promise in 04 §4, 07 §5.4 and the privacy notice precisely: GET is refused at `expiresAt` by the Worker, while the R2 lifecycle rule deletes objects asynchronously, so physical deletion can lag the expiry (state the maximum observed lag after reading it back). No document promises deletion at an exact time.
 - **Acceptance:**
@@ -8171,7 +8171,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - `grep -i "agent card" docs/status.yaml` finds only code names; the docs-status check passes.
 
 #### CHORE-FILES-WIN-NAME-CASE · Files page on Windows shows a protected folder's name in lower case (new, IR-CHORE-WIN-D99-1, #559)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (`packages/node` Files route; display only, no change to what is refused)
+- **Status:** in review · **Size:** XS · **Tier:** Opus · **Security:** S2 (`packages/node` Files route; display only, no change to what is refused)
 - **Repo/path:** agentlink · `packages/node/src/local-ui/api/files.ts` (near the protected-folder check), tests
 - **Depends on:** none
 - **Spec:** 04 §4
@@ -8261,7 +8261,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Tests first (RED commit): a version-5 cloud store opens, migrates once and keeps every row; a version-6 store is unchanged; no test weakened; independent review (S2).
 
 #### CHORE-WIN-REVEAL-ARGS · Windows Show in folder: pass file names verbatim (new, low, #582)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (`packages/node` OS opener) · **Phase:** M1b
+- **Status:** in review · **Size:** XS · **Tier:** Opus · **Security:** S2 (`packages/node` OS opener) · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/approval-os.ts`, `packages/node/src/local-ui/reveal-file.ts`, tests
 - **Depends on:** MSG-FILES-IO-h
 - **Spec:** 04 §4
@@ -10687,7 +10687,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** sizes match fixtures (store and WAL, messages per person, indexed saved files, unassigned Inbox files, drop usage); no Show in Finder (deferred to RET-4); works with 2+ IDs; no name, path or link in logs or the answer beyond 11 §5.2 names (I-7); vocabulary lint; one e2e-browser journey; screenshots.
 
 #### RET-2 · Store schema: tombstones, `saved_files`, migration (0.5.2)
-- **Status:** new · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Status:** in review (branch `ret-2`) · **Size:** M · **Tier:** Opus · **Security:** S2
 - **Repo/path:** agentlink · `packages/core/src/store/schema.ts`, `packages/node/src/sqlite-schema.ts`, `packages/core/src/files/auto-save.ts`, `files/fetch*`
 - **Depends on:** RET-0
 - **Spec:** 07 §3, §3.8; 04 §4.2
@@ -10701,7 +10701,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** `RED (expected):` commit first; a relay replay of a deleted envelope is dropped; a proof pack verifies after delete (OD-4); the Contact check digits still recompute; protected items refused with a fixed reason; a moved, renamed, edited or symlinked file is untouched; files go to the OS Trash on macOS, Linux and Windows (no shell); secure_delete zeroes pages; no path or name in logs.
 
 #### RET-4 · Delete sheet, Free up space and message selection in the app (0.5.2)
-- **Status:** new · **Size:** M · **Tier:** Opus build (routes), Sonnet (UI) · **Security:** S2
+- **Status:** in review · **Size:** M · **Tier:** Opus build (routes), Sonnet (UI) · **Security:** S2
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/messages/*`, `pages/settings/storage*`; node UI server routes `POST /api/ui/history/delete/begin` and `/finish`
 - **Depends on:** RET-1, RET-3
 - **Spec:** 08 §1 "Storage, archive and delete"; 04 §4.2 "Presence and undo"; 11 §5.7
@@ -10709,21 +10709,21 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** `RED (expected):` commit first for the routes; presence required once per sheet; the list is bound at begin; Undo within 10 s cancels the commit; copy per 11 §5.7 with the OS sensor word; integrated walkthrough screenshots.
 
 #### RET-5 · Archive conversations as a store flag (0.5.2)
-- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · core store, node UI route, `apps/local-ui` (replaces the browser-only flag)
 - **Depends on:** RET-2
 - **Spec:** 04 §4.2 "Two words, two actions"; 08 §1
 - **Done when:** archive and unarchive are reversible and seen in every browser; `agentlink_inbox` and the AI are unaffected; DOM tests.
 
 #### RET-6 · Retention policy `history.*` and the daily pass (0.5.2)
-- **Status:** new · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2
 - **Repo/path:** agentlink · `packages/types/src/policy*`, `packages/core/src/policy*`, `files/retention.ts`, Settings › Storage, CLI `owner policy`
 - **Depends on:** RET-3
 - **Spec:** 06 §3 (`history`, absent-key rule); 04 §4.2 "Retention policy"
 - **Done when:** `RED (expected):` commit first; a pre-D-148 policy reads as `0`/`0`; new policies default `filesKeepDays: 90`; invalid policy or paused ID deletes nothing; no MCP tool can set it (I-4 test); preview before the first turn-on; the existing-install hint shows once.
 
 #### RET-7 · `agentlink_tidy`: the AI proposes a cleanup, the owner approves (0.5.2 or later)
-- **Status:** new · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (MCP surface)
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (MCP surface)
 - **Repo/path:** agentlink · `packages/mcp-tools/src`, core approvals, tool-surface snapshot, 06 §2.0 table
 - **Depends on:** RET-3; its own spec PR for the tool-surface change (06 §2.0)
 - **Spec:** D-148 (3); 06 §2.0; 04 §4.2 "The AI proposes, the owner approves"

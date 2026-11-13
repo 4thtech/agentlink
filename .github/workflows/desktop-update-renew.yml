@@ -1,0 +1,239 @@
+# UPD-3 (D-151, IR-UPD-8-1 #4): renew the signed desktop update manifest of the CURRENT Latest release
+# without shipping a release. Dispatch only, on main (Actions > Desktop update renew > Run workflow).
+#
+# A manifest is valid 30 days; desktop-update-expiry.yml goes red 7 days before it expires. This
+# re-signs the same release with a new 30-day window, rebuilt only from what is on the Release and
+# verified (no build artifacts, which GitHub keeps 14 days):
+#   renew-environment  no secret: `desktop-update` exists with a required reviewer, main only, no admin
+#                      bypass (IR-UPD-8-1 #2).
+#   renew-manifest     no secret, read-only: the Latest release's tag must point at a commit on main
+#                      whose root-key.json equals main's; each zip and DMG must match the Release's sums
+#                      and carry a build provenance attestation made by desktop.yml AT THAT COMMIT of
+#                      main; builds the unsigned manifest (`--renewal`).
+#   renew-sign         environment `desktop-update` (the owner's approval click), the same steps as
+#                      release.yml `sign-update-manifest`: Latest check, one step with the key, the app's
+#                      own checks, then the upload of desktop-update-<key id>.json and desktop-update.json.
+# Tools and the pin come from main (this run's commit), never from the tag.
+name: Desktop update renew
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: release-desktop-update
+  cancel-in-progress: false
+
+jobs:
+  renew-environment:
+    name: renew-environment
+    if: github.repository_owner == '4thtech' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read # read the environment's rules (gh api)
+      contents: read # check out the checker
+    steps:
+      - name: Check out this commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Check the environment desktop-update
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$REPOSITORY/environments/desktop-update" > "$RUNNER_TEMP/env.json" 2> /dev/null ||
+            echo null > "$RUNNER_TEMP/env.json"
+          gh api "repos/$REPOSITORY/environments/desktop-update/deployment-branch-policies" > "$RUNNER_TEMP/policies.json" 2> /dev/null ||
+            echo null > "$RUNNER_TEMP/policies.json"
+          node tools/release/desktop-update-environment.mjs --environment "$RUNNER_TEMP/env.json" --policies "$RUNNER_TEMP/policies.json"
+
+  renew-manifest:
+    name: renew-manifest
+    needs: renew-environment
+    if: github.ref == 'refs/heads/main' && needs.renew-environment.result == 'success' && vars.DEPLOY_FREEZE != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read # check out main; read the Release, its tag and root-key.json at the tag
+      attestations: read # gh attestation verify
+    outputs:
+      version: ${{ steps.latest.outputs.version }}
+    steps:
+      - name: Check out this commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Find the Latest release and its commit on main
+        id: latest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="$(gh api "repos/$REPOSITORY/releases/latest" --jq .tag_name)"
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::The Latest release is not a v<x.y.z> release."; exit 1; }
+          sha="$(gh api "repos/$REPOSITORY/commits/$tag" --jq .sha)"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Cannot resolve the release commit."; exit 1; }
+          status="$(gh api "repos/$REPOSITORY/compare/$sha...$GITHUB_SHA" --jq .status)"
+          case "$status" in ahead|identical) ;; *) echo "::error::$tag does not point at a commit on main. Nothing is signed."; exit 1 ;; esac
+          gh api "repos/$REPOSITORY/contents/apps/desktop/src/main/updater/root-key.json?ref=$sha" --jq .content | base64 -d > "$RUNNER_TEMP/root-key-at-release.json"
+          cmp -s "$RUNNER_TEMP/root-key-at-release.json" apps/desktop/src/main/updater/root-key.json ||
+            { echo "::error::The pinned update key changed since $tag; ship a release instead of renewing."; exit 1; }
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Renewing the update manifest of $tag."
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      - name: Build the crypto package
+        shell: bash
+        run: pnpm exec turbo run build --filter=@4thtech-io/crypto
+
+      # The anchor of a renewal: each file's attestation made by desktop.yml at the release commit on main.
+      - name: Download and check the Release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ steps.latest.outputs.version }}
+          RELEASE_SHA: ${{ steps.latest.outputs.sha }}
+          DIR: ${{ runner.temp }}/update-assets
+        run: |
+          set -euo pipefail
+          mkdir -p "$DIR"
+          cd "$DIR"
+          gh release download "v$VERSION" --repo "$REPOSITORY" --dir . \
+            --pattern "AgentLink-$VERSION-mac-arm64.zip" --pattern "AgentLink-$VERSION-mac-x64.zip" \
+            --pattern "AgentLink-$VERSION-mac-arm64.dmg" --pattern "AgentLink-$VERSION-mac-x64.dmg" \
+            --pattern AgentLink-mac-arm64.dmg --pattern AgentLink-mac-x64.dmg --pattern SHA256SUMS-desktop-app.txt
+          sha256sum --check --strict SHA256SUMS-desktop-app.txt
+          for f in "AgentLink-$VERSION-mac-arm64.zip" "AgentLink-$VERSION-mac-x64.zip" "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg"; do
+            gh attestation verify "$f" --repo "$REPOSITORY" --signer-workflow "$REPOSITORY/.github/workflows/desktop.yml" --signer-digest "$RELEASE_SHA" --source-digest "$RELEASE_SHA" --source-ref refs/heads/main --deny-self-hosted-runners > /dev/null ||
+              { echo "::error::$f has no build provenance attestation from desktop.yml at the release commit on main. Nothing is signed."; exit 1; }
+          done
+          echo "The Release assets of v$VERSION match their sums and attestations."
+
+      - name: Build the unsigned manifest
+        shell: bash
+        env:
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ steps.latest.outputs.version }}
+          DIR: ${{ runner.temp }}/update-assets
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/desktop-update"
+          node tools/release/desktop-update-manifest.mjs build --version "$VERSION" --channel stable --dir "$DIR" --root-key apps/desktop/src/main/updater/root-key.json --repository "$REPOSITORY" --renewal --out "$RUNNER_TEMP/desktop-update/desktop-update.unsigned.json"
+
+      - name: Upload the unsigned manifest
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-update-unsigned-renewal
+          path: ${{ runner.temp }}/desktop-update/desktop-update.unsigned.json
+          if-no-files-found: error
+          retention-days: 1
+
+  renew-sign:
+    name: renew-sign
+    needs: renew-manifest
+    if: github.ref == 'refs/heads/main' && needs.renew-manifest.result == 'success' && vars.DEPLOY_FREEZE != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: desktop-update
+    permissions:
+      contents: write # upload the two manifest files to the Latest GitHub Release
+    steps:
+      # Evaluated after the approval wait: a freeze set while the job waited still stops it.
+      - name: Stop if DEPLOY_FREEZE is set
+        shell: bash
+        env:
+          DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
+        run: |
+          set -euo pipefail
+          if [ "${DEPLOY_FREEZE:-}" = "true" ]; then
+            echo "::error::DEPLOY_FREEZE is set; nothing is published until the owner clears it."
+            exit 1
+          fi
+
+      - name: Check out this commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+
+      # Everything that installs or builds code runs here, before the key is read.
+      - name: Build the verifier
+        shell: bash
+        run: pnpm exec turbo run build --filter=@4thtech-io/desktop...
+
+      - name: Download the unsigned manifest
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: desktop-update-unsigned-renewal
+          path: ${{ runner.temp }}/desktop-update
+
+      - name: Check the release is still Latest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ needs.renew-manifest.outputs.version }}
+        run: |
+          set -euo pipefail
+          latest="$(gh api "repos/$REPOSITORY/releases/latest" --jq .tag_name)"
+          [ "$latest" = "v$VERSION" ] ||
+            { echo "::error::v$VERSION is no longer the Latest release. Nothing is signed."; exit 1; }
+
+      # The only step that reads the key (see release.yml sign-update-manifest).
+      - name: Sign the update manifest
+        shell: bash
+        env:
+          DESKTOP_UPDATE_KEY: ${{ secrets.DESKTOP_UPDATE_KEY }}
+          DIR: ${{ runner.temp }}/desktop-update
+        run: node tools/release/desktop-update-manifest.mjs sign --in "$DIR/desktop-update.unsigned.json" --root-key apps/desktop/src/main/updater/root-key.json --out-dir "$DIR/signed"
+
+      - name: Check the signed manifest with the app's own checks
+        shell: bash
+        env:
+          VERSION: ${{ needs.renew-manifest.outputs.version }}
+          DIR: ${{ runner.temp }}/desktop-update
+        run: node tools/release/desktop-update-manifest.mjs verify --dir "$DIR/signed" --root-key apps/desktop/src/main/updater/root-key.json --version "$VERSION" --channel stable
+
+      - name: Publish the update manifest
+        shell: bash
+        working-directory: ${{ runner.temp }}/desktop-update/signed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ needs.renew-manifest.outputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Unexpected version."; exit 1; }
+          shopt -s nullglob
+          keyed=( desktop-update-*.json )
+          [ "${#keyed[@]}" -eq 1 ] && [ -f desktop-update.json ] ||
+            { echo "::error::Expected one desktop-update-<key id>.json and desktop-update.json."; exit 1; }
+          gh release upload "v$VERSION" --repo "$REPOSITORY" --clobber -- "${keyed[0]}" desktop-update.json
+          mkdir -p ../readback
+          gh release download "v$VERSION" --repo "$REPOSITORY" --dir ../readback --clobber \
+            --pattern "${keyed[0]}" --pattern desktop-update.json
+          cmp -s -- "${keyed[0]}" "../readback/${keyed[0]}" && cmp -s -- desktop-update.json ../readback/desktop-update.json ||
+            { echo "::error::The update manifest on v$VERSION is not the one signed here."; exit 1; }
+          echo "Renewed ${keyed[0]} and desktop-update.json on v$VERSION."

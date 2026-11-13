@@ -184,6 +184,7 @@ async function insertFile(
       delivery: 'sent',
       refused_at: null,
       request_accepted_at: null,
+      deleted_at: null,
     });
     tx.insert('files', row);
   });

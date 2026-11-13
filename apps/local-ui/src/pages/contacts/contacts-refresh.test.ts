@@ -213,7 +213,7 @@ describe('UI-REFRESH-i: waiting, codes match, duplicate notice', () => {
     };
     await mount(f);
     expect(document.body.querySelector('.al-moment')).toBeNull();
-    await click(button(S.theyMatch));
+    await click(button(S.matchWithCode));
     const field = document.body.querySelector<HTMLInputElement>(
       'input[name="owner-code"]',
     ) as HTMLInputElement;

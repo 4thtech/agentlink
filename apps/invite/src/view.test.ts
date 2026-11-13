@@ -9,8 +9,8 @@ import {
   DOCS_LINKS,
   MAC_APP_AVAILABLE,
   MAC_APP_URLS,
-  MAC_APP_VERSION,
-  macAppAsset,
+  WIN_APP_AVAILABLE,
+  WIN_APP_URL,
 } from './config.js';
 import type { InviteView } from './invite-state.js';
 import { buildAppLink, buildAskAi, buildCommands } from './prompt.js';
@@ -87,23 +87,13 @@ describe('config (REL051-INV)', () => {
       expect(url).toMatch(/^https:\/\/github\.com\/4thtech\/agentlink\/releases\//);
   });
 
-  it('pins both Mac app links to the exact release assets of the desktop build, never latest', () => {
-    expect(MAC_APP_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(macAppAsset('0.5.2', 'arm64')).toBe('AgentLink-0.5.2-mac-arm64.dmg');
-    expect(macAppAsset('0.5.2', 'x64')).toBe('AgentLink-0.5.2-mac-x64.dmg');
-    for (const arch of ['arm64', 'x64'] as const) {
-      const url = MAC_APP_URLS[arch];
-      const match =
-        /^https:\/\/github\.com\/4thtech\/agentlink\/releases\/download\/v(\d+\.\d+\.\d+)\/AgentLink-(\d+\.\d+\.\d+)-mac-(arm64|x64)\.dmg$/.exec(
-          url,
-        );
-      expect(match, url).not.toBeNull();
-      expect(match?.[1]).toBe(MAC_APP_VERSION);
-      expect(match?.[2]).toBe(MAC_APP_VERSION);
-      expect(match?.[3]).toBe(arch);
-      expect(url).not.toContain('latest');
-    }
-    expect(MAC_APP_URLS.arm64).not.toBe(MAC_APP_URLS.x64);
+  it('links both Mac app files by their stable names on the latest release', () => {
+    expect(MAC_APP_URLS.arm64).toBe(
+      'https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-arm64.dmg',
+    );
+    expect(MAC_APP_URLS.x64).toBe(
+      'https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-x64.dmg',
+    );
   });
 
   it('the page links are exactly the docs links, each in a new tab with no referrer', () => {
@@ -321,6 +311,34 @@ describe('render (REL051-INV)', () => {
     const win = fakeDocument();
     render(win.doc, ready(), noCopy, undefined, { os: 'windows', macApp: true });
     expect(win.el('mac-app').hidden).toBe(true);
+  });
+
+  // WIN-DESK-1d: the unsigned Windows early build, under the Windows choice only, by its stable link.
+  it('the Windows app shows under Windows only, with the stable link and the SmartScreen note', () => {
+    expect(WIN_APP_AVAILABLE).toBe(true);
+    expect(WIN_APP_URL).toBe(
+      'https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe',
+    );
+    expect(pageHtml).toMatch(/<a id="win-app-link"(?![^>]*href)[^>]*>/);
+    expect(pageHtml).not.toContain(WIN_APP_URL);
+    const { doc, el } = fakeDocument();
+    render(doc, ready(), noCopy, undefined, { os: 'windows', winApp: true });
+    expect(el('win-app').hidden).toBe(false);
+    expect(el('win-app-link').getAttribute('href')).toBe(WIN_APP_URL);
+    expect(el('win-app-lead').textContent).toBe(strings.step.winApp.lead);
+    expect(el('win-app-link').textContent).toBe(strings.step.winApp.link);
+    expect(el('win-app-note').textContent).toContain('More info');
+    expect(el('win-app-note').textContent).toContain('Run anyway');
+    el('os-mac').onclick?.();
+    expect(el('win-app').hidden).toBe(true);
+    el('os-windows').onclick?.();
+    expect(el('win-app').hidden).toBe(false);
+    const off = fakeDocument();
+    render(off.doc, ready(), noCopy, undefined, { os: 'windows', winApp: false });
+    expect(off.el('win-app').hidden).toBe(true);
+    expect(off.el('win-app-link').getAttribute('href')).toBeNull();
+    render(off.doc, { kind: 'damaged' }, noCopy, undefined, { os: 'windows', winApp: true });
+    expect(off.el('win-app').hidden).toBe(true);
   });
 
   it('a state with no invite shows no step, no phone line, no Mac app and no run-again line', () => {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // REL051-RET1: Settings > Storage. Sizes only: per ID, per person for the open ID, and the Inbox
-// folder. No delete control exists; the page says deleting is coming and is local only. Names other
+// folder. RET-4: Free up space (filters, Review) replaces "deleting is coming". Names other
 // people chose render as text; a failed read says so and offers a retry; nothing is made up.
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -107,15 +107,17 @@ describe('Settings > Storage', () => {
     expect(t).toContain('10 MB of 1.1 GB');
   });
 
-  it('says deleting is coming and is only on this computer; offers no delete control', async () => {
+  it('RET-4: Free up space replaces "coming"; nothing is deleted until Review and the sheet', async () => {
     await mount(api({ kind: 'ok', status: 200, data: ANSWER }));
-    expect(text()).toContain('Deleting is coming');
-    expect(text()).toContain('only remove them from this computer');
-    expect(text()).toContain('the other person keeps their copy and is not told');
-    const controls = [...host.querySelectorAll('button, a, input')].map((c) =>
+    expect(text()).not.toContain('Deleting is coming');
+    expect(text()).toContain('Free up space');
+    expect(text()).toContain('Your contacts keep their copies.');
+    const controls = [...host.querySelectorAll('button, a')].map((c) =>
       (c.textContent ?? '').trim().toLowerCase(),
     );
-    expect(controls.some((c) => /delete|remove|clear|free up/.test(c))).toBe(false);
+    // The page itself has no delete button: Review asks what would go, the sheet asks for presence.
+    expect(controls.some((c) => /^delete|^remove|^clear/.test(c))).toBe(false);
+    expect(controls).toContain('review');
   });
 
   it('renders a name another person chose as plain text', async () => {
@@ -129,11 +131,33 @@ describe('Settings > Storage', () => {
     expect(text()).not.toMatch(/wallet|\bgas\b|seed phrase|transaction/i);
   });
 
+  it('an owner with no ID sees a calm empty state, not a failure or an Inbox read', async () => {
+    await mount(
+      api({
+        kind: 'ok',
+        status: 200,
+        data: { status: 'ok', switchable: true, ids: [], inbox: null },
+      }),
+    );
+    expect(text()).toContain('No IDs yet — nothing stored.');
+    expect(text()).not.toContain('could not be read');
+    expect(host.querySelector('[role="alert"]')).toBeNull();
+  });
+
   it('a failed read says so and Try again reads once more', async () => {
-    const get = vi
+    const sizes = vi
       .fn()
       .mockResolvedValueOnce({ kind: 'error', status: 503 })
       .mockResolvedValueOnce({ kind: 'ok', status: 200, data: ANSWER });
+    // RET-4: Free up space also reads the people (the Messages list) for its filter. RET-6: Keep
+    // automatically reads its own values.
+    const get = vi.fn((path: string) =>
+      path === '/api/ui/messages'
+        ? Promise.resolve({ kind: 'ok', status: 200, data: { conversations: [] } })
+        : path.startsWith('/api/ui/storage/retention')
+          ? Promise.resolve({ kind: 'ok', status: 200, data: { status: 'not_valid' } })
+          : (sizes() as Promise<unknown>),
+    );
     await mount({ get } as unknown as ApiClient);
     expect(text()).toContain('The sizes could not be read just now.');
     const retry = [...host.querySelectorAll('button')].find((b) => b.textContent === 'Try again');
@@ -141,7 +165,7 @@ describe('Settings > Storage', () => {
       retry?.click();
     });
     await settle();
-    expect(get).toHaveBeenCalledTimes(2);
+    expect(sizes).toHaveBeenCalledTimes(2);
     expect(text()).toContain('Marko Novak');
   });
 

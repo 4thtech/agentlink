@@ -149,6 +149,12 @@ async function type(el: HTMLInputElement, value: string): Promise<void> {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(el, value);
     el.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  // UX1113-N2: the label is checked while typing (debounced), and the name typed in Remove starts the
+  // read of the running apps, both before the one button can go.
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, el.name === 'agent-label' ? 400 : 0));
+  });
+  await settle();
 }
 /** Text without the bidi isolates the page puts around labels (U+2068, U+2069). */
 const plain = (el: Element): string => (el.textContent ?? '').replace(/[\u2068\u2069]/g, '');
@@ -295,7 +301,7 @@ describe('Rename', () => {
     const field = rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!;
     expect(field.maxLength).toBe(32);
     await type(field, 'Home');
-    await click(button(rowOf('work'), 'Rename with Touch ID'));
+    await click(button(rowOf('work'), 'Rename with your master code'));
     expect(plain(document.body)).toContain('Rename Work to Home');
     await type(code(), '123456');
     await click(button(document.body, 'Confirm with your master code'));
@@ -316,7 +322,7 @@ describe('Rename', () => {
     await mountPage();
     await click(button(rowOf('work'), 'Rename'));
     await type(rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
-    await click(button(rowOf('work'), 'Rename with Touch ID'));
+    await click(button(rowOf('work'), 'Rename with your master code'));
     await type(code(), '123456');
     await click(button(document.body, 'Confirm with your master code'));
     // WP-1: a 501 (the rename that updates the card was not offered) says what to do, not "Try again".
@@ -342,7 +348,7 @@ describe('label check and removal states', () => {
     await mountPage();
     await click(button(rowOf('work'), 'Rename'));
     await type(rowOf('work').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
-    await click(button(rowOf('work'), 'Rename with Touch ID'));
+    await click(button(rowOf('work'), 'Rename with your master code'));
     expect(plain(document.body)).toContain("That name can't be used.");
     expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
   });
@@ -352,7 +358,7 @@ describe('label check and removal states', () => {
     await click(await inMore(rowOf('work'), 'Remove'));
     const sheet = document.body.querySelector<HTMLElement>('[role="dialog"]')!;
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
-    await click(button(sheet, 'Remove with Touch ID'));
+    await click(button(sheet, 'Remove with your master code'));
     await type(code(), '123456');
     await click(button(document.body, 'Confirm with your master code'));
     expect(document.body.querySelector('[role="dialog"]')).toBeNull();
@@ -367,7 +373,7 @@ describe('Remove', () => {
   };
   const confirmTyped = async (sheet: HTMLElement): Promise<void> => {
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
-    await click(button(sheet, 'Remove with Touch ID'));
+    await click(button(sheet, 'Remove with your master code'));
     await type(code(), '123456');
     await click(button(document.body, 'Confirm with your master code'));
   };
@@ -380,12 +386,12 @@ describe('Remove', () => {
     expect(plain(sheet)).toContain("This can't be undone.");
     expect(plain(sheet)).toContain('ID folder: work');
     expect(button(sheet, 'Save recovery kit first')).toBeDefined();
-    expect(button(sheet, 'Remove with Touch ID')!.disabled).toBe(true);
+    expect(button(sheet, 'Remove with your master code')!.disabled).toBe(true);
     const field = sheet.querySelector<HTMLInputElement>('input[type="text"]')!;
     await type(field, 'work');
-    expect(button(sheet, 'Remove with Touch ID')!.disabled).toBe(true);
+    expect(button(sheet, 'Remove with your master code')!.disabled).toBe(true);
     await type(field, 'Work');
-    expect(button(sheet, 'Remove with Touch ID')!.disabled).toBe(false);
+    expect(button(sheet, 'Remove with your master code')!.disabled).toBe(false);
   });
   it('sends the typed label and shows the in_use sentence with Check again', async () => {
     answers['POST /api/ui/agents/remove'] = { status: 409, body: { status: 'in_use' } };
@@ -412,8 +418,8 @@ describe('Remove', () => {
     ]);
     answers['GET /api/ui/agents'] = { status: 200, body: running };
     const sheet = await open('work');
+    // UX1113-N2: the read of the running apps happens once the name is typed, before the one button.
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
-    await click(button(sheet, 'Remove with Touch ID'));
     expect(plain(document.body)).toContain('Quit Codex first.');
     expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
     expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
@@ -424,6 +430,7 @@ describe('Remove', () => {
     // Quit: Check again goes on to the Touch ID step, and the server still decides.
     answers['GET /api/ui/agents'] = { status: 200, body: list(FOUR) };
     await click(button(document.body, 'Check again'));
+    await click(button(document.body, 'Remove with your master code'));
     expect(code()).toBeTruthy();
     expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
   });
@@ -440,8 +447,8 @@ describe('Remove', () => {
     ]);
     answers['GET /api/ui/agents'] = { status: 200, body: running };
     const sheet = await open('work');
+    // UX1113-N2: the read of the running apps happens once the name is typed, before the one button.
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
-    await click(button(sheet, 'Remove with Touch ID'));
     expect(plain(document.body)).toContain(
       'Claude Code sessions in Terminal are still using this ID. Close them, then check again.',
     );
@@ -456,6 +463,7 @@ describe('Remove', () => {
     // Quit: Check again goes on to the Touch ID step, and the server still decides.
     answers['GET /api/ui/agents'] = { status: 200, body: list(FOUR) };
     await click(button(document.body, 'Check again'));
+    await click(button(document.body, 'Remove with your master code'));
     expect(code()).toBeTruthy();
     expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
   });
@@ -472,8 +480,8 @@ describe('Remove', () => {
     ]);
     answers['GET /api/ui/agents'] = { status: 200, body: running };
     const sheet = await open('work');
+    // UX1113-N2: the read of the running apps happens once the name is typed, before the one button.
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
-    await click(button(sheet, 'Remove with Touch ID'));
     expect(plain(document.body)).toContain(
       'OpenCode keeps running in the background after you close its window. Quit it from its menu, then check again.',
     );
@@ -488,6 +496,7 @@ describe('Remove', () => {
     // Quit: Check again goes on to the Touch ID step, and the server still decides.
     answers['GET /api/ui/agents'] = { status: 200, body: list(FOUR) };
     await click(button(document.body, 'Check again'));
+    await click(button(document.body, 'Remove with your master code'));
     expect(code()).toBeTruthy();
     expect(calls.some((c) => c.url === '/api/ui/agents/remove')).toBe(false);
   });
@@ -495,7 +504,7 @@ describe('Remove', () => {
     const sheet = await open('work');
     answers['GET /api/ui/agents'] = { status: 500, body: {} };
     await type(sheet.querySelector<HTMLInputElement>('input[type="text"]')!, 'Work');
-    await click(button(sheet, 'Remove with Touch ID'));
+    await click(button(sheet, 'Remove with your master code'));
     expect(code()).toBeTruthy();
   });
   it('reads "not available" gracefully and never says it was removed', async () => {
@@ -515,7 +524,7 @@ describe('Remove', () => {
     const sheet = await open('work');
     await confirmTyped(sheet);
     expect(plain(document.body)).toContain("Remove anyway? Contacts can't be told now.");
-    expect(button(document.body, 'Remove anyway')).toBeDefined();
+    expect(button(document.body, 'Remove anyway with your master code')).toBeDefined();
     expect(button(document.body, 'Not now')).toBeDefined();
   });
   it('says "You switched agents" and closes when the page was for another agent', async () => {
@@ -660,7 +669,7 @@ describe('W8-S4: finish removing, and one "Not used" line', () => {
     expect(unisolated(sheet)).toContain('Finish removing Old test');
     expect(sheet.querySelector('input[type="text"]')).toBeNull();
     expect(button(sheet, 'Save recovery kit first')).toBeDefined();
-    await click(button(sheet, 'Finish with Touch ID'));
+    await click(button(sheet, 'Finish with your master code'));
     await type(
       document.body.querySelector<HTMLInputElement>('input[name="owner-code"]')!,
       '123456',

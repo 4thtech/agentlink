@@ -115,6 +115,7 @@ export {
   type ApprovalServerEvent,
   type ApprovalServerOptions,
   type ApprovalServerSource,
+  type DesktopAlertState,
   type PendingApprovalView,
 } from './approval-server.js';
 // M1-11s-b: what the caller wires into the local UI (D-118): the app's in-memory files and the
@@ -178,11 +179,23 @@ export {
 } from './agent-peek.js';
 // REL051-RET1: the read-only sizes of an ID's store and of the Inbox folder (Settings, Storage).
 export { peekStorageUsage, type StoragePerContact, type StorageUsage } from './storage-usage.js';
+// RET-3 (D-148; 04 §4.2): a saved Inbox file to the OS Trash, only while unchanged; never deleted.
+export {
+  moveToTrash,
+  placeNoReplace,
+  trashSavedFile,
+  type SavedFileExpectation as TrashSavedFileExpectation,
+  type TrashOptions,
+  type TrashOutcome,
+  type TrashSavedFileInput,
+} from './trash.js';
 // DESK051-UPD: Settings > Updates in the desktop app (the desktop host builds the desk);
 // REL051-UPD2: and in the browser app (apps/cli/src/runtime/npm-update-check.ts).
 export {
   APP_UPDATE_CHECK_PATH,
+  APP_UPDATE_INSTALL_PATH,
   APP_UPDATE_PATH,
+  APP_UPDATE_RESTART_PATH,
   type AppUpdateInstall,
   type AppUpdateState,
   type AppUpdateView,

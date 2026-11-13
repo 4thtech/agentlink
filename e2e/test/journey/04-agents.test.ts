@@ -23,7 +23,6 @@ import {
   removeAgent,
 } from './helpers-agents.js';
 import {
-  CONFIRM_PASSKEY,
   chapter,
   eventually,
   firstRunWithTouchId,
@@ -120,9 +119,9 @@ describe('chapter 4: agents', () => {
     await openAgents(jp.page);
     await agentCard(jp.page, 'Ana').getByRole('button', { name: 'Rename', exact: true }).click();
     await jp.page.getByLabel('Name').fill('Ana Studio');
-    await jp.page.getByRole('button', { name: 'Rename with Touch ID' }).click();
+    // UX1113-N2: the button is the gesture; no second confirm.
     await withDiagnostics(jp.page, 'Rename asks for Touch ID', () =>
-      jp.page.getByRole('button', { name: CONFIRM_PASSKEY }).click({ timeout: 60_000 }),
+      jp.page.getByRole('button', { name: 'Rename with Touch ID' }).click({ timeout: 60_000 }),
     );
     await agentCard(jp.page, 'Ana Studio').waitFor({ timeout: 30_000 });
     expect(await text(jp.page)).not.toContain("Couldn't rename it");
@@ -263,7 +262,6 @@ describe('chapter 4: agents', () => {
     await pauseAna(page);
     const before = jp.gestures.total();
     await page.getByRole('button', { name: 'Resume with Touch ID' }).first().click();
-    await page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
     await eventually(
       'Ana resumed',
       async () => !(await text(page)).includes('Ana is paused'),
@@ -323,7 +321,7 @@ describe('chapter 4: agents', () => {
       .first()
       .waitFor({ timeout: 60_000 });
     await withDiagnostics(page, 'Resume asks for Touch ID', () =>
-      page.getByRole('button', { name: CONFIRM_PASSKEY }).click({ timeout: 60_000 }),
+      page.getByRole('button', { name: 'Resume with Touch ID' }).first().click({ timeout: 60_000 }),
     );
     await eventually(
       'Work resumed',
@@ -351,7 +349,6 @@ describe('chapter 4: agents', () => {
       await agentCard(a.page, 'Ana').getByRole('button', { name: 'Rename', exact: true }).click();
       await a.page.getByLabel('Name').fill('Ana Studio');
       await a.page.getByRole('button', { name: 'Rename with Touch ID' }).click();
-      await a.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
       await a.page.getByText('Ana Studio').first().waitFor();
       expect(a.gestures.total() - before).toBe(1);
 

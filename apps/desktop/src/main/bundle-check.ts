@@ -12,8 +12,9 @@
 // residual in 04 §2.3.4). It catches a file changed or swapped after the build (a broken copy, a
 // careless edit, a simple swap of one binary) and fails closed with a fixed page. Phase 3 replaces it
 // with the OS signature and caller checks. Not checked: the core's node_modules (they carry native
-// modules that signing rewrites; the bundle signature seals them on macOS). Windows builds carry no
-// record yet ('unchecked').
+// modules that signing rewrites; the bundle signature seals them on macOS). WIN-DESK-2: Windows builds
+// carry the record too (resources\node\node.exe, the host, resources\native\agentlink-presence.exe;
+// build-win.mjs). Unsigned there, so the record is covered by ASAR integrity only.
 //
 // Hashing goes through @4thtech-io/crypto (AGENTS.md). Nothing is logged.
 import { createReadStream } from 'node:fs';
@@ -32,7 +33,7 @@ export type BundlePaths = Readonly<Record<BundleFileKey, string | null>>;
 
 const HEX64 = /^[0-9a-f]{64}$/;
 
-/** The files under `resourcesPath` (macOS `AgentLink.app/Contents/Resources`). */
+/** The files under `resourcesPath` (macOS `AgentLink.app/Contents/Resources`, Windows `…\resources`). */
 export function bundleFilePaths(resourcesPath: string, platform: string): BundlePaths {
   return {
     node: join(
@@ -51,7 +52,9 @@ export function bundleFilePaths(resourcesPath: string, platform: string): Bundle
             'MacOS',
             'agentlink-presence',
           )
-        : null,
+        : platform === 'win32'
+          ? join(resourcesPath, 'native', 'agentlink-presence.exe')
+          : null,
   };
 }
 
@@ -86,7 +89,7 @@ export async function sha256File(path: string): Promise<string> {
 
 /**
  * 'ok' when every recorded file matches; 'changed' when one differs, is missing or unreadable, or
- * the record is broken; 'unchecked' when there is no record (a development run, a Windows build).
+ * the record is broken; 'unchecked' when there is no record (a development run).
  */
 export async function verifyBundle(
   recordText: string | null,

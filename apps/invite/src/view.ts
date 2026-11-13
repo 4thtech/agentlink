@@ -14,7 +14,7 @@
 // with where to paste it), then the link for people who already have AgentLink, then Ask your AI. A
 // phone gets a line saying AgentLink runs on a computer. The Mac app shows only when the release
 // switch MAC_APP_AVAILABLE is on (config.ts); its link is a build constant.
-import { MAC_APP_AVAILABLE, MAC_APP_URLS } from './config.js';
+import { MAC_APP_AVAILABLE, MAC_APP_URLS, WIN_APP_AVAILABLE, WIN_APP_URL } from './config.js';
 import type { InviteView } from './invite-state.js';
 import type { InviteCommands } from './prompt.js';
 import { DESKTOP_APP_LINKS, GET_APP_URL } from './flags.js';
@@ -88,6 +88,8 @@ export interface RenderOptions {
   readonly phone?: boolean;
   /** The Mac app release switch (tests pass it; the page uses the build constant). */
   readonly macApp?: boolean;
+  /** WIN-DESK-1d: the Windows app release switch (default WIN_APP_AVAILABLE). */
+  readonly winApp?: boolean;
 }
 
 /**
@@ -102,7 +104,7 @@ export function render(
   retry?: () => void,
   options: RenderOptions = {},
 ): void {
-  const { phone = false, macApp = MAC_APP_AVAILABLE } = options;
+  const { phone = false, macApp = MAC_APP_AVAILABLE, winApp = WIN_APP_AVAILABLE } = options;
   const os = options.os === undefined ? (phone ? null : 'mac') : options.os;
   const state = element(doc, 'state');
   const retryButton = element(doc, 'retry') as HTMLButtonElement;
@@ -152,6 +154,8 @@ export function render(
     (arch) => [arch, element(doc, `mac-app-${arch}`)] as const,
   );
   const helpAgain = element(doc, 'help-again');
+  const winAppBlock = element(doc, 'win-app');
+  const winAppLink = element(doc, 'win-app-link');
 
   // Start from nothing shown: a state never shows a command or a sentence.
   inviter.hidden = true;
@@ -174,6 +178,8 @@ export function render(
   phoneNote.hidden = true;
   macAppBlock.hidden = true;
   for (const [, link] of macAppLinks) link.removeAttribute('href');
+  winAppBlock.hidden = true;
+  winAppLink.removeAttribute('href');
   helpAgain.hidden = true;
   retryButton.hidden = true;
   retryButton.disabled = false;
@@ -287,6 +293,12 @@ export function render(
       element(doc, 'mac-app-which').textContent = strings.step.macApp.which;
       element(doc, 'mac-app-note').textContent = strings.step.macApp.note;
     }
+    if (winApp) {
+      element(doc, 'win-app-lead').textContent = strings.step.winApp.lead;
+      winAppLink.textContent = strings.step.winApp.link;
+      winAppLink.setAttribute('href', WIN_APP_URL);
+      element(doc, 'win-app-note').textContent = strings.step.winApp.note;
+    }
     // On a phone or tablet nothing is chosen first (null): no command is shown until the person
     // picks the computer they will use.
     const choose = (o: Os | null): void => {
@@ -299,6 +311,7 @@ export function render(
       element(doc, 'step-text').hidden = o === null;
       element(doc, 'copy').hidden = o === null;
       macAppBlock.hidden = !(macApp && o === 'mac');
+      winAppBlock.hidden = !(winApp && o === 'windows');
       show(commandCard);
     };
     for (const [o, button] of osButtons) {

@@ -88,13 +88,18 @@ describe('the pages', () => {
         // app's links have no href in the HTML (its release switch is off). WP-D9: the two app
         // links of the command card are in the file only as empty, hidden placeholders with no
         // address and no text; only a build with the desktop app links flag on (src/flags.ts)
-        // fills and shows them.
+        // fills and shows them. WIN-DESK-2: the Windows app's link (#win-app-link) is in the file
+        // with no href too, inside the hidden #win-app block; the script fills it only on Windows.
         expect([...html.matchAll(/https?:\/\/[^\s"'<>]*/gi)].map((m) => m[0])).toEqual([
           DOCS_LINKS.guide,
           DOCS_LINKS.windows,
         ]);
         const anchors = [...html.matchAll(/<a\b[^>]*>/gi)].map((m) => m[0]);
-        expect(anchors).toHaveLength(6);
+        expect(anchors).toHaveLength(7);
+        expect(anchors.filter((a) => /id="win-app-link"/.test(a))).toEqual([
+          '<a id="win-app-link" target="_blank" rel="noopener noreferrer">',
+        ]);
+        expect(html).toMatch(/<p id="win-app" class="mac-app small" hidden>/);
         const appAnchors = [
           '<a id="open-app" class="btn secondary">',
           '<a id="get-app" class="btn secondary" rel="noopener noreferrer">',

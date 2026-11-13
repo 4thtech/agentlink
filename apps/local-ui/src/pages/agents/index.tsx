@@ -12,7 +12,7 @@ import {
   SkeletonGate,
   SkeletonList,
   SkeletonTable,
-  Surface,
+  Banner,
   useHood,
 } from '@4thtech-io/ui';
 import {
@@ -283,23 +283,20 @@ export function AgentsPage({
   const pausedOpen = open !== undefined && stateOf(open) === 'paused' ? open : undefined;
   const banner =
     pausedOpen === undefined ? null : (
-      <PausedBanner row={pausedOpen} resuming={resuming} onResume={() => setResuming(true)}>
-        {resuming ? (
-          <ResumeGate
-            row={pausedOpen}
-            api={api}
-            owner={owner}
-            onCancel={() => setResuming(false)}
-            onResumed={() => {
-              setResuming(false);
-              changed();
-            }}
-            onAgentChanged={() => {
-              setResuming(false);
-              agentChanged();
-            }}
-          />
-        ) : null}
+      <PausedBanner row={pausedOpen}>
+        <ResumeGate
+          row={pausedOpen}
+          api={api}
+          owner={owner}
+          onResumed={() => {
+            setResuming(false);
+            changed();
+          }}
+          onAgentChanged={() => {
+            setResuming(false);
+            agentChanged();
+          }}
+        />
       </PausedBanner>
     );
   // The Resume gate of an agent that is not shown as paused (an intent, or a stale read).
@@ -329,14 +326,16 @@ export function AgentsPage({
 
   let body: ReactElement;
   const errorBox = (
-    <Surface as="section" level={1} className="ag-error-box">
-      <p className="al-text-body" role="alert">
-        {S.loadError}
-      </p>
-      <Button variant="secondary" onClick={reread}>
-        {S.tryAgain}
-      </Button>
-    </Surface>
+    <Banner
+      tone="danger"
+      action={
+        <Button variant="secondary" size="sm" onClick={reread}>
+          {S.tryAgain}
+        </Button>
+      }
+    >
+      {S.loadError}
+    </Banner>
   );
   if (failed && detailName !== undefined) {
     body = errorBox;

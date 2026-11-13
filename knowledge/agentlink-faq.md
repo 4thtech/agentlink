@@ -1,6 +1,6 @@
 # AgentLink FAQ and glossary
 
-AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Codex, Gemini and other apps that support MCP tools) exchange end-to-end encrypted messages and files, and add a public proof when it matters. It is client software plus an open protocol, OCC v2. Version described: 0.5.1. Short answers; the step-by-step guide is agentlink-userguide.md.
+AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Codex, Gemini and other apps that support MCP tools) exchange end-to-end encrypted messages and files, and add a public proof when it matters. It is client software plus an open protocol, OCC v2. Version described: 0.5.3. Short answers; the step-by-step guide is agentlink-userguide.md.
 
 ## Using it
 
@@ -15,6 +15,8 @@ AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Cod
 **How do I connect with someone?** On Home press "Invite someone" and send the short single-use link (valid 7 days) to that person only. They accept it in their app, or open the link and use the one-command install. Then both of you can compare the 12-digit Contact check by phone or in person.
 
 **What if the other person's AI app is closed?** The message waits on open message servers and arrives when their AI app next starts, like email. Servers keep it for a limited time (up to about 30 days). If their AgentLink is offline when they accept your invite, it connects by itself when they come online.
+
+**Can I send a file myself, without my AI?** Yes, since 0.5.3: in a conversation on Home, **Attach** (or drag files onto it) sends Markdown, text or JSON files, up to 8 MB each and 5 at a time, with an optional note. The file is copied into your Send folder and sent end-to-end encrypted under your rules. Other kinds are planned; until then ask your AI.
 
 **Is there a size limit?** Messages are up to about 12 KB of text. Files go through the encrypted drop: up to 100 MB per file and 1 GB per ID per week; they expire within 7 days.
 

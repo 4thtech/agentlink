@@ -28,6 +28,7 @@ export const KNOWLEDGE_FILES = [
   'README.md',
   'agentlink-desktop-app.md',
   'agentlink-faq.md',
+  'agentlink-files-and-storage.md',
   'agentlink-overview.md',
   'agentlink-security-and-privacy.md',
   'agentlink-technical-overview.md',

@@ -10,10 +10,12 @@ export const CLI_PREFIX = 'npx -y @4thtech-io/agentlink';
 
 export const APPROVAL_STRINGS = Object.freeze({
   cannotApprove: "Your AI can't approve this for you.",
-  notRunning: `AgentLink is not running. Open it again from your AI, or run ${CLI_PREFIX} approve in your own terminal.`,
+  notRunning: `AgentLink is not running. Open the AgentLink app again, or start it from your AI app.`,
   firstRunTitle: 'Protect your approvals',
-  firstRun:
-    'Approvals need you: each approval, or each list of approvals you review together, asks for your passkey or master code, and only after you click Approve. Never give them to your AI.',
+  // UX1113-N2 (PRESENCE-COPY): the sensor's own word, never "passkey" on a Mac or Windows.
+  get firstRun(): string {
+    return `Approvals need you: each approval, or each list of approvals you review together, asks for ${sensorWord()} or your master code, and only after you click Approve. Never give them to your AI.`;
+  },
   checkFailedTitle: "Couldn't check how approvals are protected",
   checkFailed: "AgentLink didn't answer just now. Nothing was changed.",
   retry: 'Try again',
@@ -30,7 +32,9 @@ export const APPROVAL_STRINGS = Object.freeze({
   needsOwnerTitle: 'Set up AgentLink',
   needsOwner:
     'Finish setting up AgentLink first: create your first ID on Home and save your master code. Until then, nothing can be approved here.',
-  noPasskeys: "Passkeys aren't available in this browser. Approve with your master code.",
+  get noPasskeys(): string {
+    return `${sensorSentence()} isn't available here. Approve with your master code.`;
+  },
   appTitle: 'Approvals',
   // UX2-a (B-11 §26.2): the Grid/List control.
   layout: 'Layout',
@@ -85,6 +89,25 @@ export const APPROVAL_STRINGS = Object.freeze({
   get denyWithPasskey(): string {
     return `Deny with ${sensorWord()}`;
   },
+  // N3 / OWNERSTEP-LEFT: the one-step buttons name the sensor that works here ({sensor} is Touch ID
+  // in the Mac app, Windows Hello on Windows, "your passkey" in a browser elsewhere).
+  approveWith: 'Approve with {sensor}',
+  denyWith: 'Deny with {sensor}',
+  confirmWith: 'Confirm with {sensor}',
+  // N3 (D3): the compact card's own control; it opens the full approval in place.
+  review: 'Review',
+  hideReview: 'Hide details',
+  cancel: 'Cancel',
+  // IR-UX1113-N2-1 #2: the sensor was used, and the server did not accept the proof.
+  sensorRefused:
+    "AgentLink didn't accept that confirmation. Nothing was changed. Try again, or use your master code.",
+  // IR-N3-1 #5: the server could not use Touch ID (or the passkey) here just now.
+  sensorUnavailable:
+    "That confirmation isn't available here right now. Nothing was changed. Use your master code.",
+  // IR-N3-1 #4: the compact line for a request with no name.
+  aContact: 'a contact',
+  // IR-N3-1 #2: the capped terms on the compact card; the rest is under Review.
+  moreInReview: '{count} more in Review.',
   confirmApproval: 'Confirm approval',
   confirmDenial: 'Confirm denial',
   approved: 'Approved.',
@@ -93,8 +116,10 @@ export const APPROVAL_STRINGS = Object.freeze({
     'Free means your messages travel over the network at no cost. Only proofs cost a small fee.',
   denied: 'Denied.',
   presenceRequired: 'Enter your master code. Nothing was changed.',
-  presenceRejected: "That didn't match your passkey or master code. Nothing was changed.",
-  wait: `Too many wrong tries. Wait {seconds} seconds, then try again. Nothing was changed. You can also run ${CLI_PREFIX} approve in your own terminal.`,
+  get presenceRejected(): string {
+    return `That didn't match ${sensorWord()} or your master code. Nothing was changed.`;
+  },
+  wait: `Too many wrong tries. Wait {seconds} seconds, then try again. Nothing was changed.`,
   notPending: 'This request is no longer waiting for you.',
   listNotPending:
     'Some of these requests are no longer waiting for you. Nothing was changed. Review the list again.',

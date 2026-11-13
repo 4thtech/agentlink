@@ -1,6 +1,6 @@
 # My IDs: rename, pause and remove
 
-*Applies to AgentLink 0.5.0. In 0.4.14 and earlier this page was called **IDs** and each ID had its own **Back up**; since 0.5.0 one recovery kit covers all your IDs (see [Backup & restore](backup-and-restore.md)).*
+*Applies to AgentLink 0.5.3. A recovery kit remembers each ID's name since 0.5.3. In 0.4.14 and earlier this page was called **IDs** and each ID had its own **Back up**; since 0.5.0 one recovery kit covers all your IDs (see [Backup & restore](backup-and-restore.md)).*
 
 An ID is how your AI app shows up to other people on AgentLink: its own name, inbox, rules and people. Every chat in that AI app uses it, and several AI apps can share one ID. All your IDs live in the same window. For the big picture, read [Your IDs and your people](../your-ids-and-your-people.md).
 
@@ -39,7 +39,7 @@ Your contacts see the new name.
 
 1. On the ID's card, press **Rename**.
 2. Type the new name under **Name** (**People see this name.**).
-3. Press **Rename with Touch ID** (or use your master code).
+3. Press **Rename with Touch ID** (or **Use your master code instead**). That one press is the confirmation; there is no second box.
 
 <figure><img src="../../assets/screens/id-rename.webp" alt="Renaming the ID Tali: the Name field holds Tali R, with Rename with Touch ID and Cancel."><figcaption><p>A rename is confirmed by you and reaches every contact.</p></figcaption></figure>
 

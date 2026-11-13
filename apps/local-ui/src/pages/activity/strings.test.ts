@@ -76,3 +76,10 @@ describe('Activity copy (11 §5.1)', () => {
     expect(ACTIVITY_COPY.emptyPrompt).toMatch(/your AI asks for something/);
   });
 });
+
+describe('UX-LEFT-1 (R1-UI-25): rule rows say what happens next', () => {
+  it('the rules row says the new rules apply and where to see them', () => {
+    expect(ACTIVITY_COPY.rulesChangedLine).toContain('apply from now on');
+    expect(ACTIVITY_COPY.rulesChangedLine).toContain('Rules');
+  });
+});

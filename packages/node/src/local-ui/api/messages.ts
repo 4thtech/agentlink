@@ -95,7 +95,19 @@ function itemView(box: MessageBox, item: unknown): JsonObject | undefined {
   if (typeof text !== 'string' || typeof proof !== 'boolean') return undefined;
   const shownFiles = filesView(files);
   if (shownFiles === undefined) return undefined;
-  const base: JsonObject = { id, at, type, text, files: shownFiles, proof, size };
+  // MSG-ORDER-1: the local order of one second (core's `seq`), a whole number when present.
+  const { seq } = item as Record<string, unknown>;
+  if (seq !== undefined && !isTime(seq)) return undefined;
+  const base: JsonObject = {
+    id,
+    at,
+    type,
+    text,
+    files: shownFiles,
+    proof,
+    size,
+    ...(seq === undefined ? {} : { seq }),
+  };
   if (box === 'in') return base;
   const { status, receipt } = item as Record<string, unknown>;
   if (typeof status !== 'string' || !SENT_STATUSES.has(status)) return undefined;

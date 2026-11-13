@@ -31,10 +31,16 @@ export const TAGS = Object.freeze({
   /**
    * D-145 (5), 08 §8 (WP-D10): a desktop update key statement is BIP-340 by the offline ROOT key over
    * taggedHash(TAGS.desktopKeyStatement, JCS(statement without sig)). The tag equals its `domain`.
+   * Retired by UPD-1 (owner decision 2026-11-13: one pinned update key, no root statements); kept
+   * only so the tag is never reused.
    */
   desktopKeyStatement: 'agentlink-desktop-root/v1',
-  /** D-145 (5): a desktop update manifest, BIP-340 by the UPDATE key, over JCS(manifest without sig). */
-  desktopUpdateManifest: 'agentlink-desktop-update/v1',
+  /**
+   * D-145 (5), UPD-1: a desktop update manifest, format v2 (asset `kind`), BIP-340 by the single
+   * update key pinned in the app, over JCS(manifest without sig). v1 is retired: no v1 document can
+   * verify as v2 (test-vectors/desktop-update).
+   */
+  desktopUpdateManifest: 'agentlink-desktop-update/v2',
 } as const);
 
 /** SHA-256 (FIPS 180-4). */

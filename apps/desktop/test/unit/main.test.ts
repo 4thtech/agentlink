@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { CORE_LOG_FILE } from '../../src/main/core-log.js';
-import { STATUS_ACTION_URLS, statusPageUrl } from '../../src/main/status-page.js';
+import { STATUS_ACTION_URLS, STATUS_COPY, statusPageUrl } from '../../src/main/status-page.js';
 import {
   LAUNCH_REFUSED_EXIT,
   readPreview,
@@ -136,6 +136,18 @@ describe('runShell startup', () => {
     expect(electron.app.order.slice(0, 3)).toEqual(['sandbox', 'lock', 'ready']);
   });
 
+  it('UPD-4 (IR-UPD-4-1 #2): the update start signal comes before the lock, ready and the location check', async () => {
+    const { electron, proc } = setup([], {
+      updateHealth: () => ({
+        starting: () => electron.app.order.push('update-starting'),
+        ready: () => electron.app.order.push('update-ready'),
+      }),
+    });
+    electron.app.lockGranted = false;
+    expect(await runShell(electron, proc)).toBe('second-instance');
+    expect(electron.app.order.slice(0, 3)).toEqual(['update-starting', 'sandbox', 'lock']);
+  });
+
   it('a second instance exits without a window or a core', async () => {
     const { electron, children, proc } = setup();
     electron.app.lockGranted = false;
@@ -146,6 +158,66 @@ describe('runShell startup', () => {
     expect(readFileSync(join(proc.logDir, CORE_LOG_FILE), 'utf8')).toContain(
       'app quit at start: another AgentLink is running',
     );
+  });
+
+  // WIN-DESK-1: Electron cannot resolve the data folder (on Windows: the Roaming folder of the
+  // profile is missing or broken). Never the misleading "another AgentLink is running" line.
+  it('no data folder → its own fixed line, exit 66, no lock, no window, no core', async () => {
+    const { electron, children, proc } = setup();
+    Object.assign(electron.app, {
+      getPath: () => {
+        throw new Error("Failed to get 'userData' path");
+      },
+    });
+    expect(await runShell(electron, proc)).toBe('profile');
+    expect(electron.app.exitCode).toBe(66);
+    expect(electron.app.order).not.toContain('lock');
+    expect(FakeBrowserWindow.created).toHaveLength(0);
+    expect(children).toHaveLength(0);
+    const logged = readFileSync(join(proc.logDir, CORE_LOG_FILE), 'utf8');
+    expect(logged).toContain('app quit at start: the AgentLink data folder is not available');
+    expect(logged).not.toContain('another AgentLink is running');
+    expect(logged).not.toContain('userData');
+  });
+
+  // WIN-DESK-2: the guard runs before anything else asks for an app path (the update watchdog).
+  it('no data folder → the guard answers before the update watchdog runs', async () => {
+    let watchdog = 0;
+    const { electron, proc } = setup([], {
+      updateHealth: () => {
+        watchdog += 1;
+        (electron.app as unknown as { getPath: (name: string) => string }).getPath('userData');
+        return { starting: () => undefined, ready: () => undefined };
+      },
+    });
+    Object.assign(electron.app, {
+      isPackaged: true,
+      getPath: () => {
+        throw new Error("Failed to get 'userData' path");
+      },
+    });
+    expect(await runShell(electron, proc)).toBe('profile');
+    expect(electron.app.exitCode).toBe(66);
+    expect(watchdog).toBe(0);
+  });
+
+  it('a data folder that resolves → the lock is taken as before', async () => {
+    const { electron, proc } = setup();
+    Object.assign(electron.app, {
+      getPath: () => '/Users/x/Library/Application Support/AgentLink',
+    });
+    expect(await runShell(electron, proc)).toBe('running');
+    expect(electron.app.order).toContain('lock');
+  });
+
+  it('notes "core ready" once per ready, never the link', async () => {
+    const { electron, children, proc } = setup();
+    await runShell(electron, proc);
+    children[0]?.stream.push(readyLine());
+    const text = readFileSync(join(proc.logDir, CORE_LOG_FILE), 'utf8');
+    expect(text.match(/core ready/g)).toHaveLength(1);
+    expect(text).not.toContain(SESSION_URL);
+    expect(text).not.toContain('localhost');
   });
 
   it('refuses a translocated location before starting the core', async () => {
@@ -290,7 +362,7 @@ describe('runShell startup', () => {
     } as unknown as ReleaseChecker;
     const { electron, children, proc } = setup([], { releaseChecker: () => fake });
     await runShell(electron, proc);
-    const line = `${JSON.stringify({ v: 1, type: 'app-update', ...view })}\n`;
+    const line = `${JSON.stringify({ v: 1, type: 'app-update', ...view, installable: false, percent: 0 })}\n`;
     expect(children[0]?.stream.written).toEqual([]);
     children[0]?.stream.push(readyLine());
     expect(children[0]?.stream.written).toEqual([line]);
@@ -300,6 +372,64 @@ describe('runShell startup', () => {
     expect(checks).toBe(1);
     // Answered even though nothing changed (the page waits for "checking" to end).
     expect(children[0]?.stream.written).toEqual([line, line]);
+  });
+
+  it('UPD-5: Update now and Restart now reach the in-app updater; its view goes to the core', async () => {
+    const view = { state: 'current', current: '0.5.2', latest: '', download: '' } as const;
+    const fake = {
+      view: () => view,
+      start: () => Promise.resolve(),
+      check: () => Promise.resolve(view),
+    } as unknown as ReleaseChecker;
+    const calls: string[] = [];
+    let changed: () => void = () => undefined;
+    const DMG =
+      'https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-mac-arm64.dmg';
+    let state: 'available' | 'downloading' = 'available';
+    const { electron, children, proc } = setup([], {
+      releaseChecker: () => fake,
+      inAppUpdater: (_electron, onChange) => {
+        changed = onChange;
+        return {
+          view: () => ({
+            state,
+            current: '0.5.2',
+            latest: '0.5.3',
+            download: DMG,
+            installable: true,
+            percent: 0,
+          }),
+          check: () => {
+            calls.push('check');
+            return Promise.resolve();
+          },
+          install: () => {
+            calls.push('install');
+            return true;
+          },
+          restart: () => {
+            calls.push('restart');
+            return true;
+          },
+        };
+      },
+    });
+    await runShell(electron, proc);
+    children[0]?.stream.push(readyLine());
+    const sent = (): unknown[] =>
+      (children[0]?.stream.written ?? []).map((l) => JSON.parse(l) as unknown);
+    expect(sent().at(-1)).toMatchObject({
+      type: 'app-update',
+      state: 'available',
+      installable: true,
+    });
+    children[0]?.stream.push(`${JSON.stringify({ v: 1, type: 'app-update-install' })}\n`);
+    children[0]?.stream.push(`${JSON.stringify({ v: 1, type: 'app-update-restart' })}\n`);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(calls.filter((c) => c !== 'check')).toEqual(['install', 'restart']);
+    state = 'downloading';
+    changed();
+    expect(sent().at(-1)).toMatchObject({ type: 'app-update', state: 'downloading' });
   });
 
   it('locks every webContents that is ever created', async () => {
@@ -631,5 +761,119 @@ describe('bundle tripwire (D15-07)', () => {
     const { electron, children, proc } = setup([], { verifyBundle: () => Promise.resolve('ok') });
     await runShell(electron, proc);
     expect(children).toHaveLength(1);
+  });
+});
+
+// OD-M (WIN-DESK-2): the data folder's ACL is checked before every core start on Windows.
+describe('data folder access (Windows)', () => {
+  it('a data folder others can open → the fixed page, no core', async () => {
+    const { electron, children, proc } = setup([], {
+      checkDataFolder: () => Promise.resolve('too_open'),
+    });
+    await runShell(electron, proc);
+    expect(children).toHaveLength(0);
+    expect(lastPage()).toBe(statusPageUrl('shared_data_folder'));
+  });
+
+  it('ok or unchecked → the core starts', async () => {
+    for (const result of ['ok', 'unchecked'] as const) {
+      const { electron, children, proc } = setup([], {
+        checkDataFolder: () => Promise.resolve(result),
+      });
+      await runShell(electron, proc);
+      expect(children, result).toHaveLength(1);
+    }
+  });
+
+  // Fable rules on whether "unchecked" may start; until then it starts but leaves a fixed line.
+  it('unchecked leaves a fixed line in core.log; ok leaves none', async () => {
+    const line = 'data folder access could not be checked';
+    const read = (dir: string): string => {
+      try {
+        return readFileSync(join(dir, CORE_LOG_FILE), 'utf8');
+      } catch {
+        return '';
+      }
+    };
+    const unchecked = setup([], { checkDataFolder: () => Promise.resolve('unchecked') });
+    await runShell(unchecked.electron, unchecked.proc);
+    expect(read(unchecked.proc.logDir)).toContain(line);
+    const ok = setup([], { checkDataFolder: () => Promise.resolve('ok') });
+    await runShell(ok.electron, ok.proc);
+    expect(read(ok.proc.logDir)).not.toContain(line);
+  });
+
+  it('the copy says what to do, in plain words', () => {
+    const copy = STATUS_COPY.shared_data_folder;
+    expect(copy.heading).toBe('Your AgentLink folder is shared');
+    expect(copy.body).toContain('Properties');
+    expect(copy.body).toContain('Try again');
+    expect(copy.body).not.toMatch(/ACL|SID|DACL|wallet|seed/i);
+  });
+});
+
+// WIN-DESK-3 (R-WIN §6 item 12): a browser click on Windows starts `"<exe>" -- "<link>"` (the NSIS
+// registration); while AgentLink runs, that second start forwards only the checked link.
+describe('deep link to a running copy (Windows)', () => {
+  it('the second start hands the link over and exits; the first opens it', async () => {
+    const second = setup(['--', 'agentlink://join#win'], { platform: 'win32' });
+    second.electron.app.lockGranted = false;
+    expect(await runShell(second.electron, second.proc)).toBe('second-instance');
+    expect(second.electron.app.lockData).toEqual({ deepLink: 'agentlink://join#win' });
+    expect(second.children).toHaveLength(0);
+
+    const seen: string[] = [];
+    const first = setup([], {
+      platform: 'win32',
+      toInviteLink: (link) => {
+        seen.push(link);
+        return null;
+      },
+    });
+    await runShell(first.electron, first.proc);
+    first.electron.app.emit(
+      'second-instance',
+      new FakeEvent(),
+      ['--original-process-start-time=1'],
+      'C:\\',
+      {
+        deepLink: 'agentlink://join#win',
+      },
+    );
+    await tick();
+    expect(seen).toEqual(['agentlink://join#win']);
+  });
+
+  it('a Windows-style switch before the separator is refused', async () => {
+    const { electron, proc } = setup(['/inspect', '--', 'agentlink://join#x'], {
+      platform: 'win32',
+    });
+    expect(await runShell(electron, proc)).toBe('refused');
+  });
+});
+
+// WIN-DESK-2 (R-WIN §6 item 6): the Windows tray icon follows the taskbar (light or dark).
+describe('Windows tray icon', () => {
+  it('picks the icon for the taskbar colour; dark by default', () => {
+    const res = join('C:', 'AgentLink', 'resources');
+    expect(resourcePaths(res, 'win32').trayIcon).toBe(join(res, 'assets', 'tray-dark-taskbar.ico'));
+    expect(resourcePaths(res, 'win32', { darkTaskbar: false }).trayIcon).toBe(
+      join(res, 'assets', 'tray-light-taskbar.ico'),
+    );
+    expect(resourcePaths(res, 'win32', { darkTaskbar: true }).trayIcon).toBe(
+      join(res, 'assets', 'tray-dark-taskbar.ico'),
+    );
+    expect(resourcePaths(RES, 'darwin').trayIcon).toBe(join(RES, 'assets', 'trayTemplate.png'));
+  });
+
+  it('the shell asks Electron for the taskbar colour', async () => {
+    const { electron, proc } = setup([], { platform: 'win32' });
+    const light = join(RES, 'assets', 'tray-light-taskbar.ico');
+    electron.imageFiles.add(light);
+    (electron as { nativeTheme?: unknown }).nativeTheme = {
+      shouldUseDarkColorsForSystemIntegratedUI: false,
+    };
+    await runShell(electron, proc);
+    expect((FakeTray.created[0]?.icon as { source?: string }).source).toBe(light);
   });
 });

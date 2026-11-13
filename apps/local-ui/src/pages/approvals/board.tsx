@@ -12,7 +12,7 @@ import {
   ApprovalFoot,
   ApprovedMoment,
   approvalHoodFields,
-  OwnerStep,
+  PresenceAction,
   SingleApproval,
   Statuses,
   waitText,
@@ -179,32 +179,31 @@ function ReviewStep({
     say(listText(a));
     if (a.kind === 'status' && !RETRY.has(a.status)) onFinished(listText(a), 0, 0);
   };
+  const covers = kept.length === 1 ? S.coversOne : fmt(S.coversMany, { count: kept.length });
   return (
     <Surface level={2} className="al-panel">
-      <OwnerStep
-        passkey={owner.passkey !== undefined}
-        passkeyLabel={S.confirmPasskey}
-        codeSubmit={S.confirm}
-        label={S.confirm}
-        onPasskey={async () => {
-          if (owner.passkey === undefined) return;
-          answer(await client.review(kept, { kind: 'passkey', passkey: owner.passkey }));
-        }}
-        onCode={async (code) => answer(await client.review(kept, { kind: 'code', code }))}
-      >
-        <>
-          <ul className="al-lines">
-            {kept.map((p) => (
-              <li key={p.item.approvalId}>
-                {fmt(p.decision === 'approve' ? S.lineApprove : S.lineDeny, {
-                  summary: p.item.summary,
-                })}
-              </li>
-            ))}
-          </ul>
-          <p>{kept.length === 1 ? S.coversOne : fmt(S.coversMany, { count: kept.length })}</p>
-        </>
-      </OwnerStep>
+      <div className="al-step" role="group" aria-label={S.confirm}>
+        <ul className="al-lines">
+          {kept.map((p) => (
+            <li key={p.item.approvalId}>
+              {fmt(p.decision === 'approve' ? S.lineApprove : S.lineDeny, {
+                summary: p.item.summary,
+              })}
+            </li>
+          ))}
+        </ul>
+        <p>{covers}</p>
+        {/* OWNERSTEP-LEFT: the confirm button is the sensor; the master code is its link. */}
+        <PresenceAction
+          owner={owner}
+          withSensor={(sensor) => fmt(S.confirmWith, { sensor })}
+          withCode={S.confirm}
+          codeSubmit={S.confirm}
+          statement={covers}
+          codeInline
+          send={async (presence) => answer(await client.review(kept, presence))}
+        />
+      </div>
       <Statuses lines={lines} />
       <Button variant="ghost" block onClick={onBack}>
         {S.back}

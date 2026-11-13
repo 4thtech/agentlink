@@ -59,6 +59,16 @@ export interface StoreTx {
   update<T extends TableName>(table: T, where: Where<T>, patch: Partial<Row<T>>): number;
   /** Deletes every row that matches; returns the number of rows deleted. */
   delete<T extends TableName>(table: T, where: Where<T>): number;
+  /**
+   * MSG-ORDER-1: the local insertion order of the rows with these keys (undefined for a key with no
+   * row): a later insert has a larger number, and an update keeps it. Numbers compare only with
+   * each other; they are not times, not IDs and not stable across stores. Optional: a store
+   * without it gives no order, and callers then fall back to their own.
+   */
+  rowOrder?<T extends TableName>(
+    table: T,
+    keys: readonly PrimaryKey<T>[],
+  ): readonly (number | undefined)[];
 }
 
 export interface Store {
@@ -66,6 +76,12 @@ export interface Store {
   readonly schemaVersion: number;
   /** Runs `body` as one serializable, all-or-nothing transaction (07 §3.1). */
   transaction<R>(body: (tx: StoreTx) => R): Promise<R>;
+  /**
+   * RET-2 (D-148; 04 §4.2 "Space on disk"): returns freed space to the file system after a large
+   * delete, best effort (SQLite: `PRAGMA incremental_vacuum`). Absent where there is nothing to
+   * return (in memory). Never part of a transaction.
+   */
+  compact?(): Promise<void>;
   close(): Promise<void>;
 }
 

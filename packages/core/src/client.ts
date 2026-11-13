@@ -35,6 +35,8 @@ import {
   type FetchFileResult,
   type SavedFileRef,
 } from './files/incoming.js';
+import type { BackfillSavedFilesResult } from './files/saved-files.js';
+import { HistoryService } from './history/delete.js';
 import { savedNameOf } from './files/received.js';
 import { saveReceivedFile, type SaveReceivedFileResult } from './files/save.js';
 import type { FilesPlatform } from './files/platform.js';
@@ -47,6 +49,7 @@ import {
 } from './files/refresh-link.js';
 import { ActivityService } from './activity.js';
 import {
+  HistoryRetention,
   deleteExpiredFiles,
   deleteFilesOnReceipt,
   type ReceiptRetentionResult,
@@ -218,6 +221,18 @@ export class AgentLinkClient {
   readonly autoSave: AutoSaver;
   /** The activity feed (M1-11r-a, M1-11r-d; the local UI): messages, files, approvals, proofs, blocks, rules. */
   readonly activity: ActivityService;
+  /**
+   * RET-3 (D-148; 04 §4.2): the owner's history delete on this computer (plan, then apply). For the
+   * owner surfaces only (the local app with presence, the owner's retention pass); no MCP tool
+   * reaches it (I-4, 06 §1).
+   */
+  readonly history: HistoryService;
+  /**
+   * RET-6 (D-148; 04 §4.2 "Retention policy"): the daily pass under the owner-signed `history.*`
+   * (the lease holder's background loop calls `run`) and its preview (the Storage editor). It deletes
+   * only under a verified signed policy, never while paused. No MCP tool reaches it (I-4).
+   */
+  readonly historyRetention: HistoryRetention;
   readonly #send: SendService;
   readonly #sync: SyncService;
   readonly #files: FileFetcher;
@@ -314,6 +329,12 @@ export class AgentLinkClient {
       files,
     );
     this.activity = new ActivityService(ctx, this.contacts);
+    this.history = new HistoryService(ctx, { files: this.#files });
+    this.historyRetention = new HistoryRetention(ctx, {
+      loadPolicy: () => this.ownerActions.loadPolicy(),
+      paused: () => this.pause.paused(),
+      history: this.history,
+    });
     this.messages = new MessagesView(ctx, this.contacts);
     // MSG-FILES-IO-d: "saved as" from the sealed files.saved_name; a value that does not open shows
     // that one item without it (FilesIoView catches per row).
@@ -407,6 +428,15 @@ export class AgentLinkClient {
    */
   deleteExpiredFiles(): Promise<ReceiptRetentionResult> {
     return deleteExpiredFiles(this.#ctx, this.#filesPlatform);
+  }
+
+  /**
+   * RET-2 (D-148; 07 §3.8): indexes in `saved_files` the files saved before schema version 15 whose
+   * receiver row still records the save. The first auto-save run of a process runs it; idempotent,
+   * best effort, touches no file. Not reachable from an MCP tool (I-4).
+   */
+  backfillSavedFiles(): Promise<BackfillSavedFilesResult> {
+    return this.#files.backfillSavedFiles();
   }
 
   /**

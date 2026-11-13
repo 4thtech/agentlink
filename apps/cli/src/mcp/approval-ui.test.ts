@@ -83,6 +83,10 @@ function fakeServer(origin = 'http://localhost:47321'): FakeServer {
     openFirstRun: () => Promise.resolve(true),
     openHome: () => Promise.resolve(true),
     openJoin: () => Promise.resolve(true),
+    // N7: the desktop app's pages and alerts; not used here.
+    openUpdates: () => Promise.resolve(true),
+    desktopAlerts: () => Promise.resolve(undefined),
+    ownerNames: () => Promise.resolve(new Map<string, string>()),
     notifyNewApproval: (id) => {
       notified.push(id);
       return Promise.resolve(`${origin}/approve/${id}`);
@@ -251,6 +255,56 @@ describe('the owner’s browser opens with the one-shot link, not the agent', ()
     expect(server.opened).toEqual([APPROVAL]);
     expect(notified).toEqual([APPROVAL, APPROVAL_3]);
     await approvalUi.close();
+  });
+});
+
+describe('ATT-ALLOW-LINK: the Allow a folder link (Settings > Files, Send folder filled in)', () => {
+  const FILES = 'http://localhost:47321/settings/files?folder=~%2FAgentLink%2FSend';
+  const withHome = (opened: boolean, homes: number[]): ApprovalServer => ({
+    ...fakeServer(),
+    openHome: () => {
+      homes.push(1);
+      return Promise.resolve(opened);
+    },
+  });
+
+  it('opens Home once (its banner) and gives the fixed link, with no token', async () => {
+    const homes: number[] = [];
+    const { ui: approvalUi } = ui(withHome(true, homes));
+    const one = await approvalUi.allowFolderLink();
+    expect(one).toEqual({ url: FILES, origin: 'http://localhost:47321' });
+    expect(one?.url).not.toMatch(/[?&]t=/);
+    await approvalUi.allowFolderLink();
+    expect(homes).toHaveLength(1);
+    await approvalUi.close();
+  });
+
+  it('opens no new window when a browser already holds the session', async () => {
+    const homes: number[] = [];
+    const { ui: approvalUi } = ui(withHome(true, homes));
+    await approvalUi.link(APPROVAL);
+    expect((await approvalUi.allowFolderLink())?.url).toBe(FILES);
+    expect(homes).toEqual([]);
+    await approvalUi.close();
+  });
+
+  it('with no browser, gives no link', async () => {
+    const homes: number[] = [];
+    const { ui: approvalUi } = ui(withHome(false, homes));
+    expect(await approvalUi.allowFolderLink()).toBeUndefined();
+    expect(await approvalUi.allowFolderLink()).toBeUndefined();
+    expect(homes).toHaveLength(1);
+    await approvalUi.close();
+  });
+
+  it('a server off the local UI origin gives no link; after close nothing starts', async () => {
+    const { ui: odd } = ui(fakeServer('http://127.0.0.1:47321'));
+    expect(await odd.allowFolderLink()).toBeUndefined();
+    await odd.close();
+    const { ui: closed, start } = ui(fakeServer());
+    await closed.close();
+    expect(await closed.allowFolderLink()).toBeUndefined();
+    expect(start).not.toHaveBeenCalled();
   });
 });
 
@@ -553,6 +607,7 @@ describe('agentlink mcp starts and stops the approval UI with the server', () =>
       return {
         link: created.link,
         openSetupPage: created.openSetupPage,
+        allowFolderLink: created.allowFolderLink,
         get running() {
           return created.running;
         },

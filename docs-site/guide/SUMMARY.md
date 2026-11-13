@@ -49,10 +49,11 @@
   * [Settings](local-app/settings.md)
   * [Touch ID & master code](local-app/touch-id-and-master-code.md)
   * [Files page](local-app/files.md)
-  * [Storage](local-app/storage.md)
+  * [Storage and Free up space](local-app/storage.md)
   * [Updates](local-app/updates.md)
   * [Rules page](local-app/rules.md)
   * [Appearance](local-app/appearance.md)
+  * [Notifications](local-app/notifications.md)
   * [Under the hood](local-app/under-the-hood.md)
   * [Confirming paid actions](local-app/confirm-paid-actions.md)
 
@@ -66,7 +67,7 @@
 
 ## Coming later
 
-* [Mac desktop app](apps/desktop-app.md)
+* [Desktop app (Mac and Windows)](apps/desktop-app.md)
 * [Always-on cloud agent](apps/cloud-agent.md)
 
 ## Privacy

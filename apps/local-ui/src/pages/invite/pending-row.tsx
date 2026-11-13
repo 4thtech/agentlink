@@ -4,7 +4,7 @@
 // in place. Under the hood: the invite's ID and its exact expiry. The name is the owner's own label,
 // rendered as text. REL051-B2 (owner test, 13 Nov): Copy link and Show link get the invite's kept
 // link from this app on a click (invite-link-actions.tsx); the list itself never carries a link.
-import { Button, useHood } from '@4thtech-io/ui';
+import { Button, InlineError, useHood } from '@4thtech-io/ui';
 import { useState, type ReactElement } from 'react';
 import type { ConnectingRow, LinkOutcome, OpenInvite } from '../contacts/invite-api.js';
 import { cancelProminent, connectingLine, useConnectingView } from './connecting-stage.js';
@@ -80,11 +80,7 @@ export function PendingInviteRow({
             {invite.inviteId} · {S.expires.toLowerCase()} {exact(invite.expiresAt)}
           </span>
         ) : null}
-        {state === 'failed' ? (
-          <span className="al-text-body-sm inv-error" role="alert">
-            {S.cantCancel}
-          </span>
-        ) : null}
+        {state === 'failed' ? <InlineError>{S.cantCancel}</InlineError> : null}
         {done || onLink === undefined ? null : (
           <InviteLinkReveal link={link} label={linkLabel(invite.name ?? '')} />
         )}
@@ -147,11 +143,7 @@ export function ConnectingInviteRow({
       <span className="inv-pending-main">
         <span className="inv-pending-name">{row.name}</span>
         <span className="al-text-body-sm al-muted">{connectingLine(shown, now)}</span>
-        {failed ? (
-          <span role="alert" className="al-text-body-sm">
-            {F.cancelConnectingFailed}
-          </span>
-        ) : null}
+        {failed ? <InlineError>{F.cancelConnectingFailed}</InlineError> : null}
       </span>
       {blocked || onCancel !== undefined ? (
         <span className="inv-pending-actions">

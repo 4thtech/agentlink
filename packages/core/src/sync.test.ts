@@ -1292,6 +1292,7 @@ async function storeInboundOk(to: Agent, from: Agent, n: number): Promise<string
         delivery: null,
         refused_at: null,
         request_accepted_at: null,
+        deleted_at: null,
       });
     }
   });
@@ -1337,6 +1338,7 @@ describe('M1-7h-b (IR-M1-7h-1 F04): catch-up counts, staged acks, a failing key 
           delivery: null,
           refused_at: null,
           request_accepted_at: null,
+          deleted_at: null,
         });
       });
     });

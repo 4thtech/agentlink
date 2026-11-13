@@ -150,8 +150,9 @@
 // - M1-UX-FIRSTRUN-V2 (D-130 (1), (2); 08 §1 first run v2; proposed, owner confirms at merge): when
 //   the setup's `firstCard.firstPolicy` is wired, `begin` first prepares the folders (Send, Inbox,
 //   Proofs; owner-setup.ts prepareSetupFolders) and answers 409 `folder_refused` (reason
-//   `folder_not_empty` or `folder_unavailable`) before any seed exists when Send is a link at either
-//   level, not a folder or not empty. `finish` signs the card and the first policy with the same
+//   `folder_unavailable`) before any seed exists when Send is a link at either level or not a
+//   folder. ATT-SENDFOLDER-FIX: a Send that already holds files is used (`folder_not_empty` is no
+//   longer answered; the code stays known to older pages). `finish` signs the card and the first policy with the same
 //   gesture and answers the fixed `sendFolder` outcome (`allowed`, `not_confirmed`, `not_allowed`;
 //   never the path) and the computer's name for the backup-code save form. The folders this run
 //   created are removed whenever the policy is not in force (failure, expiry, drop, close).
@@ -170,7 +171,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { homedir, hostname as osHostname } from 'node:os';
 import type { AddressInfo, ListenOptions } from 'node:net';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { resolveInboxFolder } from './allowed-path.js';
 import {
   PayConfirmError,
   buildPayConfirmFlow,
@@ -341,6 +343,8 @@ import {
   registerOwnerPasskey,
   type PasskeyAssertion,
 } from './owner-passkey.js';
+import { attachDesk } from './local-ui/attach-desk.js';
+import { ATTACH_MAX_BODY_BYTES } from './local-ui/api/attach.js';
 import {
   creditsPort,
   fileSavePort,
@@ -364,6 +368,7 @@ import { pairingFollower, type PairingFollower } from './local-ui/pairing-follow
 import { JOIN_PAGE_PATH } from './local-ui/invite-paths.js';
 import type {
   LocalUiInviteRoute,
+  LocalUiAttachRoute,
   LocalUiReadRoute,
   LocalUiRoute,
   LocalUiSwitchRoute,
@@ -376,6 +381,8 @@ import type {
   LocalUiResult,
   LocalUiRevealRoute,
   LocalUiKitRevealRoute,
+  LocalUiHistoryRoute,
+  LocalUiInboxRevealRoute,
   LocalUiMarkRoute,
   LocalUiUiSettingsRoute,
   LocalUiSetupStep,
@@ -387,8 +394,24 @@ import {
   type UiSettings,
 } from '@4thtech-io/types/ui-contract/ui-settings';
 import { createUiSettingsDesk } from './local-ui/api/ui-settings.js';
+import type { LocalUiNotificationsDesk } from './local-ui/api/notifications.js';
+import {
+  notifyPrefsInForce,
+  type NotificationItem,
+  type NotifyPrefKey,
+} from '@4thtech-io/types/ui-contract/notifications';
+import {
+  createNotificationStore,
+  memoryNotificationPersistence,
+  type NotificationInbound,
+  type NotificationPersistence,
+  type NotificationSignals,
+  type NotificationStore,
+} from './notifications.js';
 import { createPeopleAllDesk } from './local-ui/api/people-all.js';
 import { createStorageDesk, inboxUsageOf } from './local-ui/api/storage.js';
+// RET-4 (D-148): the Delete history tickets (plan on begin, apply after the Undo window).
+import { HistoryDesk, type HistoryPort } from './local-ui/history-desk.js';
 import type { LocalUiAppUpdateDesk } from './local-ui/api/app-update.js';
 import {
   AppHostSlot,
@@ -574,6 +597,20 @@ const HEAD_OPEN = /<head(?:\s[^>]*)?>/i;
 const MAX_REVEAL_BODY_BYTES = 256;
 /** WP-R2b: the kit-reveal route takes no body; anything up to this is read and refused (400). */
 const MAX_KIT_REVEAL_BODY_BYTES = 256;
+/** RET-4: a history-kind body (begin names at most 500 message IDs). */
+const MAX_HISTORY_BODY_BYTES = 32_768;
+
+/**
+ * ATT-SENDFOLDER-FIX (IR-ATT-SENDFOLDER-1 M-1): the Send folder a begin answer names for the page
+ * to show before the gesture: its real path (local data, shown as text) and whether it already
+ * holds files (then the owner reads that those can be sent too). Nothing when no folder is ready.
+ */
+function sendFolderReview(send: SendFolderPlan | undefined): {
+  sendFolderReview?: { folder: string; holdsFiles: boolean };
+} {
+  if (send?.status !== 'ready') return {};
+  return { sendFolderReview: { folder: send.folder, holdsFiles: send.holdsFiles === true } };
+}
 /** MSG-FILES-IO-h: an item ID, `<envelope ID>.<index>` (core ui-messages.ts). */
 const REVEAL_ITEM_ID = /^[A-Za-z0-9_-]{1,64}\.[0-9]{2}$/;
 
@@ -587,6 +624,11 @@ const MAX_INVITE_CREATE_BODY_BYTES = 1_024;
 /** UX2-d1: at most this many invites created per window, per server (a store and spam bound). */
 const INVITE_CREATE_LIMIT = 10;
 const INVITE_CREATE_WINDOW_MS = 10 * 60_000;
+/** ATT-APP-ATTACH: at most this many attached messages per window, per server (then 429 `wait`). */
+const ATTACH_LIMIT = 20;
+const ATTACH_WINDOW_MS = 60_000;
+/** IR-ATTACH-1 F-1: at most this many attach requests read or sent at once (then 429 `wait`). */
+const ATTACH_MAX_IN_FLIGHT = 2;
 /** U3-invite (08 §4): at most one handoff per this many ms (then 429 `wait`). */
 const HANDOFF_INTERVAL_MS = 5_000;
 /** U3-invite (08 §4; M1-UX-OPEN-APP rules): at most one join-screen open per this many ms. */
@@ -934,6 +976,11 @@ export type OwnerSetupFailure =
 
 export interface ApprovalServerOptions {
   readonly source: ApprovalServerSource;
+  /**
+   * IR-NOTIFY-1 M-1 (N6): whether the OS approval alert (notifyNewApproval) may show, read on each
+   * alert. Absent: the app host's UI settings (`notify.approvals`), else on (the D2 default).
+   */
+  readonly approvalAlerts?: () => Promise<boolean>;
   /** Receives fixed-value events (for the redacting logger). Exceptions in it are ignored. */
   readonly onEvent?: (event: ApprovalServerEvent) => void;
   /** M1-11s-b: the local UI app's files and the agent's core client (D-118). */
@@ -1012,6 +1059,8 @@ export interface ApprovalServerInternals {
   readonly filesHome?: string;
   /** The clock in milliseconds (link lifetime, backoff). Default: Date.now. */
   readonly now?: () => number;
+  /** RET-4: the Undo window of Delete history in ms (tests). Default: HISTORY_UNDO_MS (10 s). */
+  readonly historyUndoMs?: number;
   /** M1-11s-b: the /api/ui/ routes. Default: createLocalUiRoutes() (the page files). */
   readonly routes?: LocalUiRouteRegistry;
   /** M1-11s-c: Argon2id parameters for the new master code's wrap. Default: the keystore defaults. */
@@ -1093,6 +1142,22 @@ export interface ApprovalServer {
   /** Raises the fixed OS notification for a new request and returns its approvalUrl. */
   notifyNewApproval(approvalId: string): Promise<string>;
   /**
+   * N7: the same as `openHome` for Settings › Updates (`/settings/updates`), the page a click on the
+   * desktop app's "Update ready" notification opens. A fixed path.
+   */
+  openUpdates(): Promise<boolean>;
+  /**
+   * N7 (desktop app): the open ID's notification items (brought up to date first; kind, ref, count
+   * and times only) and the Settings › Notifications switches in force. Undefined while no ID with a
+   * centre is open. In memory only; never leaves the process except as protocol `notify` codes.
+   */
+  desktopAlerts(): Promise<DesktopAlertState | undefined>;
+  /**
+   * N7: the names the OWNER gave these contacts of the open ID (nameSource 'owner'; a self-declared
+   * name is never answered, I-5). Only the refs asked for; none when no client is open.
+   */
+  ownerNames(refs: readonly string[]): Promise<ReadonlyMap<string, string>>;
+  /**
    * F25: whether the app is in use, for the `ui` command's idle limit. `lastAt` is the time (ms) of
    * the last request to the page API (`/api/ui/`), `openStreams` the open live streams (open tabs).
    * Counts and a time only. F40: `linksUsed` counts the one-shot session links used so far (each
@@ -1104,6 +1169,14 @@ export interface ApprovalServer {
     linksUsed(): number;
   };
   close(): Promise<void>;
+}
+
+/** N7: what the desktop core alerts from (ApprovalServer.desktopAlerts). */
+export interface DesktopAlertState {
+  /** The open ID's folder name (a change starts a fresh first look); in memory only. */
+  readonly scope: string;
+  readonly items: readonly NotificationItem[];
+  readonly prefs: Readonly<Record<NotifyPrefKey, boolean>>;
 }
 
 type DecisionOutcome = Extract<ApprovalServerEvent, { kind: 'decision' }>['outcome'];
@@ -1210,6 +1283,9 @@ const NO_AGENT_ROUTES: ReadonlySet<string> = new Set([
   // DESK051-UPD: the app's own version and updates are the app's, not an agent's.
   'GET /api/ui/app-update',
   'GET /api/ui/app-update/check',
+  // UPD-5: Update now and Restart now (the mark kind; desktop app only).
+  'POST /api/ui/app-update/install',
+  'POST /api/ui/app-update/restart',
 ]);
 
 /**
@@ -1635,6 +1711,16 @@ export async function startApprovalServerWith(
   let invitesDesk = agentUi?.client === undefined ? undefined : inviteDesk(agentUi.client);
   /** UX2-d1: when each recent invite was created (ms), oldest first, for the create limit. */
   const invitesCreated: number[] = [];
+  /** ATT-APP-ATTACH: the attach desk of the attach route (never reachable from another route). */
+  const attachDeskOf = (ui: typeof agentUi) =>
+    ui?.client === undefined
+      ? undefined
+      : attachDesk(ui.client, filesHome === undefined ? {} : { home: filesHome });
+  let attachSendDesk = attachDeskOf(agentUi);
+  /** ATT-APP-ATTACH: when each recent attach request was taken (ms), oldest first. */
+  const attachesSent: number[] = [];
+  /** IR-ATTACH-1 F-1: attach requests being read or sent now. */
+  let attachesInFlight = 0;
   /** M1-11s-c: the one owner setup in progress, if any. */
   let pendingSetup: PendingSetup | undefined;
   /** U3-invite (08 §4): the app host's waiting invite, in memory only; absent outside the host. */
@@ -1684,6 +1770,125 @@ export async function startApprovalServerWith(
           write: (settings) =>
             (uiSettingsDirectory.writeUiSettings as (s: UiSettings) => Promise<void>)(settings),
         });
+  // N4 (PLAN-NOTIFY §3.1): the notification centre's stores, one per ID (by folder name) for the
+  // life of the process; the record is the ID folder's `notifications.json` in the app host, memory
+  // otherwise. Signals are what the server already holds in clear: the approvals waiting (a count),
+  // inbound message and file events (contact ID, kind, time), the update state and the relay check.
+  // No text, name, file name or link is read for it (I-5, I-7); no MCP tool reaches it (I-4).
+  const notificationStores = new Map<string, NotificationStore>();
+  let notificationsName: string | undefined;
+  const networkDownSince = new Map<string, number>();
+  /** The network counts as a problem for the centre only after 10 minutes (PLAN-NOTIFY §3.2). */
+  const NETWORK_DOWN_NOTIFY_MS = 10 * 60 * 1000;
+  function notificationsPart(bound: ApprovalServerSource): {
+    notifications?: LocalUiNotificationsDesk;
+  } {
+    // The bound ID's folder name (bindAgent sets it before the context is built); one store outside
+    // the app host.
+    const name = options.host === undefined ? '' : notificationsName;
+    if (name === undefined || agentUi === undefined) return {};
+    let store = notificationStores.get(name);
+    if (store === undefined) {
+      const dir = options.host?.directory;
+      const readFile = dir?.readNotifications?.bind(dir);
+      const writeFile = dir?.writeNotifications?.bind(dir);
+      const persistence: NotificationPersistence =
+        name !== '' && readFile !== undefined && writeFile !== undefined
+          ? { read: () => readFile(name), write: (record) => writeFile(name, record) }
+          : memoryNotificationPersistence();
+      store = createNotificationStore(persistence, { now: () => now() / 1000 });
+      notificationStores.set(name, store);
+    }
+    const kept = store;
+    const client = agentUi.client;
+    const signals = async (): Promise<NotificationSignals> => {
+      const out: {
+        approvals?: number;
+        inbound?: readonly NotificationInbound[];
+        scannedUntil?: number;
+        update?: boolean;
+        networkDown?: boolean;
+      } = {};
+      try {
+        out.approvals = (await bound.list())
+          .map(view)
+          .filter((i) => i !== undefined && !decided.has(i.approvalId)).length;
+      } catch {
+        // Unknown: the approvals item stays as it was.
+      }
+      if (client !== undefined) {
+        try {
+          // IR-NOTIFY-1 M-2: the read starts before the last one ended (store: since), so a
+          // message stored late with an older time is still seen; the store counts each once.
+          const until = Math.floor(now() / 1000);
+          const since = await kept.since();
+          if (since <= until) {
+            const flow = await client.messages.flowEvents(since, until);
+            out.inbound = flow.events
+              .filter((e) => e.direction === 'in')
+              .map((e) => ({ contactId: e.contactId, kind: e.kind, at: e.at }));
+            // A capped read keeps the cursor where it was (the next read covers the rest again).
+            if (!flow.capped) out.scannedUntil = until;
+          }
+        } catch {
+          // Nothing new is counted this time; the cursor stays.
+        }
+      }
+      const update = options.appUpdate?.view();
+      if (update !== undefined) out.update = update.state === 'available';
+      try {
+        const health = await uiContext.health?.();
+        const relays = health?.relays;
+        if (relays !== null && relays !== undefined && health?.agent === 'running') {
+          const t = now();
+          if (relays.total > 0 && relays.connected === 0) {
+            const since = networkDownSince.get(name) ?? t;
+            networkDownSince.set(name, since);
+            out.networkDown = t - since >= NETWORK_DOWN_NOTIFY_MS;
+          } else {
+            networkDownSince.delete(name);
+            out.networkDown = false;
+          }
+        }
+      } catch {
+        // Unknown: the network item stays as it was.
+      }
+      return out;
+    };
+    return {
+      notifications: Object.freeze<LocalUiNotificationsDesk>({
+        list: () => kept.list(),
+        refresh: async () => {
+          await kept.observe(await signals());
+        },
+        markRead: (id) => kept.markRead(id),
+        markAllRead: () => kept.markAllRead(),
+      }),
+    };
+  }
+  /**
+   * IR-NOTIFY-1 M-1 (N6): whether the OS approval alert is on. The caller's answer when it gave one
+   * (agentlink mcp reads ui-settings.json), else the app host's UI settings, else the D2 default (on).
+   * Unreadable settings count as the default.
+   */
+  /** N7: the switches in force (unreadable settings count as the D2 defaults). */
+  async function notifyPrefsNow(): Promise<Record<NotifyPrefKey, boolean>> {
+    try {
+      if (uiSettingsDesk === undefined) return notifyPrefsInForce(undefined);
+      return notifyPrefsInForce((await uiSettingsDesk.read()).notify);
+    } catch {
+      return notifyPrefsInForce(undefined);
+    }
+  }
+  async function approvalAlertsOn(): Promise<boolean> {
+    try {
+      if (options.approvalAlerts !== undefined) return await options.approvalAlerts();
+      if (uiSettingsDesk === undefined) return true;
+      return notifyPrefsInForce((await uiSettingsDesk.read()).notify).approvals;
+    } catch {
+      return true;
+    }
+  }
   // WP-P2: every ID's people for the People page. Read only: the open ID through its own client
   // (captured with its name and the generation in one step), every other ID as a count from the
   // read-only store peek (directory.stats); no other KeyStore, client or store is opened (04 §2.5).
@@ -1745,6 +1950,56 @@ export async function startApprovalServerWith(
               ? undefined
               : await inboxUsageOf(readOnlyClient(agentUi.client)),
         });
+  // RET-4 (D-148; 04 §4.2): Delete history. The open ID's own core plans and applies; a ticket is
+  // bound to its page session and to the ID it was made on (a switch applies nothing).
+  const historyDesk = new HistoryDesk({
+    current: (): HistoryPort | undefined => {
+      const client = agentUi?.client as
+        { agentId?: unknown; history?: Partial<Omit<HistoryPort, 'agentId'>> } | undefined;
+      const history = client?.history;
+      if (
+        typeof client?.agentId !== 'string' ||
+        typeof history?.plan !== 'function' ||
+        typeof history.apply !== 'function'
+      ) {
+        return undefined;
+      }
+      const plan = history.plan.bind(history);
+      const apply = history.apply.bind(history);
+      return { agentId: client.agentId, plan, apply };
+    },
+    now: () => now(),
+    ...(internals.historyUndoMs === undefined ? {} : { undoMs: internals.historyUndoMs }),
+  });
+  // RET-4 (08 §1 "Free up space"): Show in Finder for the open ID's configured Inbox folder; the
+  // folder is resolved and checked by the 04 §4.1 rules (resolveInboxFolder), never a page path.
+  const revealInbox = async (): Promise<
+    'shown' | 'not_found' | 'refused' | 'unavailable' | 'not_opened'
+  > => {
+    const client = agentUi?.client;
+    if (client === undefined) return 'unavailable';
+    const read = readOnlyClient(client);
+    let setting: unknown;
+    try {
+      const policy = await read.policy.load();
+      if (policy.mode === 'fail_closed') return 'unavailable';
+      setting = (policy.policy.files as { inboxFolder?: unknown } | undefined)?.inboxFolder;
+    } catch {
+      return 'unavailable';
+    }
+    if (typeof setting !== 'string' || setting.length === 0) return 'not_found';
+    let folder: string;
+    try {
+      folder = (await resolveInboxFolder(setting, { home: filesHome ?? homedir() })).folder;
+    } catch {
+      return 'not_found';
+    }
+    try {
+      return (await fileRevealer(folder, dirname(folder))) ? 'shown' : 'not_opened';
+    } catch {
+      return 'not_opened';
+    }
+  };
   /**
    * WP-R2b (04 §2.3.3 "Kit record"): what `GET /api/ui/backup` and Show in Finder read. Reads only;
    * it signs nothing, opens no other ID's core and reads no keychain item. Built where an ID can
@@ -1837,6 +2092,8 @@ export async function startApprovalServerWith(
       now: () => now(),
       // M1-11s-a-d: the status bar's health read (fixed fields, cached, bounded).
       health: createHealthReader({
+        // UX-LEFT-1 (OUTBOX-RECONNECT): relays back: one host pass now sends what was queued.
+        onReconnect: () => hostFlush(),
         // REL051-CF2: with no source wired, the open agent's own relay check (network-health.ts),
         // so the app never says Connected while no relay can be reached.
         ...(() => {
@@ -1863,10 +2120,14 @@ export async function startApprovalServerWith(
       ...(options.host === undefined ? {} : { agents: { list: () => listAgents() } }),
       ...(peopleAllDesk === undefined ? {} : { peopleAll: peopleAllDesk }),
       ...(storageDesk === undefined ? {} : { storage: storageDesk }),
+      // RET-4: Show in Finder for the Inbox folder (the history desk is bound per request).
+      ...(agentUi?.client === undefined ? {} : { revealInbox }),
       // DESK051-UPD: the desktop host's update state (no agent needed).
       ...(options.appUpdate === undefined ? {} : { appUpdate: options.appUpdate }),
       // W4-SHELL-V2: the app's UI settings, in the app host only (one desk for every context).
       ...(uiSettingsDesk === undefined ? {} : { uiSettings: uiSettingsDesk }),
+      // N4: the open ID's notification centre (kind, ref, count and times only).
+      ...notificationsPart(bound),
       // U3-d: create an agent and save a verified label, in the app host only.
       ...(options.host === undefined ? {} : { agentsManage }),
       // U3-invite: the waiting invite, in the app host only.
@@ -2089,6 +2350,10 @@ export async function startApprovalServerWith(
               prepareBackupExport: (kitId, contents) =>
                 client.ownerActions.prepareBackupExport(kitId, contents),
               apply,
+              // KIT-NAMES: its verified label, sealed inside the kit (read during this step).
+              ...(typeof client.ownerActions.loadLabel === 'function'
+                ? { loadLabel: () => (client.ownerActions.loadLabel as () => Promise<unknown>)() }
+                : {}),
             });
           },
           {
@@ -3221,6 +3486,12 @@ export async function startApprovalServerWith(
       readonly ownerCode?: LocalUiOwnerCodeStep;
       readonly session?: string;
       /**
+       * RET-4 (D-148; 04 §4.2): the Delete history finish. Presence is verified as for every owner
+       * route; `sign` refuses everything, and the handler marks its one owner operation with
+       * `presenceChecked` before it schedules the plan bound at begin.
+       */
+      readonly history?: true;
+      /**
        * WP-R2b: the page session (its cookie value), for the recovery-kit export only: the restore
        * engine binds the export handle for Check to it (registerExportedKit).
        */
@@ -3479,6 +3750,22 @@ export async function startApprovalServerWith(
                       carriersOpen ? carrierKeysOf(session, () => carriersOpen) : undefined,
                   }
                 : {}),
+              // RET-4: the Delete history finish: one owner operation with verified presence and
+              // nothing signed (the handler schedules the plan bound at begin).
+              ...(gate.history === true
+                ? {
+                    presenceChecked: () => {
+                      if (!stillCurrent(req)) throw new AgentChanged();
+                      if (used) {
+                        throw new NodeKeyStoreError(
+                          'owner_operation_invalid',
+                          'One owner operation signs once.',
+                        );
+                      }
+                      used = true;
+                    },
+                  }
+                : {}),
               sign: async (review, requests) => {
                 // U3-c: right before acting, the open agent is still the one the page showed.
                 if (!stillCurrent(req)) throw new AgentChanged();
@@ -3491,6 +3778,8 @@ export async function startApprovalServerWith(
                 }
                 // WP-11: the export gate signs only through exportRecoveryKit.
                 if (gate.recoveryKit === true) throw ownerOperationRefused();
+                // RET-4: the history finish signs nothing (presenceChecked only).
+                if (gate.history === true) throw ownerOperationRefused();
                 used = true;
                 const frozen = checkGesture(review, requests);
                 // WP-11 (04 §2.3.3): a `backup.export` is signed only by the export gesture, right
@@ -3634,7 +3923,11 @@ export async function startApprovalServerWith(
             finishOwner(res, 409, 'refused');
             return;
           }
-          emit({ kind: 'owner_operation', outcome: 'done' });
+          // RET-4 (IR-RET-4-1 L-2): a refused history finish (changed, expired, another ID) did
+          // nothing, so it emits no `owner_operation: done`.
+          if (gate.history !== true || result.status === 200) {
+            emit({ kind: 'owner_operation', outcome: 'done' });
+          }
           sendResult(res, result);
         } finally {
           await store.lock().catch(() => undefined);
@@ -5009,6 +5302,8 @@ export async function startApprovalServerWith(
       finishSetup(res, 200, 'ready', {
         expiresInMs: SETUP_HOLD_MS,
         fingerprint,
+        // ATT-SENDFOLDER-FIX (IR-1 M-1): the Send folder the gesture allows, shown before it.
+        ...sendFolderReview(folders?.send),
         nonce: encodeBase64url(nonce),
         ...(statement === undefined ? {} : { statement: statement as unknown as JsonValue }),
         publicKey: {
@@ -5545,8 +5840,10 @@ export async function startApprovalServerWith(
         ({ planned, shown } = found);
       }
       // The Send folder for its first policy, checked (or created) now; removed again unless used.
+      // ATT-SENDFOLDER-FIX: an unusable Send falls back to a fresh Send-2 ... (never a link).
       send = await prepareSendFolder(
         boundHome ?? (firstId ? options.host?.firstRun?.home : undefined),
+        { fallback: true },
       ).catch((): SendFolderPlan => ({
         status: 'unavailable',
         reason: 'folder_unavailable',
@@ -5614,6 +5911,8 @@ export async function startApprovalServerWith(
       finishCreate(res, 200, 'ready', {
         nonce: encodeBase64url(nonce),
         statement: statement as unknown as JsonValue,
+        // ATT-SENDFOLDER-FIX (IR-1 M-1): the Send folder the gesture allows, shown before it.
+        ...sendFolderReview(send),
         expiresInMs: CREATE_CONNECT_HOLD_MS,
         publicKey: {
           rpId: PASSKEY_RP_ID,
@@ -6041,7 +6340,7 @@ export async function startApprovalServerWith(
     req: IncomingMessage,
     res: ServerResponse,
     url: URL,
-    route: LocalUiKitRevealRoute,
+    route: LocalUiKitRevealRoute | LocalUiInboxRevealRoute,
   ): Promise<void> {
     if (
       url.search !== '' ||
@@ -6323,6 +6622,56 @@ export async function startApprovalServerWith(
     }
   }
 
+  /**
+   * RET-4 (D-148; 08 §1): the gate of the history kind (begin, undo, status). The caller checked the
+   * session, CSRF, Origin, fetch metadata, the octet-stream type and the generation. No query,
+   * operation input or presence header; the body must be one strict JSON object of at most
+   * MAX_HISTORY_BODY_BYTES. No owner presence, no owner store, nothing signed, nothing deleted. The
+   * handler gets that object and the desk of this request's page session only.
+   */
+  async function historyGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiHistoryRoute,
+    cookie: string,
+  ): Promise<void> {
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    const body = await boundedBody(req, res, MAX_HISTORY_BODY_BYTES);
+    if (body === undefined) return;
+    let parsed: JsonValue;
+    try {
+      parsed = parseJson(decodeUtf8(body));
+    } catch {
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    if (!stillCurrent(req)) {
+      agentChanged(res);
+      return;
+    }
+    let result: LocalUiResult;
+    try {
+      result = await route.handler(uiContext, parsed as JsonObject, historyDesk.forSession(cookie));
+    } catch (error) {
+      sendJson(res, 500, failedBody(error));
+      return;
+    }
+    sendResult(res, result);
+  }
+
   async function inviteGate(
     req: IncomingMessage,
     res: ServerResponse,
@@ -6384,6 +6733,111 @@ export async function startApprovalServerWith(
         result = await route.handler(uiContext, parsed as JsonObject, invitesDesk);
       } catch (error) {
         sendJson(res, 500, failedBody(error));
+        return;
+      }
+      sendResult(res, result);
+    } finally {
+      wipe(body);
+    }
+  }
+
+  /**
+   * ATT-APP-ATTACH (08 §1 "Attach a file"; proposed, owner confirms at merge): the attach kind, run
+   * after the session, CSRF, Origin, fetch-metadata, octet-stream and generation checks of every
+   * write. It refuses a query, an operation input and a presence header; refuses a body without a
+   * declared length (411) or declared over ATTACH_MAX_BODY_BYTES (413) before anything is counted
+   * or allocated; takes the slot BEFORE reading (at most ATTACH_LIMIT requests per ATTACH_WINDOW_MS
+   * and ATTACH_MAX_IN_FLIGHT at once, else 429 `wait`; IR-ATTACH-1 F-1); parses
+   * one strict JSON object and hands the handler only that object and the attach desk. No owner
+   * presence, no owner store, nothing signed. The body (the file bytes) is wiped after the handler;
+   * nothing here logs a name, a path or the content (I-7).
+   */
+  async function attachGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiAttachRoute,
+  ): Promise<void> {
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    // IR-ATTACH-1 F-1: a declared length over the cap is refused before anything is counted or
+    // allocated; a body without a declared length is refused too (no chunked uploads here).
+    const declaredText = header(req, 'content-length');
+    const declared = declaredText === undefined ? Number.NaN : Number(declaredText);
+    if (!Number.isSafeInteger(declared) || declared < 0) {
+      req.resume();
+      res.setHeader('Connection', 'close');
+      sendJson(res, 411, { error: 'length_required' });
+      return;
+    }
+    if (declared > ATTACH_MAX_BODY_BYTES) {
+      req.resume();
+      res.setHeader('Connection', 'close');
+      sendJson(res, 413, { error: 'too_large' });
+      return;
+    }
+    const at = now();
+    while (attachesSent.length > 0 && (attachesSent[0] as number) <= at - ATTACH_WINDOW_MS) {
+      attachesSent.shift();
+    }
+    if (attachesSent.length >= ATTACH_LIMIT || attachesInFlight >= ATTACH_MAX_IN_FLIGHT) {
+      const oldest = attachesSent[0] ?? at;
+      const retryAfter =
+        attachesSent.length >= ATTACH_LIMIT
+          ? Math.max(1, Math.ceil((oldest + ATTACH_WINDOW_MS - at) / 1000))
+          : 1;
+      req.resume();
+      res.setHeader('Retry-After', String(retryAfter));
+      sendJson(res, 429, { error: 'wait', retryAfter });
+      return;
+    }
+    // F-1: the slot is taken before the body is read, so parallel requests are counted too.
+    attachesSent.push(at);
+    attachesInFlight += 1;
+    try {
+      await attachBody(req, res, route);
+    } finally {
+      attachesInFlight -= 1;
+    }
+  }
+
+  /** The attach gate after its slot is taken: the body, the parse and the handler. */
+  async function attachBody(
+    req: IncomingMessage,
+    res: ServerResponse,
+    route: LocalUiAttachRoute,
+  ): Promise<void> {
+    const body = await boundedBody(req, res, ATTACH_MAX_BODY_BYTES);
+    if (body === undefined) return;
+    try {
+      let parsed: JsonValue;
+      try {
+        parsed = parseJson(decodeUtf8(body));
+      } catch {
+        sendJson(res, 400, { error: 'invalid' });
+        return;
+      }
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        sendJson(res, 400, { error: 'invalid' });
+        return;
+      }
+      if (!stillCurrent(req)) {
+        agentChanged(res);
+        return;
+      }
+      let result: LocalUiResult;
+      try {
+        result = await route.handler(uiContext, parsed as JsonObject, attachSendDesk);
+      } catch {
+        // Never the error's text: it could name a path or a file (I-7).
+        sendJson(res, 503, { error: 'unavailable' });
         return;
       }
       sendResult(res, result);
@@ -6670,9 +7124,15 @@ export async function startApprovalServerWith(
       await removeGate(req, res, url);
       return;
     }
-    if (route.presence === 'kit-reveal') {
+    if (route.presence === 'kit-reveal' || route.presence === 'inbox-reveal') {
       // WP-R2b: Show in Finder for the recovery kit has its own gate; no presence, no input.
+      // RET-4: Show in Finder for the Inbox folder takes the same checks (no input at all).
       await kitRevealGate(req, res, url, route);
+      return;
+    }
+    if (route.presence === 'history') {
+      // RET-4: Delete history's begin, undo and status; never ownerGate (no presence, no signing).
+      await historyGate(req, res, url, route, cookie);
       return;
     }
     if (route.presence === 'mark') {
@@ -6688,6 +7148,11 @@ export async function startApprovalServerWith(
     if (route.presence === 'invite') {
       // UX2-d1: creating and checking an invite have their own gate; ownerGate never runs them.
       await inviteGate(req, res, url, route);
+      return;
+    }
+    if (route.presence === 'attach') {
+      // ATT-APP-ATTACH: the owner's attached files have their own gate; ownerGate never runs it.
+      await attachGate(req, res, url, route);
       return;
     }
     if (route.presence === 'setup') {
@@ -6729,12 +7194,17 @@ export async function startApprovalServerWith(
         return;
       }
     }
+    // RET-4: the finish route's context carries this page session's history desk only.
+    const context: LocalUiContext =
+      route.historyFinish === true
+        ? Object.freeze({ ...uiContext, historySession: historyDesk.forSession(cookie) })
+        : uiContext;
     await ownerGate(
       req,
       res,
       (owner) =>
         route.handler(
-          uiContext,
+          context,
           { params, query: url.searchParams, ...(input === undefined ? {} : { input }) },
           owner,
         ),
@@ -6742,7 +7212,9 @@ export async function startApprovalServerWith(
         ? { recoveryKit: true, pageSession: cookie }
         : route.ownerCode !== undefined
           ? { ownerCode: route.ownerCode, session: cookie }
-          : {},
+          : route.historyFinish === true
+            ? { history: true }
+            : {},
     );
   }
 
@@ -7024,6 +7496,7 @@ export async function startApprovalServerWith(
 
   /** Rebinds every per-agent piece to `agent` (or to none); nothing of the previous one is kept. */
   function bindAgent(agent: AppHostAgent | undefined): void {
+    notificationsName = agent?.name;
     source = agent?.source ?? NO_AGENT_SOURCE;
     agentUi = agent?.localUi;
     // U3-d (04 §2.5.1 "Labels and AI app connections"): the open agent is named only by its
@@ -7032,6 +7505,7 @@ export async function startApprovalServerWith(
     agentLabel = undefined;
     labelReady = refreshLabel();
     invitesDesk = agentUi?.client === undefined ? undefined : inviteDesk(agentUi.client);
+    attachSendDesk = attachDeskOf(agentUi);
     follower = followerOf(agentUi);
     uiContext = buildUiContext();
     // Approvals, a held owner setup and held paid-action confirmations belong to the old agent.
@@ -7073,6 +7547,21 @@ export async function startApprovalServerWith(
       const hold = await slot.enter();
       try {
         if (hold.valid() && follower === bound) await bound.tick();
+      } finally {
+        hold.leave();
+      }
+    })().catch(() => undefined);
+  }
+
+  /** UX-LEFT-1: like `hostTick`, but at once (relays are reachable again). Never rejects. */
+  function hostFlush(): void {
+    const slot = host;
+    const bound = follower;
+    if (slot === undefined || bound === undefined) return;
+    void (async () => {
+      const hold = await slot.enter();
+      try {
+        if (hold.valid() && follower === bound) await bound.flush();
       } finally {
         hold.leave();
       }
@@ -7749,10 +8238,56 @@ export async function startApprovalServerWith(
     },
     openFirstRun: async () => opener(`${origin}/first-run?t=${mintLink()}`).catch(() => false),
     openHome: async () => opener(`${origin}/settings/home?t=${mintLink()}`).catch(() => false),
+    openUpdates: async () =>
+      opener(`${origin}/settings/updates?t=${mintLink()}`).catch(() => false),
     openJoin: () => openJoinPage(false),
+    desktopAlerts: async () => {
+      const desk = notificationsPart(source).notifications;
+      if (desk === undefined) return undefined;
+      const scope = notificationsName ?? '';
+      try {
+        await desk.refresh();
+      } catch {
+        // The items stay as they were.
+      }
+      let items: readonly NotificationItem[];
+      try {
+        items = await desk.list();
+      } catch {
+        return undefined;
+      }
+      return Object.freeze({ scope, items, prefs: Object.freeze(await notifyPrefsNow()) });
+    },
+    ownerNames: async (refs: readonly string[]) => {
+      const out = new Map<string, string>();
+      const wanted = new Set(refs);
+      const contacts = (
+        agentUi?.client as { contacts?: { list?: () => Promise<unknown> } } | undefined
+      )?.contacts;
+      if (wanted.size === 0 || typeof contacts?.list !== 'function') return out;
+      let views: unknown;
+      try {
+        views = await contacts.list();
+      } catch {
+        return out;
+      }
+      if (!Array.isArray(views)) return out;
+      for (const v of views as unknown[]) {
+        if (typeof v !== 'object' || v === null) continue;
+        const { id, display } = v as { id?: unknown; display?: unknown };
+        if (typeof id !== 'string' || !wanted.has(id)) continue;
+        if (typeof display !== 'object' || display === null) continue;
+        const { name, nameSource } = display as { name?: unknown; nameSource?: unknown };
+        // I-5: only a name the owner gave; a contact's own (self-declared) name never.
+        if (nameSource !== 'owner' || typeof name !== 'string' || name.trim() === '') continue;
+        out.set(id, name.trim());
+      }
+      return out;
+    },
     notifyNewApproval: async (approvalId: string) => {
       const url = approvalUrl(approvalId);
-      await notifier(NOTIFICATION).catch(() => false);
+      // IR-NOTIFY-1 M-1 (N6): Settings › Notifications › Approvals waiting governs this alert.
+      if (await approvalAlertsOn()) await notifier(NOTIFICATION).catch(() => false);
       return url;
     },
     close: async () => {
@@ -7763,6 +8298,8 @@ export async function startApprovalServerWith(
       dropCreate();
       // WP-S2: a staged master-code change this server began is removed (the old code keeps working).
       await ownerCodes.clear();
+      // RET-4: a delete still in its Undo window is dropped (never applied).
+      historyDesk.close();
       // REL051-CF3: a held master code goes with the server (a restart never shows it again).
       codeHold.clear();
       await folderRemoval;

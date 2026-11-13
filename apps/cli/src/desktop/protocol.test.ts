@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { joinLinkOf } from '../commands/join.js';
 import {
   MAX_PIPE_LINE_BYTES,
+  SHOW_ROUTES,
   encodeHostMessage,
   encodeShellMessage,
   isInviteLink,
@@ -164,6 +165,8 @@ describe('app update messages', () => {
     current: '0.5.1',
     latest: '0.5.2',
     download: DMG,
+    installable: false,
+    percent: 0,
   };
   const line = (v: unknown): string => JSON.stringify(v);
 
@@ -205,6 +208,41 @@ describe('app update messages', () => {
     expect(parseShellMessage(line(value))).toBeUndefined();
   });
 
+  it('UPD-5: the in-app states, a flag and a whole percentage only', () => {
+    const inApp = { ...ok, installable: true };
+    for (const v of [
+      inApp,
+      { ...inApp, state: 'downloading', percent: 42 },
+      { ...inApp, state: 'verifying' },
+      { ...inApp, state: 'ready' },
+      { ...inApp, state: 'restarting' },
+      { ...ok, state: 'install_failed' },
+    ]) {
+      expect(parseShellMessage(line(v)), v.state).toEqual(v);
+    }
+    for (const bad of [
+      { ...inApp, note: 'hi' },
+      { ...inApp, state: 'downloading', percent: '5' },
+      { ...inApp, state: 'downloading', percent: 101 },
+      { ...inApp, state: 'downloading', percent: 0.5 },
+      { ...inApp, percent: 3 },
+      { ...ok, state: 'ready' },
+      { ...inApp, state: 'install_failed' },
+      { ...ok, installable: 1 },
+      { ...ok, state: 'current', latest: '', download: '', installable: true },
+    ]) {
+      expect(parseShellMessage(line(bad))).toBeUndefined();
+    }
+  });
+
+  it('UPD-5: the core asks for an install or a restart with no other key', () => {
+    for (const type of ['app-update-install', 'app-update-restart'] as const) {
+      expect(encodeHostMessage({ v: 1, type })).toBe(`${line({ v: 1, type })}\n`);
+      expect(parseHostMessage(line({ v: 1, type, version: '0.5.2' }))).toBeUndefined();
+      expect(parseShellMessage(line({ v: 1, type }))).toBeUndefined();
+    }
+  });
+
   it('the core sends only a bare check request', () => {
     expect(encodeHostMessage({ v: 1, type: 'app-update-check' })).toBe(
       `${line({ v: 1, type: 'app-update-check' })}\n`,
@@ -212,5 +250,32 @@ describe('app update messages', () => {
     expect(parseHostMessage(line({ v: 1, type: 'app-update-check', url: DMG }))).toBeUndefined();
     expect(parseShellMessage(line({ v: 1, type: 'app-update-check' }))).toBeUndefined();
     expect(parseHostMessage(line(ok))).toBeUndefined();
+  });
+});
+
+describe('N7: notify (core -> shell), fixed codes only', () => {
+  const l = (value: unknown): string => JSON.stringify(value);
+  it('kind, count and a name ("" unless an owner alias on messages or files)', () => {
+    expect(
+      parseHostMessage(l({ v: 1, type: 'notify', kind: 'update', count: 1, name: '' })),
+    ).toEqual({ v: 1, type: 'notify', kind: 'update', count: 1, name: '' });
+    expect(
+      parseHostMessage(l({ v: 1, type: 'notify', kind: 'files', count: 2, name: 'Ana' })),
+    ).toEqual({ v: 1, type: 'notify', kind: 'files', count: 2, name: 'Ana' });
+  });
+  it.each([
+    { v: 1, type: 'notify', kind: 'messages', count: 1, name: '', text: 'hello' },
+    { v: 1, type: 'notify', kind: 'messages', count: 1 },
+    { v: 1, type: 'notify', kind: 'network', count: 1, name: '' },
+    { v: 1, type: 'notify', kind: 'messages', count: 0, name: '' },
+    { v: 1, type: 'notify', kind: 'approvals', count: 1, name: 'Ana' },
+    { v: 1, type: 'notify', kind: 'messages', count: 1, name: 'Ana\nhttps://x' },
+    { v: 1, type: 'notify', kind: 'messages', count: 1, name: 'A'.repeat(33) },
+  ])('rejects %j', (value) => {
+    expect(parseHostMessage(l(value))).toBeUndefined();
+  });
+  it('show may also open inbox and updates; session links may land on /settings/updates', () => {
+    expect(SHOW_ROUTES).toEqual(['home', 'approvals', 'join', 'inbox', 'updates']);
+    expect(isSessionUrl(`http://localhost:4567/settings/updates?t=${TOKEN}`)).toBe(true);
   });
 });

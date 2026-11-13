@@ -12,7 +12,13 @@ import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { DOCS_LINKS, MAC_APP_URLS, buildAskAi, buildCommands } from '@4thtech-io/invite';
+import {
+  DOCS_LINKS,
+  MAC_APP_URLS,
+  WIN_APP_URL,
+  buildAskAi,
+  buildCommands,
+} from '@4thtech-io/invite';
 import { CSP, headersFor } from './invite/headers.js';
 import {
   BASE_INVITE,
@@ -258,16 +264,19 @@ describe('a good invite (U3-invite)', () => {
     await expect(page.locator('#step-help').textContent()).resolves.toMatch(
       /^Paste it into (Terminal|the terminal \(Ctrl, Shift and V\)) and press (Return|Enter)\. It installs AgentLink, and Node\.js if needed, then opens the invite\.$/,
     );
-    // REL051-INV: the only links are the Mac app's two (in the hidden Mac note here) and the two help links.
+    // REL051-INV: the only links are the Mac app's two (in the hidden Mac note here), the Windows
+    // app's one (WIN-DESK-2, in its hidden block here) and the two help links.
     await expect(
       page.locator('a[href]').evaluateAll((as) => as.map((a) => a.getAttribute('href'))),
     ).resolves.toEqual([
       MAC_APP_URLS.arm64,
       MAC_APP_URLS.x64,
+      WIN_APP_URL,
       DOCS_LINKS.guide,
       DOCS_LINKS.windows,
     ]);
     await expect(page.locator('#mac-app').isHidden()).resolves.toBe(true);
+    await expect(page.locator('#win-app').isHidden()).resolves.toBe(true);
     await expect(page.locator('#phone-note').isHidden()).resolves.toBe(true);
     await expectNoAppLinks(page);
     await expect(page.locator('#next').textContent()).resolves.toBe(
@@ -381,6 +390,18 @@ describe('a good invite (U3-invite)', () => {
       }
       await expect(page.locator('#phone-note').isVisible()).resolves.toBe(phone);
       await expect(page.locator('#mac-app').isHidden()).resolves.toBe(chosen !== 'os-mac');
+      // WIN-DESK-2: the Windows app block shows only when Windows is chosen (here from its UA).
+      await expect(page.locator('#win-app').isHidden()).resolves.toBe(chosen !== 'os-windows');
+      if (chosen === 'os-windows') {
+        await expect(page.locator('#win-app-link').getAttribute('href')).resolves.toBe(WIN_APP_URL);
+        await expect(page.locator('#win-app-link').getAttribute('target')).resolves.toBe('_blank');
+        await expect(page.locator('#win-app-link').getAttribute('rel')).resolves.toBe(
+          'noopener noreferrer',
+        );
+        await expect(page.locator('#win-app-link').textContent()).resolves.toBe(
+          'AgentLink for Windows 10 or 11',
+        );
+      }
       expect(requests.sort()).toEqual(['/i', '/invite.css', '/invite.js']);
       await context.close();
     }
@@ -451,15 +472,16 @@ describe('a hostile invite (I-5)', () => {
       // The only svg is the fixed AgentLink mark in the header.
       expect(await page.locator('img, div, svg:not(.mark), iframe').count()).toBe(0);
       expect(await page.locator('object, embed, form, input, style').count()).toBe(0);
-      // REL051-INV, WP-D9: no link but the fixed ones of the HTML (two help links, the Mac app's
-      // two links and the two app links, all four with no href while their switches are off);
-      // none comes from the name.
-      expect(await page.locator('a').count()).toBe(6);
+      // REL051-INV, WP-D9, WIN-DESK-2: no link but the fixed ones of the HTML (two help links, the
+      // Mac app's two links, the Windows app's one and the two app links, the last two with no
+      // href while their switches are off); none comes from the name.
+      expect(await page.locator('a').count()).toBe(7);
       await expect(
         page.locator('a[href]').evaluateAll((as) => as.map((a) => a.getAttribute('href'))),
       ).resolves.toEqual([
         MAC_APP_URLS.arm64,
         MAC_APP_URLS.x64,
+        WIN_APP_URL,
         DOCS_LINKS.guide,
         DOCS_LINKS.windows,
       ]);
@@ -696,7 +718,8 @@ describe('WP-D9: desktop app links (flag-on build)', () => {
     // The two app links in the command card, besides REL051-INV's two help links (the Mac app's
     // links, hidden here, and two more with their switch on).
     expect(await page.locator('#app-links a[href]').count()).toBe(2);
-    expect(await page.locator('a[href]').count()).toBe(6);
+    // WIN-DESK-2: and the Windows app's one, hidden here (not Windows).
+    expect(await page.locator('a[href]').count()).toBe(7);
     await expect(page.locator('#open-app').getAttribute('href')).resolves.toBe(
       `agentlink://join#${payloadOf(link)}`,
     );

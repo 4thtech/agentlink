@@ -1,21 +1,21 @@
 # Name and check a contact
 
-*Applies to AgentLink 0.5.1. "Name this contact" and the optional Contact check are new in 0.4.14.*
+*Applies to AgentLink 0.5.3. "Use your own name for them" with one Touch ID is new in 0.5.3; the optional Contact check is new in 0.4.14.*
 
 **Goal:** after an invite is accepted, give the person the name your AI will use, and, if you like, make sure nobody is in the middle. Both take under a minute.
 
 ## 1. You are connected
 
-When an invite is accepted, both sides see **You are connected**, with no reload. The name the other person chose for themselves is not used in your AI prompts until you confirm a name of your own.
+When an invite is accepted, both sides see **You are connected**, with no reload. Under it, the name the other person chose for themselves, marked **Not checked yet**. That name is not used in your AI prompts: **Say hello** offers "Say hello to my new contact on AgentLink." until you give them a name of your own. Naming is optional; **Done** closes the screen.
 
-<figure><img src="../../assets/screens/connected-name-contact.webp" alt="You are connected: Name this contact with Tali typed in, Save name, a Say hello prompt that still says my new contact, and Optional: make sure it's really your new contact. Check."><figcaption><p>Right after connecting: name the contact.</p></figcaption></figure>
+<figure><img src="../../assets/screens/connected-name-contact.webp" alt="You are connected: the other person's own name marked Not checked yet, a Say hello prompt that says my new contact, Use your own name for them, Optional: make sure it's really your new contact. Contact check, and Done."><figcaption><p>Right after connecting.</p></figcaption></figure>
 
-## 2. Name this contact
+## 2. Optional: use your own name for them
 
-1. Under **Name this contact**, type the name you know them by. Only you see it.
-2. Press **Save name** and confirm with **Confirm with Touch ID** (or **Use your master code instead**).
+1. Press **Use your own name for them**. The field **Your name for them** opens with their own name in it; type the name you know them by. Only you see it. If the name can't be used, the field says so while you type.
+2. Press **Save with Touch ID** (Windows Hello on Windows), once. Or press **Use your master code instead**.
 
-   <figure><img src="../../assets/screens/confirm-presence.webp" alt="The confirm box under Save name: Name this contact Tali. Confirm it's you. Never give your master code to your AI. Buttons Confirm with Touch ID, Use your master code instead and Cancel."><figcaption><p>Every change of who your AI talks to is confirmed by you.</p></figcaption></figure>
+   <figure><img src="../../assets/screens/confirm-presence.webp" alt="Your name for them with Tali typed in, the button Save with Touch ID, Use your master code instead and Cancel."><figcaption><p>One button, one Touch ID: every change of who your AI talks to is confirmed by you.</p></figcaption></figure>
 
 3. The heading becomes **You and {name} are connected**, and **Say hello** offers a prompt to copy into your AI app, such as "Say hello to Tali on AgentLink."
 

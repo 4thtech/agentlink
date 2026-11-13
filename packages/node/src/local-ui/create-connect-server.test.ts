@@ -13,7 +13,7 @@
 //   takes nothing but the nonce; the restricted session is unit-tested in owner-add-agent-plan).
 // - Timeout (120 s), a changed file (refused before anything is signed), a wrong proof (the plan is
 //   kept; the third ends it) and a failed entry write (the agent is kept: created_not_connected).
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { request as httpRequest, type IncomingHttpHeaders } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -877,6 +877,17 @@ describe('W4-ONE-TOUCH New agent: one gesture creates the agent and connects its
     expect(h.w.desk.entry).toEqual({ agent: 'work' });
     expect(h.w.entries.get('work')).toMatchObject({ label: 'Work' });
     expect(h.w.ownKeys).toEqual([]);
+  });
+
+  it('ATT-SENDFOLDER-FIX (IR-1 M-1): begin names a Send folder that already holds files', async () => {
+    const { h, s } = await owned();
+    const send = join(await realpath(join(dir, 'home')), 'AgentLink', 'Send');
+    await mkdir(send, { recursive: true });
+    await writeFile(join(send, 'earlier.txt'), 'x');
+    const begin = await agentBegin(h, s, { label: 'Work' });
+    expect(begin.status).toBe(200);
+    expect(json(begin)['sendFolderReview']).toEqual({ folder: send, holdsFiles: true });
+    expect(await readdir(send)).toEqual(['earlier.txt']);
   });
 
   // W8-S5 (F7; 04 §2.8 Begin; 11 §5.8): a move names the ID the AI app leaves, resolved here from

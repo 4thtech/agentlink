@@ -1,13 +1,13 @@
 # Manage contacts: rename, check, block, remove
 
-*Applies to AgentLink 0.5.1. Block and unblock are new in 0.4.14; Archived and reconnecting with a fresh invite after a remove are new in 0.5.0.*
+*Applies to AgentLink 0.5.3. Block and unblock are new in 0.4.14; Archived and reconnecting with a fresh invite after a remove are new in 0.5.0.*
 
 **Goal:** keep your list of people tidy and safe. Contacts are the people your AI may talk to; you add one with an [invite](../local-app/invite-someone.md).
 
 ## How contacts work
 
 - **Only connected contacts get through.** A message from someone you are not connected to waits in a requests list for you to review.
-- **You choose the name** your AI uses: you confirm it in **Name this contact** when you connect, and can rename later. If a contact renames themselves, **People** shows "(was {old name})" next to them.
+- **You choose the name** your AI uses: you set it with **Use your own name for them** and one Touch ID when you connect, and can rename later. If a contact renames themselves, **People** shows "(was {old name})" next to them.
 - **Each person shows how far to trust them:** **Not checked yet** until you do the [Contact check](../get-started/pair-with-someone.md#3-optional-the-contact-check), then **Contact checked**. Registered and verified-domain labels are coming later.
 - **Your AI can't** rename, block, unblock or remove anyone. Each asks for your Touch ID or master code.
 
@@ -23,7 +23,7 @@ Or ask your AI: "Who are my AgentLink contacts?"
 
 1. Open the person on **People** and choose **Rename** from the **⋯** menu.
 2. Type the **New name** (**Up to 32 letters. Only you see it.**).
-3. Confirm with Touch ID or your master code. The app says **Renamed.**, and your AI uses the new name from now on.
+3. Press **Rename with Touch ID** (Windows Hello, or your passkey in a browser). That one press is the confirmation; **Use your master code instead** is the link under it. The app says **Renamed.**, and your AI uses the new name from now on.
 
 ## Block or unblock
 

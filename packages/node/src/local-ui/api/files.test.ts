@@ -41,7 +41,7 @@ import {
   type LocalUiResult,
 } from '../route-types.js';
 import { createLocalUiRoutes } from '../routes.js';
-import { createFilesRoutes, filesRoutes } from './files.js';
+import { createFilesRoutes, filesRoutes, shownProtectedFolder } from './files.js';
 
 // The routes pick the path flavour from the platform; the tests build real paths with node:path, so
 // they must run with the same flavour (a Windows path is never a posix full path).
@@ -242,6 +242,7 @@ describe('routes (M1-11c-a3)', () => {
       ['GET', '/api/ui/files', false],
       ['GET', '/api/ui/files/review', false],
       ['POST', '/api/ui/files/folders', true],
+      ['POST', '/api/ui/files/send-folder', 'mark'],
     ]);
     expect(Object.isFrozen(filesRoutes)).toBe(true);
   });
@@ -370,14 +371,38 @@ describe('GET /api/ui/files/review: the 04 §4 checks before anything is prepare
       body: {
         error: 'folder_refused',
         reason: 'contains_protected',
-        // Windows paths are parsed case-folded (path-guard), so the folder is named in lower case there.
-        protectedFolder: WIN
-          ? sepOut(['~', PROTECTED_TOP, ...PROTECTED_TAIL].join('/')).toLowerCase()
-          : ['~', PROTECTED_TOP, ...PROTECTED_TAIL].join('/'),
+        // CHORE-FILES-WIN-NAME-CASE: named in its original spelling on every platform (Windows
+        // paths are parsed case-folded, but the shown name comes from the root string itself).
+        protectedFolder: sepOut(['~', PROTECTED_TOP, ...PROTECTED_TAIL].join('/')),
       },
     });
     expect(fake.patches).toEqual([]);
   });
+
+  // CHORE-FILES-WIN-NAME-CASE: display only. The shown name keeps the root's own spelling; the
+  // comparison (and so what is refused) stays case-insensitive in the guard.
+  it.each([
+    [
+      'win32',
+      'C:\\Users\\Ana\\AppData\\Roaming\\Microsoft\\Protect',
+      'C:\\Users\\Ana',
+      '~\\AppData\\Roaming\\Microsoft\\Protect',
+    ],
+    [
+      'win32',
+      'C:/Users/Ana/AppData/Local/Microsoft/Vault',
+      'c:\\users\\ana',
+      '~\\AppData\\Local\\Microsoft\\Vault',
+    ],
+    ['win32', 'D:\\Other\\.ssh', 'C:\\Users\\Ana', 'D:\\Other\\.ssh'],
+    ['posix', '/Users/Ana/Library/Keychains', '/Users/Ana', '~/Library/Keychains'],
+    ['posix', '/Library/Keychains', '/Users/Ana', '/Library/Keychains'],
+  ] as const)(
+    'names a protected folder (%s) in its original spelling',
+    (flavor, root, home, shown) => {
+      expect(shownProtectedFolder(root, home, flavor)).toBe(shown);
+    },
+  );
 
   it('refuses a folder already allowed, and a 33rd folder', async () => {
     const { review } = setup();
@@ -407,9 +432,26 @@ describe('GET /api/ui/files/review: the 04 §4 checks before anything is prepare
     expect(b['expiresAt']).toBe(1_600);
     expect(b['review']).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(Object.keys(b).sort()).toEqual(
-      ['change', 'elsewhere', 'expiresAt', 'folder', 'review', 'typed', 'warnings'].sort(),
+      [
+        'change',
+        'elsewhere',
+        'expiresAt',
+        'folder',
+        'holdsFiles',
+        'review',
+        'typed',
+        'warnings',
+      ].sort(),
     );
+    expect(b['holdsFiles']).toBe(false);
     expectNoLeak(res);
+  });
+
+  it('ATT-SENDFOLDER-FIX (IR-1 M-1): says when the folder already holds files', async () => {
+    const { review } = setup();
+    const res = await review(q('add', '~/Documents'));
+    expect(res.status).toBe(200);
+    expect(body(res)['holdsFiles']).toBe(true);
   });
 
   it('follows a link to the real folder and says the folder is elsewhere', async () => {
@@ -683,5 +725,54 @@ describe('POST /api/ui/files/folders: D-119, every warning acknowledged for this
       status: 200,
       body: { status: 'applied', confirmed: false },
     });
+  });
+});
+
+// ATT-SENDFOLDER-FIX (Home banner "Allow your Send folder"): `POST /api/ui/files/send-folder`
+// prepares the Send folder (owner-first-policy prepareSendFolder with fallback) and answers the folder
+// to review. A mark-kind route: no presence, no input, and nothing is prepared, signed or applied, so
+// the rules never change here (I-4). Allowing it is the ordinary review and confirm with presence.
+describe('ATT-SENDFOLDER-FIX: the Send folder for the Home banner', () => {
+  const sendHome = join(root, 'send-home');
+  mkdirSync(sendHome, { recursive: true });
+  const prepare = () => {
+    const routes = createFilesRoutes({ home: sendHome, flavor: FLAVOR });
+    const route = routes.find((r) => r.path === '/api/ui/files/send-folder');
+    if (route === undefined || route.presence !== 'mark') throw new Error('no send-folder route');
+    return (context: LocalUiContext) => route.handler(context, {});
+  };
+
+  it('is registered as a mark route in the default registry', () => {
+    const hit = createLocalUiRoutes().match('POST', '/api/ui/files/send-folder');
+    expect(hit !== undefined && hit !== 'method' && hit.route.presence).toBe('mark');
+  });
+
+  it('answers an existing Send folder that holds files, and changes no rules', async () => {
+    const send = join(sendHome, 'AgentLink', 'Send');
+    mkdirSync(send, { recursive: true });
+    writeFileSync(join(send, 'old.txt'), 'x');
+    const res = await prepare()(ctx());
+    expect(res.status).toBe(200);
+    expect(body(res)).toEqual({ folder: realpathSync.native(send) });
+    expect(fake.patches).toEqual([]);
+    expect(fake.applied).toEqual([]);
+    expect(Object.keys(body(res))).toEqual(['folder']);
+  });
+
+  it.skipIf(WIN)('falls back to a fresh folder when Send is a link, never the link', async () => {
+    const other = mkdtempSync(join(root, 'att-'));
+    const h = join(other, 'h');
+    mkdirSync(join(h, 'AgentLink'), { recursive: true });
+    symlinkSync(outside, join(h, 'AgentLink', 'Send'));
+    const routes = createFilesRoutes({ home: h, flavor: FLAVOR });
+    const route = routes.find((r) => r.path === '/api/ui/files/send-folder');
+    if (route === undefined || route.presence !== 'mark') throw new Error('no route');
+    const res = await route.handler(ctx(), {});
+    expect(res.status).toBe(200);
+    expect(body(res)['folder']).toBe(join(realpathSync.native(h), 'AgentLink', 'Send-2'));
+  });
+
+  it('without an ID answers not set up', async () => {
+    expect(await prepare()(ctx(null))).toEqual(UI_NOT_SET_UP);
   });
 });

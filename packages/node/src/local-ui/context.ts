@@ -11,6 +11,7 @@ import type { LocalUiBackupDesk } from '../kit-record.js';
 import type { LiveAgentState, LiveAppRecord } from './live-status.js';
 import type { LocalUiPeopleAllDesk } from './api/people-all.js';
 import type { LocalUiStorageDesk } from './api/storage.js';
+import type { LocalUiHistorySession } from './history-desk.js';
 import type { LocalUiAppUpdateDesk } from './api/app-update.js';
 import {
   CoreError,
@@ -40,6 +41,7 @@ import type {
   Page,
   PageQuery,
   PolicyEditOptions,
+  HistoryRetentionPreview,
   LabelReading,
   RenameAllowance,
   SendState,
@@ -63,6 +65,7 @@ import type { LocalUiDataFolder, LocalUiHealthBody, LocalUiHealthSource } from '
 import type { LocalUiInviteDesk } from './route-types.js';
 import type { JoinDesk } from './join-desk.js';
 import type { LocalUiSettingsDesk } from './api/ui-settings.js';
+import type { LocalUiNotificationsDesk } from './api/notifications.js';
 
 /**
  * The local UI's built files (apps/local-ui, D-118), in memory, from the caller (the CLI embeds
@@ -317,6 +320,14 @@ export interface LocalUiReadClient {
     recordReceiptsKept(version: number): Promise<boolean>;
   };
   /**
+   * RET-6 (D-148; 04 §4.2): what a `history.*` setting would remove now, for the Storage editor
+   * before the owner signs (core `historyRetention.preview`: plans only, deletes nothing). Not the
+   * pass itself. Absent in a double that does not need it.
+   */
+  readonly retention?: {
+    preview(keep: unknown): Promise<HistoryRetentionPreview>;
+  };
+  /**
    * M1-11c-a3 (Files): the allowed folders as the rules write them and their realpaths (display
    * paths only), and the unsigned `policy.set` for a folder edit (D-118). Both write nothing; the
    * body is signed only behind the presence gate and applied by core (I-4). Not `apply`, not
@@ -465,6 +476,9 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       prepareEdit: (patch: unknown, options: PolicyEditOptions) =>
         client.ownerActions.preparePolicyEdit(patch, options),
       recordReceiptsKept: (version: number) => client.ownerActions.recordReceiptsKept(version),
+    }),
+    retention: Object.freeze({
+      preview: (keep: unknown) => client.historyRetention.preview(keep),
     }),
     files: Object.freeze({
       resolvedFolders: () => client.files.resolvedFolders(),
@@ -718,6 +732,11 @@ export interface LocalUiContext {
    */
   readonly uiSettings?: LocalUiSettingsDesk;
   /**
+   * N4 (PLAN-NOTIFY §3.1): the open ID's notification store (kind, ref, count and times only), for
+   * api/notifications.ts only. Absent: the bell lists nothing.
+   */
+  readonly notifications?: LocalUiNotificationsDesk;
+  /**
    * U3-g-b: present only while the app host has no agent yet: true when first run cannot set up an
    * owner here (an owner or any agent folder exists). `GET /api/ui/first-run` answers from it.
    */
@@ -777,6 +796,18 @@ export interface LocalUiContext {
   readonly peopleAll?: LocalUiPeopleAllDesk;
   /** REL051-RET1: the sizes behind `GET /api/ui/storage` (api/storage.ts); app host only. Reads only. */
   readonly storage?: LocalUiStorageDesk;
+  /**
+   * RET-4 (D-148; 04 §4.2): Delete history for this request's page session only (history-desk.ts).
+   * Set by the server on the history routes and the finish route; never on any other route.
+   */
+  readonly historySession?: LocalUiHistorySession;
+  /**
+   * RET-4 (08 §1 "Free up space"): Show in Finder for the configured Inbox folder (no input; the
+   * folder is the rules' own setting, resolved and checked; never a path from the page).
+   */
+  readonly revealInbox?: () => Promise<
+    'shown' | 'not_found' | 'refused' | 'unavailable' | 'not_opened'
+  >;
   /** DESK051-UPD: Settings > Updates (api/app-update.ts); the desktop app's host only. */
   readonly appUpdate?: LocalUiAppUpdateDesk;
   /**

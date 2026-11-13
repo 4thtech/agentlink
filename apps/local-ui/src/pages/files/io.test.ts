@@ -198,6 +198,86 @@ describe('tabs', () => {
   });
 });
 
+describe('ATT-SENDFOLDER-FIX: a ?folder=…&check=1 link (Home banner) checks the folder at once', () => {
+  it('runs the review once and lands on the confirm step; nothing is signed without the owner', async () => {
+    const before = window.location.href;
+    window.history.replaceState(
+      null,
+      '',
+      '/settings/files?folder=%2FUsers%2Fme%2FAgentLink%2FSend&check=1',
+    );
+    // Set by Home's banner (IR-1 L-2); read and removed once.
+    sessionStorage.setItem('agentlink.sendFolderCheck', '/Users/me/AgentLink/Send');
+    const review = `/api/ui/files/review?${new URLSearchParams({ add: '/Users/me/AgentLink/Send', version: '3' }).toString()}`;
+    try {
+      const s = await mount({
+        [FOLDERS]: { folders: [], max: 32, version: 3 },
+        [review]: {
+          review: 'r'.repeat(43),
+          change: 'add',
+          folder: '/Users/me/AgentLink/Send',
+          typed: '/Users/me/AgentLink/Send',
+          elsewhere: false,
+          holdsFiles: true,
+          warnings: [],
+          expiresAt: 1_900_000_000,
+        },
+      });
+      await flush();
+      expect(s.calls.filter((c) => c.url === review)).toHaveLength(1);
+      expect(host.querySelector('#fl-confirm-title')).toBeTruthy();
+      expect(sessionStorage.getItem('agentlink.sendFolderCheck')).toBeNull();
+      // IR-1 M-1: the confirm says the folder already holds files, before the owner confirms.
+      expect(host.querySelector('[data-holds-files]')?.textContent).toBe(
+        'It already holds files, and your AI can send those too.',
+      );
+      expect(host.textContent).toContain('/Users/me/AgentLink/Send');
+      expect(s.calls.every((c) => c.method === 'GET')).toBe(true);
+    } finally {
+      window.history.replaceState(null, '', before);
+    }
+  });
+
+  it('IR-1 L-2: a pasted ?folder=…&check=1 link (no banner token) only fills the field', async () => {
+    const before = window.location.href;
+    sessionStorage.removeItem('agentlink.sendFolderCheck');
+    window.history.replaceState(null, '', '/settings/files?folder=%2FUsers%2Fme%2F.ssh&check=1');
+    try {
+      const s = await mount({ [FOLDERS]: { folders: [], max: 32, version: 3 } });
+      expect(s.calls.map((c) => c.url)).toEqual([FOLDERS]);
+      expect(host.querySelector<HTMLInputElement>('input[name="folder"]')?.value).toBe(
+        '/Users/me/.ssh',
+      );
+      expect(host.querySelector('#fl-confirm-title')).toBeNull();
+    } finally {
+      window.history.replaceState(null, '', before);
+    }
+  });
+
+  it('IR-1 L-2: a banner token for another folder does not check this one', async () => {
+    const before = window.location.href;
+    sessionStorage.setItem('agentlink.sendFolderCheck', '/Users/me/AgentLink/Send');
+    window.history.replaceState(null, '', '/settings/files?folder=%2FUsers%2Fme%2FOther&check=1');
+    try {
+      const s = await mount({ [FOLDERS]: { folders: [], max: 32, version: 3 } });
+      expect(s.calls.map((c) => c.url)).toEqual([FOLDERS]);
+    } finally {
+      window.history.replaceState(null, '', before);
+    }
+  });
+
+  it('without check=1 the field is only filled in (no review)', async () => {
+    const before = window.location.href;
+    window.history.replaceState(null, '', '/settings/files?folder=%2FUsers%2Fme%2FProjects');
+    try {
+      const s = await mount({ [FOLDERS]: { folders: [], max: 32, version: 3 } });
+      expect(s.calls.map((c) => c.url)).toEqual([FOLDERS]);
+    } finally {
+      window.history.replaceState(null, '', before);
+    }
+  });
+});
+
 describe('Received', () => {
   it('shows from, when, size, the proof badge and the saved-as name with a stale note', async () => {
     await mount({ [RECEIVED]: page([received({ proof: true })]) });

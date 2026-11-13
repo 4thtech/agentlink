@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApiClient, type ApiClient, type OwnerApiResult } from './api/client.js';
 import type { CheckOutcome, InviteApi } from './pages/contacts/invite-api.js';
 import type { PasskeyInfo, PresenceProof } from './pages/contacts/owner.js';
+import { PresenceButton } from './pages/contacts/presence-button.js';
 import { PresencePrompt } from './pages/contacts/presence-prompt.js';
 import type { AppChange, AppsApi } from './pages/first-run/apps-api.js';
 import { ConnectApp } from './pages/first-run/connect-app.js';
@@ -211,6 +212,30 @@ const SURFACES: readonly Surface[] = [
             sent.push(codeOf(proof));
           },
           onCancel: () => undefined,
+        }),
+      ),
+  },
+  {
+    // UX1113-N1: the step's own button is the sensor (the Connected moment's "Save with Touch ID").
+    file: 'pages/contacts/presence-button.tsx',
+    name: 'the one-gesture sensor button (Connected moment naming)',
+    submit: 'Confirm with your master code',
+    mount: (sent, gestures) =>
+      render(
+        createElement(PresenceButton, {
+          withSensor: (sensor: string) => `Save with ${sensor}`,
+          withCode: 'Save with your master code',
+          statement: 'Name this contact Marko.',
+          busy: false,
+          notUsed: 'Not saved. Try again.',
+          owner: {
+            passkey: () => Promise.resolve(PASSKEY),
+            post: () => Promise.resolve({ kind: 'done' as const }),
+          },
+          gesture: gesture(gestures),
+          onProof: (proof: PresenceProof) => {
+            sent.push(codeOf(proof));
+          },
         }),
       ),
   },
@@ -437,7 +462,7 @@ const sourceOf = (file: string): string => {
 
 /** What makes a .tsx an owner-presence file: it reads, asks for or hands on a presence proof. */
 const PRESENCE_SIGNAL =
-  /PasskeyInfo|PresenceProof|PasskeyStatus|kind: 'passkey'|\.passkey\(\)|credentials\.get|passkeyProof|withPasskey|<PresencePrompt|<OwnerGate|<OwnerStep/;
+  /PasskeyInfo|PresenceProof|PasskeyStatus|kind: 'passkey'|\.passkey\(\)|credentials\.get|passkeyProof|withPasskey|<PresencePrompt|<OwnerGate|<OwnerButton|<OwnerStep/;
 
 type Entry =
   /** A confirm screen: `offers` must be in its source (the code option or a shared prompt with it). */
@@ -455,9 +480,9 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   'pages/proofs/top-up.tsx': { offers: /<UseCodeInstead\b/ },
   // Screens that confirm through the shared prompt (presence-prompt.tsx offers the code).
   'pages/agents/owner-gate.tsx': { offers: /<PresencePrompt\b/ },
-  'pages/agents/name-update.tsx': { offers: /<OwnerGate\b/ },
-  'pages/agents/parts.tsx': { offers: /<OwnerGate\b/ },
-  'pages/agents/sheets.tsx': { offers: /<OwnerGate\b/ },
+  'pages/agents/name-update.tsx': { offers: /<OwnerButton\b/ },
+  'pages/agents/parts.tsx': { offers: /<OwnerButton\b/ },
+  'pages/agents/sheets.tsx': { offers: /<OwnerButton\b/ },
   'pages/apps/panel.tsx': { offers: /<OwnerGate\b/ },
   // WP-11: Save recovery kit (Settings › Backup and the ID card's Back up panel).
   'pages/backup/export-kit.tsx': { offers: /<OwnerGate\b/ },
@@ -465,14 +490,20 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   'pages/touch-id/index.tsx': { offers: /<UseCodeInstead\b/ },
   // UX1113-R3: Restore here asks first on a computer that has an owner (PresenceStep offers the code).
   'pages/restore/index.tsx': { offers: /<PresenceStep\b/ },
-  'pages/contacts/index.tsx': { offers: /<PresencePrompt\b/ },
-  'pages/invite/name-contact.tsx': { offers: /<PresencePrompt\b/ },
-  'pages/home/person-menu.tsx': { offers: /<PresencePrompt\b/ },
-  // Approvals: OwnerStep draws the passkey button with the code field under it (approvals/card.tsx).
+  'pages/contacts/index.tsx': { offers: /<PresenceButton\b/ },
+  'pages/contacts/presence-button.tsx': { offers: /<UseCodeInstead\b/ },
+  'pages/invite/name-contact.tsx': { offers: /<PresenceButton\b/ },
+  'pages/home/person-menu.tsx': { offers: /<PresenceButton\b/ },
+  // RET-4: the delete sheet's one button is the sensor, with the master code as a link.
+  'pages/history/delete-sheet.tsx': { offers: /<PresenceButton\b/ },
+  // RET-6: Settings > Storage > Keep automatically (Save is the sensor; the code as a link).
+  'pages/storage/keep.tsx': { offers: /<PresenceButton\b/ },
+  // Approvals: OWNERSTEP-LEFT, the one-step PresenceAction offers the code (link, or the code field
+  // when no sensor works here; approvals/card.tsx CodeStep).
   'pages/approvals/card.tsx': { offers: /<CodeForm\b/ },
-  'pages/approvals/board.tsx': { offers: /<OwnerStep\b/ },
-  'pages/home/home-approvals.tsx': { offers: /<OwnerStep\b/ },
-  'pages/inbox/save.tsx': { offers: /<OwnerStep\b/ },
+  'pages/approvals/board.tsx': { offers: /<PresenceAction\b/ },
+  'pages/home/home-approvals.tsx': { offers: /<PresenceAction\b/ },
+  'pages/inbox/save.tsx': { offers: /<PresenceAction\b/ },
   // Their own code option (each with its own DOM tests).
   'pages/apps/create-agent-gate.tsx': { offers: /NAME\.backupInstead/ },
   'pages/files/index.tsx': { offers: /S\.useCode/ },

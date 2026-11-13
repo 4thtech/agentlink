@@ -184,7 +184,10 @@ async function sendFolder(): Promise<string> {
   return join(await realpath(home), 'AgentLink', 'Send');
 }
 
-/** The 06 §3 defaults with only `files.allowedFolders` replaced. */
+/**
+ * The 06 §3 defaults with only `files.allowedFolders` replaced, and `history` a new ID's first rules
+ * (D-148, OD-2: saved files 90 days, messages forever; the 06 §3 defaults keep both forever).
+ */
 function defaultsWith(folders: readonly string[]): string {
   const effective = POLICY_DEFAULTS_EFFECTIVE;
   if (effective.mode !== 'defaults') throw new Error('core defaults changed shape');
@@ -195,6 +198,7 @@ function defaultsWith(folders: readonly string[]): string {
   return canonicalize({
     ...base,
     files: { ...base.files, allowedFolders: [...folders], autoSave: { ...AUTO_SAVE_DEFAULTS } },
+    history: { messagesKeepDays: 0, filesKeepDays: 90 },
   });
 }
 
@@ -326,7 +330,7 @@ describe('owner init signs the first rules with the first card (M1-36b-2; 04 §2
     expect(await exists(join(home, 'AgentLink'))).toBe(false);
   });
 
-  it('a Send folder that already holds files is not allowed and nothing in it is touched', async () => {
+  it('ATT-SENDFOLDER-FIX: a Send folder that already holds files is allowed (the owner is told), nothing in it is touched', async () => {
     const alice = await initAgent('alice');
     await mkdir(join(home, 'AgentLink', 'Send'), { recursive: true });
     await writeFile(join(home, 'AgentLink', 'Send', 'private.txt'), 'x');
@@ -338,8 +342,11 @@ describe('owner init signs the first rules with the first card (M1-36b-2; 04 §2
       { kdf: KDF },
     );
     expect(result.card).toBeDefined();
-    expect(result.sendFolder).toEqual({ status: 'not_allowed', reason: 'folder_not_empty' });
-    expect((await alice.client.ownerActions.loadPolicy()).mode).toBe('defaults');
+    expect(result.sendFolder).toEqual({ status: 'allowed', folder: await sendFolder() });
+    const effective = await alice.client.ownerActions.loadPolicy();
+    expect(effective.mode).toBe('signed');
+    expect(canonicalize(signedPolicy(effective))).toBe(defaultsWith([await sendFolder()]));
+    expect(run.written.join('\n')).toMatch(/already holds files/);
     expect(await readdir(join(home, 'AgentLink', 'Send'))).toEqual(['private.txt']);
   });
 

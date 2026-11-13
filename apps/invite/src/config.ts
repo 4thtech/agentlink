@@ -21,19 +21,21 @@ export const DOCS_LINKS = {
  */
 export const MAC_APP_AVAILABLE = true;
 
-/** The release the Mac app link names (its GitHub Release tag is `v` plus this). */
-export const MAC_APP_VERSION = '0.5.2';
+/**
+ * The Mac app's downloads: the stable file names of the newest GitHub Release marked Latest
+ * (`AgentLink-mac-<arch>.dmg`, Apple chip arm64 and Intel x64). The release workflow uploads these
+ * copies and marks the Release Latest only after both are attached, so the links never go stale.
+ */
+const macAppUrl = (arch: 'arm64' | 'x64'): string =>
+  `https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-${arch}.dmg`;
+
+export const MAC_APP_URLS = { arm64: macAppUrl('arm64'), x64: macAppUrl('x64') } as const;
 
 /**
- * The Mac app's file name, as the desktop build writes it (apps/desktop/build/build-mac.mjs on
- * desktop/integration-051: `AgentLink-<version>-mac-<arch>.dmg`, arch arm64 or x64). The page links
- * both: Apple chip (arm64) and Intel chip (x64).
+ * WIN-DESK-1d (owner, 0.5.3): the Windows app, an unsigned early build. Shown under the Windows
+ * choice only; the command stays the first way on Windows. Its link is the stable name on the newest
+ * Release marked Latest (`AgentLink-win-x64-setup.exe`), uploaded before that flip (release.yml).
  */
-export const macAppAsset = (version: string, arch: 'arm64' | 'x64'): string =>
-  `AgentLink-${version}-mac-${arch}.dmg`;
-
-const macAppUrl = (arch: 'arm64' | 'x64'): string =>
-  `https://github.com/4thtech/agentlink/releases/download/v${MAC_APP_VERSION}/${macAppAsset(MAC_APP_VERSION, arch)}`;
-
-/** The Mac app's downloads: those exact assets of that exact GitHub Release (never `latest`). */
-export const MAC_APP_URLS = { arm64: macAppUrl('arm64'), x64: macAppUrl('x64') } as const;
+export const WIN_APP_AVAILABLE = true;
+export const WIN_APP_URL =
+  'https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe';

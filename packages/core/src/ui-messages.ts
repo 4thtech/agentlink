@@ -92,6 +92,13 @@ export interface InboxMessage {
   readonly proof: boolean;
   /** The message's plaintext size in bytes. */
   readonly size: number;
+  /**
+   * MSG-ORDER-1 (audit R2-UI-09): the local order this message was stored in, the same scale for
+   * both boxes, so messages of one second keep their order: a sent one in the order it was sent, a
+   * received one in the order it arrived (`createdAt` has whole seconds only, 04 §3.1). Compare
+   * only after `at`, and only within one store; absent when the store gives no order.
+   */
+  readonly seq?: number;
 }
 
 /** A message in a contact's Sent list. */
@@ -249,6 +256,8 @@ function whereOf(direction: MessageBox, contacts: readonly string[] | 'any'): Wh
   const base = {
     direction,
     state: 'ok' as const,
+    // RET-3 (D-148; 07 §3.8): a tombstone is absent from every read.
+    deleted_at: null,
     ...(contacts === 'any' ? {} : { contact_id: { in: [...contacts] } }),
     type: { in: [...PAGE_TYPES] },
   };
@@ -301,7 +310,7 @@ async function ackedOf(
     contacts.flatMap((contactId) =>
       tx.select(
         'envelopes',
-        { direction: 'in', contact_id: contactId, state: 'ok', type: 'ack' },
+        { direction: 'in', contact_id: contactId, state: 'ok', type: 'ack', deleted_at: null },
         {
           orderBy: [
             ['created_at', 'desc'],
@@ -532,7 +541,14 @@ export class MessagesView {
         tx,
         page.items.map((p) => p.id),
       );
-      return { rows: page.items.map((p) => p.row), nextCursor: page.nextCursor, proofs };
+      const shown = page.items.map((p) => p.row);
+      // MSG-ORDER-1: the local insertion order, read with the page (nothing else about the row).
+      const order =
+        tx.rowOrder?.(
+          'envelopes',
+          shown.map((r) => ({ envelope_id: r.envelope_id })),
+        ) ?? [];
+      return { rows: shown, order, nextCursor: page.nextCursor, proofs };
     });
     if (read === undefined) throw noContact();
 
@@ -545,7 +561,8 @@ export class MessagesView {
         : new Set<string>();
     const items: MessageItem[] = [];
     let unreadable = 0;
-    for (const row of read.rows) {
+    for (const [i, row] of read.rows.entries()) {
+      const seq = read.order[i];
       const opened = await openStoredPayload(this.#ctx, row);
       if (opened === undefined) {
         unreadable += 1;
@@ -563,6 +580,7 @@ export class MessagesView {
         ),
         proof: read.proofs.has(row.envelope_id),
         size: encodeUtf8(opened.text).length,
+        ...(seq === undefined ? {} : { seq }),
       };
       if (box === 'out') {
         if (!isSentStatus(row.delivery)) {

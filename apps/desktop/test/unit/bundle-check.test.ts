@@ -2,7 +2,7 @@
 // SHA-256 of Resources/node, the core's desktop host and the presence helper in app.asar (covered by
 // ASAR integrity); the shell compares them before it starts the core. Not a security boundary against
 // a same-user process (it can replace the whole app), only a check that catches a changed file.
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -71,5 +71,31 @@ describe('bundle tripwire', () => {
     const paths = { node: '/x', host: '/y', helper: null };
     expect(await verifyBundle(null, paths)).toBe('unchecked');
     expect(await verifyBundle('{"v":1,"files":{"node":"zz"}}', paths)).toBe('changed');
+  });
+});
+
+// WIN-DESK-2 (R-WIN §6 item 3): Windows builds carry the record too; the helper is
+// resources\native\agentlink-presence.exe.
+describe('bundle tripwire on Windows', () => {
+  it('knows where the three files are inside the installed Windows app', () => {
+    const win = bundleFilePaths(join('C:', 'AgentLink', 'resources'), 'win32');
+    expect(win.node).toBe(join('C:', 'AgentLink', 'resources', 'node', 'node.exe'));
+    expect(win.helper).toBe(
+      join('C:', 'AgentLink', 'resources', 'native', 'agentlink-presence.exe'),
+    );
+  });
+
+  it('a changed Windows helper is caught', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'al-bundle-win-'));
+    dirs.push(dir);
+    const paths = bundleFilePaths(join(dir, 'resources'), 'win32');
+    for (const p of [paths.node, paths.host, paths.helper] as string[]) {
+      mkdirSync(join(p, '..'), { recursive: true });
+      writeFileSync(p, 'abc');
+    }
+    const record = JSON.stringify({ v: 1, files: { node: ABC, host: ABC, helper: ABC } });
+    expect(await verifyBundle(record, paths)).toBe('ok');
+    writeFileSync(paths.helper as string, 'abd');
+    expect(await verifyBundle(record, paths)).toBe('changed');
   });
 });

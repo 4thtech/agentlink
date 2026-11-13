@@ -12,7 +12,13 @@
 // - Fail closed: a stored value outside its column's type is `store_unreadable`, never absent; a lost
 //   transaction (SQLite rolled it back on an I/O error) stops every later statement of the body.
 // - Forward migrations only (07 §3.7): a newer schema version is refused, never downgraded.
-import { closeSync, openSync } from 'node:fs';
+// - RET-2 (D-148; 04 §4.2 "Space on disk"; 07 §3.8): `auto_vacuum=INCREMENTAL`. A new file gets it
+//   before its first table; an existing file is switched once with a VACUUM, after the migrations,
+//   under the ID's inter-process lock, only when the volume has at least twice the store's size (file
+//   and write-ahead log) free. Busy, a held lock, too little or unreadable space: skipped, the store
+//   opens as it is and a later open tries again. `compact()` then returns freed pages after a delete.
+import { closeSync, lstatSync, openSync } from 'node:fs';
+import { dirname } from 'node:path';
 import Database from 'better-sqlite3';
 import {
   StoreConstraintError,
@@ -41,6 +47,7 @@ import {
 } from './sqlite-schema.js';
 import { NodeStoreError } from './store-errors.js';
 import { withInterProcessLock, type InterProcessLockOptions } from './inter-process-lock.js';
+import { freeBytes as volumeFreeBytes } from './inbox-folder.js';
 
 /** How long a transaction waits for the write lock before `store_busy`. */
 export const STORE_LOCK_TIMEOUT_MS = 10_000;
@@ -53,6 +60,24 @@ export interface SqliteStoreOptions {
   readonly lockTimeoutMs?: number;
   /** Test seam (not exported from the package): the migration list. Default MIGRATIONS. */
   readonly migrations?: readonly StoreMigration[];
+  /** Test seam: free bytes on the volume of a folder (the auto_vacuum switch). Default statfs. */
+  readonly freeBytes?: (folder: string) => Promise<number>;
+  /** Test seam: how long the auto_vacuum switch waits for the ID lock. Default 1 second. */
+  readonly vacuumLockTimeoutMs?: number;
+}
+
+/** PRAGMA auto_vacuum value of INCREMENTAL. */
+const AUTO_VACUUM_INCREMENTAL = 2;
+/** How long opening waits for the ID lock before it skips the one-time auto_vacuum switch. */
+const VACUUM_LOCK_TIMEOUT_MS = 1_000;
+
+/** The size of a file in bytes, 0 when it does not exist. */
+function fileSize(path: string): number {
+  try {
+    return lstatSync(path).size;
+  } catch {
+    return 0;
+  }
 }
 
 type AnyRow = Readonly<Record<string, StoreValue>>;
@@ -185,6 +210,19 @@ function whereSql(table: TableName, where: unknown): Sql {
   return { text: parts.length === 0 ? '' : ` WHERE ${parts.join(' AND ')}`, params };
 }
 
+/** The where of one primary key; throws unless it names every primary-key column. */
+function keyWhere(table: TableName, key: unknown): Record<string, unknown> {
+  const where: Record<string, unknown> = {};
+  for (const column of tableSpec(table).primaryKey) {
+    const value = (key as Readonly<Record<string, unknown>> | null)?.[column];
+    if (value === undefined || value === null || typeof value === 'object') {
+      throw new StoreUsageError('store: get needs every primary-key column');
+    }
+    where[column] = value;
+  }
+  return where;
+}
+
 function checkTable(table: unknown): asserts table is TableName {
   if (typeof table !== 'string' || !Object.hasOwn(TABLES, table)) {
     throw new StoreUsageError('store: unknown table');
@@ -231,21 +269,36 @@ class SqliteTx implements StoreTx {
 
   get<T extends TableName>(table: T, key: PrimaryKey<T>): Row<T> | undefined {
     this.#ready(table);
-    const where: Record<string, unknown> = {};
-    for (const column of tableSpec(table).primaryKey) {
-      const value = (key as Readonly<Record<string, unknown>> | null)?.[column];
-      if (value === undefined || value === null || typeof value === 'object') {
-        throw new StoreUsageError('store: get needs every primary-key column');
-      }
-      where[column] = value;
-    }
-    const w = whereSql(table, where);
+    const w = whereSql(table, keyWhere(table, key));
     const rows = this.#read(
       table,
       `SELECT ${selectList(table)} FROM ${q(table)}${w.text} LIMIT 1`,
       w.params,
     );
     return rows[0] as Row<T> | undefined;
+  }
+
+  /**
+   * MSG-ORDER-1: SQLite's rowid, the local insertion order (every table has one: none is WITHOUT
+   * ROWID). A new row gets the largest rowid plus one; an update keeps it, and VACUUM keeps the
+   * relative order. Read for a few keys at a time (one page of a UI read).
+   */
+  rowOrder<T extends TableName>(
+    table: T,
+    keys: readonly PrimaryKey<T>[],
+  ): readonly (number | undefined)[] {
+    this.#ready(table);
+    return keys.map((key) => {
+      const w = whereSql(table, keyWhere(table, key));
+      const value: unknown = this.#ops.run(table, () =>
+        this.#ops
+          .statement(`SELECT rowid FROM ${q(table)}${w.text} LIMIT 1`)
+          .pluck(true)
+          .safeIntegers(false)
+          .get(...w.params),
+      );
+      return typeof value === 'number' && Number.isSafeInteger(value) ? value : undefined;
+    });
   }
 
   select<T extends TableName>(table: T, where?: Where<T>, options?: SelectOptions<T>): Row<T>[] {
@@ -442,8 +495,20 @@ export class SqliteStore implements Store {
       if (Number(db.pragma('secure_delete = ON', { simple: true })) !== 1) {
         throw new NodeStoreError('store_failed');
       }
+      // RET-2: a file without any table yet gets incremental auto_vacuum before its first table.
+      const objects = Number(
+        db
+          .prepare("SELECT count(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'")
+          .pluck()
+          .get(),
+      );
+      if (objects === 0) db.pragma(`auto_vacuum = ${String(AUTO_VACUUM_INCREMENTAL)}`);
       store.#schemaVersion = await store.#migrate(migrations);
       verifySchema(db);
+      await store.#switchAutoVacuum(
+        options.freeBytes ?? volumeFreeBytes,
+        options.vacuumLockTimeoutMs ?? VACUUM_LOCK_TIMEOUT_MS,
+      );
       db.pragma(`busy_timeout = ${STATEMENT_BUSY_MS}`);
       return store;
     } catch (error) {
@@ -470,6 +535,54 @@ export class SqliteStore implements Store {
         delay = Math.min(delay * 2, 50);
       }
     }
+  }
+
+  /**
+   * RET-2: the one-time switch of an existing file to `auto_vacuum=INCREMENTAL` (see the header).
+   * Best effort: it never fails the open, and it writes nothing else. A VACUUM rewrites the file with
+   * the same rows; `secure_delete` stays on, so no freed content is left behind.
+   */
+  async #switchAutoVacuum(
+    freeBytesOf: (folder: string) => Promise<number>,
+    lockTimeoutMs: number,
+  ): Promise<void> {
+    const db = this.#db;
+    const incremental = (): boolean =>
+      Number(db.pragma('auto_vacuum', { simple: true })) === AUTO_VACUUM_INCREMENTAL;
+    try {
+      if (incremental()) return;
+      const size = fileSize(this.#path) + fileSize(`${this.#path}-wal`);
+      const free = await freeBytesOf(dirname(this.#path));
+      if (typeof free !== 'number' || !Number.isFinite(free) || free < 2 * size) return;
+      await withInterProcessLock(
+        `${this.#path}.lock`,
+        () => {
+          if (incremental()) return;
+          db.pragma(`auto_vacuum = ${String(AUTO_VACUUM_INCREMENTAL)}`);
+          db.exec('VACUUM');
+        },
+        { timeoutMs: lockTimeoutMs },
+      );
+    } catch {
+      // Skipped (busy, the lock held elsewhere, no room, statfs failed): the file keeps its size.
+    }
+  }
+
+  /**
+   * RET-2 (04 §4.2 "Space on disk"): returns the free pages of the file to the file system after a
+   * large delete (`PRAGMA incremental_vacuum`). A no-op on a file not yet switched to incremental
+   * auto_vacuum. Runs between transactions, waiting for the write lock like one.
+   */
+  compact(): Promise<void> {
+    const run = async (): Promise<void> => {
+      if (this.#closed) throw new StoreUsageError('store: the store is closed');
+      await this.#retryBusy(() => {
+        this.#db.pragma('incremental_vacuum');
+      });
+    };
+    const next = this.#tail.then(run, run);
+    this.#tail = next.catch(() => undefined);
+    return next;
   }
 
   /** Brings the schema to the last migration's version in one IMMEDIATE transaction per step. */

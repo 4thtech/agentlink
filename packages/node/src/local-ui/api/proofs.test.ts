@@ -464,6 +464,8 @@ describe('the read-only client view (context.ts)', () => {
       'messages',
       'policy',
       'proofs',
+      // RET-6: what a history.* setting would remove now (a plan; deletes nothing).
+      'retention',
     ]);
     expect(Object.keys(view.proofs).sort()).toEqual(['creditsBalance', 'list', 'topUp']);
     // M1-11c-a4c adds the top-up read (proofs-top-up.test.ts); still nothing that moves funds.

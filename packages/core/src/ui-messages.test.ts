@@ -186,6 +186,7 @@ async function put(p: Put): Promise<string> {
       delivery: direction === 'out' ? (p.delivery ?? 'sent') : null,
       refused_at: state === 'refused' ? clock.t : null,
       request_accepted_at: null,
+      deleted_at: null,
     }),
   );
   return id;
@@ -254,7 +255,7 @@ async function expectNoSecrets(value: unknown, agent: TestAgent = a): Promise<vo
 
 const keys = (o: object): string[] => Object.keys(o).sort();
 
-const MESSAGE_IN_KEYS = ['at', 'files', 'id', 'proof', 'size', 'text', 'type'];
+const MESSAGE_IN_KEYS = ['at', 'files', 'id', 'proof', 'seq', 'size', 'text', 'type'];
 const MESSAGE_OUT_KEYS = [...MESSAGE_IN_KEYS, 'receipt', 'status'].sort();
 const CONVERSATION_KEYS = ['contactId', 'display', 'lastAt', 'lastInAt'];
 const RECEIVED_KEYS = ['at', 'from', 'id', 'name', 'proof', 'size', 'state'];
@@ -546,6 +547,23 @@ describe('MessagesView.flowEvents (U3-flow, USABILITY-WAVE-3 §4.1: GET /api/ui/
 // ---- Messages: one contact's Inbox or Sent -------------------------------------------------------
 
 describe('MessagesView.list (plan §4 GET /api/ui/messages/:contactId)', () => {
+  it('MSG-ORDER-1: messages of the same second carry the local order, both ways', async () => {
+    // Envelope IDs sort opposite to the order they were stored in, so only `seq` can order them.
+    const ids = ['zz', 'yy', 'xx', 'ww', 'vv', 'uu'].map((p) => `${p}${'A'.repeat(20)}`);
+    const dirs = ['out', 'in', 'out', 'out', 'in', 'in'] as const;
+    for (const [i, id] of ids.entries()) {
+      await put({ id, contact: b.id, createdAt: T0, direction: dirs[i] as 'in' | 'out' });
+    }
+    const inbox = await a.client.messages.list(b.id, 'in');
+    const sent = await a.client.messages.list(b.id, 'out');
+    const all = [...inbox.items, ...sent.items];
+    for (const item of all) expect(Number.isSafeInteger(item.seq)).toBe(true);
+    const merged = [...all].sort((x, y) => x.at - y.at || (x.seq ?? 0) - (y.seq ?? 0));
+    expect(merged.map((m) => m.id)).toEqual(ids);
+    // Paging is unchanged: each box still pages newest first by (time, envelope ID).
+    expect(inbox.items.map((m) => m.id)).toEqual([ids[1], ids[4], ids[5]]);
+  });
+
   it('returns Inbox items as plain text, newest first, with an exact key set', async () => {
     const plain = await put({
       contact: b.id,

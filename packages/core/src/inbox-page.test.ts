@@ -141,6 +141,7 @@ async function put(p: Put): Promise<string> {
       delivery: direction === 'out' ? (p.delivery ?? 'sent') : null,
       refused_at: state === 'refused' ? clock.t : null,
       request_accepted_at: p.acceptedAt ?? null,
+      deleted_at: null,
     }),
   );
   return id;

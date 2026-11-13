@@ -748,6 +748,7 @@ export class EnvelopeService {
           delivery: null,
           refused_at: null,
           request_accepted_at: null,
+          deleted_at: null,
         });
         markSeen();
         return { status: 'verified', report: report(envelope.id, 'deferred') };
@@ -1536,6 +1537,7 @@ export class EnvelopeService {
       delivery: null,
       refused_at: null,
       request_accepted_at: null,
+      deleted_at: null,
     };
     const now = nowOf(ctx);
     let revoked: RevokeActivity | undefined;
@@ -1792,6 +1794,7 @@ export class EnvelopeService {
         // D-72: the local time it was stored as refused, for its retention (07 §3.2).
         refused_at: now,
         request_accepted_at: null,
+        deleted_at: null,
       });
       return report(item.envelopeId, 'refused', {
         reason: effective.reason,
@@ -1936,6 +1939,7 @@ export async function outboundRow(
     delivery: 'queued',
     refused_at: null,
     request_accepted_at: null,
+    deleted_at: null,
   };
 }
 

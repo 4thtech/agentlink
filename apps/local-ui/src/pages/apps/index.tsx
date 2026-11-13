@@ -5,7 +5,7 @@
 // paths are rendered as text only (I-5).
 // WP-D7: a card connected to the open ID with npx offers "Use the app for …" when the AgentLink app
 // is on this computer (or says to move it first when it runs from a place that is never written).
-import { Button, EmptyState, Icon, Skeleton, Surface, useHood } from '@4thtech-io/ui';
+import { Banner, Button, EmptyState, Icon, Skeleton, useHood } from '@4thtech-io/ui';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { createAgentsApi, type AgentsApi } from '../agents/api.js';
 import { announceAgentsChanged } from '../agents/use-agents.js';
@@ -306,26 +306,32 @@ export function AppsPage({ api, agents, owner }: AppsPageProps): ReactElement {
         {notice}
       </div>
       {otherWanted === undefined ? null : (
-        <Surface as="section" level={1} className="ap-error">
-          <p className="al-text-body">{S.switchFirst(otherWanted.label)}</p>
-          <Button variant="secondary" onClick={switchToWanted}>
-            {S.switchTo(otherWanted.label)}
-          </Button>
-        </Surface>
+        <Banner
+          tone="info"
+          action={
+            <Button variant="secondary" size="sm" onClick={switchToWanted}>
+              {S.switchTo(otherWanted.label)}
+            </Button>
+          }
+        >
+          {S.switchFirst(otherWanted.label)}
+        </Banner>
       )}
       {!loaded ? (
         <Skeleton loading lines={3}>
           <span />
         </Skeleton>
       ) : list === undefined && failed ? (
-        <Surface as="section" level={1} className="ap-error">
-          <p className="al-text-body" role="alert">
-            {S.loadError}
-          </p>
-          <Button variant="secondary" onClick={read}>
-            {S.tryAgain}
-          </Button>
-        </Surface>
+        <Banner
+          tone="danger"
+          action={
+            <Button variant="secondary" size="sm" onClick={read}>
+              {S.tryAgain}
+            </Button>
+          }
+        >
+          {S.loadError}
+        </Banner>
       ) : list !== undefined && list.apps.length === 0 ? (
         <EmptyState
           title={S.none}

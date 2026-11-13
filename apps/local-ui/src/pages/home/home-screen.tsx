@@ -21,13 +21,14 @@ import {
   Button,
   EmptyState,
   Icon,
+  InlineError,
   SkeletonGate,
   SkeletonLine,
   SkeletonList,
   SkeletonTable,
+  type PayPlatform,
   UntrustedContent,
   useViewTransition,
-  type PayPlatform,
 } from '@4thtech-io/ui';
 import {
   useCallback,
@@ -43,7 +44,8 @@ import { createApiClient, type ApiClient } from '../../api/client.js';
 import { getLive, subscribeLive, switchAgent, type LiveAgent } from '../../api/live.js';
 import { initials } from '../../initials.js';
 import { INVITE_PATH, PEOPLE_PATH } from '../../nav.js';
-import { notify, setArchived, useArchived } from '../../notices/index.js';
+import { notify, setArchived, useArchived, useConversationsArchived } from '../../notices/index.js';
+import { DeleteSheet } from '../history/delete-sheet.js';
 import { checkHref } from '../contacts/safety.js';
 import { CONTACTS_CHANGED } from '../../api/contact-changes.js';
 import { PasteEntryLink } from '../invite/paste-entry.js';
@@ -82,6 +84,8 @@ import { useTerms } from './terms-trail.js';
 import type { Preview } from './file-reader.js';
 import { HomeApprovals } from './home-approvals.js';
 import { RenameBanner } from './rename-banner.js';
+import { SendFolderBanner, createSendFolderApi, type SendFolderApi } from './send-folder-banner.js';
+import { createAttachApi, type AttachApi } from './attach-api.js';
 import {
   createPeopleApi,
   MAX_SUMMARIES,
@@ -147,6 +151,10 @@ interface Clients {
   /** W8-S4: Finish removing (the Remove sheet's own calls). */
   readonly agents: AgentsApi;
   readonly owner: OwnerClient;
+  /** ATT-SENDFOLDER-FIX: the Send folder banner's read and set-up calls. */
+  readonly sendFolder: SendFolderApi;
+  /** ATT-APP-ATTACH: attach files in a conversation and send them yourself. */
+  readonly attach: AttachApi;
 }
 
 function useClients(props: HomeScreenProps): Clients {
@@ -169,6 +177,9 @@ function useClients(props: HomeScreenProps): Clients {
       invites: createInviteApi(opts),
       agents: createAgentsApi(opts),
       owner: createOwnerClient(opts),
+      sendFolder: createSendFolderApi(opts),
+      // ATT-APP-ATTACH: attach files in a conversation and send them yourself.
+      attach: createAttachApi(opts),
     };
   }, [givenFetch, token, credentials, approvalsClient]);
 }
@@ -258,7 +269,10 @@ function PersonOpen({
   props,
   onChanged,
   archived,
+  idName,
 }: {
+  /** RET-5: the open ID's name (Archive in the person menu). */
+  readonly idName?: string | undefined;
   readonly person: Person;
   readonly contact: ContactRow | undefined;
   readonly data: HomeData;
@@ -283,6 +297,21 @@ function PersonOpen({
   const terms = useTerms(clients.api, person.contactId, tick);
   const files = thread.state === 'ready' ? filesOf(thread.inbox.items, thread.sent.items) : [];
   const removed = contact?.status === 'revoked';
+  // RET-4: the messages chosen in Select mode, shown in the delete sheet.
+  const [chosen, setChosen] = useState<readonly string[] | undefined>(undefined);
+  // ATT-APP-ATTACH: only for a connected, active contact (the server checks again).
+  const attach = useMemo(
+    () =>
+      contact !== undefined && contact.status === 'active' && contact.pairing === 'complete'
+        ? {
+            contactId: person.contactId,
+            api: clients.attach,
+            folderApi: clients.sendFolder,
+            onSent: refresh,
+          }
+        : undefined,
+    [contact, person.contactId, clients.attach, clients.sendFolder, refresh],
+  );
   const fileContext = useMemo(
     () => ({
       received: data.received,
@@ -323,8 +352,20 @@ function PersonOpen({
           {...(props.fetch === undefined ? {} : { fetch: props.fetch })}
           {...(props.token === undefined ? {} : { token: props.token })}
           onChanged={(what) => onChanged(what)}
+          idName={idName}
+          onDeleted={refresh}
         />
       </div>
+      {chosen === undefined || contact === undefined ? null : (
+        <DeleteSheet
+          name={person.name}
+          target={{ contact: contact.ref, envelopeIds: chosen }}
+          {...(props.fetch === undefined ? {} : { fetch: props.fetch })}
+          {...(props.token === undefined ? {} : { token: props.token })}
+          onClose={() => setChosen(undefined)}
+          onApplied={refresh}
+        />
+      )}
       {pro && contact !== undefined ? (
         <dl className="hm-facts al-reveal">
           {contact.fingerprint === undefined ? null : (
@@ -366,6 +407,8 @@ function PersonOpen({
         terms={terms}
         removed={removed}
         files={fileContext}
+        onDelete={contact === undefined ? undefined : (ids) => setChosen(ids)}
+        attach={attach}
       />
       <PersonFiles
         name={person.name}
@@ -456,11 +499,7 @@ function PendingInviteRow({
             {agent === '' ? '' : ` · ${agent}`}
           </span>
         ) : null}
-        {failed ? (
-          <span role="alert" className="hm-inline-error al-text-body-sm">
-            {S.cantCancel}
-          </span>
-        ) : null}
+        {failed ? <InlineError>{S.cantCancel}</InlineError> : null}
         {api.link === undefined ? null : (
           <InviteLinkReveal link={link} label={linkLabel(name ?? '')} />
         )}
@@ -515,11 +554,7 @@ function ConnectingRowView({
       <span className="hm-row-main hm-c">
         <PersonName name={row.name} />
         <span className="hm-sub al-text-body-sm">{connectingLine(row, now)}</span>
-        {failed ? (
-          <span role="alert" className="hm-inline-error al-text-body-sm">
-            {F.cancelConnectingFailed}
-          </span>
-        ) : null}
+        {failed ? <InlineError>{F.cancelConnectingFailed}</InlineError> : null}
       </span>
       {row.blocked === true ? (
         <a className="al-btn al-btn-secondary al-btn-sm" href={PEOPLE_PATH}>
@@ -736,8 +771,11 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   const isGone = (contactId: string): boolean =>
     data?.contacts.get(contactId)?.status === 'revoked';
   // UX 2026-11-12: a removed connection the owner archived leaves People for "Archived" (kept).
+  // RET-5 (D-148): any person can be archived from their menu; the AI still sees them.
+  const conversationsArchived = useConversationsArchived(current?.name);
   const isArchived = (contactId: string): boolean =>
-    isGone(contactId) && archivedRefs.has(contactId.toLowerCase());
+    conversationsArchived.has(contactId.toLowerCase()) ||
+    (isGone(contactId) && archivedRefs.has(contactId.toLowerCase()));
   const matching = (data?.people ?? []).filter(
     (p) => otherAgent === undefined && (!pro || q === '' || p.name.toLowerCase().includes(q)),
   );
@@ -964,6 +1002,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
               props={props}
               {...(props.folderNote === undefined ? {} : { folderNote: props.folderNote })}
               archived={archive}
+              idName={current?.name}
               onChanged={(what) => {
                 if (what === 'remove') setOpen(undefined);
                 if (what === 'remove') notify({ text: fmt(S.removed, { name: person.name }) });
@@ -1047,6 +1086,11 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
               api={clients.agents}
               owner={clients.owner}
               row={liveIds.rows.find((r) => r.current && !r.removing)}
+            />
+            {/* ATT-SENDFOLDER-FIX: no folder allowed yet: one button to allow the Send folder. */}
+            <SendFolderBanner
+              api={clients.sendFolder}
+              agentKey={liveIds.rows.find((r) => r.current)?.name ?? ''}
             />
             <HomeApprovals
               items={approvals}

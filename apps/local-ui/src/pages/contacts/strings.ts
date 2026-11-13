@@ -76,6 +76,17 @@ export const CONTACTS_STRINGS = {
   blockedNow: 'Blocked.',
   unblocked: 'Unblocked. Messages from this person arrive again.',
   cancel: 'Cancel',
+  // UX1113-N2: one owner step, one gesture. Each action's own button is the sensor.
+  renameWith: (sensor: string): string => `Rename with ${sensor}`,
+  renameWithCode: 'Rename with your master code',
+  removeWith: (sensor: string): string => `Remove with ${sensor}`,
+  removeWithCode: 'Remove with your master code',
+  blockWith: (sensor: string): string => `Block with ${sensor}`,
+  blockWithCode: 'Block with your master code',
+  unblockWith: (sensor: string): string => `Unblock with ${sensor}`,
+  unblockWithCode: 'Unblock with your master code',
+  matchWith: (sensor: string): string => `They match · ${sensor}`,
+  matchWithCode: 'They match · master code',
   presenceIntro: 'Confirm it’s you. Never give your master code to your AI.',
   get usePasskey(): string {
     return `Confirm with ${sensorWord()}`;
@@ -95,6 +106,12 @@ export const CONTACTS_STRINGS = {
   get presenceRequired(): string {
     return `Enter your master code or use ${sensorWord()}. Nothing was changed.`;
   },
+  // IR-UX1113-N2-1 #2: the sensor was used, and the server did not accept the proof.
+  sensorRefused:
+    "AgentLink didn't accept that confirmation. Nothing was changed. Try again, or use your master code.",
+  // IR-N3-1 #5: the server could not use Touch ID (or the passkey) here just now.
+  sensorUnavailable:
+    "That confirmation isn't available here right now. Nothing was changed. Use your master code.",
   get passkeyNotUsed(): string {
     return `${sensorSentence()} wasn't used. Nothing was changed. You can enter your master code.`;
   },

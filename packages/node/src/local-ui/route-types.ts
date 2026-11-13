@@ -15,12 +15,15 @@
 // 'switch'`, for switching the open agent in the app host: one fixed POST, no presence, no signing,
 // no handler (the server's switch gate runs it); it writes only `app.json`. U3-c also adds route
 // stubs (`stub: true`) for the U3 routes later cards fill: a stub answers 501 `not_available` before
-// any presence check and never runs its handler.
+// any presence check and never runs its handler. ATT-APP-ATTACH adds `presence: 'attach'`: one fixed
+// POST, no presence, no signing; its handler gets only the parsed body and the attach desk.
 import type { CreatedInvite, InviteLinkResult, PendingContact } from '@4thtech-io/core';
 import type { EnvelopeKeys, JsonObject, JsonValue } from '@4thtech-io/crypto';
 import { UI_SETTINGS_PATH, type UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 import type { LocalUiContext } from './context.js';
 import type { LocalUiOwnerCodeStep } from './owner-code-paths.js';
+import type { LocalUiHistoryStep } from './history-paths.js';
+import type { LocalUiHistorySession } from './history-desk.js';
 import type { RenameSignOutcome } from '../owner-rename.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
 
@@ -169,6 +172,13 @@ export interface LocalUiOwnerRoute {
   /** UX1113 WP-S2: one owner-code step, only at its fixed path (owner-code-paths.ts). */
   readonly ownerCode?: LocalUiOwnerCodeStep;
   /**
+   * RET-4 (D-148; 04 §4.2): the Delete history finish route only, at HISTORY_FINISH_PATH. The gate
+   * verifies presence as for every owner route, `sign` refuses everything, and the handler marks the
+   * one owner operation with `presenceChecked` before it schedules the bound plan; the context
+   * carries this page session's history desk.
+   */
+  readonly historyFinish?: true;
+  /**
    * U3-invite: a read-only check run after the generation check and before the presence gate. A
    * result refuses the request with it (the owner store is never opened, nothing is signed); the
    * handler still checks again after presence. Undefined lets the request on.
@@ -285,6 +295,40 @@ export interface LocalUiKitRevealRoute {
   readonly handler: (context: LocalUiContext) => Promise<LocalUiResult>;
 }
 
+/**
+ * RET-4 (D-148; 08 §1 "The delete sheet"): the history kind. Begin (plan on the server, a ticket for
+ * this page session), Undo and Status: no presence, nothing signed, nothing deleted (the delete is
+ * the finish route's, behind presence). Only POST at the step's fixed path (history-paths.ts), once
+ * each. The server's history gate runs it after the same session, CSRF, Origin, fetch-metadata and
+ * octet-stream checks as every write, refuses a query, an operation input or a presence header, and
+ * parses the body itself (one strict JSON object, at most 32 KiB). The handler gets that object and
+ * this page session's desk only.
+ */
+export interface LocalUiHistoryRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'history';
+  readonly step: LocalUiHistoryStep;
+  readonly handler: (
+    context: LocalUiContext,
+    body: JsonObject,
+    history: LocalUiHistorySession,
+  ) => Promise<LocalUiResult>;
+}
+
+/**
+ * RET-4 (08 §1 "Free up space"): Show in Finder for the Inbox folder. Like the kit-reveal kind it
+ * changes nothing and takes no input at all: only `POST /api/ui/storage/inbox/reveal`, registered
+ * once; the server runs it through the kit-reveal gate's checks (no query, input, presence header or
+ * body byte). The handler gets the context only; the folder is the rules' own setting.
+ */
+export interface LocalUiInboxRevealRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'inbox-reveal';
+  readonly handler: (context: LocalUiContext) => Promise<LocalUiResult>;
+}
+
 /** UX2-d1: the steps of the invite kind (U3-invite adds `dismiss`, "Not now" on the join screen). */
 export type LocalUiInviteStep =
   'create' | 'check' | 'dismiss' | 'cancel' | 'cancel-connecting' | 'link';
@@ -339,6 +383,77 @@ export interface LocalUiInviteRoute {
     context: LocalUiContext,
     body: JsonObject,
     invites: LocalUiInviteDesk | undefined,
+  ) => Promise<LocalUiResult>;
+}
+
+/** ATT-APP-ATTACH (08 §1 "Attach a file"): the fixed path of the attach kind. */
+export const ATTACH_PATH = '/api/ui/attach';
+
+/** ATT-APP-ATTACH: one attached file as the route checked it (allowed type, light UTF-8 text). */
+export interface LocalUiAttachFile {
+  /** The name as the owner's file had it (the desk sanitises it again before writing). */
+  readonly name: string;
+  readonly bytes: Uint8Array;
+}
+
+/** ATT-APP-ATTACH: what the attach route hands the desk. */
+export interface LocalUiAttachRequest {
+  /** The contact's agent ID (`0x` + 40 lowercase hex). */
+  readonly to: string;
+  /** The owner's note; may be empty. */
+  readonly text: string;
+  readonly files: readonly LocalUiAttachFile[];
+  /**
+   * IR-ATTACH-1 F-4: the page's ID for this message, the same on a retry, passed to core as
+   * `clientRequestId` so a retry after a lost answer does not send twice.
+   */
+  readonly requestId?: string;
+}
+
+/** ATT-APP-ATTACH: why an attached message was not sent (fixed codes, never a path or a name). */
+export type LocalUiAttachRefusal =
+  | 'type'
+  | 'no_folder'
+  | 'folder_unavailable'
+  | 'not_found'
+  | 'not_ready'
+  | 'policy'
+  | 'too_large'
+  | 'storage'
+  | 'busy'
+  | 'paused'
+  | 'failed';
+
+export type LocalUiAttachOutcome =
+  | { readonly status: 'sent' | 'queued' | 'not_delivered' }
+  | { readonly status: 'refused'; readonly reason: LocalUiAttachRefusal };
+
+/**
+ * ATT-APP-ATTACH: the attach kind's one write (local-ui/attach-desk.ts, built by the server over the
+ * core client): the files into the open ID's allowed Send folder, then core's ordinary send under
+ * the policy in force. It signs nothing, changes no rule and is never reachable from MCP (I-4).
+ */
+export interface LocalUiAttachDesk {
+  send(request: LocalUiAttachRequest): Promise<LocalUiAttachOutcome>;
+}
+
+/**
+ * ATT-APP-ATTACH (08 §1; proposed, owner confirms at merge): the owner attaches light text files in
+ * a conversation and sends them. Only `POST /api/ui/attach`, registered once (routes.ts). The
+ * server's attach gate runs after the same session, CSRF, Origin, fetch-metadata and octet-stream
+ * checks as every write, refuses a query, an operation input or a presence header, reads at most
+ * ATTACH_MAX_BODY_BYTES, parses one strict JSON object and hands the handler only that object and
+ * the desk. No owner presence, as for a message the owner's AI sends (the policy in force applies,
+ * D-70); nothing is signed.
+ */
+export interface LocalUiAttachRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'attach';
+  readonly handler: (
+    context: LocalUiContext,
+    body: JsonObject,
+    desk: LocalUiAttachDesk | undefined,
   ) => Promise<LocalUiResult>;
 }
 
@@ -484,7 +599,10 @@ export interface LocalUiRestoreRoute {
  * gate runs after the same session, CSRF, Origin, fetch-metadata, octet-stream and generation checks
  * as every write, refuses a query, an `X-AgentLink-Input` or presence header and any body byte, and
  * hands the handler only the context and the route parameters. No owner presence, nothing signed:
- * display state only (07 §3: nothing is decided from it).
+ * display state only (07 §3: nothing is decided from it). ATT-SENDFOLDER-FIX: the one exception is
+ * `/api/ui/files/send-folder`, which may also create an empty 0700 folder under ~/AgentLink (the Send
+ * folder or a fresh Send-N, never through a link) and answers its path; it changes no rules and
+ * signs nothing, so allowing that folder is still the presence-gated Files confirm (I-4).
  */
 export interface LocalUiMarkRoute {
   readonly method: 'POST';
@@ -500,6 +618,18 @@ export interface LocalUiMarkRoute {
 export const MARK_PATHS: readonly string[] = Object.freeze([
   '/api/ui/files/auto-save-notice/dismiss',
   '/api/ui/contacts/:ref/name-seen',
+  // ATT-SENDFOLDER-FIX: Home's Send folder banner sets up the folder (api/files.ts). It makes at
+  // most one empty 0700 folder under ~/AgentLink and changes no rules: allowing it is the ordinary
+  // review and the presence-gated confirm.
+  '/api/ui/files/send-folder',
+  // N4: the notification centre's read marks (display state only).
+  '/api/ui/notifications/:id/read',
+  '/api/ui/notifications/read-all',
+  '/api/ui/notifications/refresh',
+  // UPD-5: "Update now" and "Restart now" in Settings › Updates (api/app-update.ts). They pass no
+  // value; the desktop shell installs only the update it verified itself.
+  '/api/ui/app-update/install',
+  '/api/ui/app-update/restart',
 ]);
 
 export type LocalUiRoute =
@@ -517,7 +647,10 @@ export type LocalUiRoute =
   | LocalUiCreateAgentRoute
   | LocalUiRevealRoute
   | LocalUiKitRevealRoute
-  | LocalUiInviteRoute;
+  | LocalUiHistoryRoute
+  | LocalUiInboxRevealRoute
+  | LocalUiInviteRoute
+  | LocalUiAttachRoute;
 
 /**
  * The shared fixed answers of the page read routes (M1-11c; the same codes as Activity, #417). A

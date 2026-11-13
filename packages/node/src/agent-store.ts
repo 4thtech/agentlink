@@ -27,6 +27,8 @@ import { createAgentStoreCipher, type AgentStoreCipher } from './store-cipher.js
 export interface AgentStore {
   /** The Store (07 §3.7) over the agent's SQLite file. */
   readonly store: Store & {
+    /** RET-2: returns freed pages to the file system after a large delete (incremental_vacuum). */
+    compact(): Promise<void>;
     /** The agent's inter-process lock (06 §6; 07 §3.4). */
     withInterProcessLock<T>(fn: () => Promise<T> | T): Promise<T>;
   };
@@ -69,6 +71,7 @@ function storeFacade(store: SqliteStore): AgentStore['store'] {
   return Object.freeze({
     schemaVersion: store.schemaVersion,
     transaction: <R>(body: (tx: StoreTx) => R): Promise<R> => store.transaction(body),
+    compact: (): Promise<void> => store.compact(),
     withInterProcessLock: <T>(fn: () => Promise<T> | T): Promise<T> =>
       store.withInterProcessLock(fn),
     close: (): Promise<void> => store.close(),

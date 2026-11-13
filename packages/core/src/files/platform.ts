@@ -42,6 +42,36 @@ export type InboxSaveError = 'disk_full';
  */
 export type QuarantineMark = 'marked' | 'unsupported' | 'failed';
 
+/**
+ * RET-2 (D-148; 07 §3.8): who a saved file is on its volume: the device and inode as decimal text
+ * (they can exceed 2^53), and its size in bytes. Read without following a link.
+ */
+export interface SavedFileIdentity {
+  readonly dev: string;
+  readonly ino: string;
+  readonly size: number;
+}
+
+/**
+ * RET-3 (D-148; 04 §4.2): what an index row says a saved file is: the device and inode as decimal
+ * text, its size and the payload's plaintextSha256 (lowercase hex).
+ */
+export interface SavedFileExpectation {
+  readonly dev: string;
+  readonly ino: string;
+  readonly size: number;
+  readonly sha256: string;
+}
+
+/**
+ * RET-3: the outcome of one move to the OS Trash, as a fixed code (never a path or a name):
+ * `trashed` (moved; recoverable from the Trash), `changed` (not the file the app saved: another
+ * device, inode, size or content, a link or not a regular file; untouched), `missing` (no entry at
+ * the name), `no_trash` (no Trash on this platform or volume; untouched), `failed` (anything else;
+ * untouched as far as the platform can tell).
+ */
+export type TrashSavedOutcome = 'trashed' | 'changed' | 'missing' | 'no_trash' | 'failed';
+
 /** The inbox folder (`files.inboxFolder`) as the platform resolved it. */
 export interface InboxFolder {
   /** Its realpath (absolute). */
@@ -58,10 +88,23 @@ export interface InboxFolder {
   /** W4-AUTO-SAVE: true when `name` is a regular file directly inside the folder (no link followed). */
   isSavedFile?(name: string): Promise<boolean>;
   /**
+   * RET-2 (D-148; 07 §3.8): the device, inode and size of `name` when it is a regular file directly
+   * inside the folder (no link followed, the folder handle still the same); otherwise undefined.
+   * Recorded in the saved-file index so a later delete touches only the file the app saved.
+   */
+  identify?(name: string): Promise<SavedFileIdentity | undefined>;
+  /**
    * REL051-A12: the bytes of `name` when it is a regular file directly inside the folder (no link
    * followed) of at most `maxBytes`; otherwise undefined. The core re-hashes them before any use.
    */
   readSaved?(name: string, maxBytes: number): Promise<Uint8Array | undefined>;
+  /**
+   * RET-3 (D-148; 04 §4.2 "Deleting a saved file"): moves `name`, a regular file directly inside the
+   * folder, to the OS Trash only when it still has the expected device, inode, size and sha256,
+   * re-checked through the held folder handle just before the move (no link followed). Never deletes
+   * outright. Absent where the platform has no Trash.
+   */
+  trashSaved?(name: string, expected: SavedFileExpectation): Promise<TrashSavedOutcome>;
   /** W4-AUTO-SAVE: releases the held folder handle; the core calls it once the save ended. */
   close?(): Promise<void>;
 }

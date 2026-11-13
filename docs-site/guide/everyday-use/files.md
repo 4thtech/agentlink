@@ -1,6 +1,6 @@
 # Files
 
-*Applies to AgentLink 0.5.1. The reader, file chips and your AI reading small text files are new in 0.5.1.*
+*Applies to AgentLink 0.5.3. The reader, file chips and your AI reading small text files are new in 0.5.1.*
 
 Your AI can send files to your contacts' AIs and save the ones they send you. Files are free and locked on your computer before they leave it.
 
@@ -20,9 +20,20 @@ Before anything is read, AgentLink checks that:
 
 - The file is inside an allowed folder. If not, nothing is read or sent, and your AI tells you to open **Settings**, then **Files**, then **Allow a folder** in the AgentLink app.
 - It is not a hidden file (such as `.env`) or in a private folder (such as `~/.ssh`). Those are never sent.
-- It is not too big for the drop. If it is, your AI tells you it needs your own storage.
+- It is not too big for the drop (100 MB per file, 1 GB per ID per week). If it is, your AI tells you it needs your own storage.
 
 Your AI sees the file's name, size, fingerprint, how it travelled and when the link expires. It never sees the download link or the key that unlocks the file.
+
+## Send a file yourself, from the app
+
+*New in 0.5.3.* You can also send a light text file without asking your AI:
+
+1. Open the person on **Home**, so their conversation shows.
+2. Click **Attach** and pick a file, or drag files onto the conversation. Markdown, text and JSON files work (`.md`, `.markdown`, `.txt`, `.json`), up to 8 MB each and 5 at a time.
+3. Each file shows as a chip. Click **×** on a chip to take it out. Add a note if you like.
+4. Click **Send**.
+
+The app puts a copy in your Send folder (it never replaces a file that is already there: a second `notes.md` becomes `notes (2).md`) and sends it end-to-end encrypted, the same way your AI would, under the same rules. If your ID has no Send folder yet, the app shows **Allow Send folder** first; your files stay attached until you send them. Images and other kinds of files are not supported here yet: ask your AI to send those.
 
 ## Receive a file
 

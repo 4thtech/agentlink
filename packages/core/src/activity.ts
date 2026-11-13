@@ -624,8 +624,15 @@ export class ActivityService {
       const types = { in: [...PAGE_TYPES] };
       const envelopes = (
         [
-          { direction: 'in', state: { in: ['ok', 'request'] }, type: types },
-          { direction: 'out', state: 'ok', type: types, delivery: { in: [...DELIVERY_STATES] } },
+          // RET-3 (D-148; 07 §3.8): a tombstone is absent from every read.
+          { direction: 'in', state: { in: ['ok', 'request'] }, type: types, deleted_at: null },
+          {
+            direction: 'out',
+            state: 'ok',
+            type: types,
+            delivery: { in: [...DELIVERY_STATES] },
+            deleted_at: null,
+          },
         ] satisfies Where<'envelopes'>[]
       ).flatMap((where) =>
         candidatesTx(tx, 'envelopes', where, 'created_at', 'envelope_id', ENVELOPE, cursor, limit),

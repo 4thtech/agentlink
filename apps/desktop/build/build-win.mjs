@@ -6,9 +6,19 @@
 //   node build-win.mjs --tgz <packed-cli.tgz> [--version 0.5.0] [--out dir] [--nsi-only] [--helper agentlink-presence.exe]
 //
 // Signing: Authenticode is a hook that is OFF. DESKTOP_SIGNING=on is refused here until WP-D18.
-import { cpSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { basename, join, resolve } from 'node:path';
+import { BUNDLE_HASHES_FILE, bundleHashesJson } from './lib/bundle-hashes.mjs';
 import { constants } from './lib/constants.mjs';
+import { TRAY_ICO_NAMES, icoFromPngs, trayIcoSources } from './lib/ico.mjs';
 import { BUILD_FUSES } from './lib/fuses.mjs';
 import { asarIntegrity, writeWinIcon, writeWinIntegrity } from './lib/integrity.mjs';
 import { winIcoPath } from './lib/icon.mjs';
@@ -21,6 +31,7 @@ import {
   OUT_DIR,
   assertNoPreviewString,
   assertPinnedRootKey,
+  updatePinFor,
   buildPayload,
   extract,
   fetchRuntimes,
@@ -59,12 +70,64 @@ extract(rt.electron, dir);
 renameSync(join(dir, 'electron.exe'), join(dir, 'AgentLink.exe'));
 rmSync(join(dir, 'resources', 'default_app.asar'), { force: true });
 
-console.log('[3/7] ASAR payload');
+console.log('[3/7] bundled Node (official node.exe, untouched) and the presence helper');
+const nx = join(work, 'node-x');
+extract(rt.node, nx);
+const nodeSrc = join(nx, `node-v${constants.node.version}-win-x64`);
+const nodeExe = join(dir, 'resources', ...LAYOUT.node.win32); // resources\\node\\node.exe
+mkdirSync(join(nodeExe, '..'), { recursive: true });
+cpSync(join(nodeSrc, 'node.exe'), nodeExe);
+cpSync(join(nodeSrc, 'LICENSE'), join(nodeExe, '..', 'LICENSE'));
+// Owner-presence helper (WP-D12b): a prebuilt one from CI (--helper) or built here with MSVC.
+const helperDir = join(dir, 'resources', 'native');
+const helperExe = join(helperDir, 'agentlink-presence.exe');
+if (args.helper) {
+  mkdirSync(helperDir, { recursive: true });
+  cpSync(resolve(args.helper), helperExe);
+} else if (process.platform === 'win32') {
+  buildWinHelper({ outDir: helperDir, arch: 'x64' });
+} else if (!args['nsi-only']) {
+  throw new Error('The presence helper needs MSVC: pass --helper <agentlink-presence.exe>.');
+}
+
+console.log('[4/7] core (packed tarball, npm ci from core-lock, --ignore-scripts)');
+const core = installCore({
+  tgz,
+  dest: join(dir, 'resources', ...LAYOUT.coreDir),
+  os: 'win32',
+  cpu: 'x64',
+});
+const hostScript = join(dir, 'resources', ...LAYOUT.hostScript);
+if (!existsSync(hostScript)) {
+  throw new Error(
+    `The core has no desktop host at resources\\${LAYOUT.hostScript.join('\\')}: pack the CLI after \`pnpm --filter @4thtech-io/agentlink build\` (it builds dist/desktop-host.js).`,
+  );
+}
+
+// WIN-DESK-2: the tray icons, one per taskbar colour (build/lib/ico.mjs; the shell picks one).
+const assetsDir = join(dir, 'resources', ...LAYOUT.assetsDir);
+mkdirSync(assetsDir, { recursive: true });
+const traySources = trayIcoSources();
+for (const taskbar of ['dark', 'light']) {
+  const pngs = traySources[taskbar].map((file) => readFileSync(file));
+  writeFileSync(join(assetsDir, TRAY_ICO_NAMES[taskbar]), icoFromPngs(pngs));
+}
+
+// WIN-DESK-2 (D15-07 on Windows): the SHA-256 of node.exe, the core's desktop host and the helper go
+// into app.asar (bundle-hashes.json), which ASAR integrity covers; the shell compares them before
+// every core start (src/main/bundle-check.ts). No signing step comes after, so the files are final.
+console.log('[5/7] ASAR payload (with bundle-hashes.json)');
 const payload = buildPayload({
   workDir: work,
   version,
   distDir: args['dist-dir'] ? resolve(args['dist-dir']) : undefined,
 });
+const bundleHashes = {
+  node: await sha256Of(nodeExe),
+  host: await sha256Of(hostScript),
+  ...(existsSync(helperExe) ? { helper: await sha256Of(helperExe) } : {}),
+};
+writeFileSync(join(payload.dir, BUNDLE_HASHES_FILE), bundleHashesJson(bundleHashes));
 const asarPath = join(dir, 'resources', 'app.asar');
 await packAsar(payload.dir, asarPath);
 await assertNoPreviewString(asarPath);
@@ -76,33 +139,6 @@ if (rootKeyMode === 'owner-local') {
 }
 const integrity = await asarIntegrity(asarPath);
 
-console.log('[4/7] bundled Node (official node.exe, untouched)');
-const nx = join(work, 'node-x');
-extract(rt.node, nx);
-const nodeSrc = join(nx, `node-v${constants.node.version}-win-x64`);
-const nodeExe = join(dir, 'resources', ...LAYOUT.node.win32); // resources\\node\\node.exe
-mkdirSync(join(nodeExe, '..'), { recursive: true });
-cpSync(join(nodeSrc, 'node.exe'), nodeExe);
-cpSync(join(nodeSrc, 'LICENSE'), join(nodeExe, '..', 'LICENSE'));
-// Owner-presence helper (WP-D12b): a prebuilt one from CI (--helper) or built here with MSVC.
-const helperDir = join(dir, 'resources', 'native');
-if (args.helper) {
-  mkdirSync(helperDir, { recursive: true });
-  cpSync(resolve(args.helper), join(helperDir, 'agentlink-presence.exe'));
-} else if (process.platform === 'win32') {
-  buildWinHelper({ outDir: helperDir, arch: 'x64' });
-} else if (!args['nsi-only']) {
-  throw new Error('The presence helper needs MSVC: pass --helper <agentlink-presence.exe>.');
-}
-
-console.log('[5/7] core (packed tarball, npm ci from core-lock, --ignore-scripts)');
-const core = installCore({
-  tgz,
-  dest: join(dir, 'resources', ...LAYOUT.coreDir),
-  os: 'win32',
-  cpu: 'x64',
-});
-
 console.log('[6/7] fuses and ASAR integrity resource');
 const exe = join(dir, 'AgentLink.exe');
 await fuses.flipFuses(exe, {
@@ -113,6 +149,15 @@ await fuses.flipFuses(exe, {
 const ico = winIcoPath(); // throws when the real icon is missing
 await writeWinIcon(exe, ico);
 await writeWinIntegrity(exe, 'resources\\app.asar', integrity);
+for (const [key, file] of [
+  ['node', nodeExe],
+  ['host', hostScript],
+  ['helper', helperExe],
+]) {
+  if (bundleHashes[key] !== undefined && (await sha256Of(file)) !== bundleHashes[key]) {
+    throw new Error(`The bundled ${key} file changed after its hash was recorded in app.asar.`);
+  }
+}
 
 console.log('[7/7] zip, NSIS, SHA256SUMS');
 mkdirSync(out, { recursive: true });
@@ -141,6 +186,7 @@ writeFileSync(
       version,
       signed: false,
       placeholderMain: payload.placeholder,
+      ...updatePinFor(rootKeyMode),
       electron: {
         version: constants.electron.version,
         sha256: constants.electron.assets[platform].sha256,
@@ -148,6 +194,7 @@ writeFileSync(
       node: { version: constants.node.version, sha256: constants.node.assets[platform].sha256 },
       coreTgzSha256: await sha256Of(tgz),
       asarHeaderSha256: integrity.hash,
+      bundleHashes,
       coreLockSha256: core.lockSha256,
       coreTreeSha256: core.treeSha256,
       git: gitHeadOrNull(),

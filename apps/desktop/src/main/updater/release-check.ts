@@ -30,6 +30,8 @@ import {
   macDownloadUrl,
   parseReleaseVersion,
   releasePageUrl,
+  winAssetName,
+  winDownloadUrl,
   type AppUpdateState,
   type AppUpdateView,
 } from '../../shared/app-update.js';
@@ -321,9 +323,10 @@ export class ReleaseChecker {
     return running;
   }
 
-  /** Newer than this app, and (on a Mac) this Mac's file is attached to the release. */
+  /** Newer than this app, and (on a Mac or Windows) this computer's file is attached to the release. */
   #offerable(found: LatestRelease): boolean {
     if (!isNewerVersion(found.version, this.#view.current)) return false;
+    if (this.#deps.platform === 'win32') return found.assets.has(winAssetName(found.version));
     if (this.#deps.platform !== 'darwin') return true;
     const arch = macArch(this.#deps.arch, this.#deps.translated === true);
     return arch !== undefined && found.assets.has(macAssetName(found.version, arch));
@@ -339,6 +342,7 @@ export class ReleaseChecker {
   }
 
   #downloadFor(version: string): string | undefined {
+    if (this.#deps.platform === 'win32') return winDownloadUrl(version);
     if (this.#deps.platform !== 'darwin') return releasePageUrl(version);
     const arch = macArch(this.#deps.arch, this.#deps.translated === true);
     return arch === undefined ? undefined : macDownloadUrl(version, arch);

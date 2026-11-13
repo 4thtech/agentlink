@@ -88,6 +88,10 @@ describe('policy defaults (06 §3)', () => {
           "ownerArchive": false,
           "storage": "auto",
         },
+        "history": {
+          "filesKeepDays": 0,
+          "messagesKeepDays": 0,
+        },
         "proofs": {
           "allowKeyDisclosure": "approval",
           "dailyBudgetUSD": "5",
@@ -193,9 +197,13 @@ describe('policy rejects (M1-2b acceptance)', () => {
   const isRuleProofKey = (p: Path) =>
     p.length === 4 && p[0] === 'contactRules' && p[2] === 'proofs';
 
+  // RET-6 (D-148): the whole `history` section may be absent (a policy signed before D-148;
+  // policy-history.test.ts); each of its keys may not.
+  const isHistorySection = (p: Path) => p.length === 1 && p[0] === 'history';
+
   it.each(
     keyPaths(policyWithRules())
-      .filter((p) => !isRuleProofKey(p))
+      .filter((p) => !isRuleProofKey(p) && !isHistorySection(p))
       .map((p) => [p.join('.'), p] as const),
   )('a missing key: %s', (_label, path) => {
     expectReject(policySchema, edit(policyWithRules(), path, DELETE));

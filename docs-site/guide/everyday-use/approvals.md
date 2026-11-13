@@ -1,6 +1,6 @@
 # Approve with Touch ID or your master code
 
-*Applies to AgentLink 0.4.14. "Use your master code instead" is on every confirm since 0.4.14.*
+*Applies to AgentLink 0.5.3. "Use your master code instead" is on every confirm since 0.4.14; since 0.5.3 each confirmation is one press, on a compact card (see [Approvals in the app](../local-app/approvals.md)).*
 
 **Goal:** know what your AI must ask you about, and how you say yes or no. Your AI can ask; only you can approve.
 
@@ -30,8 +30,8 @@ flowchart LR
 ## Steps
 
 1. Your AI says something needs your approval and shows a link, or the card simply appears at the top of [Home](../local-app/home.md). It says who, what and any cost.
-2. Read it, then press **Approve** or **Deny**.
-3. Confirm with **Confirm with Touch ID** (**Windows Hello** on Windows), or press **Use your master code instead** and type your master code.
+2. Read it, then press **Approve with Touch ID** or **Deny with Touch ID** (**Windows Hello** on Windows). That one press asks your computer for your fingerprint, face or PIN.
+3. Or press **Use your master code instead**, then **Approve** or **Deny**, and type your master code.
 
 <figure><img src="../../assets/screens/confirm-presence.webp" alt="A confirm box: Confirm it's you. Never give your master code to your AI. Buttons Confirm with Touch ID, Use your master code instead and Cancel."><figcaption><p>The same confirm box everywhere: Touch ID, or your master code.</p></figcaption></figure>
 

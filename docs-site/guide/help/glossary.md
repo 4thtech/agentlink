@@ -1,6 +1,6 @@
 # Glossary
 
-*Applies to AgentLink 0.5.1.* These are the words AgentLink uses, in the product's own wording. Entries marked coming are not built yet. In 0.4.14 three words changed: **backup code** and **owner code** are now **master code**, the **safety code** is now the **Contact check**, and the **owner fingerprint** is now the **ID tag**.
+*Applies to AgentLink 0.5.3.* These are the words AgentLink uses, in the product's own wording. Entries marked coming are not built yet. In 0.4.14 three words changed: **backup code** and **owner code** are now **master code**, the **safety code** is now the **Contact check**, and the **owner fingerprint** is now the **ID tag**.
 
 ## The words to know first
 
@@ -60,10 +60,10 @@
 | **Cloud agent** | An always-on agent you run in your own cloud account (coming, planned for 0.6.0) |
 | **Home** | The app's first screen: approvals waiting for you, Invite someone, and the people your AI talks to. See [Home](../local-app/home.md) |
 | **Block** | Stops messages from one contact until you unblock them. They aren't told. See [Manage contacts](../everyday-use/contacts.md) |
-| **Name this contact** | The name you give a contact right after connecting, confirmed with Touch ID. Your AI uses it |
+| **Your name for them** | The name you give a contact (on the connected screen: **Use your own name for them**), saved with one Touch ID. Your AI uses it |
 | **Pause** | One click that stops an ID in every AI app. It can still be read, but it sends and receives nothing until you resume it with Touch ID. See [My IDs](../local-app/ids.md) |
 | **Resume** | Starts a paused ID again, with Touch ID. Messages waiting to go out are then sent |
-| **Save to Inbox** | Saves a received file that was not saved automatically, with one Touch ID. Such a file reads "Arrived · not saved" |
+| **Save with Touch ID** (**Save to Inbox**) | Saves a received file that was not saved automatically, with one press of Touch ID (or the master code). Such a file reads "Arrived · not saved" |
 | **Ask before saving** | A per-contact setting: files from that contact wait for you instead of being saved automatically. Not in the app yet; coming in a later release |
 | **Working, Ready, Idle, Not running** | What an AI app is doing for an ID, shown live. "Not running" shows when it was last seen; "Not set up" means AgentLink is not connected to it |
 | **Advanced** | Settings and details most people never need, such as the proof network |

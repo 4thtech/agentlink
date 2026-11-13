@@ -47,6 +47,7 @@ import {
 import { createKeyExportControl } from './key-controls.js';
 import type { KeychainBackend } from './keychain.js';
 import { MAX_KIT_IDS, writeKitRecord } from './kit-record.js';
+import { isConfigLabel } from './recovery-kit-restore.js';
 import type { LocalUiRecoveryKitSource } from './local-ui/context.js';
 import type { LocalUiRecoveryKitOutcome } from './local-ui/route-types.js';
 import type { KeychainOwnerKeyStore } from './owner-keystore.js';
@@ -59,11 +60,16 @@ type PrepareBackupExport = (
   { readonly status: 'prepared'; readonly body: unknown } | { readonly status: 'refused' }
 >;
 
+/** KIT-NAMES: core `loadLabel` (the stored owner-signed `agent.label`, re-verified on load). */
+type LoadLabel = () => Promise<unknown>;
+
 /** What the open agent's core offers this export (AgentLinkClient, read through these only). */
 export interface RecoveryKitClient {
   readonly agentId: string;
   readonly ownerActions: {
     prepareBackupExport: PrepareBackupExport;
+    /** KIT-NAMES: the ID's verified label, sealed inside the kit (absent: no label). */
+    loadLabel?: LoadLabel;
   };
 }
 
@@ -86,6 +92,25 @@ export interface RecoveryKitPeer {
   readonly source: RecoveryKitPeerSource;
   readonly prepareBackupExport: PrepareBackupExport;
   apply(signed: { readonly body: JsonObject; readonly sig: string }): Promise<OwnerActionOutcome>;
+  /** KIT-NAMES: its core's `loadLabel`, read during its step (absent: no label). */
+  readonly loadLabel?: LoadLabel;
+}
+
+/**
+ * KIT-NAMES (04 §2.3.3 v2; proposed, owner confirms at merge): the label a kit carries for an ID:
+ * its verified `agent.label` (core re-verifies the owner signature on load), only when it is the
+ * folder label rule restore writes to config.json; anything else (none, unverified, a failing read,
+ * a label outside the rule) is no label, and the restore shows the folder as before. Display text.
+ */
+async function kitLabelOf(load: LoadLabel | undefined): Promise<string | undefined> {
+  if (load === undefined) return undefined;
+  try {
+    const reading = (await load()) as { status?: unknown; label?: unknown } | null | undefined;
+    if (reading?.status !== 'verified') return undefined;
+    return isConfigLabel(reading.label) ? reading.label : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -313,6 +338,8 @@ interface KitPart {
   readonly source: RecoveryKitPeerSource;
   prepare(kitId: string): ReturnType<PrepareBackupExport>;
   apply(signed: { readonly body: JsonObject; readonly sig: string }): Promise<OwnerActionOutcome>;
+  /** KIT-NAMES: its core's `loadLabel`, while its core is open. */
+  readonly loadLabel?: LoadLabel;
 }
 
 /** True when `s` is a valid ID's public facts not yet in the kit, and the kit has room for it. */
@@ -341,6 +368,9 @@ function openPart(args: RecoveryKitExportArgs): KitPart | undefined {
     source: facts,
     prepare: (kitId) => client.ownerActions.prepareBackupExport(kitId, 'full'),
     apply: (signed) => args.apply(signed),
+    ...(typeof client.ownerActions.loadLabel === 'function'
+      ? { loadLabel: () => (client.ownerActions.loadLabel as LoadLabel)() }
+      : {}),
   };
 }
 
@@ -357,6 +387,8 @@ export async function exportRecoveryKit(
   // 1 and 2. One ID at a time, with its own core open: prepare, sign, apply.
   const parts: KitPart[] = [];
   const proofs: { readonly body: JsonObject; readonly sig: string }[] = [];
+  /** KIT-NAMES: each included ID's label, sealed inside the kit only (never in the record). */
+  const labels = new Map<string, string>();
   // Set once the walk ended (also by a host timeout): a step still running signs and applies no more.
   let ended = false;
   const one = async (part: KitPart): Promise<boolean> => {
@@ -376,6 +408,10 @@ export async function exportRecoveryKit(
     if (ended) return false;
     const applied = await part.apply(only.signed);
     if (applied.status !== 'applied' || ended) return false;
+    // KIT-NAMES: read while this ID's core is still open (the host closes it after the step).
+    const label = await kitLabelOf(part.loadLabel);
+    if (ended) return false;
+    if (label !== undefined) labels.set(part.source.agentId, label);
     parts.push(part);
     proofs.push(only.signed);
     return true;
@@ -405,6 +441,7 @@ export async function exportRecoveryKit(
             source: { agentId: facts.agentId, name: facts.name, storePath: facts.storePath },
             prepare: (k) => peer.prepareBackupExport(k, 'full'),
             apply: (signed) => peer.apply(signed),
+            ...(typeof peer.loadLabel === 'function' ? { loadLabel: peer.loadLabel } : {}),
           });
         },
         Object.freeze({ deadlineAt: deadline }),
@@ -461,7 +498,12 @@ export async function exportRecoveryKit(
       kitId,
       createdAt,
       contents: 'full',
-      agents: parts.map((p) => ({ agentId: p.source.agentId, name: p.source.name })),
+      agents: parts.map((p) => {
+        const label = labels.get(p.source.agentId);
+        return label === undefined
+          ? { agentId: p.source.agentId, name: p.source.name }
+          : { agentId: p.source.agentId, name: p.source.name, label };
+      }),
       // Called by the control under each ID's own lock hold: that ID's consistent cut.
       snapshots: async (agentId: string) => {
         const into = join(snapshotDir, `store-${people.size}.sqlite`);

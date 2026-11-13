@@ -2,12 +2,12 @@
 // app's dot and word, the Pause sheet (one click, no Touch ID), the paused banner with Resume (Touch
 // ID, signs `agent.resume`), and the "Contacts still see {name}" note (D-141). Labels and former names
 // are text only, each in its own bidi-isolated run (I-5).
-import { Button, Icon, PageNotice, Pulse, Sheet } from '@4thtech-io/ui';
+import { Button, Icon, InlineError, PageNotice, Pulse, Sheet } from '@4thtech-io/ui';
 import { useState, type ReactElement } from 'react';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import type { AgentsApi } from './api.js';
 import { appDot, appWord, type AgentRow, type AppLive } from './data.js';
-import { gateMessage, OwnerGate, usePasskey } from './owner-gate.js';
+import { gateMessage, OwnerButton } from './owner-gate.js';
 import { renameProblem } from './sheets.js';
 import { AGENTS_STRINGS as S } from './strings.js';
 
@@ -155,11 +155,7 @@ export function PauseSheet({
     <Sheet open title={S.pauseTitle(row.label)} onClose={onClose} closeLabel={S.close}>
       <div className="ag-sheet-body">
         <p className="al-text-body">{S.pauseBody(row.label)}</p>
-        {error === undefined ? null : (
-          <p className="al-text-body-sm ag-error" role="alert">
-            {error}
-          </p>
-        )}
+        {error === undefined ? null : <InlineError>{error}</InlineError>}
         <div className="ag-actions">
           <Button variant="primary" icon="pause" onClick={pause} disabled={busy}>
             {S.pause}
@@ -185,11 +181,11 @@ export function ResumeGate({
   row: AgentRow;
   api: AgentsApi;
   owner: OwnerClient;
-  onCancel: () => void;
+  /** Absent on the paused banner, where the button stands alone. */
+  onCancel?: () => void;
   onResumed: () => void;
   onAgentChanged: () => void;
 }): ReactElement {
-  const passkey = usePasskey(owner);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const send = (proof: PresenceProof): void => {
@@ -205,28 +201,32 @@ export function ResumeGate({
     });
   };
   return (
-    <OwnerGate
-      summary={S.resumeStatement(row.label)}
-      passkey={passkey}
-      busy={busy}
-      error={error}
-      onProof={send}
-      onCancel={onCancel}
-    />
+    <div className="ag-actions">
+      <OwnerButton
+        owner={owner}
+        statement={S.resumeStatement(row.label)}
+        withSensor={S.resumeWith}
+        withCode={S.resumeWithCode}
+        busy={busy}
+        error={error}
+        onProof={send}
+      />
+      {onCancel === undefined ? null : (
+        <Button variant="ghost" size="sm" onClick={onCancel} disabled={busy}>
+          {S.cancel}
+        </Button>
+      )}
+    </div>
   );
 }
 
 /** 08 §1: "{label} is paused" with "Resume with Touch ID" (only for the open agent). */
 export function PausedBanner({
   row,
-  resuming,
-  onResume,
   children,
 }: {
   row: AgentRow;
-  resuming: boolean;
-  onResume: () => void;
-  /** The Resume gate, while open. */
+  /** UX1113-N2: the Resume button itself (one gesture): ResumeGate. */
   children?: ReactElement | null;
 }): ReactElement {
   return (
@@ -240,16 +240,8 @@ export function PausedBanner({
             {S.isPaused}
           </>
         }
-        actions={
-          resuming ? undefined : (
-            <Button size="sm" variant="primary" icon="play" onClick={onResume}>
-              {S.resumeTouchId}
-            </Button>
-          )
-        }
-      >
-        {resuming ? children : undefined}
-      </PageNotice>
+        actions={children}
+      />
     </div>
   );
 }
@@ -274,8 +266,6 @@ export function CardNameNote({
   onUpdated: (told: boolean) => void;
 }): ReactElement {
   const noContacts = row.contacts === 0;
-  const passkey = usePasskey(owner);
-  const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const send = (proof: PresenceProof): void => {
@@ -300,27 +290,21 @@ export function CardNameNote({
           </>
         }
         actions={
-          asking ? undefined : (
-            <Button variant="primary" size="sm" onClick={() => setAsking(true)}>
-              {noContacts ? S.updateName : S.updateContacts}
-            </Button>
-          )
+          <OwnerButton
+            owner={owner}
+            statement={S.renameStatement(cardName, row.label)}
+            withSensor={noContacts ? S.updateNameWith : S.updateContactsWith}
+            withCode={noContacts ? S.updateNameWithCode : S.updateContactsWithCode}
+            busy={busy}
+            error={error}
+            onProof={send}
+          />
         }
       >
         <p>
           {S.noteHint}
           <bdi>{row.label}</bdi>.
         </p>
-        {asking ? (
-          <OwnerGate
-            summary={S.renameStatement(cardName, row.label)}
-            passkey={passkey}
-            busy={busy}
-            error={error}
-            onProof={send}
-            onCancel={() => setAsking(false)}
-          />
-        ) : null}
       </PageNotice>
     </div>
   );

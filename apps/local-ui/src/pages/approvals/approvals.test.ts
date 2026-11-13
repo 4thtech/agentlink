@@ -493,9 +493,10 @@ describe('one request: its own Approve or Deny, then presence', () => {
       ),
     );
     await flush();
-    await click(buttonNamed(S.approve, cardOf('D') as ParentNode));
+    // UX1113-N2 (R2-UI-13): Approve is the gesture itself; one press asks once.
+    expect(buttonNamed(S.approve, cardOf('D') as ParentNode)).toBeUndefined();
     expect(asked).toHaveLength(0);
-    await click(buttonNamed(S.approveWithPasskey));
+    await click(buttonNamed(S.approveWithPasskey, cardOf('D') as ParentNode));
     expect(asked).toHaveLength(1);
     expect(asked[0]?.publicKey?.rpId).toBe('localhost');
     expect(asked[0]?.publicKey?.userVerification).toBe('required');
@@ -512,6 +513,38 @@ describe('one request: its own Approve or Deny, then presence', () => {
     // user handle (none) and the PRF output.
     expect(call?.body).toHaveLength(2 + 1 + 2 + 2 + 2 + 1 + 2 + 1 + 2 + 2 + 32);
     expect(statuses()).toContain(S.approved);
+  });
+
+  it('UX1113-N2: with a passkey, "Use your master code instead" turns Approve into the code step', async () => {
+    const srv = server({
+      [PASSKEY]: [
+        ok({
+          passkey: {
+            rpId: 'localhost',
+            registered: true,
+            credentialId: 'CQ',
+            prfSalt: 'BQY',
+            userId: 'AQ',
+          },
+        }),
+      ],
+      [LIST]: [ok({ approvals: [item('D', { commitment: true })] })],
+    });
+    act(() =>
+      root.render(
+        createElement<ApprovalsPageProps>(ApprovalsBoard, {
+          client: createApprovalsClient({ fetch: srv.fetch, token: 't' }),
+          canPasskey: true,
+        }),
+      ),
+    );
+    await flush();
+    const card = cardOf('D') as ParentNode;
+    await click(buttonNamed('Use your master code instead', card));
+    expect(buttonNamed(S.approveWithPasskey, card)).toBeUndefined();
+    await click(buttonNamed(S.approve, card));
+    expect(host.querySelector('.al-step input')).not.toBeNull();
+    expect(srv.calls.filter((c) => c.url.endsWith('/approve'))).toHaveLength(0);
   });
 
   it('before the owner is set up nothing can be approved, with the reason', async () => {
@@ -570,7 +603,6 @@ describe('F29-F31: the ID, the words and one primary button', () => {
       ),
     );
     await flush();
-    await click(buttonNamed(S.approve, cardOf('D') as ParentNode));
     expect(primaries()).toBe(1);
     expect(buttonNamed(S.approveWithPasskey)?.classList.contains('al-btn-primary')).toBe(true);
   });

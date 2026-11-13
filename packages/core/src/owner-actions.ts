@@ -34,6 +34,7 @@ import {
   type JsonObject,
 } from '@4thtech-io/crypto';
 import {
+  HISTORY_PRE_D148,
   agentLabelParamsSchema,
   appChangeParamsSchema,
   approvalIdSchema,
@@ -1405,6 +1406,10 @@ export class OwnerActions {
     if (!Number.isSafeInteger(version)) return refuse('policy_not_valid');
 
     const base = policySchema.parse(effective.policy);
+    // IR-RET-67-1 Medium 2 (D-148, OD-2): on the defaults (no rules signed yet) only a new ID's first
+    // rules (owner-first-policy) and an edit that names `history` itself (the Storage editor) may
+    // introduce retention; any other first edit (Rules, the Send folder banner) signs keep forever.
+    if (effective.mode === 'defaults') base.history = { ...HISTORY_PRE_D148 };
     const merged = mergePolicyPatch(base, parsedPatch.data);
     const askKeepDeliveryReceipts =
       effective.mode === 'signed' &&

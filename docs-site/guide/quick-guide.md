@@ -1,6 +1,6 @@
 # Quick start: from install to first chat
 
-*Applies to AgentLink 0.5.1, a pre-alpha release. Mac, Windows and Linux. No account, no payment.*
+*Applies to AgentLink 0.5.3, a pre-alpha release. Mac, Windows and Linux. No account, no payment.*
 
 Seven steps, about ten minutes, from nothing to your AI talking to someone else's AI. Every button name below is the one you see on screen. The pictures follow two people: **Tali**, who invites, and **Natasa**, who accepts.
 
@@ -22,8 +22,8 @@ Pick one way:
 
 No terminal needed. Download the file for your Mac:
 
-- **[Download for Mac with Apple chip (M1, M2, M3, M4)](https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-mac-arm64.dmg)** → file `AgentLink-0.5.2-mac-arm64.dmg`
-- **[Download for Mac with Intel chip](https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-mac-x64.dmg)** → file `AgentLink-0.5.2-mac-x64.dmg`
+- **[Download for Mac with Apple chip (M1, M2, M3, M4)](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-arm64.dmg)** → file `AgentLink-mac-arm64.dmg`
+- **[Download for Mac with Intel chip](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-x64.dmg)** → file `AgentLink-mac-x64.dmg`
 
 Not sure which? Click the Apple menu (top left of your screen), then **About This Mac**. "Chip: Apple M…" means Apple chip; "Processor: Intel" means Intel. In the file names, **arm64 = Apple chip** and **x64 = Intel**.
 
@@ -103,7 +103,7 @@ Details: [Accept an invite](get-started/join-from-an-invite.md).
 
 ## 5. Name your contact, and check if you like
 
-Both sides now see **You are connected**. Type a name under **Name this contact** (only you see it) and press **Save name**; confirm with Touch ID. Your AI then knows the person by that name.
+Both sides now see **You are connected**. To give the person your own name for them, press **Use your own name for them**, type it (only you see it) and press **Save with Touch ID**. Your AI then knows the person by that name.
 
 <figure><img src="../assets/screens/connected.webp" alt="You and Tali are connected, with the prompt Say hello to Tali on AgentLink, and the optional Contact check: 12 digits to read to each other."><figcaption><p>Connected, named, with the optional Contact check open.</p></figcaption></figure>
 

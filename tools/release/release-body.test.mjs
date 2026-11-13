@@ -78,7 +78,15 @@ describe('release body Download section (inline in release.yml)', () => {
     expect(out).toContain(
       '| Mac with Intel chip | [AgentLink-0.2.0-mac-x64.dmg](https://github.com/4thtech/agentlink/releases/download/v0.2.0/AgentLink-0.2.0-mac-x64.dmg) |',
     );
-    expect(out).toContain('| Windows or Linux | No download: [one command]');
+    // WIN-DESK-1d: the unsigned Windows early build; the browser app stays the Windows default.
+    expect(out).toContain(
+      '| Windows 10 or 11 (early build) | [AgentLink-0.2.0-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/download/v0.2.0/AgentLink-0.2.0-win-x64-setup.exe) |',
+    );
+    expect(out).toContain('| Linux, or Windows without the app | No download: [one command]');
+    expect(out).toContain(
+      '**Windows, first time:** Windows may say "Windows protected your PC". Choose **More info**, then **Run anyway**.',
+    );
+    expect(out).toContain('Smart App Control');
     expect(out).toContain('**arm64 = Apple chip** and **x64 = Intel**');
     expect(out).toContain('About This Mac');
   });

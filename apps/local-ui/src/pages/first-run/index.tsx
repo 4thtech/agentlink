@@ -34,7 +34,7 @@
 // begin/finish). `?add=agent` stays on every step, so an open agent never turns it into Connect
 // another AI app, and a new Add agent starts with nothing kept from an earlier run. It ends on Home
 // in the app (no reload), and the agents are read again.
-import { Banner, Button, CopyPrompt, ProgressBar, TextField } from '@4thtech-io/ui';
+import { Banner, Button, CopyPrompt, InlineError, ProgressBar, TextField } from '@4thtech-io/ui';
 import {
   useCallback,
   useEffect,
@@ -49,6 +49,7 @@ import {
   type ReactNode,
 } from 'react';
 import { lazyPart } from '../../lazy/index.js';
+import { holdsFilesNotice } from '../../api/send-folder-review.js';
 import { INVITE_PATH } from '../../nav.js';
 import { createInviteApi, type InviteApi } from '../contacts/invite-api.js';
 import { navigate } from '../../router.js';
@@ -265,6 +266,8 @@ interface Done {
   readonly passkey: boolean;
   readonly fingerprint: string;
   readonly sendFolder: SendFolderOutcome;
+  /** ATT-SENDFOLDER-FIX: the Send folder begin named (its real path), for the outcome line. */
+  readonly sendFolderPath?: string;
   /** Present only while the "Your master code" step is on screen. */
   readonly ownerCode?: string;
   readonly computerName?: string;
@@ -285,6 +288,8 @@ type View =
       readonly fieldError?: string;
       /** M1-UX-PRF-MATRIX: the browser reports no passkey with PRF here. */
       readonly noPrf?: boolean;
+      /** ATT-SENDFOLDER-FIX: the Send folder already holds files; shown before the gesture. */
+      readonly notice?: string;
     }
   /** U3-g: the master code is saved; deciding between "Connect your AI app" and Home. */
   | { readonly k: 'leaving' }
@@ -432,9 +437,7 @@ function BackupCode({
         {file === 'yes' ? ` ${T.fileSaved}` : ''}
       </p>
       {copied === 'failed' || file === 'failed' ? (
-        <p className="al-text-body-sm ct-error" role="alert">
-          {copied === 'failed' ? T.copyFailed : T.fileFailed}
-        </p>
+        <InlineError>{copied === 'failed' ? T.copyFailed : T.fileFailed}</InlineError>
       ) : null}
       {file === 'yes' ? (
         <p className="al-text-caption al-muted" aria-hidden="true">
@@ -453,8 +456,9 @@ function BackupCode({
 }
 
 /** The first policy's outcome in plain words (D-130 (2)); nothing when no policy was signed. */
-function sendLine(outcome: SendFolderOutcome): string | undefined {
-  if (outcome === 'allowed') return T.sendAllowed;
+function sendLine(outcome: SendFolderOutcome, folder?: string): string | undefined {
+  // ATT-SENDFOLDER-FIX: the folder as it really is (begin named it), else the usual one.
+  if (outcome === 'allowed') return folder === undefined ? T.sendAllowed : T.sendAllowedAt(folder);
   if (outcome === 'not_allowed') return T.sendNotAllowed;
   if (outcome === 'not_confirmed') return T.sendNotConfirmed;
   return undefined;
@@ -532,6 +536,11 @@ function ConnectFirstStep({
       {noPrf ? (
         <Banner tone="warning">{T.noPrf(SENSOR[platform], otherBrowser(platform))}</Banner>
       ) : null}
+      {view.notice === undefined ? null : (
+        <div data-holds-files>
+          <Banner tone="info">{view.notice}</Banner>
+        </div>
+      )}
       {view.message === undefined ? null : <Banner tone="warning">{view.message}</Banner>}
       <div className="st-actions">
         {view.working ? (
@@ -718,7 +727,6 @@ export function FirstRunPage({
   const [takenNames, setTakenNames] = useState<ReadonlySet<string>>(() => new Set());
   // W8-S5 (F7): the owner's IDs, so the pick says which ID an AI app uses now (or a removed one).
   const [knownIds, setKnownIds] = useState<readonly KnownId[] | undefined>(undefined);
-  const [prefilled, setPrefilled] = useState('');
   const setNamed = (value: boolean): void => {
     setNamedState(value);
     rememberWizard({ named: value });
@@ -946,13 +954,7 @@ export function FirstRunPage({
               removing: a.removing === true,
             })),
           );
-          // W7-ID-B1: the person is the same owner, so the name field starts with their ID's name
-          // (never over something already typed or remembered).
-          const own = result.list.agents.find((row) => row.current) ?? result.list.agents[0];
-          if (own !== undefined && own.label.trim() !== '' && wizardMemory().name === undefined) {
-            setPrefilled(own.label);
-            setName(own.label);
-          }
+          // UX-LEFT-1 (R1-UI-21): the field stays empty; another ID's name is never filled in.
         }
       },
       () => undefined,
@@ -979,6 +981,8 @@ export function FirstRunPage({
   };
 
   const label = name.trim();
+  /** ATT-SENDFOLDER-FIX: the Send folder whose "already holds files" line was shown. */
+  const sendNoticeShown = useRef<string | undefined>(undefined);
 
   const protect = useCallback(
     async (noPrf: boolean) => {
@@ -1018,6 +1022,18 @@ export function FirstRunPage({
       const begun = await api.begin(label, app?.id);
       if (begun.kind === 'owner_exists') return existingOwner(undefined, true);
       if (begun.kind === 'error') return problem(begun);
+      // ATT-SENDFOLDER-FIX (IR-1 M-1): a Send folder that already holds files is named first; the
+      // owner presses again to go on (a new begin replaces this plan), so the gesture follows it.
+      const review = begun.sendFolder;
+      if (review?.holdsFiles === true && sendNoticeShown.current !== review.folder) {
+        sendNoticeShown.current = review.folder;
+        return setView({
+          k: 'protect',
+          working: false,
+          noPrf,
+          notice: holdsFilesNotice(review.folder),
+        });
+      }
       // Without PRF here, any passkey: the gesture proves presence, the master code approves.
       const made = await createPasskey(begun.publicKey, { platform: !noPrf });
       if (made.kind === 'unsupported') return setView({ k: 'unsupported' });
@@ -1064,6 +1080,7 @@ export function FirstRunPage({
           passkey: finished.passkey,
           fingerprint: finished.fingerprint,
           sendFolder: finished.sendFolder,
+          ...(begun.sendFolder === undefined ? {} : { sendFolderPath: begun.sendFolder.folder }),
           ownerCode: finished.ownerCode,
           computerName: finished.computerName,
           ...(finished.app === undefined || app === undefined || finished.app !== app.id
@@ -1466,7 +1483,7 @@ export function FirstRunPage({
     }
     case 'done': {
       const { done } = view;
-      const line = sendLine(done.sendFolder);
+      const line = sendLine(done.sendFolder, done.sendFolderPath);
       return frame(
         <section className="st-screen st-w-560" aria-labelledby="fr-h">
           <h1 id="fr-h" ref={backupTitle} tabIndex={-1} className="st-title-2">
@@ -1518,7 +1535,7 @@ export function FirstRunPage({
           value={name}
           onChange={setName}
           onContinue={() => void submitName()}
-          taken={takenNames.has(name.trim()) && name.trim() !== prefilled}
+          taken={takenNames.has(name.trim())}
           working={naming}
           {...(nameError === undefined ? {} : { error: nameError })}
         />

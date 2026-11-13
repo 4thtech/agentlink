@@ -97,6 +97,8 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
   // REL051-RET1: sizes only (retention plan RET-1).
   { label: PAGE_TITLES.storage, path: '/settings/storage' },
   { label: PAGE_TITLES.appearance, path: '/settings/appearance' },
+  // N6 (PLAN-NOTIFY §4.4): replaces the redirect to Settings home.
+  { label: PAGE_TITLES.notifications, path: '/settings/notifications' },
   { label: PAGE_TITLES.rules, path: '/settings/rules' },
   { label: PAGE_TITLES.proofs, path: '/settings/proofs' },
   // DESK051-UPD, REL051-UPD2: the app's version and "Check for updates", the one update surface in
@@ -162,7 +164,6 @@ export const REDIRECTS: Readonly<Record<string, string>> = {
   // real now, so `/settings/touch-id` is no longer redirected.
   '/settings/advanced': ADVANCED_HOME,
   '/settings/about': '/advanced/diagnostics',
-  '/settings/notifications': SETTINGS_HOME,
   '/settings/passkeys': '/settings/backup',
   '/advanced': ADVANCED_HOME,
 };
@@ -182,8 +183,24 @@ export interface GoToEntry {
 
 /** Extra words a section is found by in Cmd+K ("IDs" stays a name for My IDs; "Contacts" for People). */
 const SECTION_KEYWORDS: Readonly<Record<string, string>> = {
-  people: 'contacts',
+  people: 'contacts person people',
   agents: 'ids id agents',
+  activity: 'history log recent changes',
+};
+
+/** UX-LEFT-1 (R1-UI-23): the words people type for a Settings page that its title does not hold. */
+const SETTINGS_KEYWORDS: Readonly<Record<string, string>> = {
+  '/settings/backup': 'recovery master code restore kit',
+  '/settings/touch-id': 'passkey fingerprint password code',
+  '/settings/apps': 'ai app connect claude cursor',
+  '/settings/files': 'folder inbox send',
+  '/settings/storage': 'space size disk delete',
+  '/settings/appearance': 'theme dark light mode colour color',
+  '/settings/notifications': 'alerts sounds',
+  '/settings/rules': 'allow permissions policy',
+  '/settings/proofs': 'proof credits',
+  '/settings/updates': 'version update upgrade',
+  '/settings/advanced': 'help diagnostics relay network pro technical',
 };
 
 /** Everything Cmd+K reaches, in the order it lists them (the prototype's palette). */
@@ -224,6 +241,7 @@ export function goToEntries(hood: boolean): readonly GoToEntry[] {
         label: p.label,
         hint: PAGE_TITLES.settings,
         path: p.path,
+        ...(SETTINGS_KEYWORDS[p.path] === undefined ? {} : { keywords: SETTINGS_KEYWORDS[p.path] }),
       })),
   ];
   if (hood) {
