@@ -72,10 +72,7 @@ const unsigned = (over = {}) =>
     ...over,
   });
 const rootKeyJson = (pin) => JSON.stringify({ rootPublicKey: pin, minimumStatementSequence: 0 });
-const PLACEHOLDER = readFileSync(
-  join(root, 'apps/desktop/src/main/updater/root-key.json'),
-  'utf8',
-);
+const PLACEHOLDER = readFileSync(join(root, 'apps/desktop/src/main/updater/root-key.json'), 'utf8');
 const UPDATES_OFF = readFileSync(
   join(root, 'apps/desktop/src/main/updater/root-key.updates-off.json'),
   'utf8',
@@ -123,8 +120,15 @@ describe('the pin (Fable L3)', () => {
   });
 
   it('every built app must have updates on and carry exactly the pin of root-key.json', () => {
-    const on = (pin, extra = {}) => ({ platform: 'darwin', updates: 'on', updatePin: pin, ...extra });
-    expect(() => checkBuildInputs([on(k1.publicKey), on(k1.publicKey)], k1.publicKey)).not.toThrow();
+    const on = (pin, extra = {}) => ({
+      platform: 'darwin',
+      updates: 'on',
+      updatePin: pin,
+      ...extra,
+    });
+    expect(() =>
+      checkBuildInputs([on(k1.publicKey), on(k1.publicKey)], k1.publicKey),
+    ).not.toThrow();
     expect(() => checkBuildInputs([on(k1.publicKey), on(k2.publicKey)], k1.publicKey)).toThrow(
       /pin/,
     );
@@ -250,10 +254,13 @@ describe("the check with the app's own parser blocks a bad or unsigned manifest"
   it('refuses unsigned, tampered, other-key, wrong version and wrong channel documents', () => {
     const { text } = sign();
     const doc = JSON.parse(text);
-    const { sig: _sig, ...noSig } = doc;
+    const noSig = { ...doc };
+    delete noSig.sig;
     expect(() => check(JSON.stringify(noSig))).toThrow(ToolError);
     expect(() =>
-      check(JSON.stringify({ ...doc, assets: doc.assets.map((a) => ({ ...a, size: a.size + 1 })) })),
+      check(
+        JSON.stringify({ ...doc, assets: doc.assets.map((a) => ({ ...a, size: a.size + 1 })) }),
+      ),
     ).toThrow(ToolError);
     expect(() => check(text, { pin: k2.publicKey })).toThrow(ToolError);
     expect(() => check(text, { version: '0.5.4' })).toThrow(/version/);
@@ -357,7 +364,9 @@ describe('command line', () => {
 
 describe('renewal warning (scheduled, no secret)', () => {
   const doc = (expiresInDays) =>
-    JSON.stringify({ expires: new Date(NOW + expiresInDays * DAY).toISOString().replace('.000Z', 'Z') });
+    JSON.stringify({
+      expires: new Date(NOW + expiresInDays * DAY).toISOString().replace('.000Z', 'Z'),
+    });
   it('ok above 7 days, warns within 7 days, fails when expired or unreadable', () => {
     expect(expiryStatus(doc(10), NOW, 7).level).toBe('ok');
     expect(expiryStatus(doc(6), NOW, 7).level).toBe('warn');
@@ -394,7 +403,9 @@ describe('release.yml: desktop-app-release attaches the zips and reports the upd
   const attach = job(release, 'desktop-app-release');
   it('attaches the Mac zips next to the DMGs, and outputs the update mode of the builds', () => {
     expect(attach).toContain('"AgentLink-$VERSION-mac-arm64.zip" "AgentLink-$VERSION-mac-x64.zip"');
-    expect(attach).toMatch(/\n {4}outputs:\n {6}updates: \$\{\{ steps\.mode\.outputs\.updates \}\}/);
+    expect(attach).toMatch(
+      /\n {4}outputs:\n {6}updates: \$\{\{ steps\.mode\.outputs\.updates \}\}/,
+    );
     expect(attach).toMatch(/inputs-mac-arm64\.json/);
     expect(attach).not.toMatch(/secrets\./);
   });
@@ -446,7 +457,9 @@ describe('release.yml: sign-update-manifest (the one job with the key)', () => {
     const s = withSecret[0];
     expect(s).toMatch(/- name: Sign the update manifest\n/);
     expect(s).toMatch(/\n {10}DESKTOP_UPDATE_KEY: \$\{\{ secrets\.DESKTOP_UPDATE_KEY \}\}\n/);
-    expect(s).not.toMatch(/GH_TOKEN|github\.token|set -x|echo "\$DESKTOP_UPDATE_KEY|run: .*secrets/);
+    expect(s).not.toMatch(
+      /GH_TOKEN|github\.token|set -x|echo "\$DESKTOP_UPDATE_KEY|run: .*secrets/,
+    );
     expect(s).toMatch(/desktop-update-manifest\.mjs sign/);
   });
 

@@ -7,7 +7,7 @@ import { fetchVerified, sha256File } from './fetch-verified.mjs';
 import { checkTgzDeps, lockRegistryProblems, treeHash } from './core-lock.mjs';
 import { sha256Hex } from './hash.mjs';
 import { PREVIEW_VAR, findPreviewString } from './preview-check.mjs';
-import { assertRootKeyPinned, readRootKeyJson } from './root-key-check.mjs';
+import { assertRootKeyPinned, readRootKeyJson, updatePinRecord } from './root-key-check.mjs';
 import { capture, npmCommand, run, tarCommand, walk } from './run.mjs';
 
 export const DESKTOP_DIR = resolve(fileURLToPath(new URL('../..', import.meta.url)));
@@ -215,3 +215,7 @@ export function gitHeadOrNull() {
   const r = capture('git', ['rev-parse', 'HEAD'], { cwd: DESKTOP_DIR });
   return r.code === 0 ? r.stdout.trim() : null;
 }
+
+/** UPD-3 (Fable L3): the update mode and pin a build records in inputs-<target>.json. */
+export const updatePinFor = (mode) =>
+  updatePinRecord({ mode, rootKeyJson: readRootKeyJson(DESKTOP_DIR) });

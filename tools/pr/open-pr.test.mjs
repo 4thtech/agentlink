@@ -337,7 +337,9 @@ describe('the desktop update pin is a sensitive path', () => {
       expect(v.reviewRequired).toBe(true);
     }
     expect(classifyFiles(['apps/desktop/src/main/updater/manifest.ts']).sensitive).toBe(false);
-    expect(classifyFiles(['apps/desktop/src/main/updater/root-key.json.bak']).sensitive).toBe(false);
+    expect(classifyFiles(['apps/desktop/src/main/updater/root-key.json.bak']).sensitive).toBe(
+      false,
+    );
   });
 
   it('CODEOWNERS names the pin files explicitly', () => {

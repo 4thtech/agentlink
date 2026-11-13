@@ -39,6 +39,7 @@ import {
   LAYOUT,
   assertNoPreviewString,
   assertPinnedRootKey,
+  updatePinFor,
   buildPayload,
   extract,
   fetchRuntimes,
@@ -271,6 +272,8 @@ const inputs = {
   coreLockSha256: core.lockSha256,
   coreTreeSha256: core.treeSha256,
   git: gitHeadOrNull(),
+  // UPD-3 (Fable L3): the release checks this pin against root-key.json and the signing key.
+  ...updatePinFor(rootKeyMode),
 };
 writeFileSync(join(out, `inputs-mac-${arch}.json`), JSON.stringify(inputs, null, 2) + '\n');
 if (!args['keep-work']) rmSync(dmgStage, { recursive: true, force: true });

@@ -32,7 +32,11 @@ const run = async (argv, env = {}) => {
 
 describe('new-update-key.mjs', () => {
   it('refuses to run when CI or GITHUB_ACTIONS is set, and writes nothing', async () => {
-    for (const env of [{ CI: 'true' }, { GITHUB_ACTIONS: 'true' }, { CI: '1', GITHUB_ACTIONS: '' }]) {
+    for (const env of [
+      { CI: 'true' },
+      { GITHUB_ACTIONS: 'true' },
+      { CI: '1', GITHUB_ACTIONS: '' },
+    ]) {
       const out = join(tempDir(), 'update.key');
       const r = await run(['--out', out], env);
       expect(r.error).toBeInstanceOf(ToolError);

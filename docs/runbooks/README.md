@@ -30,7 +30,7 @@ Private procedures (incident response, secret rotation, deploy keys, Safe operat
 | RB-20 | [M1 gate: tester runbook](m1-gate-testing.md) | Coordinator (orchestrator or Tali) with 10 internal testers | Sonnet (coordinator) |
 | RB-21 | [Owner feedback loop: local first, CI once](owner-feedback-loop.md) | Orchestrator; owner looks | Opus orchestrates, Sonnet builds |
 | RB-22 | [Classroom handout: students and teacher](classroom-handout.md) | Teacher and students | Any |
-| RB-23 | [Desktop update keys: one-time setup and signing a release](desktop-update-keys.md) | Owner (Tali) only | Owner |
+| RB-23 | [Desktop update key: one-time setup, renewal and changing the key](desktop-update-keys.md) | Owner (Tali) only | Owner |
 
 ## Template
 

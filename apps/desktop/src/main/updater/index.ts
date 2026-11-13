@@ -27,15 +27,27 @@ import {
 import { markDownloaded } from './quarantine.js';
 import { loadFailedVersion } from './state.js';
 
-/**
- * Where each channel's signed document is published (WP-D11 uploads it). `stable` follows the latest
- * GitHub Release; `beta` a fixed prerelease tag, because "latest" never points at a prerelease.
- */
-export const DOCUMENT_URLS: Readonly<Record<Channel, string>> = Object.freeze({
-  stable:
-    'https://github.com/4thtech/agentlink/releases/latest/download/agentlink-desktop-stable.json',
-  beta: 'https://github.com/4thtech/agentlink/releases/download/desktop-beta/agentlink-desktop-beta.json',
+/** UPD-3 (Fable M1): the key id in the document name is the first 16 hex of the pinned key. */
+export const UPDATE_KEY_ID_LENGTH = 16;
+
+export function updateKeyId(pinnedKey: string): string {
+  return pinnedKey.slice(0, UPDATE_KEY_ID_LENGTH);
+}
+
+const DOCUMENT_BASES: Readonly<Record<Channel, string>> = Object.freeze({
+  stable: 'https://github.com/4thtech/agentlink/releases/latest/download/',
+  beta: 'https://github.com/4thtech/agentlink/releases/download/desktop-beta/',
 });
+
+/**
+ * Where this app finds its signed document (release.yml `sign-update-manifest` publishes it). `stable`
+ * follows the latest GitHub Release; `beta` a fixed prerelease tag ("latest" never points at a
+ * prerelease). The name carries the id of the pinned key (Fable M1), so after a re-pin an app that
+ * still trusts the old key asks for the old key's document, never for one it would refuse.
+ */
+export function documentUrl(channel: Channel, pinnedKey: string): string {
+  return `${DOCUMENT_BASES[channel]}desktop-update-${updateKeyId(pinnedKey)}.json`;
+}
 
 /** User-facing words (11 §5): plain, no internals. */
 export const UPDATE_COPY = Object.freeze({
@@ -105,7 +117,7 @@ export async function checkForUpdate(
   const now = (deps.now ?? Date.now)();
   const failedVersion = await loadFailedVersion(deps.stateDir);
   const bytes = await fetchDocument(
-    DOCUMENT_URLS[deps.channel],
+    documentUrl(deps.channel, root.rootPublicKey),
     MAX_DOCUMENT_BYTES,
     deps.fetch ?? defaultFetch,
   );
