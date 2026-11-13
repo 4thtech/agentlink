@@ -11,7 +11,9 @@ import {
 } from '../approval-server.js';
 import {
   APP_UPDATE_CHECK_PATH,
+  APP_UPDATE_INSTALL_PATH,
   APP_UPDATE_PATH,
+  APP_UPDATE_RESTART_PATH,
   type AppUpdateView,
   type LocalUiAppUpdateDesk,
 } from './api/app-update.js';
@@ -35,14 +37,19 @@ interface Res {
   readonly headers: IncomingHttpHeaders;
   readonly body: string;
 }
-function send(port: number, path: string, headers: Record<string, string> = {}): Promise<Res> {
+function send(
+  port: number,
+  path: string,
+  headers: Record<string, string> = {},
+  method = 'GET',
+): Promise<Res> {
   return new Promise((resolve, reject) => {
     const req = httpRequest(
       {
         host: '127.0.0.1',
         port,
         path,
-        method: 'GET',
+        method,
         headers: { Host: `localhost:${String(port)}`, ...headers },
         setHost: false,
       },
@@ -120,7 +127,9 @@ async function harness(appUpdate?: LocalUiAppUpdateDesk) {
   const shell = await send(server.port, '/', { Cookie: cookie });
   const csrf =
     /<meta name="agentlink-csrf" content="([A-Za-z0-9_-]+)">/.exec(shell.body)?.[1] ?? '';
-  return { port: server.port, cookie, csrf };
+  const generation =
+    /<meta name="agentlink-generation" content="([0-9]+)">/.exec(shell.body)?.[1] ?? '';
+  return { port: server.port, cookie, csrf, generation };
 }
 
 describe('Settings > Updates through the server (DESK051-UPD)', () => {
@@ -131,7 +140,13 @@ describe('Settings > Updates through the server (DESK051-UPD)', () => {
       'X-AgentLink-CSRF': h.csrf,
     });
     expect(res.status).toBe(200);
-    expect(JSON.parse(res.body)).toEqual({ ...AVAILABLE, install: 'desktop' });
+    expect(JSON.parse(res.body)).toEqual({
+      ...AVAILABLE,
+      install: 'desktop',
+      installable: false,
+      percent: 0,
+      busy: false,
+    });
   });
 
   it('a check reaches the desk only through the read gates', async () => {
@@ -162,6 +177,57 @@ describe('Settings > Updates through the server (DESK051-UPD)', () => {
     expect(ok.status).toBe(200);
     expect(JSON.parse(ok.body)).toMatchObject({ state: 'checking' });
     expect(checks).toBe(1);
+  });
+
+  it('UPD-5: Update now and Restart now reach the desk only with the session, CSRF and Origin', async () => {
+    const calls: string[] = [];
+    const IN_APP: AppUpdateView = { ...AVAILABLE, installable: true, percent: 0 };
+    const h = await harness({
+      install: 'desktop',
+      view: () => IN_APP,
+      check: () => IN_APP,
+      startInstall: () => {
+        calls.push('install');
+        return { ...IN_APP, state: 'downloading' };
+      },
+      restart: () => {
+        calls.push('restart');
+        return { ...IN_APP, state: 'restarting' };
+      },
+      busy: () => false,
+    });
+    const origin = `http://localhost:${String(h.port)}`;
+    const good = {
+      Cookie: h.cookie,
+      'X-AgentLink-CSRF': h.csrf,
+      Origin: origin,
+      'Content-Type': 'application/octet-stream',
+      'X-AgentLink-Generation': h.generation,
+    };
+    const { Cookie: _c, ...noCookie } = good;
+    const { 'X-AgentLink-CSRF': _x, ...noCsrf } = good;
+    expect((await send(h.port, APP_UPDATE_INSTALL_PATH, noCookie, 'POST')).status).toBe(401);
+    expect((await send(h.port, APP_UPDATE_INSTALL_PATH, noCsrf, 'POST')).status).toBe(403);
+    expect(
+      (
+        await send(
+          h.port,
+          APP_UPDATE_INSTALL_PATH,
+          { ...good, 'Sec-Fetch-Site': 'cross-site' },
+          'POST',
+        )
+      ).status,
+    ).toBe(403);
+    // A GET is never the install.
+    expect((await send(h.port, APP_UPDATE_INSTALL_PATH, good)).status).not.toBe(200);
+    expect(calls).toEqual([]);
+    const ok = await send(h.port, APP_UPDATE_INSTALL_PATH, good, 'POST');
+    expect(ok.status).toBe(200);
+    expect(JSON.parse(ok.body)).toMatchObject({ state: 'downloading', install: 'desktop' });
+    const again = await send(h.port, APP_UPDATE_RESTART_PATH, good, 'POST');
+    expect(again.status).toBe(200);
+    expect(JSON.parse(again.body)).toMatchObject({ state: 'restarting' });
+    expect(calls).toEqual(['install', 'restart']);
   });
 
   it('the browser app’s desk (REL051-UPD2): the version and how it was installed, no link', async () => {

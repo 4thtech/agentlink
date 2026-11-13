@@ -615,6 +615,73 @@ describe('installUpdate end to end, up to the watchdog (UPD-4)', () => {
     expect(HEALTH_TIMEOUT_MS).toBe(90_000);
   });
 
+  it('UPD-5: says when it verifies, waits for Restart now, and checks the app again before the watchdog', async () => {
+    const apps = join(root, 'Applications');
+    const current = await fakeApp(apps, '0.5.2');
+    const src = join(root, 'src');
+    const next = await fakeApp(src, '0.5.3');
+    const bytes = new Uint8Array(32).fill(9);
+    const spawned: string[] = [];
+    const steps: string[] = [];
+    let records = 0;
+    let release: () => void = () => undefined;
+    const done = installUpdate({
+      accepted: { version: '0.5.3', required: false, asset: zipAsset(bytes) },
+      stateDir: join(root, 'state'),
+      currentApp: current,
+      pid: 4242,
+      fetch: fetchBytes(bytes),
+      run: fakeTools({ source: src }).run,
+      readRecord: async () => {
+        records += 1;
+        return recordFor(next);
+      },
+      spawnDetached: (cmd) => spawned.push(cmd),
+      onVerifying: () => steps.push('verifying'),
+      confirmRestart: () =>
+        new Promise<void>((resolve) => {
+          steps.push('ready');
+          release = resolve;
+        }),
+    });
+    for (let i = 0; i < 200 && !steps.includes('ready'); i += 1)
+      await new Promise((r) => setTimeout(r, 5));
+    expect(steps).toEqual(['verifying', 'ready']);
+    expect(spawned).toEqual([]); // nothing starts before the click
+    expect(records).toBe(1);
+    release();
+    expect(await done).toEqual({ kind: 'restarting', version: '0.5.3' });
+    expect(records).toBe(2); // the staged app was checked again after the wait
+    expect(spawned).toHaveLength(1);
+  });
+
+  it('UPD-5: a staged app changed while waiting for Restart now is refused, nothing starts', async () => {
+    const apps = join(root, 'Applications');
+    const current = await fakeApp(apps, '0.5.2');
+    const src = join(root, 'src');
+    const next = await fakeApp(src, '0.5.3');
+    const bytes = new Uint8Array(32).fill(9);
+    const spawned: string[] = [];
+    let records = 0;
+    const outcome = await installUpdate({
+      accepted: { version: '0.5.3', required: false, asset: zipAsset(bytes) },
+      stateDir: join(root, 'state'),
+      currentApp: current,
+      pid: 4242,
+      fetch: fetchBytes(bytes),
+      run: fakeTools({ source: src }).run,
+      readRecord: async () => {
+        records += 1;
+        return records === 1 ? recordFor(next) : null;
+      },
+      spawnDetached: (cmd) => spawned.push(cmd),
+      confirmRestart: () => Promise.resolve(),
+    });
+    expect(outcome).toEqual({ kind: 'fallback', code: 'bundle_hashes' });
+    expect(spawned).toEqual([]);
+    expect(await readdir(join(root, 'state', 'updates'))).toEqual([]);
+  });
+
   it('every refusal is a fixed code with fixed words: no URL or path in what the person sees', async () => {
     const apps = join(root, 'Applications');
     const current = await fakeApp(apps, '0.5.2');
