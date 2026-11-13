@@ -1,5 +1,12 @@
 # @4thtech-io/local-ui
 
+## 0.0.20
+
+### Patch Changes
+
+- Updated dependencies [5c44229]
+  - @4thtech-io/ui@0.5.1
+
 ## 0.0.19
 
 ### Patch Changes

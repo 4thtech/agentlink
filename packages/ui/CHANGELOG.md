@@ -1,5 +1,11 @@
 # @4thtech-io/ui
 
+## 0.5.1
+
+### Patch Changes
+
+- 5c44229: Files sit in the message they came with; a saved Markdown, code, JSON, patch or text file opens in a safe in-app reader (D-149).
+
 ## 0.5.0
 
 No changes in this release.

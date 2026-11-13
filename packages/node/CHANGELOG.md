@@ -1,5 +1,29 @@
 # @4thtech-io/node
 
+## 0.5.1
+
+### Patch Changes
+
+- 5c44229: In the desktop app, approvals can use Touch ID (Mac) or Windows Hello (Windows) once it is turned on for this computer; the backup code keeps working everywhere. Nothing changes in the browser.
+- 5c44229: AI apps can point at the AgentLink desktop app (WP-D7): the app-form entry (the app's own Node and CLI, `node.exe` itself on Windows) is recognised next to the npx form, "Use the app for …" on the AI apps page shows the exact change and writes it only after Touch ID or the backup code, the installer's `agentlink` command can be pointed at the app too, and a translocated, temporary or read-only app is never written into a config.
+- 5c44229: Files sit in the message they came with; a saved Markdown, code, JSON, patch or text file opens in a safe in-app reader (D-149).
+- 5c44229: The master code shown once at first run and after a restore survives a reload of its step until "I saved it" (server memory, this page session, 10 minutes); after a restart the app says it was not saved and offers a new one; a restore closed before its new master code reached the page is rolled back to "Finish restoring" at the next start (REL051-CF3).
+- 5c44229: An expired approval link points to Waiting for you and to the `approve` command; the app-link expired page keeps `ui` (REL051-INTFIX).
+- 5c44229: Restore and first-run follow-ups (REL051-R2C): a restore whose page is gone or whose app closes mid-write rolls its owner back to "Finish restoring"; "Make a new master code" starts the replace step directly; honest waiting-invite hints; one unnamed invite draft; readable restore names; task-list boxes in the reader; plain Inbox count; one cancelled-sensor wording; the AI is told why a long text file has no text.
+- 5c44229: Pairing and name hardening (REL051-SF2): removed or blocked contacts complete no pairing through invites they should not reach, a second answer to a used invite is listed in Activity, invite labels follow the name rule, staged accepts lapse within 7 days, and the name rule refuses role words and look-alikes of reserved words.
+- 5c44229: Recovery kit restore hardening (REL051-SF3): restore on a computer with a leftover passkey copy of the owner key ends with the owner restored or refuses before writing anything; the kit is read from one file descriptor; a second restore never removes another's files and an apply that restored no ID never creates the owner; stale restore files are removed at start-up; restore presence shares the presence backoff; the kit is never saved through a linked Downloads folder.
+- 5c44229: The app now opens in your browser through a private file only you can read, so other people signed in to the same computer can no longer pick up its one-time link. Local server and owner-step hardening: only your open app keeps it running, a wrong handoff can no longer delay `agentlink join`, two display marks now need the full write checks, more Windows file types that run on double-click are saved with `.download`, and owner steps are refused in more AI apps' terminals (REL051-SF4).
+- 5c44229: Settings has a read-only Storage page: sizes of messages and saved files per ID and per person, and of the Inbox folder.
+- Updated dependencies [5c44229]
+- Updated dependencies [5c44229]
+- Updated dependencies [5c44229]
+- Updated dependencies [5c44229]
+- Updated dependencies [5c44229]
+- Updated dependencies [5c44229]
+  - @4thtech-io/crypto@0.5.1
+  - @4thtech-io/core@0.5.1
+  - @4thtech-io/transport-nostr@0.5.1
+
 ## 0.5.0
 
 ### Minor Changes

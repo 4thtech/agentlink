@@ -1,5 +1,13 @@
 # @4thtech-io/crypto
 
+## 0.5.1
+
+### Patch Changes
+
+- 5c44229: Adds the sealed format for approving with Touch ID or Windows Hello in the desktop app (not used by the app yet).
+- 5c44229: In the desktop app, approvals can use Touch ID (Mac) or Windows Hello (Windows) once it is turned on for this computer; the backup code keeps working everywhere. Nothing changes in the browser.
+- 5c44229: Groundwork for signed desktop app updates: the signature tags for update key notes and release manifests, and a passphrase-locked file format for the owner's offline update keys. Nothing changes for `agentlink`, AI apps or existing keys.
+
 ## 0.5.0
 
 No changes in this release.
