@@ -2,4 +2,4 @@
 '@4thtech-io/agentlink': patch
 ---
 
-The desktop app's core keeps its one-line reason when it cannot start on Windows (it exited before the line was written).
+The desktop app's core starts on Windows (it refused the app's private connection there), and keeps its one-line reason when it cannot start.

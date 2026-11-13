@@ -27,6 +27,7 @@ import {
   accessSync,
   constants as fsConstants,
   existsSync,
+  mkdirSync,
   readFileSync,
   readlinkSync,
   rmSync,
@@ -204,6 +205,14 @@ export async function runShell(
   }
   const lockPayload =
     instance === null ? { deepLink: launch.deepLink } : lockData(launch.deepLink, instance.build);
+  // Windows: on the very first start the user-data folder does not exist yet, and the lock then
+  // fails as if another copy held it (the first start quit at once). Create it first.
+  try {
+    const userData = app.getPath?.('userData');
+    if (userData) mkdirSync(userData, { recursive: true, mode: 0o700 });
+  } catch {
+    // The lock reports the problem the way it always did.
+  }
   if (!app.requestSingleInstanceLock(lockPayload)) {
     // D15-01: never a silent exit when the running copy cannot answer for itself.
     if (instance !== null) {
