@@ -30,6 +30,10 @@ export interface App {
   /** D15-01: start an executable once this one exits (default: this app with its own arguments). */
   relaunch?(options?: { execPath?: string; args?: string[] }): void;
   isInApplicationsFolder?(): boolean;
+  /** N7: the dock (macOS) / launcher (Linux) badge number; false where the OS has none. */
+  setBadgeCount?(count?: number): boolean;
+  /** N7 (Windows): the AppUserModelID toasts are attributed to. */
+  setAppUserModelId?(id: string): void;
   moveToApplicationsFolder?(options?: {
     conflictHandler?: (conflictType: 'exists' | 'existsAndRunning') => boolean;
   }): boolean;
@@ -240,6 +244,23 @@ export interface NativeImageModule {
   createFromBuffer(buffer: Uint8Array, options?: { scaleFactor?: number }): NativeImage;
 }
 
+/** N7: a native notification's options (only these: no icon path, no actions, no reply). */
+export interface NotificationOptions {
+  readonly title: string;
+  readonly body: string;
+}
+
+/** N7: Electron's main-process Notification (only what the shell uses). */
+export interface NativeNotification {
+  on(event: 'click' | 'close', listener: () => void): void;
+  show(): void;
+}
+
+export interface NotificationConstructor {
+  new (options: NotificationOptions): NativeNotification;
+  isSupported(): boolean;
+}
+
 /** The Electron module as main.ts uses it. */
 export interface ElectronModule {
   readonly app: App;
@@ -252,4 +273,6 @@ export interface ElectronModule {
   readonly shell: Shell;
   /** DESK051-UPD: whether the computer is online (no request is made while it is not). */
   readonly net?: { isOnline(): boolean };
+  /** N7: native notifications (main process). */
+  readonly Notification?: NotificationConstructor;
 }

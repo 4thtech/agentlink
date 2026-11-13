@@ -3,12 +3,17 @@
 // UX guard, G-1). Without them it prints ONE fixed line to stderr and exits 1: no agent is opened,
 // no server starts, no session link exists. With them it wires the production pieces (nodeUiDeps
 // with the link-sink server, `join`'s invite checks and handoff) and runs host-core.ts.
+import { homedir } from 'node:os';
 import process from 'node:process';
 import { checkInviteLink, resolveInviteLink, shortInviteFetcher } from '@4thtech-io/core';
 import { desktopNativeHelper, startApprovalServerWithLinkSink } from '@4thtech-io/node';
 import { DROP_DEFAULT_ENDPOINT } from '@4thtech-io/storage';
 import { nodeUiDeps, onStopSignals } from '../commands/ui.js';
 import { sendHandoff } from '../runtime/app-host-record.js';
+import {
+  removeDesktopAlertsRecord,
+  writeDesktopAlertsRecord,
+} from '../runtime/desktop-alerts-record.js';
 import { guardedDropFetch } from '../runtime/files.js';
 import { harnessMarkerSet, type Env } from '../runtime/guards.js';
 import { createOutput } from '../output.js';
@@ -109,6 +114,11 @@ export function nodeDesktopHostDeps(pipe: DesktopPipe): DesktopHostDeps {
           { pid: record.pid, port: record.port, handoffToken: record.handoffToken },
           link,
         ),
+    }),
+    // N7: while this host runs, the desktop app owns the OS notifications (no osascript from mcp).
+    alertsRecord: Object.freeze({
+      write: () => writeDesktopAlertsRecord(homedir(), process.pid),
+      remove: () => removeDesktopAlertsRecord(homedir(), process.pid),
     }),
     interrupt: (stop) => onStopSignals(stop),
     guard: (onFatal) => guardProcess({ log: logger, onFatal }),

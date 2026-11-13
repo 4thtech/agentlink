@@ -28,13 +28,21 @@
 //       The last message before the core exits.
 //   {"v":1,"type":"app-update-check"}                                       (DESK051-UPD)
 //       The person chose "Check for updates" in Settings. No other key.
+//   {"v":1,"type":"notify","kind":<NOTIFY_KINDS>,"count":n,"name":""|<owner alias>}   (N7)
+//       Raise one native notification: a fixed code; the shell builds every word and opens only
+//       the kind's fixed route on a click. `count` >= 1. `name` is "" except on messages and files,
+//       and only while the owner turned on Show names: then an alias the OWNER gave the contact
+//       (nameSource 'owner', never a self-declared name), in the plain NOTIFY_NAME shape. Sent only
+//       for the kinds the owner switched on (Settings > Notifications). Never message text, a file
+//       name, a link or anything inbound (I-5).
 //
 // Shell -> core:
 //   {"v":1,"type":"invite","link":"https://agentlink.4thtech.io/i#…"}
 //       The canonical invite link the shell rebuilt from `agentlink://join#…` (08 §4 pattern; the
 //       short form too). The core checks it again (Accept step 1) and holds it in memory only.
 //   {"v":1,"type":"show","route":<SHOW_ROUTES>}
-//       Open a page in the window (a fresh `ready` follows). A fixed enum, never a path.
+//       Open a page in the window (a fresh `ready` follows). A fixed enum, never a path. N7: `inbox`
+//       (Home, a click on a message or file notification) and `updates` (Settings > Updates).
 //   {"v":1,"type":"shutdown"}
 //       Close the server (which removes app-host.json) and exit 0.
 //   {"v":1,"type":"app-update","state":<APP_UPDATE_STATES>,"current":"<v>","latest":"<v>"|"","download":"<link>"|""}
@@ -48,9 +56,36 @@ export const DESKTOP_PIPE_VERSION = 1;
 /** The longest line accepted (an invite link is at most ~21.9 k characters). */
 export const MAX_PIPE_LINE_BYTES = 32 * 1024;
 
-/** `show` routes: Home (first run while no owner exists), the approvals list, the join screen. */
-export const SHOW_ROUTES = Object.freeze(['home', 'approvals', 'join'] as const);
+/**
+ * `show` routes: Home (first run while no owner exists), the approvals list, the join screen; N7:
+ * inbox (Home, where the people are) and updates (Settings > Updates).
+ */
+export const SHOW_ROUTES = Object.freeze([
+  'home',
+  'approvals',
+  'join',
+  'inbox',
+  'updates',
+] as const);
 export type ShowRoute = (typeof SHOW_ROUTES)[number];
+
+/** N7: the kinds a native notification can be about (the notification store's kinds that alert). */
+export const NOTIFY_KINDS = Object.freeze(['approvals', 'messages', 'files', 'update'] as const);
+export type NotifyKind = (typeof NOTIFY_KINDS)[number];
+/** N7: the kinds that may carry an owner-given name. */
+export const NOTIFY_NAME_KINDS: readonly NotifyKind[] = Object.freeze(['messages', 'files']);
+/** N7: the longest name, in code points (06 §2.1's restricted length). */
+export const NOTIFY_NAME_MAX_CODE_POINTS = 32;
+/** N7: letters, marks, numbers, single spaces, apostrophes and hyphens; starts with a letter or number. */
+const NOTIFY_NAME = /^[\p{L}\p{N}](?:[\p{L}\p{M}\p{N}'\u2019-]| (?! ))*$/u;
+
+/** N7: true for a name the pipe may carry in `notify.name` (non-empty; the shell's rule). */
+export function isNotifyName(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > 128) return false;
+  if ([...value].length > NOTIFY_NAME_MAX_CODE_POINTS) return false;
+  if (value.endsWith(' ')) return false;
+  return NOTIFY_NAME.test(value);
+}
 
 /** The core's states, as the tray shows them. */
 export const HOST_STATES = Object.freeze(['starting', 'running', 'closing'] as const);
@@ -164,10 +199,12 @@ export const SESSION_PATHS = Object.freeze([
   '/first-run',
   '/settings/home',
   '/settings/join',
+  // N7: a click on an "Update ready" notification.
+  '/settings/updates',
 ] as const);
 
 const SESSION_URL =
-  /^http:\/\/localhost:([1-9][0-9]{0,4})(\/|\/first-run|\/settings\/home|\/settings\/join)\?t=[A-Za-z0-9_-]{43}$/;
+  /^http:\/\/localhost:([1-9][0-9]{0,4})(\/|\/first-run|\/settings\/home|\/settings\/join|\/settings\/updates)\?t=[A-Za-z0-9_-]{43}$/;
 
 /** 08 §4: the canonical invite (join.ts CANONICAL; a test keeps them equal). */
 const INVITE_CANONICAL = /^https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_-]{1,21846}$/;
@@ -190,7 +227,18 @@ export type HostMessage =
   | { readonly v: 1; readonly type: 'approval-waiting'; readonly count: number }
   | { readonly v: 1; readonly type: 'invite-result'; readonly outcome: InviteOutcome }
   | { readonly v: 1; readonly type: 'stopped'; readonly reason: StopReason }
-  | { readonly v: 1; readonly type: 'app-update-check' };
+  | { readonly v: 1; readonly type: 'app-update-check' }
+  | NotifyMessage;
+
+/** N7: one native notification as a fixed code. */
+export interface NotifyMessage {
+  readonly v: 1;
+  readonly type: 'notify';
+  readonly kind: NotifyKind;
+  readonly count: number;
+  /** "" or an owner-given alias (messages, files only). */
+  readonly name: string;
+}
 
 export type ShellMessage =
   | { readonly v: 1; readonly type: 'invite'; readonly link: string }
@@ -325,6 +373,18 @@ export function parseHostMessage(line: string): HostMessage | undefined {
       const m = exactObject(value, ['v', 'type']);
       if (m?.['v'] !== DESKTOP_PIPE_VERSION) return undefined;
       return Object.freeze({ v: 1, type: 'app-update-check' });
+    }
+    case 'notify': {
+      const m = exactObject(value, ['v', 'type', 'kind', 'count', 'name']);
+      if (m?.['v'] !== DESKTOP_PIPE_VERSION || !isOneOf(NOTIFY_KINDS, m['kind'])) return undefined;
+      const kind = m['kind'];
+      const count = m['count'];
+      const name = m['name'];
+      if (!isCount(count) || count < 1 || typeof name !== 'string') return undefined;
+      if (name !== '' && (!NOTIFY_NAME_KINDS.includes(kind) || !isNotifyName(name))) {
+        return undefined;
+      }
+      return Object.freeze({ v: 1, type: 'notify', kind, count, name });
     }
     default:
       return undefined;

@@ -51,7 +51,12 @@ describe('the desktop alerts record', () => {
 
   it('a malformed, oversized, linked or shared record does not count', async () => {
     await mkdir(join(home, '.agentlink'), { recursive: true, mode: 0o700 });
-    for (const text of ['{}', '{"v":1,"pid":"1"}', `{"v":1,"pid":${process.pid},"x":1}`, 'x'.repeat(600)]) {
+    for (const text of [
+      '{}',
+      '{"v":1,"pid":"1"}',
+      `{"v":1,"pid":${process.pid},"x":1}`,
+      'x'.repeat(600),
+    ]) {
       await writeFile(file(), text, { mode: 0o600 });
       expect(await desktopOwnsAlerts(home, alive)).toBe(false);
     }

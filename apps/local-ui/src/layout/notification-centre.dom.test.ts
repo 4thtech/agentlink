@@ -406,7 +406,12 @@ describe('Settings › Notifications (N6)', () => {
       );
     });
     const labels = switches().map((s) =>
-      (s.getAttribute('aria-label') ?? s.closest('label')?.textContent ?? s.textContent ?? '').trim(),
+      (
+        s.getAttribute('aria-label') ??
+        s.closest('label')?.textContent ??
+        s.textContent ??
+        ''
+      ).trim(),
     );
     expect(switches().map((s) => s.getAttribute('aria-checked'))).toEqual([
       'true',

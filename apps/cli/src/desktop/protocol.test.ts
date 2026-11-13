@@ -219,9 +219,9 @@ describe('app update messages', () => {
 describe('N7: notify (core -> shell), fixed codes only', () => {
   const l = (value: unknown): string => JSON.stringify(value);
   it('kind, count and a name ("" unless an owner alias on messages or files)', () => {
-    expect(parseHostMessage(l({ v: 1, type: 'notify', kind: 'update', count: 1, name: '' }))).toEqual(
-      { v: 1, type: 'notify', kind: 'update', count: 1, name: '' },
-    );
+    expect(
+      parseHostMessage(l({ v: 1, type: 'notify', kind: 'update', count: 1, name: '' })),
+    ).toEqual({ v: 1, type: 'notify', kind: 'update', count: 1, name: '' });
     expect(
       parseHostMessage(l({ v: 1, type: 'notify', kind: 'files', count: 2, name: 'Ana' })),
     ).toEqual({ v: 1, type: 'notify', kind: 'files', count: 2, name: 'Ana' });

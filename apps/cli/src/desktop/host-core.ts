@@ -16,6 +16,11 @@
 //   The core makes no request of its own for it.
 // - `~/.agentlink/app-host.json` is written by the server's handoff option (nodeUiDeps), so a
 //   terminal `agentlink join` hands its invite to this host unchanged; it is removed on close.
+// - N7 (PLAN-NOTIFY §3.5): the desktop app owns the OS notifications. Each tick turns the open ID's
+//   notification items and the approvals count into fixed `notify` codes (alerts.ts) for the
+//   switches the owner turned on; the shell builds the words. Its own server never runs the
+//   osascript / notify-send alert (approvalAlerts: false), and `~/.agentlink/desktop-alerts.json`
+//   ({v, pid}) tells `agentlink mcp` not to either while this host runs (no double alerts).
 // - `shutdown`, the pipe closing, a stop signal or a fatal error: the server closes, `stopped`
 //   goes out, the pipe closes, and the run ends.
 //
@@ -32,6 +37,7 @@ import type {
   LocalUiAppUpdateDesk,
 } from '@4thtech-io/node';
 import { startUiServer, type UiDeps, type UiServer } from '../commands/ui.js';
+import { notifyMessages, planAlerts, refsToName, type AlertBaseline } from './alerts.js';
 import type { FatalReason } from '../runtime/ui-lifecycle.js';
 import type { DesktopPipe } from './pipe.js';
 import {
@@ -75,6 +81,11 @@ export interface DesktopHostDeps {
   guard?(onFatal: (reason: FatalReason) => void): () => void;
   /** Default STATUS_EVERY_MS. */
   readonly statusEveryMs?: number;
+  /**
+   * N7: the mark that this desktop app owns the OS notifications (desktop-alerts-record.ts), written
+   * once the host runs and removed when it stops. Absent: no mark (tests).
+   */
+  readonly alertsRecord?: { write(): Promise<void>; remove(): Promise<void> };
 }
 
 /** Exit codes: 0 for a clean stop, 1 when it could not start or a fatal error ended it. */
@@ -174,6 +185,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     const wrapped: ApprovalServerOptions = {
       ...options,
       appUpdate: appUpdateDesk,
+      // N7: the shell shows native notifications; this server never runs osascript / notify-send.
+      approvalAlerts: () => Promise.resolve(false),
       ...(host === undefined
         ? {}
         : {
@@ -257,7 +270,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
 
   const show = async (route: ShowRoute): Promise<void> => {
     if (approvalServer === undefined) return;
-    if (route === 'approvals') await approvalServer.open().catch(() => false);
+    if (route === 'approvals' || route === 'inbox') await approvalServer.open().catch(() => false);
+    else if (route === 'updates') await approvalServer.openUpdates().catch(() => false);
     else if (route === 'join') await approvalServer.openJoin().catch(() => false);
     else if (server.page === 'first-run' && !openedSinceStart) {
       await approvalServer.openFirstRun().catch(() => false);
@@ -302,6 +316,34 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     queue = queue.then(() => handle(message)).catch(() => undefined);
   });
 
+  // N7: the desktop app owns the OS notifications while it runs.
+  await deps.alertsRecord?.write().catch(() => undefined);
+
+  /** N7: the last look at the open ID (undefined: the next look only notes what is there). */
+  let alertBaseline: AlertBaseline | undefined;
+  const alert = async (): Promise<void> => {
+    const server = approvalServer;
+    if (server === undefined || current === undefined) {
+      alertBaseline = undefined;
+      return;
+    }
+    const state = await server.desktopAlerts().catch(() => undefined);
+    if (state === undefined) {
+      alertBaseline = undefined;
+      return;
+    }
+    const { news, baseline } = planAlerts(alertBaseline, waiting, state);
+    alertBaseline = baseline;
+    if (news.length === 0) return;
+    const refs = refsToName(news, state.prefs);
+    const names =
+      refs.length === 0
+        ? new Map<string, string>()
+        : await server.ownerNames(refs).catch(() => new Map<string, string>());
+    if (stopping) return;
+    for (const message of notifyMessages(news, state.prefs, names)) pipe.send(message);
+  };
+
   const every = deps.statusEveryMs ?? STATUS_EVERY_MS;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const tick = async (): Promise<void> => {
@@ -312,6 +354,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     } else waiting = 0;
     if (stopping) return;
     sendStatus();
+    await alert().catch(() => undefined);
+    if (stopping) return;
     timer = setTimeout(() => void tick(), every);
   };
   await tick();
@@ -322,6 +366,7 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   sendStatus();
   await queue;
   await server.close().catch(() => undefined);
+  await deps.alertsRecord?.remove().catch(() => undefined);
   pipe.send({ v: 1, type: 'stopped', reason });
   unsubscribe();
   unguard?.();

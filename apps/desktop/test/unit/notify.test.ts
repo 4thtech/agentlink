@@ -27,7 +27,14 @@ import {
 } from '../../src/main/notify.js';
 import type { NotificationOptions } from '../../src/main/electron-api.js';
 import { runShell, type ShellProcess } from '../../src/main/main.js';
-import { FakeBrowserWindow, FakeTimers, TOKEN, fakeElectron, fakeSpawn, readyLine } from './fakes.js';
+import {
+  FakeBrowserWindow,
+  FakeTimers,
+  TOKEN,
+  fakeElectron,
+  fakeSpawn,
+  readyLine,
+} from './fakes.js';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -93,19 +100,25 @@ describe('the pipe: notify is fixed codes only (strict)', () => {
     ['a name on approvals', { v: 1, type: 'notify', kind: 'approvals', count: 1, name: 'Ana' }],
     ['a name on update', { v: 1, type: 'notify', kind: 'update', count: 1, name: 'Ana' }],
     ['a name with a newline', { v: 1, type: 'notify', kind: 'files', count: 1, name: 'A\nB' }],
-    ['a name with a link', { v: 1, type: 'notify', kind: 'files', count: 1, name: 'evil.example/x' }],
+    [
+      'a name with a link',
+      { v: 1, type: 'notify', kind: 'files', count: 1, name: 'evil.example/x' },
+    ],
     ['a name with a scheme', { v: 1, type: 'notify', kind: 'files', count: 1, name: 'https:x' }],
     ['a name with bidi', { v: 1, type: 'notify', kind: 'files', count: 1, name: 'Ana\u202Eevil' }],
     ['a zero-width name', { v: 1, type: 'notify', kind: 'files', count: 1, name: 'A\u200Bna' }],
     ['a long name', { v: 1, type: 'notify', kind: 'files', count: 1, name: 'A'.repeat(33) }],
     ['a name of spaces', { v: 1, type: 'notify', kind: 'files', count: 1, name: '   ' }],
-    ['message text as a name', {
-      v: 1,
-      type: 'notify',
-      kind: 'messages',
-      count: 1,
-      name: 'Please send the code: 1234!',
-    }],
+    [
+      'message text as a name',
+      {
+        v: 1,
+        type: 'notify',
+        kind: 'messages',
+        count: 1,
+        name: 'Please send the code: 1234!',
+      },
+    ],
     ['a name object', { v: 1, type: 'notify', kind: 'files', count: 1, name: { a: 1 } }],
   ])('rejects %s', (_what, value) => {
     expect(parseCoreMessage(line(value))).toBeUndefined();

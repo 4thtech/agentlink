@@ -115,6 +115,7 @@ export {
   type ApprovalServerEvent,
   type ApprovalServerOptions,
   type ApprovalServerSource,
+  type DesktopAlertState,
   type PendingApprovalView,
 } from './approval-server.js';
 // M1-11s-b: what the caller wires into the local UI (D-118): the app's in-memory files and the

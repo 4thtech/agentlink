@@ -664,7 +664,11 @@ describe('N7: native notifications from the desktop host', () => {
     const s = setup({
       pending: () => pending,
       alerts: {
-        state: () => ({ scope: 'default', items: [], prefs: { ...NOTIFY_DEFAULTS, approvals: false } }),
+        state: () => ({
+          scope: 'default',
+          items: [],
+          prefs: { ...NOTIFY_DEFAULTS, approvals: false },
+        }),
       },
     });
     const run = runDesktopHost(s.deps);
@@ -687,7 +691,16 @@ describe('N7: native notifications from the desktop host', () => {
           items:
             count === 0
               ? []
-              : [{ id: `messages-${A}`, kind: 'messages', ref: A, count, at: 10 + count, read: false }],
+              : [
+                  {
+                    id: `messages-${A}`,
+                    kind: 'messages',
+                    ref: A,
+                    count,
+                    at: 10 + count,
+                    read: false,
+                  },
+                ],
           prefs: { ...NOTIFY_DEFAULTS, messages: true, showNames: true },
         }),
         names: new Map([[A, 'Ana']]),
