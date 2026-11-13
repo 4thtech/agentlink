@@ -12,7 +12,7 @@
 // - Neither: the one button opens the master code (PresencePrompt, code first), as does the link.
 // The statement the gesture confirms is the button's accessible description, and the line above
 // the master code field. A double click asks once (REL051-UF3).
-import { Button } from '@4thtech-io/ui';
+import { Button, InlineError } from '@4thtech-io/ui';
 import {
   createContext,
   useContext,
@@ -237,11 +237,7 @@ export function PresenceButton({
           />
         )}
       </div>
-      {message === undefined ? null : (
-        <p className="al-text-body-sm ct-error" role="alert">
-          {message}
-        </p>
-      )}
+      {message === undefined ? null : <InlineError>{message}</InlineError>}
     </div>
   );
 }

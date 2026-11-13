@@ -51,7 +51,7 @@ import { SwitchToPasskeyBanner } from '../states/index.js';
 import type { ApiResult } from '../api/client.js';
 import { TidyNote } from '../pages/agents/tidy-note.js';
 import { subscribeHealth } from './health-feed.js';
-import { readHealth as defaultReadHealth, type HealthState } from './health.js';
+import { readHealth as defaultReadHealth } from './health.js';
 import { VT_CLASS } from '@4thtech-io/ui';
 import { morph, toggleHood } from './hood.js';
 import { SectionRail, SectionSheet } from './section-menu.js';
@@ -60,45 +60,16 @@ import { StatusStrip } from './status-strip.js';
 import { ContactToasts } from './contact-toasts.js';
 import './shell.css';
 
-/**
- * What the status bar shows. "Connected" appears only when the local server's health read says the
- * agent is running (M1-11s-a-d, health.ts); until the first answer the state is "unknown" (shown as
- * "Checking…", at most 4 s). The browser's offline event shows "Not connected" and wins over the
- * health read while the browser stays offline; the online event goes back to "unknown", never
- * straight to "connected": the next health read decides.
- */
-export type ConnectionState = 'unknown' | 'offline' | HealthState;
+import {
+  getConnectionState,
+  setConnectionState,
+  useConnectionState,
+  type ConnectionState,
+} from './connection.js';
+import { healthWord } from './health-word.js';
+import { BackOnlineToast, HealthBanner } from './health-notices.js';
 
-let current: ConnectionState = 'unknown';
-const listeners = new Set<() => void>();
-
-/** Record the connection state (called by whatever learns it: the server health read). */
-export function setConnectionState(next: ConnectionState): void {
-  if (next === current) return;
-  current = next;
-  for (const l of listeners) l();
-}
-
-export function useConnectionState(): ConnectionState {
-  const [state, setState] = useState<ConnectionState>(current);
-  useEffect(() => {
-    const sync = (): void => setState(current);
-    const onOffline = (): void => setConnectionState('offline');
-    const onOnline = (): void => {
-      if (current === 'offline') setConnectionState('unknown');
-    };
-    listeners.add(sync);
-    window.addEventListener('offline', onOffline);
-    window.addEventListener('online', onOnline);
-    sync();
-    return () => {
-      listeners.delete(sync);
-      window.removeEventListener('offline', onOffline);
-      window.removeEventListener('online', onOnline);
-    };
-  }, []);
-  return state;
-}
+export { setConnectionState, useConnectionState, type ConnectionState };
 
 const browserOffline = (): boolean =>
   typeof navigator !== 'undefined' && navigator.onLine === false;
@@ -107,13 +78,13 @@ const browserOffline = (): boolean =>
  * M1-11s-a-d: polls the health read while mounted and records the state; returns the app version
  * it reported (a plain version, or undefined).
  */
-export function useHealth(
+function useHealthPoll(
   read: () => Promise<ApiResult<unknown>> = defaultReadHealth,
 ): string | undefined {
   const [version, setVersion] = useState<string | undefined>(undefined);
   useEffect(() => {
     // A fresh poller starts from "Checking…": an earlier answer is not evidence for this one.
-    if (current !== 'offline') setConnectionState('unknown');
+    if (getConnectionState() !== 'offline') setConnectionState('unknown');
     // The poller is shared with Home (health-feed.ts): one read per tick for the whole app.
     return subscribeHealth(read, {
       onState: (state, reported) => {
@@ -125,20 +96,6 @@ export function useHealth(
   }, [read]);
   return version;
 }
-
-/** The status bar's words; "Paused" means the user paused AgentLink, never an unknown state. */
-const STATUS: Readonly<Record<ConnectionState, readonly [cls: string, word: string]>> = {
-  unknown: ['checking', 'Checking…'],
-  connected: ['connected', 'Connected'],
-  // REL051-CF2 (R1-CLASS-02): the agent runs but none of its relays can be reached from here.
-  unreachable: ['unreachable', SHELL_STRINGS.networkUnreachable],
-  // REL051-CF2: running, the first relay check has not finished yet.
-  checking: ['checking', SHELL_STRINGS.networkChecking],
-  offline: ['disconnected', 'Not connected'],
-  paused: ['paused', 'Paused'],
-  not_running: ['not-running', 'Not running'],
-  needs_setup: ['needs-setup', 'Needs setup'],
-};
 
 /**
  * M1-UX-FIRSTRUN-V2-c: true when the owner exists but approves only with the master code (no
@@ -262,7 +219,7 @@ export function Layout({
 }: LayoutProps): ReactElement {
   const focused = isFocusedPath(path);
   const connection = useConnectionState();
-  const version = useHealth(readHealth);
+  const version = useHealthPoll(readHealth);
   const waiting = useApprovalsWaiting(path, waitingApprovals);
   const { hood } = usePrefs();
   const expanded = useMenuExpanded();
@@ -316,7 +273,7 @@ export function Layout({
   const facts = useCallback(
     () => ({
       ...(version === undefined ? {} : { version }),
-      connection: (STATUS[connection] ?? STATUS.unknown)[1],
+      connection: healthWord(connection).bar,
       hood: getPrefs().hood,
       agents: getLive().agents.length,
     }),
@@ -335,7 +292,7 @@ export function Layout({
       </PrefsHood>
     );
   }
-  const [statusClass, statusWord] = STATUS[connection];
+  const { cls: statusClass, bar: statusWord } = healthWord(connection);
   const settings = sectionOf(path) === 'settings' || path === '/advanced/network';
   return (
     <PrefsHood>
@@ -356,6 +313,8 @@ export function Layout({
           />
           <main className={`al-shell-content al-app-main ${VT_CLASS.main}`} id="al-main">
             <div className="al-route" {...(settings ? { 'data-settings': '' } : {})}>
+              {/* N2: the offline banner, after 5 s offline. Home says it in its own words. */}
+              {path === '/' ? null : <HealthBanner />}
               {switchNeeded ? <SwitchToPasskeyBanner platform={platform} /> : null}
               <StartHereContext.Provider value={start}>
                 {/* The one-time Tidy up note (b11 §29.7), on Home. */}
@@ -385,6 +344,8 @@ export function Layout({
       <ShellDialogs keys={shortcutKeys} facts={facts} />
       {/* W5-INVITE-FEEDBACK: "{name} accepted your invite" and friends, on every page. */}
       {settled ? <ContactToasts /> : null}
+      {/* N2: "Back online", once, after the offline banner had shown. */}
+      <BackOnlineToast />
     </PrefsHood>
   );
 }

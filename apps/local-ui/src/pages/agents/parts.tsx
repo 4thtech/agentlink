@@ -2,7 +2,7 @@
 // app's dot and word, the Pause sheet (one click, no Touch ID), the paused banner with Resume (Touch
 // ID, signs `agent.resume`), and the "Contacts still see {name}" note (D-141). Labels and former names
 // are text only, each in its own bidi-isolated run (I-5).
-import { Button, Icon, PageNotice, Pulse, Sheet } from '@4thtech-io/ui';
+import { Button, Icon, InlineError, PageNotice, Pulse, Sheet } from '@4thtech-io/ui';
 import { useState, type ReactElement } from 'react';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
 import type { AgentsApi } from './api.js';
@@ -155,11 +155,7 @@ export function PauseSheet({
     <Sheet open title={S.pauseTitle(row.label)} onClose={onClose} closeLabel={S.close}>
       <div className="ag-sheet-body">
         <p className="al-text-body">{S.pauseBody(row.label)}</p>
-        {error === undefined ? null : (
-          <p className="al-text-body-sm ag-error" role="alert">
-            {error}
-          </p>
-        )}
+        {error === undefined ? null : <InlineError>{error}</InlineError>}
         <div className="ag-actions">
           <Button variant="primary" icon="pause" onClick={pause} disabled={busy}>
             {S.pause}

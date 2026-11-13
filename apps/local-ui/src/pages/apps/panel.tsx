@@ -5,7 +5,7 @@
 // WP-D7: `form="app"` ("Use the app for …") shows the entry before and after, and offers to point the
 // `agentlink` command at the app too; ticking it previews again, so the change shown (and bound by
 // its changeId) always includes exactly what will be written.
-import { Button, Sheet, Skeleton } from '@4thtech-io/ui';
+import { Button, InlineError, Sheet, Skeleton } from '@4thtech-io/ui';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 import { CONTACTS_STRINGS as C, waitSeconds } from '../contacts/strings.js';
 import type { OwnerClient, PresenceProof } from '../contacts/owner.js';
@@ -211,9 +211,7 @@ export function ChangePanel({
             </Skeleton>
           ) : preview.kind === 'error' ? (
             <>
-              <p className="al-text-body" role="alert">
-                {S.loadError}
-              </p>
+              <InlineError>{S.loadError}</InlineError>
               <div className="ap-card-actions">
                 <Button variant="secondary" onClick={read}>
                   {S.tryAgain}
@@ -286,11 +284,7 @@ export function ChangePanel({
               <p className="al-text-body-sm al-muted">
                 {S.folder(change?.folder ?? labels.folder)} {S.backup}
               </p>
-              {error === undefined ? null : (
-                <p className="al-text-body-sm" role="alert">
-                  {error}
-                </p>
-              )}
+              {error === undefined ? null : <InlineError>{error}</InlineError>}
               <div className="ap-card-actions">
                 <Button
                   variant="primary"

@@ -22,7 +22,7 @@
 // Safari. With an owner and no ID on this computer, begin answers a plan for the master code or
 // Touch ID (04 §2.8 "No ID on this computer yet"); nothing here sends the owner to a terminal.
 import { holdsFilesNotice, type SendFolderReview } from '../../api/send-folder-review.js';
-import { Banner, Button } from '@4thtech-io/ui';
+import { Banner, Button, InlineError } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
 import { AppMark } from '../first-run/pick-app.js';
@@ -591,11 +591,7 @@ export function CreateAgentGate({
               {PASSKEY_WHY.switchCancel}
             </Button>
           </div>
-          {note === undefined ? null : (
-            <p className="al-text-body-sm" role="alert">
-              {note}
-            </p>
-          )}
+          {note === undefined ? null : <InlineError>{note}</InlineError>}
         </form>
       ) : native && !useCode && desktop !== undefined ? (
         <div className="ag-actions">
@@ -628,11 +624,7 @@ export function CreateAgentGate({
             {switchTo === undefined ? null : switchButton('ghost')}
             {back}
           </div>
-          {note === undefined ? null : (
-            <p className="al-text-body-sm" role="alert">
-              {note}
-            </p>
-          )}
+          {note === undefined ? null : <InlineError>{note}</InlineError>}
         </form>
       ) : switchTo !== undefined ? (
         <>

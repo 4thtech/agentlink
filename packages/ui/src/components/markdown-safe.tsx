@@ -33,6 +33,7 @@ import {
   type ReactNode,
 } from 'react';
 import { Icon } from './brand.js';
+import { COPIED_MS } from './notice-timing.js';
 import { cleanText, cx } from './util.js';
 
 /** The most characters rendered (the preview cap is 256 KB). */
@@ -56,7 +57,6 @@ export const MARKDOWN_SLICE = 600;
 export const MARKDOWN_PIECE_MAX = 1_200;
 /** The most numbered lines SafeCode draws; the rest is plain text. */
 export const CODE_MAX_LINES = 1_500;
-const COPIED_MS = 1_600;
 
 export interface MarkdownLabels {
   readonly copy: string;

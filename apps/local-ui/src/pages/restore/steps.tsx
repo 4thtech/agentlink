@@ -2,7 +2,7 @@
 // page (UX1113-R3; spec §6.4 to §6.6). They draw only what their props hold: the page (index.tsx)
 // owns the calls. Names from a kit are rendered as text. The master code is held in a prop for as
 // long as the card is on screen: never stored, never put in an attribute or a URL.
-import { Banner, Button, Icon, Lockup, useHood } from '@4thtech-io/ui';
+import { Banner, Button, Icon, InlineError, Lockup, useHood } from '@4thtech-io/ui';
 import {
   useEffect,
   useId,
@@ -819,11 +819,7 @@ function Code({
           {PROTECT.print}
         </Button>
       </div>
-      {copied === 'failed' ? (
-        <p className="rs-error" role="alert">
-          {PROTECT.copyFailed}
-        </p>
-      ) : null}
+      {copied === 'failed' ? <InlineError>{PROTECT.copyFailed}</InlineError> : null}
     </>
   );
 }
@@ -890,11 +886,7 @@ export function ProtectStep(p: ProtectStepProps): ReactElement {
                 {PROTECT.typedBackOk}
               </p>
             ) : null}
-            {typedWrong ? (
-              <p className="rs-error" role="alert">
-                {PROTECT.typeBackWrong}
-              </p>
-            ) : null}
+            {typedWrong ? <InlineError>{PROTECT.typeBackWrong}</InlineError> : null}
           </div>
           {/* Rendered here in memory for the printer only; never written to disk. */}
           <div className="rs-print-sheet" aria-hidden="true">
