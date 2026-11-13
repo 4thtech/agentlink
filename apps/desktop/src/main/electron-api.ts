@@ -23,6 +23,8 @@ export interface App {
   /** WP-D10 updater: the installed version and the app's own data folder. */
   getVersion?(): string;
   getPath?(name: 'userData'): string;
+  /** DESK051-UPD: an Intel copy running under Rosetta on Apple silicon (macOS only). */
+  readonly runningUnderARM64Translation?: boolean;
   quit(): void;
   exit(code?: number): void;
   /** D15-01: start an executable once this one exits (default: this app with its own arguments). */
@@ -248,4 +250,6 @@ export interface ElectronModule {
   readonly Menu: { buildFromTemplate(template: MenuItemOptions[]): Menu };
   readonly dialog: Dialog;
   readonly shell: Shell;
+  /** DESK051-UPD: whether the computer is online (no request is made while it is not). */
+  readonly net?: { isOnline(): boolean };
 }

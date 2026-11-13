@@ -388,6 +388,7 @@ import {
 import { createUiSettingsDesk } from './local-ui/api/ui-settings.js';
 import { createPeopleAllDesk } from './local-ui/api/people-all.js';
 import { createStorageDesk, inboxUsageOf } from './local-ui/api/storage.js';
+import type { LocalUiAppUpdateDesk } from './local-ui/api/app-update.js';
 import {
   AppHostSlot,
   FIRST_AGENT_LABEL,
@@ -948,6 +949,12 @@ export interface ApprovalServerOptions {
    */
   readonly nativePresence?: NativeHelper;
   /**
+   * DESK051-UPD: Settings > Updates, when core runs inside the desktop app (its host relays the
+   * shell's update state; local-ui/api/app-update.ts). Undefined everywhere else: the routes answer
+   * 501 and the page is not offered.
+   */
+  readonly appUpdate?: LocalUiAppUpdateDesk;
+  /**
    * DESK-NATIVE-DEBUG: receives ONE fixed diagnostic line per native presence operation outcome
    * (nativeDiagnostic: fixed words, step names and error codes only; never a secret, a path, a
    * handle, a record or a system message). The desktop host writes it to stderr, which the shell's
@@ -1194,6 +1201,9 @@ const NO_AGENT_ROUTES: ReadonlySet<string> = new Set([
   // W4-SHELL-V2: the app's UI settings are the app's, not an agent's (the shell during first run).
   'GET /api/ui/ui-settings',
   'PUT /api/ui/ui-settings',
+  // DESK051-UPD: the app's own version and updates are the app's, not an agent's.
+  'GET /api/ui/app-update',
+  'GET /api/ui/app-update/check',
 ]);
 
 /**
@@ -1840,6 +1850,8 @@ export async function startApprovalServerWith(
       ...(options.host === undefined ? {} : { agents: { list: () => listAgents() } }),
       ...(peopleAllDesk === undefined ? {} : { peopleAll: peopleAllDesk }),
       ...(storageDesk === undefined ? {} : { storage: storageDesk }),
+      // DESK051-UPD: the desktop host's update state (no agent needed).
+      ...(options.appUpdate === undefined ? {} : { appUpdate: options.appUpdate }),
       // W4-SHELL-V2: the app's UI settings, in the app host only (one desk for every context).
       ...(uiSettingsDesk === undefined ? {} : { uiSettings: uiSettingsDesk }),
       // U3-d: create an agent and save a verified label, in the app host only.

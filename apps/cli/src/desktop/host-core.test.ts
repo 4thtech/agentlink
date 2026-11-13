@@ -487,6 +487,66 @@ describe('runDesktopHost (WP-D3)', () => {
     expect(s.pipe.closed()).toBe(true);
   });
 
+  it('DESK051-UPD: keeps the shell’s update state for Settings and asks the shell to check', async () => {
+    const s = setup();
+    let options: ApprovalServerOptions | undefined;
+    const start = s.deps.startServer;
+    const deps: DesktopHostDeps = {
+      ...s.deps,
+      startServer: (o, sink) => {
+        options = o;
+        return start(o, sink);
+      },
+    };
+    const run = runDesktopHost(deps);
+    await until(() => readies(s.pipe.sent).length === 1);
+    const desk = options?.appUpdate;
+    expect(desk).toBeDefined();
+    // Nothing yet from the shell: no state, and a check asks nothing.
+    expect(desk?.view()).toBeUndefined();
+    expect(desk?.check()).toBeUndefined();
+    expect(s.pipe.sent.some((m) => m.type === 'app-update-check')).toBe(false);
+    const DMG =
+      'https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-mac-arm64.dmg';
+    s.pipe.shell({
+      v: 1,
+      type: 'app-update',
+      state: 'available',
+      current: '0.5.1',
+      latest: '0.5.2',
+      download: DMG,
+    });
+    expect(desk?.view()).toEqual({
+      state: 'available',
+      current: '0.5.1',
+      latest: '0.5.2',
+      download: DMG,
+    });
+    // A check: one message with no other key, and "checking" (no link) meanwhile.
+    expect(desk?.check()).toEqual({
+      state: 'checking',
+      current: '0.5.1',
+      latest: '',
+      download: '',
+    });
+    expect(s.pipe.sent.filter((m) => m.type === 'app-update-check')).toEqual([
+      { v: 1, type: 'app-update-check' },
+    ]);
+    // Off (development build or policy): never asks.
+    s.pipe.shell({
+      v: 1,
+      type: 'app-update',
+      state: 'off',
+      current: '0.5.1',
+      latest: '',
+      download: '',
+    });
+    expect(desk?.check()).toEqual({ state: 'off', current: '0.5.1', latest: '', download: '' });
+    expect(s.pipe.sent.filter((m) => m.type === 'app-update-check')).toHaveLength(1);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await expect(run).resolves.toBe(0);
+  });
+
   it('the sink refuses anything that is not a session link of its own server', async () => {
     const s = setup({
       start: () =>

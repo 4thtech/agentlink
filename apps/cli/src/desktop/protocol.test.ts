@@ -151,3 +151,66 @@ describe('core -> shell messages', () => {
     expect(parseHostMessage('{"v":1,"type":"stopped","reason":"other"}')).toBeUndefined();
   });
 });
+
+// DESK051-UPD: the update messages; the same rules as the shell's copy (apps/desktop
+// src/shared/protocol.ts + app-update.ts).
+describe('app update messages', () => {
+  const DMG =
+    'https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-mac-arm64.dmg';
+  const ok = {
+    v: 1,
+    type: 'app-update',
+    state: 'available',
+    current: '0.5.1',
+    latest: '0.5.2',
+    download: DMG,
+  };
+  const line = (v: unknown): string => JSON.stringify(v);
+
+  it('accepts the update state in its exact forms', () => {
+    expect(parseShellMessage(line(ok))).toEqual(ok);
+    for (const download of [
+      DMG.replaceAll('arm64', 'x64'),
+      'https://github.com/4thtech/agentlink/releases/tag/v0.5.2',
+    ]) {
+      expect(parseShellMessage(line({ ...ok, download }))).toEqual({ ...ok, download });
+    }
+    for (const state of ['off', 'idle', 'checking', 'current', 'failed', 'offline']) {
+      const v = { ...ok, state, latest: '', download: '' };
+      expect(parseShellMessage(line(v)), state).toEqual(v);
+    }
+    expect(encodeShellMessage(ok as never)).toBe(`${line(ok)}\n`);
+  });
+
+  it.each([
+    ['an unknown state', { ...ok, state: 'installing' }],
+    ['an extra key', { ...ok, x: 1 }],
+    ['a missing key', { ...ok, download: undefined }],
+    [
+      'a version that is not newer',
+      { ...ok, latest: '0.5.1', download: DMG.replaceAll('0.5.2', '0.5.1') },
+    ],
+    ['10 < 9 as text', { ...ok, current: '0.10.0' }],
+    ['a prerelease', { ...ok, latest: '0.5.2-beta.1' }],
+    ['a link for another version', { ...ok, download: DMG.replaceAll('0.5.2', '0.5.3') }],
+    ['a link elsewhere', { ...ok, download: 'https://evil.example/x.dmg' }],
+    [
+      'another file of the release',
+      { ...ok, download: DMG.replace('AgentLink-0.5.2-mac-arm64.dmg', 'x.dmg') },
+    ],
+    ['a link while not available', { ...ok, state: 'current' }],
+    ['a bad current version', { ...ok, current: '0.5.1\n' }],
+    ['a wrong version', { ...ok, v: 2 }],
+  ])('refuses %s', (_label, value) => {
+    expect(parseShellMessage(line(value))).toBeUndefined();
+  });
+
+  it('the core sends only a bare check request', () => {
+    expect(encodeHostMessage({ v: 1, type: 'app-update-check' })).toBe(
+      `${line({ v: 1, type: 'app-update-check' })}\n`,
+    );
+    expect(parseHostMessage(line({ v: 1, type: 'app-update-check', url: DMG }))).toBeUndefined();
+    expect(parseShellMessage(line({ v: 1, type: 'app-update-check' }))).toBeUndefined();
+    expect(parseHostMessage(line(ok))).toBeUndefined();
+  });
+});
