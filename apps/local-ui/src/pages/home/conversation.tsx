@@ -12,7 +12,15 @@
 //
 // Under the hood adds each message's ID, exact time, size, sending agent, delivery receipt and
 // proof. Reading here sends GETs only and never marks anything read for the AI.
-import { AgentIcon, Banner, Button, Icon, SkeletonLine, UntrustedContent } from '@4thtech-io/ui';
+import {
+  AgentIcon,
+  Banner,
+  Button,
+  CopyButton,
+  Icon,
+  SkeletonLine,
+  UntrustedContent,
+} from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { sizeText } from '../files/io.js';
 import type { MessageItem, MessagePage, MessagesApi } from '../messages/api.js';
@@ -23,7 +31,6 @@ import { HOME_STRINGS as S, fmt } from './people-strings.js';
 import { HISTORY_STRINGS as H } from '../history/strings.js';
 import { termsLine, termsStateWord, type TermsEvent } from './terms-trail.js';
 
-const COPIED_MS = 1600;
 const SHORT = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
 const DAY = new Intl.DateTimeFormat(undefined, {
   day: 'numeric',
@@ -179,56 +186,15 @@ function Delivery({
 }
 
 function CopyText({ text }: { readonly text: string }): ReactElement {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
-  useEffect(() => {
-    if (state !== 'copied') return undefined;
-    const timer = setTimeout(() => setState('idle'), COPIED_MS);
-    return () => clearTimeout(timer);
-  }, [state]);
-  const copy = (): void => {
-    try {
-      const clip = navigator.clipboard as Clipboard | undefined;
-      if (clip === undefined) {
-        setState('failed');
-        return;
-      }
-      void clip.writeText(text).then(
-        () => setState('copied'),
-        () => setState('failed'),
-      );
-    } catch {
-      setState('failed');
-    }
-  };
   return (
-    <>
-      <button
-        type="button"
-        className="al-btn al-btn-ghost al-btn-sm hm-copy"
-        aria-label={S.copyLabel}
-        onClick={copy}
-      >
-        {state === 'copied' ? (
-          <span className="hm-copied hm-f al-pop">
-            <Icon name="check" size={13} />
-            <span>{S.copied}</span>
-          </span>
-        ) : (
-          <>
-            <Icon name="copy" size={13} />
-            <span>{S.copy}</span>
-          </>
-        )}
-      </button>
-      <span className="al-visually-hidden" aria-live="polite">
-        {state === 'copied' ? S.copied : ''}
-      </span>
-      {state === 'failed' ? (
-        <span role="status" className="hm-dl-hint">
-          {S.copyFailed}
-        </span>
-      ) : null}
-    </>
+    <CopyButton
+      text={text}
+      label={S.copy}
+      copiedLabel={S.copied}
+      failedLabel={S.copyFailed}
+      ariaLabel={S.copyLabel}
+      className="hm-copy"
+    />
   );
 }
 

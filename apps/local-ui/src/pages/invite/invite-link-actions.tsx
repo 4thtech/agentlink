@@ -3,14 +3,12 @@
 // clipboard or shown as text in the row (never an attribute, the title, the address, a log or an
 // error), and dropped from the page when hidden. Prototype 02-people: Copy link (secondary), the
 // rest quiet (ghost).
-import { Button } from '@4thtech-io/ui';
+import { Button, COPIED_MS, InlineError } from '@4thtech-io/ui';
 import { useEffect, useId, useState, type ReactElement } from 'react';
 import type { LinkOutcome } from '../contacts/invite-api.js';
 import { CheckMark, CopyMark } from './icons.js';
 import { INVITE_STRINGS as S } from './strings.js';
 import './invite.css';
-
-const COPIED_MS = 1600;
 
 export interface InviteLink {
   readonly copy: () => void;
@@ -141,11 +139,7 @@ export function InviteLinkReveal({
           </div>
         )}
       </div>
-      {link.problem === undefined ? null : (
-        <span className="al-text-body-sm inv-error" role="alert">
-          {link.problem}
-        </span>
-      )}
+      {link.problem === undefined ? null : <InlineError>{link.problem}</InlineError>}
       <span className="al-visually-hidden" role="status" aria-live="polite">
         {link.announce}
       </span>

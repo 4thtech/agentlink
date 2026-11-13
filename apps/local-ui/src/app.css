@@ -44,8 +44,7 @@ main.al-first-run {
 .set-state.is-good,
 .set-state.is-warn,
 .ag-kit,
-.rl-tag,
-.set-notice {
+.rl-tag {
   border: var(--al-border-width-thin) solid;
 }
 .set-state.is-good,
@@ -62,8 +61,7 @@ main.al-first-run {
 }
 .set-state.is-warn,
 .ag-kit.is-none,
-.rl-tag,
-.set-notice {
+.rl-tag {
   background: var(--al-color-status-warning-bg);
   color: var(--al-color-status-warning-fg);
   border-color: var(--al-color-status-warning-border);
