@@ -12,8 +12,10 @@ export const APPROVAL_STRINGS = Object.freeze({
   cannotApprove: "Your AI can't approve this for you.",
   notRunning: `AgentLink is not running. Open it again from your AI, or run ${CLI_PREFIX} approve in your own terminal.`,
   firstRunTitle: 'Protect your approvals',
-  firstRun:
-    'Approvals need you: each approval, or each list of approvals you review together, asks for your passkey or master code, and only after you click Approve. Never give them to your AI.',
+  // UX1113-N2 (PRESENCE-COPY): the sensor's own word, never "passkey" on a Mac or Windows.
+  get firstRun(): string {
+    return `Approvals need you: each approval, or each list of approvals you review together, asks for ${sensorWord()} or your master code, and only after you click Approve. Never give them to your AI.`;
+  },
   checkFailedTitle: "Couldn't check how approvals are protected",
   checkFailed: "AgentLink didn't answer just now. Nothing was changed.",
   retry: 'Try again',
@@ -30,7 +32,9 @@ export const APPROVAL_STRINGS = Object.freeze({
   needsOwnerTitle: 'Set up AgentLink',
   needsOwner:
     'Finish setting up AgentLink first: create your first ID on Home and save your master code. Until then, nothing can be approved here.',
-  noPasskeys: "Passkeys aren't available in this browser. Approve with your master code.",
+  get noPasskeys(): string {
+    return `${sensorSentence()} isn't available here. Approve with your master code.`;
+  },
   appTitle: 'Approvals',
   // UX2-a (B-11 §26.2): the Grid/List control.
   layout: 'Layout',
@@ -93,7 +97,9 @@ export const APPROVAL_STRINGS = Object.freeze({
     'Free means your messages travel over the network at no cost. Only proofs cost a small fee.',
   denied: 'Denied.',
   presenceRequired: 'Enter your master code. Nothing was changed.',
-  presenceRejected: "That didn't match your passkey or master code. Nothing was changed.",
+  get presenceRejected(): string {
+    return `That didn't match ${sensorWord()} or your master code. Nothing was changed.`;
+  },
   wait: `Too many wrong tries. Wait {seconds} seconds, then try again. Nothing was changed. You can also run ${CLI_PREFIX} approve in your own terminal.`,
   notPending: 'This request is no longer waiting for you.',
   listNotPending:

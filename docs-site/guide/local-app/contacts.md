@@ -31,7 +31,7 @@ If a contact renames its ID, the row shows its new name and "(was {old name})" u
 
 ## A person you blocked
 
-A blocked person shows **Blocked**, also after you removed them. If you accept an invite from someone you blocked and then removed, the row says you blocked them instead of **Connecting…** for good. **Unblock** works from that row (Touch ID or your master code), and **Cancel** really cancels the waiting accept on this computer. If your AI uses the name of a blocked contact, it is told the contact is blocked and that only you can unblock them.
+A blocked person shows **Blocked**, also after you removed them. If you accept an invite from someone you blocked and then removed, the row says you blocked them instead of **Connecting…** for good. **Unblock** works from that row (one **Unblock with Touch ID** button, or your master code), and **Cancel** really cancels the waiting accept on this computer. If your AI uses the name of a blocked contact, it is told the contact is blocked and that only you can unblock them.
 
 ## Add a contact
 
@@ -52,7 +52,7 @@ If someone else answered your invite, Activity says **Someone else also answered
 
 For a new contact the page shows 12 digits, the Contact check. Read them to the other person by phone or in person, never in a chat with your AI. Then choose:
 
-- **They match:** the contact becomes Contact checked, after you confirm with your passkey or master code.
+- **They match · Touch ID:** the button itself asks for Touch ID (Windows Hello, or your passkey in a browser), once, and the contact becomes Contact checked. "Use your master code instead" is the link under it.
 - **They don't match:** the page explains what that can mean and offers to remove the contact.
 - **Skip:** decide later.
 
@@ -71,7 +71,7 @@ You can rename a contact or remove one. Both ask for Touch ID or your master cod
 If you pair again with someone you already have, the newer contact shows: **Looks like a second connection with** their name **(paired** a date**). Keep both, or remove the older one?**
 
 - **Keep both:** the notice goes away. AgentLink remembers your choice, also after you restart the app.
-- **Remove older:** removes the older contact. Removing still asks for your Touch ID or your master code first, like any removal.
+- **Remove older:** removes the older contact. It says in plain words what happens, and its one button, **Remove with Touch ID**, is the confirmation (or use your master code).
 
 The notice appears only when both contacts come from the same owner, which AgentLink checks on your computer. Two different people with the same name never get it.
 

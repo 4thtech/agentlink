@@ -352,6 +352,9 @@ describe('Agents, simple (A8)', () => {
       window.dispatchEvent(new Event('agentlink:agents-changed'));
     });
     await settle();
+    // UX1113-N2: the banner's one button is the gesture; the master code opens its field.
+    expect(plain(document.body)).toContain('Resume with your master code');
+    await click(button(document.body, 'Resume with your master code'));
     expect(plain(document.body)).toContain('Resume Invoices');
     expect(document.body.querySelector('input[name="owner-code"]')).not.toBeNull();
   });
@@ -388,7 +391,7 @@ describe('Agents, simple (A8)', () => {
     await mount();
     const banner = document.body.querySelector<HTMLElement>('[data-paused-banner]')!;
     expect(banner.textContent).toContain('Personal is paused');
-    await click(button(banner, 'Resume with Touch ID'));
+    await click(button(banner, 'Resume with your master code'));
     expect(plain(document.body)).toContain('Resume Personal');
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
@@ -412,7 +415,7 @@ describe('Agents, simple (A8)', () => {
     await click(button(card('default'), 'Rename'));
     expect(card('default').textContent).toContain('People see this name.');
     await type(card('default').querySelector<HTMLInputElement>('input[type="text"]')!, 'Home');
-    await click(button(card('default'), 'Rename with Touch ID'));
+    await click(button(card('default'), 'Rename with your master code'));
     await type(code(), '123456');
     await click(button(document.body, 'Confirm with your master code'));
     expect(plain(document.body)).toContain(
@@ -426,7 +429,7 @@ describe('Agents, simple (A8)', () => {
     // UX1113-QA2 N1: the open ID (another one switches first).
     await click(button(card('default'), 'Rename'));
     await type(card('default').querySelector<HTMLInputElement>('input[type="text"]')!, 'Job');
-    await click(button(card('default'), 'Rename with Touch ID'));
+    await click(button(card('default'), 'Rename with your master code'));
     await type(code(), '123456');
     await click(button(document.body, 'Confirm with your master code'));
     expect(plain(document.body)).toMatch(/You can rename Personal again at \S/);
@@ -444,7 +447,7 @@ describe('Agents, simple (A8)', () => {
     await mount();
     const personal = card('default');
     expect(personal.textContent).toContain('Contacts still see My agent');
-    await click(button(personal, 'Update contacts'));
+    await click(button(personal, 'Update contacts with your master code'));
     await type(code(), '123456');
     await click(button(document.body, 'Confirm with your master code'));
     const [post] = posts('/api/ui/agents/label');
@@ -464,9 +467,9 @@ describe('Agents, simple (A8)', () => {
     };
     await mount();
     expect(card('default').textContent).not.toContain('Contacts still see');
-    expect(button(card('default'), 'Update contacts')).toBeUndefined();
+    expect(button(card('default'), 'Update contacts with your master code')).toBeUndefined();
     expect(card('default').textContent).toContain('New invites still show My agent');
-    expect(button(card('default'), 'Update name')).toBeDefined();
+    expect(button(card('default'), 'Update name with your master code')).toBeDefined();
   });
 
   it('AI apps: each app with its word, Connect or Disconnect, and the quit-first guidance', async () => {

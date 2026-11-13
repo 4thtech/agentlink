@@ -15,6 +15,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ApiClient, ApiResult } from '../../api/client.js';
 import type { OwnerClient, OwnerResult, PasskeyInfo, PresenceProof } from '../contacts/owner.js';
 import { CONTACTS_STRINGS as C } from '../contacts/strings.js';
+import type { NativeStatus } from '../../presence/native-api.js';
+import { DESKTOP_MARKER } from '../../presence/desktop.js';
 import { ConnectedMoment } from './connected.js';
 import { INVITE_STRINGS as S } from './strings.js';
 
@@ -79,6 +81,8 @@ async function show(
     readonly gestureProof?: PresenceProof | undefined;
     readonly passkey?: PasskeyInfo | undefined;
     readonly selfDeclared?: boolean;
+    readonly userAgent?: string;
+    readonly nativeStatus?: () => Promise<NativeStatus>;
   } = {},
 ): Promise<Rig> {
   const checks: string[] = [];
@@ -116,7 +120,8 @@ async function show(
         owner,
         gesture,
         platform: 'mac',
-        userAgent: 'Mozilla/5.0 (Macintosh)',
+        userAgent: options.userAgent ?? 'Mozilla/5.0 (Macintosh)',
+        ...(options.nativeStatus === undefined ? {} : { nativeStatus: options.nativeStatus }),
         checkDelayMs: 0,
       }),
     );
@@ -320,5 +325,39 @@ describe('ConnectedMoment naming (UX1113-N1)', () => {
     await click(save);
     expect(rig.gesture).not.toHaveBeenCalled();
     expect(host.querySelector('input[type="password"]')).not.toBeNull();
+  });
+
+  it('saved: focus moves to the "Saved." status (IR-N1 #8)', async () => {
+    await show();
+    await openNaming();
+    await type(field(), 'Natasa');
+    await click(byText(S.saveWith('Touch ID')));
+    expect(document.activeElement?.textContent).toBe(S.saved);
+  });
+
+  it('a held name also holds the master-code link (IR-N1 #7)', async () => {
+    const rig = await show({ check: () => ({ status: 'refused', reason: 'alias_taken' }) });
+    await openNaming();
+    await type(field(), 'Taken');
+    const link = byText(C.useCode);
+    expect(link.disabled).toBe(true);
+    await click(link);
+    expect(host.querySelector('input[type="password"], input[name="code"]')).toBeNull();
+    expect(rig.posts).toEqual([]);
+  });
+
+  it('the Mac app with Touch ID on: one click, no passkey gesture, one POST with the native proof (IR-N1 #9)', async () => {
+    const rig = await show({
+      userAgent: `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Electron/39.0 ${DESKTOP_MARKER}`,
+      nativeStatus: () => Promise.resolve({ available: true, registered: true }),
+    });
+    await openNaming();
+    await type(field(), 'Natasa');
+    await click(byText(S.saveWith('Touch ID')));
+    expect(rig.gesture).not.toHaveBeenCalled();
+    expect(rig.posts).toEqual([
+      [`/api/ui/contacts/${REF}/rename`, { alias: 'Natasa' }, { kind: 'native' }],
+    ]);
+    expect(text()).not.toMatch(/passkey|browser|Safari/i);
   });
 });

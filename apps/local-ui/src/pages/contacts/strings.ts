@@ -76,6 +76,17 @@ export const CONTACTS_STRINGS = {
   blockedNow: 'Blocked.',
   unblocked: 'Unblocked. Messages from this person arrive again.',
   cancel: 'Cancel',
+  // UX1113-N2: one owner step, one gesture. Each action's own button is the sensor.
+  renameWith: (sensor: string): string => `Rename with ${sensor}`,
+  renameWithCode: 'Rename with your master code',
+  removeWith: (sensor: string): string => `Remove with ${sensor}`,
+  removeWithCode: 'Remove with your master code',
+  blockWith: (sensor: string): string => `Block with ${sensor}`,
+  blockWithCode: 'Block with your master code',
+  unblockWith: (sensor: string): string => `Unblock with ${sensor}`,
+  unblockWithCode: 'Unblock with your master code',
+  matchWith: (sensor: string): string => `They match · ${sensor}`,
+  matchWithCode: 'They match · master code',
   presenceIntro: 'Confirm it’s you. Never give your master code to your AI.',
   get usePasskey(): string {
     return `Confirm with ${sensorWord()}`;

@@ -153,6 +153,14 @@ async function click(label: string): Promise<void> {
   await settle();
 }
 
+/** UX1113-N2: the name is checked while typing (debounced), before the one button can go. */
+async function checked(): Promise<void> {
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 400));
+  });
+  await settle();
+}
+
 async function type(selector: string, value: string): Promise<void> {
   const input = document.body.querySelector<HTMLInputElement>(selector);
   if (input === null) throw new Error(`no input ${selector}`);
@@ -258,7 +266,7 @@ describe('ContactsPage: the 12 digits (04 §3.6.1)', () => {
       CODE.replace(/\s/g, ''),
     );
     expect(text()).toContain('Want to be sure it’s really Marko Novak?');
-    expect(button(S.theyMatch)).toBeDefined();
+    expect(button(S.matchWithCode)).toBeDefined();
     expect(button(S.theyDontMatch)).toBeDefined();
     expect(button(S.skip)).toBeDefined();
   });
@@ -284,7 +292,7 @@ describe('ContactsPage: the 12 digits (04 §3.6.1)', () => {
     const calls = await mount(
       routes({ [`POST /api/ui/contacts/${MARKO}/check`]: { status: 'done' } }),
     );
-    await click(S.theyMatch);
+    await click(S.matchWithCode);
     expect(posts(calls)).toHaveLength(0);
     expect(document.body.querySelector('input[name="owner-code"]')).not.toBeNull();
     await confirmWithCode('ABCD-EFGH');
@@ -307,7 +315,7 @@ describe('ContactsPage: the 12 digits (04 §3.6.1)', () => {
     await click(S.theyDontMatch);
     expect(posts(calls)).toHaveLength(0);
     expect(text()).toContain(S.mismatchTitle);
-    await click(S.removeContact);
+    await click(S.removeWithCode);
     await confirmWithCode();
     const sent = posts(calls);
     expect(sent.map((c) => c.url)).toEqual([`/api/ui/contacts/${MARKO}/remove`]);
@@ -322,7 +330,7 @@ describe('ContactsPage: the 12 digits (04 §3.6.1)', () => {
         }),
       }),
     );
-    await click(S.theyMatch);
+    await click(S.matchWithCode);
     await confirmWithCode('WRONG');
     expect(text()).toContain(S.presenceRejected);
     expect(text()).not.toContain(S.matched);
@@ -332,7 +340,7 @@ describe('ContactsPage: the 12 digits (04 §3.6.1)', () => {
     await mount(
       routes({ [`POST /api/ui/contacts/${MARKO}/check`]: new Answer(409, { status: 'refused' }) }),
     );
-    await click(S.theyMatch);
+    await click(S.matchWithCode);
     await confirmWithCode();
     expect(text()).toContain(S.refused);
   });
@@ -354,7 +362,8 @@ describe('ContactsPage: rename and remove', () => {
     await openMenu();
     await click(S.rename);
     await type('input[name="alias"]', 'Ana K');
-    await click(S.saveName);
+    await checked();
+    await click(S.renameWithCode);
     await confirmWithCode();
     const sent = posts(calls);
     expect(sent.map((c) => c.url)).toEqual([`/api/ui/contacts/${ANA}/rename`]);
@@ -372,8 +381,9 @@ describe('ContactsPage: rename and remove', () => {
     await openMenu();
     await click(S.rename);
     await type('input[name="alias"]', 'Marko');
-    await click(S.saveName);
+    await checked();
     expect(text()).toContain(S.aliasTaken);
+    expect(button(S.renameWithCode).disabled).toBe(true);
     expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
     expect(posts(calls)).toHaveLength(0);
   });
@@ -387,7 +397,7 @@ describe('ContactsPage: rename and remove', () => {
     await click(S.remove);
     expect(posts(calls)).toHaveLength(0);
     expect(text()).toContain(S.removeExplain);
-    await click(S.removeContact);
+    await click(S.removeWithCode);
     await confirmWithCode();
     expect(posts(calls).map((c) => c.url)).toEqual([`/api/ui/contacts/${ANA}/remove`]);
   });
@@ -396,7 +406,7 @@ describe('ContactsPage: rename and remove', () => {
     const calls = await mount({ [LIST]: { status: 'ok', contacts: [ana] } });
     await openMenu();
     await click(S.remove);
-    await click(S.removeContact);
+    await click(S.removeWithCode);
     await click(S.cancel);
     expect(posts(calls)).toHaveLength(0);
     expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
@@ -416,7 +426,7 @@ describe('ContactsPage: block and unblock (WP-12)', () => {
     await click(S.block);
     expect(posts(calls)).toHaveLength(0);
     expect(text()).toContain(S.blockExplain);
-    await click(S.blockContact);
+    await click(S.blockWithCode);
     expect(text()).toContain('Block Ana.');
     await confirmWithCode();
     const sent = posts(calls);
@@ -425,7 +435,7 @@ describe('ContactsPage: block and unblock (WP-12)', () => {
     expect(text()).toContain(S.blockedNow);
   });
 
-  it('a blocked contact offers Unblock (not Block) in the menu; it asks for presence and posts /unblock', async () => {
+  it('a blocked contact offers one Unblock button (no Block); it asks for the master code and posts /unblock', async () => {
     const calls = await mount({
       [LIST]: { status: 'ok', contacts: [{ ...ana, status: 'blocked' }] },
       [`POST /api/ui/contacts/${ANA}/unblock`]: { status: 'done' },
@@ -435,9 +445,10 @@ describe('ContactsPage: block and unblock (WP-12)', () => {
     const items = [...document.body.querySelectorAll('[role="menuitem"]')].map(
       (i) => i.textContent,
     );
-    expect(items).toContain(S.unblock);
+    // UX1113-N2: Unblock is one button in the detail, not a menu step.
+    expect(items).not.toContain(S.unblock);
     expect(items).not.toContain(S.block);
-    await click(S.unblock);
+    await click(S.unblockWithCode);
     expect(text()).toContain('Unblock Ana.');
     await confirmWithCode();
     expect(posts(calls).map((c) => c.url)).toEqual([`/api/ui/contacts/${ANA}/unblock`]);
@@ -462,7 +473,7 @@ describe('ContactsPage: block and unblock (WP-12)', () => {
     expect(text()).not.toContain(S.blockExplain);
     await openMenu();
     await click(S.block);
-    await click(S.blockContact);
+    await click(S.blockWithCode);
     await click(S.cancel);
     expect(posts(calls)).toHaveLength(0);
     expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
@@ -593,7 +604,7 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
     expect(posts(calls)).toHaveLength(0);
     expect(document.body.querySelector('.ct-confirm')?.textContent).toContain(S.removeExplain);
     expect(document.body.querySelector('input[name="owner-code"]')).toBeNull();
-    await click(S.removeContact);
+    await click(S.removeWithCode);
     expect(posts(calls)).toHaveLength(0);
     expect(document.body.querySelector('input[name="owner-code"]')).not.toBeNull();
     await confirmWithCode();
@@ -604,7 +615,7 @@ describe('ContactsPage: a second connection with the same owner (M1-UX3-DUP-CONT
     const calls = await mount({ [LIST]: { status: 'ok', contacts: [OLD, NEW] } });
     await selectNewer();
     await click(S.removeOlder);
-    await click(S.removeContact);
+    await click(S.removeWithCode);
     expect(document.body.querySelector('input[name="owner-code"]')).not.toBeNull();
     await click(S.cancel);
     expect(posts(calls)).toHaveLength(0);
@@ -735,7 +746,7 @@ describe('ContactsPage: the Home link to the 12 digits (W5-SAFETY-STEP)', () => 
     );
     expect(location.search).toBe('');
     // Completion is still the signed "They match"; nothing here marks it done.
-    expect(button(S.theyMatch)).toBeDefined();
+    expect(button(S.matchWithCode)).toBeDefined();
   });
 
   it('without the marker, or with a stranger ref, no panel opens by itself', async () => {
