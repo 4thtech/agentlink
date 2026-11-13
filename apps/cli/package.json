@@ -36,7 +36,7 @@
     "dist/desktop-host.js"
   ],
   "scripts": {
-    "build": "tsc -b && vite build --config bundle.config.mjs && AGENTLINK_BUNDLE_ENTRY=desktop-host vite build --config bundle.config.mjs",
+    "build": "tsc -b && vite build --config bundle.config.mjs && vite build --config bundle.config.mjs --mode desktop-host",
     "typecheck": "tsc -p tsconfig.test.json",
     "lint": "eslint .",
     "test": "vitest run"

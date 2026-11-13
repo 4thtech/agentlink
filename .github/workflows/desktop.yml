@@ -9,9 +9,9 @@
 #   pull_request       only for a change under apps/desktop/**, apps/cli/src/desktop/** or this file.
 #
 # Jobs (4, well inside the Free-plan cap of 20 concurrent jobs)
-#   build   matrix: macos-14 arm64, macos-14 x64 (cross-build), windows-2022 x64.
+#   build   matrix: macos-26 arm64, macos-26 x64 (cross-build), windows-2022 x64.
 #           Builds the CLI tarball and the shell bundle, the native presence helper (macOS: the
-#           AgentLink.app helper bundle; Windows: MSVC via vcvars64), then the app with it, then runs on the built
+#           AgentLink.app helper bundle; Windows: MSVC via Enter-VsDevShell), then the app with it, then runs on the built
 #           binaries: check-fuses (fuse read-back and ASAR integrity), check-preview-string,
 #           check-switch-lockdown, check-tampered-asar, and the smoke test
 #           (apps/desktop/test/smoke/smoke.mjs). The x64 macOS binaries are launched only when
@@ -87,11 +87,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # macos-26 is the macOS label the other workflows use (ci.yml); the x64 app is
+          # cross-built on the arm64 runner.
           - target: mac-arm64
-            os: macos-14
+            os: macos-26
             arch: arm64
           - target: mac-x64
-            os: macos-14
+            os: macos-26
             arch: x64
           - target: win-x64
             os: windows-2022
@@ -150,17 +152,22 @@ jobs:
           node apps/desktop/build/native.mjs --arch "$ARCH" --out "$RUNNER_TEMP/native"
           test -d "$RUNNER_TEMP/native/AgentLink.app"
 
-      # Windows: cl.exe needs the MSVC environment, so the step runs vcvars64.bat (found with vswhere,
-      # both part of the runner's Visual Studio install) and then native.mjs in the same cmd session.
+      # Windows: cl.exe needs the MSVC environment. The step finds Visual Studio with vswhere and enters
+      # its developer shell (Enter-VsDevShell, x64), both part of the runner's Visual Studio install,
+      # then runs native.mjs in that PowerShell session (pwsh, not cmd: a failure stops the step).
       - name: Build the native presence helper (Windows)
         if: runner.os == 'Windows'
-        shell: cmd
+        shell: pwsh
         run: |
-          for /f "usebackq delims=" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSINSTALL=%%i"
-          if not defined VSINSTALL exit /b 1
-          call "%VSINSTALL%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
-          node apps\desktop\build\native.mjs --arch x64 --out "%RUNNER_TEMP%\native" || exit /b 1
-          if not exist "%RUNNER_TEMP%\native\agentlink-presence.exe" exit /b 1
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'Visual Studio with the x64 C++ tools was not found.' }
+          Import-Module (Join-Path $vs 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll')
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64'
+          node apps/desktop/build/native.mjs --arch x64 --out (Join-Path $env:RUNNER_TEMP 'native')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path (Join-Path $env:RUNNER_TEMP 'native\agentlink-presence.exe'))) { throw 'agentlink-presence.exe was not built.' }
 
       - name: Build the app (macOS)
         if: runner.os == 'macOS'
