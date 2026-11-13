@@ -371,6 +371,38 @@ describe('notarize → DELIVERED → OPENED → export → verify (acceptance, t
     expect(chain.creditOf(a.id)).toBe(9n * FEE_UNITS);
     expect(await ledger(a)).toHaveLength(1);
   });
+
+  it('RET-3 (OD-4): after a history delete the body is gone and the proof pack still verifies', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b, 'RET3 notarized body text');
+    const proof = await a.client.notarize({ envelopeId });
+    expect(proof).toMatchObject({ status: 'ok' });
+    await deliver(a, b);
+
+    for (const agent of [a, b]) {
+      const result = await agent.client.history.delete({ envelopeIds: [envelopeId], include: 'both' });
+      expect(result.messages).toMatchObject({ deleted: 1, notarized: 1 });
+      const row = await agent.store.transaction((tx) =>
+        tx.get('envelopes', { envelope_id: envelopeId }),
+      );
+      // The readable body goes; the signed ciphertext, the proof row and receipts stay.
+      expect(row?.payload_json).toBeNull();
+      expect(row?.envelope_json).not.toBeNull();
+      expect(row?.deleted_at).not.toBeNull();
+    }
+    expect((await proofRows(a)).some((r) => r.envelope_id === envelopeId)).toBe(true);
+    const exported = await a.client.exportProofPack({ envelopeId });
+    expect(exported.status).toBe('ok');
+    const pack = (exported as { pack: Record<string, unknown> }).pack;
+    expect(
+      await verifyProofPack(JSON.stringify(pack), {
+        chains: [{ config: chain.config, client: chain.client }],
+      }),
+    ).toMatchObject({ valid: true });
+    // The deleted message is gone from the readable views.
+    const page = await b.client.messages.list(a.id, 'in', { limit: 50 });
+    expect(page.items.map((m) => m.id)).not.toContain(envelopeId);
+  });
 });
 
 describe('kind mapping and what is never notarized (05 §3.1, D-86; 06 §2.4)', () => {
