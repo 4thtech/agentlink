@@ -222,6 +222,46 @@ describe('the file revealer (MSG-FILES-IO-h)', () => {
     expect(calls[0]?.options['windowsVerbatimArguments']).toBe(true);
   });
 
+  // CHORE-WIN-REVEAL-ARGS: explorer.exe parses its own command line. A path its parser could misread
+  // (over MAX_PATH, a segment ending in a dot or space, a character no Windows name holds) is never
+  // put after /select; the checked Inbox folder opens instead, still one quoted verbatim argument.
+  it.each([
+    ['over MAX_PATH', `C:\\Users\\me\\AgentLink\\Inbox\\${'a'.repeat(240)}.pdf`],
+    ['a trailing dot', 'C:\\Users\\me\\AgentLink\\Inbox\\report.'],
+    ['a trailing space', 'C:\\Users\\me\\AgentLink\\Inbox\\report.pdf '],
+    ['a forward slash', 'C:\\Users\\me\\AgentLink\\Inbox\\a/select,b.pdf'],
+    ['a control character', 'C:\\Users\\me\\AgentLink\\Inbox\\a\u0001b.pdf'],
+    ['a pipe', 'C:\\Users\\me\\AgentLink\\Inbox\\a|b.pdf'],
+    ['a second colon', 'C:\\Users\\me\\AgentLink\\Inbox\\a.pdf:stream'],
+    ['an empty segment', 'C:\\Users\\me\\AgentLink\\\\Inbox\\a.pdf'],
+  ])(
+    'on Windows a path with %s opens the folder instead (one quoted argument, no shell)',
+    async (_what, file) => {
+      const folder = 'C:\\Users\\me\\AgentLink\\Inbox, 2';
+      const { seams: s, calls } = seams('win32');
+      expect(await fileRevealerWith(s)(file, folder)).toBe(true);
+      expect(calls).toHaveLength(1);
+      expect(calls[0]?.file).toBe('C:\\Windows\\explorer.exe');
+      expect(calls[0]?.args).toEqual([`"${folder}"`]);
+      expect(calls[0]?.options['shell']).toBe(false);
+      expect(calls[0]?.options['windowsVerbatimArguments']).toBe(true);
+    },
+  );
+
+  it('on Windows a folder explorer.exe could misread is not opened either', async () => {
+    const file = `C:\\Inbox.\\${'a'.repeat(300)}.pdf`;
+    const { seams: s, calls } = seams('win32');
+    expect(await fileRevealerWith(s)(file, 'C:\\Inbox.')).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
+  it('on Windows a long but safe name still selects the file', async () => {
+    const file = `C:\\Users\\me\\AgentLink\\Inbox\\${'b'.repeat(200)}, (1).pdf`;
+    const { seams: s, calls } = seams('win32');
+    expect(await fileRevealerWith(s)(file, 'C:\\Users\\me\\AgentLink\\Inbox')).toBe(true);
+    expect(calls[0]?.args).toEqual([`/select,"${file}"`]);
+  });
+
   it('the verbatim Windows arguments are used only for the revealer', async () => {
     const { seams: s, calls } = seams('win32');
     expect(await browserOpenerWith(s)(URL_)).toBe(true);

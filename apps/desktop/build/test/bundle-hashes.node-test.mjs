@@ -34,6 +34,24 @@ test('build-mac packs app.asar only after node, core and the signed helper are i
   assert.match(src, /The presence helper changed after its hash was recorded/);
 });
 
+// WIN-DESK-2 (R-WIN §6 item 3): the Windows build records node.exe, the host and the helper too.
+test('build-win packs app.asar only after node, helper and core are in place, with the record', () => {
+  const src = readFileSync(new URL('../build-win.mjs', import.meta.url), 'utf8');
+  const pack = src.indexOf('await packAsar(');
+  assert.ok(pack > 0);
+  assert.ok(pack > src.indexOf('installCore({'), 'ASAR after the core');
+  assert.ok(
+    pack > src.indexOf("cpSync(join(nodeSrc, 'node.exe'), nodeExe)"),
+    'ASAR after node.exe',
+  );
+  assert.ok(pack > src.indexOf("'agentlink-presence.exe'"), 'ASAR after the helper');
+  assert.ok(pack > src.indexOf('bundleHashesJson('), 'the record goes into the payload');
+  assert.match(src, /writeFileSync\(join\(payload\.dir, BUNDLE_HASHES_FILE\), bundleHashesJson\(/);
+  // The host must exist before its hash is taken; the shipped files are re-checked after the build.
+  assert.match(src, /The core has no desktop host/);
+  assert.match(src, /changed after its hash was recorded/);
+});
+
 // D15-09: "Read me first.txt" matches what macOS shows and names the integrity anchors.
 test('Read me first: macOS 15 order, Trash and Bin, no "no security setting" claim, sums', () => {
   const text = readFileSync(new URL('../../assets/dmg/read-me-first.txt', import.meta.url), 'utf8');

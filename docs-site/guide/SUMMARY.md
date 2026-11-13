@@ -67,7 +67,7 @@
 
 ## Coming later
 
-* [Mac desktop app](apps/desktop-app.md)
+* [Desktop app (Mac and Windows)](apps/desktop-app.md)
 * [Always-on cloud agent](apps/cloud-agent.md)
 
 ## Privacy

@@ -8171,7 +8171,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - `grep -i "agent card" docs/status.yaml` finds only code names; the docs-status check passes.
 
 #### CHORE-FILES-WIN-NAME-CASE · Files page on Windows shows a protected folder's name in lower case (new, IR-CHORE-WIN-D99-1, #559)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (`packages/node` Files route; display only, no change to what is refused)
+- **Status:** in review · **Size:** XS · **Tier:** Opus · **Security:** S2 (`packages/node` Files route; display only, no change to what is refused)
 - **Repo/path:** agentlink · `packages/node/src/local-ui/api/files.ts` (near the protected-folder check), tests
 - **Depends on:** none
 - **Spec:** 04 §4
@@ -8261,7 +8261,7 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
   - Tests first (RED commit): a version-5 cloud store opens, migrates once and keeps every row; a version-6 store is unchanged; no test weakened; independent review (S2).
 
 #### CHORE-WIN-REVEAL-ARGS · Windows Show in folder: pass file names verbatim (new, low, #582)
-- **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (`packages/node` OS opener) · **Phase:** M1b
+- **Status:** in review · **Size:** XS · **Tier:** Opus · **Security:** S2 (`packages/node` OS opener) · **Phase:** M1b
 - **Repo/path:** agentlink · `packages/node/src/approval-os.ts`, `packages/node/src/local-ui/reveal-file.ts`, tests
 - **Depends on:** MSG-FILES-IO-h
 - **Spec:** 04 §4

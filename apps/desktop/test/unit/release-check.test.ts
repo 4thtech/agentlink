@@ -17,6 +17,8 @@ import {
   macDownloadUrl,
   parseReleaseVersion,
   releasePageUrl,
+  winAssetName,
+  winDownloadUrl,
 } from '../../src/shared/app-update.js';
 import {
   CHECK_STATE_FILE,
@@ -101,6 +103,26 @@ describe('versions', () => {
     for (const bad of ['', 'dev', '0.5.1-', '0.5.1-a b', '0.5.1-<x>', `0.5.1-${'a'.repeat(33)}`]) {
       expect(isAppVersion(bad), bad).toBe(false);
     }
+  });
+});
+
+// WIN-DESK-2 (R-WIN §6 item 7): Settings › Updates on Windows links the exact setup.exe of the
+// newer release (x64 only; Windows on Arm runs the x64 app emulated). No in-app swap on Windows.
+describe('the asset for Windows', () => {
+  it('names and links the setup.exe the release attaches, only from a plain version', () => {
+    expect(winAssetName('0.5.3')).toBe('AgentLink-0.5.3-win-x64-setup.exe');
+    expect(winDownloadUrl('0.5.3')).toBe(
+      'https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-win-x64-setup.exe',
+    );
+    expect(() => winDownloadUrl('0.5.3/../x')).toThrow();
+    expect(isDownloadUrlFor(winDownloadUrl('0.5.3'), '0.5.3')).toBe(true);
+    expect(isDownloadUrlFor(winDownloadUrl('0.5.3'), '0.5.4')).toBe(false);
+    expect(
+      isDownloadUrlFor(
+        'https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-win-arm64-setup.exe',
+        '0.5.3',
+      ),
+    ).toBe(false);
   });
 });
 
@@ -404,8 +426,35 @@ describe('the checker', () => {
     expect(h.checker.view().download).toBe(macDownloadUrl('0.5.2', 'x64'));
   });
 
-  it('Windows gets the release page (no Windows file name is guessed)', async () => {
+  it('Windows gets the exact setup.exe when the release has it (x64, also on Arm)', async () => {
+    const withWin = bytesOf(
+      release({
+        assets: [
+          { name: 'AgentLink-0.5.2-mac-arm64.dmg' },
+          { name: 'AgentLink-0.5.2-win-x64-setup.exe' },
+        ],
+      }),
+    );
+    for (const arch of ['x64', 'arm64']) {
+      const h = harness({ platform: 'win32', arch }, withWin);
+      await h.checker.check();
+      expect(h.checker.view()).toEqual({
+        state: 'available',
+        current: '0.5.1',
+        latest: '0.5.2',
+        download: winDownloadUrl('0.5.2'),
+      });
+    }
+  });
+
+  it('Windows is not offered a release without its setup.exe', async () => {
     const h = harness({ platform: 'win32', arch: 'x64' });
+    await h.checker.check();
+    expect(h.checker.view()).toMatchObject({ state: 'current', latest: '', download: '' });
+  });
+
+  it('Linux (no app yet) gets the release page', async () => {
+    const h = harness({ platform: 'linux', arch: 'x64' });
     await h.checker.check();
     expect(h.checker.view()).toMatchObject({
       state: 'available',

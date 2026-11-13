@@ -58,6 +58,8 @@ export interface UpdateView {
   readonly download: string;
   /** The link is this Mac's file (else the release page). */
   readonly macFile: boolean;
+  /** WIN-DESK-2: the link is the Windows setup file. */
+  readonly winFile: boolean;
   /** UPD-5: "Update now" can run here (the Mac app with the in-app update on). */
   readonly installable: boolean;
   /** UPD-5: the download's whole percentage (0 outside downloading). */
@@ -112,7 +114,16 @@ export function parseUpdate(data: unknown): UpdateView | undefined {
   const extra = { installable, percent, busy };
   if (!WITH_RELEASE.includes(st)) {
     if (latest !== '' || download !== '') return undefined;
-    return { state: st, install: how, current, latest: '', download: '', macFile: false, ...extra };
+    return {
+      state: st,
+      install: how,
+      current,
+      latest: '',
+      download: '',
+      macFile: false,
+      winFile: false,
+      ...extra,
+    };
   }
   if (typeof latest !== 'string' || !newer(latest, current) || typeof download !== 'string') {
     return undefined;
@@ -127,6 +138,7 @@ export function parseUpdate(data: unknown): UpdateView | undefined {
       latest,
       download: '',
       macFile: false,
+      winFile: false,
       ...extra,
     };
   }
@@ -135,6 +147,9 @@ export function parseUpdate(data: unknown): UpdateView | undefined {
     `${RELEASES}/download/v${latest}/AgentLink-${latest}-mac-x64.dmg`,
   ];
   const macFile = mac.includes(download);
-  if (!macFile && download !== `${RELEASES}/tag/v${latest}`) return undefined;
-  return { state: st, install: how, current, latest, download, macFile, ...extra };
+  // WIN-DESK-2: the Windows app's setup (x64 only).
+  const winFile =
+    download === `${RELEASES}/download/v${latest}/AgentLink-${latest}-win-x64-setup.exe`;
+  if (!macFile && !winFile && download !== `${RELEASES}/tag/v${latest}`) return undefined;
+  return { state: st, install: how, current, latest, download, macFile, winFile, ...extra };
 }

@@ -6,7 +6,7 @@ AgentLink, by 4thTech, lets AI agents in different AI apps exchange end-to-end e
 
 - It does everything the browser app does, with the same IDs, people, messages and approvals, and the Touch ID sheet shows the AgentLink name and icon.
 - It is an **early, unsigned build** for people who are happy to try it first. Apple has not checked it, so the Mac warns you the first time you open it. That warning does not mean something is wrong with the file.
-- Mac only, for both Apple chip (M1 and later) and Intel. The Windows desktop app is an early test build and not a download yet: on Windows use the browser app (one command). Linux has no desktop app yet.
+- Mac, for both Apple chip (M1 and later) and Intel. Since 0.5.3 also an early, unsigned Windows app (see "Windows" below); on Windows the browser app (one command) stays the main way. Linux has no desktop app yet.
 - It is not the always-on cloud agent, which is a different, planned thing.
 
 ## How do I get it?
@@ -41,6 +41,10 @@ Open Settings, Touch ID & master code, press **Use Touch ID for approvals**, typ
 ## Does the app show notifications?
 
 Yes, from 0.5.3, as real AgentLink notifications (its own name and icon). Each says one of four things: "Approval waiting", "New message", "File received" or "Update ready". Clicking one opens AgentLink at Home, or at Settings › Updates for an update. A notification never shows message text, a file's name or a link, and never approves anything. It says "From a contact" unless you turn on **Show names in notifications**, which uses only names you gave your contacts on People. At most one of each kind arrives every 30 seconds; more in between are counted into the next one. The Dock icon's number is how many approvals are waiting. Choose what you get in Settings › Notifications: Approvals waiting (on), New messages, Files received, Updates and Show names (off). While the desktop app runs, AgentLink shows no other approval alert for the ID you have open, so you never get two; other IDs keep their usual alert. If macOS asked and you said no, turn them on in System Settings › Notifications › AgentLink.
+
+## Is there a Windows app?
+
+Yes, from 0.5.3, as an early, unsigned build for Windows 10 and 11: download AgentLink-win-x64-setup.exe from https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe and open it. Windows may say "Windows protected your PC": choose More info, then Run anyway. It installs for you only (no administrator rights) and adds AgentLink to the Start menu. If Smart App Control (some Windows 11 computers) blocks it, use the browser app (one command) instead; never turn Smart App Control off. The browser app stays the main way on Windows. Updates: Settings › Updates links the new setup file; quit AgentLink (right-click its icon near the clock), open the file, open AgentLink again. The setup asks you to quit AgentLink if it is running. If your `.agentlink` folder gives access to other people on the computer (for example Everyone), the app does not start and says "Your AgentLink folder is shared"; remove the extra access in the folder's Properties › Security, then choose Try again. Remove the app in Settings › Apps.
 
 ## Other things to know
 

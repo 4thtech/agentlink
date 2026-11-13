@@ -72,6 +72,12 @@ export const strings = {
       which: 'Not sure? Apple menu → About This Mac → Chip.',
       note: 'This early build is not signed by Apple yet. The first time, right-click the app and choose Open.',
     },
+    /** WIN-DESK-1d: the Windows app, shown only when WIN_APP_AVAILABLE is on (config.ts). */
+    winApp: {
+      lead: 'Prefer an app? Download AgentLink for Windows (early build):',
+      link: 'AgentLink for Windows 10 or 11',
+      note: 'This early build is not signed yet. If Windows says it protected your PC, choose More info, then Run anyway.',
+    },
     /** WP-D9: next to the command, the desktop app link and its download page. */
     openApp: 'Open in the AgentLink app',
     getApp: 'Get the app (coming soon)',

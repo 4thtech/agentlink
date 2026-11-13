@@ -102,12 +102,13 @@
 #                   only after the approved publish-latest, so the release needs no second click.
 #   desktop-app-build    (WP-D11) calls desktop.yml for the published CLI version: the AgentLink app
 #                   for macOS arm64 + x64, unsigned, updates off until the key ceremony; checks, smoke
-#                   test, provenance attestation. No Windows app in the release (REL051-CIE: not
-#                   shipped yet; desktop.yml builds it only on a manual run with `windows: true`).
+#                   test, provenance attestation. WIN-DESK-1d: with the Windows app (unsigned early
+#                   build, win-x64 NSIS setup).
 #   desktop-app-release  after a green smoke-latest: checks the names and SHA256SUMS and attaches
-#                   the two DMGs and their sums to the GitHub Release v<version>
-#                   (AgentLink-<version>-mac-{arm64,x64}.dmg, SHA256SUMS-desktop-app.txt), plus
-#                   same-bytes copies under the stable names AgentLink-mac-{arm64,x64}.dmg (REL-LINKS-1).
+#                   the two DMGs, the Windows setup and their sums to the GitHub Release v<version>
+#                   (AgentLink-<version>-mac-{arm64,x64}.dmg, AgentLink-<version>-win-x64-setup.exe,
+#                   SHA256SUMS-desktop-app.txt), plus same-bytes copies under the stable names
+#                   AgentLink-mac-{arm64,x64}.dmg and AgentLink-win-x64-setup.exe (REL-LINKS-1, WIN-DESK-1d).
 #                   Only then, as its last step, does it mark the Release Latest, so the public links
 #                   .../releases/latest/download/AgentLink-mac-<arch>.dmg never 404 or go stale, and it
 #                   checks both with curl. The Release is created `--latest=false`. No environment and no
@@ -1271,8 +1272,8 @@ jobs:
           fi
           # BODY-LIMIT-END
           # Every Release body starts with a short "Download" section (DOCS-MAC-2): which file to download
-          # for which computer, then the changes under "What's new". The two DMGs are attached later by
-          # desktop-app-release under exactly these names.
+          # for which computer, then the changes under "What's new". The two DMGs and the Windows setup
+          # (WIN-DESK-1d) are attached later by desktop-app-release under exactly these names.
           # DOWNLOAD-BEGIN
           dl="https://github.com/$GITHUB_REPOSITORY/releases/download/v$version"
           docs="https://github.com/$GITHUB_REPOSITORY/blob/main/docs-site/guide"
@@ -1281,9 +1282,11 @@ jobs:
             printf '| Your computer | Download this |\n|---|---|\n'
             printf '| Mac with Apple chip (M1, M2, M3, M4) | [AgentLink-%s-mac-arm64.dmg](%s/AgentLink-%s-mac-arm64.dmg) |\n' "$version" "$dl" "$version"
             printf '| Mac with Intel chip | [AgentLink-%s-mac-x64.dmg](%s/AgentLink-%s-mac-x64.dmg) |\n' "$version" "$dl" "$version"
-            printf '| Windows or Linux | No download: [one command](%s/get-started/start-fast.md) |\n\n' "$docs"
-            printf 'Not sure which Mac? Apple menu, then **About This Mac**: "Chip: Apple M..." means Apple chip, "Processor: Intel" means Intel. In the file names, **arm64 = Apple chip** and **x64 = Intel**.\n\n'
-            printf '**Mac, first time:** 1) Open the .dmg and drag AgentLink to Applications. 2) Open AgentLink from Applications; macOS blocks it the first time, press **Done**. 3) **System Settings** > **Privacy & Security**, scroll down, press **Open Anyway** next to the AgentLink message, confirm when your Mac asks (Touch ID, or what you type to unlock your Mac), then **Open**. 4) You only do this once. AgentLink isn\047t signed with an Apple Developer ID yet; this is normal for early apps. [Full steps](%s/apps/desktop-app.md#open-it-the-first-time).\n\n' "$docs"
+            printf '| Windows 10 or 11 (early build) | [AgentLink-%s-win-x64-setup.exe](%s/AgentLink-%s-win-x64-setup.exe) |\n' "$version" "$dl" "$version"
+            printf '| Linux, or Windows without the app | No download: [one command](%s/get-started/start-fast.md) |\n\n' "$docs"
+            printf 'Not sure which Mac? Apple menu, then **About This Mac**. In the file names, **arm64 = Apple chip** and **x64 = Intel**.\n\n'
+            printf '**Mac, first time:** 1) Open the .dmg and drag AgentLink to Applications. 2) Open AgentLink from Applications; macOS blocks it the first time, press **Done**. 3) **System Settings** > **Privacy & Security**, scroll down, press **Open Anyway** next to the AgentLink message, confirm, then **Open**. 4) You only do this once. AgentLink isn\047t signed with an Apple Developer ID yet. [Full steps](%s/apps/desktop-app.md#open-it-the-first-time).\n\n' "$docs"
+            printf '**Windows, first time:** Windows may say "Windows protected your PC". Choose **More info**, then **Run anyway**. If Smart App Control blocks it, use the [one command](%s/get-started/windows.md).\n\n' "$docs"
             printf 'The other files (`.mcpb`, `SHA256SUMS`) are for AI-app extensions and checks. You don\047t need them.\n\n'
             printf '## What\047s new\n\n'
             cat "$notes"
@@ -1844,8 +1847,8 @@ jobs:
   # ---------------------------------------------------------------------------
   # WP-D11 (DESK051-C4): the AgentLink desktop app for the npm version just published. desktop.yml
   # builds it on macOS (arm64, x64), runs the hardening checks and the smoke test on the built
-  # binaries and attests build provenance. No Windows leg (REL051-CIE: the Windows app is not shipped
-  # yet; desktop.yml runs it only on a manual run with `windows: true`). UNSIGNED (signing stays off, D-91 is the
+  # binaries and attests build provenance, and the Windows app (WIN-DESK-1d: win-x64 NSIS setup, an
+  # early build; the browser app stays the Windows default). UNSIGNED (signing stays off, D-91 is the
   # owner's) and with updates OFF until the offline key ceremony (no update root key in the app, so
   # it never checks for updates; desktop.yml header). No secret is passed or referenced.
   desktop-app-build:
@@ -1864,11 +1867,12 @@ jobs:
   # Attaches the app to the GitHub Release v<version> after a green smoke test, under the exact names
   # the invite page links to (releases/download/v<version>/AgentLink-<version>-mac-{arm64,x64}.dmg),
   # plus SHA256SUMS-desktop-app.txt listing exactly the files attached (the extension's SHA256SUMS stays
-  # its own). The two DMGs and, since UPD-3, the two Mac zips (the in-app update installs the zip) ship;
-  # no Windows installer (REL051-CIE). Every file is checked against the sums written by the build jobs
+  # its own). The two DMGs, since UPD-3 the two Mac zips (the in-app update installs the zip), and
+  # since WIN-DESK-1d the Windows setup ship (no Windows zip). Every file is checked against the sums written by the build jobs
   # first. UPD-3: output `updates` is the update mode both Mac builds recorded (inputs-mac-*.json); the
   # update manifest jobs below run only when it is "on". REL-LINKS-1: it also uploads copies of
-  # the two DMGs named AgentLink-mac-{arm64,x64}.dmg (same bytes, listed in the sums), then marks the
+  # the two DMGs named AgentLink-mac-{arm64,x64}.dmg and of the setup named AgentLink-win-x64-setup.exe
+  # (same bytes, listed in the sums), then marks the
   # Release Latest (never a prerelease or draft) and checks the public latest/download links.
   desktop-app-release:
     name: desktop-app-release
@@ -1939,11 +1943,12 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Unexpected CLI version."; exit 1; }
-          dmgs=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" "AgentLink-$VERSION-mac-arm64.zip" "AgentLink-$VERSION-mac-x64.zip" )
+          dmgs=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" "AgentLink-$VERSION-mac-arm64.zip" "AgentLink-$VERSION-mac-x64.zip" "AgentLink-$VERSION-win-x64-setup.exe" )
           for f in "${dmgs[@]}"; do
             [ -f "$f" ] || { echo "::error::$f is missing."; exit 1; }
           done
-          # The build's sums must hold for every file it built; the release lists only the DMGs and zips.
+          # The build's sums must hold for every file it built; the release lists only the DMGs, the Mac
+          # zips and the Windows setup.
           sha256sum --check --strict SHA256SUMS
           : > SHA256SUMS-desktop-app.txt
           for f in "${dmgs[@]}"; do
@@ -1963,6 +1968,8 @@ jobs:
             cp -- "AgentLink-$VERSION-mac-$arch.dmg" "AgentLink-mac-$arch.dmg"
             printf '%s  %s\n' "$(sha256sum -- "AgentLink-mac-$arch.dmg" | cut -d ' ' -f 1)" "AgentLink-mac-$arch.dmg" >> SHA256SUMS-desktop-app.txt
           done
+          cp -- "AgentLink-$VERSION-win-x64-setup.exe" "AgentLink-win-x64-setup.exe"
+          printf '%s  %s\n' "$(sha256sum -- "AgentLink-win-x64-setup.exe" | cut -d ' ' -f 1)" "AgentLink-win-x64-setup.exe" >> SHA256SUMS-desktop-app.txt
           sha256sum --check --strict SHA256SUMS-desktop-app.txt
           cat SHA256SUMS-desktop-app.txt
 
@@ -1982,9 +1989,9 @@ jobs:
           gh release view "v$VERSION" --repo "$REPOSITORY" > /dev/null 2>&1 ||
             { echo "::error::GitHub Release v$VERSION does not exist, so the desktop app was not attached. Owner: create the release (docs/process/versioning.md §6), then re-run this job."; exit 1; }
           shopt -s nullglob
-          # The two DMGs, each under its versioned and its stable name, and the two zips (UPD-3, versioned
-          # name only: the signed update manifest links them). No Windows installer (REL051-CIE).
-          files=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" "AgentLink-$VERSION-mac-arm64.zip" "AgentLink-$VERSION-mac-x64.zip" "AgentLink-mac-arm64.dmg" "AgentLink-mac-x64.dmg" )
+          # The two DMGs and the Windows setup (WIN-DESK-1d), each under its versioned and its stable
+          # name, and the two zips (UPD-3, versioned name only: the signed update manifest links them).
+          files=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" "AgentLink-$VERSION-mac-arm64.zip" "AgentLink-$VERSION-mac-x64.zip" "AgentLink-$VERSION-win-x64-setup.exe" "AgentLink-mac-arm64.dmg" "AgentLink-mac-x64.dmg" "AgentLink-win-x64-setup.exe" )
           [ "${#files[@]}" -gt 0 ] || { echo "::error::No desktop app files to attach."; exit 1; }
           for f in "${files[@]}"; do
             grep -q -F -x -e "$(sha256sum -- "$f" | cut -d ' ' -f 1)  $f" SHA256SUMS-desktop-app.txt ||
@@ -2032,15 +2039,16 @@ jobs:
           gh release download "v$VERSION" --repo "$REPOSITORY" --dir ../verify-assets \
             --pattern "AgentLink-$VERSION-mac-arm64.dmg" --pattern "AgentLink-$VERSION-mac-x64.dmg" \
             --pattern "AgentLink-$VERSION-mac-arm64.zip" --pattern "AgentLink-$VERSION-mac-x64.zip" \
+            --pattern "AgentLink-$VERSION-win-x64-setup.exe" --pattern AgentLink-win-x64-setup.exe \
             --pattern AgentLink-mac-arm64.dmg --pattern AgentLink-mac-x64.dmg --pattern SHA256SUMS-desktop-app.txt
           (
             cd ../verify-assets
-            [ "$(wc -l < SHA256SUMS-desktop-app.txt)" -eq 6 ] || { echo "::error::SHA256SUMS-desktop-app.txt must list exactly 6 files."; exit 1; }
+            [ "$(wc -l < SHA256SUMS-desktop-app.txt)" -eq 8 ] || { echo "::error::SHA256SUMS-desktop-app.txt must list exactly 8 files."; exit 1; }
             sha256sum --check --strict SHA256SUMS-desktop-app.txt
           )
-          # A HEAD request follows the redirect to the file; the size must be plausible for a Mac app.
-          for arch in arm64 x64; do
-            url="https://github.com/$REPOSITORY/releases/download/v$VERSION/AgentLink-mac-$arch.dmg"
+          # A HEAD request follows the redirect to the file; the size must be plausible for the app.
+          for file in AgentLink-mac-arm64.dmg AgentLink-mac-x64.dmg AgentLink-win-x64-setup.exe; do
+            url="https://github.com/$REPOSITORY/releases/download/v$VERSION/$file"
             ok=false
             for _ in 1 2 3 4 5 6; do
               headers="$(curl -sIL --max-time 60 "$url" | tr -d '\r' || true)"
@@ -2049,8 +2057,8 @@ jobs:
               if [ "$code" = "200" ] && [ "$size" -gt 20000000 ]; then ok=true; break; fi
               sleep 10
             done
-            [ "$ok" = "true" ] || { echo "::error::v$VERSION AgentLink-mac-$arch.dmg answered '$code' with size $size; the Release was not marked Latest."; exit 1; }
-            echo "v$VERSION AgentLink-mac-$arch.dmg: 200, $size bytes."
+            [ "$ok" = "true" ] || { echo "::error::v$VERSION $file answered '$code' with size $size; the Release was not marked Latest."; exit 1; }
+            echo "v$VERSION $file: 200, $size bytes."
           done
 
       # REL-LINKS-1: the last step that changes the Release. Never a prerelease or a draft, and only the
@@ -2089,8 +2097,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for arch in arm64 x64; do
-            url="https://github.com/$GITHUB_REPOSITORY/releases/latest/download/AgentLink-mac-$arch.dmg"
+          for file in AgentLink-mac-arm64.dmg AgentLink-mac-x64.dmg AgentLink-win-x64-setup.exe; do
+            url="https://github.com/$GITHUB_REPOSITORY/releases/latest/download/$file"
             ok=false
             for _ in 1 2 3 4 5 6; do
               headers="$(curl -sIL --max-time 60 "$url" | tr -d '\r' || true)"
@@ -2099,8 +2107,8 @@ jobs:
               if [ "$code" = "200" ] && [ "$size" -gt 20000000 ]; then ok=true; break; fi
               sleep 10
             done
-            [ "$ok" = "true" ] || { echo "::error::latest/download/AgentLink-mac-$arch.dmg answered '$code' with size $size."; exit 1; }
-            echo "AgentLink-mac-$arch.dmg: 200, $size bytes."
+            [ "$ok" = "true" ] || { echo "::error::latest/download/$file answered '$code' with size $size."; exit 1; }
+            echo "$file: 200, $size bytes."
           done
 
   # ---------------------------------------------------------------------------

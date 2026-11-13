@@ -188,7 +188,7 @@ function InApp({
 
 function Ready({ view }: { readonly view: UpdateView }): ReactElement {
   if (view.install !== 'desktop') return <BrowserReady view={view} />;
-  const steps = view.macFile ? S.macSteps : S.otherSteps;
+  const steps = view.macFile ? S.macSteps : view.winFile ? S.winSteps : S.otherSteps;
   const failed = view.state === 'install_failed';
   return (
     <Surface as="section" level={1} className="upd-card upd-ready" aria-labelledby="upd-ready-t">

@@ -40,6 +40,9 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, [switch]$Desktop, $
   $DesktopReleased = $false
   $DesktopVersion = '0.0.0'
   $DesktopReleases = 'https://github.com/4thtech/agentlink/releases/download'
+  # WIN-DESK-1d: until the hash is pinned here, -Desktop points to the early Windows app's download
+  # (a browser download: SmartScreen checks it).
+  $DesktopNotYet = 'The installer does not install the AgentLink desktop app yet. Download the early Windows app from https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe (if Windows says it protected your PC, choose More info, then Run anyway), or run the installer without -Desktop.'
 
   function Get-AgentLinkPlatform([string]$Arch) {
     switch ($Arch) {
@@ -429,7 +432,7 @@ param([switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, [switch]$Desktop, $
   # brings its own. Nothing here touches the mark of the web or SmartScreen.
   function Install-AgentLinkDesktop {
     param([string]$ProgramsDir, [string]$Arch, [switch]$DryRun, [switch]$Uninstall, [switch]$NoStart, [switch]$Interactive, [string]$Invite)
-    if (-not $DesktopReleased) { throw 'The AgentLink desktop app is not released yet. Run the installer without -Desktop.' }
+    if (-not $DesktopReleased) { throw $DesktopNotYet }
     if ($Uninstall) { throw "-Desktop can't be used with -Uninstall. To remove the app, use Settings, Apps, AgentLink, Uninstall." }
     if ($Invite) { Assert-InviteLink $Invite }
     $platform = Get-AgentLinkPlatform $Arch

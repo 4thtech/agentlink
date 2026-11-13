@@ -8,7 +8,8 @@
 //   development build says `0.0.0-dev`); such a build is never offered anything.
 // - Links: built here from a checked version and a fixed architecture word, never taken from the
 //   network. The Mac file names are the ones the release attaches (release.yml, build-mac.mjs):
-//   AgentLink-<version>-mac-<arm64|x64>.dmg. Other platforms get the release page.
+//   AgentLink-<version>-mac-<arm64|x64>.dmg; Windows (WIN-DESK-2) AgentLink-<version>-win-x64-setup.exe.
+//   Other platforms get the release page.
 
 /** What the Settings page can show (fixed words; the copy lives in the page). */
 export const APP_UPDATE_STATES = [
@@ -100,6 +101,19 @@ export function macDownloadUrl(version: string, arch: MacArch): string {
   return `${RELEASES}/download/v${checked(version)}/${macAssetName(version, arch)}`;
 }
 
+/**
+ * WIN-DESK-2: the Windows setup the release attaches (release.yml, build-win.mjs). x64 only: Windows
+ * on Arm runs the x64 app emulated. No in-app update on Windows in this release: the link only.
+ */
+export function winAssetName(version: string): string {
+  return `AgentLink-${checked(version)}-win-x64-setup.exe`;
+}
+
+/** The exact release file for Windows. */
+export function winDownloadUrl(version: string): string {
+  return `${RELEASES}/download/v${checked(version)}/${winAssetName(version)}`;
+}
+
 /** The release page (other platforms). */
 export function releasePageUrl(version: string): string {
   return `${RELEASES}/tag/v${checked(version)}`;
@@ -111,6 +125,7 @@ export function isDownloadUrlFor(url: unknown, version: string): boolean {
   return (
     url === macDownloadUrl(version, 'arm64') ||
     url === macDownloadUrl(version, 'x64') ||
+    url === winDownloadUrl(version) ||
     url === releasePageUrl(version)
   );
 }

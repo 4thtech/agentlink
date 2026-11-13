@@ -120,6 +120,8 @@ function linkFor(url: unknown, version: string): boolean {
   return (
     url === `${RELEASES}/download/v${version}/AgentLink-${version}-mac-arm64.dmg` ||
     url === `${RELEASES}/download/v${version}/AgentLink-${version}-mac-x64.dmg` ||
+    // WIN-DESK-2: the Windows app's setup (x64; no in-app update on Windows).
+    url === `${RELEASES}/download/v${version}/AgentLink-${version}-win-x64-setup.exe` ||
     url === `${RELEASES}/tag/v${version}`
   );
 }

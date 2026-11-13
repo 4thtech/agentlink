@@ -18,7 +18,7 @@ $found = $ast.FindAll({
 foreach ($statement in $found) {
   $isFunction = $statement -is [System.Management.Automation.Language.FunctionDefinitionAst]
   $isSetting = $statement -is [System.Management.Automation.Language.AssignmentStatementAst] -and
-    @('$NodeVersion', '$Package', '$DesktopReleased', '$DesktopVersion', '$DesktopReleases') -contains $statement.Left.Extent.Text
+    @('$NodeVersion', '$Package', '$DesktopReleased', '$DesktopVersion', '$DesktopReleases', '$DesktopNotYet') -contains $statement.Left.Extent.Text
   if ($isFunction -or $isSetting) { . ([scriptblock]::Create($statement.Extent.Text)) }
 }
 
@@ -311,7 +311,7 @@ function Protect-Directory([string]$Path) {
 function New-Programs { $script:roots++; $script:Programs = Join-Path $Work "programs$($script:roots)"; return $script:Programs }
 
 Check 'the desktop app ships switched off' { $DesktopReleased -eq $false }
-Expect-Throw 'switched off: -Desktop is refused with one fixed line' '^The AgentLink desktop app is not released yet\. Run the installer without -Desktop\.$' {
+Expect-Throw 'switched off: -Desktop is refused with one fixed line' '^The installer does not install the AgentLink desktop app yet\. Download the early Windows app from https://github\.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup\.exe \(if Windows says it protected your PC, choose More info, then Run anyway\), or run the installer without -Desktop\.$' {
   Install-AgentLinkDesktop -ProgramsDir (New-Programs) -Arch 'AMD64' -Invite $short
 }
 Check '... before anything is downloaded or run' {

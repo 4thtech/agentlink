@@ -30,3 +30,12 @@ const macAppUrl = (arch: 'arm64' | 'x64'): string =>
   `https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-${arch}.dmg`;
 
 export const MAC_APP_URLS = { arm64: macAppUrl('arm64'), x64: macAppUrl('x64') } as const;
+
+/**
+ * WIN-DESK-1d (owner, 0.5.3): the Windows app, an unsigned early build. Shown under the Windows
+ * choice only; the command stays the first way on Windows. Its link is the stable name on the newest
+ * Release marked Latest (`AgentLink-win-x64-setup.exe`), uploaded before that flip (release.yml).
+ */
+export const WIN_APP_AVAILABLE = true;
+export const WIN_APP_URL =
+  'https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe';

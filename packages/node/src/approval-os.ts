@@ -402,6 +402,26 @@ function revealablePath(p: string, platform: NodeJS.Platform): boolean {
   return platform === 'win32' ? /^[A-Za-z]:\\/.test(p) && !p.includes('"') : p.startsWith('/');
 }
 
+/** The longest path explorer.exe takes without long-path support (MAX_PATH, without the NUL). */
+const EXPLORER_MAX_PATH = 259;
+
+/**
+ * CHORE-WIN-REVEAL-ARGS: a drive path that explorer.exe's own command-line parser reads as exactly
+ * that path once quoted: at most MAX_PATH, every segment non-empty and not `.` or `..`, no segment
+ * ending in a dot or space (Windows would name another object), and no character a Windows name
+ * cannot hold (`"`, `/`, `:` after the drive, `<>|?*`, controls). Commas, semicolons, `=` and spaces
+ * are safe inside the quotes.
+ */
+function explorerSafe(p: string): boolean {
+  if (p.length > EXPLORER_MAX_PATH || !/^[A-Za-z]:\\[^\\]/.test(p)) return false;
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f"/:<>|?*]/.test(p.slice(2))) return false;
+  return p
+    .slice(3)
+    .split('\\')
+    .every((s) => s !== '' && s !== '.' && s !== '..' && !/[. ]$/.test(s));
+}
+
 /**
  * The revealer over `seams`: macOS `open -R <file>` (Finder selects it), Windows
  * `explorer.exe /select,"<file>"` (exits 1 even when it worked), elsewhere `xdg-open <folder>` (no
@@ -409,6 +429,9 @@ function revealablePath(p: string, platform: NodeJS.Platform): boolean {
  * path as its own argument. explorer.exe parses its own command line and splits on commas, so on
  * Windows the path is quoted here and passed verbatim (windowsVerbatimArguments, still no shell); it
  * holds no `"` (revealablePath), so the quotes cannot be closed early (CHORE-MAIN-NODEOS-040).
+ * CHORE-WIN-REVEAL-ARGS: a file path explorer.exe could misread (explorerSafe) is never put after
+ * `/select`; the checked Inbox folder opens instead (`explorer.exe "<folder>"`, the same single
+ * quoted verbatim argument), and when the folder is not explorerSafe either, nothing is run.
  */
 export function fileRevealerWith(seams: OsSeams): FileRevealer {
   return (file, folder) => {
@@ -419,7 +442,13 @@ export function fileRevealerWith(seams: OsSeams): FileRevealer {
       case 'darwin':
         return run(seams, OS_PROGRAMS.darwinOpen, ['-R', file]);
       case 'win32':
-        return run(seams, windowsExplorer(seams.env), [`/select,"${file}"`], true, true);
+        if (explorerSafe(file)) {
+          return run(seams, windowsExplorer(seams.env), [`/select,"${file}"`], true, true);
+        }
+        if (explorerSafe(folder)) {
+          return run(seams, windowsExplorer(seams.env), [`"${folder}"`], true, true);
+        }
+        return Promise.resolve(false);
       default:
         return run(seams, OS_PROGRAMS.linuxOpen, [folder]);
     }

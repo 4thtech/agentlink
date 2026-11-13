@@ -124,7 +124,15 @@ describe('install.ps1 source', () => {
     );
     // -Desktop goes to Install-AgentLinkDesktop, whose first line is the switch.
     expect(source).toMatch(
-      /function Install-AgentLinkDesktop \{\n\s*param\([^\n]*\)\n\s*if \(-not \$DesktopReleased\) \{ throw 'The AgentLink desktop app is not released yet\./,
+      /function Install-AgentLinkDesktop \{\n\s*param\([^\n]*\)\n\s*if \(-not \$DesktopReleased\) \{ throw \$DesktopNotYet \}/,
+    );
+  });
+
+  // WIN-DESK-1d: the early Windows app is a browser download (stable latest link) until the installer
+  // pins its hash; the refusal says where to get it, with the SmartScreen step.
+  it('points -Desktop to the early Windows app by its stable link', () => {
+    expect(source).toContain(
+      "  $DesktopNotYet = 'The installer does not install the AgentLink desktop app yet. Download the early Windows app from https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe (if Windows says it protected your PC, choose More info, then Run anyway), or run the installer without -Desktop.'\n",
     );
   });
 

@@ -18,6 +18,12 @@ export const UPDATES_STRINGS = {
     'Drag AgentLink to the Applications folder and choose Replace.',
     'Open AgentLink again.',
   ],
+  // WIN-DESK-2: the Windows app (unsigned early build: SmartScreen asks once per new file).
+  winSteps: [
+    'Quit AgentLink: right-click its icon near the clock and choose Quit AgentLink.',
+    'Open the file you downloaded. If Windows says it protected your PC, choose More info, then Run anyway.',
+    'Open AgentLink again from the Start menu.',
+  ],
   otherSteps: [
     'On the page that opens, download AgentLink for your computer.',
     'Open the file and follow its steps.',

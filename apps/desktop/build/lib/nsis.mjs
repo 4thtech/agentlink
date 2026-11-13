@@ -91,6 +91,43 @@ aumid_link:
 aumid_done:
 FunctionEnd
 
+; WIN-DESK-2 (R-WIN §6 item 11): AgentLink's files are in use while it runs, so install and uninstall
+; first check that it is not running. A running .exe cannot be opened for writing; FileOpen in append
+; mode only opens it (nothing is written, nothing is closed by force). Retry checks again; a silent
+; run (/S) stops with an error instead of waiting.
+!macro CHECK_NOT_RUNNING UN
+Function \${UN}CheckNotRunning
+  check_again:
+  ClearErrors
+  IfFileExists "$INSTDIR\\${exe}" 0 +4
+    FileOpen $R0 "$INSTDIR\\${exe}" a
+    IfErrors is_running
+    FileClose $R0
+  ClearErrors
+  IfFileExists "$INSTDIR\\resources\\node\\node.exe" 0 +4
+    FileOpen $R0 "$INSTDIR\\resources\\node\\node.exe" a
+    IfErrors is_running
+    FileClose $R0
+  Return
+  is_running:
+  IfSilent 0 +3
+    SetErrorLevel 2
+    Quit
+  MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "AgentLink is running.$\\r$\\n$\\r$\\nQuit AgentLink first: right-click its icon near the clock and choose Quit AgentLink. Then choose Retry." IDRETRY check_again
+  Quit
+FunctionEnd
+!macroend
+!insertmacro CHECK_NOT_RUNNING ""
+!insertmacro CHECK_NOT_RUNNING "un."
+
+Function .onInit
+  Call CheckNotRunning
+FunctionEnd
+
+Function un.onInit
+  Call un.CheckNotRunning
+FunctionEnd
+
 Section "Uninstall"
   DeleteRegKey HKCU "Software\\Classes\\agentlink"
   DeleteRegKey HKCU "${uninstKey}"

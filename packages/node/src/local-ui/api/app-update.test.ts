@@ -27,6 +27,24 @@ import {
 
 const DMG =
   'https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-mac-arm64.dmg';
+// WIN-DESK-2: the Windows app's link is the exact setup.exe of the newer release.
+const EXE =
+  'https://github.com/4thtech/agentlink/releases/download/v0.5.2/AgentLink-0.5.2-win-x64-setup.exe';
+
+describe('the Windows setup link (WIN-DESK-2)', () => {
+  it('is accepted for the desktop app, and only in its exact form', () => {
+    // No in-app update on Windows in this release: the link only.
+    const extra = { ...AVAILABLE, download: EXE, installable: false, percent: 0 };
+    expect(appUpdateBody(extra, 'desktop')?.download).toBe(EXE);
+    for (const bad of [
+      EXE.replace('win-x64', 'win-arm64'),
+      EXE.replace('v0.5.2/AgentLink-0.5.2', 'v0.5.2/AgentLink-0.5.3'),
+      `${EXE}#x`,
+    ]) {
+      expect(appUpdateBody({ ...extra, download: bad }, 'desktop'), bad).toBeUndefined();
+    }
+  });
+});
 const AVAILABLE: AppUpdateView = {
   state: 'available',
   current: '0.5.1',

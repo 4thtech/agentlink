@@ -67,3 +67,30 @@ test('N7 (IR-N7-1 M-1): the Start menu shortcut carries the app’s AppUserModel
   assert.match(fn, /\$3->6\(p 0, i 1\)/);
   assert.doesNotMatch(s, /WinShell::|!addplugindir/);
 });
+
+// WIN-DESK-2 (R-WIN §6 item 11): install and uninstall stop while AgentLink runs (its files are in
+// use), with a fixed message and Retry; a silent run fails instead of waiting.
+test('install and uninstall check for a running copy first', () => {
+  const s = nsisScript({ version: '0.5.3', sourceDir: 'a', outFile: 'b' });
+  for (const [fn, init] of [
+    ['Function .onInit', 'Call CheckNotRunning'],
+    ['Function un.onInit', 'Call un.CheckNotRunning'],
+  ]) {
+    const at = s.indexOf(fn);
+    assert.ok(at >= 0, fn);
+    assert.ok(s.slice(at, s.indexOf('FunctionEnd', at)).includes(init), init);
+  }
+  const check = s.slice(s.indexOf('!macro CHECK_NOT_RUNNING'), s.indexOf('!macroend'));
+  // An exe that is running cannot be opened for writing; nothing is written or closed by force.
+  for (const file of ['$INSTDIR\\AgentLink.exe', '$INSTDIR\\resources\\node\\node.exe']) {
+    assert.ok(check.includes(`IfFileExists "${file}"`), file);
+    assert.ok(check.includes(`FileOpen $R0 "${file}" a`), file);
+  }
+  assert.match(check, /MB_RETRYCANCEL/);
+  assert.match(check, /IfSilent/);
+  assert.ok(check.includes('AgentLink is running.'));
+  assert.ok(check.includes('Quit AgentLink'));
+  assert.doesNotMatch(check, /FileWrite|taskkill|KillProc|Delete /);
+  assert.ok(s.includes('!insertmacro CHECK_NOT_RUNNING ""'));
+  assert.ok(s.includes('!insertmacro CHECK_NOT_RUNNING "un."'));
+});

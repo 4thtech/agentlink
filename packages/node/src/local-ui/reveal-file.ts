@@ -20,7 +20,9 @@
 // 5. That handle is checked: a regular file, and the path still names it (realpath equals the joined
 //    path, and its device and inode equal the handle's). Any doubt is `refused`. The handle is closed.
 // 6. Only then the checked path (and the folder, for Linux) goes to the OS revealer, which runs a
-//    fixed program by absolute path with the path as one argument, never through a shell.
+//    fixed program by absolute path with the path as one argument, never through a shell. On
+//    Windows a path explorer.exe's own parser could misread is not selected; the checked folder
+//    opens instead (CHORE-WIN-REVEAL-ARGS, approval-os.ts explorerSafe).
 //
 // Residuals (threat note in the PR): the revealer gets a path, not the handle, so a same-user process
 // could swap the file between step 5 and the reveal; the OS file manager then only selects whatever

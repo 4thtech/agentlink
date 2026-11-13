@@ -1,6 +1,6 @@
-# Mac desktop app
+# Desktop app (Mac and Windows)
 
-*Applies to AgentLink 0.5.3. This is an early, unsigned build, meant for people who are happy to try it first. The Windows desktop app is an early test build and not a download yet; on Windows, use the browser app (one command). Linux is not available yet.*
+*Applies to AgentLink 0.5.1 (Mac) and 0.5.3 (Windows). These are early, unsigned builds, meant for people who are happy to try them first. On Windows the browser app (one command) stays the main way; the [Windows app](#windows) is an early build. Linux is not available yet.*
 
 ## Which file do I download?
 
@@ -8,7 +8,8 @@
 |---|---|
 | Mac with Apple chip (M1, M2, M3, M4) | **[AgentLink-mac-arm64.dmg](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-arm64.dmg)** |
 | Mac with Intel chip | **[AgentLink-mac-x64.dmg](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-x64.dmg)** |
-| Windows or Linux | No app to download: use the [one command](../get-started/start-fast.md) |
+| Windows 10 or 11 (early build) | **[AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe)**, see [Windows](#windows) |
+| Linux, or Windows without the app | No app to download: use the [one command](../get-started/start-fast.md) |
 
 Not sure which Mac? Click the Apple menu (top left of your screen), then **About This Mac**. "Chip: Apple M…" means Apple chip; "Processor: Intel" means Intel. In the file names, **arm64 = Apple chip** and **x64 = Intel**.
 
@@ -49,7 +50,21 @@ That command only removes the "downloaded from the internet" mark from this one 
 
 ## Windows
 
-The Windows desktop app is an early build (0.5.3 fixed its core starting) and is built by hand for testing; it is not a download yet. On Windows, use the browser app: one command installs AgentLink and opens it in your browser. See [Windows](../get-started/windows.md). Like any file few people have downloaded, a Windows app can make SmartScreen ask you to confirm it.
+*Applies to AgentLink 0.5.3.* There is an **early Windows app** for Windows 10 and 11 (64-bit; it also runs on Windows on Arm). It is not signed yet. The browser app is still the main way on Windows: one command installs AgentLink and opens it in your browser, see [Windows](../get-started/windows.md). Use the app if you prefer AgentLink in its own window.
+
+1. **Download** [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe). It is also on the [latest release](https://github.com/4thtech/agentlink/releases/latest) under **Assets**, with its fingerprint in `SHA256SUMS-desktop-app.txt` (check it with `certutil -hashfile AgentLink-win-x64-setup.exe SHA256` if you like).
+2. **Open the file.** Windows may say "Windows protected your PC". That is SmartScreen: it shows for files few people have downloaded yet. Choose **More info**, then **Run anyway**. You only do this once per download.
+3. The setup installs AgentLink for you only (no administrator rights) and adds it to the Start menu. Open **AgentLink** from the Start menu.
+
+**Smart App Control.** On some Windows 11 computers Smart App Control is on, and it blocks apps that are not signed, with no way to allow them. If AgentLink does not open and Windows says Smart App Control blocked it, use the browser app (the one command) instead. Never turn Smart App Control off for AgentLink.
+
+**Good to know on Windows:**
+- Closing the window keeps AgentLink running near the clock (the system tray). Quit it there: right-click its icon, then **Quit AgentLink**.
+- **Updating:** Settings › **Updates** shows when a newer version is out and links the new setup file. Quit AgentLink, open the file, and open AgentLink again. Your IDs, contacts and messages stay.
+- If AgentLink is running when you install a new version or remove it, the setup asks you to quit it first.
+- **Your AgentLink folder** (`.agentlink` in your user folder) must be yours alone. Windows gives a folder there to you, SYSTEM and Administrators, and AgentLink accepts exactly that. If someone gave other people access to it (for example Everyone or Users), AgentLink does not start and says "Your AgentLink folder is shared": right-click the folder, **Properties**, **Security**, remove everyone except you, SYSTEM and Administrators, then choose **Try again**.
+- **Remove it** in **Settings** › **Apps** › **AgentLink** › **Uninstall**. Your IDs, contacts and messages are kept.
+- Windows Hello for approvals is new on Windows: if it does not work for you, use your master code and tell us.
 
 ## Closing and quitting
 
