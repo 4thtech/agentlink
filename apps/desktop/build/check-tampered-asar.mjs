@@ -22,6 +22,7 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { capture, parseArgs } from './lib/run.mjs';
 import { tamperAsarHeader } from './lib/tamper.mjs';
+import { throwAwayEnv } from './lib/throwaway-env.mjs';
 
 const args = parseArgs(process.argv.slice(2), { app: 'v', 'timeout-ms': 'v', 'control-ms': 'v' });
 if (!args.app) throw new Error('--app <AgentLink.app | AgentLink.exe> is required.');
@@ -36,17 +37,8 @@ const controlMs = Number(args['control-ms'] ?? 6000);
 const tmp = mkdtempSync(join(process.env.RUNNER_TEMP || tmpdir(), 'agentlink-tamper-'));
 const home = join(tmp, 'home');
 mkdirSync(home, { recursive: true });
-const env = {
-  PATH: process.env.PATH,
-  SystemRoot: process.env.SystemRoot,
-  HOME: home,
-  USERPROFILE: home,
-  APPDATA: join(home, 'AppData', 'Roaming'),
-  LOCALAPPDATA: join(home, 'AppData', 'Local'),
-  TMPDIR: home,
-  TEMP: home,
-  TMP: home,
-};
+// WIN-DESK-1c: with both AppData folders, as on a real Windows account (lib/throwaway-env.mjs).
+const env = throwAwayEnv(home);
 
 /** Copies the build to tmp/<label>; returns {exe, asar}. */
 function copyBuild(label) {
