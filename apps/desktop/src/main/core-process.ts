@@ -3,7 +3,9 @@
 // when it dies, and stops it on quit (shutdown message, then a kill after a grace period).
 //
 // - argv: exactly [<bundled node>, <host script>]. No Node options, ever.
-// - stdio: [ignore, ignore, pipe, pipe]. stdout is ignored; the session link travels only on fd 3.
+// - stdio: [ignore, ignore, pipe, overlapped]. stdout is ignored; the session link travels only on
+//   fd 3. fd 3 is 'overlapped' (WIN-DESK-1): the same as 'pipe' outside Windows; on Windows the
+//   core's end is an asynchronous handle, so its pending read never blocks its write of `ready`.
 //   stderr is read and handed to `onStderr` (core-log.ts redacts it and keeps the last lines in
 //   memory and in a 0600 log file), so a core that dies before `ready` leaves a trace.
 // - env: built from an allowlist (home, temp, locale, PATH and the OS basics). NODE_OPTIONS, NODE_*,
@@ -128,7 +130,7 @@ export interface CoreChild {
 
 export interface SpawnOptions {
   readonly env: Record<string, string>;
-  readonly stdio: readonly ['ignore', 'ignore', 'pipe', 'pipe'];
+  readonly stdio: readonly ['ignore', 'ignore', 'pipe', 'overlapped'];
   readonly windowsHide: true;
   readonly shell: false;
   readonly detached: false;
@@ -249,7 +251,7 @@ export class CoreSupervisor {
     try {
       child = o.spawn(o.nodePath, [o.hostScript], {
         env: cleanCoreEnv(o.env, o.platform),
-        stdio: ['ignore', 'ignore', 'pipe', 'pipe'],
+        stdio: ['ignore', 'ignore', 'pipe', 'overlapped'],
         windowsHide: true,
         shell: false,
         detached: false,

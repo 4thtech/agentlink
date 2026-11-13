@@ -170,7 +170,9 @@ describe('runShell startup', () => {
 
   it('a data folder that resolves → the lock is taken as before', async () => {
     const { electron, proc } = setup();
-    Object.assign(electron.app, { getPath: () => '/Users/x/Library/Application Support/AgentLink' });
+    Object.assign(electron.app, {
+      getPath: () => '/Users/x/Library/Application Support/AgentLink',
+    });
     expect(await runShell(electron, proc)).toBe('running');
     expect(electron.app.order).toContain('lock');
   });

@@ -48,7 +48,14 @@ export async function desktopHostMain(deps: DesktopHostMainDeps): Promise<number
     deps.printError(DESKTOP_HOST_TEXT.notInApp);
     return HOST_EXIT_FAILED;
   }
-  const pipe = deps.openPipe();
+  // WIN-DESK-1: net.Socket checks the fd type again and throws when it is not a pipe or socket.
+  let pipe: DesktopPipe;
+  try {
+    pipe = deps.openPipe();
+  } catch {
+    deps.printError(DESKTOP_HOST_TEXT.notInApp);
+    return HOST_EXIT_FAILED;
+  }
   return deps.run(deps.hostDeps(pipe));
 }
 
