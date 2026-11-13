@@ -66,7 +66,8 @@ import {
 } from './switches.js';
 import type { StatusAction } from './status-page.js';
 import { AppTray, trayImage } from './tray.js';
-import { writeHealth, writeStarting } from './updater/health.js';
+import { writeHealthIfPending, writeStarting } from './updater/health.js';
+import { UPDATES_DIR, sweepStaging } from './updater/install.js';
 import { procTranslated, updateChannel, updaterArch } from './updater/host.js';
 import { ReleaseChecker, updateChecksAllowed } from './updater/release-check.js';
 import { scheduleUpdateChecks } from './updater/schedule.js';
@@ -209,6 +210,11 @@ export async function runShell(
     app.exit(LAUNCH_REFUSED_EXIT);
     return 'refused';
   }
+
+  // UPD-4 (IR-UPD-4-1 #2): the update watchdog's start signal comes first, before the lock, whenReady
+  // and any dialog, so a new copy that hangs later can still be found and stopped.
+  const updateHealth = app.isPackaged && preview === null ? proc.updateHealth?.(app) : undefined;
+  updateHealth?.starting();
 
   // The log keeps one fixed line when the shell quits on its own at start (no window yet), so a
   // start that "does nothing" can be told apart afterwards: another copy running, or the folder.
@@ -393,8 +399,6 @@ export async function runShell(
       return 'location';
     }
   }
-  const updateHealth = app.isPackaged && preview === null ? proc.updateHealth?.(app) : undefined;
-  updateHealth?.starting();
 
   const windowSession = electron.session.fromPartition(WINDOW_PARTITION, { cache: false });
   // DESK-TOUCHID-FIX: before a request that starts the presence helper reaches the core, focus
@@ -599,12 +603,19 @@ export function realProcess(): ShellProcess {
     updateHealth: (app) => {
       const dir = app.getPath?.('userData');
       const version = app.getVersion?.();
-      const write = (fn: typeof writeHealth): void => {
+      const write = (fn: typeof writeStarting): void => {
         if (proc.platform !== 'darwin' || dir === undefined || version === undefined) return;
         // Public data only (a version and a pid); a failed write just means no in-app update.
         fn(dir, version, proc.pid).catch(() => undefined);
       };
-      return { starting: () => write(writeStarting), ready: () => write(writeHealth) };
+      return {
+        starting: () => write(writeStarting),
+        ready: () => {
+          write(writeHealthIfPending);
+          if (proc.platform === 'darwin' && dir !== undefined)
+            void sweepStaging(join(dir, UPDATES_DIR), Date.now());
+        },
+      };
     },
     releaseChecker: (electron, onChange) =>
       releaseCheckerFor(

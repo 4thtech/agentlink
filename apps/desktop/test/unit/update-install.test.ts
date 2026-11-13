@@ -748,6 +748,7 @@ describe('health, pending and failed records (IR-UPD-4-1 #4, #5)', () => {
     // No pending update: nothing written.
     await writeHealthIfPending(dir, '0.5.3', 123);
     expect(await readHealth(dir)).toBeNull();
+    await mkdir(dir, { recursive: true });
     await writeFile(
       join(dir, PENDING_FILE),
       JSON.stringify({ version: '0.5.3', nonce: 'n'.repeat(32) }),
@@ -811,7 +812,10 @@ if (v === process.env.HANG) {
     const launcher = join(dir, 'fake-open.sh');
     await writeFile(launcher, `#!/bin/sh\nexec "$FAKE_NODE" "${js}" "$@"\n`, { mode: 0o755 });
     const ps = join(dir, 'fake-ps.sh');
-    await writeFile(ps, `#!/bin/sh\ncat "$FAKE_PS" 2>/dev/null\nexit 0\n`, { mode: 0o755 });
+    // The watchdog runs ps with a fixed env, so the listing's path is baked in.
+    await writeFile(ps, `#!/bin/sh\ncat "${join(dir, 'ps.txt')}" 2>/dev/null\nexit 0\n`, {
+      mode: 0o755,
+    });
     return { launcher, ps };
   }
 
@@ -856,7 +860,7 @@ if (v === process.env.HANG) {
     const env = {
       FAKE_LOG: join(tools, 'log'),
       FAKE_STATE: state,
-      FAKE_PS: join(tools, 'ps.txt'),
+      FAKE_PS: join(tools, 'ps.txt'), // read by the fake ps at this fixed path
       FAKE_HUNG: join(tools, 'hung'),
       FAKE_NODE: process.execPath,
       HEALTHY: 'none',

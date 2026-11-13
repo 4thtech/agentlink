@@ -2,6 +2,7 @@
 // a path or anything from the network; the person sees one fixed sentence and the existing download
 // link (release-check.ts, the DMG link built from the version), whatever the code.
 import { UpdateRefusal } from './manifest.js';
+import type { FailedReason } from './state.js';
 
 export type InstallRefusalCode =
   // before anything is downloaded
@@ -27,8 +28,12 @@ export type InstallRefusalCode =
   | 'node_signature'
   | 'bundle_hashes'
   | 'quarantined'
-  // starting the swap
-  | 'swap_failed';
+  // the swap (reported by the watchdog through the failed record, state.ts)
+  | 'swap_failed'
+  | 'not_permitted'
+  | 'did_not_start'
+  | 'did_not_quit'
+  | 'rollback_incomplete';
 
 const MESSAGES: Readonly<Record<InstallRefusalCode, string>> = Object.freeze({
   not_zip: 'the update has no in-app package for this computer',
@@ -51,6 +56,10 @@ const MESSAGES: Readonly<Record<InstallRefusalCode, string>> = Object.freeze({
   bundle_hashes: 'the update files do not match their record',
   quarantined: 'the update carries a download mark',
   swap_failed: 'the update could not be started',
+  not_permitted: 'the system did not allow the app to be replaced',
+  did_not_start: 'the new version did not start in time',
+  did_not_quit: 'the app did not close for the update',
+  rollback_incomplete: 'the previous version could not be fully restored',
 });
 
 export class InstallRefusal extends Error {
@@ -66,6 +75,22 @@ export class InstallRefusal extends Error {
 export const INSTALL_COPY = Object.freeze({
   failed: "Couldn't update here. Download the new version instead.",
 });
+
+/** The watchdog's recorded reason → its fixed code (a record without a reason: did_not_start). */
+export function failedReasonCode(reason: FailedReason | null): InstallRefusalCode {
+  switch (reason) {
+    case 'not_permitted':
+      return 'not_permitted';
+    case 'not_quit':
+      return 'did_not_quit';
+    case 'swap_failed':
+      return 'swap_failed';
+    case 'rollback_incomplete':
+      return 'rollback_incomplete';
+    default:
+      return 'did_not_start';
+  }
+}
 
 const DOWNLOAD_CODES = new Set<string>([
   'wrong_host',

@@ -10,25 +10,69 @@
 // Every refusal is an outcome with a fixed code (install-refusal.ts); the person sees one fixed
 // sentence and the existing download link. Never logged: the download URL (AGENTS.md), paths, tool
 // output.
-import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { lstat, mkdir, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { BUNDLE_HASHES_FILE } from '../bundle-check.js';
 import { streamToFile, type DownloadProgress, type FetchLike } from './download.js';
 import { InstallRefusal, installCode, type InstallRefusalCode } from './install-refusal.js';
 import type { AcceptedUpdate, UpdateAsset } from './manifest.js';
-import { recheckZip, unpackZip, verifyStagedApp, type RunProgram } from './stage.js';
+import { recheckZip, runProgram, unpackZip, verifyStagedApp, type RunProgram } from './stage.js';
 import {
   HEALTH_TIMEOUT_MS,
   OPEN,
   PREVIOUS_DIR,
+  PS,
   UNPACKED_DIR,
+  appBundleOf,
   bundledNode,
   preflightSwap,
+  spawnDetached as realSpawnDetached,
   startWatchdog,
   type SpawnDetached,
 } from './swap-mac.js';
 
 export const UPDATES_DIR = 'updates';
 export const ZIP_FILE = 'AgentLink.zip';
+/** A staging folder older than this is left over (a watchdog lives a few minutes at most). */
+export const STAGING_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const STAGING_NAME = /^u-[A-Za-z0-9]{6}$/;
+const MAX_RECORD_BYTES = 64 * 1024;
+
+/**
+ * Removes left-over staging folders (`u-xxxxxx`, real folders, older than STAGING_MAX_AGE_MS) from
+ * `updatesDir`: a watchdog that kept one (a copy it could not stop, an incomplete rollback) or a
+ * crash. Other names and symlinks are left alone; rm never follows symlinks inside. Never throws.
+ */
+export async function sweepStaging(updatesDir: string, nowMs: number): Promise<void> {
+  let names: string[];
+  try {
+    names = await readdir(updatesDir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (!STAGING_NAME.test(name)) continue;
+    const p = join(updatesDir, name);
+    try {
+      const st = await lstat(p);
+      if (!st.isDirectory() || nowMs - st.mtimeMs < STAGING_MAX_AGE_MS) continue;
+      await rm(p, { recursive: true, force: true });
+    } catch {
+      // next one
+    }
+  }
+}
+
+/** `bundle-hashes.json` inside `<resources>/app.asar` (Electron's fs reads ASAR paths), or null. */
+export async function readRecordFromAsar(resourcesPath: string): Promise<string | null> {
+  try {
+    const bytes = await readFile(join(resourcesPath, 'app.asar', BUNDLE_HASHES_FILE));
+    if (bytes.length > MAX_RECORD_BYTES) return null;
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
+}
 
 export interface DownloadedZip {
   /** `<updatesDir>/<random>` (0700). */
@@ -86,6 +130,7 @@ export async function installUpdate(deps: InstallDeps): Promise<InstallOutcome> 
     if (accepted.asset.kind !== 'zip') throw new InstallRefusal('not_zip');
     const updatesDir = join(deps.stateDir, UPDATES_DIR);
     await mkdir(updatesDir, { recursive: true, mode: 0o700 });
+    await sweepStaging(updatesDir, Date.now());
     await (deps.preflight ?? preflightSwap)(deps.currentApp, updatesDir);
     const zip = await downloadZip(accepted.asset, {
       fetch: deps.fetch,
@@ -112,6 +157,7 @@ export async function installUpdate(deps: InstallDeps): Promise<InstallOutcome> 
         version: accepted.version,
         launcher: OPEN,
         timeoutMs: HEALTH_TIMEOUT_MS,
+        ps: PS,
       },
       deps.spawnDetached,
     );
@@ -122,4 +168,43 @@ export async function installUpdate(deps: InstallDeps): Promise<InstallOutcome> 
   } finally {
     if (dir !== undefined) await rm(dir, { recursive: true, force: true }).catch(() => undefined);
   }
+}
+
+const defaultFetch: FetchLike = (url, init) => fetch(url, init);
+
+/** The install with the real tools, for this running copy (`process.execPath`). */
+export function installFromProcess(opts: {
+  readonly accepted: AcceptedUpdate;
+  readonly stateDir: string;
+  readonly execPath: string;
+  readonly pid: number;
+  readonly fetch?: FetchLike;
+  readonly onProgress?: DownloadProgress;
+}): Promise<InstallOutcome> {
+  const currentApp = appBundleOf(opts.execPath);
+  if (currentApp === null) return Promise.resolve({ kind: 'fallback', code: 'not_in_place' });
+  return installUpdate({
+    accepted: opts.accepted,
+    stateDir: opts.stateDir,
+    currentApp,
+    pid: opts.pid,
+    fetch: opts.fetch ?? defaultFetch,
+    run: runProgram,
+    readRecord: readRecordFromAsar,
+    spawnDetached: realSpawnDetached,
+    ...(opts.onProgress !== undefined ? { onProgress: opts.onProgress } : {}),
+  });
+}
+
+/**
+ * The quit step: runs `install` and, only when the watchdog was started, quits the app (Electron
+ * `app.quit()`: before-quit stops the core first, then the watchdog sees the process exit).
+ */
+export async function restartForUpdate(
+  install: () => Promise<InstallOutcome>,
+  quit: () => void,
+): Promise<InstallOutcome> {
+  const outcome = await install();
+  if (outcome.kind === 'restarting') quit();
+  return outcome;
 }
