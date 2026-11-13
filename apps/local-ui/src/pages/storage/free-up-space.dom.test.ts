@@ -66,7 +66,9 @@ const api = {
 
 const fetchFn = ((input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const path = typeof input === 'string' ? input : input.toString();
-  const raw = init?.body instanceof Uint8Array ? new TextDecoder().decode(init.body) : '';
+  const raw = ArrayBuffer.isView(init?.body)
+    ? new TextDecoder().decode(init?.body as Uint8Array)
+    : '';
   if ((init?.method ?? 'GET') === 'POST') {
     sent.push({ path, body: raw === '' ? undefined : (JSON.parse(raw) as unknown) });
   }

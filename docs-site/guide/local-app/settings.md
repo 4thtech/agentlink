@@ -9,7 +9,7 @@
 | Group | Pages |
 |---|---|
 | **Safety** | [Backup & restore](backup-and-restore.md) (*Up to date*, *Out of date*, *Not backed up* or *Not finished*) and [Touch ID & master code](touch-id-and-master-code.md) (*Touch ID on* or *Master code only*; Windows Hello on Windows, *your passkey* elsewhere) |
-| **Your AI** | [Rules](rules.md) (how many things your AI asks you about first), [AI apps](ai-apps.md) (which are connected) **Files** (the [folders your AI may send from](../everyday-use/allowed-folders.md) and where received files go) and [Storage](storage.md) (how much room your messages and saved files take) |
+| **Your AI** | [Rules](rules.md) (how many things your AI asks you about first), [AI apps](ai-apps.md) (which are connected) **Files** (the [folders your AI may send from](../everyday-use/allowed-folders.md) and where received files go) and [Storage](storage.md) (how much room your messages and saved files take, and Free up space) |
 | **This app** | [Appearance](appearance.md) (theme, motion and Under the hood), [Proofs & credits](proofs-and-credits.md), [Updates](updates.md) (your version, and a newer one when it is out) and **Advanced** (network, diagnostics and the activity log; *All working* when nothing needs you) |
 
 - **One notice at the top** says what needs you first, for example *"You have no recovery kit."* or *"Your recovery kit is missing 2 IDs."*, with the button that fixes it.

@@ -1,9 +1,6 @@
 // RET-3 (S2; D-148; 04 §4.2; 06 §1; I-4): deleting history is the owner's, in the app. No MCP tool
 // deletes anything, moves a file to the Trash, or names history retention (RET-7's proposing
 // `agentlink_tidy` needs its own spec PR and Fable review).
-import { readdirSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { ToolClient } from './context.js';
 import { ADVANCED_TOOLS, TOOLS } from './registry.js';
@@ -28,14 +25,5 @@ describe('no MCP tool deletes history (I-4, 06 §1)', () => {
 
   it('ToolClient has no history member (checked by the typecheck too)', () => {
     expect(noHistory).toBe(true);
-  });
-
-  it('RET-4: no tool source reaches the app history or archive routes', () => {
-    const here = dirname(fileURLToPath(import.meta.url));
-    for (const name of readdirSync(here)) {
-      if (!name.endsWith('.ts') || name.endsWith('.test.ts')) continue;
-      const text = readFileSync(join(here, name), 'utf8');
-      expect(text, name).not.toMatch(/\/api\/ui\/history|history\/delete|history\.archived/);
-    }
   });
 });

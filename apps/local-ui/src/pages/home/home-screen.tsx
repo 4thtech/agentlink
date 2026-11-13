@@ -43,7 +43,8 @@ import { createApiClient, type ApiClient } from '../../api/client.js';
 import { getLive, subscribeLive, switchAgent, type LiveAgent } from '../../api/live.js';
 import { initials } from '../../initials.js';
 import { INVITE_PATH, PEOPLE_PATH } from '../../nav.js';
-import { notify, setArchived, useArchived } from '../../notices/index.js';
+import { notify, setArchived, useArchived, useConversationsArchived } from '../../notices/index.js';
+import { DeleteSheet } from '../history/delete-sheet.js';
 import { checkHref } from '../contacts/safety.js';
 import { CONTACTS_CHANGED } from '../../api/contact-changes.js';
 import { PasteEntryLink } from '../invite/paste-entry.js';
@@ -262,7 +263,10 @@ function PersonOpen({
   props,
   onChanged,
   archived,
+  idName,
 }: {
+  /** RET-5: the open ID's name (Archive in the person menu). */
+  readonly idName?: string | undefined;
   readonly person: Person;
   readonly contact: ContactRow | undefined;
   readonly data: HomeData;
@@ -287,6 +291,8 @@ function PersonOpen({
   const terms = useTerms(clients.api, person.contactId, tick);
   const files = thread.state === 'ready' ? filesOf(thread.inbox.items, thread.sent.items) : [];
   const removed = contact?.status === 'revoked';
+  // RET-4: the messages chosen in Select mode, shown in the delete sheet.
+  const [chosen, setChosen] = useState<readonly string[] | undefined>(undefined);
   const fileContext = useMemo(
     () => ({
       received: data.received,
@@ -327,8 +333,20 @@ function PersonOpen({
           {...(props.fetch === undefined ? {} : { fetch: props.fetch })}
           {...(props.token === undefined ? {} : { token: props.token })}
           onChanged={(what) => onChanged(what)}
+          idName={idName}
+          onDeleted={refresh}
         />
       </div>
+      {chosen === undefined || contact === undefined ? null : (
+        <DeleteSheet
+          name={person.name}
+          target={{ contact: contact.ref, envelopeIds: chosen }}
+          {...(props.fetch === undefined ? {} : { fetch: props.fetch })}
+          {...(props.token === undefined ? {} : { token: props.token })}
+          onClose={() => setChosen(undefined)}
+          onApplied={refresh}
+        />
+      )}
       {pro && contact !== undefined ? (
         <dl className="hm-facts al-reveal">
           {contact.fingerprint === undefined ? null : (
@@ -370,6 +388,7 @@ function PersonOpen({
         terms={terms}
         removed={removed}
         files={fileContext}
+        onDelete={contact === undefined ? undefined : (ids) => setChosen(ids)}
       />
       <PersonFiles
         name={person.name}
@@ -740,8 +759,11 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   const isGone = (contactId: string): boolean =>
     data?.contacts.get(contactId)?.status === 'revoked';
   // UX 2026-11-12: a removed connection the owner archived leaves People for "Archived" (kept).
+  // RET-5 (D-148): any person can be archived from their menu; the AI still sees them.
+  const conversationsArchived = useConversationsArchived(current?.name);
   const isArchived = (contactId: string): boolean =>
-    isGone(contactId) && archivedRefs.has(contactId.toLowerCase());
+    conversationsArchived.has(contactId.toLowerCase()) ||
+    (isGone(contactId) && archivedRefs.has(contactId.toLowerCase()));
   const matching = (data?.people ?? []).filter(
     (p) => otherAgent === undefined && (!pro || q === '' || p.name.toLowerCase().includes(q)),
   );
@@ -968,6 +990,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
               props={props}
               {...(props.folderNote === undefined ? {} : { folderNote: props.folderNote })}
               archived={archive}
+              idName={current?.name}
               onChanged={(what) => {
                 if (what === 'remove') setOpen(undefined);
                 if (what === 'remove') notify({ text: fmt(S.removed, { name: person.name }) });

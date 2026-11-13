@@ -21,6 +21,12 @@ afterAll(() => ch.stop());
 
 const NOTE = 'RET4-journey-note';
 
+/** Whether Bo's AI still reads the note (read ones included; core skips deleted messages). */
+async function aiReads(mcp: Parameters<typeof inboxHas>[0], needle: string): Promise<boolean> {
+  const all = await mcp.call('agentlink_inbox', { includeRead: true, limit: 50 });
+  return JSON.stringify(all.structured).includes(needle);
+}
+
 describe('chapter 12: delete a person’s history, undo, delete again', () => {
   it('Bo deletes his history with Ana; Undo keeps it; the second delete removes it here only', async (ctx) => {
     const ready = ch.need(ctx);
@@ -50,7 +56,9 @@ describe('chapter 12: delete a person’s history, undo, delete again', () => {
       expect(await text(b.page)).toContain(
         'Only on this computer; Ana keeps their copy and is not told.',
       );
-      await b.page.getByRole('button', { name: /^Delete with (Touch ID|Windows Hello|passkey)$/ }).click();
+      await b.page
+        .getByRole('button', { name: /^Delete with (Touch ID|Windows Hello|your passkey)$/ })
+        .click();
       const confirm = b.page.getByRole('button', { name: CONFIRM_PASSKEY });
       const toast = b.page.getByText(/^Deleted \d+ messages?\.$/).first();
       await Promise.race([confirm.waitFor().then(() => confirm.click()), toast.waitFor()]).catch(
@@ -64,15 +72,16 @@ describe('chapter 12: delete a person’s history, undo, delete again', () => {
     await b.page.getByRole('button', { name: 'Undo' }).first().click();
     await b.page.getByText('Nothing was deleted.').first().waitFor({ timeout: 10_000 });
     await b.page.waitForTimeout(11_000);
-    expect(await inboxHas(mcpB, `${NOTE} 1`)).toBe(true);
+    expect(await aiReads(mcpB, `${NOTE} 1`)).toBe(true);
+    expect(await text(b.page)).toContain(`${NOTE} 1`);
 
     // 2. Delete again and let the window end: gone from this computer.
     await deleteOnce();
-    await eventually(
-      'the delete applied',
-      async () => (await inboxHas(mcpB, `${NOTE} 1`)) === undefined,
-      40_000,
-    );
-    expect(await inboxHas(mcpB, `${NOTE} 2`)).toBeUndefined();
+    await eventually('the delete applied', async () => !(await aiReads(mcpB, `${NOTE} 1`)), 40_000);
+    expect(await aiReads(mcpB, `${NOTE} 2`)).toBe(false);
+    await eventually('the conversation no longer shows them', async () => {
+      const shown = await text(b.page);
+      return !shown.includes(`${NOTE} 1`) && !shown.includes(`${NOTE} 2`);
+    });
   }, 240_000);
 });

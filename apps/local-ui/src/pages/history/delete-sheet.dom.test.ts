@@ -86,8 +86,8 @@ const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit): Promise<R
   const path = typeof input === 'string' ? input : input.toString();
   const headers = new Headers(init?.headers);
   let body: unknown;
-  if (init?.body instanceof Uint8Array && path !== '/api/ui/history/delete/finish') {
-    body = JSON.parse(new TextDecoder().decode(init.body)) as unknown;
+  if (ArrayBuffer.isView(init?.body) && path !== '/api/ui/history/delete/finish') {
+    body = JSON.parse(new TextDecoder().decode(init?.body as Uint8Array)) as unknown;
   }
   if ((init?.method ?? 'GET') === 'POST') {
     sent.push({ path, body, input: decodeInput(headers.get('X-AgentLink-Input')) });
@@ -110,7 +110,8 @@ const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit): Promise<R
       undoSeconds: 10,
     });
   }
-  if (path === '/api/ui/history/delete/finish') return reply(finishAnswer.status, finishAnswer.body);
+  if (path === '/api/ui/history/delete/finish')
+    return reply(finishAnswer.status, finishAnswer.body);
   if (path === '/api/ui/history/delete/undo') return reply(200, { status: 'cancelled' });
   if (path === '/api/ui/history/delete/status') return reply(200, statusAnswer);
   return reply(404, { error: 'not_found' });

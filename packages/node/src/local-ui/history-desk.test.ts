@@ -104,9 +104,10 @@ describe('parseHistorySelection (begin body)', () => {
     expect(
       parseHistorySelection({ contact: ALICE, olderThanDays: 90, include: 'messages' }, NOW_MS),
     ).toEqual({ contactId: ALICE, before: NOW_MS / 1000 - 90 * 86_400, include: 'messages' });
-    expect(parseHistorySelection({ envelopeIds: ['e1', 'e2'], include: 'both' }, NOW_MS)).toEqual(
-      { envelopeIds: ['e1', 'e2'], include: 'both' },
-    );
+    expect(parseHistorySelection({ envelopeIds: ['e1', 'e2'], include: 'both' }, NOW_MS)).toEqual({
+      envelopeIds: ['e1', 'e2'],
+      include: 'both',
+    });
   });
 
   it('refuses anything else (fixed shape, no extra keys)', () => {

@@ -100,6 +100,11 @@ const KEPT: Readonly<Record<string, (raw: string) => string | undefined>> = Obje
     const [id, ref, rest] = v.split('/');
     return rest === undefined && ID_NAME.test(id ?? '') && REF.test(ref ?? '');
   }),
+  /** RET-5 (D-148): conversations archived from a person's menu: `<ID name>/<contact ref>`. */
+  'agentlink.conversations.archived.v1': list((v) => {
+    const [id, ref, rest] = v.split('/');
+    return rest === undefined && ID_NAME.test(id ?? '') && REF.test(ref ?? '');
+  }),
   /** The recovery kit was put off ("Later"): a time in ms only. */
   'agentlink.recoveryKit.later': (raw) => (/^[0-9]{1,16}$/.test(raw) ? raw : undefined),
   'agentlink.getStarted.hidden': fixed('1'),

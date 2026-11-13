@@ -8,6 +8,9 @@
 //   with the code that was shown (`contact.check`); "They don't match" signs nothing and explains.
 // - Remove: asks first in plain words, then presence → `…/remove`.
 //
+// RET-4 + RET-5 (D-148; 08 §1 "Conversation menu"): Archive (no presence, nothing deleted; the app
+// keeps the choice for every browser, notices/index.ts) and "Delete history…" (the delete sheet).
+//
 // UX1113-N2: one owner step, one gesture. Each action's own button is the sensor ("Rename with
 // Touch ID", "They match · Touch ID", "Remove with Touch ID"), with the master code as a link:
 // Contacts' PresenceButton. The routes and the signed objects are unchanged.
@@ -20,8 +23,11 @@ import { useAliasCheck } from '../contacts/alias-check.js';
 import { PresenceButton } from '../contacts/presence-button.js';
 import { CONTACTS_STRINGS as C, SUMMARY, mismatchBody, waitSeconds } from '../contacts/strings.js';
 import { HOME_STRINGS as S, fmt } from './people-strings.js';
+import { notify, setConversationArchived, useConversationsArchived } from '../../notices/index.js';
+import { DeleteSheet } from '../history/delete-sheet.js';
+import { HISTORY_STRINGS as H } from '../history/strings.js';
 
-type Mode = 'none' | 'rename' | 'check' | 'remove';
+type Mode = 'none' | 'rename' | 'check' | 'remove' | 'delete';
 
 interface Pending {
   readonly what: 'check' | 'rename' | 'remove';
@@ -46,7 +52,13 @@ export function PersonMenu({
   fetch: givenFetch,
   token,
   onChanged,
+  idName,
+  onDeleted,
 }: {
+  /** RET-5: the open ID's name; with it the menu offers Archive / Unarchive. */
+  readonly idName?: string | undefined;
+  /** RET-4: a delete of this person's history was applied (read Home again). */
+  readonly onDeleted?: (() => void) | undefined;
   readonly name: string;
   /** The contact's row (ref, identity, pairing); the menu is off without one. */
   readonly contact: ContactRow | undefined;
@@ -78,6 +90,8 @@ export function PersonMenu({
   const [notice, setNotice] = useState<string | undefined>(undefined);
   const wantedAlias = alias.trim();
   const aliasCheck = useAliasCheck(api, contact?.ref ?? '', wantedAlias, mode === 'rename');
+  const archivedRefs = useConversationsArchived(idName);
+  const isArchived = contact !== undefined && archivedRefs.has(contact.ref.toLowerCase());
 
   // The menu closes on Escape or a click outside, and gives the focus back to its button.
   useEffect(() => {
@@ -224,6 +238,38 @@ export function PersonMenu({
                 {S.checkSafetyCode}
               </button>
             )}
+            {idName === undefined ? null : (
+              <button
+                type="button"
+                role="menuitem"
+                className="al-mitem"
+                onClick={() => {
+                  setOpen(false);
+                  const id = idName;
+                  const ref = contact.ref;
+                  const next = !isArchived;
+                  setConversationArchived(id, ref, next);
+                  notify({
+                    text: next ? H.archived : H.unarchived,
+                    tone: 'success',
+                    action: H.undo,
+                    onAction: () => setConversationArchived(id, ref, !next),
+                  });
+                }}
+              >
+                <Icon name="inbox" size={16} />
+                {isArchived ? H.unarchive : H.archive}
+              </button>
+            )}
+            <button
+              type="button"
+              role="menuitem"
+              className="al-mitem hm-danger"
+              onClick={() => start('delete')}
+            >
+              <Icon name="x" size={16} />
+              {H.deleteHistory}
+            </button>
             <button
               type="button"
               role="menuitem"
@@ -321,6 +367,17 @@ export function PersonMenu({
               {S.cancel}
             </Button>
           </div>
+        ) : null}
+        {mode === 'delete' ? (
+          <DeleteSheet
+            name={name}
+            target={{ contact: contact.ref }}
+            choose
+            {...(givenFetch === undefined ? {} : { fetch: givenFetch })}
+            {...(token === undefined ? {} : { token })}
+            onClose={close}
+            {...(onDeleted === undefined ? {} : { onApplied: onDeleted })}
+          />
         ) : null}
         {notice === undefined ? null : (
           <Banner

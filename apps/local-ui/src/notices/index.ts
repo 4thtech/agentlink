@@ -5,7 +5,9 @@
 //   shows it. Text only (I-5): never a link, code, key or another party's message text.
 // - `useDismissed(key)`: a dismissal remembered in this browser (localStorage), for notices that
 //   may be closed before they are resolved. Keys are fixed words plus an ID's name; nothing else.
-// - `useArchived(id)`: the removed connections the owner archived on Home, per ID (contact refs).
+// - `useArchived(id)`: the removed connections the owner archived on Home, per ID (contact refs),
+//   and (RET-5, D-148) the conversations the owner archived from a person's menu
+//   (`useConversationsArchived`). Both are kept by the app for every browser (prefs/app-kept.ts).
 // Storage can be missing or blocked: every access is wrapped, and the choice then lasts while the
 // page is open.
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
@@ -99,6 +101,7 @@ export function dismissNotice(key: string): void {
 export function resetNoticesForTests(): void {
   dismissedHere.clear();
   archivedHere.clear();
+  conversationsHere.clear();
   dismissVersion += 1;
   archiveVersion += 1;
 }
@@ -140,15 +143,52 @@ function validEntry(v: string): boolean {
   );
 }
 
-/** The contact refs archived for this ID. */
-export function archivedOf(id: string): ReadonlySet<string> {
-  if (!ID_NAME.test(id)) return new Set();
-  const out = new Set(archivedHere.get(id) ?? []);
-  for (const v of readList(ARCHIVED_KEY, validEntry, MAX_ARCHIVED)) {
+/** RET-5 (D-148): conversations archived from a person's menu (`<ID name>/<contact ref>`). */
+export const CONVERSATIONS_ARCHIVED_KEY = 'agentlink.conversations.archived.v1';
+const conversationsHere = new Map<string, Set<string>>();
+
+function listedFor(id: string, key: string, here: Map<string, Set<string>>): Set<string> {
+  const out = new Set(here.get(id) ?? []);
+  for (const v of readList(key, validEntry, MAX_ARCHIVED)) {
     const [owner, ref] = v.split('/');
     if (owner === id && ref !== undefined) out.add(ref);
   }
   return out;
+}
+
+/** The contact refs archived for this ID: removed connections and archived conversations. */
+export function archivedOf(id: string): ReadonlySet<string> {
+  if (!ID_NAME.test(id)) return new Set();
+  return new Set([
+    ...listedFor(id, ARCHIVED_KEY, archivedHere),
+    ...listedFor(id, CONVERSATIONS_ARCHIVED_KEY, conversationsHere),
+  ]);
+}
+
+/** RET-5: the conversations the owner archived for this ID (any connection, removed or not). */
+export function conversationsArchivedOf(id: string): ReadonlySet<string> {
+  if (!ID_NAME.test(id)) return new Set();
+  return listedFor(id, CONVERSATIONS_ARCHIVED_KEY, conversationsHere);
+}
+
+/** RET-5: Archive or Unarchive a conversation (no presence, nothing deleted; the AI still sees it). */
+export function setConversationArchived(id: string, ref: string, archived: boolean): void {
+  const lower = ref.toLowerCase();
+  if (!ID_NAME.test(id) || !REF.test(lower)) return;
+  const here = conversationsHere.get(id) ?? new Set<string>();
+  if (archived) here.add(lower);
+  else here.delete(lower);
+  conversationsHere.set(id, here);
+  const list = readList(CONVERSATIONS_ARCHIVED_KEY, validEntry, MAX_ARCHIVED).filter(
+    (v) => v !== entry(id, lower),
+  );
+  writeList(
+    CONVERSATIONS_ARCHIVED_KEY,
+    archived ? [...list, entry(id, lower)] : list,
+    MAX_ARCHIVED,
+  );
+  archiveVersion += 1;
+  for (const l of archiveListeners) l();
 }
 
 export function setArchived(id: string, ref: string, archived: boolean): void {
@@ -179,6 +219,20 @@ function subscribeArchived(l: () => void): () => void {
   return () => {
     archiveListeners.delete(l);
   };
+}
+
+/** RET-5: the archived conversations of the open ID, following every Archive and Unarchive. */
+export function useConversationsArchived(id: string | undefined): ReadonlySet<string> {
+  const version = useSyncExternalStore(
+    subscribeArchived,
+    () => archiveVersion,
+    () => archiveVersion,
+  );
+  return useMemo(
+    () => (id === undefined ? new Set<string>() : conversationsArchivedOf(id)),
+    // `version` changes on every archive or restore.
+    [id, version],
+  );
 }
 
 /** The archived refs of the open ID, following every archive and restore. */

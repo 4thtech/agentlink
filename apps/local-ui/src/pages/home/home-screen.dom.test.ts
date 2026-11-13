@@ -514,7 +514,13 @@ describe('Home simple (A4)', () => {
     await click(row('Ana'));
     await click(all('button').find((b) => b.getAttribute('aria-label') === 'More for Ana'));
     const items = all('[role="menuitem"]').map((e) => e.textContent?.trim());
-    expect(items).toEqual([S.rename, S.checkSafetyCode, S.remove]);
+    // RET-4 + RET-5: Delete history… (and Archive when an ID is open) sit before Remove.
+    expect(items.filter((i) => i !== 'Archive')).toEqual([
+      S.rename,
+      S.checkSafetyCode,
+      'Delete history…',
+      S.remove,
+    ]);
     await click(all('[role="menuitem"]').find((e) => e.textContent?.trim() === S.remove));
     const confirm = q('[role="alertdialog"]');
     expect(confirm?.textContent).toContain('Remove Ana?');
@@ -784,7 +790,7 @@ describe('W6-FLOW-FIXES: a connection the other side removed', () => {
     expect(document.body.textContent).toContain('Sending the brief.');
     await click(all('button').find((b) => b.getAttribute('aria-label') === 'More for Denis'));
     const items = all('[role="menuitem"]').map((e) => e.textContent?.trim());
-    expect(items).toEqual([S.rename, S.remove]);
+    expect(items.filter((i) => i !== 'Archive')).toEqual([S.rename, 'Delete history…', S.remove]);
   });
 
   const withId = (): Answers => ({

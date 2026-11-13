@@ -8,6 +8,9 @@
 //   the proof and the input is exactly `{nonce}`, so the page cannot name any other list.
 // - The apply waits for the Undo window; Undo inside it applies nothing.
 // - Nothing here is an MCP tool: a request without the page session or CSRF is refused (I-4).
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { HistoryDeleteInput, HistoryDeletePlan, HistoryDeleteResult } from '@4thtech-io/core';
 import { encodeBase64url, encodeUtf8 } from '@4thtech-io/crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -271,6 +274,50 @@ describe('Delete history through the real gates (RET-4)', () => {
     );
     expect(withInput.status).toBe(400);
     expect(h.state.planned).toEqual([]);
+  });
+});
+
+describe('MCP cannot reach Delete history or Archive (I-4)', () => {
+  it('no MCP tool source names the history routes or the archive key', () => {
+    const tools = join(
+      dirname(fileURLToPath(import.meta.url)),
+      '..',
+      '..',
+      '..',
+      'mcp-tools',
+      'src',
+    );
+    const names = readdirSync(tools).filter((n) => n.endsWith('.ts') && !n.endsWith('.test.ts'));
+    expect(names.length).toBeGreaterThan(10);
+    for (const name of names) {
+      const text = readFileSync(join(tools, name), 'utf8');
+      expect(text, name).not.toMatch(/\/api\/ui\/|history\/delete|conversations\.archived/);
+    }
+  });
+});
+
+describe('Show in Finder for the Inbox folder (inbox-reveal kind)', () => {
+  it('takes no input at all and never a path from the page', async () => {
+    const h = await harness();
+    const withBody = await send(h.server.port, '/api/ui/storage/inbox/reveal', {
+      method: 'POST',
+      headers: h.headers(),
+      body: encodeUtf8(JSON.stringify({ path: '/etc' })),
+    });
+    expect(withBody.status).toBe(400);
+    const withQuery = await send(h.server.port, '/api/ui/storage/inbox/reveal?path=/etc', {
+      method: 'POST',
+      headers: h.headers(),
+      body: new Uint8Array(0),
+    });
+    expect(withQuery.status).toBe(400);
+    // This fake ID has no rules to read: the folder is unknown, nothing is opened.
+    const plain = await send(h.server.port, '/api/ui/storage/inbox/reveal', {
+      method: 'POST',
+      headers: h.headers(),
+      body: new Uint8Array(0),
+    });
+    expect(plain.status).toBe(503);
   });
 });
 

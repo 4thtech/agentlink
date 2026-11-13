@@ -180,7 +180,8 @@ export const HOME_STRINGS = {
   restoreLabel: 'Move {name} back to People',
   archived: 'Archived',
   archivedCount: 'Archived ({count})',
-  archivedHint: 'Connections that were removed. Their conversation and saved files stay here.',
+  archivedHint:
+    'People you archived and connections that were removed. Nothing is deleted, and your AI still sees them.',
   checked: 'Contact checked.',
   codeLead: 'Compare this code with {name}, on a call or in person.',
   codeLoading: 'Getting the 12 digits…',
