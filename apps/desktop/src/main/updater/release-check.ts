@@ -15,7 +15,8 @@
 // - When: a quiet check LAUNCH_CHECK_DELAY_MS after launch and then once a day while the app runs,
 //   each only when the last good check is a day old or more (update-check.json in the app's own
 //   data folder: the time and the version found, nothing else). A quiet check that fails says
-//   nothing. "Check for updates" always asks (one request at a time).
+//   nothing. "Check for updates" asks at once, but at most one request a minute (MANUAL_MIN_GAP_MS;
+//   within it the last result is shown again), and one at a time.
 // - Never: while offline (`isOnline`), in a development or preview build, or when this computer's
 //   policy turns it off (AGENTLINK_UPDATE_CHECK=off; updateChecksAllowed).
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
@@ -40,6 +41,8 @@ export const MAX_RELEASE_ASSETS = 200;
 export const CHECK_TIMEOUT_MS = 15_000;
 export const DAY_MS = 24 * 60 * 60 * 1000;
 export const LAUNCH_CHECK_DELAY_MS = 30_000;
+/** UPD-N1: at most one request per this window; a click within it gets the last result. */
+export const MANUAL_MIN_GAP_MS = 60_000;
 export const CHECK_STATE_FILE = 'update-check.json';
 const MAX_STATE_BYTES = 1024;
 /** The policy switch (exact value `off`). */
@@ -231,6 +234,8 @@ export class ReleaseChecker {
   readonly #active: boolean;
   #view: AppUpdateView;
   #running: Promise<AppUpdateView> | undefined;
+  /** When the last request started (UPD-N1). */
+  #lastFetchAt: number | undefined;
 
   constructor(deps: ReleaseCheckerDeps) {
     this.#deps = deps;
@@ -260,7 +265,10 @@ export class ReleaseChecker {
     this.#deps.timers.setTimeout(() => this.#tick(), LAUNCH_CHECK_DELAY_MS);
   }
 
-  /** "Check for updates": always asks (unless off or offline); concurrent calls share one request. */
+  /**
+   * "Check for updates": asks unless off, offline or asked less than MANUAL_MIN_GAP_MS ago (then the
+   * last result); concurrent calls share one request.
+   */
   check(): Promise<AppUpdateView> {
     return this.#run(false);
   }
@@ -281,12 +289,18 @@ export class ReleaseChecker {
   #run(quiet: boolean): Promise<AppUpdateView> {
     if (!this.#active) return Promise.resolve(this.#view);
     if (this.#running !== undefined) return this.#running;
+    const started = this.#now();
+    const last = this.#lastFetchAt;
+    if (!quiet && last !== undefined && started >= last && started - last < MANUAL_MIN_GAP_MS) {
+      return Promise.resolve(this.#view);
+    }
     if (!this.#deps.isOnline()) {
       if (!quiet) this.#set('offline');
       return Promise.resolve(this.#view);
     }
     const before = this.#view;
     if (!quiet) this.#set('checking');
+    this.#lastFetchAt = started;
     const running = (async (): Promise<AppUpdateView> => {
       const found = await fetchLatestRelease(this.#deps.fetch ?? defaultFetch);
       if (found === undefined) {

@@ -43,7 +43,7 @@ The Windows desktop app is coming later. On Windows, use the browser app: one co
 
 ## Updating
 
-Open **Settings**, then **Updates**. It shows the version you have and a **Check for updates** button. The app also looks for a newer version by itself, at most once a day, and only says something on this page.
+Open **Settings**, then **Updates**. It shows the version you have and a **Check for updates** button. The app checks once a day by itself, and when you press the button (at most once a minute), and only says something on this page.
 
 When a newer version is out, the page says so, for example **AgentLink 0.5.2 is ready**. Then:
 
@@ -57,7 +57,9 @@ If you open the new version while the old one is still running, AgentLink says a
 
 Your IDs, people and messages stay as they are: they live in your AgentLink folder, not in the app.
 
-To check, the app asks GitHub which AgentLink release is the newest. It sends nothing about you or your IDs, and it downloads and installs nothing by itself. Offline, it doesn't check. An administrator can turn the check off for a computer by starting the app with `AGENTLINK_UPDATE_CHECK=off`.
+**What the check sends.** The app asks GitHub which AgentLink release is the newest, and nothing else. GitHub sees your IP, as any website you visit does, and the name "AgentLink-Desktop"; no ID, contact, message or version number is sent. The app downloads and installs nothing by itself, and offline it doesn't check.
+
+**Turning it off.** Start the app with the setting `AGENTLINK_UPDATE_CHECK=off` (for example, an administrator can set it for a computer with `launchctl setenv AGENTLINK_UPDATE_CHECK off`, then reopen AgentLink). Settings › Updates then says checking is turned off, and the app never asks GitHub.
 
 You can always get a newer version by hand too: download the new `.dmg` from the [Releases page](https://github.com/4thtech/agentlink/releases) and drag it over the old one in Applications.
 

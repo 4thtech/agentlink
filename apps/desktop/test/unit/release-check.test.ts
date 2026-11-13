@@ -22,6 +22,7 @@ import {
   CHECK_STATE_FILE,
   DAY_MS,
   LAUNCH_CHECK_DELAY_MS,
+  MANUAL_MIN_GAP_MS,
   MAX_RELEASE_BYTES,
   RELEASE_API_URL,
   ReleaseChecker,
@@ -515,11 +516,35 @@ describe('the checker', () => {
     expect(h.calls).toHaveLength(1);
   });
 
-  it('a manual check always asks, even right after a check; two clicks share one request', async () => {
+  it('UPD-N1: two clicks share one request; a click within a minute gets the last result', async () => {
     const h = harness();
-    await h.checker.check();
     await Promise.all([h.checker.check(), h.checker.check()]);
+    expect(h.calls).toHaveLength(1);
+    h.clock += MANUAL_MIN_GAP_MS - 1;
+    const again = await h.checker.check();
+    expect(h.calls).toHaveLength(1);
+    expect(again).toMatchObject({ state: 'available', latest: '0.5.2' });
+    h.clock += 1;
+    await h.checker.check();
     expect(h.calls).toHaveLength(2);
+  });
+
+  it('UPD-N1: a failed check is shown again within the minute, then asked again', async () => {
+    let n = 0;
+    const h = harness({
+      fetch: () => {
+        n += 1;
+        return n === 1
+          ? Promise.reject(new Error('down'))
+          : Promise.resolve(new Response(Buffer.from(bytesOf(release()))));
+      },
+    });
+    expect((await h.checker.check()).state).toBe('failed');
+    expect((await h.checker.check()).state).toBe('failed');
+    expect(n).toBe(1);
+    h.clock += MANUAL_MIN_GAP_MS;
+    expect((await h.checker.check()).state).toBe('available');
+    expect(n).toBe(2);
   });
 
   it('shows "checking" while a manual check runs', async () => {
