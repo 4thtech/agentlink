@@ -9,8 +9,6 @@
 // - The desktop app on a Mac with Touch ID turned on sends the native kind and never says
 //   "passkey", "browser" or "Safari".
 // - IR-UX1113-N2-1 lows #1 (one decision in flight) and #2 (a refused proof is not "wasn't used").
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
 import { act, createElement, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -74,7 +72,12 @@ function fakeClient(
       // Never answers synchronously: a second click lands while the first is in flight.
       return new Promise((r) =>
         setTimeout(
-          () => r(reply.kind === 'status' && reply.status === 'applied' ? { ...reply, decision } : reply),
+          () =>
+            r(
+              reply.kind === 'status' && reply.status === 'applied'
+                ? { ...reply, decision }
+                : reply,
+            ),
           5,
         ),
       );
@@ -141,7 +144,12 @@ async function mount(
   const { client, calls } = fakeClient(items, reply);
   const el: ReactElement = createElement(
     PresenceSeamsContext.Provider,
-    { value: { nativeStatus: () => Promise.resolve({ available: false, registered: false }), ...seams } },
+    {
+      value: {
+        nativeStatus: () => Promise.resolve({ available: false, registered: false }),
+        ...seams,
+      },
+    },
     createElement(HomeApprovals, {
       items,
       owner: passkey ? { ready: true, passkey: PASSKEY } : { ready: true },
@@ -164,7 +172,9 @@ describe('N3: the compact approval card on Home', () => {
     const card = host.querySelector('.al-approval');
     expect(card).not.toBeNull();
     // The one line: the server's fixed-template headline, as text.
-    expect(host.querySelector('.al-approval-line')?.textContent).toContain('Send a message to Ana A');
+    expect(host.querySelector('.al-approval-line')?.textContent).toContain(
+      'Send a message to Ana A',
+    );
     expect(labels()).toContain('Approve with Touch ID');
     expect(labels()).toContain('Deny with Touch ID');
     const review = button('Review');
@@ -337,7 +347,11 @@ describe('OWNERSTEP-LEFT: the Inbox Save is one step', () => {
         createElement(
           PresenceSeamsContext.Provider,
           { value: { platform: 'mac' } },
-          createElement(SaveFile, { id: ID, api: saveApi, passkey: () => Promise.resolve(PASSKEY) }),
+          createElement(SaveFile, {
+            id: ID,
+            api: saveApi,
+            passkey: () => Promise.resolve(PASSKEY),
+          }),
         ),
       );
     });
@@ -352,7 +366,11 @@ describe('OWNERSTEP-LEFT: the Inbox Save is one step', () => {
     const { api: saveApi, sent } = api();
     await act(async () => {
       root.render(
-        createElement(SaveFile, { id: ID, api: saveApi, passkey: () => Promise.resolve(undefined) }),
+        createElement(SaveFile, {
+          id: ID,
+          api: saveApi,
+          passkey: () => Promise.resolve(undefined),
+        }),
       );
     });
     await settle();
@@ -380,7 +398,11 @@ describe('OWNERSTEP-LEFT: the Inbox Save is one step', () => {
               nativeStatus: () => Promise.resolve({ available: true, registered: true }),
             },
           },
-          createElement(SaveFile, { id: ID, api: saveApi, passkey: () => Promise.resolve(undefined) }),
+          createElement(SaveFile, {
+            id: ID,
+            api: saveApi,
+            passkey: () => Promise.resolve(undefined),
+          }),
         ),
       );
     });
@@ -392,19 +414,17 @@ describe('OWNERSTEP-LEFT: the Inbox Save is one step', () => {
 
 describe('OWNERSTEP-LEFT: no two-step OwnerStep is left in the app', () => {
   it('no source under src/ draws <OwnerStep', () => {
-    const src = join(__dirname, '..', '..');
-    const hits: string[] = [];
-    const walk = (dir: string): void => {
-      for (const name of readdirSync(dir)) {
-        const path = join(dir, name);
-        if (statSync(path).isDirectory()) walk(path);
-        else if (name.endsWith('.tsx') && !/\.test\./.test(name)) {
-          if (/<OwnerStep\b|function OwnerStep\b/.test(readFileSync(path, 'utf8'))) hits.push(path);
-        }
-      }
-    };
-    walk(src);
+    const sources = import.meta.glob<string>('../../**/*.tsx', {
+      query: '?raw',
+      import: 'default',
+      eager: true,
+    });
+    const hits = Object.entries(sources)
+      .filter(
+        ([path, text]) => !/\.test\./.test(path) && /<OwnerStep\b|function OwnerStep\b/.test(text),
+      )
+      .map(([path]) => path);
+    expect(Object.keys(sources).length).toBeGreaterThan(50);
     expect(hits).toEqual([]);
   });
 });
-

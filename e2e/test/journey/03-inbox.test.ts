@@ -9,7 +9,7 @@ import { encodeHex, randomBytes, sha256 } from '@4thtech-io/crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { until } from '../app-world.js';
 import {
-  CONFIRM_PASSKEY,
+  SAVE_WITH_PASSKEY,
   chapter,
   eventually,
   inboxHas,
@@ -174,8 +174,8 @@ describe('chapter 3: inbox', () => {
     // Save into the linked folder: refused, nothing written.
     expect(readdirSync(planted)).toEqual([]);
     const before1 = b.gestures.total();
-    await b.page.getByRole('button', { name: 'Save to Inbox' }).first().click();
-    await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
+    // OWNERSTEP-LEFT: the Save button is the sensor; one press, one gesture.
+    await b.page.getByRole('button', { name: SAVE_WITH_PASSKEY }).first().click();
     await b.page
       .getByText(/Inbox folder can't take files/)
       .first()
@@ -189,8 +189,8 @@ describe('chapter 3: inbox', () => {
     const outside = join(pcB.home, 'outside-target.txt');
     await symlink(outside, join(inboxFolder, FILE_NAME));
     const before2 = b.gestures.total();
-    await b.page.getByRole('button', { name: 'Save to Inbox' }).first().click();
-    await b.page.getByRole('button', { name: CONFIRM_PASSKEY }).click();
+    // OWNERSTEP-LEFT: the Save button is the sensor; one press, one gesture.
+    await b.page.getByRole('button', { name: SAVE_WITH_PASSKEY }).first().click();
     await eventually('the file is saved', async () => (await text(b.page)).includes('Saved as'));
     expect(b.gestures.total() - before2).toBe(1);
     expect(existsSync(outside)).toBe(false);
@@ -200,7 +200,7 @@ describe('chapter 3: inbox', () => {
     expect(sha(readFileSync(join(inboxFolder, savedName)))).toBe(sha(file.bytes));
     expect(await text(b.page)).toContain(savedName);
     // Saved once: no Save button for it any more.
-    expect(await b.page.getByRole('button', { name: 'Save to Inbox' }).count()).toBe(0);
+    expect(await b.page.getByRole('button', { name: SAVE_WITH_PASSKEY }).count()).toBe(0);
     dropHoldsNoPlaintext(world.drop, file.bytes);
     await bProbe.check();
   }, 240_000);

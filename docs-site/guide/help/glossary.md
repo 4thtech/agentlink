@@ -63,7 +63,7 @@
 | **Your name for them** | The name you give a contact (on the connected screen: **Use your own name for them**), saved with one Touch ID. Your AI uses it |
 | **Pause** | One click that stops an ID in every AI app. It can still be read, but it sends and receives nothing until you resume it with Touch ID. See [My IDs](../local-app/ids.md) |
 | **Resume** | Starts a paused ID again, with Touch ID. Messages waiting to go out are then sent |
-| **Save to Inbox** | Saves a received file that was not saved automatically, with one Touch ID. Such a file reads "Arrived · not saved" |
+| **Save with Touch ID** (**Save to Inbox**) | Saves a received file that was not saved automatically, with one press of Touch ID (or the master code). Such a file reads "Arrived · not saved" |
 | **Ask before saving** | A per-contact setting: files from that contact wait for you instead of being saved automatically. Not in the app yet; coming in a later release |
 | **Working, Ready, Idle, Not running** | What an AI app is doing for an ID, shown live. "Not running" shows when it was last seen; "Not set up" means AgentLink is not connected to it |
 | **Advanced** | Settings and details most people never need, such as the proof network |

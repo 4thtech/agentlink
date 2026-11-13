@@ -3,24 +3,28 @@
 // SingleApproval: Approve and Deny, the presence step inline, Details folded); "+N more waiting"
 // opens the others in place, each with its own Approve and Deny.
 //
+// N3 (run1113 D3): each card is compact: one line with what the AI wants, "Approve with Touch ID",
+// "Deny with Touch ID" and "Review", which opens the full approval in place.
+//
 // Under the hood adds each request's ID, kind and exact expiry, and the bulk review: free plain
 // requests can be picked and approved together with ONE presence step (client.review, the same
-// call and "This covers exactly these n" as the old Approvals list). Terms and anything that costs
-// money are never pickable: each keeps its own Approve (paid through the confirmation sheet).
+// call and "This covers exactly these n" as the old Approvals list). OWNERSTEP-LEFT: the bulk
+// button itself is the sensor ("Approve 2 with Touch ID"); no second box. Terms and anything that
+// costs money are never pickable: each keeps its own Approve (paid through the confirmation sheet).
 //
 // Nothing here signs (D-118); every server value is React text (I-5); the badge hears how many
 // still wait (a number only).
-import { AgentIcon, Banner, Button, Icon, VT_CLASS } from '@4thtech-io/ui';
+import { AgentIcon, Banner, Icon, VT_CLASS } from '@4thtech-io/ui';
 import { useEffect, useState, type ReactElement } from 'react';
 import { announceDecided, announceWaiting } from '../approvals/badge.js';
 import {
-  OwnerStep,
+  decisionText,
+  PresenceAction,
   SingleApproval,
-  Statuses,
   type OwnerState,
   type SheetOptions,
 } from '../approvals/card.js';
-import type { ApprovalItem, ApprovalsClient, DecideAnswer } from '../approvals/client.js';
+import type { ApprovalItem, ApprovalsClient, DecideAnswer, Presence } from '../approvals/client.js';
 import { APPROVAL_STRINGS as A } from '../approvals/strings.js';
 import { HOME_STRINGS as S, fmt } from './people-strings.js';
 
@@ -75,61 +79,20 @@ const NOT_APPLIED: Readonly<Record<string, string>> = {
   paid_item_in_batch: A.listPaid,
 };
 
-/** The bulk review's presence step: exactly the picked requests, then one gesture. */
-function BulkReview({
-  picks,
-  owner,
-  client,
-  onDone,
-  onBack,
-}: {
-  readonly picks: readonly ApprovalItem[];
-  readonly owner: OwnerState;
-  readonly client: ApprovalsClient;
-  /** `applied` requests were decided; otherwise `why` says why nothing was. */
-  readonly onDone: (applied: number, why?: string) => void;
-  readonly onBack: () => void;
-}): ReactElement {
-  const [lines, setLines] = useState<readonly string[]>([]);
-  const review = picks.map((item) => ({ item, decision: 'approve' as const }));
-  const answer = (a: DecideAnswer): void => {
-    if (a.kind === 'status' && a.status === 'applied') {
-      onDone(picks.length);
-      return;
-    }
-    if (a.kind === 'offline') setLines((l) => [...l, A.notRunning]);
-    else if (a.kind === 'dismissed') setLines((l) => [...l, A.notUsed]);
-    else if (!RETRY.has(a.status)) onDone(0, NOT_APPLIED[a.status] ?? A.listRefused);
-    else setLines((l) => [...l, A.presenceRejected]);
-  };
-  return (
-    <div className="hm-ap-bulk hm-c al-reveal">
-      <OwnerStep
-        passkey={owner.passkey !== undefined}
-        passkeyLabel={A.confirmPasskey}
-        codeSubmit={A.confirm}
-        label={A.confirm}
-        onPasskey={async () => {
-          if (owner.passkey === undefined) return;
-          answer(await client.review(review, { kind: 'passkey', passkey: owner.passkey }));
-        }}
-        onCode={async (code) => answer(await client.review(review, { kind: 'code', code }))}
-      >
-        <>
-          <ul className="al-lines">
-            {picks.map((item) => (
-              <li key={item.approvalId}>{fmt(A.lineApprove, { summary: item.summary })}</li>
-            ))}
-          </ul>
-          <p>{picks.length === 1 ? A.coversOne : fmt(A.coversMany, { count: picks.length })}</p>
-        </>
-      </OwnerStep>
-      <Statuses lines={lines} />
-      <Button variant="ghost" size="sm" onClick={onBack}>
-        {A.back}
-      </Button>
-    </div>
-  );
+/**
+ * OWNERSTEP-LEFT: the bulk approve's answer in the page's words, or undefined once it applied. A
+ * refused sensor proof was used and refused (IR-UX1113-N2-1 #2), never "wasn't used".
+ */
+function bulkAnswerText(a: DecideAnswer, by: Presence['kind']): string | undefined {
+  if (a.kind === 'offline') return A.notRunning;
+  if (a.kind === 'dismissed') return A.notUsed;
+  if (a.status === 'applied') return undefined;
+  if (RETRY.has(a.status)) {
+    return by !== 'code' && a.status !== 'busy' && a.status !== 'wait'
+      ? A.sensorRefused
+      : decisionText(a);
+  }
+  return NOT_APPLIED[a.status] ?? A.listRefused;
 }
 
 function Pick({
@@ -182,7 +145,6 @@ export function HomeApprovals({
   const [open, setOpen] = useState(false);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [reviewing, setReviewing] = useState(false);
-  const [kept, setKept] = useState<readonly ApprovalItem[]>([]);
   const [notice, setNotice] = useState<string | undefined>(undefined);
   // A decided card stays (its Approved moment, the pay sheet's Done) until it has collapsed out,
   // even when the list read meanwhile no longer holds it; then the list is read again.
@@ -220,27 +182,50 @@ export function HomeApprovals({
       else next.add(i.approvalId);
       return next;
     });
-  // Before presence, read the list again: what is no longer waiting, or changed, is left out and
-  // said (04 §2.5.2, as the review-together list did); only the rest goes to the gesture.
-  const startReview = async (): Promise<void> => {
+  // OWNERSTEP-LEFT: one press of "Approve 2 with Touch ID" is the whole step. Before the request,
+  // read the list again: what is no longer waiting, or changed, is said and nothing is sent, so the
+  // owner confirms only what is still there (04 §2.5.2). Otherwise one review, one gesture.
+  const approveSelected = async (presence: Presence): Promise<void> => {
     setNotice(undefined);
-    const live = await client.list();
-    if (live.kind !== 'ok') {
-      setNotice(A.notRunning);
-      return;
-    }
-    const digests = new Map(live.items.map((i) => [i.approvalId, i.actionDigest]));
-    const keep = bulk.filter((i) => digests.get(i.approvalId) === i.actionDigest && pickable(i));
-    const dropped = bulk.length - keep.length;
-    if (dropped === 1) setNotice(A.droppedOne);
-    else if (dropped > 1) setNotice(fmt(A.droppedMany, { count: dropped }));
-    if (keep.length === 0) {
-      setNotice(A.nothingLeft);
-      onChanged();
-      return;
-    }
-    setKept(keep);
     setReviewing(true);
+    try {
+      const live = await client.list();
+      if (live.kind !== 'ok') {
+        setNotice(A.notRunning);
+        return;
+      }
+      const digests = new Map(live.items.map((i) => [i.approvalId, i.actionDigest]));
+      const keep = bulk.filter((i) => digests.get(i.approvalId) === i.actionDigest && pickable(i));
+      const dropped = bulk.length - keep.length;
+      if (dropped > 0) {
+        setPicked(new Set(keep.map((i) => i.approvalId)));
+        setNotice(
+          keep.length === 0
+            ? A.nothingLeft
+            : dropped === 1
+              ? A.droppedOne
+              : fmt(A.droppedMany, { count: dropped }),
+        );
+        onChanged();
+        return;
+      }
+      const a = await client.review(
+        keep.map((item) => ({ item, decision: 'approve' as const })),
+        presence,
+      );
+      const said = bulkAnswerText(a, presence.kind);
+      if (said !== undefined) {
+        setNotice(said);
+        if (a.kind === 'status' && !RETRY.has(a.status)) onChanged();
+        return;
+      }
+      setPicked(new Set());
+      announceDecided(keep.length);
+      setNotice(fmt(S.approvedSelected, { count: keep.length }));
+      onChanged();
+    } finally {
+      setReviewing(false);
+    }
   };
   const decided = (item: ApprovalItem): void => {
     announceDecided(1);
@@ -284,7 +269,6 @@ export function HomeApprovals({
         owner={owner}
         client={client}
         sheet={sheet}
-        passkeyLabel={A.confirmPasskey}
         compact
         onDecided={() => decided(first)}
         onLeft={() => left(first)}
@@ -319,7 +303,6 @@ export function HomeApprovals({
                   owner={owner}
                   client={client}
                   sheet={sheet}
-                  passkeyLabel={A.confirmPasskey}
                   compact
                   onDecided={() => decided(item)}
                   onLeft={() => left(item)}
@@ -331,32 +314,22 @@ export function HomeApprovals({
       ) : null}
       {pro && (open || bulk.length > 0) ? (
         <div className="hm-ap-bar hm-f">
-          {bulk.length > 0 && !reviewing ? (
-            <Button variant="primary" size="sm" onClick={() => void startReview()}>
-              {fmt(S.approveSelected, { count: bulk.length })}
-            </Button>
+          {bulk.length > 0 ? (
+            <PresenceAction
+              owner={owner}
+              size="sm"
+              withSensor={(sensor) => fmt(S.approveSelectedWith, { count: bulk.length, sensor })}
+              withCode={fmt(S.approveSelected, { count: bulk.length })}
+              codeSubmit={A.confirm}
+              statement={
+                bulk.length === 1 ? A.coversOne : fmt(A.coversMany, { count: bulk.length })
+              }
+              disabled={reviewing}
+              send={approveSelected}
+            />
           ) : null}
           {open ? <span className="hm-ap-note al-text-body-sm">{S.paidAlone}</span> : null}
         </div>
-      ) : null}
-      {reviewing && kept.length > 0 ? (
-        <BulkReview
-          picks={kept}
-          owner={owner}
-          client={client}
-          onBack={() => setReviewing(false)}
-          onDone={(applied, why) => {
-            setReviewing(false);
-            setPicked(new Set());
-            if (applied > 0) {
-              announceDecided(applied);
-              setNotice(fmt(S.approvedSelected, { count: applied }));
-            } else if (why !== undefined) {
-              setNotice(why);
-            }
-            onChanged();
-          }}
-        />
       ) : null}
       {notice === undefined ? null : (
         <Banner tone="info" compact className="hm-ap-done" onDismiss={() => setNotice(undefined)}>

@@ -35,6 +35,11 @@ export const INBOX_STRINGS = {
   get confirmPasskey(): string {
     return `Confirm with ${sensorWord()}`;
   },
+  // OWNERSTEP-LEFT: the Save button is the sensor ({sensor}: Touch ID in the Mac app).
+  saveWith: 'Save with {sensor}',
+  // IR-UX1113-N2-1 #2: the sensor was used, and the server did not accept the proof.
+  sensorRefused:
+    "AgentLink didn't accept that confirmation. Nothing was saved. Try again, or use your master code.",
   confirmSave: 'Confirm save',
   saveStepLabel: 'Save this file to your Inbox folder',
   saving: 'Saving…',
