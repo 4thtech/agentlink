@@ -785,7 +785,7 @@ function runQuiet(
   env: Record<string, string>,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(
+    const child = execFile(
       file,
       [...args],
       { env, windowsHide: true, timeout: 15_000, maxBuffer: 64 * 1024, encoding: 'utf8' },
@@ -794,6 +794,8 @@ function runQuiet(
         else resolve(stdout);
       },
     );
+    // PowerShell waits for the end of its input when stdin is a pipe: close it at once.
+    child.stdin?.end();
   });
 }
 

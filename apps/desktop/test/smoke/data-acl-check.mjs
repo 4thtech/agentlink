@@ -16,15 +16,35 @@ if (process.platform !== 'win32') {
 const runner = {
   run: (file, args, env) =>
     new Promise((resolve, reject) => {
-      execFile(file, [...args], { env, windowsHide: true, timeout: 30_000 }, (error, stdout) =>
-        error ? reject(error) : resolve(stdout),
+      const child = execFile(
+        file,
+        [...args],
+        { env, windowsHide: true, timeout: 30_000 },
+        (error, stdout) => (error ? reject(error) : resolve(stdout)),
       );
+      // As the shell does (main.ts runQuiet): PowerShell waits for stdin to end.
+      child.stdin?.end();
     }),
 };
 
 // The user's own temp folder (under %USERPROFILE%), not RUNNER_TEMP on another drive.
 const dir = mkdtempSync(join(tmpdir(), 'al-acl-'));
 let failed = false;
+// Diagnosis on a failure: does each tool run at all (fixed words and exit codes only)?
+const sys32 = `${process.env.SystemRoot ?? 'C:\\Windows'}\\System32`;
+for (const [name, file, args] of [
+  ['whoami', `${sys32}\\whoami.exe`, ['/user', '/fo', 'csv', '/nh']],
+  [
+    'powershell',
+    `${sys32}\\WindowsPowerShell\\v1.0\\powershell.exe`,
+    ['-NoProfile', '-NonInteractive', '-Command', '1'],
+  ],
+]) {
+  await runner.run(file, args, process.env).then(
+    () => console.log(`${name}: runs`),
+    (error) => console.log(`${name}: failed (${String(error?.code ?? 'error')})`),
+  );
+}
 try {
   const inherited = await checkDataFolderAcl('win32', dir, process.env, runner);
   console.log(`inherited ACL: ${inherited}`);
