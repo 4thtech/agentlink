@@ -764,6 +764,24 @@ describe('data folder access (Windows)', () => {
     }
   });
 
+  // Fable rules on whether "unchecked" may start; until then it starts but leaves a fixed line.
+  it('unchecked leaves a fixed line in core.log; ok leaves none', async () => {
+    const line = 'data folder access could not be checked';
+    const read = (dir: string): string => {
+      try {
+        return readFileSync(join(dir, CORE_LOG_FILE), 'utf8');
+      } catch {
+        return '';
+      }
+    };
+    const unchecked = setup([], { checkDataFolder: () => Promise.resolve('unchecked') });
+    await runShell(unchecked.electron, unchecked.proc);
+    expect(read(unchecked.proc.logDir)).toContain(line);
+    const ok = setup([], { checkDataFolder: () => Promise.resolve('ok') });
+    await runShell(ok.electron, ok.proc);
+    expect(read(ok.proc.logDir)).not.toContain(line);
+  });
+
   it('the copy says what to do, in plain words', () => {
     const copy = STATUS_COPY.shared_data_folder;
     expect(copy.heading).toBe('Your AgentLink folder is shared');

@@ -2,13 +2,15 @@
 // shell reads the folder's security descriptor (SDDL from Get-Acl) and the user's SID (whoami) and
 // accepts only an ACL that gives access to this user, SYSTEM and Administrators (the set a folder
 // under %USERPROFILE% inherits); anything wider (Everyone, Users, Authenticated Users, another
-// user, a null DACL) stops the start with a fixed page. The runners are stubbed: no PowerShell here.
+// user, a null DACL) stops the start with a fixed page. The runners are stubbed: no icacls here.
 import { describe, expect, it } from 'vitest';
 import {
-  ACL_SCRIPT,
+  ACL_TIMEOUT_MS,
   aclVerdict,
   checkDataFolderAcl,
   dataFolderFor,
+  decodeSaved,
+  sddlFromSaved,
   parseDacl,
   parseWhoamiSid,
   type AclRunner,
@@ -104,22 +106,54 @@ describe('the verdict', () => {
   });
 });
 
+describe('reading what icacls /save writes', () => {
+  it('decodes UTF-16LE (with or without a byte order mark) and UTF-8', () => {
+    const text = `.agentlink\r\n${INHERITED}\r\n`;
+    const le = Buffer.from(text, 'utf16le');
+    expect(decodeSaved(le)).toBe(text);
+    expect(decodeSaved(Buffer.concat([Buffer.from([0xff, 0xfe]), le]))).toBe(text);
+    expect(decodeSaved(Buffer.from(text, 'utf8'))).toBe(text);
+  });
+
+  it('takes the SDDL line, never the name line', () => {
+    expect(sddlFromSaved(`.agentlink\r\n${INHERITED}\r\n`)).toBe(INHERITED);
+    expect(sddlFromSaved(`D-folder\r\nD:AI(A;;FA;;;SY)\r\n`)).toBe('D:AI(A;;FA;;;SY)');
+    expect(sddlFromSaved('.agentlink\r\n')).toBeUndefined();
+    expect(sddlFromSaved('')).toBeUndefined();
+  });
+});
+
 describe('checking the folder', () => {
+  type Call = { file: string; args: readonly string[]; env: Record<string, string>; ms: number };
   const runner = (
     sddl: string | Error,
     whoami: string | Error = WHOAMI,
-  ): AclRunner & {
-    calls: { file: string; args: readonly string[]; env: Record<string, string> }[];
-  } => {
-    const calls: { file: string; args: readonly string[]; env: Record<string, string> }[] = [];
-    return {
+  ): AclRunner & { calls: Call[]; disposed: number } => {
+    const calls: Call[] = [];
+    const r = {
       calls,
-      run: (file, args, env) => {
-        calls.push({ file, args, env });
-        const out = file.toLowerCase().endsWith('whoami.exe') ? whoami : sddl;
-        return out instanceof Error ? Promise.reject(out) : Promise.resolve(out);
+      disposed: 0,
+      run: (file: string, args: readonly string[], env: Record<string, string>, ms: number) => {
+        calls.push({ file, args, env, ms });
+        if (file.toLowerCase().endsWith('whoami.exe')) {
+          return whoami instanceof Error ? Promise.reject(whoami) : Promise.resolve(whoami);
+        }
+        return sddl instanceof Error ? Promise.reject(sddl) : Promise.resolve('');
       },
+      scratch: () =>
+        Promise.resolve({
+          dir: 'C:\\Users\\ana\\AppData\\Local\\Temp\\al-acl-1',
+          read: (name: string) =>
+            name === 'acl.txt' && typeof sddl === 'string'
+              ? Promise.resolve(Buffer.from(`.agentlink\r\n${sddl}\r\n`, 'utf16le'))
+              : Promise.reject(new Error('no file')),
+          dispose: () => {
+            r.disposed += 1;
+            return Promise.resolve();
+          },
+        }),
     };
+    return r;
   };
 
   it('is win32 only', async () => {
@@ -128,20 +162,36 @@ describe('checking the folder', () => {
     expect(r.calls).toHaveLength(0);
   });
 
-  it('runs Windows PowerShell and whoami from System32, the path only through the environment', async () => {
+  it('runs icacls /save and whoami from System32 with a short fixed timeout, no shell', async () => {
     const r = runner(INHERITED);
     const env = { SystemRoot: 'C:\\Windows' };
     await expect(
       checkDataFolderAcl('win32', 'C:\\Users\\a"; rm\\.agentlink', env, r),
     ).resolves.toBe('ok');
-    const ps = r.calls.find((c) => c.file.endsWith('powershell.exe'));
-    expect(ps?.file).toBe('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
-    expect(ps?.args).toEqual(['-NoProfile', '-NonInteractive', '-Command', ACL_SCRIPT]);
-    expect(ps?.args.join(' ')).not.toContain('.agentlink');
-    expect(ps?.env['AGENTLINK_ACL_PATH']).toBe('C:\\Users\\a"; rm\\.agentlink');
+    const ic = r.calls.find((c) => c.file.endsWith('icacls.exe'));
+    expect(ic?.file).toBe('C:\\Windows\\System32\\icacls.exe');
+    // The folder is one argument; the output goes to a new private scratch folder.
+    expect(ic?.args).toEqual([
+      'C:\\Users\\a"; rm\\.agentlink',
+      '/save',
+      'C:\\Users\\ana\\AppData\\Local\\Temp\\al-acl-1\\acl.txt',
+    ]);
     const who = r.calls.find((c) => c.file.endsWith('whoami.exe'));
     expect(who?.file).toBe('C:\\Windows\\System32\\whoami.exe');
     expect(who?.args).toEqual(['/user', '/fo', 'csv', '/nh']);
+    for (const c of r.calls) expect(c.ms).toBe(ACL_TIMEOUT_MS);
+    expect(ACL_TIMEOUT_MS).toBeLessThanOrEqual(5000);
+    expect(r.disposed).toBe(1);
+  });
+
+  // Fable rules on "unchecked" (it does not stop the start); here it must never read as "ok".
+  it('a timeout or a missing output file is unchecked, never ok, and the scratch is removed', async () => {
+    const timedOut = Object.assign(new Error('timed out'), { killed: true, signal: 'SIGTERM' });
+    const r = runner(timedOut);
+    await expect(checkDataFolderAcl('win32', 'C:\\x', {}, r)).resolves.toBe('unchecked');
+    expect(r.disposed).toBe(1);
+    const empty = runner('');
+    await expect(checkDataFolderAcl('win32', 'C:\\x', {}, empty)).resolves.toBe('unchecked');
   });
 
   it('an odd SystemRoot falls back to C:\\Windows', async () => {
