@@ -136,6 +136,18 @@ describe('runShell startup', () => {
     expect(electron.app.order.slice(0, 3)).toEqual(['sandbox', 'lock', 'ready']);
   });
 
+  it('UPD-4 (IR-UPD-4-1 #2): the update start signal comes before the lock, ready and the location check', async () => {
+    const { electron, proc } = setup([], {
+      updateHealth: () => ({
+        starting: () => electron.app.order.push('update-starting'),
+        ready: () => electron.app.order.push('update-ready'),
+      }),
+    });
+    electron.app.lockGranted = false;
+    expect(await runShell(electron, proc)).toBe('second-instance');
+    expect(electron.app.order.slice(0, 3)).toEqual(['update-starting', 'sandbox', 'lock']);
+  });
+
   it('a second instance exits without a window or a core', async () => {
     const { electron, children, proc } = setup();
     electron.app.lockGranted = false;
