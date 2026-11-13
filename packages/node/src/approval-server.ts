@@ -343,6 +343,8 @@ import {
   registerOwnerPasskey,
   type PasskeyAssertion,
 } from './owner-passkey.js';
+import { attachDesk } from './local-ui/attach-desk.js';
+import { ATTACH_MAX_BODY_BYTES } from './local-ui/api/attach.js';
 import {
   creditsPort,
   fileSavePort,
@@ -366,6 +368,7 @@ import { pairingFollower, type PairingFollower } from './local-ui/pairing-follow
 import { JOIN_PAGE_PATH } from './local-ui/invite-paths.js';
 import type {
   LocalUiInviteRoute,
+  LocalUiAttachRoute,
   LocalUiReadRoute,
   LocalUiRoute,
   LocalUiSwitchRoute,
@@ -391,6 +394,16 @@ import {
   type UiSettings,
 } from '@4thtech-io/types/ui-contract/ui-settings';
 import { createUiSettingsDesk } from './local-ui/api/ui-settings.js';
+import type { LocalUiNotificationsDesk } from './local-ui/api/notifications.js';
+import { notifyPrefsInForce } from '@4thtech-io/types/ui-contract/notifications';
+import {
+  createNotificationStore,
+  memoryNotificationPersistence,
+  type NotificationInbound,
+  type NotificationPersistence,
+  type NotificationSignals,
+  type NotificationStore,
+} from './notifications.js';
 import { createPeopleAllDesk } from './local-ui/api/people-all.js';
 import { createStorageDesk, inboxUsageOf } from './local-ui/api/storage.js';
 // RET-4 (D-148): the Delete history tickets (plan on begin, apply after the Undo window).
@@ -607,6 +620,11 @@ const MAX_INVITE_CREATE_BODY_BYTES = 1_024;
 /** UX2-d1: at most this many invites created per window, per server (a store and spam bound). */
 const INVITE_CREATE_LIMIT = 10;
 const INVITE_CREATE_WINDOW_MS = 10 * 60_000;
+/** ATT-APP-ATTACH: at most this many attached messages per window, per server (then 429 `wait`). */
+const ATTACH_LIMIT = 20;
+const ATTACH_WINDOW_MS = 60_000;
+/** IR-ATTACH-1 F-1: at most this many attach requests read or sent at once (then 429 `wait`). */
+const ATTACH_MAX_IN_FLIGHT = 2;
 /** U3-invite (08 §4): at most one handoff per this many ms (then 429 `wait`). */
 const HANDOFF_INTERVAL_MS = 5_000;
 /** U3-invite (08 §4; M1-UX-OPEN-APP rules): at most one join-screen open per this many ms. */
@@ -954,6 +972,11 @@ export type OwnerSetupFailure =
 
 export interface ApprovalServerOptions {
   readonly source: ApprovalServerSource;
+  /**
+   * IR-NOTIFY-1 M-1 (N6): whether the OS approval alert (notifyNewApproval) may show, read on each
+   * alert. Absent: the app host's UI settings (`notify.approvals`), else on (the D2 default).
+   */
+  readonly approvalAlerts?: () => Promise<boolean>;
   /** Receives fixed-value events (for the redacting logger). Exceptions in it are ignored. */
   readonly onEvent?: (event: ApprovalServerEvent) => void;
   /** M1-11s-b: the local UI app's files and the agent's core client (D-118). */
@@ -1232,6 +1255,9 @@ const NO_AGENT_ROUTES: ReadonlySet<string> = new Set([
   // DESK051-UPD: the app's own version and updates are the app's, not an agent's.
   'GET /api/ui/app-update',
   'GET /api/ui/app-update/check',
+  // UPD-5: Update now and Restart now (the mark kind; desktop app only).
+  'POST /api/ui/app-update/install',
+  'POST /api/ui/app-update/restart',
 ]);
 
 /**
@@ -1657,6 +1683,16 @@ export async function startApprovalServerWith(
   let invitesDesk = agentUi?.client === undefined ? undefined : inviteDesk(agentUi.client);
   /** UX2-d1: when each recent invite was created (ms), oldest first, for the create limit. */
   const invitesCreated: number[] = [];
+  /** ATT-APP-ATTACH: the attach desk of the attach route (never reachable from another route). */
+  const attachDeskOf = (ui: typeof agentUi) =>
+    ui?.client === undefined
+      ? undefined
+      : attachDesk(ui.client, filesHome === undefined ? {} : { home: filesHome });
+  let attachSendDesk = attachDeskOf(agentUi);
+  /** ATT-APP-ATTACH: when each recent attach request was taken (ms), oldest first. */
+  const attachesSent: number[] = [];
+  /** IR-ATTACH-1 F-1: attach requests being read or sent now. */
+  let attachesInFlight = 0;
   /** M1-11s-c: the one owner setup in progress, if any. */
   let pendingSetup: PendingSetup | undefined;
   /** U3-invite (08 §4): the app host's waiting invite, in memory only; absent outside the host. */
@@ -1706,6 +1742,116 @@ export async function startApprovalServerWith(
           write: (settings) =>
             (uiSettingsDirectory.writeUiSettings as (s: UiSettings) => Promise<void>)(settings),
         });
+  // N4 (PLAN-NOTIFY §3.1): the notification centre's stores, one per ID (by folder name) for the
+  // life of the process; the record is the ID folder's `notifications.json` in the app host, memory
+  // otherwise. Signals are what the server already holds in clear: the approvals waiting (a count),
+  // inbound message and file events (contact ID, kind, time), the update state and the relay check.
+  // No text, name, file name or link is read for it (I-5, I-7); no MCP tool reaches it (I-4).
+  const notificationStores = new Map<string, NotificationStore>();
+  let notificationsName: string | undefined;
+  const networkDownSince = new Map<string, number>();
+  /** The network counts as a problem for the centre only after 10 minutes (PLAN-NOTIFY §3.2). */
+  const NETWORK_DOWN_NOTIFY_MS = 10 * 60 * 1000;
+  function notificationsPart(bound: ApprovalServerSource): {
+    notifications?: LocalUiNotificationsDesk;
+  } {
+    // The bound ID's folder name (bindAgent sets it before the context is built); one store outside
+    // the app host.
+    const name = options.host === undefined ? '' : notificationsName;
+    if (name === undefined || agentUi === undefined) return {};
+    let store = notificationStores.get(name);
+    if (store === undefined) {
+      const dir = options.host?.directory;
+      const readFile = dir?.readNotifications?.bind(dir);
+      const writeFile = dir?.writeNotifications?.bind(dir);
+      const persistence: NotificationPersistence =
+        name !== '' && readFile !== undefined && writeFile !== undefined
+          ? { read: () => readFile(name), write: (record) => writeFile(name, record) }
+          : memoryNotificationPersistence();
+      store = createNotificationStore(persistence, { now: () => now() / 1000 });
+      notificationStores.set(name, store);
+    }
+    const kept = store;
+    const client = agentUi.client;
+    const signals = async (): Promise<NotificationSignals> => {
+      const out: {
+        approvals?: number;
+        inbound?: readonly NotificationInbound[];
+        scannedUntil?: number;
+        update?: boolean;
+        networkDown?: boolean;
+      } = {};
+      try {
+        out.approvals = (await bound.list())
+          .map(view)
+          .filter((i) => i !== undefined && !decided.has(i.approvalId)).length;
+      } catch {
+        // Unknown: the approvals item stays as it was.
+      }
+      if (client !== undefined) {
+        try {
+          // IR-NOTIFY-1 M-2: the read starts before the last one ended (store: since), so a
+          // message stored late with an older time is still seen; the store counts each once.
+          const until = Math.floor(now() / 1000);
+          const since = await kept.since();
+          if (since <= until) {
+            const flow = await client.messages.flowEvents(since, until);
+            out.inbound = flow.events
+              .filter((e) => e.direction === 'in')
+              .map((e) => ({ contactId: e.contactId, kind: e.kind, at: e.at }));
+            // A capped read keeps the cursor where it was (the next read covers the rest again).
+            if (!flow.capped) out.scannedUntil = until;
+          }
+        } catch {
+          // Nothing new is counted this time; the cursor stays.
+        }
+      }
+      const update = options.appUpdate?.view();
+      if (update !== undefined) out.update = update.state === 'available';
+      try {
+        const health = await uiContext.health?.();
+        const relays = health?.relays;
+        if (relays !== null && relays !== undefined && health?.agent === 'running') {
+          const t = now();
+          if (relays.total > 0 && relays.connected === 0) {
+            const since = networkDownSince.get(name) ?? t;
+            networkDownSince.set(name, since);
+            out.networkDown = t - since >= NETWORK_DOWN_NOTIFY_MS;
+          } else {
+            networkDownSince.delete(name);
+            out.networkDown = false;
+          }
+        }
+      } catch {
+        // Unknown: the network item stays as it was.
+      }
+      return out;
+    };
+    return {
+      notifications: Object.freeze<LocalUiNotificationsDesk>({
+        list: () => kept.list(),
+        refresh: async () => {
+          await kept.observe(await signals());
+        },
+        markRead: (id) => kept.markRead(id),
+        markAllRead: () => kept.markAllRead(),
+      }),
+    };
+  }
+  /**
+   * IR-NOTIFY-1 M-1 (N6): whether the OS approval alert is on. The caller's answer when it gave one
+   * (agentlink mcp reads ui-settings.json), else the app host's UI settings, else the D2 default (on).
+   * Unreadable settings count as the default.
+   */
+  async function approvalAlertsOn(): Promise<boolean> {
+    try {
+      if (options.approvalAlerts !== undefined) return await options.approvalAlerts();
+      if (uiSettingsDesk === undefined) return true;
+      return notifyPrefsInForce((await uiSettingsDesk.read()).notify).approvals;
+    } catch {
+      return true;
+    }
+  }
   // WP-P2: every ID's people for the People page. Read only: the open ID through its own client
   // (captured with its name and the generation in one step), every other ID as a count from the
   // read-only store peek (directory.stats); no other KeyStore, client or store is opened (04 §2.5).
@@ -1941,6 +2087,8 @@ export async function startApprovalServerWith(
       ...(options.appUpdate === undefined ? {} : { appUpdate: options.appUpdate }),
       // W4-SHELL-V2: the app's UI settings, in the app host only (one desk for every context).
       ...(uiSettingsDesk === undefined ? {} : { uiSettings: uiSettingsDesk }),
+      // N4: the open ID's notification centre (kind, ref, count and times only).
+      ...notificationsPart(bound),
       // U3-d: create an agent and save a verified label, in the app host only.
       ...(options.host === undefined ? {} : { agentsManage }),
       // U3-invite: the waiting invite, in the app host only.
@@ -6547,6 +6695,111 @@ export async function startApprovalServerWith(
   }
 
   /**
+   * ATT-APP-ATTACH (08 §1 "Attach a file"; proposed, owner confirms at merge): the attach kind, run
+   * after the session, CSRF, Origin, fetch-metadata, octet-stream and generation checks of every
+   * write. It refuses a query, an operation input and a presence header; refuses a body without a
+   * declared length (411) or declared over ATTACH_MAX_BODY_BYTES (413) before anything is counted
+   * or allocated; takes the slot BEFORE reading (at most ATTACH_LIMIT requests per ATTACH_WINDOW_MS
+   * and ATTACH_MAX_IN_FLIGHT at once, else 429 `wait`; IR-ATTACH-1 F-1); parses
+   * one strict JSON object and hands the handler only that object and the attach desk. No owner
+   * presence, no owner store, nothing signed. The body (the file bytes) is wiped after the handler;
+   * nothing here logs a name, a path or the content (I-7).
+   */
+  async function attachGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiAttachRoute,
+  ): Promise<void> {
+    if (
+      url.search !== '' ||
+      header(req, 'x-agentlink-input') !== undefined ||
+      header(req, 'x-agentlink-presence') !== undefined
+    ) {
+      req.resume();
+      sendJson(res, 400, { error: 'invalid' });
+      return;
+    }
+    // IR-ATTACH-1 F-1: a declared length over the cap is refused before anything is counted or
+    // allocated; a body without a declared length is refused too (no chunked uploads here).
+    const declaredText = header(req, 'content-length');
+    const declared = declaredText === undefined ? Number.NaN : Number(declaredText);
+    if (!Number.isSafeInteger(declared) || declared < 0) {
+      req.resume();
+      res.setHeader('Connection', 'close');
+      sendJson(res, 411, { error: 'length_required' });
+      return;
+    }
+    if (declared > ATTACH_MAX_BODY_BYTES) {
+      req.resume();
+      res.setHeader('Connection', 'close');
+      sendJson(res, 413, { error: 'too_large' });
+      return;
+    }
+    const at = now();
+    while (attachesSent.length > 0 && (attachesSent[0] as number) <= at - ATTACH_WINDOW_MS) {
+      attachesSent.shift();
+    }
+    if (attachesSent.length >= ATTACH_LIMIT || attachesInFlight >= ATTACH_MAX_IN_FLIGHT) {
+      const oldest = attachesSent[0] ?? at;
+      const retryAfter =
+        attachesSent.length >= ATTACH_LIMIT
+          ? Math.max(1, Math.ceil((oldest + ATTACH_WINDOW_MS - at) / 1000))
+          : 1;
+      req.resume();
+      res.setHeader('Retry-After', String(retryAfter));
+      sendJson(res, 429, { error: 'wait', retryAfter });
+      return;
+    }
+    // F-1: the slot is taken before the body is read, so parallel requests are counted too.
+    attachesSent.push(at);
+    attachesInFlight += 1;
+    try {
+      await attachBody(req, res, route);
+    } finally {
+      attachesInFlight -= 1;
+    }
+  }
+
+  /** The attach gate after its slot is taken: the body, the parse and the handler. */
+  async function attachBody(
+    req: IncomingMessage,
+    res: ServerResponse,
+    route: LocalUiAttachRoute,
+  ): Promise<void> {
+    const body = await boundedBody(req, res, ATTACH_MAX_BODY_BYTES);
+    if (body === undefined) return;
+    try {
+      let parsed: JsonValue;
+      try {
+        parsed = parseJson(decodeUtf8(body));
+      } catch {
+        sendJson(res, 400, { error: 'invalid' });
+        return;
+      }
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+        sendJson(res, 400, { error: 'invalid' });
+        return;
+      }
+      if (!stillCurrent(req)) {
+        agentChanged(res);
+        return;
+      }
+      let result: LocalUiResult;
+      try {
+        result = await route.handler(uiContext, parsed as JsonObject, attachSendDesk);
+      } catch {
+        // Never the error's text: it could name a path or a file (I-7).
+        sendJson(res, 503, { error: 'unavailable' });
+        return;
+      }
+      sendResult(res, result);
+    } finally {
+      wipe(body);
+    }
+  }
+
+  /**
    * U3-invite (08 §4): opens the join screen through the OS opener, or first run while no owner
    * exists (it ends on the join screen). A fixed path and a one-shot session link; the invite is
    * never in it. At most one open per JOIN_OPEN_INTERVAL_MS for a handoff (`limited`).
@@ -6848,6 +7101,11 @@ export async function startApprovalServerWith(
     if (route.presence === 'invite') {
       // UX2-d1: creating and checking an invite have their own gate; ownerGate never runs them.
       await inviteGate(req, res, url, route);
+      return;
+    }
+    if (route.presence === 'attach') {
+      // ATT-APP-ATTACH: the owner's attached files have their own gate; ownerGate never runs it.
+      await attachGate(req, res, url, route);
       return;
     }
     if (route.presence === 'setup') {
@@ -7191,6 +7449,7 @@ export async function startApprovalServerWith(
 
   /** Rebinds every per-agent piece to `agent` (or to none); nothing of the previous one is kept. */
   function bindAgent(agent: AppHostAgent | undefined): void {
+    notificationsName = agent?.name;
     source = agent?.source ?? NO_AGENT_SOURCE;
     agentUi = agent?.localUi;
     // U3-d (04 §2.5.1 "Labels and AI app connections"): the open agent is named only by its
@@ -7199,6 +7458,7 @@ export async function startApprovalServerWith(
     agentLabel = undefined;
     labelReady = refreshLabel();
     invitesDesk = agentUi?.client === undefined ? undefined : inviteDesk(agentUi.client);
+    attachSendDesk = attachDeskOf(agentUi);
     follower = followerOf(agentUi);
     uiContext = buildUiContext();
     // Approvals, a held owner setup and held paid-action confirmations belong to the old agent.
@@ -7919,7 +8179,8 @@ export async function startApprovalServerWith(
     openJoin: () => openJoinPage(false),
     notifyNewApproval: async (approvalId: string) => {
       const url = approvalUrl(approvalId);
-      await notifier(NOTIFICATION).catch(() => false);
+      // IR-NOTIFY-1 M-1 (N6): Settings › Notifications › Approvals waiting governs this alert.
+      if (await approvalAlertsOn()) await notifier(NOTIFICATION).catch(() => false);
       return url;
     },
     close: async () => {

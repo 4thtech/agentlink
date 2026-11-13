@@ -43,6 +43,12 @@
 //   {"v":1,"type":"app-update-check"}
 //       DESK051-UPD: the person chose "Check for updates" in Settings. No other key: the shell checks
 //       its one fixed source and answers with an "app-update".
+//   {"v":1,"type":"app-update-install"}
+//       UPD-5: the person chose "Update now" (owner session + CSRF in the page). No other key: the
+//       shell installs only the update it verified itself (updater/in-app.ts), if any.
+//   {"v":1,"type":"app-update-restart"}
+//       UPD-5: the person chose "Restart now". No other key: the shell restarts only when its own
+//       update is ready.
 //
 // Shell -> core
 //   {"v":1,"type":"invite","link":"https://agentlink.4thtech.io/i#<payload>"}
@@ -53,12 +59,15 @@
 //   {"v":1,"type":"show","route":<SHOW_ROUTES>}
 //       The person asked for a page (tray, dock, second launch). The core answers with a "ready"
 //       carrying a fresh session link for that route's fixed path.
-//   {"v":1,"type":"app-update","state":<APP_UPDATE_STATES>,"current":"<v>","latest":"<v>"|"","download":"<link>"|""}
+//   {"v":1,"type":"app-update","state":<APP_UPDATE_STATES>,"current":"<v>","latest":"<v>"|"","download":"<link>"|"","installable":<bool>,"percent":<0..100>}
 //       DESK051-UPD: what Settings > Updates shows. Sent after every "ready" and whenever it changes.
 //       `current` is this app's version (x.y.z, optionally a short build suffix); `latest` and
-//       `download` are set only for "available": `latest` is a plain x.y.z newer than `current`
-//       and `download` is exactly the release file for this Mac (or the release page) that the
-//       shell built from it (app-update.ts). Both are empty otherwise.
+//       `download` are set only for "available" and the UPD-5 states (downloading, verifying,
+//       ready, restarting, install_failed): `latest` is a plain x.y.z newer than `current` and
+//       `download` is exactly the release file for this Mac (or the release page) that the shell
+//       built from it (app-update.ts). Both are empty otherwise. UPD-5: `installable` (Update now
+//       can run here) and `percent` (a whole number, only while downloading); see
+//       app-update.ts isAppUpdatePipeView.
 //   {"v":1,"type":"shutdown"}
 //       Close cleanly (close the agent, the server and the relays) and exit 0. The shell kills the
 //       core if it has not exited within its grace period.
@@ -66,7 +75,7 @@
 //
 // This module is pure (no Node or Electron APIs) so both sides and their tests can use it.
 
-import { isAppUpdateView, type AppUpdateView } from './app-update.js';
+import { isAppUpdatePipeView, type AppUpdatePipeView } from './app-update.js';
 
 /** Protocol version carried in every message as `"v": 1`. */
 export const PROTOCOL_VERSION = 1;
@@ -170,13 +179,19 @@ export interface AppUpdateCheckMessage {
   readonly v: 1;
   readonly type: 'app-update-check';
 }
+/** UPD-5: "Update now" and "Restart now" (no other key). */
+export interface AppUpdateStepMessage {
+  readonly v: 1;
+  readonly type: 'app-update-install' | 'app-update-restart';
+}
 export type CoreMessage =
   | ReadyMessage
   | StatusMessage
   | ApprovalWaitingMessage
   | InviteResultMessage
   | StoppedMessage
-  | AppUpdateCheckMessage;
+  | AppUpdateCheckMessage
+  | AppUpdateStepMessage;
 
 export interface InviteMessage {
   readonly v: 1;
@@ -192,8 +207,8 @@ export interface ShutdownMessage {
   readonly v: 1;
   readonly type: 'shutdown';
 }
-/** DESK051-UPD: Settings > Updates (app-update.ts isAppUpdateView). */
-export interface AppUpdateMessage extends AppUpdateView {
+/** DESK051-UPD, UPD-5: Settings > Updates (app-update.ts isAppUpdatePipeView). */
+export interface AppUpdateMessage extends AppUpdatePipeView {
   readonly v: 1;
   readonly type: 'app-update';
 }
@@ -309,6 +324,10 @@ export function parseCoreMessage(line: string): CoreMessage | undefined {
     case 'app-update-check':
       if (!hasExactKeys(value, ['v', 'type'])) return undefined;
       return { v: 1, type: 'app-update-check' };
+    case 'app-update-install':
+    case 'app-update-restart':
+      if (!hasExactKeys(value, ['v', 'type'])) return undefined;
+      return { v: 1, type: value['type'] };
     default:
       return undefined;
   }
@@ -335,16 +354,26 @@ export function parseShellMessage(line: string): ShellMessage | undefined {
       if (!hasExactKeys(value, ['v', 'type'])) return undefined;
       return { v: 1, type: 'shutdown' };
     case 'app-update': {
-      if (!hasExactKeys(value, ['v', 'type', 'state', 'current', 'latest', 'download'])) {
-        return undefined;
-      }
+      const keys = [
+        'v',
+        'type',
+        'state',
+        'current',
+        'latest',
+        'download',
+        'installable',
+        'percent',
+      ];
+      if (!hasExactKeys(value, keys)) return undefined;
       const view = {
         state: value['state'],
         current: value['current'],
         latest: value['latest'],
         download: value['download'],
+        installable: value['installable'],
+        percent: value['percent'],
       };
-      if (!isAppUpdateView(view)) return undefined;
+      if (!isAppUpdatePipeView(view)) return undefined;
       return { v: 1, type: 'app-update', ...view };
     }
     default:
@@ -376,6 +405,8 @@ export function encodeShellMessage(message: ShellMessage): string {
         current: message.current,
         latest: message.latest,
         download: message.download,
+        installable: message.installable,
+        percent: message.percent,
       });
       break;
     default:
@@ -413,7 +444,9 @@ export function encodeCoreMessage(message: CoreMessage): string {
       line = JSON.stringify({ v: 1, type: 'stopped', reason: message.reason });
       break;
     case 'app-update-check':
-      line = JSON.stringify({ v: 1, type: 'app-update-check' });
+    case 'app-update-install':
+    case 'app-update-restart':
+      line = JSON.stringify({ v: 1, type: message.type });
       break;
     default:
       throw new Error('protocol: unknown core message');

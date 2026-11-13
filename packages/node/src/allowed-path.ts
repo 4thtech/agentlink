@@ -131,7 +131,7 @@ export function pinnedLocation(folder: string, realHome: string): string | undef
  * The real path of every allowed folder that is still where it was allowed (see the header); the
  * others (missing, a link, below a link) are left out, fail closed.
  */
-async function pinnedAllowedFolders(
+export async function pinnedAllowedFolders(
   allowedFolders: readonly string[],
   home: string,
 ): Promise<string[]> {

@@ -106,6 +106,12 @@ export const CONTACTS_STRINGS = {
   get presenceRequired(): string {
     return `Enter your master code or use ${sensorWord()}. Nothing was changed.`;
   },
+  // IR-UX1113-N2-1 #2: the sensor was used, and the server did not accept the proof.
+  sensorRefused:
+    "AgentLink didn't accept that confirmation. Nothing was changed. Try again, or use your master code.",
+  // IR-N3-1 #5: the server could not use Touch ID (or the passkey) here just now.
+  sensorUnavailable:
+    "That confirmation isn't available here right now. Nothing was changed. Use your master code.",
   get passkeyNotUsed(): string {
     return `${sensorSentence()} wasn't used. Nothing was changed. You can enter your master code.`;
   },

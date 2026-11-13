@@ -502,6 +502,10 @@ describe('Home simple (A4)', () => {
     const card = q('section[aria-label="' + S.approvalsLabel + '"]');
     expect(card).toBeTruthy();
     expect(card?.textContent).toContain('Headline A');
+    // IR-N3-1 #1: the terms card on top offers Approve only once Review shows the terms.
+    expect(byText('button', 'Deny')).toBeTruthy();
+    expect(byText('button', 'Approve')).toBeFalsy();
+    await click(byText('button', 'Review'));
     expect(byText('button', 'Approve')).toBeTruthy();
     const more = byText('button', fmtCount(S.moreWaiting, 1));
     await click(more);

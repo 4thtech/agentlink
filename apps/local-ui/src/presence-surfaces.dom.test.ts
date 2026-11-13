@@ -496,11 +496,12 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   'pages/home/person-menu.tsx': { offers: /<PresenceButton\b/ },
   // RET-4: the delete sheet's one button is the sensor, with the master code as a link.
   'pages/history/delete-sheet.tsx': { offers: /<PresenceButton\b/ },
-  // Approvals: OwnerStep draws the passkey button with the code field under it (approvals/card.tsx).
+  // Approvals: OWNERSTEP-LEFT, the one-step PresenceAction offers the code (link, or the code field
+  // when no sensor works here; approvals/card.tsx CodeStep).
   'pages/approvals/card.tsx': { offers: /<CodeForm\b/ },
-  'pages/approvals/board.tsx': { offers: /<OwnerStep\b/ },
-  'pages/home/home-approvals.tsx': { offers: /<OwnerStep\b/ },
-  'pages/inbox/save.tsx': { offers: /<OwnerStep\b/ },
+  'pages/approvals/board.tsx': { offers: /<PresenceAction\b/ },
+  'pages/home/home-approvals.tsx': { offers: /<PresenceAction\b/ },
+  'pages/inbox/save.tsx': { offers: /<PresenceAction\b/ },
   // Their own code option (each with its own DOM tests).
   'pages/apps/create-agent-gate.tsx': { offers: /NAME\.backupInstead/ },
   'pages/files/index.tsx': { offers: /S\.useCode/ },

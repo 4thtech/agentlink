@@ -31,6 +31,7 @@ import {
 import { SHELL_STRINGS } from '../strings.js';
 import { GoTo } from './go-to.js';
 import { TopBar, shortcutKeys } from './top-bar.js';
+import { setPageTitle } from './attention.js';
 import { useApprovalsWaiting } from '../pages/approvals/badge.js';
 import { detectPlatform, passkeysAvailable } from '../pages/first-run/passkey.js';
 import {
@@ -179,7 +180,8 @@ export { toggleHood };
 function useRouteAnnouncement(path: string): void {
   const first = useRef(true);
   useEffect(() => {
-    document.title = `${titleOf(path)} · AgentLink`;
+    // N5: the bell's number is put in front by attention.ts ("(3) Home · AgentLink").
+    setPageTitle(`${titleOf(path)} · AgentLink`);
     if (first.current) {
       first.current = false;
       return undefined;
@@ -341,7 +343,7 @@ export function Layout({
         {SHELL_STRINGS.skipToContent}
       </a>
       <div className="al-app" data-hood={hood ? 'on' : 'off'}>
-        <TopBar connection={connection} onHood={toggleHood} />
+        <TopBar connection={connection} onHood={toggleHood} path={path} />
         {settled && hood ? <StatusStrip connection={connection} /> : null}
         {settled ? <SectionSheet path={path} hood={hood} /> : null}
         <div className="al-app-body" hidden={!settled}>

@@ -1,97 +1,74 @@
-# RB-23 · Desktop update keys: one-time setup and signing a release
+# RB-23 · Desktop update key: one-time setup, renewal and changing the key
 
 ## Purpose
-The desktop app installs an update only if it was signed with **your** keys (D-145 (5), 08 §8). The keys never go to CI or to any agent. This page covers the one-time setup (about 30 minutes), signing each release (about 1 minute), changing a key, and what to do if something goes wrong.
+The desktop app installs an update only if its update document was signed with **the** update key whose public half is built into the app (D-151, 08 §8). Since the owner decision of 13 Nov 2026 there is **one** key. GitHub holds it as the environment secret `DESKTOP_UPDATE_KEY` in the environment `desktop-update`, with you as the required reviewer. The release signs the update document only after your approval click, the same trust as the npm `latest` click. There is no USB ceremony and no root key.
+
+This page covers the one-time setup (about 10 minutes), what happens at each release, renewing a document before it expires, changing the key, and what to do if something goes wrong.
 
 ## Who runs it
-Tali (owner) only. Agents never hold these keys, never type the passphrases and never run the tool. The tool refuses to run in CI.
+Tali (owner) only. Agents never hold the private key, never create the environment or the secret, and never run the key tool. The key tool refuses to run in CI.
 
-## Two keys, in plain words
-- **Root key.** The master key. Its public half is built into every copy of the app. It signs only short notes that say "this is the update key now" or "that update key is withdrawn". You use it rarely: once now, and again only to change the update key. **It never stays on your everyday computer.** It lives only on two USB sticks.
-- **Update key.** Signs each release. It is kept separate from the root key. If it is ever lost or exposed, the root key replaces it and the apps follow, with no reinstall.
+## One-time setup (about 10 minutes)
 
-Each key is a file locked with its own passphrase (Argon2id + AES-256-GCM, in its own `ALKU` file format). The file is useless without the passphrase, and the passphrase is useless without the file.
+You need this repository at a reviewed commit of `main` with `pnpm install` done (`git status` shows no changes).
 
-## One-time setup (about 30 minutes)
+Do the steps **in this order**: GitHub creates a missing environment with no rules the first time a job names it, so the environment and its rules come first, the pin PR last. The release also checks the rules before any job can reach the key (`desktop-update-environment`) and stops if they are missing.
 
-You need:
-- two USB sticks labelled **ROOT A** and **ROOT B**, and a third labelled **UPDATE** (or a folder on your computer for the update key, see step 9);
-- this repository at a **reviewed, tagged commit** (the tag the orchestrator names, for example `desktop-keys-v1`), with `pnpm install` done and the desktop app built (`pnpm --filter @4thtech-io/desktop build`);
-- two passphrases, one per key, each at least 16 characters (a sentence of five or six random words is good). Write each on paper. Do not save them in a password manager that syncs to this computer.
-
-Steps:
-1. **Check you have the reviewed code.** In the repository: `git checkout <the tag>` and `git status` must show no changes.
-2. **Go offline.** Turn Wi-Fi off and unplug the network cable. Best of all is a separate offline computer, or a computer started from a live USB system that keeps nothing. Keep the network off until step 10.
-3. **Plug in ROOT A.** Create the root key **directly on the stick**, never on the computer's own disk:
+1. **Create the environment.** GitHub › `4thtech/agentlink` › Settings › Environments › **New environment** › name `desktop-update`:
+   - **Required reviewers:** you (tick "Prevent self-review" off, you are the one approving).
+   - **Deployment branches and tags:** "Selected branches and tags", add the branch `main` only (no pattern, no tag, no other branch).
+   - Turn "Allow administrators to bypass configured protection rules" **off**.
+2. **Create the key on your own computer.** In a normal terminal (not a CI shell):
    ```bash
-   node tools/desktop/sign-manifest.mjs generate --role root --out /Volumes/ROOT_A/root.key
+   node tools/desktop/new-update-key.mjs --out ~/agentlink-update.key
    ```
-   Type the root passphrase twice. It prints `root public key: …` (64 characters). Write the first and last 8 characters on the paper next to the passphrase.
-4. **Copy it to ROOT B** and check both open:
-   ```bash
-   cp /Volumes/ROOT_A/root.key /Volumes/ROOT_B/root.key
-   node tools/desktop/sign-manifest.mjs check /Volumes/ROOT_A/root.key
-   node tools/desktop/sign-manifest.mjs check /Volumes/ROOT_B/root.key
-   ```
-   Each prints `OK: …`.
-5. **Create the update key** with the other passphrase, on the UPDATE stick (or in its own folder, step 9):
-   ```bash
-   node tools/desktop/sign-manifest.mjs generate --role update --out /Volumes/UPDATE/update.key
-   node tools/desktop/sign-manifest.mjs check /Volumes/UPDATE/update.key
-   ```
-6. **Sign the first note** ("the update key is this one"), number 1, onto the UPDATE stick:
-   ```bash
-   node tools/desktop/sign-manifest.mjs public-key /Volumes/UPDATE/update.key
-   node tools/desktop/sign-manifest.mjs statement --root-key /Volumes/ROOT_A/root.key \
-     --action introduce --update-key <the update public key> --sequence 1 \
-     --out /Volumes/UPDATE/statement-1.json
-   ```
-7. **Write down the public keys** (they are not secret): `public-key /Volumes/ROOT_A/root.key` and `public-key /Volumes/UPDATE/update.key`. Save the two lines in a text file on the UPDATE stick, for example `public-keys.txt`.
-8. **Make sure no root key is left on the computer.** Nothing was written to the disk, but check: `ls ~ ~/Downloads ~/Desktop | grep -i '\.key'` shows nothing. Eject ROOT A and ROOT B and store them in two different places (for example home and office), each with its paper.
-9. **Update key location.** The update key may stay on the UPDATE stick (best) or in its own folder on your computer, for example `~/agentlink-update-key/` (copy `update.key`, `statement-1.json` and `public-keys.txt` there). Never put it in the same place as a root key.
-10. Turn the network back on. Send the orchestrator `public-keys.txt` and `statement-1.json` only. **Never** send a `.key` file or a passphrase.
+   It writes only the private key (one line, 64 characters) to that new file, readable only by you, and never overwrites a file. It prints the **public key** (64 characters) and the next steps. Write the first and last 8 characters of the public key on paper.
+3. **Add the secret.** In the environment `desktop-update` › **Environment secrets** › **Add secret**. Name `DESKTOP_UPDATE_KEY`. Value: open `~/agentlink-update.key` in a text editor and copy the one line. Paste it there and nowhere else. Save.
+4. **Pin the public key** (last). Send the orchestrator the **public key** only (never the file). The orchestrator opens a PR that sets `"rootPublicKey"` in `apps/desktop/src/main/updater/root-key.json` to it and switches the release build to updates on. This file is a sensitive path: the PR needs the independent review and your "merge". Before you say "merge":
+   1. open the PR's `root-key.json` on GitHub;
+   2. compare all 64 characters with the public key the tool printed (and the first and last 8 on your paper). If any character differs, do **not** merge; tell the orchestrator.
+5. **Remove the file.** `rm ~/agentlink-update.key` (and empty the Trash if you moved it there; make sure no backup or sync folder copied it), or move it to an offline USB stick if you want a copy for changing environments later. Nothing else needs it: GitHub has the secret, the app has the public key.
 
-### Before you say "merge" on the root-key PR
-The orchestrator opens a PR that puts the root public key into `apps/desktop/src/main/updater/root-key.json`. Before you say "merge":
-1. Plug in ROOT A and run `node tools/desktop/sign-manifest.mjs check /Volumes/ROOT_A/root.key`, then type the root passphrase. Use `check`, not `public-key`: `public-key` only reads the public half written in the file, which anyone could have changed; `check` opens the key with your passphrase and prints the public key that really belongs to it (`OK: the passphrase opens the root key …`).
-2. Open the PR's file `root-key.json` on GitHub.
-3. Compare all 64 characters with the key `check` printed in step 1, and with the first and last 8 on your paper. If any character differs, do **not** merge; tell the orchestrator.
+The first release after step 4 is the first one that apps can update **to by themselves only from then on**: copies built with updates off (0.5.x up to that release) never check, so everyone installs that one release by hand once.
 
-## Each release (about 1 minute)
+## Each release (one click)
 
-In the same sitting as the npm `latest` approval, CI leaves an unsigned manifest (`agentlink-desktop-stable.json.unsigned`, or `beta`) on the draft GitHub release.
+After you approve npm `latest` and the app is attached to the GitHub Release, two jobs run in `release.yml`:
+- `desktop-update-environment` (no secret) checks that `desktop-update` still has you as required reviewer, `main` only and no admin bypass.
+- `desktop-update-manifest` (no secret) downloads the app files from the Release, checks that each is the file this run built, that its build provenance was made by `desktop.yml` at this very commit of `main`, that both built apps carry exactly the key in `root-key.json`, and writes the unsigned update document.
+- `sign-update-manifest` waits for **your approval** (environment `desktop-update`). Approve it when the release is the one you just approved. It checks the release is still the Latest one; then one step reads the key, signs, and the next step checks the result with the app's own checks; a bad or unsigned document stops the job before anything is uploaded. It publishes `desktop-update-<key id>.json` (the first 16 characters of the public key) and the same file as `desktop-update.json` on the Release.
 
-1. Download it. With the desktop app built from the release commit (`pnpm --filter @4thtech-io/desktop build`), sign it:
-   ```bash
-   node tools/desktop/sign-manifest.mjs sign --update-key /Volumes/UPDATE/update.key \
-     --statement /Volumes/UPDATE/statement-1.json \
-     --manifest ~/Downloads/agentlink-desktop-stable.json.unsigned \
-     --out ~/Downloads/agentlink-desktop-stable.json
-   ```
-2. The tool first checks the note against the root key built into the app, then shows the version, each installer's system and chip, size and checksum, and the expiry (30 days). Compare the version with the release, and the checksums with `SHA256SUMS` on the draft release. Type `yes` only if they match, then the update passphrase.
-3. The tool checks the signed file with the app's own checks before writing it. Upload `agentlink-desktop-stable.json` to the draft release. CI checks it against the root key and publishes. Your signature is the approval; nothing else goes out.
+If you do not approve, the Release is still there and people can download it; apps just do not offer it in-app.
 
-## Changing the update key (rotation)
+## Renew (about every 3–4 weeks without a release)
 
-Do this once as a rehearsal before any external build, and any time the update key may be exposed.
+An update document is valid for 30 days. The daily check `Desktop update expiry` goes red 7 days before it expires (and when it has expired or is missing while a key is pinned). GitHub emails you the red run. To renew:
+- **ship a release** (any release signs a new document), or
+- open Actions › **Desktop update renew** › **Run workflow** on `main`, and approve its `renew-sign` job. It re-signs the **current Latest** release with a new 30-day window. It uses only what is on the Release: the release tag must point at a commit on `main` whose `root-key.json` equals main's, and each file needs its build provenance from `desktop.yml` at that commit. It needs no build files, so it works at any time (unlike re-running the release jobs, which needs build files GitHub keeps only 14 days). If the pinned key changed since that release, it refuses: ship a release instead.
 
-1. Offline: `generate --role update --out /Volumes/UPDATE/update-2.key` (new passphrase).
-2. With ROOT A plugged in: `statement --root-key /Volumes/ROOT_A/root.key --action rotate --update-key <new public key> --sequence 2 --out /Volumes/UPDATE/statement-2.json`. The number is always one higher than the last note you signed (keep a list on the paper).
-3. Sign the next release with `update-2.key` and `statement-2.json`. Apps that see it switch to the new key and refuse the old one from then on, also apps that are already up to date.
-4. **Raise the floor in the next build.** Tell the orchestrator the new number. The next app build sets `minimumStatementSequence` in `root-key.json` to it, so even a freshly installed copy never accepts an older note. Check it in that PR the same way as above: the number in the file equals your latest note number.
+If it expires anyway, nothing breaks: apps stop offering in-app updates and keep showing the download link (release check) until a new document is published.
 
-To **withdraw** a key with no new release ready: `--action revoke --update-key <that key> --sequence <next number>` and give the orchestrator the note; it is published on its own, and the apps stop accepting that key. Then introduce a new key with the next number, and raise the floor as in step 4.
+## Changing the key
+
+Plan it; there is no way to withdraw a key from apps in the field (D-151). Apps keep trusting the key they were built with until they install a release that pins another one.
+
+1. `node tools/desktop/new-update-key.mjs --out ~/agentlink-update-2.key` (new file).
+2. The orchestrator opens a PR that pins the **new** public key in `root-key.json`. Check the 64 characters as in setup step 4, then merge it and replace `DESKTOP_UPDATE_KEY` with the new key (environment › secret › Update). Remove the old key file.
+3. The release that carries the new pin is signed with the new key, under the new key id. Apps that still trust the old key ask for the old key id's document, do not find it on that release, and show the download link instead: **everyone installs that one release by hand**, as with the first updates-on release. After that, in-app updates work again.
+   - A smoother **bridge** (sign the release that carries the new pin with the old key, under the old key id, so old apps update in-app) needs both keys for one release. `sign-update-manifest` does not do this yet; it is a follow-up (Fable M1).
+
+Because the document name carries the key id, an app with an old pin never fetches a document it would refuse and never mistakes "signed by a key I do not trust" for "no update": it keeps working and shows the download link, and installing by hand moves it to the new key.
 
 ## If something goes wrong
-- **Update key lost, forgotten or exposed:** rotate (above). Nothing is reinstalled.
-- **One root stick lost:** use the other one at once to copy it to a new stick.
-- **Root key exposed, or both root sticks lost:** existing apps can no longer be updated safely. Stop all desktop releases (`DEPLOY_FREEZE`), generate a new root key with this guide, and publish a new build that people install by hand, with a short notice on the website and README. Old apps keep working but will not update.
+- **The key may be exposed** (a leaked log, a compromised GitHub account): set `DEPLOY_FREEZE`, create a new key and change it as above with a release you check yourself. Until apps install that release they still trust the old key: whoever has it **and** can upload to our GitHub Releases could ship them code. That is the same trust as npm `latest` today (04 §7). Delete the old secret at once.
+- **Lost the key file:** nothing to do; GitHub has the secret. To move it elsewhere, create a new key and change it as above.
+- **`sign-update-manifest` says the key is not the pinned one:** the secret and `root-key.json` disagree. Do not approve again; check which public key is pinned and recreate the secret from the matching file, or change the key as above.
 - **`This tool … does not run in CI`:** you are in a CI shell or have `CI` set; open a normal terminal.
-- **`Run this in a terminal`:** the passphrase must be typed, never piped or pasted from a file.
-- **`The app's checks are not built`:** run `pnpm --filter @4thtech-io/desktop build` first.
 
 ## Known limits (for reviewers)
-- **Clock.** Expiry and "dated in the future" use the computer's clock. A wrong clock can make the app refuse a good update (until it is fixed) or accept an expired one; it never makes it accept an unsigned or wrongly signed one.
-- **Freeze window.** Someone who controls the download path can keep showing the last valid manifest until it expires (at most 31 days), so an app may learn of a new release up to that late. They cannot make it install anything older or unsigned.
-- **Rollback of the app's own record.** A program running as the same user can delete the app's record of the latest note; the pinned floor (step 4 of rotation) limits how far back that goes.
-- **Between the check and opening.** The installer is checked again right before it is opened, but a program running as the same user could swap it in that moment. Gatekeeper and SmartScreen still check what is opened; the same user could already change the installed app (04 §2.5).
+- **No field revocation.** A key cannot be withdrawn from installed apps; it is replaced only by a release that pins a new one (D-151).
+- **Same trust as npm `latest`.** The key sits in GitHub's secret store and is used by one CI step after the owner's approval click. Someone with the key and write access to the Releases could ship code to apps that trust it.
+- **The approval click is a process rule against agents, not a technical one.** Agents work under your GitHub account (D-51): that token could approve the pending job, change the environment, replace the secret or upload Release files. Only AGENTS.md ("never approve deployments") stops it, as for npm `latest`. A separate agent token without these rights is the real fix (later).
+- **Clock.** Expiry and "dated in the future" use the computer's clock. A wrong clock can make the app refuse a good update or accept an expired one; it never makes it accept an unsigned or wrongly signed one.
+- **Freeze window.** Someone who controls the download path can keep showing the last valid document until it expires (at most 31 days). They cannot make the app install anything older or unsigned.
+- **`tools/desktop/sign-manifest.mjs`** stays for local checks and signing with a sealed key file; releases no longer need it.

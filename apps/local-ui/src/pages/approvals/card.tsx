@@ -46,7 +46,9 @@ import type {
   DecideAnswer,
   Decision,
   DecisionPasskey,
+  Presence,
 } from './client.js';
+import { usePresenceMode, type PresenceMode } from '../contacts/presence-button.js';
 import { APPROVAL_ID } from './client.js';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
 import { normaliseBackupCode, UseCodeInstead } from '../first-run/backup-code.js';
@@ -273,10 +275,15 @@ export function CompactHead({ item }: { item: ApprovalItem }): ReactElement {
         <p className="al-approval-type">{S.cardTitle}</p>
         <TimeLeft expiresAt={item.expiresAt} />
       </div>
-      <h2>{d === undefined ? item.summary : (d.headline ?? d.what)}</h2>
-      {d === undefined ? null : (
-        <p className="al-approval-line al-text-body-sm">{[d.who, d.what, d.cost].join(' · ')}</p>
-      )}
+      {/* N3: one line, never a heading or a link: the core's fixed-template line and the cost. */}
+      <p className="al-approval-line al-approval-what">
+        {d === undefined ? item.summary : (d.headline ?? d.what)}
+        {/* IR-N3-1 #4: a headline names who; without one, the core's who (or "a contact"). */}
+        {d === undefined || d.headline !== undefined
+          ? null
+          : ` · ${d.who.trim() === '' ? S.aContact : d.who}`}
+        {d === undefined ? null : <span className="al-muted">{` · ${d.cost}`}</span>}
+      </p>
       {d?.terms !== undefined && d.terms.length > 0 ? <TermsSummary lines={d.terms} /> : null}
     </>
   );
@@ -367,28 +374,25 @@ export function CodeForm({
 }
 
 /**
- * The presence step: the passkey first when there is one, the master code below it. `send` runs once
- * per attempt; it resolves when the answer is shown.
+ * OWNERSTEP-LEFT: the master code step. The one-step buttons (Approve with Touch ID, the bulk
+ * approve, Save with Touch ID) send their proof at once; only the master code needs this field,
+ * opened by the action itself when no sensor works here, or by "Use your master code instead".
+ * `children` says what the code confirms. `onCode` runs once per attempt.
  */
-export function OwnerStep({
-  passkey,
-  passkeyLabel,
+export function CodeStep({
   codeSubmit,
   label,
-  onPasskey,
   onCode,
+  onCancel,
   children,
 }: {
-  passkey: boolean;
-  passkeyLabel: string;
   codeSubmit: string;
   label: string;
-  onPasskey: () => Promise<unknown>;
   onCode: (code: string) => Promise<unknown>;
+  onCancel?: () => void;
   children?: ReactElement | null;
 }): ReactElement {
   const box = useRef<HTMLDivElement>(null);
-  const [waiting, setWaiting] = useState(false);
   useEffect(() => {
     // The clicked button is gone: focus moves to the step itself, never to a default button.
     box.current?.focus();
@@ -396,24 +400,145 @@ export function OwnerStep({
   return (
     <div ref={box} className="al-step" role="group" aria-label={label} tabIndex={-1}>
       {children}
-      {passkey ? (
-        <>
-          <Button
-            variant="primary"
-            size="lg"
-            block
-            disabled={waiting}
-            onClick={() => {
-              setWaiting(true);
-              void onPasskey().finally(() => setWaiting(false));
-            }}
-          >
-            {passkeyLabel}
-          </Button>
-          <p className="al-or">{S.orCode}</p>
-        </>
-      ) : null}
-      <CodeForm label={S.codeLabel} submit={codeSubmit} onCode={onCode} primary={!passkey} />
+      <CodeForm label={S.codeLabel} submit={codeSubmit} onCode={onCode} />
+      {onCancel === undefined ? null : (
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          {S.cancel}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** The decision presence a one-step button sends, or undefined when only the code works. */
+export function sensorPresence(mode: PresenceMode): Presence | undefined {
+  if (mode.kind === 'native') return { kind: 'native' };
+  if (mode.kind === 'passkey') return { kind: 'passkey', passkey: mode.info };
+  return undefined;
+}
+
+/** The reading of what confirms here, for a page that already knows the decision passkey. */
+export function useApprovalPresence(
+  owner: OwnerState,
+  readPasskey?: () => Promise<DecisionPasskey | undefined>,
+): {
+  readonly mode: PresenceMode;
+  readonly sensor: string;
+} {
+  const known = owner.passkey;
+  return usePresenceMode({
+    readPasskey: readPasskey ?? (() => Promise.resolve(known)),
+    watch: known?.credentialId ?? '',
+  });
+}
+
+/**
+ * The words for a sensor proof the server did not take: refused (IR-UX1113-N2-1 #2: it was used, not
+ * "wasn't used"), or not available here (IR-N3-1 #5: no Touch ID here now), else undefined.
+ */
+export function sensorAnswer(status: string): string | undefined {
+  if (status === 'presence_rejected') return S.sensorRefused;
+  if (status === 'presence_required') return S.sensorUnavailable;
+  return undefined;
+}
+
+/**
+ * OWNERSTEP-LEFT: one owner action as one step: the button is the sensor ("Approve 2 with Touch
+ * ID", "Confirm with Touch ID"), with "Use your master code instead" as a link; without a sensor here
+ * the button opens the master code. `statement` (what the gesture confirms) is the button's
+ * description. `send` runs once per press; a second press while one is in flight is ignored.
+ */
+export function PresenceAction({
+  owner,
+  readPasskey,
+  withSensor,
+  withCode,
+  codeSubmit,
+  statement,
+  send,
+  disabled = false,
+  size = 'lg',
+  icon,
+  codeInline = false,
+}: {
+  owner: OwnerState;
+  /** Reads the passkey when the page does not know it yet (the Inbox Save). */
+  readPasskey?: () => Promise<DecisionPasskey | undefined>;
+  withSensor: (sensor: string) => string;
+  withCode: string;
+  codeSubmit: string;
+  statement: string;
+  /** Sends one request with this presence; resolves when its answer is shown. */
+  send: (presence: Presence) => Promise<unknown>;
+  disabled?: boolean;
+  size?: 'sm' | 'lg';
+  icon?: 'inbox';
+  /** Inside a step that already says what is confirmed: with only the code here, show its field. */
+  codeInline?: boolean;
+}): ReactElement {
+  const { mode, sensor } = useApprovalPresence(owner, readPasskey);
+  const [asking, setAsking] = useState(false);
+  const [codeOpen, setCodeOpen] = useState(false);
+  const flight = useRef(false);
+  const describedBy = useId();
+  const proof = sensorPresence(mode);
+  const held = disabled || asking || mode.kind === 'reading';
+  const run = (presence: Presence): void => {
+    if (flight.current) return;
+    flight.current = true;
+    setAsking(true);
+    void send(presence).finally(() => {
+      flight.current = false;
+      setAsking(false);
+    });
+  };
+  if (codeInline && mode.kind === 'code') {
+    return (
+      <CodeStep
+        codeSubmit={codeSubmit}
+        label={statement}
+        onCode={(code) => send({ kind: 'code', code })}
+      />
+    );
+  }
+  if (codeOpen) {
+    return (
+      <CodeStep
+        codeSubmit={codeSubmit}
+        label={statement}
+        onCode={async (code) => {
+          await send({ kind: 'code', code });
+          setCodeOpen(false);
+        }}
+        onCancel={() => setCodeOpen(false)}
+      >
+        <p className="al-text-body-sm">{statement}</p>
+      </CodeStep>
+    );
+  }
+  return (
+    <div className="al-presence-action">
+      <span id={describedBy} className="al-sr-only">
+        {statement}
+      </span>
+      <Button
+        variant="primary"
+        size={size}
+        {...(icon === undefined ? {} : { icon })}
+        disabled={held}
+        aria-describedby={describedBy}
+        {...(mode.kind === 'native' ? { 'data-native-confirm': '' } : {})}
+        onClick={() => {
+          if (held) return;
+          if (proof === undefined) setCodeOpen(true);
+          else run(proof);
+        }}
+      >
+        {proof === undefined ? withCode : withSensor(sensor)}
+      </Button>
+      {proof === undefined ? null : (
+        <UseCodeInstead disabled={held} onClick={() => setCodeOpen(true)} />
+      )}
     </div>
   );
 }
@@ -426,26 +551,21 @@ export function SingleApproval({
   sheet,
   onDecided,
   onLeft,
-  passkeyLabel,
   compact = false,
 }: {
   item: ApprovalItem;
   owner: OwnerState;
   client: ApprovalsClient;
   sheet: SheetOptions;
-  /**
-   * W4-INBOX: the passkey button's words for both decisions ("Confirm with your passkey" in the
-   * Inbox, after Approve or Deny was clicked); the default names the decision.
-   */
-  passkeyLabel?: string;
   /** An applied decision (approve or deny); never called for a refused or failed attempt. */
   onDecided?: () => void;
   /** The decided card has collapsed out; the page keeps this line in its place. */
   onLeft?: (line: string) => void;
   /**
-   * W4-INBOX (owner feedback on #714): one head line (what, who, cost, time left) and the actions
-   * in view; everything else (the facts, the quoted terms, the notes, the footer, Under the hood)
-   * folded behind "Details", closed by default, with the same text and untrusted wrapping inside.
+   * N3 (run1113 D3, the compact card on Home): one line with what the AI wants, the time left,
+   * "Approve with Touch ID", "Deny with Touch ID" and "Review", which opens the full approval in
+   * place (the facts, the quoted terms, the AI's words in their untrusted container, the footer and
+   * Under the hood). Collapsed, nothing the AI wrote is drawn.
    */
   compact?: boolean;
 }): ReactElement | null {
@@ -454,6 +574,8 @@ export function SingleApproval({
   const [lines, setLines] = useState<readonly string[]>([]);
   const [paying, setPaying] = useState(false);
   const [outcome, setOutcome] = useState<'approved' | 'denied' | undefined>(undefined);
+  const [reviewing, setReviewing] = useState(false);
+  const reviewId = useId();
   const say = (text: string): void => setLines((l) => [...l, text]);
 
   // UI-REFRESH-o-b / o-c: a decided card (approved or denied) leaves once the sheet (if any) is
@@ -472,7 +594,7 @@ export function SingleApproval({
       ),
   });
 
-  const answer = (a: DecideAnswer): void => {
+  const answer = (a: DecideAnswer, by: Presence['kind']): void => {
     if (a.kind === 'dismissed') {
       say(S.notUsed);
       return;
@@ -483,7 +605,11 @@ export function SingleApproval({
       else if (a.decision === 'deny') setOutcome('denied');
       onDecided?.();
     }
-    say(decisionText(a));
+    // IR-UX1113-N2-1 #2: a sensor proof the server refused was used, not "wasn't used".
+    say(
+      (a.kind === 'status' && by !== 'code' ? sensorAnswer(a.status) : undefined) ??
+        decisionText(a),
+    );
     // F32: after approving something marked Free, say in plain words what that means.
     if (
       a.kind === 'status' &&
@@ -496,31 +622,53 @@ export function SingleApproval({
     if (a.kind === 'status' && RETRY.has(a.status)) setActions(true);
   };
 
-  // UX1113-N2 (R2-UI-13): with a passkey (or Touch ID in the Mac app) the Approve / Deny button is
-  // the gesture ("Approve with Touch ID"): one press, one gesture, one request. The master code is
-  // the link under the buttons; with it the buttons open the code field as before.
+  // UX1113-N2 (R2-UI-13) + N3: with Touch ID in the Mac app, or a passkey here, the Approve / Deny
+  // button is the gesture ("Approve with Touch ID"): one press, one gesture, one request. The master
+  // code is the link under the buttons; with it (or with no sensor here) the buttons open the code.
+  const { mode, sensor } = useApprovalPresence(owner);
   const [codeMode, setCodeMode] = useState(false);
-  const direct = owner.passkey !== undefined && !codeMode;
-  const decideNow = async (decision: Decision): Promise<void> => {
-    if (owner.passkey === undefined) return;
+  const proof = codeMode ? undefined : sensorPresence(mode);
+  // IR-UX1113-N2-1 #1: one decision in flight, whatever the buttons do meanwhile.
+  const flight = useRef(false);
+  const decideNow = async (decision: Decision, presence: Presence): Promise<void> => {
+    if (flight.current) return;
+    flight.current = true;
     setActions(false);
-    const a = await client.decide(item, decision, { kind: 'passkey', passkey: owner.passkey });
-    answer(a);
-    if (a.kind === 'dismissed') setActions(true);
+    try {
+      const a = await client.decide(item, decision, presence);
+      answer(a, presence.kind);
+      if (a.kind === 'dismissed') setActions(true);
+    } finally {
+      flight.current = false;
+    }
   };
+  // IR-N3-1 #1: terms commit the owner, so on the compact card Approve is offered only once Review
+  // shows every line of them; Deny needs no Review.
+  const termsHidden = compact && item.commitment && !reviewing;
   const open = (decision: Decision): void => {
+    if (flight.current) return;
+    if (decision === 'approve' && termsHidden) return;
     // M1-PAY-CONFIRM-b: approving a request that costs credits is the confirmation sheet's.
     if (item.paid && decision === 'approve') {
       setPaying(true);
       return;
     }
-    if (direct) {
-      void decideNow(decision);
+    if (proof !== undefined) {
+      void decideNow(decision, proof);
       return;
     }
     setActions(false);
     setStep(decision);
   };
+
+  const full = (
+    <>
+      <ApprovalFacts item={item} />
+      {item.commitment ? <p className="al-note">{S.termsAlone}</p> : null}
+      {item.paid ? <p className="al-note">{S.paidAlone}</p> : null}
+    </>
+  );
+  const reading = mode.kind === 'reading';
 
   if (!row.mounted) return null;
   return (
@@ -528,68 +676,70 @@ export function SingleApproval({
       <Surface
         as="section"
         level={step !== undefined || paying ? 2 : 1}
-        className="al-approval"
+        className={compact ? 'al-approval al-approval-compact' : 'al-approval'}
         {...(APPROVAL_ID.test(item.approvalId) ? { 'data-approval': item.approvalId } : {})}
         {...(outcome === undefined ? {} : { 'data-outcome': outcome })}
       >
-        {compact ? (
-          <CompactHead item={item} />
-        ) : (
-          <>
-            <ApprovalFacts item={item} />
-            {item.commitment ? <p className="al-note">{S.termsAlone}</p> : null}
-            {item.paid ? <p className="al-note">{S.paidAlone}</p> : null}
-          </>
-        )}
+        {compact ? <CompactHead item={item} /> : full}
         <div className="al-slot">
           {owner.ready && actions ? (
             // Deny first, Approve as the wider primary (D1); neither is a default button (11 §8).
             <div className="al-approval-actions">
-              <Button size="lg" onClick={() => open('deny')}>
-                {direct ? S.denyWithPasskey : S.deny}
+              <Button size="lg" disabled={reading} onClick={() => open('deny')}>
+                {proof === undefined ? S.deny : fmt(S.denyWith, { sensor })}
               </Button>
-              {/* F30/F31: while the confirm step is open, its button is the one orange button. */}
-              <Button
-                {...(step === undefined ? { variant: 'primary' as const } : {})}
-                size="lg"
-                onClick={() => open('approve')}
-              >
-                {direct && !item.paid ? S.approveWithPasskey : S.approve}
-              </Button>
-              {direct ? <UseCodeInstead onClick={() => setCodeMode(true)} /> : null}
+              {/* F30/F31: while the code step is open, its button is the one orange button. */}
+              {termsHidden ? null : (
+                <Button
+                  {...(step === undefined ? { variant: 'primary' as const } : {})}
+                  size="lg"
+                  disabled={reading}
+                  {...(proof?.kind === 'native' && !item.paid ? { 'data-native-confirm': '' } : {})}
+                  onClick={() => open('approve')}
+                >
+                  {proof !== undefined && !item.paid ? fmt(S.approveWith, { sensor }) : S.approve}
+                </Button>
+              )}
+              {compact ? (
+                <Button
+                  variant="ghost"
+                  size="lg"
+                  aria-expanded={reviewing}
+                  aria-controls={reviewId}
+                  onClick={() => setReviewing((r) => !r)}
+                >
+                  {reviewing ? S.hideReview : S.review}
+                </Button>
+              ) : null}
+              {proof !== undefined ? <UseCodeInstead onClick={() => setCodeMode(true)} /> : null}
             </div>
           ) : null}
           {outcome === 'approved' ? <ApprovedMoment /> : null}
           <Statuses lines={lines} />
           {step === undefined ? null : (
-            <OwnerStep
-              passkey={owner.passkey !== undefined && !codeMode}
-              passkeyLabel={
-                passkeyLabel ?? (step === 'approve' ? S.approveWithPasskey : S.denyWithPasskey)
-              }
+            <CodeStep
               codeSubmit={step === 'approve' ? S.confirmApproval : S.confirmDenial}
               label={step === 'approve' ? S.confirmApproval : S.confirmDenial}
-              onPasskey={async () => {
-                if (owner.passkey === undefined) return;
-                answer(
-                  await client.decide(item, step, { kind: 'passkey', passkey: owner.passkey }),
-                );
-              }}
               onCode={async (code) =>
-                answer(await client.decide(item, step, { kind: 'code', code }))
+                answer(await client.decide(item, step, { kind: 'code', code }), 'code')
               }
+              onCancel={() => {
+                setStep(undefined);
+                setActions(true);
+              }}
             />
           )}
         </div>
         {compact ? (
-          <details className="al-approval-details">
-            <summary className="al-text-body-sm">{S.details}</summary>
-            <ApprovalFacts item={item} />
-            {item.commitment ? <p className="al-note">{S.termsAlone}</p> : null}
-            {item.paid ? <p className="al-note">{S.paidAlone}</p> : null}
-            <ApprovalFoot />
-            <UnderTheHood fields={approvalHoodFields(item)} />
-          </details>
+          reviewing ? (
+            <div id={reviewId} className="al-approval-review al-expand">
+              {full}
+              <ApprovalFoot />
+              <UnderTheHood fields={approvalHoodFields(item)} />
+            </div>
+          ) : (
+            <div id={reviewId} hidden />
+          )
         ) : (
           <>
             <ApprovalFoot />

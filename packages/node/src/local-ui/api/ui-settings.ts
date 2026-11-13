@@ -22,6 +22,7 @@ import {
   readKeptValue,
   type UiSettings,
 } from '@4thtech-io/types/ui-contract/ui-settings';
+import { NOTIFY_PREF_KEYS } from '@4thtech-io/types/ui-contract/notifications';
 import type { LocalUiContext } from '../context.js';
 import {
   NOT_AVAILABLE,
@@ -47,7 +48,7 @@ export interface LocalUiSettingsDesk {
  * UX1113-QA-HOST: `kept` carries only allowlisted keys whose value passes its own check again.
  */
 function body(settings: UiSettings): JsonObject {
-  const out: Record<string, boolean | Record<string, string>> = {};
+  const out: Record<string, boolean | Record<string, string> | Record<string, boolean>> = {};
   if (typeof settings.underTheHood === 'boolean') out['underTheHood'] = settings.underTheHood;
   if (typeof settings.menuExpanded === 'boolean') out['menuExpanded'] = settings.menuExpanded;
   if (settings.kept !== undefined) {
@@ -57,6 +58,15 @@ function body(settings: UiSettings): JsonObject {
       if (value !== undefined) kept[key] = value;
     }
     out['kept'] = kept;
+  }
+  if (settings.notify !== undefined) {
+    // N6: the Settings › Notifications switches, key by key (readNotifyPrefs checked them).
+    const notify: Record<string, boolean> = {};
+    for (const key of NOTIFY_PREF_KEYS) {
+      const value = settings.notify[key];
+      if (typeof value === 'boolean') notify[key] = value;
+    }
+    out['notify'] = notify;
   }
   return out;
 }
