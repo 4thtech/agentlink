@@ -92,11 +92,16 @@ export function attachDesk(
       // 4. Core's ordinary send.
       let result;
       try {
+        // IR-ATTACH-1 F-4: the page's request ID makes a retry a replay, never a second message
+        // (the retry writes the same name again once this call's copy was removed).
         result = await client.sendMessage({
           to: request.to,
           text: request.text,
           type: 'text',
           files,
+          ...(request.requestId === undefined
+            ? {}
+            : { clientRequestId: `attach:${request.requestId}` }),
         });
       } catch (error) {
         await removeAll(written);

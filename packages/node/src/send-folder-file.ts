@@ -7,9 +7,11 @@
 //   the type allowlist on the sanitised name's last extension: .md, .markdown, .txt, .json. Light
 //   text only, Markdown first; every other type is refused (also `notes.md.exe`).
 // - attachProblem: at most ATTACH_MAX_FILE_BYTES (8 MiB); no NUL byte; valid UTF-8 (fatal decode).
-// - writeSendFolderFile: the folder is a PINNED allowed folder (allowed-path `pinnedAllowedFolders`:
-//   its realpath is where it was allowed, so a Send folder that became a link is not used), the
-//   default `~/AgentLink/Send` first. The folder is held (inbox-folder `openInboxDir`: O_DIRECTORY |
+// - writeSendFolderFile: the folder is the ID's own Send folder (`~/AgentLink/Send`, or the
+//   `Send-2` ... `Send-9` set-up made beside an unusable one), and only while it is allowed and
+//   PINNED (allowed-path `pinnedAllowedFolders`: its realpath is where it was allowed, so a Send
+//   folder that became a link is not used). Another allowed folder is never written to (IR-ATTACH-1
+//   F-3): without the Send folder the answer is `no_folder`. The folder is held (inbox-folder `openInboxDir`: O_DIRECTORY |
 //   O_NOFOLLOW, same device and inode) for the whole write. The file is created with O_CREAT |
 //   O_EXCL | O_NOFOLLOW, mode 0600, so nothing existing is overwritten and a planted link is never
 //   followed: a clash takes `name (2).md`, `name (3).md`, … Then the written path must pass the full
@@ -26,6 +28,7 @@ import path from 'node:path';
 import { sanitizeFileName } from '@4thtech-io/core';
 import { pinnedAllowedFolders, pinnedLocation, resolveAllowedFile } from './allowed-path.js';
 import { openInboxDir } from './inbox-folder.js';
+import { SEND_FOLDER_FALLBACKS, SEND_FOLDER_SEGMENTS } from './owner-first-policy.js';
 
 /** The types the owner may attach in the app (lowercase extensions, no dot). */
 export const ATTACH_EXTENSIONS: readonly string[] = Object.freeze([
@@ -59,7 +62,11 @@ export type SendFolderWrite =
     }
   | { readonly ok: false; readonly reason: SendFolderWriteRefusal };
 
-const DEFAULT_SEND = '~/AgentLink/Send';
+const [SEND_PARENT, SEND_NAME] = SEND_FOLDER_SEGMENTS as readonly [string, string];
+/** The ID's own Send folder, in order: `~/AgentLink/Send`, then `~/AgentLink/Send-2` ... `Send-9`. */
+const SEND_CANDIDATES: readonly string[] = [SEND_NAME, ...SEND_FOLDER_FALLBACKS].map(
+  (name) => `~/${SEND_PARENT}/${name}`,
+);
 const MAX_NAME_BYTES = 255;
 const MAX_ATTEMPTS = 100;
 const noFollow = (constants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0;
@@ -115,8 +122,13 @@ async function sendFolder(
   const pinned = await pinnedAllowedFolders(allowedFolders, home);
   if (pinned.length === 0) return undefined;
   const realHome = await realpath(home).catch(() => home);
-  const preferred = pinnedLocation(DEFAULT_SEND, realHome);
-  return pinned.find((f) => f === preferred) ?? pinned[0];
+  // IR-ATTACH-1 F-3: only the ID's own Send folder (`~/AgentLink/Send`, or the `Send-2` ... `Send-9`
+  // set-up made beside an unusable one), never another allowed folder the owner allowed for his AI.
+  for (const candidate of SEND_CANDIDATES) {
+    const where = pinnedLocation(candidate, realHome);
+    if (where !== undefined && pinned.includes(where)) return where;
+  }
+  return undefined;
 }
 
 /** Writes `bytes` as a new file in the open ID's Send folder (see the header). */

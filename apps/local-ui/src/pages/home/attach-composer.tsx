@@ -79,6 +79,15 @@ function errorText(error: AttachError, name: string): string {
   }
 }
 
+/** A fresh request ID: 16 random bytes as base64url (22 characters). */
+function newRequestId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/u, '');
+}
+
 const hasFiles = (event: DragEvent): boolean => {
   const types = event.dataTransfer?.types;
   return types === undefined || Array.from(types).includes('Files');
@@ -103,6 +112,8 @@ export function AttachComposer({
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement | null>(null);
   const nextKey = useRef(1);
+  /** IR-ATTACH-1 F-4: this message's ID; kept for a retry, new once the files or the note change. */
+  const requestId = useRef<string | undefined>(undefined);
 
   const add = (list: FileList | readonly File[] | null | undefined): void => {
     const files = list === null || list === undefined ? [] : Array.from(list);
@@ -124,11 +135,15 @@ export function AttachComposer({
       nextKey.current += 1;
       room -= 1;
     }
-    if (accepted.length > 0) setPending((prev) => [...prev, ...accepted]);
+    if (accepted.length > 0) {
+      requestId.current = undefined;
+      setPending((prev) => [...prev, ...accepted]);
+    }
     setNotice(problem);
   };
 
   const remove = (key: number): void => {
+    requestId.current = undefined;
     setPending((prev) => prev.filter((p) => p.key !== key));
     setNotice(undefined);
   };
@@ -137,13 +152,16 @@ export function AttachComposer({
     if (pending.length === 0 || sending) return;
     setSending(true);
     setNotice(undefined);
+    requestId.current ??= newRequestId();
     const result = await api.send(
       contactId,
       note,
       pending.map((p) => p.file),
+      requestId.current,
     );
     setSending(false);
     if (result.ok) {
+      requestId.current = undefined;
       setPending([]);
       setNote('');
       setNotice(
@@ -232,7 +250,10 @@ export function AttachComposer({
             maxLength={ATTACH_MAX_TEXT_CHARS}
             value={note}
             disabled={sending}
-            onChange={(event) => setNote(event.currentTarget.value)}
+            onChange={(event) => {
+              requestId.current = undefined;
+              setNote(event.currentTarget.value);
+            }}
           />
         )}
         <div className="hm-attach-actions hm-f">

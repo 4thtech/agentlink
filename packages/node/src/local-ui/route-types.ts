@@ -360,6 +360,11 @@ export interface LocalUiAttachRequest {
   /** The owner's note; may be empty. */
   readonly text: string;
   readonly files: readonly LocalUiAttachFile[];
+  /**
+   * IR-ATTACH-1 F-4: the page's ID for this message, the same on a retry, passed to core as
+   * `clientRequestId` so a retry after a lost answer does not send twice.
+   */
+  readonly requestId?: string;
 }
 
 /** ATT-APP-ATTACH: why an attached message was not sent (fixed codes, never a path or a name). */

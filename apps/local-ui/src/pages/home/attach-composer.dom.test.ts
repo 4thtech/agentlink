@@ -202,6 +202,30 @@ describe('AttachComposer', () => {
     expect(host.textContent).toContain('Sent to Marko');
   });
 
+  it('IR-ATTACH-1 F-4: a retry carries the same request ID; a changed message a new one', async () => {
+    const s = server({ status: 503, body: { error: 'unavailable' } });
+    render(createAttachApi({ fetch: s.fetch, token: 'tok' }));
+    pick([file('plan.md', 'x')]);
+    await settle();
+    act(() => button(/^Send$/).click());
+    await settle();
+    act(() => button(/^Send$/).click());
+    await settle();
+    pick([file('more.md', 'y')]);
+    await settle();
+    act(() => button(/^Send$/).click());
+    await settle();
+    const ids = s.calls.map(
+      (c) =>
+        (JSON.parse(new TextDecoder().decode(c.body as Uint8Array)) as { requestId: string })
+          .requestId,
+    );
+    expect(ids).toHaveLength(3);
+    expect(ids[0]).toMatch(/^[A-Za-z0-9_-]{16,64}$/);
+    expect(ids[1]).toBe(ids[0]);
+    expect(ids[2]).not.toBe(ids[0]);
+  });
+
   it('no Send folder: shows the Send folder banner and keeps the files', async () => {
     const s = server({ status: 409, body: { error: 'no_folder' } });
     render(createAttachApi({ fetch: s.fetch, token: 'tok' }), () => undefined, true);

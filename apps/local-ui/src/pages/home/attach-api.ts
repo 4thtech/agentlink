@@ -38,7 +38,13 @@ export type AttachResult =
   | { readonly ok: false; readonly error: AttachError };
 
 export interface AttachApi {
-  send(contactId: string, text: string, files: readonly File[]): Promise<AttachResult>;
+  /** `requestId`: the same for a retry of the same message (no second message is sent). */
+  send(
+    contactId: string,
+    text: string,
+    files: readonly File[],
+    requestId?: string,
+  ): Promise<AttachResult>;
 }
 
 /** Why the page refuses a file before sending (the server checks again). */
@@ -100,14 +106,21 @@ export function createAttachApi(
   const doFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const token = (): string => options.token ?? pageToken();
   return {
-    async send(contactId, text, files) {
+    async send(contactId, text, files, requestId) {
       let body: Uint8Array<ArrayBuffer>;
       try {
         const encoded = [];
         for (const file of files) {
           encoded.push({ name: file.name, data: base64(await bytesOf(file)) });
         }
-        body = new TextEncoder().encode(JSON.stringify({ to: contactId, text, files: encoded }));
+        body = new TextEncoder().encode(
+          JSON.stringify({
+            to: contactId,
+            text,
+            files: encoded,
+            ...(requestId === undefined ? {} : { requestId }),
+          }),
+        );
       } catch {
         return { ok: false, error: 'failed' };
       }

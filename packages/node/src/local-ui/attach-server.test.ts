@@ -36,7 +36,7 @@ import {
 import { ownerSigValid, ownerWorld, send, type OwnerWorld } from '../approval-ui.fixture.js';
 import { KeychainOwnerKeyStore } from '../owner-keystore.js';
 import type { LocalUiAssets } from './context.js';
-import { ATTACH_PATH } from './api/attach.js';
+import { ATTACH_MAX_BODY_BYTES, ATTACH_PATH } from './api/attach.js';
 
 const hex = (n: number, pair: string): string => pair.repeat(n);
 const CONTACT_ID = `0x${hex(20, '1a')}`;
@@ -60,6 +60,7 @@ const bundle = (): LocalUiAssets => ({
 interface SentCall {
   readonly to: string;
   readonly text: string | undefined;
+  readonly clientRequestId: string | undefined;
   readonly files: { realpath: string; name: string; mime: string; size: number; bytes: string }[];
 }
 
@@ -90,7 +91,9 @@ interface Harness {
   ): Promise<{ status: number; body: string }>;
 }
 
-async function harness(options: { folders?: string[]; result?: unknown } = {}): Promise<Harness> {
+async function harness(
+  options: { folders?: string[]; result?: unknown; gate?: Promise<void> } = {},
+): Promise<Harness> {
   const sent: SentCall[] = [];
   const folders = options.folders ?? ['~/AgentLink/Send'];
   const policy = {
@@ -111,6 +114,7 @@ async function harness(options: { folders?: string[]; result?: unknown } = {}): 
     sendMessage: async (input: {
       to: string;
       text?: string;
+      clientRequestId?: string;
       files?: readonly {
         realpath: string;
         name?: string;
@@ -134,7 +138,8 @@ async function harness(options: { folders?: string[]; result?: unknown } = {}): 
           bytes: new TextDecoder().decode(bytes),
         });
       }
-      sent.push({ to: input.to, text: input.text, files });
+      if (options.gate !== undefined) await options.gate;
+      sent.push({ to: input.to, text: input.text, clientRequestId: input.clientRequestId, files });
       return (
         options.result ?? {
           status: 'ok',
@@ -197,6 +202,8 @@ async function harness(options: { folders?: string[]; result?: unknown } = {}): 
         'X-AgentLink-CSRF': csrf,
         'Content-Type': 'application/octet-stream',
         'Sec-Fetch-Site': 'same-origin',
+        // As a browser's fetch does for a byte body (the gate refuses a body of unknown length).
+        ...(body === undefined ? {} : { 'Content-Length': String(body.length) }),
         ...extra,
       };
       for (const name of omit) Reflect.deleteProperty(headers, name);
@@ -363,6 +370,83 @@ describe('ATT-APP-ATTACH: the attach route', () => {
     expect(res.status).toBe(403);
     expect(JSON.parse(res.body)).toEqual({ error: 'policy' });
     expect(await readdir(sendFolder)).toEqual([]);
+  });
+
+  it('IR-ATTACH-1 F-3: another allowed folder is never used; no Send folder is no_folder', async () => {
+    const elsewhere = path.join(home, 'Elsewhere');
+    await mkdir(elsewhere);
+    const h = await harness({ folders: ['~/Elsewhere'] });
+    const res = await h.post(ATTACH_PATH, one('a.md', 'x'));
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({ error: 'no_folder' });
+    expect(await readdir(elsewhere)).toEqual([]);
+    expect(h.sent).toHaveLength(0);
+  });
+
+  it('IR-ATTACH-1 F-4: the page request ID reaches core as clientRequestId; a bad one is refused', async () => {
+    const h = await harness();
+    const id = 'AbCdEfGhIjKlMnOpQrSt_-';
+    expect((await h.post(ATTACH_PATH, one('a.md', 'x', { requestId: id }))).status).toBe(200);
+    expect(h.sent[0]?.clientRequestId).toBe(`attach:${id}`);
+    expect((await h.post(ATTACH_PATH, one('b.md', 'x'))).status).toBe(200);
+    expect(h.sent[1]?.clientRequestId).toBeUndefined();
+    for (const bad of ['short', 'has space in it here', 'x'.repeat(65), 42]) {
+      const res = await h.post(ATTACH_PATH, one('c.md', 'x', { requestId: bad }));
+      expect(res.status).toBe(400);
+    }
+    expect(h.sent).toHaveLength(2);
+  });
+
+  describe('IR-ATTACH-1 F-1: the limits are taken before the body is read', () => {
+    it('no declared length: 411; a declared length over the cap: 413, nothing counted', async () => {
+      const h = await harness();
+      const chunked = await h.post(ATTACH_PATH, one('a.md', 'x'), {}, ['Content-Length']);
+      expect(chunked.status).toBe(411);
+      const over = await h.post(ATTACH_PATH, one('a.md', 'x'), {
+        'Content-Length': String(ATTACH_MAX_BODY_BYTES + 1),
+      });
+      expect(over.status).toBe(413);
+      expect(h.sent).toHaveLength(0);
+      // Neither took a slot: 20 more still go through.
+      for (let i = 0; i < 20; i += 1) {
+        expect((await h.post(ATTACH_PATH, one(`n${String(i)}.md`, 'x'))).status).toBe(200);
+      }
+    });
+
+    it('at most 20 a minute: the 21st is 429 wait with Retry-After, before its body is used', async () => {
+      const h = await harness();
+      for (let i = 0; i < 20; i += 1) {
+        // A refused body still takes its slot (the slot is taken before reading).
+        const res = await h.post(ATTACH_PATH, one(i % 2 === 0 ? `f${String(i)}.md` : 'x.exe', 'x'));
+        expect([200, 400]).toContain(res.status);
+      }
+      const res = await h.post(ATTACH_PATH, one('last.md', 'x'));
+      expect(res.status).toBe(429);
+      expect(JSON.parse(res.body)).toMatchObject({ error: 'wait' });
+      expect(h.sent.map((s) => s.files[0]?.name)).not.toContain('last.md');
+    });
+
+    it('parallel requests: at most 2 at once, the rest 429', async () => {
+      let open = (): void => undefined;
+      const gate = new Promise<void>((resolve) => {
+        open = resolve;
+      });
+      const h = await harness({ gate });
+      const first = [
+        h.post(ATTACH_PATH, one('p1.md', 'x')),
+        h.post(ATTACH_PATH, one('p2.md', 'x')),
+      ];
+      // Let both reach the (held) send.
+      await new Promise((r) => setTimeout(r, 200));
+      const third = await h.post(ATTACH_PATH, one('p3.md', 'x'));
+      expect(third.status).toBe(429);
+      open();
+      const done = await Promise.all(first);
+      expect(done.map((d) => d.status)).toEqual([200, 200]);
+      expect(h.sent).toHaveLength(2);
+      // Once they finished, the next one goes through.
+      expect((await h.post(ATTACH_PATH, one('p4.md', 'x'))).status).toBe(200);
+    });
   });
 
   describe('the gate (session, CSRF, Origin, fetch metadata, octet-stream)', () => {

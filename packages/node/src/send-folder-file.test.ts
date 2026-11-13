@@ -213,9 +213,22 @@ describe('writeSendFolderFile', () => {
     });
   });
 
-  it('prefers ~/AgentLink/Send over another allowed folder', async () => {
+  it('uses ~/AgentLink/Send even when another folder is listed first', async () => {
     const out = await write('a.md', utf8('x'), ['~/Elsewhere', '~/AgentLink/Send']);
     expect(out.ok && path.dirname(out.realpath)).toBe(send);
+  });
+
+  it('never writes into another allowed folder: no Send folder allowed is no_folder', async () => {
+    const out = await write('a.md', utf8('x'), ['~/Elsewhere']);
+    expect(out).toEqual({ ok: false, reason: 'no_folder' });
+    expect(await readdir(outside)).toEqual([]);
+  });
+
+  it('uses the Send-2 set-up made beside an unusable Send', async () => {
+    const send2 = path.join(home, 'AgentLink', 'Send-2');
+    await mkdir(send2, { mode: 0o700 });
+    const out = await write('a.md', utf8('x'), ['~/Elsewhere', '~/AgentLink/Send-2']);
+    expect(out.ok && path.dirname(out.realpath)).toBe(send2);
   });
 
   it('remove() deletes only the file it wrote', async () => {
