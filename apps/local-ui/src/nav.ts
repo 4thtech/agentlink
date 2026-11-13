@@ -97,6 +97,8 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
   // REL051-RET1: sizes only (retention plan RET-1).
   { label: PAGE_TITLES.storage, path: '/settings/storage' },
   { label: PAGE_TITLES.appearance, path: '/settings/appearance' },
+  // N6 (PLAN-NOTIFY §4.4): replaces the redirect to Settings home.
+  { label: PAGE_TITLES.notifications, path: '/settings/notifications' },
   { label: PAGE_TITLES.rules, path: '/settings/rules' },
   { label: PAGE_TITLES.proofs, path: '/settings/proofs' },
   // DESK051-UPD, REL051-UPD2: the app's version and "Check for updates", the one update surface in
@@ -162,7 +164,6 @@ export const REDIRECTS: Readonly<Record<string, string>> = {
   // real now, so `/settings/touch-id` is no longer redirected.
   '/settings/advanced': ADVANCED_HOME,
   '/settings/about': '/advanced/diagnostics',
-  '/settings/notifications': SETTINGS_HOME,
   '/settings/passkeys': '/settings/backup',
   '/advanced': ADVANCED_HOME,
 };

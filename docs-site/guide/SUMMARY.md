@@ -53,6 +53,7 @@
   * [Updates](local-app/updates.md)
   * [Rules page](local-app/rules.md)
   * [Appearance](local-app/appearance.md)
+  * [Notifications](local-app/notifications.md)
   * [Under the hood](local-app/under-the-hood.md)
   * [Confirming paid actions](local-app/confirm-paid-actions.md)
 

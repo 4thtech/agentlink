@@ -29,6 +29,8 @@ import {
   readAgentConfig,
   readAppCurrent,
   readUiSettingsFile,
+  readAgentNotifications,
+  writeAgentNotifications,
   writeUiSettingsFile,
   removeAgentFolder,
   writeAgentConfig,
@@ -388,5 +390,48 @@ describe('removeAgentFolder (U3-c seam; card U3-e calls it)', () => {
     expect(await readFile(join(dir, 'notes.txt'), 'utf8')).toBe('mine');
     // Nothing was deleted: the agent still reads.
     expect(await readAgentConfig(home, 'keep')).toBeDefined();
+  });
+});
+
+describe('notifications.json in the ID folder (N4; PLAN-NOTIFY §3.4)', () => {
+  const record = { v: 1, cursor: 1_800_000_000, items: [] };
+  const file = (name: string): string =>
+    join(home, '.agentlink', 'agents', name, 'notifications.json');
+
+  it('writes the record 0600 into the ID folder and reads it back; per ID', async () => {
+    await oldAgent('default');
+    await oldAgent('work');
+    expect(await readAgentNotifications(home, 'default')).toBeUndefined();
+    await writeAgentNotifications(home, 'default', record);
+    expect(await readAgentNotifications(home, 'default')).toEqual(record);
+    expect(await readAgentNotifications(home, 'work')).toBeUndefined();
+    if (POSIX) expect((await stat(file('default'))).mode & 0o777).toBe(0o600);
+  });
+
+  it('refuses a bad name, a missing folder and an oversized record; ignores a linked file', async () => {
+    await oldAgent('default');
+    expect(
+      codeOf(await writeAgentNotifications(home, '../x', record).catch((e: unknown) => e)),
+    ).toBe('agent_name_invalid');
+    expect(await writeAgentNotifications(home, 'nobody', record).catch(() => 'refused')).toBe(
+      'refused',
+    );
+    const big = { ...record, pad: 'x'.repeat(200_000) };
+    expect(
+      codeOf(await writeAgentNotifications(home, 'default', big).catch((e: unknown) => e)),
+    ).toBe('agent_config_invalid');
+    if (POSIX) {
+      const target = join(home, 'elsewhere.json');
+      await writeFile(target, JSON.stringify(record), { mode: 0o600 });
+      await symlink(target, file('default'));
+      expect(await readAgentNotifications(home, 'default')).toBeUndefined();
+    }
+  });
+
+  it('removeAgentFolder deletes it with the rest of the folder', async () => {
+    await oldAgent('gone');
+    await writeAgentNotifications(home, 'gone', record);
+    await removeAgentFolder(home, 'gone');
+    expect(await readAgentConfig(home, 'gone')).toBeUndefined();
   });
 });

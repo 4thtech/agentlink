@@ -507,6 +507,10 @@ export const MARK_PATHS: readonly string[] = Object.freeze([
   // most one empty 0700 folder under ~/AgentLink and changes no rules: allowing it is the ordinary
   // review and the presence-gated confirm.
   '/api/ui/files/send-folder',
+  // N4: the notification centre's read marks (display state only).
+  '/api/ui/notifications/:id/read',
+  '/api/ui/notifications/read-all',
+  '/api/ui/notifications/refresh',
 ]);
 
 export type LocalUiRoute =

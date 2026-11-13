@@ -55,6 +55,12 @@ export const SETTINGS_STRINGS = {
     title: 'Storage',
     line: 'How much room your messages and saved files take',
   },
+  // N6: Settings › Notifications.
+  notifications: {
+    title: 'Notifications',
+    line: 'What AgentLink may alert you about',
+    state: 'Approvals on',
+  },
   appearance: {
     title: 'Appearance',
     line: 'Theme, motion and the Under the hood view',
