@@ -62,6 +62,7 @@ import {
 import { encodeBase64url, encodeHex, randomBytes, type JsonObject } from '@4thtech-io/crypto';
 import {
   AUTO_SAVE_DEFAULTS,
+  HISTORY_PRE_D148,
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   POLICY_BOUNDS,
   defaultPolicy,
@@ -295,6 +296,10 @@ function contactRule(item: unknown): string {
   return `${contact}: ${parts.join(', ')}`;
 }
 
+/** `history.*` (D-148): 0 or absent keeps forever; older saved files go to the Trash. */
+const keptFor = (v: Leaf): string =>
+  typeof v === 'number' && v > 0 ? `${String(v)} days` : 'forever';
+
 const deleteAfterNotes = (v: Leaf): readonly string[] => [
   `${v === 'receipt' ? 'Applies' : 'Delete on delivery applies'} only to files sent while it is on, and only while it stays on.`,
   'Checked once each time old files are cleaned up.',
@@ -365,13 +370,18 @@ export const POLICY_REVIEW_ROWS: readonly PolicyReviewRow[] = Object.freeze([
     read: (v) => (v === 'sell' ? 'selling' : 'buying'),
   },
   { path: 'commitments.autoAcceptMinUSD', label: 'Selling accepted automatically from', read: usd },
+  // D-148 (RET-6): absent in a policy signed before D-148, which keeps everything.
+  { path: 'history.messagesKeepDays', label: 'Messages are kept', read: keptFor },
+  { path: 'history.filesKeepDays', label: 'Saved files are kept', read: keptFor },
   { path: 'contactRules', label: 'Rules for single contacts', read: list('none') },
 ]);
 
 const leafAt = (policy: Policy, path: string): Leaf =>
-  path
-    .split('.')
-    .reduce<unknown>((at, key) => (at as Record<string, unknown>)[key], policy) as Leaf;
+  path.split('.').reduce<unknown>(
+    // An absent optional section (`history` before D-148) reads as undefined.
+    (at, key) => (at === undefined ? undefined : (at as Record<string, unknown>)[key]),
+    policy,
+  ) as Leaf;
 
 /**
  * The policy in full, one line per rule, or undefined when a value would read differently on the
@@ -528,6 +538,9 @@ function current(
   if (effective.mode === 'fail_closed') return undefined;
   // A deep, plain copy: the loader's document is never changed in place.
   const policy = JSON.parse(JSON.stringify(effective.policy)) as Policy;
+  // IR-RET-67-1 Medium 2: rules not signed yet keep everything; an edit here never turns retention
+  // on (only the app's Storage editor or a new ID's first rules do).
+  if (effective.mode === 'defaults') policy.history = { ...HISTORY_PRE_D148 };
   return { policy, version: effective.mode === 'signed' ? effective.version : undefined };
 }
 
@@ -570,6 +583,8 @@ async function setFolders(
       allowedFolders: [...folders],
       autoSave: rules.policy.files.autoSave ?? { ...AUTO_SAVE_DEFAULTS },
     },
+    // D-148 (RET-6): every policy.set carries `history`; one signed before D-148 keeps everything.
+    history: rules.policy.history ?? { ...HISTORY_PRE_D148 },
   };
   if (folders.length > POLICY_BOUNDS.allowedFolders.max) {
     output.printError(POLICY_TEXT.tooMany);

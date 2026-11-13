@@ -49,6 +49,7 @@ import {
 } from './files/refresh-link.js';
 import { ActivityService } from './activity.js';
 import {
+  HistoryRetention,
   deleteExpiredFiles,
   deleteFilesOnReceipt,
   type ReceiptRetentionResult,
@@ -226,6 +227,12 @@ export class AgentLinkClient {
    * reaches it (I-4, 06 §1).
    */
   readonly history: HistoryService;
+  /**
+   * RET-6 (D-148; 04 §4.2 "Retention policy"): the daily pass under the owner-signed `history.*`
+   * (the lease holder's background loop calls `run`) and its preview (the Storage editor). It deletes
+   * only under a verified signed policy, never while paused. No MCP tool reaches it (I-4).
+   */
+  readonly historyRetention: HistoryRetention;
   readonly #send: SendService;
   readonly #sync: SyncService;
   readonly #files: FileFetcher;
@@ -323,6 +330,11 @@ export class AgentLinkClient {
     );
     this.activity = new ActivityService(ctx, this.contacts);
     this.history = new HistoryService(ctx, { files: this.#files });
+    this.historyRetention = new HistoryRetention(ctx, {
+      loadPolicy: () => this.ownerActions.loadPolicy(),
+      paused: () => this.pause.paused(),
+      history: this.history,
+    });
     this.messages = new MessagesView(ctx, this.contacts);
     // MSG-FILES-IO-d: "saved as" from the sealed files.saved_name; a value that does not open shows
     // that one item without it (FilesIoView catches per row).

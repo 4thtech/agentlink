@@ -41,6 +41,7 @@ import type {
   Page,
   PageQuery,
   PolicyEditOptions,
+  HistoryRetentionPreview,
   LabelReading,
   RenameAllowance,
   SendState,
@@ -319,6 +320,14 @@ export interface LocalUiReadClient {
     recordReceiptsKept(version: number): Promise<boolean>;
   };
   /**
+   * RET-6 (D-148; 04 §4.2): what a `history.*` setting would remove now, for the Storage editor
+   * before the owner signs (core `historyRetention.preview`: plans only, deletes nothing). Not the
+   * pass itself. Absent in a double that does not need it.
+   */
+  readonly retention?: {
+    preview(keep: unknown): Promise<HistoryRetentionPreview>;
+  };
+  /**
    * M1-11c-a3 (Files): the allowed folders as the rules write them and their realpaths (display
    * paths only), and the unsigned `policy.set` for a folder edit (D-118). Both write nothing; the
    * body is signed only behind the presence gate and applied by core (I-4). Not `apply`, not
@@ -467,6 +476,9 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       prepareEdit: (patch: unknown, options: PolicyEditOptions) =>
         client.ownerActions.preparePolicyEdit(patch, options),
       recordReceiptsKept: (version: number) => client.ownerActions.recordReceiptsKept(version),
+    }),
+    retention: Object.freeze({
+      preview: (keep: unknown) => client.historyRetention.preview(keep),
     }),
     files: Object.freeze({
       resolvedFolders: () => client.files.resolvedFolders(),

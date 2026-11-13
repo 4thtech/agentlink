@@ -152,6 +152,11 @@ export const policyDefaultsFromSpec = () => ({
     autoAcceptDirection: 'buy',
     autoAcceptMinUSD: null,
   },
+  // D-148 (RET-6): `history` in the 06 §3 listing.
+  history: {
+    messagesKeepDays: 0,
+    filesKeepDays: 90,
+  },
   contactRules: [],
 });
 

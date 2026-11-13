@@ -289,6 +289,8 @@ describe('the read-only client view (M1-11c-a1 adds listActivity)', () => {
       'messages',
       'policy',
       'proofs',
+      // RET-6: what a history.* setting would remove now (a plan; deletes nothing).
+      'retention',
     ]);
     expect(Object.isFrozen(view)).toBe(true);
     await expect(view.listActivity({ limit: 3 })).resolves.toBe(page);

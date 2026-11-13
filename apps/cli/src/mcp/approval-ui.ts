@@ -40,6 +40,7 @@ import type { ApprovalServer } from '@4thtech-io/node';
 import { approveCommand, isApprovalId } from '../approval/next-step.js';
 import type { AllowFolderLink, ApprovalLink } from '@4thtech-io/mcp-tools';
 import { ALLOW_SEND_FOLDER_PAGE } from '@4thtech-io/mcp-tools/files-common.js';
+import { TIDY_PAGE_PATTERN } from '@4thtech-io/mcp-tools/tidy.js';
 
 /** The shortest time between two browser windows the server opens by itself. */
 export const BROWSER_OPEN_INTERVAL_MS = 30_000;
@@ -87,6 +88,12 @@ export interface ApprovalUi {
    * link (the fixed result). Never throws.
    */
   allowFolderLink(): Promise<AllowFolderLink | undefined>;
+  /**
+   * RET-7: an `agentlink_tidy` proposal's link, Settings › Storage with its filter: `<origin>` plus
+   * `page` only when `page` is exactly the fixed tidy page (TIDY_PAGE_PATTERN), under the same rules
+   * as `allowFolderLink`. Undefined: no link. Never throws. Optional for older fakes.
+   */
+  tidyLink?(page: string): Promise<AllowFolderLink | undefined>;
   /** True while a server is running. */
   readonly running: boolean;
   /** Stops the server (if one started) and gives no link afterwards. Idempotent. */
@@ -199,6 +206,42 @@ export function createApprovalUi(options: ApprovalUiOptions): ApprovalUi {
     return (await lastOpen) || browserOpened;
   };
 
+  /**
+   * ATT-ALLOW-LINK and RET-7: `<origin>` plus a fixed app page the caller checked, given only while
+   * a browser holds this server's session; when none does yet, Home opens once (the same one-shot
+   * rules and interval as approvals). Undefined: no link. Never throws.
+   */
+  const pageLink = async (page: string): Promise<AllowFolderLink | undefined> => {
+    if (closed) return undefined;
+    try {
+      const running = await ensure();
+      if (running === undefined || closed) return undefined;
+      const origin = running.origin;
+      const port = typeof origin === 'string' ? UI_ORIGIN.exec(origin)?.[1] : undefined;
+      if (port === undefined || Number(port) > 65_535) return undefined;
+      if (!browserOpened && !openerFailed) {
+        const at = now();
+        if (at - lastAlertAt >= BROWSER_OPEN_INTERVAL_MS) {
+          lastAlertAt = at;
+          // Home, a fixed path (its banner offers the Send folder). The one-shot link goes only
+          // to the OS opener.
+          const opened = (await running.openHome().catch(() => false)) === true;
+          if (opened) browserOpened = true;
+          else {
+            openerFailed = true;
+            logger.warn('approval ui: no browser could be opened');
+          }
+        } else if (lastOpen !== undefined && (await lastOpen)) {
+          browserOpened = true;
+        }
+      }
+      if (!browserOpened || closed) return undefined;
+      return Object.freeze({ url: `${origin}${page}`, origin });
+    } catch {
+      return undefined;
+    }
+  };
+
   return Object.freeze<ApprovalUi>({
     link: async (approvalId: string) => {
       if (closed || !isApprovalId(approvalId)) return undefined;
@@ -229,36 +272,10 @@ export function createApprovalUi(options: ApprovalUiOptions): ApprovalUi {
         return false;
       }
     },
-    allowFolderLink: async () => {
-      if (closed) return undefined;
-      try {
-        const running = await ensure();
-        if (running === undefined || closed) return undefined;
-        const origin = running.origin;
-        const port = typeof origin === 'string' ? UI_ORIGIN.exec(origin)?.[1] : undefined;
-        if (port === undefined || Number(port) > 65_535) return undefined;
-        if (!browserOpened && !openerFailed) {
-          const at = now();
-          if (at - lastAlertAt >= BROWSER_OPEN_INTERVAL_MS) {
-            lastAlertAt = at;
-            // Home, a fixed path: its banner offers the Send folder. The one-shot link goes only
-            // to the OS opener.
-            const opened = (await running.openHome().catch(() => false)) === true;
-            if (opened) browserOpened = true;
-            else {
-              openerFailed = true;
-              logger.warn('approval ui: no browser could be opened');
-            }
-          } else if (lastOpen !== undefined && (await lastOpen)) {
-            browserOpened = true;
-          }
-        }
-        if (!browserOpened || closed) return undefined;
-        return Object.freeze({ url: `${origin}${ALLOW_SEND_FOLDER_PAGE}`, origin });
-      } catch {
-        return undefined;
-      }
-    },
+    allowFolderLink: () => pageLink(ALLOW_SEND_FOLDER_PAGE),
+    // RET-7: only the fixed Storage page with a tidy filter (mcp-tools tidy.ts).
+    tidyLink: (page: string) =>
+      TIDY_PAGE_PATTERN.test(page) ? pageLink(page) : Promise.resolve(undefined),
     get running() {
       return server !== undefined && !closed;
     },

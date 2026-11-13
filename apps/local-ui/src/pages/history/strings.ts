@@ -83,6 +83,9 @@ export const HISTORY_STRINGS = {
   review: 'Review',
   removes: (messages: number, files: number, bytes: number): string =>
     `This removes ${plural(messages, 'message', 'messages')} and ${plural(files, 'file', 'files')} (${sizeWords(bytes)}).`,
+  // RET-7: opened from a link (agentlink_tidy gives one); the page does not say who made it.
+  fromLink: 'These filters were filled in from a link.',
+  fromLinkNext: 'Press Review to see what it removes. Nothing is deleted until you confirm it.',
   showInFinder: 'Show in Finder',
   showInFolder: 'Show in folder',
   revealFailed: "The folder didn't open. Try again.",

@@ -13,6 +13,7 @@ import {
   APPROVAL_STATUSES,
   APPROVAL_SUMMARY_MAX_CHARS,
   APPROVAL_TOOL_NAMES,
+  APP_APPROVAL_TOOL_NAMES,
   APPROVAL_TTL_SECONDS,
   BUDGET_WINDOW_SECONDS,
   BYTE_LENGTHS,
@@ -134,9 +135,15 @@ describe('constants (04, 05, 06)', () => {
     expect(APPROVAL_STATUSES).toEqual(['pending', 'approved', 'denied', 'expired']);
   });
 
-  it('has the 15 frozen tool names (06 §2.0, D-53, D-55) and the seven that can need approval', () => {
-    expect(MCP_TOOL_NAMES).toHaveLength(15);
-    expect(new Set(MCP_TOOL_NAMES).size).toBe(15);
+  it('has the 15 frozen tool names plus agentlink_tidy (RET-7) and the seven that can need approval', () => {
+    expect(MCP_TOOL_NAMES).toHaveLength(16);
+    expect(new Set(MCP_TOOL_NAMES).size).toBe(16);
+    // RET-7 (D-148 (3)): the one tool added since 0.1.0 only proposes; the owner approves in the app.
+    expect(MCP_TOOL_NAMES.at(-1)).toBe('agentlink_tidy');
+    expect([...APP_APPROVAL_TOOL_NAMES]).toEqual(['agentlink_tidy']);
+    for (const name of APP_APPROVAL_TOOL_NAMES) {
+      expect(APPROVAL_TOOL_NAMES as readonly string[]).not.toContain(name);
+    }
     expect(MCP_TOOL_NAMES).toContain('agentlink_propose_terms');
     expect(MCP_TOOL_NAMES).toContain('agentlink_respond_to_terms');
     for (const name of MCP_TOOL_NAMES) expect(name).toMatch(/^agentlink_[a-z_]+$/);
