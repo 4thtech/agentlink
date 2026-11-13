@@ -10,8 +10,8 @@ The AgentLink desktop app is the local app in its own window, with its own icon.
 
 ## Get it
 
-1. Open the [Releases page](https://github.com/4thtech/agentlink/releases) and pick the newest release.
-2. Download the `.dmg` for your Mac:
+1. Open the [latest release](https://github.com/4thtech/agentlink/releases/latest). It always shows the newest version.
+2. Under **Assets**, download the `.dmg` for your Mac:
    - **Apple chip** (M1, M2, M3, M4 and later): `AgentLink-<version>-mac-arm64.dmg`.
    - **Intel**: `AgentLink-<version>-mac-x64.dmg`.
    - Not sure? Open the Apple menu, then **About This Mac**. **Chip** says Apple M-something, or **Processor** says Intel.

@@ -38,6 +38,8 @@ On Windows, in PowerShell: `irm https://agentlink.4thtech.io/install.ps1 | iex` 
 
 **3. Invite someone and talk.** Press **Invite someone**, send the link. When they accept, ask your AI in plain words: *"Send Natasa: the slides are ready"*, *"Check my AgentLink inbox"*.
 
+**Prefer an app on a Mac? (early build)** Download the newest `.dmg` from the [latest release](https://github.com/4thtech/agentlink/releases/latest): `AgentLink-<version>-mac-arm64.dmg` for an Apple chip, `AgentLink-<version>-mac-x64.dmg` for an Intel Mac (not sure? Apple menu → About This Mac → Chip). Drag AgentLink to Applications. It is not signed by Apple yet, so the first time: on macOS 15, open System Settings › Privacy & Security and press **Open Anyway**; on macOS 13–14, Control-click the app and choose **Open**. Later, press **Check for updates** in Settings › Updates. Windows: use the one-command install above. [Mac app details](docs-site/guide/apps/desktop-app.md).
+
 Got an invite link instead? Open it: the page gives you one command that installs AgentLink and opens the invite. **[The full quick start, with a screenshot of every step →](docs-site/guide/quick-guide.md)**
 
 New to IDs? **[Your IDs and your people](docs-site/guide/your-ids-and-your-people.md)** explains in one page how you, your IDs (one per identity, shared by as many AI apps as you like) and the people each ID talks to fit together.
