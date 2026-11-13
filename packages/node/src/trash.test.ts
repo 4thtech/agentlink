@@ -19,12 +19,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { encodeHex, sha256 } from '@4thtech-io/crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import {
-  moveToTrash,
-  trashSavedFile,
-  type SavedFileExpectation,
-  type TrashSpawn,
-} from './trash.js';
+import { moveToTrash, placeNoReplace, trashSavedFile, type SavedFileExpectation } from './trash.js';
 
 let root: string;
 let home: string;
@@ -274,74 +269,63 @@ describe('only the file the app saved, still unchanged (re-checked just before t
   });
 });
 
-describe('Windows: the Recycle Bin through a fixed PowerShell command (stubbed here)', () => {
-  const TARGET = "C:\\Users\\u\\AgentLink\\Inbox\\it's; & rm -rf $(x) `y`.pdf";
-
-  it('the path goes only through the environment: fixed executable, fixed arguments, no shell', async () => {
-    const calls: { file: string; args: readonly string[]; options: Parameters<TrashSpawn>[2] }[] =
-      [];
-    const spawn: TrashSpawn = (file, args, options) => {
-      calls.push({ file, args, options });
-      return Promise.resolve({ code: 0 });
-    };
-    const outcome = await moveToTrash(TARGET, {
-      platform: 'win32',
-      spawn,
-      systemRoot: 'C:\\Windows',
-      gone: () => Promise.resolve(true),
-    });
-    expect(outcome).toBe('trashed');
-    expect(calls).toHaveLength(1);
-    const call = calls[0]!;
-    expect(call.file).toBe('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe');
-    expect(call.options.shell).toBe(false);
-    expect(call.options.windowsHide).toBe(true);
-    expect(call.options.env.AGENTLINK_TRASH_TARGET).toBe(TARGET);
-    const joined = call.args.join(' ');
-    expect(joined).not.toContain('Inbox');
-    expect(joined).not.toContain('rm -rf');
-    expect(joined).toContain('Microsoft.VisualBasic.FileIO.FileSystem');
-    expect(joined).toContain('SendToRecycleBin');
-    expect(joined).toContain('$env:AGENTLINK_TRASH_TARGET');
-    expect(call.args).toContain('-NoProfile');
-    expect(call.args).toContain('-NonInteractive');
-    // The same arguments for any path: nothing from the file name is ever part of the command.
-    const again: (typeof calls)[number][] = [];
-    await moveToTrash('C:\\other.txt', {
-      platform: 'win32',
-      spawn: (file, args, options) => {
-        again.push({ file, args, options });
+describe('Windows: no Recycle Bin move in this release (IR-RET-3-1 High 1)', () => {
+  it('win32 answers no_trash, starts no process and leaves the file where it is', async () => {
+    const expected = await savedFile('report.pdf');
+    let started = 0;
+    const options = {
+      platform: 'win32' as const,
+      home,
+      // Anything that could start a process is ignored on win32: nothing is ever deleted there.
+      spawn: () => {
+        started += 1;
         return Promise.resolve({ code: 0 });
       },
-      systemRoot: 'C:\\Windows',
-      gone: () => Promise.resolve(true),
-    });
-    expect(again[0]!.args).toEqual(call.args);
+    };
+    expect(await trashSavedFile({ folder: inbox, name: 'report.pdf', expected, ...options })).toBe(
+      'no_trash',
+    );
+    expect(await moveToTrash(path.join(inbox, 'report.pdf'), options)).toBe('no_trash');
+    expect(started).toBe(0);
+    expect(await readFile(path.join(inbox, 'report.pdf'))).toEqual(BYTES);
   });
 
-  it('a failing command, a file still there, or a launcher that throws answers failed', async () => {
-    const base = { platform: 'win32' as const, systemRoot: 'C:\\Windows' };
-    expect(
-      await moveToTrash(TARGET, {
-        ...base,
-        spawn: () => Promise.resolve({ code: 1 }),
-        gone: () => Promise.resolve(true),
-      }),
-    ).toBe('failed');
-    expect(
-      await moveToTrash(TARGET, {
-        ...base,
-        spawn: () => Promise.resolve({ code: 0 }),
-        gone: () => Promise.resolve(false),
-      }),
-    ).toBe('failed');
-    expect(
-      await moveToTrash(TARGET, {
-        ...base,
-        spawn: () => Promise.reject(new Error(TARGET)),
-        gone: () => Promise.resolve(true),
-      }),
-    ).toBe('failed');
+  it('the module carries no Recycle Bin call and no PowerShell', async () => {
+    const source = await readFile(new URL('./trash.ts', import.meta.url), 'utf8');
+    expect(source).not.toMatch(/DeleteFile|powershell|child_process|ExecutionPolicy/i);
+  });
+});
+
+describe('placeNoReplace never removes the last name (IR-RET-3-1 Low 4)', () => {
+  it('a source name that vanished after the link keeps the new name (placed, nothing removed)', async () => {
+    const from = path.join(inbox, 'a.txt');
+    const to = path.join(root, 'b.txt');
+    await writeFile(from, BYTES);
+    const outcome = await placeNoReplace(from, to, {
+      unlink: async (p: string) => {
+        if (p === from) {
+          await rm(from);
+          throw Object.assign(new Error('gone'), { code: 'ENOENT' });
+        }
+        throw new Error('the new name must never be removed');
+      },
+    });
+    expect(outcome).toBe('placed');
+    expect(await readFile(to)).toEqual(BYTES);
+  });
+
+  it('another unlink failure rolls back by removing only the extra name', async () => {
+    const from = path.join(inbox, 'a.txt');
+    const to = path.join(root, 'b.txt');
+    await writeFile(from, BYTES);
+    const real = (await import('node:fs/promises')).unlink;
+    const outcome = await placeNoReplace(from, to, {
+      unlink: (p: string) =>
+        p === from ? Promise.reject(Object.assign(new Error('busy'), { code: 'EBUSY' })) : real(p),
+    });
+    expect(outcome).toBe('failed');
+    expect(await readFile(from)).toEqual(BYTES);
+    expect(await exists(to)).toBe(false);
   });
 });
 

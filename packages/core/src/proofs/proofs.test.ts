@@ -402,6 +402,9 @@ describe('notarize → DELIVERED → OPENED → export → verify (acceptance, t
         chains: [{ config: chain.config, client: chain.client }],
       }),
     ).toMatchObject({ valid: true });
+    // IR-RET-3-1 Medium 2: the deleted body is never disclosed through a content key.
+    const keyed = await a.client.exportProofPack({ envelopeId, includeContentKey: true });
+    expect(keyed).toMatchObject({ status: 'rejected', code: 'CONTENT_DELETED' });
     // The deleted message is gone from the readable views.
     const page = await b.client.messages.list(a.id, 'in', { limit: 50 });
     expect(page.items.map((m) => m.id)).not.toContain(envelopeId);

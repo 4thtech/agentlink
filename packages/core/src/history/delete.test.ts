@@ -406,3 +406,125 @@ describe('no name, path or text in logs (I-7)', () => {
     }
   });
 });
+
+// --- fix round 1 (IR-RET-3-1) ---------------------------------------------------------------------
+
+/** Stores an `ack` (or a `proof`) row naming `target`, as the receive path would. */
+async function plantLinked(
+  w: World,
+  target: string,
+  n: number,
+  type: 'ack' | 'proof' = 'ack',
+  direction: 'in' | 'out' = 'in',
+): Promise<string> {
+  const base = (await row(w.b, target))!;
+  const id = `ret3-${type}-${String(n)}`;
+  const payload = await w.b.cipher.seal(
+    { table: 'envelopes', column: 'payload_json', rowKey: JSON.stringify([id]) },
+    JSON.stringify({
+      type,
+      body: { kind: 'received', envelopeId: target },
+      replyTo: target,
+      files: [],
+    }),
+  );
+  w.clock.t += 1;
+  await w.b.store.transaction((tx) =>
+    tx.insert('envelopes', {
+      ...base,
+      envelope_id: id,
+      envelope_hash: `0x${String(n).padStart(64, '0')}`,
+      direction,
+      type,
+      created_at: w.clock.t,
+      payload_json: payload,
+      read_at: null,
+      delivery: direction === 'out' ? 'sent' : null,
+      deleted_at: null,
+    }),
+  );
+  return id;
+}
+
+async function plantProofRow(w: World, envelopeId: string): Promise<void> {
+  const salt = await w.b.cipher.seal(
+    { table: 'proofs', column: 'salt', rowKey: JSON.stringify(['0xrec-ret3']) },
+    '00',
+  );
+  await w.b.store.transaction((tx) =>
+    tx.insert('proofs', {
+      record_id: '0xrec-ret3',
+      envelope_id: envelopeId,
+      chain_id: 84532,
+      record_json: '{}' as never,
+      tx_hash: null,
+      status: 'received',
+      fee_token: null,
+      fee_amount: null,
+      salt,
+      created_at: w.clock.t,
+    }),
+  );
+}
+
+describe('acks follow their message; acks and proofs of a notarized message stay (IR-RET-3-1 Low 7)', () => {
+  it('deleting a message by ID also deletes the acks that name it', async () => {
+    const w = await world();
+    const m = await send(w);
+    const ack = await plantLinked(w, m, 1, 'ack', 'out');
+    const plan = await w.b.client.history.plan({ envelopeIds: [m], include: 'messages' });
+    expect([...plan.envelopeIds].sort()).toEqual([m, ack].sort());
+    await w.b.client.history.apply(plan);
+    expect((await row(w.b, ack))?.deleted_at).not.toBeNull();
+  });
+
+  it('an ack selected on its own while its message stays is kept', async () => {
+    const w = await world();
+    const m = await send(w);
+    const ack = await plantLinked(w, m, 2);
+    const plan = await w.b.client.history.plan({ envelopeIds: [ack], include: 'messages' });
+    expect(plan.envelopeIds).toEqual([]);
+    expect(plan.kept.by.receipt).toBe(1);
+  });
+
+  it('by contact: the acks and proof envelopes of a notarized message are kept', async () => {
+    const w = await world();
+    const m = await send(w);
+    const plain = await send(w);
+    await plantProofRow(w, m);
+    const ack = await plantLinked(w, m, 3);
+    const proof = await plantLinked(w, m, 4, 'proof');
+    const plainAck = await plantLinked(w, plain, 5);
+    const plan = await w.b.client.history.plan({ contactId: w.a.id, include: 'messages' });
+    expect(plan.envelopeIds).toEqual(expect.arrayContaining([m, plain, plainAck]));
+    expect(plan.envelopeIds).not.toContain(ack);
+    expect(plan.envelopeIds).not.toContain(proof);
+    expect(plan.kept.by.receipt).toBe(2);
+    await w.b.client.history.apply(plan);
+    for (const id of [ack, proof]) expect((await row(w.b, id))?.deleted_at).toBeNull();
+    expect((await row(w.b, plainAck))?.deleted_at).not.toBeNull();
+  });
+});
+
+describe('a partial apply leaves no orphans (IR-RET-3-1 Low 6)', () => {
+  it('files of an already deleted message can be planned and trashed later', async () => {
+    const w = await world();
+    const id = await saved(w, 'later.pdf');
+    w.b.inbox.nextTrashOutcome = 'no_trash';
+    const first = await w.b.client.history.delete({ envelopeIds: [id], include: 'both' });
+    expect(first.messages.deleted).toBe(1);
+    expect(first.files.noTrash).toBe(1);
+    for (const input of [
+      { envelopeIds: [id], include: 'files' as const },
+      { contactId: w.a.id, include: 'files' as const },
+      { before: w.clock.t + 1, include: 'both' as const },
+    ]) {
+      const plan = await w.b.client.history.plan(input);
+      expect(plan.files.count).toBe(1);
+      expect(plan.messages.count).toBe(0);
+    }
+    const second = await w.b.client.history.delete({ contactId: w.a.id, include: 'files' });
+    expect(second.files.trashed).toBe(1);
+    expect(w.b.inbox.trashed).toEqual(['later.pdf']);
+  });
+});
