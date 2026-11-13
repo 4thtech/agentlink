@@ -205,6 +205,8 @@ describe('the sections (nav.ts)', () => {
       'Appearance',
       'Rules',
       'Proofs & credits',
+      // REL051-UPD2: one Updates page in the desktop app and the browser app.
+      'Updates',
       'Advanced',
     ]);
   });

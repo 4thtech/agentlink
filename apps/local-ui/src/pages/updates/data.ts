@@ -1,7 +1,8 @@
 // DESK051-UPD: Settings > Updates reads (node api/app-update.ts). Every value is checked again before
 // use; anything shaped wrong is dropped (the page then says it could not read), never guessed. The
 // download link is used only in one of the exact forms the app builds: this repository's release file
-// for this Mac, or its release page.
+// for this Mac, or its release page. REL051-UPD2: `install` says how this copy was installed; only
+// the desktop app ever has a link (the browser app shows a restart or a fixed command instead).
 export const APP_UPDATE_PATH = '/api/ui/app-update';
 export const APP_UPDATE_CHECK_PATH = '/api/ui/app-update/check';
 
@@ -17,8 +18,12 @@ const STATES: readonly UpdateState[] = [
   'offline',
 ];
 
+export type UpdateInstall = 'desktop' | 'installer' | 'npx' | 'global';
+const INSTALLS: readonly UpdateInstall[] = ['desktop', 'installer', 'npx', 'global'];
+
 export interface UpdateView {
   readonly state: UpdateState;
+  readonly install: UpdateInstall;
   readonly current: string;
   /** Set only when available. */
   readonly latest: string;
@@ -48,15 +53,30 @@ const isObject = (v: unknown): v is Readonly<Record<string, unknown>> =>
 /** The answer as a view, or undefined when any field breaks the rules. */
 export function parseUpdate(data: unknown): UpdateView | undefined {
   if (!isObject(data)) return undefined;
-  const { state, current, latest, download } = data;
+  const { state, current, latest, download, install } = data;
   if (typeof state !== 'string' || !(STATES as readonly string[]).includes(state)) return undefined;
   if (typeof current !== 'string' || !APP.test(current)) return undefined;
+  if (typeof install !== 'string' || !(INSTALLS as readonly string[]).includes(install)) {
+    return undefined;
+  }
+  const how = install as UpdateInstall;
   if (state !== 'available') {
     if (latest !== '' || download !== '') return undefined;
-    return { state: state as UpdateState, current, latest: '', download: '', macFile: false };
+    return {
+      state: state as UpdateState,
+      install: how,
+      current,
+      latest: '',
+      download: '',
+      macFile: false,
+    };
   }
   if (typeof latest !== 'string' || !newer(latest, current) || typeof download !== 'string') {
     return undefined;
+  }
+  if (how !== 'desktop') {
+    if (download !== '') return undefined;
+    return { state: 'available', install: how, current, latest, download: '', macFile: false };
   }
   const mac = [
     `${RELEASES}/download/v${latest}/AgentLink-${latest}-mac-arm64.dmg`,
@@ -64,5 +84,5 @@ export function parseUpdate(data: unknown): UpdateView | undefined {
   ];
   const macFile = mac.includes(download);
   if (!macFile && download !== `${RELEASES}/tag/v${latest}`) return undefined;
-  return { state: 'available', current, latest, download, macFile };
+  return { state: 'available', install: how, current, latest, download, macFile };
 }

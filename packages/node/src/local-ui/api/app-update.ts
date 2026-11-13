@@ -9,8 +9,12 @@
 //   one fixed source and answers with a new state. A read route on purpose, with the gates of every
 //   read (session cookie, CSRF header, fetch metadata): it needs no presence and carries no body.
 //
-// Only the desktop host wires a desk (ApprovalServerOptions.appUpdate); everywhere else both routes
-// answer 501 `not_available` and the page is not offered. Every answer is rebuilt field by field and
+// REL051-UPD2: the browser app (the local app server `agentlink` / npx starts) wires its own desk
+// (apps/cli runtime/npm-update-check.ts): the npm registry's latest version, never a link. Every
+// answer names how this copy was installed (`install`), so the page shows the one right action: the
+// desktop app's release link, "Restart AgentLink" (the installer's command and npx run the latest at
+// every start) or the one update command (a global npm install). A server with no desk (the MCP
+// server's page, first run in a terminal) answers 501 `not_available` and the page says so. Every answer is rebuilt field by field and
 // checked again here (the same rules as the pipe), so nothing but those fixed forms ever reaches the
 // page. Not an MCP tool (I-4).
 import type { JsonObject } from '@4thtech-io/crypto';
@@ -39,8 +43,19 @@ export interface AppUpdateView {
   readonly download: string;
 }
 
-/** The desktop host's side (apps/cli/src/desktop/host-core.ts). */
+/** How this copy of AgentLink was installed (what the page offers to update it). */
+export const APP_UPDATE_INSTALLS = Object.freeze([
+  'desktop',
+  'installer',
+  'npx',
+  'global',
+] as const);
+export type AppUpdateInstall = (typeof APP_UPDATE_INSTALLS)[number];
+
+/** The host's side (desktop: apps/cli/src/desktop/host-core.ts; browser: runtime/npm-update-check.ts). */
 export interface LocalUiAppUpdateDesk {
+  /** How this copy was installed (fixed for the life of the process). */
+  readonly install: AppUpdateInstall;
   /** The shell's last state, or undefined before it sent one. */
   view(): AppUpdateView | undefined;
   /** Asks the shell to check now; returns the state to show meanwhile. */
@@ -70,22 +85,28 @@ function linkFor(url: unknown, version: string): boolean {
   );
 }
 
-/** The view as an answer body, or undefined when any field breaks the rules. */
-export function appUpdateBody(view: AppUpdateView | undefined): JsonObject | undefined {
+/**
+ * The view as an answer body, or undefined when any field breaks the rules. Only the desktop app
+ * carries a link (this repository's release file or page); the browser app never does.
+ */
+export function appUpdateBody(
+  view: AppUpdateView | undefined,
+  install: AppUpdateInstall,
+): JsonObject | undefined {
   if (view === undefined) return undefined;
+  if (!(APP_UPDATE_INSTALLS as readonly string[]).includes(install)) return undefined;
   const { state, current, latest, download } = view;
   if (!(APP_UPDATE_STATES as readonly string[]).includes(state)) return undefined;
   if (typeof current !== 'string' || !APP_VERSION.test(current)) return undefined;
   if (state === 'available') {
-    if (typeof latest !== 'string' || !newer(latest, current) || !linkFor(download, latest)) {
-      return undefined;
-    }
+    if (typeof latest !== 'string' || !newer(latest, current)) return undefined;
+    if (install === 'desktop' ? !linkFor(download, latest) : download !== '') return undefined;
   } else if (latest !== '' || download !== '') return undefined;
-  return { state, current, latest, download };
+  return { state, current, latest, download, install };
 }
 
-const answer = (view: AppUpdateView | undefined): LocalUiResult => {
-  const body = appUpdateBody(view);
+const answer = (desk: LocalUiAppUpdateDesk, view: AppUpdateView | undefined): LocalUiResult => {
+  const body = appUpdateBody(view, desk.install);
   return body === undefined ? UI_UNAVAILABLE : { status: 200, body };
 };
 
@@ -98,7 +119,7 @@ const readRoute: LocalUiReadRoute = Object.freeze<LocalUiReadRoute>({
     const desk = context.appUpdate;
     if (desk === undefined) return Promise.resolve(NOT_AVAILABLE);
     try {
-      return Promise.resolve(answer(desk.view()));
+      return Promise.resolve(answer(desk, desk.view()));
     } catch {
       return Promise.resolve(UI_UNAVAILABLE);
     }
@@ -114,7 +135,7 @@ const checkRoute: LocalUiReadRoute = Object.freeze<LocalUiReadRoute>({
     const desk = context.appUpdate;
     if (desk === undefined) return Promise.resolve(NOT_AVAILABLE);
     try {
-      return Promise.resolve(answer(desk.check()));
+      return Promise.resolve(answer(desk, desk.check()));
     } catch {
       return Promise.resolve(UI_UNAVAILABLE);
     }

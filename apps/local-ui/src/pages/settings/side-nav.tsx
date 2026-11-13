@@ -15,7 +15,7 @@ const ADVANCED_NETWORK = '/advanced/network';
 export function isSettingsSubpage(path: string): boolean {
   // Advanced › Relays & network (/advanced/network) is the page behind Settings' "Advanced" row.
   if (path === ADVANCED_NETWORK) return true;
-  return path.startsWith('/settings/') && settingsPages(true).some((p) => p.path === path);
+  return path.startsWith('/settings/') && settingsPages().some((p) => p.path === path);
 }
 
 export function SettingsFrame({

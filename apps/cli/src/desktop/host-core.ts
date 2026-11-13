@@ -155,6 +155,7 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
 
   /** DESK051-UPD: Settings > Updates. A check is the shell's; meanwhile the page sees "checking". */
   const appUpdateDesk: LocalUiAppUpdateDesk = Object.freeze<LocalUiAppUpdateDesk>({
+    install: 'desktop',
     view: () => appUpdate,
     check: () => {
       const now = appUpdate;

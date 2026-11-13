@@ -28,7 +28,7 @@ irm https://agentlink.4thtech.io/install.ps1 | iex
 powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 | iex"
 ```
 
-It downloads the official Node.js from nodejs.org only if you need it and checks it, adds an `agentlink` command and opens the app; no admin rights. Run it again to update; add `--uninstall` (Mac, Linux) to remove it. Next time, type `agentlink`.
+It downloads the official Node.js from nodejs.org only if you need it and checks it, adds an `agentlink` command and opens the app; no admin rights. Run it again to update; add `--uninstall` (Mac, Linux) to remove it. Next time, type `agentlink`. Settings, Updates (the one update place, browser and desktop app alike) shows your version and "Check for updates" (also once a day by itself; it asks only the npm registry for the latest version, no ID or version is sent; `AGENTLINK_UPDATE_CHECK=off` turns it off). When "AgentLink <v> is ready": installer or npx, "Restart AgentLink to update" (Ctrl+C in its terminal, then `agentlink` or `npx -y @4thtech-io/agentlink@latest`; each start picks the newest); after `npm install -g`, run `npm install -g @4thtech-io/agentlink@latest`, then `agentlink`. Nothing is installed from the page.
 
 If you already have Node.js 22.14 or newer, you can instead run `npx -y @4thtech-io/agentlink@latest`. `@latest` makes sure you run the newest version. Your browser opens the app. Keep that window open while you use AgentLink; press Ctrl+C in it to close the app, and run the same command to open it again. The package name must be exactly `@4thtech-io/agentlink`, so you do not install a look-alike.
 

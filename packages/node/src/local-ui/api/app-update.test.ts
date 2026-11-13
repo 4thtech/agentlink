@@ -132,7 +132,12 @@ describe('app-update routes', () => {
 
   // REL051-UPD2: the browser app (the local app server) has its own desk: the npm registry's latest
   // version and how this copy was installed. The page shows the action; there is never a link.
-  const BROWSER: AppUpdateView = { state: 'available', current: '0.5.1', latest: '0.5.2', download: '' };
+  const BROWSER: AppUpdateView = {
+    state: 'available',
+    current: '0.5.1',
+    latest: '0.5.2',
+    download: '',
+  };
 
   it.each<AppUpdateInstall>(['installer', 'npx', 'global'])(
     'browser app (%s): the version and how it was installed, no link',
@@ -151,8 +156,6 @@ describe('app-update routes', () => {
     ['an unknown install', BROWSER, 'brew' as never],
   ])('never passes on %s', async (_label, view, install) => {
     expect(appUpdateBody(view, install)).toBeUndefined();
-    expect(await read?.handler(ctx(desk(view, undefined, install)), req())).toEqual(
-      UI_UNAVAILABLE,
-    );
+    expect(await read?.handler(ctx(desk(view, undefined, install)), req())).toEqual(UI_UNAVAILABLE);
   });
 });

@@ -178,10 +178,13 @@ export {
 } from './agent-peek.js';
 // REL051-RET1: the read-only sizes of an ID's store and of the Inbox folder (Settings, Storage).
 export { peekStorageUsage, type StoragePerContact, type StorageUsage } from './storage-usage.js';
-// DESK051-UPD: Settings > Updates in the desktop app (the desktop host builds the desk).
+// DESK051-UPD: Settings > Updates in the desktop app (the desktop host builds the desk);
+// REL051-UPD2: and in the browser app (apps/cli runtime/npm-update-check.ts).
 export {
   APP_UPDATE_CHECK_PATH,
   APP_UPDATE_PATH,
+  type AppUpdateInstall,
+  type AppUpdateState,
   type AppUpdateView,
   type LocalUiAppUpdateDesk,
 } from './local-ui/api/app-update.js';

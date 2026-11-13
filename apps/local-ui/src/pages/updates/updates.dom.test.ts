@@ -184,12 +184,10 @@ describe('parseUpdate', () => {
 });
 
 describe('one Updates page in Settings, in the desktop app and in the browser', () => {
-  it('is listed once, before Advanced, in both', () => {
-    for (const desktop of [true, false]) {
-      const paths = settingsPages(desktop).map((p) => p.path);
-      expect(paths.filter((p) => p === '/settings/updates')).toHaveLength(1);
-      expect(paths.slice(-2)).toEqual(['/settings/updates', '/settings/advanced']);
-    }
+  it('is listed once, before Advanced (the same list in both)', () => {
+    const paths = settingsPages().map((p) => p.path);
+    expect(paths.filter((p) => p === '/settings/updates')).toHaveLength(1);
+    expect(paths.slice(-2)).toEqual(['/settings/updates', '/settings/advanced']);
     expect(SETTINGS_PAGES.filter((p) => p.path === '/settings/updates')).toHaveLength(1);
   });
 });

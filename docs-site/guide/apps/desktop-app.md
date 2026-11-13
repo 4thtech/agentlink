@@ -43,7 +43,7 @@ The Windows desktop app is coming later. On Windows, use the browser app: one co
 
 ## Updating
 
-Open **Settings**, then **Updates**. It shows the version you have and a **Check for updates** button. The app checks once a day by itself, and when you press the button (at most once a minute), and only says something on this page.
+Open **Settings**, then **Updates** (the same page as in the browser app, see [Updates](../local-app/updates.md)). It shows the version you have and a **Check for updates** button. The app checks once a day by itself, and when you press the button (at most once a minute), and only says something on this page.
 
 When a newer version is out, the page says so, for example **AgentLink 0.5.2 is ready**. Then:
 

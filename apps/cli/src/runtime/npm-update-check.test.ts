@@ -98,8 +98,10 @@ describe('fetchLatestVersion', () => {
   });
 
   it('no network (name lookup or no route) is offline; anything else thrown is a failure', async () => {
-    const thrown = (code: string): RegistryFetch => () =>
-      Promise.reject(Object.assign(new TypeError('fetch failed'), { cause: { code } }));
+    const thrown =
+      (code: string): RegistryFetch =>
+      () =>
+        Promise.reject(Object.assign(new TypeError('fetch failed'), { cause: { code } }));
     expect(await fetchLatestVersion(thrown('ENOTFOUND'))).toEqual({ kind: 'offline' });
     expect(await fetchLatestVersion(thrown('EAI_AGAIN'))).toEqual({ kind: 'offline' });
     expect(await fetchLatestVersion(thrown('ENETUNREACH'))).toEqual({ kind: 'offline' });
@@ -122,9 +124,9 @@ describe('fetchLatestVersion', () => {
 describe('browserInstall', () => {
   const never = (): boolean => false;
   it('the installers’ launcher: a restart runs the latest (npx @latest every start)', () => {
-    expect(browserInstall({ AGENTLINK_LAUNCHER: 'installer' }, '/x/_npx/1/agentlink.js', never)).toBe(
-      'installer',
-    );
+    expect(
+      browserInstall({ AGENTLINK_LAUNCHER: 'installer' }, '/x/_npx/1/agentlink.js', never),
+    ).toBe('installer');
   });
   it('npx, npm exec, dlx or an unknown start: the npx form', () => {
     expect(browserInstall({}, '/Users/a/.npm/_npx/ab12/node_modules/.bin/agentlink', never)).toBe(
@@ -256,7 +258,9 @@ describe('NpmUpdateChecker', () => {
       'failed',
     );
     const offline = (): Promise<Response> =>
-      Promise.reject(Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } }));
+      Promise.reject(
+        Object.assign(new TypeError('fetch failed'), { cause: { code: 'ENOTFOUND' } }),
+      );
     expect((await harness([offline]).checker.check()).state).toBe('offline');
   });
 

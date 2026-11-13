@@ -50,6 +50,7 @@
   * [Touch ID & master code](local-app/touch-id-and-master-code.md)
   * [Files page](local-app/files.md)
   * [Storage](local-app/storage.md)
+  * [Updates](local-app/updates.md)
   * [Rules page](local-app/rules.md)
   * [Appearance](local-app/appearance.md)
   * [Under the hood](local-app/under-the-hood.md)

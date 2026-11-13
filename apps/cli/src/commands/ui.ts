@@ -59,6 +59,7 @@ import { removeAppHostRecord, writeAppHostRecord } from '../runtime/app-host-rec
 import { writeLastExit, type LastExitReason } from '../runtime/last-exit.js';
 import { guardProcess, type FatalReason } from '../runtime/ui-lifecycle.js';
 import { cliVersion } from '../runtime/cli-version.js';
+import { nodeBrowserUpdateDesk, withUpdates } from '../runtime/npm-update-check.js';
 import {
   OPEN_CHECK_MS,
   openAndWatch,
@@ -446,7 +447,11 @@ export async function diagnoseStart(
  * desktop host passes `hooks.startServer` (ui-host.ts UiHostHooks) so its links go to its pipe.
  */
 export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
-  const startServer = hooks.startServer ?? startApprovalServer;
+  // REL051-UPD2: the browser app's Settings > Updates (the npm registry's latest version). The
+  // desktop host passes its own starter, which gives the desktop app's desk instead.
+  const startServer =
+    hooks.startServer ??
+    withUpdates(startApprovalServer, () => nodeBrowserUpdateDesk(cliVersion()));
   const owner = nodeOwnerDeps();
   const logger: Logger = cliLogger('ui', process.env);
   return Object.freeze<UiDeps>({

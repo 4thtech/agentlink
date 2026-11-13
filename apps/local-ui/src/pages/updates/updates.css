@@ -64,3 +64,26 @@
 .upd-page a.al-btn {
   text-decoration: none;
 }
+/* REL051-UPD2: a fixed command with Copy (browser app). */
+.upd-cmd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-1);
+  margin-block: var(--al-space-2);
+}
+.upd-cmd-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--al-space-2);
+}
+.upd-cmd-text {
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+  padding: var(--al-space-2) var(--al-space-3);
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-bg-sunken);
+  color: var(--al-color-fg-default);
+  user-select: all;
+}

@@ -125,18 +125,19 @@ async function harness(appUpdate?: LocalUiAppUpdateDesk) {
 
 describe('Settings > Updates through the server (DESK051-UPD)', () => {
   it('answers the desk’s state with a session and the CSRF header, with no agent open', async () => {
-    const h = await harness({ view: () => AVAILABLE, check: () => AVAILABLE });
+    const h = await harness({ install: 'desktop', view: () => AVAILABLE, check: () => AVAILABLE });
     const res = await send(h.port, APP_UPDATE_PATH, {
       Cookie: h.cookie,
       'X-AgentLink-CSRF': h.csrf,
     });
     expect(res.status).toBe(200);
-    expect(JSON.parse(res.body)).toEqual(AVAILABLE);
+    expect(JSON.parse(res.body)).toEqual({ ...AVAILABLE, install: 'desktop' });
   });
 
   it('a check reaches the desk only through the read gates', async () => {
     let checks = 0;
     const h = await harness({
+      install: 'desktop',
       view: () => AVAILABLE,
       check: () => {
         checks += 1;
@@ -163,7 +164,23 @@ describe('Settings > Updates through the server (DESK051-UPD)', () => {
     expect(checks).toBe(1);
   });
 
-  it('outside the desktop app: 501 not_available', async () => {
+  it('the browser app’s desk (REL051-UPD2): the version and how it was installed, no link', async () => {
+    const browser = {
+      state: 'available',
+      current: '0.5.1',
+      latest: '0.5.2',
+      download: '',
+    } as const;
+    const h = await harness({ install: 'global', view: () => browser, check: () => browser });
+    const res = await send(h.port, APP_UPDATE_PATH, {
+      Cookie: h.cookie,
+      'X-AgentLink-CSRF': h.csrf,
+    });
+    expect(res.status).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ ...browser, install: 'global' });
+  });
+
+  it('a server with no desk: 501 not_available', async () => {
     const h = await harness();
     const res = await send(h.port, APP_UPDATE_PATH, {
       Cookie: h.cookie,
