@@ -4,12 +4,18 @@
 # decision); the signing hooks in apps/desktop/build stay off (DESKTOP_SIGNING is never set here).
 #
 # Triggers
-#   workflow_dispatch  a manual build (input `version`, default 0.0.0-dev).
+#   workflow_dispatch  a manual build (input `version`, default 0.0.0-dev; input `windows`, default
+#                      false, adds the Windows leg).
 #   workflow_call      for release.yml's desktop-app jobs (WP-D11, DESK051-C4); inputs `version`, `updates`.
 #   pull_request       only for a change under apps/desktop/**, apps/cli/src/desktop/** or this file.
 #
-# Jobs (4, well inside the Free-plan cap of 20 concurrent jobs)
-#   build   matrix: macos-26 arm64, macos-26 x64 (cross-build), windows-2022 x64.
+# Windows (REL051-CIE, scope change for 0.5.1): the Windows desktop app is not shipped yet (its core
+# exits at start on Windows and the first start loses the single-instance lock). The win-x64 leg runs
+# only on a manual run with `windows: true`, never on pull requests or in the release, so it can be
+# fixed separately. Windows users use the browser app.
+#
+# Jobs (3, or 4 with `windows: true`; well inside the Free-plan cap of 20 concurrent jobs)
+#   build   matrix: macos-26 arm64, macos-26 x64 (cross-build); windows-2022 x64 only with `windows: true`.
 #           Builds the CLI tarball and the shell bundle, the native presence helper (macOS: the
 #           AgentLink.app helper bundle; Windows: MSVC via Enter-VsDevShell), then the app with it, then runs on the built
 #           binaries: check-fuses (fuse read-back and ASAR integrity), check-preview-string,
@@ -56,6 +62,11 @@ on:
         type: string
         required: false
         default: "off"
+      windows:
+        description: "Also build and check the Windows app (not shipped yet; REL051-CIE)"
+        type: boolean
+        required: false
+        default: false
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches-ignore: [sync]
@@ -86,18 +97,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # macos-26 is the macOS label the other workflows use (ci.yml); the x64 app is
-          # cross-built on the arm64 runner.
-          - target: mac-arm64
-            os: macos-26
-            arch: arm64
-          - target: mac-x64
-            os: macos-26
-            arch: x64
-          - target: win-x64
-            os: windows-2022
-            arch: x64
+        # macos-26 is the macOS label the other workflows use (ci.yml); the x64 app is
+        # cross-built on the arm64 runner. win-x64 (windows-2022) only on a manual run with
+        # `windows: true` (REL051-CIE); `inputs.windows` is unset on pull requests and workflow_call.
+        include: ${{ fromJSON(inputs.windows == true && '[{"target":"mac-arm64","os":"macos-26","arch":"arm64"},{"target":"mac-x64","os":"macos-26","arch":"x64"},{"target":"win-x64","os":"windows-2022","arch":"x64"}]' || '[{"target":"mac-arm64","os":"macos-26","arch":"arm64"},{"target":"mac-x64","os":"macos-26","arch":"x64"}]') }}
     env:
       VERSION: ${{ inputs.version || '0.0.0-dev' }}
       UPDATES: ${{ inputs.updates || 'off' }}

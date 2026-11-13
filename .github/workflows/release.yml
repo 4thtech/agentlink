@@ -101,11 +101,13 @@
 #                   `desktop-sign` (it holds the key; no reviewer, main only, OPS-UNSTICK-B): it runs
 #                   only after the approved publish-latest, so the release needs no second click.
 #   desktop-app-build    (WP-D11) calls desktop.yml for the published CLI version: the AgentLink app
-#                   for macOS arm64 + x64 (DMG, zip) and Windows x64 (NSIS installer, zip), unsigned,
-#                   updates off until the key ceremony; checks, smoke test, provenance attestation.
+#                   for macOS arm64 + x64, unsigned, updates off until the key ceremony; checks, smoke
+#                   test, provenance attestation. No Windows app in the release (REL051-CIE: not
+#                   shipped yet; desktop.yml builds it only on a manual run with `windows: true`).
 #   desktop-app-release  after a green smoke-latest: checks the names and SHA256SUMS and attaches
-#                   them to the GitHub Release v<version> (AgentLink-<version>-mac-{arm64,x64}.dmg,
-#                   ...-win-x64-setup.exe). No environment and no secret; DEPLOY_FREEZE stops it.
+#                   the two DMGs and their sums to the GitHub Release v<version>
+#                   (AgentLink-<version>-mac-{arm64,x64}.dmg, SHA256SUMS-desktop-app.txt). No
+#                   environment and no secret; DEPLOY_FREEZE stops it.
 #
 # RELEASE APP (OPS-UNSTICK-B)
 #   The `version` job opens the "Version packages" PR with an installation token of the release GitHub
@@ -1809,8 +1811,9 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # WP-D11 (DESK051-C4): the AgentLink desktop app for the npm version just published. desktop.yml
-  # builds it on macOS (arm64, x64) and Windows x64, runs the hardening checks and the smoke test on
-  # the built binaries and attests build provenance. UNSIGNED (signing stays off, D-91 is the
+  # builds it on macOS (arm64, x64), runs the hardening checks and the smoke test on the built
+  # binaries and attests build provenance. No Windows leg (REL051-CIE: the Windows app is not shipped
+  # yet; desktop.yml runs it only on a manual run with `windows: true`). UNSIGNED (signing stays off, D-91 is the
   # owner's) and with updates OFF until the offline key ceremony (no update root key in the app, so
   # it never checks for updates; desktop.yml header). No secret is passed or referenced.
   desktop-app-build:
@@ -1828,8 +1831,9 @@ jobs:
 
   # Attaches the app to the GitHub Release v<version> after a green smoke test, under the exact names
   # the invite page links to (releases/download/v<version>/AgentLink-<version>-mac-{arm64,x64}.dmg),
-  # plus the Windows installer and zips and SHA256SUMS-desktop-app.txt (the extension's SHA256SUMS
-  # stays its own). Every file is checked against the sums written by the build jobs first.
+  # plus SHA256SUMS-desktop-app.txt listing exactly those two DMGs (the extension's SHA256SUMS stays
+  # its own). Only the two DMGs ship (REL051-CIE): no zip, no Windows installer. Every file is
+  # checked against the sums written by the build jobs first.
   desktop-app-release:
     name: desktop-app-release
     needs: [publish-latest, smoke-latest, desktop-extension-build, desktop-app-build]
@@ -1868,10 +1872,20 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Unexpected CLI version."; exit 1; }
-          for f in "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" "AgentLink-$VERSION-win-x64-setup.exe"; do
+          dmgs=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" )
+          for f in "${dmgs[@]}"; do
             [ -f "$f" ] || { echo "::error::$f is missing."; exit 1; }
           done
-          mv SHA256SUMS SHA256SUMS-desktop-app.txt
+          # The build's sums must hold for every file it built; the release lists only the two DMGs.
+          sha256sum --check --strict SHA256SUMS
+          : > SHA256SUMS-desktop-app.txt
+          for f in "${dmgs[@]}"; do
+            line="$(awk -v f="$f" '$2 == f' SHA256SUMS)"
+            [ -n "$line" ] && [ "$(printf '%s\n' "$line" | wc -l)" -eq 1 ] ||
+              { echo "::error::$f is not listed exactly once in SHA256SUMS."; exit 1; }
+            printf '%s\n' "$line" >> SHA256SUMS-desktop-app.txt
+          done
+          rm -f SHA256SUMS
           sha256sum --check --strict SHA256SUMS-desktop-app.txt
           cat SHA256SUMS-desktop-app.txt
 
@@ -1891,7 +1905,8 @@ jobs:
           gh release view "v$VERSION" --repo "$REPOSITORY" > /dev/null 2>&1 ||
             { echo "::error::GitHub Release v$VERSION does not exist, so the desktop app was not attached. Owner: create the release (docs/process/versioning.md §6), then re-run this job."; exit 1; }
           shopt -s nullglob
-          files=( *.dmg *.zip *-setup.exe )
+          # Only the two DMGs (REL051-CIE): no zip, no Windows installer.
+          files=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" )
           [ "${#files[@]}" -gt 0 ] || { echo "::error::No desktop app files to attach."; exit 1; }
           for f in "${files[@]}"; do
             grep -q -F -x -e "$(sha256sum -- "$f" | cut -d ' ' -f 1)  $f" SHA256SUMS-desktop-app.txt ||
@@ -1917,7 +1932,7 @@ jobs:
             gh release upload "v$VERSION" --repo "$REPOSITORY" -- "${upload[@]}"
           fi
           attached="$(gh release view "v$VERSION" --repo "$REPOSITORY" --json assets --jq '.assets[].name')"
-          for f in "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" "AgentLink-$VERSION-win-x64-setup.exe" SHA256SUMS-desktop-app.txt; do
+          for f in "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" SHA256SUMS-desktop-app.txt; do
             grep -q -F -x -e "$f" <<< "$attached" || { echo "::error::$f is not on v$VERSION after the upload."; exit 1; }
           done
           echo "Attached the desktop app (${#files[@]} files, ${#upload[@]} uploaded now) to v$VERSION."

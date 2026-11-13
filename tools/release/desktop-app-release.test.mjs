@@ -60,8 +60,10 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
   it('requires the exact DMG names the invite page links to, checks the sums, keeps the extension sums', () => {
     expect(attach).toContain('"AgentLink-$VERSION-mac-arm64.dmg"');
     expect(attach).toContain('"AgentLink-$VERSION-mac-x64.dmg"');
-    expect(attach).toContain('"AgentLink-$VERSION-win-x64-setup.exe"');
+    // The build's own sums are checked in full before the release sums are cut down to the DMGs.
+    expect(attach).toMatch(/sha256sum --check --strict SHA256SUMS\n/);
     expect(attach).toMatch(/sha256sum --check --strict SHA256SUMS-desktop-app\.txt/);
+    expect(attach).toMatch(/is not listed exactly once in SHA256SUMS/);
     // DESK051-C5: the sums file is in the attach list (uploaded, or already there with the same bytes).
     expect(attach).toMatch(/for f in "\$\{files\[@\]\}" SHA256SUMS-desktop-app\.txt; do/);
     expect(attach).toMatch(
@@ -79,9 +81,20 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
     expect(step).not.toMatch(/exit 0/);
     // After the upload: every installer name must be on the release.
     expect(step).toMatch(/gh release view "v\$VERSION" [^\n]*--json assets/);
-    for (const name of ['mac-arm64.dmg', 'mac-x64.dmg', 'win-x64-setup.exe']) {
+    for (const name of ['mac-arm64.dmg', 'mac-x64.dmg']) {
       expect(step).toContain(`AgentLink-$VERSION-${name}`);
     }
+  });
+
+  // REL051-CIE (scope change, 0.5.1): the Windows desktop app is not shipped yet. The release
+  // attaches exactly the two Mac DMGs and their sums: no Windows installer, no zip, no glob.
+  it('attaches only the two Mac DMGs and SHA256SUMS-desktop-app.txt', () => {
+    const step = attach.slice(attach.indexOf('Attach the app to the GitHub Release'));
+    expect(step).toContain(
+      'files=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" )',
+    );
+    expect(attach).not.toMatch(/setup\.exe|win-x64|\*\.zip|\*\.dmg/);
+    expect(build).not.toMatch(/windows/);
   });
 
   // D15-10: a re-run never silently replaces a published installer with other bytes.
@@ -103,6 +116,32 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
 });
 
 describe('desktop.yml release inputs (WP-D11)', () => {
+  // REL051-CIE: the win-x64 leg runs only on a manual run with `windows: true` (boolean, default
+  // false); pull requests and workflow_call (the release) build the two Mac targets only.
+  it('builds Windows only on a manual run with windows: true', () => {
+    const dispatch = desktop.slice(
+      desktop.indexOf('  workflow_dispatch:'),
+      desktop.indexOf('  pull_request:'),
+    );
+    expect(dispatch).toMatch(
+      /windows:\n {8}description:[^\n]*\n {8}type: boolean\n {8}required: false\n {8}default: false/,
+    );
+    const call = desktop.slice(
+      desktop.indexOf('  workflow_call:'),
+      desktop.indexOf('  workflow_dispatch:'),
+    );
+    expect(call).not.toMatch(/windows/);
+    const include = desktop.match(
+      /\n {8}include: \$\{\{ fromJSON\(inputs\.windows == true && '(\[.*?\])' \|\| '(\[.*?\])'\) \}\}\n/,
+    );
+    expect(include).not.toBeNull();
+    const withWindows = JSON.parse(include[1]);
+    const macOnly = JSON.parse(include[2]);
+    expect(macOnly.map((t) => t.target)).toEqual(['mac-arm64', 'mac-x64']);
+    expect(withWindows.map((t) => t.target)).toEqual(['mac-arm64', 'mac-x64', 'win-x64']);
+    expect(macOnly.every((t) => t.os === 'macos-26')).toBe(true);
+  });
+
   it('defaults updates to off, validates it, and hands it to the bundle and both builds', () => {
     expect(desktop).toMatch(
       /updates:\n {8}description:[^\n]*\n {8}type: string\n {8}required: false\n {8}default: "off"/,
