@@ -24,6 +24,17 @@ Before anything is read, AgentLink checks that:
 
 Your AI sees the file's name, size, fingerprint, how it travelled and when the link expires. It never sees the download link or the key that unlocks the file.
 
+## Send a file yourself, from the app
+
+*New in the next release.* You can also send a light text file without asking your AI:
+
+1. Open the person on **Home**, so their conversation shows.
+2. Click **Attach** and pick a file, or drag files onto the conversation. Markdown, text and JSON files work (`.md`, `.markdown`, `.txt`, `.json`), up to 8 MB each and 5 at a time.
+3. Each file shows as a chip. Click **×** on a chip to take it out. Add a note if you like.
+4. Click **Send**.
+
+The app puts a copy in your Send folder (it never replaces a file that is already there: a second `notes.md` becomes `notes (2).md`) and sends it end-to-end encrypted, the same way your AI would, under the same rules. If your ID has no Send folder yet, the app shows **Allow Send folder** first; your files stay attached until you send them. Images and other kinds of files are not supported here yet: ask your AI to send those.
+
 ## Receive a file
 
 When a contact you keep sends a file, AgentLink saves it for you, with no request from you or your AI. Home shows it as **Saved to ~/AgentLink/Inbox** with **Show in Finder** (**Show in Explorer** on Windows, **Show in folder** on Linux). Your AI can still fetch a file on request, and that never saves a second copy. Each file is:

@@ -34,8 +34,11 @@
 //   0700 folder under ~/AgentLink and changes no rules) is only a POST at one of MARK_PATHS with a
 //   handler, each registered once; the server's mark gate runs it with no input at all. A GET is
 //   always a read.
+// - ATT-APP-ATTACH: a `presence: 'attach'` route is only a POST at ATTACH_PATH with a handler,
+//   registered once; the server's attach gate runs it.
 // - The page files in api/ each own their routes; this file only lists them.
 import { activityRoutes } from './api/activity.js';
+import { attachRoute } from './api/attach.js';
 // U3-c: the Agents list and the switch kind; the stubs of U3-d, U3-e, U3-f and U3-flow.
 import { agentsRoutes } from './api/agents.js';
 import { eventsRoutes } from './api/events.js';
@@ -77,6 +80,7 @@ import {
   AGENTS_REMOVE_PATH,
   AGENTS_RESUME_PATH,
   AGENTS_SWITCH_PATH,
+  ATTACH_PATH,
   BACKUP_EXPORT_PATH,
   BACKUP_PATH,
   CREATE_AGENT_PATHS,
@@ -369,6 +373,14 @@ export class LocalUiRouteRegistry {
       if (this.#entries.some((e) => e.route.presence === 'invite' && e.route.step === step)) {
         throw invalid('this invite step is already registered');
       }
+    } else if (presence === 'attach') {
+      // ATT-APP-ATTACH: the owner's attached files only; the server's attach gate runs it.
+      if (method !== 'POST') throw invalid('an attach route is a POST');
+      if (route.path !== ATTACH_PATH) throw invalid('an attach route is only at the attach path');
+      if (typeof handler !== 'function') throw invalid('an attach route needs a handler');
+      if (this.#entries.some((e) => e.route.presence === 'attach')) {
+        throw invalid('the attach route is already registered');
+      }
     } else if (typeof handler !== 'function') {
       throw invalid('no handler');
     } else if (method === 'GET') {
@@ -474,6 +486,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     ownerPresenceRoutes,
     // UX1113-R1 (D-147): restore from a recovery kit, in the app.
     restoreRoutes,
+    // ATT-APP-ATTACH: the owner attaches light text files in a conversation (the attach kind).
+    [attachRoute],
   ]) {
     for (const route of routes) registry.register(route);
   }
