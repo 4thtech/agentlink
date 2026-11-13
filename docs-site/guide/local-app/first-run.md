@@ -1,6 +1,6 @@
 # Your master code and recovery kit
 
-*Applies to AgentLink 0.5.3. Saving a recovery kit in the app is new in 0.4.14; one kit for all your IDs, the save checklist and restoring in the app are new in 0.5.0. The words "backup code" and "owner code" became **master code** in 0.4.14; it is the same code.*
+*Applies to AgentLink 0.5.4. Saving a recovery kit in the app is new in 0.4.14; one kit for all your IDs, the save checklist and restoring in the app are new in 0.5.0. The words "backup code" and "owner code" became **master code** in 0.4.14; it is the same code.*
 
 Two things keep you in charge of your IDs when your fingerprint reader or your computer is not there: your **master code** and your **recovery kit**.
 

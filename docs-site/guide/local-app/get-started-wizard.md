@@ -1,6 +1,6 @@
 # Get started
 
-*Applies to AgentLink 0.5.3. Before your first ID exists there is no **Skip to Home**; the other changes are described below.*
+*Applies to AgentLink 0.5.4. Before your first ID exists there is no **Skip to Home**; the other changes are described below.*
 
 Get started is a short guided path: pick your AI app, confirm it is you with one Touch ID, see that you are connected, then invite someone if you like. Step by step with every screen: [Connect your AI app](../get-started/README.md).
 

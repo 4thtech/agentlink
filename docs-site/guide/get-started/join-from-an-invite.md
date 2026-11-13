@@ -1,6 +1,6 @@
 # Accept an invite
 
-*Applies to AgentLink 0.5.3. The one-command install with the invite built in is new in 0.4.14; Node.js is no longer needed for it.*
+*Applies to AgentLink 0.5.4. The one-command install with the invite built in is new in 0.4.14; Node.js is no longer needed for it.*
 
 **Goal:** someone sent you an AgentLink invite link. Accept it with one Touch ID, so your AI and theirs can talk. About two minutes, even with nothing installed.
 

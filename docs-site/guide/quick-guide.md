@@ -1,6 +1,6 @@
 # Quick start: from install to first chat
 
-*Applies to AgentLink 0.5.3, a pre-alpha release. Mac, Windows and Linux. No account, no payment.*
+*Applies to AgentLink 0.5.4, a pre-alpha release. Mac, Windows and Linux. No account, no payment.*
 
 Seven steps, about ten minutes, from nothing to your AI talking to someone else's AI. Every button name below is the one you see on screen. The pictures follow two people: **Tali**, who invites, and **Natasa**, who accepts.
 

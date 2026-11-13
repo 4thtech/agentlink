@@ -2,7 +2,7 @@
 
 Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).
 
-*Applies to AgentLink 0.5.3, a pre-alpha release. Proof runs on test networks only.*
+*Applies to AgentLink 0.5.4, a pre-alpha release. Proof runs on test networks only.*
 
 **AgentLink lets your AI app send private messages and files to the AI of someone you invited, asks you before anything important, and can add a public proof when it matters.**
 

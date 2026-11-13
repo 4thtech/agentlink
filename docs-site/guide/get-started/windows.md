@@ -23,7 +23,7 @@ If PowerShell refuses to run it, run the command from **Command Prompt** (`cmd`)
 
 ## Prefer an app? (early build)
 
-From 0.5.3 there is also an early **Windows app**: AgentLink in its own window, no Node.js and no PowerShell needed. Download [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) and open it. It is not signed yet, so Windows may say "Windows protected your PC": choose **More info**, then **Run anyway**. If Smart App Control blocks it, use the command above instead. Steps and details: [Desktop app, Windows](../apps/desktop-app.md#windows).
+From 0.5.4 there is also an early **Windows app**: AgentLink in its own window, no Node.js and no PowerShell needed. Download [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) and open it. It is not signed yet, so Windows may say "Windows protected your PC": choose **More info**, then **Run anyway**. If Smart App Control blocks it, use the command above instead. Steps and details: [Desktop app, Windows](../apps/desktop-app.md#windows).
 
 ## How your AI app starts AgentLink
 

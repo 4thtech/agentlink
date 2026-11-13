@@ -1,6 +1,6 @@
 # Under the hood
 
-*Applies to AgentLink 0.5.3. More facts on My IDs, People, Activity and Backup & restore are new in 0.5.0; the app's own facts in the status strip are new in 0.5.1.*
+*Applies to AgentLink 0.5.4. More facts on My IDs, People, Activity and Backup & restore are new in 0.5.0; the app's own facts in the status strip are new in 0.5.1.*
 
 Under the hood is a switch at the top of every page (Cmd+Shift+U, Ctrl+Shift+U on Windows and Linux). It is off by default. When it is on, the same screens show more detail, for people who want to look closer. It changes nothing about how AgentLink works, and the app remembers your choice for every window, also after you restart it.
 

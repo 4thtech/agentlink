@@ -1,6 +1,6 @@
 # Approve with Touch ID or your master code
 
-*Applies to AgentLink 0.5.3. "Use your master code instead" is on every confirm since 0.4.14; since 0.5.3 each confirmation is one press, on a compact card (see [Approvals in the app](../local-app/approvals.md)).*
+*Applies to AgentLink 0.5.4. "Use your master code instead" is on every confirm since 0.4.14; since 0.5.4 each confirmation is one press, on a compact card (see [Approvals in the app](../local-app/approvals.md)).*
 
 **Goal:** know what your AI must ask you about, and how you say yes or no. Your AI can ask; only you can approve.
 

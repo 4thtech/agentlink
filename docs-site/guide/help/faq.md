@@ -1,6 +1,6 @@
 # FAQ
 
-Applies to AgentLink 0.5.3, a pre-alpha release. Proof runs on test networks only. For the full picture, see [What works today](../README.md#what-works-today).
+Applies to AgentLink 0.5.4, a pre-alpha release. Proof runs on test networks only. For the full picture, see [What works today](../README.md#what-works-today).
 
 ## The basics
 

@@ -1,6 +1,6 @@
 # Install AgentLink
 
-*Applies to AgentLink 0.5.3. Mac, Windows 10 or 11, and Linux.*
+*Applies to AgentLink 0.5.4. Mac, Windows 10 or 11, and Linux.*
 
 **Goal:** AgentLink installed and open, in about two minutes. You need no account and no admin rights.
 

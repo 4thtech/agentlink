@@ -1,6 +1,6 @@
 # Home
 
-*Applies to AgentLink 0.5.3. Waiting invites, file chips with a reader in the conversation and the network status line are new in 0.5.1. In 0.4.4 and 0.4.5, Home was five tiles and a seven-step Start here.*
+*Applies to AgentLink 0.5.4. Waiting invites, file chips with a reader in the conversation and the network status line are new in 0.5.1. In 0.4.4 and 0.4.5, Home was five tiles and a seven-step Start here.*
 
 Home is the first screen. It shows what needs you, then the people your AI talks to.
 
