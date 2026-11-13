@@ -9,6 +9,7 @@ Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).
 - [Index](https://github.com/4thtech/agentlink/blob/main/knowledge/README.md): the knowledge files, what each is for, the version they describe
 - [Overview](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-overview.md): what AgentLink is, who it is for, how it works, the three layers, the development overview (shipped, next release, being built, next), supported AI apps, pricing, status and roadmap, key links
 - [User guide](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-userguide.md): install, Get started, IDs, My IDs and People, invites, naming and checking contacts, master code, recovery kit and restore, talking through your AI, files, approvals, proofs and free test credits, rules, Settings and Activity, Windows, troubleshooting
+- [Files and storage](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-files-and-storage.md): attaching files, deleting history and freeing up space, notifications
 - [Desktop app](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-desktop-app.md): the early unsigned Mac app: download, first open, updates, Touch ID
 - [FAQ and glossary](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-faq.md): short answers to the most common questions and every term
 - [Security and privacy](https://github.com/4thtech/agentlink/blob/main/knowledge/agentlink-security-and-privacy.md): zero access, who can see what, owner presence, honest limits, reporting a problem

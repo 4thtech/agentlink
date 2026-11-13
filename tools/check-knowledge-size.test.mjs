@@ -79,7 +79,7 @@ describe('the committed knowledge base', () => {
 describe('checkFileSet', () => {
   it('accepts exactly the knowledge files (an index and six topic files)', () => {
     expect(checkFileSet([...KNOWLEDGE_FILES])).toEqual([]);
-    expect(KNOWLEDGE_FILES).toHaveLength(7);
+    expect(KNOWLEDGE_FILES).toHaveLength(8);
   });
 
   it('rejects a missing and an extra file', () => {

@@ -92,7 +92,7 @@ describe('chapter 11: a Markdown plan in the reader', () => {
     };
     await snap('chip-light-desktop');
 
-    await chip.getByRole('button', { name: 'Open', exact: true }).click();
+    await chip.getByRole('button', { name: 'Open plan.md', exact: true }).click();
     const reader = b.page.getByRole('dialog');
 
     await reader.locator('h3').filter({ hasText: 'Build plan: class project' }).waitFor();
@@ -116,7 +116,7 @@ describe('chapter 11: a Markdown plan in the reader', () => {
       await snap('chip-dark-desktop');
       await b.page.setViewportSize({ width: 390, height: 844 });
       await snap('chip-dark-phone');
-      await chip.getByRole('button', { name: 'Open', exact: true }).click();
+      await chip.getByRole('button', { name: 'Open plan.md', exact: true }).click();
       await reader.locator('h3').first().waitFor();
       await snap('reader-dark-phone');
       await b.page.emulateMedia({ colorScheme: 'light' });
