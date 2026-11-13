@@ -147,6 +147,8 @@ export class InboxService {
             row !== undefined &&
             row.direction === 'in' &&
             row.state === 'ok' &&
+            // RET-3 (D-148; 07 §3.8): a tombstone is absent from every read.
+            row.deleted_at === null &&
             row.contact_id !== null &&
             row.payload_json !== null &&
             INBOX_TYPES.includes(row.type),
@@ -221,6 +223,7 @@ export class InboxService {
             contact_id: contact.contact_id,
             state: 'ok',
             read_at: null,
+            deleted_at: null,
             type: { in: [...PAGE_TYPES] },
           }) +
           tx.count('envelopes', {

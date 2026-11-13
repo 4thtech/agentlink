@@ -620,6 +620,19 @@ export type {
   QuarantineMark,
   SavedFileIdentity,
 } from './files/platform.js';
+// RET-3 (D-148; 04 §4.2): the owner's history delete (plan, then apply) and the Trash outcome codes.
+export {
+  HistoryService,
+  MAX_PLAN_IDS,
+  MAX_PLAN_MESSAGES,
+  type HistoryDeleteInclude,
+  type HistoryDeleteInput,
+  type HistoryDeletePlan,
+  type HistoryDeleteResult,
+  type HistoryKeptReason,
+} from './history/delete.js';
+export type { SavedFileKey, TrashSavedCounts } from './files/incoming.js';
+export type { SavedFileExpectation, TrashSavedOutcome } from './files/platform.js';
 // RET-2 (D-148; 07 §3.8): the saved-file index, read by the history delete (RET-3).
 export {
   openSavedFile,

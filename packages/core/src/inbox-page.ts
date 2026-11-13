@@ -268,7 +268,17 @@ function categoryWheres(
   const types = { in: [...PAGE_TYPES] };
   const out: (readonly [Category, Where<'envelopes'>])[] = [];
   if (scope.length > 0) {
-    out.push(['in', { direction: 'in', state: 'ok', contact_id: { in: [...scope] }, type: types }]);
+    // RET-3 (D-148; 07 §3.8): a tombstone is absent from every read.
+    out.push([
+      'in',
+      {
+        direction: 'in',
+        state: 'ok',
+        contact_id: { in: [...scope] },
+        type: types,
+        deleted_at: null,
+      },
+    ]);
   }
   if (q.contactId === undefined) {
     out.push([
@@ -290,6 +300,7 @@ function categoryWheres(
         state: 'ok',
         contact_id: { in: [...scope] },
         type: types,
+        deleted_at: null,
         delivery: { in: [...DELIVERY_STATES] },
       },
     ]);

@@ -59,6 +59,14 @@ function refusal(code: string): HandlerOutput {
       return fail('error', EXPORT_TEXT.received, EXPORT_TEXT.receivedNextStep, code);
     case 'POLICY_DENIED':
       return fail('rejected', EXPORT_TEXT.policyDenied, EXPORT_TEXT.policyDeniedNextStep, code);
+    // RET-3: the owner deleted this message on this computer; its content is never shared.
+    case 'CONTENT_DELETED':
+      return fail(
+        'rejected',
+        "This message was deleted on this computer, so its content can't be shared.",
+        EXPORT_TEXT.policyDeniedNextStep,
+        code,
+      );
     default:
       return proofRefusal(code);
   }

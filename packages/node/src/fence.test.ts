@@ -68,6 +68,8 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'holdAgentFolderShared',
       'inboxFolderProblem',
       'initOwner',
+      // RET-3 (04 §4.2): a file move into the OS Trash (no key, no store, no cipher).
+      'moveToTrash',
       'nodeHostResolver',
       'nodeNip11Fetcher',
       'nodeRelayConnector',
@@ -87,6 +89,8 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'performOwnerOperation',
       // W4-LIVE-STATUS (04 §2.5): signal 0 to a valid pid, a boolean back; no key, no seam.
       'pidAlive',
+      // RET-3: a no-replace rename used by the Trash mover (no key, no store).
+      'placeNoReplace',
       'probeOsKeychain',
       'quarantineMark',
       'resolveAllowedFile',
@@ -104,6 +108,8 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // WP-D3: the same server for the desktop host; session links go to the pipe sink, never the
       // OS opener (approval-server-link-sink.test.ts).
       'startApprovalServerWithLinkSink',
+      // RET-3: one saved Inbox file to the Trash, only while unchanged (no key, no store).
+      'trashSavedFile',
       'unlockFileKeyStoreAgent',
       // U3-c (card U3-e uses it): removal takes the folder lock exclusive.
       'withAgentFolderExclusive',
