@@ -1211,6 +1211,10 @@ describe('Files in the conversation and the reader (REL051-A34)', () => {
       S.openFile,
       S.showInFinder,
     ]);
+    // UX-LEFT-1 (R2-UI-12): each chip's buttons carry the file's name for a screen reader.
+    expect(
+      [...(chip?.querySelectorAll('button') ?? [])].map((x) => x.getAttribute('aria-label')),
+    ).toEqual(['Open plan.md', `${S.showInFinder}, plan.md`]);
     expect(lintVocabulary(host.textContent ?? '')).toEqual([]);
   });
 
