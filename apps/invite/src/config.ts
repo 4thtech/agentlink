@@ -21,19 +21,12 @@ export const DOCS_LINKS = {
  */
 export const MAC_APP_AVAILABLE = true;
 
-/** The release the Mac app link names (its GitHub Release tag is `v` plus this). */
-export const MAC_APP_VERSION = '0.5.2';
-
 /**
- * The Mac app's file name, as the desktop build writes it (apps/desktop/build/build-mac.mjs on
- * desktop/integration-051: `AgentLink-<version>-mac-<arch>.dmg`, arch arm64 or x64). The page links
- * both: Apple chip (arm64) and Intel chip (x64).
+ * The Mac app's downloads: the stable file names of the newest GitHub Release marked Latest
+ * (`AgentLink-mac-<arch>.dmg`, Apple chip arm64 and Intel x64). The release workflow uploads these
+ * copies and marks the Release Latest only after both are attached, so the links never go stale.
  */
-export const macAppAsset = (version: string, arch: 'arm64' | 'x64'): string =>
-  `AgentLink-${version}-mac-${arch}.dmg`;
-
 const macAppUrl = (arch: 'arm64' | 'x64'): string =>
-  `https://github.com/4thtech/agentlink/releases/download/v${MAC_APP_VERSION}/${macAppAsset(MAC_APP_VERSION, arch)}`;
+  `https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-${arch}.dmg`;
 
-/** The Mac app's downloads: those exact assets of that exact GitHub Release (never `latest`). */
 export const MAC_APP_URLS = { arm64: macAppUrl('arm64'), x64: macAppUrl('x64') } as const;

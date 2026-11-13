@@ -533,6 +533,8 @@ jobs:
           set -euo pipefail
           node tools/check-knowledge-size.mjs
           node tools/check-knowledge-links.mjs
+          # REL-LINKS-3: the Mac download links never name a version.
+          node tools/check-download-links.mjs
           node tools/docs-status/index.mjs --check
           # DOCS-UNIFY: docs-site still generates a clean 4thTech Docs (wiki) copy: every page in its
           # SUMMARY.md, every link and image resolves after the GitBook rewrite.
@@ -546,7 +548,7 @@ jobs:
         run: >-
           pnpm exec vitest run vocabulary.test.mjs id-vocabulary.test.mjs retired-scope.test.mjs networks-page.test.mjs
           skill-file.test.mjs check-knowledge-links.test.mjs check-knowledge-size.test.mjs docs-status
-          release/deploy-drop.test.mjs docs/wiki-sync.test.mjs
+          check-download-links.test.mjs release/deploy-drop.test.mjs docs/wiki-sync.test.mjs
 
       - name: Prettier
         run: pnpm exec prettier --check .

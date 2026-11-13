@@ -36,6 +36,7 @@ import { CONNECT_WITH } from '../test/journey/helpers-wizard.js';
 import {
   ACCEPT_WITH,
   CONFIRM_PASSKEY,
+  SAVE_WITH_PASSKEY,
   goTo,
   inboxHas,
   journeyWorld,
@@ -298,9 +299,10 @@ describe('docs screens', () => {
         .getByRole('heading', { name: 'You are connected', exact: true })
         .waitFor({ timeout: 30_000 });
       await shot(b, 'connected-name-contact');
-      await b.getByLabel('Name this contact').fill('Tali');
-      await b.getByRole('button', { name: 'Save name', exact: true }).click();
-      const confirm = b.getByRole('button', { name: CONFIRM_PASSKEY });
+      // UX1113-N1: naming is optional; the field opens on request with one "Save with Touch ID".
+      await b.getByRole('button', { name: 'Use your own name for them', exact: true }).click();
+      await b.getByLabel('Your name for them').fill('Tali');
+      const confirm = b.getByRole('button', { name: SAVE_WITH_PASSKEY });
       await confirm.waitFor();
       await shot(b, 'confirm-presence');
       await confirm.click();
@@ -325,11 +327,11 @@ describe('docs screens', () => {
         .first()
         .waitFor({ timeout: 30_000 });
       await shot(a, 'connected-inviter');
-      const name = a.getByLabel('Name this contact');
-      if (await name.isVisible()) {
-        await name.fill('Natasa');
-        await a.getByRole('button', { name: 'Save name', exact: true }).click();
-        await a.getByRole('button', { name: CONFIRM_PASSKEY }).click();
+      const own = a.getByRole('button', { name: 'Use your own name for them', exact: true });
+      if (await own.isVisible()) {
+        await own.click();
+        await a.getByLabel('Your name for them').fill('Natasa');
+        await a.getByRole('button', { name: SAVE_WITH_PASSKEY }).click();
         await a.getByRole('heading', { name: /^You and “?Natasa”? are connected$/ }).waitFor();
       }
     });

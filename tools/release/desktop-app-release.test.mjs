@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -74,7 +75,10 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
 
   // D15-03: a missing release or a missing asset is a red job, never a warning on a green run.
   it('fails when Release v<version> does not exist, and checks what got attached', () => {
-    const step = attach.slice(attach.indexOf('Attach the app to the GitHub Release'));
+    const step = attach.slice(
+      attach.indexOf('Attach the app to the GitHub Release'),
+      attach.indexOf('Check the attached files and their public links'),
+    );
     expect(step).not.toBe('');
     expect(step).not.toMatch(/::warning::/);
     expect(step).toMatch(/gh release view "v\$VERSION"[^\n]*\|\|[^\n]*\n?[^\n]*::error::/);
@@ -89,9 +93,12 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
   // REL051-CIE (scope change, 0.5.1): the Windows desktop app is not shipped yet. The release
   // attaches exactly the two Mac DMGs and their sums: no Windows installer, no zip, no glob.
   it('attaches only the two Mac DMGs and SHA256SUMS-desktop-app.txt', () => {
-    const step = attach.slice(attach.indexOf('Attach the app to the GitHub Release'));
+    const step = attach.slice(
+      attach.indexOf('Attach the app to the GitHub Release'),
+      attach.indexOf('Check the attached files and their public links'),
+    );
     expect(step).toContain(
-      'files=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" )',
+      'files=( "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" "AgentLink-mac-arm64.dmg" "AgentLink-mac-x64.dmg" )',
     );
     expect(attach).not.toMatch(/setup\.exe|win-x64|\*\.zip|\*\.dmg/);
     expect(build).not.toMatch(/windows/);
@@ -99,10 +106,81 @@ describe('release.yml desktop app jobs (WP-D11)', () => {
 
   // D15-10: a re-run never silently replaces a published installer with other bytes.
   it('never clobbers; an existing asset must have the same hash; every uploaded file is in the sums', () => {
-    const step = attach.slice(attach.indexOf('Attach the app to the GitHub Release'));
+    const step = attach.slice(
+      attach.indexOf('Attach the app to the GitHub Release'),
+      attach.indexOf('Check the attached files and their public links'),
+    );
     expect(step).not.toMatch(/--clobber/);
     expect(step).toMatch(/gh release download "v\$VERSION"/);
     expect(step).toMatch(/is not listed in SHA256SUMS-desktop-app\.txt/);
+  });
+
+  // REL-LINKS-1: stable names, Latest flipped last, public links checked; REL-HOLD-1: RELEASE_HOLD.
+  it('uploads stable-named copies and lists them in the sums', () => {
+    expect(attach).toContain('cp -- "AgentLink-$VERSION-mac-$arch.dmg" "AgentLink-mac-$arch.dmg"');
+    expect(attach).toMatch(/AgentLink-mac-\$arch\.dmg" >> SHA256SUMS-desktop-app\.txt/);
+  });
+
+  it('creates the Release not-Latest and marks it Latest only as the last Release change', () => {
+    const create = release.slice(release.indexOf('gh release create "v$VERSION"'));
+    expect(create.split('\n')[0]).toContain('--latest=false');
+    const flip = attach.indexOf('gh release edit "v$VERSION"');
+    expect(flip).toBeGreaterThan(attach.indexOf('gh release upload'));
+    expect(attach.slice(flip)).not.toMatch(/gh release (upload|create|delete)/);
+    expect(attach.match(/gh release edit/g)).toHaveLength(1);
+    expect(attach).toMatch(/gh release edit "v\$VERSION" [^\n]*--latest\n/);
+    // never for a prerelease or a draft
+    expect(attach).toMatch(/--json isPrerelease,isDraft/);
+    // the hashes and the public links of this release are checked before the flip
+    const checkAt = attach.indexOf('Check the attached files and their public links');
+    expect(checkAt).toBeGreaterThan(attach.indexOf('gh release upload'));
+    expect(checkAt).toBeLessThan(attach.indexOf('Mark the Release Latest'));
+    expect(attach.slice(checkAt, flip)).toMatch(
+      /sha256sum --check --strict SHA256SUMS-desktop-app\.txt/,
+    );
+  });
+
+  it('checks the versioned release links before the flip and the latest links after it', () => {
+    const before = attach.slice(
+      attach.indexOf('Check the attached files and their public links'),
+      attach.indexOf('Mark the Release Latest'),
+    );
+    expect(before).toContain('releases/download/v$VERSION/AgentLink-mac-$arch.dmg');
+    expect(before).toContain('for arch in arm64 x64');
+    expect(before).toMatch(/"\$code" = "200"/);
+    expect(before).toMatch(/-gt 20000000/);
+    const after = attach.slice(attach.indexOf('Check the public download links'));
+    expect(after).toContain('releases/latest/download/AgentLink-mac-$arch.dmg');
+    expect(after).toMatch(/if: steps\.latest\.outputs\.flipped == 'true'/);
+    expect(after).toMatch(/"\$code" = "200"/);
+  });
+
+  // The pipeline of the "Mark the Release Latest" step, run on a sample `gh release list` output.
+  it('flips Latest only for the highest stable v* release', () => {
+    const step = attach.slice(attach.indexOf('Mark the Release Latest'));
+    expect(step).toMatch(/gh release list [^\n]*--json tagName,isPrerelease,isDraft/);
+    expect(step).toMatch(/select\(\.isPrerelease == false and \.isDraft == false\)/);
+    expect(step).toMatch(/sort -V \| tail -n 1/);
+    expect(step).toMatch(/\$highest" != "v\$VERSION"[\s\S]*flipped=false[\s\S]*exit 0/);
+    const highest = (tags) =>
+      execFileSync('bash', ['-c', "grep -E '^v[0-9]+\\.[0-9]+\\.[0-9]+$' | sort -V | tail -n 1"], {
+        input: tags.join('\n'),
+        encoding: 'utf8',
+      }).trim();
+    expect(highest(['v0.5.2', 'v0.5.10', 'v0.5.9', 'v0.5.11-next.1', 'desktop-beta'])).toBe(
+      'v0.5.10',
+    );
+    expect(highest(['v0.9.0', 'v0.10.0', 'v0.5.2'])).toBe('v0.10.0');
+  });
+
+  it('RELEASE_HOLD: the Version PR still updates, but auto-merge and pack are off', () => {
+    const version = job(release, 'version');
+    expect(version).toMatch(/Turn on auto-merge[^\n]*\n\s+if:[^\n]*vars\.RELEASE_HOLD != 'true'/);
+    expect(version).toContain('changesets/action/version');
+    expect(version).not.toMatch(
+      /uses: changesets[^\n]*\n(?:[^\n]*\n){0,3}\s+if:[^\n]*RELEASE_HOLD/,
+    );
+    expect(job(release, 'pack')).toMatch(/\n {4}if: [^\n]*vars\.RELEASE_HOLD != 'true'/);
   });
 
   it('pins every action to a full commit SHA', () => {
