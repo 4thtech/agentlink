@@ -10,6 +10,7 @@ import {
   assertRootKeyPinned,
   findRootKeyPlaceholder,
   rootKeyProblems,
+  updatePinRecord,
 } from '../lib/root-key-check.mjs';
 
 const DESKTOP = fileURLToPath(new URL('../..', import.meta.url));
@@ -19,6 +20,11 @@ const REAL = JSON.stringify({
   minimumStatementSequence: 0,
 });
 const cleanAsar = [{ path: 'dist/main/entry.js', content: Buffer.from('console.log(1)') }];
+const REAL_KEY = '79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798';
+// UPD-3 (Fable L3): the bundled main process carries the pin as text (the JSON import).
+const pinnedAsar = [
+  { path: 'dist/main/entry.js', content: Buffer.from(`var r={rootPublicKey:"${REAL_KEY}"};`) },
+];
 
 test('the committed root-key.json is the placeholder, and a release build refuses it', () => {
   assert.ok(REPO_JSON.includes(ROOT_KEY_PLACEHOLDER_MARK));
@@ -30,7 +36,7 @@ test('the committed root-key.json is the placeholder, and a release build refuse
 });
 
 test('a real key passes; the placeholder anywhere in the ASAR still refuses', () => {
-  assert.equal(assertRootKeyPinned({ rootKeyJson: REAL, files: cleanAsar, env: {} }), 'pinned');
+  assert.equal(assertRootKeyPinned({ rootKeyJson: REAL, files: pinnedAsar, env: {} }), 'pinned');
   const stale = [
     { path: 'dist/main/entry.js', content: Buffer.from(`x="${ROOT_KEY_PLACEHOLDER_MARK}-y"`) },
   ];
@@ -150,4 +156,37 @@ test('the release bundle swaps in the updates-off root only when asked', async (
   );
   assert.doesNotMatch(JSON.stringify(probe({})), /updates-off/);
   assert.throws(() => probe({ AGENTLINK_DESKTOP_UPDATES: 'maybe' }));
+});
+
+// UPD-3 (Fable L3): the built app's pin must equal root-key.json. An updates-on build whose ASAR does
+// not carry exactly that key is refused, and the build records the pin (inputs-<target>.json) so the
+// release checks it again against root-key.json before anything is signed.
+test('an updates-on build is refused when the ASAR does not carry the pin of root-key.json', () => {
+  assert.throws(
+    () => assertRootKeyPinned({ rootKeyJson: REAL, files: cleanAsar, env: {} }),
+    /does not carry the pinned update key/,
+  );
+  const other = [
+    { path: 'dist/main/entry.js', content: Buffer.from(`var r="${'ab'.repeat(32)}";`) },
+  ];
+  assert.throws(
+    () => assertRootKeyPinned({ rootKeyJson: REAL, files: other, env: {} }),
+    /does not carry the pinned update key/,
+  );
+});
+
+test('the pin record for inputs-<target>.json', () => {
+  assert.deepEqual(updatePinRecord({ mode: 'pinned', rootKeyJson: REAL }), {
+    updates: 'on',
+    updatePin: REAL_KEY,
+  });
+  assert.deepEqual(updatePinRecord({ mode: 'updates-off', rootKeyJson: REPO_JSON }), {
+    updates: 'off',
+    updatePin: null,
+  });
+  // An owner-local build has no pin; the release refuses it (updates on, no pin).
+  assert.deepEqual(updatePinRecord({ mode: 'owner-local', rootKeyJson: REPO_JSON }), {
+    updates: 'on',
+    updatePin: null,
+  });
 });

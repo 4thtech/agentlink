@@ -71,11 +71,62 @@ export interface PresenceSeams {
 }
 export const PresenceSeamsContext = createContext<PresenceSeams>({});
 
-type Mode =
+/** What this computer offers for one owner step (read once per mount, or when `watch` changes). */
+export type PresenceMode =
   | { readonly kind: 'reading' }
   | { readonly kind: 'native'; readonly sensor: string }
   | { readonly kind: 'passkey'; readonly info: PasskeyInfo }
   | { readonly kind: 'code' };
+
+/**
+ * N3 / OWNERSTEP-LEFT: the one reading every one-step owner button shares (PresenceButton, the
+ * approval card, the Inbox Save): the desktop app's Touch ID / Windows Hello when it is turned on
+ * there, else the passkey this browser can use, else the master code. `sensor` is the word the
+ * button names ("Touch ID", "Windows Hello", "your passkey").
+ */
+export function usePresenceMode({
+  readPasskey,
+  watch,
+  platform: givenPlatform,
+  nativeStatus: givenNativeStatus,
+  userAgent: givenUserAgent,
+}: {
+  readonly readPasskey: () => Promise<PasskeyInfo | undefined>;
+  /** Read again when this changes (the page learnt of a passkey after the button mounted). */
+  readonly watch?: string | undefined;
+} & Omit<PresenceSeams, 'gesture'>): { readonly mode: PresenceMode; readonly sensor: string } {
+  const seams = useContext(PresenceSeamsContext);
+  const nativeStatus = givenNativeStatus ?? seams.nativeStatus ?? readNativeStatus;
+  const userAgent = givenUserAgent ?? seams.userAgent;
+  const [platform] = useState<Platform>(() => givenPlatform ?? seams.platform ?? detectPlatform());
+  const [mode, setMode] = useState<PresenceMode>({ kind: 'reading' });
+  useEffect(() => {
+    let live = true;
+    const desktop = desktopPlatform(userAgent);
+    void (async () => {
+      if (desktop !== undefined) {
+        const status = await nativeStatus().catch((): NativeStatus => ({
+          available: false,
+          registered: false,
+        }));
+        if (status.available && status.registered && status.reason === undefined) {
+          if (live) {
+            setMode({ kind: 'native', sensor: desktop === 'mac' ? 'Touch ID' : 'Windows Hello' });
+          }
+          return;
+        }
+      }
+      const info = await readPasskey().catch(() => undefined);
+      if (!live) return;
+      setMode(info === undefined ? { kind: 'code' } : { kind: 'passkey', info });
+    })();
+    return () => {
+      live = false;
+    };
+    // Read once (and again when `watch` changes): what this computer offers decides the button.
+  }, [watch]);
+  return { mode, sensor: mode.kind === 'native' ? mode.sensor : SENSOR[platform] };
+}
 
 export function PresenceButton({
   withSensor,
@@ -95,41 +146,23 @@ export function PresenceButton({
 }: PresenceButtonProps): ReactElement {
   const seams = useContext(PresenceSeamsContext);
   const gesture = ownGesture ?? seams.gesture ?? passkeyProof;
-  const givenPlatform = ownPlatform ?? seams.platform;
-  const nativeStatus = ownNativeStatus ?? seams.nativeStatus ?? readNativeStatus;
+  const { mode, sensor } = usePresenceMode({
+    readPasskey: () => owner.passkey(),
+    ...(ownPlatform === undefined ? {} : { platform: ownPlatform }),
+    ...(ownNativeStatus === undefined ? {} : { nativeStatus: ownNativeStatus }),
+    ...(ownUserAgent === undefined ? {} : { userAgent: ownUserAgent }),
+  });
   const userAgent = ownUserAgent ?? seams.userAgent;
-  const [platform] = useState<Platform>(() => givenPlatform ?? detectPlatform());
-  const [mode, setMode] = useState<Mode>({ kind: 'reading' });
   const [askCode, setAskCode] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const flight = usePresenceFlight(busy);
   const mounted = useRef(true);
   const describedBy = useId();
-
   useEffect(() => {
     mounted.current = true;
-    const desktop = desktopPlatform(userAgent);
-    void (async () => {
-      if (desktop !== undefined) {
-        const status = await nativeStatus().catch((): NativeStatus => ({
-          available: false,
-          registered: false,
-        }));
-        if (status.available && status.registered && status.reason === undefined) {
-          if (mounted.current) {
-            setMode({ kind: 'native', sensor: desktop === 'mac' ? 'Touch ID' : 'Windows Hello' });
-          }
-          return;
-        }
-      }
-      const info = await owner.passkey().catch(() => undefined);
-      if (!mounted.current) return;
-      setMode(info === undefined ? { kind: 'code' } : { kind: 'passkey', info });
-    })();
     return () => {
       mounted.current = false;
     };
-    // Read once: what this computer offers decides the button.
   }, []);
 
   const held = busy || flight.asking || disabled || mode.kind === 'reading';
@@ -174,7 +207,6 @@ export function PresenceButton({
     );
   }
 
-  const sensor = mode.kind === 'native' ? mode.sensor : SENSOR[platform];
   const message = cancelled ? notUsed : error;
   return (
     <div>

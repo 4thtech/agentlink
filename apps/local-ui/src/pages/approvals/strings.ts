@@ -89,6 +89,25 @@ export const APPROVAL_STRINGS = Object.freeze({
   get denyWithPasskey(): string {
     return `Deny with ${sensorWord()}`;
   },
+  // N3 / OWNERSTEP-LEFT: the one-step buttons name the sensor that works here ({sensor} is Touch ID
+  // in the Mac app, Windows Hello on Windows, "your passkey" in a browser elsewhere).
+  approveWith: 'Approve with {sensor}',
+  denyWith: 'Deny with {sensor}',
+  confirmWith: 'Confirm with {sensor}',
+  // N3 (D3): the compact card's own control; it opens the full approval in place.
+  review: 'Review',
+  hideReview: 'Hide details',
+  cancel: 'Cancel',
+  // IR-UX1113-N2-1 #2: the sensor was used, and the server did not accept the proof.
+  sensorRefused:
+    "AgentLink didn't accept that confirmation. Nothing was changed. Try again, or use your master code.",
+  // IR-N3-1 #5: the server could not use Touch ID (or the passkey) here just now.
+  sensorUnavailable:
+    "That confirmation isn't available here right now. Nothing was changed. Use your master code.",
+  // IR-N3-1 #4: the compact line for a request with no name.
+  aContact: 'a contact',
+  // IR-N3-1 #2: the capped terms on the compact card; the rest is under Review.
+  moreInReview: '{count} more in Review.',
   confirmApproval: 'Confirm approval',
   confirmDenial: 'Confirm denial',
   approved: 'Approved.',

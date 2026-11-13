@@ -156,6 +156,12 @@ describe('the asset for this Mac', () => {
       'available',
       'failed',
       'offline',
+      // UPD-5: the in-app update (updater/in-app.ts).
+      'downloading',
+      'verifying',
+      'ready',
+      'restarting',
+      'install_failed',
     ]);
   });
 });

@@ -77,6 +77,15 @@ Your IDs, people and messages stay as they are: they live in your AgentLink fold
 
 You can always get a newer version by hand too: download the new `.dmg` from the [Releases page](https://github.com/4thtech/agentlink/releases) and drag it over the old one in Applications.
 
+**Coming: Update now (not switched on yet).** A later Mac version will update itself on a click, with no download and no dragging. The steps above stay until then. When it is on, Settings › Updates shows:
+
+1. **AgentLink 0.5.4 is available** (for example) and an **Update now** button.
+2. **Downloading…** with a progress bar and the percentage, then **Checking the new version…**: the app checks that the new version is the one AgentLink published before it changes anything.
+3. **AgentLink 0.5.4 is ready** and a **Restart now** button. Nothing changes until you press it. If a request from your AI is waiting for your approval, the page says so first: it waits until AgentLink is back.
+4. **Restarting…**: AgentLink closes and opens again with the new version. If the new version does not start, the one you had comes back by itself.
+
+If the app can't update itself (for example, it is not in a folder you can change), the page says **Couldn't update here. Download the new version instead.** and shows the **Download update** button with the steps above.
+
 ## Touch ID
 
 Turning on Touch ID in the desktop app is guided: open **Settings**, then **Touch ID & master code**, and press **Use Touch ID for approvals**. Type your master code once, then touch the sensor. **Test Touch ID** on the same page checks that it works. If you cancel or the touch fails, it goes back to off with a plain message, and your master code keeps working.

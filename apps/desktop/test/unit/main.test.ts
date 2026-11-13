@@ -341,7 +341,7 @@ describe('runShell startup', () => {
     } as unknown as ReleaseChecker;
     const { electron, children, proc } = setup([], { releaseChecker: () => fake });
     await runShell(electron, proc);
-    const line = `${JSON.stringify({ v: 1, type: 'app-update', ...view })}\n`;
+    const line = `${JSON.stringify({ v: 1, type: 'app-update', ...view, installable: false, percent: 0 })}\n`;
     expect(children[0]?.stream.written).toEqual([]);
     children[0]?.stream.push(readyLine());
     expect(children[0]?.stream.written).toEqual([line]);
@@ -351,6 +351,64 @@ describe('runShell startup', () => {
     expect(checks).toBe(1);
     // Answered even though nothing changed (the page waits for "checking" to end).
     expect(children[0]?.stream.written).toEqual([line, line]);
+  });
+
+  it('UPD-5: Update now and Restart now reach the in-app updater; its view goes to the core', async () => {
+    const view = { state: 'current', current: '0.5.2', latest: '', download: '' } as const;
+    const fake = {
+      view: () => view,
+      start: () => Promise.resolve(),
+      check: () => Promise.resolve(view),
+    } as unknown as ReleaseChecker;
+    const calls: string[] = [];
+    let changed: () => void = () => undefined;
+    const DMG =
+      'https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-mac-arm64.dmg';
+    let state: 'available' | 'downloading' = 'available';
+    const { electron, children, proc } = setup([], {
+      releaseChecker: () => fake,
+      inAppUpdater: (_electron, onChange) => {
+        changed = onChange;
+        return {
+          view: () => ({
+            state,
+            current: '0.5.2',
+            latest: '0.5.3',
+            download: DMG,
+            installable: true,
+            percent: 0,
+          }),
+          check: () => {
+            calls.push('check');
+            return Promise.resolve();
+          },
+          install: () => {
+            calls.push('install');
+            return true;
+          },
+          restart: () => {
+            calls.push('restart');
+            return true;
+          },
+        };
+      },
+    });
+    await runShell(electron, proc);
+    children[0]?.stream.push(readyLine());
+    const sent = (): unknown[] =>
+      (children[0]?.stream.written ?? []).map((l) => JSON.parse(l) as unknown);
+    expect(sent().at(-1)).toMatchObject({
+      type: 'app-update',
+      state: 'available',
+      installable: true,
+    });
+    children[0]?.stream.push(`${JSON.stringify({ v: 1, type: 'app-update-install' })}\n`);
+    children[0]?.stream.push(`${JSON.stringify({ v: 1, type: 'app-update-restart' })}\n`);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(calls.filter((c) => c !== 'check')).toEqual(['install', 'restart']);
+    state = 'downloading';
+    changed();
+    expect(sent().at(-1)).toMatchObject({ type: 'app-update', state: 'downloading' });
   });
 
   it('locks every webContents that is ever created', async () => {

@@ -12,7 +12,7 @@ Right after setup, before you have contacts, Home also shows the **Get started**
 
 ## What you see
 
-1. **Approvals on top.** Anything waiting for you is a card with **Approve** and **Deny**. You confirm each with Touch ID (or your master code). When several wait, the card says "+2 more". Your AI can ask, but only you can approve. See [Approvals](approvals.md).
+1. **Approvals on top.** Anything waiting for you is a short card: what your AI wants in one line, **Approve with Touch ID**, **Deny with Touch ID** and **Review**, which opens the whole request in place. One press confirms (or use your master code). When several wait, the card says "+2 more". Your AI can ask, but only you can approve. See [Approvals](approvals.md).
 2. **Invite someone.** Opens the [Invite screen](invite-someone.md).
 3. **Invites waiting.** An invite you made, or your AI made, that nobody has accepted yet shows as **Waiting for {name} to accept**, with **Copy link**, **Show link** and **Cancel invite**. See below.
 4. **People.** The people your AI talks to, each with their last activity. A connection the other person removed shows as one line with **Archive**, which moves it to **Archived** on [People](contacts.md).
@@ -31,7 +31,7 @@ If you have two IDs and look at **All IDs**, Home names each other ID that has p
 ## Open a person
 
 - **The conversation, both ways.** Each message you sent says **Sent**, **Waiting to send** or **Not delivered**. Every message has **Copy**. Earlier messages load when you ask. To reply, ask your AI.
-- **Files you exchanged.** Each file sits as a chip in the message it came with. A file that arrived and was saved shows "Saved to ~/AgentLink/Inbox" and **Show in Finder** (**Show in Explorer** on Windows, **Show in folder** on Linux). A file that arrived but was not saved reads **Arrived · not saved** with **Save to Inbox**, which asks for Touch ID. A saved Markdown, code, JSON, patch or text file also has **Open**, which shows it in a reader inside the app. See [Files](files.md).
+- **Files you exchanged.** Each file sits as a chip in the message it came with. A file that arrived and was saved shows "Saved to ~/AgentLink/Inbox" and **Show in Finder** (**Show in Explorer** on Windows, **Show in folder** on Linux). A file that arrived but was not saved reads **Arrived · not saved** with **Save with Touch ID** (one press; **Save to Inbox** opens the master code when Touch ID is not set up here). A saved Markdown, code, JSON, patch or text file also has **Open**, which shows it in a reader inside the app. See [Files](files.md).
 - **Terms.** Terms you proposed, accepted, declined or answered show in the conversation too, right where they happened.
 - **A menu** to rename the person, do the Contact check or remove them.
 

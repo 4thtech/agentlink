@@ -4,16 +4,20 @@
 import { describe, expect, it } from 'vitest';
 import type { LocalUiContext } from '../context.js';
 import {
+  MARK_PATHS,
   NOT_AVAILABLE,
   UI_INVALID_QUERY,
   UI_UNAVAILABLE,
+  type LocalUiMarkRoute,
   type LocalUiReadRoute,
   type LocalUiRequest,
 } from '../route-types.js';
 import { createLocalUiRoutes } from '../routes.js';
 import {
   APP_UPDATE_CHECK_PATH,
+  APP_UPDATE_INSTALL_PATH,
   APP_UPDATE_PATH,
+  APP_UPDATE_RESTART_PATH,
   appUpdateBody,
   appUpdateRoutes,
   type AppUpdateInstall,
@@ -30,6 +34,9 @@ const AVAILABLE: AppUpdateView = {
   download: DMG,
 };
 const [read, check] = appUpdateRoutes as readonly LocalUiReadRoute[];
+const [installRoute, restartRoute] = appUpdateRoutes.slice(2) as readonly LocalUiMarkRoute[];
+/** UPD-5: what the desktop app adds to every answer (nothing in-app here, nothing waiting). */
+const DESK_EXTRA = { installable: false, percent: 0, busy: false } as const;
 const req = (query = ''): LocalUiRequest => ({ params: {}, query: new URLSearchParams(query) });
 const ctx = (appUpdate?: LocalUiAppUpdateDesk): LocalUiContext =>
   (appUpdate === undefined ? {} : { appUpdate }) as unknown as LocalUiContext;
@@ -68,7 +75,7 @@ describe('app-update routes', () => {
   it('answers the shell’s state as is', async () => {
     expect(await read?.handler(ctx(desk(AVAILABLE)), req())).toEqual({
       status: 200,
-      body: { ...AVAILABLE, install: 'desktop' },
+      body: { ...AVAILABLE, install: 'desktop', ...DESK_EXTRA },
     });
   });
 
@@ -89,7 +96,10 @@ describe('app-update routes', () => {
       req(),
     );
     expect(asked).toBe(1);
-    expect(result).toEqual({ status: 200, body: { ...checking, install: 'desktop' } });
+    expect(result).toEqual({
+      status: 200,
+      body: { ...checking, install: 'desktop', ...DESK_EXTRA },
+    });
   });
 
   it('refuses a query', async () => {
@@ -119,15 +129,100 @@ describe('app-update routes', () => {
     expect(await read?.handler(ctx(desk(view)), req())).toEqual(UI_UNAVAILABLE);
   });
 
-  it('the body has exactly the five fields (nothing else of the desk’s object)', () => {
+  it('the body has exactly its fields (nothing else of the desk’s object)', () => {
     const extra = { ...AVAILABLE, secret: 'x' } as AppUpdateView;
     expect(Object.keys(appUpdateBody(extra, 'desktop') ?? {}).sort()).toEqual([
+      'busy',
+      'current',
+      'download',
+      'install',
+      'installable',
+      'latest',
+      'percent',
+      'state',
+    ]);
+    // The browser app keeps its five (its restart is the update).
+    expect(Object.keys(appUpdateBody({ ...AVAILABLE, download: '' }, 'npx') ?? {}).sort()).toEqual([
       'current',
       'download',
       'install',
       'latest',
       'state',
     ]);
+  });
+
+  // UPD-5: Update now and Restart now (the mark kind: session, CSRF, Origin, fetch metadata,
+  // octet-stream, generation, no input, no body, no presence).
+  const IN_APP: AppUpdateView = { ...AVAILABLE, installable: true, percent: 0 };
+  it('UPD-5: two POSTs of the mark kind at fixed paths, registered once', () => {
+    expect(installRoute?.method).toBe('POST');
+    expect(installRoute?.path).toBe(APP_UPDATE_INSTALL_PATH);
+    expect(installRoute?.presence).toBe('mark');
+    expect(restartRoute?.method).toBe('POST');
+    expect(restartRoute?.path).toBe(APP_UPDATE_RESTART_PATH);
+    expect(restartRoute?.presence).toBe('mark');
+    expect(MARK_PATHS).toContain(APP_UPDATE_INSTALL_PATH);
+    expect(MARK_PATHS).toContain(APP_UPDATE_RESTART_PATH);
+    const registry = createLocalUiRoutes();
+    expect(registry.match('POST', APP_UPDATE_INSTALL_PATH)).toMatchObject({ route: installRoute });
+    expect(registry.match('POST', APP_UPDATE_RESTART_PATH)).toMatchObject({ route: restartRoute });
+  });
+
+  it('UPD-5: Update now and Restart now ask the desk and answer its new state', async () => {
+    const calls: string[] = [];
+    const d: LocalUiAppUpdateDesk = {
+      install: 'desktop',
+      view: () => IN_APP,
+      check: () => IN_APP,
+      startInstall: () => {
+        calls.push('install');
+        return { ...IN_APP, state: 'downloading', percent: 0 };
+      },
+      restart: () => {
+        calls.push('restart');
+        return { ...IN_APP, state: 'restarting' };
+      },
+      busy: () => true,
+    };
+    expect(await installRoute?.handler(ctx(d), {})).toEqual({
+      status: 200,
+      body: { ...IN_APP, state: 'downloading', install: 'desktop', busy: true },
+    });
+    expect(await restartRoute?.handler(ctx(d), {})).toEqual({
+      status: 200,
+      body: { ...IN_APP, state: 'restarting', install: 'desktop', busy: true },
+    });
+    expect(calls).toEqual(['install', 'restart']);
+  });
+
+  it('UPD-5: outside the desktop app, or a desk without the in-app steps: 501', async () => {
+    expect(await installRoute?.handler(ctx(), {})).toEqual(NOT_AVAILABLE);
+    expect(await restartRoute?.handler(ctx(), {})).toEqual(NOT_AVAILABLE);
+    expect(await installRoute?.handler(ctx(desk(AVAILABLE)), {})).toEqual(NOT_AVAILABLE);
+    expect(await restartRoute?.handler(ctx(desk(BROWSER, undefined, 'npx')), {})).toEqual(
+      NOT_AVAILABLE,
+    );
+  });
+
+  it.each<[string, AppUpdateView]>([
+    [
+      'downloading that is not installable',
+      { ...IN_APP, state: 'downloading', installable: false },
+    ],
+    ['a percent outside downloading', { ...IN_APP, percent: 4 }],
+    ['a percent over 100', { ...IN_APP, state: 'downloading', percent: 101 }],
+    ['install_failed with Update now', { ...IN_APP, state: 'install_failed' }],
+    ['ready without the link', { ...IN_APP, state: 'ready', download: '' }],
+  ])('UPD-5: never passes on %s', (_label, view) => {
+    expect(appUpdateBody(view, 'desktop')).toBeUndefined();
+  });
+
+  it('UPD-5: the in-app states never reach the browser app', () => {
+    for (const state of ['downloading', 'verifying', 'ready', 'restarting', 'install_failed']) {
+      expect(
+        appUpdateBody({ ...AVAILABLE, state, download: '' } as AppUpdateView, 'npx'),
+      ).toBeUndefined();
+    }
   });
 
   // REL051-UPD2: the browser app (the local app server) has its own desk: the npm registry's latest

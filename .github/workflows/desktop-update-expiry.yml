@@ -1,0 +1,46 @@
+# UPD-3 (D-151): renewal warning for the signed desktop update manifest.
+#
+# A manifest is valid for 30 days (at most 31). Daily, this reads desktop-update.json from the latest
+# GitHub Release (public, no token) and goes red 7 days before it expires, when it has expired, or
+# when it is missing while an update key is pinned in root-key.json. That red run is the alert; the
+# owner renews (RB-23, docs/runbooks/desktop-update-keys.md "Renew"). While no key is pinned
+# (updates off) it passes. It gates nothing.
+#
+# Not a required check. No secret, read-only token, no dependency install.
+name: Desktop update expiry
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: desktop-update-expiry
+  cancel-in-progress: true
+
+jobs:
+  check-expiry:
+    name: check-expiry
+    if: github.repository_owner == '4thtech'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check the update manifest of the latest release
+        shell: bash
+        run: |
+          set -euo pipefail
+          doc="$RUNNER_TEMP/desktop-update.json"
+          if curl -sSfL --max-time 60 -o "$doc" "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/desktop-update.json"; then
+            node tools/release/desktop-update-expiry.mjs --root-key apps/desktop/src/main/updater/root-key.json --file "$doc" --warn-days 7
+          else
+            node tools/release/desktop-update-expiry.mjs --root-key apps/desktop/src/main/updater/root-key.json --missing --warn-days 7
+          fi

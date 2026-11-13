@@ -164,6 +164,8 @@ describe('app update messages', () => {
     current: '0.5.1',
     latest: '0.5.2',
     download: DMG,
+    installable: false,
+    percent: 0,
   };
   const line = (v: unknown): string => JSON.stringify(v);
 
@@ -203,6 +205,41 @@ describe('app update messages', () => {
     ['a wrong version', { ...ok, v: 2 }],
   ])('refuses %s', (_label, value) => {
     expect(parseShellMessage(line(value))).toBeUndefined();
+  });
+
+  it('UPD-5: the in-app states, a flag and a whole percentage only', () => {
+    const inApp = { ...ok, installable: true };
+    for (const v of [
+      inApp,
+      { ...inApp, state: 'downloading', percent: 42 },
+      { ...inApp, state: 'verifying' },
+      { ...inApp, state: 'ready' },
+      { ...inApp, state: 'restarting' },
+      { ...ok, state: 'install_failed' },
+    ]) {
+      expect(parseShellMessage(line(v)), v.state).toEqual(v);
+    }
+    for (const bad of [
+      { ...inApp, note: 'hi' },
+      { ...inApp, state: 'downloading', percent: '5' },
+      { ...inApp, state: 'downloading', percent: 101 },
+      { ...inApp, state: 'downloading', percent: 0.5 },
+      { ...inApp, percent: 3 },
+      { ...ok, state: 'ready' },
+      { ...inApp, state: 'install_failed' },
+      { ...ok, installable: 1 },
+      { ...ok, state: 'current', latest: '', download: '', installable: true },
+    ]) {
+      expect(parseShellMessage(line(bad))).toBeUndefined();
+    }
+  });
+
+  it('UPD-5: the core asks for an install or a restart with no other key', () => {
+    for (const type of ['app-update-install', 'app-update-restart'] as const) {
+      expect(encodeHostMessage({ v: 1, type })).toBe(`${line({ v: 1, type })}\n`);
+      expect(parseHostMessage(line({ v: 1, type, version: '0.5.2' }))).toBeUndefined();
+      expect(parseShellMessage(line({ v: 1, type }))).toBeUndefined();
+    }
   });
 
   it('the core sends only a bare check request', () => {

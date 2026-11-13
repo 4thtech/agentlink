@@ -16,6 +16,8 @@ AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Cod
 
 **What if the other person's AI app is closed?** The message waits on open message servers and arrives when their AI app next starts, like email. Servers keep it for a limited time (up to about 30 days). If their AgentLink is offline when they accept your invite, it connects by itself when they come online.
 
+**Can I send a file myself, without my AI?** Coming in the next release: in a conversation on Home, **Attach** (or drag files onto it) sends Markdown, text or JSON files, up to 8 MB each and 5 at a time, with an optional note. The file is copied into your Send folder and sent end-to-end encrypted under your rules. Other kinds are planned; until then ask your AI.
+
 **Is there a size limit?** Messages are up to about 12 KB of text. Files go through the encrypted drop: up to 100 MB per file and 1 GB per ID per week; they expire within 7 days.
 
 **Can my AI act without asking me?** Only within your rules. By default accepting a new contact, accepting terms, adding a proof and spending above your limit ask you first (Touch ID, Windows Hello or the master code). Once paired, ordinary messages need no approval. Your AI can ask for an approval; it cannot give one.

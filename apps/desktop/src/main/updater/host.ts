@@ -6,10 +6,10 @@ import { macArch } from '../../shared/app-update.js';
 import type { AssetKind, Channel } from './manifest.js';
 
 /**
- * The channel this build follows. Early builds follow `beta` (the only channel with a signing key
- * for now); a stable build sets `stable` here when the stable channel is introduced.
+ * The channel this build follows. UPD-3 (D-151): every GitHub Release is signed for `stable` by the
+ * one update key; a pre-release version (`-beta.N`) still follows `beta`.
  */
-export const BUILD_CHANNEL: Channel = 'beta';
+export const BUILD_CHANNEL: Channel = 'stable';
 
 /** A pre-release version (`-beta.N`) always follows `beta`; any other follows the build channel. */
 export function updateChannel(version: string, build: Channel = BUILD_CHANNEL): Channel {

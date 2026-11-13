@@ -15,7 +15,8 @@
 // 'switch'`, for switching the open agent in the app host: one fixed POST, no presence, no signing,
 // no handler (the server's switch gate runs it); it writes only `app.json`. U3-c also adds route
 // stubs (`stub: true`) for the U3 routes later cards fill: a stub answers 501 `not_available` before
-// any presence check and never runs its handler.
+// any presence check and never runs its handler. ATT-APP-ATTACH adds `presence: 'attach'`: one fixed
+// POST, no presence, no signing; its handler gets only the parsed body and the attach desk.
 import type { CreatedInvite, InviteLinkResult, PendingContact } from '@4thtech-io/core';
 import type { EnvelopeKeys, JsonObject, JsonValue } from '@4thtech-io/crypto';
 import { UI_SETTINGS_PATH, type UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
@@ -342,6 +343,77 @@ export interface LocalUiInviteRoute {
   ) => Promise<LocalUiResult>;
 }
 
+/** ATT-APP-ATTACH (08 §1 "Attach a file"): the fixed path of the attach kind. */
+export const ATTACH_PATH = '/api/ui/attach';
+
+/** ATT-APP-ATTACH: one attached file as the route checked it (allowed type, light UTF-8 text). */
+export interface LocalUiAttachFile {
+  /** The name as the owner's file had it (the desk sanitises it again before writing). */
+  readonly name: string;
+  readonly bytes: Uint8Array;
+}
+
+/** ATT-APP-ATTACH: what the attach route hands the desk. */
+export interface LocalUiAttachRequest {
+  /** The contact's agent ID (`0x` + 40 lowercase hex). */
+  readonly to: string;
+  /** The owner's note; may be empty. */
+  readonly text: string;
+  readonly files: readonly LocalUiAttachFile[];
+  /**
+   * IR-ATTACH-1 F-4: the page's ID for this message, the same on a retry, passed to core as
+   * `clientRequestId` so a retry after a lost answer does not send twice.
+   */
+  readonly requestId?: string;
+}
+
+/** ATT-APP-ATTACH: why an attached message was not sent (fixed codes, never a path or a name). */
+export type LocalUiAttachRefusal =
+  | 'type'
+  | 'no_folder'
+  | 'folder_unavailable'
+  | 'not_found'
+  | 'not_ready'
+  | 'policy'
+  | 'too_large'
+  | 'storage'
+  | 'busy'
+  | 'paused'
+  | 'failed';
+
+export type LocalUiAttachOutcome =
+  | { readonly status: 'sent' | 'queued' | 'not_delivered' }
+  | { readonly status: 'refused'; readonly reason: LocalUiAttachRefusal };
+
+/**
+ * ATT-APP-ATTACH: the attach kind's one write (local-ui/attach-desk.ts, built by the server over the
+ * core client): the files into the open ID's allowed Send folder, then core's ordinary send under
+ * the policy in force. It signs nothing, changes no rule and is never reachable from MCP (I-4).
+ */
+export interface LocalUiAttachDesk {
+  send(request: LocalUiAttachRequest): Promise<LocalUiAttachOutcome>;
+}
+
+/**
+ * ATT-APP-ATTACH (08 §1; proposed, owner confirms at merge): the owner attaches light text files in
+ * a conversation and sends them. Only `POST /api/ui/attach`, registered once (routes.ts). The
+ * server's attach gate runs after the same session, CSRF, Origin, fetch-metadata and octet-stream
+ * checks as every write, refuses a query, an operation input or a presence header, reads at most
+ * ATTACH_MAX_BODY_BYTES, parses one strict JSON object and hands the handler only that object and
+ * the desk. No owner presence, as for a message the owner's AI sends (the policy in force applies,
+ * D-70); nothing is signed.
+ */
+export interface LocalUiAttachRoute {
+  readonly method: 'POST';
+  readonly path: string;
+  readonly presence: 'attach';
+  readonly handler: (
+    context: LocalUiContext,
+    body: JsonObject,
+    desk: LocalUiAttachDesk | undefined,
+  ) => Promise<LocalUiResult>;
+}
+
 /** U3-c: the fixed path of the switch kind (08 §1). */
 export const AGENTS_SWITCH_PATH = '/api/ui/agents/switch';
 
@@ -507,6 +579,14 @@ export const MARK_PATHS: readonly string[] = Object.freeze([
   // most one empty 0700 folder under ~/AgentLink and changes no rules: allowing it is the ordinary
   // review and the presence-gated confirm.
   '/api/ui/files/send-folder',
+  // N4: the notification centre's read marks (display state only).
+  '/api/ui/notifications/:id/read',
+  '/api/ui/notifications/read-all',
+  '/api/ui/notifications/refresh',
+  // UPD-5: "Update now" and "Restart now" in Settings › Updates (api/app-update.ts). They pass no
+  // value; the desktop shell installs only the update it verified itself.
+  '/api/ui/app-update/install',
+  '/api/ui/app-update/restart',
 ]);
 
 export type LocalUiRoute =
@@ -524,7 +604,8 @@ export type LocalUiRoute =
   | LocalUiCreateAgentRoute
   | LocalUiRevealRoute
   | LocalUiKitRevealRoute
-  | LocalUiInviteRoute;
+  | LocalUiInviteRoute
+  | LocalUiAttachRoute;
 
 /**
  * The shared fixed answers of the page read routes (M1-11c; the same codes as Activity, #417). A
