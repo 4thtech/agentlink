@@ -549,6 +549,124 @@ describe('ALKK v1 sealing checks its input before writing anything', () => {
   });
 });
 
+// KIT-NAMES (04 §2.3.3 v2; proposed, owner confirms at merge): the kit carries each ID's
+// owner-set name (`label`) inside its encrypted manifest, so a restore names IDs as their owner
+// does. The byte-exact cases (v1 and v2 kits, label refusals) are the `recovery-kit` vectors.
+describe('ALKK v2: owner-set names', () => {
+  const LABEL_A = 'Ana Novak';
+  const LABEL_B = 'Résumé 鍵 🔑';
+  const NAMED: RecoveryKitInput = {
+    ...INPUT,
+    agents: [
+      { ...A, label: LABEL_A },
+      { ...B, label: LABEL_B },
+    ],
+  };
+  const open = (kit: Uint8Array) =>
+    openRecoveryKitWithKek(kit, KEK, { createStoreSink: () => sinks().createStoreSink() });
+  const indexOf = (hay: Uint8Array, needle: Uint8Array): number => {
+    outer: for (let i = 0; i + needle.length <= hay.length; i += 1) {
+      for (let j = 0; j < needle.length; j += 1) if (hay[i + j] !== needle[j]) continue outer;
+      return i;
+    }
+    return -1;
+  };
+
+  it('writes version 2 and the header reader reports it', async () => {
+    const kit = await seal(NAMED);
+    expect(kit[4]).toBe(2);
+    expect(readRecoveryKitHeader(kit).version).toBe(2);
+    // Writers write v2 only, with or without labels.
+    expect(KIT[4]).toBe(2);
+  });
+
+  it('opens each label as UTF-8 bytes, and no label for an ID without one', async () => {
+    const kit = await open(await seal({ ...INPUT, agents: [{ ...A, label: LABEL_A }, B] }));
+    const byId = new Map(kit.agents.map((a) => [a.agentId, a]));
+    expect(decodeUtf8(byId.get(A.agentId)?.label as Uint8Array)).toBe(LABEL_A);
+    expect(byId.get(B.agentId)?.label).toBeUndefined();
+    const both = await open(await seal(NAMED));
+    const named = new Map(both.agents.map((a) => [a.agentId, a]));
+    expect(decodeUtf8(named.get(B.agentId)?.label as Uint8Array)).toBe(LABEL_B);
+    expect(decodeUtf8(named.get(B.agentId)?.name as Uint8Array)).toBe('research');
+  });
+
+  it('never puts a label in the clear: not in the header, not anywhere in the kit bytes', async () => {
+    const kit = await seal(NAMED, 4096);
+    for (const label of [LABEL_A, LABEL_B]) {
+      expect(indexOf(kit, encodeUtf8(label))).toBe(-1);
+      expect(indexOf(kit, encodeUtf8(label.slice(0, 4)))).toBe(-1);
+    }
+    // The header of a named kit is byte for byte that of the same kit without names.
+    expect(kit.subarray(0, RECOVERY_KIT_HEADER_LENGTH)).toEqual(
+      (await seal(INPUT, 4096)).subarray(0, RECOVERY_KIT_HEADER_LENGTH),
+    );
+  });
+
+  it('detects tampering with the label: every byte changed in its ciphertext fails', async () => {
+    const kit = await seal(NAMED, 4096);
+    const clear = await open(kit);
+    const at = indexOf(clear.manifest, encodeUtf8(LABEL_A));
+    expect(at).toBeGreaterThan(0);
+    // One chunk: plaintext byte j is ciphertext byte header + j (entry head: 2 + "manifest" + 8).
+    const base = RECOVERY_KIT_HEADER_LENGTH + 2 + 'manifest'.length + 8 + at;
+    for (let i = 0; i < encodeUtf8(LABEL_A).length; i += 1) {
+      const bad = kit.slice();
+      bad[base + i] = (bad[base + i] as number) ^ 0x20; // "a" <-> "A": still a valid label
+      const error = await refusal(open(bad));
+      expect(error.code).toBe('open_failed');
+    }
+  });
+
+  it('a kit whose version byte is rewritten fails (the version is in every chunk AAD)', async () => {
+    const kit = await seal(NAMED);
+    const bad = kit.slice();
+    bad[4] = 1;
+    expect((await refusal(open(bad))).code).toBe('open_failed');
+    bad[4] = 3;
+    expect((await refusal(open(bad))).code).toBe('open_failed');
+    expect(() => readRecoveryKitHeader(bad)).toThrow(CryptoInputError);
+  });
+
+  it('refuses a label outside the rule before anything is written', async () => {
+    for (const label of [
+      '',
+      'a'.repeat(33),
+      'é'.repeat(33),
+      'Ana "N"',
+      'Ana\\Novak',
+      'Ana\nNovak',
+      'Ana\u001fNovak',
+      'Ana\u007fNovak',
+      'Ana\ud800',
+      7 as unknown as string,
+      null as unknown as string,
+    ]) {
+      let wrote = false;
+      const error = await refusal(
+        sealRecoveryKitWith(
+          CODE,
+          SALT,
+          PREFIX,
+          64,
+          FLOOR,
+          { ...INPUT, agents: [{ ...A, label }] },
+          () => {
+            wrote = true;
+          },
+        ),
+      );
+      expect(error.code).toBe('invalid_argument');
+      expect(error.message).not.toContain('Ana');
+      expect(wrote).toBe(false);
+    }
+    // The longest label: 32 code points of 4-byte UTF-8.
+    const longest = '🔑'.repeat(32);
+    const kit = await open(await seal({ ...INPUT, agents: [{ ...A, label: longest }] }));
+    expect(decodeUtf8(kit.agents[0]?.label as Uint8Array)).toBe(longest);
+  });
+});
+
 // Type-level: the opened kit's item values are bytes, never strings (04 §2.3.3).
 const typeCheck = (kit: OpenedRecoveryKit): Uint8Array =>
   kit.agents[0]?.items[0]?.value ?? kit.ownerSeed;

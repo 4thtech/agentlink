@@ -263,8 +263,11 @@ describe.runIf(POSIX)('header first (T-2, T-5)', () => {
       ownerPresent: false,
     });
     const bytes = new Uint8Array(await readFile(path));
+    // KIT-NAMES: this app reads versions 1 and 2; a kit of version 3 is newer. (A v1-only app
+    // answers newer_version to a v2 kit the same way, before any code.)
+    expect(bytes[4]).toBe(2);
     const newer = bytes.slice();
-    newer[4] = 2;
+    newer[4] = 3;
     const up = await engine.upload('S1', [newer], newer.length);
     expect(body(await engine.header('S1', { handle: body(up)['handle'] as string }))).toEqual({
       header: 'newer_version',
@@ -1119,10 +1122,12 @@ describe.runIf(POSIX)('UX1113-R1-LABEL: the done answer names IDs by their verif
     );
     const handle = await foundHandle();
     const opened = await openKit('S1', handle, kit.code);
-    // Step 3 (before anything is written) still names each ID by its folder only.
+    // KIT-NAMES: step 3 (before anything is written) names each ID by the owner-set name the kit
+    // carries inside it; an ID without one has no label (the page shows its folder).
     const summary = body(opened)['summary'] as { ids: Record<string, unknown>[] };
     expect(summary.ids.map((r) => r['name']).sort()).toEqual(['default', 'work']);
-    expect(summary.ids.every((r) => !('label' in r))).toBe(true);
+    expect(summary.ids.find((r) => r['agentId'] === ana.agentId)?.['label']).toBe('Ana');
+    expect(summary.ids.find((r) => r['agentId'] === plain.agentId)).not.toHaveProperty('label');
     const done = await gestureAndFinish('S1', body(opened)['kit'] as string, [
       ana.agentId,
       plain.agentId,
@@ -1138,6 +1143,23 @@ describe.runIf(POSIX)('UX1113-R1-LABEL: the done answer names IDs by their verif
       label: 'work',
       outcome: 'restored',
     });
+  });
+
+  it('KIT-NAMES: a kit label outside the folder label rule is not shown in step 3', async () => {
+    const owner = await makeOwner();
+    const plain = await makeAgent(t.root, owner, 'work');
+    const kit = await makeKit(
+      t.root,
+      owner,
+      [{ ...plain, label: '‮evil‬' }],
+      'agentlink-recovery-kit-hl.alkk',
+      join(t.home, 'Downloads'),
+    );
+    const handle = await foundHandle();
+    const opened = await openKit('S1', handle, kit.code);
+    const summary = body(opened)['summary'] as { ids: Record<string, unknown>[] };
+    expect(summary.ids).toHaveLength(1);
+    expect(summary.ids[0]).not.toHaveProperty('label');
   });
 
   it('a label is display text only: anything not a plain restricted label shows the folder name', () => {
