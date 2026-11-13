@@ -35,6 +35,7 @@ import {
   type FetchFileResult,
   type SavedFileRef,
 } from './files/incoming.js';
+import type { BackfillSavedFilesResult } from './files/saved-files.js';
 import { savedNameOf } from './files/received.js';
 import { saveReceivedFile, type SaveReceivedFileResult } from './files/save.js';
 import type { FilesPlatform } from './files/platform.js';
@@ -407,6 +408,15 @@ export class AgentLinkClient {
    */
   deleteExpiredFiles(): Promise<ReceiptRetentionResult> {
     return deleteExpiredFiles(this.#ctx, this.#filesPlatform);
+  }
+
+  /**
+   * RET-2 (D-148; 07 §3.8): indexes in `saved_files` the files saved before schema version 15 whose
+   * receiver row still records the save. The first auto-save run of a process runs it; idempotent,
+   * best effort, touches no file. Not reachable from an MCP tool (I-4).
+   */
+  backfillSavedFiles(): Promise<BackfillSavedFilesResult> {
+    return this.#files.backfillSavedFiles();
   }
 
   /**
