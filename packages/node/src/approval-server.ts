@@ -3880,7 +3880,11 @@ export async function startApprovalServerWith(
             finishOwner(res, 409, 'refused');
             return;
           }
-          emit({ kind: 'owner_operation', outcome: 'done' });
+          // RET-4 (IR-RET-4-1 L-2): a refused history finish (changed, expired, another ID) did
+          // nothing, so it emits no `owner_operation: done`.
+          if (gate.history !== true || result.status === 200) {
+            emit({ kind: 'owner_operation', outcome: 'done' });
+          }
           sendResult(res, result);
         } finally {
           await store.lock().catch(() => undefined);

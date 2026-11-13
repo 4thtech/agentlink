@@ -82,7 +82,7 @@ export const HISTORY_STRINGS = {
   filesOnly: 'Files only',
   review: 'Review',
   removes: (messages: number, files: number, bytes: number): string =>
-    `This removes ${String(messages)} messages and ${String(files)} files (${sizeWords(bytes)}).`,
+    `This removes ${plural(messages, 'message', 'messages')} and ${plural(files, 'file', 'files')} (${sizeWords(bytes)}).`,
   showInFinder: 'Show in Finder',
   showInFolder: 'Show in folder',
   revealFailed: "The folder didn't open. Try again.",

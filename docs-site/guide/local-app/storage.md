@@ -17,7 +17,7 @@ Open **Settings** › **Storage** (in the **Your AI** group). It shows how much 
 1. Choose a **Person** (or Everyone), how old (**Older than** 30 days, 90 days or 1 year), and tick **Files only** to keep the messages.
 2. Press **Review**. AgentLink says what that removes, for example "This removes 12 messages and 4 files (30 MB)." Nothing is removed yet.
 3. Press **Delete with Touch ID** (or Windows Hello, your passkey, or **Use your master code instead**). You confirm once for the whole list.
-4. For 10 seconds a message offers **Undo**. Undo cancels everything: nothing is removed.
+4. For 10 seconds a message offers **Undo**. Undo cancels everything: nothing is removed. Quitting AgentLink during those 10 seconds also removes nothing.
 5. After that, the messages are gone from this computer and the saved files are in the Trash ("Moved 4 files to the Trash."). You can still get files back from the Trash.
 
 ## From a conversation

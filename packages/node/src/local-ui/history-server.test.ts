@@ -55,6 +55,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function harness() {
   const state = {
+    events: [] as string[],
     hash: 'plan-1',
     planned: [] as HistoryDeleteInput[],
     applied: [] as HistoryDeletePlan[],
@@ -98,7 +99,13 @@ async function harness() {
   };
   const opened: string[] = [];
   const server = await startApprovalServerWith(
-    { source, localUi: { assets: TEST_APP, client: client as never } },
+    {
+      source,
+      localUi: { assets: TEST_APP, client: client as never },
+      onEvent: (e) => {
+        if (e.kind === 'owner_operation') state.events.push(String(e.outcome));
+      },
+    },
     {
       keychain: world.keychain,
       openOwnerStore: (expected) => KeychainOwnerKeyStore.open(world.keychain, expected),
@@ -241,6 +248,33 @@ describe('Delete history through the real gates (RET-4)', () => {
     expect(stale.json).toEqual({ status: 'not_applied' });
     await sleep(UNDO_MS * 3);
     expect(h.state.applied).toEqual([]);
+  });
+
+  it('IR-RET-4-1 L-3: a finish replayed after success or after Undo is refused', async () => {
+    const h = await harness();
+    const done = await h.begin({ contact: ALICE, include: 'both' });
+    expect((await h.finish({ nonce: done.nonce }, world.code)).status).toBe(200);
+    await sleep(UNDO_MS * 3);
+    expect(h.state.applied).toHaveLength(1);
+    expect((await h.finish({ nonce: done.nonce }, world.code)).status).toBe(409);
+    const undone = await h.begin({ contact: ALICE, include: 'both' });
+    expect((await h.finish({ nonce: undone.nonce }, world.code)).status).toBe(200);
+    expect((await h.json(UNDO, { nonce: undone.nonce })).json).toEqual({ status: 'cancelled' });
+    expect((await h.finish({ nonce: undone.nonce }, world.code)).status).toBe(409);
+    await sleep(UNDO_MS * 3);
+    expect(h.state.applied).toHaveLength(1);
+  });
+
+  it('IR-RET-4-1 L-2: a refused finish emits no owner_operation done', async () => {
+    const h = await harness();
+    const begun = await h.begin({ contact: ALICE, include: 'both' });
+    h.state.hash = 'plan-2';
+    expect((await h.finish({ nonce: begun.nonce }, world.code)).status).toBe(409);
+    expect(h.state.events).not.toContain('done');
+    h.state.hash = 'plan-1';
+    const ok = await h.begin({ contact: ALICE, include: 'both' });
+    expect((await h.finish({ nonce: ok.nonce }, world.code)).status).toBe(200);
+    expect(h.state.events.filter((e) => e === 'done')).toHaveLength(1);
   });
 
   it('MCP cannot reach it: no page session or no CSRF is refused before anything runs', async () => {
