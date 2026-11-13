@@ -49,6 +49,7 @@ import { contactsRoutes } from './api/contacts.js';
 import { filesRoutes } from './api/files.js';
 // MSG-FILES-IO-d: Files, Received and Sent (read-only); MSG-FILES-IO-h: Show in Finder.
 import { filesIoRoutes, filesRevealRoute } from './api/files-io.js';
+import { notificationsRoutes } from './api/notifications.js';
 import { filesPreviewRoute } from './api/files-preview.js';
 import { filesSaveRoute } from './api/files-save.js';
 import { firstRunRoutes } from './api/first-run.js';
@@ -461,6 +462,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     // W4-PAUSE (D-143 (5)): Pause and Resume.
     agentsPauseRoutes,
     uiSettingsRoutes,
+    // N4: the notification centre (a read and two display marks).
+    notificationsRoutes,
     // WP-P2: People across all IDs (read only).
     peopleAllRoutes,
     // REL051-RET1: Settings > Storage, sizes only (read only).

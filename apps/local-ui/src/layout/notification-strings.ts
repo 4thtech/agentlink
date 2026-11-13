@@ -1,0 +1,54 @@
+// N5/N6 copy (11 §5; PLAN-NOTIFY §4.1, §4.4). Plain words. A person is named only by the owner's own
+// contact list (bold, React text); never message text, a file name, a link or an amount (11 §5.7).
+export const NOTIFY_STRINGS = {
+  bell: 'Notifications',
+  bellNew: (n: number): string => `Notifications, ${n > 9 ? 'more than 9' : String(n)} new`,
+  announce: (n: number): string =>
+    n === 0 ? '' : n === 1 ? '1 new notification' : `${String(n)} new notifications`,
+  title: 'Notifications',
+  markAll: 'Mark all read',
+  settings: 'Notification settings',
+  needsYou: 'Needs you',
+  fresh: 'New',
+  earlier: 'Earlier',
+  empty: 'Nothing new. Approvals and messages for your IDs show up here.',
+  openActivity: 'Open Activity',
+  unread: 'Unread',
+  aContact: 'a contact',
+  approvals: (n: number): string =>
+    n === 1 ? 'An approval is waiting for you' : `${String(n)} approvals are waiting for you`,
+  approvalsLine: 'Review on Home',
+  messages: (n: number): string =>
+    n === 1 ? 'New message from ' : `${String(n)} new messages from `,
+  files: (n: number): string =>
+    n === 1 ? 'A file arrived from ' : `${String(n)} files arrived from `,
+  personLine: 'Open Home',
+  update: 'A new version of AgentLink is ready',
+  updateLine: 'Settings › Updates',
+  network: "Can't reach the message network",
+  networkLine: "Messages wait and send when it's back.",
+  justNow: 'just now',
+  minutes: (n: number): string => `${String(n)} min ago`,
+  hours: (n: number): string => `${String(n)} h ago`,
+  days: (n: number): string => (n === 1 ? 'yesterday' : `${String(n)} days ago`),
+} as const;
+
+export const NOTIFY_SETTINGS_STRINGS = {
+  title: 'Notifications',
+  intro:
+    'Choose what AgentLink may alert you about on this computer. The bell in the app always lists what is new.',
+  line: 'Approvals, messages and problems',
+  approvals: 'Approvals waiting',
+  approvalsHint: 'Opens the request. A notification never approves anything.',
+  messages: 'New messages and files',
+  messagesHint: 'Only when AgentLink is not in front.',
+  people: 'People joined or left',
+  problems: 'Problems that need you',
+  problemsHint: 'The message network down for 10 minutes, or an update that failed.',
+  showNames: 'Show names in notifications',
+  showNamesHint: 'Off: “a contact”. Message text is never shown.',
+  quietHours: 'Quiet hours',
+  quietHoursHint: 'Approvals still show in the app.',
+  onWord: 'Approvals on',
+  saveFailed: "Couldn't save this choice. Try again.",
+} as const;

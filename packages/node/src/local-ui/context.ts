@@ -63,6 +63,7 @@ import type { LocalUiDataFolder, LocalUiHealthBody, LocalUiHealthSource } from '
 import type { LocalUiInviteDesk } from './route-types.js';
 import type { JoinDesk } from './join-desk.js';
 import type { LocalUiSettingsDesk } from './api/ui-settings.js';
+import type { LocalUiNotificationsDesk } from './api/notifications.js';
 
 /**
  * The local UI's built files (apps/local-ui, D-118), in memory, from the caller (the CLI embeds
@@ -717,6 +718,11 @@ export interface LocalUiContext {
    * for api/ui-settings.ts only; absent outside the app host. Allowlisted booleans only.
    */
   readonly uiSettings?: LocalUiSettingsDesk;
+  /**
+   * N4 (PLAN-NOTIFY §3.1): the open ID's notification store (kind, ref, count and times only), for
+   * api/notifications.ts only. Absent: the bell lists nothing.
+   */
+  readonly notifications?: LocalUiNotificationsDesk;
   /**
    * U3-g-b: present only while the app host has no agent yet: true when first run cannot set up an
    * owner here (an owner or any agent folder exists). `GET /api/ui/first-run` answers from it.

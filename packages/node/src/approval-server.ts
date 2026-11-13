@@ -387,6 +387,15 @@ import {
   type UiSettings,
 } from '@4thtech-io/types/ui-contract/ui-settings';
 import { createUiSettingsDesk } from './local-ui/api/ui-settings.js';
+import type { LocalUiNotificationsDesk } from './local-ui/api/notifications.js';
+import {
+  createNotificationStore,
+  memoryNotificationPersistence,
+  type NotificationInbound,
+  type NotificationPersistence,
+  type NotificationSignals,
+  type NotificationStore,
+} from './notifications.js';
 import { createPeopleAllDesk } from './local-ui/api/people-all.js';
 import { createStorageDesk, inboxUsageOf } from './local-ui/api/storage.js';
 import type { LocalUiAppUpdateDesk } from './local-ui/api/app-update.js';
@@ -1684,6 +1693,97 @@ export async function startApprovalServerWith(
           write: (settings) =>
             (uiSettingsDirectory.writeUiSettings as (s: UiSettings) => Promise<void>)(settings),
         });
+  // N4 (PLAN-NOTIFY §3.1): the notification centre's stores, one per ID (by folder name) for the
+  // life of the process; the record is the ID folder's `notifications.json` in the app host, memory
+  // otherwise. Signals are what the server already holds in clear: the approvals waiting (a count),
+  // inbound message and file events (contact ID, kind, time), the update state and the relay check.
+  // No text, name, file name or link is read for it (I-5, I-7); no MCP tool reaches it (I-4).
+  const notificationStores = new Map<string, NotificationStore>();
+  let notificationsName: string | undefined;
+  const networkDownSince = new Map<string, number>();
+  /** The network counts as a problem for the centre only after 10 minutes (PLAN-NOTIFY §3.2). */
+  const NETWORK_DOWN_NOTIFY_MS = 10 * 60 * 1000;
+  function notificationsPart(bound: ApprovalServerSource): {
+    notifications?: LocalUiNotificationsDesk;
+  } {
+    // The bound ID's folder name (bindAgent sets it before the context is built); one store outside
+    // the app host.
+    const name = options.host === undefined ? '' : notificationsName;
+    if (name === undefined || agentUi === undefined) return {};
+    let store = notificationStores.get(name);
+    if (store === undefined) {
+      const dir = options.host?.directory;
+      const readFile = dir?.readNotifications?.bind(dir);
+      const writeFile = dir?.writeNotifications?.bind(dir);
+      const persistence: NotificationPersistence =
+        name !== '' && readFile !== undefined && writeFile !== undefined
+          ? { read: () => readFile(name), write: (record) => writeFile(name, record) }
+          : memoryNotificationPersistence();
+      store = createNotificationStore(persistence, { now: () => now() / 1000 });
+      notificationStores.set(name, store);
+    }
+    const kept = store;
+    const client = agentUi.client;
+    const signals = async (): Promise<NotificationSignals> => {
+      const out: {
+        approvals?: number;
+        inbound?: readonly NotificationInbound[];
+        update?: boolean;
+        networkDown?: boolean;
+      } = {};
+      try {
+        out.approvals = (await bound.list())
+          .map(view)
+          .filter((i) => i !== undefined && !decided.has(i.approvalId)).length;
+      } catch {
+        // Unknown: the approvals item stays as it was.
+      }
+      if (client !== undefined) {
+        try {
+          const until = Math.floor(now() / 1000);
+          const since = (await kept.cursor()) + 1;
+          if (since <= until) {
+            const flow = await client.messages.flowEvents(since, until);
+            out.inbound = flow.events
+              .filter((e) => e.direction === 'in')
+              .map((e) => ({ contactId: e.contactId, kind: e.kind, at: e.at }));
+          }
+        } catch {
+          // Nothing new is counted this time; the cursor stays.
+        }
+      }
+      const update = options.appUpdate?.view();
+      if (update !== undefined) out.update = update.state === 'available';
+      try {
+        const health = await uiContext.health?.();
+        const relays = health?.relays;
+        if (relays !== null && relays !== undefined && health?.agent === 'running') {
+          const t = now();
+          if (relays.total > 0 && relays.connected === 0) {
+            const since = networkDownSince.get(name) ?? t;
+            networkDownSince.set(name, since);
+            out.networkDown = t - since >= NETWORK_DOWN_NOTIFY_MS;
+          } else {
+            networkDownSince.delete(name);
+            out.networkDown = false;
+          }
+        }
+      } catch {
+        // Unknown: the network item stays as it was.
+      }
+      return out;
+    };
+    return {
+      notifications: Object.freeze<LocalUiNotificationsDesk>({
+        list: async () => {
+          await kept.observe(await signals());
+          return kept.list();
+        },
+        markRead: (id) => kept.markRead(id),
+        markAllRead: () => kept.markAllRead(),
+      }),
+    };
+  }
   // WP-P2: every ID's people for the People page. Read only: the open ID through its own client
   // (captured with its name and the generation in one step), every other ID as a count from the
   // read-only store peek (directory.stats); no other KeyStore, client or store is opened (04 §2.5).
@@ -1867,6 +1967,8 @@ export async function startApprovalServerWith(
       ...(options.appUpdate === undefined ? {} : { appUpdate: options.appUpdate }),
       // W4-SHELL-V2: the app's UI settings, in the app host only (one desk for every context).
       ...(uiSettingsDesk === undefined ? {} : { uiSettings: uiSettingsDesk }),
+      // N4: the open ID's notification centre (kind, ref, count and times only).
+      ...notificationsPart(bound),
       // U3-d: create an agent and save a verified label, in the app host only.
       ...(options.host === undefined ? {} : { agentsManage }),
       // U3-invite: the waiting invite, in the app host only.
@@ -7024,6 +7126,7 @@ export async function startApprovalServerWith(
 
   /** Rebinds every per-agent piece to `agent` (or to none); nothing of the previous one is kept. */
   function bindAgent(agent: AppHostAgent | undefined): void {
+    notificationsName = agent?.name;
     source = agent?.source ?? NO_AGENT_SOURCE;
     agentUi = agent?.localUi;
     // U3-d (04 §2.5.1 "Labels and AI app connections"): the open agent is named only by its

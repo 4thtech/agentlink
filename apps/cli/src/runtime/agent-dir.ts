@@ -449,6 +449,8 @@ export async function removeAgentFolder(
     `${STORE_FILE}.lock`,
     AGENT_OPEN_LOCK_FILE,
     'free-credits.json',
+    // N4: the notification centre's record (display state only).
+    NOTIFICATIONS_FILE,
     CONFIG_FILE,
   ];
   // Anything else in the folder refuses the removal before a single file is deleted.
@@ -720,6 +722,16 @@ async function writeRootFile(
   const uid = expectedUid(options);
   const root = join(home, '.agentlink');
   await ensurePrivateDir(root, uid);
+  await writeFileIn(root, file, text, uid);
+}
+
+/** One small file written atomically into a checked private folder (0600, never a link). */
+async function writeFileIn(
+  root: string,
+  file: string,
+  text: string,
+  uid: number | undefined,
+): Promise<void> {
   const target = join(root, file);
   const existing = await lstatOrMissing(target);
   if (existing !== undefined) checkFileInfo(existing, uid);
@@ -756,8 +768,18 @@ async function readRootJson(
   options: OwnerCheck,
 ): Promise<Record<string, unknown> | undefined> {
   const uid = expectedUid(options);
+  const root = join(home, '.agentlink');
+  return readJsonIn(root, file, maxBytes, uid);
+}
+
+/** readRootJson's read, in any checked private folder; never throws. */
+async function readJsonIn(
+  root: string,
+  file: string,
+  maxBytes: number,
+  uid: number | undefined,
+): Promise<Record<string, unknown> | undefined> {
   try {
-    const root = join(home, '.agentlink');
     if ((await checkDir(root, uid)) === undefined) return undefined;
     const path = join(root, file);
     const before = await lstatOrMissing(path);
@@ -820,6 +842,49 @@ export async function writeUiSettingsFile(
     `${JSON.stringify({ v: 1, settings: mergeUiSettings({}, checked) })}\n`,
     options,
   );
+}
+
+/**
+ * N4 (PLAN-NOTIFY §3.4): the ID's notification centre record, `notifications.json` in its folder
+ * (`{"v":1,"cursor":…,"items":[…]}`: kinds, contact IDs, counts and times only; node notifications.ts
+ * reads it strictly). Local only, never sent anywhere.
+ */
+export const NOTIFICATIONS_FILE = 'notifications.json';
+/** 200 items of about 120 bytes each, with room to spare. */
+const MAX_NOTIFICATIONS_BYTES = 64 * 1024;
+
+/** N4: the parsed record, or undefined (absent, a link, non-private, oversized or malformed). */
+export async function readAgentNotifications(
+  home: string,
+  name: string,
+  options: OwnerCheck = {},
+): Promise<unknown> {
+  if (!isAgentName(name)) return undefined;
+  let dir: string;
+  try {
+    dir = await checkContained(home, name);
+  } catch {
+    return undefined;
+  }
+  return readJsonIn(dir, NOTIFICATIONS_FILE, MAX_NOTIFICATIONS_BYTES, expectedUid(options));
+}
+
+/** N4: writes the record (already checked by the store) to the ID folder, atomically, 0600. */
+export async function writeAgentNotifications(
+  home: string,
+  name: string,
+  record: unknown,
+  options: OwnerCheck = {},
+): Promise<void> {
+  if (!isAgentName(name)) throw new RuntimeError('agent_name_invalid');
+  const text = `${JSON.stringify(record)}\n`;
+  if (Buffer.byteLength(text, 'utf8') > MAX_NOTIFICATIONS_BYTES) {
+    throw new RuntimeError('agent_config_invalid');
+  }
+  const uid = expectedUid(options);
+  const dir = await checkContained(home, name);
+  if ((await checkDir(dir, uid)) === undefined) throw new RuntimeError('agent_path_invalid');
+  await writeFileIn(dir, NOTIFICATIONS_FILE, text, uid);
 }
 
 /** One agent folder as the app host lists it: never a path or an agent ID. */
@@ -935,5 +1000,7 @@ export function agentDirectory(
     writeCurrent: (name) => writeAppCurrent(home, name, check),
     readUiSettings: () => readUiSettingsFile(home, check),
     writeUiSettings: (settings) => writeUiSettingsFile(home, settings, check),
+    readNotifications: (name) => readAgentNotifications(home, name, check),
+    writeNotifications: (name, record) => writeAgentNotifications(home, name, record, check),
   });
 }

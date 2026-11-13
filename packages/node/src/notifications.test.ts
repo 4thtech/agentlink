@@ -17,6 +17,7 @@ import {
   readNotifyPrefs,
   unreadOf,
 } from '@4thtech-io/types/ui-contract/notifications';
+import { mergeUiSettings, readUiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 import { describe, expect, it } from 'vitest';
 import {
   createNotificationStore,
@@ -41,7 +42,9 @@ describe('the notification schema (no content fields)', () => {
 
   it('accepts exactly kind, id ref, count and times', () => {
     expect(readNotificationItem(good)).toEqual(good);
-    expect(readNotificationItem({ id: 'approvals', kind: 'approvals', count: 1, at: T0, read: true })).toBeDefined();
+    expect(
+      readNotificationItem({ id: 'approvals', kind: 'approvals', count: 1, at: T0, read: true }),
+    ).toBeDefined();
   });
 
   it.each([
@@ -66,8 +69,14 @@ describe('the notification schema (no content fields)', () => {
     ['a fractional time', { ...good, at: 1.5 }],
     ['an unknown kind', { ...good, kind: 'chat', id: `chat-${A}` }],
     ['an id that does not match', { ...good, id: `messages-${B}` }],
-    ['a ref on a state kind', { id: 'update', kind: 'update', ref: A, count: 1, at: T0, read: false }],
-    ['no ref on a person kind', { id: 'messages', kind: 'messages', count: 1, at: T0, read: false }],
+    [
+      'a ref on a state kind',
+      { id: 'update', kind: 'update', ref: A, count: 1, at: T0, read: false },
+    ],
+    [
+      'no ref on a person kind',
+      { id: 'messages', kind: 'messages', count: 1, at: T0, read: false },
+    ],
     ['a string read flag', { ...good, read: 'no' }],
     ['an array', [good]],
     ['null', null],
@@ -104,6 +113,16 @@ describe('the notification schema (no content fields)', () => {
     expect(readNotifyPrefs({ approvals: false })).toEqual({ approvals: false });
     expect(readNotifyPrefs({ approvals: 'yes' })).toBeUndefined();
     expect(readNotifyPrefs({ sound: true })).toBeUndefined();
+  });
+
+  it('prefs round-trip through the UI settings (N6): merged key by key, refused when not boolean', () => {
+    const stored = mergeUiSettings({}, readUiSettings({ notify: { messages: true } }, 1) ?? {});
+    const next = mergeUiSettings(stored, readUiSettings({ notify: { showNames: true } }, 1) ?? {});
+    expect(readUiSettings(JSON.parse(JSON.stringify(next)))).toEqual({
+      notify: { messages: true, showNames: true },
+    });
+    expect(readUiSettings({ notify: { messages: 'yes' } })).toBeUndefined();
+    expect(readUiSettings({ notify: { name: true } })).toBeUndefined();
   });
 });
 
@@ -203,7 +222,9 @@ describe('the notification store', () => {
     let stored: unknown = {
       v: 1,
       cursor: T0,
-      items: [{ id: `messages-${A}`, kind: 'messages', ref: A, count: 1, at: T0, read: false, text: 'x' }],
+      items: [
+        { id: `messages-${A}`, kind: 'messages', ref: A, count: 1, at: T0, read: false, text: 'x' },
+      ],
     };
     const persistence: NotificationPersistence = {
       read: () => Promise.resolve(stored),
@@ -223,6 +244,24 @@ describe('the notification store', () => {
     }
     expect(readNotificationRecord({ v: 2, cursor: T0, items: [] })).toBeUndefined();
     expect(readNotificationRecord({ v: 1, cursor: T0, items: [], note: 'hi' })).toBeUndefined();
+  });
+
+  it('a poll that changes nothing writes nothing', async () => {
+    let writes = 0;
+    const inner = memoryNotificationPersistence();
+    const persistence: NotificationPersistence = {
+      read: () => inner.read(),
+      write: (record) => {
+        writes += 1;
+        return inner.write(record);
+      },
+    };
+    const store = createNotificationStore(persistence, { now: clock().now });
+    await store.observe({ approvals: 1 });
+    expect(writes).toBe(1);
+    await store.observe({ approvals: 1, update: false, networkDown: false, inbound: [] });
+    await store.observe({});
+    expect(writes).toBe(1);
   });
 
   it('markRead refuses an ID that is not an item', async () => {

@@ -1,0 +1,7 @@
+---
+section: Added
+---
+
+- A notification centre in the local app (N4, S2, PLAN-NOTIFY §3.1, §3.4; proposed, owner confirms at merge): `GET /api/ui/notifications`, `POST /api/ui/notifications/:id/read` and `POST /api/ui/notifications/read-all`, behind the session, CSRF, Origin and generation checks of every page write, with no owner presence and nothing signed. Each ID keeps `notifications.json` in its own folder: only a kind (approvals waiting, new messages, files arrived, update available, network down for 10 minutes), a contact ID, a count and times, for 30 days or 200 items. The schema refuses any other field, so no message text, file name, name or link can be stored. No MCP tool reaches it.
+- The bell in the top bar (N5, S1, PLAN-NOTIFY §4.1, D4): the number of new things, "9+" above nine, also in front of the tab title, and a dot on the tab icon while approvals wait. Its centre groups Needs you, New and Earlier, names people only from your own People list, opens the right page and marks it read; approvals stay counted until you decide them. Keyboard: arrows, Home, End, Escape back to the bell; on a phone it opens across the screen.
+- Settings › Notifications (N6, S1, PLAN-NOTIFY §4.4, D2) replaces the redirect to Settings home: Approvals waiting (on), New messages and files, People joined or left, Problems that need you, Show names in notifications and Quiet hours (all off), kept per install in the app's UI settings. Native desktop notifications that follow these switches come later (N7).

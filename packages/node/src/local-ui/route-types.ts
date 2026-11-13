@@ -500,6 +500,9 @@ export interface LocalUiMarkRoute {
 export const MARK_PATHS: readonly string[] = Object.freeze([
   '/api/ui/files/auto-save-notice/dismiss',
   '/api/ui/contacts/:ref/name-seen',
+  // N4: the notification centre's read marks (display state only).
+  '/api/ui/notifications/:id/read',
+  '/api/ui/notifications/read-all',
 ]);
 
 export type LocalUiRoute =
