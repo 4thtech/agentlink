@@ -61,21 +61,26 @@ const nodeBin = join(resources, ...(win ? layout.node.win32 : layout.node.posix)
 const entryJs = join(resources, ...layout.hostScript.slice(0, -1), 'agentlink.js');
 const hostScript = join(resources, ...layout.hostScript);
 
-const home = mkdtempSync(join(tmpdir(), 'agentlink-desktop-smoke-'));
-// A small, explicit environment: no AI-app marker, nothing from the runner's secrets.
-const env = {
-  PATH: process.env.PATH,
-  SystemRoot: process.env.SystemRoot,
-  HOME: home,
-  USERPROFILE: home,
-  APPDATA: join(home, 'AppData', 'Roaming'),
-  LOCALAPPDATA: join(home, 'AppData', 'Local'),
-  TMPDIR: home,
-  TEMP: home,
-  TMP: home,
-};
-mkdirSync(env.APPDATA, { recursive: true });
-mkdirSync(env.LOCALAPPDATA, { recursive: true });
+/** A fresh throw-away profile: its own home and a small, explicit environment. */
+function makeHome(opts = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'agentlink-desktop-smoke-'));
+  // No AI-app marker, nothing from the runner's secrets.
+  const e = {
+    PATH: process.env.PATH,
+    SystemRoot: process.env.SystemRoot,
+    HOME: dir,
+    USERPROFILE: dir,
+    APPDATA: join(dir, 'AppData', 'Roaming'),
+    LOCALAPPDATA: join(dir, 'AppData', 'Local'),
+    TMPDIR: dir,
+    TEMP: dir,
+    TMP: dir,
+  };
+  if (!opts.noRoaming) mkdirSync(e.APPDATA, { recursive: true });
+  mkdirSync(e.LOCALAPPDATA, { recursive: true });
+  return { home: dir, env: e };
+}
+const { home, env } = makeHome();
 
 // A fresh runner has no usable keychain under a temporary HOME (the same setup as
 // tools/ci/golden-path-published.mjs): on macOS the throw-away profile gets its own unlocked login
@@ -160,11 +165,16 @@ const stderrLines = (text) =>
  * The fd 3 mode the bundled node sees with this stdio slot (printed, octal). Async spawn: spawnSync
  * does not take 'overlapped'.
  */
-function fd3Mode(label, slot) {
+function fd3Mode(ctx, label, slot) {
   const stdio =
     slot === undefined ? ['ignore', 'ignore', 'pipe'] : ['ignore', 'ignore', 'pipe', slot];
   return new Promise((done) => {
-    const child = spawn(nodeBin, ['-e', FD3_MODE], { env, cwd: home, stdio, windowsHide: true });
+    const child = spawn(nodeBin, ['-e', FD3_MODE], {
+      env: ctx.env,
+      cwd: ctx.home,
+      stdio,
+      windowsHide: true,
+    });
     let stderr = '';
     const timer = setTimeout(() => child.kill('SIGKILL'), 20_000);
     child.stderr.on('data', (c) => (stderr += c));
@@ -182,13 +192,13 @@ function fd3Mode(label, slot) {
  * A control: the host started directly with `slot` on fd 3 must refuse (its fixed line, exit 1)
  * within 20 s. Returns null when it did, else the reason.
  */
-async function controlRefused(label, slot) {
-  await fd3Mode(label, slot);
+async function controlRefused(ctx, label, slot) {
+  await fd3Mode(ctx, label, slot);
   const stdio =
     slot === undefined ? ['ignore', 'ignore', 'pipe'] : ['ignore', 'ignore', 'pipe', slot];
   const r = spawnSync(nodeBin, [hostScript], {
-    env,
-    cwd: home,
+    env: ctx.env,
+    cwd: ctx.home,
     stdio,
     encoding: 'utf8',
     timeout: 20_000,
@@ -208,12 +218,12 @@ async function controlRefused(label, slot) {
  * it must send `ready` on fd 3 (the pipe works in both directions). The link is never printed.
  * The child is then stopped and must exit.
  */
-async function pipeAccepted() {
-  await fd3Mode('the shell’s pipe (overlapped)', 'overlapped');
+async function pipeAccepted(ctx) {
+  await fd3Mode(ctx, 'the shell’s pipe (overlapped)', 'overlapped');
   return new Promise((done) => {
     const child = spawn(nodeBin, [hostScript], {
-      env,
-      cwd: home,
+      env: ctx.env,
+      cwd: ctx.home,
       stdio: ['ignore', 'ignore', 'pipe', 'overlapped'],
       windowsHide: true,
     });
@@ -251,7 +261,7 @@ async function pipeAccepted() {
       if (exited === null) child.kill('SIGKILL');
       while (exited === null) await sleep(100);
       // The direct host's record is not the app's: the app writes its own.
-      rmSync(join(home, '.agentlink', 'app-host.json'), { force: true });
+      rmSync(join(ctx.home, '.agentlink', 'app-host.json'), { force: true });
       done(ready ? null : 'the host did not send `ready` on the shell’s pipe');
     }, 250);
   });
@@ -261,7 +271,10 @@ async function pipeAccepted() {
 async function pipeControls() {
   console.log('fd 3 controls (bundled node, host started directly):');
   const failures = [];
-  const dir = mkdtempSync(join(home, 'fd3-'));
+  // Its own throw-away home, so the direct host's ~/.agentlink never reaches the fresh profile
+  // appStarts() runs on.
+  const ctx = makeHome();
+  const dir = mkdtempSync(join(ctx.home, 'fd3-'));
   const fileFd = openSync(join(dir, 'f'), 'w');
   let nulFd = null;
   try {
@@ -284,13 +297,14 @@ async function pipeControls() {
       ["'ignore'", 'ignore'],
     ]) {
       if (slot === null) continue;
-      const reason = await controlRefused(label, slot);
+      const reason = await controlRefused(ctx, label, slot);
       if (reason !== null) failures.push(reason);
     }
   } finally {
     for (const fd of [fileFd, nulFd, consoleFd]) if (fd !== null) closeSync(fd);
   }
-  const accepted = await pipeAccepted();
+  const accepted = await pipeAccepted(ctx);
+  rmSync(ctx.home, { recursive: true, force: true });
   if (accepted !== null) failures.push(accepted);
   if (failures.length > 0) fail(failures.join('; '));
   else console.log('ok  fd 3: only the shell’s pipe is accepted, and the host answers on it');
@@ -410,8 +424,44 @@ function mcpToolsList() {
   });
 }
 
+/**
+ * Windows only: a real account always has AppData\\Roaming, so this profile deliberately lacks it.
+ * The app must say so in its fixed line and exit 66 (PROFILE_UNAVAILABLE_EXIT), not claim another
+ * AgentLink is running. Code only here; it runs on the Windows runner.
+ */
+async function missingRoaming() {
+  const ctx = makeHome({ noRoaming: true });
+  try {
+    const child = spawn(exe, [], { env: ctx.env, stdio: 'ignore' });
+    let exited = null;
+    child.on('exit', (code) => (exited = code ?? 'signal'));
+    child.on('error', () => (exited = 'spawn error'));
+    const end = Date.now() + 60_000;
+    while (exited === null && Date.now() < end) await sleep(250);
+    if (exited === null) {
+      child.kill('SIGKILL');
+      return fail('the app did not exit without AppData\\Roaming');
+    }
+    let log = '';
+    try {
+      log = readFileSync(join(ctx.env.LOCALAPPDATA, 'AgentLink', 'logs', 'core.log'), 'utf8');
+    } catch {
+      // no log
+    }
+    if (exited !== 66)
+      return fail(`without AppData\\Roaming the app exited ${exited} (expected 66)`);
+    if (!log.includes('the AgentLink data folder is not available')) {
+      return fail('without AppData\\Roaming the fixed line is missing from core.log');
+    }
+    console.log('ok  without AppData\\Roaming the app exits 66 with its fixed line');
+  } finally {
+    rmSync(ctx.home, { recursive: true, force: true });
+  }
+}
+
 try {
   await pipeControls();
+  if (win) await missingRoaming();
   await appStarts();
   const result = await mcpToolsList();
   if (!Array.isArray(result?.tools) || result.tools.length === 0) {
