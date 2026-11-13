@@ -130,6 +130,47 @@ export async function hashFile(path: string): Promise<{ sha256: string; size: nu
   }
 }
 
+/** Receives the bytes written so far and the signed size (UPD-4 progress bar). Counts only. */
+export type DownloadProgress = (done: number, total: number) => void;
+
+/**
+ * Streams `asset` into a new file at `path` (created exclusively, 0600) and checks it: more bytes
+ * than `size` stop the download (`size_mismatch`), fewer or a different SHA-256 (`size_mismatch`,
+ * `hash_mismatch`) refuse it. The caller removes the folder on a refusal.
+ */
+export async function streamToFile(
+  asset: UpdateAsset,
+  fetchImpl: FetchLike,
+  path: string,
+  onProgress?: DownloadProgress,
+): Promise<void> {
+  const response = await fetchAllowed(asset.url, fetchImpl, DOWNLOAD_TIMEOUT_MS);
+  const declared = response.headers.get('content-length');
+  if (declared !== null && Number(declared) !== asset.size) {
+    await response.body?.cancel().catch(() => undefined);
+    throw new UpdateRefusal('size_mismatch');
+  }
+  const hasher = createSha256();
+  let size = 0;
+  const file = await open(path, 'wx', 0o600);
+  try {
+    for await (const chunk of chunks(response)) {
+      size += chunk.length;
+      if (size > asset.size) throw new UpdateRefusal('size_mismatch');
+      hasher.update(chunk);
+      await file.write(chunk);
+      onProgress?.(size, asset.size);
+    }
+  } catch (error) {
+    if (error instanceof UpdateRefusal) throw error;
+    return fail();
+  } finally {
+    await file.close();
+  }
+  if (size !== asset.size) throw new UpdateRefusal('size_mismatch');
+  if (encodeHex(hasher.digest()) !== asset.sha256) throw new UpdateRefusal('hash_mismatch');
+}
+
 export interface DownloadedInstaller {
   readonly path: string;
   readonly dir: string;
@@ -150,30 +191,7 @@ export async function downloadInstaller(
   const dir = await mkdtemp(join(tempRoot, 'agentlink-update-'));
   const path = join(dir, name);
   try {
-    const response = await fetchAllowed(asset.url, fetchImpl, DOWNLOAD_TIMEOUT_MS);
-    const declared = response.headers.get('content-length');
-    if (declared !== null && Number(declared) !== asset.size) {
-      await response.body?.cancel().catch(() => undefined);
-      throw new UpdateRefusal('size_mismatch');
-    }
-    const hasher = createSha256();
-    let size = 0;
-    const file = await open(path, 'wx', 0o600);
-    try {
-      for await (const chunk of chunks(response)) {
-        size += chunk.length;
-        if (size > asset.size) throw new UpdateRefusal('size_mismatch');
-        hasher.update(chunk);
-        await file.write(chunk);
-      }
-    } catch (error) {
-      if (error instanceof UpdateRefusal) throw error;
-      return fail();
-    } finally {
-      await file.close();
-    }
-    if (size !== asset.size) throw new UpdateRefusal('size_mismatch');
-    if (encodeHex(hasher.digest()) !== asset.sha256) throw new UpdateRefusal('hash_mismatch');
+    await streamToFile(asset, fetchImpl, path);
     return Object.freeze({ path, dir });
   } catch (error) {
     await rm(dir, { recursive: true, force: true });

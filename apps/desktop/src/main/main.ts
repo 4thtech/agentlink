@@ -66,6 +66,8 @@ import {
 } from './switches.js';
 import type { StatusAction } from './status-page.js';
 import { AppTray, trayImage } from './tray.js';
+import { writeHealthIfPending, writeStarting } from './updater/health.js';
+import { UPDATES_DIR, sweepStaging } from './updater/install.js';
 import { procTranslated, updateChannel, updaterArch } from './updater/host.js';
 import { ReleaseChecker, updateChecksAllowed } from './updater/release-check.js';
 import { scheduleUpdateChecks } from './updater/schedule.js';
@@ -163,6 +165,14 @@ export interface ShellProcess {
   readonly toInviteLink?: (deepLink: string) => string | null;
   /** The per-user folder for core.log (core-log.ts logDir). */
   readonly logDir: string;
+  /**
+   * UPD-4: the in-app update's two signals for its watchdog (updater/health.ts): this shell started,
+   * and its core is ready. Packaged release builds only. Absent: none.
+   */
+  readonly updateHealth?: (app: App) => {
+    readonly starting: () => void;
+    readonly ready: () => void;
+  };
   /** WP-D10: starts the phase-1 update checks (packaged release builds only). Absent: none. */
   readonly startUpdates?: (electron: ElectronModule) => void;
   /**
@@ -207,6 +217,11 @@ export async function runShell(
     app.exit(LAUNCH_REFUSED_EXIT);
     return 'refused';
   }
+
+  // UPD-4 (IR-UPD-4-1 #2): the update watchdog's start signal comes first, before the lock, whenReady
+  // and any dialog, so a new copy that hangs later can still be found and stopped.
+  const updateHealth = app.isPackaged && preview === null ? proc.updateHealth?.(app) : undefined;
+  updateHealth?.starting();
 
   // The log keeps one fixed line when the shell quits on its own at start (no window yet), so a
   // start that "does nothing" can be told apart afterwards: another copy running, or the folder.
@@ -473,6 +488,7 @@ export async function runShell(
         case 'ready':
           // WIN-DESK-1: proof the pipe works both ways (fixed text, never the link).
           coreLog.note('core ready');
+          updateHealth?.ready();
           if (releaseChecker !== null) sendAppUpdate(releaseChecker.view());
           if (window?.loadSessionUrl(message.sessionUrl) === true) {
             window.show();
@@ -607,6 +623,23 @@ export function realProcess(): ShellProcess {
     toInviteLink,
     logDir: logDir(proc.platform, homedir(), proc.env),
     startUpdates: (electron) => startUpdates(electron, proc.platform, proc.arch),
+    updateHealth: (app) => {
+      const dir = app.getPath?.('userData');
+      const version = app.getVersion?.();
+      const write = (fn: typeof writeStarting): void => {
+        if (proc.platform !== 'darwin' || dir === undefined || version === undefined) return;
+        // Public data only (a version and a pid); a failed write just means no in-app update.
+        fn(dir, version, proc.pid).catch(() => undefined);
+      };
+      return {
+        starting: () => write(writeStarting),
+        ready: () => {
+          write(writeHealthIfPending);
+          if (proc.platform === 'darwin' && dir !== undefined)
+            void sweepStaging(join(dir, UPDATES_DIR), Date.now());
+        },
+      };
+    },
     releaseChecker: (electron, onChange) =>
       releaseCheckerFor(
         electron,
