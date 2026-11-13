@@ -73,7 +73,11 @@ const unsigned = (over = {}) =>
     ...over,
   });
 const rootKeyJson = (pin) => JSON.stringify({ rootPublicKey: pin, minimumStatementSequence: 0 });
-const PLACEHOLDER = readFileSync(join(root, 'apps/desktop/src/main/updater/root-key.json'), 'utf8');
+// UPD-2: root-key.json is now the real pin; the placeholder is a fixture.
+const PLACEHOLDER = JSON.stringify({
+  rootPublicKey: 'PLACEHOLDER-AGENTLINK-DESKTOP-ROOT-KEY-run-the-offline-key-ceremony',
+  minimumStatementSequence: 0,
+});
 const UPDATES_OFF = readFileSync(
   join(root, 'apps/desktop/src/main/updater/root-key.updates-off.json'),
   'utf8',
@@ -114,6 +118,11 @@ describe('key id and document names (Fable M1)', () => {
 describe('the pin (Fable L3)', () => {
   it('reads a real pin from root-key.json and refuses the placeholder and the updates-off file', () => {
     expect(pinFromRootKeyJson(rootKeyJson(k1.publicKey))).toBe(k1.publicKey);
+    expect(
+      pinFromRootKeyJson(
+        readFileSync(join(root, 'apps/desktop/src/main/updater/root-key.json'), 'utf8'),
+      ),
+    ).toBe('7efc699ddc401adc0c9901f12e152397c835c825d5bc34e7f5f4de00f5f6c984');
     expect(() => pinFromRootKeyJson(PLACEHOLDER)).toThrow(/placeholder|no real/i);
     expect(() => pinFromRootKeyJson(UPDATES_OFF)).toThrow(ToolError);
     expect(() => pinFromRootKeyJson('{')).toThrow(ToolError);

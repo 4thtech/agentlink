@@ -467,7 +467,13 @@ describe('phase 1 flow: verified download, then "Open the installer"', () => {
 
   it('does nothing while the key is the placeholder', async () => {
     const t = setup();
-    const deps = omit(t.deps, 'root');
+    const deps = {
+      ...t.deps,
+      root: {
+        rootPublicKey: 'PLACEHOLDER-AGENTLINK-DESKTOP-ROOT-KEY',
+        minimumStatementSequence: 0,
+      },
+    };
     expect(await runUpdateCheck(deps)).toEqual({ kind: 'not_configured' });
     expect(t.seen).toEqual([]);
   });
@@ -510,8 +516,10 @@ describe('the command line, end to end (real offline KDF)', () => {
         '--pinned-public',
         pinned,
       ];
-      // Without a pinned key (root-key.json is the placeholder) and no --pinned-public: refused.
-      await expect(run(signArgs(p('a.json')).slice(0, -2))).rejects.toThrow(/placeholder/);
+      // UPD-2: without --pinned-public the owner's pin in root-key.json is used; this test key is not it.
+      await expect(run(signArgs(p('a.json')).slice(0, -2))).rejects.toThrow(
+        /not the update key pinned/,
+      );
       // A key file that is not the pinned key is refused before the passphrase is asked.
       await expect(run(signArgs(p('c.json'), k2.publicKey))).rejects.toThrow(
         /not the update key pinned/,

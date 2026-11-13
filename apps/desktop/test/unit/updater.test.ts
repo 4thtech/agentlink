@@ -4,6 +4,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { decodeHex, isBip340PublicKey } from '@4thtech-io/crypto';
 import { describe, expect, it } from 'vitest';
 import rootKeyFile from '../../src/main/updater/root-key.json' with { type: 'json' };
 import {
@@ -66,9 +67,21 @@ const code = (fn: () => unknown): string => {
 };
 
 describe('pinned root', () => {
-  it('the repository holds the placeholder, which configures nothing', () => {
-    expect(rootKeyFile.rootPublicKey).toMatch(/^PLACEHOLDER-AGENTLINK-DESKTOP-ROOT-KEY/);
-    expect(configuredRoot()).toBeUndefined();
+  it('the repository holds the owner pin (UPD-2), a valid x-only key; a placeholder configures nothing', () => {
+    expect(rootKeyFile.rootPublicKey).toBe(
+      '7efc699ddc401adc0c9901f12e152397c835c825d5bc34e7f5f4de00f5f6c984',
+    );
+    expect(configuredRoot()).toEqual({
+      rootPublicKey: rootKeyFile.rootPublicKey,
+      minimumStatementSequence: 0,
+    });
+    expect(isBip340PublicKey(decodeHex(rootKeyFile.rootPublicKey))).toBe(true);
+    expect(
+      configuredRoot({
+        rootPublicKey: 'PLACEHOLDER-AGENTLINK-DESKTOP-ROOT-KEY',
+        minimumStatementSequence: 0,
+      }),
+    ).toBeUndefined();
   });
 
   it('accepts only a valid x-only key and a whole-number floor', () => {
@@ -93,6 +106,10 @@ describe('pinned root', () => {
       platform: 'darwin',
       arch: 'arm64',
       stateDir: '/nonexistent',
+      root: {
+        rootPublicKey: 'PLACEHOLDER-AGENTLINK-DESKTOP-ROOT-KEY',
+        minimumStatementSequence: 0,
+      },
       fetch: () => Promise.reject(new Error('must not fetch')),
       openPath: () => Promise.reject(new Error('must not open')),
       showMessageBox: () => Promise.reject(new Error('must not ask')),

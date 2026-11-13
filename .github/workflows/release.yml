@@ -101,7 +101,7 @@
 #                   `desktop-sign` (it holds the key; no reviewer, main only, OPS-UNSTICK-B): it runs
 #                   only after the approved publish-latest, so the release needs no second click.
 #   desktop-app-build    (WP-D11) calls desktop.yml for the published CLI version: the AgentLink app
-#                   for macOS arm64 + x64, unsigned, updates off until the key ceremony; checks, smoke
+#                   for macOS arm64 + x64, unsigned, updates on (the owner key is pinned, UPD-2); checks, smoke
 #                   test, provenance attestation. WIN-DESK-1d: with the Windows app (unsigned early
 #                   build, win-x64 NSIS setup).
 #   desktop-app-release  after a green smoke-latest: checks the names and SHA256SUMS and attaches
@@ -1862,7 +1862,7 @@ jobs:
     uses: ./.github/workflows/desktop.yml
     with:
       version: ${{ needs.desktop-extension-build.outputs.version }}
-      updates: "off"
+      updates: "on"
 
   # Attaches the app to the GitHub Release v<version> after a green smoke test, under the exact names
   # the invite page links to (releases/download/v<version>/AgentLink-<version>-mac-{arm64,x64}.dmg),
@@ -2115,7 +2115,7 @@ jobs:
   # UPD-3 (D-151, owner decision 2026-11-13): the signed desktop update manifest, in two jobs.
   # Runs only on a push to main, after desktop-app-release attached the app and marked the Release
   # Latest, and only when both Mac builds have updates on (output `updates`; release.yml builds with
-  # updates "off" until the key is pinned, so these jobs are skipped until then).
+  # updates "on" since the key is pinned, UPD-2).
   #   desktop-update-manifest  no secret, read-only: downloads the assets FROM the Release, checks their
   #                            sums and their build provenance attestations (desktop.yml), checks the
   #                            pin (Fable L3: both builds carry exactly root-key.json's real key) and
