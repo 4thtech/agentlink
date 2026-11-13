@@ -232,6 +232,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/owner-code/replace/cancel',
       // WP-R2b: Show in Finder for the recovery kit (local-ui/backup-host-server.test.ts).
       '/api/ui/backup/reveal',
+      // ATT-SENDFOLDER-FIX: Home's Send folder banner (api/files.test.ts).
+      '/api/ui/files/send-folder',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).

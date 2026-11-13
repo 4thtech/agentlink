@@ -285,6 +285,8 @@ export const AGENTS_OWNER = {
             oldGone: false,
           },
         },
+        // ATT-SENDFOLDER-FIX: the Send folder the gesture allows, shown before it.
+        sendFolderReview: { folder: '/Users/me/AgentLink/Send', holdsFiles: false },
         expiresInMs: 120000,
         publicKey: {
           rpId: 'localhost',

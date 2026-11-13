@@ -150,8 +150,9 @@
 // - M1-UX-FIRSTRUN-V2 (D-130 (1), (2); 08 §1 first run v2; proposed, owner confirms at merge): when
 //   the setup's `firstCard.firstPolicy` is wired, `begin` first prepares the folders (Send, Inbox,
 //   Proofs; owner-setup.ts prepareSetupFolders) and answers 409 `folder_refused` (reason
-//   `folder_not_empty` or `folder_unavailable`) before any seed exists when Send is a link at either
-//   level, not a folder or not empty. `finish` signs the card and the first policy with the same
+//   `folder_unavailable`) before any seed exists when Send is a link at either level or not a
+//   folder. ATT-SENDFOLDER-FIX: a Send that already holds files is used (`folder_not_empty` is no
+//   longer answered; the code stays known to older pages). `finish` signs the card and the first policy with the same
 //   gesture and answers the fixed `sendFolder` outcome (`allowed`, `not_confirmed`, `not_allowed`;
 //   never the path) and the computer's name for the backup-code save form. The folders this run
 //   created are removed whenever the policy is not in force (failure, expiry, drop, close).
@@ -574,6 +575,18 @@ const HEAD_OPEN = /<head(?:\s[^>]*)?>/i;
 const MAX_REVEAL_BODY_BYTES = 256;
 /** WP-R2b: the kit-reveal route takes no body; anything up to this is read and refused (400). */
 const MAX_KIT_REVEAL_BODY_BYTES = 256;
+
+/**
+ * ATT-SENDFOLDER-FIX (IR-ATT-SENDFOLDER-1 M-1): the Send folder a begin answer names for the page
+ * to show before the gesture: its real path (local data, shown as text) and whether it already
+ * holds files (then the owner reads that those can be sent too). Nothing when no folder is ready.
+ */
+function sendFolderReview(send: SendFolderPlan | undefined): {
+  sendFolderReview?: { folder: string; holdsFiles: boolean };
+} {
+  if (send?.status !== 'ready') return {};
+  return { sendFolderReview: { folder: send.folder, holdsFiles: send.holdsFiles === true } };
+}
 /** MSG-FILES-IO-h: an item ID, `<envelope ID>.<index>` (core ui-messages.ts). */
 const REVEAL_ITEM_ID = /^[A-Za-z0-9_-]{1,64}\.[0-9]{2}$/;
 
@@ -5009,6 +5022,8 @@ export async function startApprovalServerWith(
       finishSetup(res, 200, 'ready', {
         expiresInMs: SETUP_HOLD_MS,
         fingerprint,
+        // ATT-SENDFOLDER-FIX (IR-1 M-1): the Send folder the gesture allows, shown before it.
+        ...sendFolderReview(folders?.send),
         nonce: encodeBase64url(nonce),
         ...(statement === undefined ? {} : { statement: statement as unknown as JsonValue }),
         publicKey: {
@@ -5545,8 +5560,10 @@ export async function startApprovalServerWith(
         ({ planned, shown } = found);
       }
       // The Send folder for its first policy, checked (or created) now; removed again unless used.
+      // ATT-SENDFOLDER-FIX: an unusable Send falls back to a fresh Send-2 ... (never a link).
       send = await prepareSendFolder(
         boundHome ?? (firstId ? options.host?.firstRun?.home : undefined),
+        { fallback: true },
       ).catch((): SendFolderPlan => ({
         status: 'unavailable',
         reason: 'folder_unavailable',
@@ -5614,6 +5631,8 @@ export async function startApprovalServerWith(
       finishCreate(res, 200, 'ready', {
         nonce: encodeBase64url(nonce),
         statement: statement as unknown as JsonValue,
+        // ATT-SENDFOLDER-FIX (IR-1 M-1): the Send folder the gesture allows, shown before it.
+        ...sendFolderReview(send),
         expiresInMs: CREATE_CONNECT_HOLD_MS,
         publicKey: {
           rpId: PASSKEY_RP_ID,

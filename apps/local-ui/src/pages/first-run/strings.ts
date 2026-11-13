@@ -85,6 +85,8 @@ export const FIRST_RUN = {
   // The first policy's outcome (D-130 (2)).
   sendAllowed:
     'Your AI can send files you put in ~/AgentLink/Send. Nothing else on this computer can be sent.',
+  sendAllowedAt: (folder: string): string =>
+    `Your AI can send files you put in ${folder}. Nothing else on this computer can be sent.`,
   sendNotAllowed:
     "AgentLink couldn't allow your Send folder, so your AI can't send files yet. You can allow a folder later in Files.",
   sendNotConfirmed:

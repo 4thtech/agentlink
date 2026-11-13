@@ -30,8 +30,10 @@
 //   recovery kit) is only a POST at BACKUP_REVEAL_PATH with a handler, registered once; the server's
 //   kit-reveal gate runs it with no input at all. No other path, method or route can use the kind.
 // - R1-SEC-16: a `presence: 'mark'` route (a display mark: the auto-save notice's dismiss, a former
-//   name's seen mark) is only a POST at one of MARK_PATHS with a handler, each registered once; the
-//   server's mark gate runs it with no input at all. A GET is always a read.
+//   name's seen mark; ATT-SENDFOLDER-FIX: Home's Send folder set-up, which may also create an empty
+//   0700 folder under ~/AgentLink and changes no rules) is only a POST at one of MARK_PATHS with a
+//   handler, each registered once; the server's mark gate runs it with no input at all. A GET is
+//   always a read.
 // - The page files in api/ each own their routes; this file only lists them.
 import { activityRoutes } from './api/activity.js';
 // U3-c: the Agents list and the switch kind; the stubs of U3-d, U3-e, U3-f and U3-flow.
@@ -250,7 +252,8 @@ export class LocalUiRouteRegistry {
         throw invalid('the handoff route is already registered');
       }
     } else if (presence === 'mark') {
-      // R1-SEC-16: the display marks; the server's mark gate runs them (no input, no presence).
+      // R1-SEC-16: the display marks (and the Send folder set-up, ATT-SENDFOLDER-FIX); the server's
+      // mark gate runs them (no input, no presence).
       if (method !== 'POST') throw invalid('a mark route is a POST');
       if (!MARK_PATHS.includes(route.path)) throw invalid('a mark route is only at a mark path');
       if (typeof handler !== 'function') throw invalid('a mark route needs a handler');

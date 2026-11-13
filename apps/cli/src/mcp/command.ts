@@ -117,7 +117,11 @@ export function agentToolContext(
     urlOrigins: Object.freeze([]),
     ...(approvalUi === undefined
       ? {}
-      : { approvalLink: (approvalId: string) => approvalUi.link(approvalId) }),
+      : {
+          approvalLink: (approvalId: string) => approvalUi.link(approvalId),
+          // ATT-ALLOW-LINK: the no-folder result's link to Settings > Files (Send folder filled in).
+          allowFolderLink: () => approvalUi.allowFolderLink(),
+        }),
     // M1-36a-b: the no-owner text names the command that works here, and `owner init` on a
     // machine known to have no owner (folder names and file presence only; never a key).
     cliPrefix: cliPrefix(),
