@@ -66,6 +66,7 @@ import {
 } from './switches.js';
 import type { StatusAction } from './status-page.js';
 import { AppTray, trayImage } from './tray.js';
+import { APP_USER_MODEL_ID, NativeNotifier } from './notify.js';
 import { writeHealthIfPending, writeStarting } from './updater/health.js';
 import { InAppUpdater, inAppEnabled } from './updater/in-app.js';
 import { checkForUpdate } from './updater/index.js';
@@ -249,6 +250,14 @@ export async function runShell(
 
   // 2. Sandbox for every renderer; one instance.
   app.enableSandbox();
+  // N7 (R-WIN): Windows attributes toasts to this ID (the installer's Start menu shortcut).
+  if (proc.platform === 'win32') {
+    try {
+      app.setAppUserModelId?.(APP_USER_MODEL_ID);
+    } catch {
+      // Without it Windows shows no toast; nothing else depends on it.
+    }
+  }
   // WIN-DESK-1: the lock lives in the data folder. When Electron cannot resolve it, getPath
   // throws and the lock would fail for that reason alone: say so (fixed line), never "another
   // AgentLink is running". Nothing from the error is kept.
@@ -304,6 +313,7 @@ export async function runShell(
   let supervisor: CoreSupervisor | null = null;
   let window: MainWindow | null = null;
   let tray: AppTray | null = null;
+  let notifier: NativeNotifier | null = null;
   let pendingInvite: string | null = null;
   const toInviteLink = proc.toInviteLink ?? ((): null => null);
   // DESK051-UPD: the update state goes to the core (Settings > Updates) after every `ready` and on
@@ -420,6 +430,7 @@ export async function runShell(
     event.preventDefault();
     const stop = supervisor?.stop() ?? Promise.resolve();
     void stop.then(() => {
+      notifier?.dispose();
       removeRecord();
       tray?.destroy();
       window?.destroy();
@@ -488,6 +499,27 @@ export async function runShell(
   });
 
   let approvals = 0;
+  // N7: the dock badge is the number of approvals waiting (never unread messages).
+  let badge: number | undefined;
+  const setBadge = (count: number): void => {
+    if (badge === count) return;
+    badge = count;
+    try {
+      app.setBadgeCount?.(count);
+    } catch {
+      // Best effort (an OS without a badge).
+    }
+  };
+  // N7: native notifications from the core's fixed codes; a click focuses the window and opens the
+  // kind's fixed route (a `show` enum, a fresh one-shot link from the core).
+  notifier = new NativeNotifier({
+    ...(electron.Notification === undefined ? {} : { Notification: electron.Notification }),
+    timers: proc.timers,
+    onClick: (route) => {
+      window?.show();
+      supervisor?.send({ v: 1, type: 'show', route });
+    },
+  });
   supervisor = new CoreSupervisor({
     nodePath,
     hostScript,
@@ -531,10 +563,15 @@ export async function runShell(
         case 'status':
           approvals = message.counts.waitingApprovals;
           tray?.update(message.state, approvals);
+          setBadge(approvals);
           return;
         case 'approval-waiting':
-          // WP-D8 adds the text-free notification; the tray shows the number.
+          // The tray and the dock badge show the number; N7's `notify` raises the notification.
           approvals = message.count;
+          setBadge(approvals);
+          return;
+        case 'notify':
+          notifier?.handle(message);
           return;
         case 'invite-result':
           showInviteResult(message.outcome);
