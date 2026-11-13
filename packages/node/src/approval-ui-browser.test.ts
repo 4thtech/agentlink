@@ -225,10 +225,9 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
       await box.getByText(text, { exact: false }).first().waitFor();
     }
     await page.getByText("Your AI can't approve this for you.").first().waitFor();
-    // Clicking Approve alone decides nothing: presence comes after the click.
-    await box.getByRole('button', { name: 'Approve', exact: true }).click();
+    // UX1113-N2: nothing is decided before the owner presses the passkey button (one step).
     expect(source.applied).toEqual([]);
-    await page
+    await box
       .getByRole('button', { name: /^Approve with (Touch ID|Windows Hello|your passkey)$/ })
       .click();
     await page.getByText('Approved.').waitFor();
@@ -267,14 +266,19 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     // 3 is left unpicked.
     expect(await pick(page, 3).isChecked()).toBe(false);
     const before = await signCounts();
-    await page.getByRole('button', { name: 'Approve 2 selected' }).click();
-    await page
-      .getByText('This covers exactly these 2. Anything new waits for your next review.')
-      .waitFor();
+    // UX1113-N2: one step. "Approve 2 with <sensor>" is the gesture; what it covers is the
+    // button's description (screen-reader text), not a second screen.
     expect(source.applied).toEqual([]);
-    await page
-      .getByRole('button', { name: /^Confirm with (Touch ID|Windows Hello|your passkey)$/ })
-      .click();
+    const bulkButton = page.getByRole('button', {
+      name: /^Approve 2 with (Touch ID|Windows Hello|your passkey)$/,
+    });
+    await expect.poll(() => bulkButton.getAttribute('aria-describedby')).not.toBeNull();
+    expect(
+      await page
+        .getByText('This covers exactly these 2. Anything new waits for your next review.')
+        .count(),
+    ).toBe(1);
+    await bulkButton.click();
     await page.getByText('Approved 2.').waitFor();
 
     // One gesture (sign count + 1), one signed object, exactly the picked items.
@@ -305,9 +309,14 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     await homeBulk(page, 4);
     for (const n of [2, 3, 4]) await pick(page, n).check();
     source.remove(3);
+    // The master code is what works here: the button opens the code, and the list is read again
+    // only when it is sent, so the dropped item is said after the code, with nothing sent for 3.
     await page.getByRole('button', { name: 'Approve 3 selected' }).click();
+    await page.getByLabel(CODE_LABEL).fill(world.code);
+    await page.getByRole('button', { name: 'Confirm', exact: true }).click();
     await page.getByText('1 request is no longer waiting and was left out.').waitFor();
-    await page.getByText('This covers exactly these 2.', { exact: false }).waitFor();
+    expect(source.applied).toEqual([]);
+    await page.getByRole('button', { name: 'Approve 2 selected' }).click();
     await page.getByLabel(CODE_LABEL).fill(world.code);
     await page.getByRole('button', { name: 'Confirm', exact: true }).click();
     await page.getByText('Approved 2.').waitFor();
@@ -343,9 +352,9 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
       .waitFor();
     for (const view of ['/', `/approve/${id(1)}`]) {
       await page.goto(`${server.origin}${view}`);
-      // Home's compact card folds the AI's words behind Details.
-      const details = card(page, 1).locator('details > summary');
-      if (view === '/') await details.click();
+      // N3: Home's compact card folds the AI's words behind Review.
+      if (view === '/')
+        await card(page, 1).getByRole('button', { name: 'Review', exact: true }).click();
       await card(page, 1).getByText(`/tmp/${XSS}.pdf`).waitFor();
       expect(await page.evaluate(() => (globalThis as { __xss?: unknown }).__xss)).toBeUndefined();
       expect(await page.locator('main img').count()).toBe(0);
@@ -395,7 +404,10 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     const { server, source, link } = await start();
     const page = await pageWithoutPasskeys();
     await page.goto(await link());
-    await page.getByText("Passkeys aren't available in this browser.", { exact: false }).waitFor();
+    await page
+      .getByText(/(Touch ID|Windows Hello|Your passkey) isn't available here\./)
+      .first()
+      .waitFor();
     expect(await page.getByRole('button', { name: 'Set up a passkey' }).count()).toBe(0);
     source.add(1);
     await page.goto(server.approvalUrl(id(1)));
@@ -502,8 +514,12 @@ describe('the approvals as the owner sees them (M1-11a-ux; Chromium)', () => {
     for (const view of ['/', `/approve/${id(1)}`]) {
       await page.goto(`${server.origin}${view}`);
       const box = card(page, 1);
-      await box.getByRole('heading', { name: HEADLINE }).waitFor();
-      // Home's compact card says who on its one line; `/approve/<id>` in its facts.
+      // N3: the compact card on Home is one line, never a heading; the full view has the heading.
+      if (view === '/') await box.getByText(HEADLINE, { exact: false }).first().waitFor();
+      else await box.getByRole('heading', { name: HEADLINE }).waitFor();
+      // N3: Home's compact card names who in its headline; the owner ID and "not in your contacts
+      // yet" are in its facts under Review; `/approve/<id>` shows them at once.
+      if (view === '/') await box.getByRole('button', { name: 'Review', exact: true }).click();
       await box.getByText(WHO, { exact: false }).first().waitFor();
       const html = await page.content();
       expect(html, view).not.toContain(INVITE);
@@ -573,7 +589,8 @@ describe('the approvals as the owner sees them (M1-11a-ux; Chromium)', () => {
     const page = await context.newPage();
     page.on('request', (r) => requests.push(r.url()));
     await page.goto(url);
-    await card(page, 1).getByRole('heading', { name: HEADLINE }).waitFor();
+    // Home's compact card (N3) says it in one line.
+    await card(page, 1).getByText(HEADLINE, { exact: false }).first().waitFor();
     const bg = (): Promise<string> =>
       page.evaluate<string>('getComputedStyle(document.body).backgroundColor');
     const light = await bg();
