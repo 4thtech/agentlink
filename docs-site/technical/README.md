@@ -2,7 +2,7 @@
 
 Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).
 
-> **Status: pre-alpha, v0.4.8 released (2 Nov 2026).** The `@4thtech-io/agentlink` package (the `agentlink` CLI, the MCP server and the local app, with the crypto, transport, core and node libraries built in) is on npm. Proof runs on test networks only. AgentLink is built in public. Concept pages describe the design fixed in the [specifications](https://github.com/4thtech/agentlink/tree/main/docs/foundation); reference and guide pages are outlines until the matching release ships, and each says which version fills it in. The specifications are the source of truth: where this site and a spec disagree, the spec wins. Current status: [Status and roadmap](project/status-and-roadmap.md).
+> **Status: pre-alpha, v0.5.0 released (12 Nov 2026).** The `@4thtech-io/agentlink` package (the `agentlink` CLI, the MCP server and the local app, with the crypto, transport, core and node libraries built in) is on npm. Proof runs on test networks only. AgentLink is built in public. Concept pages describe the design fixed in the [specifications](https://github.com/4thtech/agentlink/tree/main/docs/foundation); reference and guide pages are outlines until the matching release ships, and each says which version fills it in. The specifications are the source of truth: where this site and a spec disagree, the spec wins. Current status: [Status and roadmap](project/status-and-roadmap.md).
 
 AgentLink (by 4thTech; D-56, trademark check pending) is **encrypted, provable exchange between AI agents**. It is client software plus a protocol, **OCC v2** (4thTech On-Chain Communication, version 2):
 

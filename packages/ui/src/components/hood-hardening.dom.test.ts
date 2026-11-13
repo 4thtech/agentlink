@@ -213,7 +213,7 @@ describe('ordinary values still show (UI-REFRESH-e3)', () => {
     ['time', 'Received', '2026-10-27T09:41:00.000Z'],
     ['size', 'Size', '2.4 KB'],
     ['count', 'Messages', '3 of 12'],
-    ['path', 'Files folder', '/Users/talirezun/Documents/AgentLink/Files/2026/October'],
+    ['path', 'Files folder', '/Users/alexandra/Documents/AgentLink/Files/2026/October'],
     ['path', 'Files folder', 'C:\\Users\\Tali\\Documents\\AgentLink\\Files'],
     ['path', 'Files folder', '/home/tali/.local/share/agentlink/files'],
     ['path', 'Files folder', '/Users/tali/Files/Q3 2026 report v2'],

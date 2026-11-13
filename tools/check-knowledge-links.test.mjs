@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -77,8 +77,9 @@ describe('the committed knowledge base', () => {
     const real = (path) => existsSync(join(root, path));
     for (const file of [
       'llms.txt',
-      'knowledge/agentlink-overview.md',
-      'knowledge/agentlink-userguide.md',
+      ...readdirSync(join(root, 'knowledge'))
+        .filter((name) => name.endsWith('.md'))
+        .map((name) => `knowledge/${name}`),
     ]) {
       expect(checkLinks(file, readFileSync(join(root, file), 'utf8'), real)).toEqual([]);
     }

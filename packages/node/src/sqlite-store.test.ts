@@ -721,8 +721,11 @@ describe(
       await reopened.close();
     });
 
-    it('migrates a version 10 file to version 11 (D-142): the notice only for an agent that updates', async () => {
-      for (const withIdentity of [true, false]) {
+    // REPO-CLEAN-1 (D-1): one case per file, so each case builds the migration chain once within the
+    // time allowed (the loop over both files took 26 s on a Windows runner).
+    it.each([true, false])(
+      'migrates a version 10 file to version 11 (D-142): the notice only for an agent that updates (identity: %s)',
+      async (withIdentity) => {
         const file = `${path()}-${withIdentity ? 'updated' : 'new'}`;
         const raw = new Database(file);
         for (const m of MIGRATIONS.slice(0, 10)) {
@@ -751,8 +754,8 @@ describe(
         );
         expect(await v11.transaction((tx) => tx.select('auto_save_log'))).toEqual([]);
         await v11.close();
-      }
-    });
+      },
+    );
 
     it('migrates a version 11 file to version 12 (W4-PAUSE): rows kept, not paused', async () => {
       const raw = new Database(path());

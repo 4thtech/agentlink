@@ -4,10 +4,10 @@ Thank you for your interest. AgentLink is built in public, and this page explain
 
 ## Project stage
 
-AgentLink is **pre-alpha** (M0 Foundations): the specifications, process and CI exist, and product code does not yet. That shapes how you can help right now:
+AgentLink is **pre-alpha** and works today on test networks: the CLI, MCP server and local app ship on npm as [`@4thtech-io/agentlink`](https://www.npmjs.com/package/@4thtech-io/agentlink), and an early Mac app is attached to each [release](https://github.com/4thtech/agentlink/releases). That shapes how you can help:
 
-- **Open now:** [issues](https://github.com/4thtech/agentlink/issues) for feedback, questions, ideas, and reports of unclear or inconsistent spec text. Reading and challenging the [specs](docs/foundation/00-README.md) is genuinely useful.
-- **Opens after the M1a skeleton lands:** code contributions. Until then, please open an issue before investing time in a pull request, so we can tell you whether it fits the plan.
+- **Issues** for bugs, feedback, questions, ideas and reports of unclear or inconsistent spec text. Reading and challenging the [specs](docs/foundation/00-README.md) is genuinely useful.
+- **Code contributions** are welcome. Please open an issue before investing time in a larger pull request, so we can tell you whether it fits the plan.
 
 See the Status and Roadmap in the [README](README.md) for where things stand.
 
@@ -26,7 +26,7 @@ See the Status and Roadmap in the [README](README.md) for where things stand.
   | **S2** | Critical: crypto, keys, owner presence, envelope and pairing protocol, policy engine, anything that signs | Everything in S1, plus tests written first, a full threat note, and the owner's (@talirezun) explicit go-ahead before merge (D-51) |
 
 - **Merging.** S0/S1 changes merge through GitHub auto-merge once every required check is green. Changes to S2 paths and sensitive paths (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files) also need the owner's explicit go-ahead (D-51). Nobody pushes to `main`, and there is no admin bypass.
-- **Tests and checks.** Tests are expected with every change; crypto, the policy engine and anything that signs are tests-first. The commands are in [`docs/process/repo-reference.md`](docs/process/repo-reference.md) and will be usable once the first packages land.
+- **Tests and checks.** Tests are expected with every change; crypto, the policy engine and anything that signs are tests-first. The commands are in [`docs/process/repo-reference.md`](docs/process/repo-reference.md); `pnpm verify` runs locally what CI's `checks` runs for the packages you changed. Open a PR with `node tools/pr/open-pr.mjs` (it fills the template and the security class).
 - **AI agents working in this repository follow [`AGENTS.md`](AGENTS.md).** Much of the project is built by orchestrated AI agents under human review, and the rules for agents and people are the same. Do not add AI-attribution lines (co-author trailers, "generated with" footers) to commits or PRs.
 
 The full process is in [`docs/process/development-process.md`](docs/process/development-process.md).
@@ -36,7 +36,7 @@ The full process is in [`docs/process/development-process.md`](docs/process/deve
 AgentLink uses SemVer, with one shared product version during beta. You do not bump versions by hand.
 
 - A PR that changes a published package adds a **changeset**.
-- A user-visible, spec or process change adds a line under `[Unreleased]` in [`CHANGELOG.md`](CHANGELOG.md).
+- A user-visible, spec or process change adds a fragment file in [`changelog.d/`](changelog.d/README.md); do not edit [`CHANGELOG.md`](CHANGELOG.md), it is rolled from the fragments at release.
 
 Details are in [`docs/process/versioning.md`](docs/process/versioning.md).
 
