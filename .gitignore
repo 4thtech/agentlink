@@ -32,6 +32,7 @@ coverage/
 playwright-report/
 test-results/
 *.log
+/log.txt
 .DS_Store
 
 # OPS-UNSTICK-A: per-package vitest JSON reports written in CI (tools/ci/quarantine.mjs)

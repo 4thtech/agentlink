@@ -8,6 +8,7 @@ import {
   checkFileSet,
   KNOWLEDGE_FILES,
   MAX_TOKENS,
+  PER_FILE_MAX_TOKENS,
   TARGET_TOKENS,
 } from './check-knowledge-size.mjs';
 
@@ -20,7 +21,12 @@ describe('estimateTokens', () => {
 });
 
 describe('evaluateBudget', () => {
-  const at = (tokens) => [{ path: 'a.md', bytes: tokens * 4 }];
+  // Split into files of 1,000 tokens so the per-file cap does not decide these cases.
+  const at = (tokens) =>
+    Array.from({ length: Math.ceil(tokens / 1000) }, (_, i) => ({
+      path: `f${i}.md`,
+      bytes: (i === Math.ceil(tokens / 1000) - 1 ? tokens - i * 1000 : 1000) * 4,
+    }));
 
   it('is ok up to and including the target', () => {
     expect(evaluateBudget(at(TARGET_TOKENS)).level).toBe('ok');
@@ -33,6 +39,15 @@ describe('evaluateBudget', () => {
 
   it('fails above the hard max', () => {
     expect(evaluateBudget(at(MAX_TOKENS + 1)).level).toBe('fail');
+  });
+
+  it('fails when one file is above the per-file cap, even if the total is fine', () => {
+    const result = evaluateBudget([
+      { path: 'big.md', bytes: (PER_FILE_MAX_TOKENS + 1) * 4 },
+      { path: 'small.md', bytes: 40 },
+    ]);
+    expect(result.level).toBe('fail');
+    expect(result.overCap).toEqual(['big.md']);
   });
 
   it('sums the files and reports each one', () => {
@@ -62,14 +77,14 @@ describe('the committed knowledge base', () => {
 });
 
 describe('checkFileSet', () => {
-  it('accepts exactly the two knowledge files', () => {
+  it('accepts exactly the knowledge files (an index and six topic files)', () => {
     expect(checkFileSet([...KNOWLEDGE_FILES])).toEqual([]);
-    expect(KNOWLEDGE_FILES).toHaveLength(2);
+    expect(KNOWLEDGE_FILES).toHaveLength(7);
   });
 
   it('rejects a missing and an extra file', () => {
-    const problems = checkFileSet(['agentlink-overview.md', 'README.md']);
+    const problems = checkFileSet(['agentlink-overview.md', 'notes.md']);
     expect(problems.join('\n')).toContain('agentlink-userguide.md is missing');
-    expect(problems.join('\n')).toContain('README.md is not allowed');
+    expect(problems.join('\n')).toContain('notes.md is not allowed');
   });
 });

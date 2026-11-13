@@ -356,20 +356,11 @@ Goal (10 M0): accounts, repositories and CI hardened; docs in place; decisions D
 - **Acceptance:**
   - Each rule has a failing fixture test; the guard job is part of `ci-gate`.
 
-#### M0-10b · Boundary guards: residual bypasses and wider scope (new)
+#### M0-10b · boundary guards: hardening follow-up (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1
-- **Repo/path:** agentlink · eslint config, tools/deps-check/
 - **Depends on:** M0-10 (and M0-9 for the test-vectors items)
 - **Spec:** 04 §8.1; `development-process.md` §11; reviews IR-M0-10-1 and IR-M0-10-2 (open items)
-- **Invariants:** I-8
-- **Scope:** (the guards catch honest mistakes; they are not a security boundary against a malicious contributor, which is code review plus the crypto/KeyStore design. Do the items that stay cheap and drop the rest.)
-  - Treat `process` and `<x>.process` as a loader receiver (`.binding`, computed access, `Reflect.get(process, 'getBuiltinModule')`); report the member names `eval` and `Function` on any receiver and `.constructor(...)` calls with a string argument (IR-M0-10-2 F03, F04).
-  - Allowlist for app devDependencies that get bundled (`bundled: true` on app zones) plus a shared, reasoned dev-tools list (vite, vitest, wrangler, typescript, `@types/*`) (IR-M0-10-1 F04).
-  - Resolve `tsconfig` `paths`, Vite aliases and `new URL(..., import.meta.url)` against the relative-escape rule when the first app configs land (IR-M0-10-1 F10, IR-M0-10-2 F05).
-  - Zones for `e2e/` (no primitive libraries) and `test-vectors/` once M0-9 has landed; a check that every `SUBTLE_EXEMPT_FILES` entry exists, and removal of the placeholder-suite exemption when the first real vector suite lands (IR-M0-10-1 F11, IR-M0-10-2).
-  - A narrow, reasoned carve-out for Node built-ins in `vite.config.ts` and `vitest.config.ts` of non-Node zones (IR-M0-10-1 F12).
-- **Acceptance:**
-  - Each item has a failing fixture test; `pnpm lint` stays green on the real tree.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M0-10c · deps-check eslint-rules test: deterministic timeout (new)
 - **Status:** done (4thtech/agentlink#39, merged 2026-10-14) · **Size:** XS · **Tier:** Sonnet · **Security:** S1
@@ -1075,48 +1066,23 @@ The public-docs cards (`DOCS-PUB` and the milestone passes `DOCS-M1a` to `DOCS-M
 
 Legacy OCC v1 / PollinationX items from private 09 §4. Details of unresolved items stay private (D-21, `development-process.md` §12); cards describe actions only. Evidence goes to `agentlink-ops`, never to this repo or the sync branch.
 
-#### OPS-L1 · Encryptor extension: resolve L-1
+#### OPS-L1 · legacy operations item (security follow-up)
 - **Status:** ready · **Size:** S · **Tier:** Owner (Opus prepares) · **Security:** S2
-- **Repo/path:** legacy `encryptor-extension`; Chrome Web Store listing
 - **Depends on:** —
-- **Spec:** see private 09 §4 L-1 (priority: immediate)
-- **Invariants:** — (legacy)
-- **Scope:**
-  - Owner chooses: unpublish the extension and notify users (default, consistent with its "retire" verdict), or ship the remediation described privately and then retire.
-  - User notice drafted privately; public wording only after users are protected.
-- **Acceptance:**
-  - Written confirmation of the store listing state and, if patched, the private verification result (M0-1).
-  - Unblocks publication of 09 §4 together with OPS-L5 (D-21).
+- **Spec:** see private 09 §4 L-1
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
-#### OPS-L2 · OCC v1 ownership to Safes on all chains
+#### OPS-L2 · legacy operations item (security follow-up)
 - **Status:** backlog · **Size:** M · **Tier:** Opus (script) + Owner (signing) · **Security:** S2
-- **Repo/path:** agentlink-ops · scripts (calls deployed v1 contracts; no v1 code copied)
 - **Depends on:** OPS-L3
 - **Spec:** see private 09 §4 L-2; D-20
-- **Invariants:** —
-- **Scope:**
-  - Inventory owner-controlled v1 proxies: 4 per chain on Polygon, Gnosis, Sonic, Fantom, Oasis Sapphire (20 mainnet calls); decide whether the 7 testnet deployments are included.
-  - Sequence: (1) withdraw accrued owner fees from the Mails and Chat proxies (OPS-L3); (2) verify a working Safe (≥ 2-of-3) exists on each chain, including Sapphire, Fantom and Sonic support; (3) `transferOwnership` to the Safe. Never renounce ownership or upgrades.
-  - Ownership transfer is single-step: verify the Safe address on-chain per chain before sending.
-  - Fork dry-run for every call before mainnet execution.
-- **Acceptance:**
-  - Fork dry-run log for all 20 calls asserting `owner()` == Safe afterwards.
-  - Post-execution read of `owner()` on every proxy equals the chain's Safe; tx references recorded privately.
-  - No proxy renounced.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
-#### OPS-L3 · v1 fee withdrawal constraint
+#### OPS-L3 · legacy operations item (security follow-up)
 - **Status:** ready · **Size:** S · **Tier:** Sonnet (runbook) + Owner (withdrawals) · **Security:** S1
-- **Repo/path:** agentlink-ops · runbooks; GitBook `wiki.4thtech.io` (v1 docs)
 - **Depends on:** —
 - **Spec:** see private 09 §4 L-3; 05 §2.6 (v2 design)
-- **Invariants:** —
-- **Scope:**
-  - Withdraw v1 owner fees only to EOAs, before OPS-L2 moves ownership to Safes.
-  - No code change to v1 fee transfers (the reason is recorded privately); v2 handles this by design (05 §2.6).
-  - Public v1 docs note the recipient constraint without further detail.
-- **Acceptance:**
-  - Per-chain withdrawal records exist privately before any OPS-L2 transfer.
-  - Runbook reviewed by @denisjazbec (v1 author).
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### OPS-L4 · Document v1 group-chat key behaviour
 - **Status:** ready · **Size:** S · **Tier:** Haiku · **Security:** S0
@@ -1129,39 +1095,23 @@ Legacy OCC v1 / PollinationX items from private 09 §4. Details of unresolved it
 - **Acceptance:**
   - v1 docs page updated via the GitBook change-request flow; owner approved.
 
-#### OPS-L5 · PollinationX auth service: resolve L-5
+#### OPS-L5 · legacy operations item (security follow-up)
 - **Status:** ready · **Size:** S · **Tier:** Owner (Sonnet prepares a checklist) · **Security:** S1
-- **Repo/path:** PollinationX hosting accounts and DNS
 - **Depends on:** —
-- **Spec:** see private 09 §4 L-5 (priority: immediate, verify)
-- **Invariants:** — (legacy)
-- **Scope:**
-  - Confirm whether the legacy PX `auth` service is deployed anywhere; if it is, shut it down and rotate the associated server key.
-  - Checks limited to infrastructure 4thTech owns.
-- **Acceptance:**
-  - Written confirmation (where checked, date, result; shutdown and rotation records if it was live) for M0-1.
+- **Spec:** see private 09 §4 L-5
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
-#### OPS-L6 · PollinationX login: resolve L-6 (conditional)
+#### OPS-L6 · legacy operations item (security follow-up)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S1
-- **Repo/path:** legacy `px-dapp`, `dapp`, PX backend
 - **Depends on:** owner decision whether PollinationX stays live
-- **Spec:** see private 09 §4 L-6 (high, if PX stays live)
-- **Invariants:** —
-- **Scope:**
-  - If PX stays live: server-issued, expiring login nonces (SIWE / EIP-4361). If not: shut the login down.
-- **Acceptance:**
-  - Decision recorded; if implemented, a test shows a previously valid login signature is rejected and nonces expire.
+- **Spec:** see private 09 §4 L-6
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
-#### OPS-L7 · PX Drive key handling: resolve L-7 (conditional)
+#### OPS-L7 · legacy operations item (security follow-up)
 - **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
-- **Repo/path:** legacy `px-dapp`
 - **Depends on:** OPS-L6 decision (PX live or retired)
-- **Spec:** see private 09 §4 L-7 (medium)
-- **Invariants:** —
-- **Scope:**
-  - If PX stays live: implement the remediation described privately (user-secret or passkey-derived key), migrate existing users, notify them. If retired: notify users and retire.
-- **Acceptance:**
-  - Decision recorded; if fixed, migration tested on a copy of real-shaped data and the private verification check passes.
+- **Spec:** see private 09 §4 L-7
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### OPS-L8 · Secret scan of all 4thTech and PollinationX repositories
 - **Status:** ready · **Size:** M · **Tier:** Sonnet (scan, triage) + Owner (rotation) · **Security:** S1
@@ -1187,15 +1137,10 @@ Legacy OCC v1 / PollinationX items from private 09 §4. Details of unresolved it
 - **Acceptance:**
   - Docs updated via the GitBook change-request flow.
 
-#### M0-8c-d · logger: a quote inside a secret's bracket value must not close it early (new, IR-2 on #509)
+#### M0-8c-d · logger: redaction hardening (security follow-up)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1
-- **Repo/path:** agentlink · packages/log
 - **Depends on:** M0-8c
-- **Scope:**
-  - A value such as `secret=[ab'c]KEY']` (or a Go `%v` form with a quote inside brackets) closes at the first `]`, so part of the secret is left visible where `main` redacted to the end of the line. No known serializer emits this shape.
-  - Inside a secret's bracket value, never let `]` close it before a `'` is balanced.
-- **Acceptance:**
-  - Tests first: the shapes above are fully redacted; existing logger tests unchanged; no test weakened.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### CHORE-PR-TITLE-REGEX · pr-hygiene: allow multi-letter task-ID suffixes in PR titles (new, from PR title failures, 2026-10-25)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (sensitive path: CI workflow)
@@ -1632,17 +1577,11 @@ The owner designs in Claude Design and delivers in three drops (10 "Design deliv
 - **Acceptance:**
   - deps-check and ESLint regressions: test files of the two packages are allowed; their production files, deep and relative paths, subpaths, other zones' tests and a `src/x.test.mts` are refused. Repository tests: every build excludes `src/**/*.test.ts` and maps no paths, and no `dist/` contains the seam.
 
-#### M1-1g-c · Boundary guards scan e2e/ (new, IR-M1-1g-b-1 C-1)
+#### M1-1g-c · boundary guards: e2e coverage hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 (boundary policy, `tools/deps-check/policy.mjs`) · **Phase:** M1a
-- **Repo/path:** agentlink · tools/deps-check/, eslint.config.mjs, e2e/
 - **Depends on:** M1-1g-b; lands before or with M1-13a
 - **Spec:** 04 §3.1.1 (test doubles allowed in e2e), §8.1; development-process.md §11
-- **Invariants:** I-1, I-8
-- **Scope:**
-  - deps-check (`check.mjs`) and the root ESLint config scan neither `e2e/` nor give it zone rules, so an `e2e/src/a.ts` importing `@noble/curves`, `@4thtech-io/crypto/keystore`, the test seam or `crypto.subtle` passes both tools. e2e is never built or published and may use the seam (04 §3.1.1), but its suites touch real crypto paths.
-  - Give `e2e` a deps-check zone and an ESLint block: primitive libraries refused, the `/keystore` entry refused, `crypto.subtle` refused, Node built-ins as M1-13 decides, the seam allowed.
-- **Acceptance:**
-  - Regressions in `tools/deps-check`: each of those imports planted in `e2e/` fails both tools, and the seam import passes. The repository scan covers `e2e/`.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### CHORE-E2E-RENDEZVOUS-AEAD · Retire the rendezvous.mjs node:crypto exemption (new, IR-M1-1g-c-1 L-1)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (crypto package API) · **Phase:** M1b
@@ -2528,21 +2467,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Follow-up (owner, sensitive path):** add the `relays-docker` job to `.github/workflows/ci.yml` (snippet in the PR body of this card) in its own PR. Do not list it in `ci-gate` `needs` until it has run green once, so `main` never blocks on a suite that has not executed (IR-M1-5b-b-1 §5). Its first green run, with any test-only fixes it needs, closes this card.
 - **Threat note (draft):** assets: the relay connection target, the agent's NIP-42 login key (signs only through `EnvelopeKeys`), the host's private network. Entry points: relay URLs from cards, invites and bodies (inbound, I-5), DNS answers, relay HTTP responses (upgrade and NIP-11) and frames. Abuse cases: (a) DNS rebinding: a name that answers public at check time and private at connect time; stopped by connecting to the checked address only, never a second lookup; (b) a redirect on the upgrade or the NIP-11 GET to an internal URL; stopped by refusing every 3xx; (c) `HTTPS_PROXY` or `ALL_PROXY` making a proxy resolve the name and bypass the check; stopped by a socket factory with no agent; (d) an oversized or compressed frame exhausting memory before the pool's own check; stopped by `maxPayload` in the socket layer and no per-message deflate; (e) a slow or huge NIP-11 body holding a connection or memory; stopped by its own timeout and byte cap; (f) relay text (errors, NOTICE, NIP-11 fields) reaching logs or errors; the connector never logs and maps every failure to a close. Residual: a relay on a public address is reachable by design; TLS trust is the system roots; the IPv6 zone or scoped answers fail closed in the pool's check (M1-5b).
 
-#### M1-5b-c · transport-nostr: hardening follow-ups (new, IR-M1-5b-1 L-2, L-6, I-1…I-3)
+#### M1-5b-c · transport-nostr: relay handling hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
-- **Repo/path:** agentlink · packages/transport-nostr
 - **Depends on:** M1-5b
 - **Spec:** 07 §4.2, §4.3 (an owner row with fewer than 2 usable relays; relay health); 04 §4
-- **Invariants:** I-3, I-7
-- **Scope:**
-  - A hanging NIP-11 fetch must not make a working relay time out for the publish: the NIP-11 wait has its own bound, after which the relay is used with the default limits for that attempt (this is new behaviour: the PR adds a line to 07 §4.2 first).
-  - A row with fewer than 2 usable relays reports why in the activity feed (07 §4.3), for example "no relay with a large enough message limit".
-  - A closed pool returns its own error code, not `invalid_url`.
-  - Relay health output avoids full URLs: it follows the logger's URL rule (origin only) and 07 §4.3 (the activity log names a relay without its address).
-  - Jitter on the outbox backoff, so that many queued rows do not retry in step.
-- **Acceptance:**
-  - Fake-clock tests: a NIP-11 fetch that never answers does not delay a publish to a working relay beyond its own bound; a row with one usable relay stays unsent and the activity entry names the reason; a publish on a closed pool returns the closed-pool code; health output contains no path or query; with an injected random source, the retry times of two rows differ and stay within the 24 h bound.
-  - Existing M1-5b tests stay green; no test is weakened.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M1-5c · transport-nostr: subscribe and sync with cursors and dedup
 - **Status:** done (4thtech/agentlink#63, merged 2026-10-14; IR-M1-5c-1 follow-ups in M1-5d, M1-5e and G-49, now M1-5f) · **Size:** M · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1a
@@ -2678,17 +2607,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
 - **Acceptance:**
   - The lifecycle rule is applied and read back on R2 (owner-run check recorded); L3, L4 and L5 each have a test; the lifecycle helper does not discard rules it did not write.
 
-#### M1-6b-c · storage: lifecycle read-back compares rule content, not only IDs (new, IR-M1-6b-b-1, #440)
+#### M1-6b-c · storage: lifecycle write hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · `packages/storage/src/lifecycle.ts`
 - **Depends on:** M1-6b-b
 - **Spec:** 07 §5.2
-- **Invariants:** I-2, I-3
-- **Scope:**
-  - The lifecycle read-back (around `lifecycle.ts` line 190) matches rules by ID only. If another writer changes a rule's content in the race window, our write overwrites it silently.
-  - Compare content (not only the ID) and detect or retry on a difference, as M1-6b-b L3 intends.
-- **Acceptance:**
-  - A test where a rule with the same ID but different content appears between read and write is detected, not overwritten; rules this code did not write stay untouched.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M1-6b-d · storage: warn when a provider drops the abort-incomplete-multipart lifecycle element on read-back (new, follow-up of M1-6b-c, #457)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -2740,17 +2663,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Card with a signature not from `ownerEvm` rejected; rotation yields epoch + 1 and old-epoch keys still open old envelopes.
   - Envelopes from a blocked contact are dropped (test).
 
-#### M1-7a-b · core: test-only subpath for the in-memory Store (new, IR-M1-7a-1 L-6)
+#### M1-7a-b · core: test store export hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 (boundary policy, `tools/deps-check/policy.mjs`) · **Phase:** M1a
-- **Repo/path:** agentlink · packages/core, tools/deps-check/, eslint.config.mjs
 - **Depends on:** M1-7a
 - **Spec:** 07 §3.1 (in-memory Store for tests); 04 §2.5.1 (nonce retention)
-- **Invariants:** I-4
-- **Scope:**
-  - `MemoryStore` is exported from the `@4thtech-io/core` root, documented as NOT FOR PRODUCTION. A host that wires it in production forgets `owner_action_nonces`, `seen` and `idempotency` on restart, which reopens replay windows for signed owner actions until they expire.
-  - Move it to a `@4thtech-io/core/testing` export (package `exports`) and let the boundary guards allow that entry only in `*.test.ts` files, `e2e/` and the M1-8b store conformance tests, as for `@4thtech-io/crypto/testing`.
-- **Acceptance:**
-  - deps-check and ESLint regressions: production source importing `@4thtech-io/core/testing` fails both tools; test files pass. The root entry no longer exports `MemoryStore`.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M1-7b · core: envelope build/open and threads
 - **Status:** done (4thtech/agentlink#66, merged 2026-10-14; IR-M1-7b-1 follow-ups in G-50 and G-51, now M1-7b-b; its spec lines are in 04 §3.1.1 and 07 §3.2) · **Size:** M · **Tier:** Opus · **Security:** S2 · **Phase:** M1a
@@ -4035,17 +3952,11 @@ All contract cards: private repo on the Free plan (D-27), so no rulesets or envi
   - Faucet key separation across environments (staging and production use different faucet keys); done together with M1-10c.
 - **Acceptance:** tests first (local red run): a storage failure at charge time sends nothing and allows no second claim; a lost broadcast answer is followed by a retry that returns the transaction; the gas limit comes from simulation; the staging and production configs cannot share a faucet key.
 
-#### M1-10b-c · faucet robustness: stuck approve, gas cap, rollback note (new, IR-M1-10b-b-1)
+#### M1-10b-c · faucet: robustness hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b (before the faucet is deployed)
-- **Repo/path:** agentlink · apps/submitter (faucet route), packages/chain (`src/fees/faucet.ts`), `docs/runbooks/submitter-deploy.md`
 - **Depends on:** M1-10b-b
 - **Spec:** 05 §9 (faucet); 03 §4.4; `release-and-deployment.md` §4.5
-- **Invariants:** I-3
-- **Scope:**
-  - A stuck approve transaction wedges later claims. Before sending a new approve, compare the faucet key's latest and pending nonce and refuse at once (a clear, retryable refusal), or replace the stuck transaction.
-  - Cap the simulated gas for `depositFor` (for example at most 300k), so a bad simulation result cannot spend the faucet key on a runaway limit.
-  - The runbook rollback note says that the old daily cleanup deletes new-format claim records, so a rollback of the faucet must account for that.
-- **Acceptance:** tests first (local red run): with a stuck approve (pending nonce above latest) a new claim is refused at once and sends nothing; a simulated gas figure above the cap is rejected or clamped to the cap, per the chosen rule; the runbook rollback note is present and the docs checks pass.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M1-10b-d · faucet: wait for its own pending depositFor before refusing `busy` (new, IR-M1-10b-c-1 L1)
 - **Status:** in review (`packages/chain/src/fees/faucet.ts`) · **Size:** XS · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
@@ -4885,17 +4796,11 @@ Owner decision (Tali, 27 Oct, in chat): build the full refresh from the approved
 - **Acceptance:**
   - Tests first (RED commit): the lint passes without the knob exception; a folder path is accepted and each refused kind above still is; no test weakened.
 
-#### UI-REFRESH-f-b · local-ui: paid-action sheet modal behaviour (new, low, #604)
+#### UI-REFRESH-f-b · local-ui: payment confirmation hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/local-ui/src/pay-confirm/**`, `packages/ui/src/components/surface.tsx`, tests; changeset
 - **Depends on:** UI-REFRESH-f; UI-REFRESH-b-b
 - **Spec:** B-11 §13.2; 06 (approvals); 04 §2.5
-- **Invariants:** I-4
-- **Scope:**
-  - (a) The paid-action confirmation sheet (`PayConfirmSheet`) behaves as a modal: the page behind it is inert for pointer, keyboard and programmatic focus, focus returns to the opener on close, and Escape and outside-click keep today's meaning.
-  - (b) The sheet's copy, buttons, amounts and the owner-presence step do not change; no approval or payment logic changes.
-- **Acceptance:**
-  - Tests first (RED commit): focus cannot leave the open sheet by click, Tab or script; the confirm and cancel paths behave as before; threat note in the PR; no test weakened.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### UI-REFRESH-f-c · local-ui: shell inert, tab order and token lows (new, low, #604)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -6986,12 +6891,10 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Scope:** `owner-code-typed-at-shell-prompt` (the M1-9z incident: a code typed into a shell and a chat). The code prompt states that it is not a shell command and not for chat; guard where feasible (for example a hint when the entry looks like a command). Never log or echo the entry (I-1).
 - **Acceptance:** prompt copy per 11 §5 and tests for the guard; nothing about the entry is logged.
 
-#### M1-9zd-b · cli: the owner-code prompt rejects an entry that looks like a shell command; argv guard trims whitespace (new, IR-M1-9zd-1, IR-M1-9zd-2)
+#### M1-9zd-b · cli: owner-code entry hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (owner presence) · **Phase:** M1b
-- **Repo/path:** agentlink · packages/node (prompt side); apps/cli (`commands/owner/**`, `strings.ts`)
 - **Depends on:** M1-9zd
-- **Scope:** add a prompt-side check that the typed owner code does not look like a shell command (refuse it with the 11 §5 hint; never log or echo the entry, I-1). Also trim trailing whitespace in the argv guard, and cover lowercase all-letter codes pasted into a command (IR-M1-9zd-2, info). Source: IR-M1-9zd-1, IR-M1-9zd-2.
-- **Acceptance:** tests first for each case: a command-like entry is refused at the prompt, a valid code is accepted, an argv code with trailing whitespace is caught, an all-letter lowercase pasted code is caught; nothing about the entry is logged.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M1-9ze · core: invite acceptance checks the invite's contact id equals the counterparty (new, review low 2026-10-18)
 - **Status:** done (4thtech/agentlink#353, merged 2026-10-21) · **Size:** S · **Tier:** Opus · **Security:** S2 (pairing and contact binding) · **Phase:** M1b
@@ -7252,17 +7155,11 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Acceptance:**
   - A test pins the strings for each platform; no write behaviour changes.
 
-#### M1-36g-c · init: confirmation code binds the path actually used for Windsurf (new, IR-M1-36g-2, #441; owner #422/#431)
+#### M1-36g-c · init: confirmation binding hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet (Opus audit) · **Security:** S1 (sensitive writer) · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/cli/src/commands/init.ts`
 - **Depends on:** M1-36g
 - **Spec:** 06 §5; 08
-- **Invariants:** I-4
-- **Scope:**
-  - `init.ts` hashes `displayPath` without the environment, so the confirmation code binds the default Windsurf path and not the XDG one that is written when the environment selects it.
-  - Hash the resolved path (environment applied) so the code a user confirms names the file that is written.
-- **Acceptance:**
-  - A test with and without the XDG environment shows the code differs and matches the path written; nothing is written before the confirmation.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M1-36h · agent UX: spec wording and tool surface (UX-H) (new, UX audit, agent side, 2026-10-22)
 - **Status:** in review · **Size:** S · **Tier:** Opus · **Security:** S2 (spec and tool surface) · **Phase:** M1b
@@ -7741,17 +7638,11 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Acceptance:**
   - Tests first: no grant means no outside recipient; an expired, over-amount or wrong-recipient grant is refused before any key read; threat note and Fable audit.
 
-#### M1-11c-shared · Files and Rules: one acknowledgement helper; cap pending reviews (new, IR-M1-11c-a5-1 lows)
+#### M1-11c-shared · local UI: pending review handling hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `packages/node/src/local-ui/api/files.ts`, `packages/node/src/local-ui/api/rules.ts` and a shared helper, tests
 - **Depends on:** M1-11c-a3, M1-11c-a5
 - **Spec:** 08 §1; D-119
-- **Invariants:** I-4
-- **Scope:**
-  - Share `acknowledgedExactly` and the prepare surface between Files and Rules.
-  - Cap pending reviews per owner action so a session caller cannot evict the owner's pending review.
-- **Acceptance:**
-  - Tests: both pages use the one helper; a flood of reviews cannot evict the owner's pending one; the D-119 acknowledgement tests pass unchanged.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M1-11s-a-c · local UI shell follow-ups: sub-navigation, Storage stub, layout (new, IR-M1-11s-a-b-1; #426)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -7778,17 +7669,11 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Acceptance:**
   - Tests: each state is returned; the route needs no presence and reveals nothing sensitive; the status bar in M1-11s-a-c reads it.
 
-#### M1-4c-b-b · KeyStore `signTransaction` lows from IR-M1-4c-b-1 (new, IR-M1-4c-b-1)
+#### M1-4c-b-b · KeyStore: transaction signing hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Phase:** M1b
-- **Repo/path:** agentlink · `packages/crypto`, `packages/chain` (direct mode), tests
 - **Depends on:** M1-4c-b
 - **Spec:** 04 §2; 07 §6.2
-- **Invariants:** I-1, I-3
-- **Scope:**
-  - L-1: cap `approve(vault, amount)`. L-2: `notarizeDirect` head-size check. L-3: per-chain caps before mainnet. L-4: runtime fee-token check.
-  - Merge order: if #392 lands after #425 or the reverse, the second adds the file-KeyStore `signTransaction` (mirrors `keychain-keystore.ts`) plus a delta review.
-- **Acceptance:**
-  - Tests first: an over-cap approve, an oversize head and a wrong fee token are refused before any key read.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M1-3c-b-b · contracts repo: vault implementation check emits an error for a missing label (new, IR-M1-3c-b-1; cross-repo)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (deploy scripts) · **Phase:** M1b
@@ -7888,16 +7773,10 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Acceptance:**
   - The comment and the doc line match the workflow files; the workflow checks pass; no trigger or step changes.
 
-#### M1-6b-d-b · abort-incomplete lifecycle: empty element, and status wording (new, follow-up of IR-1 on #485)
+#### M1-6b-d-b · storage: lifecycle check hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 (storage) · **Phase:** M1b
-- **Repo/path:** agentlink · `packages/storage` (lifecycle read), `README.md` status text
 - **Depends on:** M1-6b-d
-- **Scope:**
-  - An empty `<AbortIncompleteMultipartUpload></AbortIncompleteMultipartUpload>` element reads as the rule being kept. It must read as dropped.
-  - README and status text say "gasless top-up"; the word "gas" is technical status text. Consider "credits top-up without fees" (11 §5).
-- **Acceptance:**
-  - Tests first: a lifecycle document with the empty element is reported as the rule dropped; a document with a day count still reads as kept.
-  - The docs vocabulary check passes; the status wording is reviewed against 11 §5 (change it only if the owner agrees).
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M1-34-c-b · receipt retry: acknowledge no longer blocks on a lagging RPC (new, follow-up of IR-1 on #489)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (the submitter, `packages/core` receipt path) · **Phase:** M1b
@@ -7965,14 +7844,10 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Acceptance:**
   - Tests first: one page does one `unknownSenderCodesTx` computation (spy count); a file name with markup renders as text in the #417 view.
 
-#### M1-4d-h · chain: read `RecordNotFound` only as the bare selector in the state client (new, IR-1 on #499)
+#### M1-4d-h · chain: state client hardening (security follow-up)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (packages/chain, used by core) · **Phase:** M1b
-- **Repo/path:** agentlink · packages/chain `clients/state.ts`
 - **Depends on:** M1-4d-g
-- **Scope:**
-  - `getRecord` matches `RecordNotFound` by name only, without the bare-selector check. A faulty RPC could make the notarize replacement path and the core own-parent check see "absent". Apply `revertBare` there. Doc nit: `state.ts:63` should say "the bare `RecordNotFound()` revert".
-- **Acceptance:**
-  - Tests first: a non-bare `RecordNotFound` revert is not read as absent; the bare selector still is.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M1-9i-x · crypto: opaque `hold` parameter on the recovery-kit snapshots request (new, IR-M1-9i-c-3)
 - **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (packages/crypto) · **Phase:** M1b
@@ -7983,19 +7858,10 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Acceptance:**
   - Types compile without casts; behaviour unchanged; no test weakened.
 
-#### M1-9i-c-b · node: key-store export and import lows (new, IR-1 on #507)
+#### M1-9i-c-b · node: key-store import and export hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (packages/node) · **Phase:** M1b
-- **Repo/path:** agentlink · packages/node (keychain, sqlite, restore tests)
 - **Depends on:** M1-9i-c
-- **Scope:**
-  - Export conformance tests only the keychain double as `itemsOf`; cover the real stores.
-  - Keychain `importAgent` and `importOwner` take no inter-process lock (G-1); add one.
-  - Restoring agents first and the owner second: a failed owner import leaves the agents blocking a later restore. Make the order or the cleanup safe, and record the CLI follow-up for M1-9i.
-  - The async-local held-set can report a spurious `store_busy` for detached promises.
-  - The sqlite `-shm` file is created with the process umask; set its mode.
-  - Tighten the restore test from `toThrow()` back to `toThrow(KeyStoreError)`.
-- **Acceptance:**
-  - Tests first for each item; no test weakened.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M1-9i-c-c · node: pass the inter-process lock hold to nested callers (new, IR-2 on #507)
 - **Status:** backlog · **Size:** XS · **Tier:** Opus · **Security:** S2 (packages/node) · **Phase:** M1b
@@ -8065,16 +7931,10 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Acceptance:**
   - Tests first for L1 and L2; no test weakened.
 
-#### M1-11b-6-b · cli init: first-run and agent-context lows (new, low, IR-M1-11b-6-1)
+#### M1-11b-6-b · cli init: first-run hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S2 (apps/cli, owner setup path) · **Phase:** M1b
-- **Repo/path:** agentlink · apps/cli `init` and agent-context
 - **Depends on:** M1-11b-6
-- **Scope:**
-  - L1: the init "nothing to do" branch calls `firstRun` without the `others.length === 0` guard the other branch has.
-  - L2: agent-context `available()` opens the agent store only to pick one line of copy.
-  - L3: the opener's argv briefly exposes the link to other processes of the same user (pre-existing, G-1); note it or avoid it.
-- **Acceptance:**
-  - Tests first for L1; L2 and L3 resolved or recorded with a reason.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M1-11b-9-b · cli: wider copy fence test and a clearer not-ready message (new, low, IR-M1-11b-9-1)
 - **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -8147,20 +8007,11 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
   - Tests first (RED commit) for (a) and (b); no test weakened; threat note; independent review (S2).
 - **Notes:** Send-time dev/ino pin: no (Fable IR-M1-36b-2-d-1; the signed realpath is the pin).
 
-#### M1-11c-a3c · local UI Files and Rules: folder checks use the pin helpers; one folder count (new, low, IR-M1-11c-a3-3 #430, IR-M1-11c-a5-3 #432)
+#### M1-11c-a3c · local UI Files: folder check hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` Files and Rules routes) · **Phase:** M1b
-- **Repo/path:** agentlink · `packages/node/src/local-ui/api/files.ts`, `packages/node/src/local-ui/api/rules.ts`, tests
 - **Depends on:** M1-36b-2-d (`pinFolder`, `stillPinned`, `pinnedLocation`); M1-11c-shared
 - **Spec:** 04 §2.5, §4 (realpath rules); 08 §1; D-119
-- **Invariants:** I-4, I-7
-- **Scope:**
-  - #430 L1: the Files review-to-commit step uses `pinFolder` / `stillPinned`, so a folder whose real location changed between review and commit is refused.
-  - #430 L2: the Files list uses `pinnedLocation`, so an entry stored as a link shows "not used".
-  - #432 L1: the Rules page folder count and the Files page `resolvedFolders().configured` count the same entries, so the two pages agree.
-  - #430 L3: the Files review store is per server, not per session, and the eight-review cap can evict a pending review; handled together with the cap in M1-11c-shared, not twice.
-  - Not here: the #432 L2 cap on pending reviews (M1-11c-shared).
-- **Acceptance:**
-  - Tests first (RED commit) for each item; the Files and Rules counts match for a link-stored entry; no test weakened; threat note; independent review (S2).
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M1-11c-a4e · local UI credits: guard test for unsigned money input, top-up e2e (new, low, IR-M1-11c-a4c-2, #435)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (`packages/node` proof service guard tests) · **Phase:** M1b
@@ -8175,15 +8026,10 @@ Source: `docs/process/proposals/USABILITY-WAVE-3.md` (PR #664, for context). The
 - **Acceptance:**
   - Tests first (RED commit) for L-1 and L-4; the Playwright flow passes; no test weakened; independent review (S2).
 
-#### M1-11a-ux-b · approval page: headline and test lows (new, low, IR-M1-11a-ux-1)
+#### M1-11a-ux-b · approval page: headline rendering hardening (security follow-up)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
-- **Repo/path:** agentlink · apps/cli approval page, packages/ui
 - **Depends on:** M1-11a-ux
-- **Scope:**
-  - Restricted names can still read like a sentence in the headline ("Approve now"); de-emphasise them visually.
-  - The node approval-page test relies on the UI-side token test; add its own check.
-- **Acceptance:**
-  - A restricted name cannot read as an instruction; the node test stands alone.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M1-11a-ux-c · terminal approve card: no link in the output (new, owner yes 2026-10-25)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1 · **Phase:** M1b
@@ -8288,17 +8134,11 @@ Cards from the UX-v2 onboarding plan after the owner's two-computer test of 2026
 - **Acceptance:**
   - Tests first (RED commit) for (a) and (b); (d) keeps every existing test green; no test weakened; independent review (S2).
 
-#### M1-UX-OPEN-APP-b · cli opener fence keyed by path; hanging start delays shutdown (new, low, IR-M1-11b-8-1, #549)
+#### M1-UX-OPEN-APP-b · cli opener: allowance hardening (security follow-up)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (owner-surface boundary; parent M1-UX-OPEN-APP is S2) · **Phase:** M1b
-- **Repo/path:** agentlink · `apps/cli/src/mcp/**` (opener fence, loop), tests
 - **Depends on:** M1-11b-8
 - **Spec:** 06 §2.5; 08 §1
-- **Invariants:** I-4
-- **Scope:**
-  - (a) Key the opener allowance by full path.
-  - (b) A `start()` that never returns delays shutdown (existing behaviour); bound the wait.
-- **Acceptance:**
-  - Tests first (RED commit): the opener allowance is keyed by full path; shutdown completes within the bound with a hanging `start()`; no test weakened; independent review (S2).
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M1-11b-6-c · cli init: one fixed clause when an AI runs init (new, low, IR-M1-11b-6-1 L-3; copy)
 - **Status:** backlog · **Size:** XS · **Tier:** Sonnet · **Security:** S1 (`apps/cli`; fixed text, 11 §5) · **Phase:** M1b
@@ -9796,13 +9636,11 @@ D-145 replaces the M2-11a comparison with a decision and splits M2-11a to M2-11f
 - **Scope:** for a second a relay returned at its cap (M1-5d), do one bounded re-query by `ids` learned from the agent's other relays, with a fixed cap on queries and ids per gap, so the gap closes where another relay holds the events. NIP-77 negentropy is a later step, only for relays that support it.
 - **Acceptance:** tests first: a capped relay plus a second relay that holds the missing events closes the gap; the re-query count and id count stay within the fixed bounds; a gap no relay can close stays reported as incomplete (M1-5g).
 
-#### M2-19-b · transport-nostr: re-hash a `duplicate` before using it as page evidence (new, AUDIT-FABLE-M2-19-2)
+#### M2-19-b · transport-nostr: sync evidence hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 (inbound events; sync completeness) · **Phase:** M2
-- **Repo/path:** agentlink · packages/transport-nostr; docs/foundation/07 (§4.2)
 - **Depends on:** M2-19
 - **Spec:** 07 §4.2; 04 §3.5
-- **Scope:** a hostile relay S could return an event with a forged older `created_at` as a `duplicate` and make the re-query treat a gap as closed. Re-hash the event (id over its content) and verify it before using a `duplicate` as page evidence. Source: AUDIT-FABLE-M2-19-2.
-- **Acceptance:** tests first: a duplicate with a forged `created_at` or a mismatched id is not counted as evidence and the gap stays reported as incomplete; a genuine duplicate still closes it.
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M2-GATE · Milestone 2 gate: internal audit and external testing
 - **Status:** backlog · **Size:** M · **Tier:** Opus (audit session) + Owner (sign-off) · **Security:** S2
@@ -9857,7 +9695,7 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
   - Each finding fixed in its own PR with a regression test; fixes verified by the auditor.
   - Prior audits in the readiness pack (`audit-rules.md` §4.5, §8): **AUDIT-FABLE-OCCv2-1**, an independent pre-audit of `occ-v2-contracts` before the Base Sepolia deployment (2026-10-14). Verdict: GO for Base Sepolia with conditions. 0 Critical, 0 High, 1 Medium, 7 Low, 6 Info. Report: private, `agentlink-ops` `audits/reviews/AUDIT-FABLE-OCCv2-1.md`. Follow-ups: FA-1 and FA-3 (07 §7, M1-10a), FA-2 (gap G-47), FA-4, FA-5 and FA-8 (M1-3k), FA-6 and FA-7 (M1-3g). Before mainnet, FA-1 is fixed at the submitter and every Low is dispositioned (`audit-rules.md` §9.3); the pre-audit does not replace this audit.
   - Pre-audit dispositions of the rest (proposed, owner confirms at merge): FA-9, FA-10, FA-11, FA-12 and §8 condition 4 (docs for FA-2, FA-9, FA-10) are carded as M1-3m. FA-13 needs no action: it confirms the D-59 residual (a malicious module, or a module upgrade, after the 7-day delay), which stays in this audit's scope as D-59 states. FA-14 needs no new action: it repeats earlier informational items that are already carded or documented (zero-amount events in the client cards; the others in 05 or in their original reviews).
-  - Scope item (FA-1, recommendation 2; a 05 §3.2 change; **required**, because D-66 adopts G-47 option (b)): a bound on the gas forwarded to ERC-1271 `isValidSignature` (for example 500 000, enough for a multi-owner Safe or a software P-256 verifier), so an account that burns gas at inclusion costs at most the bound. A test asserts the bound. The EIP-7702 fallback (M1-3l) is in scope too.
+  - Scope item (FA-1, recommendation 2; a 05 §3.2 change; **required**, because D-66 adopts G-47 option (b)): a bound on the gas forwarded to ERC-1271 `isValidSignature` (for example 500 000, enough for a multi-owner Safe or a software P-256 verifier), (rationale in `agentlink-ops`). A test asserts the bound. The EIP-7702 fallback (M1-3l) is in scope too.
 - **Acceptance:**
   - All High and Medium findings fixed and auditor-verified; Low/Info dispositioned; final report stored in `audits/` (published at mainnet).
   - The FA-1 gas bound is adopted with a test (required by D-66 with the M1-3l fallback).
@@ -10020,17 +9858,11 @@ Goal (10 M3): audited contracts on Base and Gnosis, governance in Safes with tim
 - **Acceptance:**
   - The test fails if the flag check is removed; no test mocks the registry in it.
 
-#### M3-4b-t-T3-c · deposit relay: cap order and refund on a crash mid-send (new, IR-M3-4b-t-T3-b-1, #459)
+#### M3-4b-t-T3-c · deposit relay: cap handling hardening (security follow-up)
 - **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (`apps/submitter/**`) · **Phase:** M3 (pulled forward by D-123)
-- **Repo/path:** agentlink · `apps/submitter` (deposit-authorization route)
 - **Depends on:** M3-4b-t-T3-b (#459)
 - **Spec:** 07 §7; 04 §7
-- **Invariants:** I-3
-- **Scope:**
-  - Count the global cap after `relay.check` (so a bad request cannot burn it, which raises the attacker's cost), or add a signature pre-verify before counting.
-  - Refund the quota when the process crashes mid-send.
-- **Acceptance:**
-  - Tests: a request refused by `relay.check` does not consume the global cap; a crash mid-send leaves the quota refunded; threat note and tests-first evidence (S2).
+- **Details:** in the private `agentlink-ops` repo (open security follow-up; published when the fix ships).
 
 #### M3-4b-t-T4-a · gasless top-up: core executor `runGaslessTopUp` (new, D-123, T4 plan 2026-10-23)
 - **Status:** backlog · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (signs; money path) · **Phase:** M3 (pulled forward by D-123)
