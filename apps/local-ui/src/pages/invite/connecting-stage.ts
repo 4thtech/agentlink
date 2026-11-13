@@ -46,14 +46,14 @@ export function connectingLine(row: ConnectingRow, nowMs: number): string {
     case 'noAnswer':
       return F.noAnswer(row.name);
     default:
-      return F.connecting(row.name);
+      return F.connectingHonest(row.name);
   }
 }
 
 /** Whether the row has waited long enough for Cancel to be the plain way out (R2-CLASS-01). */
 export function cancelProminent(row: ConnectingRow, nowMs: number): boolean {
   const stage = connectingStage(row, nowMs);
-  return stage === 'waiting' || stage === 'noAnswer' || stage === 'notSent';
+  return stage !== 'blocked';
 }
 
 /** How often a shown row looks at the clock again. */

@@ -199,6 +199,9 @@ export const FEEDBACK_STRINGS = {
   connected: (name: string): string => `You're connected with ${name}`,
   again: (name: string): string => `Connected again with ${name}. Do the Contact check again.`,
   connecting: (name: string): string => `Connecting to ${name}…`,
+  // IR-REL051-R2C-1 (R2-CLASS-01): a waiting accept is honest from its first line.
+  connectingHonest: (name: string): string =>
+    `Connecting to ${name}… If someone else already used this invite, it won't connect: ask ${name} for a new one.`,
   youBlocked: (name: string): string => `You blocked ${name}. Unblock to connect.`,
   unblockAction: 'Unblock',
   cancelConnecting: 'Cancel',

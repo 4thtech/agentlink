@@ -661,7 +661,7 @@ export function ReviewStep(p: ReviewStepProps): ReactElement {
         ))}
       </ul>
       {choosable.length === 0 ? (
-        <Banner tone="info">{REVIEW.nothing}</Banner>
+        <Banner tone="info">{p.newOwner ? REVIEW.finishNeeded : REVIEW.nothing}</Banner>
       ) : (
         <div className="rs-cols">
           <div>
@@ -709,7 +709,17 @@ export function ReviewStep(p: ReviewStepProps): ReactElement {
         </p>
       ) : null}
       <div className="rs-actions">
-        {choosable.length === 0 ? (
+        {choosable.length === 0 && p.newOwner ? (
+          // IR-REL051-R2C-1: no owner here: owner-only completion (nothing chosen) with the sensor,
+          // then the new master code. Never a Done that cancels and leaves no owner.
+          <Button variant="primary" size="lg" disabled={p.working} onClick={p.onRestore}>
+            {p.working
+              ? REVIEW.restoring
+              : p.error === undefined
+                ? REVIEW.finishOwner
+                : REVIEW.tryAgain}
+          </Button>
+        ) : choosable.length === 0 ? (
           <Button variant="primary" size="lg" onClick={p.onDone}>
             {REVIEW.done}
           </Button>

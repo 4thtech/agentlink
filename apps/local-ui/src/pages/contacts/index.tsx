@@ -1402,6 +1402,9 @@ export function ContactsPage({
     const outcome = await invites.cancelConnecting(ref);
     if (outcome.kind === 'cancelled' || outcome.kind === 'not_found') {
       setConnectingRows((list) => list.filter((c) => c.ref !== ref));
+      // IR-REL051-R2C-1: the page's "Connecting to {name}…" line goes with the row.
+      setNotice(undefined);
+      setConnectingSince(undefined);
       setTick((n) => n + 1);
       return outcome.kind === 'cancelled' ? 'cancelled' : 'gone';
     }

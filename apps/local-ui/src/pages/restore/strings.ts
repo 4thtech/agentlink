@@ -142,6 +142,11 @@ export const REVIEW = {
   ],
   restore: (n: number): string => `Restore ${n} ${n === 1 ? 'ID' : 'IDs'}`,
   nothing: 'Everything in this kit is already on this computer. Nothing to restore.',
+  // IR-REL051-R2C-1: the IDs are here but their owner is not (a restore that did not finish): the
+  // kit finishes it with a new master code.
+  finishNeeded:
+    'Your IDs are already on this computer, but restoring did not finish. Finish it now: AgentLink makes a new master code for you.',
+  finishOwner: 'Finish restoring',
   done: 'Done',
   progress: (name: string, i: number, n: number): string => `Restoring ${name}… ${i} of ${n}`,
   restoring: 'Restoring…',
