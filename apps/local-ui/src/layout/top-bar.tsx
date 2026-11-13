@@ -11,7 +11,8 @@ import { setUnderTheHood, usePrefs } from '../prefs/index.js';
 import { SHELL_STRINGS as S } from '../strings.js';
 import { AgentSwitcher, type SwitcherChip } from './agent-switcher.js';
 import { goToKeys, openGoTo } from './go-to.js';
-import type { ConnectionState } from './index.js';
+import type { ConnectionState } from './connection.js';
+import { healthWord } from './health-word.js';
 import { VT_CLASS } from '@4thtech-io/ui';
 import { openShellDialog } from './shell-dialogs.js';
 import { ShellIcon } from './shell-icons.js';
@@ -21,22 +22,9 @@ import { NotificationBell } from './notification-centre.js';
 /** The user guide (the same address as About › Read the guides). */
 export const GUIDE_URL = 'https://wiki.4thtech.io/products/agentlink';
 
-const CHIP: Readonly<Record<ConnectionState, SwitcherChip>> = {
-  unknown: { state: 'checking' },
-  connected: { state: 'connected' },
-  // REL051-CF2: running, but no relay can be reached from this computer.
-  unreachable: { state: 'reconnecting', label: S.networkUnreachableChip },
-  checking: { state: 'checking' },
-  paused: { state: 'paused' },
-  not_running: { state: 'not-running' },
-  needs_setup: { state: 'needs-setup' },
-  // The browser lost its connection: the same shape as "not running", in the status bar's words.
-  offline: { state: 'not-running', label: S.offlineChip },
-};
-
 /** The chip's one status for the app's connection state. */
 export function connectionChip(connection: ConnectionState): SwitcherChip {
-  return CHIP[connection];
+  return healthWord(connection).chip;
 }
 
 /** The "?" Help menu. */

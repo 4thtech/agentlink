@@ -28,10 +28,12 @@ import {
 import { CONTACTS_STRINGS as C } from '../contacts/strings.js';
 import {
   Button,
+  CopyButton,
+  InlineError,
   ProgressBar,
-  WaitingMark,
   useReducedMotion,
   useVisibilityPause,
+  WaitingMark,
 } from '@4thtech-io/ui';
 import {
   useCallback,
@@ -653,21 +655,9 @@ export function AddCreditsPanel({
   readonly onTurn: (move: Move) => void;
   readonly onCheckAgain: () => void;
 }): ReactElement {
-  const [copy, setCopy] = useState<'idle' | 'copied' | 'failed'>('idle');
   const details = useRef<HTMLDivElement | null>(null);
   const reduced = useReducedMotion();
   const name = NETWORK_NAMES[net.network];
-  const copyAddress = (): void => {
-    const clip = (globalThis.navigator as Navigator | undefined)?.clipboard;
-    if (clip === undefined) {
-      setCopy('failed');
-      return;
-    }
-    void clip.writeText(net.address).then(
-      () => setCopy('copied'),
-      () => setCopy('failed'),
-    );
-  };
   const showDetails = (): void => {
     const el = details.current;
     if (el === null) return;
@@ -694,14 +684,13 @@ export function AddCreditsPanel({
         <QrCode value={net.address} label={S.qrLabel} exposeValue />
         <div className="al-text-caption al-muted">{S.addressLabel}</div>
         <code className="pf-address al-text-code">{net.address}</code>
-        <Button size="sm" onClick={copyAddress}>
-          {S.copyAddress}
-        </Button>
-        {copy === 'idle' ? null : (
-          <p className="al-text-caption" role="status">
-            {copy === 'copied' ? S.copied : S.copyFailed}
-          </p>
-        )}
+        <CopyButton
+          text={net.address}
+          variant="secondary"
+          label={S.copyAddress}
+          copiedLabel={S.copied}
+          failedLabel={S.copyFailed}
+        />
       </div>
       <p className="al-text-caption al-muted">{S.privacy}</p>
       {s === undefined ? null : (
@@ -833,11 +822,7 @@ export function ConfirmMove({
       <p className="al-text-caption al-muted">{deposit ? S.reserveNote : S.withdrawNote}</p>
       {withPasskey ? (
         <div className="pf-confirm-form">
-          {line === undefined ? null : (
-            <p className="al-text-body-sm" role="alert">
-              {line}
-            </p>
-          )}
+          {line === undefined ? null : <InlineError>{line}</InlineError>}
           <div className="pf-confirm-actions">
             <Button
               type="button"
@@ -872,11 +857,7 @@ export function ConfirmMove({
               if (value !== '') setCodeChosen(true);
             }}
           />
-          {line === undefined ? null : (
-            <p className="al-text-body-sm" role="alert">
-              {line}
-            </p>
-          )}
+          {line === undefined ? null : <InlineError>{line}</InlineError>}
           <div className="pf-confirm-actions">
             <Button type="submit" variant="primary" disabled={busy || code.length === 0}>
               {busy ? S.working : S.confirm}

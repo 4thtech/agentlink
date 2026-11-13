@@ -11,7 +11,7 @@
 // UX1113-N2: one owner step, one gesture. Each action's own button is the sensor ("Rename with
 // Touch ID", "They match · Touch ID", "Remove with Touch ID"), with the master code as a link:
 // Contacts' PresenceButton. The routes and the signed objects are unchanged.
-import { Banner, Button, Icon } from '@4thtech-io/ui';
+import { Banner, Button, Icon, InlineError } from '@4thtech-io/ui';
 import { useEffect, useId, useMemo, useRef, useState, type ReactElement } from 'react';
 import type { ApiClient } from '../../api/client.js';
 import { contactPath, parseCode, type CodeAnswer, type ContactRow } from '../contacts/data.js';
@@ -276,11 +276,7 @@ export function PersonMenu({
             <Button variant="ghost" size="sm" onClick={close}>
               {S.cancel}
             </Button>
-            {aliasCheck.kind === 'refused' ? (
-              <p role="alert" className="hm-inline-error al-text-body-sm">
-                {aliasCheck.message}
-              </p>
-            ) : null}
+            {aliasCheck.kind === 'refused' ? <InlineError>{aliasCheck.message}</InlineError> : null}
           </form>
         ) : null}
         {mode === 'check' ? (

@@ -21,13 +21,14 @@ import {
   Button,
   EmptyState,
   Icon,
+  InlineError,
   SkeletonGate,
   SkeletonLine,
   SkeletonList,
   SkeletonTable,
+  type PayPlatform,
   UntrustedContent,
   useViewTransition,
-  type PayPlatform,
 } from '@4thtech-io/ui';
 import {
   useCallback,
@@ -479,11 +480,7 @@ function PendingInviteRow({
             {agent === '' ? '' : ` · ${agent}`}
           </span>
         ) : null}
-        {failed ? (
-          <span role="alert" className="hm-inline-error al-text-body-sm">
-            {S.cantCancel}
-          </span>
-        ) : null}
+        {failed ? <InlineError>{S.cantCancel}</InlineError> : null}
         {api.link === undefined ? null : (
           <InviteLinkReveal link={link} label={linkLabel(name ?? '')} />
         )}
@@ -538,11 +535,7 @@ function ConnectingRowView({
       <span className="hm-row-main hm-c">
         <PersonName name={row.name} />
         <span className="hm-sub al-text-body-sm">{connectingLine(row, now)}</span>
-        {failed ? (
-          <span role="alert" className="hm-inline-error al-text-body-sm">
-            {F.cancelConnectingFailed}
-          </span>
-        ) : null}
+        {failed ? <InlineError>{F.cancelConnectingFailed}</InlineError> : null}
       </span>
       {row.blocked === true ? (
         <a className="al-btn al-btn-secondary al-btn-sm" href={PEOPLE_PATH}>

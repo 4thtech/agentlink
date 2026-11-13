@@ -16,6 +16,7 @@ import {
   Banner,
   Button,
   Icon,
+  InlineError,
   Segmented,
   Skeleton,
   SuccessMoment,
@@ -571,9 +572,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
                   onChange={(v) => edit({ perActionMaxUSD: v })}
                 />
                 {checked.invalid.has('dailyBudgetUSD') || checked.invalid.has('perActionMaxUSD') ? (
-                  <span className="rl-error" role="alert">
-                    {S.invalidAmount}
-                  </span>
+                  <InlineError>{S.invalidAmount}</InlineError>
                 ) : null}
               </div>
             )}
@@ -881,11 +880,7 @@ function ConfirmStep({
             onValue={onCode}
           />
         ) : null}
-        {confirm.error === undefined ? null : (
-          <p className="al-text-body-sm rl-error" role="alert">
-            {confirm.error}
-          </p>
-        )}
+        {confirm.error === undefined ? null : <InlineError>{confirm.error}</InlineError>}
         <div className="rl-confirm-actions">
           <Button variant="ghost" onClick={onBack} disabled={confirm.busy}>
             {S.back}

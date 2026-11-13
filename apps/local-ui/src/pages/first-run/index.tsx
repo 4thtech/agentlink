@@ -34,7 +34,7 @@
 // begin/finish). `?add=agent` stays on every step, so an open agent never turns it into Connect
 // another AI app, and a new Add agent starts with nothing kept from an earlier run. It ends on Home
 // in the app (no reload), and the agents are read again.
-import { Banner, Button, CopyPrompt, ProgressBar, TextField } from '@4thtech-io/ui';
+import { Banner, Button, CopyPrompt, InlineError, ProgressBar, TextField } from '@4thtech-io/ui';
 import {
   useCallback,
   useEffect,
@@ -437,9 +437,7 @@ function BackupCode({
         {file === 'yes' ? ` ${T.fileSaved}` : ''}
       </p>
       {copied === 'failed' || file === 'failed' ? (
-        <p className="al-text-body-sm ct-error" role="alert">
-          {copied === 'failed' ? T.copyFailed : T.fileFailed}
-        </p>
+        <InlineError>{copied === 'failed' ? T.copyFailed : T.fileFailed}</InlineError>
       ) : null}
       {file === 'yes' ? (
         <p className="al-text-caption al-muted" aria-hidden="true">

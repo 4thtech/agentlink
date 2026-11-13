@@ -19,7 +19,7 @@
 //   dependable way when there is no mail app), Share (only where the browser has a share sheet).
 // - Under the hood: the invite's facts, a long link instead (D-139 fallback, nothing stored on the
 //   service) and the QR code.
-import { Button, InlineError, SkeletonLine, useHood } from '@4thtech-io/ui';
+import { Button, COPIED_MS, InlineError, SkeletonLine, useHood } from '@4thtech-io/ui';
 import { useCallback, useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import { createAgentsApi, type AgentsApi } from '../agents/api.js';
 import { InviteNameGate } from '../agents/name-update.js';
@@ -37,7 +37,6 @@ import {
 import './invite.css';
 
 const DAY_MS = 86_400_000;
-const COPIED_MS = 1600;
 const MAX_NAME = 32;
 
 export interface InvitePanelProps {
@@ -595,15 +594,9 @@ export function InvitePanel({
             </p>
           ) : null}
           {copied === 'failed' || copiedMessage === 'failed' ? (
-            <p className="al-text-body-sm" role="alert">
-              {S.copyFailed}
-            </p>
+            <InlineError>{S.copyFailed}</InlineError>
           ) : null}
-          {shareFailed ? (
-            <p className="al-text-body-sm" role="alert">
-              {S.shareFailed}
-            </p>
-          ) : null}
+          {shareFailed ? <InlineError>{S.shareFailed}</InlineError> : null}
           {error === undefined ? null : (
             <InlineError
               action={

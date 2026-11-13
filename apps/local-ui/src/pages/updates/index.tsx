@@ -13,7 +13,7 @@
 // "Checking the new version" → "Restart now" (a note first when a request waits for the owner) →
 // "Restarting"; "Couldn't update here" keeps the download link. Both buttons are POSTs with no body
 // (owner session + CSRF); the shell installs only the update it verified itself.
-import { Button, ProgressBar, Skeleton, Surface } from '@4thtech-io/ui';
+import { Button, CopyButton, InlineError, ProgressBar, Skeleton, Surface } from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
 import { SettingsIcon } from '../settings/icons.js';
@@ -75,34 +75,18 @@ function statusLine(view: UpdateView): string | undefined {
 
 /** One fixed command with Copy (REL051-UPD2). */
 function Command({ command }: { readonly command: string }): ReactElement {
-  const [copied, setCopied] = useState(false);
-  const [problem, setProblem] = useState(false);
-  const copy = (): void => {
-    const clip = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
-    if (clip === undefined) {
-      setProblem(true);
-      return;
-    }
-    clip.writeText(command).then(
-      () => {
-        setProblem(false);
-        setCopied(true);
-      },
-      () => setProblem(true),
-    );
-  };
   return (
     <span className="upd-cmd">
       <span className="upd-cmd-row">
         <code className="upd-cmd-text al-text-code">{command}</code>
-        <Button size="sm" variant="secondary" onClick={copy}>
-          {copied ? S.copied : S.copy}
-        </Button>
+        <CopyButton
+          text={command}
+          variant="secondary"
+          label={S.copy}
+          copiedLabel={S.copied}
+          failedLabel={S.copyFailed}
+        />
       </span>
-      <span className="al-visually-hidden" role="status" aria-live="polite">
-        {copied ? S.copied : ''}
-      </span>
-      {problem ? <span className="al-text-body-sm al-muted">{S.copyFailed}</span> : null}
     </span>
   );
 }
@@ -211,11 +195,7 @@ function Ready({ view }: { readonly view: UpdateView }): ReactElement {
       <h2 id="upd-ready-t" className="al-text-h3">
         {S.ready(view.latest)}
       </h2>
-      {failed ? (
-        <p className="al-text-body-sm" role="alert">
-          {S.cantUpdate}
-        </p>
-      ) : null}
+      {failed ? <InlineError>{S.cantUpdate}</InlineError> : null}
       <p className="al-text-body-sm al-muted">{S.readyLead}</p>
       <div>
         <a
