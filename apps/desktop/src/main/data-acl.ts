@@ -7,26 +7,39 @@
 // descriptor and refuses to start when it gives access to anyone else (Everyone, Users,
 // Authenticated Users, another user, or a null DACL), with a fixed page that says how to fix it.
 //
-// How it reads it (no new dependency, no native code): Windows PowerShell's `Get-Acl` prints the
-// SDDL (security identifiers, not account names, so it does not depend on the Windows language), and
-// `whoami /user` prints this user's SID. Both are started from %SystemRoot%\System32 by absolute
-// path, without a shell; the folder path reaches PowerShell only through an environment variable,
-// never inside the command. A check that cannot run or cannot be read ("unchecked") does not stop the
-// start: the folder then has whatever ACL it inherited, which is what it had before this check.
+// How it reads it (no new dependency, no native code): `icacls <folder> /save <file>` writes the
+// folder's DACL as SDDL (security identifiers, not account names, so it does not depend on the
+// Windows language) into a new private scratch folder, and `whoami /user` prints this user's SID.
+// Both are started from %SystemRoot%\System32 by absolute path, without a shell, stdin closed, each
+// killed after ACL_TIMEOUT_MS (PowerShell's Get-Acl timed out at 30 s on a cold CI runner, so it is
+// not used). A check that cannot run or cannot be read ("unchecked") does not stop the start (Fable
+// rules on this) but leaves a fixed line in core.log (main.ts); it is never read as "ok".
 //
 // What this is NOT: a security boundary against a same-user process (it can change the ACL back, or
 // read the folder itself). It catches a folder made readable to other people on this computer.
 // SYSTEM and Administrators can read any file anyway. Nothing here is logged.
 import { join, win32 } from 'node:path';
 
-/** Runs an executable (absolute path, no shell) and resolves with its stdout. */
+/** A new empty private folder for icacls's output (its own temp folder), read and removed after. */
+export interface AclScratch {
+  readonly dir: string;
+  readonly read: (name: string) => Promise<Uint8Array>;
+  readonly dispose: () => Promise<void>;
+}
+
+/** Runs an executable (absolute path, no shell, stdin closed, killed after `ms`) → its stdout. */
 export interface AclRunner {
   readonly run: (
     file: string,
     args: readonly string[],
     env: Record<string, string>,
+    ms: number,
   ) => Promise<string>;
+  readonly scratch: () => Promise<AclScratch>;
 }
+
+/** The fixed limit for each tool (icacls and whoami take well under a second). */
+export const ACL_TIMEOUT_MS = 5000;
 
 export type AclVerdict = 'ok' | 'too_open' | 'unchecked';
 
@@ -36,9 +49,6 @@ export interface AclEntry {
   readonly inheritOnly: boolean;
   readonly sid: string;
 }
-
-/** The PowerShell command: the SDDL of the folder named by AGENTLINK_ACL_PATH. Fixed text. */
-export const ACL_SCRIPT = '(Get-Acl -LiteralPath $env:AGENTLINK_ACL_PATH).Sddl';
 
 const SYSTEM = 'S-1-5-18';
 const ADMINISTRATORS = 'S-1-5-32-544';
@@ -191,25 +201,45 @@ export async function checkDataFolderAcl(
   if (platform !== 'win32') return 'ok';
   const root = systemRoot(env);
   const system32 = `${root}\\System32`;
-  // The OS basics PowerShell needs to start; nothing that loads code (no PSModulePath, no PATH).
+  // The OS basics the tools need; nothing that changes what runs (no PATH).
   const base: Record<string, string> = { SystemRoot: root };
   for (const name of BASIC_ENV) {
     const value = env[name];
     if (value !== undefined) base[name] = value;
   }
   base['SystemRoot'] = root;
+  let scratch: AclScratch | undefined;
   try {
-    const [sddl, whoami] = await Promise.all([
-      runner.run(
-        `${system32}\\WindowsPowerShell\\v1.0\\powershell.exe`,
-        ['-NoProfile', '-NonInteractive', '-Command', ACL_SCRIPT],
-        { ...base, AGENTLINK_ACL_PATH: folder },
-      ),
-      runner.run(`${system32}\\whoami.exe`, ['/user', '/fo', 'csv', '/nh'], base),
+    scratch = await runner.scratch();
+    const saved = win32.join(scratch.dir, SAVED_NAME);
+    const [, whoami] = await Promise.all([
+      runner.run(`${system32}\\icacls.exe`, [folder, '/save', saved], base, ACL_TIMEOUT_MS),
+      runner.run(`${system32}\\whoami.exe`, ['/user', '/fo', 'csv', '/nh'], base, ACL_TIMEOUT_MS),
     ]);
+    const sddl = sddlFromSaved(decodeSaved(await scratch.read(SAVED_NAME)));
     const sid = parseWhoamiSid(whoami);
-    return sid === undefined ? 'unchecked' : aclVerdict(sddl, sid);
+    return sid === undefined || sddl === undefined ? 'unchecked' : aclVerdict(sddl, sid);
   } catch {
+    // A timeout, a tool that does not run, no output: unchecked, never ok.
     return 'unchecked';
+  } finally {
+    await scratch?.dispose().catch(() => undefined);
   }
+}
+
+/** The name of icacls's output file in the scratch folder. */
+const SAVED_NAME = 'acl.txt';
+
+/** icacls writes UTF-16LE (some versions with a byte order mark); anything else is read as UTF-8. */
+export function decodeSaved(bytes: Uint8Array): string {
+  const b = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (b.length >= 2 && b[0] === 0xff && b[1] === 0xfe) return b.subarray(2).toString('utf16le');
+  if (b.length >= 2 && b[1] === 0 && b[0] !== 0) return b.toString('utf16le');
+  return b.toString('utf8');
+}
+
+/** The SDDL line of `icacls <folder> /save` output (the line after the folder's name). */
+export function sddlFromSaved(text: string): string | undefined {
+  const lines = text.split(/\r?\n/).map((l) => l.trim());
+  return lines.find((l, i) => i > 0 && /^(O:|G:|D:|S:)/.test(l));
 }

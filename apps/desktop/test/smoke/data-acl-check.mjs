@@ -1,16 +1,21 @@
 // OD-M (WIN-DESK-2): runs the shell's data folder ACL check (src/main/data-acl.ts) against REAL
-// folders on the Windows CI runner: a new folder under the runner's temp folder (inherited ACL) must
-// be 'ok'; the same folder with read access for Everyone must be 'too_open'. Windows only; started by
-// desktop.yml with `node --experimental-strip-types`. Prints fixed words only.
+// folders on the Windows CI runner, with the same runner as the shell (main.ts runQuiet, aclScratch):
+// a new folder under the user's temp folder (inherited ACL) must be 'ok' and the same folder with read
+// access for Everyone must be 'too_open', each well inside ACL_TIMEOUT_MS. Windows only; started by
+// desktop.yml with `node --experimental-strip-types`. Prints fixed words, timings and, on a failure,
+// the parsed entries with this user's SID shown as USER.
 import { execFile } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  ACL_SCRIPT,
+  ACL_TIMEOUT_MS,
   checkDataFolderAcl,
+  decodeSaved,
   parseDacl,
   parseWhoamiSid,
+  sddlFromSaved,
 } from '../../src/main/data-acl.ts';
 
 if (process.platform !== 'win32') {
@@ -19,54 +24,52 @@ if (process.platform !== 'win32') {
 }
 
 const runner = {
-  run: (file, args, env) =>
+  run: (file, args, env, ms) =>
     new Promise((resolve, reject) => {
       const child = execFile(
         file,
         [...args],
-        { env, windowsHide: true, timeout: 30_000 },
+        { env, windowsHide: true, timeout: ms, encoding: 'utf8' },
         (error, stdout) => (error ? reject(error) : resolve(stdout)),
       );
-      // As the shell does (main.ts runQuiet): PowerShell waits for stdin to end.
       child.stdin?.end();
     }),
+  scratch: async () => {
+    const d = await mkdtemp(join(tmpdir(), 'agentlink-acl-'));
+    return {
+      dir: d,
+      read: (name) => readFile(join(d, name)),
+      dispose: () => rm(d, { recursive: true, force: true }),
+    };
+  },
 };
 
-// The user's own temp folder (under %USERPROFILE%), not RUNNER_TEMP on another drive.
-const dir = mkdtempSync(join(tmpdir(), 'al-acl-'));
-let failed = false;
-// Diagnosis on a failure: does each tool run at all (fixed words and exit codes only)?
 const sys32 = `${process.env.SystemRoot ?? 'C:\\Windows'}\\System32`;
-for (const [name, file, args] of [
-  ['whoami', `${sys32}\\whoami.exe`, ['/user', '/fo', 'csv', '/nh']],
-  [
-    'powershell',
-    `${sys32}\\WindowsPowerShell\\v1.0\\powershell.exe`,
-    ['-NoProfile', '-NonInteractive', '-Command', '1'],
-  ],
-]) {
-  await runner.run(file, args, process.env).then(
-    () => console.log(`${name}: runs`),
-    (error) => console.log(`${name}: failed (${String(error?.code ?? 'error')})`),
-  );
-}
-// Diagnosis: how long Get-Acl takes and whether its SDDL parses (entries with this user's SID shown
-// as USER; nothing else about the runner).
-{
-  const started = Date.now();
-  const env = { ...process.env, AGENTLINK_ACL_PATH: dir };
-  await Promise.all([
-    runner.run(
-      `${sys32}\\WindowsPowerShell\\v1.0\\powershell.exe`,
-      ['-NoProfile', '-NonInteractive', '-Command', ACL_SCRIPT],
-      env,
-    ),
-    runner.run(`${sys32}\\whoami.exe`, ['/user', '/fo', 'csv', '/nh'], process.env),
-  ]).then(
-    ([sddl, who]) => {
-      const sid = parseWhoamiSid(who) ?? 'none';
-      const dacl = parseDacl(sddl);
-      const shown =
+
+/** On a failure: what icacls wrote and how it parsed (this user's SID shown as USER). */
+async function explain(folder) {
+  const s = await runner.scratch();
+  try {
+    const who = await runner.run(
+      `${sys32}\\whoami.exe`,
+      ['/user', '/fo', 'csv', '/nh'],
+      process.env,
+      30_000,
+    );
+    const sid = parseWhoamiSid(who) ?? 'none';
+    await runner.run(
+      `${sys32}\\icacls.exe`,
+      [folder, '/save', join(s.dir, 'acl.txt')],
+      process.env,
+      30_000,
+    );
+    const text = decodeSaved(await s.read('acl.txt'));
+    const sddl = sddlFromSaved(text);
+    const dacl = sddl === undefined ? undefined : parseDacl(sddl);
+    console.log(`  saved lines: ${String(text.split(/\r?\n/).filter(Boolean).length)}`);
+    console.log(`  sddl: ${sddl === undefined ? 'none' : sddl.split(sid).join('USER')}`);
+    console.log(
+      `  dacl: ${
         dacl === undefined || dacl === 'null'
           ? String(dacl)
           : dacl
@@ -74,32 +77,42 @@ for (const [name, file, args] of [
                 (e) =>
                   `${e.allow ? 'allow' : 'deny'}${e.inheritOnly ? '/io' : ''}:${e.sid === sid ? 'USER' : e.sid}`,
               )
-              .join(' ');
-      console.log(`Get-Acl: ${String(Date.now() - started)} ms; dacl: ${shown}`);
-      if (dacl === undefined) console.log(`sddl: ${sddl.trim().split(sid).join('USER')}`);
-    },
-    (error) =>
-      console.log(
-        `Get-Acl: failed after ${String(Date.now() - started)} ms (${String(error?.code ?? 'error')})`,
-      ),
-  );
+              .join(' ')
+      }`,
+    );
+  } catch (error) {
+    console.log(`  explain: failed (${String(error?.code ?? error?.signal ?? 'error')})`);
+  } finally {
+    await s.dispose();
+  }
 }
+
+async function timed(label, folder, expected) {
+  const started = Date.now();
+  const result = await checkDataFolderAcl('win32', folder, process.env, runner);
+  const ms = Date.now() - started;
+  console.log(`${label}: ${result} in ${String(ms)} ms`);
+  if (result === expected && ms < ACL_TIMEOUT_MS) return true;
+  await explain(folder);
+  return false;
+}
+
+// The user's own temp folder (under %USERPROFILE%), not RUNNER_TEMP on another drive.
+const dir = mkdtempSync(join(tmpdir(), 'al-acl-'));
+let ok = true;
 try {
-  const inherited = await checkDataFolderAcl('win32', dir, process.env, runner);
-  console.log(`inherited ACL: ${inherited}`);
-  if (inherited !== 'ok') failed = true;
+  ok = (await timed('inherited ACL', dir, 'ok')) && ok;
   await runner.run(
-    `${process.env.SystemRoot ?? 'C:\\Windows'}\\System32\\icacls.exe`,
+    `${sys32}\\icacls.exe`,
     [dir, '/grant', '*S-1-1-0:(OI)(CI)R'],
     process.env,
+    30_000,
   );
-  const wide = await checkDataFolderAcl('win32', dir, process.env, runner);
-  console.log(`with Everyone: ${wide}`);
-  if (wide !== 'too_open') failed = true;
+  ok = (await timed('with Everyone', dir, 'too_open')) && ok;
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }
-if (failed) {
+if (!ok) {
   console.error('data-acl-check: unexpected result.');
   process.exit(1);
 }

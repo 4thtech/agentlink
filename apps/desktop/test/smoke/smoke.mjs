@@ -448,8 +448,17 @@ async function missingRoaming() {
     } catch {
       // no log
     }
-    if (exited !== 66)
+    if (exited !== 66) {
+      // Diagnosis (WIN-DESK-2): the code in hex, the shell's own fixed lines, and whether the
+      // app made the Roaming folder itself.
+      const hex = typeof exited === 'number' ? `0x${(exited >>> 0).toString(16)}` : String(exited);
+      console.log(
+        `    exit code ${hex}; Roaming exists after: ${String(existsSync(ctx.env.APPDATA))}`,
+      );
+      for (const l of log.split('\n').filter((x) => x.startsWith('--- '))) console.log(`    ${l}`);
+      if (log === '') console.log('    (no core.log in the profile)');
       return fail(`without AppData\\Roaming the app exited ${exited} (expected 66)`);
+    }
     if (!log.includes('the AgentLink data folder is not available')) {
       return fail('without AppData\\Roaming the fixed line is missing from core.log');
     }

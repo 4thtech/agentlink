@@ -38,7 +38,8 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BUNDLE_HASHES_FILE, bundleFilePaths, verifyBundle } from './bundle-check.js';
 import { CoreLog, logDir } from './core-log.js';
-import { checkDataFolderAcl, dataFolderFor, type AclVerdict } from './data-acl.js';
+import { checkDataFolderAcl, dataFolderFor, type AclScratch, type AclVerdict } from './data-acl.js';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { CoreSupervisor, aiAppMarkerSet, type SpawnFn, type Timers } from './core-process.js';
 import { INVITE_RESULT_TITLE, inviteResultCopy, toInviteLink } from './deep-link.js';
 import type { App, ElectronModule } from './electron-api.js';
@@ -668,7 +669,11 @@ export async function runShell(
       if (quitting) return;
       if (bundle === 'changed') blocked('changed_files');
       else if (folder === 'too_open') blocked('shared_data_folder');
-      else launchCore();
+      else {
+        // OD-M: a check that could not run still starts (Fable rules), with one fixed line.
+        if (folder === 'unchecked') coreLog.note('data folder access could not be checked');
+        launchCore();
+      }
     })();
   };
   const tryAgain = (): void => {
@@ -773,7 +778,7 @@ export function realProcess(): ShellProcess {
         proc.platform,
         dataFolderFor(homedir(), proc.platform, existsSync),
         proc.env,
-        { run: runQuiet },
+        { run: runQuiet, scratch: aclScratch },
       ),
   };
 }
@@ -783,20 +788,31 @@ function runQuiet(
   file: string,
   args: readonly string[],
   env: Record<string, string>,
+  ms: number,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = execFile(
       file,
       [...args],
-      { env, windowsHide: true, timeout: 15_000, maxBuffer: 64 * 1024, encoding: 'utf8' },
+      { env, windowsHide: true, timeout: ms, maxBuffer: 64 * 1024, encoding: 'utf8' },
       (error, stdout) => {
         if (error !== null) reject(new Error('check failed'));
         else resolve(stdout);
       },
     );
-    // PowerShell waits for the end of its input when stdin is a pipe: close it at once.
+    // A tool that reads its input would wait for a pipe to end: close it at once.
     child.stdin?.end();
   });
+}
+
+/** OD-M: a new private folder in this user's temp folder for icacls's output; removed after. */
+async function aclScratch(): Promise<AclScratch> {
+  const dir = await mkdtemp(join(tmpdir(), 'agentlink-acl-'));
+  return {
+    dir,
+    read: (name) => readFile(join(dir, name)),
+    dispose: () => rm(dir, { recursive: true, force: true }),
+  };
 }
 
 /** `<size>-<mtimeMs>-<ino>` of a file, or '' (D15-01 build stamp). */
