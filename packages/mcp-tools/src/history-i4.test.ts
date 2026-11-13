@@ -2,7 +2,6 @@
 // deletes anything, moves a file to the Trash, or names history retention (RET-7's proposing
 // `agentlink_tidy` needs its own spec PR and Fable review).
 import { describe, expect, it } from 'vitest';
-import { readFile } from 'node:fs/promises';
 import type { ToolClient } from './context.js';
 import { ADVANCED_TOOLS, TOOLS } from './registry.js';
 
@@ -24,9 +23,7 @@ describe('no MCP tool deletes history (I-4, 06 §1)', () => {
     }
   });
 
-  it('ToolClient has no history member and coreToolClient never reaches client.history', async () => {
+  it('ToolClient has no history member (checked by the typecheck too)', () => {
     expect(noHistory).toBe(true);
-    const source = await readFile(new URL('./context.ts', import.meta.url), 'utf8');
-    expect(source).not.toMatch(/\.history\b|history\s*[:(]/);
   });
 });

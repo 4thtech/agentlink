@@ -13,14 +13,13 @@
 // - Linux and other freedesktop systems: the freedesktop.org Trash specification, home trash
 //   (`$XDG_DATA_HOME/Trash`, default `~/.local/share/Trash`): `info/<name>.trashinfo` is created
 //   exclusively first, then the file goes to `files/<name>`; another volume answers `no_trash`.
-// - Windows: the Recycle Bin through `Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(...,
-//   SendToRecycleBin)` in Windows PowerShell, started by its absolute path with fixed arguments, no
-//   shell, no profile. The path reaches it only through an environment variable, never as part of
-//   the command, so nothing in a file name can become code.
+// - Windows: `no_trash` in this release (IR-RET-3-1 High 1): nothing is moved and nothing is
+//   deleted. The shell's silent recycle call deletes outright where an item cannot be recycled (bin
+//   off, oversize, network drive). A later card adds the Recycle Bin through IFileOperation with
+//   FOFX_RECYCLEONDELETE, proven on a real Windows machine first.
 // - Anything else: `no_trash` (the caller asks before a permanent delete; the retention pass skips).
 //
 // Nothing here logs. Outcomes are fixed codes; no error carries a path or a name (I-7).
-import { spawn as nodeSpawn } from 'node:child_process';
 import { constants } from 'node:fs';
 import { link, lstat, mkdir, open, rename, unlink, type FileHandle } from 'node:fs/promises';
 import os from 'node:os';
@@ -40,18 +39,6 @@ export interface SavedFileExpectation {
 /** Fixed outcome codes (core TrashSavedOutcome). */
 export type TrashOutcome = 'trashed' | 'changed' | 'missing' | 'no_trash' | 'failed';
 
-/** Starts a process with fixed arguments and no shell; resolves with its exit code. */
-export type TrashSpawn = (
-  file: string,
-  args: readonly string[],
-  options: {
-    readonly env: Readonly<Record<string, string>>;
-    readonly shell: false;
-    readonly windowsHide: true;
-    readonly timeout: number;
-  },
-) => Promise<{ readonly code: number | null }>;
-
 export interface TrashOptions {
   /** Default: process.platform. */
   readonly platform?: NodeJS.Platform;
@@ -59,12 +46,6 @@ export interface TrashOptions {
   readonly home?: string;
   /** `$XDG_DATA_HOME` (Linux); default from the environment. Used only when absolute. */
   readonly xdgDataHome?: string;
-  /** Windows: `%SystemRoot%`; default from the environment, else `C:\Windows`. */
-  readonly systemRoot?: string;
-  /** Windows: the process launcher (a stub in tests). */
-  readonly spawn?: TrashSpawn;
-  /** Windows: true once the file is gone from its place (default: lstat says ENOENT). */
-  readonly gone?: (target: string) => Promise<boolean>;
 }
 
 export interface TrashSavedFileInput extends TrashOptions {
@@ -79,30 +60,6 @@ export interface TrashSavedFileInput extends TrashOptions {
 
 const CHUNK = 256 * 1024;
 const MAX_NAME_ATTEMPTS = 1_000;
-const WINDOWS_TIMEOUT_MS = 30_000;
-const ENV_TARGET = 'AGENTLINK_TRASH_TARGET';
-
-/**
- * The fixed PowerShell command (Windows). It reads the path only from the environment; the Recycle
- * Bin option is fixed; only error dialogs can show (VisualBasic has no "no dialog" option here).
- */
-const WINDOWS_SCRIPT =
-  "$ErrorActionPreference = 'Stop'; " +
-  'Add-Type -AssemblyName Microsoft.VisualBasic; ' +
-  `[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile($env:${ENV_TARGET}, ` +
-  '[Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs, ' +
-  '[Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin)';
-
-const WINDOWS_ARGS: readonly string[] = Object.freeze([
-  '-NoProfile',
-  '-NonInteractive',
-  '-NoLogo',
-  '-ExecutionPolicy',
-  'Bypass',
-  '-Command',
-  WINDOWS_SCRIPT,
-]);
-
 const codeOf = (error: unknown): string | undefined =>
   (error as NodeJS.ErrnoException | undefined)?.code;
 
@@ -132,6 +89,8 @@ export async function trashSavedFile(input: TrashSavedFileInput): Promise<TrashO
 }
 
 async function trashSavedFileUnsafe(input: TrashSavedFileInput): Promise<TrashOutcome> {
+  // IR-RET-3-1 High 1: no move on Windows in this release; the file is never opened or touched.
+  if ((input.platform ?? process.platform) === 'win32') return 'no_trash';
   const { folder, name, expected } = input;
   if (!isOneVisibleSegment(name) || typeof folder !== 'string' || !path.isAbsolute(folder)) {
     return 'failed';
@@ -231,7 +190,8 @@ export async function moveToTrash(
   try {
     const platform = options.platform ?? process.platform;
     if (platform === 'darwin') return await toMacTrash(target, options, identity);
-    if (platform === 'win32') return await toRecycleBin(target, options);
+    // IR-RET-3-1 High 1: never on Windows in this release (see the header).
+    if (platform === 'win32') return 'no_trash';
     if (platform === 'linux' || platform === 'freebsd' || platform === 'openbsd') {
       return await toXdgTrash(target, options, identity);
     }
@@ -261,14 +221,19 @@ function* candidates(name: string): Generator<string> {
   for (let n = 2; n <= MAX_NAME_ATTEMPTS; n += 1) yield `${stem} ${String(n)}${e}`;
 }
 
-type Placed = 'placed' | 'exists' | 'other_volume' | 'failed';
+export type Placed = 'placed' | 'exists' | 'other_volume' | 'failed';
 
 /**
  * Moves `from` to `to` without ever replacing an entry at `to`: a hard link (fails when `to`
  * exists), then the old name removed. Where the volume has no hard links, a rename after checking
  * that `to` is free (a same-user race is the accepted residual, G-1).
  */
-async function placeNoReplace(from: string, to: string): Promise<Placed> {
+export async function placeNoReplace(
+  from: string,
+  to: string,
+  ops: { readonly unlink?: (p: string) => Promise<void> } = {},
+): Promise<Placed> {
+  const removeName = ops.unlink ?? unlink;
   try {
     await link(from, to);
   } catch (error) {
@@ -291,10 +256,12 @@ async function placeNoReplace(from: string, to: string): Promise<Placed> {
     }
   }
   try {
-    await unlink(from);
-  } catch {
+    await removeName(from);
+  } catch (error) {
+    // IR-RET-3-1 Low 4: the old name is already gone, so the new name is the last one: keep it.
+    if (codeOf(error) === 'ENOENT') return 'placed';
     // Roll back: the file keeps its place, the extra name goes (it is the same file).
-    await unlink(to).catch(() => undefined);
+    await removeName(to).catch(() => undefined);
     return 'failed';
   }
   return 'placed';
@@ -398,62 +365,4 @@ async function toXdgTrash(
     return placed === 'other_volume' ? 'no_trash' : 'failed';
   }
   return 'failed';
-}
-
-/** The real launcher: no shell, hidden window, a time bound; output is ignored, never logged. */
-const defaultSpawn: TrashSpawn = (file, args, options) =>
-  new Promise((resolve) => {
-    let child;
-    try {
-      child = nodeSpawn(file, [...args], {
-        env: { ...options.env },
-        shell: false,
-        windowsHide: true,
-        timeout: options.timeout,
-        stdio: 'ignore',
-      });
-    } catch {
-      resolve({ code: null });
-      return;
-    }
-    child.once('error', () => resolve({ code: null }));
-    child.once('exit', (code) => resolve({ code }));
-  });
-
-async function toRecycleBin(target: string, options: TrashOptions): Promise<TrashOutcome> {
-  const systemRoot =
-    options.systemRoot ?? process.env.SystemRoot ?? process.env.SYSTEMROOT ?? 'C:\\Windows';
-  // The absolute path of Windows PowerShell: never looked up on PATH.
-  const exe = path.win32.join(
-    systemRoot,
-    'System32',
-    'WindowsPowerShell',
-    'v1.0',
-    'powershell.exe',
-  );
-  const env: Record<string, string> = {};
-  for (const [k, v] of Object.entries(process.env)) if (typeof v === 'string') env[k] = v;
-  env[ENV_TARGET] = target;
-  env.SystemRoot = systemRoot;
-  const run = options.spawn ?? defaultSpawn;
-  let code: number | null;
-  try {
-    ({ code } = await run(exe, WINDOWS_ARGS, {
-      env,
-      shell: false,
-      windowsHide: true,
-      timeout: WINDOWS_TIMEOUT_MS,
-    }));
-  } catch {
-    return 'failed';
-  }
-  if (code !== 0) return 'failed';
-  const gone =
-    options.gone ??
-    ((p: string) =>
-      lstat(p).then(
-        () => false,
-        (e: unknown) => codeOf(e) === 'ENOENT',
-      ));
-  return (await gone(target).catch(() => false)) ? 'trashed' : 'failed';
 }

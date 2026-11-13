@@ -24,12 +24,18 @@
 // - `approval`: an envelope a pending approval answers, an approved one whose commitment scope still
 //   has a live part, or one a live `commitment_parts` row references (owner or policy grant alike);
 // - `outbox`: an outbound envelope still queued, with a pending outbox row or a staged row;
-// - `ledger`: a notarized envelope whose budget ledger entry is still only reserved.
+// - `ledger`: a notarized envelope whose budget ledger entry is still only reserved;
+// - `receipt` (IR-RET-3-1 Low 7): every `proof` envelope, an `ack` of a notarized message, an `ack`
+//   whose message stays, and an `ack` whose body does not name one message. Other acks follow the
+//   message they name: they go with it, or after it was deleted.
+//
+// A later plan with `include: files` or `both` also lists the still indexed saved files of messages
+// deleted earlier (a Trash move that did not happen), so a partial apply leaves no orphans.
 //
 // No MCP tool reaches this (I-4, 06 §1): the client exposes it to the owner surfaces only. Nothing is
 // sent to the contact, a relay, the drop or any 4thTech service. Logs carry counts only (I-7).
-import { encodeHex, sha256 } from '@4thtech-io/crypto';
-import { nowOf, type CoreContext } from '../context.js';
+import { encodeHex, parseJson, sha256 } from '@4thtech-io/crypto';
+import { nowOf, open, type CoreContext } from '../context.js';
 import { CoreError } from '../errors.js';
 import type { FileFetcher, SavedFileKey, TrashSavedCounts } from '../files/incoming.js';
 import type { Row } from '../store/schema.js';
@@ -47,7 +53,7 @@ export type HistoryDeleteInput =
   | { readonly before: number; readonly include: HistoryDeleteInclude };
 
 /** Why a selected message is kept (04 §4.2 "Protected items"). */
-export type HistoryKeptReason = 'pairing' | 'terms' | 'approval' | 'outbox' | 'ledger';
+export type HistoryKeptReason = 'pairing' | 'terms' | 'approval' | 'outbox' | 'ledger' | 'receipt';
 
 export interface HistoryDeletePlan {
   /** The input the plan was made from; apply plans it again and compares. */
@@ -213,8 +219,38 @@ const wantsFiles = (i: HistoryDeleteInclude): boolean => i !== 'messages';
 
 const utf8 = new TextEncoder();
 
+/** Ack envelope ID -> the envelope it acknowledges (null when its body does not say or is unreadable). */
+type AckLinks = ReadonlyMap<string, string | null>;
+
+/** Ack rows read per contact for the links (newest first). */
+const MAX_ACK_LINKS_PER_CONTACT = 5_000;
+
+/** Already deleted messages the selector names (their saved files may still be indexed). */
+function tombstonedTx(tx: StoreTx, input: HistoryDeleteInput): Row<'envelopes'>[] {
+  const gone: Where<'envelopes'> = { state: 'ok', deleted_at: { gte: 0 } };
+  if ('envelopeIds' in input) {
+    const out: Row<'envelopes'>[] = [];
+    for (const id of new Set(input.envelopeIds)) {
+      const row = tx.get('envelopes', { envelope_id: id });
+      if (row !== undefined && row.state === 'ok' && row.deleted_at !== null) out.push(row);
+    }
+    return out;
+  }
+  const where: Where<'envelopes'> =
+    'contactId' in input
+      ? { ...gone, contact_id: input.contactId }
+      : { ...gone, created_at: { lt: input.before } };
+  return tx.select('envelopes', where, {
+    orderBy: [
+      ['created_at', 'asc'],
+      ['envelope_id', 'asc'],
+    ],
+    limit: MAX_PLAN_MESSAGES,
+  });
+}
+
 /** The plan, from one consistent read. */
-function planTx(tx: StoreTx, input: HistoryDeleteInput): HistoryDeletePlan {
+function planTx(tx: StoreTx, input: HistoryDeleteInput, links: AckLinks): HistoryDeletePlan {
   const { rows, truncated } = selectTx(tx, input);
   const by: Record<HistoryKeptReason, number> = {
     pairing: 0,
@@ -222,36 +258,91 @@ function planTx(tx: StoreTx, input: HistoryDeleteInput): HistoryDeletePlan {
     approval: 0,
     outbox: 0,
     ledger: 0,
+    receipt: 0,
   };
   const going: string[] = [];
+  const goingSet = new Set<string>();
   const keptIds: string[] = [];
   let bytes = 0;
   let notarized = 0;
   const savedFiles: SavedFileKey[] = [];
+  const fileSeen = new Set<string>();
   let fileBytes = 0;
-  for (const row of rows) {
-    const reason = protectionTx(tx, row);
-    if (reason !== undefined) {
-      by[reason] += 1;
-      keptIds.push(row.envelope_id);
-      continue;
+  const keep = (id: string, reason: HistoryKeptReason): void => {
+    by[reason] += 1;
+    keptIds.push(id);
+  };
+  const filesOf = (envelopeId: string): void => {
+    for (const f of tx.select(
+      'saved_files',
+      { envelope_id: envelopeId, trashed_at: null },
+      { orderBy: [['idx', 'asc']] },
+    )) {
+      const key = `${f.envelope_id}/${String(f.idx)}`;
+      if (fileSeen.has(key)) continue;
+      fileSeen.add(key);
+      savedFiles.push(Object.freeze({ envelopeId: f.envelope_id, index: f.idx }));
+      fileBytes += f.size;
     }
+  };
+  const take = (row: Row<'envelopes'>): void => {
+    goingSet.add(row.envelope_id);
     if (wantsMessages(input.include)) {
       const isNotarized = notarizedTx(tx, row.envelope_id);
       if (isNotarized) notarized += 1;
       bytes += lengthOf(row.payload_json) + (isNotarized ? 0 : lengthOf(row.envelope_json));
       going.push(row.envelope_id);
     }
-    if (wantsFiles(input.include)) {
-      for (const f of tx.select(
-        'saved_files',
-        { envelope_id: row.envelope_id, trashed_at: null },
-        { orderBy: [['idx', 'asc']] },
-      )) {
-        savedFiles.push(Object.freeze({ envelopeId: f.envelope_id, index: f.idx }));
-        fileBytes += f.size;
+    if (wantsFiles(input.include)) filesOf(row.envelope_id);
+  };
+  // 1. Conversation messages.
+  for (const row of rows) {
+    if (row.type === 'ack' || row.type === 'proof') continue;
+    const reason = protectionTx(tx, row);
+    if (reason !== undefined) keep(row.envelope_id, reason);
+    else take(row);
+  }
+  // 2. Proof envelopes always belong to a notarized message: kept (IR-RET-3-1 Low 7).
+  for (const row of rows) if (row.type === 'proof') keep(row.envelope_id, 'receipt');
+  // 3. Acks follow the message they name: they go when it goes (or is already deleted) and it is
+  //    not notarized; an ack of a notarized message, of a message that stays, or whose body does not
+  //    say which message it names, is kept.
+  if (wantsMessages(input.include)) {
+    const selected = rows.filter((r) => r.type === 'ack').map((r) => r.envelope_id);
+    const selectedSet = new Set(selected);
+    const following = [...links.entries()]
+      .filter(([id, target]) => !selectedSet.has(id) && target !== null && goingSet.has(target))
+      .map(([id]) => id)
+      .sort();
+    for (const id of [...selected, ...following]) {
+      const row = tx.get('envelopes', { envelope_id: id });
+      if (
+        row === undefined ||
+        row.type !== 'ack' ||
+        row.state !== 'ok' ||
+        row.deleted_at !== null
+      ) {
+        continue;
       }
+      const target = links.get(id) ?? null;
+      const targetRow = target === null ? undefined : tx.get('envelopes', { envelope_id: target });
+      const follows =
+        target !== null &&
+        targetRow !== undefined &&
+        !notarizedTx(tx, target) &&
+        (goingSet.has(target) || targetRow.deleted_at !== null);
+      if (!follows) {
+        keep(id, 'receipt');
+        continue;
+      }
+      const reason = protectionTx(tx, row);
+      if (reason !== undefined) keep(id, reason);
+      else take(row);
     }
+  }
+  // 4. Saved files of messages deleted earlier whose move did not happen (IR-RET-3-1 Low 6).
+  if (wantsFiles(input.include)) {
+    for (const row of tombstonedTx(tx, input)) filesOf(row.envelope_id);
   }
   const digest = encodeHex(
     sha256(
@@ -299,10 +390,75 @@ export class HistoryService {
     this.#deps = deps;
   }
 
+  /**
+   * Which message each ack of the selected contacts names, read from its sealed body before the
+   * plan's transaction (bodies open outside a transaction, 07 §3.1). A body that does not open or
+   * name one envelope maps to null (the ack is then kept).
+   */
+  async #ackLinks(input: HistoryDeleteInput): Promise<AckLinks> {
+    const ctx = this.#ctx;
+    const acks = await ctx.store.transaction((tx) => {
+      const { rows } = selectTx(tx, input);
+      const contacts = new Set<string>();
+      for (const r of rows) if (r.contact_id !== null) contacts.add(r.contact_id);
+      if ('contactId' in input) contacts.add(input.contactId);
+      const out: Row<'envelopes'>[] = [];
+      for (const contactId of [...contacts].sort()) {
+        out.push(
+          ...tx.select(
+            'envelopes',
+            { contact_id: contactId, type: 'ack', state: 'ok', deleted_at: null },
+            {
+              orderBy: [
+                ['created_at', 'desc'],
+                ['envelope_id', 'asc'],
+              ],
+              limit: MAX_ACK_LINKS_PER_CONTACT,
+            },
+          ),
+        );
+      }
+      return out;
+    });
+    const links = new Map<string, string | null>();
+    for (const ack of acks) {
+      let target: string | null = null;
+      if (ack.payload_json !== null) {
+        try {
+          const text = await open(
+            ctx,
+            'envelopes',
+            'payload_json',
+            [ack.envelope_id],
+            ack.payload_json,
+          );
+          const parsed = parseJson(text) as {
+            readonly type?: unknown;
+            readonly replyTo?: unknown;
+            readonly body?: { readonly envelopeId?: unknown } | null;
+          } | null;
+          const named = parsed?.body?.envelopeId;
+          if (
+            parsed?.type === 'ack' &&
+            typeof named === 'string' &&
+            (parsed.replyTo === null || parsed.replyTo === undefined || parsed.replyTo === named)
+          ) {
+            target = named;
+          }
+        } catch {
+          target = null;
+        }
+      }
+      links.set(ack.envelope_id, target);
+    }
+    return links;
+  }
+
   /** What a delete would remove and keep, with counts, sizes and the plan hash. Writes nothing. */
   async plan(input: HistoryDeleteInput): Promise<HistoryDeletePlan> {
     const checked = checkInput(input);
-    return this.#ctx.store.transaction((tx) => planTx(tx, checked));
+    const links = await this.#ackLinks(checked);
+    return this.#ctx.store.transaction((tx) => planTx(tx, checked, links));
   }
 
   /**
@@ -315,9 +471,10 @@ export class HistoryService {
       throw invalid();
     }
     const input = checkInput(plan.input);
+    const links = await this.#ackLinks(input);
     const now = nowOf(ctx);
     const outcome = await ctx.store.transaction((tx) => {
-      const fresh = planTx(tx, input);
+      const fresh = planTx(tx, input, links);
       if (fresh.planHash !== plan.planHash) return undefined;
       let deleted = 0;
       let notarized = 0;

@@ -181,12 +181,12 @@ export { peekStorageUsage, type StoragePerContact, type StorageUsage } from './s
 // RET-3 (D-148; 04 §4.2): a saved Inbox file to the OS Trash, only while unchanged; never deleted.
 export {
   moveToTrash,
+  placeNoReplace,
   trashSavedFile,
   type SavedFileExpectation as TrashSavedFileExpectation,
   type TrashOptions,
   type TrashOutcome,
   type TrashSavedFileInput,
-  type TrashSpawn,
 } from './trash.js';
 // DESK051-UPD: Settings > Updates in the desktop app (the desktop host builds the desk);
 // REL051-UPD2: and in the browser app (apps/cli/src/runtime/npm-update-check.ts).
