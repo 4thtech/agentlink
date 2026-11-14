@@ -925,7 +925,13 @@ export function FirstRunPage({
       const agent = await appsApi.currentAgent();
       if (!isLive()) return;
       // FILES-ONB-1: Connect another AI app has no Files step (the ID already has its folders).
-      if (agent.kind === 'ok' && !wantsNewAgent()) {
+      // FILES-ONB-1 (JOURNEY-FILES-SKIP): each step is its own page mount, so this runs again on
+      // Files after this run made the ID. A run that already connected here (remembered as not
+      // connect-only, with its outcome) is still the first run: five steps, Files fourth.
+      const ranHere = wizardMemory().connectOnly === false && wizardMemory().outcome !== undefined;
+      if (agent.kind === 'ok' && !wantsNewAgent() && ranHere) {
+        setMode({ k: 'first' });
+      } else if (agent.kind === 'ok' && !wantsNewAgent()) {
         rememberWizard({ connectOnly: true });
         setMode({ k: 'more', folder: agent.folder });
       } else {
