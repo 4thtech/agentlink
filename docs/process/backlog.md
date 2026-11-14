@@ -11034,6 +11034,14 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Spec:** 08 §8
 - **Done when:** Settings › Updates shows Update now, a progress bar, Restart now and a fallback download link; the app installs only an update it verified itself. Details: CHANGELOG 0.5.4.
 
+#### UPD-BUTTON-FIX · Update now and Restart now do nothing in Settings › Updates (Mac) (0.5.6)
+- **Status:** built (rel056/upd-button) · **Size:** S · **Tier:** Opus build, Fable independent audit (updater path) · **Security:** S2
+- **Repo/path:** agentlink · `apps/local-ui/src/api/client.ts` (bodyless POST = empty octet-stream), `apps/local-ui/src/pages/updates/` (refused/failed line); `e2e/test/empty-body-routes.test.ts`; `tools/deps-check/policy.mjs` (three e2e relative escapes into `apps/local-ui/src`)
+- **Depends on:** UPD-5
+- **Spec:** 08 §8; 11 §5
+- **Cause:** the page's `api.post(path)` with no body sent no Content-Type; the server's mutating gate (`handleUi`) answers 415 `content_type` before the mark gate, so `appUpdateDesk.startInstall` / `restart` never ran, and the page re-read the state and redrew "available" in silence. The kit-reveal `api.post(BACKUP_REVEAL_PATH)` (Settings › Backup, Save checklist) had the same bug.
+- **Done when:** `RED (expected):` commit first; an integration test drives the page's real ApiClient and generation guard against the real approval server: Update now and Restart now reach the update desk (200, new state), the kit's Show in Finder passes the gate; a page test shows one plain line on a refused, failed or not-started answer (the card, its button and "Your IDs, people and messages stay as they are." stay); 0.5.4/0.5.5 users install 0.5.6 once by hand (CHANGELOG).
+
 #### KIT-NAMES · Recovery kit carries each ID's name (kit format v2) (0.5.4)
 - **Status:** done (released 0.5.4) · **Security:** S2
 - **Spec:** 04 §2.3.3; 07 §9.4

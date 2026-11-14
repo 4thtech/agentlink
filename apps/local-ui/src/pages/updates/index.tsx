@@ -13,6 +13,8 @@
 // "Checking the new version" → "Restart now" (a note first when a request waits for the owner) →
 // "Restarting"; "Couldn't update here" keeps the download link. Both buttons are POSTs with no body
 // (owner session + CSRF); the shell installs only the update it verified itself.
+// UPD-BUTTON-FIX: a refused or failed answer (or one that did not start anything) shows one plain
+// line on the card; the page never just draws the same card again in silence.
 import { Button, CopyButton, InlineError, ProgressBar, Skeleton, Surface } from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
@@ -127,17 +129,22 @@ function BrowserReady({ view }: { readonly view: UpdateView }): ReactElement {
   );
 }
 
+/** UPD-BUTTON-FIX: which button's last press was refused or failed. */
+type Refused = 'update' | 'restart' | undefined;
+
 /** UPD-5: the in-app update, one card per state. */
 function InApp({
   view,
   onUpdate,
   onRestart,
   sending,
+  refused,
 }: {
   readonly view: UpdateView;
   readonly onUpdate: () => void;
   readonly onRestart: () => void;
   readonly sending: boolean;
+  readonly refused: Refused;
 }): ReactElement {
   const title = view.state === 'available' ? S.availableTitle(view.latest) : S.ready(view.latest);
   return (
@@ -154,6 +161,7 @@ function InApp({
       {view.state === 'available' ? (
         <>
           <p className="al-text-body-sm al-muted">{S.availableLead}</p>
+          {refused === 'update' ? <InlineError>{S.updateFailed}</InlineError> : null}
           <div>
             <Button variant="primary" onClick={onUpdate} disabled={sending}>
               {S.updateNow}
@@ -177,6 +185,7 @@ function InApp({
               {S.busy}
             </p>
           ) : null}
+          {refused === 'restart' ? <InlineError>{S.restartFailed}</InlineError> : null}
           <div>
             <Button variant="primary" onClick={onRestart} disabled={sending}>
               {S.restartNow}
@@ -353,11 +362,16 @@ export function UpdatesPage({
     void readOnce(APP_UPDATE_CHECK_PATH).then(follow);
   };
 
-  // UPD-5: Update now / Restart now: one POST with no body each; the answer is the new state.
+  // UPD-5: Update now / Restart now: one POST with no body each (the client sends it as the empty
+  // octet-stream the server's gate takes); the answer is the new state.
   const [sending, setSending] = useState(false);
-  const step = (path: string): void => {
+  const [refused, setRefused] = useState<Refused>(undefined);
+  const step = (path: string, which: 'update' | 'restart'): void => {
     if (sending) return;
     setSending(true);
+    setRefused(undefined);
+    // The state the button was pressed in: an answer still in it started nothing.
+    const pressedIn: UpdateState = which === 'update' ? 'available' : 'ready';
     void api
       .post(path)
       .then(
@@ -371,6 +385,9 @@ export function UpdatesPage({
       )
       .then(async (next) => {
         if (alive.current) setSending(false);
+        // UPD-BUTTON-FIX: refused, failed, unreadable or nothing started: say so on the card.
+        const started = next !== undefined && next !== 'not_here' && next.state !== pressedIn;
+        if (!started && next !== 'not_here' && alive.current) setRefused(which);
         // A refused or unreadable answer: read the state again rather than guess.
         await follow(next === undefined ? await readOnce(APP_UPDATE_PATH) : next);
       });
@@ -448,8 +465,14 @@ export function UpdatesPage({
             <InApp
               view={load.view}
               sending={sending}
-              onUpdate={() => step(APP_UPDATE_INSTALL_PATH)}
-              onRestart={() => step(APP_UPDATE_RESTART_PATH)}
+              refused={
+                (refused === 'update' && load.view.state === 'available') ||
+                (refused === 'restart' && load.view.state === 'ready')
+                  ? refused
+                  : undefined
+              }
+              onUpdate={() => step(APP_UPDATE_INSTALL_PATH, 'update')}
+              onRestart={() => step(APP_UPDATE_RESTART_PATH, 'restart')}
             />
           ) : load.view.state === 'available' || load.view.state === 'install_failed' ? (
             <Ready view={load.view} />

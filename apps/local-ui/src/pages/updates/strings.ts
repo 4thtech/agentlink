@@ -63,4 +63,7 @@ export const UPDATES_STRINGS = {
   busy: 'An AI request is waiting for your approval. If you restart now, it waits until AgentLink is back.',
   restarting: 'Restarting…',
   cantUpdate: 'Couldn’t update here. Download the new version instead.',
+  // UPD-BUTTON-FIX: Update now or Restart now was refused or failed (one plain line, no detail).
+  updateFailed: 'Couldn’t start the update just now. Try again.',
+  restartFailed: 'Couldn’t restart just now. Try again, or quit AgentLink and open it again.',
 } as const;

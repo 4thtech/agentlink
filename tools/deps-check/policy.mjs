@@ -112,6 +112,24 @@ export const RELATIVE_ESCAPES = [
   },
   {
     zone: 'e2e',
+    target: 'apps/local-ui/src/api/client.js',
+    reason:
+      'UPD-BUTTON-FIX: the page’s real API client, driven against the real approval-server gate (empty-body POSTs); browser code with no keys, store or signing',
+  },
+  {
+    zone: 'e2e',
+    target: 'apps/local-ui/src/api/generation.js',
+    reason:
+      'UPD-BUTTON-FIX: the page’s real generation guard, wrapped around the browser fetch as the page does, so mutating POSTs carry the generation; reads and sends only that number',
+  },
+  {
+    zone: 'e2e',
+    target: 'apps/local-ui/src/pages/updates/data.js',
+    reason:
+      'UPD-BUTTON-FIX: the Update now / Restart now paths the page posts, never retyped in the test; constants and a parser only',
+  },
+  {
+    zone: 'e2e',
     target: 'apps/desktop/test/smoke/first-run-code.mjs',
     reason:
       'FIRSTRUN-MATRIX: the desktop smoke driver that creates the owner with the master code on a temp HOME; a test file, never built or shipped',
