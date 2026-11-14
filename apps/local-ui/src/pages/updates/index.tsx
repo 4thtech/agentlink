@@ -22,12 +22,16 @@
 import { Button, CopyButton, InlineError, ProgressBar, Skeleton, Surface } from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
+import { inDesktopApp } from '../../desktop.js';
+import { detectOs, type OsName } from '../../layout/os.js';
 import { SettingsIcon } from '../settings/icons.js';
+import { SETUP_EXIT as X } from '../start/strings.js';
 import {
   APP_UPDATE_CHECK_PATH,
   APP_UPDATE_INSTALL_PATH,
   APP_UPDATE_PATH,
   APP_UPDATE_RESTART_PATH,
+  WINDOWS_SETUP_URL,
   parseUpdate,
   type UpdateState,
   type UpdateView,
@@ -40,6 +44,9 @@ export interface UpdatesPageProps {
   readonly api?: ApiClient;
   /** How long to wait between reads while a check runs (tests pass 0). */
   readonly pollMs?: number;
+  /** FIRSTRUN-EXIT test seams: the platform and whether this is the desktop app's window. */
+  readonly os?: OsName;
+  readonly desktop?: boolean;
 }
 
 type Load =
@@ -210,6 +217,61 @@ function InApp({
   );
 }
 
+/**
+ * FIRSTRUN-EXIT: the Windows app has no in-app update, so it always offers the newest setup file,
+ * also when the check can't run (a broken first run, offline, no answer).
+ */
+function WindowsDownload(): ReactElement {
+  return (
+    <Surface as="section" level={1} className="upd-card" aria-labelledby="upd-win-t">
+      <h2 id="upd-win-t" className="al-text-h3">
+        {X.windowsTitle}
+      </h2>
+      <p className="al-text-body-sm al-muted">{X.windowsLead}</p>
+      <div>
+        <a
+          className="al-btn al-btn-secondary"
+          href={WINDOWS_SETUP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {X.windowsDownload}
+        </a>
+      </div>
+      <ol className="upd-steps" aria-label={S.stepsLabel}>
+        {S.winSteps.map((step) => (
+          <li key={step} className="al-text-body-sm">
+            {step}
+          </li>
+        ))}
+      </ol>
+    </Surface>
+  );
+}
+
+/** FIRSTRUN-EXIT: the browser app, always: how to update (the fixed commands of REL051-UPD2). */
+function BrowserHow({
+  install,
+}: {
+  readonly install: UpdateView['install'] | undefined;
+}): ReactElement {
+  const global = install === 'global';
+  const command = global
+    ? S.globalCommand
+    : install === 'installer'
+      ? S.installerCommand
+      : S.npxCommand;
+  return (
+    <Surface as="section" level={1} className="upd-card" aria-labelledby="upd-how-t">
+      <h2 id="upd-how-t" className="al-text-h3">
+        {X.browserHowTitle}
+      </h2>
+      <p className="al-text-body-sm al-muted">{global ? S.commandLead : X.browserHowLead}</p>
+      <Command command={command} />
+    </Surface>
+  );
+}
+
 function Ready({ view }: { readonly view: UpdateView }): ReactElement {
   if (view.install !== 'desktop') return <BrowserReady view={view} />;
   const steps = view.macFile ? S.macSteps : view.winFile ? S.winSteps : S.otherSteps;
@@ -243,7 +305,14 @@ function Ready({ view }: { readonly view: UpdateView }): ReactElement {
   );
 }
 
-export function UpdatesPage({ api: givenApi, pollMs = 1000 }: UpdatesPageProps): ReactElement {
+export function UpdatesPage({
+  api: givenApi,
+  pollMs = 1000,
+  os: givenOs,
+  desktop: givenDesktop,
+}: UpdatesPageProps): ReactElement {
+  const [os] = useState<OsName>(() => givenOs ?? detectOs());
+  const [desktop] = useState<boolean>(() => givenDesktop ?? inDesktopApp());
   const [api] = useState<ApiClient>(() => givenApi ?? createApiClient());
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
   const alive = useRef(true);
@@ -346,6 +415,17 @@ export function UpdatesPage({ api: givenApi, pollMs = 1000 }: UpdatesPageProps):
     view.state !== 'off' &&
     view.state !== 'checking' &&
     !RUNNING.includes(view.state);
+  // FIRSTRUN-EXIT: the always-there fallbacks, unless the page already shows that version's card.
+  // BROWSER-UPDATE: a running in-app update (the browser app's too) is that version's card.
+  const versionCard =
+    view !== undefined &&
+    (view.state === 'available' || view.state === 'install_failed' || RUNNING.includes(view.state));
+  const settled = load.kind !== 'loading';
+  const appWindow = view === undefined ? desktop : view.install === 'desktop';
+  // Not when the check just said this is the newest version (IR-FIRSTRUN-EXIT-1).
+  const upToDate = view?.state === 'current';
+  const windowsFallback = settled && appWindow && os === 'windows' && !versionCard && !upToDate;
+  const browserHow = settled && !appWindow && !versionCard;
   // BROWSER-UPDATE: the browser app too, when its server can update here.
   const inApp =
     view !== undefined &&
@@ -418,6 +498,8 @@ export function UpdatesPage({ api: givenApi, pollMs = 1000 }: UpdatesPageProps):
           ) : null}
         </>
       )}
+      {windowsFallback ? <WindowsDownload /> : null}
+      {browserHow ? <BrowserHow install={view?.install} /> : null}
     </div>
   );
 }

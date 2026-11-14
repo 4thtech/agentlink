@@ -18,6 +18,7 @@ import {
 import { useTitleFocus } from '../welcome/index.js';
 import type { DetectedApp } from '../first-run/apps-api.js';
 import { skipToHome } from './guard.js';
+import { SetupExitLinks } from './setup-exit.js';
 import {
   CONNECTED_STEP as D,
   CONNECT_STEP as C,
@@ -109,6 +110,8 @@ export function WizardFrame({
             <Segments step={step} steps={steps} />
             <span className="st-eyebrow">{label}</span>
           </span>
+          {/* FIRSTRUN-EXIT: a way out on every step, also before an ID exists (no owner needed). */}
+          <SetupExitLinks />
           {hideSkip ? (
             // Keeps its room (no layout shift when the mode is known), but is not there to use.
             <span className="st-skip st-skip-gone al-text-body-sm" aria-hidden="true">

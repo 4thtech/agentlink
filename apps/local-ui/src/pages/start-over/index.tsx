@@ -27,6 +27,7 @@ import {
   UNFINISHED,
   WARN,
 } from './strings.js';
+import { SetupExitLinks } from '../start/setup-exit.js';
 import '../restore/restore.css';
 
 /** The page's path (the focused shell, like the restore wizard). */
@@ -357,6 +358,8 @@ export function StartOverPage(props: StartOverPageProps): ReactElement {
       <header className="rs-head">
         <Lockup size={22} />
         <div className="rs-head-end">
+          {/* FIRSTRUN-EXIT: Check for updates and Help here too (not while the start over runs). */}
+          {view === 'working' ? null : <SetupExitLinks />}
           <button
             type="button"
             className="rs-cancel al-text-body-sm"

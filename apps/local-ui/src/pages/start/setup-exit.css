@@ -1,0 +1,37 @@
+/* FIRSTRUN-EXIT: the way out of a first-run screen, styled as the header's "Skip to Home" link
+   (start.css .st-skip). Tokens only. */
+.al-setup-exit {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--al-space-4);
+}
+.al-setup-exit-link {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 44px;
+  padding: 0 var(--al-space-2);
+  color: var(--al-color-fg-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.al-setup-exit-link:focus-visible {
+  outline: 2px solid var(--al-color-focus-ring);
+  outline-offset: 2px;
+}
+.al-setup-first {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+  max-inline-size: 560px;
+}
+.al-setup-first p {
+  margin: 0;
+}
+
+/* Phones: the links sit beside the logo, before the step bar (start.css puts it on its own row). */
+@media (max-width: 480px) {
+  .al-setup-exit {
+    order: 1;
+  }
+}
