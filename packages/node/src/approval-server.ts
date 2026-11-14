@@ -365,7 +365,7 @@ import {
 } from './local-ui/context.js';
 import { JoinDesk, type JoinCheck } from './local-ui/join-desk.js';
 import { pairingFollower, type PairingFollower } from './local-ui/pairing-follow.js';
-import { JOIN_PAGE_PATH } from './local-ui/invite-paths.js';
+import { HOST_SHOW_PATH, HOST_YIELD_PATH, JOIN_PAGE_PATH } from './local-ui/invite-paths.js';
 import type {
   LocalUiInviteRoute,
   LocalUiAttachRoute,
@@ -1743,6 +1743,8 @@ export async function startApprovalServerWith(
   let lastHandoffAt = Number.NEGATIVE_INFINITY;
   /** R1-SEC-15: when the last handoff with a wrong token was refused (ms); throttled on its own. */
   let lastHandoffRefusedAt = Number.NEGATIVE_INFINITY;
+  /** APP-CONTINUITY: when the last takeover or show request with the token arrived (ms). */
+  let lastHostCallAt = Number.NEGATIVE_INFINITY;
   let lastJoinOpenAt = Number.NEGATIVE_INFINITY;
   // U3-d (D-138; 08 §1; 04 §2.8 "From the local app"): create an agent and save a verified label.
   // Nothing here signs. W4-ONE-TOUCH: creating an agent is the create-agent gate's (createAgentGate).
@@ -5370,7 +5372,17 @@ export async function startApprovalServerWith(
     // at merge): the master code only, with no WebAuthn: the body is empty and no registration is
     // parsed. The owner is stored under the generated master code only, exactly as a passkey with no
     // PRF gives today (and as `owner init` does). A body here is refused and does not use the plan.
+    // APP-CONTINUITY (FIRSTRUN Fable L1): it is a rejected presence proof like every other refused
+    // finish: it counts towards the backoff, and the third ends the plan.
     if (masterCodeOnly && body.length !== 0) {
+      presenceFailed();
+      held.tries += 1;
+      if (held.tries >= CREATE_CONNECT_TRIES) {
+        dropSetup(held);
+        await folderRemoval;
+        finishSetup(res, 403, 'tries_exhausted');
+        return;
+      }
       finishSetup(res, 400, 'invalid');
       return;
     }
@@ -6925,7 +6937,17 @@ export async function startApprovalServerWith(
       emit({ kind: 'rejected', reason: 'handoff' });
       sendJson(res, status, { error });
     };
-    if (joinDesk === undefined || handoffBytes === undefined) return refuse(501, 'not_available');
+    // APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): the takeover and show requests use
+    // this same gate with an empty body; they need the app host's record, not the join desk.
+    const hostCall =
+      url.pathname === HOST_YIELD_PATH
+        ? ('yield' as const)
+        : url.pathname === HOST_SHOW_PATH
+          ? ('show' as const)
+          : undefined;
+    if (handoffBytes === undefined || (hostCall === undefined && joinDesk === undefined)) {
+      return refuse(501, 'not_available');
+    }
     if (
       header(req, 'origin') !== undefined ||
       Object.keys(req.headers).some((name) => name.startsWith('sec-fetch-')) ||
@@ -6945,7 +6967,11 @@ export async function startApprovalServerWith(
     // `join` at 429. Each kind: at most one per HANDOFF_INTERVAL_MS.
     const at = now();
     const valid = matches(header(req, HANDOFF_HEADER), handoffBytes);
-    const last = valid ? lastHandoffAt : lastHandoffRefusedAt;
+    const last = !valid
+      ? lastHandoffRefusedAt
+      : hostCall === undefined
+        ? lastHandoffAt
+        : lastHostCallAt;
     if (at - last < HANDOFF_INTERVAL_MS) {
       const retryAfter = Math.max(1, Math.ceil((last + HANDOFF_INTERVAL_MS - at) / 1000));
       res.setHeader('Retry-After', String(retryAfter));
@@ -6955,6 +6981,32 @@ export async function startApprovalServerWith(
       lastHandoffRefusedAt = at;
       return refuse(401, 'refused');
     }
+    if (hostCall !== undefined) {
+      lastHostCallAt = at;
+      // An empty body only: nothing is chosen by the caller.
+      const empty = await boundedBody(req, res, 64);
+      if (empty === undefined) return;
+      const length = empty.length;
+      wipe(empty);
+      if (length !== 0) {
+        emit({ kind: 'rejected', reason: 'handoff' });
+        sendJson(res, 400, { error: 'invalid' });
+        return;
+      }
+      const record = options.host?.handoff;
+      // The host's own answer: the terminal host closes (the desktop app takes over), the desktop
+      // app shows its window. Fixed words only; nothing is signed, opened or logged here.
+      let done: boolean;
+      try {
+        done = (hostCall === 'yield' ? record?.onYield?.() : record?.onShow?.()) === true;
+      } catch {
+        done = false;
+      }
+      if (!done) return refuse(409, 'kept');
+      sendJson(res, 200, { status: hostCall === 'yield' ? 'yielding' : 'shown' });
+      return;
+    }
+    if (joinDesk === undefined) return refuse(501, 'not_available');
     lastHandoffAt = at;
     const body = await boundedBody(req, res, MAX_INVITE_CHECK_BODY_BYTES);
     if (body === undefined) return;

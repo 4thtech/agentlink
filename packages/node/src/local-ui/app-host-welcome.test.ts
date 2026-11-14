@@ -497,6 +497,9 @@ const SETUP_TIME = new Set([
   'GET /api/ui/join',
   'POST /api/ui/join/dismiss',
   'POST /api/ui/join/handoff',
+  // APP-CONTINUITY: the host takeover and show are the same handoff kind (no agent needed).
+  'POST /api/ui/host/yield',
+  'POST /api/ui/host/show',
   // UX1113-R1 (D-147): restore from a recovery kit is first run's other way in; its own gate
   // (local-ui/restore-server.test.ts, recovery-kit-restore.test.ts).
   'GET /api/ui/restore/found',

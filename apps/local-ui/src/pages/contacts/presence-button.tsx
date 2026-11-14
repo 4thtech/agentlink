@@ -10,6 +10,8 @@
 // - A passkey here: the gesture starts inside the click (Safari's user-gesture rule), so the caller
 //   must do any reading (a name check) before the click, never between the click and the gesture.
 // - Neither: the one button opens the master code (PresencePrompt, code first), as does the link.
+// - APP-CONTINUITY: inside the desktop app it is never the passkey (presence/offer.ts): its own
+//   Touch ID / Windows Hello once on, else the master code. No WebAuthn call in the app's window.
 // The statement the gesture confirms is the button's accessible description, and the line above
 // the master code field. A double click asks once (REL051-UF3).
 import { Button, InlineError } from '@4thtech-io/ui';
@@ -25,7 +27,8 @@ import {
 import { UseCodeInstead } from '../first-run/backup-code.js';
 import { detectPlatform } from '../first-run/passkey.js';
 import { SENSOR, type Platform } from '../first-run/strings.js';
-import { desktopPlatform } from '../../presence/desktop.js';
+import { desktopPlatform, nativeSensor } from '../../presence/desktop.js';
+import { desktopPresenceOffer } from '../../presence/offer.js';
 import { readNativeStatus, type NativeStatus } from '../../presence/native-api.js';
 import { FingerprintIcon } from '../invite/icons.js';
 import { passkeyProof, type OwnerClient, type PasskeyInfo, type PresenceProof } from './owner.js';
@@ -109,12 +112,14 @@ export function usePresenceMode({
           available: false,
           registered: false,
         }));
-        if (status.available && status.registered && status.reason === undefined) {
-          if (live) {
-            setMode({ kind: 'native', sensor: desktop === 'mac' ? 'Touch ID' : 'Windows Hello' });
-          }
-          return;
-        }
+        if (!live) return;
+        // APP-CONTINUITY (offer.ts): the app's window never uses a passkey: native, else the code.
+        setMode(
+          desktopPresenceOffer(desktop, status).kind === 'native'
+            ? { kind: 'native', sensor: nativeSensor(desktop) }
+            : { kind: 'code' },
+        );
+        return;
       }
       const info = await readPasskey().catch(() => undefined);
       if (!live) return;

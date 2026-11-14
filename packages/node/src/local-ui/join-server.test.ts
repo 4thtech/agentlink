@@ -1054,12 +1054,14 @@ describe('APP-CONTINUITY: host takeover and show (the handoff kind)', () => {
   it('a host that keeps running (no answer, or false) says kept; no host: not_available', async () => {
     const kept = await harness({ onYield: () => false });
     expect((await kept.handoff('', {}, [], HOST_YIELD_PATH)).status).toBe(409);
+    // At most one host request per 5 s, as for the handoff.
+    expect((await kept.handoff('', {}, [], HOST_SHOW_PATH)).status).toBe(429);
+    kept.advance(10_000);
     expect((await kept.handoff('', {}, [], HOST_SHOW_PATH)).status).toBe(409);
     const none = await harness({ host: false });
     expect(
-      (
-        await none.handoff('', { 'X-AgentLink-Handoff': 'A'.repeat(43) }, [], HOST_YIELD_PATH)
-      ).status,
+      (await none.handoff('', { 'X-AgentLink-Handoff': 'A'.repeat(43) }, [], HOST_YIELD_PATH))
+        .status,
     ).toBe(501);
   });
 
@@ -1073,8 +1075,14 @@ describe('APP-CONTINUITY: host takeover and show (the handoff kind)', () => {
     });
     const token = h.records[0]?.handoffToken ?? '';
     expect(
-      (await h.handoff('', { 'X-AgentLink-Handoff': `${token.slice(0, -1)}x` }, [], HOST_YIELD_PATH))
-        .status,
+      (
+        await h.handoff(
+          '',
+          { 'X-AgentLink-Handoff': `${token.slice(0, -1)}x` },
+          [],
+          HOST_YIELD_PATH,
+        )
+      ).status,
     ).toBe(401);
     h.advance(10_000);
     for (const extra of [
@@ -1085,7 +1093,12 @@ describe('APP-CONTINUITY: host takeover and show (the handoff kind)', () => {
       expect((await h.handoff('', extra, [], HOST_YIELD_PATH)).status).toBe(403);
     }
     expect((await h.handoff('', {}, [], `${HOST_YIELD_PATH}?x=1`)).status).toBe(400);
-    expect((await h.handoff({ invite: LINK }, {}, [], HOST_YIELD_PATH)).status).toBe(400);
+    // A body is refused (too large for the empty body, or not empty).
+    expect([400, 413]).toContain(
+      (await h.handoff({ invite: LINK }, {}, [], HOST_YIELD_PATH)).status,
+    );
+    h.advance(10_000);
+    expect((await h.handoff('x', {}, [], HOST_YIELD_PATH)).status).toBe(400);
     expect(yields).toBe(0);
   });
 });

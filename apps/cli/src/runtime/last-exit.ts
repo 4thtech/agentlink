@@ -16,6 +16,8 @@ export const LAST_EXIT_REASONS = Object.freeze([
   'sigterm',
   'sighup',
   'idle',
+  // APP-CONTINUITY: the desktop app took over this terminal host.
+  'moved_to_app',
   'uncaught',
   'rejections',
   'start_no_owner',

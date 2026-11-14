@@ -23,6 +23,8 @@
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { LocalUiContext } from '../context.js';
 import {
+  HOST_SHOW_PATH,
+  HOST_YIELD_PATH,
   JOIN_ACCEPT_PATH,
   JOIN_DISMISS_PATH,
   JOIN_HANDOFF_PATH,
@@ -161,9 +163,27 @@ export const joinHandoffRoute: LocalUiHandoffRoute = Object.freeze<LocalUiHandof
   presence: 'handoff',
 });
 
+/**
+ * APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): the desktop app taking over a running
+ * `agentlink ui` host, and terminal `agentlink ui` showing a running desktop app. The same handoff
+ * kind and gate (empty body); no handler, nothing signed.
+ */
+export const hostYieldRoute: LocalUiHandoffRoute = Object.freeze<LocalUiHandoffRoute>({
+  method: 'POST',
+  path: HOST_YIELD_PATH,
+  presence: 'handoff',
+});
+export const hostShowRoute: LocalUiHandoffRoute = Object.freeze<LocalUiHandoffRoute>({
+  method: 'POST',
+  path: HOST_SHOW_PATH,
+  presence: 'handoff',
+});
+
 export const joinRoutes: readonly LocalUiRoute[] = Object.freeze([
   joinReadRoute,
   joinAcceptRoute,
   joinDismissRoute,
   joinHandoffRoute,
+  hostYieldRoute,
+  hostShowRoute,
 ]);

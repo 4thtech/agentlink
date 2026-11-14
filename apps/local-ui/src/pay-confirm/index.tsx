@@ -20,6 +20,7 @@ import {
   type PayPlatform,
   type PaySheetPhase,
 } from '@4thtech-io/ui';
+import { pageCredentials } from '../presence/webauthn-here.js';
 
 const CSRF_HEADER = 'X-AgentLink-CSRF';
 const BEGIN = '/api/ui/pay-confirm/begin';
@@ -141,7 +142,8 @@ export function createPayConfirmClient(options: PayConfirmClientOptions = {}): P
   const doFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const token = (): string => options.token ?? pageToken();
   const credentials = (): CredentialsContainer | undefined =>
-    options.credentials ?? (typeof navigator === 'undefined' ? undefined : navigator.credentials);
+    // APP-CONTINUITY: never in the desktop app's window (presence/webauthn-here.ts).
+    options.credentials ?? pageCredentials();
 
   async function post(
     path: string,

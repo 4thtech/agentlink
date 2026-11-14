@@ -291,8 +291,14 @@ describe('agentlink join: a computer with no agent folder at all (IR-U3-invite-2
     const source = await readFile(new URL('./ui.ts', import.meta.url), 'utf8');
     const welcome = source.slice(source.indexOf('startWelcome: ('), source.indexOf('start: async'));
     expect(welcome).toContain('waitingInvite');
-    expect(welcome).toContain('writeAppHostRecord');
-    expect(welcome).toContain('removeAppHostRecord');
+    // APP-CONTINUITY: the one shared handoff record of nodeUiDeps (write, remove, the takeover).
+    expect(welcome).toMatch(/\bhandoff,/);
+    const shared = source.slice(
+      source.indexOf('const handoff = {'),
+      source.indexOf('startWelcome: ('),
+    );
+    expect(shared).toContain('writeAppHostRecord');
+    expect(shared).toContain('removeAppHostRecord');
   });
 });
 

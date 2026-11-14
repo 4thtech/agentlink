@@ -2174,11 +2174,14 @@ describe('FIRSTRUN-ANY-PLATFORM: first run with the master code only (no passkey
     const body = new Authenticator().create(begun.publicKey, { origin: h.origin });
     const nonce = beginNonces.get(s.cookie);
     expect((await post(h, FINISH, s, body.slice(), codeOnly(nonce))).status).toBe(400);
+    h.clock += 30_000;
     expect((await post(h, FINISH, s, body.slice(), codeOnly(nonce))).status).toBe(400);
+    h.clock += 30_000;
     const third = await post(h, FINISH, s, body.slice(), codeOnly(nonce));
     expect(third.status).toBe(403);
     expect(JSON.parse(third.body)).toEqual({ status: 'tries_exhausted' });
     expect(h.seeds.every(allZero)).toBe(true);
+    h.clock += 30_000;
     const after = await post(h, FINISH, s, new Uint8Array(0), codeOnly(nonce));
     expect(after.status).toBe(409);
     expect(agent.keychain.items.has(OWNER_ACCOUNT)).toBe(false);

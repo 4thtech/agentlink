@@ -46,6 +46,14 @@ export const NATIVE_STRINGS = Object.freeze({
   settingsOff: 'Off: approvals use your master code.',
   turnOnAgain: 'Turn on again',
   /**
+   * APP-CONTINUITY (offer.ts): why a presence screen in the app asks for the master code. Never a
+   * passkey or a security key: the app's window doesn't use them.
+   */
+  codeHelp: (platform: DesktopPlatform, available: boolean): string =>
+    available
+      ? `${nativeSensor(platform)} isn't turned on for approvals in this app yet, so this asks for your master code. You can turn it on in Settings › ${nativeSensor(platform)} & master code.`
+      : `${nativeSensor(platform)} isn't available on this computer, so this asks for your master code.`,
+  /**
    * DESK051-C2 (owner feedback): why the master code comes first, said once in the in-between step.
    * Adding a way to confirm is itself an owner action, so the master code proves it is the owner.
    */

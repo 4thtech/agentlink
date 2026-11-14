@@ -98,6 +98,7 @@ import { filesOf, PersonFiles, type Reveal } from './person-files.js';
 import { PersonMenu } from './person-menu.js';
 import { PersonName } from './person-name.js';
 import './people.css';
+import { webAuthnHere } from '../../presence/webauthn-here.js';
 
 /** How often Home looks again while the tab is visible. */
 export const HOME_POLL_MS = 5_000;
@@ -130,13 +131,9 @@ export interface HomeScreenProps {
   readonly folderNote?: ReactNode;
 }
 
+// APP-CONTINUITY: never in the desktop app's window (presence/webauthn-here.ts).
 function browserPasskeys(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    'PublicKeyCredential' in window &&
-    typeof navigator !== 'undefined' &&
-    navigator.credentials !== undefined
-  );
+  return webAuthnHere();
 }
 
 interface Clients {

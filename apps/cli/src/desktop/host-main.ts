@@ -9,7 +9,7 @@ import { checkInviteLink, resolveInviteLink, shortInviteFetcher } from '@4thtech
 import { desktopNativeHelper, startApprovalServerWithLinkSink } from '@4thtech-io/node';
 import { DROP_DEFAULT_ENDPOINT } from '@4thtech-io/storage';
 import { nodeUiDeps, onStopSignals } from '../commands/ui.js';
-import { sendHandoff } from '../runtime/app-host-record.js';
+import { sendHandoff, takeOverAppHost } from '../runtime/app-host-record.js';
 import {
   processStartedAt,
   removeDesktopAlertsRecord,
@@ -129,6 +129,9 @@ export function nodeDesktopHostDeps(pipe: DesktopPipe): DesktopHostDeps {
     }),
     interrupt: (stop) => onStopSignals(stop),
     guard: (onFatal) => guardProcess({ log: logger, onFatal }),
+    // APP-CONTINUITY: the app installed after the browser continues where the person left off: a
+    // running terminal `agentlink ui` host closes for it, a crashed host's record is cleared.
+    takeOver: () => takeOverAppHost(homedir()),
   });
 }
 

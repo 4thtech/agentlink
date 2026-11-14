@@ -12,6 +12,7 @@
 // TODO(M1-11c follow-up): other pages need the same owner call (Files, Contacts). Move this into the
 // shared api/ client when the second page lands.
 import { sendWithPresence } from '../approvals/client.js';
+import { pageCredentials } from '../../presence/webauthn-here.js';
 
 const CSRF_HEADER = 'X-AgentLink-CSRF';
 const PASSKEY_PATH = '/api/owner/passkey';
@@ -94,7 +95,8 @@ export function createOwnerClient(options: OwnerClientOptions = {}): OwnerClient
   const doFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const token = (): string => options.token ?? pageToken();
   const credentials = (): CredentialsContainer | undefined =>
-    options.credentials ?? (typeof navigator === 'undefined' ? undefined : navigator.credentials);
+    // APP-CONTINUITY: never in the desktop app's window (presence/webauthn-here.ts).
+    options.credentials ?? pageCredentials();
 
   async function passkey(): Promise<PasskeyInfo | null> {
     try {

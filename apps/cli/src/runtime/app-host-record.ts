@@ -12,6 +12,13 @@
 // the token in `X-AgentLink-Handoff`, no Origin, no cookie, and the body `{"invite":"<link>"}` as
 // octet-stream. The invite is only in that body: never in the URL, a query, a header, the record, a
 // log or an error. Any failure is a plain outcome word; nothing here prints.
+//
+// APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): the desktop app's record adds
+// `"host":"desktop"`. Before its own host starts, the app takes over a terminal `agentlink ui` host
+// (`POST /api/ui/host/yield`, same rules, empty body) or clears a stale record; terminal
+// `agentlink ui` asks a running desktop app to show its window (`POST /api/ui/host/show`) instead of
+// starting a second host. The token grants nothing more than a same-user process already has
+// (stopping a process, opening the app).
 import { constants } from 'node:fs';
 import { mkdir, open, rename, unlink } from 'node:fs/promises';
 import { request } from 'node:http';
@@ -29,6 +36,11 @@ const DIR_MODE = 0o700;
 const POSIX = process.platform !== 'win32';
 /** The handoff path (packages/node JOIN_HANDOFF_PATH; a test keeps them equal). */
 export const HANDOFF_PATH = '/api/ui/join/handoff';
+/** APP-CONTINUITY: the takeover and show paths (packages/node HOST_YIELD_PATH, HOST_SHOW_PATH). */
+export const HOST_YIELD_PATH = '/api/ui/host/yield';
+export const HOST_SHOW_PATH = '/api/ui/host/show';
+/** How long the desktop app waits for a host it took over to end (then it starts anyway). */
+export const TAKEOVER_WAIT_MS = 8_000;
 /** How long the one handoff request may take. */
 export const HANDOFF_TIMEOUT_MS = 5_000;
 
@@ -36,6 +48,8 @@ export interface AppHostRecord {
   readonly pid: number;
   readonly port: number;
   readonly handoffToken: string;
+  /** APP-CONTINUITY: the desktop app's host says so; a terminal `agentlink ui` host has none. */
+  readonly host?: 'desktop';
 }
 
 const isPort = (value: unknown): value is number =>
@@ -53,19 +67,28 @@ export function parseAppHostRecord(text: string): AppHostRecord | undefined {
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return undefined;
   const record = parsed as Record<string, unknown>;
-  if (Object.keys(record).sort().join(',') !== 'handoffToken,pid,port,v' || record['v'] !== 1) {
+  const keys = Object.keys(record).sort().join(',');
+  // APP-CONTINUITY: `host` is optional and only ever "desktop" (an older CLI ignores such a record
+  // and starts its own host, as with no record).
+  if (
+    (keys !== 'handoffToken,pid,port,v' && keys !== 'handoffToken,host,pid,port,v') ||
+    record['v'] !== 1
+  ) {
     return undefined;
   }
-  const { pid, port, handoffToken } = record;
+  const { pid, port, handoffToken, host } = record;
   if (
     !isPid(pid) ||
     !isPort(port) ||
     typeof handoffToken !== 'string' ||
-    !TOKEN.test(handoffToken)
+    !TOKEN.test(handoffToken) ||
+    (host !== undefined && host !== 'desktop')
   ) {
     return undefined;
   }
-  return Object.freeze({ pid, port, handoffToken });
+  return Object.freeze(
+    host === 'desktop' ? { pid, port, handoffToken, host } : { pid, port, handoffToken },
+  );
 }
 
 const recordPath = (home: string): string => join(home, '.agentlink', APP_HOST_FILE);
@@ -114,7 +137,13 @@ export async function writeAppHostRecord(home: string, record: AppHostRecord): P
   try {
     if (POSIX) await handle.chmod(FILE_MODE);
     await handle.writeFile(
-      `${JSON.stringify({ v: 1, pid: record.pid, port: record.port, handoffToken: record.handoffToken })}\n`,
+      `${JSON.stringify({
+        v: 1,
+        pid: record.pid,
+        port: record.port,
+        handoffToken: record.handoffToken,
+        ...(record.host === 'desktop' ? { host: 'desktop' } : {}),
+      })}\n`,
       'utf8',
     );
     await handle.sync();
@@ -217,4 +246,114 @@ export function sendHandoff(
     req.on('error', () => finish('failed'));
     req.end(body);
   });
+}
+
+export type HostCallOutcome = 'done' | 'kept' | 'failed';
+
+/**
+ * APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): one empty request of the handoff kind to
+ * the running host, exactly like the handoff (127.0.0.1, `Host: localhost:<port>`, the token, no
+ * Origin, no cookie). `done` on 200, `kept` on 409 or 404 (an older host without the route).
+ */
+export function sendHostCall(
+  record: AppHostRecord,
+  call: 'yield' | 'show',
+  timeoutMs: number = HANDOFF_TIMEOUT_MS,
+): Promise<HostCallOutcome> {
+  return new Promise<HostCallOutcome>((resolve) => {
+    let done = false;
+    const finish = (outcome: HostCallOutcome): void => {
+      if (done) return;
+      done = true;
+      resolve(outcome);
+    };
+    const req = request(
+      {
+        host: '127.0.0.1',
+        port: record.port,
+        path: call === 'yield' ? HOST_YIELD_PATH : HOST_SHOW_PATH,
+        method: 'POST',
+        setHost: false,
+        agent: false,
+        timeout: timeoutMs,
+        headers: {
+          Host: `localhost:${String(record.port)}`,
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': '0',
+          'X-AgentLink-Handoff': record.handoffToken,
+        },
+      },
+      (res) => {
+        res.resume();
+        res.on('end', () => {
+          if (res.statusCode === 200) return finish('done');
+          if (res.statusCode === 409 || res.statusCode === 404) return finish('kept');
+          finish('failed');
+        });
+        res.on('error', () => finish('failed'));
+      },
+    );
+    req.on('timeout', () => {
+      req.destroy();
+      finish('failed');
+    });
+    req.on('error', () => finish('failed'));
+    req.end();
+  });
+}
+
+export type TakeoverOutcome = 'none' | 'stale' | 'yielded' | 'kept';
+
+export interface TakeoverOptions {
+  /** How long to wait for the host to end (default TAKEOVER_WAIT_MS). */
+  readonly waitMs?: number;
+  readonly alive?: (pid: number) => boolean;
+}
+
+/**
+ * APP-CONTINUITY: before the desktop app's own host starts. No record (or this process's): `none`.
+ * A record whose process is gone (a crash): removed, `stale`. A terminal `agentlink ui` host: asked
+ * to close (it answers, then closes its server and removes its record) and waited for: `yielded`.
+ * Another desktop app, an older host without the route, or no answer: `kept` (both run, each on
+ * its own port; nothing breaks). Never throws.
+ */
+export async function takeOverAppHost(
+  home: string,
+  options: TakeoverOptions = {},
+): Promise<TakeoverOutcome> {
+  const alive = options.alive ?? pidAlive;
+  const record = await readAppHostRecord(home);
+  if (record === undefined || record.pid === process.pid) return 'none';
+  if (!alive(record.pid)) {
+    // Only this exact record (another host may have replaced it meanwhile).
+    await removeAppHostRecord(home, record.pid);
+    return 'stale';
+  }
+  if (record.host === 'desktop') return 'kept';
+  const asked = await sendHostCall(record, 'yield').catch(() => 'failed' as const);
+  if (asked !== 'done') return 'kept';
+  const until = Date.now() + (options.waitMs ?? TAKEOVER_WAIT_MS);
+  while (Date.now() < until) {
+    const now = await readAppHostRecord(home);
+    if (!alive(record.pid) || now === undefined || now.pid !== record.pid) return 'yielded';
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return 'kept';
+}
+
+/**
+ * APP-CONTINUITY: terminal `agentlink ui` while the desktop app runs: ask it to show its window
+ * (`shown`) instead of starting a second host. Anything else (no record, a terminal host, a stale
+ * record, no answer): `none`, and `ui` starts as before. Never throws.
+ */
+export async function showRunningApp(
+  home: string,
+  alive: (pid: number) => boolean = pidAlive,
+): Promise<'shown' | 'none'> {
+  const record = await readAppHostRecord(home);
+  if (record?.host !== 'desktop' || record.pid === process.pid || !alive(record.pid)) {
+    return 'none';
+  }
+  const asked = await sendHostCall(record, 'show').catch(() => 'failed' as const);
+  return asked === 'done' ? 'shown' : 'none';
 }

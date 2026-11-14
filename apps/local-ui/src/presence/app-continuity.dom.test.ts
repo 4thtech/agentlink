@@ -39,7 +39,8 @@ beforeEach(() => {
     get: vi.fn(() => Promise.reject(new DOMException('no', 'NotAllowedError'))),
   };
   Object.defineProperty(navigator, 'credentials', { value: webauthn, configurable: true });
-  (window as { PublicKeyCredential?: unknown }).PublicKeyCredential = function PublicKeyCredential() {};
+  (window as { PublicKeyCredential?: unknown }).PublicKeyCredential =
+    function PublicKeyCredential() {};
   ua = MAC_APP;
   Object.defineProperty(navigator, 'userAgent', { get: () => ua, configurable: true });
 });
@@ -117,7 +118,7 @@ describe('presence prompts in the desktop app never call navigator.credentials',
         error: undefined,
         onSubmit: (p: PresenceProof) => sent.push(p),
         onCancel: () => undefined,
-        passkeyStatus: () => Promise.resolve({ kind: 'ready', info: PASSKEY }),
+        passkeyStatus: () => Promise.resolve({ kind: 'ready' as const, info: PASSKEY }),
         nativeStatus: () => Promise.resolve(OFF),
       }),
     );
@@ -135,7 +136,7 @@ describe('presence prompts in the desktop app never call navigator.credentials',
         error: undefined,
         onSubmit: () => undefined,
         onCancel: () => undefined,
-        passkeyStatus: () => Promise.resolve({ kind: 'ready', info: PASSKEY }),
+        passkeyStatus: () => Promise.resolve({ kind: 'ready' as const, info: PASSKEY }),
         nativeStatus: () => Promise.resolve(OFF),
       }),
     );
@@ -207,6 +208,45 @@ describe('presence prompts in the desktop app never call navigator.credentials',
       }),
     );
     expect(labels()).toContain('Save with Touch ID');
+  });
+
+  it('an owner made in the app (Touch ID there, no passkey) uses the master code in a browser', async () => {
+    ua = BROWSER;
+    const owner: OwnerClient = {
+      passkey: () => Promise.resolve(undefined),
+      post: () => Promise.reject(new Error('never')),
+    };
+    const sent: PresenceProof[] = [];
+    await render(
+      h(PresenceButton, {
+        withSensor: (s: string) => `Save with ${s}`,
+        withCode: 'Save with your master code',
+        statement: 'Save the rules',
+        busy: false,
+        notUsed: 'Not used',
+        onProof: (p: PresenceProof) => sent.push(p),
+        owner,
+        platform: 'mac',
+      }),
+    );
+    await click('Save with your master code');
+    expect(codeFields()).toBe(1);
+    const input = host.querySelector<HTMLInputElement>('input[type="password"]');
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+        input,
+        'ABCD-EFGH-IJKL-MNOP-QRST-UVWX',
+      );
+      input?.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await settle();
+    const submit = host.querySelector<HTMLButtonElement>('button[data-confirm-code]');
+    await act(async () => {
+      submit?.click();
+    });
+    await settle();
+    expect(sent).toEqual([{ kind: 'code', code: 'ABCD-EFGH-IJKL-MNOP-QRST-UVWX' }]);
+    noWebAuthn();
   });
 });
 

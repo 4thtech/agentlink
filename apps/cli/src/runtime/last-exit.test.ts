@@ -46,6 +46,8 @@ describe('the last-exit record (R1)', () => {
       [
         'ctrl_c',
         'idle',
+        // APP-CONTINUITY: the desktop app took over this terminal host.
+        'moved_to_app',
         'rejections',
         'sighup',
         'sigterm',

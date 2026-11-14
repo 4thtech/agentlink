@@ -514,7 +514,8 @@ describe('APP-CONTINUITY: an owner from the browser, opened in the desktop app',
       api: ownerApi(),
       native: {
         userAgent: MAC_APP,
-        status: (): Promise<NativeStatus> => Promise.resolve({ available: true, registered: false }),
+        status: (): Promise<NativeStatus> =>
+          Promise.resolve({ available: true, registered: false }),
       },
       upgradeApi: { info, register: () => Promise.reject(new Error('never')) },
       masterCodeApi: {

@@ -217,7 +217,10 @@ describe('APP-CONTINUITY: take over or show the running host', () => {
     status: number,
     body: unknown,
     onCall: (url: string) => void = () => undefined,
-  ): Promise<{ port: number; seen: { url: string; headers: IncomingHttpHeaders; body: string }[] }> {
+  ): Promise<{
+    port: number;
+    seen: { url: string; headers: IncomingHttpHeaders; body: string }[];
+  }> {
     const seen: { url: string; headers: IncomingHttpHeaders; body: string }[] = [];
     server = createServer((req, res) => {
       const chunks: Buffer[] = [];

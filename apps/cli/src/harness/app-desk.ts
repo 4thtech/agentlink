@@ -24,6 +24,9 @@
 //   before the write; a translocated, temporary or read-only location is never written
 //   (`app_location`). Optionally the installer's `agentlink` launcher is pointed at the app too
 //   (launcher.ts), only when it is exactly the installer's own file.
+// - APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): inside the desktop app a new connect
+//   is the app form (when the app may be written), so an app-only computer needs no Node or npx; a
+//   move keeps the entry's form, so entries made from the browser keep working unchanged.
 //
 // Threat note (04 §2.5): an entry starts a program, so this is a code-execution path. The fixed
 // content, the fixed paths and the owner's signed gesture (node local-ui/api/apps.ts) are what stop
@@ -45,7 +48,12 @@ import type {
 import type { JsonObject } from '@4thtech-io/crypto';
 import { readAgentConfig } from '../runtime/agent-dir.js';
 import { isAgentName } from '../runtime/agent-name.js';
-import { locateDesktopApp, type AppStart, type DesktopApp } from './desktop-app.js';
+import {
+  locateDesktopApp,
+  resourcesOfExecPath,
+  type AppStart,
+  type DesktopApp,
+} from './desktop-app.js';
 import {
   entryOf,
   readEntryState,
@@ -88,6 +96,13 @@ export interface AiAppsDeskOptions {
    * locateDesktopApp for this process; `undefined`: none).
    */
   readonly desktopApp?: () => Promise<DesktopApp | undefined>;
+  /**
+   * APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): this desk runs inside the desktop app
+   * (its bundled Node). Then a new connect writes the app form when the app may be written, so a
+   * computer with only the app (no Node, no npx) gets a working entry. Default: whether this
+   * process's Node is the app's (resourcesOfExecPath).
+   */
+  readonly runningInApp?: boolean;
 }
 
 const DESKTOP: HarnessDef['id'] = 'claude-desktop';
@@ -181,6 +196,8 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
     (async (name: string) => (await readAgentConfig(options.home, name))?.config.agentId);
   const log = options.log ?? (() => undefined);
   const locate = options.desktopApp ?? (() => locateDesktopApp({ home: options.home, platform }));
+  const inApp =
+    options.runningInApp ?? resourcesOfExecPath(process.execPath, platform) !== undefined;
   /** The desktop app now; a failed lookup is no app. */
   const appNow = (): Promise<DesktopApp | undefined> => locate().catch(() => undefined);
   const context: HarnessContext = {
@@ -313,7 +330,15 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
           }
         } else {
           kind = state.kind === 'agent' ? 'move' : 'connect';
-          form = wantApp ? 'app' : state.kind === 'agent' ? state.form : 'npx';
+          // APP-CONTINUITY: a new connect from inside the app (where it may be written) is the
+          // app form; a move keeps the entry's form (a browser-made npx entry stays npx).
+          form = wantApp
+            ? 'app'
+            : state.kind === 'agent'
+              ? state.form
+              : inApp && located?.status === 'ok'
+                ? 'app'
+                : 'npx';
           // A move keeps an app-form entry only while the app may be written.
           if (form === 'app' && located?.status !== 'ok') return brief('app_location');
           text = setEntry(def, before.text, agent, { ...recognise, form });
