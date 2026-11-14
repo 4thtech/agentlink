@@ -389,6 +389,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
    * renewed every RECORD_RENEW_MS; a record that is not renewed stops counting).
    */
   let recordScope: string | undefined;
+  /** NOTIFY-UPDATE-READY: the first look of this run is done (an update already waiting is alerted once). */
+  let firstLookDone = false;
   let recordAt = 0;
   const mark = async (scope: string | undefined): Promise<void> => {
     if (deps.alertsRecord === undefined) return;
@@ -423,7 +425,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     if (state === undefined) return;
     // Another ID's approvals (a switch): a fresh first look, whatever the scope says yet.
     const prev = baselineOf === source ? alertBaseline : undefined;
-    const { news, baseline } = planAlerts(prev, waitingIds, state);
+    const { news, baseline } = planAlerts(prev, waitingIds, state, { launch: !firstLookDone });
+    firstLookDone = true;
     alertBaseline = baseline;
     baselineOf = source;
     await mark(state.scope);

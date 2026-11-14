@@ -191,6 +191,24 @@ describe('the notification store', () => {
     expect(await store.list()).toEqual([]);
   });
 
+  it('NOTIFY-UPDATE-READY: an update that becomes ready is news again (count 2, unread)', async () => {
+    const c = clock();
+    const store = createNotificationStore(memoryNotificationPersistence(), { now: c.now });
+    await store.observe({ update: 1 });
+    await store.markRead('update');
+    c.advance(60);
+    await store.observe({ update: 2 });
+    expect(await store.list()).toEqual([
+      { id: 'update', kind: 'update', count: 2, at: T0 + 60, read: false },
+    ]);
+    // Ready again, or back to available: no new news.
+    c.advance(60);
+    await store.markRead('update');
+    await store.observe({ update: 2 });
+    await store.observe({ update: 1 });
+    expect((await store.list())[0]?.read).toBe(true);
+  });
+
   it('keeps at most 200 items, the newest', async () => {
     const c = clock();
     const store = createNotificationStore(memoryNotificationPersistence(), { now: c.now });

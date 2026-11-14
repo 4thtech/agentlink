@@ -10861,3 +10861,10 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** N7 (native notifications), NOTIFY-WIRING-054
 - **Spec:** 08 §1 (notification centre); 11 §5
 - **Done when:** a click on an approval notification opens `/approve/<id>` when one request is waiting (the list when several); a click on a message or file notification opens Home with that person's conversation open; the link carries only an opaque local ID (a request's or a person's), never content or a name; the ID is checked by the pipe parser, the core and Home (an unknown one opens Home as before); tests for the pipe, the shell, the core and Home's reader.
+
+#### NOTIFY-UPDATE-READY · Alert when the update is ready to install, and once at launch if one is pending (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (a count on the private pipe; no new data)
+- **Repo/path:** agentlink · `apps/cli/src/desktop/{alerts,host-core}.ts`, `apps/desktop/src/main/notify.ts`, `packages/node/src/{approval-server,notifications}.ts`
+- **Depends on:** UPD-5 (in-app update), NOTIFY-DEEPLINK
+- **Spec:** 08 §1; 11 §5
+- **Done when:** the update item counts 1 while available and 2 once downloaded and verified (`ready`); going from 1 to 2 is news again (once; the same state never repeats); the notification says "Update ready: a new version is ready to install" only for 2 and "Update available" for 1; an unread update already waiting at launch is alerted once per run (never again when another ID opens); the Updates switch still decides; tests.

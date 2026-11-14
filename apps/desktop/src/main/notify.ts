@@ -38,6 +38,8 @@ export const NOTIFY_TITLES: Readonly<Record<NotifyKind, string>> = Object.freeze
   files: 'File received',
   update: 'Update ready',
 });
+/** The title of an update that is only available (count 1; count 2 is ready to install). */
+export const UPDATE_AVAILABLE_TITLE = 'Update available';
 
 /** The one page a click opens, per kind (a `show` route; never a path). */
 export const NOTIFY_ROUTES: Readonly<Record<NotifyKind, ShowRoute>> = Object.freeze({
@@ -76,7 +78,10 @@ export function notificationText(
       if (named) return { title, body: count === 1 ? `From ${name}.` : `${n} files from ${name}.` };
       return { title, body: count === 1 ? 'From a contact.' : `${n} files from your contacts.` };
     case 'update':
-      return { title, body: 'A new version of AgentLink is ready to install.' };
+      // NOTIFY-UPDATE-READY: count 2 = downloaded and verified; count 1 = available.
+      return count >= 2
+        ? { title, body: 'A new version of AgentLink is ready to install.' }
+        : { title: UPDATE_AVAILABLE_TITLE, body: 'A new version of AgentLink is available.' };
   }
 }
 
@@ -122,7 +127,10 @@ export class NativeNotifier {
       before === undefined
         ? { count: message.count, name: message.name, target: message.target ?? '' }
         : {
-            count: message.kind === 'approvals' ? message.count : before.count + message.count,
+            count:
+              message.kind === 'approvals' || message.kind === 'update'
+                ? Math.max(before.count, message.count)
+                : before.count + message.count,
             name: before.name === message.name ? before.name : '',
             // One target only while it is the same one (NOTIFY-DEEPLINK); else the kind's page.
             target: before.target === (message.target ?? '') ? before.target : '',

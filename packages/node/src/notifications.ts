@@ -60,7 +60,8 @@ export interface NotificationInbound {
 export interface NotificationSignals {
   readonly approvals?: number;
   readonly inbound?: readonly NotificationInbound[];
-  readonly update?: boolean;
+  /** An update: false/0 none, true/1 available, 2 ready to install (NOTIFY-UPDATE-READY). */
+  readonly update?: boolean | 0 | 1 | 2;
   /** The network has been down for more than 10 minutes. */
   readonly networkDown?: boolean;
   /** When the inbound read ended (unix seconds); the cursor moves there. */
@@ -221,7 +222,7 @@ export function createNotificationStore(
         };
         const approvals = signals.approvals;
         state('approvals', whole(approvals) ? approvals : undefined);
-        state('update', signals.update === undefined ? undefined : signals.update ? 1 : 0);
+        state('update', signals.update === undefined ? undefined : Number(signals.update));
         state(
           'network',
           signals.networkDown === undefined ? undefined : signals.networkDown ? 1 : 0,

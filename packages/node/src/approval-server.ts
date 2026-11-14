@@ -1848,7 +1848,11 @@ export async function startApprovalServerWith(
         }
       }
       const update = options.appUpdate?.view();
-      if (update !== undefined) out.update = update.state === 'available';
+      // NOTIFY-UPDATE-READY: 1 while one is available, 2 once it is downloaded and verified, ready to
+      // install (a bigger count is news again for the store and the desktop alert).
+      if (update !== undefined) {
+        out.update = update.state === 'ready' ? 2 : update.state === 'available' ? 1 : 0;
+      }
       try {
         const health = await uiContext.health?.();
         const relays = health?.relays;

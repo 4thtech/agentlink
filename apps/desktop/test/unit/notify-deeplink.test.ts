@@ -1,6 +1,6 @@
-// NOTIFY-DEEPLINK (S1): a click on a notification opens the one request or the
+// NOTIFY-DEEPLINK, NOTIFY-UPDATE-READY (S1): a click on a notification opens the one request or the
 // one conversation it is about. The pipe carries only an opaque local ID (a request's or a person's),
-// shape-checked on both sides; never content, a name or a path.
+// shape-checked on both sides; never content, a name or a path. An update that is ready to install says so.
 import { describe, expect, it } from 'vitest';
 import {
   encodeShellMessage,
@@ -155,5 +155,36 @@ describe('a click carries the notification target', () => {
     timers.advance(NOTIFY_GAP_MS);
     FakeNotification.shown[1]?.click();
     expect(clicks).toEqual([{ route: 'inbox' }]);
+  });
+});
+
+describe('NOTIFY-UPDATE-READY: the words follow the state', () => {
+  it('ready to install says so; only available says available', () => {
+    expect(notificationText('update', 2, '')).toEqual({
+      title: 'Update ready',
+      body: 'A new version of AgentLink is ready to install.',
+    });
+    expect(notificationText('update', 1, '')).toEqual({
+      title: 'Update available',
+      body: 'A new version of AgentLink is available.',
+    });
+  });
+
+  it('coalesced: the more advanced state wins (never counts added)', () => {
+    FakeNotification.shown = [];
+    const timers = new FakeTimers();
+    const notifier = new NativeNotifier({ Notification: FakeNotification, timers, onClick: () => {} });
+    const update = (count: number): NotifyMessage => ({
+      v: 1,
+      type: 'notify',
+      kind: 'update',
+      count,
+      name: '',
+    });
+    notifier.handle(update(1));
+    notifier.handle(update(1));
+    notifier.handle(update(2));
+    timers.advance(NOTIFY_GAP_MS);
+    expect(FakeNotification.shown[1]?.options.title).toBe('Update ready');
   });
 });

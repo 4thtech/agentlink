@@ -7,7 +7,8 @@
 //   already waiting is alerted (the window opens on Home anyway).
 // - News: an approval waiting that was not at the last look, by its ID, so one decided and another
 //   raised within one tick is still news (IR-N7-1 L-3); the count is the number waiting. A person's messages or
-//   files item that is new, grew or came back unread (how many are new); an update that became ready.
+//   files item that is new, grew or came back unread (how many are new); an update that became
+//   available (count 1) or ready to install (count 2), and one already waiting at launch.
 // - The owner's switches decide (Settings › Notifications; D2: approvals on, the rest off). A name
 //   only with Show names on, only from the owner-given names the server answered (nameSource
 //   'owner'), and only in the pipe's plain name shape; otherwise "".
@@ -60,9 +61,21 @@ export function planAlerts(
   prev: AlertBaseline | undefined,
   approvals: readonly string[],
   source: AlertSource,
+  options: { readonly launch?: boolean } = {},
 ): { readonly news: readonly AlertNews[]; readonly baseline: AlertBaseline } {
   const baseline = baselineOf(source.scope, approvals, source.items);
-  if (prev === undefined || prev.scope !== source.scope) return { news: [], baseline };
+  if (prev === undefined || prev.scope !== source.scope) {
+    // NOTIFY-UPDATE-READY: once at launch, an update that is already waiting (the first look of the
+    // app's run only; another ID opened later never repeats it, the update is install-wide).
+    const pending =
+      options.launch === true && prev === undefined
+        ? source.items.find((i) => i.kind === 'update' && !i.read)
+        : undefined;
+    return {
+      news: pending === undefined ? [] : [{ kind: 'update', count: pending.count }],
+      baseline,
+    };
+  }
   const news: AlertNews[] = [];
   if (approvals.some((id) => !prev.approvals.has(id))) {
     const only = approvals.length === 1 ? approvals[0] : undefined;
@@ -83,8 +96,9 @@ export function planAlerts(
       const grew = before !== undefined && !before.read && item.count >= before.count;
       const count = Math.max(1, grew ? item.count - before.count : item.count);
       news.push({ kind: item.kind, count, ref: item.ref });
-    } else if (item.kind === 'update' && before === undefined) {
-      news.push({ kind: 'update', count: 1 });
+    } else if (item.kind === 'update' && (before === undefined || item.count > before.count)) {
+      // 1: an update is available; 2: it is downloaded and verified, ready to install (NOTIFY-UPDATE-READY).
+      news.push({ kind: 'update', count: item.count });
     }
   }
   return { news, baseline };
