@@ -10891,3 +10891,9 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** NOTIFY-ALL-IDS, N7
 - **Spec:** 08 §1; 11 §5
 - **Done when:** a person's file and message arriving together (one look) or within 20 s (either order, across looks) raise one alert (whichever arrives first is shown; within one look the file's); only alerts the owner's switches let through are counted, so an off switch never hides the other kind; different people and approvals/updates are untouched. A file alone is one flow event (kind `file`), never a file plus a message.
+
+#### P2-ENV-GUARD · The update-signing environment guard requires talirezun as the only reviewer (0.5.5)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**` guard, signing key)
+- **Repo/path:** agentlink · `tools/release/desktop-update-environment.mjs` (+ test), `docs/runbooks/desktop-update-keys.md`
+- **Depends on:** UPD-3 (IR-UPD-8-2 low)
+- **Done when:** the guard used by release and renewal fails closed unless every required reviewer of `desktop-update` is the user `talirezun` (no teams, no other person); tests; no permission change.

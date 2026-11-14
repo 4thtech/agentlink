@@ -3,7 +3,8 @@
 // the first time a job names it. So before any job can reach DESKTOP_UPDATE_KEY, a job without a
 // secret checks (read-only REST answers, saved by `gh api`) that the environment `desktop-update`
 // exists and has:
-//   - a required-reviewers rule with at least one reviewer (the owner's approval click),
+//   - a required-reviewers rule whose reviewers are exactly the owner, the user `talirezun`
+//     (P2-ENV-GUARD: any other reviewer, team or extra person fails; the owner's approval click),
 //   - a custom deployment branch policy that allows exactly the branch `main` (nothing else),
 //   - `can_admins_bypass: false`.
 // It fails closed on anything else. No network, no crypto; it prints fixed sentences only.
@@ -15,6 +16,9 @@ import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 
 export class EnvironmentError extends Error {}
+
+/** The only account allowed to approve a signing run (Tali, the owner). */
+export const OWNER_LOGIN = 'talirezun';
 
 const SETUP = 'Owner: set it up as in docs/runbooks/desktop-update-keys.md (RB-23), step 1.';
 
@@ -36,6 +40,14 @@ export function checkEnvironment(env, policies) {
   if (!reviewers || !Array.isArray(reviewers.reviewers) || reviewers.reviewers.length < 1) {
     fail('has no required reviewer');
   }
+  // P2-ENV-GUARD: every reviewer must be the owner's user account (not a team, not another person).
+  const onlyOwner = reviewers.reviewers.every(
+    (entry) =>
+      entry?.type === 'User' &&
+      typeof entry.reviewer?.login === 'string' &&
+      entry.reviewer.login.toLowerCase() === OWNER_LOGIN,
+  );
+  if (!onlyOwner) fail(`has a required reviewer who is not ${OWNER_LOGIN}`);
   const branch = env.deployment_branch_policy;
   if (
     branch === null ||
@@ -75,7 +87,9 @@ export function main(argv, { out = (l) => console.log(l) } = {}) {
     out(`::error::${error instanceof EnvironmentError ? error.message : 'Unexpected error.'}`);
     return 1;
   }
-  out('The environment desktop-update has a required reviewer, main only, and no admin bypass.');
+  out(
+    'The environment desktop-update has talirezun as its only required reviewer, main only, and no admin bypass.',
+  );
   return 0;
 }
 
