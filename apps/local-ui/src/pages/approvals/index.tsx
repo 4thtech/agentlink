@@ -39,6 +39,14 @@ import {
 } from '../start/setup-state.js';
 import { Button, PageNotice, type PayPlatform } from '@4thtech-io/ui';
 import { inDesktopApp } from '../../desktop.js';
+import { desktopPlatform, nativeSensor } from '../../presence/desktop.js';
+import { readNativeStatus, type NativeStatus } from '../../presence/native-api.js';
+import { nativeStoredOf } from '../../presence/native-switch.js';
+import { webAuthnHere } from '../../presence/webauthn-here.js';
+import { navigate } from '../../router.js';
+
+/** APP-CONTINUITY: where the app's own Touch ID / Windows Hello is turned on (master code once). */
+const TOUCH_ID_PATH = '/settings/touch-id';
 import { noticeKey, useDismissed } from '../../notices/index.js';
 import { detectPlatform } from '../first-run/passkey.js';
 import { SENSOR } from '../first-run/strings.js';
@@ -73,13 +81,9 @@ export interface ApprovalsPageProps {
   readonly nativePresence?: NativePresenceSlot;
 }
 
+/** APP-CONTINUITY: never in the desktop app's window (presence/webauthn-here.ts). */
 export function browserPasskeys(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    'PublicKeyCredential' in window &&
-    typeof navigator !== 'undefined' &&
-    navigator.credentials !== undefined
-  );
+  return webAuthnHere();
 }
 
 export interface OwnerView extends OwnerState {
@@ -150,7 +154,8 @@ export function OwnerPanel({
   canPasskey,
   needsOwnerOnly = false,
   desktop = inDesktopApp(),
-  nativePresence,
+  nativePresence: givenNative,
+  nativeStatus = readNativeStatus,
 }: {
   owner: OwnerView;
   canPasskey: boolean;
@@ -158,9 +163,34 @@ export function OwnerPanel({
   /** Test seam: running in the desktop app. Default: its user-agent marker. */
   desktop?: boolean;
   nativePresence?: NativePresenceSlot | undefined;
+  /** Test seam: the desktop app's native presence status. */
+  nativeStatus?: () => Promise<NativeStatus>;
 }): ReactElement | null {
   const id = useOpenIdName();
   const [dismissed, dismiss] = useDismissed(noticeKey('protect-approvals', id));
+  // APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): an owner made in the browser opens in
+  // the app with approvals on the master code. Where the app's own Touch ID / Windows Hello can be
+  // turned on, this offers it: its setting asks the master code once, then one OS gesture.
+  const [offered, setOffered] = useState<NativePresenceSlot | undefined>(undefined);
+  useEffect(() => {
+    if (!desktop || givenNative !== undefined) return undefined;
+    let live = true;
+    void nativeStatus()
+      .catch((): NativeStatus => ({ available: false, registered: false }))
+      .then((status) => {
+        if (!live || !status.available || nativeStoredOf(status) === 'on') return;
+        if (status.reason === 'other_owner') return;
+        const platform = desktopPlatform();
+        setOffered({
+          ...(platform === undefined ? {} : { sensor: nativeSensor(platform) }),
+          turnOn: () => navigate(TOUCH_ID_PATH),
+        });
+      });
+    return () => {
+      live = false;
+    };
+  }, [desktop, givenNative]);
+  const nativePresence = givenNative ?? offered;
   if (!owner.ready) {
     return (
       <PageNotice tone="warning" icon="key-round" title={S.needsOwnerTitle}>

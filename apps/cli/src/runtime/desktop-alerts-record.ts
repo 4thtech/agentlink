@@ -169,6 +169,19 @@ export async function desktopAlertsFor(
 }
 
 /**
+ * NOTIFY-ALL-IDS: the ID a running desktop app alerts for (the same record checks as
+ * `desktopAlertsFor`), or undefined when none runs.
+ */
+export async function desktopAlertsOwner(
+  home: string,
+  checks: DesktopAlertsChecks = {},
+): Promise<string | undefined> {
+  const record = await readRecord(home);
+  if (record === undefined) return undefined;
+  return (await desktopAlertsFor(home, record.id, checks)) ? record.id : undefined;
+}
+
+/**
  * Whether `agentlink mcp` for the ID `id` may raise the osascript / notify-send approval alert: not
  * while the desktop app alerts for that ID; otherwise the owner's "Approvals waiting" switch.
  */

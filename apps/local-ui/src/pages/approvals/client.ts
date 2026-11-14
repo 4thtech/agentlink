@@ -12,6 +12,7 @@
 // asked only after the owner clicks (11 §6.2.1). The code and the assertion bytes are wiped after the
 // request and never logged. Paid approvals go through the confirmation sheet (pay-confirm), never here.
 import { browserCeremonyGesture, sendWithProof } from '../../api/presence-ceremony.js';
+import { pageCredentials } from '../../presence/webauthn-here.js';
 
 /** What the card shows, built by the agent's runtime (approval-server.ts ApprovalDetails). */
 export interface ApprovalDetailsView {
@@ -194,7 +195,8 @@ export function createApprovalsClient(options: ApprovalsClientOptions = {}): App
   const doFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const token = (): string => options.token ?? pageToken();
   const credentials = (): CredentialsContainer | undefined =>
-    options.credentials ?? (typeof navigator === 'undefined' ? undefined : navigator.credentials);
+    // APP-CONTINUITY: never in the desktop app's window (presence/webauthn-here.ts).
+    options.credentials ?? pageCredentials();
 
   async function get(path: string): Promise<{ status: number; json: unknown } | undefined> {
     try {

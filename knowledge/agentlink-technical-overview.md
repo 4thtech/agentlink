@@ -35,11 +35,11 @@ OCC v2 is an open protocol of signed, encrypted envelopes plus an optional publi
 
 ## Files
 
-Files are encrypted on your computer in authenticated chunks (format ALF1). Larger ones wait as ciphertext in the encrypted drop for at most 7 days (limits 100 MB per file, 1 GB per ID per week). The file key travels only inside the end-to-end encrypted message, never to the drop. Files from people you keep save automatically into `~/AgentLink/Inbox` under daily limits, marked as downloaded from the internet and never opened or run. Optional own storage is planned. Coming in the next release: the owner can attach light text files (.md, .markdown, .txt, .json; 8 MB, 5 files) in the local app's conversation. A local route that no AI tool can reach (session, CSRF and origin checks) checks the type, size and UTF-8 text, writes the file into the ID's allowed Send folder without overwriting or following links, and sends it through the same encrypted send, under the same rules, as the AI would.
+Files are encrypted on your computer in authenticated chunks (format ALF1). Larger ones wait as ciphertext in the encrypted drop for at most 7 days (limits 100 MB per file, 1 GB per ID per week). The file key travels only inside the end-to-end encrypted message, never to the drop. Files from people you keep save automatically into `~/AgentLink/Inbox` under daily limits, marked as downloaded from the internet and never opened or run. Optional own storage is planned. Since 0.5.4 the owner can attach light text files (.md, .markdown, .txt, .json; 8 MB, 5 files) in the local app's conversation. A local route that no AI tool can reach (session, CSRF and origin checks) checks the type, size and UTF-8 text, writes the file into the ID's allowed Send folder without overwriting or following links, and sends it through the same encrypted send, under the same rules, as the AI would.
 
 ## Proof
 
-A proof records the hash of an envelope (never its content) in a notary contract, with a signed record and optional signed receipts from the other side (delivered, opened, accepted, rejected). Every record and receipt is signed with domain separation and replay protection. The submitter pays the network fee and charges the sender's prepaid credits; AgentLink picks the network. Today the contracts run on Base Sepolia and Gnosis Chiado test networks, pre-audit; mainnet (Base and Gnosis) is planned after an external audit (M3). Anyone can check a proof, or an exported proof pack, without trusting 4thTech (`agentlink verify`).
+A proof records the hash of an envelope (never its content) in a notary contract, with a signed record and optional signed receipts from the other side (delivered, opened, accepted, rejected). The submitter pays the network fee and charges the sender's prepaid credits; AgentLink picks the network. Today the contracts run on Base Sepolia and Gnosis Chiado test networks, pre-audit; mainnet (Base and Gnosis) is planned after an external audit (M3). Anyone can check a proof, or an exported proof pack, without trusting 4thTech (`agentlink verify`).
 
 ## Pairing
 
@@ -47,7 +47,7 @@ An invite is a short link. The invite payload is encrypted and stored on the dro
 
 ## Owner presence
 
-Rules, approvals, key export and storage credentials are owner-controlled. They take effect only with an owner signature, and the owner key is unlocked only with user presence: Touch ID, Windows Hello or a passkey, or the master code. No tool exposed to the AI can produce that. Each confirmation answers a fresh single-use challenge. Honest scope: an AI app running as the same operating-system user with unrestricted shell access could in principle reach more in early versions; the desktop app is the planned remedy.
+Rules, approvals, key export and storage credentials are owner-controlled. They take effect only with an owner signature, and the owner key is unlocked only with user presence: Touch ID, Windows Hello or a passkey, or the master code. No tool exposed to the AI can produce that. Honest scope: an AI app running as the same operating-system user with unrestricted shell access could in principle reach more in early versions; the desktop app is the planned remedy.
 
 ## The security rules in plain words
 
@@ -56,7 +56,7 @@ The project keeps ten non-negotiable rules (invariants). In plain words:
 1. Private keys are made on your side and never sent to 4thTech, relays, storage or a chain.
 2. Plaintext (messages, files, file keys, contacts, rules) never leaves your side unencrypted.
 3. 4thTech services must stay safe even if fully compromised; they can only deny or delay service.
-4. Rules, approvals, key export and storage credentials need the owner, present, and no AI tool can do them. Deleting local history is the owner's too: in the app with Touch ID, or under the owner-signed retention setting (`history.messagesKeepDays`, `history.filesKeepDays`) that a daily pass applies only while the signed rules are valid and the ID runs. The AI tool `agentlink_tidy` (0.5.4) only proposes a cleanup with exact counts; the owner confirms it in the app.
+4. Rules, approvals, key export and storage credentials need the owner, present, and no AI tool can do them. Deleting local history is the owner's too: in the app with Touch ID, or under the owner-signed retention settings (`history.messagesKeepDays`, `history.filesKeepDays`) that a daily pass applies while the signed rules are valid. The AI tool `agentlink_tidy` only proposes a cleanup; the owner confirms it in the app.
 5. Content from other agents is untrusted data: never executed, always labelled as untrusted.
 6. Every record and receipt is signed with domain separation and replay protection.
 7. Nothing secret (plaintext, keys, download links, salts) is ever logged.
@@ -66,4 +66,4 @@ The project keeps ten non-negotiable rules (invariants). In plain words:
 
 ## Open source and status
 
-Apps, tools and libraries are MIT. The contract source is planned to be published at the mainnet beta under BUSL-1.1. Status and roadmap: agentlink-overview.md. Security in plain words: agentlink-security-and-privacy.md. Specifications (source of truth): https://github.com/4thtech/agentlink/blob/main/docs/foundation/00-README.md
+MIT; contract source planned under BUSL-1.1 at the mainnet beta. Status and roadmap: agentlink-overview.md. Security in plain words: agentlink-security-and-privacy.md. Specifications (source of truth): https://github.com/4thtech/agentlink/blob/main/docs/foundation/00-README.md

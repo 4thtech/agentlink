@@ -230,12 +230,25 @@ export interface AppHostHandoffRecordValue {
   readonly port: number;
   /** 32 random bytes, base64url (43 characters). */
   readonly handoffToken: string;
+  /** APP-CONTINUITY: set by the desktop app's host only (a terminal `ui` host has none). */
+  readonly host?: 'desktop';
 }
 
 /** U3-invite: where the CLI keeps the handoff record (written 0600, removed at exit). */
 export interface AppHostHandoffRecord {
   write(record: AppHostHandoffRecordValue): Promise<void>;
   remove(): Promise<void>;
+  /**
+   * APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): `POST /api/ui/host/yield` with the
+   * record's token. True when this host will close now (a terminal `agentlink ui` host the desktop
+   * app takes over); absent or false: it keeps running (`kept`). Called after the gate's checks.
+   */
+  onYield?(): boolean;
+  /**
+   * APP-CONTINUITY: `POST /api/ui/host/show` with the record's token. True when this host showed
+   * its window (the desktop app, for terminal `agentlink ui`); absent or false: `kept`.
+   */
+  onShow?(): boolean;
 }
 
 /** U3-g-b: first run with no agent yet (the folders of its first policy, the owner-file check). */

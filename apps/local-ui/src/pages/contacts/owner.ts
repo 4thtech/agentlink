@@ -15,6 +15,7 @@ import {
   proofBody,
   type CeremonyGesture,
 } from '../../api/presence-ceremony.js';
+import { webAuthnHere } from '../../presence/webauthn-here.js';
 
 /**
  * The master code as typed, or the passkey: REL051-SF1, the gesture runs when the request is sent,
@@ -91,13 +92,9 @@ async function answerOf(
   }
 }
 
+// APP-CONTINUITY: never in the desktop app's window (presence/webauthn-here.ts).
 function canPasskey(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    typeof (window as { PublicKeyCredential?: unknown }).PublicKeyCredential !== 'undefined' &&
-    typeof navigator !== 'undefined' &&
-    navigator.credentials !== undefined
-  );
+  return webAuthnHere();
 }
 
 export function createOwnerClient(options: OwnerClientOptions = {}): OwnerClient {

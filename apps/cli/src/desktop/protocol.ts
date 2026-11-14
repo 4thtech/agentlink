@@ -229,8 +229,26 @@ export const SESSION_PATHS = Object.freeze([
   '/settings/updates',
 ] as const);
 
+/** NOTIFY-DEEPLINK: the one request a notification click opens (06 §2.5's ID shape). */
+export const APPROVAL_TARGET = /^apr_[A-Za-z0-9_-]{22}$/;
+/** NOTIFY-DEEPLINK: the one person a notification click opens (an opaque local contact ID). */
+export const PERSON_TARGET = /^0x[0-9a-f]{40}$/;
+
+/**
+ * True for the opaque target a notification may carry: a request's ID for `approvals`, a person's ID
+ * for `messages` and `files`; nothing else (never content, a name or a path).
+ */
+export function isNotifyTarget(kind: NotifyKind | ShowRoute, value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  if (kind === 'approvals') return APPROVAL_TARGET.test(value);
+  if (kind === 'messages' || kind === 'files' || kind === 'inbox') return PERSON_TARGET.test(value);
+  return false;
+}
+
+// `/approve/<id>` and a `#person=<id>` fragment (NOTIFY-DEEPLINK): the fragment never leaves the
+// window (a browser does not send it to the server); Home reads it and opens that person.
 const SESSION_URL =
-  /^http:\/\/localhost:([1-9][0-9]{0,4})(\/|\/first-run|\/settings\/home|\/settings\/join|\/settings\/updates)\?t=[A-Za-z0-9_-]{43}$/;
+  /^http:\/\/localhost:([1-9][0-9]{0,4})(?:\/|\/first-run|\/settings\/home|\/settings\/join|\/settings\/updates|\/approve\/apr_[A-Za-z0-9_-]{22})\?t=[A-Za-z0-9_-]{43}(?:#person=0x[0-9a-f]{40})?$/;
 
 /** 08 §4: the canonical invite (join.ts CANONICAL; a test keeps them equal). */
 const INVITE_CANONICAL = /^https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_-]{1,21846}$/;
@@ -266,11 +284,13 @@ export interface NotifyMessage {
   readonly count: number;
   /** "" or an owner-given alias (messages, files only). */
   readonly name: string;
+  /** NOTIFY-DEEPLINK: the one request or person a click opens (isNotifyTarget); absent for none. */
+  readonly target?: string;
 }
 
 export type ShellMessage =
   | { readonly v: 1; readonly type: 'invite'; readonly link: string }
-  | { readonly v: 1; readonly type: 'show'; readonly route: ShowRoute }
+  | { readonly v: 1; readonly type: 'show'; readonly route: ShowRoute; readonly target?: string }
   | { readonly v: 1; readonly type: 'shutdown' }
   | ({ readonly v: 1; readonly type: 'app-update' } & AppUpdateView);
 
@@ -325,8 +345,13 @@ export function parseShellMessage(line: string): ShellMessage | undefined {
       return Object.freeze({ v: 1, type: 'invite', link: m['link'] });
     }
     case 'show': {
-      const m = exactObject(value, ['v', 'type', 'route']);
+      const withTarget = typeof value === 'object' && value !== null && 'target' in value;
+      const m = exactObject(value, ['v', 'type', 'route', ...(withTarget ? ['target'] : [])]);
       if (m?.['v'] !== DESKTOP_PIPE_VERSION || !isOneOf(SHOW_ROUTES, m['route'])) return undefined;
+      if (withTarget) {
+        if (!isNotifyTarget(m['route'], m['target'])) return undefined;
+        return Object.freeze({ v: 1, type: 'show', route: m['route'], target: m['target'] });
+      }
       return Object.freeze({ v: 1, type: 'show', route: m['route'] });
     }
     case 'shutdown': {
@@ -416,7 +441,15 @@ export function parseHostMessage(line: string): HostMessage | undefined {
       return Object.freeze({ v: 1, type: head.type });
     }
     case 'notify': {
-      const m = exactObject(value, ['v', 'type', 'kind', 'count', 'name']);
+      const withTarget = typeof value === 'object' && value !== null && 'target' in value;
+      const m = exactObject(value, [
+        'v',
+        'type',
+        'kind',
+        'count',
+        'name',
+        ...(withTarget ? ['target'] : []),
+      ]);
       if (m?.['v'] !== DESKTOP_PIPE_VERSION || !isOneOf(NOTIFY_KINDS, m['kind'])) return undefined;
       const kind = m['kind'];
       const count = m['count'];
@@ -424,6 +457,10 @@ export function parseHostMessage(line: string): HostMessage | undefined {
       if (!isCount(count) || count < 1 || typeof name !== 'string') return undefined;
       if (name !== '' && (!NOTIFY_NAME_KINDS.includes(kind) || !isNotifyName(name))) {
         return undefined;
+      }
+      if (withTarget) {
+        if (!isNotifyTarget(kind, m['target'])) return undefined;
+        return Object.freeze({ v: 1, type: 'notify', kind, count, name, target: m['target'] });
       }
       return Object.freeze({ v: 1, type: 'notify', kind, count, name });
     }

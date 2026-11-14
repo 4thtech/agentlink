@@ -7,11 +7,15 @@
 //   (the pipe parser refuses any other shape). Never message text, a file name, a link or an amount
 //   (11 §5.2, §5.7; I-5).
 // - A click focuses the window and opens the kind's ONE fixed route (NOTIFY_ROUTES, a `show` enum);
-//   nothing from a notification can choose a page, and no notification has an action that approves,
-//   accepts or replies (11 §10).
+//   nothing from a notification can choose a page. NOTIFY-DEEPLINK: it may also carry one opaque local
+//   ID (a request's or a person's), shape-checked by the pipe parser and again by the core before it
+//   opens that one request or conversation; never content. No notification has an action that
+//   approves, accepts or replies (11 §10).
 // - At most one notification per kind per NOTIFY_GAP_MS (30 s, 06's OS-alert rule). What arrives
 //   meanwhile is coalesced into one later notification: approvals keep the latest number waiting,
 //   messages and files add up; a name stays only while it is the same person.
+// - NOTIFY-FOCUS: while the AgentLink window is focused, no alert is shown at all (the in-app notification
+//   centre, the tray and the dock badge still update from the core).
 // - Electron drops a notification's click handler once the object is collected, so each shown one
 //   is held until it is clicked or closed (at most MAX_HELD).
 import {
@@ -36,6 +40,8 @@ export const NOTIFY_TITLES: Readonly<Record<NotifyKind, string>> = Object.freeze
   files: 'File received',
   update: 'Update ready',
 });
+/** The title of an update that is only available (count 1; count 2 is ready to install). */
+export const UPDATE_AVAILABLE_TITLE = 'Update available';
 
 /** The one page a click opens, per kind (a `show` route; never a path). */
 export const NOTIFY_ROUTES: Readonly<Record<NotifyKind, ShowRoute>> = Object.freeze({
@@ -74,7 +80,10 @@ export function notificationText(
       if (named) return { title, body: count === 1 ? `From ${name}.` : `${n} files from ${name}.` };
       return { title, body: count === 1 ? 'From a contact.' : `${n} files from your contacts.` };
     case 'update':
-      return { title, body: 'A new version of AgentLink is ready to install.' };
+      // NOTIFY-UPDATE-READY: count 2 = downloaded and verified; count 1 = available.
+      return count >= 2
+        ? { title, body: 'A new version of AgentLink is ready to install.' }
+        : { title: UPDATE_AVAILABLE_TITLE, body: 'A new version of AgentLink is available.' };
   }
 }
 
@@ -82,13 +91,18 @@ export interface NativeNotifierOptions {
   /** Electron's Notification; absent or unsupported: nothing is shown. */
   readonly Notification?: NotificationConstructor;
   readonly timers: Timers;
+  /**
+   * NOTIFY-FOCUS: true while AgentLink's window is shown and focused. Then no OS alert is raised (the
+   * person is looking at the app; its notification centre and badges still update). Absent: never.
+   */
+  readonly windowFocused?: () => boolean;
   /** A notification was clicked: focus the window and open this fixed route. */
-  readonly onClick: (route: ShowRoute) => void;
+  readonly onClick: (route: ShowRoute, target?: string) => void;
 }
 
 interface KindState {
   lastShownAt: number | undefined;
-  pending: { count: number; name: string } | undefined;
+  pending: { count: number; name: string; target: string } | undefined;
   timer: unknown;
 }
 
@@ -112,16 +126,21 @@ export class NativeNotifier {
     const free = state.lastShownAt === undefined || now - state.lastShownAt >= NOTIFY_GAP_MS;
     if (free && state.pending === undefined) {
       state.lastShownAt = now;
-      this.show(message.kind, message.count, message.name);
+      this.show(message.kind, message.count, message.name, message.target ?? '');
       return;
     }
     const before = state.pending;
     state.pending =
       before === undefined
-        ? { count: message.count, name: message.name }
+        ? { count: message.count, name: message.name, target: message.target ?? '' }
         : {
-            count: message.kind === 'approvals' ? message.count : before.count + message.count,
+            count:
+              message.kind === 'approvals' || message.kind === 'update'
+                ? Math.max(before.count, message.count)
+                : before.count + message.count,
             name: before.name === message.name ? before.name : '',
+            // One target only while it is the same one (NOTIFY-DEEPLINK); else the kind's page.
+            target: before.target === (message.target ?? '') ? before.target : '',
           };
     if (state.timer === undefined) {
       const wait = Math.max(0, (state.lastShownAt ?? now) + NOTIFY_GAP_MS - now);
@@ -148,13 +167,15 @@ export class NativeNotifier {
     state.pending = undefined;
     if (pending === undefined || this.disposed) return;
     state.lastShownAt = this.options.timers.now();
-    this.show(kind, pending.count, pending.name);
+    this.show(kind, pending.count, pending.name, pending.target);
   }
 
-  private show(kind: NotifyKind, count: number, name: string): void {
+  private show(kind: NotifyKind, count: number, name: string, target: string): void {
     const Notification = this.options.Notification;
     try {
       if (Notification === undefined || !Notification.isSupported()) return;
+      // NOTIFY-FOCUS: never an OS alert on top of the window the person is using.
+      if (this.options.windowFocused?.() === true) return;
       const notification = new Notification(notificationText(kind, count, name));
       const route = NOTIFY_ROUTES[kind];
       const release = (): void => {
@@ -162,7 +183,8 @@ export class NativeNotifier {
       };
       notification.on('click', () => {
         release();
-        this.options.onClick(route);
+        if (target === '') this.options.onClick(route);
+        else this.options.onClick(route, target);
       });
       notification.on('close', release);
       if (this.held.size >= MAX_HELD) {

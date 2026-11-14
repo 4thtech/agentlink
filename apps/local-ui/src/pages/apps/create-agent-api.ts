@@ -13,6 +13,7 @@ import { parseSendFolderReview, type SendFolderReview } from '../../api/send-fol
 import { nativeCeremony } from '../../api/presence-ceremony.js';
 import { nativeStateOf } from '../../presence/native-api.js';
 import type { NativeState } from '../../presence/strings.js';
+import { pageCredentials } from '../../presence/webauthn-here.js';
 
 export const CREATE_BEGIN_PATH = '/api/ui/agents/begin';
 export const CREATE_FINISH_PATH = '/api/ui/agents';
@@ -253,8 +254,8 @@ export function createAgentApi(options: CreateAgentApiOptions = {}): CreateAgent
   const token = (): string => options.token ?? pageToken();
   const credentials =
     options.credentials ??
-    ((): CredentialsContainer | undefined =>
-      typeof navigator === 'undefined' ? undefined : navigator.credentials);
+    // APP-CONTINUITY: never in the desktop app's window (presence/webauthn-here.ts).
+    ((): CredentialsContainer | undefined => pageCredentials());
 
   async function post(
     path: string,

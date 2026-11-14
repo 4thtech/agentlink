@@ -58,7 +58,13 @@ import {
   type UiHostHooks,
 } from './ui-host.js';
 import { uiRemovalPort } from './ui-remove.js';
-import { removeAppHostRecord, writeAppHostRecord } from '../runtime/app-host-record.js';
+import {
+  desktopHostAppears,
+  removeAppHostRecord,
+  showRunningApp,
+  writeAppHostRecord,
+  type AppHostRecord,
+} from '../runtime/app-host-record.js';
 import { writeLastExit, type LastExitReason } from '../runtime/last-exit.js';
 import { guardProcess, type FatalReason } from '../runtime/ui-lifecycle.js';
 import { cliVersion } from '../runtime/cli-version.js';
@@ -155,6 +161,11 @@ export const UI_TEXT = Object.freeze({
     failed: (prefix) =>
       `AgentLink couldn't start. Your IDs are still here. Run \`${prefix} doctor\` to see why.`,
   }),
+  /** APP-CONTINUITY: the desktop app is running: its window was shown, nothing else started. */
+  inApp: 'AgentLink is open in the AgentLink app. Its window is in front now.',
+  /** APP-CONTINUITY: the desktop app took over this host (same IDs, same AI apps). */
+  movedToApp:
+    'AgentLink moved to the AgentLink app. Everything is there: your IDs, contacts and AI apps. You can close this window.',
   agentRun: (prefix: string): string =>
     `You must do this yourself: run \`${prefix} ui\` in your own terminal. It opens your AgentLink pages in your browser. Don't let your AI open them or run this for you.`,
 });
@@ -232,6 +243,11 @@ export interface UiDeps {
    * lists it as broken (Restore, Remove, Continue). Absent: nothing is noted.
    */
   noteBroken?(name: string): void;
+  /**
+   * WIN-STARTUP-LOG: one fixed diagnostic line when the app host could not start: the failure reason
+   * and a short error code only (`startFailureNote`), never the error's message. Must not throw.
+   */
+  note?(line: string): void;
   /** R1: stray background errors keep the host up; `onFatal` ends it. Returns the unsubscribe. */
   guard?(onFatal: (reason: FatalReason) => void): () => void;
   /** R1: writes why this run closed (~/.agentlink/last-exit.json). Must not throw. */
@@ -240,6 +256,16 @@ export interface UiDeps {
   onEnter?(press: () => void): () => void;
   /** F40: how long the page has to use its link before the follow-up (default OPEN_CHECK_MS). */
   readonly openCheckMs?: number;
+  /**
+   * APP-CONTINUITY (08 §1): asks a running desktop app to show its window (`shown`: nothing is
+   * started here); `none` starts as before. Absent: not looked for.
+   */
+  runningApp?(): Promise<'shown' | 'none'>;
+  /**
+   * APP-CONTINUITY: after a takeover, true once the desktop app's host record appears (a short
+   * wait). Absent or false: the plain closed line.
+   */
+  appTookOver?(): Promise<boolean>;
 }
 
 /** The command. Returns the process exit code. */
@@ -251,6 +277,11 @@ export async function uiStep(
   if (!checkOwnerTerminal(context.terminal).ok) {
     context.output.printError(UI_TEXT.agentRun(prefix));
     return EXIT_FAILED;
+  }
+  // APP-CONTINUITY: one AgentLink: with the desktop app running, its window, not a second host.
+  if ((await deps.runningApp?.().catch(() => 'none' as const)) === 'shown') {
+    context.output.print(UI_TEXT.inApp);
+    return EXIT_OK;
   }
   return serveUi(context, deps, prefix);
 }
@@ -334,7 +365,24 @@ export async function startUiServer(
       : await (deps.diagnose?.() ?? Promise.resolve('failed' as const)).catch(
           () => 'failed' as const,
         );
+  try {
+    deps.note?.(startFailureNote(failure, thrown));
+  } catch {
+    // A diagnostic that cannot be written is skipped.
+  }
   return { ok: false, failure };
+}
+
+/**
+ * WIN-STARTUP-LOG: the diagnostic line for a failed start. Only the failure reason (a fixed set)
+ * and the error's `code` when it is a short identifier (`identity_missing`, `EADDRINUSE`); the
+ * error's message, path or anything else never goes in.
+ */
+export function startFailureNote(failure: StartFailure, thrown: unknown): string {
+  const raw =
+    typeof thrown === 'object' && thrown !== null ? (thrown as { code?: unknown }).code : undefined;
+  const code = typeof raw === 'string' && /^[A-Za-z0-9_]{1,40}$/.test(raw) ? raw : 'none';
+  return `app host did not start: reason=${failure} code=${code}`;
 }
 
 /**
@@ -364,6 +412,7 @@ export async function serveUi(
   let unguard: (() => void) | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let watch: OpenWatch | undefined;
+  let closed = false;
   try {
     const fatal = new Promise<FatalReason>((resolve) => {
       unguard = deps.guard?.(resolve);
@@ -421,15 +470,33 @@ export async function serveUi(
       await deps.recordExit?.(reason.why);
       return EXIT_FAILED;
     }
-    output.print(reason.kind === 'idle' ? UI_TEXT.closedIdle(prefix) : UI_TEXT.closed(prefix));
+    const yielded = reason.kind === 'stop' && reason.signal === 'yield';
+    // APP-CONTINUITY: "moved to the app" only once the desktop app's host is really there. It
+    // starts after this host's record is gone, so this server closes first, then its record is
+    // looked for (a short wait); otherwise the plain closed line.
+    let moved = false;
+    if (yielded) {
+      closed = true;
+      await server.close().catch(() => undefined);
+      moved = (await deps.appTookOver?.().catch(() => false)) === true;
+    }
+    output.print(
+      reason.kind === 'idle'
+        ? UI_TEXT.closedIdle(prefix)
+        : moved
+          ? UI_TEXT.movedToApp
+          : UI_TEXT.closed(prefix),
+    );
     await deps.recordExit?.(
       reason.kind === 'idle'
         ? 'idle'
-        : reason.signal === 'SIGTERM'
-          ? 'sigterm'
-          : reason.signal === 'SIGHUP'
-            ? 'sighup'
-            : 'ctrl_c',
+        : moved
+          ? 'moved_to_app'
+          : reason.signal === 'SIGTERM'
+            ? 'sigterm'
+            : reason.signal === 'SIGHUP'
+              ? 'sighup'
+              : 'ctrl_c',
     );
     return EXIT_OK;
   } finally {
@@ -437,7 +504,7 @@ export async function serveUi(
     if (timer !== undefined) clearTimeout(timer);
     unsubscribe?.();
     unguard?.();
-    await server.close().catch(() => undefined);
+    if (!closed) await server.close().catch(() => undefined);
   }
 }
 
@@ -515,6 +582,24 @@ export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
     withUpdates(startApprovalServer, () => nodeBrowserUpdateDesk(cliVersion()));
   const owner = nodeOwnerDeps();
   const logger: Logger = cliLogger('ui', process.env);
+  // APP-CONTINUITY: the desktop app's takeover (`POST /api/ui/host/yield`) stops `serveUi` like
+  // Ctrl+C. Only a terminal `ui` run listens (the desktop host passes `hooks.startServer` and never
+  // yields: its handoff record answers `kept`).
+  const yielders = new Set<(signal?: string) => void>();
+  const terminalHost = hooks.startServer === undefined;
+  const handoff = {
+    write: (record: AppHostRecord) => writeAppHostRecord(homedir(), record),
+    remove: () => removeAppHostRecord(homedir()),
+    ...(terminalHost
+      ? {
+          onYield: (): boolean => {
+            if (yielders.size === 0) return false;
+            for (const stop of yielders) stop('yield');
+            return true;
+          },
+        }
+      : {}),
+  };
   return Object.freeze<UiDeps>({
     // U3-b: no agent that is being removed; the rest through the AgentDirectory seam.
     agents: async () =>
@@ -552,10 +637,7 @@ export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
           logOwnerSetupEvent(logger, event);
         },
         ...(welcomeOptions.invite === undefined ? {} : { waitingInvite: welcomeOptions.invite }),
-        handoff: {
-          write: (record) => writeAppHostRecord(homedir(), record),
-          remove: () => removeAppHostRecord(homedir()),
-        },
+        handoff,
         // U3-g-c: the same harness desk as an open agent's (U3-f), listed read-only on Welcome.
         aiApps: () => createAiAppsDesk({ home: homedir(), env: process.env }),
       });
@@ -619,10 +701,7 @@ export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
             // U3-invite (08 §4): the invite `join` checked, held in memory by the host only.
             ...(invite === undefined ? {} : { waitingInvite: invite }),
             // U3-invite: the 0600 handoff record, so a later `join` hands its invite over here.
-            handoff: {
-              write: (record) => writeAppHostRecord(homedir(), record),
-              remove: () => removeAppHostRecord(homedir()),
-            },
+            handoff,
           },
           // Fixed values only (ApprovalServerEvent, I-7).
           onEvent: (event) => {
@@ -647,9 +726,26 @@ export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
       }
     },
     waitMs: UI_WAIT_MS,
-    interrupt: (stop) => onStopSignals(stop),
+    interrupt: (stop) => {
+      const off = onStopSignals(stop);
+      yielders.add(stop);
+      return () => {
+        off();
+        yielders.delete(stop);
+      };
+    },
+    // APP-CONTINUITY: terminal `ui` shows a running desktop app instead of a second host.
+    ...(terminalHost
+      ? {
+          runningApp: () => showRunningApp(homedir()),
+          appTookOver: () => desktopHostAppears(homedir()),
+        }
+      : {}),
     // F40: Enter in the owner's terminal tries the browser again with a fresh one-shot link.
     ...optionalEnter(),
+    // WIN-STARTUP-LOG: to stderr through the redacting logger (the desktop shell sets AGENTLINK_LOG
+    // and keeps stderr in core.log); silent in a terminal unless AGENTLINK_LOG is set.
+    note: (line) => logger.warn(line),
     // R1: stray background errors are logged with a fixed code and the host keeps serving.
     guard: (onFatal) => guardProcess({ log: logger, onFatal }),
     recordExit: (reason) => writeLastExit(homedir(), { reason, version: cliVersion() }),

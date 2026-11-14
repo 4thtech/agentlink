@@ -432,6 +432,13 @@ export class DurableObjectStore implements Store {
     const present = new Set(existing);
     const missing = TABLE_NAMES.filter((t) => !present.has(t));
     for (const statement of createSqlSchemaStatements(missing)) this.#storage.sql.exec(statement);
+    // A cloud-only table that is missing is created with its triggers (each statement names its
+    // table in `CREATE TABLE "x"` or `ON "x"`).
+    for (const statement of createCloudSchemaStatements()) {
+      const table = /^CREATE TABLE "(\w+)"|\bON "(\w+)"/.exec(statement);
+      const name = table?.[1] ?? table?.[2];
+      if (name === undefined || !present.has(name)) this.#storage.sql.exec(statement);
+    }
     for (const table of TABLE_NAMES) {
       if (!present.has(table)) continue;
       const spec = sqlTableSpec(table);

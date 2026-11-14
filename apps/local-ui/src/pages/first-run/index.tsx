@@ -140,6 +140,7 @@ import {
 import './first-run.css';
 import { NativeSetupOffer } from '../../presence/native-setup.js';
 import { desktopPlatform } from '../../presence/desktop.js';
+import { inAppWindow } from '../../presence/webauthn-here.js';
 import {
   readNativeStatus,
   type NativeRegistration,
@@ -861,6 +862,8 @@ export function FirstRunPage({
    */
   const existingOwner = useCallback(
     async (isLive: () => boolean = () => true, race = false): Promise<void> => {
+      // FIRSTRUN Fable L2 (APP-CONTINUITY): an owner exists, so Home can be skipped to.
+      setOwnerKnown(true);
       const info = await upgradeApi.info();
       if (!isLive()) return;
       if (info.kind === 'error' && info.problem === 'session_expired') {
@@ -871,7 +874,15 @@ export function FirstRunPage({
         setView({ k: 'already' });
         return;
       }
-      if (info.kind === 'ok' && !info.registered && available()) {
+      // APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): never the passkey switch in the
+      // desktop app's window (no WebAuthn there). An owner made in the browser goes on here as is;
+      // the app offers its own Touch ID / Windows Hello (Home, Settings: master code once).
+      if (
+        info.kind === 'ok' &&
+        !info.registered &&
+        available() &&
+        !inAppWindow(native?.userAgent)
+      ) {
         const prf = await prfSupport().catch((): PrfSupport => 'unknown');
         if (!isLive()) return;
         // FIRSTRUN-ANY-PLATFORM: offered only where the platform passkey is known to work here
@@ -889,7 +900,7 @@ export function FirstRunPage({
       lookForApps();
       setView({ k: 'step' });
     },
-    [upgradeApi, available, prfSupport, appsApi, lookForApps, platform],
+    [upgradeApi, available, prfSupport, appsApi, lookForApps, platform, native],
   );
 
   /**
@@ -1377,7 +1388,7 @@ export function FirstRunPage({
   const noIdYet =
     view.k !== 'done' &&
     (step === 'app' || step === 'connect') &&
-    (!ownerKnown || mode?.k === 'first');
+    (!ownerKnown || (mode?.k === 'first' && view.k !== 'already'));
   const frame = (body: ReactElement, at: StepId = step): ReactElement => (
     <WizardFrame
       step={at}

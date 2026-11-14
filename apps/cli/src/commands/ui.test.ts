@@ -18,6 +18,8 @@ import {
   UI_WAIT_MS,
   onStopSignals,
   openUiPage,
+  startFailureNote,
+  startUiServer,
   uiStep,
   type UiDeps,
   type UiPage,
@@ -515,5 +517,104 @@ describe('agentlink ui with no agent at all opens Welcome (U3-g-b)', () => {
     const source = await readFile(join(dir, 'ui.ts'), 'utf8');
     expect(source).toContain('startWelcome:');
     expect(source).toContain('startUiWelcome(');
+  });
+});
+
+// APP-CONTINUITY (owner requirement 14 Nov; 08 §1 "One AgentLink, browser or app"): terminal
+// `agentlink ui` while the desktop app runs shows the app's window (no second host, no browser); and
+// a browser host the desktop app takes over closes with one plain line.
+describe('APP-CONTINUITY: agentlink ui and the desktop app', () => {
+  it('the desktop app is running: its window is shown, nothing is started', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({});
+    const withApp: UiDeps = { ...deps, runningApp: () => Promise.resolve('shown') };
+    await expect(uiStep(p.context, withApp, PREFIX)).resolves.toBe(EXIT_OK);
+    expect(calls).toMatchObject({ start: 0, opened: 0 });
+    expect(p.out).toEqual([UI_TEXT.inApp]);
+    expectNoLink(p);
+  });
+
+  it('no desktop app running: the browser host starts as before', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({});
+    const noApp: UiDeps = { ...deps, runningApp: () => Promise.resolve('none') };
+    await expect(uiStep(p.context, noApp, PREFIX)).resolves.toBe(EXIT_OK);
+    expect(calls).toMatchObject({ start: 1, opened: 1, closed: 1 });
+  });
+
+  it.each([
+    [true, UI_TEXT.movedToApp],
+    [false, UI_TEXT.closed(PREFIX)],
+  ] as const)(
+    'asked to yield: closes once; "moved to the app" only when the app host appeared (%s)',
+    async (appeared, line) => {
+      const p = probe(TTY);
+      const { deps, calls } = fakeDeps({ stop: 'never' });
+      let handler: ((signal?: string) => void) | undefined;
+      let closedBeforeLook = false;
+      const yielding: UiDeps = {
+        ...deps,
+        interrupt: (stop) => {
+          handler = stop;
+          setTimeout(() => handler?.('yield'), 10);
+          return () => undefined;
+        },
+        appTookOver: () => {
+          // The app starts only after this host closed (its record removed).
+          closedBeforeLook = calls.closed === 1;
+          return Promise.resolve(appeared);
+        },
+      };
+      await expect(uiStep(p.context, yielding, PREFIX)).resolves.toBe(EXIT_OK);
+      expect(calls.closed).toBe(1);
+      expect(closedBeforeLook).toBe(true);
+      expect(p.out.at(-1)).toBe(line);
+    },
+  );
+});
+
+describe('a failed app host start leaves one fixed diagnostic line (WIN-STARTUP-LOG)', () => {
+  it('names the reason and a short error code, never the error message or a path', async () => {
+    const notes: string[] = [];
+    const thrown = Object.assign(new Error('C:\\Users\\me\\.agentlink\\agents\\x secret=abc'), {
+      code: 'identity_missing',
+    });
+    const { deps } = fakeDeps({ agents: ['solo'] });
+    const result = await startUiServer(
+      {
+        ...deps,
+        start: () => Promise.reject(thrown),
+        diagnose: () => Promise.resolve('open' as const),
+        note: (line) => notes.push(line),
+      },
+      undefined,
+    );
+    expect(result.ok).toBe(false);
+    expect(notes).toEqual(['app host did not start: reason=open code=identity_missing']);
+  });
+
+  it('a code that is not a short identifier becomes none', () => {
+    expect(startFailureNote('open', Object.assign(new Error('x'), { code: 'a b/c' }))).toBe(
+      'app host did not start: reason=open code=none',
+    );
+    expect(startFailureNote('no_owner', undefined)).toBe(
+      'app host did not start: reason=no_owner code=none',
+    );
+  });
+
+  it('a note that throws does not change the result', async () => {
+    const { deps } = fakeDeps({ agents: ['solo'] });
+    const result = await startUiServer(
+      {
+        ...deps,
+        start: () => Promise.resolve(undefined),
+        diagnose: () => Promise.resolve('keychain' as const),
+        note: () => {
+          throw new Error('boom');
+        },
+      },
+      undefined,
+    );
+    expect(result).toEqual({ ok: false, failure: 'keychain' });
   });
 });

@@ -173,13 +173,11 @@ function whereOf(
  * - Own sent messages: `createdAt` is this computer's own send time.
  * - Received messages: the earliest time this computer recorded for the message (first seen, read,
  *   a file of it saved; each is at or after its arrival), and never earlier than `createdAt`.
- *   P2-UNREAD-AGE: with none of these (its first-seen row pruned, never read, nothing saved) the
- *   age is `createdAt`. Sync prunes first-seen rows only once they are at least 7 days old, so such
- *   a message arrived at least 7 days ago; a contact that backdates it can therefore hasten its
- *   deletion only for a message already a week old here, and unread history ages out under the
- *   same keep-days rule instead of staying for ever.
+ *   With none of these (first-seen row pruned, never read, nothing saved) it has no local age and
+ *   is kept (the safe side; UNREAD-AGE-RECEIVED-AT gives it one).
+ * Undefined: no local age.
  */
-export function localAgeTx(tx: StoreTx, row: Row<'envelopes'>): number {
+export function localAgeTx(tx: StoreTx, row: Row<'envelopes'>): number | undefined {
   if (row.direction === 'out') return row.created_at;
   const local: number[] = [];
   const seen = tx.get('seen', { kind: 'envelope', id: row.envelope_hash });
@@ -188,7 +186,7 @@ export function localAgeTx(tx: StoreTx, row: Row<'envelopes'>): number {
   for (const f of tx.select('saved_files', { envelope_id: row.envelope_id })) {
     local.push(f.saved_at);
   }
-  if (local.length === 0) return row.created_at;
+  if (local.length === 0) return undefined;
   return Math.max(row.created_at, Math.min(...local));
 }
 
@@ -235,30 +233,33 @@ export function selectTx(
     let from: number | undefined;
     let after: string | undefined;
     let scanned = 0;
+    let exhausted = false;
     const order: [['created_at', 'asc'], ['envelope_id', 'asc']] = [
       ['created_at', 'asc'],
       ['envelope_id', 'asc'],
     ];
     const size = cap + 1;
     while (rows.length <= cap && scanned < MAX_PLAN_SCAN_ROWS) {
+      // Never read past the scan bound: the last page is cut to what is left of it.
+      const want = Math.min(size, MAX_PLAN_SCAN_ROWS - scanned);
       let page: Row<'envelopes'>[];
       if (from === undefined || after === undefined) {
-        page = tx.select('envelopes', base, { orderBy: order, limit: size });
+        page = tx.select('envelopes', base, { orderBy: order, limit: want });
       } else {
         // Keyset: the rest of the cursor's own second first, then the later seconds.
         page = tx.select(
           'envelopes',
           { ...base, created_at: from, envelope_id: { gt: after } },
-          { orderBy: order, limit: size },
+          { orderBy: order, limit: want },
         );
-        if (page.length < size) {
+        if (page.length < want) {
           const later = upper === undefined ? { gt: from } : { gt: from, lt: upper };
           page = [
             ...page,
             ...tx.select(
               'envelopes',
               { ...base, created_at: later },
-              { orderBy: order, limit: size - page.length },
+              { orderBy: order, limit: want - page.length },
             ),
           ];
         }
@@ -270,11 +271,15 @@ export function selectTx(
         // `createdAt` before the cutoff is necessary (the local age is never earlier), not enough.
         if (oldEnoughTx(tx, row, input)) rows.push(row);
       }
-      if (page.length < size || last === undefined) break;
+      if (page.length < want || last === undefined) {
+        exhausted = true;
+        break;
+      }
       from = last.created_at;
       after = last.envelope_id;
     }
-    if (scanned >= MAX_PLAN_SCAN_ROWS && rows.length <= cap) {
+    // Stopped by the scan bound with rows left unread (not merely at the end of the table).
+    if (!exhausted && rows.length <= cap && scanned >= MAX_PLAN_SCAN_ROWS) {
       return { rows, truncated: true };
     }
   }

@@ -34,24 +34,24 @@ Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and A
 
 ## The app in three layers
 
-The local app opens in your browser (or in the early Mac app: https://github.com/4thtech/agentlink/releases/latest, see agentlink-desktop-app.md; a Windows desktop app is an early, unsigned test build: SmartScreen shows More info, then Run anyway; the browser app stays the default on Windows). **Get started** is the guided setup: pick your AI app, type the name people see, one Touch ID (Windows Hello) creates the ID, the master code is shown once, then an optional invite. The **Simple view** is the default: Home, People, My IDs, Activity and Settings. **Under the hood** (Cmd+Shift+U) turns the same screens into tables with exact times, delivery and diagnostics. Words: an **ID** is an AI app's identity (inbox, contacts, keys); the **master code** confirms approvals without Touch ID; the **Contact check** is 12 digits both people compare after connecting.
+The local app opens in your browser (or in the early Mac or Windows desktop app, see agentlink-desktop-app.md; the browser app stays the default on Windows). **Get started** is the guided setup: pick your AI app, type the name people see, one Touch ID (Windows Hello) creates the ID, the master code is shown once, then an optional invite. The **Simple view** is the default: Home, People, My IDs, Activity and Settings. **Under the hood** (Cmd+Shift+U) turns the same screens into tables with exact times, delivery and diagnostics. Words: an **ID** is an AI app's identity (inbox, contacts, keys); the **master code** confirms approvals without Touch ID; the **Contact check** is 12 digits both people compare after connecting.
 
 ## Development overview
 
-**Shipped (0.1.0 to 0.5.4, pre-alpha, test networks).** Short invite links; encrypted messages and files (up to about 100 MB through the encrypted drop, auto-save to `~/AgentLink/Inbox`); terms with one owner approval; proofs and proof packs on test networks; the local app; one-line installers; owner approvals with Touch ID, Windows Hello or a code; recovery kits. Release list below.
+**Shipped (0.1.0 to 0.5.4, pre-alpha, test networks):** see the release list below.
 
-**Being built.** A signed, finished Windows desktop app with native Windows Hello (today an early, unsigned test build: SmartScreen More info, then Run anyway; the browser app stays the default on Windows); a signed Mac app (the Mac app is an early unsigned preview).
+**Being built.** A signed, finished Windows desktop app with native Windows Hello (today an early, unsigned test build); a signed Mac app (today an early, unsigned preview).
 
 **Next.** Proofs end to end, then the always-on cloud agent and business agents as 0.6.0 (a pilot), the M1 gate with internal testers, then M2 (owner console, self-hosting, verified registration and domains) and M3 (external audit, proof on Base and Gnosis main networks). Not claimed until released.
 
 ## What does it cost?
 
-AgentLink is free to start: installing, pairing, messages and files cost nothing, and no account, payment or balance is needed. You pay only to add proof, **$0.10 per proof** (one record including up to 3 receipts, paid by the sender; public upper limit $0.50). Today nothing is charged: proofs run on test networks with free test credits (about $0.50 once per test network, roughly five proofs). Paid proof starts only with the mainnet beta (v1.0.0, M3). Planned beta prices, not legal or tax advice.
+AgentLink is free to start: installing, pairing, messages and files cost nothing, and no account, payment or balance is needed. You pay only to add proof, **$0.10 per proof** (one record including up to 3 receipts, paid by the sender; public upper limit $0.50). Today nothing is charged: proofs run on test networks with free test credits (about $0.50 once per test network, roughly five proofs). Paid proof starts only with the mainnet beta (v1.0.0, M3). Planned prices, not legal or tax advice.
 
 - **Free:** install, ID, pairing, contacts, encrypted messages, files through the encrypted drop (limits 100 MB per file, 1 GB per ID per week), the app, rules and approvals, checking a proof someone sent you, and receipts on a proof (the sender's price covers them).
 - **Planned later:** registration of an ID (shows as Registered): $5 once per ID, paid by the owner (M2).
 - **Credits** are a prepaid dollar balance for proof. Unused credits can be withdrawn at any time and 4thTech cannot move or freeze them. Card and bank payments are not offered in the beta.
-- **Price rules:** every paid action shows its exact price in dollars before anything is charged; increases are announced at least 7 days ahead; prices cannot exceed the upper limits, which the public record enforces. Apps built by other companies on AgentLink may add their own fee, always shown separately as an "App fee".
+- **Price rules:** every paid action shows its exact price in dollars before anything is charged; increases are announced at least 7 days ahead; prices cannot exceed the upper limits, which the public record enforces. Apps from other companies may add an "App fee", shown separately.
 
 ## Status and roadmap
 
@@ -98,8 +98,6 @@ Older releases and the full list: [CHANGELOG.md](https://github.com/4thtech/agen
 Each milestone is a gate; M3 needs the external audit passed. Durations are indicative, not commitments. Not in the beta: a human chat app, real-time chat, readable file hosting, custody of funds or keys, a project token, and forward secrecy for archived messages.
 
 ## Key links
-
-- Knowledge files: README.md in this folder indexes them
 
 - Source and licence (MIT): https://github.com/4thtech/agentlink
 - Quick guide, install to first chat: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/quick-guide.md

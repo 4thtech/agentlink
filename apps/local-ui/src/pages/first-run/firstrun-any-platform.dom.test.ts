@@ -489,3 +489,64 @@ describe('FIRSTRUN-ANY-PLATFORM: the setup API', () => {
     expect(result.kind).toBe('done');
   });
 });
+
+// APP-CONTINUITY (owner requirement 14 Nov; 08 §1 "One AgentLink, browser or app"): an owner made
+// in the browser (a passkey there, or the master code only) opens in the desktop app with no new
+// setup and never a WebAuthn call: the app's window can't use the browser's passkey, so the switch
+// to a passkey is never offered inside the app. And an `owner_exists` answer in the middle of setup
+// (an owner made elsewhere meanwhile) is never a dead end: Skip to Home is there (FIRSTRUN Fable L2).
+describe('APP-CONTINUITY: an owner from the browser, opened in the desktop app', () => {
+  const ownerApi = (): SetupApi & Calls =>
+    Object.assign(fakeApi(), {
+      status: () => Promise.resolve({ kind: 'ok', owner: 'set_up' } as const),
+    });
+
+  it('no first-run setup and no passkey switch in the app window; nothing calls WebAuthn', async () => {
+    const info = vi.fn(() =>
+      Promise.resolve({
+        kind: 'ok',
+        registered: false,
+        values: { rpId: 'localhost', userId: 'AQID', prfSalt: 'BwgJ' },
+      } as const),
+    );
+    const { api, passkeys } = await mount({
+      platform: 'mac',
+      api: ownerApi(),
+      native: {
+        userAgent: MAC_APP,
+        status: (): Promise<NativeStatus> =>
+          Promise.resolve({ available: true, registered: false }),
+      },
+      upgradeApi: { info, register: () => Promise.reject(new Error('never')) },
+      masterCodeApi: {
+        show: () => Promise.resolve({ kind: 'none' }),
+        saved: () => Promise.resolve(),
+      },
+    });
+    expect(text()).not.toContain('Switch to Touch ID');
+    expect(api.finished).toBe(0);
+    expect(api.codeOnly).toEqual([]);
+    expect(passkeys).toEqual([]);
+    expect(webauthn.create).not.toHaveBeenCalled();
+    expect(webauthn.get).not.toHaveBeenCalled();
+  });
+
+  it('owner_exists during setup (an owner made elsewhere): Skip to Home is offered', async () => {
+    const api = Object.assign(fakeApi(), {
+      begin: () => Promise.resolve({ kind: 'owner_exists' } as const),
+    });
+    await mount({
+      platform: 'windows',
+      api,
+      prfSupport: () => Promise.resolve('no'),
+      upgradeApi: {
+        info: () => Promise.resolve({ kind: 'needs_setup' } as const),
+        register: () => Promise.reject(new Error('never')),
+      },
+    });
+    await click(FIRST_RUN.backupOnly);
+    expect(h1()).toBe('Approvals are already protected on this computer');
+    const skip = [...host.querySelectorAll('a')].find((a) => a.textContent === 'Skip to Home');
+    expect(skip).toBeDefined();
+  });
+});

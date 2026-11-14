@@ -39,14 +39,28 @@ describe('GET /api/owner/native: the unavailable reason', () => {
 });
 
 describe('desktopPresenceOffer', () => {
-  it('native when available, on both platforms', () => {
+  it('native when available and on for this owner, on both platforms', () => {
     for (const platform of ['mac', 'windows'] as const) {
       expect(desktopPresenceOffer(platform, { available: true, registered: true })).toEqual({
         kind: 'native',
       });
-      expect(desktopPresenceOffer(platform, { available: true, registered: false })).toEqual({
-        kind: 'native',
-      });
+    }
+  });
+
+  // APP-CONTINUITY: available but not on yet (or needing to be turned on again, or another
+  // owner's): the master code, with how to turn it on; a native confirm would only fail.
+  it('available but not on here: the master code with how to turn it on', () => {
+    for (const platform of ['mac', 'windows'] as const) {
+      for (const status of [
+        { available: true, registered: false },
+        { available: true, registered: true, reason: 'reregister' as const },
+        { available: true, registered: true, reason: 'other_owner' as const },
+      ]) {
+        const offer = desktopPresenceOffer(platform, status);
+        expect(offer.kind).toBe('code');
+        expect(offer.kind === 'code' ? offer.help : '').toMatch(/master code/);
+        expect(offer.kind === 'code' ? offer.help : '').toMatch(/Settings/);
+      }
     }
   });
 

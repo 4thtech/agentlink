@@ -302,7 +302,7 @@ describe('a policy edit carries history (06 §3: every new policy.set has it)', 
 // IR-RET-67-1 Medium 1: a contact signs `createdAt`, so an age must never come from it alone. Saved
 // files age by `saved_files.saved_at`; inbound messages by the earliest local time the core recorded
 // for them (first seen, read, saved), never earlier than `createdAt`; own sent messages by the local
-// send time. P2-UNREAD-AGE: an inbound message with no local time at all ages by `createdAt`.
+// send time. An inbound message with no local time at all is not aged out (kept).
 describe('backdating: ages are local (IR-RET-67-1 Medium 1)', () => {
   /** A sends with its clock `days` in the past (a backdated createdAt); B receives it now. */
   async function backdated(w: World, days: number, name?: string): Promise<string> {
@@ -353,18 +353,14 @@ describe('backdating: ages are local (IR-RET-67-1 Medium 1)', () => {
   });
 });
 
-describe('P2-UNREAD-AGE and P2-TRUNCATED-COUNT', () => {
-  it('an unread received message whose seen row was pruned ages out under the keep-days rule', async () => {
+describe('P2-TRUNCATED-COUNT', () => {
+  it('an unread received message whose seen row was pruned is kept (no local age)', async () => {
     const w = await world(keep(90, 0));
     const id = await message(w);
-    // Sync pruned the seen row long ago; the message was never read, nothing saved.
     await w.b.store.transaction((tx) => tx.delete('seen', {}));
-    w.clock.t += 89 * DAY;
+    w.clock.t += 400 * DAY;
     await w.b.client.historyRetention.run();
     expect((await body(w, id))?.deleted_at).toBeNull();
-    w.clock.t += 2 * DAY;
-    await w.b.client.historyRetention.run();
-    expect((await body(w, id))?.deleted_at).not.toBeNull();
   });
 
   it('truncated is counted after the local-age filter', async () => {
@@ -378,21 +374,27 @@ describe('P2-UNREAD-AGE and P2-TRUNCATED-COUNT', () => {
     // 8 rows old by createdAt but only just arrived here (seen now): the filter drops them all.
     // Then 3 rows that are old here too (no local time: createdAt). The cap is 3 rows per plan.
     await w.b.store.transaction((tx) => {
-      const add = (tag: string, i: number, at: number, recent: boolean): void => {
+      const add = (
+        tag: string,
+        i: number,
+        at: number,
+        withSeen: boolean,
+        seenAt = w.clock.t,
+      ): void => {
         const envelope_id = `${tag}${String(i).padStart(8, '0')}`;
         const envelope_hash = `0x${envelope_id.padEnd(64, '0')}`;
         tx.insert('envelopes', { ...base, envelope_id, envelope_hash, created_at: at });
-        if (recent) {
-          tx.insert('seen', { kind: 'envelope', id: envelope_hash, first_seen_at: w.clock.t });
+        if (withSeen) {
+          tx.insert('seen', { kind: 'envelope', id: envelope_hash, first_seen_at: seenAt });
         }
       };
       for (let i = 0; i < 8; i++) add('aa', i, 100, true);
-      for (let i = 0; i < 3; i++) add('bb', i, 200, false);
+      for (let i = 0; i < 3; i++) add('bb', i, 200, true, 150);
     });
     const plan = (cap: number) =>
       w.b.store.transaction((tx) => selectTx(tx, { before, include: 'messages' }, cap));
     const all = (await plan(1000)).rows;
-    expect(all.length).toBeGreaterThanOrEqual(4); // the 3 added rows and the original message
+    expect(all.length).toBeGreaterThanOrEqual(3); // the 3 added rows
     expect(all.some((r) => r.envelope_id.startsWith('aa'))).toBe(false);
     const n = all.length;
     const exact = await plan(n);

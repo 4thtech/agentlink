@@ -366,7 +366,7 @@ import {
 } from './local-ui/context.js';
 import { JoinDesk, type JoinCheck } from './local-ui/join-desk.js';
 import { pairingFollower, type PairingFollower } from './local-ui/pairing-follow.js';
-import { JOIN_PAGE_PATH } from './local-ui/invite-paths.js';
+import { HOST_SHOW_PATH, HOST_YIELD_PATH, JOIN_PAGE_PATH } from './local-ui/invite-paths.js';
 import type {
   LocalUiInviteRoute,
   LocalUiAttachRoute,
@@ -542,6 +542,8 @@ export function presenceBackoffSeconds(failures: number): number {
 }
 
 const APPROVAL_ID = /^apr_[A-Za-z0-9_-]{22}$/;
+/** NOTIFY-DEEPLINK: a person's opaque local contact ID. */
+const PERSON_ID = /^0x[0-9a-f]{40}$/;
 const DIGEST = /^[0-9a-f]{64}$/;
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const APPROVE_PAGE = /^\/approve\/(apr_[A-Za-z0-9_-]{22})$/;
@@ -1009,6 +1011,11 @@ export interface ApprovalServerOptions {
    */
   readonly appUpdate?: LocalUiAppUpdateDesk;
   /**
+   * WIN-ACL-NOTICE: the desktop app (Windows) could not check who can open the data folder. The
+   * health read then carries `dataAccess: 'unchecked'` and the app shows a notice. A flag only.
+   */
+  readonly dataFolderUnchecked?: boolean;
+  /**
    * DESK-NATIVE-DEBUG: receives ONE fixed diagnostic line per native presence operation outcome
    * (nativeDiagnostic: fixed words, step names and error codes only; never a secret, a path, a
    * handle, a record or a system message). The desktop host writes it to stderr, which the shell's
@@ -1152,6 +1159,12 @@ export interface ApprovalServer {
    * desktop app's "Update ready" notification opens. A fixed path.
    */
   openUpdates(): Promise<boolean>;
+  /**
+   * NOTIFY-DEEPLINK: Home with one person's conversation open (the link carries only that person's
+   * opaque local ID, after `#`, so it never reaches the server). A malformed ID rejects. Home checks
+   * the ID against its own people before it opens anything.
+   */
+  openPerson(contactId: string): Promise<boolean>;
   /**
    * N7 (desktop app): the open ID's notification items (brought up to date first; kind, ref, count
    * and times only) and the Settings › Notifications switches in force. Undefined while no ID with a
@@ -1749,6 +1762,8 @@ export async function startApprovalServerWith(
   let lastHandoffAt = Number.NEGATIVE_INFINITY;
   /** R1-SEC-15: when the last handoff with a wrong token was refused (ms); throttled on its own. */
   let lastHandoffRefusedAt = Number.NEGATIVE_INFINITY;
+  /** APP-CONTINUITY: when the last takeover or show request with the token arrived (ms). */
+  let lastHostCallAt = Number.NEGATIVE_INFINITY;
   let lastJoinOpenAt = Number.NEGATIVE_INFINITY;
   // U3-d (D-138; 08 §1; 04 §2.8 "From the local app"): create an agent and save a verified label.
   // Nothing here signs. W4-ONE-TOUCH: creating an agent is the create-agent gate's (createAgentGate).
@@ -1812,7 +1827,7 @@ export async function startApprovalServerWith(
         approvals?: number;
         inbound?: readonly NotificationInbound[];
         scannedUntil?: number;
-        update?: boolean;
+        update?: boolean | 0 | 1 | 2;
         networkDown?: boolean;
       } = {};
       try {
@@ -1841,7 +1856,11 @@ export async function startApprovalServerWith(
         }
       }
       const update = options.appUpdate?.view();
-      if (update !== undefined) out.update = update.state === 'available';
+      // NOTIFY-UPDATE-READY: 1 while one is available, 2 once it is downloaded and verified, ready to
+      // install (a bigger count is news again for the store and the desktop alert).
+      if (update !== undefined) {
+        out.update = update.state === 'ready' ? 2 : update.state === 'available' ? 1 : 0;
+      }
       try {
         const health = await uiContext.health?.();
         const relays = health?.relays;
@@ -2132,6 +2151,7 @@ export async function startApprovalServerWith(
         ...(options.localUi?.dataFolder === undefined
           ? {}
           : { dataFolder: options.localUi.dataFolder }),
+        ...(options.dataFolderUnchecked === true ? { dataFolderUnchecked: true } : {}),
         startedAt: serverStartedAt,
         now: () => now(),
       }),
@@ -5438,7 +5458,17 @@ export async function startApprovalServerWith(
     // at merge): the master code only, with no WebAuthn: the body is empty and no registration is
     // parsed. The owner is stored under the generated master code only, exactly as a passkey with no
     // PRF gives today (and as `owner init` does). A body here is refused and does not use the plan.
+    // APP-CONTINUITY (FIRSTRUN Fable L1): it is a rejected presence proof like every other refused
+    // finish: it counts towards the backoff, and the third ends the plan.
     if (masterCodeOnly && body.length !== 0) {
+      presenceFailed();
+      held.tries += 1;
+      if (held.tries >= CREATE_CONNECT_TRIES) {
+        dropSetup(held);
+        await folderRemoval;
+        finishSetup(res, 403, 'tries_exhausted');
+        return;
+      }
       finishSetup(res, 400, 'invalid');
       return;
     }
@@ -6985,7 +7015,15 @@ export async function startApprovalServerWith(
    * one wrong token per HANDOFF_INTERVAL_MS (R1-SEC-15: counted apart, so a caller without the token
    * cannot hold the real handoff at 429); parses exactly `{"invite":"<link>"}`; and
    * hands the link to the join desk, which runs Accept step 1 and stores it in memory. Nothing is
-   * signed, written or logged; the body is wiped. The token grants nothing else.
+   * signed, written or logged; the body is wiped.
+   *
+   * APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): the same gate also runs
+   * `POST /api/ui/host/yield` (the desktop app takes over a terminal `agentlink ui` host: the host's
+   * `onYield` answers, then that host closes) and `POST /api/ui/host/show` (terminal `agentlink ui`
+   * asks a running desktop app to show its window: `onShow`). Both need the token and an empty body,
+   * share one throttle (one per HANDOFF_INTERVAL_MS) apart from the invite handoff, answer
+   * `yielding` / `shown` or 409 `kept`, and sign, open in a browser or log nothing. The token grants
+   * nothing else: a same-user process can already stop a process or open the app.
    */
   async function handoffGate(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
     const refuse = (status: number, error: string): void => {
@@ -6993,7 +7031,17 @@ export async function startApprovalServerWith(
       emit({ kind: 'rejected', reason: 'handoff' });
       sendJson(res, status, { error });
     };
-    if (joinDesk === undefined || handoffBytes === undefined) return refuse(501, 'not_available');
+    // APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): the takeover and show requests use
+    // this same gate with an empty body; they need the app host's record, not the join desk.
+    const hostCall =
+      url.pathname === HOST_YIELD_PATH
+        ? ('yield' as const)
+        : url.pathname === HOST_SHOW_PATH
+          ? ('show' as const)
+          : undefined;
+    if (handoffBytes === undefined || (hostCall === undefined && joinDesk === undefined)) {
+      return refuse(501, 'not_available');
+    }
     if (
       header(req, 'origin') !== undefined ||
       Object.keys(req.headers).some((name) => name.startsWith('sec-fetch-')) ||
@@ -7013,7 +7061,11 @@ export async function startApprovalServerWith(
     // `join` at 429. Each kind: at most one per HANDOFF_INTERVAL_MS.
     const at = now();
     const valid = matches(header(req, HANDOFF_HEADER), handoffBytes);
-    const last = valid ? lastHandoffAt : lastHandoffRefusedAt;
+    const last = !valid
+      ? lastHandoffRefusedAt
+      : hostCall === undefined
+        ? lastHandoffAt
+        : lastHostCallAt;
     if (at - last < HANDOFF_INTERVAL_MS) {
       const retryAfter = Math.max(1, Math.ceil((last + HANDOFF_INTERVAL_MS - at) / 1000));
       res.setHeader('Retry-After', String(retryAfter));
@@ -7023,6 +7075,32 @@ export async function startApprovalServerWith(
       lastHandoffRefusedAt = at;
       return refuse(401, 'refused');
     }
+    if (hostCall !== undefined) {
+      lastHostCallAt = at;
+      // An empty body only: nothing is chosen by the caller.
+      const empty = await boundedBody(req, res, 64);
+      if (empty === undefined) return;
+      const length = empty.length;
+      wipe(empty);
+      if (length !== 0) {
+        emit({ kind: 'rejected', reason: 'handoff' });
+        sendJson(res, 400, { error: 'invalid' });
+        return;
+      }
+      const record = options.host?.handoff;
+      // The host's own answer: the terminal host closes (the desktop app takes over), the desktop
+      // app shows its window. Fixed words only; nothing is signed, opened or logged here.
+      let done: boolean;
+      try {
+        done = (hostCall === 'yield' ? record?.onYield?.() : record?.onShow?.()) === true;
+      } catch {
+        done = false;
+      }
+      if (!done) return refuse(409, 'kept');
+      sendJson(res, 200, { status: hostCall === 'yield' ? 'yielding' : 'shown' });
+      return;
+    }
+    if (joinDesk === undefined) return refuse(501, 'not_available');
     lastHandoffAt = at;
     const body = await boundedBody(req, res, MAX_INVITE_CHECK_BODY_BYTES);
     if (body === undefined) return;
@@ -8388,6 +8466,10 @@ export async function startApprovalServerWith(
     openUpdates: async () =>
       opener(`${origin}/settings/updates?t=${mintLink()}`).catch(() => false),
     openJoin: () => openJoinPage(false),
+    openPerson: async (contactId: string) => {
+      if (typeof contactId !== 'string' || !PERSON_ID.test(contactId)) throw invalidId();
+      return opener(`${origin}/?t=${mintLink()}#person=${contactId}`).catch(() => false);
+    },
     desktopAlerts: async () => {
       const desk = notificationsPart(source).notifications;
       if (desk === undefined) return undefined;

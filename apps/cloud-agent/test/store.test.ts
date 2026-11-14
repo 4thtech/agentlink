@@ -137,6 +137,17 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
     });
   });
 
+  it('a migration also creates a missing cloud-only table', async () => {
+    await inObject((_store, state) => {
+      state.storage.sql.exec('DROP TABLE "connector_grants"');
+      state.storage.sql.exec('UPDATE deploy_state SET schema_version = 15');
+      expect(DurableObjectStore.open(state.storage).schemaVersion).toBe(STORE_SCHEMA_VERSION);
+      expect(
+        state.storage.sql.exec('SELECT count(*) AS n FROM connector_grants').toArray(),
+      ).toEqual([{ n: 0 }]);
+    });
+  });
+
   it('a migration that cannot finish changes nothing', async () => {
     await inObject((_store, state) => {
       toV6(state);

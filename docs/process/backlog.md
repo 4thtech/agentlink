@@ -10836,7 +10836,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** README Status, docs-site and `knowledge/` match what shipped (send-by-content limits, the Files step, the Home panel); no untested claim about an AI app's own features; drift checks green.
 
 #### FIRSTRUN-ANY-PLATFORM · First run works on any computer and in any browser (0.5.5, owner test on real machines, 14 Nov)
-- **Status:** in review · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.2
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/pages/start/strings.ts`, `packages/node/src/approval-server.ts` (setup finish), tests
 - **Depends on:** — (consumes WIN-HELLO-NATIVE through `/api/owner/native`; works without it)
 - **Spec:** 04 §2.2 "Creating it on the first-run page"; 08 §1 first run; 11 §5
@@ -10845,7 +10845,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
   - Symptoms: the Mac desktop app's first run showed "This browser can't make a passkey" with `agentlink owner init`; on Windows 11 21H2 both buttons asked for a passkey with PRF and Windows offered only a USB security key; the step said "Touch ID" on Windows; "Skip to Home" was usable with no owner.
   - Fix: a master-code-only finish (`{nonce, presence: 'code'}`, empty body, no WebAuthn); presence detected first (the desktop helper, the platform authenticator, PRF); on Windows the master code first; only ever the platform authenticator; the desktop app's Touch ID / Windows Hello offered after the code; no dead-end screen; platform words from SENSOR.
 - **Acceptance:**
-  - `RED (expected):` commit first; the master-code path never calls `navigator.credentials`; no `create` without a platform authenticator; desktop shell with no owner and no WebAuthn reaches the master-code step; Opus independent review, Fable 5.1 audit, Tali's "merge"; changelog.d fragment and changeset.
+  - `RED (expected):` commit first; the master-code path never calls `navigator.credentials`; no `create` without a platform authenticator; desktop shell with no owner and no WebAuthn reaches the master-code step; Opus independent review, Fable 5.2 audit, Tali's "merge"; changelog.d fragment and changeset.
 
 #### WIN-BROKEN-ID · An ID whose key is missing: Restore, Remove from this computer, Continue (0.5.5)
 - **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (owner presence, keychain erase)
@@ -10868,13 +10868,227 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** a Durable Object store of any older schema version (v6, v15 fixtures) opens by one forward-only, all-or-nothing migration (missing tables created, missing nullable columns appended, version bumped, shape verified) instead of `store_needs_migration`; rows kept; a second open is a no-op; a newer version is still refused; tested.
 
 #### P2-UNREAD-AGE · Unread received messages with a pruned seen row age out (0.5.5)
-- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1
-- **Repo/path:** agentlink · `packages/core/src/history/delete.ts`, `packages/core/src/files/history-retention.test.ts`
+- **Status:** deferred: needs envelopes.received_at (v17), see card UNREAD-AGE-RECEIVED-AT · **Size:** XS · **Tier:** Sonnet · **Security:** S2
+- **Repo/path:** agentlink · `packages/core/src/history/delete.ts`
 - **Depends on:** RET-6, RET-7 (IR-RET-67-2 note b)
-- **Done when:** a received message with no local time (seen row pruned after 7+ days, never read, nothing saved) ages by `createdAt` under the same keep-days rule, in the pass and in the manual older-than filter; tested.
+- **Done when:** see UNREAD-AGE-RECEIVED-AT. A `createdAt` fallback was tried and dropped (Fable r1 Medium: the sender signs `createdAt` with no lower bound, so a contact could have an unread message deleted a week after arrival, IR-RET-67-1 M1, I-5). Unread messages without a local time keep, as before.
+
+#### UNREAD-AGE-RECEIVED-AT · A local arrival time for received messages (v17)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · `packages/core/src/{store/schema,envelopes,sync,history/delete}.ts`, `packages/node/src/sqlite-schema.ts`, `apps/cloud-agent/src/do-store.ts`
+- **Depends on:** P2-UNREAD-AGE
+- **Done when:** a nullable `envelopes.received_at` (migration v17) is set at receive from the local clock; `#prune` copies `first_seen_at` into it before pruning the seen row; the local age falls back to `max(createdAt, received_at)`; legacy rows without it keep; tests for backdating, pruning and legacy rows; docs say unread history ages by arrival.
 
 #### P2-TRUNCATED-COUNT · `truncated` is counted after the local-age filter (0.5.5)
 - **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · `packages/core/src/history/delete.ts`, `packages/core/src/files/history-retention.test.ts`
 - **Depends on:** RET-6, RET-7 (IR-RET-67-2 note a)
-- **Done when:** the plan walks keyset pages until it holds one plan's worth of rows that pass the local-age filter (bounded scan), so a block of rows old by `createdAt` but new here neither hides later rows nor makes `truncated` read false; tested with the cap as a test seam. Landed with P2-UNREAD-AGE in one commit (the test needs both).
+- **Done when:** the plan walks keyset pages until it holds one plan's worth of rows that pass the local-age filter (bounded scan), so a block of rows old by `createdAt` but new here neither hides later rows nor makes `truncated` read false; tested with the cap as a test seam. Independent of P2-UNREAD-AGE. The scan bound never overshoots and `truncated` is not set falsely at exactly the bound.
+
+#### WIN-INSTALLER-SHORTCUT · Desktop shortcut choice on the Windows installer's finish page (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build · **Security:** S1
+- **Repo/path:** agentlink · `apps/desktop/build/lib/nsis.mjs`, `apps/desktop/build/test/nsis.node-test.mjs`
+- **Depends on:** WIN-DESK-2
+- **Scope:** finish page with a ticked "Create a desktop shortcut" box (per-user `$DESKTOP`, same icon and AppUserModelID as the Start menu entry); the uninstaller deletes it; still per-user, no admin.
+- **Acceptance:** NSIS script test; the Windows CI leg builds the installer.
+
+#### WIN-STARTUP-LOG · Core start diagnostics reach core.log on Windows (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build · **Security:** S1
+- **Repo/path:** agentlink · `apps/desktop/src/main/core-process.ts`, `apps/cli/src/commands/ui.ts`
+- **Depends on:** WIN-DESK-2
+- **Scope:** the shell spawns the core with a fixed `AGENTLINK_LOG=warn` (the user's own value is still dropped); the core's redacting logger writes one fixed line when the app host cannot start (`reason=` and a short `code=` only) to stderr; core-log.ts redacts again and keeps it in `core.log` (1 MB, then `core.1.log`).
+- **Acceptance:** unit tests for the spawn env and the note; no message, path or secret in the line.
+
+#### WIN-ACL-NOTICE · Visible notice when the data folder access cannot be checked on Windows (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build · **Security:** S1
+- **Repo/path:** agentlink · `apps/desktop/src/main/{core-process,main}.ts`, `apps/cli/src/desktop/host-main.ts`, `packages/node/src/{approval-server.ts,local-ui/api/health.ts}`, `apps/local-ui/src/layout/data-access-notice.tsx`
+- **Depends on:** WIN-DESK-2 (OD-M)
+- **Scope:** when the shell icacls check is `unchecked`, it passes one fixed flag to the core at spawn; the health read carries `dataAccess: unchecked` (a flag only, absent otherwise); the app shows a non-blocking, closable PageNotice (tone warning, existing component, no new design) with fixed plain words. The app continues. The existing core.log line stays.
+- **Acceptance:** unit tests (spawn env, health answer, notice); the flag cannot come from the user own environment.
+
+
+#### NOTIFY-DEEPLINK · A notification click opens that approval or conversation, not Home (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (an opaque local ID on the private pipe; shape-checked on both sides)
+- **Repo/path:** agentlink · `apps/cli/src/desktop/{alerts,host-core,protocol}.ts`, `apps/desktop/src/{main/notify,main/main,shared/protocol}.ts`, `packages/node/src/approval-server.ts` (`openPerson`), `apps/local-ui/src/pages/home/{person-link,home-screen}`
+- **Depends on:** N7 (native notifications), NOTIFY-WIRING-054
+- **Spec:** 08 §1 (notification centre); 11 §5
+- **Done when:** a click on an approval notification opens `/approve/<id>` when one request is waiting (the list when several); a click on a message or file notification opens Home with that person's conversation open; the link carries only an opaque local ID (a request's or a person's), never content or a name; the ID is checked by the pipe parser, the core and Home (an unknown one opens Home as before); tests for the pipe, the shell, the core and Home's reader.
+
+#### NOTIFY-UPDATE-READY · Alert when the update is ready to install, and once at launch if one is pending (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (a count on the private pipe; no new data)
+- **Repo/path:** agentlink · `apps/cli/src/desktop/{alerts,host-core}.ts`, `apps/desktop/src/main/notify.ts`, `packages/node/src/{approval-server,notifications}.ts`
+- **Depends on:** UPD-5 (in-app update), NOTIFY-DEEPLINK
+- **Spec:** 08 §1; 11 §5
+- **Done when:** the update item counts 1 while available and 2 once downloaded and verified (`ready`); going from 1 to 2 is news again (once; the same state never repeats); the notification says "Update ready: a new version is ready to install" only for 2 and "Update available" for 1; an unread update already waiting at launch is alerted once per run (never again when another ID opens); the Updates switch still decides; tests.
+
+#### NOTIFY-ALL-IDS · Messages and files for an ID that is not open still raise an alert (0.5.5)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (new notification text from inbound events; I-5, I-7, 04 §2.5)
+- **Repo/path:** agentlink · `apps/cli/src/runtime/{other-id-alerts,desktop-alerts-record}.ts`, `apps/cli/src/mcp/command.ts`, `packages/node/src/index.ts` (`osNotifier`)
+- **Depends on:** N7, NOTIFY-WIRING-054 (gap 3), IR-N7-1 L-5
+- **Spec:** 04 §2.5; 08 §1; 11 §5
+- **Done when:** while the desktop app alerts for one ID, the `agentlink mcp` process of another ID (which already holds that ID's keys) alerts its new messages and files by OS notification under the owner's Messages and Files switches; nothing opens an ID's keys or store just to notify; first look only notes what is there; a file and its message are one alert; quiet for the ID the desktop app alerts for and while no desktop app runs.
+- **Threat note:** the text is fixed words; the only variable parts, shown only with Show names on, are the ID's folder name and a contact name the OWNER gave (`nameSource` `owner`), each checked against the pipe's plain-name rule (letters, numbers, single spaces, apostrophes, hyphens; no dot, slash, colon, angle bracket or control character). Message text, a file name, a counterparty's self-declared name and links never reach it (I-5). Reads only flow events (contact ID, direction, kind, time) and the owner's names through the client the process already holds; nothing is logged or sent (I-7). A same-user process can silence it by writing the alerts record, which it could already do for approvals (IR-N7-1 L-1). The OS alert has no click target (osascript / notify-send); it never approves or replies.
+- **RED:** `RED (expected): NOTIFY-ALL-IDS` (tests first).
+
+#### NOTIFY-FOCUS · No OS alert while the AgentLink window is focused (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (shell only; nothing on the pipe changes)
+- **Repo/path:** agentlink · `apps/desktop/src/main/{notify,window,main,electron-api}.ts`
+- **Depends on:** N7, NOTIFY-DEEPLINK
+- **Spec:** 08 §1; 11 §5
+- **Done when:** while the window is shown, not minimised and focused, no native notification is raised (the in-app centre, tray and badge still update from the core); a hidden, minimised, background or closed window alerts as before; the check is made when the alert would be shown; tests.
+
+#### NOTIFY-DEDUPE · One alert, not two, for a file plus its message (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (drops alerts; adds none)
+- **Repo/path:** agentlink · `apps/cli/src/desktop/{alert-dedupe,host-core}.ts`, `apps/cli/src/runtime/other-id-alerts.ts`
+- **Depends on:** NOTIFY-ALL-IDS, N7
+- **Spec:** 08 §1; 11 §5
+- **Done when:** a person's file and message arriving together (one look) or within 20 s (either order, across looks) raise one alert (whichever arrives first is shown; within one look the file's); only alerts the owner's switches let through are counted, so an off switch never hides the other kind; different people and approvals/updates are untouched. A file alone is one flow event (kind `file`), never a file plus a message.
+
+#### APP-CONTINUITY · One AgentLink, browser or app: either way start to finish, and moving between them keeps everything (0.5.5, owner requirement 14 Nov)
+- **Status:** in review · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.2
+- **Repo/path:** agentlink · `apps/local-ui/src/presence/{offer.ts,webauthn-here.ts}`, every owner-presence prompt (`pages/contacts/presence-{prompt,button}.tsx`, `pages/apps/create-agent-gate.tsx`, `pages/approvals/index.tsx`, `pages/first-run/index.tsx`) and the WebAuthn defaults (`api/presence-ceremony.ts`, the approvals, rules, inbox, files, pay-confirm, create-agent and restore clients); `packages/node/src/{approval-server.ts,local-ui/{invite-paths.ts,routes.ts,app-host.ts,api/join.ts}}` (host takeover and show, code-finish tries); `apps/cli/src/{runtime/app-host-record.ts,commands/ui.ts,desktop/{host-core.ts,host-main.ts},harness/app-desk.ts}`; tests
+- **Depends on:** FIRSTRUN-ANY-PLATFORM; folds in WIN-HELLO-NATIVE's `desktopPresenceOffer(platform, status)` (same API)
+- **Spec:** 08 §1 "One AgentLink, browser or app" (proposed; owner approved the requirement 14 Nov); 08 §4; 04 §2.2, §2.5
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - Symptoms (0.5.4 live): an owner made in the browser opened in the app with a passkey switch or a passkey button that cannot work in the app's window; an `agentlink ui` host and the app ran side by side with `app-host.json` naming whichever started last; connecting an AI app from the app wrote `npx …`, which fails on a computer with only the app.
+  - Fix: inside the app's window no WebAuthn call anywhere (presence offers native once on, else the master code; Home and Approvals offer "Turn on Touch ID / Windows Hello", master code once); the app takes over a running `agentlink ui` host (`POST /api/ui/host/yield`, the handoff kind, empty body) and clears a stale record; its record says `host: "desktop"`, and terminal `agentlink ui` shows its window (`POST /api/ui/host/show`) instead of a second host; a new connect from inside the app writes the app form (moves keep the entry's form).
+  - Folded-in FIRSTRUN Fable lows: a code finish with a body counts as a failed try; Skip to Home after an `owner_exists` answer; 04 §2.2 / 08 §1 name `{nonce, presence: "code"}`; route tests (another session, a wrong nonce, `presence` on begin); this card's audit model.
+- **Acceptance:**
+  - `RED (expected):` commit first; browser owner then app: no setup, no passkey, native offer, IDs listed; app owner then browser: the master code; takeover, stale record and show; the app-form connect in the app; prompts in the app never call `navigator.credentials`; Opus independent review, Fable 5.2 audit, Tali's "merge"; changelog.d fragment and changeset.
+
+#### UPD-0 · Update key held as a release secret, update signed after the owner's approval click (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8; D-151
+- **Done when:** one update key in the `desktop-update` environment secret signs the update document in `release.yml` only after the owner approves; the document is checked with the app's own checks before upload. Details: CHANGELOG 0.5.4.
+
+#### UPD-1 · Desktop update format v2: channel, expiry, asset kind (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8
+- **Done when:** manifests carry `channel`, `expires` and asset `kind` under `agentlink-desktop-update/v2`; v1 documents are refused; a version that failed to start is never offered again; shared vectors in `test-vectors/desktop-update`. Details: CHANGELOG 0.5.4.
+
+#### UPD-2 · Pin the owner's update key in the app (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8; D-151
+- **Done when:** `root-key.json` holds the public key and release builds ship with updates on; copies from 0.5.2 and earlier never check, so 0.5.4 is installed by hand once. Details: CHANGELOG 0.5.4.
+
+#### UPD-3 · Release signs the desktop update and publishes the update document (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8; D-151
+- **Done when:** the release attaches the Mac zips, builds the update document from the checked Release files and publishes `desktop-update-<key id>.json` and `desktop-update.json`. Details: CHANGELOG 0.5.4.
+
+#### UPD-4 · Mac in-app update groundwork: download, check, swap with rollback (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 04 §7
+- **Done when:** the app downloads its signed package, checks it and swaps it in through a helper that restores the previous version if the new one does not start; threat-model row added. Details: CHANGELOG 0.5.4.
+
+#### UPD-4b · Update helper keeps a copy it could not confirm as stopped (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 04 §7
+- **Done when:** the helper keeps such a copy and starts the previous version when the new one fails. Details: CHANGELOG 0.5.4.
+
+#### UPD-5 · Update now in Settings > Updates (Mac) (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8
+- **Done when:** Settings › Updates shows Update now, a progress bar, Restart now and a fallback download link; the app installs only an update it verified itself. Details: CHANGELOG 0.5.4.
+
+#### KIT-NAMES · Recovery kit carries each ID's name (kit format v2) (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 04 §2.3.3; 07 §9.4
+- **Done when:** restoring on a new computer lists IDs by the names the owner gave; names are only inside the encrypted kit; kits saved earlier still restore; an older AgentLink refuses a newer kit before asking for the code. Details: CHANGELOG 0.5.4.
+
+#### ATT-APP-ATTACH · Attach files in a conversation (Markdown, text, JSON) (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §1; D-150
+- **Done when:** Attach or drag and drop, chips, a note, sent end-to-end encrypted from the Send folder without asking the AI; never over an existing file. Details: CHANGELOG 0.5.4.
+
+#### ATT-SENDFOLDER-FIX · A new ID can use a Send folder that already holds files (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §1
+- **Done when:** the folder is allowed with a clear note, or a fresh Send-2 is set up; Home offers one button to allow the Send folder. Details: CHANGELOG 0.5.4.
+
+#### ATT-ALLOW-LINK · AI gives a Settings > Files link when there is no Send folder (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 06; 08 §1
+- **Done when:** the AI gets a link with the Send folder filled in and no terminal command; it cannot allow a folder itself. Details: CHANGELOG 0.5.4.
+
+#### ATT-POLISH · Reader polish for attached files (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** 11 §5
+- **Done when:** table headers no longer break inside a word; each file button names its file. Details: CHANGELOG 0.5.4.
+
+#### MSG-ORDER-1 · Messages sent within the same second keep their order (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** 08 §1
+- **Done when:** ties of the protocol time are broken by the order this computer stored them; no protocol or schema change. Details: CHANGELOG 0.5.4.
+
+#### DROP-OPEN-1 · Files on the encrypted drop open to all early users (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** D-129; D-139 (7)
+- **Done when:** the internal-tester rollout rule is lifted; limits stay (100 MB per file, 1 GB per ID per week, 7 days, ciphertext only); decided by Tali in chat, 2026-11-13. Details: CHANGELOG 0.5.4.
+
+#### WIN-DESK-1 · Windows app starts its core (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8
+- **Done when:** the core recognises the app's private pipe on Windows and still refuses anything else; a missing data folder is logged clearly. Details: CHANGELOG 0.5.4.
+
+#### WIN-DESK-1d · Early Windows app download and guide (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** 08 §8; 11 §5
+- **Done when:** each release attaches the versioned and the stable-named setup file (in `SHA256SUMS-desktop-app.txt`); the invite page offers it; the guide covers SmartScreen and Smart App Control. Details: CHANGELOG 0.5.4.
+
+#### WIN-DESK-2 · Windows app: bundled-file check, tray icon, updates link, data-folder access check (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8; OD-M
+- **Done when:** start-time file check, tray icons for light and dark, new setup file linked in Settings › Updates, setup asks to quit AgentLink first, and the app refuses a data folder open to other people. Details: CHANGELOG 0.5.4.
+
+#### N1 · One notice style and one set of connection words (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** 11 §5
+- **Done when:** errors, reminders and Copy buttons share one style (a check stops ad-hoc notice markup); status bar, top bar and Home use the same words. Details: CHANGELOG 0.5.4.
+
+#### N2 · Every owner action is one step (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** 11 §5
+- **Done when:** the action's own button is the Touch ID (or Windows Hello or passkey), with the master code as a link; same signed objects and owner-presence checks. Details: CHANGELOG 0.5.4.
+
+#### N3 · Compact approval card on Home (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 11 §5
+- **Done when:** one line, Approve, Deny and Review with Touch ID; terms can be approved only after Review shows them in full; AI-written text is marked as content. Details: CHANGELOG 0.5.4.
+
+#### N4 · Notification centre in the local app (routes and store) (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** PLAN-NOTIFY §3.1, §3.4
+- **Done when:** read and mark-read routes behind the session, CSRF and Origin checks; per-ID `notifications.json` holds kinds and counts only. Details: CHANGELOG 0.5.4.
+
+#### N5 · Bell in the top bar (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** PLAN-NOTIFY §4.1
+- **Done when:** count (9+), tab title and dot, grouped Needs you, New, Earlier; names only as given by the owner; keyboard support. Details: CHANGELOG 0.5.4.
+
+#### N6 · Settings > Notifications (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** PLAN-NOTIFY §4.4
+- **Done when:** one switch, Approvals waiting, kept per install; more switches arrive with native notifications. Details: CHANGELOG 0.5.4.
+
+#### N7 · Native notifications in the desktop app (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** PLAN-NOTIFY §3.5
+- **Done when:** fixed codes only over the private pipe (no message text, file name or link); at most one per kind every 30 s; the app owns alerts for the ID it has open. Details: CHANGELOG 0.5.4.
+
+#### RET-67-1 · Retention fixes from the security audit (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 04 §4.2; 06 §3
+- **Done when:** ages count from when an item reached this computer; a first rules change keeps everything; a failing daily pass waits before retrying; the tidy link only fills filters. Details: CHANGELOG 0.5.4.
+#### P2-ENV-GUARD · The update-signing environment guard requires talirezun as the only reviewer (0.5.5)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**` guard, signing key)
+- **Repo/path:** agentlink · `tools/release/desktop-update-environment.mjs` (+ test), `docs/runbooks/desktop-update-keys.md`
+- **Depends on:** UPD-3 (IR-UPD-8-2 low)
+- **Done when:** the guard used by release and renewal fails closed unless every required reviewer of `desktop-update` is the user `talirezun` (no teams, no other person); tests; no permission change.
+
+#### P2-RENEW-PIN · A renewal checks the update key and mode inside the Mac apps before signing (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`, signing key)
+- **Repo/path:** agentlink · `.github/workflows/desktop-update-renew.yml`, `tools/release/desktop-update-renewal-pin.mjs` (+ test)
+- **Depends on:** UPD-3 (IR-UPD-8-1 R2-1)
+- **Done when:** before the unsigned manifest is built, renew-manifest opens app.asar in both attested Mac zips and fails closed unless each is an updates-on build carrying exactly the key in the root-key.json of main (no updates-off mark, no placeholder); runs with `contents: read` only, no key; tests.

@@ -101,7 +101,15 @@ export class FakeBrowserWindow extends Emitter implements BrowserWindow {
     this.visible = true;
     this.shows += 1;
   }
+  /** NOTIFY-FOCUS: whether the window has focus (a test sets it). */
+  focused = false;
   focus(): void {}
+  isFocused(): boolean {
+    return this.focused;
+  }
+  isVisible(): boolean {
+    return this.visible;
+  }
   blurWebView(): void {
     this.blurs += 1;
   }
