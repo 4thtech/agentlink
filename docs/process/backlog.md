@@ -10860,3 +10860,9 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Repo/path:** agentlink · `packages/core/src/outbox.ts`, `packages/core/src/send.test.ts`
 - **Depends on:** OUTBOX-NOW-1 (IR-MSG-ORDER-1 low)
 - **Done when:** a `retryNow` within 30 s of the last one that cut backoffs short is a plain delivery pass (deadlines untouched); a flapping relay or a repeated click cannot hammer the relay; tested.
+
+#### P2-CLOUD-MIGRATE · The cloud agent store migrates any older schema to the current one (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `apps/cloud-agent/src/do-store.ts`, `apps/cloud-agent/test/store.test.ts`
+- **Depends on:** M2-3a-store6 (IR-RET-2-1 low)
+- **Done when:** a Durable Object store of any older schema version (v6, v15 fixtures) opens by one forward-only, all-or-nothing migration (missing tables created, missing nullable columns appended, version bumped, shape verified) instead of `store_needs_migration`; rows kept; a second open is a no-op; a newer version is still refused; tested.

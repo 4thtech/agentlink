@@ -65,7 +65,7 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
     });
   });
 
-  it('refuses a newer stored schema version and an older one without a migration', async () => {
+  it('refuses a newer stored schema version', async () => {
     await inObject((_store, state) => {
       state.storage.sql.exec(
         'UPDATE deploy_state SET schema_version = ?',
@@ -74,13 +74,83 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
       expect(() => DurableObjectStore.open(state.storage)).toThrow(
         expect.objectContaining({ code: 'store_too_new' }),
       );
-      state.storage.sql.exec(
-        'UPDATE deploy_state SET schema_version = ?',
-        STORE_SCHEMA_VERSION - 1,
+    });
+  });
+
+  // P2-CLOUD-MIGRATE: an older store is migrated forward to the current schema, from any version.
+  /** The shape of a version 6 store: the tables and columns later versions added are removed. */
+  const toV6 = (state: DurableObjectState): void => {
+    const sql = state.storage.sql;
+    for (const t of [
+      'local_owner_actions',
+      'mcp_sessions',
+      'mcp_last_seen',
+      'auto_save_log',
+      'auto_save_state',
+      'agent_pause',
+      'saved_files',
+      'content_file_budget',
+    ]) {
+      sql.exec(`DROP TABLE "${t}"`);
+    }
+    const columns: Record<string, string[]> = {
+      invites: ['drop_lookup_id', 'drop_key_epoch', 'cancelled_at', 'invite_link'],
+      contacts: ['former_name', 'name_changed_at', 'name_change_seen', 'declared_name'],
+      files: ['auto_save', 'auto_reason', 'auto_tries', 'auto_next_at'],
+      envelopes: ['deleted_at'],
+    };
+    for (const [table, names] of Object.entries(columns)) {
+      for (const name of names) sql.exec(`ALTER TABLE "${table}" DROP COLUMN "${name}"`);
+    }
+    sql.exec('UPDATE deploy_state SET schema_version = 6');
+  };
+
+  it('migrates a version 15 store (no content_file_budget) to the current schema, keeping its rows', async () => {
+    await inObject(async (store, state) => {
+      await store.transaction((tx) => tx.insert('seen', seen('keep')));
+      state.storage.sql.exec('DROP TABLE "content_file_budget"');
+      state.storage.sql.exec('UPDATE deploy_state SET schema_version = 15');
+      const again = DurableObjectStore.open(state.storage);
+      expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
+      expect(await again.transaction((tx) => tx.select('seen'))).toEqual([seen('keep')]);
+      expect(await again.transaction((tx) => tx.select('content_file_budget'))).toEqual([]);
+    });
+  });
+
+  it('migrates a version 6 store to the current schema, idempotently, keeping its rows', async () => {
+    await inObject(async (store, state) => {
+      await store.transaction((tx) => tx.insert('seen', seen('keep')));
+      toV6(state);
+      const once = DurableObjectStore.open(state.storage);
+      expect(once.schemaVersion).toBe(STORE_SCHEMA_VERSION);
+      expect(await once.transaction((tx) => tx.select('seen'))).toEqual([seen('keep')]);
+      const sql = new Set(
+        [
+          ...state.storage.sql.exec('SELECT sql FROM sqlite_master WHERE sql IS NOT NULL').raw(),
+        ].map((r) => String(r[0])),
       );
+      for (const table of ['saved_files', 'agent_pause', 'content_file_budget']) {
+        expect([...sql].some((x) => x.startsWith(`CREATE TABLE "${table}"`))).toBe(true);
+      }
+      // A second open finds nothing to do.
+      expect(DurableObjectStore.open(state.storage).schemaVersion).toBe(STORE_SCHEMA_VERSION);
+    });
+  });
+
+  it('a migration that cannot finish changes nothing', async () => {
+    await inObject((_store, state) => {
+      toV6(state);
+      state.storage.sql.exec('ALTER TABLE "seen" ADD COLUMN "extra" TEXT');
       expect(() => DurableObjectStore.open(state.storage)).toThrow(
-        expect.objectContaining({ code: 'store_needs_migration' }),
+        expect.objectContaining({ code: 'store_foreign' }),
       );
+      const version = state.storage.sql.exec('SELECT schema_version FROM deploy_state').toArray();
+      expect(version).toEqual([{ schema_version: 6 }]);
+      expect(
+        state.storage.sql
+          .exec("SELECT name FROM sqlite_master WHERE name = 'saved_files'")
+          .toArray(),
+      ).toEqual([]);
     });
   });
 

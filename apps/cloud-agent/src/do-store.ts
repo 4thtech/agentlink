@@ -3,7 +3,7 @@
 // - The schema is core's shared DDL (createSqlSchemaStatements), the same statements as the Node
 //   store (M1-8b), plus the cloud-only tables (cloud-schema.ts). It is created once, in one
 //   transaction, in an empty object, at the code's STORE_SCHEMA_VERSION; a newer stored version is
-//   refused and an older one needs a forward migration (none exists yet: the DO store starts at 5).
+//   refused and an older one is migrated forward, from any version, in one transaction (#migrate).
 // - Every write runs in `transactionSync` (07 §3.1): the body is synchronous and is all-or-nothing
 //   across tables. A body that returns a promise is refused and rolled back. The object is single
 //   threaded and the body never awaits, so nothing interleaves with it (serializable).
@@ -19,6 +19,7 @@ import {
   TABLES,
   TABLE_NAMES,
   createSqlSchemaStatements,
+  sqlColumnDef,
   sqlColumnsOf,
   sqlIdent as q,
   sqlTableSpec,
@@ -402,8 +403,11 @@ export class DurableObjectStore implements Store {
           throw new CloudAgentError('store_foreign');
         }
         if (version > STORE_SCHEMA_VERSION) throw new CloudAgentError('store_too_new');
-        if (version < STORE_SCHEMA_VERSION) throw new CloudAgentError('store_needs_migration');
         if (tables.some((t) => !SCHEMA_TABLES.has(t))) throw new CloudAgentError('store_foreign');
+        if (version < STORE_SCHEMA_VERSION) {
+          this.#migrate(tables);
+          return STORE_SCHEMA_VERSION;
+        }
         this.#verify();
         return version;
       });
@@ -411,6 +415,51 @@ export class DurableObjectStore implements Store {
       if (error instanceof CloudAgentError) throw error;
       throw new CloudAgentError('store_failed');
     }
+  }
+
+  /**
+   * P2-CLOUD-MIGRATE: brings a store of ANY older schema version to the current one, forward only,
+   * inside the caller's transaction (all or nothing). Every step the node store's migrations take
+   * is one of two kinds: a new table (created with its indexes and triggers) or a new nullable
+   * column (appended; existing rows keep null). So the step from any version is the same: create
+   * each missing table, append each missing column in schema order, then bump the version. Nothing
+   * is dropped, renamed or rewritten; a second run finds nothing missing (idempotent). The v11
+   * one-time notice row is written when `auto_save_state` is new and an identity exists, as the
+   * node migration does. A shape the schema cannot reach this way (a column of the wrong type, a
+   * NOT NULL column that cannot be appended) fails `#verify` and rolls everything back.
+   */
+  #migrate(existing: readonly string[]): void {
+    const present = new Set(existing);
+    const missing = TABLE_NAMES.filter((t) => !present.has(t));
+    for (const statement of createSqlSchemaStatements(missing)) this.#storage.sql.exec(statement);
+    for (const table of TABLE_NAMES) {
+      if (!present.has(table)) continue;
+      const spec = sqlTableSpec(table);
+      const have = new Set(
+        this.#storage.sql
+          .exec(`PRAGMA table_info(${q(table)})`)
+          .toArray()
+          .map((c) => c['name']),
+      );
+      for (const [name, column] of Object.entries(spec.columns)) {
+        if (have.has(name)) continue;
+        if (!column.nullable) throw new CloudAgentError('store_foreign');
+        this.#storage.sql.exec(
+          `ALTER TABLE ${q(table)} ADD COLUMN ${sqlColumnDef(table, name, column, spec)}`,
+        );
+      }
+    }
+    if (missing.includes('auto_save_state')) {
+      this.#storage.sql.exec(
+        `INSERT INTO "auto_save_state" ("slot", "notice", "paused_reason", "paused_at") ` +
+          `SELECT 'current', 'show', NULL, NULL WHERE EXISTS (SELECT 1 FROM "identity")`,
+      );
+    }
+    this.#storage.sql.exec(
+      'UPDATE "deploy_state" SET "schema_version" = ? WHERE "id" = 1',
+      STORE_SCHEMA_VERSION,
+    );
+    this.#verify();
   }
 
   /** Every table of the logical schema exists with exactly its columns, types and keys. */
