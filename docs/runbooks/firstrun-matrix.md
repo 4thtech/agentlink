@@ -28,12 +28,13 @@ Not automated: a real Touch ID or Windows Hello prompt, Safari, Firefox and Edge
 ## The common path (every row follows it; the row says what differs)
 | Step | You do | You see |
 |---|---|---|
-| 1 | Open AgentLink (the app, or `agentlink ui` in your own terminal for the browser row) | **Which AI app do you use?** with "Step 1 of 4 · Pick your AI app". No "Skip to Home". |
+| 1 | Open AgentLink (the app, or `agentlink ui` in your own terminal for the browser row) | **Which AI app do you use?** with "Step 1 of 5 · Pick your AI app". No "Skip to Home". |
 | 2 | Press **Continue with** your AI app | **Confirm it's you**, a field **Name people see** (empty), and the button disabled until you type a name |
 | 3 | Type a name (for example `Test`) | The button enables |
 | 4 | Press the primary button (see the row) | **Your master code** screen: "Shown once", **Save in my password manager**, **Copy**, **Save as file**, **I saved it** |
 | 5 | Copy or save the code, press **I saved it** | **Connected to {app}** (or "{name} is ready" if the app isn't installed). Quit and reopen the AI app if it asks. |
-| 6 | Press **Go to Home** | Home, with the section menu. No setup screen again. |
+| 6 | Press **Continue** | **Sending and receiving files** ("Step 4 of 5 · Files"): your Send folder (**Allowed**) and Inbox, each with **Show in Finder** (**Show in Explorer** on Windows), and a tip for your AI app. **Continue** or **Skip for now** moves on. |
+| 7 | On **Invite someone** press **Done, go to Home** (or **Skip for now**) | Home, with the section menu and a Files panel. No setup screen again. |
 
 The primary button on step 4 is one of: **Continue with a master code** (code path: no sensor dialog at all), or **Connect with Touch ID / Windows Hello / your passkey** (passkey path). Step 2's lead names what you confirm with: "your master code" or the sensor.
 
