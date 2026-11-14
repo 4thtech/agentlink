@@ -8,7 +8,16 @@
 // Everything runs in temp folders on this computer with fakes: the "setup" is a shell script, the
 // launcher, tasklist and taskkill are fake scripts. No real installer or app is ever run.
 import { spawn } from 'node:child_process';
-import { appendFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import {
+  appendFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createSha256, encodeHex } from '@4thtech-io/crypto';
@@ -208,7 +217,11 @@ describe('installUpdateWin: download, verify, then the watchdog (WIN-INAPP-UPDAT
     await writeFile(node, 'node 22');
     return { installDir, node, stateDir: join(root, 'state') };
   }
-  const tools = { launcher: '/x/explorer.exe', tasklist: '/x/tasklist.exe', taskkill: '/x/taskkill.exe' };
+  const tools = {
+    launcher: '/x/explorer.exe',
+    tasklist: '/x/tasklist.exe',
+    taskkill: '/x/taskkill.exe',
+  };
 
   it('verifies size + SHA-256, copies node.exe, waits for Restart now, checks again, starts the watchdog', async () => {
     const s = await setup();
@@ -326,7 +339,11 @@ describe('installUpdateWin: download, verify, then the watchdog (WIN-INAPP-UPDAT
       }),
     ).toEqual({ kind: 'fallback', code: 'not_zip' });
     expect(
-      await installUpdateWin({ ...base, accepted: accepted(bytes), installDir: join(root, 'nope') }),
+      await installUpdateWin({
+        ...base,
+        accepted: accepted(bytes),
+        installDir: join(root, 'nope'),
+      }),
     ).toEqual({ kind: 'fallback', code: 'not_in_place' });
     expect(await readdir(join(s.stateDir, 'updates')).catch(() => [])).toEqual([]);
   });
@@ -458,7 +475,10 @@ if (v === process.env.HEALTHY) {
     expect(await readFile(join(s.installDir, 'data-of-old.txt'), 'utf8')).toBe('old');
     await expect(stat(join(s.installDir, 'junk'))).rejects.toThrow();
     expect(await lines(s.log)).toEqual(['setup /S', 'launch 0.5.2']);
-    expect(await loadFailedRecord(s.state)).toEqual({ version: '0.5.3', reason: 'installer_failed' });
+    expect(await loadFailedRecord(s.state)).toEqual({
+      version: '0.5.3',
+      reason: 'installer_failed',
+    });
     expect((await readdir(s.programs)).sort()).toEqual(['AgentLink']);
   });
 
@@ -467,7 +487,10 @@ if (v === process.env.HEALTHY) {
     const code = await run(await s.args(await deadPid(), 5000), { ...s.env, FAKE_MODE: 'empty' });
     expect(code).toBe(6);
     expect(await versionAt(s.installDir)).toBe('0.5.2');
-    expect(await loadFailedRecord(s.state)).toEqual({ version: '0.5.3', reason: 'installer_failed' });
+    expect(await loadFailedRecord(s.state)).toEqual({
+      version: '0.5.3',
+      reason: 'installer_failed',
+    });
   });
 
   it('a setup changed after it was verified is never run; nothing is moved; the old copy starts', async () => {

@@ -78,6 +78,8 @@ import {
   restartForUpdate,
   sweepStaging,
 } from './updater/install.js';
+import { installWinFromProcess } from './updater/install-win.js';
+import { loadFailedVersion } from './updater/state.js';
 import { procTranslated, updateChannel, updaterArch } from './updater/host.js';
 import { ReleaseChecker, updateChecksAllowed } from './updater/release-check.js';
 import { scheduleUpdateChecks } from './updater/schedule.js';
@@ -752,9 +754,12 @@ export function realProcess(): ShellProcess {
     preview: readPreview(proc.env),
     toInviteLink,
     logDir: logDir(proc.platform, homedir(), proc.env),
-    // UPD-5: on a Mac the in-app update replaces the phase-1 installer dialog.
+    // UPD-5: on a Mac the in-app update replaces the phase-1 installer dialog. WIN-INAPP-UPDATE: on
+    // Windows too, whenever this copy can update itself (the per-user install folder).
     startUpdates: (electron) => {
-      if (proc.platform !== 'darwin') startUpdates(electron, proc.platform, proc.arch);
+      if (proc.platform === 'darwin') return;
+      if (proc.platform === 'win32' && inAppEnabledFor(electron, proc)) return;
+      startUpdates(electron, proc.platform, proc.arch);
     },
     inAppUpdater: (electron, onChange) => inAppUpdaterFor(electron, proc, onChange),
     keychainNotice: async (electron) => {
@@ -772,8 +777,10 @@ export function realProcess(): ShellProcess {
     updateHealth: (app) => {
       const dir = app.getPath?.('userData');
       const version = app.getVersion?.();
+      // UPD-4 on a Mac; WIN-INAPP-UPDATE on Windows (the watchdog waits for the same records).
+      const inPlace = proc.platform === 'darwin' || proc.platform === 'win32';
       const write = (fn: typeof writeStarting): void => {
-        if (proc.platform !== 'darwin' || dir === undefined || version === undefined) return;
+        if (!inPlace || dir === undefined || version === undefined) return;
         // Public data only (a version and a pid); a failed write just means no in-app update.
         fn(dir, version, proc.pid).catch(() => undefined);
       };
@@ -781,8 +788,7 @@ export function realProcess(): ShellProcess {
         starting: () => write(writeStarting),
         ready: () => {
           write(writeHealthIfPending);
-          if (proc.platform === 'darwin' && dir !== undefined)
-            void sweepStaging(join(dir, UPDATES_DIR), Date.now());
+          if (inPlace && dir !== undefined) void sweepStaging(join(dir, UPDATES_DIR), Date.now());
         },
       };
     },
@@ -963,18 +969,13 @@ function inAppUpdaterFor(
   const stateDir = app.getPath?.('userData');
   const translated = proc.platform === 'darwin' && translatedNow();
   const arch = macArch(proc.arch, translated) ?? 'arm64';
-  const enabled =
-    stateDir !== undefined &&
-    inAppEnabled({
-      platform: proc.platform,
-      packaged: app.isPackaged,
-      preview: readPreview(proc.env) !== null,
-      execPath: proc.execPath,
-    });
+  const windows = proc.platform === 'win32';
+  const enabled = inAppEnabledFor(electron, proc);
   return new InAppUpdater({
     enabled,
     currentVersion: version,
     arch,
+    platform: proc.platform,
     check: async () =>
       (
         await checkForUpdate({
@@ -983,25 +984,46 @@ function inAppUpdaterFor(
           platform: proc.platform,
           arch: updaterArch(proc.platform, proc.arch, translated),
           stateDir: stateDir ?? '',
-          kind: 'zip',
+          // WIN-INAPP-UPDATE: the Windows app runs the signed NSIS setup; a Mac swaps in the zip.
+          kind: windows ? 'nsis' : 'zip',
         })
       ).accepted,
+    failedVersion: () => loadFailedVersion(stateDir ?? ''),
     install: (accepted, hooks) =>
       restartForUpdate(
-        () =>
-          installFromProcess({
+        () => {
+          const common = {
             accepted,
             stateDir: stateDir ?? '',
             execPath: proc.execPath,
             pid: proc.pid,
-            onProgress: (done, total) => hooks.onProgress(done, total),
+            onProgress: (done: number, total: number) => hooks.onProgress(done, total),
             onVerifying: () => hooks.onVerifying(),
             confirmRestart: () => hooks.confirmRestart(),
-          }),
+          };
+          return windows
+            ? installWinFromProcess({ ...common, env: proc.env })
+            : installFromProcess(common);
+        },
         () => app.quit(),
       ),
     onChange,
   });
+}
+
+/** UPD-5 / WIN-INAPP-UPDATE: whether this copy may update itself in place (in-app.ts). */
+function inAppEnabledFor(electron: ElectronModule, proc: NodeJS.Process): boolean {
+  const { app } = electron;
+  return (
+    app.getPath?.('userData') !== undefined &&
+    inAppEnabled({
+      platform: proc.platform,
+      packaged: app.isPackaged,
+      preview: readPreview(proc.env) !== null,
+      execPath: proc.execPath,
+      localAppData: proc.env['LOCALAPPDATA'],
+    })
+  );
 }
 
 /** Rosetta check through sysctl.proc_translated (fixed program, fixed arguments). */

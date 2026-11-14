@@ -60,7 +60,7 @@ That command only removes the "downloaded from the internet" mark from this one 
 
 **Good to know on Windows:**
 - Closing the window keeps AgentLink running near the clock (the system tray). Quit it there: right-click its icon, then **Quit AgentLink**.
-- **Updating:** Settings › **Updates** shows when a newer version is out and links the new setup file. Quit AgentLink, open the file, and open AgentLink again. Your IDs, contacts and messages stay.
+- **Updating:** Settings › **Updates** shows when a newer version is out. From 0.5.6 the Windows app updates itself: **Update now**, a progress bar, then **Restart now**; AgentLink closes, installs the new version and opens again (it takes up to a minute). If anything goes wrong, your current version keeps working and the page says **Couldn't update here. Download the new version instead.** Before 0.5.6, or for a copy that was not installed with the AgentLink setup, the page links the new setup file: quit AgentLink, open the file, and open AgentLink again. Your IDs, contacts, messages and desktop shortcut stay.
 - If AgentLink is running when you install a new version or remove it, the setup asks you to quit it first.
 - **Your AgentLink folder** (`.agentlink` in your user folder) must be yours alone. Windows gives a folder there to you, SYSTEM and Administrators, and AgentLink accepts exactly that. If someone gave other people access to it (for example Everyone or Users), AgentLink does not start and says "Your AgentLink folder is shared": right-click the folder, **Properties**, **Security**, remove everyone except you, SYSTEM and Administrators, then choose **Try again**.
 - **Remove it** in **Settings** › **Apps** › **AgentLink** › **Uninstall**. Your IDs, contacts and messages are kept.

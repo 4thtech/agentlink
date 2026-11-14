@@ -11042,6 +11042,14 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Cause:** the page's `api.post(path)` with no body sent no Content-Type; the server's mutating gate (`handleUi`) answers 415 `content_type` before the mark gate, so `appUpdateDesk.startInstall` / `restart` never ran, and the page re-read the state and redrew "available" in silence. The kit-reveal `api.post(BACKUP_REVEAL_PATH)` (Settings › Backup, Save checklist) had the same bug.
 - **Done when:** `RED (expected):` commit first; an integration test drives the page's real ApiClient and generation guard against the real approval server: Update now and Restart now reach the update desk (200, new state), the kit's Show in Finder passes the gate; a page test shows one plain line on a refused, failed or not-started answer (the card, its button and "Your IDs, people and messages stay as they are." stay); 0.5.4/0.5.5 users install 0.5.6 once by hand (CHANGELOG).
 
+#### WIN-INAPP-UPDATE · Update now updates the Windows app too (0.5.6)
+- **Status:** built (rel056/win-update) · **Size:** M · **Tier:** Opus build, Fable independent audit (updater, supply chain) · **Security:** S2 (sensitive: `.github/workflows/**`)
+- **Repo/path:** agentlink · `apps/desktop/src/main/updater/install-win.ts` (download, verify, staged node.exe, Windows watchdog), `in-app.ts`, `main.ts`, `state.ts`, `install-refusal.ts`; `apps/desktop/build/lib/nsis.mjs` (silent upgrade: `AllowSkipFiles off`, helper in use, old resources removed in place); `tools/release/desktop-update-manifest.mjs` (Windows setup in the manifest, Windows build record's pin); `release.yml`, `desktop-update-renew.yml` (setup attestation, Windows update mode); `desktop.yml` + `apps/desktop/test/smoke/win-update-rehearsal.mjs` (rehearsal on the throwaway Windows runner)
+- **Depends on:** UPD-5, UPD-BUTTON-FIX
+- **Spec:** 08 §8 "Signed updates" (Windows in-app install, proposed); 04 §7 (changed setup residual, proposed); 11 §5
+- **Owner requirement (Tali, 14 Nov):** "Settings › Updates › Check for updates › Update now, and that's it: it updates, restarts, new version — on the Windows app too, no installer by hand."
+- **Done when:** `RED (expected):` commit first; the signed manifest lists the Windows setup and its signature covers it; win32/x64 selects it; the app verifies before it runs, refuses a setup changed after the check, keeps the old app when the setup fails or the new copy does not answer (failed version recorded, "Couldn't update here" next launch); the NSIS script upgrades silently in place keeping data and the desktop shortcut; the Windows CI rehearsal passes. What only a real release proves: the signed document on a Release, the real health answer of the new app, Explorer's launch on a person's desktop.
+
 #### KIT-NAMES · Recovery kit carries each ID's name (kit format v2) (0.5.4)
 - **Status:** done (released 0.5.4) · **Security:** S2
 - **Spec:** 04 §2.3.3; 07 §9.4

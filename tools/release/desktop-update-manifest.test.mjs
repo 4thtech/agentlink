@@ -151,7 +151,11 @@ describe('the pin (Fable L3)', () => {
     ).toThrow(/pin/);
     expect(() =>
       checkBuildInputs(
-        [on(k1.publicKey), on(k1.publicKey), { platform: 'win32', updates: 'off', updatePin: null }],
+        [
+          on(k1.publicKey),
+          on(k1.publicKey),
+          { platform: 'win32', updates: 'off', updatePin: null },
+        ],
         k1.publicKey,
       ),
     ).toThrow(/updates/);
@@ -177,23 +181,25 @@ describe('the unsigned manifest from the verified release assets', () => {
         ['x64', 'zip', 'd', 110_000_004],
         ['arm64', 'dmg', 'a', 120_000_001],
         ['x64', 'dmg', 'b', 120_000_002],
-      ].map(([arch, kind, c, size]) => ({
-        platform: 'darwin',
-        arch,
-        kind,
-        url: `https://github.com/4thtech/agentlink/releases/download/v${VERSION}/AgentLink-${VERSION}-mac-${arch}.${kind}`,
-        sha256: hex(c),
-        size,
-      })).concat([
-        {
-          platform: 'win32',
-          arch: 'x64',
-          kind: 'nsis',
-          url: `https://github.com/4thtech/agentlink/releases/download/v${VERSION}/AgentLink-${VERSION}-win-x64-setup.exe`,
-          sha256: hex('f'),
-          size: 130_000_005,
-        },
-      ]),
+      ]
+        .map(([arch, kind, c, size]) => ({
+          platform: 'darwin',
+          arch,
+          kind,
+          url: `https://github.com/4thtech/agentlink/releases/download/v${VERSION}/AgentLink-${VERSION}-mac-${arch}.${kind}`,
+          sha256: hex(c),
+          size,
+        }))
+        .concat([
+          {
+            platform: 'win32',
+            arch: 'x64',
+            kind: 'nsis',
+            url: `https://github.com/4thtech/agentlink/releases/download/v${VERSION}/AgentLink-${VERSION}-win-x64-setup.exe`,
+            sha256: hex('f'),
+            size: 130_000_005,
+          },
+        ]),
     });
     expect(releaseAssets(VERSION).map((a) => a.name)).toEqual([
       `AgentLink-${VERSION}-mac-arm64.zip`,

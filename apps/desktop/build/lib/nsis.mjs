@@ -4,6 +4,10 @@
 //  - registers agentlink:// under HKCU with the URL after an argument separator: "<exe>" -- "%1" (H1);
 //  - the uninstaller removes only the install directory and its own registry keys. It never touches
 //    the user's AgentLink data folder (the shared home of the CLI and the app).
+//  - WIN-INAPP-UPDATE: the app's in-app update runs this setup with `/S` after the app quit (after
+//    moving the old copy aside; a person can also run it over an installed copy). A silent run fails
+//    with an exit code rather than skip a file (AllowSkipFiles off), waits for nothing (a running copy
+//    is exit code 2), creates or removes no desktop shortcut, and keeps the one install folder.
 
 /** N7: the AppUserModelID the app sets at startup (apps/desktop/src/main/notify.ts). */
 export const APP_USER_MODEL_ID = '4thTech.AgentLink';
@@ -23,6 +27,9 @@ OutFile "${q(outFile)}"
 InstallDir "$LOCALAPPDATA\\Programs\\AgentLink"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
+; WIN-INAPP-UPDATE: a file that cannot be written ends a silent run with an error (never skipped).
+AllowSkipFiles off
+SetOverwrite on
 BrandingText "4thTech AgentLink ${version}"
 
 !define MUI_ABORTWARNING
@@ -38,6 +45,12 @@ ${iconFile ? `!define MUI_ICON "${q(iconFile)}"\n!define MUI_UNICON "${q(iconFil
 !insertmacro MUI_LANGUAGE "English"
 
 Section "Install"
+  ; In place over an older copy: its resources go first, so no file of the old core stays behind.
+  ; Only in the exact per-user install folder, and only when it really is an AgentLink install.
+  StrCmp "$INSTDIR" "$LOCALAPPDATA\\Programs\\AgentLink" 0 fresh_install
+  IfFileExists "$INSTDIR\\AgentLink.exe" 0 fresh_install
+    RMDir /r "$INSTDIR\\resources"
+  fresh_install:
   SetOutPath "$INSTDIR"
   File /r "${q(sourceDir)}\\*.*"
   WriteUninstaller "$INSTDIR\\Uninstall.exe"
@@ -121,6 +134,11 @@ Function \${UN}CheckNotRunning
   ClearErrors
   IfFileExists "$INSTDIR\\resources\\node\\node.exe" 0 +4
     FileOpen $R0 "$INSTDIR\\resources\\node\\node.exe" a
+    IfErrors is_running
+    FileClose $R0
+  ClearErrors
+  IfFileExists "$INSTDIR\\resources\\native\\agentlink-presence.exe" 0 +4
+    FileOpen $R0 "$INSTDIR\\resources\\native\\agentlink-presence.exe" a
     IfErrors is_running
     FileClose $R0
   Return

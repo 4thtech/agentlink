@@ -8,7 +8,7 @@ When a newer version is out, the page says so, for example **AgentLink 0.5.2 is 
 
 ## Desktop app
 
-Press **Download update** and follow the short steps on the page. A Mac app on 0.5.4 or newer updates itself: **Update now**, a progress bar, then **Restart now**. See [Desktop app: Updating](../apps/desktop-app.md#updating). A new version also shows in the [bell](notifications.md), and the desktop app can say **Update ready** in a notification.
+Press **Download update** and follow the short steps on the page. A Mac app on 0.5.4 or newer, and the Windows app from 0.5.6, update themselves: **Update now**, a progress bar, then **Restart now**. See [Desktop app: Updating](../apps/desktop-app.md#updating). A new version also shows in the [bell](notifications.md), and the desktop app can say **Update ready** in a notification.
 
 ## Browser app
 
