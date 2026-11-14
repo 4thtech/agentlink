@@ -146,6 +146,8 @@ A switch in the top bar, label "Under the hood", default **Off**, remembered per
 | 21 | **Settings › Advanced** | A (`d1/screens/local/advanced`; B-4) | Network (picked automatically; named here only), own storage status (B-4), diagnostics |
 | 22 | **Settings › About** | N | Mark, version, "by 4thTech" (endorsed lockup), licences, links to docs and support |
 | 23 | **Whole-app states** | A (`d1/screens/local/shared-states--all`) | "AgentLink isn't running. Start your AI app, then reload."; session expired; something went wrong with Retry |
+| 24 | **Get started: Files step** (D-152, 08 §1; no new design) | R (the Get started step layout of the W4 wizard, A1 to A3; folder rows from row 12 and `d1/screens/local/files--default`) | Nothing new to draw: the step reuses the wizard step frame and the Settings › Files folder cards (path, chip, Show in Finder); copy in 11 §5.7 |
+| 25 | **Home: Files panel** (D-152, 08 §1; no new design) | R (Home of §4, the folder cards of row 12, the Send folder banner it replaces) | Nothing new to draw: a Home card holding the two folder rows and the banner's action; copy in 11 §5.7 |
 
 ## 9. Accessibility and constraints (every screen)
 
