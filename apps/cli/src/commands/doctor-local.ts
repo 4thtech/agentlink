@@ -29,6 +29,7 @@ export const DOCTOR_LOCAL_TEXT = Object.freeze({
     start_port: "it couldn't start its page on this computer",
     start_keychain: "your computer's keychain wasn't available",
     start_open: "it couldn't open your ID",
+    start_broken_id: "an ID's key is missing from this computer",
     start_failed: "it couldn't start",
   }),
   get staleHost(): string {

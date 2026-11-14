@@ -784,6 +784,11 @@ type AiAppsListing = Awaited<ReturnType<LocalUiAiApps['list']>>;
 /** Structured events, fixed values only: never a token, URL, secret, ID or request text (I-7). */
 export type ApprovalServerEvent =
   | { readonly kind: 'listening' }
+  /**
+   * WIN-BROKEN-ID: a new ID that could not be completed was not removed (its folder and keys stay
+   * together, so it is listed and opens; never a folder without its keys). Fixed value only (I-7).
+   */
+  | { readonly kind: 'discard_failed' }
   /** The machine has no IPv6 loopback: the server listens on 127.0.0.1 only (M1-31). */
   | { readonly kind: 'ipv6_unavailable' }
   /** W4-LIVE-STATUS: an event stream opened or was refused (`busy`); the open count only (I-7). */
@@ -3510,6 +3515,14 @@ export async function startApprovalServerWith(
        */
       readonly history?: true;
       /**
+       * WIN-BROKEN-ID: "Remove this ID from this computer" for an ID whose key is missing. Presence
+       * is verified as for every owner route and nothing is signed (as `history`): the handler marks
+       * its one owner operation with `presenceChecked`. The owner is the open ID's owner; with no ID
+       * open, the owner stored on this computer (as HOTFIX-NOID's New ID: the master code opens the
+       * owner item, a stored Touch ID or passkey header must name the same owner key).
+       */
+      readonly setAside?: true;
+      /**
        * WP-R2b: the page session (its cookie value), for the recovery-kit export only: the restore
        * engine binds the export handle for Check to it (registerExportedKit).
        */
@@ -3616,13 +3629,30 @@ export async function startApprovalServerWith(
           return;
         }
         const byNostr = gate.ownerNostr;
+        // WIN-BROKEN-ID: with no ID open no card names the owner; the stored owner is the one.
+        const storedOwner = gate.setAside === true && byNostr === undefined && noAgentOpen();
         const context =
-          byNostr === undefined ? await (gate.context ?? (() => source.context()))() : undefined;
-        const expectedNostr = byNostr ?? context?.owner.ownerNostr;
-        if (expectedNostr === undefined) {
+          byNostr === undefined && !storedOwner
+            ? await (gate.context ?? (() => source.context()))()
+            : undefined;
+        const storedNostr = storedOwner
+          ? await (
+              native
+                ? readOwnerNativeHeader(keychainOf()).then((h) => h?.ownerNostr)
+                : passkey
+                  ? readOwnerPasskeyHeader(keychainOf()).then((h) => h?.ownerNostr)
+                  : Promise.resolve(undefined)
+            ).catch(() => undefined)
+          : undefined;
+        const expectedOrNone = byNostr ?? context?.owner.ownerNostr ?? storedNostr;
+        // Only the master code opens the stored owner without a header naming it.
+        const byCodeOnly = storedOwner && !native && !passkey;
+        if (expectedOrNone === undefined && !byCodeOnly) {
           finishOwner(res, 503, 'needs_setup');
           return;
         }
+        // The master code path below never reads it (byCodeOnly); every other path has it.
+        const expectedNostr = expectedOrNone ?? new Uint8Array(32);
         let presence: OwnerPresence;
         if (native) {
           // DESK-D12c: one helper gesture for this one owner operation, after every check. D15-04:
@@ -3670,12 +3700,31 @@ export async function startApprovalServerWith(
           // HOTFIX-045-REMOVE (GAP B): no card; the stored owner must be the one `byNostr` names.
           try {
             // unlockForOwnerNostr wipes the presented bytes, whether or not they unlock.
-            const unlocked = await KeychainOwnerKeyStore.unlockForOwnerNostr(
-              keychainOf(),
-              expectedNostr,
-              presence,
-              { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
-            );
+            // WIN-BROKEN-ID: with no ID open, the master code opens the stored owner item, which a
+            // stored Touch ID or passkey header must not contradict (as HOTFIX-NOID's New ID).
+            const unlocked = byCodeOnly
+              ? await KeychainOwnerKeyStore.unlockWithoutCard(
+                  keychainOf(),
+                  presence,
+                  (found) => sameStoredOwner(found),
+                  { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
+                )
+              : await KeychainOwnerKeyStore.unlockForOwnerNostr(
+                  keychainOf(),
+                  expectedNostr,
+                  presence,
+                  { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
+                );
+            if (unlocked === null) {
+              finishOwner(res, 409, 'refused');
+              return;
+            }
+            if (storedOwner && !byCodeOnly && !(await sameStoredOwner(unlocked.owner))) {
+              await unlocked.session.close().catch(() => undefined);
+              await unlocked.store.close().catch(() => undefined);
+              finishOwner(res, 409, 'refused');
+              return;
+            }
             ({ store, session, owner: ownerKeys } = unlocked);
           } catch (error) {
             if (error instanceof KeyStoreError && error.code === 'presence_rejected' && native) {
@@ -3770,7 +3819,7 @@ export async function startApprovalServerWith(
                 : {}),
               // RET-4: the Delete history finish: one owner operation with verified presence and
               // nothing signed (the handler schedules the plan bound at begin).
-              ...(gate.history === true
+              ...(gate.history === true || gate.setAside === true
                 ? {
                     presenceChecked: () => {
                       if (!stillCurrent(req)) throw new AgentChanged();
@@ -3796,8 +3845,9 @@ export async function startApprovalServerWith(
                 }
                 // WP-11: the export gate signs only through exportRecoveryKit.
                 if (gate.recoveryKit === true) throw ownerOperationRefused();
-                // RET-4: the history finish signs nothing (presenceChecked only).
-                if (gate.history === true) throw ownerOperationRefused();
+                // RET-4: the history finish signs nothing (presenceChecked only); nor does the
+                // WIN-BROKEN-ID set-aside.
+                if (gate.history === true || gate.setAside === true) throw ownerOperationRefused();
                 used = true;
                 const frozen = checkGesture(review, requests);
                 // WP-11 (04 §2.3.3): a `backup.export` is signed only by the export gesture, right
@@ -4856,13 +4906,13 @@ export async function startApprovalServerWith(
       return undefined;
     }
     if (name !== FIRST_AGENT_NAME) {
-      await directory.discardNew?.(name).catch(() => undefined);
+      await directory.discardNew?.(name).catch(discardFailed);
       return undefined;
     }
     const opened = await slot.openNew(name);
     if (opened === undefined || opened.name !== name || opened.firstCard === undefined) {
       await opened?.close().catch(() => undefined);
-      await directory.discardNew?.(name).catch(() => undefined);
+      await directory.discardNew?.(name).catch(discardFailed);
       return undefined;
     }
     return opened;
@@ -5460,7 +5510,7 @@ export async function startApprovalServerWith(
       created = undefined;
       if (agent !== undefined) {
         await agent.close().catch(() => undefined);
-        if (!ownerIsOurs) await host?.directory.discardNew?.(agent.name).catch(() => undefined);
+        if (!ownerIsOurs) await host?.directory.discardNew?.(agent.name).catch(discardFailed);
       }
       if (keepFolders || released) return;
       released = true;
@@ -6228,7 +6278,7 @@ export async function startApprovalServerWith(
         // All or nothing (04 §2.8 "From the local app"): exactly what this request made goes.
         if (created !== undefined) {
           await created.close().catch(() => undefined);
-          await host?.directory.discardNew?.(created.name).catch(() => undefined);
+          await host?.directory.discardNew?.(created.name).catch(discardFailed);
         }
         finishCreate(res, refusal?.status ?? 409, refusal?.outcome ?? 'not_applied');
         return;
@@ -6303,7 +6353,7 @@ export async function startApprovalServerWith(
       return undefined;
     }
     if (name !== plan.folder) {
-      await directory.discardNew?.(name).catch(() => undefined);
+      await directory.discardNew?.(name).catch(discardFailed);
       return undefined;
     }
     const opened = await slot.openNew(name);
@@ -6314,7 +6364,7 @@ export async function startApprovalServerWith(
       opened.firstCard.agent !== plan.agentId
     ) {
       await opened?.close().catch(() => undefined);
-      await directory.discardNew?.(name).catch(() => undefined);
+      await directory.discardNew?.(name).catch(discardFailed);
       return undefined;
     }
     return opened;
@@ -7616,6 +7666,11 @@ export async function startApprovalServerWith(
   }
 
   /** U3-g-b: true while the app host has no agent open (no agent yet, or a failed switch). */
+  /** WIN-BROKEN-ID: a discard that failed is logged with a fixed event, never swallowed. */
+  function discardFailed(): void {
+    emit({ kind: 'discard_failed' });
+  }
+
   function noAgentOpen(): boolean {
     return host !== undefined && host.current === undefined;
   }
@@ -7732,6 +7787,7 @@ export async function startApprovalServerWith(
           current: entry.name === current,
           available: entry.available,
           removing: entry.removing,
+          ...(entry.broken === 'identity_missing' ? { broken: true } : {}),
           contacts: stats?.contacts ?? null,
           // W4-LIVE-STATUS: a live MCP session row, never the lease (so the host's own pairing
           // pass, which takes the lease, never shows as an AI app).
@@ -8082,6 +8138,50 @@ export async function startApprovalServerWith(
       // The typed label is the confirmation (b11 §29): exactly the label shown, never normalised.
       if (input.typedLabel !== undefined && input.typedLabel !== entry.label) {
         finishRemove('label_mismatch');
+        return;
+      }
+      // WIN-BROKEN-ID (proposed, owner confirms at merge): an ID whose key is missing is not
+      // retired (no `agent.revoke`: it may be restored from a backup); it is set aside. The typed
+      // label and the owner's presence are asked as for every removal; nothing is signed. No
+      // exclusive hold: an ID without its key opens nowhere, and on Windows the hold's own lock
+      // file would keep the folder from moving. The directory checks again that the key is missing.
+      if (entry.broken === 'identity_missing' && !entry.removing) {
+        const setAside = slot.directory.setAside?.bind(slot.directory);
+        if (input.typedLabel === undefined || setAside === undefined) {
+          finishRemove('invalid');
+          return;
+        }
+        await ownerGate(
+          req,
+          res,
+          async (owner) => {
+            owner.presenceChecked?.();
+            try {
+              await setAside(input.name);
+            } catch (error) {
+              // r1 M1: the seed is here (only the store key is gone): never set aside, nothing moved.
+              const code = (error as { code?: unknown } | null)?.code;
+              if (code === 'agent_not_broken') {
+                emit({ kind: 'remove', outcome: 'key_here' });
+                return { status: REMOVE_STATUS.key_here, body: { status: 'key_here' } };
+              }
+              // r2: the keychain did not answer the seed check: its own answer, nothing moved.
+              if (code === 'agent_keys_unchecked') {
+                emit({ kind: 'remove', outcome: 'keys_unchecked' });
+                return {
+                  status: REMOVE_STATUS.keys_unchecked,
+                  body: { status: 'keys_unchecked' },
+                };
+              }
+              emit({ kind: 'remove', outcome: 'failed', step: 'set_aside' });
+              return { status: REMOVE_STATUS.failed, body: { status: 'failed' } };
+            }
+            settled = 'removed';
+            emit({ kind: 'remove', outcome: 'removed' });
+            return { status: REMOVE_STATUS.removed, body: { status: 'removed' } };
+          },
+          { setAside: true },
+        );
         return;
       }
       const keys = await removal.keys(input.name).catch(() => undefined);

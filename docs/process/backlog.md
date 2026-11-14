@@ -10846,3 +10846,11 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
   - Fix: a master-code-only finish (`{nonce, presence: 'code'}`, empty body, no WebAuthn); presence detected first (the desktop helper, the platform authenticator, PRF); on Windows the master code first; only ever the platform authenticator; the desktop app's Touch ID / Windows Hello offered after the code; no dead-end screen; platform words from SENSOR.
 - **Acceptance:**
   - `RED (expected):` commit first; the master-code path never calls `navigator.credentials`; no `create` without a platform authenticator; desktop shell with no owner and no WebAuthn reaches the master-code step; Opus independent review, Fable 5.1 audit, Tali's "merge"; changelog.d fragment and changeset.
+
+#### WIN-BROKEN-ID · An ID whose key is missing: Restore, Remove from this computer, Continue (0.5.5)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (owner presence, keychain erase)
+- **Repo/path:** agentlink · `apps/cli/src/commands/{ui,ui-host,doctor}.ts`, `apps/cli/src/runtime/{broken-id,broken-names,agent-create,agent-dir}.ts`, `packages/node/src/{broken-id,approval-server}.ts`, `apps/local-ui/src/pages/{agents,home}/`
+- **Depends on:** U3-e, HOTFIX-NOID, UX1113-R1 (D-147)
+- **Spec:** 04 §2.5 "An ID whose key is missing"; 08 §1; 11 §5
+- **Done when:** `identity_missing` is its own start reason (`broken_id`); another ID opens, or the host starts with none; Home offers Restore from backup, Remove from this computer (typed label + presence, folder set aside then leftover keys, nothing signed) and Continue without it; discard removes the folder before the keys; doctor prints fixed sentences whole; tests on posix (win32 paths guarded).
+

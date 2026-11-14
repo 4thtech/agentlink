@@ -21,23 +21,19 @@ import * as chain from '@4thtech-io/chain';
 import {
   hasOwnerOnMachine,
   hasUnfinishedOwnerCodeChange,
+  NodeKeyStoreError,
+  NodeStoreError,
   nodeRpcFetch,
   restoreHoldHere,
 } from '@4thtech-io/node';
 import { listAgentNames, readAgentConfig } from '../runtime/agent-dir.js';
 import { localDoctorChecks, type LocalChecks } from './doctor-local.js';
 import { isAgentName } from '../runtime/agent-name.js';
-import { terminalOneLine } from '../terminal/sanitize.js';
+import { RuntimeError } from '../runtime/errors.js';
+import { AGENT_PAUSED_TEXT, CoreError } from '@4thtech-io/core';
+import { terminalOneLine, terminalSentence } from '../terminal/sanitize.js';
 import { copy, renderCopy } from '@4thtech-io/mcp-tools/strings/index.js';
-import {
-  TEXT,
-  agentPausedNow,
-  createDeps,
-  fill,
-  fixedErrorText,
-  printAll,
-  type CommandDeps,
-} from './shared.js';
+import { TEXT, agentPausedNow, createDeps, fill, printAll, type CommandDeps } from './shared.js';
 
 /**
  * D-100: the rules line (11 §5: "rules", never "policy", except in the command itself). M1-36e: the
@@ -195,11 +191,13 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
       try {
         opened = await deps.open(name);
       } catch (error) {
-        const text = fixedErrorText(error);
-        emit(
-          text === undefined ? TEXT.doctorOpenFailed : fill(TEXT.doctorNoAgent, { message: text }),
-          true,
-        );
+        // WIN-BROKEN-ID: the whole fixed sentence (never cut at 128); a missing key names the fix.
+        const shown = name ?? 'default';
+        const label = await readAgentConfig(deps.home, shown)
+          .then((found) => found?.config.label ?? shown)
+          .catch(() => shown);
+        const lines = doctorOpenProblem(error, label);
+        emit(lines === undefined ? TEXT.doctorOpenFailed : lines.join('\n'), true);
         return true;
       }
       if (opened.status === 'needs_setup') {
@@ -375,3 +373,32 @@ export const doctorHandler: CommandHandler = createDoctorHandler({
   restoreHold: restoreHoldHere,
   local: () => localDoctorChecks({ env: process.env }),
 });
+
+/**
+ * WIN-BROKEN-ID: doctor's lines for an ID that would not open, or undefined when the error is not one
+ * of AgentLink's fixed sentences (doctor then prints its own). A missing key (`identity_missing`) is a
+ * Problem line naming the ID and a Fix line naming the app (11 §5: "its key", no keychain jargon);
+ * any other fixed sentence is printed whole (terminalSentence), never cut with `…`.
+ */
+export function doctorOpenProblem(error: unknown, label: string): string[] | undefined {
+  if (isFixedError(error) && (error as { code?: unknown }).code === 'identity_missing') {
+    return [
+      `Problem  ID "${terminalOneLine(label)}" can't be opened: its key isn't on this computer.`,
+      '         Open AgentLink to restore it from a backup or remove it from this computer.',
+    ];
+  }
+  if (!isFixedError(error)) return undefined;
+  if (error instanceof CoreError && error.code === 'agent_paused') {
+    return [fill(TEXT.doctorNoAgent, { message: AGENT_PAUSED_TEXT })];
+  }
+  return [fill(TEXT.doctorNoAgent, { message: terminalSentence(error.message) })];
+}
+
+function isFixedError(error: unknown): error is Error {
+  return (
+    error instanceof CoreError ||
+    error instanceof RuntimeError ||
+    error instanceof NodeKeyStoreError ||
+    error instanceof NodeStoreError
+  );
+}

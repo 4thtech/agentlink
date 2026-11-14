@@ -88,8 +88,11 @@ export async function createAgentFolder(
 }
 
 /**
- * Removes an agent that createAgentFolder made and that could not be completed: its keychain items
- * first, then its folder. Rejects when the folder is not a keychain agent's or cannot be removed.
+ * Removes an agent that createAgentFolder made and that could not be completed: its folder first,
+ * then its keychain items. WIN-BROKEN-ID: a folder that cannot be removed (an unknown file in it, a
+ * store Windows still holds open) rejects before any key is touched, so a failed discard never leaves
+ * a folder whose keys are gone (an ID that can't be opened); at worst unused keys stay behind, which
+ * nothing reads. Rejects when the folder is not a keychain agent's or cannot be removed.
  */
 export async function discardNewAgentFolder(
   home: string,
@@ -101,6 +104,6 @@ export async function discardNewAgentFolder(
   if (found === undefined || found.config.keyStore !== 'keychain') {
     throw new RuntimeError('agent_config_invalid');
   }
-  await deps.discardKeys(found.config.agentId);
   await removeAgentFolder(home, name, check);
+  await deps.discardKeys(found.config.agentId);
 }
