@@ -10877,3 +10877,10 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** while the desktop app alerts for one ID, the `agentlink mcp` process of another ID (which already holds that ID's keys) alerts its new messages and files by OS notification under the owner's Messages and Files switches; nothing opens an ID's keys or store just to notify; first look only notes what is there; a file and its message are one alert; quiet for the ID the desktop app alerts for and while no desktop app runs.
 - **Threat note:** the text is fixed words; the only variable parts, shown only with Show names on, are the ID's folder name and a contact name the OWNER gave (`nameSource` `owner`), each checked against the pipe's plain-name rule (letters, numbers, single spaces, apostrophes, hyphens; no dot, slash, colon, angle bracket or control character). Message text, a file name, a counterparty's self-declared name and links never reach it (I-5). Reads only flow events (contact ID, direction, kind, time) and the owner's names through the client the process already holds; nothing is logged or sent (I-7). A same-user process can silence it by writing the alerts record, which it could already do for approvals (IR-N7-1 L-1). The OS alert has no click target (osascript / notify-send); it never approves or replies.
 - **RED:** `RED (expected): NOTIFY-ALL-IDS` (tests first).
+
+#### NOTIFY-FOCUS · No OS alert while the AgentLink window is focused (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (shell only; nothing on the pipe changes)
+- **Repo/path:** agentlink · `apps/desktop/src/main/{notify,window,main,electron-api}.ts`
+- **Depends on:** N7, NOTIFY-DEEPLINK
+- **Spec:** 08 §1; 11 §5
+- **Done when:** while the window is shown, not minimised and focused, no native notification is raised (the in-app centre, tray and badge still update from the core); a hidden, minimised, background or closed window alerts as before; the check is made when the alert would be shown; tests.

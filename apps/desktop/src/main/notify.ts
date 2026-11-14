@@ -14,6 +14,8 @@
 // - At most one notification per kind per NOTIFY_GAP_MS (30 s, 06's OS-alert rule). What arrives
 //   meanwhile is coalesced into one later notification: approvals keep the latest number waiting,
 //   messages and files add up; a name stays only while it is the same person.
+// - NOTIFY-FOCUS: while the AgentLink window is focused, no alert is shown at all (the in-app notification
+//   centre, the tray and the dock badge still update from the core).
 // - Electron drops a notification's click handler once the object is collected, so each shown one
 //   is held until it is clicked or closed (at most MAX_HELD).
 import {
@@ -89,6 +91,11 @@ export interface NativeNotifierOptions {
   /** Electron's Notification; absent or unsupported: nothing is shown. */
   readonly Notification?: NotificationConstructor;
   readonly timers: Timers;
+  /**
+   * NOTIFY-FOCUS: true while AgentLink's window is shown and focused. Then no OS alert is raised (the
+   * person is looking at the app; its notification centre and badges still update). Absent: never.
+   */
+  readonly windowFocused?: () => boolean;
   /** A notification was clicked: focus the window and open this fixed route. */
   readonly onClick: (route: ShowRoute, target?: string) => void;
 }
@@ -167,6 +174,8 @@ export class NativeNotifier {
     const Notification = this.options.Notification;
     try {
       if (Notification === undefined || !Notification.isSupported()) return;
+      // NOTIFY-FOCUS: never an OS alert on top of the window the person is using.
+      if (this.options.windowFocused?.() === true) return;
       const notification = new Notification(notificationText(kind, count, name));
       const route = NOTIFY_ROUTES[kind];
       const release = (): void => {

@@ -537,6 +537,7 @@ export async function runShell(
   notifier = new NativeNotifier({
     ...(electron.Notification === undefined ? {} : { Notification: electron.Notification }),
     timers: proc.timers,
+    windowFocused: () => window?.focused === true,
     onClick: (route, target) => {
       window?.show();
       supervisor?.send({ v: 1, type: 'show', route, ...(target === undefined ? {} : { target }) });
