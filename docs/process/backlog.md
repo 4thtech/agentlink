@@ -10749,3 +10749,83 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** D-147 (restore in the app); consumes the platform-neutral `NativeHelper` (WIN-HELLO-NATIVE in parallel); links into first run (FIRSTRUN-ANY-PLATFORM owns those pages)
 - **Spec:** D-152; 04 §2.5.4; 08 §1; 11 §5
 - **Done when:** `RED (expected):` commit first; the routes refuse a caller without the page session (no MCP tool, no agent credential, I-4); begin needs the typed phrase, finish a fresh OS presence gesture; `~/.agentlink` is moved to `~/.agentlink.backup-YYYYMMDD-HHMMSS`, never deleted; only AgentLink's keychain accounts are erased, by exact name; a failed move or erase is answered and safe to retry; Restore from recovery kit is offered first; copy per 11 §5.
+
+#### FILES-SPEC-055 · Files UX spec and decision D-152: send-by-content, AI-side texts, Files step, Home panel (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Opus build, Opus independent review (spec only) · **Security:** S2 (spec: MCP-reachable filesystem write, I-4 boundary)
+- **Repo/path:** agentlink · `docs/foundation/{00-README,04-security-and-crypto,06-mcp-server,08-clients-console-cloud,11-claude-design-brief}.md`; `docs/design/b11-local-app.md` (§8 row 12); `docs/process/proposals/MSG-FILES-IO.md`; `docs/process/backlog.md`; `changelog.d/`
+- **Depends on:** owner decisions of 14 Nov 2026 (Skip keeps Send allowed; Send root; texts may name the path; 50 files / 64 MiB a day)
+- **Spec:** D-152; 04 §2.5, §4 "Written by the AI into the Send folder"; 06 §2.2, §2.3 "Send by content" and "AI-side texts for files", §9; 08 §1 "Files in Get started, on Home and in Settings"; 11 §5.7
+- **Done when:** the independent reviewer finds no path where `name`, `content` or the contact chooses the folder, and every D-152 point has its spec text; docs checks green; Tali confirms the D-entry and the copy at merge. Nothing in FILES-AI-1 or the copy cards merges before.
+
+#### FILES-AI-1 · `agentlink_send` `file: {name, content}`: send a text file the AI wrote (0.5.5)
+- **Status:** new · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (first MCP-reachable filesystem write; I-4)
+- **Repo/path:** agentlink · `packages/mcp-tools/src` (`agentlink_send` schema, handler, `files-common.ts` new codes, tool description, tool-surface snapshot); `packages/node/src/send-folder-file.ts` (module header: no longer "never reached from MCP"); core send path and the local store (by-content ledger); tests
+- **Depends on:** FILES-SPEC-055
+- **Spec:** D-152; 06 §2.3 "Send by content"; 04 §4 "Written by the AI into the Send folder"
+- **Done when:** `RED (expected):` commit first; and tests show:
+  - schema: `file` is `{name, content}` with `additionalProperties: false`; `path` with `file`, or `file` with `body` → `INVALID_ARGUMENT`, nothing runs;
+  - name: `/`, `\`, `a/b.md`, `../x.md`, a separator hidden behind an invisible character → `FILE_NAME`; `notes.md.exe`, `notes`, `..`, `.md`, `notes.html`, `notes.svg` → `FILE_TYPE`; `NOTES.MD` accepted; bidi and control characters removed; a 255-byte name and a 256-byte name handled by `sanitizeFileName`;
+  - content: NUL, a lone surrogate and invalid UTF-8 → `FILE_NOT_TEXT`; exactly 8 MiB sent, 8 MiB + 1 byte → `FILE_TOO_LARGE`; the bytes sent equal the UTF-8 of `content`;
+  - folder: written only into the root of the ID's own pinned Send folder with `O_CREAT | O_EXCL | O_NOFOLLOW`, mode 0600; no folder allowed → `needs_setup` `NO_ALLOWED_FOLDER` and nothing written; Send folder a link, missing or not allowed while another folder is allowed → `SEND_FOLDER_UNAVAILABLE`, nothing written, the other folder untouched (filesystem spy); a planted link at the target name is not followed; a clash → `notes (2).md`, nothing overwritten; the attempt limit → `FILE_NAME_TAKEN`;
+  - send: the written realpath goes through the ordinary `path` rules (policy, storage, drop limits, `notarize`, approvals) but the bytes sent are the in-memory input: a test that changes the Send folder copy between write and send shows the sent bytes still equal the input; the approval digest binds sanitised name, in-memory hash and size; `file.name` is the saved name; the contact file policy is checked before the write (`POLICY_DENIED`, nothing written);
+  - what stays: `sent`/`queued` keep the file; `pending_approval` keeps it while pending, the approved retry writes no second copy, deny and expiry remove it with `unlinkat` on the held folder handle after a device and inode re-check, only while unchanged (an edited copy is left alone); the card re-hashes the kept copy through one opened handle and previews those bytes only: editing the kept copy while pending → "This file changed since your AI wrote it.", no Approve, the request void; the approved retry never counts against the budget and never returns `FILE_BUDGET`; every other ending removes it at once; the approval card shows the requested name and "Your contact will see it as {savedName}." after a clash;
+  - idempotency: the `clientRequestId` is checked before the write; a repeat → the kept result and still one file; other arguments → `IDEMPOTENCY_KEY_REUSED`, nothing written;
+  - order: paused → `AGENT_PAUSED` and the cloud agent → `CLOUD_FILES_NOT_YET`, both before any write;
+  - budget: the 51st file, or the file that crosses 64 MiB, in a rolling 24 h → `FILE_BUDGET`, nothing written or sent; check and reservation are one atomic store step before the write, and a concurrency test with parallel calls for the last place lets exactly one through; every write counts, also a removed file; refusals before the write and idempotent repeats count nothing; Attach and `path` sends count nothing; an unreadable ledger → `FILES_UNAVAILABLE`; the ledger holds time and byte count only; no MCP tool reads or changes it;
+  - I-5, I-7: a redaction test finds neither `name` (except the sanitised saved name, bidi-isolated, in the summary) nor `content` in any result, `nextStep`, error or log line; no input takes an envelope ID or a received file; the summary and every refusal are the fixed strings of 06 §2.3;
+  - zero access: the content leaves only inline or as `ALF1` ciphertext (drop spy sees ciphertext only);
+  - the tool description carries the fixed D-152 line and nothing from a call; the tool-surface snapshot and the MCP conformance test are updated; `path` keeps resolving `~`-relative paths.
+
+#### FILES-AI-2 · AI-side texts for files: point to send-by-content and the Send folder (0.5.5)
+- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `packages/mcp-tools/src/files-common.ts` (`FILE_TEXT`, `allowFolderLinkNextStep`), the `{sendFolder}` slot fill; tests
+- **Depends on:** FILES-SPEC-055 (lands with or after FILES-AI-1, since the texts name `file`)
+- **Spec:** 06 §2.3 "AI-side texts for files"; 11 §5.7
+- **Done when:** snapshot of the fixed `nextStep` texts for `NO_ALLOWED_FOLDER` (with and without the app link), `OUTSIDE_ALLOWED_FOLDER` and `NOT_FOUND`; `{sendFolder}` is filled only from the ID's own pinned Send folder with home as `~`, and the sentence drops the slot when there is none or it lies outside home; an I-5 test shows no slot takes agent-written or inbound text, and a path from the call never appears.
+
+#### FILES-REVEAL · Show in Finder for the Send folder (0.5.5)
+- **Status:** new · **Size:** S · **Tier:** Opus build, Opus independent review · **Security:** S2 (local route, OS exec)
+- **Repo/path:** agentlink · `packages/node/src/local-ui/{routes,route-types}.ts`, the Inbox reveal module (reuse its kind); `apps/local-ui` API helper; tests
+- **Depends on:** FILES-SPEC-055
+- **Spec:** 08 §1 "Show in Finder for the folders"; 04 §4 "Pinned at allow time"
+- **Done when:** `RED (expected):` commit first; `POST /api/ui/files/send-folder/reveal` takes no input (a query, body or path is refused) and sits behind the session, CSRF, Origin and fetch-metadata gate (tests per header); it opens only the open ID's own allowed, pinned Send folder; a Send folder that became a link, a file or is missing → fixed `not_found`, never opened; answers carry no path; nothing logged; the Inbox reuses `POST /api/ui/storage/inbox/reveal`.
+
+#### FILES-ONB-1 · Files in Get started: the Connect card and the new Files step (0.5.5)
+- **Status:** new · **Size:** M · **Tier:** Sonnet build, Opus UX review · **Security:** S1 (UI; the add-folder confirm reuses the existing S2 flow unchanged)
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/start/*` (`STEP_IDS`, strings, the new step), `pages/first-run/strings.ts` (the collapsed "Your folders"); e2e golden path
+- **Depends on:** FILES-SPEC-055; FILES-REVEAL for Show in Finder of the Send folder (stub until it merges)
+- **Spec:** 08 §1 "Files in Get started, on Home and in Settings"; 11 §5.7 (Connect card, Files step, AI app tips)
+- **Done when:** the Connect step shows the files card above the one Touch ID with the folder from the server, and `begin`/`finish` take no new input; Get started and New ID (`?add=agent`) have five steps with "Step 4 of 5 · Files", Connect another AI app has none; DOM tests per state: allowed, not allowed (Allow Send folder), not confirmed, Send folder missing, each AI app tip and the unknown-app tip; Skip for now goes to Invite and changes no rule (no request that signs); Choose another folder opens the existing review and confirm, adds the folder, and "Also stop sending from {sendFolder}" is unticked by default and lists both changes in one signed edit; the app makes no live claim about the AI app's own file access (fixed tips only); vocabulary lint (no "harness", "wallet"); Playwright golden path install → app → connect → Files → invite on a temp HOME.
+
+#### FILES-HOME-PANEL · Home Files panel replaces the Send folder banner (0.5.5)
+- **Status:** new · **Size:** M · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/home/*` (new files panel; `send-folder-banner.tsx` folded in), the Files read route's state word if missing; tests
+- **Depends on:** FILES-SPEC-055; FILES-REVEAL (stub until it merges)
+- **Spec:** 08 §1 "Home Files panel"; 11 §5.7
+- **Done when:** DOM tests: empty, allowed, not allowed (the banner text and Allow Send folder inside the panel, and no separate banner anywhere), Send folder missing, Inbox "{n} new" (a count, never a file name), Manage folders and Tips for {app}; collapse remembered and still works when `localStorage` throws; never collapsed while the Send folder is not allowed; a conversation's Attach `no_folder` points to the same action.
+
+#### FILES-SETTINGS-COPY · Settings › Files explainer, one line, tip and Show in Finder (0.5.5)
+- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S0/S1
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/files/{io-strings.ts,io.test.ts}` and the Send folders tab; tests
+- **Depends on:** FILES-SPEC-055; FILES-REVEAL
+- **Spec:** 08 §1 "Settings › Files"; 11 §5.7 "Files explainer"
+- **Done when:** the explainer is the 11 §5.7 string exactly (`io.test.ts` updated) and "You don't upload here" appears nowhere in the app; the Send folders tab shows the one line and the AI app tip above the list; Show in Finder on the Send folder card and on the Inbox line, and on no other folder card; 11 §5.7 drift check green.
+
+#### FILES-DOCS-055 · Docs for sending files in 0.5.5
+- **Status:** new · **Size:** S · **Tier:** Sonnet build, Haiku verifier · **Security:** S0
+- **Repo/path:** agentlink · `README.md` Status, `docs-site/` ("Sending files": the two questions, Send and Inbox, send-by-content, the per-app tips), `knowledge/`, `changelog.d/`, changesets
+- **Depends on:** FILES-AI-1, FILES-ONB-1, FILES-HOME-PANEL, FILES-SETTINGS-COPY
+- **Spec:** D-152; 06 §2.3; 08 §1; 11 §5.7
+- **Done when:** README Status, docs-site and `knowledge/` match what shipped (send-by-content limits, the Files step, the Home panel); no untested claim about an AI app's own features; drift checks green.
+
+#### FIRSTRUN-ANY-PLATFORM · First run works on any computer and in any browser (0.5.5, owner test on real machines, 14 Nov)
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/pages/start/strings.ts`, `packages/node/src/approval-server.ts` (setup finish), tests
+- **Depends on:** — (consumes WIN-HELLO-NATIVE through `/api/owner/native`; works without it)
+- **Spec:** 04 §2.2 "Creating it on the first-run page"; 08 §1 first run; 11 §5
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - Symptoms: the Mac desktop app's first run showed "This browser can't make a passkey" with `agentlink owner init`; on Windows 11 21H2 both buttons asked for a passkey with PRF and Windows offered only a USB security key; the step said "Touch ID" on Windows; "Skip to Home" was usable with no owner.
+  - Fix: a master-code-only finish (`{nonce, presence: 'code'}`, empty body, no WebAuthn); presence detected first (the desktop helper, the platform authenticator, PRF); on Windows the master code first; only ever the platform authenticator; the desktop app's Touch ID / Windows Hello offered after the code; no dead-end screen; platform words from SENSOR.
+- **Acceptance:**
+  - `RED (expected):` commit first; the master-code path never calls `navigator.credentials`; no `create` without a platform authenticator; desktop shell with no owner and no WebAuthn reaches the master-code step; Opus independent review, Fable 5.1 audit, Tali's "merge"; changelog.d fragment and changeset.

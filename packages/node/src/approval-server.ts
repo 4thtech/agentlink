@@ -5075,7 +5075,12 @@ export async function startApprovalServerWith(
     req: IncomingMessage,
     step: LocalUiSetupStep,
   ):
-    | { readonly label?: string; readonly app?: string; readonly nonce?: string }
+    | {
+        readonly label?: string;
+        readonly app?: string;
+        readonly nonce?: string;
+        readonly codeOnly?: true;
+      }
     | 'invalid'
     | 'label_invalid' {
     const input = operationInput(req);
@@ -5092,9 +5097,14 @@ export async function startApprovalServerWith(
     const value = input as Record<string, unknown>;
     if (step === 'finish') {
       // 04 §2.8: finish takes only the begin nonce (and the creation response as the body).
-      if (keys.length !== 1 || keys[0] !== 'nonce') return 'invalid';
+      // FIRSTRUN-ANY-PLATFORM (04 §2.2): or the nonce and `presence: 'code'` (master code only,
+      // empty body, no WebAuthn).
+      const codeOnly =
+        keys.length === 2 && keys.includes('presence') && value['presence'] === 'code';
+      if (!keys.includes('nonce') || (keys.length !== 1 && !codeOnly)) return 'invalid';
       const nonce = value['nonce'];
-      return typeof nonce === 'string' && PLAN_NONCE.test(nonce) ? { nonce } : 'invalid';
+      if (typeof nonce !== 'string' || !PLAN_NONCE.test(nonce)) return 'invalid';
+      return codeOnly ? { nonce, codeOnly: true } : { nonce };
     }
     if (!keys.includes('label') || !keys.every((k) => k === 'label' || k === 'app')) {
       return 'invalid';
@@ -5180,7 +5190,8 @@ export async function startApprovalServerWith(
         // U3-g-b: the first agent always gets a label (b11 §28 prefills it; a page without one gets it).
         const label = given.label ?? (target.kind === 'first' ? FIRST_AGENT_LABEL : undefined);
         await setupBegin(res, body, cookie, target, label, given.app);
-      } else await setupFinish(req, res, body, cookie, target, given.nonce);
+      } else
+        await setupFinish(req, res, body, cookie, target, given.nonce, given.codeOnly === true);
     } finally {
       wipe(body);
     }
@@ -5365,6 +5376,7 @@ export async function startApprovalServerWith(
     cookie: string,
     target: SetupTarget,
     nonceText: string | undefined,
+    masterCodeOnly = false,
   ): Promise<void> {
     const held = pendingSetup;
     // Bound to its session: another session neither finishes nor consumes it. U3-g-b: and to its
@@ -5388,18 +5400,35 @@ export async function startApprovalServerWith(
       finishSetup(res, 409, 'busy');
       return;
     }
+    // FIRSTRUN-ANY-PLATFORM (04 §2.2 "Creating it on the first-run page"; proposed, owner confirms
+    // at merge): the master code only, with no WebAuthn: the body is empty and no registration is
+    // parsed. The owner is stored under the generated master code only, exactly as a passkey with no
+    // PRF gives today (and as `owner init` does). A body here is refused and does not use the plan.
+    if (masterCodeOnly && body.length !== 0) {
+      finishSetup(res, 400, 'invalid');
+      return;
+    }
     // W4-ONE-TOUCH (04 §2.8 Finish, Decision 45): a rejected presence proof signs nothing and does
     // not consume the plan; it counts towards the backoff, and the third ends the plan.
     let registration: SetupRegistration | undefined;
-    try {
-      registration = parseSetupRegistration(body);
-    } catch {
-      registration = undefined;
+    if (masterCodeOnly) {
+      registration = {
+        credentialId: new Uint8Array(0),
+        authenticatorData: new Uint8Array(0),
+        clientDataJSON: new Uint8Array(0),
+        prfOutput: new Uint8Array(0),
+      };
+    } else {
+      try {
+        registration = parseSetupRegistration(body);
+      } catch {
+        registration = undefined;
+      }
     }
-    let accepted = false;
+    let accepted = masterCodeOnly;
     // M1-11s-c-c: a get() assertion whose signature this build cannot verify gives no passkey.
-    let codeOnly = false;
-    if (registration !== undefined) {
+    let codeOnly = masterCodeOnly;
+    if (registration !== undefined && !masterCodeOnly) {
       try {
         codeOnly =
           checkSetupRegistration(registration, { challenge: held.challenge, origin }) ===
@@ -5556,7 +5585,7 @@ export async function startApprovalServerWith(
             keys: held.keys,
             credentialId: proof.credentialId,
             prfOutput,
-            authenticatorData: proof.authenticatorData,
+            ...(masterCodeOnly ? {} : { authenticatorData: proof.authenticatorData }),
             firstCard,
             ...(held.folders?.send.status === 'ready' ? { sendFolder: held.folders.send } : {}),
           },

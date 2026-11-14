@@ -2117,3 +2117,84 @@ describe('REL051-CF3: a reload on "Your master code" shows the same code again',
     expect((await send(h.port, SHOW, { headers: { Cookie: s.cookie } })).status).toBe(405);
   }, 60_000);
 });
+
+// FIRSTRUN-ANY-PLATFORM (08 §1 first run; 04 §2.2 "Creating it on the first-run page"): the master
+// code only, with no WebAuthn at all. finish takes `{nonce, presence: 'code'}` and an empty body;
+// the owner is stored under the generated master code only and the card is signed, as with a
+// passkey that gives no PRF (and as `owner init` does).
+describe('FIRSTRUN-ANY-PLATFORM: first run with the master code only (no passkey call)', () => {
+  const codeOnly = (nonce: string | undefined): Record<string, string> => ({
+    'X-AgentLink-Input': inputOf({ nonce, presence: 'code' }),
+  });
+
+  it('creates the owner with only a master code and an empty body, and signs the first card', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const s = await h.session();
+    await begin(h, s);
+    const res = await post(h, FINISH, s, new Uint8Array(0), codeOnly(beginNonces.get(s.cookie)));
+    expect(res.status).toBe(200);
+    const done = JSON.parse(res.body) as { status: string; passkey: boolean; ownerCode: string };
+    expect(done.status).toBe('done');
+    expect(done.passkey).toBe(false);
+    expect(done.ownerCode.replace(/ /g, '')).toHaveLength(24);
+    expect(agent.keychain.items.has(OWNER_ACCOUNT)).toBe(true);
+    expect(agent.keychain.items.has(OWNER_PASSKEY_ACCOUNT)).toBe(false);
+    expect(agent.keychain.items.has(OWNER_PASSKEY_KEY_ACCOUNT)).toBe(false);
+    const view = await agent.client.identity.get();
+    expect(view !== undefined && verifyAgentCard(view.card, view.cardSig, view.cardAgentSig)).toBe(
+      true,
+    );
+    // The held seed is wiped, and the plan is used: a second finish finds nothing.
+    expect(h.seeds.every(allZero)).toBe(true);
+    const again = await post(h, FINISH, s, new Uint8Array(0), codeOnly(beginNonces.get(s.cookie)));
+    expect(again.status).toBe(409);
+  }, 60_000);
+
+  it('refuses a body with the code-only presence (nothing stored) and keeps the plan', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const s = await h.session();
+    const begun = await begin(h, s);
+    const body = new Authenticator().create(begun.publicKey, { origin: h.origin });
+    const bad = await post(h, FINISH, s, body, codeOnly(beginNonces.get(s.cookie)));
+    expect(bad.status).toBe(400);
+    expect(agent.keychain.items.has(OWNER_ACCOUNT)).toBe(false);
+    const ok = await post(h, FINISH, s, new Uint8Array(0), codeOnly(beginNonces.get(s.cookie)));
+    expect(ok.status).toBe(200);
+  }, 60_000);
+
+  it('takes no other presence word and no other key', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const s = await h.session();
+    await begin(h, s);
+    const nonce = beginNonces.get(s.cookie);
+    for (const value of [
+      { nonce, presence: 'passkey' },
+      { nonce, presence: 'native' },
+      { nonce, presence: 'code', label: 'A' },
+      { presence: 'code' },
+    ]) {
+      const res = await post(h, FINISH, s, new Uint8Array(0), {
+        'X-AgentLink-Input': inputOf(value),
+      });
+      expect(res.status).toBe(400);
+    }
+    expect(agent.keychain.items.has(OWNER_ACCOUNT)).toBe(false);
+  }, 60_000);
+
+  it('still refuses when an owner item appeared after begin: nothing is replaced (D-78)', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const s = await h.session();
+    await begin(h, s);
+    const planted = randomBytes(90);
+    await agent.keychain.set(OWNER_PASSKEY_ACCOUNT, planted);
+    const res = await post(h, FINISH, s, new Uint8Array(0), codeOnly(beginNonces.get(s.cookie)));
+    expect(res.status).toBe(409);
+    expect(agent.keychain.items.get(OWNER_PASSKEY_ACCOUNT)).toEqual(planted);
+    expect(agent.keychain.items.has(OWNER_ACCOUNT)).toBe(false);
+    expect(await agent.client.identity.get()).toBeUndefined();
+  }, 60_000);
+});
