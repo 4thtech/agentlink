@@ -19,7 +19,7 @@ import {
   SetupExitLinks,
   WINDOWS_SETUP_URL,
   needsOwner,
-  OwnerGate,
+  SetupGate,
 } from './setup-exit.js';
 import { CONNECT_ONLY_STEP_IDS, SETUP_EXIT, STEP_IDS } from './strings.js';
 import { WizardFrame } from './wizard.js';
@@ -143,10 +143,10 @@ describe('FIRSTRUN-EXIT: pages that need an owner', () => {
     expect(host.textContent).not.toMatch(/wallet|gas|seed phrase|transaction/i);
   });
 
-  it('OwnerGate: with no owner an owner page shows only the notice', async () => {
+  it('SetupGate: with no owner an owner page shows only the notice', async () => {
     await render(
       h(
-        OwnerGate,
+        SetupGate,
         { path: '/contacts', read: () => Promise.resolve('missing' as const) },
         h('p', { id: 'page' }, 'People'),
       ),
@@ -155,10 +155,10 @@ describe('FIRSTRUN-EXIT: pages that need an owner', () => {
     expect(host.textContent).toContain(SETUP_EXIT.firstTitle);
   });
 
-  it('OwnerGate: Settings › Updates shows the page with no owner, with a way back to setup', async () => {
+  it('SetupGate: Settings › Updates shows the page with no owner, with a way back to setup', async () => {
     await render(
       h(
-        OwnerGate,
+        SetupGate,
         { path: '/settings/updates', read: () => Promise.resolve('missing' as const) },
         h('p', { id: 'page' }, 'Updates'),
       ),
@@ -168,13 +168,13 @@ describe('FIRSTRUN-EXIT: pages that need an owner', () => {
     expect(link(SETUP_EXIT.continueSetup)?.getAttribute('href')).toBe('/start/app');
   });
 
-  it('OwnerGate: an owner, or an unanswered read, changes nothing', async () => {
+  it('SetupGate: an owner, or an unanswered read, changes nothing', async () => {
     for (const read of [
       () => Promise.resolve('set_up' as const),
       () => Promise.resolve(undefined),
       () => Promise.reject(new Error('offline')),
     ]) {
-      await render(h(OwnerGate, { path: '/contacts', read }, h('p', { id: 'page' }, 'People')));
+      await render(h(SetupGate, { path: '/contacts', read }, h('p', { id: 'page' }, 'People')));
       expect(host.querySelector('#page')).not.toBeNull();
       expect(host.textContent).not.toContain(SETUP_EXIT.firstTitle);
       expect(link(SETUP_EXIT.continueSetup)).toBeUndefined();
@@ -252,7 +252,12 @@ describe('FIRSTRUN-EXIT: Settings › Updates before an owner exists', () => {
     for (const answer of [ok(view('idle', 'desktop')), { kind: 'offline' } as ApiResult<unknown>]) {
       const get = (): Promise<ApiResult<unknown>> => Promise.resolve(answer);
       await render(
-        h(UpdatesPage, { api: { get } as unknown as ApiClient, pollMs: 0, os: 'windows', desktop: true }),
+        h(UpdatesPage, {
+          api: { get } as unknown as ApiClient,
+          pollMs: 0,
+          os: 'windows',
+          desktop: true,
+        }),
       );
       const dl = link(SETUP_EXIT.windowsDownload);
       expect(dl?.getAttribute('href')).toBe(WINDOWS_SETUP_URL);
@@ -264,7 +269,12 @@ describe('FIRSTRUN-EXIT: Settings › Updates before an owner exists', () => {
   it('the Mac app has no Windows link (it updates in the app)', async () => {
     const get = (): Promise<ApiResult<unknown>> => Promise.resolve(ok(view('idle', 'desktop')));
     await render(
-      h(UpdatesPage, { api: { get } as unknown as ApiClient, pollMs: 0, os: 'macos', desktop: true }),
+      h(UpdatesPage, {
+        api: { get } as unknown as ApiClient,
+        pollMs: 0,
+        os: 'macos',
+        desktop: true,
+      }),
     );
     expect(link(SETUP_EXIT.windowsDownload)).toBeUndefined();
   });
@@ -273,7 +283,12 @@ describe('FIRSTRUN-EXIT: Settings › Updates before an owner exists', () => {
     for (const answer of [ok(view('idle', 'npx')), { kind: 'offline' } as ApiResult<unknown>]) {
       const get = (): Promise<ApiResult<unknown>> => Promise.resolve(answer);
       await render(
-        h(UpdatesPage, { api: { get } as unknown as ApiClient, pollMs: 0, os: 'windows', desktop: false }),
+        h(UpdatesPage, {
+          api: { get } as unknown as ApiClient,
+          pollMs: 0,
+          os: 'windows',
+          desktop: false,
+        }),
       );
       expect(host.textContent).toContain(SETUP_EXIT.browserHowTitle);
       expect(host.textContent).toContain('npx -y @4thtech-io/agentlink@latest');

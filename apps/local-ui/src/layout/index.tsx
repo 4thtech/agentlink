@@ -69,6 +69,7 @@ import {
 import { healthWord } from './health-word.js';
 import { BackOnlineToast, HealthBanner } from './health-notices.js';
 import { DataAccessNotice } from './data-access-notice.js';
+import { SetupGate, type OwnerWord } from '../pages/start/setup-exit.js';
 
 export { setConnectionState, useConnectionState, type ConnectionState };
 
@@ -207,6 +208,8 @@ export interface LayoutProps {
   readonly readHealth?: () => Promise<ApiResult<unknown>>;
   /** Test seam: the reads behind Start here (UX2-g). Default: the app's own. */
   readonly startHere?: StartHereReads;
+  /** FIRSTRUN-EXIT test seam: the owner read behind the set-up-first notice. */
+  readonly readOwner?: () => Promise<OwnerWord>;
 }
 
 export function Layout({
@@ -217,6 +220,7 @@ export function Layout({
   waitingApprovals,
   readHealth,
   startHere,
+  readOwner,
 }: LayoutProps): ReactElement {
   const focused = isFocusedPath(path);
   const connection = useConnectionState();
@@ -293,6 +297,11 @@ export function Layout({
       </PrefsHood>
     );
   }
+  const gated = (
+    <SetupGate path={path} {...(readOwner === undefined ? {} : { read: readOwner })}>
+      {children}
+    </SetupGate>
+  );
   const { cls: statusClass, bar: statusWord } = healthWord(connection);
   const settings = sectionOf(path) === 'settings' || path === '/advanced/network';
   return (
@@ -322,10 +331,12 @@ export function Layout({
               <StartHereContext.Provider value={start}>
                 {/* The one-time Tidy up note (b11 §29.7), on Home. */}
                 {path === '/' ? <TidyNote /> : null}
+                {/* FIRSTRUN-EXIT: before an owner exists, a page that needs one says so (the
+                    Settings side menu stays, so Updates is one click away). */}
                 {settings && isSettingsSubpage(path) ? (
-                  <SettingsFrame path={path}>{children}</SettingsFrame>
+                  <SettingsFrame path={path}>{gated}</SettingsFrame>
                 ) : (
-                  children
+                  gated
                 )}
               </StartHereContext.Provider>
             </div>

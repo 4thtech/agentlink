@@ -72,6 +72,12 @@ const NUM = '(0|[1-9][0-9]{0,5})';
 const RELEASE = new RegExp(`^${NUM}\\.${NUM}\\.${NUM}$`);
 const APP = new RegExp(`^${NUM}\\.${NUM}\\.${NUM}(?:-[0-9A-Za-z][0-9A-Za-z.]{0,31})?$`);
 const RELEASES = 'https://github.com/4thtech/agentlink/releases';
+/**
+ * FIRSTRUN-EXIT: the Windows app has no in-app update; its fallback is the stable link to the latest
+ * release's setup file (a fixed string, never from an answer; the window opens it in the default
+ * browser, apps/desktop security.ts allows only this repository on github.com).
+ */
+export const WINDOWS_SETUP_URL = `${RELEASES}/latest/download/AgentLink-win-x64-setup.exe`;
 
 function newer(latest: string, current: string): boolean {
   const a = RELEASE.exec(latest);
