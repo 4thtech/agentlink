@@ -810,7 +810,10 @@ describe('data folder access (Windows)', () => {
         checkDataFolder: () => Promise.resolve(result),
       });
       return runShell(electron, proc).then(
-        () => (children[0]?.options as { env: Record<string, string> }).env['AGENTLINK_DESKTOP_DATA_ACL'],
+        () =>
+          (children[0]?.options as { env: Record<string, string> }).env[
+            'AGENTLINK_DESKTOP_DATA_ACL'
+          ],
       );
     };
     await expect(flag('unchecked')).resolves.toBe('unchecked');

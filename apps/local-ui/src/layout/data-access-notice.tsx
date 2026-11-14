@@ -35,7 +35,8 @@ export function useDataAccessUnchecked(
 ): boolean {
   const [unchecked, setUnchecked] = useState(false);
   useEffect(
-    () => subscribeHealth(read, { onResult: (result) => setUnchecked(dataAccessUnchecked(result)) }),
+    () =>
+      subscribeHealth(read, { onResult: (result) => setUnchecked(dataAccessUnchecked(result)) }),
     [read],
   );
   return unchecked;

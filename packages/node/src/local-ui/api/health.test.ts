@@ -87,7 +87,11 @@ describe('the health reader (M1-11s-a-d)', () => {
     expect(Object.keys(await off())).not.toContain('dataAccess');
     const on = createHealthReader({ hasClient: true, now: Date.now, dataFolderUnchecked: true });
     expect((await on()).dataAccess).toBe('unchecked');
-    const flagOff = createHealthReader({ hasClient: true, now: Date.now, dataFolderUnchecked: false });
+    const flagOff = createHealthReader({
+      hasClient: true,
+      now: Date.now,
+      dataFolderUnchecked: false,
+    });
     expect(Object.keys(await flagOff())).not.toContain('dataAccess');
   });
 
