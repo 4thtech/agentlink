@@ -23,6 +23,7 @@ import {
   CONNECTED_STEP,
   CONNECT_STEP,
   ID_EXPLAINER,
+  FILES_STEP,
   INVITE_STEP,
   PICK_STEP,
   WIZARD,
@@ -101,6 +102,18 @@ function fakeSetup(o: { status?: StatusResult; connected?: boolean } = {}): Setu
         sendFolder: 'allowed',
         computerName: 'Mac',
         ...(picked === undefined ? {} : { app: picked, connected: o.connected ?? true }),
+      } as FinishResult);
+    },
+    finishCode: (nonce: string): Promise<FinishResult> => {
+      calls.finished.push(nonce);
+      return Promise.resolve({
+        kind: 'done',
+        confirmed: true,
+        passkey: false,
+        ownerCode: CODE,
+        fingerprint: '7F3A·19C2',
+        sendFolder: 'allowed',
+        computerName: 'Mac',
       } as FinishResult);
     },
   }) as SetupApi & Calls;
@@ -241,6 +254,37 @@ interface Mounted {
  * Renders the page for the path's step, as the router does: a step change mounts it again (the
  * `go` seam moves the path and remounts, like `navigate` does through the router's key).
  */
+/** FILES-ONB-1: the Files step's reads (the Send folder allowed, the Inbox), nothing else. */
+const FILES_SEAMS: NonNullable<FirstRunPageProps['filesStep']> = {
+  api: {
+    get: (path: string) =>
+      Promise.resolve({
+        kind: 'answer',
+        status: 200,
+        json: path.startsWith('/api/ui/files/received')
+          ? { items: [], autoSave: { on: true, folder: '~/AgentLink/Inbox', notice: false } }
+          : path.startsWith('/api/ui/files/sent')
+            ? { items: [] }
+            : {
+                folders: [{ path: '~/AgentLink/Send', resolved: '/h/AgentLink/Send' }],
+                version: 1,
+              },
+      } as const),
+    passkey: () => Promise.reject(new Error('not in this test')),
+    commit: () => Promise.reject(new Error('the Files step signs nothing here')),
+    reveal: () => Promise.resolve('shown'),
+    preview: () => Promise.resolve({ kind: 'failed' }),
+  },
+  reveal: {
+    revealSendFolder: () => Promise.resolve('shown'),
+    revealInbox: () => Promise.resolve('shown'),
+  },
+  sendFolder: {
+    noFolder: () => Promise.resolve(false),
+    prepare: () => Promise.reject(new Error('the Files step sets nothing up here')),
+  },
+};
+
 async function mount(extra: Partial<FirstRunPageProps> = {}): Promise<Mounted> {
   const home = vi.fn();
   const skip = vi.fn();
@@ -264,6 +308,7 @@ async function mount(extra: Partial<FirstRunPageProps> = {}): Promise<Mounted> {
       onSkip: skip,
       readSignal: () => Promise.resolve(undefined),
       readJoin: () => Promise.resolve({ kind: 'failed' } as const),
+      filesStep: FILES_SEAMS,
       ...extra,
       go: (path: string, replace?: boolean) => {
         went.push(replace === true ? `${path} (replace)` : path);
@@ -285,14 +330,14 @@ async function mount(extra: Partial<FirstRunPageProps> = {}): Promise<Mounted> {
 }
 
 describe('W4-WIZARD: the frame of every step (A1–A3)', () => {
-  it('shows the four-segment progress with "Step 1 of 4 · Pick your AI app"', async () => {
+  it('FILES-ONB-1: shows the five-segment progress with "Step 1 of 5 · Pick your AI app"', async () => {
     await mount();
     const bar = host.querySelector('[role="progressbar"]');
     expect(bar?.getAttribute('aria-valuenow')).toBe('1');
-    expect(bar?.getAttribute('aria-valuemax')).toBe('4');
-    expect(text()).toContain(WIZARD.stepLabel(1, WIZARD.stepNames.app));
+    expect(bar?.getAttribute('aria-valuemax')).toBe('5');
+    expect(text()).toContain(WIZARD.stepLabel(1, 5, WIZARD.stepNames.app));
     const segs = [...host.querySelectorAll('.st-seg')].map((s) => s.getAttribute('data-state'));
-    expect(segs).toEqual(['current', 'todo', 'todo', 'todo']);
+    expect(segs).toEqual(['current', 'todo', 'todo', 'todo', 'todo']);
   });
 
   it('R1-UI-01: a first run has no "Skip to Home" before the ID exists (it would be a dead end)', async () => {
@@ -414,7 +459,7 @@ describe('W4-WIZARD step 2 → 3: one Touch ID, the master code once, Connected 
     expect(text()).toContain(CONNECT_STEP.worksIn('Claude Code'));
     // W7-ID-B1: the explainer card is on the Confirm screen.
     expect(text()).toContain(ID_EXPLAINER.body);
-    expect(text()).toContain(WIZARD.stepLabel(2, WIZARD.stepNames.connect));
+    expect(text()).toContain(WIZARD.stepLabel(2, 5, WIZARD.stepNames.connect));
     expect(button(CONNECT_STEP.connect('Touch ID')).className).toContain('al-btn-primary');
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
   });
@@ -435,7 +480,7 @@ describe('W4-WIZARD step 2 → 3: one Touch ID, the master code once, Connected 
     expect(h1()).toBe(CONNECTED_STEP.title('Claude Code'));
     // The code left the page with the step.
     expect(text()).not.toContain('UVWX');
-    expect(text()).toContain(WIZARD.stepLabel(3, WIZARD.stepNames.connected));
+    expect(text()).toContain(WIZARD.stepLabel(3, 5, WIZARD.stepNames.connected));
     // Connected ✓ is the U0 moment (pop + draw; fades under reduced motion, in the kit).
     expect(host.querySelector('.st-done.al-pop')).not.toBeNull();
     expect(host.querySelector('.al-draw path')).not.toBeNull();
@@ -573,15 +618,27 @@ describe('W4-WIZARD step 3 opened from the real state, and step 4 (A2, A3)', () 
     expect(went[0]).toBe('/start/app (replace)');
   });
 
-  it('Invite someone opens step 4; Skip for now and Done go Home', async () => {
+  it('FILES-ONB-1: Continue opens Files (4 of 5), then Invite (5 of 5); Back on each; Skip for now and Done go Home', async () => {
     const { home, went } = await mount();
     await click(PICK_STEP.next('Claude Code'));
     await click(CONNECT_STEP.connect('Touch ID'));
     await click('I saved it');
-    await click(CONNECTED_STEP.invite);
+    await click(CONNECTED_STEP.next);
+    expect(went.at(-1)).toBe('/start/files');
+    expect(h1()).toBe(FILES_STEP.title);
+    expect(text()).toContain(WIZARD.stepLabel(4, 5, WIZARD.stepNames.files));
+    expect(text()).toContain('Claude Code can work with files on this ');
+    await click(FILES_STEP.back);
+    expect(went.at(-1)).toBe('/start/connected');
+    await click(CONNECTED_STEP.next);
+    await click(FILES_STEP.next);
     expect(went.at(-1)).toBe('/start/invite');
     expect(h1()).toBe(INVITE_STEP.title);
-    expect(text()).toContain(WIZARD.stepLabel(4, WIZARD.stepNames.invite));
+    expect(text()).toContain(WIZARD.stepLabel(5, 5, WIZARD.stepNames.invite));
+    await click(FILES_STEP.back);
+    expect(went.at(-1)).toBe('/start/files');
+    await click(FILES_STEP.skip);
+    expect(went.at(-1)).toBe('/start/invite');
     await click(INVITE_STEP.skip);
     await click(INVITE_STEP.done);
     expect(home).toHaveBeenCalledTimes(2);
@@ -636,6 +693,13 @@ describe('W4-WIZARD: the same steps for an owner who has one already', () => {
     expect(apps.applied).toHaveLength(1);
     expect(went.at(-1)).toBe('/start/connected');
     expect(h1()).toBe(CONNECTED_STEP.title('Cursor'));
+    // FILES-ONB-1: no Files step here (the ID has its folders): four steps, Invite fourth.
+    expect(text()).toContain(WIZARD.stepLabel(3, 4, WIZARD.stepNames.connected));
+    await click(CONNECTED_STEP.invite);
+    expect(went.at(-1)).toBe('/start/invite');
+    expect(text()).toContain(WIZARD.stepLabel(4, 4, WIZARD.stepNames.invite));
+    await click(FILES_STEP.back);
+    expect(went.at(-1)).toBe('/start/connected');
   });
 
   it("Add agent (no open agent): New agent's one gesture with the picked app", async () => {
@@ -762,7 +826,7 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
     );
     expect(h1()).toBe('Name this ID');
     const bar = host.querySelector('[role="progressbar"]');
-    expect(bar?.getAttribute('aria-valuetext')).toBe('Step 1 of 4 · Name this ID');
+    expect(bar?.getAttribute('aria-valuetext')).toBe('Step 1 of 5 · Name this ID');
     const input = host.querySelector<HTMLInputElement>('input[name="agent-name"]');
     expect(input).not.toBeNull();
     expect(host.querySelector(`label[for="${input?.id ?? ''}"]`)?.textContent).toContain(
@@ -944,7 +1008,7 @@ describe('W4-WIRE-2: Add agent names the agent first (Decision 52 (2))', () => {
 });
 
 describe('W4-WIZARD: accessibility, motion and words', () => {
-  it('axe finds nothing on steps 1 to 4', async () => {
+  it('axe finds nothing on steps 1 to 5', async () => {
     const seen: string[] = [];
     const check = async (): Promise<void> => {
       const result = await axe.run(host, { rules: { region: { enabled: false } } });
@@ -957,7 +1021,9 @@ describe('W4-WIZARD: accessibility, motion and words', () => {
     await click(CONNECT_STEP.connect('Touch ID'));
     await click('I saved it');
     await check();
-    await click(CONNECTED_STEP.invite);
+    await click(CONNECTED_STEP.next);
+    await check();
+    await click(FILES_STEP.next);
     await check();
     expect(seen).toEqual([]);
   });
@@ -978,13 +1044,18 @@ describe('W4-WIZARD: accessibility, motion and words', () => {
       PICK_STEP.notFound,
       PICK_STEP.next('Claude Code'),
       CONNECT_STEP.title,
-      CONNECT_STEP.body('Claude Code'),
+      CONNECT_STEP.body('Claude Code', 'Touch ID'),
+      CONNECT_STEP.bodyConnect('Claude Code', 'work', 'your master code'),
       CONNECT_STEP.restartNote('Claude Code'),
       CONNECTED_STEP.title('Claude Code'),
       CONNECTED_STEP.body,
       CONNECTED_STEP.notConnectedBody('Claude Code'),
       CONNECTED_STEP.restart('Claude Code'),
       INVITE_STEP.body,
+      FILES_STEP.title,
+      FILES_STEP.choose,
+      CONNECT_STEP.filesLabel,
+      CONNECT_STEP.filesLine('Touch ID', 'Mac'),
     ];
     for (const w of words) expect(lintVocabulary(w)).toEqual([]);
   });

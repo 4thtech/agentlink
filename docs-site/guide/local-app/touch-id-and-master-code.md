@@ -1,6 +1,6 @@
 # Touch ID & master code
 
-*Applies to AgentLink 0.5.4. This page is new in 0.5.0. On Windows it is called **Windows Hello & master code**, and on Linux **Your passkey & master code**.*
+*Applies to AgentLink 0.5.5. This page is new in 0.5.0. On Windows it is called **Windows Hello & master code**, and on Linux **Your passkey & master code**.*
 
 Open **Settings** › **Touch ID & master code** (in the **Safety** group). It is about how you confirm that it is you: *"AgentLink asks before anything that changes who can act for you, spends credits or commits you. Your AI can never confirm for you."*
 
@@ -22,8 +22,16 @@ Your 24-character backup for when Touch ID can't be used. You saved it when you 
 - **Check my master code.** Type it to see **That's the right code.** or **That doesn't match.** Wrong tries count towards the same wait as everywhere else.
 - **Replace master code.** Confirm with Touch ID or your current master code. AgentLink shows a new code once (**Copy**); save it, for example in your password manager. Then type or paste the new code back and press **Finish**. Until you finish, your current master code keeps working; after that, the old one stops working. **Cancel** changes nothing.
 - **I lost my master code.** If Touch ID still works, replace the code now. If neither works, restore from your recovery kit on this computer (see [Backup & restore](backup-and-restore.md)).
+- **No recovery kit either? Start over on this computer.** Choose **Forgot your master code?** under any master code field, or **Start over on this computer** here. AgentLink first offers Restore from recovery kit. To go on, type `start over` and confirm with Touch ID, Windows Hello or your browser's passkey prompt; on a computer without Touch ID or Windows Hello, you type it a second time instead. Afterwards, quit and reopen your AI apps. AgentLink then moves its folder to a backup (`~/.agentlink.backup-` and the date and time; nothing in it is deleted), removes only its own items from the Keychain or Credential Manager, and opens first run so you can set up a new master code. Your old IDs stop working: people you talk to need a new invite. If a step fails, AgentLink says which one, and **Try again** is safe. Your AI can't start this for you.
 
 Never type your master code into a chat or let your AI see it. No AI tool can reach this page.
+
+## Windows Hello in the Windows app
+
+In the Windows app, Windows Hello is what Touch ID is on a Mac: **Turn on Windows Hello** asks for your master code once, then the Windows Hello prompt opens in front of the AgentLink window. If your PC can't use it, the page says why and keeps your master code working, never a security-key prompt:
+
+- **No Windows Hello PIN:** "Windows Hello isn't set up on this computer. To use it, open Settings, then Accounts, then Sign-in options, and set up a PIN (Windows Hello). Then come back here. For now, use your master code."
+- **No security chip:** "This computer doesn't have the security chip Windows Hello needs for approvals. Use your master code."
 
 ## What asks for Touch ID
 
@@ -34,5 +42,16 @@ Never type your master code into a chat or let your AI see it. No AI tool can re
 Reading messages and looking around never asks.
 
 **Three things to keep, and what each is for:** Touch ID, every day; your master code, when Touch ID can't be used; your recovery kit and its recovery code, when this computer is gone.
+
+## Start over on this computer
+
+*New in 0.5.5.* For when you lost your master code and have no recovery kit. Your AI can't start this, and it never needs your master code.
+
+1. Choose **Forgot your master code?** under any master code field. The screen **Start over on this computer?** says what is lost: your IDs on this computer stop working and people need a new invite from you; messages and files of those IDs can't be opened in AgentLink; your AI apps lose their ID until you set up a new one.
+2. If you have your recovery kit, press **Restore from recovery kit** instead: you keep your IDs, people and history. Otherwise press **Start over instead** (**Back** changes nothing).
+3. Type `start over` (the field is **Type start over**) and press **Start over with Touch ID** (or **Start over with Windows Hello**). In a browser, the browser asks you to confirm with Touch ID, Windows Hello or a passkey. On a computer with none of them, press **Continue** and type `start over` once more in **Type start over again**, then press **Start over**.
+4. When it says **You can start fresh**, quit and reopen your AI apps: until you do, they keep using the old ID and keep writing into the backup folder. Press **Set up AgentLink** to make a new master code.
+
+AgentLink moves its folder to a dated backup (`~/.agentlink.backup-` and the date and time), and deletes nothing in it. It removes only its own items from the Keychain (Mac) or Credential Manager (Windows). Passkeys named AgentLink stay in your browser or system settings; you can delete them there. If a step fails, the screen says which one, and **Try again** is safe.
 
 Back to [Settings](settings.md) or [The local app](README.md).

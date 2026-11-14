@@ -44,7 +44,9 @@ import { startUiServer, type UiDeps, type UiServer } from '../commands/ui.js';
 import { notifyMessages, planAlerts, refsToName, type AlertBaseline } from './alerts.js';
 import type { FatalReason } from '../runtime/ui-lifecycle.js';
 import type { DesktopPipe } from './pipe.js';
+import { dedupeFileAndMessage, type RecentAlerts } from './alert-dedupe.js';
 import {
+  isNotifyTarget,
   isSessionUrl,
   type HostCounts,
   type HostState,
@@ -102,6 +104,12 @@ export interface DesktopHostDeps {
    * RECORD_RENEW_MS; removed when no ID is open and when the host stops. Absent: no mark (tests).
    */
   readonly alertsRecord?: { write(scope: string): Promise<void>; remove(): Promise<void> };
+  /**
+   * APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): before this host's server starts, take
+   * over a terminal `agentlink ui` host or clear a stale record (app-host-record.ts
+   * takeOverAppHost). Its outcome never stops the start. Absent: nothing is looked for (tests).
+   */
+  takeOver?(): Promise<'none' | 'stale' | 'yielded' | 'kept'>;
 }
 
 /** Exit codes: 0 for a clean stop, 1 when it could not start or a fatal error ended it. */
@@ -139,6 +147,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     stopWith = resolve;
   });
   let stopping = false;
+  /** APP-CONTINUITY: shows Home in the window once the server runs (terminal `agentlink ui`). */
+  const later: { showHome?: () => void } = {};
   const stop = (reason: StopReason): void => {
     if (stopping) return;
     stopping = true;
@@ -260,13 +270,24 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
                 : {
                     handoff: {
                       // Held in memory for the shell's invites; the file is `join`'s (0600).
+                      // APP-CONTINUITY: it says `host: "desktop"`, so terminal `agentlink ui`
+                      // shows this window instead of starting a second host.
                       write: async (value: AppHostHandoffRecordValue) => {
-                        record = value;
-                        await host.handoff?.write(value);
+                        record = { ...value, host: 'desktop' };
+                        await host.handoff?.write(record);
                       },
                       remove: async () => {
                         record = undefined;
                         await host.handoff?.remove();
+                      },
+                      // Never taken over: the desktop app is the one that stays.
+                      onYield: () => false,
+                      // Terminal `agentlink ui`: a fresh one-shot link to Home over the pipe; the
+                      // shell shows its window on `ready`.
+                      onShow: () => {
+                        if (stopping || later.showHome === undefined) return false;
+                        later.showHome();
+                        return true;
                       },
                     },
                   }),
@@ -295,9 +316,17 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   });
   sendStatus();
 
+  // APP-CONTINUITY: one host: a terminal `agentlink ui` host is taken over (it closes cleanly; its
+  // browser tab says so), and a stale record of a crashed host is cleared. Same ~/.agentlink, same
+  // keychain, same IDs: nothing is set up again, and AI app entries are untouched.
+  await deps.takeOver?.().catch(() => 'kept' as const);
   let started: { ok: true; server: UiServer } | { ok: false; failure: StopReason };
   try {
-    started = await startUiServer(deps.uiDeps(startServer), undefined);
+    const result = await startUiServer(deps.uiDeps(startServer), undefined);
+    // WIN-BROKEN-ID: the pipe's reasons are fixed (protocol.ts); a broken ID that left no host is `open`.
+    started = result.ok
+      ? result
+      : { ok: false, failure: result.failure === 'broken_id' ? 'open' : result.failure };
   } catch {
     started = { ok: false, failure: 'failed' };
   }
@@ -316,14 +345,26 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   // The first page: Home, first run while no owner exists (the sink sends `ready`).
   await server.open().catch(() => false);
 
-  const show = async (route: ShowRoute): Promise<void> => {
+  const show = async (route: ShowRoute, target?: string): Promise<void> => {
     if (approvalServer === undefined) return;
+    // NOTIFY-DEEPLINK: the one request or person a notification named; the server checks the shape
+    // again. A request that is no longer waiting opens the approve page's own "no longer waiting" state
+    // (the page decides); an unknown person opens Home (the fallback below).
+    if (route === 'approvals' && target !== undefined && isNotifyTarget('approvals', target)) {
+      if (await approvalServer.open(target).catch(() => false)) return;
+    } else if (route === 'inbox' && target !== undefined && isNotifyTarget('inbox', target)) {
+      if (await approvalServer.openPerson(target).catch(() => false)) return;
+    }
     if (route === 'approvals' || route === 'inbox') await approvalServer.open().catch(() => false);
     else if (route === 'updates') await approvalServer.openUpdates().catch(() => false);
     else if (route === 'join') await approvalServer.openJoin().catch(() => false);
     else if (server.page === 'first-run' && !openedSinceStart) {
       await approvalServer.openFirstRun().catch(() => false);
     } else await approvalServer.openHome().catch(() => false);
+  };
+
+  later.showHome = () => {
+    queue = queue.then(() => show('home')).catch(() => undefined);
   };
 
   const invite = async (link: string): Promise<InviteOutcome> => {
@@ -352,7 +393,7 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   const handle = async (message: ShellMessage): Promise<void> => {
     if (stopping) return;
     if (message.type === 'shutdown') stop('shutdown');
-    else if (message.type === 'show') await show(message.route);
+    else if (message.type === 'show') await show(message.route, message.target);
     else if (message.type === 'app-update')
       return; // kept by its own listener above
     else {
@@ -377,6 +418,10 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
    * renewed every RECORD_RENEW_MS; a record that is not renewed stops counting).
    */
   let recordScope: string | undefined;
+  /** NOTIFY-UPDATE-READY: the first look of this run is done (an update already waiting is alerted once). */
+  let firstLookDone = false;
+  /** NOTIFY-DEDUPE: who was alerted about lately (a file and its message are one alert). */
+  const recentAlerts: RecentAlerts = new Map();
   let recordAt = 0;
   const mark = async (scope: string | undefined): Promise<void> => {
     if (deps.alertsRecord === undefined) return;
@@ -411,18 +456,26 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     if (state === undefined) return;
     // Another ID's approvals (a switch): a fresh first look, whatever the scope says yet.
     const prev = baselineOf === source ? alertBaseline : undefined;
-    const { news, baseline } = planAlerts(prev, waitingIds, state);
+    const { news, baseline } = planAlerts(prev, waitingIds, state, { launch: !firstLookDone });
+    firstLookDone = true;
     alertBaseline = baseline;
     baselineOf = source;
     await mark(state.scope);
     if (news.length === 0) return;
-    const refs = refsToName(news, state.prefs);
+    // NOTIFY-DEDUPE: a person's file and its message are one alert.
+    const alerts = dedupeFileAndMessage(
+      news,
+      (kind) => state.prefs[kind === 'files' ? 'files' : 'messages'],
+      recentAlerts,
+      Date.now(),
+    );
+    const refs = refsToName(alerts, state.prefs);
     const names =
       refs.length === 0
         ? new Map<string, string>()
         : await server.ownerNames(refs).catch(() => new Map<string, string>());
     if (stopping) return;
-    for (const message of notifyMessages(news, state.prefs, names)) pipe.send(message);
+    for (const message of notifyMessages(alerts, state.prefs, names)) pipe.send(message);
   };
 
   const every = deps.statusEveryMs ?? STATUS_EVERY_MS;

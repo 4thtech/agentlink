@@ -56,7 +56,7 @@
     "backup/index.tsx": 2,
     "compact/index.tsx": 2,
     "files/io.tsx": 1,
-    "first-run/index.tsx": 6,
+    "first-run/index.tsx": 5,
     "home/attach-composer.tsx": 1,
     "home/conversation.tsx": 4,
     "home/home-approvals.tsx": 1,

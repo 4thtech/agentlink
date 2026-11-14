@@ -67,6 +67,11 @@ export interface AgentDirectoryEntry {
   readonly keyStore?: 'keychain' | 'file';
   /** `removing: true` in config.json, or the agent's ID is in the owner's revoked list. */
   readonly removing: boolean;
+  /**
+   * WIN-BROKEN-ID: the ID's key is missing from this computer's keychain (its open failed with
+   * `identity_missing`). Display and the set-aside path only; it is never opened as usable.
+   */
+  readonly broken?: 'identity_missing';
 }
 
 /** What the Agents list shows of an agent's store (clear columns only, node agent-peek.ts). */
@@ -131,6 +136,12 @@ export interface AgentDirectory {
   markRemoving(name: string): Promise<void>;
   /** Card U3-e: deletes the agent folder's known files and the folder (no recursive delete). */
   removeFolder(name: string): Promise<void>;
+  /**
+   * WIN-BROKEN-ID: "Remove this ID from this computer" for an ID whose key is missing: checks again
+   * that its key is missing, moves its folder to a dated folder outside the agents folder (never a
+   * delete), then erases its leftover agent items. Rejects with a fixed error on any step.
+   */
+  setAside?(name: string): Promise<void>;
   /** The last used agent from `~/.agentlink/app.json`; undefined when absent or not valid. */
   readCurrent(): Promise<string | undefined>;
   /** Writes `{v:1, current}` to `~/.agentlink/app.json` (0600). Trusted for nothing but order. */
@@ -219,12 +230,25 @@ export interface AppHostHandoffRecordValue {
   readonly port: number;
   /** 32 random bytes, base64url (43 characters). */
   readonly handoffToken: string;
+  /** APP-CONTINUITY: set by the desktop app's host only (a terminal `ui` host has none). */
+  readonly host?: 'desktop';
 }
 
 /** U3-invite: where the CLI keeps the handoff record (written 0600, removed at exit). */
 export interface AppHostHandoffRecord {
   write(record: AppHostHandoffRecordValue): Promise<void>;
   remove(): Promise<void>;
+  /**
+   * APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): `POST /api/ui/host/yield` with the
+   * record's token. True when this host will close now (a terminal `agentlink ui` host the desktop
+   * app takes over); absent or false: it keeps running (`kept`). Called after the gate's checks.
+   */
+  onYield?(): boolean;
+  /**
+   * APP-CONTINUITY: `POST /api/ui/host/show` with the record's token. True when this host showed
+   * its window (the desktop app, for terminal `agentlink ui`); absent or false: `kept`.
+   */
+  onShow?(): boolean;
 }
 
 /** U3-g-b: first run with no agent yet (the folders of its first policy, the owner-file check). */
@@ -577,7 +601,8 @@ export class AppHostSlot {
     } catch {
       return;
     }
-    const usable = entries.filter((e) => e.available && !e.removing);
+    // WIN-BROKEN-ID: an ID whose key is missing is never opened as the next one.
+    const usable = entries.filter((e) => e.available && !e.removing && e.broken === undefined);
     const last = await this.#options.directory.readCurrent().catch(() => undefined);
     const order = [
       ...usable.filter((e) => e.name === last),

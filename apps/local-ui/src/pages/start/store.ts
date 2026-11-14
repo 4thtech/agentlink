@@ -3,6 +3,7 @@
 // page (never in storage). It holds no secret: the master code stays in the connect step's own state
 // and leaves the page before the next step opens.
 import type { DetectedApp } from '../first-run/apps-api.js';
+import type { SendFolderOutcome } from '../first-run/setup-api.js';
 
 /** What the connect step did: the agent and the AI app it connected (or tried to, E1). */
 export interface WizardOutcome {
@@ -10,6 +11,8 @@ export interface WizardOutcome {
   readonly app?: { readonly id: string; readonly name: string; readonly connected: boolean };
   /** W4-WIRE-2: Add agent's new agent (its folder name), for "Open {name}" on Connected. */
   readonly agent?: string;
+  /** FILES-ONB-1: what first run's one gesture did to the Send folder (`not_confirmed` is said). */
+  readonly sendFolder?: SendFolderOutcome;
 }
 
 export interface WizardMemory {
@@ -24,6 +27,13 @@ export interface WizardMemory {
   readonly adding?: boolean;
   /** W4-WIRE-2: Add agent's "Name your agent" step was passed with the name above. */
   readonly named?: boolean;
+  /** FILES-ONB-1: this run is Connect another AI app (no Files step; four steps). */
+  readonly connectOnly?: boolean;
+  /**
+   * FILES-ONB-1 (08 §1 "Connect step"): the Connect card's "Change" was pressed. Only a wish: the
+   * Files step opens its folder choice; nothing changes before (or because of) the gesture.
+   */
+  readonly chooseFolder?: boolean;
 }
 
 let memory: WizardMemory = {};

@@ -1,3 +1,4 @@
+import { pageCredentials } from '../presence/webauthn-here.js';
 // REL051-SF1 (04 §2.5; 08 §1; packages/node presence-ceremony.ts): the page side of the presence
 // ceremony. A passkey proof answers a fresh challenge the server issued for exactly the request the
 // page is about to send:
@@ -91,9 +92,8 @@ export function ceremonyPublicKeyOf(value: unknown): CeremonyPublicKey | undefin
  */
 export async function browserCeremonyGesture(
   publicKey: CeremonyPublicKey,
-  container: CredentialsContainer | undefined = typeof navigator === 'undefined'
-    ? undefined
-    : navigator.credentials,
+  // APP-CONTINUITY: never in the desktop app's window (presence/webauthn-here.ts).
+  container: CredentialsContainer | undefined = pageCredentials(),
 ): Promise<Uint8Array | undefined> {
   if (container === undefined) return undefined;
   try {

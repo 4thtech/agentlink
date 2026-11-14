@@ -38,7 +38,7 @@ describe('planAlerts', () => {
   it('IR-N7-1 L-3: one approval decided and another raised within one look is still news', () => {
     const first = planAlerts(undefined, ['apr_1'], src([]));
     expect(planAlerts(first.baseline, ['apr_2'], src([])).news).toEqual([
-      { kind: 'approvals', count: 1 },
+      { kind: 'approvals', count: 1, approvalId: 'apr_2' },
     ]);
   });
 
@@ -144,5 +144,93 @@ describe('notifyMessages: the switches and the owner-name rule', () => {
       expect(encoded).toBeDefined();
       expect(parseHostMessage((encoded ?? '').trim())).toEqual(m);
     }
+  });
+});
+
+// NOTIFY-DEEPLINK, NOTIFY-UPDATE-READY (S1).
+describe('NOTIFY-DEEPLINK: the notification names the one thing it is about', () => {
+  const APR = `apr_${'A'.repeat(22)}`;
+  const on = { ...NOTIFY_DEFAULTS, messages: true, files: true };
+
+  it('one approval waiting: its ID as the target; several: none (the list)', () => {
+    const one = planAlerts(planAlerts(undefined, [], src([])).baseline, [APR], src([]));
+    expect(notifyMessages(one.news, NOTIFY_DEFAULTS, new Map())).toEqual([
+      { v: 1, type: 'notify', kind: 'approvals', count: 1, name: '', target: APR },
+    ]);
+    const two = planAlerts(
+      planAlerts(undefined, [], src([])).baseline,
+      [APR, `apr_${'B'.repeat(22)}`],
+      src([]),
+    );
+    expect(notifyMessages(two.news, NOTIFY_DEFAULTS, new Map())[0]).toEqual({
+      v: 1,
+      type: 'notify',
+      kind: 'approvals',
+      count: 2,
+      name: '',
+    });
+  });
+
+  it('a person: their opaque ID, with or without Show names; never a name as the target', () => {
+    const news = [{ kind: 'messages' as const, count: 1, ref: A }];
+    expect(notifyMessages(news, on, new Map([[A, 'Ana']]))[0]).toEqual({
+      v: 1,
+      type: 'notify',
+      kind: 'messages',
+      count: 1,
+      name: '',
+      target: A,
+    });
+  });
+
+  it('an ID of any other shape is never put on the pipe', () => {
+    const news = [{ kind: 'messages' as const, count: 1, ref: '../../etc' }];
+    expect(notifyMessages(news, on, new Map())[0]).toEqual({
+      v: 1,
+      type: 'notify',
+      kind: 'messages',
+      count: 1,
+      name: '',
+    });
+    const bad = [{ kind: 'approvals' as const, count: 1, approvalId: 'apr_1' }];
+    expect(notifyMessages(bad, NOTIFY_DEFAULTS, new Map())[0]).not.toHaveProperty('target');
+  });
+});
+
+describe('NOTIFY-UPDATE-READY: an update ready to install is news, once', () => {
+  const available: NotificationItem = {
+    id: 'update',
+    kind: 'update',
+    count: 1,
+    at: 50,
+    read: false,
+  };
+  const ready: NotificationItem = { ...available, count: 2, at: 60 };
+
+  it('available then ready: two alerts (count 1, then 2), the same state never twice', () => {
+    const first = planAlerts(undefined, ids(0), src([]));
+    const avail = planAlerts(first.baseline, ids(0), src([available]));
+    expect(avail.news).toEqual([{ kind: 'update', count: 1 }]);
+    const done = planAlerts(avail.baseline, ids(0), src([ready]));
+    expect(done.news).toEqual([{ kind: 'update', count: 2 }]);
+    expect(planAlerts(done.baseline, ids(0), src([ready])).news).toEqual([]);
+  });
+
+  it('already pending at launch: alerted once on the first look of the run', () => {
+    const { news } = planAlerts(undefined, ids(0), src([ready]), { launch: true });
+    expect(news).toEqual([{ kind: 'update', count: 2 }]);
+    // Not a launch (another ID opened): still silent.
+    expect(planAlerts(undefined, ids(0), src([ready])).news).toEqual([]);
+    const first = planAlerts(undefined, ids(0), src([]));
+    expect(
+      planAlerts(first.baseline, ids(0), src([ready], ALL_ON, 'work'), { launch: true }).news,
+    ).toEqual([]);
+  });
+
+  it('a read update is not alerted at launch; the Updates switch still decides', () => {
+    expect(
+      planAlerts(undefined, ids(0), src([{ ...ready, read: true }]), { launch: true }).news,
+    ).toEqual([]);
+    expect(notifyMessages([{ kind: 'update', count: 2 }], NOTIFY_DEFAULTS, new Map())).toEqual([]);
   });
 });

@@ -29,7 +29,8 @@
 Pick one way to install:
 
 - **On a Mac?** [Get the app](#on-a-mac-get-the-app). No terminal needed.
-- **Windows, Linux, or prefer the terminal?** [One command](#windows-linux-or-the-terminal-one-command).
+- **On Windows?** [Get the app](#on-windows-get-the-app), an early build.
+- **Windows without the app, Linux, or prefer the terminal?** [One command](#windows-linux-or-the-terminal-one-command).
 
 ### On a Mac? Get the app
 
@@ -48,6 +49,18 @@ Not sure which? Click the Apple menu (top left of your screen), then **About Thi
 
 If macOS says the app is "damaged", and for updates: [Mac app](docs-site/guide/apps/desktop-app.md).
 
+### On Windows? Get the app
+
+**[Download for Windows 10 or 11](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe)** → file `AgentLink-win-x64-setup.exe`
+
+This is an **early build**, not signed yet. The one-command install below stays the main way on Windows; use the app if you prefer AgentLink in its own window.
+
+1. **Open the file you downloaded.** Windows may say "Windows protected your PC" (SmartScreen). Choose **More info**, then **Run anyway**.
+2. **Follow the setup.** It installs for you only (no administrator rights). Newer setup files end with a **Create a desktop shortcut** option (ticked by default); untick it if you don't want one.
+3. **Open AgentLink** from the Start menu (or the shortcut). It opens on **Get started**. Go on with [Connect your AI app](#then-connect-your-ai-app-and-talk) below.
+
+If Smart App Control blocks the app (some Windows 11 computers), use the one command instead, and for updates: [Desktop app](docs-site/guide/apps/desktop-app.md#windows).
+
 ### Windows, Linux, or the terminal? One command
 
 Paste one line into a terminal you opened yourself (Mac or Linux: Terminal; Windows: PowerShell). It adds Node.js if you need it and opens AgentLink in your browser.
@@ -60,7 +73,7 @@ On Windows, in PowerShell: `irm https://agentlink.4thtech.io/install.ps1 | iex` 
 
 ### Then: connect your AI app and talk
 
-**1. Connect your AI app.** AgentLink opens on **Get started**: pick your AI app, type the name people will see, press **Connect with Touch ID** (Windows Hello on Windows, your passkey on Linux), save your master code, then restart your AI app once. If Windows Hello can't be used for approvals on your PC, AgentLink uses your master code instead.
+**1. Connect your AI app.** AgentLink opens on **Get started**: pick your AI app, type the name people will see, press **Continue with a master code** (no passkey or terminal needed; Touch ID or Windows Hello is optional), save your master code, check your Files, then restart your AI app once.
 
 **2. Invite someone and talk.** Press **Invite someone**, send the link. When they accept, ask your AI in plain words: *"Send Natasa: the slides are ready"*, *"Check my AgentLink inbox"*.
 
@@ -127,19 +140,21 @@ sequenceDiagram
 ## What you can do today
 
 - **Connect and talk.** Invite with a short link (copy, email or share); both sides see "connected". Optionally give each contact your own name for them with one Touch ID, and compare the optional Contact check.
-- **Send files** from folders you allow, or **Attach** a Markdown, text or JSON file in a conversation yourself, up to about 100 MB with no setup; received files land in `~/AgentLink/Inbox`.
+- **Send files** from folders you allow, or **Attach** a Markdown, text or JSON file in a conversation yourself (your AI can also send a small text file it wrote), up to about 100 MB with no setup; received files land in `~/AgentLink/Inbox`.
 - **Stay in charge.** One press on **Approve with Touch ID** (or Windows Hello) and "Use your master code instead" as a link on every confirm. Pause an ID with one click; block a contact. **Delete history**, **Archive** and **Free up space** work on this computer only, with Undo.
 - **Manage IDs.** **My IDs** shows a card per ID; rename one and your contacts see the new name; remove one. **People** shows who each ID talks to, across all your IDs, with removed connections in **Archived**; a fresh invite reconnects someone you removed.
-- **Back up and restore.** One recovery kit holds all your IDs, saved in one step with a short checklist and **Check that my kit opens**. Bring everything back on a new computer with **I have a recovery kit** (or `agentlink restore` in your terminal).
+- **Back up and restore.** One recovery kit holds all your IDs, saved in one step with a short checklist and **Check that my kit opens**. Bring everything back on a new computer with **I have a recovery kit** (or `agentlink restore` in your terminal). Lost your master code and have no kit? **Forgot your master code?** starts over on this computer.
 - **Agree and prove.** Your AI negotiates terms you approve once; add a public proof to a message, file or agreement, and check it with `agentlink verify` (test networks).
 
-**New in 0.5.4 (13 Nov 2026):** every confirmation is one press ("Approve with Touch ID", the master code as a link) and the approval card is compact, with terms shown on Review; the "You are connected" screen is simpler, with optional naming; you can **Attach** files in a conversation; files over the encrypted drop are open to all early users; **Delete history**, **Archive** and **Free up space** (with Undo, on this computer only); a notification bell in the top bar and native notifications on Mac and Windows; recovery kits keep your ID names; messages keep their order; the app says when it is offline; and the Mac download links no longer change with each release. On a Mac the app can update itself (**Update now**, then **Restart now**) from the next version on; installing 0.5.4 itself is manual.
+**New in 0.5.5 (14 Nov 2026):** first run works on any computer: you create your master code in the app or your browser (no passkey, no terminal), and Touch ID or Windows Hello is optional. Start in the browser and install the app later and it continues with the same IDs and AI apps. **Forgot your master code?** can start over on this computer, after offering your recovery kit. An ID whose key is missing no longer stops AgentLink: Restore from backup, Remove from this computer or Continue without it. A Files step in Get started, a Files panel on Home and **Show in Finder** (**Show in Explorer** on Windows); your AI can send a small text file it wrote. Notifications open the right conversation or request, cover your other IDs and stay quiet while the window is in front. The Windows app uses Windows Hello and offers a desktop shortcut.
+
+**In 0.5.4 (13 Nov 2026):** one-press confirmations and a compact approval card, **Attach** in a conversation, **Delete history**, **Archive** and **Free up space** (with Undo, on this computer only), a notification bell and native notifications, and Mac in-app updates (**Update now**, then **Restart now**, from 0.5.4 on).
 
 **New in 0.5.0 (12 Nov 2026):** the app is redesigned around you, your IDs and your people. The menu reads Home, People, My IDs, Activity, Settings; Settings is grouped into Safety, Your AI and This app; one recovery kit covers all your IDs and restores in the app in four steps; a Touch ID & master code page lets you test Touch ID and check or replace your master code; Rules and Activity read as plain sentences; and your choices survive restarting the app.
 
-**Windows app, early build (0.5.4):** AgentLink for Windows 10 and 11 in its own window, unsigned for now, download [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) (the link stays the same for every release) (Windows asks once: More info, then Run anyway). The browser app (one command) stays the main way on Windows. See the [desktop app page](docs-site/guide/apps/desktop-app.md#windows).
+**Windows app, early build (0.5.5):** AgentLink for Windows 10 and 11 in its own window, unsigned for now, download [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) (the link stays the same for every release) (Windows asks once: More info, then Run anyway). The browser app (one command) stays the main way on Windows. See the [desktop app page](docs-site/guide/apps/desktop-app.md#windows).
 
-Not built yet, and not claimed: a signed Windows app (the 0.5.4 Windows app is an early, unsigned build; the Mac app too, see the [desktop app page](docs-site/guide/apps/desktop-app.md)), the always-on cloud agent (planned as 0.6.0), and proof on main networks. What changed in each release: [CHANGELOG](CHANGELOG.md).
+Not built yet, and not claimed: a signed Windows app (the 0.5.5 Windows app is an early, unsigned build; the Mac app too, see the [desktop app page](docs-site/guide/apps/desktop-app.md)), the always-on cloud agent (planned as 0.6.0), and proof on main networks. What changed in each release: [CHANGELOG](CHANGELOG.md).
 
 ## Private by design
 
@@ -148,7 +163,7 @@ Messages and files are encrypted on your computer. Message servers and 4thTech s
 ## Status
 
 <!-- status:start -->
-> **Version:** v0.5.4 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-13
+> **Version:** v0.5.5 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-14
 >
 > - **Components:** 78 merged, 14 in progress, 7 planned
 > - **Next:** Proofs end to end, then the cloud agent and business agents as 0.6.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
@@ -163,7 +178,7 @@ Messages and files are encrypted on your computer. Message servers and 4thTech s
 |---|---|---|
 | **M0 Foundations** (nearly complete) | Repository, CI and rules in place | 0.0.x |
 | **M1a Walking skeleton: pair and talk** (released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open) | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 |
-| **M1b Files, proof, credits** (v0.2.0 to v0.5.4 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
+| **M1b Files, proof, credits** (v0.2.0 to v0.5.5 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
 | **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify page; accept in the browser (planned; today the live invite page at agentlink.4thtech.io shows how to accept in the app); verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109) | 0.6.0 (cloud agent first) and later |
 | **M3 Mainnet beta (Base, Gnosis)** | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 |
 | **M4 Expansion** | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 |

@@ -100,6 +100,9 @@ const V14_INVITES_COLUMNS: readonly string[] = ['invite_link'];
 const V15_ENVELOPE_COLUMNS: readonly string[] = ['deleted_at'];
 const V15_TABLES: readonly TableName[] = ['saved_files'];
 
+/** Tables added by version 16 (FILES-AI-1, D-152): the send-by-content daily budget ledger. */
+const V16_TABLES: readonly TableName[] = ['content_file_budget'];
+
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
   return {
@@ -288,7 +291,8 @@ function v11Statements(): readonly string[] {
  * adds `mcp_sessions.version` (WP-13, F45; nullable, null on existing rows), version 14 adds
  * `invites.invite_link` (REL051-B2; nullable, null on existing rows), version 15 adds
  * `envelopes.deleted_at` and `saved_files` (RET-2, D-148; nullable, null on existing rows, and a new
- * table). A later
+ * table), version 16 adds `content_file_budget` (FILES-AI-1, D-152; a new table, existing rows
+ * untouched). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -306,7 +310,8 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
           !V10_TABLES.includes(t) &&
           !V11_TABLES.includes(t) &&
           !V12_TABLES.includes(t) &&
-          !V15_TABLES.includes(t),
+          !V15_TABLES.includes(t) &&
+          !V16_TABLES.includes(t),
       ),
       v1Spec,
     ),
@@ -325,6 +330,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 13, statements: Object.freeze(v13Statements()) }),
   Object.freeze({ version: 14, statements: Object.freeze(v14Statements()) }),
   Object.freeze({ version: 15, statements: Object.freeze(v15Statements()) }),
+  Object.freeze({ version: 16, statements: createSchemaStatements(V16_TABLES) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

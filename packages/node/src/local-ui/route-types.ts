@@ -319,7 +319,8 @@ export interface LocalUiHistoryRoute {
 /**
  * RET-4 (08 §1 "Free up space"): Show in Finder for the Inbox folder. Like the kit-reveal kind it
  * changes nothing and takes no input at all: only `POST /api/ui/storage/inbox/reveal`, registered
- * once; the server runs it through the kit-reveal gate's checks (no query, input, presence header or
+ * once; FILES-REVEAL adds `POST /api/ui/files/send-folder/reveal` (the ID's own pinned Send folder),
+ * the same kind with a second fixed path; the server runs it through the kit-reveal gate's checks (no query, input, presence header or
  * body byte). The handler gets the context only; the folder is the rules' own setting.
  */
 export interface LocalUiInboxRevealRoute {
@@ -592,6 +593,31 @@ export interface LocalUiRestoreRoute {
   readonly step: LocalUiRestoreStep;
 }
 
+/** OWNER-START-OVER (D-153): the steps of the start-over kind, each at one fixed path (04 §2.5.4). */
+export const START_OVER_PATHS = Object.freeze({
+  state: '/api/ui/start-over/state',
+  begin: '/api/ui/start-over/begin',
+  finish: '/api/ui/start-over/finish',
+} as const);
+
+export type LocalUiStartOverStep = keyof typeof START_OVER_PATHS;
+
+/**
+ * OWNER-START-OVER (D-153; 04 §2.5.4 "Start over on this computer"; 08 §1): "Forgot your master
+ * code? Start over on this computer". Three fixed paths (START_OVER_PATHS), each registered once,
+ * `state` a GET and the others POSTs, with no handler: the server's start-over gate runs them after
+ * the session, CSRF, Host and fetch-metadata (and, for a POST, Origin and octet-stream) checks,
+ * refuses a query, and hands the start-over engine (start-over.ts) only the page session, the parsed
+ * `X-AgentLink-Input`, the presence mode and the body (a passkey creation). No page file and no MCP
+ * handler reaches the engine (I-4). Only the app host offers it (the open ID must be closed first).
+ */
+export interface LocalUiStartOverRoute {
+  readonly method: 'GET' | 'POST';
+  readonly path: string;
+  readonly presence: 'start-over';
+  readonly step: LocalUiStartOverStep;
+}
+
 /**
  * R1-SEC-16 (routes.ts rule: a GET is a read; a change is a POST with Origin and an octet-stream
  * body): the display marks, the `mark` kind. Only at MARK_PATHS: the auto-save notice's dismiss
@@ -635,6 +661,7 @@ export const MARK_PATHS: readonly string[] = Object.freeze([
 export type LocalUiRoute =
   | LocalUiMarkRoute
   | LocalUiRestoreRoute
+  | LocalUiStartOverRoute
   | LocalUiPauseRoute
   | LocalUiUiSettingsRoute
   | LocalUiHandoffRoute

@@ -11,6 +11,11 @@
 //    names a live pid and a port that accepts a loopback connection. Then the app is quit.
 // 2. The bundled `node <core>/dist/agentlink.js mcp` answers `tools/list` over stdio.
 //
+// 3. FIRSTRUN-MATRIX: on a fresh profile the host (started the way the shell starts it, on its fd 3
+//    pipe) takes first run through to an owner with the master code, over the same loopback calls
+//    the window's page makes (first-run-code.mjs): no WebAuthn, no browser, no terminal. The record
+//    it writes says `host: "desktop"` (APP-CONTINUITY).
+//
 // Not done here, on purpose: a Playwright `_electron` launch. The shell refuses every debugging
 // switch (switches.ts, fuses), which is exactly what `_electron.launch` passes, so a window-level
 // check (Welcome shown, `typeof PublicKeyCredential === 'undefined'`) needs a test seam in the shell
@@ -29,6 +34,7 @@ import { createConnection } from 'node:net';
 import { join, resolve } from 'node:path';
 import process from 'node:process';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { createOwnerWithCode } from './first-run-code.mjs';
 import { makeHome } from './profile.mjs';
 
 const fail = (reason) => {
@@ -177,7 +183,7 @@ async function controlRefused(ctx, label, slot) {
  * it must send `ready` on fd 3 (the pipe works in both directions). The link is never printed.
  * The child is then stopped and must exit.
  */
-async function pipeAccepted(ctx) {
+async function pipeAccepted(ctx, { ownerWithCode = false } = {}) {
   await fd3Mode(ctx, 'the shell’s pipe (overlapped)', 'overlapped');
   return new Promise((done) => {
     const child = spawn(nodeBin, [hostScript], {
@@ -189,6 +195,7 @@ async function pipeAccepted(ctx) {
     let stderr = '';
     let buffer = '';
     let ready = false;
+    let sessionUrl = null;
     let exited = null;
     let stoppedReason = null;
     child.stderr.on('data', (c) => (stderr += c));
@@ -197,7 +204,10 @@ async function pipeAccepted(ctx) {
       for (const line of buffer.split('\n').slice(0, -1)) {
         try {
           const message = JSON.parse(line);
-          if (message.type === 'ready') ready = true;
+          if (message.type === 'ready') {
+            ready = true;
+            if (typeof message.sessionUrl === 'string') sessionUrl ??= message.sessionUrl;
+          }
           // CI-823: the host's fixed stop code (protocol.ts STOP_REASONS), so a failed start says
           // why (e.g. `keychain`). Only a short lowercase code is kept; nothing else from the pipe.
           if (message.type === 'stopped' && /^[a-z_]{1,32}$/.test(String(message.reason))) {
@@ -220,6 +230,24 @@ async function pipeAccepted(ctx) {
         `    the shell’s pipe: ${ready ? '`ready` received on fd 3' : refused ? 'REFUSED' : exited !== null ? `host exited (${exited}${stoppedReason ? `, stopped: ${stoppedReason}` : ''})` : 'no `ready` within 60 s'}`,
       );
       if (!ready) for (const line of stderrLines(stderr)) console.error(`      ${line}`);
+      let ownerFailure = null;
+      if (ready && ownerWithCode) {
+        // FIRSTRUN-MATRIX: first run through to the owner, with the master code only.
+        const record = readHostRecord(ctx.home);
+        if (record?.host !== 'desktop')
+          ownerFailure = 'the host record does not say host: "desktop"';
+        else if (sessionUrl === null) ownerFailure = 'no session link on the pipe';
+        else {
+          const made = await createOwnerWithCode(sessionUrl, 'Smoke').catch((e) => ({
+            ok: false,
+            reason: `threw ${e?.code ?? 'error'}`,
+          }));
+          if (!made.ok) ownerFailure = `first run with the master code: ${made.reason}`;
+          else if (!made.ownerCodeShape) ownerFailure = 'the master code has an unexpected shape';
+          else if (made.passkey) ownerFailure = 'first run made a passkey (expected the code only)';
+          else console.log('    first run: owner created with the master code (no WebAuthn)');
+        }
+      }
       // Stop it: close our end (the host leaves on pipe close), then kill if still there.
       child.stdio[3].destroy();
       const end = Date.now() + 20_000;
@@ -228,7 +256,7 @@ async function pipeAccepted(ctx) {
       while (exited === null) await sleep(100);
       // The direct host's record is not the app's: the app writes its own.
       rmSync(join(ctx.home, '.agentlink', 'app-host.json'), { force: true });
-      done(ready ? null : 'the host did not send `ready` on the shell’s pipe');
+      done(!ready ? 'the host did not send `ready` on the shell’s pipe' : ownerFailure);
     }, 250);
   });
 }
@@ -272,9 +300,26 @@ async function pipeControls() {
   const accepted = await pipeAccepted(ctx);
   rmSync(ctx.home, { recursive: true, force: true });
   if (accepted !== null) failures.push(accepted);
+  // FIRSTRUN-MATRIX: a fresh profile of its own, first run through to the owner with the master code.
+  const fresh = makeHome();
+  const created = await pipeAccepted(fresh, { ownerWithCode: true });
+  rmSync(fresh.home, { recursive: true, force: true });
+  if (created !== null) failures.push(created);
   if (failures.length > 0) fail(failures.join('; '));
-  else console.log('ok  fd 3: only the shell’s pipe is accepted, and the host answers on it');
+  else
+    console.log(
+      'ok  fd 3: only the shell’s pipe is accepted, the host answers on it, and first run reaches an owner with the master code',
+    );
 }
+
+/** The app-host record (shape checked by appStarts), or undefined. */
+const readHostRecord = (dir) => {
+  try {
+    return JSON.parse(readFileSync(join(dir, '.agentlink', 'app-host.json'), 'utf8'));
+  } catch {
+    return undefined;
+  }
+};
 
 const pidAlive = (pid) => {
   try {
@@ -311,7 +356,9 @@ async function appStarts() {
       try {
         const parsed = JSON.parse(readFileSync(record, 'utf8'));
         if (
-          Object.keys(parsed).sort().join(',') === 'handoffToken,pid,port,v' &&
+          // APP-CONTINUITY: the app's record says so (a terminal `agentlink ui` host has no `host`).
+          Object.keys(parsed).sort().join(',') === 'handoffToken,host,pid,port,v' &&
+          parsed.host === 'desktop' &&
           parsed.v === 1 &&
           Number.isSafeInteger(parsed.port) &&
           pidAlive(parsed.pid)

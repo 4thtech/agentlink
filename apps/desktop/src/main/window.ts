@@ -120,6 +120,16 @@ export class MainWindow {
   }
 
   /**
+   * NOTIFY-FOCUS: true while the window is shown, not minimised and has focus (the person is looking
+   * at AgentLink); no window, a hidden or a background one: false.
+   */
+  get focused(): boolean {
+    const window = this.#window;
+    if (window === null || window.isDestroyed()) return false;
+    return window.isVisible() && !window.isMinimized() && window.isFocused();
+  }
+
+  /**
    * DESK-TOUCHID-FIX: takes keyboard focus off the page (a focused password field keeps macOS
    * secure input on). False when there is no window.
    */

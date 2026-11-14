@@ -28,7 +28,7 @@ import {
   verifyDocument,
 } from './desktop-update-manifest.mjs';
 import { RENEW, expiryStatus } from './desktop-update-expiry.mjs';
-import { EnvironmentError, checkEnvironment } from './desktop-update-environment.mjs';
+import { EnvironmentError, OWNER_ID, checkEnvironment } from './desktop-update-environment.mjs';
 
 const root = resolve(import.meta.dirname, '../..');
 const release = readFileSync(join(root, '.github/workflows/release.yml'), 'utf8');
@@ -575,7 +575,7 @@ describe('the desktop-update environment check (IR-UPD-8-1 #2)', () => {
     protection_rules: [
       {
         type: 'required_reviewers',
-        reviewers: [{ type: 'User', reviewer: { login: 'talirezun' } }],
+        reviewers: [{ type: 'User', reviewer: { login: 'talirezun', id: OWNER_ID } }],
       },
       { type: 'branch_policy' },
     ],

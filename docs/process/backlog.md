@@ -9667,6 +9667,23 @@ D-145 replaces the M2-11a comparison with a decision and splits M2-11a to M2-11f
 - **Acceptance:**
   - Spec merged before any code; the owner schedules the build.
 
+
+#### WIN-HELLO-NATIVE · Windows Hello in the Windows app, like Touch ID on the Mac (0.5.5)
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Fable review · **Security:** S2 (owner presence)
+- **Repo/path:** agentlink · `apps/desktop/native/windows/**`, `apps/desktop/build/native.mjs`, `.github/workflows/desktop.yml` (helper protocol tests on the Windows leg), the Windows branch of the presence bridge in `packages/node/src/owner-native*.ts` and `GET /api/owner/native`; `apps/local-ui/src/presence/{offer,native-api,strings}.ts` (no first-run page changes: FIRSTRUN-ANY-PLATFORM consumes `desktopPresenceOffer`)
+- **Depends on:** DESK-D12b, DESK-D12c, WIN-DESK-2
+- **Spec:** 04 §2.3.4 (kind 2), §2.5 "Desktop app owner presence" phase 2
+- **Scope:**
+  - The helper's `available` says why not, as one fixed stderr token: `no_secure_hardware` (no TPM: the Platform Crypto Provider does not open, so create would refuse the software key anyway) or `not_set_up` (no PIN / Windows Hello, e.g. Windows 11 21H2 without one; or turned off by policy). Every command that needs Windows Hello (`create`, `check`, `sign`, `delete`) runs that gate first, after parsing its input and before any credential or prompt.
+  - Core: `NativeHelper.availability()`; `nativePresenceStatus` and `GET /api/owner/native` carry `unavailable: not_set_up | no_secure_hardware | unknown` (the Mac maps its fixed `sensor` diagnostic to the same set).
+  - Page: `desktopPresenceOffer(platform, status)` is `native` or `code` with plain set-up text; inside the app it is never the WebAuthn security-key path (WIN-FIRSTRUN-NOPRF).
+  - The Windows Hello dialog is brought in front of the AgentLink window once per prompt (its system window class only).
+  - The real helper's protocol (argv, stdin, `available`, the unavailable gate) runs on the Windows CI leg.
+- **Acceptance:**
+  - `RED (expected):` commit first; helper protocol tests green on the Windows leg; bridge and page tests green.
+  - Manual on a real PC (owner): Hello set up → turn on and approve with one prompt each, in front of the app window; no PIN → the master code with the set-up text; a VM without TPM → `no_secure_hardware`, nothing left in Windows Hello.
+  - Caller check stays at macOS parity (phase 2: off; phase 3 with signed builds).
+
 ---
 
 ## 5. M3 — Mainnet beta
@@ -10742,3 +10759,390 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** RET-1 (0.5.1 part), RET-4 and RET-6 (0.5.2 part)
 - **Spec:** 08 §1; 11 §5.7
 - **Done when:** README Status and docs-site "Free up space" match what shipped; drift checks green; never claims an unbuilt part.
+
+#### OWNER-START-OVER · Forgot your master code? Start over on this computer (0.5.5)
+- **Status:** in review (branch `rel055/owner-start-over`) · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2
+- **Repo/path:** agentlink · new `packages/node/src/start-over.ts`, `packages/node/src/local-ui/api/start-over.ts` (the start-over route kind), `approval-server.ts` start-over gate, `apps/local-ui/src/pages/start-over/*`
+- **Depends on:** D-147 (restore in the app); consumes the platform-neutral `NativeHelper` (WIN-HELLO-NATIVE in parallel); links into first run (FIRSTRUN-ANY-PLATFORM owns those pages)
+- **Spec:** D-153; 04 §2.5.4; 08 §1; 11 §5
+- **Done when:** `RED (expected):` commit first; the routes refuse a caller without the page session (no MCP tool, no agent credential, I-4); begin needs the typed phrase, finish a fresh OS presence gesture, or the phrase typed again where no user-verifying presence exists (owner, 14 Nov), never a downgrade where it exists; the owner items only after every ID erase and never a new owner's; `~/.agentlink` is moved to `~/.agentlink.backup-YYYYMMDD-HHMMSS`, never deleted; only AgentLink's keychain accounts are erased, by exact name; a failed move or erase is answered and safe to retry; Restore from recovery kit is offered first; copy per 11 §5.
+
+#### FILES-SPEC-055 · Files UX spec and decision D-152: send-by-content, AI-side texts, Files step, Home panel (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Opus build, Opus independent review (spec only) · **Security:** S2 (spec: MCP-reachable filesystem write, I-4 boundary)
+- **Repo/path:** agentlink · `docs/foundation/{00-README,04-security-and-crypto,06-mcp-server,08-clients-console-cloud,11-claude-design-brief}.md`; `docs/design/b11-local-app.md` (§8 row 12); `docs/process/proposals/MSG-FILES-IO.md`; `docs/process/backlog.md`; `changelog.d/`
+- **Depends on:** owner decisions of 14 Nov 2026 (Skip keeps Send allowed; Send root; texts may name the path; 50 files / 64 MiB a day)
+- **Spec:** D-152; 04 §2.5, §4 "Written by the AI into the Send folder"; 06 §2.2, §2.3 "Send by content" and "AI-side texts for files", §9; 08 §1 "Files in Get started, on Home and in Settings"; 11 §5.7
+- **Done when:** the independent reviewer finds no path where `name`, `content` or the contact chooses the folder, and every D-152 point has its spec text; docs checks green; Tali confirms the D-entry and the copy at merge. Nothing in FILES-AI-1 or the copy cards merges before.
+
+#### FILES-AI-1 · `agentlink_send` `file: {name, content}`: send a text file the AI wrote (0.5.5)
+- **Status:** new · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (first MCP-reachable filesystem write; I-4)
+- **Repo/path:** agentlink · `packages/mcp-tools/src` (`agentlink_send` schema, handler, `files-common.ts` new codes, tool description, tool-surface snapshot); `packages/node/src/send-folder-file.ts` (module header: no longer "never reached from MCP"); core send path and the local store (by-content ledger); tests
+- **Depends on:** FILES-SPEC-055
+- **Spec:** D-152; 06 §2.3 "Send by content"; 04 §4 "Written by the AI into the Send folder"
+- **Done when:** `RED (expected):` commit first; and tests show:
+  - schema: `file` is `{name, content}` with `additionalProperties: false`; `path` with `file`, or `file` with `body` → `INVALID_ARGUMENT`, nothing runs;
+  - name: `/`, `\`, `a/b.md`, `../x.md`, a separator hidden behind an invisible character → `FILE_NAME`; `notes.md.exe`, `notes`, `..`, `.md`, `notes.html`, `notes.svg` → `FILE_TYPE`; `NOTES.MD` accepted; bidi and control characters removed; a 255-byte name and a 256-byte name handled by `sanitizeFileName`;
+  - content: NUL, a lone surrogate and invalid UTF-8 → `FILE_NOT_TEXT`; exactly 8 MiB sent, 8 MiB + 1 byte → `FILE_TOO_LARGE`; the bytes sent equal the UTF-8 of `content`;
+  - folder: written only into the root of the ID's own pinned Send folder with `O_CREAT | O_EXCL | O_NOFOLLOW`, mode 0600; no folder allowed → `needs_setup` `NO_ALLOWED_FOLDER` and nothing written; Send folder a link, missing or not allowed while another folder is allowed → `SEND_FOLDER_UNAVAILABLE`, nothing written, the other folder untouched (filesystem spy); a planted link at the target name is not followed; a clash → `notes (2).md`, nothing overwritten; the attempt limit → `FILE_NAME_TAKEN`;
+  - send: the written realpath goes through the ordinary `path` rules (policy, storage, drop limits, `notarize`, approvals) but the bytes sent are the in-memory input: a test that changes the Send folder copy between write and send shows the sent bytes still equal the input; the approval digest binds sanitised name, in-memory hash and size; `file.name` is the saved name; the contact file policy is checked before the write (`POLICY_DENIED`, nothing written);
+  - what stays: `sent`/`queued` keep the file; every other ending removes it at once. `agentlink_send` has no pre-send approval in 0.5.5. With `notarize`, `pending_approval` and `needs_credits` concern only the proof: the message is already sent and the file stays. The digest binding, card re-hash and deny/expiry removal apply only if a pre-send file approval is added later (new card FILES-SEND-APPROVAL). The approved retry (a repeat with the same `clientRequestId`) writes no second copy, never counts against the budget and never returns `FILE_BUDGET`;
+  - idempotency: the `clientRequestId` is checked before the write; a repeat → the kept result and still one file; other arguments → `IDEMPOTENCY_KEY_REUSED`, nothing written;
+  - order: paused → `AGENT_PAUSED` and the cloud agent → `CLOUD_FILES_NOT_YET`, both before any write;
+  - budget: the 51st file, or the file that crosses 64 MiB, in a rolling 24 h → `FILE_BUDGET`, nothing written or sent; check and reservation are one atomic store step before the write, and a concurrency test with parallel calls for the last place lets exactly one through; every write counts, also a removed file; refusals before the write and idempotent repeats count nothing; Attach and `path` sends count nothing; an unreadable ledger → `FILES_UNAVAILABLE`; the ledger holds time and byte count only; no MCP tool reads or changes it;
+  - I-5, I-7: a redaction test finds neither `name` (except the sanitised saved name, bidi-isolated, in the summary) nor `content` in any result, `nextStep`, error or log line; no input takes an envelope ID or a received file; the summary and every refusal are the fixed strings of 06 §2.3;
+  - zero access: the content leaves only inline or as `ALF1` ciphertext (drop spy sees ciphertext only);
+  - the tool description carries the fixed D-152 line and nothing from a call; the tool-surface snapshot and the MCP conformance test are updated; `path` keeps resolving `~`-relative paths.
+
+#### FILES-SEND-APPROVAL · A pre-send approval for files sent by content (later; not built)
+- **Status:** new (not scheduled) · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2
+- **Repo/path:** agentlink · core send path and approvals, `packages/node` approval card and approve route, `apps/local-ui`; tests
+- **Depends on:** FILES-AI-1; an owner decision that a `file` send may need approval before it is sent
+- **Spec:** D-152 (2); 06 §2.3 "What stays", "Approval sheet" (the text written for it)
+- **Done when:** `RED (expected):` commit first; a pending `file` send keeps the written file; the approval digest binds the sanitised requested name, the in-memory hash and size; the card re-hashes the kept copy through one opened handle and previews only those bytes ("This file changed since your AI wrote it.", no Approve, the request void); the server approve route re-checks hash and size through a handle or refuses a void request, so a stale or second card cannot approve it; deny and expiry remove the kept file through the held folder handle after a device and inode re-check, only while unchanged; the approved retry writes nothing and never counts against the budget.
+
+#### FILES-AI-2 · AI-side texts for files: point to send-by-content and the Send folder (0.5.5)
+- **Status:** built (rel055/files-ux) · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `packages/mcp-tools/src/files-common.ts` (`FILE_TEXT`, `allowFolderLinkNextStep`), the `{sendFolder}` slot fill; tests
+- **Depends on:** FILES-SPEC-055 (lands with or after FILES-AI-1, since the texts name `file`)
+- **Spec:** 06 §2.3 "AI-side texts for files"; 11 §5.7
+- **Done when:** snapshot of the fixed `nextStep` texts for `NO_ALLOWED_FOLDER` (with and without the app link), `OUTSIDE_ALLOWED_FOLDER` and `NOT_FOUND`; `{sendFolder}` is filled only from the ID's own pinned Send folder with home as `~`, and the sentence drops the slot when there is none or it lies outside home; an I-5 test shows no slot takes agent-written or inbound text, and a path from the call never appears.
+
+#### FILES-REVEAL · Show in Finder for the Send folder (0.5.5)
+- **Status:** built (rel055/files-ux) · **Size:** S · **Tier:** Opus build, Opus independent review · **Security:** S2 (local route, OS exec)
+- **Repo/path:** agentlink · `packages/node/src/local-ui/{routes,route-types}.ts`, the Inbox reveal module (reuse its kind); `apps/local-ui` API helper; tests
+- **Depends on:** FILES-SPEC-055
+- **Spec:** 08 §1 "Show in Finder for the folders"; 04 §4 "Pinned at allow time"
+- **Done when:** `RED (expected):` commit first; `POST /api/ui/files/send-folder/reveal` takes no input (a query, body or path is refused) and sits behind the session, CSRF, Origin and fetch-metadata gate (tests per header); it opens only the open ID's own allowed, pinned Send folder; a Send folder that became a link, a file or is missing → fixed `not_found`, never opened; answers carry no path; nothing logged; the Inbox reuses `POST /api/ui/storage/inbox/reveal`.
+
+#### FILES-ONB-1 · Files in Get started: the Connect card and the new Files step (0.5.5)
+- **Status:** built (rel055/files-onb) · **Size:** M · **Tier:** Sonnet build, Opus UX review · **Security:** S1 (UI; the add-folder confirm reuses the existing S2 flow unchanged)
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/start/*` (`STEP_IDS`, strings, the new step), `pages/first-run/strings.ts` (the collapsed "Your folders"); e2e golden path
+- **Depends on:** FILES-SPEC-055; FILES-REVEAL for Show in Finder of the Send folder (stub until it merges)
+- **Spec:** 08 §1 "Files in Get started, on Home and in Settings"; 11 §5.7 (Connect card, Files step, AI app tips)
+- **Done when:** the Connect step shows the files card above the one Touch ID with the folder from the server, and `begin`/`finish` take no new input; Get started and New ID (`?add=agent`) have five steps with "Step 4 of 5 · Files", Connect another AI app has none; DOM tests per state: allowed, not allowed (Allow Send folder), not confirmed, Send folder missing, each AI app tip and the unknown-app tip; Skip for now goes to Invite and changes no rule (no request that signs); Choose another folder opens the existing review and confirm, adds the folder, and "Also stop sending from {sendFolder}" is unticked by default and lists both changes in one signed edit; the app makes no live claim about the AI app's own file access (fixed tips only); vocabulary lint (no "harness", "wallet"); Playwright golden path install → app → connect → Files → invite on a temp HOME.
+
+#### FILES-HOME-PANEL · Home Files panel replaces the Send folder banner (0.5.5)
+- **Status:** built (rel055/files-ux) · **Size:** M · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/home/*` (new files panel; `send-folder-banner.tsx` folded in), the Files read route's state word if missing; tests
+- **Depends on:** FILES-SPEC-055; FILES-REVEAL (stub until it merges)
+- **Spec:** 08 §1 "Home Files panel"; 11 §5.7
+- **Done when:** DOM tests: empty, allowed, not allowed (the banner text and Allow Send folder inside the panel, and no separate banner anywhere), Send folder missing, Inbox "{n} new" (a count, never a file name), Manage folders and Tips for {app}; collapse remembered and still works when `localStorage` throws; never collapsed while the Send folder is not allowed; a conversation's Attach `no_folder` points to the same action.
+
+#### FILES-SETTINGS-COPY · Settings › Files explainer, one line, tip and Show in Finder (0.5.5)
+- **Status:** built (rel055/files-ux) · **Size:** S · **Tier:** Sonnet · **Security:** S0/S1
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/files/{io-strings.ts,io.test.ts}` and the Send folders tab; tests
+- **Depends on:** FILES-SPEC-055; FILES-REVEAL
+- **Spec:** 08 §1 "Settings › Files"; 11 §5.7 "Files explainer"
+- **Done when:** the explainer is the 11 §5.7 string exactly (`io.test.ts` updated) and "You don't upload here" appears nowhere in the app; the Send folders tab shows the one line and the AI app tip above the list; Show in Finder on the Send folder card and on the Inbox line, and on no other folder card; 11 §5.7 drift check green.
+
+#### FILES-ONB-STOP-OLD · "Also stop sending from {sendFolder}" in Choose another folder (after 0.5.5)
+- **Status:** new · **Size:** M · **Tier:** Opus · **Security:** S2 (policy edit)
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/files.ts` (review of an add plus a remove in one signed edit), `apps/local-ui/src/pages/files/add-folder.tsx`, the Files step
+- **Depends on:** FILES-ONB-1 (deferred from it: the review signs one change per edit)
+- **Spec:** 08 §1 "Choose another folder"; 11 §5.7 "Files step"
+- **Done when:** an unticked "Also stop sending from {sendFolder}" puts the removal in the same signed `policy.set`, both listed in the review; `RED (expected):` commit; independent review.
+
+#### FILES-ONB-SERVER-FOLDER · The Connect card shows the server's folder (after 0.5.5)
+- **Status:** new · **Size:** S · **Tier:** Opus · **Security:** S1
+- **Repo/path:** agentlink · `packages/node/src/approval-server.ts` (a read of the folder the first rules would allow, `Send-2` … `Send-9` when Send is unusable; no folder created), the Connect card
+- **Depends on:** FILES-ONB-1 (it shows the default `~/AgentLink/Send`; the server names the folder only at `begin`)
+- **Spec:** 08 §1 "Connect step"
+- **Done when:** the card shows the server's folder before the gesture; `begin`/`finish` take no new input; tests.
+
+#### FILES-FOLDER-PICKER · OS folder picker for Choose another folder in the app (after 0.5.5)
+- **Status:** new · **Size:** M · **Tier:** Opus · **Security:** S2 (host bridge)
+- **Repo/path:** agentlink · `apps/desktop` (NSOpenPanel / IFileOpenDialog through the host), `apps/local-ui/src/pages/files/add-folder.tsx`
+- **Depends on:** FILES-ONB-1 (typed path only today)
+- **Spec:** 08 §1 "Choose another folder"
+- **Done when:** in the desktop app the OS picker fills the folder, which still goes through the server's review; the typed path stays in a browser; tests.
+
+#### FILES-CONFIRM-NATIVE · Touch ID / Windows Hello for folder confirms in the app (after 0.5.5)
+- **Status:** new · **Size:** M · **Tier:** Opus · **Security:** S2 (owner presence)
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/files/add-folder.tsx` (`Confirm`), the native presence ceremony (DESK051-C6)
+- **Depends on:** FILES-ONB-1 (the app offers the master code only for folder confirms)
+- **Spec:** 04 §2.5 "Desktop app owner presence"; 08 §1
+- **Done when:** in the desktop app the folder confirm offers the app's own Touch ID / Windows Hello once it is on, the master code always; never WebAuthn in the app window; tests.
+
+#### FILES-ONB-ALLOW-RETURN · Allow Send folder returns to the wizard (after 0.5.5)
+- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/start/files-step.tsx`, `pages/files/index.tsx` (`check=1` hand-over)
+- **Depends on:** FILES-ONB-1 (Allow Send folder opens Settings › Files and does not come back)
+- **Spec:** 08 §1 "Files step"
+- **Done when:** after the confirm in Settings › Files, the owner is back on the Files step with the chip Allowed (or the confirm runs inline); tests.
+
+#### FILES-DOCS-055 · Docs for sending files in 0.5.5
+- **Status:** new · **Size:** S · **Tier:** Sonnet build, Haiku verifier · **Security:** S0
+- **Repo/path:** agentlink · `README.md` Status, `docs-site/` ("Sending files": the two questions, Send and Inbox, send-by-content, the per-app tips), `knowledge/`, `changelog.d/`, changesets
+- **Depends on:** FILES-AI-1, FILES-ONB-1, FILES-HOME-PANEL, FILES-SETTINGS-COPY
+- **Spec:** D-152; 06 §2.3; 08 §1; 11 §5.7
+- **Done when:** README Status, docs-site and `knowledge/` match what shipped (send-by-content limits, the Files step, the Home panel); no untested claim about an AI app's own features; drift checks green.
+
+#### FIRSTRUN-ANY-PLATFORM · First run works on any computer and in any browser (0.5.5, owner test on real machines, 14 Nov)
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.2
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/pages/start/strings.ts`, `packages/node/src/approval-server.ts` (setup finish), tests
+- **Depends on:** — (consumes WIN-HELLO-NATIVE through `/api/owner/native`; works without it)
+- **Spec:** 04 §2.2 "Creating it on the first-run page"; 08 §1 first run; 11 §5
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - Symptoms: the Mac desktop app's first run showed "This browser can't make a passkey" with `agentlink owner init`; on Windows 11 21H2 both buttons asked for a passkey with PRF and Windows offered only a USB security key; the step said "Touch ID" on Windows; "Skip to Home" was usable with no owner.
+  - Fix: a master-code-only finish (`{nonce, presence: 'code'}`, empty body, no WebAuthn); presence detected first (the desktop helper, the platform authenticator, PRF); on Windows the master code first; only ever the platform authenticator; the desktop app's Touch ID / Windows Hello offered after the code; no dead-end screen; platform words from SENSOR.
+- **Acceptance:**
+  - `RED (expected):` commit first; the master-code path never calls `navigator.credentials`; no `create` without a platform authenticator; desktop shell with no owner and no WebAuthn reaches the master-code step; Opus independent review, Fable 5.2 audit, Tali's "merge"; changelog.d fragment and changeset.
+
+#### WIN-BROKEN-ID · An ID whose key is missing: Restore, Remove from this computer, Continue (0.5.5)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (owner presence, keychain erase)
+- **Repo/path:** agentlink · `apps/cli/src/commands/{ui,ui-host,doctor}.ts`, `apps/cli/src/runtime/{broken-id,broken-names,agent-create,agent-dir}.ts`, `packages/node/src/{broken-id,approval-server}.ts`, `apps/local-ui/src/pages/{agents,home}/`
+- **Depends on:** U3-e, HOTFIX-NOID, UX1113-R1 (D-147)
+- **Spec:** 04 §2.5 "An ID whose key is missing"; 08 §1; 11 §5
+- **Done when:** `identity_missing` is its own start reason (`broken_id`); another ID opens, or the host starts with none; Home offers Restore from backup, Remove from this computer (typed label + presence, folder set aside then leftover keys, nothing signed) and Continue without it; discard removes the folder before the keys; doctor prints fixed sentences whole; tests on posix (win32 paths guarded).
+
+
+#### P2-RETRY-MIN · `retryNow` has a minimum interval (0.5.5)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `packages/core/src/outbox.ts`, `packages/core/src/send.test.ts`
+- **Depends on:** OUTBOX-NOW-1 (IR-MSG-ORDER-1 low)
+- **Done when:** a `retryNow` within 30 s of the last one that cut backoffs short is a plain delivery pass (deadlines untouched); a flapping relay or a repeated click cannot hammer the relay; tested.
+
+#### P2-CLOUD-MIGRATE · The cloud agent store migrates any older schema to the current one (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `apps/cloud-agent/src/do-store.ts`, `apps/cloud-agent/test/store.test.ts`
+- **Depends on:** M2-3a-store6 (IR-RET-2-1 low)
+- **Done when:** a Durable Object store of any older schema version (v6, v15 fixtures) opens by one forward-only, all-or-nothing migration (missing tables created, missing nullable columns appended, version bumped, shape verified) instead of `store_needs_migration`; rows kept; a second open is a no-op; a newer version is still refused; tested.
+
+#### P2-UNREAD-AGE · Unread received messages with a pruned seen row age out (0.5.5)
+- **Status:** deferred: needs envelopes.received_at (v17), see card UNREAD-AGE-RECEIVED-AT · **Size:** XS · **Tier:** Sonnet · **Security:** S2
+- **Repo/path:** agentlink · `packages/core/src/history/delete.ts`
+- **Depends on:** RET-6, RET-7 (IR-RET-67-2 note b)
+- **Done when:** see UNREAD-AGE-RECEIVED-AT. A `createdAt` fallback was tried and dropped (Fable r1 Medium: the sender signs `createdAt` with no lower bound, so a contact could have an unread message deleted a week after arrival, IR-RET-67-1 M1, I-5). Unread messages without a local time keep, as before.
+
+#### UNREAD-AGE-RECEIVED-AT · A local arrival time for received messages (v17)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · `packages/core/src/{store/schema,envelopes,sync,history/delete}.ts`, `packages/node/src/sqlite-schema.ts`, `apps/cloud-agent/src/do-store.ts`
+- **Depends on:** P2-UNREAD-AGE
+- **Done when:** a nullable `envelopes.received_at` (migration v17) is set at receive from the local clock; `#prune` copies `first_seen_at` into it before pruning the seen row; the local age falls back to `max(createdAt, received_at)`; legacy rows without it keep; tests for backdating, pruning and legacy rows; docs say unread history ages by arrival.
+
+#### P2-TRUNCATED-COUNT · `truncated` is counted after the local-age filter (0.5.5)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `packages/core/src/history/delete.ts`, `packages/core/src/files/history-retention.test.ts`
+- **Depends on:** RET-6, RET-7 (IR-RET-67-2 note a)
+- **Done when:** the plan walks keyset pages until it holds one plan's worth of rows that pass the local-age filter (bounded scan), so a block of rows old by `createdAt` but new here neither hides later rows nor makes `truncated` read false; tested with the cap as a test seam. Independent of P2-UNREAD-AGE. The scan bound never overshoots and `truncated` is not set falsely at exactly the bound.
+
+#### WIN-INSTALLER-SHORTCUT · Desktop shortcut choice on the Windows installer's finish page (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build · **Security:** S1
+- **Repo/path:** agentlink · `apps/desktop/build/lib/nsis.mjs`, `apps/desktop/build/test/nsis.node-test.mjs`
+- **Depends on:** WIN-DESK-2
+- **Scope:** finish page with a ticked "Create a desktop shortcut" box (per-user `$DESKTOP`, same icon and AppUserModelID as the Start menu entry); the uninstaller deletes it; still per-user, no admin.
+- **Acceptance:** NSIS script test; the Windows CI leg builds the installer.
+
+#### WIN-STARTUP-LOG · Core start diagnostics reach core.log on Windows (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build · **Security:** S1
+- **Repo/path:** agentlink · `apps/desktop/src/main/core-process.ts`, `apps/cli/src/commands/ui.ts`
+- **Depends on:** WIN-DESK-2
+- **Scope:** the shell spawns the core with a fixed `AGENTLINK_LOG=warn` (the user's own value is still dropped); the core's redacting logger writes one fixed line when the app host cannot start (`reason=` and a short `code=` only) to stderr; core-log.ts redacts again and keeps it in `core.log` (1 MB, then `core.1.log`).
+- **Acceptance:** unit tests for the spawn env and the note; no message, path or secret in the line.
+
+#### WIN-ACL-NOTICE · Visible notice when the data folder access cannot be checked on Windows (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build · **Security:** S1
+- **Repo/path:** agentlink · `apps/desktop/src/main/{core-process,main}.ts`, `apps/cli/src/desktop/host-main.ts`, `packages/node/src/{approval-server.ts,local-ui/api/health.ts}`, `apps/local-ui/src/layout/data-access-notice.tsx`
+- **Depends on:** WIN-DESK-2 (OD-M)
+- **Scope:** when the shell icacls check is `unchecked`, it passes one fixed flag to the core at spawn; the health read carries `dataAccess: unchecked` (a flag only, absent otherwise); the app shows a non-blocking, closable PageNotice (tone warning, existing component, no new design) with fixed plain words. The app continues. The existing core.log line stays.
+- **Acceptance:** unit tests (spawn env, health answer, notice); the flag cannot come from the user own environment.
+
+
+#### NOTIFY-DEEPLINK · A notification click opens that approval or conversation, not Home (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (an opaque local ID on the private pipe; shape-checked on both sides)
+- **Repo/path:** agentlink · `apps/cli/src/desktop/{alerts,host-core,protocol}.ts`, `apps/desktop/src/{main/notify,main/main,shared/protocol}.ts`, `packages/node/src/approval-server.ts` (`openPerson`), `apps/local-ui/src/pages/home/{person-link,home-screen}`
+- **Depends on:** N7 (native notifications), NOTIFY-WIRING-054
+- **Spec:** 08 §1 (notification centre); 11 §5
+- **Done when:** a click on an approval notification opens `/approve/<id>` when one request is waiting (the list when several); a click on a message or file notification opens Home with that person's conversation open; the link carries only an opaque local ID (a request's or a person's), never content or a name; the ID is checked by the pipe parser, the core and Home (an unknown one opens Home as before); tests for the pipe, the shell, the core and Home's reader.
+
+#### NOTIFY-UPDATE-READY · Alert when the update is ready to install, and once at launch if one is pending (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (a count on the private pipe; no new data)
+- **Repo/path:** agentlink · `apps/cli/src/desktop/{alerts,host-core}.ts`, `apps/desktop/src/main/notify.ts`, `packages/node/src/{approval-server,notifications}.ts`
+- **Depends on:** UPD-5 (in-app update), NOTIFY-DEEPLINK
+- **Spec:** 08 §1; 11 §5
+- **Done when:** the update item counts 1 while available and 2 once downloaded and verified (`ready`); going from 1 to 2 is news again (once; the same state never repeats); the notification says "Update ready: a new version is ready to install" only for 2 and "Update available" for 1; an unread update already waiting at launch is alerted once per run (never again when another ID opens); the Updates switch still decides; tests.
+
+#### NOTIFY-ALL-IDS · Messages and files for an ID that is not open still raise an alert (0.5.5)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (new notification text from inbound events; I-5, I-7, 04 §2.5)
+- **Repo/path:** agentlink · `apps/cli/src/runtime/{other-id-alerts,desktop-alerts-record}.ts`, `apps/cli/src/mcp/command.ts`, `packages/node/src/index.ts` (`osNotifier`)
+- **Depends on:** N7, NOTIFY-WIRING-054 (gap 3), IR-N7-1 L-5
+- **Spec:** 04 §2.5; 08 §1; 11 §5
+- **Done when:** while the desktop app alerts for one ID, the `agentlink mcp` process of another ID (which already holds that ID's keys) alerts its new messages and files by OS notification under the owner's Messages and Files switches; nothing opens an ID's keys or store just to notify; first look only notes what is there; a file and its message are one alert; quiet for the ID the desktop app alerts for and while no desktop app runs.
+- **Threat note:** the text is fixed words; the only variable parts, shown only with Show names on, are the ID's folder name and a contact name the OWNER gave (`nameSource` `owner`), each checked against the pipe's plain-name rule (letters, numbers, single spaces, apostrophes, hyphens; no dot, slash, colon, angle bracket or control character). Message text, a file name, a counterparty's self-declared name and links never reach it (I-5). Reads only flow events (contact ID, direction, kind, time) and the owner's names through the client the process already holds; nothing is logged or sent (I-7). A same-user process can silence it by writing the alerts record, which it could already do for approvals (IR-N7-1 L-1). The OS alert has no click target (osascript / notify-send); it never approves or replies.
+- **RED:** `RED (expected): NOTIFY-ALL-IDS` (tests first).
+
+#### NOTIFY-FOCUS · No OS alert while the AgentLink window is focused (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (shell only; nothing on the pipe changes)
+- **Repo/path:** agentlink · `apps/desktop/src/main/{notify,window,main,electron-api}.ts`
+- **Depends on:** N7, NOTIFY-DEEPLINK
+- **Spec:** 08 §1; 11 §5
+- **Done when:** while the window is shown, not minimised and focused, no native notification is raised (the in-app centre, tray and badge still update from the core); a hidden, minimised, background or closed window alerts as before; the check is made when the alert would be shown; tests.
+
+#### NOTIFY-DEDUPE · One alert, not two, for a file plus its message (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (drops alerts; adds none)
+- **Repo/path:** agentlink · `apps/cli/src/desktop/{alert-dedupe,host-core}.ts`, `apps/cli/src/runtime/other-id-alerts.ts`
+- **Depends on:** NOTIFY-ALL-IDS, N7
+- **Spec:** 08 §1; 11 §5
+- **Done when:** a person's file and message arriving together (one look) or within 20 s (either order, across looks) raise one alert (whichever arrives first is shown; within one look the file's); only alerts the owner's switches let through are counted, so an off switch never hides the other kind; different people and approvals/updates are untouched. A file alone is one flow event (kind `file`), never a file plus a message.
+
+#### APP-CONTINUITY · One AgentLink, browser or app: either way start to finish, and moving between them keeps everything (0.5.5, owner requirement 14 Nov)
+- **Status:** in review · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.2
+- **Repo/path:** agentlink · `apps/local-ui/src/presence/{offer.ts,webauthn-here.ts}`, every owner-presence prompt (`pages/contacts/presence-{prompt,button}.tsx`, `pages/apps/create-agent-gate.tsx`, `pages/approvals/index.tsx`, `pages/first-run/index.tsx`) and the WebAuthn defaults (`api/presence-ceremony.ts`, the approvals, rules, inbox, files, pay-confirm, create-agent and restore clients); `packages/node/src/{approval-server.ts,local-ui/{invite-paths.ts,routes.ts,app-host.ts,api/join.ts}}` (host takeover and show, code-finish tries); `apps/cli/src/{runtime/app-host-record.ts,commands/ui.ts,desktop/{host-core.ts,host-main.ts},harness/app-desk.ts}`; tests
+- **Depends on:** FIRSTRUN-ANY-PLATFORM; folds in WIN-HELLO-NATIVE's `desktopPresenceOffer(platform, status)` (same API)
+- **Spec:** 08 §1 "One AgentLink, browser or app" (proposed; owner approved the requirement 14 Nov); 08 §4; 04 §2.2, §2.5
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - Symptoms (0.5.4 live): an owner made in the browser opened in the app with a passkey switch or a passkey button that cannot work in the app's window; an `agentlink ui` host and the app ran side by side with `app-host.json` naming whichever started last; connecting an AI app from the app wrote `npx …`, which fails on a computer with only the app.
+  - Fix: inside the app's window no WebAuthn call anywhere (presence offers native once on, else the master code; Home and Approvals offer "Turn on Touch ID / Windows Hello", master code once); the app takes over a running `agentlink ui` host (`POST /api/ui/host/yield`, the handoff kind, empty body) and clears a stale record; its record says `host: "desktop"`, and terminal `agentlink ui` shows its window (`POST /api/ui/host/show`) instead of a second host; a new connect from inside the app writes the app form (moves keep the entry's form).
+  - Folded-in FIRSTRUN Fable lows: a code finish with a body counts as a failed try; Skip to Home after an `owner_exists` answer; 04 §2.2 / 08 §1 name `{nonce, presence: "code"}`; route tests (another session, a wrong nonce, `presence` on begin); this card's audit model.
+- **Acceptance:**
+  - `RED (expected):` commit first; browser owner then app: no setup, no passkey, native offer, IDs listed; app owner then browser: the master code; takeover, stale record and show; the app-form connect in the app; prompts in the app never call `navigator.credentials`; Opus independent review, Fable 5.2 audit, Tali's "merge"; changelog.d fragment and changeset.
+
+#### UPD-0 · Update key held as a release secret, update signed after the owner's approval click (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8; D-151
+- **Done when:** one update key in the `desktop-update` environment secret signs the update document in `release.yml` only after the owner approves; the document is checked with the app's own checks before upload. Details: CHANGELOG 0.5.4.
+
+#### UPD-1 · Desktop update format v2: channel, expiry, asset kind (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8
+- **Done when:** manifests carry `channel`, `expires` and asset `kind` under `agentlink-desktop-update/v2`; v1 documents are refused; a version that failed to start is never offered again; shared vectors in `test-vectors/desktop-update`. Details: CHANGELOG 0.5.4.
+
+#### UPD-2 · Pin the owner's update key in the app (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8; D-151
+- **Done when:** `root-key.json` holds the public key and release builds ship with updates on; copies from 0.5.2 and earlier never check, so 0.5.4 is installed by hand once. Details: CHANGELOG 0.5.4.
+
+#### UPD-3 · Release signs the desktop update and publishes the update document (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8; D-151
+- **Done when:** the release attaches the Mac zips, builds the update document from the checked Release files and publishes `desktop-update-<key id>.json` and `desktop-update.json`. Details: CHANGELOG 0.5.4.
+
+#### UPD-4 · Mac in-app update groundwork: download, check, swap with rollback (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 04 §7
+- **Done when:** the app downloads its signed package, checks it and swaps it in through a helper that restores the previous version if the new one does not start; threat-model row added. Details: CHANGELOG 0.5.4.
+
+#### UPD-4b · Update helper keeps a copy it could not confirm as stopped (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 04 §7
+- **Done when:** the helper keeps such a copy and starts the previous version when the new one fails. Details: CHANGELOG 0.5.4.
+
+#### UPD-5 · Update now in Settings > Updates (Mac) (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8
+- **Done when:** Settings › Updates shows Update now, a progress bar, Restart now and a fallback download link; the app installs only an update it verified itself. Details: CHANGELOG 0.5.4.
+
+#### KIT-NAMES · Recovery kit carries each ID's name (kit format v2) (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 04 §2.3.3; 07 §9.4
+- **Done when:** restoring on a new computer lists IDs by the names the owner gave; names are only inside the encrypted kit; kits saved earlier still restore; an older AgentLink refuses a newer kit before asking for the code. Details: CHANGELOG 0.5.4.
+
+#### ATT-APP-ATTACH · Attach files in a conversation (Markdown, text, JSON) (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §1; D-150
+- **Done when:** Attach or drag and drop, chips, a note, sent end-to-end encrypted from the Send folder without asking the AI; never over an existing file. Details: CHANGELOG 0.5.4.
+
+#### ATT-SENDFOLDER-FIX · A new ID can use a Send folder that already holds files (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §1
+- **Done when:** the folder is allowed with a clear note, or a fresh Send-2 is set up; Home offers one button to allow the Send folder. Details: CHANGELOG 0.5.4.
+
+#### ATT-ALLOW-LINK · AI gives a Settings > Files link when there is no Send folder (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 06; 08 §1
+- **Done when:** the AI gets a link with the Send folder filled in and no terminal command; it cannot allow a folder itself. Details: CHANGELOG 0.5.4.
+
+#### ATT-POLISH · Reader polish for attached files (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** 11 §5
+- **Done when:** table headers no longer break inside a word; each file button names its file. Details: CHANGELOG 0.5.4.
+
+#### MSG-ORDER-1 · Messages sent within the same second keep their order (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** 08 §1
+- **Done when:** ties of the protocol time are broken by the order this computer stored them; no protocol or schema change. Details: CHANGELOG 0.5.4.
+
+#### DROP-OPEN-1 · Files on the encrypted drop open to all early users (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** D-129; D-139 (7)
+- **Done when:** the internal-tester rollout rule is lifted; limits stay (100 MB per file, 1 GB per ID per week, 7 days, ciphertext only); decided by Tali in chat, 2026-11-13. Details: CHANGELOG 0.5.4.
+
+#### WIN-DESK-1 · Windows app starts its core (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8
+- **Done when:** the core recognises the app's private pipe on Windows and still refuses anything else; a missing data folder is logged clearly. Details: CHANGELOG 0.5.4.
+
+#### WIN-DESK-1d · Early Windows app download and guide (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** 08 §8; 11 §5
+- **Done when:** each release attaches the versioned and the stable-named setup file (in `SHA256SUMS-desktop-app.txt`); the invite page offers it; the guide covers SmartScreen and Smart App Control. Details: CHANGELOG 0.5.4.
+
+#### WIN-DESK-2 · Windows app: bundled-file check, tray icon, updates link, data-folder access check (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8; OD-M
+- **Done when:** start-time file check, tray icons for light and dark, new setup file linked in Settings › Updates, setup asks to quit AgentLink first, and the app refuses a data folder open to other people. Details: CHANGELOG 0.5.4.
+
+#### N1 · One notice style and one set of connection words (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** 11 §5
+- **Done when:** errors, reminders and Copy buttons share one style (a check stops ad-hoc notice markup); status bar, top bar and Home use the same words. Details: CHANGELOG 0.5.4.
+
+#### N2 · Every owner action is one step (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** 11 §5
+- **Done when:** the action's own button is the Touch ID (or Windows Hello or passkey), with the master code as a link; same signed objects and owner-presence checks. Details: CHANGELOG 0.5.4.
+
+#### N3 · Compact approval card on Home (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 11 §5
+- **Done when:** one line, Approve, Deny and Review with Touch ID; terms can be approved only after Review shows them in full; AI-written text is marked as content. Details: CHANGELOG 0.5.4.
+
+#### N4 · Notification centre in the local app (routes and store) (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** PLAN-NOTIFY §3.1, §3.4
+- **Done when:** read and mark-read routes behind the session, CSRF and Origin checks; per-ID `notifications.json` holds kinds and counts only. Details: CHANGELOG 0.5.4.
+
+#### N5 · Bell in the top bar (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** PLAN-NOTIFY §4.1
+- **Done when:** count (9+), tab title and dot, grouped Needs you, New, Earlier; names only as given by the owner; keyboard support. Details: CHANGELOG 0.5.4.
+
+#### N6 · Settings > Notifications (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** PLAN-NOTIFY §4.4
+- **Done when:** one switch, Approvals waiting, kept per install; more switches arrive with native notifications. Details: CHANGELOG 0.5.4.
+
+#### N7 · Native notifications in the desktop app (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** PLAN-NOTIFY §3.5
+- **Done when:** fixed codes only over the private pipe (no message text, file name or link); at most one per kind every 30 s; the app owns alerts for the ID it has open. Details: CHANGELOG 0.5.4.
+
+#### RET-67-1 · Retention fixes from the security audit (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 04 §4.2; 06 §3
+- **Done when:** ages count from when an item reached this computer; a first rules change keeps everything; a failing daily pass waits before retrying; the tidy link only fills filters. Details: CHANGELOG 0.5.4.
+#### P2-ENV-GUARD · The update-signing environment guard requires talirezun as the only reviewer (0.5.5)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S2 (`.github/**` guard, signing key)
+- **Repo/path:** agentlink · `tools/release/desktop-update-environment.mjs` (+ test), `docs/runbooks/desktop-update-keys.md`
+- **Depends on:** UPD-3 (IR-UPD-8-2 low)
+- **Done when:** the guard used by release and renewal fails closed unless every required reviewer of `desktop-update` is the user `talirezun` (no teams, no other person); tests; no permission change.
+
+#### P2-RENEW-PIN · A renewal checks the update key and mode inside the Mac apps before signing (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`, signing key)
+- **Repo/path:** agentlink · `.github/workflows/desktop-update-renew.yml`, `tools/release/desktop-update-renewal-pin.mjs` (+ test)
+- **Depends on:** UPD-3 (IR-UPD-8-1 R2-1)
+- **Done when:** before the unsigned manifest is built, renew-manifest opens app.asar in both attested Mac zips and fails closed unless each is an updates-on build carrying exactly the key in the root-key.json of main (no updates-off mark, no placeholder); runs with `contents: read` only, no key; tests.
+
+#### FIRSTRUN-MATRIX · First run can't silently break again: automated browser and desktop coverage plus the owner's manual matrix (0.5.5, owner requirement 14 Nov)
+- **Status:** in review · **Size:** M · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `e2e/test/{firstrun-matrix,firstrun-continuity}.test.ts`, `e2e/test/app-world.ts` (host seam), `apps/desktop/test/smoke/{smoke.mjs,first-run-code.mjs}`, `docs/runbooks/firstrun-matrix.md`
+- **Depends on:** FIRSTRUN-ANY-PLATFORM, APP-CONTINUITY
+- **Spec:** 08 §1 first run and "One AgentLink, browser or app"; 04 §2.2
+- **Scope:** owner acceptance (fresh profile → master code in the app or browser with no WebAuthn on that path → optional Touch ID / Windows Hello / platform passkey → ID → AI app → Home; no terminal, no browser hand-off, no USB key) is covered by tests so a regression fails CI.
+- **Done when:**
+  - Browser e2e (Chromium, CDP virtual authenticator, temp HOME, real built app and server): no authenticator (also with `PublicKeyCredential` removed) → master code with zero `navigator.credentials` calls; authenticator without PRF → master code finishes; with PRF → one create; Windows → master code first, never "Touch ID"; cancelled gesture → "Try again, or use your master code instead" and Back works; no "Skip to Home" before an owner exists. Firefox and WebKit are not run here: the virtual authenticator is Chromium-only (ci.yml installs both browsers for other jobs).
+  - Desktop smoke (`desktop.yml`): the built app's host record says `host: "desktop"`, and first run goes through to an owner with the master code over the host's own calls. The Electron window cannot be driven (the shell refuses debugging switches); its WebAuthn switch is covered by `apps/desktop/test/unit/security.test.ts`.
+  - Continuity e2e: browser first then the app takes over by yield (same owner, no setup); app first then `agentlink ui` shows the app and starts no second host.
+  - `docs/runbooks/firstrun-matrix.md` (RB-22): the manual matrix with exact clicks and screen text from the strings files.

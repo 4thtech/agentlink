@@ -8,7 +8,9 @@
 //   inode, no final symbolic link followed), and hashed while it is read.
 // - nodeFilesPlatform: the allowed folders' realpaths; the encrypted drop (D-48) at its configured
 //   origin; the SSRF-safe download of a received file's link (`nodeSafeFetch`, M1-15); and the
-//   inbox folder with exclusive, never-following, never-overwriting file operations (D-84).
+//   inbox folder with exclusive, never-following, never-overwriting file operations (D-84); and
+//   (FILES-AI-1, D-152) the Attach writer for core's `contentFile` sends: @4thtech-io/node's
+//   `writeSendFolderFile`, into the root of the ID's own pinned Send folder only, under this home.
 //
 // Nothing here logs. No error carries a path, a file name or a link (I-5, I-7): refusals are fixed
 // reasons, other failures fixed text.
@@ -34,9 +36,11 @@ import {
   nodeSafeFetch,
   openAllowedFile,
   openInboxDir,
+  ownSendFolder,
   quarantineMark,
   resolveAllowedFile,
   trashSavedFile,
+  writeSendFolderFile,
   type AllowedPathErrorCode,
   type InboxDir,
 } from '@4thtech-io/node';
@@ -114,6 +118,15 @@ function readStream(
 export function nodeFileOpener(options: NodeFileOpenerOptions = {}): FileOpener {
   const home = options.home ?? homedir();
   return Object.freeze<FileOpener>({
+    // FILES-AI-2 (06 §2.3): the ID's own pinned Send folder in its fixed `~` form, for the AI-side
+    // texts only (never a path from a call; nothing is opened).
+    async sendFolder(allowedFolders) {
+      try {
+        return (await ownSendFolder(allowedFolders, home))?.shown;
+      } catch {
+        return undefined;
+      }
+    },
     async attach(requested, allowedFolders): Promise<AttachOutcome> {
       const guard = { allowedFolders, home };
       let checked;
@@ -562,5 +575,14 @@ export function nodeFilesPlatform(options: NodeFilesPlatformOptions = {}): Files
       await download(url, { maxBytes, onChunk });
     },
     inbox: (folder, allowedFolders) => resolveInbox(folder, home, allowedFolders),
+    // FILES-AI-1: the folders are the core's verified policy's; nothing from the call picks one.
+    writeSendFolderFile: (input) =>
+      writeSendFolderFile({
+        allowedFolders: input.allowedFolders,
+        name: input.name,
+        bytes: input.bytes,
+        home,
+        reserve: () => input.reserve(),
+      }),
   });
 }

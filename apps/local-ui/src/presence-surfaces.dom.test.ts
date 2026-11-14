@@ -506,7 +506,10 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   'pages/inbox/save.tsx': { offers: /<PresenceAction\b/ },
   // Their own code option (each with its own DOM tests).
   'pages/apps/create-agent-gate.tsx': { offers: /NAME\.backupInstead/ },
-  'pages/files/index.tsx': { offers: /S\.useCode/ },
+  // FILES-ONB-1: the add review and confirm moved to add-folder.tsx (Settings › Files and the
+  // Files step of Get started both use its Confirm).
+  'pages/files/add-folder.tsx': { offers: /S\.useCode/ },
+  'pages/files/index.tsx': { offers: /<Confirm\b/ },
   'pages/first-run/index.tsx': { offers: /N\.backupInstead/ },
   'pay-confirm/index.tsx': { offers: /phase: 'backup'/ },
   // Not confirm screens.

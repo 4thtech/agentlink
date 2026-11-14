@@ -1,6 +1,6 @@
 # Notifications
 
-*Applies to AgentLink 0.5.4. The bell and Settings › Notifications are new in 0.5.4.*
+*Applies to AgentLink 0.5.5. The bell and Settings › Notifications are new in 0.5.4. In 0.5.5 a click opens the right place, other IDs are covered and notifications stay quiet while the window is in front.*
 
 ## The bell
 
@@ -28,17 +28,21 @@ When you use the AgentLink desktop app, it shows real notifications from AgentLi
 
 | Notification | When | A click opens |
 |---|---|---|
-| **Approval waiting** | Your AI asks for an approval | Home, with the approval |
-| **New message** | A contact sends you a message | Home |
-| **File received** | A contact sends you a file | Home |
-| **Update ready** | A new version of AgentLink is ready to install | Settings › Updates |
+| **Approval waiting** | Your AI asks for an approval | That approval |
+| **New message** | A contact sends you a message | That conversation |
+| **File received** | A contact sends you a file | That conversation |
+| **Update ready** | A new version of AgentLink has finished downloading and is ready to install (also once at launch, if one is already waiting) | Settings › Updates |
 
 - A notification never shows what a message says, a file's name or a link, and it never approves, accepts or replies. To decide, open AgentLink.
 - It says "From a contact" unless you turn on **Show names in notifications**. Then it uses the name **you** gave the contact on People. A name someone chose for themselves is never shown.
+- Since 0.5.5 a click opens that approval or that conversation, not just Home. The click carries only an opaque local reference that AgentLink checks again before it opens anything; no message text or name is in it.
+- A file and the message that comes with it raise one notification, not two.
+- Notifications also cover your **other IDs**, not only the one you have open, under the same **New messages** and **Files received** switches. With **Show names in notifications** on, such a notification names the ID and a contact name you gave, never message text.
+- While the AgentLink window is in front and focused, no notification pops up: you are already looking at it. The bell and the badge still update, and notifications return as soon as you switch away.
 - You get at most one of each kind every 30 seconds. If more arrive in between, the next one counts them ("3 new messages from your contacts").
 - On a Mac, the number on the AgentLink icon in the Dock is how many approvals are waiting.
 - On a Mac, the first notification may ask whether AgentLink may show notifications. If you said no, turn them on in System Settings › Notifications › AgentLink.
-- While the desktop app runs, AgentLink shows no other alert for approvals of the ID you have open, so you never get two. Your other IDs keep their usual alert.
+- While the desktop app runs, AgentLink shows no other alert for approvals of the ID you have open, so you never get two.
 
 ## Settings › Notifications
 

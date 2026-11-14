@@ -26,6 +26,9 @@
 // - UX1113-R1 (D-147): a `presence: 'restore'` route is one of the eleven fixed RESTORE_PATHS, each
 //   registered once, `found` a GET and every other step a POST, with no handler; the server's restore
 //   gate runs it (recovery-kit-restore.ts). No other path, method or route can use the kind.
+// - OWNER-START-OVER (D-153): a `presence: 'start-over'` route is one of the three fixed
+//   START_OVER_PATHS, each registered once, `state` a GET and `begin` / `finish` POSTs, with no
+//   handler; the server's start-over gate runs it (start-over.ts). No other path can use the kind.
 // - WP-R2b (04 §2.3.3 "Kit record"): a `presence: 'kit-reveal'` route (Show in Finder for the
 //   recovery kit) is only a POST at BACKUP_REVEAL_PATH with a handler, registered once; the server's
 //   kit-reveal gate runs it with no input at all. No other path, method or route can use the kind.
@@ -82,6 +85,8 @@ import { ownerPresenceRoutes } from './api/owner-presence.js';
 import { OWNER_CODE_PATHS, isOwnerCodeStep } from './owner-code-paths.js';
 // UX1113-R1: restore from a recovery kit (the restore kind).
 import { restoreRoutes } from './api/restore.js';
+// OWNER-START-OVER (D-153): start over on this computer (the start-over kind).
+import { startOverRoutes } from './api/start-over.js';
 // RET-4 (D-148): Delete history (begin, finish, undo, status) and Show in Finder for the Inbox.
 import { historyRoutes } from './api/history.js';
 import { retentionRoutes } from './api/retention.js';
@@ -89,6 +94,7 @@ import {
   HISTORY_FINISH_PATH,
   HISTORY_STEP_PATHS,
   INBOX_REVEAL_PATH,
+  SEND_FOLDER_REVEAL_PATH,
   isHistoryStep,
 } from './history-paths.js';
 import {
@@ -102,6 +108,7 @@ import {
   CREATE_AGENT_PATHS,
   MARK_PATHS,
   RESTORE_PATHS,
+  START_OVER_PATHS,
   UI_SETTINGS_WRITE_PATH,
   type LocalUiRoute,
 } from './route-types.js';
@@ -119,6 +126,9 @@ import {
   INVITE_CREATE_PATH,
   JOIN_ACCEPT_PATH,
   JOIN_DISMISS_PATH,
+  HANDOFF_KIND_PATHS,
+  HOST_SHOW_PATH,
+  HOST_YIELD_PATH,
   JOIN_HANDOFF_PATH,
   JOIN_PATH,
 } from './invite-paths.js';
@@ -137,6 +147,8 @@ export {
   INVITE_CREATE_PATH,
   JOIN_ACCEPT_PATH,
   JOIN_DISMISS_PATH,
+  HOST_SHOW_PATH,
+  HOST_YIELD_PATH,
   JOIN_HANDOFF_PATH,
   JOIN_PATH,
   REVEAL_PATH,
@@ -277,14 +289,31 @@ export class LocalUiRouteRegistry {
       if (this.#entries.some((e) => e.route.presence === 'restore' && e.route.step === step)) {
         throw invalid('this restore step is already registered');
       }
+    } else if (presence === 'start-over') {
+      // OWNER-START-OVER (D-153): start over on this computer; the server's start-over gate runs it.
+      const paths = START_OVER_PATHS as Readonly<Record<string, string>>;
+      if (typeof step !== 'string' || !Object.hasOwn(paths, step)) {
+        throw invalid('unknown start-over step');
+      }
+      if (route.path !== paths[step]) throw invalid('a start-over route is only at its fixed path');
+      if (method !== (step === 'state' ? 'GET' : 'POST')) {
+        throw invalid('a start-over route has its fixed method');
+      }
+      if (handler !== undefined) throw invalid('a start-over route has no handler');
+      if (this.#entries.some((e) => e.route.presence === 'start-over' && e.route.step === step)) {
+        throw invalid('this start-over step is already registered');
+      }
     } else if (presence === 'handoff') {
       // U3-invite: `agentlink join` to a running app host; the server's handoff gate runs it.
       if (method !== 'POST') throw invalid('a handoff route is a POST');
-      if (route.path !== JOIN_HANDOFF_PATH) {
+      // APP-CONTINUITY: the host's takeover and show paths are the same kind (HANDOFF_KIND_PATHS).
+      if (!HANDOFF_KIND_PATHS.includes(route.path)) {
         throw invalid('a handoff route is only at its fixed path');
       }
       if (handler !== undefined) throw invalid('a handoff route has no handler');
-      if (this.#entries.some((e) => e.route.presence === 'handoff')) {
+      if (
+        this.#entries.some((e) => e.route.presence === 'handoff' && e.route.path === route.path)
+      ) {
         throw invalid('the handoff route is already registered');
       }
     } else if (presence === 'mark') {
@@ -397,14 +426,19 @@ export class LocalUiRouteRegistry {
         throw invalid('this history step is already registered');
       }
     } else if (presence === 'inbox-reveal') {
-      // RET-4: Show in Finder for the Inbox folder only; no input, no presence.
+      // RET-4 / FILES-REVEAL: Show in Finder for the Inbox folder or the Send folder only; no
+      // input, no presence. One route per fixed path.
       if (method !== 'POST') throw invalid('an inbox-reveal route is a POST');
-      if (route.path !== INBOX_REVEAL_PATH) {
+      if (route.path !== INBOX_REVEAL_PATH && route.path !== SEND_FOLDER_REVEAL_PATH) {
         throw invalid('an inbox-reveal route is only at its fixed path');
       }
       if (typeof handler !== 'function') throw invalid('an inbox-reveal route needs a handler');
-      if (this.#entries.some((e) => e.route.presence === 'inbox-reveal')) {
-        throw invalid('the inbox-reveal route is already registered');
+      if (
+        this.#entries.some(
+          (e) => e.route.presence === 'inbox-reveal' && e.route.path === route.path,
+        )
+      ) {
+        throw invalid('this inbox-reveal route is already registered');
       }
     } else if (presence === 'invite') {
       // UX2-d1 (decision 1.1): create and check an invite only; the server's invite gate runs it.
@@ -541,6 +575,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     ownerPresenceRoutes,
     // UX1113-R1 (D-147): restore from a recovery kit, in the app.
     restoreRoutes,
+    // OWNER-START-OVER (D-153): start over on this computer.
+    startOverRoutes,
     // RET-4 (D-148): Delete history and Show in Finder for the Inbox folder.
     historyRoutes,
     // RET-6 (D-148): Settings > Storage > Keep automatically (a read; the save behind presence).

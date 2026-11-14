@@ -1,6 +1,6 @@
 # Desktop app (Mac and Windows)
 
-*Applies to AgentLink 0.5.1 (Mac) and 0.5.4 (Windows). These are early, unsigned builds, meant for people who are happy to try them first. On Windows the browser app (one command) stays the main way; the [Windows app](#windows) is an early build. Linux is not available yet.*
+*Applies to AgentLink 0.5.5 (Mac and Windows). These are early, unsigned builds, meant for people who are happy to try them first. On Windows the browser app (one command) stays the main way; the [Windows app](#windows) is an early build. Linux is not available yet.*
 
 ## Which file do I download?
 
@@ -50,11 +50,11 @@ That command only removes the "downloaded from the internet" mark from this one 
 
 ## Windows
 
-*Applies to AgentLink 0.5.4.* There is an **early Windows app** for Windows 10 and 11 (64-bit; it also runs on Windows on Arm). It is not signed yet. The browser app is still the main way on Windows: one command installs AgentLink and opens it in your browser, see [Windows](../get-started/windows.md). Use the app if you prefer AgentLink in its own window.
+*Applies to AgentLink 0.5.5.* There is an **early Windows app** for Windows 10 and 11 (64-bit; it also runs on Windows on Arm). It is not signed yet. The browser app is still the main way on Windows: one command installs AgentLink and opens it in your browser, see [Windows](../get-started/windows.md). Use the app if you prefer AgentLink in its own window.
 
 1. **Download** [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe). It is also on the [latest release](https://github.com/4thtech/agentlink/releases/latest) under **Assets**, with its fingerprint in `SHA256SUMS-desktop-app.txt` (check it with `certutil -hashfile AgentLink-win-x64-setup.exe SHA256` if you like).
 2. **Open the file.** Windows may say "Windows protected your PC". That is SmartScreen: it shows for files few people have downloaded yet. Choose **More info**, then **Run anyway**. You only do this once per download.
-3. The setup installs AgentLink for you only (no administrator rights) and adds it to the Start menu. Open **AgentLink** from the Start menu.
+3. The setup installs AgentLink for you only (no administrator rights) and adds it to the Start menu. Its last page offers **Create a desktop shortcut**, ticked by default (new in 0.5.5); untick it if you don't want one. Uninstalling removes the shortcut. Open **AgentLink** from the Start menu (or the shortcut).
 
 **Smart App Control.** On some Windows 11 computers Smart App Control is on, and it blocks apps that are not signed, with no way to allow them. If AgentLink does not open and Windows says Smart App Control blocked it, use the browser app (the one command) instead. Never turn Smart App Control off for AgentLink.
 
@@ -64,7 +64,21 @@ That command only removes the "downloaded from the internet" mark from this one 
 - If AgentLink is running when you install a new version or remove it, the setup asks you to quit it first.
 - **Your AgentLink folder** (`.agentlink` in your user folder) must be yours alone. Windows gives a folder there to you, SYSTEM and Administrators, and AgentLink accepts exactly that. If someone gave other people access to it (for example Everyone or Users), AgentLink does not start and says "Your AgentLink folder is shared": right-click the folder, **Properties**, **Security**, remove everyone except you, SYSTEM and Administrators, then choose **Try again**.
 - **Remove it** in **Settings** › **Apps** › **AgentLink** › **Uninstall**. Your IDs, contacts and messages are kept.
-- Windows Hello for approvals is new on Windows: if it does not work for you, use your master code and tell us.
+- **Windows Hello** for approvals works in the app the way Touch ID does on a Mac (new in 0.5.5): turn it on under **Settings** › **Windows Hello & master code**. The prompt opens in front of the AgentLink window. If your PC has no Windows Hello PIN, the app says: "Windows Hello isn't set up on this computer. To use it, open Settings, then Accounts, then Sign-in options, and set up a PIN (Windows Hello). Then come back here. For now, use your master code." Your master code always works. A PC without the security chip Windows Hello needs says so and uses the master code.
+- **If the app does not open:** `core.log` is in `%LOCALAPPDATA%\AgentLink\logs` (on a Mac, `~/Library/Logs/AgentLink`). Since 0.5.5 it says why the app could not open: a fixed reason and error code, never keys, codes, links or message content.
+- If AgentLink can't check who can open its data folder, it says so in a notice you can close, with how to check it yourself; the app keeps working.
+
+## One AgentLink, browser or app
+
+*New in 0.5.5.* The browser app and the desktop app are the same AgentLink on your computer, with the same IDs, contacts, messages and folders.
+
+**Browser first, app later.** Start in your browser (`npx -y @4thtech-io/agentlink@latest`), then install and open the desktop app. It continues where you left off: no new setup, the same IDs, and your AI apps stay connected. The window of the browser app says "AgentLink moved to the AgentLink app. Everything is there: your IDs, contacts and AI apps. You can close this window." The browser app and the desktop app never run side by side by accident.
+
+- **On a Mac,** your IDs are saved in the keychain, so the first time macOS asks to let AgentLink use them. A note first says: "macOS will ask to let AgentLink use your saved IDs." The macOS window says "node": that is AgentLink. Enter what you use to unlock your Mac, your Mac login (never your master code), and choose **Always Allow**, so it does not ask again. It asks once for each saved ID, so with several IDs you may see it a few times.
+- **In the app,** approvals use your master code until you turn on Touch ID or Windows Hello: **Turn on Touch ID** (or **Turn on Windows Hello**) is on Home and Approvals. The app never asks for a browser passkey it can't use.
+- **Connecting an AI app** from the desktop app works on a computer with no Node.js.
+
+**App first, browser later.** If you run `npx -y @4thtech-io/agentlink@latest` while the app is open, the window says "AgentLink is open in the AgentLink app. Its window is in front now." and the app comes to the front; no second copy starts.
 
 ## Closing and quitting
 
@@ -92,11 +106,11 @@ Your IDs, people and messages stay as they are: they live in your AgentLink fold
 
 You can always get a newer version by hand too: download the new `.dmg` from the [Releases page](https://github.com/4thtech/agentlink/releases) and drag it over the old one in Applications.
 
-**Update now (from the next version on).** Installing 0.5.4 itself is by hand, as above. From the next version on, a Mac app can update itself on a click, with no download and no dragging, once the release carries a signed update. Until then Settings › Updates keeps the **Download update** button. When it is on, Settings › Updates shows:
+**Update now.** A Mac app on 0.5.4 or newer can update itself on a click, with no download and no dragging, when the release carries a signed update. An older app (0.5.1 and before) is updated by hand, as above. Where the button isn't offered, Settings › Updates keeps **Download update**. When it is on, Settings › Updates shows:
 
-1. **AgentLink 0.5.4 is available** (for example) and an **Update now** button.
+1. **AgentLink 0.5.5 is available** (for example) and an **Update now** button.
 2. **Downloading…** with a progress bar and the percentage, then **Checking the new version…**: the app checks that the new version is the one AgentLink published before it changes anything.
-3. **AgentLink 0.5.4 is ready** and a **Restart now** button. Nothing changes until you press it. If a request from your AI is waiting for your approval, the page says so first: it waits until AgentLink is back.
+3. **AgentLink 0.5.5 is ready** and a **Restart now** button. Nothing changes until you press it. If a request from your AI is waiting for your approval, the page says so first: it waits until AgentLink is back.
 4. **Restarting…**: AgentLink closes and opens again with the new version. If the new version does not start, the one you had comes back by itself.
 
 If the app can't update itself (for example, it is not in a folder you can change), the page says **Couldn't update here. Download the new version instead.** and shows the **Download update** button with the steps above.

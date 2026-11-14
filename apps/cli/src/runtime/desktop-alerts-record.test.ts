@@ -11,6 +11,7 @@ import {
   DESKTOP_ALERTS_FILE,
   RECORD_LEASE_MS,
   desktopAlertsFor,
+  desktopAlertsOwner,
   osApprovalAlertsOn,
   removeDesktopAlertsRecord,
   writeDesktopAlertsRecord,
@@ -53,6 +54,13 @@ describe('the desktop alerts record', () => {
     await write('work');
     expect(await desktopAlertsFor(home, 'work', checks())).toBe(true);
     expect(await desktopAlertsFor(home, 'default', checks())).toBe(false);
+  });
+
+  it('NOTIFY-ALL-IDS: the owner is the ID of a live record, else undefined', async () => {
+    expect(await desktopAlertsOwner(home, checks())).toBeUndefined();
+    await write('work');
+    expect(await desktopAlertsOwner(home, checks())).toBe('work');
+    expect(await desktopAlertsOwner(home, checks({ alive: [] }))).toBeUndefined();
   });
 
   it('IR-N7-1 L-2: a stale record never counts, even with a live (reused) pid', async () => {

@@ -59,6 +59,7 @@ import {
 } from './create-agent-api.js';
 import { APPS_STRINGS as A } from './strings.js';
 import { desktopPlatform, nativeConfirmLabel } from '../../presence/desktop.js';
+import { desktopPresenceOffer } from '../../presence/offer.js';
 import { readNativeStatus, type NativeStatus } from '../../presence/native-api.js';
 import { nativeOutcomeText } from '../../presence/strings.js';
 
@@ -195,6 +196,7 @@ export function CreateAgentGate({
   // HOTFIX-NOID: inside the desktop app (and nowhere else) its own Touch ID, once it is on.
   const [desktop] = useState(() => desktopPlatform(userAgent));
   const [native, setNative] = useState(false);
+  const [desktopHelp, setDesktopHelp] = useState<string | undefined>(undefined);
   // The held plan's nonce for retries with the master code (Decision 45), and the app it was for.
   // W8-S5: a plan begun early to show a move keeps its challenge for the first gesture.
   const held = useRef<
@@ -232,17 +234,21 @@ export function CreateAgentGate({
 
   useEffect(() => {
     mounted.current = true;
-    void readStatus().then((read) => {
-      if (mounted.current) setStatus(read);
-    });
     if (desktop !== undefined) {
+      // APP-CONTINUITY (presence/offer.ts): the app's window never uses a passkey: its own Touch ID
+      // / Windows Hello once on, else the master code (no passkey read, no WebAuthn call).
       void nativeStatus()
         .catch((): NativeStatus => ({ available: false, registered: false }))
         .then((n) => {
-          if (mounted.current && n.available && n.registered && n.reason === undefined) {
-            setNative(true);
-          }
+          if (!mounted.current) return;
+          const offer = desktopPresenceOffer(desktop, n);
+          if (offer.kind === 'native') setNative(true);
+          else setDesktopHelp(offer.help);
         });
+    } else {
+      void readStatus().then((read) => {
+        if (mounted.current) setStatus(read);
+      });
     }
     return () => {
       mounted.current = false;
@@ -376,6 +382,11 @@ export function CreateAgentGate({
   };
 
   const withPasskey = async (): Promise<void> => {
+    // APP-CONTINUITY: never in the desktop app's window.
+    if (desktop !== undefined) {
+      setUseCode(true);
+      return;
+    }
     setWorking(true);
     setError(undefined);
     try {
@@ -497,7 +508,7 @@ export function CreateAgentGate({
     desktop !== undefined
       ? native
         ? undefined
-        : PASSKEY_WHY.desktopOff(sensor)
+        : (desktopHelp ?? PASSKEY_WHY.desktopOff(sensor))
       : status?.kind === 'unavailable' && !switched
         ? status.reason === 'browser'
           ? PASSKEY_WHY.browser(sensor, otherBrowser(platform))

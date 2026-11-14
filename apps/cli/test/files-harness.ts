@@ -204,7 +204,11 @@ export async function makeAgent(options: AgentOptions): Promise<Agent> {
 }
 
 /** Signs and applies a policy (the owner's `policy.set`, 04 §2.5). */
-export async function setPolicy(agent: Agent, edit: (policy: Policy) => void): Promise<void> {
+export async function setPolicy(
+  agent: Agent,
+  edit: (policy: Policy) => void,
+  version = 1,
+): Promise<void> {
   const policy = defaultPolicy();
   policy.contacts.acceptInvites = 'auto';
   edit(policy);
@@ -215,7 +219,7 @@ export async function setPolicy(agent: Agent, edit: (policy: Policy) => void): P
     agent: agent.client.agentId,
     owner: encodeHex(keys.ownerNostr),
     op: 'policy.set',
-    params: { version: 1, policy: policy as unknown as JsonObject },
+    params: { version, policy: policy as unknown as JsonObject },
     nonce: encodeBase64url(randomBytes(16)),
     issuedAt: now,
     expiresAt: now + 600,

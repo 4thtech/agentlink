@@ -220,6 +220,9 @@ export function RemoveSheet({
   // W8-S4 (04 §2.5 "Finishing a removal"): an ID whose removal stopped part-way is already retired
   // for good, so finishing asks for presence only, never the typed name again.
   const finishing = row.removing;
+  // WIN-BROKEN-ID: an ID whose key is missing is set aside (moved, never retired): the typed name
+  // and presence are asked as for every removal; there is nothing to export and nothing is sent.
+  const broken = row.broken === true && !finishing;
   const matches = finishing || typed === row.label;
   const contacts = row.contacts ?? 0;
   // W5-SHEET-CLOSE: a removal in flight keeps the sheet for a moment, never for good: after 10 s
@@ -320,6 +323,9 @@ export function RemoveSheet({
             onAgentChanged();
             return;
           }
+          // WIN-BROKEN-ID: its key is still here, so it was not moved; nothing changed.
+          if (outcome.kind === 'key_here') return setError(S.brokenKeyHere);
+          if (outcome.kind === 'keys_unchecked') return setError(S.brokenKeysUnchecked);
           const said = gateMessage(outcome);
           if (said !== undefined) return setError(said);
           if (outcome.kind === 'in_use') {
@@ -344,7 +350,9 @@ export function RemoveSheet({
     ? S.removingTitle(row.label)
     : finishing
       ? S.finishTitle(row.label)
-      : S.removeTitle(row.label);
+      : broken
+        ? S.brokenRemoveTitle(row.label)
+        : S.removeTitle(row.label);
   return (
     <Sheet
       open
@@ -356,7 +364,14 @@ export function RemoveSheet({
       className="ag-sheet"
     >
       <div className="ag-sheet-body">
-        {phase.kind === 'form' ? (
+        {phase.kind === 'form' && broken ? (
+          <>
+            <p className="al-text-body">{S.brokenRemoveIntro}</p>
+            <p className="al-text-body">{S.brokenRemoveRestore}</p>
+            <p className="al-text-caption al-muted">{S.agentFolder(row.name)}</p>
+          </>
+        ) : null}
+        {phase.kind === 'form' && !broken ? (
           <>
             {finishing ? <p className="al-text-body">{S.removalReason}</p> : null}
             <p className="al-text-body">{S.removeIntro}</p>
@@ -379,7 +394,7 @@ export function RemoveSheet({
 
         {phase.kind === 'form' ? (
           <>
-            <div className="ag-actions">
+            <div className="ag-actions" hidden={broken}>
               {exporting && row.current ? (
                 <ExportKit label={row.label} />
               ) : (
@@ -434,7 +449,13 @@ export function RemoveSheet({
             <div className="ag-actions">
               <OwnerButton
                 owner={owner}
-                statement={finishing ? S.finishStatement(row.label) : S.removeStatement(row.label)}
+                statement={
+                  finishing
+                    ? S.finishStatement(row.label)
+                    : broken
+                      ? S.brokenRemoveStatement(row.label)
+                      : S.removeStatement(row.label)
+                }
                 withSensor={finishing ? S.finishWith : S.removeWith}
                 withCode={finishing ? S.finishWithCode : S.removeWithCode}
                 busy={busy}

@@ -47,6 +47,8 @@ const listRoute: LocalUiReadRoute = Object.freeze<LocalUiReadRoute>({
               current: live.current,
               available: agent.available,
               removing: live.removing,
+              // WIN-BROKEN-ID: its key is missing here (Home offers Restore, Remove, Continue).
+              ...(agent.broken === true ? { broken: true } : {}),
               contacts: agent.contacts,
               running: agent.running,
               state: live.state,

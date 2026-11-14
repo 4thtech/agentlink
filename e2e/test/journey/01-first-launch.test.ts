@@ -38,7 +38,7 @@ describe('chapter 1: onboarding', () => {
     await page.waitForURL((url) => url.pathname === '/start/app');
     await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
     await page
-      .getByText(/Step 1 of 4/)
+      .getByText(/Step 1 of 5/)
       .first()
       .waitFor();
     // R1-UI-01: no "Skip to Home" before the ID exists (Home would be a dead end).
@@ -83,8 +83,19 @@ describe('chapter 1: onboarding', () => {
       (settingsBefore['mcpServers'] as Record<string, unknown>)['other'],
     );
 
-    // Step 4 (A3): optional; Skip for now is always there.
-    await page.getByRole('button', { name: 'Invite someone' }).click();
+    // FILES-ONB-1 (D-152): step 4, Files: Send and Inbox, read-only; Continue changes nothing.
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.waitForURL((url) => url.pathname === '/start/files');
+    await page.getByRole('heading', { name: 'Sending and receiving files' }).waitFor();
+    await page
+      .getByText(/Step 4 of 5/)
+      .first()
+      .waitFor();
+    expect(await text(page)).toContain('~/AgentLink/Inbox');
+    await page.getByRole('button', { name: 'Choose another folder' }).waitFor();
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+
+    // Step 5 (A3): optional; Skip for now is always there.
     await page.waitForURL((url) => url.pathname === '/start/invite');
     await page.getByRole('heading', { name: 'Invite someone' }).waitFor();
     await page.getByRole('button', { name: 'Skip for now' }).waitFor();

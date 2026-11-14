@@ -168,7 +168,9 @@ async function fakeServer(
     origin,
     port,
     activity: { lastAt: () => 0, openStreams: () => 1, linksUsed: () => 0 },
-    open: () => sink(`${origin}/?t=${mint()}`),
+    open: (approvalId?: string) =>
+      sink(`${origin}${approvalId === undefined ? '/' : `/approve/${approvalId}`}?t=${mint()}`),
+    openPerson: (contactId: string) => sink(`${origin}/?t=${mint()}#person=${contactId}`),
     openHome: () => sink(`${origin}/settings/home?t=${mint()}`),
     openFirstRun: () => sink(`${origin}/first-run?t=${mint()}`),
     openJoin: () => sink(`${origin}/settings/join?t=${mint()}`),
@@ -787,7 +789,7 @@ describe('N7: native notifications from the desktop host', () => {
     count = 2;
     await until(() => notifies(s.pipe.sent).length === 1);
     expect(notifies(s.pipe.sent)).toEqual([
-      { v: 1, type: 'notify', kind: 'messages', count: 2, name: 'Ana' },
+      { v: 1, type: 'notify', kind: 'messages', count: 2, name: 'Ana', target: A },
     ]);
     expect(asked).toEqual([[A]]);
     s.pipe.shell({ v: 1, type: 'shutdown' });
@@ -806,6 +808,25 @@ describe('N7: native notifications from the desktop host', () => {
       '/',
       '/settings/updates',
     ]);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+  });
+
+  it('NOTIFY-DEEPLINK: a show with a target opens that request or person; a bad one the page', async () => {
+    const s = setup();
+    const run = runDesktopHost(s.deps);
+    await until(() => readies(s.pipe.sent).length === 1);
+    const apr = `apr_${'A'.repeat(22)}`;
+    const person = `0x${'ab'.repeat(20)}`;
+    s.pipe.shell({ v: 1, type: 'show', route: 'approvals', target: apr });
+    s.pipe.shell({ v: 1, type: 'show', route: 'inbox', target: person });
+    s.pipe.shell({ v: 1, type: 'show', route: 'inbox' });
+    await until(() => readies(s.pipe.sent).length === 4);
+    const urls = readies(s.pipe.sent)
+      .slice(1)
+      .map((u) => new URL(u));
+    expect(urls.map((u) => u.pathname)).toEqual([`/approve/${apr}`, '/', '/']);
+    expect(urls.map((u) => u.hash)).toEqual(['', `#person=${person}`, '']);
     s.pipe.shell({ v: 1, type: 'shutdown' });
     await run;
   });
@@ -902,5 +923,48 @@ describe('N7: native notifications from the desktop host', () => {
     s.pipe.shell({ v: 1, type: 'shutdown' });
     await run;
     expect(marks).toEqual(['write:default', 'write:work', 'remove']);
+  });
+});
+
+// APP-CONTINUITY (owner requirement 14 Nov; 08 §1 "One AgentLink, browser or app"; 08 §4): the app
+// installed after starting in the browser continues exactly where the person left off. Before its
+// own server starts, the core takes over a running `agentlink ui` host (or clears a stale record),
+// so there is one host, one record and no second owner. Its record says `host: "desktop"`, and a
+// terminal `agentlink ui` asking it to show (the record's token) brings its window forward.
+describe('APP-CONTINUITY: the desktop host continues a browser host', () => {
+  it('takes over first, then starts; its record says desktop; show brings the window forward', async () => {
+    const s = setup();
+    const order: string[] = [];
+    const run = runDesktopHost({
+      ...s.deps,
+      takeOver: () => {
+        order.push('take over');
+        return Promise.resolve('yielded' as const);
+      },
+      startServer: (options, sink) => {
+        order.push('start');
+        return s.deps.startServer(options, sink);
+      },
+    });
+    await until(() => readies(s.pipe.sent).length === 1);
+    expect(order).toEqual(['take over', 'start']);
+    const written = JSON.parse(
+      readFileSync(join(home, '.agentlink', APP_HOST_FILE), 'utf8'),
+    ) as Record<string, unknown>;
+    expect(written['host']).toBe('desktop');
+    const handoff = s.options()?.host?.handoff;
+    expect(handoff?.onYield?.() ?? false).toBe(false);
+    expect(handoff?.onShow?.()).toBe(true);
+    await until(() => readies(s.pipe.sent).length === 2);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await expect(run).resolves.toBe(0);
+  });
+
+  it('a takeover that fails or is kept never stops the app from starting', async () => {
+    const s = setup();
+    const run = runDesktopHost({ ...s.deps, takeOver: () => Promise.reject(new Error('x')) });
+    await until(() => readies(s.pipe.sent).length === 1);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await expect(run).resolves.toBe(0);
   });
 });

@@ -92,11 +92,13 @@ function fakeApi(
     /** What the status re-check answers after the first status call. */
     statusAfter?: StatusResult;
   } = {},
-): SetupApi & { finished: Uint8Array[] } {
+): SetupApi & { finished: Uint8Array[]; codeOnly: string[] } {
   const finished: Uint8Array[] = [];
+  const codeOnly: string[] = [];
   let statusCalls = 0;
   return {
     finished,
+    codeOnly,
     status: () => {
       statusCalls += 1;
       const first = options.status ?? { kind: 'ok', owner: 'missing' };
@@ -108,6 +110,11 @@ function fakeApi(
     finish: (body) => {
       finished.push(body.slice());
       return Promise.resolve(options.finish ?? done());
+    },
+    // FIRSTRUN-ANY-PLATFORM: the master code only (no WebAuthn).
+    finishCode: (nonce) => {
+      codeOnly.push(nonce);
+      return Promise.resolve(options.finish ?? done({ passkey: false }));
     },
   };
 }
@@ -213,7 +220,16 @@ describe('first run: protect approvals (D-120 (1))', () => {
   it('starts on "Confirm it\'s you" with one primary action and says what one confirmation does', async () => {
     await mount(fakeApi());
     expect(host.querySelector('h1')?.textContent).toBe(CONNECT_STEP.title);
-    expect(text()).toContain(FIRST_RUN.foldersNote);
+    // FILES-ONB-1 (11 §5.7): the files card above the one button, and its line under it.
+    expect(text()).toContain(`${CONNECT_STEP.filesLabel}~/AgentLink/Send`);
+    expect(text()).toContain(CONNECT_STEP.filesLine('confirmation', 'computer'));
+    // Change only notes the wish: pressed, with the caption; nothing is sent.
+    const change = host.querySelector<HTMLButtonElement>('[data-send-folder-card] button');
+    expect(change?.getAttribute('aria-pressed')).toBe('false');
+    expect(text()).not.toContain(CONNECT_STEP.filesChangeLater);
+    await act(async () => change?.click());
+    expect(change?.getAttribute('aria-pressed')).toBe('true');
+    expect(text()).toContain(CONNECT_STEP.filesChangeLater);
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
     expect(button(GO.other).className).toContain('al-btn-primary');
     expect(text()).not.toMatch(BANNED);
@@ -296,7 +312,7 @@ describe('first run: protect approvals (D-120 (1))', () => {
     // For an owner: New agent (no agent is open here), never owner setup. W4-WIRE-2: New agent
     // starts with "Name your agent" (Decision 52 (2)).
     expect(host.querySelector('h1')?.textContent).toBe('Name this ID');
-    expect(text()).not.toContain(FIRST_RUN.foldersNote);
+    expect(host.querySelector('[data-send-folder-card]')).toBeNull();
     expect(api.finished).toHaveLength(0);
   });
 
@@ -359,10 +375,14 @@ describe('first run: protect approvals (D-120 (1))', () => {
     expect(button(FIRST_RUN.tryAgain)).toBeDefined();
   });
 
-  it('a browser without passkeys gets the terminal fallback', async () => {
-    await mount(fakeApi(), undefined, false);
-    expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.unsupportedTitle);
-    expect(text()).toContain('agentlink owner init');
+  it('FIRSTRUN-ANY-PLATFORM: a browser without passkeys continues with a master code, no terminal', async () => {
+    const api = fakeApi();
+    await mount(api, undefined, false);
+    expect(host.querySelector('h1')?.textContent).toBe(CONNECT_STEP.title);
+    expect(text()).not.toContain('agentlink owner init');
+    await click(FIRST_RUN.backupOnly);
+    expect(api.codeOnly).toHaveLength(1);
+    expect(api.finished).toHaveLength(0);
   });
 
   it('an expired link and a stopped agent show the shared states', async () => {
@@ -394,17 +414,25 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
   const buttons = (): string[] =>
     [...host.querySelectorAll('button')].map((b) => b.textContent?.trim() ?? '');
 
-  it('shows the folders setup creates before the gesture, and one button named for the platform', async () => {
-    for (const [platform, label] of [
-      ['mac', GO.mac],
-      ['windows', GO.windows],
-      ['other', GO.other],
+  it('shows the Send folder the gesture allows before it, and one button named for the platform', async () => {
+    for (const [platform, label, folder, line] of [
+      ['mac', GO.mac, '~/AgentLink/Send', CONNECT_STEP.filesLine('Touch ID', 'Mac')],
+      // FIRSTRUN-ANY-PLATFORM: on Windows the master code comes first (Windows Hello is offered).
+      // FILES-ONB-1: the path as Windows writes it, and "PC".
+      [
+        'windows',
+        FIRST_RUN.backupOnly,
+        '~\\AgentLink\\Send',
+        CONNECT_STEP.filesLine('confirmation', 'PC'),
+      ],
+      ['other', GO.other, '~/AgentLink/Send', CONNECT_STEP.filesLine('confirmation', 'computer')],
     ] as const) {
       await mount(fakeApi(), undefined, true, { platform });
-      expect(text()).toContain('~/AgentLink/Send');
-      expect(text()).toContain('~/AgentLink/Inbox');
-      expect(text()).toContain('~/AgentLink/Proofs');
-      expect(text()).toContain(FIRST_RUN.foldersNote);
+      expect(host.querySelector('[data-send-folder-card]')?.textContent).toContain(
+        CONNECT_STEP.filesLabel + folder,
+      );
+      expect(text()).toContain(line);
+      if (platform === 'windows') expect(text()).not.toContain('Touch ID');
       expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
       expect(button(label).className).toContain('al-btn-primary');
       expect(text()).not.toMatch(BANNED);
@@ -621,7 +649,8 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     expect(text()).toContain(FIRST_RUN.noPrf('Touch ID', 'Safari'));
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
     await click(FIRST_RUN.backupOnly);
-    expect(asked).toEqual([{ platform: false }]);
+    // FIRSTRUN-ANY-PLATFORM: the master code only makes no passkey call at all.
+    expect(asked).toEqual([]);
     expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.backupTitle);
     expect(text()).toContain(FIRST_RUN.doneNoPasskeyBody);
     expect(button(FIRST_RUN.savedIt)).toBeDefined();

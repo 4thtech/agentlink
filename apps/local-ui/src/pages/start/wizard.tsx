@@ -1,14 +1,20 @@
 // W4-WIZARD (W4 UX v2 layer 1; owner-approved artboards A1 "Get started: pick and connect", A2
 // "Connected", A3 "Invite someone"): the frame and the steps that hold no secret. The frame is the
-// focused column's own header: the brand, a four-segment progress bar with "Step n of 4 · …" and
-// "Skip to Home" on every step. The connect step's gesture lives in the first-run page (it holds the
+// focused column's own header: the brand, a segmented progress bar with "Step n of m · …" and
+// "Skip to Home" on every step (FILES-ONB-1: five steps with Files; four in Connect another AI app). The connect step's gesture lives in the first-run page (it holds the
 // one-time master code); this file only draws.
 //
 // Motion comes from the U0 kit only (al-reveal, al-pop, al-draw, al-press); under reduced motion the
 // kit turns every one into a fade. Names from the server (an app, the agent) are rendered as text.
 import { IdExplainerCard } from './id-explainer.js';
 import { Button, Icon, Lockup, Skeleton, TextField } from '@4thtech-io/ui';
-import { type FormEvent, type MouseEvent, type ReactElement, type ReactNode } from 'react';
+import {
+  useState,
+  type FormEvent,
+  type MouseEvent,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { useTitleFocus } from '../welcome/index.js';
 import type { DetectedApp } from '../first-run/apps-api.js';
 import { skipToHome } from './guard.js';
@@ -18,6 +24,7 @@ import {
   INVITE_STEP as I,
   NAME_STEP as N,
   PICK_STEP as P,
+  FILES_STEP as F,
   STEP_IDS,
   WIZARD as W,
   type StepId,
@@ -33,12 +40,18 @@ export function stepOf(path: string): StepId {
   return (STEP_IDS as readonly string[]).includes(id) ? (id as StepId) : 'app';
 }
 
-/** The four segments: done, current, to do. */
-function Segments({ step }: { readonly step: StepId }): ReactElement {
-  const at = STEP_IDS.indexOf(step);
+/** One segment per step: done, current, to do. */
+function Segments({
+  step,
+  steps,
+}: {
+  readonly step: StepId;
+  readonly steps: readonly StepId[];
+}): ReactElement {
+  const at = steps.indexOf(step);
   return (
     <span className="st-segs" aria-hidden="true">
-      {STEP_IDS.map((id, i) => (
+      {steps.map((id, i) => (
         <span
           key={id}
           className="st-seg"
@@ -58,6 +71,8 @@ export interface WizardFrameProps {
   readonly stepName?: string;
   /** R1-UI-01: no "Skip to Home" while there is no ID (Home would be a dead end). */
   readonly hideSkip?: boolean;
+  /** FILES-ONB-1: this run's steps (Connect another AI app has no Files step). */
+  readonly steps?: readonly StepId[];
 }
 
 /** The focused column's header and the step under it. */
@@ -67,9 +82,10 @@ export function WizardFrame({
   onSkip,
   stepName,
   hideSkip = false,
+  steps = STEP_IDS,
 }: WizardFrameProps): ReactElement {
-  const n = STEP_IDS.indexOf(step) + 1;
-  const label = W.stepLabel(n, stepName ?? W.stepNames[step]);
+  const n = Math.max(steps.indexOf(step), 0) + 1;
+  const label = W.stepLabel(n, steps.length, stepName ?? W.stepNames[step]);
   const skip = (event: MouseEvent<HTMLAnchorElement>): void => {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
@@ -86,11 +102,11 @@ export function WizardFrame({
             role="progressbar"
             aria-label={W.progressLabel}
             aria-valuemin={1}
-            aria-valuemax={4}
+            aria-valuemax={steps.length}
             aria-valuenow={n}
             aria-valuetext={label}
           >
-            <Segments step={step} />
+            <Segments step={step} steps={steps} />
             <span className="st-eyebrow">{label}</span>
           </span>
           {hideSkip ? (
@@ -495,6 +511,8 @@ export interface ConnectedStepProps {
   /** The app and whether its entry was written (E1: false keeps the agent and offers Connect). */
   readonly app?: { readonly name: string; readonly connected: boolean };
   readonly onInvite: () => void;
+  /** FILES-ONB-1: the Files step comes next: the primary button reads "Continue" and opens it. */
+  readonly onFiles?: () => void;
   readonly onHome: () => void;
   /** E1: connect the app now (the ordinary signed AI apps step). */
   readonly onConnect?: () => void;
@@ -507,6 +525,7 @@ export function ConnectedStep({
   label,
   app,
   onInvite,
+  onFiles,
   onHome,
   onConnect,
   onOpen,
@@ -553,6 +572,10 @@ export function ConnectedStep({
           <Button variant="primary" size="lg" className="al-press" onClick={onConnect}>
             {D.connect(appName)}
           </Button>
+        ) : onFiles !== undefined ? (
+          <Button variant="primary" size="lg" className="al-press" onClick={onFiles}>
+            {D.next}
+          </Button>
         ) : (
           <Button
             variant="primary"
@@ -595,18 +618,22 @@ export interface InviteStepProps {
   readonly onHome: () => void;
   /** Skip for now: no invite (the page ends a link that never left the screen). Default: onHome. */
   readonly onSkip?: () => void;
+  /** FILES-ONB-1: back to the step before (Files, or Connected in Connect another AI app). */
+  readonly onBack?: () => void;
 }
 
-/** A3, step 4 (optional): invite someone; "Skip for now" and "Done, go to Home". */
+/** A3, the last step (optional): invite someone; "Skip for now" and "Done, go to Home". */
 export function InviteStep({
   panel,
   inviteHref,
   onHome,
   onSkip = onHome,
+  onBack,
 }: InviteStepProps): ReactElement {
   const title = useTitleFocus<HTMLHeadingElement>();
   return (
     <section className="st-screen st-w-600" aria-labelledby="st-h">
+      {onBack === undefined ? null : <BackButton onBack={onBack} label={F.back} />}
       <div className="st-intro">
         <h1 id="st-h" ref={title} tabIndex={-1} className="st-title-2">
           {I.title}
@@ -630,5 +657,54 @@ export function InviteStep({
         </Button>
       </div>
     </section>
+  );
+}
+
+/**
+ * FILES-ONB-1 (D-152; 08 §1 "Connect step"; 11 §5.7): the one-line files card above the one
+ * gesture, in the style of the agent card. `folder` is shown as text (home as `~`, Windows with
+ * backslashes); "Change" only notes the wish: the Files step opens its folder choice after the
+ * connect, and nothing changes before the gesture.
+ */
+export function SendFolderCard({
+  folder,
+  onChange,
+  chosen = false,
+}: {
+  readonly folder: string;
+  readonly onChange?: () => void;
+  /** The wish was already noted (kept while the steps change). */
+  readonly chosen?: boolean;
+}): ReactElement {
+  const [pressed, setPressed] = useState(chosen);
+  return (
+    <div className="st-agent" data-send-folder-card>
+      <span className="st-tile-icon" aria-hidden="true">
+        <Icon name="folder" size={18} />
+      </span>
+      <span className="st-agent-words">
+        <span className="al-text-caption al-muted">{C.filesLabel}</span>
+        <span className="al-text-code">{folder}</span>
+        {pressed ? (
+          <span className="al-text-caption al-muted" data-change-later>
+            {C.filesChangeLater}
+          </span>
+        ) : null}
+      </span>
+      {onChange === undefined ? null : (
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={C.filesChangeLabel}
+          aria-pressed={pressed}
+          onClick={() => {
+            setPressed(true);
+            onChange?.();
+          }}
+        >
+          {C.filesChange}
+        </Button>
+      )}
+    </div>
   );
 }

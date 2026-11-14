@@ -22,7 +22,7 @@ export const HELPER_NAME = 'agentlink-presence';
 export const HELPER_APP = 'AgentLink.app';
 export { HELPER_ID } from './lib/sign-plan.mjs';
 export const MAC_MIN_OS = '13.0';
-export const REASONS = Object.freeze(['setup', 'approve', 'pay', 'code']);
+export const REASONS = Object.freeze(['setup', 'approve', 'pay', 'code', 'reset']);
 
 /** Fixed exit codes, identical in both helpers (checked by test/native-build.node-test.mjs). */
 export const EXIT = Object.freeze({
@@ -151,6 +151,9 @@ export function msvcArgs({ src, out, arch = 'x64' }) {
     '/DEPENDENTLOADFLAG:0x800',
     'windowsapp.lib',
     'bcrypt.lib',
+    // WIN-HELLO-NATIVE: the TPM check (Platform Crypto Provider) and the prompt focus.
+    'ncrypt.lib',
+    'user32.lib',
   ];
 }
 

@@ -587,6 +587,14 @@ export const TABLES = {
     },
     primaryKey: ['approval_id', 'part'],
   },
+  // FILES-AI-1 (D-152; 06 §2.3 "Daily budget"; schema version 16; proposed, owner confirms at
+  // merge): one row per file the AI wrote by content into the Send folder, the time and the byte
+  // count only (no name, hash or contact). Checked and reserved in one transaction before the write
+  // (files/content-file.ts); rows older than the rolling 24 h are dropped by that same step.
+  content_file_budget: {
+    columns: { entry_id: id, t: int, bytes: int },
+    primaryKey: ['entry_id'],
+  },
 } as const satisfies Readonly<Record<string, TableSpec>>;
 
 export type Tables = typeof TABLES;

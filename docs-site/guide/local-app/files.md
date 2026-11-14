@@ -1,6 +1,6 @@
 # Files page
 
-*Applies to AgentLink 0.5.4. File chips in the conversation and the reader are new in 0.5.1. Files you exchange with a person are on their page on [Home](home.md). Folders your AI may send from are in Settings, under Files folder. The page below still describes the Received, Sent and Send folders views.*
+*Applies to AgentLink 0.5.5. Show in Finder for your Send folder, the Files panel on Home and the Files step are new in 0.5.5. File chips in the conversation and the reader are new in 0.5.1. Files you exchange with a person are on their page on [Home](home.md). Folders your AI may send from are in Settings, under Files folder. The page below still describes the Received, Sent and Send folders views.*
 
 ## Files in the conversation
 
@@ -13,6 +13,12 @@ A saved Markdown, code, JSON, patch or text file has **Open**. The reader shows 
 In a conversation you can also **Attach** a Markdown, text or JSON file (or drag it onto the conversation), see it as a chip with **×** to remove it, add a note and **Send** it yourself. The copy goes into your Send folder. See [Send a file yourself, from the app](../everyday-use/files.md#send-a-file-yourself-from-the-app).
 
 Your AI can read a small text file too. When it fetches a text file of up to 64 KB, it gets the text and does not need access to your folders. Larger or other files are saved as before, and your AI is told where. The kind (Markdown, code, JSON, patch, text, image or other) comes from the file's name on your computer, never from what the sender says.
+
+## Where your files are (0.5.5)
+
+Settings › **Files** starts with one plain line: "Your AI sends files from your Send folder, and files you receive are saved in Inbox. To send a text file yourself, use Attach in a conversation." The **Send folders** tab adds how to send ("You put a file in Send, then ask your AI: “Send report.md to Ana.” Files people send you land in Inbox."), a short tip for your AI app, and **Show in Finder** (**Show in Explorer** on Windows) for your Send folder and your Inbox. **Show in Finder** opens only your own Send folder, and only while it is still the folder you allowed (not a link, not missing). Each folder shows **Allowed**, **Not allowed** or **Not found on this Mac** (**PC** on Windows). The same two folders are on [Home](home.md) in the Files panel, and the **Files** step in [Get started](get-started-wizard.md) shows them while you set up.
+
+Your AI can also send a small text file it wrote in a chat, without a file on your computer. See [Send a text file your AI wrote](../everyday-use/files.md#send-a-text-file-your-ai-wrote).
 
 ## Saved automatically
 

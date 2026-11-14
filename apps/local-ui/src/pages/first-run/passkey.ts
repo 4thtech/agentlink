@@ -14,6 +14,7 @@
 // assertion go to `finish`, which checks the assertion before using the output.
 import type { CreationValues, UpgradeValues } from './setup-api.js';
 import type { Platform } from './strings.js';
+import { webAuthnHere } from '../../presence/webauthn-here.js';
 
 /** How the passkey is asked for. */
 export interface PasskeyOptions {
@@ -63,6 +64,44 @@ export async function prfSupport(): Promise<PrfSupport> {
   return 'unknown';
 }
 
+/**
+ * FIRSTRUN-ANY-PLATFORM: how first run asks for presence, decided before anything is asked.
+ * - `native`: the desktop app's own Touch ID / Windows Hello (the shell's helper is available): the
+ *   master code is made with no WebAuthn call, then the native switch is offered at once.
+ * - `passkey`: the browser's platform authenticator with PRF, one gesture; the master code stays
+ *   the alternative.
+ * - `code`: the master code only, with no WebAuthn call at all.
+ * `passkeyOffered`: whether the platform passkey may be offered at all (primary or alternative).
+ */
+export interface SetupChoice {
+  readonly primary: 'native' | 'passkey' | 'code';
+  readonly passkeyOffered: boolean;
+}
+
+export function setupChoice(input: {
+  readonly platform: Platform;
+  readonly prf: PrfSupport;
+  readonly passkeys: boolean;
+  readonly native: boolean;
+}): SetupChoice {
+  if (input.native) return { primary: 'native', passkeyOffered: false };
+  if (!input.passkeys || input.prf === 'no') return { primary: 'code', passkeyOffered: false };
+  // Windows: a create with PRF can end on "Insert your security key" where Windows Hello has no PRF
+  // (21H2): the master code first; Windows Hello only as the alternative, and only on a clear yes.
+  if (input.platform === 'windows') {
+    return { primary: 'code', passkeyOffered: input.prf === 'yes' };
+  }
+  if (input.prf === 'yes' || (input.platform === 'mac' && input.prf === 'unknown')) {
+    return { primary: 'passkey', passkeyOffered: true };
+  }
+  return { primary: 'code', passkeyOffered: false };
+}
+
+/** Whether the switch to a passkey (an owner with a master code) is offered here (same rule). */
+export function passkeySwitchOffered(platform: Platform, prf: PrfSupport): boolean {
+  return prf === 'yes' || (platform === 'mac' && prf === 'unknown');
+}
+
 export type PasskeyResult =
   | { readonly kind: 'ok'; readonly body: Uint8Array }
   | { readonly kind: 'cancelled' }
@@ -97,7 +136,9 @@ export function encodeRegistration(fields: readonly Uint8Array[]): Uint8Array {
 
 /** True when this browser can make a passkey at all. */
 export function passkeysAvailable(): boolean {
+  // APP-CONTINUITY: never in the desktop app's window (presence/webauthn-here.ts).
   return (
+    webAuthnHere() &&
     typeof window !== 'undefined' &&
     typeof window.PublicKeyCredential === 'function' &&
     typeof navigator !== 'undefined' &&

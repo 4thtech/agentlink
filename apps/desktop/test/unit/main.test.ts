@@ -803,6 +803,23 @@ describe('data folder access (Windows)', () => {
     expect(read(ok.proc.logDir)).not.toContain(line);
   });
 
+  // WIN-ACL-NOTICE: an unchecked folder is told to the core (fixed flag), so the app shows a notice.
+  it('unchecked passes the fixed flag to the core; ok does not', async () => {
+    const flag = (result: 'ok' | 'unchecked'): unknown => {
+      const { electron, children, proc } = setup([], {
+        checkDataFolder: () => Promise.resolve(result),
+      });
+      return runShell(electron, proc).then(
+        () =>
+          (children[0]?.options as { env: Record<string, string> }).env[
+            'AGENTLINK_DESKTOP_DATA_ACL'
+          ],
+      );
+    };
+    await expect(flag('unchecked')).resolves.toBe('unchecked');
+    await expect(flag('ok')).resolves.toBeUndefined();
+  });
+
   it('the copy says what to do, in plain words', () => {
     const copy = STATUS_COPY.shared_data_folder;
     expect(copy.heading).toBe('Your AgentLink folder is shared');

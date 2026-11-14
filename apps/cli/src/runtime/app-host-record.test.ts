@@ -1,5 +1,6 @@
 // U3-invite (S2; 08 §4 "An app host already running"): the 0600 handoff record and the one
 // loopback handoff request `agentlink join` sends.
+import { spawn, type ChildProcess } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -11,11 +12,16 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   APP_HOST_FILE,
   HANDOFF_PATH,
+  HOST_SHOW_PATH,
+  HOST_YIELD_PATH,
   parseAppHostRecord,
   pidAlive,
   readAppHostRecord,
   removeAppHostRecord,
+  desktopHostAppears,
   sendHandoff,
+  showRunningApp,
+  takeOverAppHost,
   writeAppHostRecord,
 } from './app-host-record.js';
 
@@ -189,5 +195,150 @@ describe('the one loopback handoff (08 §4)', () => {
     expect(await sendHandoff({ pid: 1, port: refused.port, handoffToken: TOKEN }, LINK, 500)).toBe(
       'failed',
     );
+  });
+});
+
+// APP-CONTINUITY (owner requirement 14 Nov; 08 §1 "One AgentLink, browser or app"; 08 §4): the
+// desktop app takes over a running `agentlink ui` host cleanly (it asks it to close over the same
+// loopback, with the record's token, and waits for it to end), a stale record (its process gone, a
+// crash) is cleared, and terminal `agentlink ui` shows the running app's window instead of starting
+// a second host. The desktop's record says `host: "desktop"`.
+describe('APP-CONTINUITY: take over or show the running host', () => {
+  let server: Server | undefined;
+  let child: ChildProcess | undefined;
+  afterEach(() => {
+    server?.close();
+    server = undefined;
+    child?.kill('SIGKILL');
+    child = undefined;
+  });
+
+  /** A host stand-in: answers `status`, then calls `onCall` (a yield ends the child process). */
+  async function hostAt(
+    status: number,
+    body: unknown,
+    onCall: (url: string) => void = () => undefined,
+  ): Promise<{
+    port: number;
+    seen: { url: string; headers: IncomingHttpHeaders; body: string }[];
+  }> {
+    const seen: { url: string; headers: IncomingHttpHeaders; body: string }[] = [];
+    server = createServer((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on('data', (c: Buffer) => chunks.push(c));
+      req.on('end', () => {
+        const url = req.url ?? '';
+        seen.push({ url, headers: req.headers, body: Buffer.concat(chunks).toString('utf8') });
+        res.writeHead(status, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(body));
+        onCall(url);
+      });
+    });
+    await new Promise<void>((resolve) => server?.listen(0, '127.0.0.1', resolve));
+    return { port: (server?.address() as AddressInfo).port, seen };
+  }
+  const sleeper = (): ChildProcess => {
+    child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
+    return child;
+  };
+
+  it('the desktop record carries host "desktop"; a ui record has no host; both parse', async () => {
+    await writeAppHostRecord(home, { pid: 7, port: 8, handoffToken: TOKEN, host: 'desktop' });
+    expect(JSON.parse(await readFile(path(), 'utf8'))).toEqual({
+      v: 1,
+      pid: 7,
+      port: 8,
+      handoffToken: TOKEN,
+      host: 'desktop',
+    });
+    expect(await readAppHostRecord(home)).toEqual({
+      pid: 7,
+      port: 8,
+      handoffToken: TOKEN,
+      host: 'desktop',
+    });
+    expect(
+      parseAppHostRecord(JSON.stringify({ v: 1, pid: 3, port: 4, handoffToken: TOKEN, host: 'x' })),
+    ).toBeUndefined();
+  });
+
+  it('no record, or this process’s own: nothing to take over', async () => {
+    expect(await takeOverAppHost(home)).toBe('none');
+    await writeAppHostRecord(home, { pid: process.pid, port: 9, handoffToken: TOKEN });
+    expect(await takeOverAppHost(home)).toBe('none');
+  });
+
+  it('a stale record (its process is gone, e.g. after a crash) is removed', async () => {
+    await writeAppHostRecord(home, { pid: 2 ** 22 + 12_345, port: 9, handoffToken: TOKEN });
+    expect(await takeOverAppHost(home)).toBe('stale');
+    expect(await readAppHostRecord(home)).toBeUndefined();
+  });
+
+  it('a running `agentlink ui` host is asked to close (token, empty body) and is waited for', async () => {
+    const proc = sleeper();
+    const h = await hostAt(200, { status: 'yielding' }, () => proc.kill('SIGTERM'));
+    await writeAppHostRecord(home, { pid: proc.pid ?? 0, port: h.port, handoffToken: TOKEN });
+    expect(await takeOverAppHost(home, { waitMs: 5_000 })).toBe('yielded');
+    expect(h.seen).toHaveLength(1);
+    expect(h.seen[0]?.url).toBe(HOST_YIELD_PATH);
+    expect(h.seen[0]?.headers['x-agentlink-handoff']).toBe(TOKEN);
+    expect(h.seen[0]?.headers['origin']).toBeUndefined();
+    expect(h.seen[0]?.body).toBe('');
+    expect(pidAlive(proc.pid ?? 0)).toBe(false);
+  });
+
+  it('an older host without the takeover (404), or another desktop app: kept, both keep working', async () => {
+    const proc = sleeper();
+    const h = await hostAt(404, { error: 'not_found' });
+    await writeAppHostRecord(home, { pid: proc.pid ?? 0, port: h.port, handoffToken: TOKEN });
+    expect(await takeOverAppHost(home, { waitMs: 200 })).toBe('kept');
+    await writeAppHostRecord(home, {
+      pid: proc.pid ?? 0,
+      port: h.port,
+      handoffToken: TOKEN,
+      host: 'desktop',
+    });
+    expect(await takeOverAppHost(home, { waitMs: 200 })).toBe('kept');
+    // A desktop app is never asked to close.
+    expect(h.seen.map((s) => s.url)).toEqual([HOST_YIELD_PATH]);
+  });
+
+  it('terminal `agentlink ui` shows a running desktop app instead of starting a second host', async () => {
+    const proc = sleeper();
+    const h = await hostAt(200, { status: 'shown' });
+    await writeAppHostRecord(home, {
+      pid: proc.pid ?? 0,
+      port: h.port,
+      handoffToken: TOKEN,
+      host: 'desktop',
+    });
+    expect(await showRunningApp(home)).toBe('shown');
+    expect(h.seen.map((s) => s.url)).toEqual([HOST_SHOW_PATH]);
+    // A browser host (no `host`) or a stale desktop record: start as before.
+    await writeAppHostRecord(home, { pid: proc.pid ?? 0, port: h.port, handoffToken: TOKEN });
+    expect(await showRunningApp(home)).toBe('none');
+    await writeAppHostRecord(home, {
+      pid: 2 ** 22 + 12_345,
+      port: h.port,
+      handoffToken: TOKEN,
+      host: 'desktop',
+    });
+    expect(await showRunningApp(home)).toBe('none');
+    expect(h.seen).toHaveLength(1);
+  });
+
+  it('after a yield: the desktop host record appearing is seen; a terminal record is not', async () => {
+    const proc = sleeper();
+    await writeAppHostRecord(home, { pid: proc.pid ?? 0, port: 9, handoffToken: TOKEN });
+    expect(await desktopHostAppears(home, 150)).toBe(false);
+    setTimeout(() => {
+      void writeAppHostRecord(home, {
+        pid: proc.pid ?? 0,
+        port: 9,
+        handoffToken: TOKEN,
+        host: 'desktop',
+      });
+    }, 100);
+    expect(await desktopHostAppears(home, 3_000)).toBe(true);
   });
 });

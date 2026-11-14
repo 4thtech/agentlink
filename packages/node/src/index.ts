@@ -59,6 +59,13 @@ export {
   // U3-d: removes the keychain items of an agent the app just created and could not complete.
   discardNewOsKeychainAgent,
 } from './owner-add-agent.js';
+// WIN-BROKEN-ID: an ID folder whose key is missing (a yes/no probe; the leftover items after the
+// folder was set aside, refused while the seed is here). Nothing secret leaves the package.
+export {
+  eraseOsBrokenAgentItems,
+  osAgentIdentityMissing,
+  osAgentSeedMissing,
+} from './broken-id.js';
 // M1-9z: `owner change-code` re-wraps the owner seed under a new generated master code, at the same
 // TTY prompt; the owner identity does not change and nothing secret leaves the package.
 export {
@@ -118,6 +125,8 @@ export {
   type DesktopAlertState,
   type PendingApprovalView,
 } from './approval-server.js';
+// NOTIFY-ALL-IDS: the OS notification, for `agentlink mcp`'s alerts about another ID.
+export { osNotifier, type OsNotifier } from './approval-os.js';
 // M1-11s-b: what the caller wires into the local UI (D-118): the app's in-memory files and the
 // agent's core client. The route registry and the presence gate stay inside the package.
 export type {
@@ -262,6 +271,16 @@ export {
   type InboxFolderProblem,
   type InboxFolderRulesInput,
 } from './inbox-folder.js';
+// FILES-AI-1 (D-152; 06 §2.3 "Send by content"): the Attach writer, for the runtime's files platform
+// (core's `sendMessage` with `contentFile`). It writes only into the ID's own pinned Send folder
+// among the verified policy's folders; fixed refusal codes, nothing logged. Exported only in the form
+// whose budget `reserve` is required; the optional form stays inside for the attach route.
+export {
+  ownSendFolder,
+  writeSendFolderContentFile as writeSendFolderFile,
+  type SendFolderWrite,
+  type SendFolderWriteRefusal,
+} from './send-folder-file.js';
 // M1-36b-2-c: the Send folder for an agent that already has its card (`policy allow-send-folder`
 // †). The owner signs through the given owner operation (performOwnerOperation); the folder checks
 // and the byte-exact policy check stay inside.
@@ -275,7 +294,9 @@ export {
 // host (apps/cli/src/desktop/host-main.ts passes it to the approval server as `nativePresence`).
 export {
   desktopNativeHelper,
+  type NativeAvailability,
   type NativeHelper,
   type NativeReason,
+  type NativeUnavailableReason,
   type NativeUiState,
 } from './owner-native-helper.js';

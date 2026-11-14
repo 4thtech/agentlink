@@ -462,7 +462,10 @@ describe('the generation check on every mutating request (U3-c, 08 §1)', () => 
           r.presence !== 'ui-settings' &&
           // UX1113-R1 (D-147): restore changes no open agent; it takes no generation and works
           // with none open (local-ui/restore-server.test.ts).
-          r.presence !== 'restore',
+          r.presence !== 'restore' &&
+          // OWNER-START-OVER (D-153): start over closes the open ID itself; no generation
+          // (local-ui/start-over-server.test.ts).
+          r.presence !== 'start-over',
       );
     expect(mutating.length).toBeGreaterThan(10);
     for (const route of mutating) {

@@ -11,7 +11,17 @@ export interface NativeStatus {
   readonly registered: boolean;
   /** Why it cannot be used now: turn it on again (`reregister`, `damaged`), or another owner's. */
   readonly reason?: 'reregister' | 'damaged' | 'other_owner';
+  /**
+   * WIN-HELLO-NATIVE: why it is not available on this computer (only when `available` is false):
+   * not set up, no secure hardware, or unknown. The page offers the master code with plain set-up
+   * text (offer.ts), never the WebAuthn security-key path.
+   */
+  readonly unavailable?: NativeUnavailable;
 }
+
+export type NativeUnavailable = 'not_set_up' | 'no_secure_hardware' | 'unknown';
+const isUnavailable = (value: unknown): value is NativeUnavailable =>
+  value === 'not_set_up' || value === 'no_secure_hardware' || value === 'unknown';
 
 /** Every outcome has one fixed message (strings.ts nativeOutcomeText); none is silent. */
 export type NativeRegistration = NativeOutcomeKind;
@@ -51,9 +61,15 @@ export async function readNativeStatus(
     if (typeof n !== 'object' || n === null) return NONE;
     if (typeof n['available'] !== 'boolean' || typeof n['registered'] !== 'boolean') return NONE;
     const reason = n['reason'];
-    return reason === 'reregister' || reason === 'damaged' || reason === 'other_owner'
-      ? { available: n['available'], registered: n['registered'], reason }
-      : { available: n['available'], registered: n['registered'] };
+    const unavailable = n['unavailable'];
+    return {
+      available: n['available'],
+      registered: n['registered'],
+      ...(reason === 'reregister' || reason === 'damaged' || reason === 'other_owner'
+        ? { reason }
+        : {}),
+      ...(n['available'] === false && isUnavailable(unavailable) ? { unavailable } : {}),
+    };
   } catch {
     return NONE;
   }

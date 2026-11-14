@@ -244,4 +244,118 @@ describe('writeSendFolderFile', () => {
     expect(out).toEqual({ ok: false, reason: 'type' });
     expect(await readdir(send)).toEqual([]);
   });
+
+  // FILES-AI-1 (D-152; 06 §2.3 "Send by content"): the same writer, reached by agentlink_send with
+  // `file` through core's files platform. The budget reservation runs once the folder is held and
+  // before anything is created; the attempt limit is its own reason; the result names the Send
+  // folder only in its fixed `~` form.
+  describe('FILES-AI-1: the content-file seam', () => {
+    const reserving = (answer: 'ok' | 'over' | 'unavailable', log: string[]) => () => {
+      log.push('reserve');
+      return Promise.resolve(answer);
+    };
+
+    it('reserves once, after the folder is held and before the create; names the Send folder as ~', async () => {
+      const log: string[] = [];
+      const out = await writeSendFolderFile({
+        allowedFolders: ['~/AgentLink/Send'],
+        name: 'notes.md',
+        bytes: utf8('x'),
+        home,
+        reserve: reserving('ok', log),
+      });
+      expect(log).toEqual(['reserve']);
+      expect(out.ok && out.sendFolder).toBe('~/AgentLink/Send');
+      const send2 = path.join(home, 'AgentLink', 'Send-2');
+      await mkdir(send2, { mode: 0o700 });
+      const two = await writeSendFolderFile({
+        allowedFolders: ['~/AgentLink/Send-2'],
+        name: 'a.md',
+        bytes: utf8('x'),
+        home,
+        reserve: reserving('ok', log),
+      });
+      expect(two.ok && two.sendFolder).toBe('~/AgentLink/Send-2');
+    });
+
+    it('over the budget: nothing created; unreadable ledger: budget_unavailable', async () => {
+      const log: string[] = [];
+      expect(
+        await writeSendFolderFile({
+          allowedFolders: ['~/AgentLink/Send'],
+          name: 'notes.md',
+          bytes: utf8('x'),
+          home,
+          reserve: reserving('over', log),
+        }),
+      ).toEqual({ ok: false, reason: 'budget' });
+      expect(
+        await writeSendFolderFile({
+          allowedFolders: ['~/AgentLink/Send'],
+          name: 'notes.md',
+          bytes: utf8('x'),
+          home,
+          reserve: reserving('unavailable', log),
+        }),
+      ).toEqual({ ok: false, reason: 'budget_unavailable' });
+      expect(await readdir(send)).toEqual([]);
+    });
+
+    it('reserves nothing when the Send folder is missing, a link or not allowed', async () => {
+      const log: string[] = [];
+      const go = (folders: string[]) =>
+        writeSendFolderFile({
+          allowedFolders: folders,
+          name: 'a.md',
+          bytes: utf8('x'),
+          home,
+          reserve: reserving('ok', log),
+        });
+      expect(await go(['~/Elsewhere'])).toEqual({ ok: false, reason: 'no_folder' });
+      await rm(send, { recursive: true });
+      expect(await go(['~/AgentLink/Send', '~/Elsewhere'])).toEqual({
+        ok: false,
+        reason: 'no_folder',
+      });
+      await symlink(outside, send);
+      expect(await go(['~/AgentLink/Send', '~/Elsewhere'])).toEqual({
+        ok: false,
+        reason: 'no_folder',
+      });
+      expect(log).toEqual([]);
+      expect(await readdir(outside)).toEqual([]);
+    });
+
+    it('the package entry form requires reserve: without one it writes nothing', async () => {
+      const { writeSendFolderFile: entryWrite } = await import('./index.js');
+      const out = await entryWrite({
+        allowedFolders: ['~/AgentLink/Send'],
+        name: 'a.md',
+        bytes: utf8('x'),
+        home,
+      } as unknown as Parameters<typeof entryWrite>[0]);
+      expect(out).toEqual({ ok: false, reason: 'budget_unavailable' });
+      expect(await readdir(send)).toEqual([]);
+      const log: string[] = [];
+      const ok = await entryWrite({
+        allowedFolders: ['~/AgentLink/Send'],
+        name: 'a.md',
+        bytes: utf8('x'),
+        home,
+        reserve: reserving('ok', log),
+      });
+      expect(ok.ok).toBe(true);
+      expect(log).toEqual(['reserve']);
+    });
+
+    it('the attempt limit is name_taken, nothing overwritten', async () => {
+      await writeFile(path.join(send, 'n.md'), 'one');
+      for (let i = 2; i <= 100; i += 1)
+        await writeFile(path.join(send, `n (${String(i)}).md`), 'x');
+      const out = await write('n.md', utf8('new'));
+      expect(out).toEqual({ ok: false, reason: 'name_taken' });
+      expect(await readFile(path.join(send, 'n.md'), 'utf8')).toBe('one');
+      expect((await readdir(send)).length).toBe(100);
+    });
+  });
 });

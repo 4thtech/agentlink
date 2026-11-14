@@ -32,7 +32,21 @@ export async function addAgent(page: Page, label: string): Promise<void> {
       .getByRole('button', { name: /^Continue with / })
       .first()
       .click();
+    // ATT-SENDFOLDER-FIX: a Send folder that already holds files is named first; the same button
+    // then gives the one Touch ID. (Where the notice is already up, the first press is the gesture.)
+    const holds = page.getByText(/already holds files/);
+    const noticeUp = await holds.isVisible();
     await page.getByRole('button', { name: CONNECT_WITH }).click();
+    if (!noticeUp) {
+      const outcome = await Promise.race([
+        holds.waitFor({ timeout: 15_000 }).then(() => 'notice' as const),
+        page
+          .getByRole('heading', { name: labelled('', label, ' is ready') })
+          .waitFor({ timeout: 15_000 })
+          .then(() => 'ready' as const),
+      ]).catch(() => 'later' as const);
+      if (outcome === 'notice') await page.getByRole('button', { name: CONNECT_WITH }).click();
+    }
     // The app answers "{label} is ready" or shows an alert. Wait for either: a refusal fails at
     // once with the app's own words, and a slow host gets the time the signing needs.
     const ready = page.getByRole('heading', { name: labelled('', label, ' is ready') });

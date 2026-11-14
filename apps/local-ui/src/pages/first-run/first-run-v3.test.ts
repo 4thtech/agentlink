@@ -145,6 +145,10 @@ function fakeSetup(
           : { ...done, app: picked, connected: o.connected ?? true },
       );
     },
+    finishCode: (nonce: string): Promise<FinishResult> => {
+      calls.finished.push({ nonce, body: new Uint8Array(0) });
+      return Promise.resolve(o.finish ?? FINISHED);
+    },
   });
 }
 
@@ -447,7 +451,7 @@ describe('W4-WIZARD (was U3-g name and protect): step 2', () => {
     });
     await type('Mine');
     await click(GO);
-    expect(text()).toContain('Not protected yet. Try again.');
+    expect(text()).toContain('Not protected yet. Try again, or use your master code instead.');
     expect(field().value).toBe('Mine');
     expect(setup.finished).toHaveLength(0);
     expect(buttonNames()).toContain('Try again');

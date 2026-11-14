@@ -51,6 +51,7 @@ import type {
 import { usePresenceMode, type PresenceMode } from '../contacts/presence-button.js';
 import { APPROVAL_ID } from './client.js';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
+import { ForgotCodeLink } from '../start-over/forgot-link.js';
 import { normaliseBackupCode, UseCodeInstead } from '../first-run/backup-code.js';
 import { APPROVAL_STRINGS as S, fmt } from './strings.js';
 import { isPlumbing, TermsDetails, TermsSummary } from './terms-view.js';
@@ -360,6 +361,8 @@ export function CodeForm({
       <p id={`${hintId}-earlier`} className="al-field-hint">
         {EARLIER_OWNER_CODE_HINT}
       </p>
+      {/* OWNER-START-OVER (D-153): the way out when the master code is lost. */}
+      <ForgotCodeLink />
       <Button
         type="submit"
         {...(primary ? { variant: 'primary' as const } : {})}

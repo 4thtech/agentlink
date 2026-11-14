@@ -808,6 +808,13 @@ export interface LocalUiContext {
   readonly revealInbox?: () => Promise<
     'shown' | 'not_found' | 'refused' | 'unavailable' | 'not_opened'
   >;
+  /**
+   * FILES-REVEAL (08 §1): Show in Finder for the open ID's own pinned Send folder (no input; the
+   * folder comes from the verified policy, never from the page).
+   */
+  readonly revealSendFolder?: () => Promise<
+    'shown' | 'not_found' | 'refused' | 'unavailable' | 'not_opened'
+  >;
   /** DESK051-UPD: Settings > Updates (api/app-update.ts); the desktop app's host only. */
   readonly appUpdate?: LocalUiAppUpdateDesk;
   /**
@@ -850,6 +857,8 @@ export interface LocalUiAgentView {
   readonly available: boolean;
   /** "Removal not finished" (07 §9.1 `removing`, or in the owner's revoked list). */
   readonly removing: boolean;
+  /** WIN-BROKEN-ID: the ID's key is missing from this computer (it can't be opened here). */
+  readonly broken?: boolean;
   /** Active contacts; null when the store cannot be read just now. */
   readonly contacts: number | null;
   /** W4-LIVE-STATUS (D-143): an MCP session row of this agent is live (never the lease, 06 §6). */

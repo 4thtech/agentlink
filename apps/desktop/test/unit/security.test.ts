@@ -57,9 +57,12 @@ describe('WebAuthn in the window (spike WP-D1a)', () => {
     expect(userAgentMarker('darwin')).toBe('AgentLinkDesktop/1 (passkey=browser)');
   });
 
-  it('Windows: Windows Hello stays available in the window', () => {
+  // APP-CONTINUITY: WebAuthn is off in the window on every platform; Windows Hello is the app's
+  // own native helper (never a WebAuthn call that can end on "Insert your security key").
+  it('Windows and Linux: WebAuthn is off in the window too', () => {
     expect(passkeyPolicy('win32')).toBe('window');
-    expect(webPreferences('win32').disableBlinkFeatures).toBeUndefined();
+    expect(webPreferences('win32').disableBlinkFeatures).toBe(WEBAUTHN_BLINK_FEATURE);
+    expect(webPreferences('linux').disableBlinkFeatures).toBe(WEBAUTHN_BLINK_FEATURE);
     expect(userAgentMarker('win32')).toBe('AgentLinkDesktop/1 (passkey=window)');
   });
 });

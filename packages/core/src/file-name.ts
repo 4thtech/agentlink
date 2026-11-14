@@ -97,6 +97,18 @@ export function sanitizeFileName(raw: unknown): string {
   return name === '' ? FALLBACK_FILE_NAME : name;
 }
 
+/**
+ * FILES-AI-1 (D-152; 06 §2.3 "Name"): true when `raw` holds a folder separator (`/` or `\`), also
+ * one hidden behind invisible characters, with the same normalisation as sanitizeFileName. Such a
+ * name is refused, never shortened to its last segment.
+ */
+export function hasFolderPart(raw: string): boolean {
+  const name = [...raw.normalize('NFC').replace(INVISIBLE, '')]
+    .filter((ch) => !isVariationSelector(ch.codePointAt(0) as number))
+    .join('');
+  return name.includes('/') || name.includes('\\');
+}
+
 /** D-142 (04 §4.1): appended to names the OS shell acts on when it shows or opens the folder. */
 export const DOWNLOAD_SUFFIX = '.download';
 

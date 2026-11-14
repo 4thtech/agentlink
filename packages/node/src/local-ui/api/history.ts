@@ -9,7 +9,8 @@
 //   the bound plan is scheduled for when the Undo window ends. A list that changed is refused
 //   (409 `not_applied`); nothing else can be named here.
 // - `POST /api/ui/history/delete/undo` and `…/status` (history kind): `{nonce}`.
-// - `POST /api/ui/storage/inbox/reveal` (inbox-reveal kind, no input): the Inbox folder in Finder.
+// - `POST /api/ui/storage/inbox/reveal` and (FILES-REVEAL) `POST /api/ui/files/send-folder/reveal`
+//   (inbox-reveal kind, no input): the Inbox folder, or the ID's own pinned Send folder, in Finder.
 //
 // Not MCP tools (I-4). Answers are fixed words and numbers; nothing here logs.
 import type { JsonObject } from '@4thtech-io/crypto';
@@ -20,6 +21,7 @@ import {
   HISTORY_STATUS_PATH,
   HISTORY_UNDO_PATH,
   INBOX_REVEAL_PATH,
+  SEND_FOLDER_REVEAL_PATH,
 } from '../history-paths.js';
 import type { LocalUiResult, LocalUiRoute } from '../route-types.js';
 
@@ -43,6 +45,19 @@ function beginResult(begun: HistoryBeginAnswer): LocalUiResult {
     truncated: begun.truncated,
     undoSeconds: begun.undoSeconds,
   });
+}
+
+/** The Show in Finder answers (Inbox and Send folder): fixed words, never a path (I-5, I-7). */
+async function revealAnswer(
+  reveal:
+    (() => Promise<'shown' | 'not_found' | 'refused' | 'unavailable' | 'not_opened'>) | undefined,
+): Promise<LocalUiResult> {
+  if (reveal === undefined) return UNAVAILABLE;
+  const shown = await reveal().catch(() => 'unavailable' as const);
+  if (shown === 'shown') return answer(200, { status: 'shown' });
+  if (shown === 'not_found') return answer(404, { error: 'not_found' });
+  if (shown === 'refused') return answer(409, { error: 'refused' });
+  return answer(503, { error: shown });
 }
 
 const nonceOf = (body: JsonObject): unknown =>
@@ -137,13 +152,13 @@ export const historyRoutes: readonly LocalUiRoute[] = Object.freeze<LocalUiRoute
     method: 'POST',
     path: INBOX_REVEAL_PATH,
     presence: 'inbox-reveal',
-    handler: async (context) => {
-      if (context.revealInbox === undefined) return UNAVAILABLE;
-      const shown = await context.revealInbox().catch(() => 'unavailable' as const);
-      if (shown === 'shown') return answer(200, { status: 'shown' });
-      if (shown === 'not_found') return answer(404, { error: 'not_found' });
-      if (shown === 'refused') return answer(409, { error: 'refused' });
-      return answer(503, { error: shown });
-    },
+    handler: (context) => revealAnswer(context.revealInbox),
+  },
+  {
+    // FILES-REVEAL: the ID's own pinned Send folder; fixed answers, never a path.
+    method: 'POST',
+    path: SEND_FOLDER_REVEAL_PATH,
+    presence: 'inbox-reveal',
+    handler: (context) => revealAnswer(context.revealSendFolder),
   },
 ]);

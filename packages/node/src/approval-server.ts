@@ -287,6 +287,7 @@ import {
   checkSetupRegistration,
   completeOwnerSetup,
   computerNameOf,
+  defaultOwnerFiles,
   noOwnerAndNoAgent,
   noOwnerAnywhere,
   parseSetupRegistration,
@@ -296,6 +297,7 @@ import {
   type SetupRegistration,
 } from './owner-setup.js';
 import { createRestoreEngine, type RestoreEngine } from './recovery-kit-restore.js';
+import { createStartOverEngine, type StartOverEngine } from './start-over.js';
 import { removeStaleRestoreFiles } from './restore-quarantine.js';
 import { MasterCodeHold } from './local-ui/master-code-hold.js';
 import {
@@ -344,6 +346,7 @@ import {
   type PasskeyAssertion,
 } from './owner-passkey.js';
 import { attachDesk } from './local-ui/attach-desk.js';
+import { revealOwnSendFolder } from './send-folder-reveal.js';
 import { ATTACH_MAX_BODY_BYTES } from './local-ui/api/attach.js';
 import {
   creditsPort,
@@ -365,7 +368,7 @@ import {
 } from './local-ui/context.js';
 import { JoinDesk, type JoinCheck } from './local-ui/join-desk.js';
 import { pairingFollower, type PairingFollower } from './local-ui/pairing-follow.js';
-import { JOIN_PAGE_PATH } from './local-ui/invite-paths.js';
+import { HOST_SHOW_PATH, HOST_YIELD_PATH, JOIN_PAGE_PATH } from './local-ui/invite-paths.js';
 import type {
   LocalUiInviteRoute,
   LocalUiAttachRoute,
@@ -374,6 +377,7 @@ import type {
   LocalUiSwitchRoute,
   LocalUiPauseRoute,
   LocalUiRestoreRoute,
+  LocalUiStartOverRoute,
   LocalUiCreateAgentStep,
   LocalUiOwnerOperation,
   LocalUiPayConfirmStep,
@@ -541,6 +545,8 @@ export function presenceBackoffSeconds(failures: number): number {
 }
 
 const APPROVAL_ID = /^apr_[A-Za-z0-9_-]{22}$/;
+/** NOTIFY-DEEPLINK: a person's opaque local contact ID. */
+const PERSON_ID = /^0x[0-9a-f]{40}$/;
 const DIGEST = /^[0-9a-f]{64}$/;
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const APPROVE_PAGE = /^\/approve\/(apr_[A-Za-z0-9_-]{22})$/;
@@ -783,6 +789,11 @@ type AiAppsListing = Awaited<ReturnType<LocalUiAiApps['list']>>;
 /** Structured events, fixed values only: never a token, URL, secret, ID or request text (I-7). */
 export type ApprovalServerEvent =
   | { readonly kind: 'listening' }
+  /**
+   * WIN-BROKEN-ID: a new ID that could not be completed was not removed (its folder and keys stay
+   * together, so it is listed and opens; never a folder without its keys). Fixed value only (I-7).
+   */
+  | { readonly kind: 'discard_failed' }
   /** The machine has no IPv6 loopback: the server listens on 127.0.0.1 only (M1-31). */
   | { readonly kind: 'ipv6_unavailable' }
   /** W4-LIVE-STATUS: an event stream opened or was refused (`busy`); the open count only (I-7). */
@@ -1003,6 +1014,11 @@ export interface ApprovalServerOptions {
    */
   readonly appUpdate?: LocalUiAppUpdateDesk;
   /**
+   * WIN-ACL-NOTICE: the desktop app (Windows) could not check who can open the data folder. The
+   * health read then carries `dataAccess: 'unchecked'` and the app shows a notice. A flag only.
+   */
+  readonly dataFolderUnchecked?: boolean;
+  /**
    * DESK-NATIVE-DEBUG: receives ONE fixed diagnostic line per native presence operation outcome
    * (nativeDiagnostic: fixed words, step names and error codes only; never a secret, a path, a
    * handle, a record or a system message). The desktop host writes it to stderr, which the shell's
@@ -1146,6 +1162,12 @@ export interface ApprovalServer {
    * desktop app's "Update ready" notification opens. A fixed path.
    */
   openUpdates(): Promise<boolean>;
+  /**
+   * NOTIFY-DEEPLINK: Home with one person's conversation open (the link carries only that person's
+   * opaque local ID, after `#`, so it never reaches the server). A malformed ID rejects. Home checks
+   * the ID against its own people before it opens anything.
+   */
+  openPerson(contactId: string): Promise<boolean>;
   /**
    * N7 (desktop app): the open ID's notification items (brought up to date first; kind, ref, count
    * and times only) and the Settings › Notifications switches in force. Undefined while no ID with a
@@ -1743,6 +1765,8 @@ export async function startApprovalServerWith(
   let lastHandoffAt = Number.NEGATIVE_INFINITY;
   /** R1-SEC-15: when the last handoff with a wrong token was refused (ms); throttled on its own. */
   let lastHandoffRefusedAt = Number.NEGATIVE_INFINITY;
+  /** APP-CONTINUITY: when the last takeover or show request with the token arrived (ms). */
+  let lastHostCallAt = Number.NEGATIVE_INFINITY;
   let lastJoinOpenAt = Number.NEGATIVE_INFINITY;
   // U3-d (D-138; 08 §1; 04 §2.8 "From the local app"): create an agent and save a verified label.
   // Nothing here signs. W4-ONE-TOUCH: creating an agent is the create-agent gate's (createAgentGate).
@@ -1806,7 +1830,7 @@ export async function startApprovalServerWith(
         approvals?: number;
         inbound?: readonly NotificationInbound[];
         scannedUntil?: number;
-        update?: boolean;
+        update?: boolean | 0 | 1 | 2;
         networkDown?: boolean;
       } = {};
       try {
@@ -1835,7 +1859,11 @@ export async function startApprovalServerWith(
         }
       }
       const update = options.appUpdate?.view();
-      if (update !== undefined) out.update = update.state === 'available';
+      // NOTIFY-UPDATE-READY: 1 while one is available, 2 once it is downloaded and verified, ready to
+      // install (a bigger count is news again for the store and the desktop alert).
+      if (update !== undefined) {
+        out.update = update.state === 'ready' ? 2 : update.state === 'available' ? 1 : 0;
+      }
       try {
         const health = await uiContext.health?.();
         const relays = health?.relays;
@@ -2000,6 +2028,19 @@ export async function startApprovalServerWith(
       return 'not_opened';
     }
   };
+  // FILES-REVEAL (08 §1): Show in Finder for the open ID's own pinned Send folder; the folder is
+  // the verified policy's, checked again by send-folder-reveal.ts, never a page path.
+  const revealSendFolder = (): Promise<
+    'shown' | 'not_found' | 'refused' | 'unavailable' | 'not_opened'
+  > => {
+    const client = agentUi?.client;
+    if (client === undefined) return Promise.resolve('unavailable');
+    return revealOwnSendFolder({
+      loadPolicy: () => readOnlyClient(client).policy.load() as never,
+      revealer: fileRevealer,
+      ...(filesHome === undefined ? {} : { home: filesHome }),
+    });
+  };
   /**
    * WP-R2b (04 §2.3.3 "Kit record"): what `GET /api/ui/backup` and Show in Finder read. Reads only;
    * it signs nothing, opens no other ID's core and reads no keychain item. Built where an ID can
@@ -2113,6 +2154,7 @@ export async function startApprovalServerWith(
         ...(options.localUi?.dataFolder === undefined
           ? {}
           : { dataFolder: options.localUi.dataFolder }),
+        ...(options.dataFolderUnchecked === true ? { dataFolderUnchecked: true } : {}),
         startedAt: serverStartedAt,
         now: () => now(),
       }),
@@ -2121,7 +2163,7 @@ export async function startApprovalServerWith(
       ...(peopleAllDesk === undefined ? {} : { peopleAll: peopleAllDesk }),
       ...(storageDesk === undefined ? {} : { storage: storageDesk }),
       // RET-4: Show in Finder for the Inbox folder (the history desk is bound per request).
-      ...(agentUi?.client === undefined ? {} : { revealInbox }),
+      ...(agentUi?.client === undefined ? {} : { revealInbox, revealSendFolder }),
       // DESK051-UPD: the desktop host's update state (no agent needed).
       ...(options.appUpdate === undefined ? {} : { appUpdate: options.appUpdate }),
       // W4-SHELL-V2: the app's UI settings, in the app host only (one desk for every context).
@@ -2257,6 +2299,37 @@ export async function startApprovalServerWith(
         succeeded: () => {
           presenceSucceeded();
         },
+      },
+    }));
+  // OWNER-START-OVER (D-153; 04 §2.5.4): the start-over engine of the start-over gate (its only
+  // caller). The app host closes the open ID before the move and opens first run after it.
+  let startOverInstance: StartOverEngine | undefined;
+  /** OWNER-START-OVER: first run with no ID, once a start over emptied this host. */
+  let startedOver: AppHostFirstRun | undefined;
+  const startOverEngine = (): StartOverEngine =>
+    (startOverInstance ??= createStartOverEngine({
+      home: internals.restore?.home ?? homedir(),
+      keychain: keychainOf,
+      origin,
+      now,
+      native: options.nativePresence,
+      ...(internals.restore?.keychainTimeoutMs === undefined
+        ? {}
+        : { keychainTimeoutMs: internals.restore.keychainTimeoutMs }),
+      closeOpen: async () => {
+        const name = host?.current;
+        if (host !== undefined && name !== undefined) await host.closeForRemoval(name);
+      },
+      reopen: async () => {
+        if (host === undefined) return;
+        await host.openAfterRemoval(true);
+        if (host.current === undefined) {
+          const startHome = internals.restore?.home ?? homedir();
+          startedOver = Object.freeze<AppHostFirstRun>({
+            home: startHome,
+            ownerFiles: defaultOwnerFiles(startHome),
+          });
+        }
       },
     }));
   // REL051-SF3 (T-7): stale uploads and quarantined stores of a crashed run go at start-up, not on
@@ -2945,13 +3018,17 @@ export async function startApprovalServerWith(
     const ownerNostr =
       context?.owner.ownerNostr ?? (await noCardOwnerNostr().catch(() => undefined));
     const status = await nativePresenceStatus(keychainOf(), nativeHelper, ownerNostr).catch(
-      (): NativePresenceStatus => ({ available: false, registered: false }),
+      (): NativePresenceStatus => ({ available: false, registered: false, unavailable: 'unknown' }),
     );
     sendJson(res, 200, {
       native: {
         available: status.available,
         registered: status.registered,
         ...(status.reason === undefined ? {} : { reason: status.reason }),
+        // WIN-HELLO-NATIVE: why not (a fixed token); the page offers the master code with it.
+        ...(status.available || status.unavailable === undefined
+          ? {}
+          : { unavailable: status.unavailable }),
         platform: nativeHelper.kind === 1 ? 'mac' : 'windows',
       },
     });
@@ -3492,6 +3569,14 @@ export async function startApprovalServerWith(
        */
       readonly history?: true;
       /**
+       * WIN-BROKEN-ID: "Remove this ID from this computer" for an ID whose key is missing. Presence
+       * is verified as for every owner route and nothing is signed (as `history`): the handler marks
+       * its one owner operation with `presenceChecked`. The owner is the open ID's owner; with no ID
+       * open, the owner stored on this computer (as HOTFIX-NOID's New ID: the master code opens the
+       * owner item, a stored Touch ID or passkey header must name the same owner key).
+       */
+      readonly setAside?: true;
+      /**
        * WP-R2b: the page session (its cookie value), for the recovery-kit export only: the restore
        * engine binds the export handle for Check to it (registerExportedKit).
        */
@@ -3598,13 +3683,30 @@ export async function startApprovalServerWith(
           return;
         }
         const byNostr = gate.ownerNostr;
+        // WIN-BROKEN-ID: with no ID open no card names the owner; the stored owner is the one.
+        const storedOwner = gate.setAside === true && byNostr === undefined && noAgentOpen();
         const context =
-          byNostr === undefined ? await (gate.context ?? (() => source.context()))() : undefined;
-        const expectedNostr = byNostr ?? context?.owner.ownerNostr;
-        if (expectedNostr === undefined) {
+          byNostr === undefined && !storedOwner
+            ? await (gate.context ?? (() => source.context()))()
+            : undefined;
+        const storedNostr = storedOwner
+          ? await (
+              native
+                ? readOwnerNativeHeader(keychainOf()).then((h) => h?.ownerNostr)
+                : passkey
+                  ? readOwnerPasskeyHeader(keychainOf()).then((h) => h?.ownerNostr)
+                  : Promise.resolve(undefined)
+            ).catch(() => undefined)
+          : undefined;
+        const expectedOrNone = byNostr ?? context?.owner.ownerNostr ?? storedNostr;
+        // Only the master code opens the stored owner without a header naming it.
+        const byCodeOnly = storedOwner && !native && !passkey;
+        if (expectedOrNone === undefined && !byCodeOnly) {
           finishOwner(res, 503, 'needs_setup');
           return;
         }
+        // The master code path below never reads it (byCodeOnly); every other path has it.
+        const expectedNostr = expectedOrNone ?? new Uint8Array(32);
         let presence: OwnerPresence;
         if (native) {
           // DESK-D12c: one helper gesture for this one owner operation, after every check. D15-04:
@@ -3652,12 +3754,31 @@ export async function startApprovalServerWith(
           // HOTFIX-045-REMOVE (GAP B): no card; the stored owner must be the one `byNostr` names.
           try {
             // unlockForOwnerNostr wipes the presented bytes, whether or not they unlock.
-            const unlocked = await KeychainOwnerKeyStore.unlockForOwnerNostr(
-              keychainOf(),
-              expectedNostr,
-              presence,
-              { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
-            );
+            // WIN-BROKEN-ID: with no ID open, the master code opens the stored owner item, which a
+            // stored Touch ID or passkey header must not contradict (as HOTFIX-NOID's New ID).
+            const unlocked = byCodeOnly
+              ? await KeychainOwnerKeyStore.unlockWithoutCard(
+                  keychainOf(),
+                  presence,
+                  (found) => sameStoredOwner(found),
+                  { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
+                )
+              : await KeychainOwnerKeyStore.unlockForOwnerNostr(
+                  keychainOf(),
+                  expectedNostr,
+                  presence,
+                  { ttlMs: OWNER_SESSION_DEFAULT_TTL_MS },
+                );
+            if (unlocked === null) {
+              finishOwner(res, 409, 'refused');
+              return;
+            }
+            if (storedOwner && !byCodeOnly && !(await sameStoredOwner(unlocked.owner))) {
+              await unlocked.session.close().catch(() => undefined);
+              await unlocked.store.close().catch(() => undefined);
+              finishOwner(res, 409, 'refused');
+              return;
+            }
             ({ store, session, owner: ownerKeys } = unlocked);
           } catch (error) {
             if (error instanceof KeyStoreError && error.code === 'presence_rejected' && native) {
@@ -3752,7 +3873,7 @@ export async function startApprovalServerWith(
                 : {}),
               // RET-4: the Delete history finish: one owner operation with verified presence and
               // nothing signed (the handler schedules the plan bound at begin).
-              ...(gate.history === true
+              ...(gate.history === true || gate.setAside === true
                 ? {
                     presenceChecked: () => {
                       if (!stillCurrent(req)) throw new AgentChanged();
@@ -3778,8 +3899,9 @@ export async function startApprovalServerWith(
                 }
                 // WP-11: the export gate signs only through exportRecoveryKit.
                 if (gate.recoveryKit === true) throw ownerOperationRefused();
-                // RET-4: the history finish signs nothing (presenceChecked only).
-                if (gate.history === true) throw ownerOperationRefused();
+                // RET-4: the history finish signs nothing (presenceChecked only); nor does the
+                // WIN-BROKEN-ID set-aside.
+                if (gate.history === true || gate.setAside === true) throw ownerOperationRefused();
                 used = true;
                 const frozen = checkGesture(review, requests);
                 // WP-11 (04 §2.3.3): a `backup.export` is signed only by the export gesture, right
@@ -4838,13 +4960,13 @@ export async function startApprovalServerWith(
       return undefined;
     }
     if (name !== FIRST_AGENT_NAME) {
-      await directory.discardNew?.(name).catch(() => undefined);
+      await directory.discardNew?.(name).catch(discardFailed);
       return undefined;
     }
     const opened = await slot.openNew(name);
     if (opened === undefined || opened.name !== name || opened.firstCard === undefined) {
       await opened?.close().catch(() => undefined);
-      await directory.discardNew?.(name).catch(() => undefined);
+      await directory.discardNew?.(name).catch(discardFailed);
       return undefined;
     }
     return opened;
@@ -5041,7 +5163,12 @@ export async function startApprovalServerWith(
     req: IncomingMessage,
     step: LocalUiSetupStep,
   ):
-    | { readonly label?: string; readonly app?: string; readonly nonce?: string }
+    | {
+        readonly label?: string;
+        readonly app?: string;
+        readonly nonce?: string;
+        readonly codeOnly?: true;
+      }
     | 'invalid'
     | 'label_invalid' {
     const input = operationInput(req);
@@ -5058,9 +5185,14 @@ export async function startApprovalServerWith(
     const value = input as Record<string, unknown>;
     if (step === 'finish') {
       // 04 §2.8: finish takes only the begin nonce (and the creation response as the body).
-      if (keys.length !== 1 || keys[0] !== 'nonce') return 'invalid';
+      // FIRSTRUN-ANY-PLATFORM (04 §2.2): or the nonce and `presence: 'code'` (master code only,
+      // empty body, no WebAuthn).
+      const codeOnly =
+        keys.length === 2 && keys.includes('presence') && value['presence'] === 'code';
+      if (!keys.includes('nonce') || (keys.length !== 1 && !codeOnly)) return 'invalid';
       const nonce = value['nonce'];
-      return typeof nonce === 'string' && PLAN_NONCE.test(nonce) ? { nonce } : 'invalid';
+      if (typeof nonce !== 'string' || !PLAN_NONCE.test(nonce)) return 'invalid';
+      return codeOnly ? { nonce, codeOnly: true } : { nonce };
     }
     if (!keys.includes('label') || !keys.every((k) => k === 'label' || k === 'app')) {
       return 'invalid';
@@ -5146,7 +5278,8 @@ export async function startApprovalServerWith(
         // U3-g-b: the first agent always gets a label (b11 §28 prefills it; a page without one gets it).
         const label = given.label ?? (target.kind === 'first' ? FIRST_AGENT_LABEL : undefined);
         await setupBegin(res, body, cookie, target, label, given.app);
-      } else await setupFinish(req, res, body, cookie, target, given.nonce);
+      } else
+        await setupFinish(req, res, body, cookie, target, given.nonce, given.codeOnly === true);
     } finally {
       wipe(body);
     }
@@ -5331,6 +5464,7 @@ export async function startApprovalServerWith(
     cookie: string,
     target: SetupTarget,
     nonceText: string | undefined,
+    masterCodeOnly = false,
   ): Promise<void> {
     const held = pendingSetup;
     // Bound to its session: another session neither finishes nor consumes it. U3-g-b: and to its
@@ -5354,18 +5488,45 @@ export async function startApprovalServerWith(
       finishSetup(res, 409, 'busy');
       return;
     }
+    // FIRSTRUN-ANY-PLATFORM (04 §2.2 "Creating it on the first-run page"; proposed, owner confirms
+    // at merge): the master code only, with no WebAuthn: the body is empty and no registration is
+    // parsed. The owner is stored under the generated master code only, exactly as a passkey with no
+    // PRF gives today (and as `owner init` does). A body here is refused and does not use the plan.
+    // APP-CONTINUITY (FIRSTRUN Fable L1): it is a rejected presence proof like every other refused
+    // finish: it counts towards the backoff, and the third ends the plan.
+    if (masterCodeOnly && body.length !== 0) {
+      presenceFailed();
+      held.tries += 1;
+      if (held.tries >= CREATE_CONNECT_TRIES) {
+        dropSetup(held);
+        await folderRemoval;
+        finishSetup(res, 403, 'tries_exhausted');
+        return;
+      }
+      finishSetup(res, 400, 'invalid');
+      return;
+    }
     // W4-ONE-TOUCH (04 §2.8 Finish, Decision 45): a rejected presence proof signs nothing and does
     // not consume the plan; it counts towards the backoff, and the third ends the plan.
     let registration: SetupRegistration | undefined;
-    try {
-      registration = parseSetupRegistration(body);
-    } catch {
-      registration = undefined;
+    if (masterCodeOnly) {
+      registration = {
+        credentialId: new Uint8Array(0),
+        authenticatorData: new Uint8Array(0),
+        clientDataJSON: new Uint8Array(0),
+        prfOutput: new Uint8Array(0),
+      };
+    } else {
+      try {
+        registration = parseSetupRegistration(body);
+      } catch {
+        registration = undefined;
+      }
     }
-    let accepted = false;
+    let accepted = masterCodeOnly;
     // M1-11s-c-c: a get() assertion whose signature this build cannot verify gives no passkey.
-    let codeOnly = false;
-    if (registration !== undefined) {
+    let codeOnly = masterCodeOnly;
+    if (registration !== undefined && !masterCodeOnly) {
       try {
         codeOnly =
           checkSetupRegistration(registration, { challenge: held.challenge, origin }) ===
@@ -5413,7 +5574,7 @@ export async function startApprovalServerWith(
       created = undefined;
       if (agent !== undefined) {
         await agent.close().catch(() => undefined);
-        if (!ownerIsOurs) await host?.directory.discardNew?.(agent.name).catch(() => undefined);
+        if (!ownerIsOurs) await host?.directory.discardNew?.(agent.name).catch(discardFailed);
       }
       if (keepFolders || released) return;
       released = true;
@@ -5522,7 +5683,7 @@ export async function startApprovalServerWith(
             keys: held.keys,
             credentialId: proof.credentialId,
             prfOutput,
-            authenticatorData: proof.authenticatorData,
+            ...(masterCodeOnly ? {} : { authenticatorData: proof.authenticatorData }),
             firstCard,
             ...(held.folders?.send.status === 'ready' ? { sendFolder: held.folders.send } : {}),
           },
@@ -6181,7 +6342,7 @@ export async function startApprovalServerWith(
         // All or nothing (04 §2.8 "From the local app"): exactly what this request made goes.
         if (created !== undefined) {
           await created.close().catch(() => undefined);
-          await host?.directory.discardNew?.(created.name).catch(() => undefined);
+          await host?.directory.discardNew?.(created.name).catch(discardFailed);
         }
         finishCreate(res, refusal?.status ?? 409, refusal?.outcome ?? 'not_applied');
         return;
@@ -6256,7 +6417,7 @@ export async function startApprovalServerWith(
       return undefined;
     }
     if (name !== plan.folder) {
-      await directory.discardNew?.(name).catch(() => undefined);
+      await directory.discardNew?.(name).catch(discardFailed);
       return undefined;
     }
     const opened = await slot.openNew(name);
@@ -6267,7 +6428,7 @@ export async function startApprovalServerWith(
       opened.firstCard.agent !== plan.agentId
     ) {
       await opened?.close().catch(() => undefined);
-      await directory.discardNew?.(name).catch(() => undefined);
+      await directory.discardNew?.(name).catch(discardFailed);
       return undefined;
     }
     return opened;
@@ -6427,6 +6588,63 @@ export async function startApprovalServerWith(
    * body; the engine gets only the page session, the parsed `X-AgentLink-Input` and the body bytes.
    * A presence header only on the presence step. Nothing here reads, logs or echoes a body.
    */
+  /**
+   * OWNER-START-OVER (D-153; 04 §2.5.4): the start-over kind. After the session, CSRF, Host and
+   * fetch-metadata checks of handleUi: no query; a POST needs Origin and an octet-stream body; only
+   * the app host offers it (`open_app` otherwise: the ID is open in another process). `begin` takes
+   * the typed phrase as input and no body; `finish` takes the nonce, the presence mode
+   * (`native`, empty body; `passkey`, the creation) and nothing else. Nothing is logged or echoed.
+   */
+  async function startOverGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiStartOverRoute,
+    cookie: string,
+    originHeader: string | undefined,
+  ): Promise<void> {
+    const refuse = (status: number, error: string): void => {
+      req.resume();
+      sendJson(res, status, { error });
+    };
+    if (url.search !== '') return refuse(400, 'invalid');
+    if (host === undefined) return refuse(409, 'open_app');
+    const engine = startOverEngine();
+    if (route.step === 'state') {
+      req.resume();
+      sendResult(res, await engine.state());
+      return;
+    }
+    if (originHeader === undefined) return refuse(403, 'origin');
+    const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
+    if (type !== 'application/octet-stream') return refuse(415, 'content_type');
+    const mode = header(req, 'x-agentlink-presence');
+    if (route.step === 'begin' && mode !== undefined) return refuse(400, 'invalid');
+    if (mode !== undefined && mode !== 'native' && mode !== 'passkey' && mode !== 'typed') {
+      return refuse(400, 'invalid');
+    }
+    const input = operationInput(req);
+    if (input === 'invalid') return refuse(400, 'invalid');
+    const limit = route.step === 'finish' && mode === 'passkey' ? MAX_SETUP_REGISTRATION_BYTES : 0;
+    const body = await boundedBody(req, res, limit);
+    if (body === undefined) return;
+    try {
+      const answer =
+        route.step === 'begin'
+          ? await engine.begin(cookie, input)
+          : await engine.finish(cookie, input, mode, body);
+      if (answer.status === 429) {
+        const retry = (answer.body as { retryAfter?: unknown }).retryAfter;
+        if (typeof retry === 'number') res.setHeader('Retry-After', String(retry));
+      }
+      sendResult(res, answer);
+    } catch {
+      sendJson(res, 500, { error: 'failed' });
+    } finally {
+      wipe(body);
+    }
+  }
+
   async function restoreGate(
     req: IncomingMessage,
     res: ServerResponse,
@@ -6888,7 +7106,15 @@ export async function startApprovalServerWith(
    * one wrong token per HANDOFF_INTERVAL_MS (R1-SEC-15: counted apart, so a caller without the token
    * cannot hold the real handoff at 429); parses exactly `{"invite":"<link>"}`; and
    * hands the link to the join desk, which runs Accept step 1 and stores it in memory. Nothing is
-   * signed, written or logged; the body is wiped. The token grants nothing else.
+   * signed, written or logged; the body is wiped.
+   *
+   * APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): the same gate also runs
+   * `POST /api/ui/host/yield` (the desktop app takes over a terminal `agentlink ui` host: the host's
+   * `onYield` answers, then that host closes) and `POST /api/ui/host/show` (terminal `agentlink ui`
+   * asks a running desktop app to show its window: `onShow`). Both need the token and an empty body,
+   * share one throttle (one per HANDOFF_INTERVAL_MS) apart from the invite handoff, answer
+   * `yielding` / `shown` or 409 `kept`, and sign, open in a browser or log nothing. The token grants
+   * nothing else: a same-user process can already stop a process or open the app.
    */
   async function handoffGate(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
     const refuse = (status: number, error: string): void => {
@@ -6896,7 +7122,17 @@ export async function startApprovalServerWith(
       emit({ kind: 'rejected', reason: 'handoff' });
       sendJson(res, status, { error });
     };
-    if (joinDesk === undefined || handoffBytes === undefined) return refuse(501, 'not_available');
+    // APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): the takeover and show requests use
+    // this same gate with an empty body; they need the app host's record, not the join desk.
+    const hostCall =
+      url.pathname === HOST_YIELD_PATH
+        ? ('yield' as const)
+        : url.pathname === HOST_SHOW_PATH
+          ? ('show' as const)
+          : undefined;
+    if (handoffBytes === undefined || (hostCall === undefined && joinDesk === undefined)) {
+      return refuse(501, 'not_available');
+    }
     if (
       header(req, 'origin') !== undefined ||
       Object.keys(req.headers).some((name) => name.startsWith('sec-fetch-')) ||
@@ -6916,7 +7152,11 @@ export async function startApprovalServerWith(
     // `join` at 429. Each kind: at most one per HANDOFF_INTERVAL_MS.
     const at = now();
     const valid = matches(header(req, HANDOFF_HEADER), handoffBytes);
-    const last = valid ? lastHandoffAt : lastHandoffRefusedAt;
+    const last = !valid
+      ? lastHandoffRefusedAt
+      : hostCall === undefined
+        ? lastHandoffAt
+        : lastHostCallAt;
     if (at - last < HANDOFF_INTERVAL_MS) {
       const retryAfter = Math.max(1, Math.ceil((last + HANDOFF_INTERVAL_MS - at) / 1000));
       res.setHeader('Retry-After', String(retryAfter));
@@ -6926,6 +7166,32 @@ export async function startApprovalServerWith(
       lastHandoffRefusedAt = at;
       return refuse(401, 'refused');
     }
+    if (hostCall !== undefined) {
+      lastHostCallAt = at;
+      // An empty body only: nothing is chosen by the caller.
+      const empty = await boundedBody(req, res, 64);
+      if (empty === undefined) return;
+      const length = empty.length;
+      wipe(empty);
+      if (length !== 0) {
+        emit({ kind: 'rejected', reason: 'handoff' });
+        sendJson(res, 400, { error: 'invalid' });
+        return;
+      }
+      const record = options.host?.handoff;
+      // The host's own answer: the terminal host closes (the desktop app takes over), the desktop
+      // app shows its window. Fixed words only; nothing is signed, opened or logged here.
+      let done: boolean;
+      try {
+        done = (hostCall === 'yield' ? record?.onYield?.() : record?.onShow?.()) === true;
+      } catch {
+        done = false;
+      }
+      if (!done) return refuse(409, 'kept');
+      sendJson(res, 200, { status: hostCall === 'yield' ? 'yielding' : 'shown' });
+      return;
+    }
+    if (joinDesk === undefined) return refuse(501, 'not_available');
     lastHandoffAt = at;
     const body = await boundedBody(req, res, MAX_INVITE_CHECK_BODY_BYTES);
     if (body === undefined) return;
@@ -6997,6 +7263,12 @@ export async function startApprovalServerWith(
       // generation (it changes no open agent); Origin and the content type are checked there.
       if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return fail(403, 'csrf');
       await restoreGate(req, res, url, route, cookie as string, originHeader);
+      return;
+    }
+    if (route.presence === 'start-over') {
+      // OWNER-START-OVER (D-153): its own gate, like restore: no agent needed, no generation.
+      if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return fail(403, 'csrf');
+      await startOverGate(req, res, url, route, cookie as string, originHeader);
       return;
     }
     if (route.presence && originHeader === undefined) return fail(403, 'origin');
@@ -7083,6 +7355,7 @@ export async function startApprovalServerWith(
       | LocalUiPauseRoute
       | LocalUiUiSettingsRoute
       | LocalUiRestoreRoute
+      | LocalUiStartOverRoute
     >,
     params: Readonly<Record<string, string>>,
     cookie: string,
@@ -7569,6 +7842,11 @@ export async function startApprovalServerWith(
   }
 
   /** U3-g-b: true while the app host has no agent open (no agent yet, or a failed switch). */
+  /** WIN-BROKEN-ID: a discard that failed is logged with a fixed event, never swallowed. */
+  function discardFailed(): void {
+    emit({ kind: 'discard_failed' });
+  }
+
   function noAgentOpen(): boolean {
     return host !== undefined && host.current === undefined;
   }
@@ -7599,7 +7877,8 @@ export async function startApprovalServerWith(
    */
   function noAgentFirstRun(): AppHostFirstRun | undefined {
     const slot = host;
-    const firstRun = options.host?.firstRun;
+    // OWNER-START-OVER (D-153): a host that started with an ID gets first run after a start over.
+    const firstRun = options.host?.firstRun ?? startedOver;
     if (slot === undefined || firstRun === undefined || slot.current !== undefined)
       return undefined;
     if (slot.directory.create === undefined) return undefined;
@@ -7685,6 +7964,7 @@ export async function startApprovalServerWith(
           current: entry.name === current,
           available: entry.available,
           removing: entry.removing,
+          ...(entry.broken === 'identity_missing' ? { broken: true } : {}),
           contacts: stats?.contacts ?? null,
           // W4-LIVE-STATUS: a live MCP session row, never the lease (so the host's own pairing
           // pass, which takes the lease, never shows as an AI app).
@@ -8037,6 +8317,50 @@ export async function startApprovalServerWith(
         finishRemove('label_mismatch');
         return;
       }
+      // WIN-BROKEN-ID (proposed, owner confirms at merge): an ID whose key is missing is not
+      // retired (no `agent.revoke`: it may be restored from a backup); it is set aside. The typed
+      // label and the owner's presence are asked as for every removal; nothing is signed. No
+      // exclusive hold: an ID without its key opens nowhere, and on Windows the hold's own lock
+      // file would keep the folder from moving. The directory checks again that the key is missing.
+      if (entry.broken === 'identity_missing' && !entry.removing) {
+        const setAside = slot.directory.setAside?.bind(slot.directory);
+        if (input.typedLabel === undefined || setAside === undefined) {
+          finishRemove('invalid');
+          return;
+        }
+        await ownerGate(
+          req,
+          res,
+          async (owner) => {
+            owner.presenceChecked?.();
+            try {
+              await setAside(input.name);
+            } catch (error) {
+              // r1 M1: the seed is here (only the store key is gone): never set aside, nothing moved.
+              const code = (error as { code?: unknown } | null)?.code;
+              if (code === 'agent_not_broken') {
+                emit({ kind: 'remove', outcome: 'key_here' });
+                return { status: REMOVE_STATUS.key_here, body: { status: 'key_here' } };
+              }
+              // r2: the keychain did not answer the seed check: its own answer, nothing moved.
+              if (code === 'agent_keys_unchecked') {
+                emit({ kind: 'remove', outcome: 'keys_unchecked' });
+                return {
+                  status: REMOVE_STATUS.keys_unchecked,
+                  body: { status: 'keys_unchecked' },
+                };
+              }
+              emit({ kind: 'remove', outcome: 'failed', step: 'set_aside' });
+              return { status: REMOVE_STATUS.failed, body: { status: 'failed' } };
+            }
+            settled = 'removed';
+            emit({ kind: 'remove', outcome: 'removed' });
+            return { status: REMOVE_STATUS.removed, body: { status: 'removed' } };
+          },
+          { setAside: true },
+        );
+        return;
+      }
       const keys = await removal.keys(input.name).catch(() => undefined);
       if (keys === undefined) {
         finishRemove('unknown_agent');
@@ -8241,6 +8565,10 @@ export async function startApprovalServerWith(
     openUpdates: async () =>
       opener(`${origin}/settings/updates?t=${mintLink()}`).catch(() => false),
     openJoin: () => openJoinPage(false),
+    openPerson: async (contactId: string) => {
+      if (typeof contactId !== 'string' || !PERSON_ID.test(contactId)) throw invalidId();
+      return opener(`${origin}/?t=${mintLink()}#person=${contactId}`).catch(() => false);
+    },
     desktopAlerts: async () => {
       const desk = notificationsPart(source).notifications;
       if (desk === undefined) return undefined;
@@ -8292,6 +8620,7 @@ export async function startApprovalServerWith(
     },
     close: async () => {
       await restoreInstance?.close();
+      startOverInstance?.close();
       dropSetup();
       payHolds.clear();
       ceremonies.clear();

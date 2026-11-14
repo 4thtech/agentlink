@@ -46,6 +46,14 @@ export const NATIVE_STRINGS = Object.freeze({
   settingsOff: 'Off: approvals use your master code.',
   turnOnAgain: 'Turn on again',
   /**
+   * APP-CONTINUITY (offer.ts): why a presence screen in the app asks for the master code. Never a
+   * passkey or a security key: the app's window doesn't use them.
+   */
+  codeHelp: (platform: DesktopPlatform, available: boolean): string =>
+    available
+      ? `${nativeSensor(platform)} isn't turned on for approvals in this app yet, so this asks for your master code. You can turn it on in Settings › ${nativeSensor(platform)} & master code.`
+      : `${nativeSensor(platform)} isn't available on this computer, so this asks for your master code.`,
+  /**
    * DESK051-C2 (owner feedback): why the master code comes first, said once in the in-between step.
    * Adding a way to confirm is itself an owner action, so the master code proves it is the owner.
    */
@@ -82,6 +90,25 @@ export const NATIVE_STRINGS = Object.freeze({
    */
   nowOff: (platform: DesktopPlatform): string =>
     `${nativeSensor(platform)} is now off for approvals on this computer: the old one was removed and the new one was not finished. Turn it on again, or use your master code.`,
+  /**
+   * WIN-HELLO-NATIVE: why Touch ID / Windows Hello can't be offered on this computer, and how to set
+   * it up where that helps. Shown with the master code (offer.ts); never a security-key prompt.
+   */
+  setUp: (
+    platform: DesktopPlatform,
+    why: 'not_set_up' | 'no_secure_hardware' | 'unknown',
+  ): string =>
+    why === 'not_set_up'
+      ? platform === 'mac'
+        ? 'Touch ID has no fingerprint yet. To use it, open System Settings, then Touch ID & Password, and add a fingerprint. For now, use your master code.'
+        : "Windows Hello isn't set up on this computer. To use it, open Settings, then Accounts, then Sign-in options, and set up a PIN (Windows Hello). Then come back here. For now, use your master code."
+      : why === 'no_secure_hardware'
+        ? platform === 'mac'
+          ? "This Mac can't use Touch ID for approvals. Use your master code."
+          : "This computer doesn't have the security chip Windows Hello needs for approvals. Use your master code."
+        : platform === 'mac'
+          ? "Touch ID isn't available right now. Use your master code."
+          : "Windows Hello isn't available right now. Use your master code.",
   unavailableNow: (platform: DesktopPlatform): string =>
     platform === 'mac'
       ? "Touch ID isn't available right now (for example, the lid is closed). Use your master code."

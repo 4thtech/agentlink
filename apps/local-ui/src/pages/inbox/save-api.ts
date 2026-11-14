@@ -11,6 +11,7 @@
 // name or a path.
 import type { FileSaveOutcome } from '@4thtech-io/types/ui-contract/inbox';
 import { sendWithPresence, type DecisionPasskey } from '../approvals/client.js';
+import { pageCredentials } from '../../presence/webauthn-here.js';
 
 /** The contract path (ui-contract FILE_SAVE_PATH; save-api.test.ts checks they are equal). */
 export const FILE_SAVE_PATH = '/api/ui/files/save';
@@ -106,7 +107,8 @@ export function createSaveApi(options: SaveApiOptions = {}): SaveApi {
   const doFetch = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const token = (): string => options.token ?? pageToken();
   const credentials = (): CredentialsContainer | undefined =>
-    options.credentials ?? (typeof navigator === 'undefined' ? undefined : navigator.credentials);
+    // APP-CONTINUITY: never in the desktop app's window (presence/webauthn-here.ts).
+    options.credentials ?? pageCredentials();
 
   return {
     async save(id, presence) {

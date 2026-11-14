@@ -6,9 +6,14 @@
 // falling back to the master code silently, and an owner without a passkey on this computer can
 // switch once inside the sheet (passkey-switch.ts): the master code and one touch register the
 // passkey; then the operation itself is confirmed with its own touch (one entry, one operation).
+//
+// APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): inside the desktop app's window the prompt
+// never reads or uses a passkey: the app's own Touch ID / Windows Hello once it is on, else the
+// master code with how to turn it on (presence/offer.ts). No WebAuthn call there, ever.
 import { Button, InlineError } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
+import { ForgotCodeLink } from '../start-over/forgot-link.js';
 import { detectPlatform } from '../first-run/passkey.js';
 import { BackupCodeField, UseCodeInstead } from '../first-run/backup-code.js';
 import {
@@ -27,6 +32,7 @@ import {
 } from './owner.js';
 import { switchToPasskey, type SwitchToPasskey } from './passkey-switch.js';
 import { desktopPlatform, nativeConfirmLabel } from '../../presence/desktop.js';
+import { desktopPresenceOffer } from '../../presence/offer.js';
 import { readNativeStatus, type NativeStatus } from '../../presence/native-api.js';
 import { usePresenceFlight } from './presence-flight.js';
 import { CONTACTS_STRINGS as S, PASSKEY_WHY } from './strings.js';
@@ -64,8 +70,14 @@ export function PresencePrompt({
   nativeStatus?: () => Promise<NativeStatus>;
   userAgent?: string;
 }): ReactElement {
+  // DESK-D12c: in the desktop app, Touch ID / Windows Hello is the primary confirm once it is on.
+  // APP-CONTINUITY: and the app's window never uses a passkey (offer.ts): native, else the code.
+  const desktop = desktopPlatform(userAgent);
   const [code, setCode] = useState('');
-  const [useCode, setUseCode] = useState(codeFirst || passkey === undefined);
+  const [useCode, setUseCode] = useState(
+    codeFirst || passkey === undefined || desktop !== undefined,
+  );
+  const [desktopHelp, setDesktopHelp] = useState<string | undefined>(undefined);
   const [notUsed, setNotUsed] = useState(false);
   const [found, setFound] = useState<PasskeyInfo | undefined>(undefined);
   const [why, setWhy] = useState<Unavailable | undefined>(undefined);
@@ -76,8 +88,6 @@ export function PresencePrompt({
   // F49: a switch already failed in this browser for lack of PRF, so it is not offered again here.
   const [noSwitch, setNoSwitch] = useState(switchUnsupportedHere);
   const mounted = useRef(true);
-  // DESK-D12c: in the desktop app, Touch ID / Windows Hello is the primary confirm once it is on.
-  const desktop = desktopPlatform(userAgent);
   const [native, setNative] = useState(false);
   const platform = detectPlatform();
   const sensor = SENSOR[platform];
@@ -96,20 +106,23 @@ export function PresencePrompt({
 
   useEffect(() => {
     mounted.current = true;
-    if (desktop !== undefined && !codeFirst) {
+    if (desktop !== undefined) {
       void nativeStatus()
         .catch((): NativeStatus => ({ available: false, registered: false }))
         .then((status) => {
-          if (
-            !mounted.current ||
-            !status.available ||
-            !status.registered ||
-            status.reason !== undefined
-          )
+          if (!mounted.current) return;
+          const offer = desktopPresenceOffer(desktop, status);
+          if (offer.kind === 'code') {
+            setDesktopHelp(offer.help);
             return;
+          }
           setNative(true);
-          setUseCode(false);
+          if (!codeFirst) setUseCode(false);
         });
+      // Never the passkey read in the app's window: nothing here may fall back to WebAuthn.
+      return () => {
+        mounted.current = false;
+      };
     }
     if (passkey === undefined) {
       void readStatus().then((status) => {
@@ -141,7 +154,7 @@ export function PresencePrompt({
     onSubmit(proof);
   };
   const usePasskey = (): void => {
-    if (info === undefined || busy || !flight.start()) return;
+    if (info === undefined || busy || desktop !== undefined || !flight.start()) return;
     setNotUsed(false);
     void passkeyProof(info)
       .catch(() => undefined)
@@ -217,14 +230,16 @@ export function PresencePrompt({
   };
 
   const whyText =
-    why === undefined
-      ? undefined
-      : why.reason === 'browser'
-        ? PASSKEY_WHY.browser(sensor, otherBrowser(platform))
-        : noSwitch && why.reason === 'not_set_up_here'
-          ? PASSKEY_WHY.noSwitchHere(sensor)
-          : PASSKEY_WHY[why.reason](sensor);
-  const canSwitch = why?.switchTo !== undefined && !noSwitch;
+    desktop !== undefined
+      ? desktopHelp
+      : why === undefined
+        ? undefined
+        : why.reason === 'browser'
+          ? PASSKEY_WHY.browser(sensor, otherBrowser(platform))
+          : noSwitch && why.reason === 'not_set_up_here'
+            ? PASSKEY_WHY.noSwitchHere(sensor)
+            : PASSKEY_WHY[why.reason](sensor);
+  const canSwitch = desktop === undefined && why?.switchTo !== undefined && !noSwitch;
 
   return (
     <section className="ct-presence" aria-label={S.presenceIntro}>
@@ -300,6 +315,8 @@ export function PresencePrompt({
               value={code}
               onValue={setCode}
             />
+            {/* OWNER-START-OVER (D-153): the way out when the master code is lost. */}
+            <ForgotCodeLink />
             {/* F49: one primary action, the master code confirms. The switch is a quiet link. */}
             <div className="ct-actions">
               <Button type="submit" variant="primary" disabled={busy} data-confirm-code="">

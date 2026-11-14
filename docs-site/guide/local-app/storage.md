@@ -1,6 +1,6 @@
 # Storage and Free up space
 
-*Applies to AgentLink 0.5.4. Storage showed sizes only in 0.5.1; Free up space, Keep automatically, Delete history and Archive are new, and your AI can suggest a cleanup.*
+*Applies to AgentLink 0.5.5. Storage showed sizes only in 0.5.1; Free up space, Keep automatically, Delete history and Archive are new, and your AI can suggest a cleanup.*
 
 Open **Settings** › **Storage** (in the **Your AI** group). It shows how much room your messages and saved files take on this computer, and lets you free up space.
 

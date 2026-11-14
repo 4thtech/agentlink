@@ -100,6 +100,24 @@ export const RELATIVE_ESCAPES = [
   },
   {
     zone: 'e2e',
+    target: 'apps/local-ui/src/pages/first-run/strings.js',
+    reason:
+      'FIRSTRUN-MATRIX: the first-run words the browser e2e looks for come from the shipped strings file, never retyped in the test; strings only, no keys or store',
+  },
+  {
+    zone: 'e2e',
+    target: 'apps/local-ui/src/pages/start/strings.js',
+    reason:
+      'FIRSTRUN-MATRIX: the Get started wizard words the browser e2e looks for come from the shipped strings file, never retyped in the test; strings only',
+  },
+  {
+    zone: 'e2e',
+    target: 'apps/desktop/test/smoke/first-run-code.mjs',
+    reason:
+      'FIRSTRUN-MATRIX: the desktop smoke driver that creates the owner with the master code on a temp HOME; a test file, never built or shipped',
+  },
+  {
+    zone: 'e2e',
     target: 'apps/cli/scripts/local-ui-embed.mjs',
     reason:
       'M1-11b-6 first-run smoke: the build script that lists the local app files, to compare with what the bundle embeds',

@@ -37,7 +37,9 @@ const TABLE = { ...M1A_TABLE, ...M1B_TABLE, ...RET_TABLE };
 
 /** The only path- or file-like arguments, each confined by 04 §4 (tool-surface.test.ts allowlist). */
 const FILE_ARGS: Readonly<Record<string, readonly string[]>> = {
-  agentlink_send: ['path'],
+  // FILES-AI-1 (D-152): `file` is `{name, content}`, written only into the root of the ID's own
+  // pinned Send folder by the Attach writer; nothing in it names or picks a folder (06 §2.3).
+  agentlink_send: ['path', 'file'],
   agentlink_fetch_file: ['fileIndex'],
   // D-87: a pack file inside proofs.exportFolder or files.inboxFolder only.
   agentlink_verify_proof_pack: ['path'],

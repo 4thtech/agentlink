@@ -2,7 +2,7 @@
 // first-party presence helper of the desktop app (DESK-D12b, apps/desktop/native/*/agentlink-presence.*,
 // whose header is the contract). Fixed argv only:
 //   available · create · check (macOS) · ecdh <reason> (macOS) · sign <reason> (Windows) · delete (Windows)
-// with <reason> one of the fixed ids setup | approve | pay | code (display-only: the helper shows its own
+// with <reason> one of the fixed ids setup | approve | pay | code | reset (display-only: the helper shows its own
 // fixed text and releases the same secret for every reason). The record goes on stdin as lowercase
 // hex and one newline; stdout is lowercase hex and one newline on success, nothing else is accepted;
 // stderr carries at most one fixed diagnostic line of the macOS helper (DESK-NATIVE-DEBUG,
@@ -41,8 +41,9 @@ import {
 /**
  * The fixed reason ids (display-only). `code` (D15-04): Replace master code, the one operation that
  * mints a new root secret, is named on the OS sheet instead of reading like a routine approval.
+ * `reset` (OWNER-START-OVER, D-153): Start over on this computer names itself on the sheet.
  */
-export const NATIVE_REASONS = Object.freeze(['setup', 'approve', 'pay', 'code'] as const);
+export const NATIVE_REASONS = Object.freeze(['setup', 'approve', 'pay', 'code', 'reset'] as const);
 export type NativeReason = (typeof NATIVE_REASONS)[number];
 
 /** The helpers' fixed exit codes (identical on macOS and Windows; apps/desktop/build/native.mjs). */
@@ -166,6 +167,8 @@ export interface NativeHelperRunResult {
   readonly diag?: string;
   /** DESK-TOUCHID-FIX: the helper noted that macOS secure input was on before its sheet. */
   readonly secureInput?: true;
+  /** WIN-HELLO-NATIVE: the Windows helper's fixed reason line for `available` exit 69. */
+  readonly unavailable?: Exclude<NativeUnavailableReason, 'unknown'>;
 }
 
 /** The fixed shape of the macOS helper's one stderr line (agentlink-presence.swift header). */
@@ -193,10 +196,16 @@ export function readHelperDiagnostic(stderr: Uint8Array): string | undefined {
 export function readHelperStderr(stderr: Uint8Array): {
   readonly diag?: string;
   readonly secureInput?: true;
+  readonly unavailable?: Exclude<NativeUnavailableReason, 'unknown'>;
 } {
   if (stderr.length === 0 || stderr.length > MAX_STDERR) return {};
   for (const b of stderr) if (b < 0x0a || b > 0x7a) return {};
   let text = new TextDecoder().decode(stderr);
+  // WIN-HELLO-NATIVE: the Windows `available` line stands alone (no note, no diagnostic).
+  const why = HELPER_UNAVAILABLE.exec(text);
+  if (why !== null) {
+    return { unavailable: why[1] === 'not_set_up' ? 'not_set_up' : 'no_secure_hardware' };
+  }
   const secureInput = text.startsWith(SECURE_INPUT_NOTE);
   if (secureInput) text = text.slice(SECURE_INPUT_NOTE.length);
   if (text === '') return secureInput ? { secureInput: true } : {};
@@ -204,6 +213,43 @@ export function readHelperStderr(stderr: Uint8Array): {
   if (m === null) return {};
   const diag = `${m[1] ?? ''} ${m[2] ?? ''} ${m[3] ?? ''}`;
   return secureInput ? { diag, secureInput: true } : { diag };
+}
+
+/**
+ * WIN-HELLO-NATIVE: why Touch ID / Windows Hello cannot be used on this computer, platform-neutral:
+ * `not_set_up` (no PIN / Windows Hello, or no enrolled finger: the owner can set it up),
+ * `no_secure_hardware` (no TPM / no Secure Enclave: setting it up would not help), `unknown`
+ * (anything else, e.g. the lid is closed). The page offers the master code with plain text for it.
+ */
+export const NATIVE_UNAVAILABLE_REASONS = Object.freeze([
+  'not_set_up',
+  'no_secure_hardware',
+  'unknown',
+] as const);
+export type NativeUnavailableReason = (typeof NATIVE_UNAVAILABLE_REASONS)[number];
+
+export type NativeAvailability =
+  | { readonly available: true }
+  | {
+      readonly available: false;
+      readonly reason: NativeUnavailableReason;
+      /**
+       * OWNER-START-OVER (D-153): the helper did not answer "unavailable" (exit 69): a lockout (14),
+       * a timeout, an error. The sensor may be there; try again later, never treat it as absent.
+       */
+      readonly transient?: true;
+    };
+
+/** The Windows helper's one stderr line for `available` exit 69 (agentlink-presence.cpp header). */
+const HELPER_UNAVAILABLE = /^unavailable (not_set_up|no_secure_hardware)\n?$/;
+
+/** macOS: the `available` diagnostic line (sensor stage) as a reason. */
+function macUnavailableReason(diag: string | undefined): NativeUnavailableReason {
+  // LAError.biometryNotEnrolled: Touch ID is there, no finger yet.
+  if (diag === 'sensor la -7') return 'not_set_up';
+  // SecureEnclave.isAvailable false: no LAError at all.
+  if (diag === 'sensor none 0') return 'no_secure_hardware';
+  return 'unknown';
 }
 
 /** The error of a run that did not exit 0: its UI state and how it ended. */
@@ -232,6 +278,8 @@ export interface NativeHelper {
   readonly kind: NativePresenceKind;
   /** Touch ID / Windows Hello is set up (exit 0). Never prompts. */
   available(): Promise<boolean>;
+  /** WIN-HELLO-NATIVE: `available`, and why not (a fixed reason). Never prompts. */
+  availability(): Promise<NativeAvailability>;
   /** `create`: the bytes printed (macOS: the record; Windows: record ‖ u16 ‖ signature, one prompt). */
   create(signal?: AbortSignal): Promise<Uint8Array>;
   /** macOS `check`: resolves only when the key exists and refuses without a gesture. Never prompts. */
@@ -309,6 +357,16 @@ export function createNativeHelper(options: {
       const result = await run(['available'], undefined);
       return result.code === 0;
     },
+    async availability() {
+      const result = await run(['available'], undefined);
+      if (result.code === 0) return { available: true };
+      if (result.code !== NATIVE_HELPER_EXIT.unavailable)
+        return { available: false, reason: 'unknown', transient: true };
+      const reason: NativeUnavailableReason = mac
+        ? macUnavailableReason(result.diag)
+        : (result.unavailable ?? 'unknown');
+      return { available: false, reason };
+    },
     // DESK-TOUCHID-FIX review: turning it on can be cancelled at every helper call.
     async create(signal) {
       if (signal?.aborted === true) throw new NativeHelperError('cancelled', 'aborted');
@@ -360,7 +418,25 @@ export const NATIVE_HELPER_TIMEOUT_MS = 120_000;
 export const NATIVE_HELPER_KILL_GRACE_MS = 3_000;
 
 /**
- * Spawns the helper at `path` (no shell, empty environment, stdin/stdout/stderr pipes, stderr only
+ * Fable r1 L4 (WIN-HELLO-NATIVE): the helper's whole environment. Empty, except on Windows
+ * `SystemRoot` (WinRT and NCrypt misreport without it), taken from `env` only when it is a plain
+ * absolute drive path (`C:\Windows`): no `..`, no UNC or device path, no `%` expansion, no control
+ * characters. Anything else gives the empty environment.
+ */
+export function nativeHelperEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): Record<string, string> {
+  if (platform !== 'win32') return {};
+  const root = env['SystemRoot'] ?? env['SYSTEMROOT'];
+  if (typeof root !== 'string' || root.length > 200) return {};
+  if (!/^[A-Za-z]:\\[A-Za-z0-9 _.()\\-]*$/.test(root)) return {};
+  if (root.split('\\').some((part) => part === '..' || part === '.')) return {};
+  return { SystemRoot: root };
+}
+
+/**
+ * Spawns the helper at `path` (no shell, empty environment but SystemRoot on Windows, stdin/stdout/stderr pipes, stderr only
  * read for its fixed diagnostic line,
  * stdout capped, killed after `timeoutMs`). A helper that cannot start, is killed or prints too much
  * resolves with code null (the `error` state). Never rejects.
@@ -409,7 +485,7 @@ export function spawnNativeHelper(
       try {
         child = spawn(path, [...args], {
           shell: false,
-          env: {},
+          env: nativeHelperEnv(),
           stdio: ['pipe', 'pipe', 'pipe'],
           windowsHide: true,
         });

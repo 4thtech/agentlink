@@ -30,5 +30,18 @@ export const JOIN_ACCEPT_PATH = '/api/ui/join/accept';
 export const JOIN_DISMISS_PATH = '/api/ui/join/dismiss';
 /** `agentlink join` hands an invite to a running app host: the `presence: 'handoff'` kind. */
 export const JOIN_HANDOFF_PATH = '/api/ui/join/handoff';
+/**
+ * APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): the same handoff kind, empty body. The
+ * desktop app asks a running `agentlink ui` host to close (it takes over), and terminal
+ * `agentlink ui` asks a running desktop app to show its window (no second host).
+ */
+export const HOST_YIELD_PATH = '/api/ui/host/yield';
+export const HOST_SHOW_PATH = '/api/ui/host/show';
+/** Every path of the handoff kind (each registered once). */
+export const HANDOFF_KIND_PATHS: readonly string[] = Object.freeze([
+  JOIN_HANDOFF_PATH,
+  HOST_YIELD_PATH,
+  HOST_SHOW_PATH,
+]);
 /** The app page of the join screen (served as an app page; never carries the invite). */
 export const JOIN_PAGE_PATH = '/settings/join';

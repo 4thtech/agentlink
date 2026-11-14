@@ -52,6 +52,7 @@ import { PasteEntryLink } from '../invite/paste-entry.js';
 import { createAgentsApi, type AgentsApi } from '../agents/api.js';
 import type { AgentRow } from '../agents/data.js';
 import { FinishRemoveSheet, UnfinishedRemoval } from '../agents/finish-remove.js';
+import { BrokenIdNotice } from '../agents/broken-id.js';
 import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
 import type { PayConfirmClient } from '../../pay-confirm/index.js';
 import { usePrefs } from '../../prefs/index.js';
@@ -84,7 +85,10 @@ import { useTerms } from './terms-trail.js';
 import type { Preview } from './file-reader.js';
 import { HomeApprovals } from './home-approvals.js';
 import { RenameBanner } from './rename-banner.js';
-import { SendFolderBanner, createSendFolderApi, type SendFolderApi } from './send-folder-banner.js';
+import { createSendFolderApi, type SendFolderApi } from './send-folder-banner.js';
+import { FilesPanel } from './files-panel.js';
+import type { Getter } from '../files/folders-summary.js';
+import { createRevealApi, type RevealApi } from '../../api/reveal-folder.js';
 import { createAttachApi, type AttachApi } from './attach-api.js';
 import {
   createPeopleApi,
@@ -97,7 +101,9 @@ import { HOME_STRINGS as S, fmt, idWithApp } from './people-strings.js';
 import { filesOf, PersonFiles, type Reveal } from './person-files.js';
 import { PersonMenu } from './person-menu.js';
 import { PersonName } from './person-name.js';
+import { clearPersonHash, personFromHash } from './person-link.js';
 import './people.css';
+import { webAuthnHere } from '../../presence/webauthn-here.js';
 
 /** How often Home looks again while the tab is visible. */
 export const HOME_POLL_MS = 5_000;
@@ -130,13 +136,9 @@ export interface HomeScreenProps {
   readonly folderNote?: ReactNode;
 }
 
+// APP-CONTINUITY: never in the desktop app's window (presence/webauthn-here.ts).
 function browserPasskeys(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    'PublicKeyCredential' in window &&
-    typeof navigator !== 'undefined' &&
-    navigator.credentials !== undefined
-  );
+  return webAuthnHere();
 }
 
 interface Clients {
@@ -151,8 +153,11 @@ interface Clients {
   /** W8-S4: Finish removing (the Remove sheet's own calls). */
   readonly agents: AgentsApi;
   readonly owner: OwnerClient;
-  /** ATT-SENDFOLDER-FIX: the Send folder banner's read and set-up calls. */
+  /** ATT-SENDFOLDER-FIX: the Send folder's set-up call (Allow Send folder, in the Files panel). */
   readonly sendFolder: SendFolderApi;
+  /** FILES-HOME-PANEL: the Files panel's reads and its Show in Finder calls. */
+  readonly filesGet: Getter;
+  readonly filesReveal: RevealApi;
   /** ATT-APP-ATTACH: attach files in a conversation and send them yourself. */
   readonly attach: AttachApi;
 }
@@ -178,6 +183,8 @@ function useClients(props: HomeScreenProps): Clients {
       agents: createAgentsApi(opts),
       owner: createOwnerClient(opts),
       sendFolder: createSendFolderApi(opts),
+      filesGet: files.get,
+      filesReveal: createRevealApi(opts),
       // ATT-APP-ATTACH: attach files in a conversation and send them yourself.
       attach: createAttachApi(opts),
     };
@@ -635,9 +642,22 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   // W8-S4 (F21; 04 §2.5 "Finishing a removal"): an ID whose removal stopped part-way is never a
   // usable ID here (no chip); Home names it with Finish removing instead.
   const liveIds = useLiveAgents();
-  const agents = useMemo(() => liveIds.agents.filter((a) => !a.removing), [liveIds.agents]);
+  const brokenNames = useMemo(
+    () => new Set(liveIds.rows.filter((r) => r.broken === true).map((r) => r.name)),
+    [liveIds.rows],
+  );
+  // WIN-BROKEN-ID: an ID whose key is missing is not a usable ID here either (no chip).
+  const agents = useMemo(
+    () => liveIds.agents.filter((a) => !a.removing && !brokenNames.has(a.name)),
+    [liveIds.agents, brokenNames],
+  );
   const unfinished = liveIds.rows.filter((r) => r.removing);
   const [finishing, setFinishing] = useState<AgentRow | undefined>(undefined);
+  // WIN-BROKEN-ID: Continue without it hides the notice for this visit only.
+  const [continued, setContinued] = useState<ReadonlySet<string>>(new Set());
+  const broken = liveIds.rows.filter(
+    (r) => r.broken === true && !r.removing && !continued.has(r.name),
+  );
   const current = agents.find((a) => a.current);
   const appName = current?.apps[0]?.app;
   const agentLabel = idWithApp(current?.label ?? '', appName);
@@ -761,6 +781,15 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   };
 
   const data = view.state === 'ready' ? view.data : undefined;
+  // NOTIFY-DEEPLINK: a notification click opens that person's conversation (checked against the people
+  // Home holds; an unknown ID opens nothing).
+  useEffect(() => {
+    if (data === undefined) return;
+    const wanted = personFromHash(location.hash);
+    if (wanted === undefined) return;
+    if (data.people.some((p) => p.contactId === wanted)) setOpen(wanted);
+    clearPersonHash();
+  }, [data]);
   const many = agents.length > 1;
   const otherAgent =
     filter !== 'all' && current !== undefined && filter !== current.name
@@ -1052,6 +1081,15 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   return (
     <div className="hm-page hm-c" data-layer={pro ? 'pro' : 'simple'}>
       <h1 className="al-visually-hidden">{S.title}</h1>
+      {/* WIN-BROKEN-ID: also with no ID open (the only ID here can't be opened). */}
+      {broken.map((row) => (
+        <BrokenIdNotice
+          key={row.name}
+          row={row}
+          onRemove={setFinishing}
+          onContinue={(r) => setContinued((was) => new Set([...was, r.name]))}
+        />
+      ))}
       {/* REL051-INTFIX: an approval waits but there is no ID yet: the reason stays above the
           "Create your first ID" card, so whoever came for that approval learns why it can't be
           approved here yet. */}
@@ -1086,11 +1124,6 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
               api={clients.agents}
               owner={clients.owner}
               row={liveIds.rows.find((r) => r.current && !r.removing)}
-            />
-            {/* ATT-SENDFOLDER-FIX: no folder allowed yet: one button to allow the Send folder. */}
-            <SendFolderBanner
-              api={clients.sendFolder}
-              agentKey={liveIds.rows.find((r) => r.current)?.name ?? ''}
             />
             <HomeApprovals
               items={approvals}
@@ -1225,6 +1258,14 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                 </details>
               )}
             </section>
+            {/* FILES-HOME-PANEL (D-152): Send and Inbox; also where Allow Send folder lives. */}
+            <FilesPanel
+              get={clients.filesGet}
+              reveal={clients.filesReveal}
+              sendFolder={clients.sendFolder}
+              appName={appName}
+              agentKey={liveIds.rows.find((r) => r.current)?.name ?? ''}
+            />
           </div>
         </SkeletonGate>
       )}

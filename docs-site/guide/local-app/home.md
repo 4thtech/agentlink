@@ -1,6 +1,6 @@
 # Home
 
-*Applies to AgentLink 0.5.4. Waiting invites, file chips with a reader in the conversation and the network status line are new in 0.5.1. In 0.4.4 and 0.4.5, Home was five tiles and a seven-step Start here.*
+*Applies to AgentLink 0.5.5. The Files panel is new in 0.5.5. Waiting invites, file chips with a reader in the conversation and the network status line are new in 0.5.1. In 0.4.4 and 0.4.5, Home was five tiles and a seven-step Start here.*
 
 Home is the first screen. It shows what needs you, then the people your AI talks to.
 
@@ -16,7 +16,8 @@ Right after setup, before you have contacts, Home also shows the **Get started**
 2. **Invite someone.** Opens the [Invite screen](invite-someone.md).
 3. **Invites waiting.** An invite you made, or your AI made, that nobody has accepted yet shows as **Waiting for {name} to accept**, with **Copy link**, **Show link** and **Cancel invite**. See below.
 4. **People.** The people your AI talks to, each with their last activity. A connection the other person removed shows as one line with **Archive**, which moves it to **Archived** on [People](contacts.md).
-5. **Get started.** Until setup is done, a card says **Get started · n of 3 done**. You can hide it. See [Get started](get-started-wizard.md).
+5. **Files.** A panel below the people, new in 0.5.5. It shows your **Send** folder ("Your AI can send files from here, and only from here.") and your **Inbox** ("Files people send you are saved here. AgentLink never opens them."), each with **Show in Finder** (**Show in Explorer** on Windows). The Inbox says how many files arrived since you last opened Files, for example **3 new**. **Manage folders** opens Settings › Files. A short tip for your AI app sits under **Tips for** its name. When your Send folder isn't allowed yet, the panel says **Allow your Send folder so your AI can send files.** with **Allow Send folder** (this replaces the old banner). **Hide files** and **Show files** fold the panel away. With no files yet it says "No files yet. Put a file in Send and ask your AI: “Send notes.md to Ana.”" The panel only reads: looking changes nothing, and your AI can't use it.
+6. **Get started.** Until setup is done, a card says **Get started · n of 3 done**. You can hide it. See [Get started](get-started-wizard.md).
 
 ## Waiting invites
 
