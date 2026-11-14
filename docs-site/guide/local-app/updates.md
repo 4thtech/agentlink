@@ -1,10 +1,10 @@
 # Updates
 
-*Applies to AgentLink 0.5.5. Updates is new in 0.5.1, in the desktop app and in the browser app. **Update now** in the Mac app works from 0.5.4 on.*
+*Applies to AgentLink 0.5.6. Updates is new in 0.5.1, in the desktop app and in the browser app. **Update now** in the Mac app works from 0.5.4 on, in the browser app from 0.5.6 on.*
 
 Open **Settings** › **Updates** (in the **This app** group). It is the one place to update AgentLink. It shows the version you have and a **Check for updates** button. AgentLink also checks by itself once a day while it runs. The button asks at most once a minute.
 
-When a newer version is out, the page says so, for example **AgentLink 0.5.2 is ready**, with the one step that fits how you installed AgentLink. Nothing is downloaded or installed by the page itself. Your IDs, people and messages stay as they are: they live in your AgentLink folder, not in the program.
+When a newer version is out, the page says so, for example **AgentLink 0.5.2 is ready**, with the one step that fits how you installed AgentLink. Your IDs, people and messages stay as they are: they live in your AgentLink folder, not in the program.
 
 ## Desktop app
 
@@ -14,11 +14,21 @@ Press **Download update** and follow the short steps on the page. A Mac app on 0
 
 The browser app is what the one-command installer sets up, and what `npx -y @4thtech-io/agentlink@latest` opens.
 
-- **You installed with the one-command installer, or you start it with npx.** The page says **Restart AgentLink to update**. Each start already picks the newest version, so a restart is the update:
+From 0.5.6 the browser app updates itself, with no command to type:
+
+1. When the page says **AgentLink 0.5.7 is available**, press **Update now**. AgentLink gets the new version and checks it (**Downloading…**, then **Checking the new version…**).
+2. Press **Restart now**. AgentLink closes and opens again in a new browser tab with the new version, in the same terminal window. You can close the old tab.
+3. Quit and reopen your AI apps so they use the new version too. The page says so.
+
+AgentLink installs only the exact version the npm registry names as the latest, and only when the registry shows it was built by AgentLink's own release workflow; it checks npm's signatures for every package and runs no install scripts. Your own npm settings are not used for it. Your IDs, people and messages stay as they are.
+
+If AgentLink can't update itself here, the page shows the steps instead:
+
+- **You installed with the one-command installer, or you start it with npx.** A restart is the update, because each start picks the newest version:
   1. In the terminal window where AgentLink is running, press **Ctrl+C**.
   2. Start it again: type `agentlink` (installer) or `npx -y @4thtech-io/agentlink@latest` (npx). The page shows the right command with **Copy**.
   3. AgentLink opens in your browser again.
-- **You installed it with `npm install -g`.** That copy stays at its version until you update it, so the page shows the one command, with **Copy**:
+- **You installed it with `npm install -g`.** That copy is never changed from the page. The page shows the one command, with **Copy**:
   1. Press **Ctrl+C** in the terminal window where AgentLink is running.
   2. Run `npm install -g @4thtech-io/agentlink@latest`.
   3. Start it again with `agentlink`.
@@ -30,6 +40,8 @@ After an update, an AI app still running the older version shows **Restart {app}
 The browser app asks the npm registry (registry.npmjs.org) which version of `@4thtech-io/agentlink` is the latest, and nothing else; the desktop app asks GitHub. The registry sees your IP, as any website you visit does, and the standard Node.js user agent (`node`); no ID, contact, message, name or version number is sent.
 
 **When.** The browser app checks once, about 30 seconds after AgentLink starts, then once a day while it runs, and when you press **Check for updates** (at most once a minute). It keeps the result in memory only and writes nothing to your computer. Offline, the page says so.
+
+**Update now (browser app).** Only when you press it: npm downloads that one version from registry.npmjs.org (npm sends its usual user agent, with the npm and Node.js versions) and AgentLink keeps it in the `updates` folder inside your AgentLink folder; the older one there is removed. Nothing about your IDs, contacts or messages is sent.
 
 **Turning it off.** Start AgentLink with the setting `AGENTLINK_UPDATE_CHECK=off` (for example `AGENTLINK_UPDATE_CHECK=off agentlink`). The page then says checking is turned off, and AgentLink never asks.
 

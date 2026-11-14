@@ -66,4 +66,11 @@ export const UPDATES_STRINGS = {
   // UPD-BUTTON-FIX: Update now or Restart now was refused or failed (one plain line, no detail).
   updateFailed: 'Couldn’t start the update just now. Try again.',
   restartFailed: 'Couldn’t restart just now. Try again, or quit AgentLink and open it again.',
+  // BROWSER-UPDATE: the browser app's Update now (11 §5: plain words; nothing about how it is
+  // checked). The new version opens in a new tab; AI apps pick it up when they start again.
+  browserReadyLead: 'Restart AgentLink to finish. It opens again in a new browser tab in a moment.',
+  browserRestarting:
+    'Restarting… AgentLink opens again in a new browser tab. You can close this one.',
+  aiAppsReopen: 'Then quit and reopen your AI apps so they use the new version too.',
+  cantUpdateBrowser: 'Couldn’t update here. Update with these steps instead.',
 } as const;

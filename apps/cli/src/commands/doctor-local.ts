@@ -32,6 +32,7 @@ export const DOCTOR_LOCAL_TEXT = Object.freeze({
     start_open: "it couldn't open your ID",
     start_broken_id: "an ID's key is missing from this computer",
     start_failed: "it couldn't start",
+    updated: 'it restarted with a new version',
   }),
   get staleHost(): string {
     return `Problem  AgentLink left a note that it is running, but it isn't. Run \`agentlink\` to start it fresh.`;
@@ -49,6 +50,7 @@ const NORMAL: ReadonlySet<LastExitReason> = new Set([
   'sighup',
   'idle',
   'moved_to_app',
+  'updated',
 ]);
 
 export interface LocalChecksOptions {

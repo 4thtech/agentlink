@@ -15,6 +15,10 @@
 // (owner session + CSRF); the shell installs only the update it verified itself.
 // UPD-BUTTON-FIX: a refused or failed answer (or one that did not start anything) shows one plain
 // line on the card; the page never just draws the same card again in silence.
+// BROWSER-UPDATE: the browser app gets the same Update now → Restart now card when its server can
+// update here (`installable`): downloading has no percentage (npm gives none), Restart now says the
+// new version opens in a new tab, and both say to quit and reopen AI apps. A failed update, or a
+// global install this user cannot write, shows the steps and fixed commands instead.
 import { Button, CopyButton, InlineError, ProgressBar, Skeleton, Surface } from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
@@ -109,6 +113,7 @@ function BrowserReady({ view }: { readonly view: UpdateView }): ReactElement {
       <h2 id="upd-ready-t" className="al-text-h3">
         {S.ready(view.latest)}
       </h2>
+      {view.state === 'install_failed' ? <InlineError>{S.cantUpdateBrowser}</InlineError> : null}
       <p className="al-text-body-sm al-muted">{global ? S.commandLead : S.restartLead}</p>
       <ol className="upd-steps" aria-label={S.stepsLabel}>
         <li className="al-text-body-sm">{S.stopStep}</li>
@@ -147,6 +152,7 @@ function InApp({
   readonly refused: Refused;
 }): ReactElement {
   const title = view.state === 'available' ? S.availableTitle(view.latest) : S.ready(view.latest);
+  const browser = view.install !== 'desktop';
   return (
     <Surface
       as="section"
@@ -169,17 +175,23 @@ function InApp({
           </div>
         </>
       ) : view.state === 'downloading' ? (
-        <ProgressBar
-          label={S.downloading}
-          value={view.percent}
-          max={100}
-          amount={S.percent(view.percent)}
-        />
+        browser ? (
+          <ProgressBar label={S.downloading} indeterminate />
+        ) : (
+          <ProgressBar
+            label={S.downloading}
+            value={view.percent}
+            max={100}
+            amount={S.percent(view.percent)}
+          />
+        )
       ) : view.state === 'verifying' ? (
         <ProgressBar label={S.verifying} indeterminate />
       ) : view.state === 'ready' ? (
         <>
-          <p className="al-text-body-sm al-muted">{S.readyRestartLead}</p>
+          <p className="al-text-body-sm al-muted">
+            {browser ? S.browserReadyLead : S.readyRestartLead}
+          </p>
           {view.busy ? (
             <p className="al-text-body-sm upd-warn" role="note">
               {S.busy}
@@ -194,9 +206,12 @@ function InApp({
         </>
       ) : (
         <p className="al-text-body-sm" role="status" aria-live="polite">
-          {S.restarting}
+          {browser ? S.browserRestarting : S.restarting}
         </p>
       )}
+      {browser && (view.state === 'ready' || view.state === 'restarting') ? (
+        <p className="al-text-body-sm">{S.aiAppsReopen}</p>
+      ) : null}
       <p className="al-text-body-sm al-muted">{S.keeps}</p>
     </Surface>
   );
@@ -401,17 +416,19 @@ export function UpdatesPage({
     view.state !== 'checking' &&
     !RUNNING.includes(view.state);
   // FIRSTRUN-EXIT: the always-there fallbacks, unless the page already shows that version's card.
+  // BROWSER-UPDATE: a running in-app update (the browser app's too) is that version's card.
   const versionCard =
-    view !== undefined && (view.state === 'available' || view.state === 'install_failed');
+    view !== undefined &&
+    (view.state === 'available' || view.state === 'install_failed' || RUNNING.includes(view.state));
   const settled = load.kind !== 'loading';
   const appWindow = view === undefined ? desktop : view.install === 'desktop';
   // Not when the check just said this is the newest version (IR-FIRSTRUN-EXIT-1).
   const upToDate = view?.state === 'current';
   const windowsFallback = settled && appWindow && os === 'windows' && !versionCard && !upToDate;
   const browserHow = settled && !appWindow && !versionCard;
+  // BROWSER-UPDATE: the browser app too, when its server can update here.
   const inApp =
     view !== undefined &&
-    view.install === 'desktop' &&
     (RUNNING.includes(view.state) || (view.state === 'available' && view.installable));
 
   return (

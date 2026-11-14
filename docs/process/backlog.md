@@ -11034,6 +11034,13 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Spec:** 08 §8
 - **Done when:** Settings › Updates shows Update now, a progress bar, Restart now and a fallback download link; the app installs only an update it verified itself. Details: CHANGELOG 0.5.4.
 
+#### BROWSER-UPDATE · Update now and Restart now in the browser app (0.5.6)
+- **Status:** built (rel056/browser-update) · **Size:** M · **Tier:** Opus build, Fable independent audit (local server update, supply chain) · **Security:** S2
+- **Repo/path:** agentlink · `apps/cli/src/runtime/browser-update.ts` (stage, verify, relaunch, desk), `apps/cli/src/runtime/npm-update-check.ts`, `apps/cli/src/commands/ui.ts` (`update` stop → close → relaunch), `packages/node/src/local-ui/api/app-update.ts` (browser in-app states, steps for any desk that has them), `apps/local-ui/src/pages/updates/`
+- **Depends on:** REL051-UPD2, UPD-5, UPD-BUTTON-FIX, APP-CONTINUITY
+- **Spec:** 08 §1 "Updating the browser app" (proposed); 04 §4; 11 §5; I-4
+- **Done when:** `RED (expected):` commit first; Settings › Updates in the browser app: Check for updates → Update now (npm by argv with a fixed `@4thtech-io/agentlink@<registry version>` spec, `--ignore-scripts`, public registry forced, npm integrity, `npm audit signatures` with nothing invalid or missing, installed name and version checked) → Restart now (this host closes first, then the staged `agentlink ui` runs in the same terminal and opens a new tab) → fixed "quit and reopen your AI apps" line; IR r1 (Fable): SLSA provenance for the exact version from this repository required before install, clean npm environment and empty npmrc files, `--strict-ssl=true --package-lock=true`, every lockfile entry from registry.npmjs.org with sha512, staged files checked again at Restart now, `updated` last exit, bundle-check spawn source gate; a global npm install keeps the one command; routes only behind session, CSRF and Origin (mark gate), no MCP path; desktop apps untouched. The first real proof is the first release after the one that ships it (0.5.6 → 0.5.7).
+
 #### UPD-BUTTON-FIX · Update now and Restart now do nothing in Settings › Updates (Mac) (0.5.6)
 - **Status:** built (rel056/upd-button) · **Size:** S · **Tier:** Opus build, Fable independent audit (updater path) · **Security:** S2
 - **Repo/path:** agentlink · `apps/local-ui/src/api/client.ts` (bodyless POST = empty octet-stream), `apps/local-ui/src/pages/updates/` (refused/failed line); `e2e/test/empty-body-routes.test.ts`; `tools/deps-check/policy.mjs` (three e2e relative escapes into `apps/local-ui/src`)

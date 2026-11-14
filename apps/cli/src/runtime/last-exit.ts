@@ -28,6 +28,8 @@ export const LAST_EXIT_REASONS = Object.freeze([
   'start_open',
   'start_broken_id',
   'start_failed',
+  // BROWSER-UPDATE: Restart now in Settings › Updates handed this terminal to the new version.
+  'updated',
 ] as const);
 
 export type LastExitReason = (typeof LAST_EXIT_REASONS)[number];

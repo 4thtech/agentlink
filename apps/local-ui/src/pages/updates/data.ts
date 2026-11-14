@@ -5,7 +5,7 @@
 // the desktop app ever has a link (the browser app shows a restart or a fixed command instead).
 export const APP_UPDATE_PATH = '/api/ui/app-update';
 export const APP_UPDATE_CHECK_PATH = '/api/ui/app-update/check';
-// UPD-5: "Update now" and "Restart now" (POST, no body; the Mac app only).
+// UPD-5: "Update now" and "Restart now" (POST, no body; the Mac app, and BROWSER-UPDATE the browser app).
 export const APP_UPDATE_INSTALL_PATH = '/api/ui/app-update/install';
 export const APP_UPDATE_RESTART_PATH = '/api/ui/app-update/restart';
 
@@ -135,10 +135,11 @@ export function parseUpdate(data: unknown): UpdateView | undefined {
     return undefined;
   }
   if (how !== 'desktop') {
-    // The in-app update is the Mac app's alone.
-    if (download !== '' || st !== 'available' || installable) return undefined;
+    // BROWSER-UPDATE: the browser app's in-app update (Update now, Restart now) follows the same
+    // state rules as the Mac app's (checked above); the browser app never has a link.
+    if (download !== '') return undefined;
     return {
-      state: 'available',
+      state: st,
       install: how,
       current,
       latest,
