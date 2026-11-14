@@ -49,6 +49,15 @@ Section "Install"
   ; Only in the exact per-user install folder, and only when it really is an AgentLink install.
   StrCmp "$INSTDIR" "$LOCALAPPDATA\\Programs\\AgentLink" 0 fresh_install
   IfFileExists "$INSTDIR\\AgentLink.exe" 0 fresh_install
+  ; Never through a junction or link (FILE_ATTRIBUTE_REPARSE_POINT 0x400), for the folder or resources.
+  System::Call 'kernel32::GetFileAttributesW(w "$INSTDIR") i .r0'
+  IntCmp $0 -1 fresh_install
+  IntOp $0 $0 & 0x400
+  IntCmp $0 0 0 fresh_install fresh_install
+  System::Call 'kernel32::GetFileAttributesW(w "$INSTDIR\\resources") i .r0'
+  IntCmp $0 -1 fresh_install
+  IntOp $0 $0 & 0x400
+  IntCmp $0 0 0 fresh_install fresh_install
     RMDir /r "$INSTDIR\\resources"
   fresh_install:
   SetOutPath "$INSTDIR"

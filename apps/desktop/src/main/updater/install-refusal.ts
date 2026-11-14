@@ -93,6 +93,7 @@ export function failedReasonCode(reason: FailedReason | null): InstallRefusalCod
     case 'rollback_incomplete':
       return 'rollback_incomplete';
     case 'installer_failed':
+    case 'interrupted':
       return 'installer_failed';
     case 'installer_changed':
       return 'installer_changed';

@@ -78,7 +78,12 @@ import {
   restartForUpdate,
   sweepStaging,
 } from './updater/install.js';
-import { installWinFromProcess } from './updater/install-win.js';
+import {
+  afterHealthyStartWin,
+  installWinFromProcess,
+  winInstallDirOf,
+  winTools,
+} from './updater/install-win.js';
 import { loadFailedVersion } from './updater/state.js';
 import { procTranslated, updateChannel, updaterArch } from './updater/host.js';
 import { ReleaseChecker, updateChecksAllowed } from './updater/release-check.js';
@@ -789,6 +794,30 @@ export function realProcess(): ShellProcess {
         ready: () => {
           write(writeHealthIfPending);
           if (inPlace && dir !== undefined) void sweepStaging(join(dir, UPDATES_DIR), Date.now());
+          // WIN-INAPP-UPDATE (IR Fable r1): this copy is in place for good; its RunOnce recovery
+          // entry and left-over folders beside the install folder go.
+          const installDir = winInstallDirOf(proc.execPath, proc.env['LOCALAPPDATA']);
+          const tools = winTools(proc.env['SystemRoot']);
+          if (
+            proc.platform === 'win32' &&
+            app.isPackaged &&
+            dir !== undefined &&
+            version !== undefined &&
+            installDir !== null &&
+            tools !== null
+          )
+            void afterHealthyStartWin({
+              stateDir: dir,
+              installDir,
+              version,
+              reg: tools.reg,
+              run: (command, args) =>
+                new Promise<void>((resolve) => {
+                  execFile(command, [...args], { timeout: 15_000, windowsHide: true }, () =>
+                    resolve(),
+                  );
+                }),
+            });
         },
       };
     },

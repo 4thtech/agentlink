@@ -29,7 +29,11 @@ import {
   INSTALLER_SILENT,
   STAGED_NODE,
   WIN_HEALTH_TIMEOUT_MS,
+  RECOVERY_FILE,
+  RUNONCE_KEY,
+  RUNONCE_VALUE,
   WIN_WATCHDOG_SOURCE,
+  afterHealthyStartWin,
   installUpdateWin,
   installerIdentity,
   winInstallDirOf,
@@ -123,6 +127,7 @@ describe('the Windows copy that may update itself (WIN-INAPP-UPDATE)', () => {
       launcher: 'C:\\Windows\\explorer.exe',
       tasklist: 'C:\\Windows\\System32\\tasklist.exe',
       taskkill: 'C:\\Windows\\System32\\taskkill.exe',
+      reg: 'C:\\Windows\\System32\\reg.exe',
     });
     expect(winTools(undefined)).toBeNull();
     expect(winTools('Windows')).toBeNull();
@@ -221,7 +226,11 @@ describe('installUpdateWin: download, verify, then the watchdog (WIN-INAPP-UPDAT
     launcher: '/x/explorer.exe',
     tasklist: '/x/tasklist.exe',
     taskkill: '/x/taskkill.exe',
+    reg: '/x/reg.exe',
   };
+  // The installed app's bundle-hashes.json (app.asar): the staged node.exe must match it.
+  const record = async (): Promise<string> =>
+    JSON.stringify({ v: 1, files: { node: sha(new TextEncoder().encode('node 22')) } });
 
   it('verifies size + SHA-256, copies node.exe, waits for Restart now, checks again, starts the watchdog', async () => {
     const s = await setup();
@@ -236,6 +245,7 @@ describe('installUpdateWin: download, verify, then the watchdog (WIN-INAPP-UPDAT
       pid: 4242,
       fetch: fetchBytes(bytes),
       installedNode: s.node,
+      readRecord: record,
       env: { SystemRoot: 'C:\\Windows' },
       tools,
       spawnDetached: (cmd, args, env) => spawned.push({ cmd, args, env }),
@@ -275,9 +285,11 @@ describe('installUpdateWin: download, verify, then the watchdog (WIN-INAPP-UPDAT
         timeoutMs: WIN_HEALTH_TIMEOUT_MS,
         tasklist: tools.tasklist,
         taskkill: tools.taskkill,
+        reg: tools.reg,
+        size: 64,
       }),
     );
-    expect(plan).toHaveLength(11);
+    expect(plan).toHaveLength(13);
     expect(env['TEMP']).toBe(join(staging, 'tmp'));
     expect(env['SystemRoot']).toBe('C:\\Windows');
     expect(sha(await readFile(join(staging, SETUP)))).toBe(sha(bytes));
@@ -294,6 +306,7 @@ describe('installUpdateWin: download, verify, then the watchdog (WIN-INAPP-UPDAT
       pid: 4242,
       fetch: fetchBytes(bytes),
       installedNode: s.node,
+      readRecord: record,
       env: {},
       tools,
       spawnDetached: (cmd) => spawned.push(cmd),
@@ -317,6 +330,7 @@ describe('installUpdateWin: download, verify, then the watchdog (WIN-INAPP-UPDAT
       pid: 1,
       fetch: fetchBytes(bytes),
       installedNode: s.node,
+      readRecord: record,
       env: {},
       tools,
       spawnDetached: () => {
@@ -345,6 +359,15 @@ describe('installUpdateWin: download, verify, then the watchdog (WIN-INAPP-UPDAT
         installDir: join(root, 'nope'),
       }),
     ).toEqual({ kind: 'fallback', code: 'not_in_place' });
+    // IR Fable r1: a node.exe that is not the one in bundle-hashes.json (or no record) never runs.
+    for (const readRecord of [
+      async () => JSON.stringify({ v: 1, files: { node: 'ab'.repeat(32) } }),
+      async () => null,
+    ])
+      expect(await installUpdateWin({ ...base, accepted: accepted(bytes), readRecord })).toEqual({
+        kind: 'fallback',
+        code: 'bundle_hashes',
+      });
     expect(await readdir(join(s.stateDir, 'updates')).catch(() => [])).toEqual([]);
   });
 });
@@ -373,6 +396,7 @@ describe('Windows watchdog: wait, move aside, silent setup, relaunch, health or 
 echo "setup $*" >> "$FAKE_LOG"
 case "$FAKE_MODE" in
   ok) mkdir -p "$FAKE_DIR"; printf 0.5.3 > "$FAKE_DIR/AgentLink.exe"; exit 0 ;;
+  slow) mkdir -p "$FAKE_DIR"; printf partial > "$FAKE_DIR/junk"; echo $$ > "$FAKE_SETUP_PID"; sleep 30; exit 0 ;;
   fail) mkdir -p "$FAKE_DIR"; printf partial > "$FAKE_DIR/junk"; exit 1 ;;
   *) exit 0 ;;
 esac
@@ -397,6 +421,14 @@ if (v === process.env.HEALTHY) {
     await writeFile(launcher, `#!/bin/sh\nexec "$FAKE_NODE" "${js}" "$@"\n`, { mode: 0o755 });
     const tasklist = join(tools, 'tasklist.sh');
     await writeFile(tasklist, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    // The fake reg.exe: `add … /d <command> /f` keeps the command in runonce.txt; `delete` removes it.
+    const reg = join(tools, 'reg.sh');
+    const runOnce = join(tools, 'runonce.txt');
+    await writeFile(
+      reg,
+      `#!/bin/sh\necho "reg $1 $4" >> "${join(tools, 'reg.log')}"\nif [ "$1" = add ]; then printf '%s' "$8" > "${runOnce}"; else rm -f "${runOnce}"; fi\nexit 0\n`,
+      { mode: 0o755 },
+    );
     const taskkill = join(tools, 'taskkill.sh');
     await writeFile(taskkill, `#!/bin/sh\necho "taskkill $*" >> "$FAKE_LOG"\nexit 0\n`, {
       mode: 0o755,
@@ -407,6 +439,7 @@ if (v === process.env.HEALTHY) {
       FAKE_STATE: state,
       FAKE_NODE: process.execPath,
       FAKE_MODE: 'ok',
+      FAKE_SETUP_PID: join(tools, 'setup.pid'),
       HEALTHY: 'none',
     };
     const args = async (pid: number, timeoutMs: number): Promise<string[]> =>
@@ -422,8 +455,10 @@ if (v === process.env.HEALTHY) {
         timeoutMs,
         tasklist,
         taskkill,
+        reg,
+        size: (await stat(installer)).size,
       });
-    return { programs, installDir, state, staging, installer, env, args, log };
+    return { programs, installDir, state, staging, installer, env, args, log, runOnce, tools };
   }
 
   async function deadPid(): Promise<number> {
@@ -480,6 +515,7 @@ if (v === process.env.HEALTHY) {
       reason: 'installer_failed',
     });
     expect((await readdir(s.programs)).sort()).toEqual(['AgentLink']);
+    await expect(stat(s.runOnce)).rejects.toThrow(); // the old copy is back: no recovery entry
   });
 
   it('a setup that exits 0 but writes no app counts as failed (old copy back)', async () => {
@@ -538,7 +574,8 @@ if (v === process.env.HEALTHY) {
     const s = await setup();
     const good = await s.args(await deadPid(), 5000);
     for (const bad of [
-      good.slice(0, 10),
+      good.slice(0, 12),
+      good.map((a, i) => (i === 12 ? '1' : a)), // not the signed size
       good.map((a, i) => (i === 1 ? join(s.programs, 'Other') : a)), // not the AgentLink folder
       good.map((a, i) => (i === 5 ? join(root, SETUP) : a)), // setup outside the staging folder
       good.map((a, i) => (i === 5 ? join(s.staging, 'evil.exe') : a)), // not the setup's name
@@ -551,10 +588,110 @@ if (v === process.env.HEALTHY) {
     expect(await versionAt(s.installDir)).toBe('0.5.2');
   });
 
+  it('RunOnce recovery: set before the folder moves, removed once a copy is in place for good', async () => {
+    const s = await setup();
+    expect(await run(await s.args(await deadPid(), 5000), { ...s.env, HEALTHY: '0.5.3' })).toBe(0);
+    expect(await lines(join(s.tools, 'reg.log'))).toEqual([
+      `reg add ${RUNONCE_VALUE}`,
+      `reg delete ${RUNONCE_VALUE}`,
+    ]);
+    await expect(stat(s.runOnce)).rejects.toThrow();
+  });
+
+  it('the watchdog dies during the setup: the RunOnce command puts the old copy back and starts it', async () => {
+    const s = await setup();
+    const child = spawn(
+      process.execPath,
+      ['-e', WIN_WATCHDOG_SOURCE, '--', ...(await s.args(await deadPid(), 5000))],
+      {
+        env: { ...process.env, ...s.env, FAKE_MODE: 'slow' },
+        stdio: 'ignore',
+      },
+    );
+    const setupPid = join(s.tools, 'setup.pid');
+    for (
+      let i = 0;
+      i < 200 &&
+      !(await stat(setupPid).then(
+        () => true,
+        () => false,
+      ));
+      i += 1
+    )
+      await new Promise((r) => setTimeout(r, 25));
+    child.kill('SIGKILL'); // the computer shut down mid-update
+    process.kill(Number((await readFile(setupPid, 'utf8')).trim()), 'SIGKILL');
+    await new Promise((r) => child.on('exit', r));
+    expect((await readdir(s.programs)).sort()).toEqual([
+      'AgentLink',
+      'AgentLink.previous-u-abc123',
+    ]);
+    // What Windows runs at the next logon: "<node>" "<staging>\recover.cjs".
+    const command = await readFile(s.runOnce, 'utf8');
+    const m = /^"([^"]+)" "([^"]+)"$/.exec(command);
+    expect(m).not.toBeNull();
+    expect(m![2]).toBe(join(s.staging, RECOVERY_FILE));
+    const rec = spawn(m![1]!, [m![2]!], { env: { ...process.env, ...s.env }, stdio: 'ignore' });
+    expect(await new Promise((r) => rec.on('exit', (c) => r(c)))).toBe(0);
+    expect(await versionAt(s.installDir)).toBe('0.5.2');
+    expect(await readFile(join(s.installDir, 'data-of-old.txt'), 'utf8')).toBe('old');
+    expect((await readdir(s.programs)).sort()).toEqual(['AgentLink']);
+    expect(await loadFailedRecord(s.state)).toEqual({ version: '0.5.3', reason: 'interrupted' });
+    for (let i = 0; i < 200 && !(await lines(s.log)).includes('launch 0.5.2'); i += 1)
+      await new Promise((r) => setTimeout(r, 25));
+    expect(await lines(s.log)).toContain('launch 0.5.2');
+    // Run again (nothing aside): it does nothing.
+    const again = spawn(m![1]!, [m![2]!], { env: { ...process.env, ...s.env }, stdio: 'ignore' });
+    expect(await new Promise((r) => again.on('exit', (c) => r(c)))).toBe(0);
+    expect(await versionAt(s.installDir)).toBe('0.5.2');
+  });
+
+  it('a healthy start removes the RunOnce entry and left-over folders no watchdog owns', async () => {
+    const programs = join(root, 'P2');
+    const installDir = join(programs, 'AgentLink');
+    const state = join(root, 'state2');
+    for (const d of [
+      installDir,
+      join(programs, 'AgentLink.previous-u-gone01'),
+      join(programs, 'AgentLink.failed-u-gone02'),
+      join(programs, 'AgentLink.previous-u-busy01'),
+      join(programs, 'AgentLink.other'),
+      join(state, 'updates', 'u-busy01'),
+    ])
+      await mkdir(d, { recursive: true });
+    const calls: string[][] = [];
+    const tidy = (pending?: string) =>
+      afterHealthyStartWin({
+        stateDir: state,
+        installDir,
+        version: '0.5.3',
+        reg: '/x/reg.exe',
+        run: async (cmd, args) => {
+          calls.push([cmd, ...args]);
+        },
+      }).then(() => pending);
+    await tidy();
+    expect(calls).toEqual([['/x/reg.exe', 'delete', RUNONCE_KEY, '/v', RUNONCE_VALUE, '/f']]);
+    expect((await readdir(programs)).sort()).toEqual([
+      'AgentLink',
+      'AgentLink.other',
+      'AgentLink.previous-u-busy01',
+    ]);
+    // An update of another version is pending: the entry stays.
+    await writeFile(
+      join(state, PENDING_FILE),
+      JSON.stringify({ version: '0.5.4', nonce: 'n'.repeat(16) }),
+    );
+    calls.length = 0;
+    await tidy();
+    expect(calls).toEqual([]);
+  });
+
   it('the new reasons are fixed and map to fixed refusal codes', () => {
     expect(FAILED_REASONS).toContain('installer_failed');
     expect(FAILED_REASONS).toContain('installer_changed');
     expect(failedReasonCode('installer_failed')).toBe('installer_failed');
     expect(failedReasonCode('installer_changed')).toBe('installer_changed');
+    expect(failedReasonCode('interrupted')).toBe('installer_failed');
   });
 });

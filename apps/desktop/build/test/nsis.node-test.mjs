@@ -125,6 +125,12 @@ test('silent upgrade: no skipped files, the helper checked too, data and the des
     assert.ok(at >= 0 && at < rm, guard);
   }
   assert.equal(install.split('RMDir /r').length - 1, 1);
+  // IR Fable r1: never through a junction or link (reparse point) at the folder or at resources.
+  for (const target of ['$INSTDIR', '$INSTDIR\\resources']) {
+    const at = install.indexOf(`GetFileAttributesW(w "${target}")`);
+    assert.ok(at >= 0 && at < rm, target);
+  }
+  assert.equal(install.split('IntOp $0 $0 & 0x400').length - 1, 2);
   assert.doesNotMatch(install, /\.agentlink|\$PROFILE|\$APPDATA|\$DOCUMENTS/);
   // The desktop shortcut: only the finish page creates it (a silent run has none), nothing in the
   // install deletes it, so the person's choice stays as it was.

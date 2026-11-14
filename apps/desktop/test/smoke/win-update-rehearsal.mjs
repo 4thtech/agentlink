@@ -12,7 +12,8 @@
 //      AgentLink through Explorer, takes the health answer (written here, as the new app would), and
 //      removes the old copy;
 //   5. a setup that fails (exit ≠ 0): the old copy is back, `installer_failed` is recorded;
-//   6. a setup changed after it was verified: never run, `installer_changed` is recorded.
+//   6. a setup changed after it was verified: never run, `installer_changed` is recorded;
+//   7. the watchdog killed during the setup: its RunOnce recovery entry puts the old copy back.
 // Prints fixed words only. Usage: node win-update-rehearsal.mjs --setup <AgentLink-…-setup.exe>
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
@@ -23,6 +24,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -111,6 +113,7 @@ async function watchdog(tag, setupFrom, opts = {}) {
   const node = join(staging, 'node.exe');
   copyFileSync(process.execPath, node);
   const installerId = await win.installerIdentity(installer);
+  const size = statSync(installer).size;
   opts.before?.(installer);
   const dead = spawnSync(process.execPath, ['-e', '']).pid;
   const args = win.winWatchdogArgs({
@@ -125,6 +128,8 @@ async function watchdog(tag, setupFrom, opts = {}) {
     timeoutMs: 60_000,
     tasklist: tools.tasklist,
     taskkill: tools.taskkill,
+    reg: tools.reg,
+    size,
   });
   const wdEnv = {
     ...win.winWatchdogEnv({
@@ -156,7 +161,9 @@ async function watchdog(tag, setupFrom, opts = {}) {
       // not yet
     }
   }, 200);
-  const code = await new Promise((r) => child.on('exit', (c) => r(c)));
+  const exited = new Promise((r) => child.on('exit', (c) => r(c)));
+  await opts.during?.(child);
+  const code = await exited;
   clearInterval(answer);
   return code;
 }
@@ -186,6 +193,9 @@ for (let i = 0; i < 60 && !started; i += 1) {
   if (!started) await sleep(1000);
 }
 if (!started) fail('AgentLink was not started through Explorer');
+const recoveryEntry = () =>
+  spawnSync(tools.reg, ['query', win.RUNONCE_KEY, '/v', win.RUNONCE_VALUE], { encoding: 'utf8' });
+if (recoveryEntry().status === 0) fail('the RunOnce recovery entry stayed after a good update');
 ok(
   'watchdog: waited, moved aside, ran the setup silently, started AgentLink, removed the old copy',
 );
@@ -211,4 +221,35 @@ if ((await state.loadFailedRecord(stateDir))?.reason !== 'installer_changed')
   fail('installer_changed was not recorded');
 ok('a setup changed after the check is never run, installer_changed recorded');
 stopApp();
+await sleep(2000);
+
+// 7. The watchdog is killed during the setup (the computer shut down): Windows would run the
+// RunOnce entry at the next logon; here it is run the same way (removed first, then started).
+const aside = join(LOCAL, 'Programs', 'AgentLink.previous-u-rehea4');
+await watchdog('u-rehea4', values.setup, {
+  during: async (child) => {
+    for (let i = 0; i < 600 && !existsSync(aside); i += 1) await sleep(100);
+    await sleep(3000);
+    spawnSync(tools.taskkill, ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+  },
+});
+if (!existsSync(aside)) fail('the install folder was not moved aside before the kill');
+const query = recoveryEntry();
+const data = /REG_SZ\s+(.+?)\s*$/m.exec(query.stdout ?? '');
+const command = data === null ? null : /^"([^"]+)" "([^"]+)"$/.exec(data[1]);
+if (query.status !== 0 || command === null) fail('no RunOnce recovery entry after the kill');
+spawnSync(tools.reg, ['delete', win.RUNONCE_KEY, '/v', win.RUNONCE_VALUE, '/f'], {
+  stdio: 'ignore',
+});
+const recovered = spawnSync(command[1], [command[2]], { stdio: 'ignore', timeout: 120_000 });
+if (recovered.status !== 0) fail(`the recovery exited ${String(recovered.status)}`);
+if (
+  !existsSync(exe) ||
+  !readFileSync(exe).equals(exeBefore) ||
+  siblings().join(',') !== 'AgentLink'
+)
+  fail('the recovery did not put the old copy back');
+if ((await state.loadFailedRecord(stateDir))?.reason !== 'interrupted')
+  fail('interrupted was not recorded');
+ok('a watchdog killed during the setup: its RunOnce recovery put the old copy back');
 console.log('win-update-rehearsal: all steps passed.');
