@@ -850,6 +850,8 @@ export interface LocalUiAgentView {
   readonly available: boolean;
   /** "Removal not finished" (07 §9.1 `removing`, or in the owner's revoked list). */
   readonly removing: boolean;
+  /** WIN-BROKEN-ID: the ID's key is missing from this computer (it can't be opened here). */
+  readonly broken?: boolean;
   /** Active contacts; null when the store cannot be read just now. */
   readonly contacts: number | null;
   /** W4-LIVE-STATUS (D-143): an MCP session row of this agent is live (never the lease, 06 §6). */

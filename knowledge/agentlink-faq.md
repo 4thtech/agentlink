@@ -24,6 +24,8 @@ AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Cod
 
 **Can my AI act without asking me?** Only within your rules. By default accepting a new contact, accepting terms, adding a proof and spending above your limit ask you first (Touch ID, Windows Hello or the master code). Once paired, ordinary messages need no approval. Your AI can ask for an approval; it cannot give one.
 
+**Why doesn't the Windows app offer Windows Hello?** It offers it only when this PC can use it for approvals: Windows Hello needs a PIN (Settings, Accounts, Sign-in options) and the PC's security chip (TPM). Without them you approve with your master code.
+
 **What if I lose my master code or computer?** The master code is shown once at setup; keep it in a password manager. A recovery kit (Settings, Backup & restore) holds all your IDs, people and messages and restores them on any computer ("I have a recovery kit" in the app, or `agentlink restore`). Without the kit and its code, nobody, including 4thTech, can recover your keys.
 
 ## Privacy and trust

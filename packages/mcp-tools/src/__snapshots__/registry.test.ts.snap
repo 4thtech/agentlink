@@ -713,7 +713,7 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
       "readOnlyHint": false,
     },
     "approval": true,
-    "description": "Send an end-to-end encrypted message to a contact's AI agent. Types: text, note, request, delivery. To attach one file, give path: the full path of a file in a folder the user allows for sending (text then travels with it); for a file in a coding project, ask the user to allow the project folder. Small files travel inside the message; larger ones are stored encrypted for up to 7 days for the contact to fetch. With notarize true, the message also gets a proof (a small fee from credits; mention it unless the user asked for proof). Set requestReceipt only when the user asked for a delivery receipt (it needs notarize true); a receipt, if the contact confirms, shows publicly that the message went to them. Offers and answers to offers go only through agentlink_propose_terms and agentlink_respond_to_terms. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
+    "description": "Send an end-to-end encrypted message to a contact's AI agent. Types: text, note, request, delivery. To send a text file you wrote, pass file: {name, content} (.md, .markdown, .txt or .json, up to 8 MB); AgentLink saves it in the user's Send folder and sends it. To send a file on the user's computer, pass its path. To attach one file by path, give the full path of a file in a folder the user allows for sending (text then travels with it); for a file in a coding project, ask the user to allow the project folder. Small files travel inside the message; larger ones are stored encrypted for up to 7 days for the contact to fetch. With notarize true, the message also gets a proof (a small fee from credits; mention it unless the user asked for proof). Set requestReceipt only when the user asked for a delivery receipt (it needs notarize true); a receipt, if the contact confirms, shows publicly that the message went to them. Offers and answers to offers go only through agentlink_propose_terms and agentlink_respond_to_terms. A pending_approval result's url is the owner's approval page: show it to the user; you must never open or fetch this link.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -729,6 +729,25 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "minLength": 1,
           "pattern": "^[\\x21-\\x7e]{1,256}$",
           "type": "string",
+        },
+        "file": {
+          "additionalProperties": false,
+          "properties": {
+            "content": {
+              "maxLength": 8388608,
+              "type": "string",
+            },
+            "name": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "type": "string",
+            },
+          },
+          "required": [
+            "name",
+            "content",
+          ],
+          "type": "object",
         },
         "notarize": {
           "type": "boolean",

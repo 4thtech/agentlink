@@ -66,6 +66,7 @@ import {
 import { agentSlug, createAgentFolder, discardNewAgentFolder } from './agent-create.js';
 import { isAgentLabel, isAgentName } from './agent-name.js';
 import { RuntimeError } from './errors.js';
+import { brokenIds } from './broken-names.js';
 
 /** The recorded per-agent config (07 §9.1). */
 export interface AgentConfig {
@@ -426,6 +427,45 @@ export async function markAgentRemoving(
   const found = await readAgentConfig(home, name, options);
   if (found === undefined) throw new RuntimeError('agent_config_invalid');
   await writeAgentConfig(home, { ...found.config, removing: true }, { ...options, replace: true });
+}
+
+/** WIN-BROKEN-ID: where an ID whose key is missing is moved (`~/.agentlink/set-aside`). */
+export const SET_ASIDE_DIR = 'set-aside';
+
+/**
+ * WIN-BROKEN-ID: moves an agent folder, whole, to `~/.agentlink/set-aside/<name>.<stamp>` (never a
+ * delete; the owner can move it back). After the folder rules (realpath exactly under `agents`, no
+ * links, private), the set-aside folder is made 0700 and checked the same way (a link or a file
+ * there refuses), and the target must not exist. One rename: on Windows a file another process holds
+ * open makes it fail, and nothing is moved. Fixed errors only (I-7).
+ */
+export async function moveAgentFolderAside(
+  home: string,
+  name: string,
+  stamp: string,
+  options: OwnerCheck = {},
+): Promise<void> {
+  if (!/^[0-9]{8}-[0-9]{6}$/.test(stamp)) throw new RuntimeError('agent_path_invalid');
+  const found = await readAgentConfig(home, name, options);
+  if (found === undefined) throw new RuntimeError('agent_config_invalid');
+  const uid = expectedUid(options);
+  const asideDir = join(found.paths.root, SET_ASIDE_DIR);
+  await ensurePrivateDir(asideDir, uid);
+  let target: string;
+  try {
+    const rootReal = await realpath(found.paths.root);
+    const asideReal = await realpath(asideDir);
+    if (asideReal !== join(rootReal, SET_ASIDE_DIR)) throw new RuntimeError('agent_path_invalid');
+    target = join(asideReal, `${name}.${stamp}`);
+  } catch {
+    throw new RuntimeError('agent_path_invalid');
+  }
+  if ((await lstatOrMissing(target)) !== undefined) throw new RuntimeError('agent_path_invalid');
+  try {
+    await rename(found.paths.dir, target);
+  } catch {
+    throw new RuntimeError('agent_path_invalid');
+  }
 }
 
 /**
@@ -908,6 +948,8 @@ async function directoryEntry(
       removing,
       // WP-R2b: the recorded backend, so Back up names a file-KeyStore ID without opening it.
       keyStore: config.keyStore,
+      // WIN-BROKEN-ID: its open failed here because its key is missing (broken-names.ts).
+      ...(!removing && brokenIds(home).has(name) ? { broken: 'identity_missing' as const } : {}),
     });
   } catch {
     // A folder that breaks the rules is still listed (never lost), and never opened.
@@ -996,6 +1038,10 @@ export function agentDirectory(
     },
     markRemoving: (name) => markAgentRemoving(home, name, check),
     removeFolder: (name) => removeAgentFolder(home, name, check),
+    // WIN-BROKEN-ID: the folder aside, then the leftover keys (broken-id.ts; checked again there).
+    // Loaded on use: broken-id.ts imports this file's folder rules.
+    setAside: async (name) =>
+      (await import('./broken-id.js')).setAsideBrokenAgent(home, name, check),
     readCurrent: () => readAppCurrent(home, check),
     writeCurrent: (name) => writeAppCurrent(home, name, check),
     readUiSettings: () => readUiSettingsFile(home, check),

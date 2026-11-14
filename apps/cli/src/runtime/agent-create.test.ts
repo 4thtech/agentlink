@@ -7,7 +7,7 @@
 // - The new config names the keychain agent and holds no label: the label is written only after the
 //   server verified the signed `agent.label` (07 §9.1).
 // - Discarding a new agent removes its keychain items and its folder, and only for that agent.
-import { mkdtemp, readdir, realpath, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { encodeHex, randomBytes } from '@4thtech-io/crypto';
@@ -130,6 +130,42 @@ describe('createAgentFolder and discardNewAgentFolder (U3-d)', () => {
     expect(discarded).toEqual([agentId]);
     expect(await readdir(join(home, '.agentlink', 'agents'))).toEqual(['personal']);
     expect((await readAgentConfig(home, 'personal'))?.config.agentId).toBe(other);
+  });
+});
+
+describe('discardNewAgentFolder order (WIN-BROKEN-ID)', () => {
+  it('removes the folder first, then the keys', async () => {
+    const agentId = newId();
+    const name = await createAgentFolder(home, 'Work', {
+      createAgent: () => Promise.resolve(agentId),
+    });
+    let folderGoneFirst: boolean | undefined;
+    await discardNewAgentFolder(home, name, {
+      discardKeys: async () => {
+        folderGoneFirst = (await readAgentConfig(home, name)) === undefined;
+      },
+    });
+    expect(folderGoneFirst).toBe(true);
+  });
+
+  it('a folder that cannot be removed keeps its keys and rejects (never a folder without keys)', async () => {
+    const agentId = newId();
+    const name = await createAgentFolder(home, 'Work', {
+      createAgent: () => Promise.resolve(agentId),
+    });
+    // An unknown file refuses the folder removal (removeAgentFolder, no recursive delete).
+    await writeFile(join(home, '.agentlink', 'agents', name, 'stray.txt'), 'x');
+    const discarded: string[] = [];
+    await expect(
+      discardNewAgentFolder(home, name, {
+        discardKeys: (id) => {
+          discarded.push(id);
+          return Promise.resolve();
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'agent_path_invalid' });
+    expect(discarded).toEqual([]);
+    expect((await readAgentConfig(home, name))?.config.agentId).toBe(agentId);
   });
 });
 

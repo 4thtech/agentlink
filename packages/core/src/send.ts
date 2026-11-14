@@ -17,14 +17,32 @@
 // 6. The result is stored (idempotency), then the envelope's rows are published. A relay outage
 //    does not fail the send: the rows stay pending and the outbox retries (07 §4.2).
 //
+// FILES-AI-1 (D-152; 06 §2.3 "Send by content"): with `contentFile: {name, content}` the idempotency
+// row binds the raw name, the content's SHA-256 and length (never the content, never a path), so a
+// repeat is answered before anything is written. Inside the run, after the pause and before the
+// contact policy: the name and the content checks (FILE_NAME, FILE_TYPE, FILE_NOT_TEXT,
+// FILE_TOO_LARGE); then the contact policy (POLICY_DENIED); then the verified policy's allowed folders
+// (none: needs_setup `no_folder`); then the platform's Send folder writer, which holds the ID's own
+// pinned Send folder, calls the budget reservation (one store transaction) and only then creates the
+// file. The send then takes the written realpath through every `path` rule, but the bytes it encrypts
+// are the ones in memory. Anything but `ok` removes the file this call wrote; the content refusals
+// are never kept under the clientRequestId.
+//
 // Errors are CoreErrors with fixed sentences; nothing of the message, the contact or a key goes
 // into an error or a log line (I-5, I-7). Logs carry counts only.
-import { canonicalize, encodeUtf8, type JsonValue } from '@4thtech-io/crypto';
+import {
+  canonicalize,
+  createSha256,
+  encodeHex,
+  encodeUtf8,
+  sha256,
+  type JsonValue,
+} from '@4thtech-io/crypto';
 import { PAYLOAD_MAX_BYTES } from '@4thtech-io/storage';
-import { SEND_TOOL_PAYLOAD_TYPES, payloadSchema } from '@4thtech-io/types';
+import { SEND_TOOL_PAYLOAD_TYPES, mimeForName, payloadSchema } from '@4thtech-io/types';
 import { IDEMPOTENCY_KEY_REUSED } from './constants.js';
 import type { ContactBook } from './contacts.js';
-import type { CoreContext } from './context.js';
+import { nowOf, type CoreContext } from './context.js';
 import type { EnvelopeService } from './envelopes.js';
 import { CoreError } from './errors.js';
 import {
@@ -34,7 +52,18 @@ import {
   type OutgoingRecord,
   type SentFile,
 } from './files/outgoing.js';
-import type { FilesPlatform, OutgoingFile } from './files/platform.js';
+import {
+  CONTENT_FILE_UNKEPT,
+  FILE_BUDGET,
+  FILE_NAME_TAKEN,
+  FILE_TYPE,
+  SEND_FOLDER_UNAVAILABLE,
+  contentFileBytes,
+  contentFileName,
+  reserveContentBudget,
+  type ContentFileCode,
+} from './files/content-file.js';
+import type { FilesPlatform, OutgoingFile, SendFolderWriteResult } from './files/platform.js';
 import { sealFileRows } from './files/records.js';
 import type { IdempotencyRun, IdempotencyService } from './idempotency.js';
 import type { IdentityService } from './identity.js';
@@ -63,6 +92,11 @@ export interface SendMessageInput {
    * allowed-folder check; the core checks the realpath again (04 §4).
    */
   readonly files?: readonly OutgoingFile[];
+  /**
+   * FILES-AI-1 (D-152; 06 §2.3 "Send by content"): a small text file the AI wrote, saved into the
+   * ID's own Send folder by the platform's writer and sent from these bytes. Not with `files`.
+   */
+  readonly contentFile?: { readonly name: string; readonly content: string };
 }
 
 export const USE_TERMS_TOOLS = 'USE_TERMS_TOOLS' as const;
@@ -91,6 +125,16 @@ export type SendMessageResult =
        * envelope at answer time, also for a repeat with the same clientRequestId; never stored.
        */
       readonly delivery?: SendDelivery;
+      /**
+       * FILES-AI-1: the file written by content: the saved name (`notes (2).md` after a clash), the
+       * size and SHA-256 of the in-memory bytes, and the Send folder in its fixed `~` form.
+       */
+      readonly contentFile?: {
+        readonly name: string;
+        readonly size: number;
+        readonly plaintextSha256: string;
+        readonly sendFolder: string;
+      };
     }
   | {
       readonly status: 'rejected';
@@ -99,7 +143,8 @@ export type SendMessageResult =
         | typeof IDEMPOTENCY_KEY_REUSED
         | typeof POLICY_DENIED
         | typeof PAYLOAD_TOO_LARGE
-        | typeof FILE_TOO_LARGE;
+        | typeof FILE_TOO_LARGE
+        | ContentFileCode;
     }
   /** A file send that needs the owner first (06 §2.3): an allowed folder or own storage. */
   | { readonly status: 'needs_setup'; readonly reason: FilesNeedsSetup }
@@ -114,6 +159,8 @@ interface Request {
     readonly replyTo: string | null;
   };
   readonly files: readonly OutgoingFile[];
+  /** FILES-AI-1: the content file, checked in the run (06 §2.3 order). */
+  readonly contentFile?: { readonly name: unknown; readonly content: unknown };
   /** `args` as for `action.args` (04 §3.4.1): defaults applied, without clientRequestId. */
   readonly args: Readonly<Record<string, unknown>>;
 }
@@ -128,7 +175,7 @@ const invalid = (): never => {
 /** The checked request, or the USE_TERMS_TOOLS refusal. Throws for any other bad input. */
 function readInput(input: SendMessageInput): Request | 'terms' {
   if (!isPlainObject(input)) return invalid();
-  const { to, text, body, replyTo, files } = input;
+  const { to, text, body, replyTo, files, contentFile } = input;
   const type = input.type ?? 'text';
   if (body !== undefined && isPlainObject(body) && Object.hasOwn(body, 'terms')) return 'terms';
   if (!(SEND_TOOL_PAYLOAD_TYPES as readonly unknown[]).includes(type)) {
@@ -140,6 +187,9 @@ function readInput(input: SendMessageInput): Request | 'terms' {
   if (body !== undefined && !isPlainObject(body)) return invalid();
   if (replyTo !== undefined && typeof replyTo !== 'string') return invalid();
   if (files !== undefined && (!Array.isArray(files) || files.length > 16)) return invalid();
+  if (contentFile !== undefined && (!isPlainObject(contentFile) || files !== undefined)) {
+    return invalid();
+  }
   const payload = {
     type,
     body: text ?? body,
@@ -152,6 +202,9 @@ function readInput(input: SendMessageInput): Request | 'terms' {
     to,
     payload: { type: payload.type, body: payload.body, replyTo: payload.replyTo },
     files: attached,
+    ...(contentFile === undefined
+      ? {}
+      : { contentFile: { name: contentFile['name'], content: contentFile['content'] } }),
     args: {
       to,
       type,
@@ -170,7 +223,25 @@ function readInput(input: SendMessageInput): Request | 'terms' {
               mime: typeof f?.mime === 'string' ? f.mime : null,
             })),
           }),
+      // FILES-AI-1: the raw name, the content's hash and length; never the content or a path.
+      ...(contentFile === undefined ? {} : { contentFile: contentFileArgs(contentFile) }),
     },
+  };
+}
+
+/** The idempotency args of a content file (06 §2.3: "the record holds the content's hash"). */
+function contentFileArgs(
+  file: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, unknown>> {
+  const { name, content } = file;
+  const text = typeof content === 'string' ? content : '';
+  const hasher = createSha256();
+  // Lone surrogates encode as U+FFFD: `chars` and the refusal in the run keep two such inputs apart.
+  hasher.update(new TextEncoder().encode(text));
+  return {
+    name: typeof name === 'string' ? name : null,
+    sha256: typeof content === 'string' ? encodeHex(hasher.digest()) : null,
+    chars: typeof content === 'string' ? content.length : null,
   };
 }
 
@@ -243,7 +314,12 @@ export class SendService {
           }
           throw error;
         }
-        if (done.result.status === 'needs_setup') {
+        if (
+          done.result.status === 'needs_setup' ||
+          (request.contentFile !== undefined &&
+            done.result.status === 'rejected' &&
+            CONTENT_FILE_UNKEPT.has(done.result.code))
+        ) {
           // Nothing happened and the owner is about to fix the cause (an allowed folder, own
           // storage): the row is deleted, never replayed, so the same clientRequestId runs again
           // (07 §3.3).
@@ -266,15 +342,117 @@ export class SendService {
     request: Request,
     run: IdempotencyRun | undefined,
   ): Promise<{ readonly result: SendMessageResult; readonly envelopeId?: string }> {
-    const ctx = this.#ctx;
-    const { identity, ownerActions } = this.#deps;
-    await identity.assertCanSend();
+    await this.#deps.identity.assertCanSend();
+    // FILES-AI-1: the name and the content are checked before the contact rule (06 §2.3 order).
+    if (request.contentFile !== undefined) return this.#runContentFile(request, run);
     // The contact rule before anything is read, uploaded or signed; the size rule once the
     // envelope exists.
     if ((await this.#decide(request.to, 0)) !== 'allow') {
       return { result: { status: 'rejected', code: POLICY_DENIED } };
     }
-    if (request.files.length === 0) {
+    return this.#runFiles(request, request.files, run);
+  }
+
+  /** FILES-AI-1: the content file's checks, the write, then the ordinary file send (06 §2.3). */
+  async #runContentFile(
+    request: Request,
+    run: IdempotencyRun | undefined,
+  ): Promise<{ readonly result: SendMessageResult; readonly envelopeId?: string }> {
+    const ctx = this.#ctx;
+    const refuse = (code: ContentFileCode) => ({ result: { status: 'rejected', code } as const });
+    const named = contentFileName(request.contentFile?.name);
+    if (!named.ok) return refuse(named.code);
+    const content = contentFileBytes(request.contentFile?.content);
+    if (!content.ok) return refuse(content.code);
+    const bytes = content.bytes;
+    // The contact policy, the same rule that decides a `path` send to this contact.
+    if ((await this.#decide(request.to, 0)) !== 'allow') {
+      return { result: { status: 'rejected', code: POLICY_DENIED } };
+    }
+    const policy = await this.#deps.ownerActions.loadPolicy();
+    const folders = policy.mode === 'fail_closed' ? [] : policy.policy.files.allowedFolders;
+    if (!Array.isArray(folders) || folders.length === 0) {
+      return { result: { status: 'needs_setup', reason: 'no_folder' } };
+    }
+    const write = this.#deps.files?.writeSendFolderFile?.bind(this.#deps.files);
+    if (write === undefined) {
+      throw new CoreError('files_unavailable', 'This agent cannot send files here.');
+    }
+    let written: SendFolderWriteResult;
+    try {
+      written = await write({
+        allowedFolders: folders,
+        name: named.name,
+        bytes,
+        reserve: async () => {
+          try {
+            return await reserveContentBudget(ctx.store, nowOf(ctx), bytes.length);
+          } catch {
+            // Fail closed: an unreadable ledger refuses (FILES_UNAVAILABLE), nothing is written.
+            return 'unavailable';
+          }
+        },
+      });
+    } catch {
+      // The platform's own error can name a path; it is replaced (I-7).
+      throw new CoreError('files_unavailable', 'The Send folder cannot be used now.');
+    }
+    if (!written.ok) {
+      switch (written.reason) {
+        case 'budget':
+          return refuse(FILE_BUDGET);
+        case 'budget_unavailable':
+          throw new CoreError('files_unavailable', 'The Send folder cannot be used now.');
+        case 'name_taken':
+          return refuse(FILE_NAME_TAKEN);
+        case 'type':
+          return refuse(FILE_TYPE);
+        default:
+          return refuse(SEND_FOLDER_UNAVAILABLE);
+      }
+    }
+    const file: OutgoingFile = {
+      realpath: written.realpath,
+      name: written.name,
+      mime: mimeForName(written.name),
+      size: bytes.length,
+      // The bytes in memory, never read back from the folder.
+      open: () => Promise.resolve(bytes.slice()),
+    };
+    let done: { readonly result: SendMessageResult; readonly envelopeId?: string };
+    try {
+      done = await this.#runFiles(request, [file], run);
+    } catch (error) {
+      await written.remove().catch(() => undefined);
+      throw error;
+    }
+    if (done.result.status !== 'ok') {
+      await written.remove().catch(() => undefined);
+      return done;
+    }
+    return {
+      ...done,
+      result: {
+        ...done.result,
+        contentFile: {
+          name: written.name,
+          size: bytes.length,
+          plaintextSha256: encodeHex(sha256(bytes)),
+          sendFolder: written.sendFolder,
+        },
+      },
+    };
+  }
+
+  /** The file send of `files` (none: a plain message), after the contact policy passed. */
+  async #runFiles(
+    request: Request,
+    files: readonly OutgoingFile[],
+    run: IdempotencyRun | undefined,
+  ): Promise<{ readonly result: SendMessageResult; readonly envelopeId?: string }> {
+    const ctx = this.#ctx;
+    const { ownerActions } = this.#deps;
+    if (files.length === 0) {
       return this.#store(request, { ...request.payload, files: [] }, [], run);
     }
     const platform = this.#deps.files;
@@ -284,7 +462,7 @@ export class SendService {
     const outcome = await prepareOutgoing(
       { ctx, platform, policy: await ownerActions.loadPolicy() },
       request.payload,
-      request.files,
+      files,
     );
     if (outcome.kind === 'needs_setup') {
       return { result: { status: 'needs_setup', reason: outcome.reason } };

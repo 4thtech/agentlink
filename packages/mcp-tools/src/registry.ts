@@ -239,6 +239,18 @@ const filePath = str({
   pattern: '^[^\\u0000-\\u001f\\u007f-\\u009f]+$',
 });
 
+/**
+ * The `file` input of `agentlink_send` (FILES-AI-1, D-152; 06 §2.3 "Send by content"): a text file
+ * the AI wrote, exactly `{name, content}`. No member takes an envelope, a received file or a path.
+ */
+const contentFileInput = obj(
+  {
+    name: str({ minLength: 1, maxLength: 1024 }),
+    content: str({ maxLength: 8_388_608 }),
+  },
+  ['name', 'content'],
+);
+
 /** The `file` of an `agentlink_send` with `path` (06 §2.2): never a link, a locator or a key. */
 const sentFile = obj(
   {
@@ -487,7 +499,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     name: 'agentlink_send',
     title: 'AgentLink: send a message or file',
     description:
-      "Send an end-to-end encrypted message to a contact's AI agent. Types: text, note, request, delivery. To attach one file, give path: the full path of a file in a folder the user allows for sending (text then travels with it); for a file in a coding project, ask the user to allow the project folder. Small files travel inside the message; larger ones are stored encrypted for up to 7 days for the contact to fetch. With notarize true, the message also gets a proof (a small fee from credits; mention it unless the user asked for proof). Set requestReceipt only when the user asked for a delivery receipt (it needs notarize true); a receipt, if the contact confirms, shows publicly that the message went to them. Offers and answers to offers go only through agentlink_propose_terms and agentlink_respond_to_terms.",
+      "Send an end-to-end encrypted message to a contact's AI agent. Types: text, note, request, delivery. To send a text file you wrote, pass file: {name, content} (.md, .markdown, .txt or .json, up to 8 MB); AgentLink saves it in the user's Send folder and sends it. To send a file on the user's computer, pass its path. To attach one file by path, give the full path of a file in a folder the user allows for sending (text then travels with it); for a file in a coding project, ask the user to allow the project folder. Small files travel inside the message; larger ones are stored encrypted for up to 7 days for the contact to fetch. With notarize true, the message also gets a proof (a small fee from credits; mention it unless the user asked for proof). Set requestReceipt only when the user asked for a delivery receipt (it needs notarize true); a receipt, if the contact confirms, shows publicly that the message went to them. Offers and answers to offers go only through agentlink_propose_terms and agentlink_respond_to_terms.",
     inputSchema: obj(
       {
         to: str({ minLength: 1, maxLength: MAX_CONTACT_ARG, description: CONTACT_ARG_HELP }),
@@ -495,6 +507,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
         type: oneOf(['text', 'note', 'request', 'delivery']),
         body: { type: 'object' },
         path: filePath,
+        file: contentFileInput,
         replyTo: envelopeId,
         notarize: bool(),
         requestReceipt: bool(),

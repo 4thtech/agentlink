@@ -52,6 +52,7 @@ import { PasteEntryLink } from '../invite/paste-entry.js';
 import { createAgentsApi, type AgentsApi } from '../agents/api.js';
 import type { AgentRow } from '../agents/data.js';
 import { FinishRemoveSheet, UnfinishedRemoval } from '../agents/finish-remove.js';
+import { BrokenIdNotice } from '../agents/broken-id.js';
 import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
 import type { PayConfirmClient } from '../../pay-confirm/index.js';
 import { usePrefs } from '../../prefs/index.js';
@@ -632,9 +633,22 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   // W8-S4 (F21; 04 §2.5 "Finishing a removal"): an ID whose removal stopped part-way is never a
   // usable ID here (no chip); Home names it with Finish removing instead.
   const liveIds = useLiveAgents();
-  const agents = useMemo(() => liveIds.agents.filter((a) => !a.removing), [liveIds.agents]);
+  const brokenNames = useMemo(
+    () => new Set(liveIds.rows.filter((r) => r.broken === true).map((r) => r.name)),
+    [liveIds.rows],
+  );
+  // WIN-BROKEN-ID: an ID whose key is missing is not a usable ID here either (no chip).
+  const agents = useMemo(
+    () => liveIds.agents.filter((a) => !a.removing && !brokenNames.has(a.name)),
+    [liveIds.agents, brokenNames],
+  );
   const unfinished = liveIds.rows.filter((r) => r.removing);
   const [finishing, setFinishing] = useState<AgentRow | undefined>(undefined);
+  // WIN-BROKEN-ID: Continue without it hides the notice for this visit only.
+  const [continued, setContinued] = useState<ReadonlySet<string>>(new Set());
+  const broken = liveIds.rows.filter(
+    (r) => r.broken === true && !r.removing && !continued.has(r.name),
+  );
   const current = agents.find((a) => a.current);
   const appName = current?.apps[0]?.app;
   const agentLabel = idWithApp(current?.label ?? '', appName);
@@ -1049,6 +1063,15 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   return (
     <div className="hm-page hm-c" data-layer={pro ? 'pro' : 'simple'}>
       <h1 className="al-visually-hidden">{S.title}</h1>
+      {/* WIN-BROKEN-ID: also with no ID open (the only ID here can't be opened). */}
+      {broken.map((row) => (
+        <BrokenIdNotice
+          key={row.name}
+          row={row}
+          onRemove={setFinishing}
+          onContinue={(r) => setContinued((was) => new Set([...was, r.name]))}
+        />
+      ))}
       {/* REL051-INTFIX: an approval waits but there is no ID yet: the reason stays above the
           "Create your first ID" card, so whoever came for that approval learns why it can't be
           approved here yet. */}

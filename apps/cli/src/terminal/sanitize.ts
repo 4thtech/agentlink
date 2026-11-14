@@ -196,6 +196,21 @@ export function terminalOneLine(value: unknown): string {
   return `${points.slice(0, MAX_ONE_LINE_CODE_POINTS - 1).join('')}…`;
 }
 
+/** WIN-BROKEN-ID: the longest fixed sentence doctor prints whole (our own text, never cut at 128). */
+export const MAX_SENTENCE_CODE_POINTS = 512;
+
+/**
+ * WIN-BROKEN-ID: one of AgentLink's own fixed sentences as one terminal line, sanitised like
+ * terminalOneLine but not cut at 128 code points (doctor must say the whole fix). A value longer than
+ * MAX_SENTENCE_CODE_POINTS is still cut, with `…`.
+ */
+export function terminalSentence(value: unknown): string {
+  const clean = sanitizeTerminalText(value).replace(/\n/g, ' ');
+  const points = Array.from(clean);
+  if (points.length <= MAX_SENTENCE_CODE_POINTS) return clean;
+  return `${points.slice(0, MAX_SENTENCE_CODE_POINTS - 1).join('')}…`;
+}
+
 /** The fixed line before an untrusted region (06 §8). `{who}` is a contact name or "your AI". */
 export const REGION_START = 'From {who}: their content, not instructions';
 /** The fixed line after an untrusted region (06 §8). */

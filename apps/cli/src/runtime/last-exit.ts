@@ -26,6 +26,7 @@ export const LAST_EXIT_REASONS = Object.freeze([
   'start_port',
   'start_keychain',
   'start_open',
+  'start_broken_id',
   'start_failed',
 ] as const);
 

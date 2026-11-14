@@ -12,22 +12,41 @@
 //
 // CONTRACT WITH THE CORE (WP-D12a / WP-D12c) — keep in sync with ../macos/agentlink-presence.swift
 //   argv (fixed; anything else exits 64 before any key is touched):
-//     available          exit 0 if Windows Hello is set up (KeyCredentialManager.IsSupportedAsync)
+//     available          exit 0 if Windows Hello can hold a TPM-backed key here: a TPM (the Platform
+//                        Crypto Provider opens) and Windows Hello set up (KeyCredentialManager.
+//                        IsSupportedAsync). Else 69 and ONE fixed stderr line (WIN-HELLO-NATIVE):
+//                          unavailable no_secure_hardware   no TPM (create would refuse the
+//                                                           software key with 16 anyway)
+//                          unavailable not_set_up           Windows Hello / PIN not set up, turned
+//                                                           off by policy, or not usable here
+//                        (each line ends in one "\n")
+//                        The core passes the token on; the page offers the master code and plain
+//                        set-up text, never a WebAuthn security key.
 //     version            prints "01\n" (record version)
-//     create             Windows Hello prompt(s); makes a new credential, requires TPM attestation,
+//     create             the `available` gate (69 + its line, no prompt); then Windows Hello prompt(s); makes a new credential, requires TPM attestation,
 //                        signs the new challenge once (so registration needs no separate sign), and
 //                        prints record || u16 BE sig length || signature (below); on any refusal
 //                        the new credential is deleted and nothing is printed
-//     check              stdin: record; no prompt; exit 0 if the credential exists and its public
-//                        key matches the record, else 13
-//     sign <reason-id>   stdin: record; one Windows Hello prompt; prints the signature
-//     delete             stdin: record; removes the credential (no prompt); exit 0 or 13
+//     check              stdin: record; no prompt; the `available` gate; exit 0 if the credential
+//                        exists and its public key matches the record, else 13
+//     sign <reason-id>   stdin: record; the `available` gate (no prompt when it fails); one Windows
+//                        Hello prompt; prints the signature
+//     delete             stdin: record; removes the credential (no prompt, no `available` gate,
+//                        so it works while Windows Hello is briefly unavailable); exit 0 or 13
+//   The record is parsed (65 on any defect) before the gate, so bad input never depends on the PC.
 //   reason-id is one of: setup | approve | pay | code. Windows Hello draws its own fixed text and takes no
 //   caller text; the id is accepted for symmetry with macOS and otherwise unused.
 //
 //   stdin: lowercase hex of the record, optionally followed by exactly one "\n"; at most 8192 bytes.
 //   stdout: on success only, lowercase hex followed by "\n". Nothing else, ever.
-//   stderr: never written. Errors are reported only by the exit code.
+//   stderr: written only by the `available` gate: exactly one of the two fixed lines above, then exit
+//           69 (FinishUnavailable; WIN-HELLO-NATIVE). Never a key, a name or any text from the
+//           system. Every other error is reported only by the exit code.
+//
+//   Focus (WIN-HELLO-NATIVE): a console helper's Windows Hello dialog can open behind the AgentLink
+//   window. While create or sign waits for it, PromptFocus looks for the system's own dialog
+//   (window class "Credential Dialog Xaml Host") for a few seconds and asks Windows to bring it to
+//   the front, once. It never reads, types into or clicks the dialog.
 //
 //   Record v1 (what `create` prints and the other commands read back; not secret). The core does
 //   not store it: it reads it into the ALKH header fields and rebuilds it from the stored header for
@@ -73,6 +92,7 @@
 
 #include <windows.h>
 #include <bcrypt.h>
+#include <ncrypt.h>
 
 #include <winrt/base.h>
 #include <winrt/Windows.Foundation.h>
@@ -81,9 +101,12 @@
 #include <winrt/Windows.Security.Cryptography.Core.h>
 #include <winrt/Windows.Storage.Streams.h>
 
+#include <atomic>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace winrt;
@@ -237,6 +260,99 @@ static void Random(std::uint8_t* p, size_t n) {
   }
 }
 
+// ---- Windows Hello gate (WIN-HELLO-NATIVE) ----
+
+// Why Windows Hello cannot hold the owner key here: two fixed values, two fixed lines.
+enum class Unavailable { NoSecureHardware, NotSetUp };
+
+// The one stderr write: a fixed line, then exit 69. Nothing else is ever written to stderr.
+[[noreturn]] static void FinishUnavailable(Unavailable why) {
+  const char* line = why == Unavailable::NoSecureHardware ? "unavailable no_secure_hardware\n"
+                                                          : "unavailable not_set_up\n";
+  HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
+  if (err != nullptr && err != INVALID_HANDLE_VALUE) {
+    DWORD n = 0;
+    WriteFile(err, line, static_cast<DWORD>(strlen(line)), &n, nullptr);
+  }
+  Finish(EXIT_UNAVAILABLE);
+}
+// ---- end FinishUnavailable
+
+// A TPM is there when the Platform Crypto Provider opens (no key is created or read).
+static bool HasTpm() {
+  NCRYPT_PROV_HANDLE prov = 0;
+  if (NCryptOpenStorageProvider(&prov, MS_PLATFORM_CRYPTO_PROVIDER, 0) != ERROR_SUCCESS) return false;
+  NCryptFreeObject(prov);
+  return true;
+}
+
+static bool HelloSetUp() {
+  try {
+    return KeyCredentialManager::IsSupportedAsync().get();
+  } catch (...) {
+    return false;
+  }
+}
+
+// Exits 69 with its fixed line when Windows Hello cannot hold the owner key here.
+// No TPM first: setting up a PIN would not help there.
+static void RequireHello() {
+  if (!HasTpm()) FinishUnavailable(Unavailable::NoSecureHardware);
+  if (!HelloSetUp()) FinishUnavailable(Unavailable::NotSetUp);
+}
+
+// True only when `window` belongs to the system's own %SystemRoot%\System32\CredentialUIBroker.exe
+// (the folder from GetSystemDirectoryW, never from the environment). A same-user process can make a
+// window with the same class name; that one is never brought to the front.
+static bool OwnedByCredentialBroker(HWND window) {
+  DWORD pid = 0;
+  if (GetWindowThreadProcessId(window, &pid) == 0 || pid == 0) return false;
+  HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+  if (process == nullptr) return false;
+  wchar_t image[MAX_PATH];
+  DWORD imageLen = MAX_PATH;
+  const BOOL named = QueryFullProcessImageNameW(process, 0, image, &imageLen);
+  CloseHandle(process);
+  if (!named || imageLen == 0 || imageLen >= MAX_PATH) return false;
+  wchar_t sys[MAX_PATH];
+  const UINT sysLen = GetSystemDirectoryW(sys, MAX_PATH);
+  if (sysLen == 0 || sysLen >= MAX_PATH) return false;
+  std::wstring broker(sys, sysLen);
+  broker += L"\\CredentialUIBroker.exe";
+  return CompareStringOrdinal(image, static_cast<int>(imageLen), broker.c_str(),
+                              static_cast<int>(broker.size()), TRUE) == CSTR_EQUAL;
+}
+
+// Brings the system's Windows Hello dialog in front, once, while a prompt is pending. Best effort:
+// it only calls SetForegroundWindow on a window of the dialog's class that CredentialUIBroker.exe
+// owns (OwnedByCredentialBroker); any other window of that class is skipped.
+class PromptFocus {
+ public:
+  PromptFocus() : worker_([this] { Run(); }) {}
+  ~PromptFocus() {
+    stop_ = true;
+    if (worker_.joinable()) worker_.join();
+  }
+  PromptFocus(const PromptFocus&) = delete;
+  PromptFocus& operator=(const PromptFocus&) = delete;
+
+ private:
+  void Run() {
+    for (int i = 0; i < 100 && !stop_; i++) {
+      for (HWND w = FindWindowExW(nullptr, nullptr, L"Credential Dialog Xaml Host", nullptr);
+           w != nullptr; w = FindWindowExW(nullptr, w, L"Credential Dialog Xaml Host", nullptr)) {
+        if (OwnedByCredentialBroker(w)) {
+          SetForegroundWindow(w);
+          return;
+        }
+      }
+      Sleep(100);
+    }
+  }
+  std::atomic<bool> stop_{false};
+  std::thread worker_;
+};
+
 static int MapStatus(KeyCredentialStatus s) {
   switch (s) {
     case KeyCredentialStatus::Success: return EXIT_OK;
@@ -278,11 +394,12 @@ static KeyCredential OpenMatching(const Record& r) {
 }
 
 [[noreturn]] static void CmdAvailable() {
-  Finish(KeyCredentialManager::IsSupportedAsync().get() ? EXIT_OK : EXIT_UNAVAILABLE);
+  RequireHello();
+  Finish(EXIT_OK);
 }
 
 [[noreturn]] static void CmdCreate() {
-  if (!KeyCredentialManager::IsSupportedAsync().get()) Finish(EXIT_UNAVAILABLE);
+  RequireHello();
   std::uint8_t id[16];
   Random(id, sizeof id);
   std::wstring name = kNamePrefix;
@@ -294,6 +411,7 @@ static KeyCredential OpenMatching(const Record& r) {
   std::vector<std::uint8_t> challenge(kChallengeLen);
   Random(challenge.data(), challenge.size());
 
+  PromptFocus focus;
   auto res = KeyCredentialManager::RequestCreateAsync(hstring(name), KeyCredentialCreationOption::FailIfExists).get();
   if (res.Status() != KeyCredentialStatus::Success) Finish(MapStatus(res.Status()));
   auto cred = res.Credential();
@@ -319,6 +437,7 @@ static KeyCredential OpenMatching(const Record& r) {
     // First signature now, so registration needs no separate `sign setup` (and,
     // where Windows reuses the create gesture, no second prompt). Same fixed-padding check as `sign`.
     auto data = ToBuffer(challenge);
+    PromptFocus signFocus;
     auto sr = cred.RequestSignAsync(data).get();
     if (sr.Status() != KeyCredentialStatus::Success) Refuse(name, MapStatus(sr.Status()));
     if (!CryptographicEngine::VerifySignature(key, data, sr.Result())) Refuse(name, EXIT_KEY_UNUSABLE);
@@ -345,15 +464,18 @@ static KeyCredential OpenMatching(const Record& r) {
 
 [[noreturn]] static void CmdCheck() {
   Record r = ParseRecord(ReadInput());
+  RequireHello();
   OpenMatching(r);
   Finish(EXIT_OK);
 }
 
 [[noreturn]] static void CmdSign() {
   Record r = ParseRecord(ReadInput());
+  RequireHello();
   auto verifyKey = VerifyKey(r.spki);
   auto cred = OpenMatching(r);
   auto data = ToBuffer(r.challenge);
+  PromptFocus focus;
   auto res = cred.RequestSignAsync(data).get();
   if (res.Status() != KeyCredentialStatus::Success) Finish(MapStatus(res.Status()));
   auto sig = res.Result();
@@ -362,6 +484,8 @@ static KeyCredential OpenMatching(const Record& r) {
   WriteOut(FromBuffer(sig));
 }
 
+// No Windows Hello gate here: delete never prompts, and a credential must still go away while the
+// TPM or Windows Hello is briefly unavailable (Fable r1 L2).
 [[noreturn]] static void CmdDelete() {
   Record r = ParseRecord(ReadInput());
   OpenMatching(r);

@@ -60,6 +60,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // W4-RENAME-REACHES-CONTACTS (D-141): an opaque token of a KeyStore this package opened; only
       // this package turns it into an epoch control (key-epoch.ts), for the app host's rename.
       'epochKeysOf',
+      // WIN-BROKEN-ID: an ID whose seed is gone: its leftover agent items (never an owner item;
+      // refused while the seed is here). agentId in, nothing out.
+      'eraseOsBrokenAgentItems',
       // W4-AUTO-SAVE (D-142, 04 §4.1): the Inbox folder rules, the held directory, the quarantine
       // mark and the free-space read (paths in, fixed codes out; no key, no store).
       'freeBytes',
@@ -83,6 +86,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'openAllowedFile',
       'openInboxDir',
       // M1-11b-6: a store-only boolean (no owner anywhere: card, owner items, owner files).
+      // WIN-BROKEN-ID: a yes/no (the seed or store key is missing); the bytes read never leave.
+      'osAgentIdentityMissing',
+      'osAgentSeedMissing',
       'ownerSetupAvailable',
       'packageName',
       // U3-c: counts from clear store columns, read-only (no key, no cipher).
@@ -116,6 +122,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'unlockFileKeyStoreAgent',
       // U3-c (card U3-e uses it): removal takes the folder lock exclusive.
       'withAgentFolderExclusive',
+      // FILES-AI-1 (D-152): the Attach writer for the runtime's files platform (`contentFile` sends):
+      // the ID's own pinned Send folder only, no folder or path seam; fixed codes.
+      'writeSendFolderFile',
     ]);
   });
 
