@@ -12,7 +12,6 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Page } from 'playwright';
 import { uiStep, UI_TEXT } from '../../apps/cli/dist/commands/ui.js';
 import { takeOverAppHost } from '../../apps/cli/dist/runtime/app-host-record.js';
-// eslint-disable-next-line boundaries/no-bypass -- the shipped words and the smoke driver are the thing under test
 import { FIRST_RUN, NAME } from '../../apps/local-ui/src/pages/first-run/strings.js';
 import { openedLink, runUi, shownCount, uiDepsOf } from './app-world.js';
 import { chapter, journeyWorld } from './journey/world.js';

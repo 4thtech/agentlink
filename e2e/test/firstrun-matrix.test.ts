@@ -20,15 +20,12 @@
 // and the desktop window look like to the page).
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Browser, BrowserContext, Page } from 'playwright';
-// eslint-disable-next-line boundaries/no-bypass -- the shipped words and the smoke driver are the thing under test
 import {
   FIRST_RUN,
   SETUP_MESSAGES,
   NAME,
 } from '../../apps/local-ui/src/pages/first-run/strings.js';
-// eslint-disable-next-line boundaries/no-bypass -- the shipped words and the smoke driver are the thing under test
 import { WIZARD } from '../../apps/local-ui/src/pages/start/strings.js';
-// eslint-disable-next-line boundaries/no-bypass -- the shipped words and the smoke driver are the thing under test
 import { createOwnerWithCode } from '../../apps/desktop/test/smoke/first-run-code.mjs';
 import { chapter, journeyWorld, startUi } from './journey/world.js';
 
