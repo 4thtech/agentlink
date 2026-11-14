@@ -47,6 +47,7 @@ import type {
 import { createUiApprovalSource } from '../approval/ui-source.js';
 import { newAgentFirstCard } from '../mcp/local-ui-wiring.js';
 import { cliVersion } from '../runtime/cli-version.js';
+import { isIdentityMissing } from '../runtime/broken-names.js';
 import type { OwnerAgent, OwnerCommandDeps } from './owner/deps.js';
 
 /** The per-agent part of the local UI options: everything but the app's files. */
@@ -92,6 +93,8 @@ export interface UiHostDeps {
   readonly localUi: (agent: OwnerAgent) => Promise<LocalUiOptions>;
   /** Unix seconds, for the approval source. */
   readonly now: () => number;
+  /** WIN-BROKEN-ID: notes an ID whose open failed because its key is missing (display only). */
+  readonly noteBroken?: (name: string) => void;
 }
 
 /**
@@ -105,7 +108,11 @@ export async function openUiHostAgent(
   const entry = await deps.directory.read(name).catch(() => undefined);
   // 04 §2.5: an agent marked `removing` is never opened as usable.
   if (entry === undefined || !entry.available || entry.removing) return undefined;
-  const opened = await deps.owner.open(name).catch(() => undefined);
+  const opened = await deps.owner.open(name).catch((error: unknown) => {
+    // WIN-BROKEN-ID: its key is missing here; Home then offers Restore, Remove or Continue.
+    if (isIdentityMissing(error)) deps.noteBroken?.(name);
+    return undefined;
+  });
   if (opened?.status !== 'ok') return undefined;
   const { agent } = opened;
   try {
@@ -183,7 +190,10 @@ const NO_AGENT_SOURCE: ApprovalServerSource = Object.freeze<ApprovalServerSource
 export async function startUiWelcome(deps: UiWelcomeDeps): Promise<UiWelcomeServer | undefined> {
   const entries = await deps.directory.list().catch(() => undefined);
   // R1: half-removed IDs do not count: only a usable (or unreadable) folder keeps Welcome away.
-  if (entries === undefined || entries.some((e) => !e.removing)) return undefined;
+  // WIN-BROKEN-ID: nor do IDs whose key is missing (Home offers Restore or Remove for them).
+  if (entries === undefined || entries.some((e) => !e.removing && e.broken === undefined)) {
+    return undefined;
+  }
   if (!(await deps.keychainUsable().catch(() => false))) return undefined;
   const assets = deps.assets();
   if (assets.files.has('index.html') !== true) return undefined;

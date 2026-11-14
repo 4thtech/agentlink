@@ -10,7 +10,7 @@ describe('doctorOpenProblem (WIN-BROKEN-ID)', () => {
       'identity_missing',
       "This agent's identity is not in the system keychain. Restore it from a backup or check the agent name; AgentLink never creates a new identity in its place.",
     );
-    const lines = doctorOpenProblem(error, 'Personal');
+    const lines = doctorOpenProblem(error, 'Personal') ?? [];
     expect(lines).toEqual([
       `Problem  ID "Personal" can't be opened: its key isn't on this computer.`,
       '         Open AgentLink to restore it from a backup or remove it from this computer.',
@@ -20,7 +20,8 @@ describe('doctorOpenProblem (WIN-BROKEN-ID)', () => {
 
   it('any other long fixed sentence is printed whole (still one sanitised line)', () => {
     const long = `${'A fixed sentence that is long. '.repeat(6)}End.`;
-    const lines = doctorOpenProblem(new NodeKeyStoreError('keychain_failed', long), 'Personal');
+    const lines =
+      doctorOpenProblem(new NodeKeyStoreError('keychain_failed', long), 'Personal') ?? [];
     expect(lines).toHaveLength(1);
     expect(lines[0]).toBe(`Problem  ${long}`);
     expect(lines[0]).not.toContain('…');
@@ -28,7 +29,7 @@ describe('doctorOpenProblem (WIN-BROKEN-ID)', () => {
 
   it('control characters in a label never reach the terminal', () => {
     const error = new NodeKeyStoreError('identity_missing', 'x');
-    const [first] = doctorOpenProblem(error, 'Per\u001b[31msonal');
+    const [first] = doctorOpenProblem(error, 'Per\u001b[31msonal') ?? [];
     expect(first).not.toContain('\u001b');
   });
 

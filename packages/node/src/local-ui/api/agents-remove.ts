@@ -251,7 +251,8 @@ export interface RemovalSteps {
 }
 
 /** The fixed steps a failure names (I-7: never a value). */
-export type RemovalStep = 'sign' | 'record' | 'mark' | 'tell' | 'apps' | 'keys' | 'folder';
+export type RemovalStep =
+  'sign' | 'record' | 'mark' | 'tell' | 'apps' | 'keys' | 'folder' | 'set_aside';
 
 /** A removal step failed; the gate answers `failed` with the fixed step only. */
 export class RemovalStepFailed extends Error {

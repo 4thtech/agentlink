@@ -46,6 +46,8 @@ export interface AgentRow {
   readonly current: boolean;
   readonly available: boolean;
   readonly removing: boolean;
+  /** WIN-BROKEN-ID: its key is missing from this computer; it can't be opened here. */
+  readonly broken?: boolean;
   readonly contacts: number | null;
   readonly running: boolean;
   /** The AI apps that run this agent (not "Not set up"): ids from the read, names once mapped. */
@@ -151,6 +153,7 @@ function parseRow(v: unknown): AgentRow | undefined {
     current: v['current'] === true,
     available: v['available'] !== false,
     removing: v['removing'] === true,
+    ...(v['broken'] === true ? { broken: true } : {}),
     contacts:
       typeof contacts === 'number' && Number.isSafeInteger(contacts) && contacts >= 0
         ? contacts
@@ -271,6 +274,7 @@ function liveApps(row: AgentRow): AppLive[] {
  */
 export function agentLine(row: AgentRow, now: number): string {
   if (row.removing) return S.removalNotFinished;
+  if (row.broken === true) return S.brokenState;
   const state = stateOf(row);
   if (state === 'paused') return W.paused;
   const live = liveApps(row);

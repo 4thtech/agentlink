@@ -21,7 +21,11 @@ export type RuntimeErrorCode =
   /** U3-c (06 §6): an agent label breaks the label rule. */
   | 'agent_label_invalid'
   /** An approval ID failed its exact pattern (04 §2.4.1). */
-  | 'approval_id_invalid';
+  | 'approval_id_invalid'
+  /** WIN-BROKEN-ID: the ID's key is here (or it is not a keychain ID); it is not set aside. */
+  | 'agent_not_broken'
+  /** WIN-BROKEN-ID: the folder was set aside but some of the ID's leftover keys stayed. */
+  | 'agent_keys_left';
 
 export const RUNTIME_MESSAGES: Readonly<Record<RuntimeErrorCode, string>> = Object.freeze({
   get agent_name_invalid(): string {
@@ -41,6 +45,10 @@ export const RUNTIME_MESSAGES: Readonly<Record<RuntimeErrorCode, string>> = Obje
   agent_label_invalid:
     'Use letters, digits, spaces, dots, apostrophes and hyphens, up to 32 characters.',
   approval_id_invalid: "That approval ID isn't valid. Check it and try again.",
+  agent_not_broken:
+    'This ID can be opened on this computer, so it was not moved. Nothing was changed.',
+  agent_keys_left:
+    "AgentLink moved this ID's folder aside, but couldn't remove all of its leftover keys. Try again.",
 });
 
 export class RuntimeError extends Error {

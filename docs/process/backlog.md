@@ -10742,3 +10742,11 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** RET-1 (0.5.1 part), RET-4 and RET-6 (0.5.2 part)
 - **Spec:** 08 §1; 11 §5.7
 - **Done when:** README Status and docs-site "Free up space" match what shipped; drift checks green; never claims an unbuilt part.
+
+#### WIN-BROKEN-ID · An ID whose key is missing: Restore, Remove from this computer, Continue (0.5.5)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (owner presence, keychain erase)
+- **Repo/path:** agentlink · `apps/cli/src/commands/{ui,ui-host,doctor}.ts`, `apps/cli/src/runtime/{broken-id,broken-names,agent-create,agent-dir}.ts`, `packages/node/src/{broken-id,approval-server}.ts`, `apps/local-ui/src/pages/{agents,home}/`
+- **Depends on:** U3-e, HOTFIX-NOID, UX1113-R1 (D-147)
+- **Spec:** 04 §2.5 "An ID whose key is missing"; 08 §1; 11 §5
+- **Done when:** `identity_missing` is its own start reason (`broken_id`); another ID opens, or the host starts with none; Home offers Restore from backup, Remove from this computer (typed label + presence, folder set aside then leftover keys, nothing signed) and Continue without it; discard removes the folder before the keys; doctor prints fixed sentences whole; tests on posix (win32 paths guarded).
+

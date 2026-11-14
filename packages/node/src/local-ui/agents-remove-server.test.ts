@@ -1288,6 +1288,6 @@ describe('WIN-BROKEN-ID: Remove this ID from this computer (an ID whose key is m
     });
     const rows = (JSON.parse(res.body) as { agents: { name: string; broken?: boolean }[] }).agents;
     expect(rows.find((r) => r.name === 'work')?.broken).toBe(true);
-    expect(rows.find((r) => r.name === 'default')?.broken).toBe(false);
+    expect(rows.find((r) => r.name === 'default')?.broken).toBeUndefined();
   });
 });

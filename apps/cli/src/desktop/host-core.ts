@@ -297,7 +297,11 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
 
   let started: { ok: true; server: UiServer } | { ok: false; failure: StopReason };
   try {
-    started = await startUiServer(deps.uiDeps(startServer), undefined);
+    const result = await startUiServer(deps.uiDeps(startServer), undefined);
+    // WIN-BROKEN-ID: the pipe's reasons are fixed (protocol.ts); a broken ID that left no host is `open`.
+    started = result.ok
+      ? result
+      : { ok: false, failure: result.failure === 'broken_id' ? 'open' : result.failure };
   } catch {
     started = { ok: false, failure: 'failed' };
   }

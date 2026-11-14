@@ -35,6 +35,19 @@ export const AGENTS_STRINGS = {
   running: 'Running',
   notRunning: 'Not running',
   removalNotFinished: 'Removal not finished',
+  // WIN-BROKEN-ID (11 §5: "its key", no keychain jargon): an ID whose key is missing here.
+  brokenTitle: (label: string): string => `${iso(label)} can't be opened on this computer`,
+  brokenBody:
+    "Its key isn't on this computer any more. Your other IDs and your master code are fine.",
+  brokenState: "Can't be opened here",
+  restoreFromBackup: 'Restore from backup',
+  removeFromComputer: 'Remove from this computer',
+  continueWithout: 'Continue without it',
+  brokenRemoveTitle: (label: string): string => `Remove ${iso(label)} from this computer?`,
+  brokenRemoveIntro:
+    "AgentLink moves this ID's folder to a dated folder in ~/.agentlink/set-aside, then removes the key parts left behind. Nothing is sent to your contacts.",
+  brokenRemoveRestore: 'You can still restore this ID from a backup later.',
+  brokenRemoveStatement: (label: string): string => `Remove ${iso(label)} from this computer`,
   removalReason: 'Removing it stopped part-way. Nothing else was affected.',
   // W8-S4 (F16, F21; 04 §2.5 "Finishing a removal"; 11 §5.8 "Unfinished removal").
   notFullyRemoved: (label: string): string => `${iso(label)} wasn't fully removed`,

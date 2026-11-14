@@ -32,6 +32,7 @@ import type { Logger } from '@4thtech-io/log';
 import { cliLogger } from '../runtime/log-level.js';
 import {
   hasOwnerOnMachine,
+  osAgentIdentityMissing,
   probeOsKeychain,
   selectKeyStoreBackend,
   startApprovalServer,
@@ -44,6 +45,8 @@ import { localUiOptions, logOwnerSetupEvent } from '../mcp/local-ui-wiring.js';
 import { cliPrefix } from '../runtime/cli-prefix.js';
 import { agentDirectory } from '../runtime/agent-dir.js';
 import { DEFAULT_AGENT_NAME } from '../runtime/agent-name.js';
+import { brokenIds, isIdentityMissing } from '../runtime/broken-names.js';
+import { readAgentConfig } from '../runtime/agent-dir.js';
 import { checkOwnerTerminal } from '../runtime/guards.js';
 import { appServes, chooseCurrentAgent } from './current-agent.js';
 import { nodeOwnerDeps } from './owner/deps.js';
@@ -80,7 +83,15 @@ const OPEN_PAGE_CHECK_MS = 15_000;
 
 /** R1: why `ui` could not start. */
 export type StartFailure =
-  'no_owner' | 'no_ids' | 'only_removing' | 'port' | 'keychain' | 'open' | 'failed';
+  | 'no_owner'
+  | 'no_ids'
+  | 'only_removing'
+  | 'port'
+  | 'keychain'
+  | 'open'
+  /** WIN-BROKEN-ID: an ID folder is here but its key is missing from this computer's keychain. */
+  | 'broken_id'
+  | 'failed';
 
 const START_EXIT: Readonly<Record<StartFailure, LastExitReason>> = Object.freeze({
   no_owner: 'start_no_owner',
@@ -89,6 +100,7 @@ const START_EXIT: Readonly<Record<StartFailure, LastExitReason>> = Object.freeze
   port: 'start_port',
   keychain: 'start_keychain',
   open: 'start_open',
+  broken_id: 'start_broken_id',
   failed: 'start_failed',
 });
 
@@ -138,6 +150,8 @@ export const UI_TEXT = Object.freeze({
       `AgentLink can't reach your computer's keychain. Unlock it, then run \`${prefix}\` again.`,
     open: (prefix) =>
       `AgentLink couldn't open your ID. Your IDs are still here. Run \`${prefix} doctor\` to see why.`,
+    broken_id: (prefix) =>
+      `Your ID can't be opened on this computer: its key isn't here. Run \`${prefix}\` to restore it from a backup or remove it from this computer.`,
     failed: (prefix) =>
       `AgentLink couldn't start. Your IDs are still here. Run \`${prefix} doctor\` to see why.`,
   }),
@@ -213,6 +227,11 @@ export interface UiDeps {
    * Absent: the line for "not set up here yet".
    */
   diagnose?(): Promise<StartFailure>;
+  /**
+   * WIN-BROKEN-ID: called for each ID whose open failed because its key is missing, so the app host
+   * lists it as broken (Restore, Remove, Continue). Absent: nothing is noted.
+   */
+  noteBroken?(name: string): void;
   /** R1: stray background errors keep the host up; `onFatal` ends it. Returns the unsubscribe. */
   guard?(onFatal: (reason: FatalReason) => void): () => void;
   /** R1: writes why this run closed (~/.agentlink/last-exit.json). Must not throw. */
@@ -252,10 +271,11 @@ export async function startUiServer(
 ): Promise<UiStartResult> {
   let agent = requested;
   let none = false;
+  let names: readonly string[] | undefined;
   if (agent === undefined && deps.agents !== undefined) {
     // U3-b (USABILITY-WAVE-3 §7.4): never asked. The last used agent, else the one an AI app
     // serves (`default` first), else the first by name.
-    const names = await deps.agents().catch(() => undefined);
+    names = await deps.agents().catch(() => undefined);
     none = names !== undefined && names.length === 0;
     const last = await deps.lastUsed?.().catch(() => undefined);
     const chosen = await chooseCurrentAgent(
@@ -279,6 +299,31 @@ export async function startUiServer(
     return undefined;
   });
   if (server !== undefined) return { ok: true, server };
+  // WIN-BROKEN-ID: the chosen ID's key is missing. Never a dead end: without `--agent`, another ID
+  // opens ("Continue without it"); with none left, the app host starts with no ID open, so Home can
+  // offer Restore from backup or Remove this ID from this computer. Nothing from the error is shown.
+  if (requested === undefined && isIdentityMissing(thrown)) {
+    const first = agent ?? DEFAULT_AGENT_NAME;
+    deps.noteBroken?.(first);
+    const broken = new Set([first]);
+    for (const other of names ?? []) {
+      if (broken.has(other)) continue;
+      let failed: unknown;
+      const next = await deps.start(other, startOptions).catch((error: unknown) => {
+        failed = error;
+        return undefined;
+      });
+      if (next !== undefined) return { ok: true, server: next };
+      if (isIdentityMissing(failed)) {
+        broken.add(other);
+        deps.noteBroken?.(other);
+      }
+    }
+    if ((names ?? [first]).every((name) => broken.has(name)) && deps.startWelcome !== undefined) {
+      const welcome = await deps.startWelcome(startOptions).catch(() => undefined);
+      if (welcome !== undefined) return { ok: true, server: welcome };
+    }
+  }
   // R1: say what went wrong; "run init" only when nothing is set up. Nothing from the error is shown.
   const failure: StartFailure = isPortError(thrown)
     ? 'port'
@@ -423,6 +468,8 @@ export async function diagnoseStart(
   probes: {
     readonly keychainUsable?: () => Promise<boolean>;
     readonly ownerOnMachine?: () => Promise<boolean>;
+    /** WIN-BROKEN-ID: whether this ID folder's key is missing (default: the OS keychain). */
+    readonly identityMissing?: (name: string) => Promise<boolean>;
   } = {},
 ): Promise<StartFailure> {
   try {
@@ -432,7 +479,14 @@ export async function diagnoseStart(
     const entries = await agentDirectory(home).list();
     if (entries.length > 0) {
       if (entries.every((e) => e.removing)) return 'only_removing';
-      return (await keychainUsable().catch(() => false)) ? 'open' : 'keychain';
+      if (!(await keychainUsable().catch(() => false))) return 'keychain';
+      // WIN-BROKEN-ID: a folder whose key is missing is its own reason (a probe that fails is not).
+      const missing = probes.identityMissing ?? ((name: string) => folderKeyMissing(home, name));
+      for (const entry of entries) {
+        if (entry.removing || !entry.available) continue;
+        if (await missing(entry.name).catch(() => false)) return 'broken_id';
+      }
+      return 'open';
     }
     if (!(await keychainUsable().catch(() => false))) return 'keychain';
     const owner = await (probes.ownerOnMachine ?? hasOwnerOnMachine)().catch(() => false);
@@ -440,6 +494,13 @@ export async function diagnoseStart(
   } catch {
     return 'failed';
   }
+}
+
+/** WIN-BROKEN-ID: whether the keychain ID in folder `name` has lost its seed or store key. */
+async function folderKeyMissing(home: string, name: string): Promise<boolean> {
+  const found = await readAgentConfig(home, name);
+  if (found === undefined || found.config.keyStore !== 'keychain') return false;
+  return osAgentIdentityMissing(found.config.agentId);
 }
 
 /**
@@ -473,6 +534,7 @@ export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
         directory,
         localUi: (opened) => localUiOptions(opened),
         now: () => Math.floor(Date.now() / 1000),
+        noteBroken: (name) => brokenIds(homedir()).note(name),
       };
       return startUiWelcome({
         directory,
@@ -525,6 +587,7 @@ export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
           directory,
           localUi: (opened) => localUiOptions(opened),
           now,
+          noteBroken: (name) => brokenIds(homedir()).note(name),
         };
         // WP-1: the ID open at launch carries its key-items token too, so it can be renamed (D-141).
         const initialUi = hostUiOf(agent, localUi);
@@ -589,6 +652,8 @@ export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
     guard: (onFatal) => guardProcess({ log: logger, onFatal }),
     recordExit: (reason) => writeLastExit(homedir(), { reason, version: cliVersion() }),
     diagnose: () => diagnoseStart(homedir()),
+    // WIN-BROKEN-ID: the app host's directory lists these as broken (in memory, this process only).
+    noteBroken: (name) => brokenIds(homedir()).note(name),
   });
 }
 
