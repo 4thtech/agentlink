@@ -84,11 +84,47 @@ test('helpers print nothing but the result: no logging calls in either source', 
     'std::wcout',
     'std::wcerr',
     'OutputDebugString',
-    'STD_ERROR_HANDLE',
     'fprintf',
     'puts(',
   ]) {
     assert.ok(!winSrc.includes(bad), `cpp uses ${bad}`);
+  }
+  // WIN-HELLO-NATIVE: stderr is written in exactly one place, the fixed `unavailable <reason>` line.
+  assert.equal(winSrc.split('STD_ERROR_HANDLE').length - 1, 1, 'one stderr write in the cpp');
+  const unavail = winSrc.slice(
+    winSrc.indexOf('static void FinishUnavailable'),
+    winSrc.indexOf('// ---- end FinishUnavailable'),
+  );
+  assert.match(unavail, /STD_ERROR_HANDLE/);
+});
+
+test('Windows available: says why not, as one fixed token (WIN-HELLO-NATIVE)', () => {
+  const lines = [...winSrc.matchAll(/"unavailable ([a-z_]+)\\n"/g)].map((m) => m[1]).sort();
+  assert.deepEqual(lines, ['no_secure_hardware', 'not_set_up']);
+  // No TPM: Windows Hello would make a software key, which create refuses (16); say so up front.
+  assert.match(winSrc, /MS_PLATFORM_CRYPTO_PROVIDER/);
+  assert.match(winSrc, /KeyCredentialManager::IsSupportedAsync\(\)/);
+  // Every command that needs Windows Hello says unavailable before it touches a credential.
+  for (const cmd of ['CmdCreate', 'CmdCheck', 'CmdSign', 'CmdDelete']) {
+    const body = winSrc.slice(winSrc.indexOf(`static void ${cmd}`));
+    const end = body.indexOf('\n}\n');
+    const fn = body.slice(0, end);
+    assert.match(fn, /RequireHello\(\)/, `${cmd} checks Windows Hello first`);
+    if (cmd !== 'CmdCreate') {
+      assert.ok(fn.indexOf('RequireHello()') < fn.indexOf('OpenMatching'), `${cmd}: gate first`);
+    }
+  }
+  // Never a WebAuthn / security-key path in the helper.
+  assert.ok(!/webauthn|WebAuthN|fido/i.test(winSrc));
+});
+
+test('Windows prompts are brought in front of the AgentLink window (WIN-HELLO-NATIVE)', () => {
+  assert.match(winSrc, /L"Credential Dialog Xaml Host"/);
+  assert.match(winSrc, /SetForegroundWindow/);
+  for (const cmd of ['CmdCreate', 'CmdSign']) {
+    const body = winSrc.slice(winSrc.indexOf(`static void ${cmd}`));
+    const fn = body.slice(0, body.indexOf('\n}\n'));
+    assert.match(fn, /PromptFocus /, `${cmd} raises the Windows Hello prompt`);
   }
 });
 
@@ -213,6 +249,8 @@ test('MSVC args: static CRT, hardening flags, WinRT + bcrypt only, no debug info
     '/guard:cf',
     'windowsapp.lib',
     'bcrypt.lib',
+    'ncrypt.lib',
+    'user32.lib',
     '/SUBSYSTEM:CONSOLE',
     '/guard:ehcont',
     '/DEPENDENTLOADFLAG:0x800',

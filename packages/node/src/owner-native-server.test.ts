@@ -226,6 +226,20 @@ describe('GET and POST /api/owner/native', () => {
     expect(json(again)).toEqual({ status: 'native_exists' });
   });
 
+  it('WIN-HELLO-NATIVE: Windows Hello not set up is reported with its reason; registering is refused', async () => {
+    const helper = new StandInHelper(2);
+    helper.unavailable = 'not_set_up';
+    const h = await harness({ helper });
+    const page = await h.page();
+    expect(json(await send(h.port, '/api/owner/native', { headers: page }))).toEqual({
+      native: { available: false, registered: false, unavailable: 'not_set_up', platform: 'windows' },
+    });
+    helper.createState = 'unavailable';
+    const reg = await register(h, page);
+    expect(reg.status).not.toBe(200);
+    expect(helper.calls.some((c) => c.startsWith('release'))).toBe(false);
+  });
+
   it('outside the desktop app (no helper) native is not available and registration is refused', async () => {
     const h = await harness({ helper: null });
     const page = await h.page();
