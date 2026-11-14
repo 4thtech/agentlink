@@ -73,6 +73,7 @@ import {
 } from './key-controls.js';
 import { keychainAccount, osKeychain, type KeychainBackend } from './keychain.js';
 import { markKitRecordChecked } from './kit-record.js';
+import { eraseBrokenAgentItems } from './broken-id.js';
 import { openAgentStoreWith, type AgentStore } from './agent-store.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded, openRecordedKeyStore } from './keychain-keystore.js';
 import { ttyOwnerTerminal } from './owner-terminal.js';
@@ -1161,9 +1162,26 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         lastMessageAt: null,
       };
       let state: SummaryRow['state'];
+      // WIN-BROKEN-ID: the folder here that holds this ID (its config names this agentId).
+      const hereFolder = [...folders].find(([, id]) => id === agent.agentId)?.[0];
+      let rowName = name;
       if (await inOwnersRevokedList(revokedDir, agent.agentId)) state = 'removed_earlier';
-      else if (ids.has(agent.agentId)) state = 'already_here';
-      else {
+      else if (ids.has(agent.agentId)) {
+        // WIN-BROKEN-ID (04 §2.5 "An ID whose key is missing"): a folder of this ID whose seed is
+        // gone from the keychain is restorable into that same folder (keys only; the folder is
+        // kept). With the seed here it is already here, as before (never overwritten, D-115 C).
+        const seed = await guarded(
+          () => keychain.get(keychainAccount(agent.agentId, 'seed')),
+          keychainTimeoutMs,
+        );
+        if (seed !== null) {
+          wipe(seed);
+          state = 'already_here';
+        } else if (hereFolder !== undefined) {
+          state = 'new';
+          rowName = hereFolder;
+        } else state = 'already_here';
+      } else {
         const seed = await guarded(
           () => keychain.get(keychainAccount(agent.agentId, 'seed')),
           keychainTimeoutMs,
@@ -1187,7 +1205,10 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       // KIT-NAMES: an ID already here by the label this computer shows; otherwise (and as a
       // fallback) by the owner-set name a v2 kit carries inside it, only when it is the folder
       // label rule. A v1 kit has none: the page shows the folder, as before. Display text only.
-      const local = state === 'already_here' ? localLabels.get(agent.agentId) : undefined;
+      const local =
+        state === 'already_here' || hereFolder !== undefined
+          ? localLabels.get(agent.agentId)
+          : undefined;
       const label = local ?? kitLabel(agent.label);
       // UX1113-QA2 (Fable ruling): a clash names the ID already here by the name people see.
       const takenId = state === 'name_taken' ? folders.get(name) : undefined;
@@ -1195,7 +1216,7 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       rows.push(
         Object.freeze({
           agentId: agent.agentId,
-          name,
+          name: rowName,
           people: counts.people,
           lastMessageAt: counts.lastMessageAt,
           state,
@@ -1411,7 +1432,11 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       if (row === undefined || (row.state !== 'new' && row.state !== 'name_taken'))
         return undefined;
       const name = map[id] ?? (row.state === 'new' ? row.name : undefined);
-      if (name === undefined || folders.has(name) || finals.has(name)) return undefined;
+      if (name === undefined || finals.has(name)) return undefined;
+      // WIN-BROKEN-ID: an ID whose folder is here (its seed missing) goes back into that folder
+      // only; any other ID never into a folder that exists.
+      const here = [...folders].find(([, folderId]) => folderId === id)?.[0];
+      if (here !== undefined ? name !== here : folders.has(name)) return undefined;
       finals.add(name);
     }
     return Object.freeze({ selection: Object.freeze([...ids]), names: Object.freeze(map) });
@@ -1424,6 +1449,27 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       await unlink(join(dir, file)).catch(() => undefined);
     }
     await rmdir(dir).catch(() => undefined);
+  }
+
+  /**
+   * WIN-BROKEN-ID: the kit's store into a kept folder of this ID that has none (created without
+   * following links, never over an existing file). The folder rules are checked first.
+   */
+  async function installStoreIfMissing(
+    kit: RecoveryKitImport,
+    agentId: string,
+    name: string,
+  ): Promise<void> {
+    const dir = join(agentsDir, name);
+    const info = await lstat(dir);
+    if (info.isSymbolicLink() || !info.isDirectory()) throw new Error('folder');
+    if ((await realpath(dir)) !== join(await realpath(agentsDir), name)) throw new Error('folder');
+    const store = join(dir, 'store.sqlite');
+    const there = await lstat(store).then(
+      () => true,
+      () => false,
+    );
+    if (!there) await installRestoredStore(kit, agentId, store);
   }
 
   /** Restore step 5 for one ID: its folder, its store, then `config.json` last. */
@@ -1529,17 +1575,35 @@ function build(options: RestoreEngineOptions): TerminalRestore {
     const out: Outcome[] = [];
     for (const agent of current.kit.agents) {
       if (!plan.selection.includes(agent.agentId)) continue;
-      const name = plan.names[agent.agentId] ?? ascii(agent.name);
+      // WIN-BROKEN-ID: the summary's name (for an ID whose folder is here: that folder).
+      const name =
+        plan.names[agent.agentId] ??
+        current.rows.find((r) => r.agentId === agent.agentId)?.name ??
+        ascii(agent.name);
       let written = false;
       let installed = false;
       try {
+        // WIN-BROKEN-ID: the folder of this ID that is here (seed missing), kept as it is. A folder
+        // of this ID under any other name refuses (never a second folder of the same ID).
+        const here = await existingFolders();
+        const kept = here.get(name) === agent.agentId;
+        if (!kept && [...here.values()].includes(agent.agentId)) throw new Error('folder');
+        // Leftover items of this ID (its seed is gone, checked again right before the deletes; any
+        // seed refuses) would refuse the import; the kit carries every one of them.
+        await eraseBrokenAgentItems(keychain, agent.agentId, keychainTimeoutMs);
         await control.importAgent(current.kit, agent.agentId, {
           name,
           ...(owner === undefined ? {} : { owner: owner.session }),
         });
         written = true;
-        await installFolder(current.kit, agent.agentId, name);
-        installed = true;
+        if (kept) {
+          // A folder without a store gets the kit's (nothing to overwrite); one with a store keeps
+          // it, and the read-back below must open it with the restored keys, or this ID rolls back.
+          await installStoreIfMissing(current.kit, agent.agentId, name);
+        } else {
+          await installFolder(current.kit, agent.agentId, name);
+          installed = true;
+        }
         // Restore step 7 (IR-UX1113-R1 M2): the ID opens with its KeyStore and store, its card names
         // the kit's owner, and its policy loads at the restored mark; else this ID is rolled back.
         const storePath = join(agentsDir, name, 'store.sqlite');

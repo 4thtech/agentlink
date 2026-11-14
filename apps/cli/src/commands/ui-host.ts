@@ -95,6 +95,8 @@ export interface UiHostDeps {
   readonly now: () => number;
   /** WIN-BROKEN-ID: notes an ID whose open failed because its key is missing (display only). */
   readonly noteBroken?: (name: string) => void;
+  /** WIN-BROKEN-ID: clears that note once the ID opens again (restored, or its key came back). */
+  readonly clearBroken?: (name: string) => void;
 }
 
 /**
@@ -114,6 +116,7 @@ export async function openUiHostAgent(
     return undefined;
   });
   if (opened?.status !== 'ok') return undefined;
+  deps.clearBroken?.(name);
   const { agent } = opened;
   try {
     // The app's files are the server's and never change on a switch. W4-RENAME-REACHES-CONTACTS

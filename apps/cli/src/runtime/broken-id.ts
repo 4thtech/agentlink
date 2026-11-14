@@ -14,7 +14,7 @@
 //
 // I-4: no MCP tool reaches any of this; the only caller is the app host's remove route, behind the
 // owner's presence and the typed label. I-7: no name, path or agent ID is logged.
-import { eraseOsBrokenAgentItems, osAgentIdentityMissing } from '@4thtech-io/node';
+import { eraseOsBrokenAgentItems, osAgentSeedMissing } from '@4thtech-io/node';
 import {
   SET_ASIDE_DIR,
   moveAgentFolderAside,
@@ -29,9 +29,16 @@ export { SET_ASIDE_DIR };
 export { brokenIds, isIdentityMissing, type BrokenIds } from './broken-names.js';
 
 export interface SetAsideDeps extends OwnerCheck {
-  /** True when the ID's seed or store key is missing (default: the OS keychain). */
-  readonly identityMissing?: (agentId: string) => Promise<boolean>;
-  /** Erases the ID's leftover agent items (default: the OS keychain, refused while the seed is here). */
+  /**
+   * True when the ID's SEED is missing (default: the OS keychain). r1 M1: an ID whose seed is here
+   * (only its store key gone) is never set aside: its key can still sign, so it needs its signed
+   * removal. Checked before the move.
+   */
+  readonly seedMissing?: (agentId: string) => Promise<boolean>;
+  /**
+   * Erases the ID's leftover agent items, keeping its store key so the set-aside store stays
+   * readable (default: the OS keychain; refused while the seed is here, read again right before).
+   */
   readonly eraseLeftovers?: (agentId: string) => Promise<void>;
   /** Milliseconds since the epoch, for the folder's date. */
   readonly now?: () => number;
@@ -59,9 +66,7 @@ export async function setAsideBrokenAgent(
   const { agentId, keyStore } = found.config;
   // A file-KeyStore ID's key is its passphrase-protected file, never "missing" this way.
   if (keyStore !== 'keychain') throw new RuntimeError('agent_not_broken');
-  const missing = await (deps.identityMissing ?? osAgentIdentityMissing)(agentId).catch(
-    () => false,
-  );
+  const missing = await (deps.seedMissing ?? osAgentSeedMissing)(agentId).catch(() => false);
   if (!missing) throw new RuntimeError('agent_not_broken');
   // 1. The folder, whole, out of `agents`: the ID is no longer listed and can be moved back.
   await moveAgentFolderAside(home, name, stampOf((deps.now ?? Date.now)()), check);

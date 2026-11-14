@@ -88,6 +88,7 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // M1-11b-6: a store-only boolean (no owner anywhere: card, owner items, owner files).
       // WIN-BROKEN-ID: a yes/no (the seed or store key is missing); the bytes read never leave.
       'osAgentIdentityMissing',
+      'osAgentSeedMissing',
       'ownerSetupAvailable',
       'packageName',
       // U3-c: counts from clear store columns, read-only (no key, no cipher).

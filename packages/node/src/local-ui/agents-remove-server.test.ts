@@ -337,7 +337,11 @@ async function world(
       available: true,
       removing: marked.has(name) || revoked.has(e.agentId),
       // WIN-BROKEN-ID: the directory reports an ID whose key is missing.
-      ...(options.broken === true && name === workName && !keychain.items.has(e.agentId)
+      // As the CLI: an open failed for a missing seed OR store key.
+      ...(options.broken === true &&
+      name === workName &&
+      (!keychain.items.has(e.agentId) ||
+        !keychain.items.has(keychainAccount(e.agentId, 'store-key')))
         ? { broken: 'identity_missing' as const }
         : {}),
     };
@@ -364,6 +368,11 @@ async function world(
     // WIN-BROKEN-ID: the folder moved aside (the CLI's setAsideBrokenAgent is tested in the CLI).
     setAside: (name) => {
       if (faults.setAside === true) return Promise.reject(new Error('disk'));
+      // As the CLI's setAsideBrokenAgent (r1 M1): only an ID whose SEED is gone is set aside.
+      const id = entries.get(name)?.agentId ?? '';
+      if (keychain.items.has(id)) {
+        return Promise.reject(Object.assign(new Error('x'), { code: 'agent_not_broken' }));
+      }
       log.push(`setAside ${name}`);
       entries.delete(name);
       return Promise.resolve();
@@ -1289,5 +1298,48 @@ describe('WIN-BROKEN-ID: Remove this ID from this computer (an ID whose key is m
     const rows = (JSON.parse(res.body) as { agents: { name: string; broken?: boolean }[] }).agents;
     expect(rows.find((r) => r.name === 'work')?.broken).toBe(true);
     expect(rows.find((r) => r.name === 'default')?.broken).toBeUndefined();
+  });
+
+  it('r1 M1: the seed is here, only the store key is gone: never set aside (key_here)', async () => {
+    const w = await world({ broken: true });
+    const seed = randomBytes(32);
+    keychain.items.set(w.work.agentId, seed);
+    keychain.items.delete(keychainAccount(w.work.agentId, 'store-key'));
+    const res = await remove(w, { name: 'work', typedLabel: 'Work' });
+    expect(res.status).toBe(409);
+    expect(res.json).toEqual({ status: 'key_here' });
+    expect(w.log).not.toContain('setAside work');
+    expect(w.entries.has('work')).toBe(true);
+    keychain.items.delete(w.work.agentId);
+  });
+
+  it('with no ID open, a wrong master code sets nothing aside', async () => {
+    const w = await world({ broken: true, solo: true, noneOpen: true });
+    const generation = (await generationOf(w)) ?? '1';
+    const wrong = await remove(
+      w,
+      { name: 'work', typedLabel: 'Work' },
+      { generation, presence: '0000-0000' },
+    );
+    expect(wrong.status).toBe(403);
+    expect(wrong.json).toEqual({ status: 'presence_rejected' });
+    expect(w.log).not.toContain('setAside work');
+  });
+
+  it('with no ID open, a stored passkey header that does not name this owner refuses', async () => {
+    const w = await world({ broken: true, solo: true, noneOpen: true });
+    // Not a well-formed ALKP blob: the header names no owner, so the stored owner is not confirmed.
+    keychain.items.set(OWNER_PASSKEY_ACCOUNT, randomBytes(64));
+    try {
+      const res = await remove(
+        w,
+        { name: 'work', typedLabel: 'Work' },
+        { generation: (await generationOf(w)) ?? '1' },
+      );
+      expect(res.json['status']).toBe('refused');
+      expect(w.log).not.toContain('setAside work');
+    } finally {
+      keychain.items.delete(OWNER_PASSKEY_ACCOUNT);
+    }
   });
 });

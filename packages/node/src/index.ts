@@ -61,7 +61,11 @@ export {
 } from './owner-add-agent.js';
 // WIN-BROKEN-ID: an ID folder whose key is missing (a yes/no probe; the leftover items after the
 // folder was set aside, refused while the seed is here). Nothing secret leaves the package.
-export { eraseOsBrokenAgentItems, osAgentIdentityMissing } from './broken-id.js';
+export {
+  eraseOsBrokenAgentItems,
+  osAgentIdentityMissing,
+  osAgentSeedMissing,
+} from './broken-id.js';
 // M1-9z: `owner change-code` re-wraps the owner seed under a new generated master code, at the same
 // TTY prompt; the owner identity does not change and nothing secret leaves the package.
 export {

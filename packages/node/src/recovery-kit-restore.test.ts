@@ -517,9 +517,13 @@ describe.runIf(POSIX)('never overwrites (04 §2.3.3 table; T-8)', () => {
     }
     await mkdir(join(t.home, '.agentlink', 'revoked'), { recursive: true, mode: 0o700 });
     await writeFile(join(t.home, '.agentlink', 'revoked', `${gone.agentId}.json`), '{}');
+    // WIN-BROKEN-ID: `helper` is really here, its seed in the keychain (a folder whose seed is gone
+    // is restorable into that folder; see "an ID whose key is missing" below).
+    const here = new Uint8Array(32).fill(7);
+    keychain.items.set(keychainAccount(a.agentId, 'seed'), here.slice());
     const handle = await foundHandle();
     const opened = await openKit('S1', handle, c);
-    return { a, b, gone, opened, kit: body(opened)['kit'] as string };
+    return { a, b, gone, opened, here, kit: body(opened)['kit'] as string };
   }
 
   it('already here, name taken (rename map), removed earlier; the whole map is checked before a write', async () => {
@@ -543,17 +547,54 @@ describe.runIf(POSIX)('never overwrites (04 §2.3.3 table; T-8)', () => {
       expect(refused.status, JSON.stringify(bad)).toBe(400);
       expect(body(refused)['error']).toBe('invalid');
     }
-    expect([...keychain.items.keys()]).toEqual([]);
+    expect([...keychain.items.keys()]).toEqual([keychainAccount(a.agentId, 'seed')]);
   });
 
   it('the name-taken ID restores under its new name; the one here and the removed one are untouched', async () => {
-    const { a, b, gone, kit } = await renameMapKit();
+    const { a, b, gone, here, kit } = await renameMapKit();
     const done = await gestureAndFinish('S1', kit, [b.agentId], { [b.agentId]: 'work-2' });
     expect(done['ids']).toEqual([
       { agentId: b.agentId, name: 'work-2', label: 'work-2', outcome: 'restored' },
     ]);
     expect(keychain.items.has(keychainAccount(gone.agentId, 'seed'))).toBe(false);
-    expect(keychain.items.has(keychainAccount(a.agentId, 'seed'))).toBe(false);
+    expect(keychain.items.get(keychainAccount(a.agentId, 'seed'))).toEqual(here);
+  });
+});
+
+describe.runIf(POSIX)('an ID whose key is missing (WIN-BROKEN-ID r1 M2)', () => {
+  it('a folder of this ID whose seed is gone is restorable into that folder: keys back, folder kept', async () => {
+    const { code: c, agents } = await kitOnDisk([{ name: 'helper' }]);
+    const a = agents[0] as (typeof agents)[0];
+    // The leftover folder (config only, as a create that stopped part-way) and a leftover item.
+    const dir = join(t.home, '.agentlink', 'agents', 'mine');
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    const config = `${JSON.stringify({ v: 1, name: 'mine', agentId: a.agentId, keyStore: 'keychain' })}\n`;
+    await writeFile(join(dir, 'config.json'), config, { mode: 0o600 });
+    keychain.items.set(keychainAccount(a.agentId, 'policy-version'), new TextEncoder().encode('0'));
+    const handle = await foundHandle();
+    const opened = await openKit('S1', handle, c);
+    const ids = (body(opened)['summary'] as { ids: Record<string, unknown>[] }).ids;
+    expect(ids).toHaveLength(1);
+    expect(ids[0]?.['state']).toBe('new');
+    // It goes back into its own folder, never a second folder of the same ID.
+    expect(ids[0]?.['name']).toBe('mine');
+    const kit = body(opened)['kit'] as string;
+    const twice = await engine.applyBegin('S1', {
+      kit,
+      selection: [a.agentId],
+      names: { [a.agentId]: 'helper' },
+    });
+    expect(body(twice)['error']).toBe('invalid');
+    const done = await gestureAndFinish('S1', kit, [a.agentId]);
+    expect(done['ids']).toEqual([
+      expect.objectContaining({ agentId: a.agentId, name: 'mine', outcome: 'restored' }),
+    ]);
+    expect(keychain.items.has(keychainAccount(a.agentId, 'seed'))).toBe(true);
+    expect(keychain.items.has(keychainAccount(a.agentId, 'store-key'))).toBe(true);
+    // The folder is the same folder; its config still names it; the kit's store is in it.
+    expect(await readFile(join(dir, 'config.json'), 'utf8')).toContain('"name":"mine"');
+    expect(await readdir(join(t.home, '.agentlink', 'agents'))).toEqual(['mine']);
+    expect(await readdir(dir)).toEqual(expect.arrayContaining(['config.json', 'store.sqlite']));
   });
 });
 

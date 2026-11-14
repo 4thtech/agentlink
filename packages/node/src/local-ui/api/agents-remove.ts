@@ -199,6 +199,11 @@ export type RemoveOutcome =
   | 'agent_changed'
   | 'not_available'
   | 'invalid'
+  /**
+   * WIN-BROKEN-ID r1 M1: "Remove from this computer" for an ID whose seed is still here (only its
+   * store key is gone): it is never set aside; nothing changed.
+   */
+  | 'key_here'
   | 'failed';
 
 /** The HTTP status of each outcome. */
@@ -211,6 +216,7 @@ export const REMOVE_STATUS: Readonly<Record<RemoveOutcome, number>> = Object.fre
   agent_changed: 409,
   not_available: 501,
   invalid: 400,
+  key_here: 409,
   failed: 500,
 });
 

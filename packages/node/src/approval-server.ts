@@ -8140,7 +8140,12 @@ export async function startApprovalServerWith(
             owner.presenceChecked?.();
             try {
               await setAside(input.name);
-            } catch {
+            } catch (error) {
+              // r1 M1: the seed is here (only the store key is gone): never set aside, nothing moved.
+              if ((error as { code?: unknown } | null)?.code === 'agent_not_broken') {
+                emit({ kind: 'remove', outcome: 'key_here' });
+                return { status: REMOVE_STATUS.key_here, body: { status: 'key_here' } };
+              }
               emit({ kind: 'remove', outcome: 'failed', step: 'set_aside' });
               return { status: REMOVE_STATUS.failed, body: { status: 'failed' } };
             }

@@ -32,6 +32,8 @@ export type OwnerKind =
   | 'contacts_unreachable'
   | 'label_invalid'
   | 'label_mismatch'
+  /** WIN-BROKEN-ID: the ID's key is still here; it was not removed from this computer. */
+  | 'key_here'
   | 'invalid'
   | 'not_applied'
   | 'agent_removing'
@@ -98,6 +100,7 @@ const WORDS: ReadonlySet<string> = new Set([
   'in_use',
   'label_invalid',
   'label_mismatch',
+  'key_here',
   'invalid',
   'not_applied',
   'agent_removing',

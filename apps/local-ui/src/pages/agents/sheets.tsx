@@ -323,6 +323,8 @@ export function RemoveSheet({
             onAgentChanged();
             return;
           }
+          // WIN-BROKEN-ID: its key is still here, so it was not moved; nothing changed.
+          if (outcome.kind === 'key_here') return setError(S.brokenKeyHere);
           const said = gateMessage(outcome);
           if (said !== undefined) return setError(said);
           if (outcome.kind === 'in_use') {

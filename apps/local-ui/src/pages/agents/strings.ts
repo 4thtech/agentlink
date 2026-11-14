@@ -45,8 +45,10 @@ export const AGENTS_STRINGS = {
   continueWithout: 'Continue without it',
   brokenRemoveTitle: (label: string): string => `Remove ${iso(label)} from this computer?`,
   brokenRemoveIntro:
-    "AgentLink moves this ID's folder to a dated folder in ~/.agentlink/set-aside, then removes the key parts left behind. Nothing is sent to your contacts.",
+    "AgentLink moves this ID's folder to a dated folder in ~/.agentlink/set-aside and removes the key parts left behind, except the one that keeps its history readable. Nothing is sent to your contacts.",
   brokenRemoveRestore: 'You can still restore this ID from a backup later.',
+  brokenKeyHere:
+    "This ID's key is still on this computer, so it wasn't removed. Run `agentlink doctor` to see what is wrong with it.",
   brokenRemoveStatement: (label: string): string => `Remove ${iso(label)} from this computer`,
   removalReason: 'Removing it stopped part-way. Nothing else was affected.',
   // W8-S4 (F16, F21; 04 §2.5 "Finishing a removal"; 11 §5.8 "Unfinished removal").

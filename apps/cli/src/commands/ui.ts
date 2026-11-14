@@ -535,6 +535,7 @@ export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
         localUi: (opened) => localUiOptions(opened),
         now: () => Math.floor(Date.now() / 1000),
         noteBroken: (name) => brokenIds(homedir()).note(name),
+        clearBroken: (name) => brokenIds(homedir()).clear(name),
       };
       return startUiWelcome({
         directory,
@@ -588,6 +589,7 @@ export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
           localUi: (opened) => localUiOptions(opened),
           now,
           noteBroken: (name) => brokenIds(homedir()).note(name),
+          clearBroken: (name) => brokenIds(homedir()).clear(name),
         };
         // WP-1: the ID open at launch carries its key-items token too, so it can be renamed (D-141).
         const initialUi = hostUiOf(agent, localUi);

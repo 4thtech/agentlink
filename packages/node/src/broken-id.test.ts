@@ -1,7 +1,7 @@
 // WIN-BROKEN-ID: the keychain probe and the leftover erase of an ID whose key is missing.
 import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { describe, expect, it } from 'vitest';
-import { agentIdentityMissing, eraseBrokenAgentItems } from './broken-id.js';
+import { agentIdentityMissing, agentSeedMissing, eraseBrokenAgentItems } from './broken-id.js';
 import { keychainAccount, type KeychainBackend } from './keychain.js';
 
 class MapKeychain implements KeychainBackend {
@@ -65,5 +65,26 @@ describe('eraseBrokenAgentItems (WIN-BROKEN-ID)', () => {
       code: 'keystore_erase_failed',
     });
     expect(k.items.size).toBe(2);
+  });
+});
+
+describe('agentSeedMissing and keepStoreKey (WIN-BROKEN-ID r1)', () => {
+  it('is true only when the seed itself is gone (a missing store key alone is not)', async () => {
+    const k = new MapKeychain();
+    const id = newId();
+    k.items.set(keychainAccount(id, 'seed'), randomBytes(32));
+    expect(await agentSeedMissing(k, id)).toBe(false);
+    k.items.delete(keychainAccount(id, 'seed'));
+    k.items.set(keychainAccount(id, 'store-key'), randomBytes(32));
+    expect(await agentSeedMissing(k, id)).toBe(true);
+  });
+
+  it('set-aside keeps the store key, so the set-aside store stays readable', async () => {
+    const k = new MapKeychain();
+    const id = newId();
+    k.items.set(keychainAccount(id, 'store-key'), randomBytes(32));
+    k.items.set(keychainAccount(id, 'policy-version'), randomBytes(2));
+    await eraseBrokenAgentItems(k, id, undefined, { keepStoreKey: true });
+    expect([...k.items.keys()]).toEqual([keychainAccount(id, 'store-key')]);
   });
 });

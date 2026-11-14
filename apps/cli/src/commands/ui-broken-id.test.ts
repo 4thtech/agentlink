@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { writeAgentConfig } from '../runtime/agent-dir.js';
 import { brokenIds, isIdentityMissing } from '../runtime/broken-id.js';
 import { UI_TEXT, diagnoseStart, startUiServer, type UiDeps, type UiServer } from './ui.js';
+import { openUiHostAgent, type UiHostDeps } from './ui-host.js';
 
 const PREFIX = 'npx -y @4thtech-io/agentlink';
 const newId = (): string => `0x${encodeHex(randomBytes(20))}`;
@@ -159,5 +160,43 @@ describe('brokenIds (WIN-BROKEN-ID): the names whose open failed for a missing k
     expect(brokenIds(home).has('default')).toBe(false);
     ids.note('NOT A NAME');
     expect(brokenIds(home).has('NOT A NAME')).toBe(false);
+  });
+});
+
+describe('openUiHostAgent (WIN-BROKEN-ID r1): the broken note follows the open', () => {
+  const entry = { name: 'default', label: 'Personal', available: true, removing: false };
+  const hostDeps = (open: UiHostDeps['owner']['open'], log: string[]): UiHostDeps =>
+    ({
+      owner: { open },
+      directory: { read: () => Promise.resolve(entry) },
+      localUi: () => Promise.resolve({}),
+      now: () => 0,
+      noteBroken: (name: string) => log.push(`note ${name}`),
+      clearBroken: (name: string) => log.push(`clear ${name}`),
+    }) as unknown as UiHostDeps;
+
+  it('notes a missing key, and clears the note once the ID opens', async () => {
+    const log: string[] = [];
+    expect(
+      await openUiHostAgent(
+        hostDeps(() => Promise.reject(missing()), log),
+        'default',
+      ),
+    ).toBe(undefined);
+    expect(log).toEqual(['note default']);
+    const opened = await openUiHostAgent(
+      hostDeps(
+        () =>
+          Promise.resolve({
+            status: 'ok',
+            agent: { name: 'default', close: () => Promise.resolve() },
+          }) as never,
+        log,
+      ),
+      'default',
+    );
+    // The wiring after the open is not under test here; the note is cleared once it opened.
+    void opened;
+    expect(log).toEqual(['note default', 'clear default']);
   });
 });

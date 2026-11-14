@@ -28,7 +28,7 @@ describe('setAsideBrokenAgent (WIN-BROKEN-ID)', () => {
     await writeAgentConfig(home, { v: 1, name: 'work', agentId: newId(), keyStore: 'keychain' });
     const order: string[] = [];
     await setAsideBrokenAgent(home, 'default', {
-      identityMissing: () => Promise.resolve(true),
+      seedMissing: () => Promise.resolve(true),
       eraseLeftovers: async (id) => {
         // The folder is already gone from `agents` when the keys are touched.
         order.push(`erase ${id}`);
@@ -49,7 +49,7 @@ describe('setAsideBrokenAgent (WIN-BROKEN-ID)', () => {
     let erased = 0;
     await expect(
       setAsideBrokenAgent(home, 'default', {
-        identityMissing: () => Promise.resolve(false),
+        seedMissing: () => Promise.resolve(false),
         eraseLeftovers: () => {
           erased += 1;
           return Promise.resolve();
@@ -68,7 +68,7 @@ describe('setAsideBrokenAgent (WIN-BROKEN-ID)', () => {
     let erased = 0;
     await expect(
       setAsideBrokenAgent(home, 'default', {
-        identityMissing: () => Promise.resolve(true),
+        seedMissing: () => Promise.resolve(true),
         eraseLeftovers: () => {
           erased += 1;
           return Promise.resolve();
@@ -94,7 +94,7 @@ describe('setAsideBrokenAgent (WIN-BROKEN-ID)', () => {
       await symlink(elsewhere, join(home, '.agentlink', SET_ASIDE_DIR));
       await expect(
         setAsideBrokenAgent(home, 'default', {
-          identityMissing: () => Promise.resolve(true),
+          seedMissing: () => Promise.resolve(true),
           eraseLeftovers: () => Promise.resolve(),
           now: () => NOW,
         }),
@@ -107,7 +107,7 @@ describe('setAsideBrokenAgent (WIN-BROKEN-ID)', () => {
     await writeAgentConfig(home, { v: 1, name: 'default', agentId: newId(), keyStore: 'keychain' });
     await expect(
       setAsideBrokenAgent(home, 'default', {
-        identityMissing: () => Promise.resolve(true),
+        seedMissing: () => Promise.resolve(true),
         eraseLeftovers: () => Promise.reject(new Error('keychain')),
         now: () => NOW,
       }),
@@ -119,7 +119,7 @@ describe('setAsideBrokenAgent (WIN-BROKEN-ID)', () => {
   it('refuses a file-KeyStore ID and a bad name', async () => {
     await writeAgentConfig(home, { v: 1, name: 'filed', agentId: newId(), keyStore: 'file' });
     const deps = {
-      identityMissing: () => Promise.resolve(true),
+      seedMissing: () => Promise.resolve(true),
       eraseLeftovers: () => Promise.resolve(),
       now: () => NOW,
     };
