@@ -1,6 +1,6 @@
-// ATT-SENDFOLDER-FIX (D-121 D6; 08 §1; 11 §5; I-4): Home's "Allow your Send folder" banner, for an
+// ATT-SENDFOLDER-FIX (D-121 D6; 08 §1; 11 §5; I-4): the "Allow your Send folder" action, for an
 // ID that allows no folder yet (made when ~/AgentLink/Send could not be used, or before the first
-// rules carried it), so the owner's AI can send files without a terminal.
+// rules carried it), so the owner's AI can send files without a terminal. FILES-HOME-PANEL: Home's Files panel (files-panel.tsx) now holds this action and replaced the banner on Home; the banner stays where an Attach answers no_folder, and its api is shared.
 //
 // - Reads `GET /api/ui/files` (a read; signs nothing). Shown only when it answers an empty list.
 // - Its one button asks the local server to set up the Send folder (`POST /api/ui/files/send-folder`,

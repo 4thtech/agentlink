@@ -245,6 +245,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/history/delete/undo',
       '/api/ui/history/delete/status',
       '/api/ui/storage/inbox/reveal',
+      // FILES-REVEAL: Show in Finder for the Send folder (local-ui/send-reveal-server.test.ts).
+      '/api/ui/files/send-folder/reveal',
       // RET-6: Keep automatically, a read and the save (local-ui/api/retention.test.ts).
       '/api/ui/storage/retention',
       // ATT-APP-ATTACH: attach files in a conversation (local-ui/attach-server.test.ts).

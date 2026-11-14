@@ -38,7 +38,7 @@
 // 06 §2.1 rule only. Core errors become fixed text by their code; any other failure is INTERNAL.
 import { CoreError, type CoreErrorCode, type SendMessageInput } from '@4thtech-io/core';
 import { contactRef, renderRef, resolveContact } from './contacts.js';
-import type { AttachedFile, ToolContext } from './context.js';
+import type { AttachedFile, ToolClient, ToolContext } from './context.js';
 import {
   attachRefusal,
   contentFileRefusal,
@@ -142,6 +142,18 @@ function coreErrorOutput(code: CoreErrorCode): HandlerOutput | undefined {
   }
 }
 
+/**
+ * FILES-AI-2 (06 §2.3): the ID's own pinned Send folder in its fixed `~` form for the AI-side texts,
+ * or undefined (no runtime support, none pinned, an error). Never a value from the call.
+ */
+async function ownSendFolder(client: ToolClient): Promise<string | undefined> {
+  try {
+    return await client.files?.sendFolder?.();
+  } catch {
+    return undefined;
+  }
+}
+
 export async function sendHandler(input: unknown, context: ToolContext): Promise<HandlerOutput> {
   if (!isPlainObject(input)) return invalidArgument();
   const { to, text, body, type, replyTo, clientRequestId, path, file, notarize, approvalId } =
@@ -205,7 +217,7 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
     const outcome = await client.files.attach(path);
     if (!outcome.ok) {
       logger.info('file send refused', { reason: outcome.reason });
-      return attachRefusal(outcome.reason);
+      return attachRefusal(outcome.reason, await ownSendFolder(client));
     }
     attached = outcome.file;
   }
@@ -319,7 +331,7 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
     }
     case 'needs_setup':
       logger.info('file send needs setup', { reason: result.reason });
-      return filesNeedsSetup(result.reason);
+      return filesNeedsSetup(result.reason, await ownSendFolder(client));
     case 'in_progress':
       return fail('error', SEND_TEXT.inProgress, SEND_TEXT.inProgressNextStep, 'IN_PROGRESS');
     case 'rejected':

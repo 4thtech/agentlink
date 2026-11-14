@@ -45,13 +45,16 @@ describe('pending_approval points at agentlink_get_approval (F5a)', () => {
 });
 
 describe('the folder-not-allowed results point to the app first (REL051-A5)', () => {
-  it('no_folder and outside_folder name Allow a folder in the app', () => {
-    for (const reason of ['no_folder', 'outside_folder'] as const) {
+  it('no_folder names Allow Send folder and outside_folder names Allow a folder, in the app', () => {
+    for (const [reason, control] of [
+      ['no_folder', 'Allow Send folder'],
+      ['outside_folder', 'Allow a folder'],
+    ] as const) {
       const out = attachRefusal(reason);
       const step = out.result.nextStep ?? '';
       expect(out.result.status, reason).toBe('needs_setup');
       expect(step, reason).toContain('AgentLink app');
-      expect(step, reason).toContain('Allow a folder');
+      expect(step, reason).toContain(control);
       expect(step.length, reason).toBeLessThanOrEqual(500);
     }
     expect(FILE_TEXT.noFolderNextStep).not.toMatch(/AgentLink rules/);

@@ -241,31 +241,37 @@ const row = (name: string): HTMLButtonElement | undefined =>
   all('button[aria-expanded]').find((b) => b.textContent?.includes(name)) as
     HTMLButtonElement | undefined;
 
-describe('ATT-SENDFOLDER-FIX: Home asks to allow the Send folder when none is allowed', () => {
+describe('FILES-HOME-PANEL: Home holds the Files panel, not a separate Send folder banner', () => {
   const FILES = '/api/ui/files';
-  it('shows the calm banner with its one button when no folder is allowed', async () => {
+  it('no folder allowed: the banner text and Allow Send folder sit inside the panel, nowhere else', async () => {
     await render(base({ [FILES]: ok({ folders: [], max: 32, version: 1 }) }));
-    const banner = q('[data-send-folder-banner]');
-    expect(banner).toBeTruthy();
-    expect(banner?.textContent).toContain('Allow your Send folder so your AI can send files');
-    expect(byText('[data-send-folder-banner] button', 'Allow Send folder')).toBeTruthy();
+    const panel = q('[data-files-panel]');
+    expect(panel).toBeTruthy();
+    expect(panel?.textContent).toContain('Allow your Send folder so your AI can send files');
+    expect(byText('[data-files-panel] button', 'Allow Send folder')).toBeTruthy();
+    expect(q('[data-send-folder-banner]')).toBeNull();
+    expect(all('button').filter((b) => b.textContent === 'Allow Send folder')).toHaveLength(1);
     expect(lintVocabulary(document.body.textContent ?? '')).toEqual([]);
   });
 
-  it('shows no banner when a folder is allowed, or when the list cannot be read', async () => {
+  it('a folder allowed: the panel shows the Send and Inbox rows, and there is no banner', async () => {
     await render(
       base({
         [FILES]: ok({
-          folders: [{ path: '/h/AgentLink/Send', resolved: null }],
+          folders: [{ path: '~/AgentLink/Send', resolved: '/h/AgentLink/Send' }],
           max: 32,
           version: 2,
         }),
       }),
     );
+    expect(q('[data-files-panel]')?.textContent).toContain('~/AgentLink/Send');
     expect(q('[data-send-folder-banner]')).toBeNull();
-    act(() => root.unmount());
-    root = createRoot(host);
+    expect(document.body.textContent).not.toContain('Allow your Send folder');
+  });
+
+  it('when the list cannot be read there is no panel and no banner', async () => {
     await render(base());
+    expect(q('[data-files-panel]')).toBeNull();
     expect(q('[data-send-folder-banner]')).toBeNull();
   });
 });

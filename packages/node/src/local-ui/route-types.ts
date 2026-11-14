@@ -319,7 +319,8 @@ export interface LocalUiHistoryRoute {
 /**
  * RET-4 (08 §1 "Free up space"): Show in Finder for the Inbox folder. Like the kit-reveal kind it
  * changes nothing and takes no input at all: only `POST /api/ui/storage/inbox/reveal`, registered
- * once; the server runs it through the kit-reveal gate's checks (no query, input, presence header or
+ * once; FILES-REVEAL adds `POST /api/ui/files/send-folder/reveal` (the ID's own pinned Send folder),
+ * the same kind with a second fixed path; the server runs it through the kit-reveal gate's checks (no query, input, presence header or
  * body byte). The handler gets the context only; the folder is the rules' own setting.
  */
 export interface LocalUiInboxRevealRoute {

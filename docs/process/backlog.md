@@ -10794,14 +10794,14 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** `RED (expected):` commit first; a pending `file` send keeps the written file; the approval digest binds the sanitised requested name, the in-memory hash and size; the card re-hashes the kept copy through one opened handle and previews only those bytes ("This file changed since your AI wrote it.", no Approve, the request void); the server approve route re-checks hash and size through a handle or refuses a void request, so a stale or second card cannot approve it; deny and expiry remove the kept file through the held folder handle after a device and inode re-check, only while unchanged; the approved retry writes nothing and never counts against the budget.
 
 #### FILES-AI-2 · AI-side texts for files: point to send-by-content and the Send folder (0.5.5)
-- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Status:** built (rel055/files-ux) · **Size:** S · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · `packages/mcp-tools/src/files-common.ts` (`FILE_TEXT`, `allowFolderLinkNextStep`), the `{sendFolder}` slot fill; tests
 - **Depends on:** FILES-SPEC-055 (lands with or after FILES-AI-1, since the texts name `file`)
 - **Spec:** 06 §2.3 "AI-side texts for files"; 11 §5.7
 - **Done when:** snapshot of the fixed `nextStep` texts for `NO_ALLOWED_FOLDER` (with and without the app link), `OUTSIDE_ALLOWED_FOLDER` and `NOT_FOUND`; `{sendFolder}` is filled only from the ID's own pinned Send folder with home as `~`, and the sentence drops the slot when there is none or it lies outside home; an I-5 test shows no slot takes agent-written or inbound text, and a path from the call never appears.
 
 #### FILES-REVEAL · Show in Finder for the Send folder (0.5.5)
-- **Status:** new · **Size:** S · **Tier:** Opus build, Opus independent review · **Security:** S2 (local route, OS exec)
+- **Status:** built (rel055/files-ux) · **Size:** S · **Tier:** Opus build, Opus independent review · **Security:** S2 (local route, OS exec)
 - **Repo/path:** agentlink · `packages/node/src/local-ui/{routes,route-types}.ts`, the Inbox reveal module (reuse its kind); `apps/local-ui` API helper; tests
 - **Depends on:** FILES-SPEC-055
 - **Spec:** 08 §1 "Show in Finder for the folders"; 04 §4 "Pinned at allow time"
@@ -10815,14 +10815,14 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** the Connect step shows the files card above the one Touch ID with the folder from the server, and `begin`/`finish` take no new input; Get started and New ID (`?add=agent`) have five steps with "Step 4 of 5 · Files", Connect another AI app has none; DOM tests per state: allowed, not allowed (Allow Send folder), not confirmed, Send folder missing, each AI app tip and the unknown-app tip; Skip for now goes to Invite and changes no rule (no request that signs); Choose another folder opens the existing review and confirm, adds the folder, and "Also stop sending from {sendFolder}" is unticked by default and lists both changes in one signed edit; the app makes no live claim about the AI app's own file access (fixed tips only); vocabulary lint (no "harness", "wallet"); Playwright golden path install → app → connect → Files → invite on a temp HOME.
 
 #### FILES-HOME-PANEL · Home Files panel replaces the Send folder banner (0.5.5)
-- **Status:** new · **Size:** M · **Tier:** Sonnet · **Security:** S1
+- **Status:** built (rel055/files-ux) · **Size:** M · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/home/*` (new files panel; `send-folder-banner.tsx` folded in), the Files read route's state word if missing; tests
 - **Depends on:** FILES-SPEC-055; FILES-REVEAL (stub until it merges)
 - **Spec:** 08 §1 "Home Files panel"; 11 §5.7
 - **Done when:** DOM tests: empty, allowed, not allowed (the banner text and Allow Send folder inside the panel, and no separate banner anywhere), Send folder missing, Inbox "{n} new" (a count, never a file name), Manage folders and Tips for {app}; collapse remembered and still works when `localStorage` throws; never collapsed while the Send folder is not allowed; a conversation's Attach `no_folder` points to the same action.
 
 #### FILES-SETTINGS-COPY · Settings › Files explainer, one line, tip and Show in Finder (0.5.5)
-- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S0/S1
+- **Status:** built (rel055/files-ux) · **Size:** S · **Tier:** Sonnet · **Security:** S0/S1
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/files/{io-strings.ts,io.test.ts}` and the Send folders tab; tests
 - **Depends on:** FILES-SPEC-055; FILES-REVEAL
 - **Spec:** 08 §1 "Settings › Files"; 11 §5.7 "Files explainer"

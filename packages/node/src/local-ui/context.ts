@@ -808,6 +808,13 @@ export interface LocalUiContext {
   readonly revealInbox?: () => Promise<
     'shown' | 'not_found' | 'refused' | 'unavailable' | 'not_opened'
   >;
+  /**
+   * FILES-REVEAL (08 §1): Show in Finder for the open ID's own pinned Send folder (no input; the
+   * folder comes from the verified policy, never from the page).
+   */
+  readonly revealSendFolder?: () => Promise<
+    'shown' | 'not_found' | 'refused' | 'unavailable' | 'not_opened'
+  >;
   /** DESK051-UPD: Settings > Updates (api/app-update.ts); the desktop app's host only. */
   readonly appUpdate?: LocalUiAppUpdateDesk;
   /**
