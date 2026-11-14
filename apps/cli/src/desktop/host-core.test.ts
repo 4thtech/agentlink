@@ -168,7 +168,9 @@ async function fakeServer(
     origin,
     port,
     activity: { lastAt: () => 0, openStreams: () => 1, linksUsed: () => 0 },
-    open: () => sink(`${origin}/?t=${mint()}`),
+    open: (approvalId?: string) =>
+      sink(`${origin}${approvalId === undefined ? '/' : `/approve/${approvalId}`}?t=${mint()}`),
+    openPerson: (contactId: string) => sink(`${origin}/?t=${mint()}#person=${contactId}`),
     openHome: () => sink(`${origin}/settings/home?t=${mint()}`),
     openFirstRun: () => sink(`${origin}/first-run?t=${mint()}`),
     openJoin: () => sink(`${origin}/settings/join?t=${mint()}`),
@@ -787,7 +789,7 @@ describe('N7: native notifications from the desktop host', () => {
     count = 2;
     await until(() => notifies(s.pipe.sent).length === 1);
     expect(notifies(s.pipe.sent)).toEqual([
-      { v: 1, type: 'notify', kind: 'messages', count: 2, name: 'Ana' },
+      { v: 1, type: 'notify', kind: 'messages', count: 2, name: 'Ana', target: A },
     ]);
     expect(asked).toEqual([[A]]);
     s.pipe.shell({ v: 1, type: 'shutdown' });
@@ -806,6 +808,25 @@ describe('N7: native notifications from the desktop host', () => {
       '/',
       '/settings/updates',
     ]);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+  });
+
+  it('NOTIFY-DEEPLINK: a show with a target opens that request or person; a bad one the page', async () => {
+    const s = setup();
+    const run = runDesktopHost(s.deps);
+    await until(() => readies(s.pipe.sent).length === 1);
+    const apr = `apr_${'A'.repeat(22)}`;
+    const person = `0x${'ab'.repeat(20)}`;
+    s.pipe.shell({ v: 1, type: 'show', route: 'approvals', target: apr });
+    s.pipe.shell({ v: 1, type: 'show', route: 'inbox', target: person });
+    s.pipe.shell({ v: 1, type: 'show', route: 'inbox' });
+    await until(() => readies(s.pipe.sent).length === 4);
+    const urls = readies(s.pipe.sent)
+      .slice(1)
+      .map((u) => new URL(u));
+    expect(urls.map((u) => u.pathname)).toEqual([`/approve/${apr}`, '/', '/']);
+    expect(urls.map((u) => u.hash)).toEqual(['', `#person=${person}`, '']);
     s.pipe.shell({ v: 1, type: 'shutdown' });
     await run;
   });

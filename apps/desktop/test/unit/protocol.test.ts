@@ -24,6 +24,8 @@ describe('session links', () => {
     [`http://localhost:1/first-run?t=${TOKEN}`, 'http://localhost:1'],
     [`http://localhost:65535/settings/join?t=${TOKEN}`, 'http://localhost:65535'],
     [`http://localhost:80/settings/home?t=${TOKEN}`, 'http://localhost:80'],
+    // NOTIFY-DEEPLINK: one request by its ID shape.
+    [`http://localhost:4567/approve/apr_${'a'.repeat(22)}?t=${TOKEN}`, 'http://localhost:4567'],
   ])('accepts %s', (url, origin) => {
     expect(sessionUrlOrigin(url)).toBe(origin);
   });
@@ -47,7 +49,6 @@ describe('session links', () => {
     `http://localhost:4567//evil?t=${TOKEN}`,
     `http://localhost:4567/a%2fb?t=${TOKEN}`,
     `http://localhost:4567/${'a'.repeat(201)}?t=${TOKEN}`,
-    `http://localhost:4567/approve/apr_${'a'.repeat(22)}?t=${TOKEN}`,
     `http://localhost:4567/settings?t=${TOKEN}`,
     `http://localhost:4567/first-run/?t=${TOKEN}`,
     `http://localhost:4567/`,

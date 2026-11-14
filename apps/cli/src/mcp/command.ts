@@ -32,7 +32,7 @@ import type { Readable, Writable } from 'node:stream';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { createLogger, type Logger } from '@4thtech-io/log';
-import { pidAlive, startApprovalServer, type AgentStore } from '@4thtech-io/node';
+import { osNotifier, pidAlive, startApprovalServer, type AgentStore } from '@4thtech-io/node';
 import { approvalNextStep } from '../approval/next-step.js';
 import { createUiApprovalSource } from '../approval/ui-source.js';
 import { EXIT_OK, type CommandHandler } from '../dispatch.js';
@@ -45,7 +45,8 @@ import {
 } from '../runtime/index.js';
 import { notifyPrefsInForce } from '@4thtech-io/types/ui-contract/notifications';
 import { readUiSettingsFile } from '../runtime/agent-dir.js';
-import { osApprovalAlertsOn } from '../runtime/desktop-alerts-record.js';
+import { desktopAlertsOwner, osApprovalAlertsOn } from '../runtime/desktop-alerts-record.js';
+import { createOtherIdAlerts, type OtherIdAlerts } from '../runtime/other-id-alerts.js';
 import { cliVersion } from '../runtime/cli-version.js';
 import { cliPrefix } from '../runtime/cli-prefix.js';
 import { ownerKnownAbsent } from '../runtime/owner-on-machine.js';
@@ -81,6 +82,15 @@ export interface McpCommandDeps {
    * server). Without it, `pending_approval` results carry the CLI command only (M1a).
    */
   readonly approvalUi?: (agent: OpenedAgent, logger: Logger) => ApprovalUi;
+  /**
+   * NOTIFY-ALL-IDS: the OS alerts for this ID's new messages and files while the desktop app alerts
+   * for another ID (runtime/other-id-alerts.ts). Started with the server, stopped with it.
+   */
+  readonly otherIdAlerts?: (
+    agent: OpenedAgent,
+    logger: Logger,
+    holdsLease: () => boolean,
+  ) => OtherIdAlerts;
   /**
    * M1-11b-8: true only while owner setup may be wired for the opened agent (fail closed). With
    * it and the approval UI, the start opens the first-run page once (first-run-on-start.ts).
@@ -177,10 +187,16 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
       server.onclose = resolve;
     });
     let firstRun: Promise<boolean> | undefined;
+    let otherIds: OtherIdAlerts | undefined;
     try {
       await server.connect(deps.transport());
       logger.info('mcp server started', { setUp: agent !== undefined });
       loop?.start();
+      otherIds =
+        agent === undefined
+          ? undefined
+          : deps.otherIdAlerts?.(agent, logger, () => loop?.holding === true);
+      otherIds?.start();
       // M1-11b-8: once per start, in the background (the tools answer meanwhile); never a tool.
       const available = deps.firstRunAvailable;
       if (agent !== undefined && approvalUi !== undefined && available !== undefined) {
@@ -198,6 +214,7 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
       // Stop the passes and release the lease while the store is still open (06 §6), then the
       // approval server, whose source reads the same store (M1-11a-b). A first-run open still
       // under way finishes first (it never throws).
+      otherIds?.stop();
       await loop?.stop();
       // W4-LIVE-STATUS (06 §6 "Exit"): the session row goes after the lease, before the agent.
       await heartbeat?.stop();
@@ -277,6 +294,40 @@ export const mcpCommand = (version: string): CommandHandler => {
     transport: () => stdioTransport(),
     version,
     heartbeat: processHeartbeat,
+    // NOTIFY-ALL-IDS: this process already holds this ID's keys and store; the alert only reads what
+    // it holds (flow events, owner-given names), while the desktop app alerts for another ID.
+    otherIdAlerts: (agent, _logger, holdsLease) =>
+      createOtherIdAlerts({
+        agentName: agent.name,
+        leader: holdsLease,
+        desktopOwner: () => desktopAlertsOwner(homedir()),
+        prefs: async () => notifyPrefsInForce((await readUiSettingsFile(homedir()))?.notify),
+        events: async (since, until) => {
+          const flow = await agent.client.messages.flowEvents(since, until);
+          return {
+            events: flow.events.map((e) => ({
+              contactId: e.contactId,
+              direction: e.direction,
+              kind: e.kind,
+              at: e.at,
+            })),
+            capped: flow.capped,
+          };
+        },
+        ownerNames: async (refs) => {
+          const wanted = new Set(refs);
+          const out = new Map<string, string>();
+          for (const c of await agent.client.contacts.list()) {
+            // I-5: only a name the owner gave; a contact's own (self-declared) name never.
+            if (!wanted.has(c.id) || c.display.nameSource !== 'owner') continue;
+            const name = c.display.name.trim();
+            if (name !== '') out.set(c.id, name);
+          }
+          return out;
+        },
+        notify: (lines) => osNotifier(lines),
+        now: systemClock,
+      }),
     approvalUi: (agent, logger) => {
       const store = opened;
       return createApprovalUi({

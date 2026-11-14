@@ -43,7 +43,8 @@ interface Call {
 const RECEIVED = '/api/ui/files/received?limit=20';
 const SENT = '/api/ui/files/sent?limit=20';
 const FOLDERS = '/api/ui/files';
-
+// FILES-SETTINGS-COPY: the Send folders tab reads the received page once only for the Inbox folder line.
+const INBOX_READ = '/api/ui/files/received';
 /** A route's answer: a body (200), or `[status, body]`; `POST <path>` keys a POST. */
 function server(routes: Record<string, unknown>, offline: readonly string[] = []) {
   const calls: Call[] = [];
@@ -143,7 +144,7 @@ describe('tabs', () => {
 
   it('the explainer says the page does not upload', () => {
     expect(IO.explainer).toBe(
-      "You don't upload here. Put files in your Send folder or ask your AI to send them; files you receive appear under Received.",
+      'Your AI sends files from your Send folder, and files you receive are saved in Inbox. To send a text file yourself, use Attach in a conversation.',
     );
   });
 
@@ -180,7 +181,7 @@ describe('tabs', () => {
       { initialTab: 'folders' },
     );
     expect(tabs()[2]?.getAttribute('aria-selected')).toBe('true');
-    expect(s.calls.map((c) => c.url)).toEqual([FOLDERS]);
+    expect(s.calls.map((c) => c.url).filter((u) => !u.startsWith(INBOX_READ))).toEqual([FOLDERS]);
   });
 
   it('a ?folder= link opens Send folders with the folder filled in, and reads no file list', async () => {
@@ -191,7 +192,7 @@ describe('tabs', () => {
       expect(tabs()[2]?.getAttribute('aria-selected')).toBe('true');
       const field = host.querySelector<HTMLInputElement>('input[name="folder"]');
       expect(field?.value).toBe('/Users/me/Projects');
-      expect(s.calls.map((c) => c.url)).toEqual([FOLDERS]);
+      expect(s.calls.map((c) => c.url).filter((u) => !u.startsWith(INBOX_READ))).toEqual([FOLDERS]);
     } finally {
       window.history.replaceState(null, '', before);
     }
@@ -244,7 +245,7 @@ describe('ATT-SENDFOLDER-FIX: a ?folder=…&check=1 link (Home banner) checks th
     window.history.replaceState(null, '', '/settings/files?folder=%2FUsers%2Fme%2F.ssh&check=1');
     try {
       const s = await mount({ [FOLDERS]: { folders: [], max: 32, version: 3 } });
-      expect(s.calls.map((c) => c.url)).toEqual([FOLDERS]);
+      expect(s.calls.map((c) => c.url).filter((u) => !u.startsWith(INBOX_READ))).toEqual([FOLDERS]);
       expect(host.querySelector<HTMLInputElement>('input[name="folder"]')?.value).toBe(
         '/Users/me/.ssh',
       );
@@ -260,7 +261,7 @@ describe('ATT-SENDFOLDER-FIX: a ?folder=…&check=1 link (Home banner) checks th
     window.history.replaceState(null, '', '/settings/files?folder=%2FUsers%2Fme%2FOther&check=1');
     try {
       const s = await mount({ [FOLDERS]: { folders: [], max: 32, version: 3 } });
-      expect(s.calls.map((c) => c.url)).toEqual([FOLDERS]);
+      expect(s.calls.map((c) => c.url).filter((u) => !u.startsWith(INBOX_READ))).toEqual([FOLDERS]);
     } finally {
       window.history.replaceState(null, '', before);
     }
@@ -271,7 +272,7 @@ describe('ATT-SENDFOLDER-FIX: a ?folder=…&check=1 link (Home banner) checks th
     window.history.replaceState(null, '', '/settings/files?folder=%2FUsers%2Fme%2FProjects');
     try {
       const s = await mount({ [FOLDERS]: { folders: [], max: 32, version: 3 } });
-      expect(s.calls.map((c) => c.url)).toEqual([FOLDERS]);
+      expect(s.calls.map((c) => c.url).filter((u) => !u.startsWith(INBOX_READ))).toEqual([FOLDERS]);
     } finally {
       window.history.replaceState(null, '', before);
     }

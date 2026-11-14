@@ -134,6 +134,17 @@ describe('toInviteLink: the 08 §4 crafted list is ignored', () => {
 });
 
 describe('toInviteLink: other schemes and non-strings are ignored', () => {
+  it('NOTIFY-DEEPLINK: an approval or person target never comes in through the OS scheme', () => {
+    for (const link of [
+      `agentlink://approve/apr_${'A'.repeat(22)}`,
+      `agentlink://join#person=0x${'ab'.repeat(20)}`,
+      `agentlink://home#person=0x${'ab'.repeat(20)}`,
+      `agentlink://person/0x${'ab'.repeat(20)}`,
+    ]) {
+      expect(toInviteLink(link), link).toBeNull();
+    }
+  });
+
   it('ignores other schemes', () => {
     for (const link of [
       `${PREFIX}${LONG}`,

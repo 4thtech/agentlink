@@ -187,6 +187,9 @@ export interface BrowserWindow {
   hide(): void;
   isDestroyed(): boolean;
   isMinimized(): boolean;
+  /** NOTIFY-FOCUS: the window is the one the person is using right now. */
+  isFocused(): boolean;
+  isVisible(): boolean;
   restore(): void;
   destroy(): void;
   on(event: 'close', listener: (event: ElectronEvent) => void): void;

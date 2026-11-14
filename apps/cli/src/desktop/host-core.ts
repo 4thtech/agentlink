@@ -44,7 +44,9 @@ import { startUiServer, type UiDeps, type UiServer } from '../commands/ui.js';
 import { notifyMessages, planAlerts, refsToName, type AlertBaseline } from './alerts.js';
 import type { FatalReason } from '../runtime/ui-lifecycle.js';
 import type { DesktopPipe } from './pipe.js';
+import { dedupeFileAndMessage, type RecentAlerts } from './alert-dedupe.js';
 import {
+  isNotifyTarget,
   isSessionUrl,
   type HostCounts,
   type HostState,
@@ -320,8 +322,16 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   // The first page: Home, first run while no owner exists (the sink sends `ready`).
   await server.open().catch(() => false);
 
-  const show = async (route: ShowRoute): Promise<void> => {
+  const show = async (route: ShowRoute, target?: string): Promise<void> => {
     if (approvalServer === undefined) return;
+    // NOTIFY-DEEPLINK: the one request or person a notification named; the server checks the shape
+    // again. A request that is no longer waiting opens the approve page's own "no longer waiting" state
+    // (the page decides); an unknown person opens Home (the fallback below).
+    if (route === 'approvals' && target !== undefined && isNotifyTarget('approvals', target)) {
+      if (await approvalServer.open(target).catch(() => false)) return;
+    } else if (route === 'inbox' && target !== undefined && isNotifyTarget('inbox', target)) {
+      if (await approvalServer.openPerson(target).catch(() => false)) return;
+    }
     if (route === 'approvals' || route === 'inbox') await approvalServer.open().catch(() => false);
     else if (route === 'updates') await approvalServer.openUpdates().catch(() => false);
     else if (route === 'join') await approvalServer.openJoin().catch(() => false);
@@ -356,7 +366,7 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   const handle = async (message: ShellMessage): Promise<void> => {
     if (stopping) return;
     if (message.type === 'shutdown') stop('shutdown');
-    else if (message.type === 'show') await show(message.route);
+    else if (message.type === 'show') await show(message.route, message.target);
     else if (message.type === 'app-update')
       return; // kept by its own listener above
     else {
@@ -381,6 +391,10 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
    * renewed every RECORD_RENEW_MS; a record that is not renewed stops counting).
    */
   let recordScope: string | undefined;
+  /** NOTIFY-UPDATE-READY: the first look of this run is done (an update already waiting is alerted once). */
+  let firstLookDone = false;
+  /** NOTIFY-DEDUPE: who was alerted about lately (a file and its message are one alert). */
+  const recentAlerts: RecentAlerts = new Map();
   let recordAt = 0;
   const mark = async (scope: string | undefined): Promise<void> => {
     if (deps.alertsRecord === undefined) return;
@@ -415,18 +429,26 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     if (state === undefined) return;
     // Another ID's approvals (a switch): a fresh first look, whatever the scope says yet.
     const prev = baselineOf === source ? alertBaseline : undefined;
-    const { news, baseline } = planAlerts(prev, waitingIds, state);
+    const { news, baseline } = planAlerts(prev, waitingIds, state, { launch: !firstLookDone });
+    firstLookDone = true;
     alertBaseline = baseline;
     baselineOf = source;
     await mark(state.scope);
     if (news.length === 0) return;
-    const refs = refsToName(news, state.prefs);
+    // NOTIFY-DEDUPE: a person's file and its message are one alert.
+    const alerts = dedupeFileAndMessage(
+      news,
+      (kind) => state.prefs[kind === 'files' ? 'files' : 'messages'],
+      recentAlerts,
+      Date.now(),
+    );
+    const refs = refsToName(alerts, state.prefs);
     const names =
       refs.length === 0
         ? new Map<string, string>()
         : await server.ownerNames(refs).catch(() => new Map<string, string>());
     if (stopping) return;
-    for (const message of notifyMessages(news, state.prefs, names)) pipe.send(message);
+    for (const message of notifyMessages(alerts, state.prefs, names)) pipe.send(message);
   };
 
   const every = deps.statusEveryMs ?? STATUS_EVERY_MS;

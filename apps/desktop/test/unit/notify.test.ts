@@ -208,7 +208,7 @@ describe('fixed strings', () => {
       body: 'From a contact.',
     });
     expect(notificationText('files', 2, 'Ana').body).toBe('2 files from Ana.');
-    expect(notificationText('update', 1, '')).toEqual({
+    expect(notificationText('update', 2, '')).toEqual({
       title: 'Update ready',
       body: 'A new version of AgentLink is ready to install.',
     });
@@ -357,7 +357,7 @@ describe('runShell wiring (N7)', () => {
     await runShell(electron, proc);
     const core = children[0];
     core?.stream.push(readyLine());
-    core?.stream.push(`${notify('update', 1)}\n`);
+    core?.stream.push(`${notify('update', 2)}\n`);
     expect(FakeNotification.shown.map((n) => n.options.title)).toEqual(['Update ready']);
     const window = FakeBrowserWindow.created[0];
     window?.hide();

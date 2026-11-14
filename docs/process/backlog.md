@@ -10794,14 +10794,14 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** `RED (expected):` commit first; a pending `file` send keeps the written file; the approval digest binds the sanitised requested name, the in-memory hash and size; the card re-hashes the kept copy through one opened handle and previews only those bytes ("This file changed since your AI wrote it.", no Approve, the request void); the server approve route re-checks hash and size through a handle or refuses a void request, so a stale or second card cannot approve it; deny and expiry remove the kept file through the held folder handle after a device and inode re-check, only while unchanged; the approved retry writes nothing and never counts against the budget.
 
 #### FILES-AI-2 · AI-side texts for files: point to send-by-content and the Send folder (0.5.5)
-- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Status:** built (rel055/files-ux) · **Size:** S · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · `packages/mcp-tools/src/files-common.ts` (`FILE_TEXT`, `allowFolderLinkNextStep`), the `{sendFolder}` slot fill; tests
 - **Depends on:** FILES-SPEC-055 (lands with or after FILES-AI-1, since the texts name `file`)
 - **Spec:** 06 §2.3 "AI-side texts for files"; 11 §5.7
 - **Done when:** snapshot of the fixed `nextStep` texts for `NO_ALLOWED_FOLDER` (with and without the app link), `OUTSIDE_ALLOWED_FOLDER` and `NOT_FOUND`; `{sendFolder}` is filled only from the ID's own pinned Send folder with home as `~`, and the sentence drops the slot when there is none or it lies outside home; an I-5 test shows no slot takes agent-written or inbound text, and a path from the call never appears.
 
 #### FILES-REVEAL · Show in Finder for the Send folder (0.5.5)
-- **Status:** new · **Size:** S · **Tier:** Opus build, Opus independent review · **Security:** S2 (local route, OS exec)
+- **Status:** built (rel055/files-ux) · **Size:** S · **Tier:** Opus build, Opus independent review · **Security:** S2 (local route, OS exec)
 - **Repo/path:** agentlink · `packages/node/src/local-ui/{routes,route-types}.ts`, the Inbox reveal module (reuse its kind); `apps/local-ui` API helper; tests
 - **Depends on:** FILES-SPEC-055
 - **Spec:** 08 §1 "Show in Finder for the folders"; 04 §4 "Pinned at allow time"
@@ -10815,14 +10815,14 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** the Connect step shows the files card above the one Touch ID with the folder from the server, and `begin`/`finish` take no new input; Get started and New ID (`?add=agent`) have five steps with "Step 4 of 5 · Files", Connect another AI app has none; DOM tests per state: allowed, not allowed (Allow Send folder), not confirmed, Send folder missing, each AI app tip and the unknown-app tip; Skip for now goes to Invite and changes no rule (no request that signs); Choose another folder opens the existing review and confirm, adds the folder, and "Also stop sending from {sendFolder}" is unticked by default and lists both changes in one signed edit; the app makes no live claim about the AI app's own file access (fixed tips only); vocabulary lint (no "harness", "wallet"); Playwright golden path install → app → connect → Files → invite on a temp HOME.
 
 #### FILES-HOME-PANEL · Home Files panel replaces the Send folder banner (0.5.5)
-- **Status:** new · **Size:** M · **Tier:** Sonnet · **Security:** S1
+- **Status:** built (rel055/files-ux) · **Size:** M · **Tier:** Sonnet · **Security:** S1
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/home/*` (new files panel; `send-folder-banner.tsx` folded in), the Files read route's state word if missing; tests
 - **Depends on:** FILES-SPEC-055; FILES-REVEAL (stub until it merges)
 - **Spec:** 08 §1 "Home Files panel"; 11 §5.7
 - **Done when:** DOM tests: empty, allowed, not allowed (the banner text and Allow Send folder inside the panel, and no separate banner anywhere), Send folder missing, Inbox "{n} new" (a count, never a file name), Manage folders and Tips for {app}; collapse remembered and still works when `localStorage` throws; never collapsed while the Send folder is not allowed; a conversation's Attach `no_folder` points to the same action.
 
 #### FILES-SETTINGS-COPY · Settings › Files explainer, one line, tip and Show in Finder (0.5.5)
-- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S0/S1
+- **Status:** built (rel055/files-ux) · **Size:** S · **Tier:** Sonnet · **Security:** S0/S1
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/files/{io-strings.ts,io.test.ts}` and the Send folders tab; tests
 - **Depends on:** FILES-SPEC-055; FILES-REVEAL
 - **Spec:** 08 §1 "Settings › Files"; 11 §5.7 "Files explainer"
@@ -10874,3 +10874,41 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** WIN-DESK-2 (OD-M)
 - **Scope:** when the shell icacls check is `unchecked`, it passes one fixed flag to the core at spawn; the health read carries `dataAccess: unchecked` (a flag only, absent otherwise); the app shows a non-blocking, closable PageNotice (tone warning, existing component, no new design) with fixed plain words. The app continues. The existing core.log line stays.
 - **Acceptance:** unit tests (spawn env, health answer, notice); the flag cannot come from the user own environment.
+
+
+#### NOTIFY-DEEPLINK · A notification click opens that approval or conversation, not Home (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (an opaque local ID on the private pipe; shape-checked on both sides)
+- **Repo/path:** agentlink · `apps/cli/src/desktop/{alerts,host-core,protocol}.ts`, `apps/desktop/src/{main/notify,main/main,shared/protocol}.ts`, `packages/node/src/approval-server.ts` (`openPerson`), `apps/local-ui/src/pages/home/{person-link,home-screen}`
+- **Depends on:** N7 (native notifications), NOTIFY-WIRING-054
+- **Spec:** 08 §1 (notification centre); 11 §5
+- **Done when:** a click on an approval notification opens `/approve/<id>` when one request is waiting (the list when several); a click on a message or file notification opens Home with that person's conversation open; the link carries only an opaque local ID (a request's or a person's), never content or a name; the ID is checked by the pipe parser, the core and Home (an unknown one opens Home as before); tests for the pipe, the shell, the core and Home's reader.
+
+#### NOTIFY-UPDATE-READY · Alert when the update is ready to install, and once at launch if one is pending (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (a count on the private pipe; no new data)
+- **Repo/path:** agentlink · `apps/cli/src/desktop/{alerts,host-core}.ts`, `apps/desktop/src/main/notify.ts`, `packages/node/src/{approval-server,notifications}.ts`
+- **Depends on:** UPD-5 (in-app update), NOTIFY-DEEPLINK
+- **Spec:** 08 §1; 11 §5
+- **Done when:** the update item counts 1 while available and 2 once downloaded and verified (`ready`); going from 1 to 2 is news again (once; the same state never repeats); the notification says "Update ready: a new version is ready to install" only for 2 and "Update available" for 1; an unread update already waiting at launch is alerted once per run (never again when another ID opens); the Updates switch still decides; tests.
+
+#### NOTIFY-ALL-IDS · Messages and files for an ID that is not open still raise an alert (0.5.5)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (new notification text from inbound events; I-5, I-7, 04 §2.5)
+- **Repo/path:** agentlink · `apps/cli/src/runtime/{other-id-alerts,desktop-alerts-record}.ts`, `apps/cli/src/mcp/command.ts`, `packages/node/src/index.ts` (`osNotifier`)
+- **Depends on:** N7, NOTIFY-WIRING-054 (gap 3), IR-N7-1 L-5
+- **Spec:** 04 §2.5; 08 §1; 11 §5
+- **Done when:** while the desktop app alerts for one ID, the `agentlink mcp` process of another ID (which already holds that ID's keys) alerts its new messages and files by OS notification under the owner's Messages and Files switches; nothing opens an ID's keys or store just to notify; first look only notes what is there; a file and its message are one alert; quiet for the ID the desktop app alerts for and while no desktop app runs.
+- **Threat note:** the text is fixed words; the only variable parts, shown only with Show names on, are the ID's folder name and a contact name the OWNER gave (`nameSource` `owner`), each checked against the pipe's plain-name rule (letters, numbers, single spaces, apostrophes, hyphens; no dot, slash, colon, angle bracket or control character). Message text, a file name, a counterparty's self-declared name and links never reach it (I-5). Reads only flow events (contact ID, direction, kind, time) and the owner's names through the client the process already holds; nothing is logged or sent (I-7). A same-user process can silence it by writing the alerts record, which it could already do for approvals (IR-N7-1 L-1). The OS alert has no click target (osascript / notify-send); it never approves or replies.
+- **RED:** `RED (expected): NOTIFY-ALL-IDS` (tests first).
+
+#### NOTIFY-FOCUS · No OS alert while the AgentLink window is focused (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (shell only; nothing on the pipe changes)
+- **Repo/path:** agentlink · `apps/desktop/src/main/{notify,window,main,electron-api}.ts`
+- **Depends on:** N7, NOTIFY-DEEPLINK
+- **Spec:** 08 §1; 11 §5
+- **Done when:** while the window is shown, not minimised and focused, no native notification is raised (the in-app centre, tray and badge still update from the core); a hidden, minimised, background or closed window alerts as before; the check is made when the alert would be shown; tests.
+
+#### NOTIFY-DEDUPE · One alert, not two, for a file plus its message (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (drops alerts; adds none)
+- **Repo/path:** agentlink · `apps/cli/src/desktop/{alert-dedupe,host-core}.ts`, `apps/cli/src/runtime/other-id-alerts.ts`
+- **Depends on:** NOTIFY-ALL-IDS, N7
+- **Spec:** 08 §1; 11 §5
+- **Done when:** a person's file and message arriving together (one look) or within 20 s (either order, across looks) raise one alert (whichever arrives first is shown; within one look the file's); only alerts the owner's switches let through are counted, so an off switch never hides the other kind; different people and approvals/updates are untouched. A file alone is one flow event (kind `file`), never a file plus a message.

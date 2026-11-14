@@ -344,6 +344,7 @@ import {
   type PasskeyAssertion,
 } from './owner-passkey.js';
 import { attachDesk } from './local-ui/attach-desk.js';
+import { revealOwnSendFolder } from './send-folder-reveal.js';
 import { ATTACH_MAX_BODY_BYTES } from './local-ui/api/attach.js';
 import {
   creditsPort,
@@ -541,6 +542,8 @@ export function presenceBackoffSeconds(failures: number): number {
 }
 
 const APPROVAL_ID = /^apr_[A-Za-z0-9_-]{22}$/;
+/** NOTIFY-DEEPLINK: a person's opaque local contact ID. */
+const PERSON_ID = /^0x[0-9a-f]{40}$/;
 const DIGEST = /^[0-9a-f]{64}$/;
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const APPROVE_PAGE = /^\/approve\/(apr_[A-Za-z0-9_-]{22})$/;
@@ -1156,6 +1159,12 @@ export interface ApprovalServer {
    * desktop app's "Update ready" notification opens. A fixed path.
    */
   openUpdates(): Promise<boolean>;
+  /**
+   * NOTIFY-DEEPLINK: Home with one person's conversation open (the link carries only that person's
+   * opaque local ID, after `#`, so it never reaches the server). A malformed ID rejects. Home checks
+   * the ID against its own people before it opens anything.
+   */
+  openPerson(contactId: string): Promise<boolean>;
   /**
    * N7 (desktop app): the open ID's notification items (brought up to date first; kind, ref, count
    * and times only) and the Settings › Notifications switches in force. Undefined while no ID with a
@@ -1816,7 +1825,7 @@ export async function startApprovalServerWith(
         approvals?: number;
         inbound?: readonly NotificationInbound[];
         scannedUntil?: number;
-        update?: boolean;
+        update?: boolean | 0 | 1 | 2;
         networkDown?: boolean;
       } = {};
       try {
@@ -1845,7 +1854,11 @@ export async function startApprovalServerWith(
         }
       }
       const update = options.appUpdate?.view();
-      if (update !== undefined) out.update = update.state === 'available';
+      // NOTIFY-UPDATE-READY: 1 while one is available, 2 once it is downloaded and verified, ready to
+      // install (a bigger count is news again for the store and the desktop alert).
+      if (update !== undefined) {
+        out.update = update.state === 'ready' ? 2 : update.state === 'available' ? 1 : 0;
+      }
       try {
         const health = await uiContext.health?.();
         const relays = health?.relays;
@@ -2010,6 +2023,19 @@ export async function startApprovalServerWith(
       return 'not_opened';
     }
   };
+  // FILES-REVEAL (08 §1): Show in Finder for the open ID's own pinned Send folder; the folder is
+  // the verified policy's, checked again by send-folder-reveal.ts, never a page path.
+  const revealSendFolder = (): Promise<
+    'shown' | 'not_found' | 'refused' | 'unavailable' | 'not_opened'
+  > => {
+    const client = agentUi?.client;
+    if (client === undefined) return Promise.resolve('unavailable');
+    return revealOwnSendFolder({
+      loadPolicy: () => readOnlyClient(client).policy.load() as never,
+      revealer: fileRevealer,
+      ...(filesHome === undefined ? {} : { home: filesHome }),
+    });
+  };
   /**
    * WP-R2b (04 §2.3.3 "Kit record"): what `GET /api/ui/backup` and Show in Finder read. Reads only;
    * it signs nothing, opens no other ID's core and reads no keychain item. Built where an ID can
@@ -2132,7 +2158,7 @@ export async function startApprovalServerWith(
       ...(peopleAllDesk === undefined ? {} : { peopleAll: peopleAllDesk }),
       ...(storageDesk === undefined ? {} : { storage: storageDesk }),
       // RET-4: Show in Finder for the Inbox folder (the history desk is bound per request).
-      ...(agentUi?.client === undefined ? {} : { revealInbox }),
+      ...(agentUi?.client === undefined ? {} : { revealInbox, revealSendFolder }),
       // DESK051-UPD: the desktop host's update state (no agent needed).
       ...(options.appUpdate === undefined ? {} : { appUpdate: options.appUpdate }),
       // W4-SHELL-V2: the app's UI settings, in the app host only (one desk for every context).
@@ -8380,6 +8406,10 @@ export async function startApprovalServerWith(
     openUpdates: async () =>
       opener(`${origin}/settings/updates?t=${mintLink()}`).catch(() => false),
     openJoin: () => openJoinPage(false),
+    openPerson: async (contactId: string) => {
+      if (typeof contactId !== 'string' || !PERSON_ID.test(contactId)) throw invalidId();
+      return opener(`${origin}/?t=${mintLink()}#person=${contactId}`).catch(() => false);
+    },
     desktopAlerts: async () => {
       const desk = notificationsPart(source).notifications;
       if (desk === undefined) return undefined;

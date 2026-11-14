@@ -18,6 +18,7 @@ import { Banner, Button, EmptyState, Icon, TextField } from '@4thtech-io/ui';
 import { UnderTheHood } from '../../lazy/hood.js';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { createApiClient } from '../../api/client.js';
+import { createRevealApi } from '../../api/reveal-folder.js';
 import { useFileMarks } from '../moving/use-file-marks.js';
 import {
   EARLIER_OWNER_CODE_HINT,
@@ -46,6 +47,11 @@ import {
   type PasskeyInfo,
 } from './files-api.js';
 import { createSaveApi } from '../inbox/save-api.js';
+import { RevealButton } from './folder-rows.js';
+import { FILES_COPY as C, appTip, computerWord } from './folders-copy.js';
+import { RECEIVED_PATH, listPath, parseInboxFolder } from './io-api.js';
+import { markSeen } from './folders-summary.js';
+import { useAppName } from './use-app-name.js';
 import { FilesSkeleton, FilesTabs, ReceivedPanel, SentPanel, type FilesTab } from './io.js';
 import {
   FILES_IO_STRINGS as IO,
@@ -279,6 +285,15 @@ const prefill = (): string => {
   }
 };
 
+/** FILES-HOME-PANEL: Home's "Manage folders" opens this page on the Send folders tab. */
+const wantsFolders = (): boolean => {
+  try {
+    return new URLSearchParams(window.location.search).get('tab') === 'folders';
+  } catch {
+    return false;
+  }
+};
+
 /**
  * ATT-SENDFOLDER-FIX: a `?folder=...&check=1` link checks the filled-in folder once, only when Home's
  * banner set it (IR-1 L-2: the one-time SEND_FOLDER_CHECK_KEY names this folder; it is removed
@@ -295,9 +310,54 @@ const autoCheck = (folder: string): boolean => {
   }
 };
 
-/** Send folders: the folders the AI may send files from (today's page, unchanged). */
-function SendFolders({ api }: { readonly api: FilesApi }): ReactElement {
+/** The ID's own Send folders in the server's order (send-folder-file.ts): the first found gets Show in Finder. */
+const SEND_ORDER = [
+  '~/AgentLink/Send',
+  ...[2, 3, 4, 5, 6, 7, 8, 9].map((n) => `~/AgentLink/Send-${String(n)}`),
+];
+
+/** Send folders: the folders the AI may send files from. */
+function SendFolders({
+  api,
+  fetch: givenFetch,
+  token,
+}: {
+  readonly api: FilesApi;
+  readonly fetch?: typeof fetch | undefined;
+  readonly token?: string | undefined;
+}): ReactElement {
   const [list, setList] = useState<ListState>({ phase: 'loading' });
+  // FILES-SETTINGS-COPY (D-152): Show in Finder for the Send folder card and the Inbox line, the
+  // one line and the fixed tip of the AI app. Reads only; no folder is named to the server.
+  const reveal = useMemo(
+    () =>
+      createRevealApi({
+        ...(givenFetch === undefined ? {} : { fetch: givenFetch }),
+        ...(token === undefined ? {} : { token }),
+      }),
+    [givenFetch, token],
+  );
+  const appName = useAppName();
+  // Show in Finder on one card only: the one the server opens (the first Send folder, in its order,
+  // that is found), never another allowed folder.
+  const revealable =
+    list.phase === 'ok'
+      ? SEND_ORDER.map((path) => list.folders.find((r) => r.path === path)).find(
+          (r) => r !== undefined && r.resolved !== null,
+        )?.path
+      : undefined;
+  const [inbox, setInbox] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    void api.get(listPath(RECEIVED_PATH, null)).then((answer) => {
+      if (live && answer.kind === 'answer' && answer.status === 200) {
+        setInbox(parseInboxFolder(answer.json));
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, [api]);
   const [initial] = useState(prefill);
   const [checkOnce, setCheckOnce] = useState(() => initial.length > 0 && autoCheck(initial));
   const [step, setStep] = useState<Step>(
@@ -432,6 +492,10 @@ function SendFolders({ api }: { readonly api: FilesApi }): ReactElement {
   } else {
     content = (
       <>
+        <p className="al-text-body-sm">{C.oneLine}</p>
+        <p className="al-text-body-sm al-muted" data-app-tip>
+          <span className="al-text-label">{C.aiAppHeading}</span> {appTip(appName, computerWord())}
+        </p>
         {list.folders.length === 0 && step.kind === 'idle' ? (
           <EmptyState
             icon="folder"
@@ -461,6 +525,7 @@ function SendFolders({ api }: { readonly api: FilesApi }): ReactElement {
                     <span className="al-text-caption al-muted">{opensAt(row.resolved)}</span>
                   ) : null}
                 </div>
+                {row.path === revealable ? <RevealButton which="send" reveal={reveal} /> : null}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -474,6 +539,17 @@ function SendFolders({ api }: { readonly api: FilesApi }): ReactElement {
             ))}
           </ul>
         ) : null}
+        {inbox === undefined ? null : (
+          <div className="fl-row" data-row="inbox">
+            <Icon name="inbox" size={16} />
+            <div className="fl-row-main">
+              <span className="al-text-label">{C.inboxLabel}</span>
+              <span className="al-text-code">{inbox}</span>
+              <span className="al-text-caption al-muted">{C.inboxLine}</span>
+            </div>
+            <RevealButton which="inbox" reveal={reveal} />
+          </div>
+        )}
         {step.kind === 'idle' && list.folders.length > 0 ? (
           <Button
             block
@@ -633,8 +709,12 @@ export function FilesPage({
     [givenFetch, token],
   );
   const [tab, setTab] = useState<FilesTab>(
-    () => initialTab ?? (prefill().length > 0 ? 'folders' : 'received'),
+    () => initialTab ?? (prefill().length > 0 || wantsFolders() ? 'folders' : 'received'),
   );
+  // FILES-HOME-PANEL: Home's "{n} new" counts what arrived since Files was last opened.
+  useEffect(() => {
+    markSeen();
+  }, []);
   const [waiting, setWaiting] = useState<Readonly<Partial<Record<FilesTab, number>>>>({});
   const onReceived = useCallback((n: number) => setWaiting((w) => ({ ...w, received: n })), []);
   const onSent = useCallback((n: number) => setWaiting((w) => ({ ...w, sent: n })), []);
@@ -654,7 +734,7 @@ export function FilesPage({
             onSent={onSent}
           />
         ) : null}
-        {tab === 'folders' ? <SendFolders api={api} /> : null}
+        {tab === 'folders' ? <SendFolders api={api} fetch={givenFetch} token={token} /> : null}
       </div>
     </div>
   );

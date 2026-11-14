@@ -537,9 +537,10 @@ export async function runShell(
   notifier = new NativeNotifier({
     ...(electron.Notification === undefined ? {} : { Notification: electron.Notification }),
     timers: proc.timers,
-    onClick: (route) => {
+    windowFocused: () => window?.focused === true,
+    onClick: (route, target) => {
       window?.show();
-      supervisor?.send({ v: 1, type: 'show', route });
+      supervisor?.send({ v: 1, type: 'show', route, ...(target === undefined ? {} : { target }) });
     },
   });
   // WIN-ACL-NOTICE: the last data folder check could not run; the core shows a notice in the app.
