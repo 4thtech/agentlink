@@ -28,6 +28,7 @@ import {
   historyKeepOf,
 } from './retention.js';
 import { CoreError } from '../errors.js';
+import { selectTx } from '../history/delete.js';
 import { defaultPolicy, type Policy } from '@4thtech-io/types';
 
 const DAY = 86_400;
@@ -349,6 +350,61 @@ describe('backdating: ages are local (IR-RET-67-1 Medium 1)', () => {
     w.clock.t += 5 * DAY;
     await w.b.client.historyRetention.run();
     expect(w.b.inbox.trashed).toEqual(['back.pdf']);
+  });
+});
+
+describe('P2-TRUNCATED-COUNT', () => {
+  it('an unread received message whose seen row was pruned is kept (no local age)', async () => {
+    const w = await world(keep(90, 0));
+    const id = await message(w);
+    await w.b.store.transaction((tx) => tx.delete('seen', {}));
+    w.clock.t += 400 * DAY;
+    await w.b.client.historyRetention.run();
+    expect((await body(w, id))?.deleted_at).toBeNull();
+  });
+
+  it('truncated is counted after the local-age filter', async () => {
+    const w = await world(keep(0, 0));
+    const id = await message(w);
+    await w.b.store.transaction((tx) => tx.delete('seen', {}));
+    w.clock.t += 400 * DAY;
+    const before = w.clock.t - 90 * DAY;
+    const base = await body(w, id);
+    if (base === undefined) throw new Error('no row');
+    // 8 rows old by createdAt but only just arrived here (seen now): the filter drops them all.
+    // Then 3 rows that are old here too (no local time: createdAt). The cap is 3 rows per plan.
+    await w.b.store.transaction((tx) => {
+      const add = (
+        tag: string,
+        i: number,
+        at: number,
+        withSeen: boolean,
+        seenAt = w.clock.t,
+      ): void => {
+        const envelope_id = `${tag}${String(i).padStart(8, '0')}`;
+        const envelope_hash = `0x${envelope_id.padEnd(64, '0')}`;
+        tx.insert('envelopes', { ...base, envelope_id, envelope_hash, created_at: at });
+        if (withSeen) {
+          tx.insert('seen', { kind: 'envelope', id: envelope_hash, first_seen_at: seenAt });
+        }
+      };
+      for (let i = 0; i < 8; i++) add('aa', i, 100, true);
+      for (let i = 0; i < 3; i++) add('bb', i, 200, true, 150);
+    });
+    const plan = (cap: number) =>
+      w.b.store.transaction((tx) => selectTx(tx, { before, include: 'messages' }, cap));
+    const all = (await plan(1000)).rows;
+    expect(all.length).toBeGreaterThanOrEqual(3); // the 3 added rows
+    expect(all.some((r) => r.envelope_id.startsWith('aa'))).toBe(false);
+    const n = all.length;
+    const exact = await plan(n);
+    expect(exact.truncated).toBe(false); // exactly the cap, not over it
+    expect(exact.rows).toHaveLength(n);
+    const over = await plan(n - 1);
+    expect(over.truncated).toBe(true); // before the fix the 8 filtered rows hid the count
+    expect(over.rows).toHaveLength(n - 1);
+    // Pages of mostly filtered rows are walked: one row at a time still reaches the end.
+    expect((await plan(1)).rows).toHaveLength(1);
   });
 });
 

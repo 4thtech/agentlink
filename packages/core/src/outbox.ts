@@ -80,6 +80,8 @@ import type { RelayStatus, Transport, TransportFactory } from './transport.js';
  */
 export const OUTBOX_CLAIM_SECONDS = 30;
 /** Rows claimed per listing: one worker batch, so no claimed row waits behind a slow batch. */
+/** P2-RETRY-MIN: the least time between two `retryNow` calls that cut backoffs short. */
+const RETRY_NOW_MIN_SECONDS = 30;
 const DUE_BATCH = 8;
 /** Listings per processDue pass (at most 512 rows). */
 const MAX_BATCHES = 64;
@@ -302,6 +304,7 @@ export class OutboxService {
   #transportClosed = false;
   /** OUTBOX-NOW-1: the persistence of every pass of this client still running (their claims). */
   readonly #passes = new Set<StoreOutboxPersistence>();
+  #lastRetryNow: number | undefined;
   /** The agent's own relays, the only ones where NIP-42 AUTH may be signed (07 §4.3). */
   #ownRelays: ReadonlySet<string> = new Set();
 
@@ -499,6 +502,14 @@ export class OutboxService {
     // Paused: processDue publishes nothing, and no deadline is touched.
     if (this.#pause !== undefined && (await this.#pause.paused())) return this.processDue();
     const now = nowOf(this.#ctx);
+    // P2-RETRY-MIN: repeated calls (a flapping relay, a button pressed again and again) cut the
+    // wait short at most once per RETRY_NOW_MIN_SECONDS; in between it is a plain delivery pass.
+    // A clock set back counts as elapsed (the interval is only ever measured forward).
+    const last = this.#lastRetryNow;
+    if (last !== undefined && now >= last && now - last < RETRY_NOW_MIN_SECONDS) {
+      return this.processDue();
+    }
+    this.#lastRetryNow = now;
     await this.#ctx.store.transaction((tx) => {
       // Read inside the transaction: a pass records its claims in its own claim transaction.
       const held = new Set<string>();
