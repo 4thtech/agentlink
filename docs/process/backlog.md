@@ -11034,6 +11034,29 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Spec:** 08 §8
 - **Done when:** Settings › Updates shows Update now, a progress bar, Restart now and a fallback download link; the app installs only an update it verified itself. Details: CHANGELOG 0.5.4.
 
+#### BROWSER-UPDATE · Update now and Restart now in the browser app (0.5.6)
+- **Status:** built (rel056/browser-update) · **Size:** M · **Tier:** Opus build, Fable independent audit (local server update, supply chain) · **Security:** S2
+- **Repo/path:** agentlink · `apps/cli/src/runtime/browser-update.ts` (stage, verify, relaunch, desk), `apps/cli/src/runtime/npm-update-check.ts`, `apps/cli/src/commands/ui.ts` (`update` stop → close → relaunch), `packages/node/src/local-ui/api/app-update.ts` (browser in-app states, steps for any desk that has them), `apps/local-ui/src/pages/updates/`
+- **Depends on:** REL051-UPD2, UPD-5, UPD-BUTTON-FIX, APP-CONTINUITY
+- **Spec:** 08 §1 "Updating the browser app" (proposed); 04 §4; 11 §5; I-4
+- **Done when:** `RED (expected):` commit first; Settings › Updates in the browser app: Check for updates → Update now (npm by argv with a fixed `@4thtech-io/agentlink@<registry version>` spec, `--ignore-scripts`, public registry forced, npm integrity, `npm audit signatures` with nothing invalid or missing, installed name and version checked) → Restart now (this host closes first, then the staged `agentlink ui` runs in the same terminal and opens a new tab) → fixed "quit and reopen your AI apps" line; IR r1 (Fable): SLSA provenance for the exact version from this repository required before install, clean npm environment and empty npmrc files, `--strict-ssl=true --package-lock=true`, every lockfile entry from registry.npmjs.org with sha512, staged files checked again at Restart now, `updated` last exit, bundle-check spawn source gate; a global npm install keeps the one command; routes only behind session, CSRF and Origin (mark gate), no MCP path; desktop apps untouched. The first real proof is the first release after the one that ships it (0.5.6 → 0.5.7).
+
+#### UPD-BUTTON-FIX · Update now and Restart now do nothing in Settings › Updates (Mac) (0.5.6)
+- **Status:** built (rel056/upd-button) · **Size:** S · **Tier:** Opus build, Fable independent audit (updater path) · **Security:** S2
+- **Repo/path:** agentlink · `apps/local-ui/src/api/client.ts` (bodyless POST = empty octet-stream), `apps/local-ui/src/pages/updates/` (refused/failed line); `e2e/test/empty-body-routes.test.ts`; `tools/deps-check/policy.mjs` (three e2e relative escapes into `apps/local-ui/src`)
+- **Depends on:** UPD-5
+- **Spec:** 08 §8; 11 §5
+- **Cause:** the page's `api.post(path)` with no body sent no Content-Type; the server's mutating gate (`handleUi`) answers 415 `content_type` before the mark gate, so `appUpdateDesk.startInstall` / `restart` never ran, and the page re-read the state and redrew "available" in silence. The kit-reveal `api.post(BACKUP_REVEAL_PATH)` (Settings › Backup, Save checklist) had the same bug.
+- **Done when:** `RED (expected):` commit first; an integration test drives the page's real ApiClient and generation guard against the real approval server: Update now and Restart now reach the update desk (200, new state), the kit's Show in Finder passes the gate; a page test shows one plain line on a refused, failed or not-started answer (the card, its button and "Your IDs, people and messages stay as they are." stay); 0.5.4/0.5.5 users install 0.5.6 once by hand (CHANGELOG).
+
+#### WIN-INAPP-UPDATE · Update now updates the Windows app too (0.5.6)
+- **Status:** built (rel056/win-update) · **Size:** M · **Tier:** Opus build, Fable independent audit (updater, supply chain) · **Security:** S2 (sensitive: `.github/workflows/**`)
+- **Repo/path:** agentlink · `apps/desktop/src/main/updater/install-win.ts` (download, verify, staged node.exe, Windows watchdog), `in-app.ts`, `main.ts`, `state.ts`, `install-refusal.ts`; `apps/desktop/build/lib/nsis.mjs` (silent upgrade: `AllowSkipFiles off`, helper in use, old resources removed in place); `tools/release/desktop-update-manifest.mjs` (Windows setup in the manifest, Windows build record's pin); `release.yml`, `desktop-update-renew.yml` (setup attestation, Windows update mode); `desktop.yml` + `apps/desktop/test/smoke/win-update-rehearsal.mjs` (rehearsal on the throwaway Windows runner)
+- **Depends on:** UPD-5, UPD-BUTTON-FIX
+- **Spec:** 08 §8 "Signed updates" (Windows in-app install, proposed); 04 §7 (changed setup residual, proposed); 11 §5
+- **Owner requirement (Tali, 14 Nov):** "Settings › Updates › Check for updates › Update now, and that's it: it updates, restarts, new version — on the Windows app too, no installer by hand."
+- **Done when:** `RED (expected):` commit first; the signed manifest lists the Windows setup and its signature covers it; win32/x64 selects it; the app verifies before it runs, refuses a setup changed after the check, keeps the old app when the setup fails or the new copy does not answer (failed version recorded, "Couldn't update here" next launch); the NSIS script upgrades silently in place keeping data and the desktop shortcut; the Windows CI rehearsal passes. What only a real release proves: the signed document on a Release, the real health answer of the new app, Explorer's launch on a person's desktop.
+
 #### KIT-NAMES · Recovery kit carries each ID's name (kit format v2) (0.5.4)
 - **Status:** done (released 0.5.4) · **Security:** S2
 - **Spec:** 04 §2.3.3; 07 §9.4
@@ -11146,3 +11169,10 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
   - Desktop smoke (`desktop.yml`): the built app's host record says `host: "desktop"`, and first run goes through to an owner with the master code over the host's own calls. The Electron window cannot be driven (the shell refuses debugging switches); its WebAuthn switch is covered by `apps/desktop/test/unit/security.test.ts`.
   - Continuity e2e: browser first then the app takes over by yield (same owner, no setup); app first then `agentlink ui` shows the app and starts no second host.
   - `docs/runbooks/firstrun-matrix.md` (RB-22): the manual matrix with exact clicks and screen text from the strings files.
+
+#### FIRSTRUN-EXIT · A way out of first run at any time: Check for updates and Help on every step; owner pages say "Set up AgentLink first" (0.5.6, owner requirement 14 Nov)
+- **Status:** in review (branch `rel056/firstrun-exit`) · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (first run, owner gating)
+- **Repo/path:** agentlink · new `apps/local-ui/src/pages/start/setup-exit.{tsx,css}`; `pages/start/{wizard,strings}.ts(x)`, `pages/restore/steps.tsx`, `pages/start-over/index.tsx`, `layout/index.tsx`, `pages/updates/{index.tsx,data.ts}`
+- **Depends on:** UPD-5 (Settings › Updates), FIRSTRUN-ANY-PLATFORM
+- **Spec:** 08 §1 "A way out of first run" (proposed); 08 §8 "Signed updates" (installing a verified update is not an owner operation); 11 §5
+- **Done when:** `RED (expected):` commit first; every Get started step (all five, Connect another AI app, before an ID exists), every restore step and Start over show **Check for updates** (Settings › Updates) and **Help** (the user guide), in the browser and the desktop window; before an owner exists every shell page but Home, Settings, Settings › Updates and Appearance shows only "Set up AgentLink first" with **Continue setup**; Settings › Updates shows the version and checks with no owner; the Windows app always offers **Download the new version** (the stable `releases/latest/download/AgentLink-win-x64-setup.exe`), the browser app always shows how to update; an unanswered owner read gates nothing; no server route changes gating.

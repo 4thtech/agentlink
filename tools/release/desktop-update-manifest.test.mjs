@@ -56,12 +56,14 @@ const SUMS = [
   `${hex('c')}  AgentLink-${VERSION}-mac-arm64.zip`,
   `${hex('d')}  AgentLink-${VERSION}-mac-x64.zip`,
   `${hex('e')}  AgentLink-mac-arm64.dmg`,
+  `${hex('f')}  AgentLink-${VERSION}-win-x64-setup.exe`,
 ].join('\n');
 const SIZES = new Map([
   [`AgentLink-${VERSION}-mac-arm64.dmg`, 120_000_001],
   [`AgentLink-${VERSION}-mac-x64.dmg`, 120_000_002],
   [`AgentLink-${VERSION}-mac-arm64.zip`, 110_000_003],
   [`AgentLink-${VERSION}-mac-x64.zip`, 110_000_004],
+  [`AgentLink-${VERSION}-win-x64-setup.exe`, 130_000_005],
 ]);
 const unsigned = (over = {}) =>
   buildUnsigned({
@@ -136,23 +138,38 @@ describe('the pin (Fable L3)', () => {
       updatePin: pin,
       ...extra,
     });
+    // WIN-INAPP-UPDATE: the Windows build's record too (three: Mac arm64, Mac x64, Windows x64).
+    const win = (pin, extra = {}) => on(pin, { platform: 'win32', ...extra });
     expect(() =>
-      checkBuildInputs([on(k1.publicKey), on(k1.publicKey)], k1.publicKey),
+      checkBuildInputs([on(k1.publicKey), on(k1.publicKey), win(k1.publicKey)], k1.publicKey),
     ).not.toThrow();
-    expect(() => checkBuildInputs([on(k1.publicKey), on(k2.publicKey)], k1.publicKey)).toThrow(
-      /pin/,
-    );
     expect(() =>
-      checkBuildInputs([on(k1.publicKey), { updates: 'off', updatePin: null }], k1.publicKey),
+      checkBuildInputs([on(k1.publicKey), on(k2.publicKey), win(k1.publicKey)], k1.publicKey),
+    ).toThrow(/pin/);
+    expect(() =>
+      checkBuildInputs([on(k1.publicKey), on(k1.publicKey), win(k2.publicKey)], k1.publicKey),
+    ).toThrow(/pin/);
+    expect(() =>
+      checkBuildInputs(
+        [
+          on(k1.publicKey),
+          on(k1.publicKey),
+          { platform: 'win32', updates: 'off', updatePin: null },
+        ],
+        k1.publicKey,
+      ),
     ).toThrow(/updates/);
     expect(() => checkBuildInputs([on(null)], k1.publicKey)).toThrow(ToolError);
     expect(() => checkBuildInputs([], k1.publicKey)).toThrow(ToolError);
-    expect(() => checkBuildInputs([on(k1.publicKey)], k1.publicKey)).toThrow(/two|both|arm64|x64/i);
+    expect(() => checkBuildInputs([on(k1.publicKey)], k1.publicKey)).toThrow(/three|Windows/i);
+    expect(() => checkBuildInputs([on(k1.publicKey), on(k1.publicKey)], k1.publicKey)).toThrow(
+      /three|Windows/i,
+    );
   });
 });
 
 describe('the unsigned manifest from the verified release assets', () => {
-  it('lists the zip and the DMG for arm64 and x64 with their SHA-256, size and release URL', () => {
+  it('lists the zip and the DMG for arm64 and x64, and the Windows setup, with SHA-256, size and URL', () => {
     const m = unsigned();
     expect(m).toEqual({
       domain: 'agentlink-desktop-update/v2',
@@ -164,20 +181,32 @@ describe('the unsigned manifest from the verified release assets', () => {
         ['x64', 'zip', 'd', 110_000_004],
         ['arm64', 'dmg', 'a', 120_000_001],
         ['x64', 'dmg', 'b', 120_000_002],
-      ].map(([arch, kind, c, size]) => ({
-        platform: 'darwin',
-        arch,
-        kind,
-        url: `https://github.com/4thtech/agentlink/releases/download/v${VERSION}/AgentLink-${VERSION}-mac-${arch}.${kind}`,
-        sha256: hex(c),
-        size,
-      })),
+      ]
+        .map(([arch, kind, c, size]) => ({
+          platform: 'darwin',
+          arch,
+          kind,
+          url: `https://github.com/4thtech/agentlink/releases/download/v${VERSION}/AgentLink-${VERSION}-mac-${arch}.${kind}`,
+          sha256: hex(c),
+          size,
+        }))
+        .concat([
+          {
+            platform: 'win32',
+            arch: 'x64',
+            kind: 'nsis',
+            url: `https://github.com/4thtech/agentlink/releases/download/v${VERSION}/AgentLink-${VERSION}-win-x64-setup.exe`,
+            sha256: hex('f'),
+            size: 130_000_005,
+          },
+        ]),
     });
     expect(releaseAssets(VERSION).map((a) => a.name)).toEqual([
       `AgentLink-${VERSION}-mac-arm64.zip`,
       `AgentLink-${VERSION}-mac-x64.zip`,
       `AgentLink-${VERSION}-mac-arm64.dmg`,
       `AgentLink-${VERSION}-mac-x64.dmg`,
+      `AgentLink-${VERSION}-win-x64-setup.exe`,
     ]);
   });
 
@@ -309,6 +338,10 @@ describe('command line', () => {
         JSON.stringify({ platform: 'darwin', updates: 'on', updatePin: k1.publicKey }),
       );
     }
+    writeFileSync(
+      join(assets, 'inputs-win-x64.json'),
+      JSON.stringify({ platform: 'win32', updates: 'on', updatePin: k1.publicKey }),
+    );
     const rk = join(d, 'root-key.json');
     writeFileSync(rk, rootKeyJson(k1.publicKey));
     const out = [];
@@ -682,5 +715,77 @@ describe('desktop-update-renew.yml (IR-UPD-8-1 #4)', () => {
   });
   it('the expiry warning points at the renewal workflow', () => {
     expect(RENEW).toContain('desktop-update-renew');
+  });
+});
+
+// WIN-INAPP-UPDATE: the Windows setup is in the signed manifest, the signature covers it, the app
+// picks it on win32/x64 (kind nsis), and the workflows check its attestation and build record.
+describe('WIN-INAPP-UPDATE: the Windows setup in the signed manifest', () => {
+  const ctx = (over = {}) => ({
+    root: { rootPublicKey: k1.publicKey, minimumStatementSequence: 0 },
+    currentVersion: '0.5.2',
+    channel: 'stable',
+    platform: 'win32',
+    arch: 'x64',
+    kind: 'nsis',
+    failedVersion: null,
+    now: NOW,
+    ...over,
+  });
+  const enc = (t) => new TextEncoder().encode(t);
+
+  it('the app accepts the signed manifest on win32/x64 and selects the setup', () => {
+    const { text } = sign();
+    const accepted = verifier.acceptManifest(verifier.parseUpdateDocument(enc(text)), ctx());
+    expect(accepted.asset).toEqual({
+      platform: 'win32',
+      arch: 'x64',
+      kind: 'nsis',
+      url: `https://github.com/4thtech/agentlink/releases/download/v${VERSION}/AgentLink-${VERSION}-win-x64-setup.exe`,
+      sha256: hex('f'),
+      size: 130_000_005,
+    });
+    // No Windows arm64 build: an arm64 Windows asks for x64 (host.ts), nothing else is offered.
+    expect(() =>
+      verifier.acceptManifest(verifier.parseUpdateDocument(enc(text)), ctx({ arch: 'arm64' })),
+    ).toThrow(/no installer/);
+  });
+
+  it('the signature covers the Windows asset: a changed hash, size or URL is refused', () => {
+    const { text } = sign();
+    for (const change of [
+      (a) => ({ ...a, sha256: hex('0') }),
+      (a) => ({ ...a, size: a.size + 1 }),
+      (a) => ({ ...a, url: a.url.replace('win-x64-setup', 'win-x64-setup2') }),
+    ]) {
+      const doc = JSON.parse(text);
+      doc.assets = doc.assets.map((a) => (a.platform === 'win32' ? change(a) : a));
+      expect(() =>
+        verifier.acceptManifest(verifier.parseUpdateDocument(enc(JSON.stringify(doc))), ctx()),
+      ).toThrow(/signature/);
+    }
+  });
+
+  const renew = readFileSync(join(root, '.github/workflows/desktop-update-renew.yml'), 'utf8');
+  const attested = (source) => {
+    const m = source.match(/for f in ([^;]*); do\n\s*gh attestation verify/);
+    return m === null ? '' : m[1];
+  };
+  it('release.yml and the renewal check the setup’s build provenance attestation', () => {
+    expect(attested(job(release, 'desktop-update-manifest'))).toContain(
+      '"AgentLink-$VERSION-win-x64-setup.exe"',
+    );
+    expect(attested(renew)).toContain('"AgentLink-$VERSION-win-x64-setup.exe"');
+  });
+
+  it('the manifest job reads the Windows build record; the attach job checks its update mode and pin', () => {
+    const prep = job(release, 'desktop-update-manifest');
+    expect(prep).toMatch(/inputs-win-x64\.json/);
+    const attach = job(release, 'desktop-app-release');
+    const mode = attach.slice(attach.indexOf('- name: Read the update mode of the builds'));
+    expect(mode).toMatch(/inputs-win-x64\.json/);
+    // No new permission or secret on either job.
+    expect(permissions(prep).sort()).toEqual(['attestations: read', 'contents: read']);
+    expect(prep).not.toMatch(/secrets\./);
   });
 });

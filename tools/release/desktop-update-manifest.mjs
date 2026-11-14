@@ -5,8 +5,9 @@
 //   build   (job desktop-update-manifest, no secret): from the release assets that were downloaded
 //           from the Release, whose SHA-256 sums and build provenance attestations the job checked,
 //           writes the UNSIGNED manifest (format v2, apps/desktop/src/main/updater/manifest.ts).
-//           It also checks the pin (Fable L3): both built apps have updates on and carry exactly the
-//           key pinned in root-key.json, which must be a real key, never the placeholder.
+//           It also checks the pin (Fable L3): every built app (both Macs and, since
+//           WIN-INAPP-UPDATE, Windows) has updates on and carries exactly the key pinned in
+//           root-key.json, which must be a real key, never the placeholder.
 //   sign    (job sign-update-manifest, the ONE step with the key): reads the private key from the one
 //           environment variable DESKTOP_UPDATE_KEY, masks it (`::add-mask::`), removes it from the
 //           environment, refuses a key that is not the pinned one, and signs through
@@ -72,7 +73,10 @@ export function documentNames(publicKey) {
   });
 }
 
-/** The release assets a manifest lists, in its order: the zips (in-app install), then the DMGs. */
+/**
+ * The release assets a manifest lists, in its order: the Mac zips (in-app install), the DMGs, then
+ * the Windows NSIS setup (WIN-INAPP-UPDATE: the Windows app's in-app install runs it silently).
+ */
 export function releaseAssets(version) {
   const list = [];
   for (const kind of ['zip', 'dmg']) {
@@ -85,8 +89,21 @@ export function releaseAssets(version) {
       });
     }
   }
+  list.push({
+    name: `AgentLink-${version}-win-x64-setup.exe`,
+    platform: 'win32',
+    arch: 'x64',
+    kind: 'nsis',
+  });
   return list;
 }
+
+/** The build records the manifest job reads (desktop.yml uploads them with each build). */
+export const BUILD_RECORDS = Object.freeze([
+  'inputs-mac-arm64.json',
+  'inputs-mac-x64.json',
+  'inputs-win-x64.json',
+]);
 
 /** The pinned key from root-key.json text; refuses the placeholder and the updates-off file. */
 export function pinFromRootKeyJson(text) {
@@ -105,10 +122,15 @@ export function pinFromRootKeyJson(text) {
   return key;
 }
 
-/** Both Mac builds (inputs-mac-{arm64,x64}.json) must have updates on and carry exactly `pin`. */
+/**
+ * The three builds (BUILD_RECORDS: Mac arm64, Mac x64, Windows x64) must have updates on and carry
+ * exactly `pin`: the manifest lists all of their files.
+ */
 export function checkBuildInputs(inputs, pin) {
-  if (!Array.isArray(inputs) || inputs.length !== 2) {
-    throw new ToolError('expected the build records of both Mac apps (arm64 and x64)');
+  if (!Array.isArray(inputs) || inputs.length !== BUILD_RECORDS.length) {
+    throw new ToolError(
+      'expected the build records of all three apps (Mac arm64, Mac x64 and Windows x64)',
+    );
   }
   for (const record of inputs) {
     if (record?.updates !== 'on') {
@@ -297,14 +319,12 @@ export async function main(argv, io = {}) {
       const pin = pinFromRootKeyJson(readText(values['root-key'], 'root-key.json'));
       let buildSums;
       if (!renewal) {
-        const inputs = ['arm64', 'x64'].map((arch) => {
+        const inputs = BUILD_RECORDS.map((name) => {
           try {
-            return JSON.parse(
-              readText(join(values.dir, `inputs-mac-${arch}.json`), 'a build record'),
-            );
+            return JSON.parse(readText(join(values.dir, name), 'a build record'));
           } catch (error) {
             if (error instanceof ToolError) throw error;
-            throw new ToolError(`inputs-mac-${arch}.json is not JSON`);
+            throw new ToolError(`${name} is not JSON`);
           }
         });
         checkBuildInputs(inputs, pin);

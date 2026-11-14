@@ -30,6 +30,7 @@ import {
   WIZARD,
   type StepId,
 } from './strings.js';
+import { SetupExitLinks } from '../start/setup-exit.js';
 import './restore.css';
 
 // --- formatting ---------------------------------------------------------------------------------
@@ -111,6 +112,8 @@ export function Frame({ step, check, onCancel, children }: FrameProps): ReactEle
             </span>
             <span className="rs-eyebrow">{label}</span>
           </span>
+          {/* FIRSTRUN-EXIT: Check for updates and Help on every restore step. */}
+          <SetupExitLinks />
           <button type="button" className="rs-cancel al-text-body-sm" onClick={onCancel}>
             {WIZARD.cancel}
           </button>

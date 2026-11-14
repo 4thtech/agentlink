@@ -26,6 +26,13 @@
 // shell-capable agent as the same OS user could start the server itself. This step adds no route and
 // no authority: owner actions on the pages still need the owner's presence (passkey or code) and an
 // owner signature, and first-run setup is the `setupGate` route that re-checks that no owner exists.
+//
+// BROWSER-UPDATE (runtime/browser-update.ts): a terminal host's Settings › Updates can stage the
+// registry's latest version and, on Restart now, stop itself (`update`, like a yield) and run that
+// version in this terminal. The new code runs as this OS user with the same reach as `npx …@latest`
+// already has at every start; its trust anchors are the registry's SLSA provenance for that exact
+// version (this repository's release workflow), npm's sha512 integrity, a lockfile of only registry.npmjs.org sha512 entries and `npm audit signatures`. A same-user process could already replace the
+// files npx or a global install runs, so this adds no authority beyond the page's session.
 import { homedir } from 'node:os';
 import process from 'node:process';
 import type { Logger } from '@4thtech-io/log';
@@ -69,6 +76,12 @@ import { writeLastExit, type LastExitReason } from '../runtime/last-exit.js';
 import { guardProcess, type FatalReason } from '../runtime/ui-lifecycle.js';
 import { cliVersion } from '../runtime/cli-version.js';
 import { nodeBrowserUpdateDesk, withUpdates } from '../runtime/npm-update-check.js';
+import {
+  browserUpdateDeskWith,
+  nodeBrowserUpdater,
+  relaunch,
+  type BrowserUpdater,
+} from '../runtime/browser-update.js';
 import {
   OPEN_CHECK_MS,
   openAndWatch,
@@ -166,6 +179,12 @@ export const UI_TEXT = Object.freeze({
   /** APP-CONTINUITY: the desktop app took over this host (same IDs, same AI apps). */
   movedToApp:
     'AgentLink moved to the AgentLink app. Everything is there: your IDs, contacts and AI apps. You can close this window.',
+  /** BROWSER-UPDATE: Restart now in Settings › Updates: this host closed; the new version starts here. */
+  updating:
+    'Starting the new version of AgentLink… It opens in your browser in a moment. Keep this window open.',
+  /** BROWSER-UPDATE: the new version could not be started (this host is already closed). */
+  updateNotStarted: (prefix: string): string =>
+    `AgentLink couldn't start the new version. Run \`${prefix}\` to open AgentLink again.`,
   agentRun: (prefix: string): string =>
     `You must do this yourself: run \`${prefix} ui\` in your own terminal. It opens your AgentLink pages in your browser. Don't let your AI open them or run this for you.`,
 });
@@ -266,6 +285,12 @@ export interface UiDeps {
    * wait). Absent or false: the plain closed line.
    */
   appTookOver?(): Promise<boolean>;
+  /**
+   * BROWSER-UPDATE: after Restart now stopped this host (signal `update`) and its server closed:
+   * runs the staged new version in this terminal and waits for it (its exit code), or undefined when
+   * it could not start. Absent: an `update` stop is a plain stop.
+   */
+  relaunch?(): Promise<number | undefined>;
 }
 
 /** The command. Returns the process exit code. */
@@ -470,6 +495,22 @@ export async function serveUi(
       await deps.recordExit?.(reason.why);
       return EXIT_FAILED;
     }
+    // BROWSER-UPDATE: Restart now. Like a yield, this server closes first (its app-host.json goes
+    // with it: no port clash, never a second owner); then the new version runs in this terminal.
+    // The close awaits the app host's close, which closes the open ID (its store and keys) before
+    // anything new starts.
+    if (reason.kind === 'stop' && reason.signal === 'update' && deps.relaunch !== undefined) {
+      closed = true;
+      await server.close().catch(() => undefined);
+      await deps.recordExit?.('updated');
+      output.print(UI_TEXT.updating);
+      const code = await deps.relaunch().catch(() => undefined);
+      if (code === undefined) {
+        output.print(UI_TEXT.updateNotStarted(prefix));
+        return EXIT_FAILED;
+      }
+      return code;
+    }
     const yielded = reason.kind === 'stop' && reason.signal === 'yield';
     // APP-CONTINUITY: "moved to the app" only once the desktop app's host is really there. It
     // starts after this host's record is gone, so this server closes first, then its record is
@@ -575,18 +616,32 @@ async function folderKeyMissing(home: string, name: string): Promise<boolean> {
  * desktop host passes `hooks.startServer` (ui-host.ts UiHostHooks) so its links go to its pipe.
  */
 export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
-  // REL051-UPD2: the browser app's Settings > Updates (the npm registry's latest version). The
-  // desktop host passes its own starter, which gives the desktop app's desk instead.
-  const startServer =
-    hooks.startServer ??
-    withUpdates(startApprovalServer, () => nodeBrowserUpdateDesk(cliVersion()));
-  const owner = nodeOwnerDeps();
-  const logger: Logger = cliLogger('ui', process.env);
   // APP-CONTINUITY: the desktop app's takeover (`POST /api/ui/host/yield`) stops `serveUi` like
   // Ctrl+C. Only a terminal `ui` run listens (the desktop host passes `hooks.startServer` and never
   // yields: its handoff record answers `kept`).
   const yielders = new Set<(signal?: string) => void>();
   const terminalHost = hooks.startServer === undefined;
+  // REL051-UPD2: the browser app's Settings > Updates (the npm registry's latest version). The
+  // desktop host passes its own starter, which gives the desktop app's desk instead.
+  // BROWSER-UPDATE: in a terminal host, Update now stages the new version (BrowserUpdater) and
+  // Restart now stops this host with `update`; serveUi then closes it and runs the new one.
+  let updater: BrowserUpdater | undefined;
+  const startServer =
+    hooks.startServer ??
+    withUpdates(startApprovalServer, () =>
+      nodeBrowserUpdateDesk(cliVersion(), (install, checker) => {
+        updater = nodeBrowserUpdater(install, homedir());
+        return browserUpdateDeskWith(checker, install, updater, {
+          requestRestart: () => {
+            if (yielders.size === 0) return false;
+            for (const stop of yielders) stop('update');
+            return true;
+          },
+        });
+      }),
+    );
+  const owner = nodeOwnerDeps();
+  const logger: Logger = cliLogger('ui', process.env);
   const handoff = {
     write: (record: AppHostRecord) => writeAppHostRecord(homedir(), record),
     remove: () => removeAppHostRecord(homedir()),
@@ -739,6 +794,10 @@ export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
       ? {
           runningApp: () => showRunningApp(homedir()),
           appTookOver: () => desktopHostAppears(homedir()),
+          relaunch: async () => {
+            const launch = await updater?.launch();
+            return launch === undefined ? undefined : relaunch(launch);
+          },
         }
       : {}),
     // F40: Enter in the owner's terminal tries the browser again with a fresh one-shot link.

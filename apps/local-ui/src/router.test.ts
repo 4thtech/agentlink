@@ -40,9 +40,21 @@ afterEach(() => {
   host.remove();
 });
 
-function mountAt(path: string): void {
+/** Mounts without waiting for any read (what shows before the server answers). */
+function mountNow(path: string): void {
   history.replaceState(null, '', path);
   act(() => root.render(h(AppRoutes)));
+}
+
+/** FIRSTRUN-EXIT: the shell waits for its owner read (here unanswered, so every page shows). */
+async function mountAt(path: string): Promise<void> {
+  history.replaceState(null, '', path);
+  act(() => root.render(h(AppRoutes)));
+  for (let i = 0; i < 4; i += 1) {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  }
 }
 
 const rail = (): Element | null => host.querySelector('nav.al-rail');
@@ -99,14 +111,14 @@ const FOCUSED = [
 ];
 
 describe('routes', () => {
-  it('declares exactly the shell routes', () => {
+  it('declares exactly the shell routes', async () => {
     expect(ROUTES.map((r) => r.path).sort()).toEqual(
       [...EXPECTED.map(([p]) => p), ...FOCUSED].sort(),
     );
   });
 
-  it.each(EXPECTED)('%s renders its page inside the layout', (path, heading, section) => {
-    mountAt(path);
+  it.each(EXPECTED)('%s renders its page inside the layout', async (path, heading, section) => {
+    await mountAt(path);
     expect(rail()).not.toBeNull();
     expect(host.querySelector('header.al-top')).not.toBeNull();
     expect(host.querySelector('footer.al-statusbar')).not.toBeNull();
@@ -114,51 +126,54 @@ describe('routes', () => {
     if (section !== null) expect(currentSection()).toBe(section);
   });
 
-  it.each(FOCUSED)('%s renders in the focused shell: no top bar, menu or status bar', (path) => {
-    mountAt(path);
-    expect(rail()).toBeNull();
-    expect(host.querySelector('header.al-top')).toBeNull();
-    expect(host.querySelector('main.al-first-run')).not.toBeNull();
-  });
+  it.each(FOCUSED)(
+    '%s renders in the focused shell: no top bar, menu or status bar',
+    async (path) => {
+      await mountAt(path);
+      expect(rail()).toBeNull();
+      expect(host.querySelector('header.al-top')).toBeNull();
+      expect(host.querySelector('main.al-first-run')).not.toBeNull();
+    },
+  );
 
-  it('shows one agent at /agents/<name> on the Agents page (W4-AGENTS: its own page)', () => {
-    mountAt('/agents/work');
+  it('shows one agent at /agents/<name> on the Agents page (W4-AGENTS: its own page)', async () => {
+    await mountAt('/agents/work');
     expect(location.pathname).toBe('/agents/work');
     // The Agents page draws the agent's page (its heading is the agent's label once read).
     expect(host.querySelector('main .ag-page')).not.toBeNull();
     expect(currentSection()).toBe('My IDs');
   });
 
-  it('R1-UI-17: each page sets its own document title', () => {
-    mountAt('/people');
+  it('R1-UI-17: each page sets its own document title', async () => {
+    await mountAt('/people');
     expect(document.title).toBe('People · AgentLink');
-    mountAt('/activity');
+    await mountAt('/activity');
     expect(document.title).toBe('Activity · AgentLink');
   });
 
-  it('shows the not-found state for an unknown path, still in the layout', () => {
-    mountAt('/settings/nope');
+  it('shows the not-found state for an unknown path, still in the layout', async () => {
+    await mountAt('/settings/nope');
     expect(rail()).not.toBeNull();
     expect(host.querySelector('main .al-empty')).not.toBeNull();
-    mountAt('/agents/Not_A_Name');
+    await mountAt('/agents/Not_A_Name');
     expect(host.querySelector('main .al-empty')).not.toBeNull();
   });
 
-  it('shows Home at / (every approval link points there; the approval card sits on top), with Home current', () => {
-    mountAt('/');
+  it('shows Home at / (every approval link points there; the approval card sits on top), with Home current', async () => {
+    await mountAt('/');
     expect(location.pathname).toBe('/');
     expect(host.querySelector('main h1')?.textContent).toBe('Home');
     expect(currentSection()).toBe('Home');
   });
 
-  it('keeps /approve/<id> unchanged, with Home current', () => {
-    mountAt(`/approve/apr_${'A'.repeat(22)}`);
+  it('keeps /approve/<id> unchanged, with Home current', async () => {
+    await mountAt(`/approve/apr_${'A'.repeat(22)}`);
     expect(location.pathname).toBe(`/approve/apr_${'A'.repeat(22)}`);
     expect(currentSection()).toBe('Home');
   });
 
-  it('shows not-found for an /approve path that is not an approval ID', () => {
-    mountAt('/approve/nope');
+  it('shows not-found for an /approve path that is not an approval ID', async () => {
+    await mountAt('/approve/nope');
     expect(host.querySelector('main .al-empty')).not.toBeNull();
   });
 
@@ -175,15 +190,15 @@ describe('routes', () => {
     ['/settings/contacts', '/people'],
     ['/settings/passkeys', '/settings/backup'],
     ['/advanced', '/advanced/network'],
-  ])('keeps the old path %s working: it goes to %s', (from, to) => {
+  ])('keeps the old path %s working: it goes to %s', async (from, to) => {
     expect(REDIRECTS[from]).toBe(to);
-    mountAt(from);
+    await mountAt(from);
     expect(location.pathname).toBe(to);
   });
 });
 
 describe('the sections (nav.ts)', () => {
-  it('Home, People, My IDs, Activity, Settings; Advanced holds four pages', () => {
+  it('Home, People, My IDs, Activity, Settings; Advanced holds four pages', async () => {
     expect(SECTIONS.map((s) => [s.label, s.path])).toEqual([
       ['Home', '/'],
       ['People', '/people'],
@@ -199,7 +214,7 @@ describe('the sections (nav.ts)', () => {
     ]);
   });
 
-  it('Settings (A9) in order, ending with Advanced', () => {
+  it('Settings (A9) in order, ending with Advanced', async () => {
     expect(SETTINGS_PAGES.map((p) => p.label)).toEqual([
       'Backup & restore',
       'Touch ID & master code',
@@ -217,7 +232,7 @@ describe('the sections (nav.ts)', () => {
     ]);
   });
 
-  it('keeps every label in plain words (11 §5)', () => {
+  it('keeps every label in plain words (11 §5)', async () => {
     const text = [
       ...SECTIONS.map((s) => s.label),
       ...ADVANCED_SECTIONS.map((s) => s.label),
@@ -227,7 +242,7 @@ describe('the sections (nav.ts)', () => {
     expect(text).not.toMatch(/wallet|gas|seed|transaction|chain|address|hash/i);
   });
 
-  it('names the section of a path, and its title', () => {
+  it('names the section of a path, and its title', async () => {
     expect(sectionOf('/')).toBe('home');
     expect(sectionOf('/agents/work')).toBe('agents');
     expect(sectionOf('/activity/live')).toBe('live');
@@ -243,8 +258,8 @@ describe('the sections (nav.ts)', () => {
     expect(sectionOf('/ids/work')).toBe('agents');
   });
 
-  it('shows the Settings side list (no tab strip) on a Settings sub-page only', () => {
-    mountAt('/settings/rules');
+  it('shows the Settings side list (no tab strip) on a Settings sub-page only', async () => {
+    await mountAt('/settings/rules');
     expect(host.querySelector('.al-subnav')).toBeNull();
     const side = host.querySelector('nav[aria-label="Settings pages"]');
     const hrefs = [...(side?.querySelectorAll('a.set-side-link') ?? [])].map((a) =>
@@ -255,14 +270,14 @@ describe('the sections (nav.ts)', () => {
       '/settings/rules',
     );
     expect(side?.querySelector('a.set-back')?.getAttribute('href')).toBe('/settings');
-    mountAt('/settings');
+    await mountAt('/settings');
     expect(host.querySelector('nav[aria-label="Settings pages"]')).toBeNull();
-    mountAt('/agents');
+    await mountAt('/agents');
     expect(host.querySelector('nav[aria-label="Settings pages"]')).toBeNull();
   });
 
-  it('changes page on a click without a reload and moves the current mark', () => {
-    mountAt('/');
+  it('changes page on a click without a reload and moves the current mark', async () => {
+    await mountAt('/');
     const link = host.querySelector<HTMLAnchorElement>('nav.al-rail a[href="/activity"]');
     act(() => {
       link?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
@@ -273,8 +288,8 @@ describe('the sections (nav.ts)', () => {
     expect(host.querySelectorAll('nav.al-rail [aria-current="page"]')).toHaveLength(1);
   });
 
-  it('follows the browser back button', () => {
-    mountAt('/activity');
+  it('follows the browser back button', async () => {
+    await mountAt('/activity');
     act(() => {
       history.pushState(null, '', '/settings/backup');
       window.dispatchEvent(new PopStateEvent('popstate'));
@@ -285,15 +300,15 @@ describe('the sections (nav.ts)', () => {
 
 describe('the status bar (kept)', () => {
   it('shows Checking… (never Connected or Paused) before the server reports', () => {
-    mountAt('/settings/rules');
+    mountNow('/settings/rules');
     const bar = host.querySelector('footer.al-statusbar')?.textContent ?? '';
     expect(bar).toContain('Checking…');
     expect(bar).not.toContain('Connected');
     expect(bar).not.toContain('Paused');
   });
 
-  it('shows Not connected after offline and does not turn Connected on the online event', () => {
-    mountAt('/settings/rules');
+  it('shows Not connected after offline and does not turn Connected on the online event', async () => {
+    await mountAt('/settings/rules');
     act(() => {
       window.dispatchEvent(new Event('offline'));
     });
@@ -306,8 +321,8 @@ describe('the status bar (kept)', () => {
     expect(bar).not.toContain('Connected');
   });
 
-  it('shows Connected only when the server reports healthy', () => {
-    mountAt('/settings/rules');
+  it('shows Connected only when the server reports healthy', async () => {
+    await mountAt('/settings/rules');
     act(() => setConnectionState('connected'));
     expect(host.querySelector('footer.al-statusbar')?.textContent).toContain('Connected');
     act(() => setConnectionState('unknown'));
@@ -315,13 +330,13 @@ describe('the status bar (kept)', () => {
 });
 
 describe('compact view route (UX2-h)', () => {
-  it('serves /settings/compact without the shell, so a small window has no menu', () => {
-    mountAt('/settings/compact');
+  it('serves /settings/compact without the shell, so a small window has no menu', async () => {
+    await mountAt('/settings/compact');
     expect(rail()).toBeNull();
     expect(host.querySelector('footer.al-statusbar')).toBeNull();
   });
 
-  it('adds no route to the shell list or the menu', () => {
+  it('adds no route to the shell list or the menu', async () => {
     expect(ROUTES.some((r) => r.path.includes('compact'))).toBe(false);
     expect(SECTIONS.some((s) => s.path.includes('compact'))).toBe(false);
   });
@@ -330,7 +345,7 @@ describe('compact view route (UX2-h)', () => {
 // UX1113-QA-HOST (B1): a reload asks the app host for the path itself, so every path the router
 // shows must be on the host's one list of app pages (types ui-contract/app-pages.ts).
 describe('reload: every routed path is an app page on the host', () => {
-  it('ROUTES, redirects, the menus, one ID and the compact view are all on the list', () => {
+  it('ROUTES, redirects, the menus, one ID and the compact view are all on the list', async () => {
     const paths = [
       ...ROUTES.map((r) => r.path),
       ...Object.keys(REDIRECTS),
@@ -345,8 +360,8 @@ describe('reload: every routed path is an app page on the host', () => {
     for (const path of paths) expect(isAppPagePath(path), path).toBe(true);
   });
 
-  it('an unknown path shows Page not found with a way back to Home', () => {
-    mountAt('/nope');
+  it('an unknown path shows Page not found with a way back to Home', async () => {
+    await mountAt('/nope');
     const main = host.querySelector('main');
     expect(main?.textContent).toContain('Page not found');
     const home = [...(main?.querySelectorAll('a') ?? [])].find(

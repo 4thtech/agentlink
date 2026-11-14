@@ -35,6 +35,11 @@ export const FAILED_REASONS = Object.freeze([
   'not_permitted',
   'swap_failed',
   'rollback_incomplete',
+  // WIN-INAPP-UPDATE (install-win.ts): the Windows setup failed, or was not the verified file.
+  'installer_failed',
+  'installer_changed',
+  // The Windows watchdog died mid-update; its RunOnce recovery put the old copy back.
+  'interrupted',
 ] as const);
 export type FailedReason = (typeof FAILED_REASONS)[number];
 
