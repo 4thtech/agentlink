@@ -2164,6 +2164,62 @@ describe('FIRSTRUN-ANY-PLATFORM: first run with the master code only (no passkey
     expect(ok.status).toBe(200);
   }, 60_000);
 
+  // FIRSTRUN Fable L1 (APP-CONTINUITY): a code finish with a body is a rejected presence proof like
+  // every other refused finish: it counts towards the backoff and the third ends the plan.
+  it('a code finish with a body counts as a failed try; the third ends the plan', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const s = await h.session();
+    const begun = await begin(h, s);
+    const body = new Authenticator().create(begun.publicKey, { origin: h.origin });
+    const nonce = beginNonces.get(s.cookie);
+    expect((await post(h, FINISH, s, body.slice(), codeOnly(nonce))).status).toBe(400);
+    expect((await post(h, FINISH, s, body.slice(), codeOnly(nonce))).status).toBe(400);
+    const third = await post(h, FINISH, s, body.slice(), codeOnly(nonce));
+    expect(third.status).toBe(403);
+    expect(JSON.parse(third.body)).toEqual({ status: 'tries_exhausted' });
+    expect(h.seeds.every(allZero)).toBe(true);
+    const after = await post(h, FINISH, s, new Uint8Array(0), codeOnly(nonce));
+    expect(after.status).toBe(409);
+    expect(agent.keychain.items.has(OWNER_ACCOUNT)).toBe(false);
+  }, 60_000);
+
+  // FIRSTRUN Fable L4: the code finish keeps every binding of a passkey finish.
+  it('a code finish from another session, or with a wrong nonce, is not_pending; nothing stored', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const a = await h.session();
+    const b = await h.session();
+    await begin(h, a);
+    const other = await post(h, FINISH, b, new Uint8Array(0), codeOnly(beginNonces.get(a.cookie)));
+    expect(other.status).toBe(409);
+    expect(JSON.parse(other.body)).toEqual({ status: 'not_pending' });
+    const wrong = await post(
+      h,
+      FINISH,
+      a,
+      new Uint8Array(0),
+      codeOnly(encodeBase64url(randomBytes(32))),
+    );
+    expect(wrong.status).toBe(409);
+    expect(JSON.parse(wrong.body)).toEqual({ status: 'not_pending' });
+    expect(agent.keychain.items.has(OWNER_ACCOUNT)).toBe(false);
+    // The rightful session with its own nonce still finishes.
+    const ok = await post(h, FINISH, a, new Uint8Array(0), codeOnly(beginNonces.get(a.cookie)));
+    expect(ok.status).toBe(200);
+  }, 60_000);
+
+  it('begin takes no presence word: `presence: "code"` on begin is refused before any seed', async () => {
+    const agent = await initAgent();
+    const h = await harness(agent);
+    const s = await h.session();
+    const res = await post(h, BEGIN, s, new Uint8Array(0), {
+      'X-AgentLink-Input': inputOf({ label: 'Ana', presence: 'code' }),
+    });
+    expect(res.status).toBe(400);
+    expect(h.seeds).toHaveLength(0);
+  }, 60_000);
+
   it('takes no other presence word and no other key', async () => {
     const agent = await initAgent();
     const h = await harness(agent);

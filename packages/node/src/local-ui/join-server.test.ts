@@ -53,6 +53,8 @@ import {
   INVITE_ACCEPT_PATH,
   JOIN_ACCEPT_PATH,
   JOIN_DISMISS_PATH,
+  HOST_SHOW_PATH,
+  HOST_YIELD_PATH,
   JOIN_HANDOFF_PATH,
   JOIN_PATH,
 } from './invite-paths.js';
@@ -165,6 +167,9 @@ interface Options {
   readonly sync?: (core: Core) => Promise<void>;
   /** Decision 37: a pairing is pending from the start (a sent invite not used yet). */
   readonly pending?: boolean;
+  /** APP-CONTINUITY: the host's answers to a takeover and a show request (absent: kept). */
+  readonly onYield?: () => boolean;
+  readonly onShow?: () => boolean;
 }
 
 async function harness(opts: Options = {}) {
@@ -322,6 +327,8 @@ async function harness(opts: Options = {}) {
                   removed += 1;
                   return Promise.resolve();
                 },
+                ...(opts.onYield === undefined ? {} : { onYield: opts.onYield }),
+                ...(opts.onShow === undefined ? {} : { onShow: opts.onShow }),
               },
               ...(opts.waitingInvite === undefined ? {} : { waitingInvite: opts.waitingInvite }),
             },
@@ -1006,4 +1013,79 @@ describe('HOTFIX-045-TOUCHID: Accept on a computer without Touch ID set up yet',
     expect(decide.body['op']).toBe('approval.decide');
     expect(ownerSigValid(world.owner, decide.body, decide.sig)).toBe(true);
   }, 60_000);
+});
+
+// APP-CONTINUITY (owner requirement 14 Nov; 08 §1 "One AgentLink, browser or app", 08 §4): the
+// desktop app takes over a running `agentlink ui` host (`POST /api/ui/host/yield`), and terminal
+// `agentlink ui` shows the running app's window instead of starting a second host
+// (`POST /api/ui/host/show`). Both are the handoff kind: only the record's token, no Origin, no
+// Sec-Fetch-*, no cookie, no CSRF value, no query, an empty octet-stream body. They sign nothing,
+// open nothing and grant nothing else (a same-user process can already stop or start the app).
+describe('APP-CONTINUITY: host takeover and show (the handoff kind)', () => {
+  it('yield: the token alone asks the host to close; it answers before it closes', async () => {
+    let yields = 0;
+    const h = await harness({
+      onYield: () => {
+        yields += 1;
+        return true;
+      },
+    });
+    const res = await h.handoff('', {}, [], HOST_YIELD_PATH);
+    expect(res.status).toBe(200);
+    expect(parse(res.body)).toEqual({ status: 'yielding' });
+    expect(yields).toBe(1);
+    expect(h.opened).toEqual([]);
+  });
+
+  it('show: the token alone asks the host to show its window', async () => {
+    let shows = 0;
+    const h = await harness({
+      onShow: () => {
+        shows += 1;
+        return true;
+      },
+    });
+    const res = await h.handoff('', {}, [], HOST_SHOW_PATH);
+    expect(res.status).toBe(200);
+    expect(parse(res.body)).toEqual({ status: 'shown' });
+    expect(shows).toBe(1);
+  });
+
+  it('a host that keeps running (no answer, or false) says kept; no host: not_available', async () => {
+    const kept = await harness({ onYield: () => false });
+    expect((await kept.handoff('', {}, [], HOST_YIELD_PATH)).status).toBe(409);
+    expect((await kept.handoff('', {}, [], HOST_SHOW_PATH)).status).toBe(409);
+    const none = await harness({ host: false });
+    expect(
+      (
+        await none.handoff('', { 'X-AgentLink-Handoff': 'A'.repeat(43) }, [], HOST_YIELD_PATH)
+      ).status,
+    ).toBe(501);
+  });
+
+  it('refuses a wrong token, an Origin, fetch metadata, a cookie, a query and a body', async () => {
+    let yields = 0;
+    const h = await harness({
+      onYield: () => {
+        yields += 1;
+        return true;
+      },
+    });
+    const token = h.records[0]?.handoffToken ?? '';
+    expect(
+      (await h.handoff('', { 'X-AgentLink-Handoff': `${token.slice(0, -1)}x` }, [], HOST_YIELD_PATH))
+        .status,
+    ).toBe(401);
+    h.advance(10_000);
+    for (const extra of [
+      { Origin: h.server.origin },
+      { 'Sec-Fetch-Site': 'same-origin' },
+      { Cookie: 'al_s=x' },
+    ]) {
+      expect((await h.handoff('', extra, [], HOST_YIELD_PATH)).status).toBe(403);
+    }
+    expect((await h.handoff('', {}, [], `${HOST_YIELD_PATH}?x=1`)).status).toBe(400);
+    expect((await h.handoff({ invite: LINK }, {}, [], HOST_YIELD_PATH)).status).toBe(400);
+    expect(yields).toBe(0);
+  });
 });
