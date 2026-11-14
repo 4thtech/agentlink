@@ -2945,13 +2945,17 @@ export async function startApprovalServerWith(
     const ownerNostr =
       context?.owner.ownerNostr ?? (await noCardOwnerNostr().catch(() => undefined));
     const status = await nativePresenceStatus(keychainOf(), nativeHelper, ownerNostr).catch(
-      (): NativePresenceStatus => ({ available: false, registered: false }),
+      (): NativePresenceStatus => ({ available: false, registered: false, unavailable: 'unknown' }),
     );
     sendJson(res, 200, {
       native: {
         available: status.available,
         registered: status.registered,
         ...(status.reason === undefined ? {} : { reason: status.reason }),
+        // WIN-HELLO-NATIVE: why not (a fixed token); the page offers the master code with it.
+        ...(status.available || status.unavailable === undefined
+          ? {}
+          : { unavailable: status.unavailable }),
         platform: nativeHelper.kind === 1 ? 'mac' : 'windows',
       },
     });
