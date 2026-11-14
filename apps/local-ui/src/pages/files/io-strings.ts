@@ -3,7 +3,7 @@
 // of these strings; the page shows them as plain text (I-5). Re-exported from strings.ts.
 export const FILES_IO_STRINGS = {
   explainer:
-    "You don't upload here. Put files in your Send folder or ask your AI to send them; files you receive appear under Received.",
+    'Your AI sends files from your Send folder, and files you receive are saved in Inbox. To send a text file yourself, use Attach in a conversation.',
   tabsLabel: 'Files',
   tabReceived: 'Received',
   tabSent: 'Sent',
