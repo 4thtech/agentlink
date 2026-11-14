@@ -1265,6 +1265,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
               sendFolder={clients.sendFolder}
               appName={appName}
               agentKey={liveIds.rows.find((r) => r.current)?.name ?? ''}
+              idLabel={many ? agentLabel : undefined}
             />
           </div>
         </SkeletonGate>

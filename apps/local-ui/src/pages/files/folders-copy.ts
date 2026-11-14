@@ -35,6 +35,8 @@ export const FILES_COPY = {
   /** The Home panel's shorter line. */
   oneLineShort: 'Put a file in Send, then ask your AI to send it.',
   panelTitle: 'Files',
+  /** FILES-ALLOWED-STATE: with several IDs, the panel says whose folders it shows. */
+  forId: (id: string): string => `For ${id}`,
   panelEmpty: 'No files yet. Put a file in Send and ask your AI: “Send notes.md to Ana.”',
   noFolder: 'Allow your Send folder so your AI can send files.',
   allowSendFolder: 'Allow Send folder',

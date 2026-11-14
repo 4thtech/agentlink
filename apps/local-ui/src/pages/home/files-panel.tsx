@@ -11,6 +11,9 @@
 //   tip per AI app (11 §5.7), never a status: the app cannot see what the AI app can do.
 // - Collapsible; the state is remembered in `localStorage` under try/catch and works without it. It
 //   is never collapsed while the Send folder is not allowed.
+// - FILES-ALLOWED-STATE: whether the Send folder is allowed is the server's answer (`sendFolder` of
+//   `GET /api/ui/files`), never a path compared here, so Allow Send folder is offered only when it
+//   is really not allowed. With several IDs the panel names the open ID it describes.
 // - Allow Send folder asks the local server to set up the Send folder (`POST /api/ui/files/send-folder`,
 //   a mark-kind route: no input, no presence, nothing signed) and opens Settings › Files with it
 //   filled in and checked; the owner confirms there with Touch ID or the master code. Nothing signs
@@ -58,6 +61,11 @@ export interface FilesPanelProps {
   readonly appName?: string | undefined;
   /** Changes when the open ID changes, so everything is read again. */
   readonly agentKey?: string;
+  /**
+   * FILES-ALLOWED-STATE: with several IDs (All IDs), the open ID's name with its app, said in the
+   * panel: the folders are that ID's, not every ID's.
+   */
+  readonly idLabel?: string | undefined;
   readonly go?: (to: string) => void;
 }
 
@@ -67,6 +75,7 @@ export function FilesPanel({
   sendFolder,
   appName,
   agentKey,
+  idLabel,
   go = navigate,
 }: FilesPanelProps): ReactElement | null {
   const [summary, setSummary] = useState<FilesSummary | undefined>(undefined);
@@ -133,6 +142,11 @@ export function FilesPanel({
           />
         )}
       </div>
+      {idLabel === undefined || idLabel === '' ? null : (
+        <p className="al-text-body-sm al-muted" data-files-for-id>
+          {C.forId(idLabel)}
+        </p>
+      )}
       {closed ? null : (
         <div id="hm-files-body" className="fl-enter">
           {notAllowed ? (

@@ -11182,3 +11182,10 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Repo/path:** agentlink · `.changeset/`, `changelog.d/`, `docs/status.yaml` and generated status blocks only
 - **Depends on:** the 0.5.6 release
 - **Done when:** 0.5.7 is released with no code change; Update now from 0.5.6 reaches 0.5.7 in the Mac app, the Windows app and the browser app.
+
+#### FILES-ALLOWED-STATE · Home Files panel and the Files step say an allowed Send folder is allowed (0.5.7, owner report 14 Nov)
+- **Status:** in review (branch `rel057/files-allowed`) · **Size:** S · **Tier:** Opus · **Security:** S1
+- **Repo/path:** agentlink · `packages/node/src/send-folder-file.ts` (`sendFolderState`), `packages/node/src/local-ui/api/files.ts` (`GET /api/ui/files` answers `sendFolder`), `apps/local-ui/src/pages/files/{data,folders-summary,folders-copy}.ts`, `apps/local-ui/src/pages/home/{files-panel,home-screen,send-folder-banner}.tsx`; tests
+- **Depends on:** FILES-HOME-PANEL, FILES-ONB-1
+- **Spec:** 08 §1 "Home Files panel", "Files step"; 11 §5.7
+- **Done when:** `RED (expected):` commit first; the server decides the ID's own Send folder state (`allowed` / `not_found` / `not_allowed`, the path in its `~` form) exactly as sending does (`ownSendFolder`), whether the rules hold the realpath or `~/AgentLink/Send`; Home's Files panel, the Files step and the Send folder banner use it and never compare paths, so Allow Send folder is never offered for an allowed folder; with several IDs the panel says which ID it describes.
