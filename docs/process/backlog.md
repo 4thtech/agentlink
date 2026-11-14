@@ -11099,3 +11099,15 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Repo/path:** agentlink · `.github/workflows/desktop-update-renew.yml`, `tools/release/desktop-update-renewal-pin.mjs` (+ test)
 - **Depends on:** UPD-3 (IR-UPD-8-1 R2-1)
 - **Done when:** before the unsigned manifest is built, renew-manifest opens app.asar in both attested Mac zips and fails closed unless each is an updates-on build carrying exactly the key in the root-key.json of main (no updates-off mark, no placeholder); runs with `contents: read` only, no key; tests.
+
+#### FIRSTRUN-MATRIX · First run can't silently break again: automated browser and desktop coverage plus the owner's manual matrix (0.5.5, owner requirement 14 Nov)
+- **Status:** in review · **Size:** M · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `e2e/test/{firstrun-matrix,firstrun-continuity}.test.ts`, `e2e/test/app-world.ts` (host seam), `apps/desktop/test/smoke/{smoke.mjs,first-run-code.mjs}`, `docs/runbooks/firstrun-matrix.md`
+- **Depends on:** FIRSTRUN-ANY-PLATFORM, APP-CONTINUITY
+- **Spec:** 08 §1 first run and "One AgentLink, browser or app"; 04 §2.2
+- **Scope:** owner acceptance (fresh profile → master code in the app or browser with no WebAuthn on that path → optional Touch ID / Windows Hello / platform passkey → ID → AI app → Home; no terminal, no browser hand-off, no USB key) is covered by tests so a regression fails CI.
+- **Done when:**
+  - Browser e2e (Chromium, CDP virtual authenticator, temp HOME, real built app and server): no authenticator (also with `PublicKeyCredential` removed) → master code with zero `navigator.credentials` calls; authenticator without PRF → master code finishes; with PRF → one create; Windows → master code first, never "Touch ID"; cancelled gesture → "Try again, or use your master code instead" and Back works; no "Skip to Home" before an owner exists. Firefox and WebKit are not run here: the virtual authenticator is Chromium-only (ci.yml installs both browsers for other jobs).
+  - Desktop smoke (`desktop.yml`): the built app's host record says `host: "desktop"`, and first run goes through to an owner with the master code over the host's own calls. The Electron window cannot be driven (the shell refuses debugging switches); its WebAuthn switch is covered by `apps/desktop/test/unit/security.test.ts`.
+  - Continuity e2e: browser first then the app takes over by yield (same owner, no setup); app first then `agentlink ui` shows the app and starts no second host.
+  - `docs/runbooks/firstrun-matrix.md` (RB-22): the manual matrix with exact clicks and screen text from the strings files.
