@@ -24,7 +24,9 @@ function sumsDownloads(file) {
   const text = readFileSync(join(root, file), 'utf8').replace(/\\\n\s*/g, ' ');
   return text
     .split('\n')
-    .filter((l) => /gh release download/.test(l) && /--pattern "?SHA256SUMS-desktop-app\.txt/.test(l));
+    .filter(
+      (l) => /gh release download/.test(l) && /--pattern "?SHA256SUMS-desktop-app\.txt/.test(l),
+    );
 }
 
 function patterns(cmd) {
