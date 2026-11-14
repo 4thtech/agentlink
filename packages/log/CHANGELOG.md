@@ -1,5 +1,9 @@
 # @4thtech-io/log
 
+## 0.5.5
+
+No changes in this release.
+
 ## 0.5.4
 
 No changes in this release.

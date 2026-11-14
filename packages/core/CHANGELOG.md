@@ -1,5 +1,20 @@
 # @4thtech-io/core
 
+## 0.5.5
+
+### Patch Changes
+
+- ce33902: FILES-AI-1 (D-152): `agentlink_send` takes `file: {name, content}`, so an AI that wrote a small text file (.md, .markdown, .txt or .json, up to 8 MB) can send it without access to the user's folders. AgentLink saves it into the root of the ID's own Send folder with the Attach writer (never overwriting, never through a link, `notes (2).md` on a clash) and sends the bytes it was given through the ordinary encrypted send. At most 50 files and 64 MB a day per ID; refusals are fixed codes (`FILE_NAME`, `FILE_TYPE`, `FILE_NOT_TEXT`, `FILE_TOO_LARGE`, `FILE_NAME_TAKEN`, `SEND_FOLDER_UNAVAILABLE`, `FILE_BUDGET`). The local store moves to schema version 16 (the budget ledger: times and byte counts only).
+- ce33902: P2-TRUNCATED-COUNT: the history plan counts `truncated` after the local-age filter, walking past rows that are old by their date but new on this computer, within a bounded scan.
+- ce33902: P2-RETRY-MIN: `outbox.retryNow()` cuts backoffs short at most once every 30 seconds; calls in between are a plain delivery pass, so a flapping relay cannot make rows republish on every reconnect.
+- Updated dependencies [ce33902]
+  - @4thtech-io/types@0.5.5
+  - @4thtech-io/chain@0.5.5
+  - @4thtech-io/transport-nostr@0.5.5
+  - @4thtech-io/crypto@0.5.5
+  - @4thtech-io/log@0.5.5
+  - @4thtech-io/storage@0.5.5
+
 ## 0.5.4
 
 ### Patch Changes

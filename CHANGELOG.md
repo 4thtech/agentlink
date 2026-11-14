@@ -6,6 +6,47 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-11-14
+
+### Added
+
+- Your AI can send a text file it wrote (FILES-AI-1, S2, D-152; 06 §2.3, 04 §4): `agentlink_send` with `file: {name, content}` for .md, .markdown, .txt or .json up to 8 MB. AgentLink saves it in your Send folder (never over another file, never through a link) and sends exactly what your AI wrote, end-to-end encrypted. Up to 50 files and 64 MB a day per ID; your AI can't pick another folder or change your rules.
+- Home has a Files panel (FILES-HOME-PANEL, S1, D-152; 08 §1, 11 §5.7): your Send and Inbox folders with Show in Finder (Show in Explorer on Windows), how many files arrived since you last opened Files, a link to manage the folders and a fixed tip for your AI app. It replaces the separate Send folder banner: when your Send folder isn't allowed yet, the same message and Allow Send folder button sit inside the panel.
+- Get started and New ID have a Files step (FILES-ONB-1, S1/S2, D-152; 08 §1, 11 §5.7): step 4 of 5 shows your Send folder (Allowed, Not allowed or Not found) and your Inbox, each with Show in Finder (Show in Explorer on Windows), and a fixed tip for the AI app you picked. Choose another folder uses the same review and confirm as Settings › Files (your master code in the desktop app, never a passkey there). Skip for now and Continue change nothing: the Send folder allowed when you connected stays allowed. Back works on Files and Invite. Connect another AI app keeps four steps, without Files. The Connect step now says "Your AI may send files from ~/AgentLink/Send" (with backslashes on Windows) above the one confirmation, with a line under the button, instead of the collapsed "Your folders".
+- Show in Finder (Show in Explorer on Windows) for your Send folder (FILES-REVEAL, S2, D-152; 08 §1, 04 §4): the app opens only your own Send folder, from your rules, and only while it is still the folder you allowed (not a link, not a file, not missing). The page names no folder, your AI can't use it, and nothing about it is logged.
+- New messages and files for an ID you are not looking at in the desktop app now raise a notification too, under the same Messages and Files switches (NOTIFY-ALL-IDS, S2, 04 §2.5). The text is fixed words; with Show names on it names only the ID and a contact name you gave, never message text or a name the other side chose for itself.
+- Forgot your master code? Start over on this computer (OWNER-START-OVER, S2, D-153, 04 §2.5.4): from any master code field, the app warns what is lost, offers Restore from recovery kit first, then asks you to type `start over` and confirm with Touch ID, Windows Hello or a passkey (or, on a computer without them, type it a second time). It moves `~/.agentlink` to `~/.agentlink.backup-YYYYMMDD-HHMMSS` (never deletes it), removes only AgentLink's own Keychain or Credential Manager items, and opens first run for a new master code. A failed step is shown and safe to retry. No MCP tool can start it.
+- Windows app: the installer's last page offers "Create a desktop shortcut" (ticked by default); uninstalling removes it. Still a per-user install with no admin prompt (WIN-INSTALLER-SHORTCUT, S1).
+
+### Changed
+
+- In the app, Home and Approvals offer "Turn on Touch ID" (or Windows Hello) when it isn't on yet. You enter your master code once, then touch the sensor (APP-CONTINUITY, 08 §1).
+- Docs for 0.5.5 (DOCS-055, S0): README, the user guide, the technical docs, the knowledge files and llms.txt describe first run on any computer with a master code, one AgentLink for the browser and the app, Windows Hello in the Windows app, start over on this computer, an ID that can't be opened, the Files step, the Home Files panel and Show in Finder, sending a small text file the AI wrote (`agentlink_send` `file: {name, content}`), the notification changes, and the Windows installer's desktop shortcut and logs folder. The first-run matrix has its start-over row.
+- When your AI can't send a file, it now gets clearer steps (FILES-AI-2, S1, D-152; 06 §2.3): put the file in your Send folder, or, for a small text file, send its text directly. The texts are fixed and never contain anything from the AI's own request.
+- Settings, then Files now explains how files work (FILES-SETTINGS-COPY, S0, D-152; 11 §5.7): your AI sends from your Send folder, received files are saved in Inbox, and you can send a text file yourself with Attach. The Send folders tab adds one line on how to send, a fixed tip for your AI app, and Show in Finder (Show in Explorer on Windows) for your Send folder and your Inbox. The old "You don't upload here" line is gone.
+- Spec for sending files more simply (FILES-SPEC-055, S2, D-152; 06 §2.3, 04 §4, 08 §1, 11 §5.7): your AI can send a small text file it wrote (.md, .txt or .json, up to 8 MB) without access to your folders; AgentLink saves it in your Send folder and sends it, up to 50 files and 64 MB a day. Get started gets a Files step, Home a Files panel, and the AI's messages point to your Send folder.
+- After the master code, the desktop app offers Touch ID or Windows Hello for approvals. In a browser, Touch ID or Windows Hello is offered only where the browser says it works here. On Windows the master code comes first, and Windows Hello is the alternative (FIRSTRUN-ANY-PLATFORM, 08 §1).
+- "Skip to Home" is hidden until an owner exists, so first run can't end on a Home that doesn't work yet (FIRSTRUN-ANY-PLATFORM).
+- The desktop app no longer pops up a notification while its own window is in front and focused: you are already looking at it (NOTIFY-FOCUS, S1). The in-app notification centre and the badge still update, and alerts come back as soon as you switch away.
+- Windows app: the app now knows why Windows Hello can't be used for approvals on a PC (no Windows Hello PIN, or no security chip) and checks it before any prompt, so its screens can offer the master code with set-up help instead of a security-key prompt. The Windows Hello prompt opens in front of the AgentLink window (WIN-HELLO-NATIVE, S2, 04 §2.5).
+
+### Fixed
+
+- Installing the AgentLink app after starting in the browser now continues where you left off (APP-CONTINUITY, S2, 08 §1): same owner, IDs, contacts and folders, with no new setup. Inside the app, approvals and every other confirmation use the app's own Touch ID or Windows Hello once it is on, otherwise your master code. The app never asks for a browser passkey it can't use.
+- The app and `agentlink ui` no longer run side by side by accident (APP-CONTINUITY, 08 §1). Opening the app closes a running `agentlink ui` cleanly, and its window says the app took over. Running `agentlink ui` while the app is open brings the app's window to the front instead of starting a second copy. A note left behind by a crashed copy is cleared.
+- Connecting an AI app from inside the app now works on a computer with only the app, with no Node or npx needed (APP-CONTINUITY, 06 §7). AI apps connected from the browser keep working unchanged.
+- After "Approvals are already protected on this computer" in first run, "Skip to Home" is there (APP-CONTINUITY).
+- First run no longer dead-ends on "This browser can't make a passkey" or on Windows' "Insert your security key" (FIRSTRUN-ANY-PLATFORM, S2, 08 §1, 04 §2.2): on a Mac or Windows computer, in the desktop app or any browser (Firefox too), you create your master code in the app. "Use your master code instead" now makes no passkey request at all. There is no terminal step and no USB key.
+- On Windows the setup step says Windows Hello, never Touch ID (FIRSTRUN-ANY-PLATFORM).
+- A file and the message that comes with it now raise one notification, not two (NOTIFY-DEDUPE, S1, 08 §1).
+- Clicking a new-message, file or approval notification now opens that conversation or that request, not just Home (NOTIFY-DEEPLINK, S1, 08 §1). The click carries only an opaque local ID, checked again before anything opens; no message text or name is ever in it.
+- The desktop app now tells you when an update has finished downloading and is ready to install (not only that one is available), and once at launch if one is already waiting (NOTIFY-UPDATE-READY, S1, 08 §1).
+- Windows app: when AgentLink cannot check who can open its data folder, it now says so in a notice you can close (with how to check it yourself) instead of saying nothing; the app keeps working (WIN-ACL-NOTICE, S1, 11 §5).
+- An ID whose key is missing from this computer no longer stops AgentLink with "couldn't open its page" (WIN-BROKEN-ID, S2, 04 §2.5): your other IDs open as usual, and Home names that ID with three choices: Restore from backup, Remove from this computer (after Touch ID, Windows Hello or your master code and typing its name; its folder is moved to `~/.agentlink/set-aside`, never deleted, and nothing is sent to your contacts) and Continue without it.
+- A new ID that could not be finished is now removed folder first, then its keys, so a failed clean-up never leaves an ID without its key (WIN-BROKEN-ID).
+- `agentlink doctor` no longer cuts its sentences short, and names an ID whose key is missing with the fix (WIN-BROKEN-ID).
+- Windows app: why the app could not open now reaches `core.log` in the logs folder (a fixed reason and error code only, never keys, codes, links or message content). Before, the start details were lost on Windows (WIN-STARTUP-LOG, S1).
+
 ## [0.5.4] - 2026-11-13
 
 ### Added
@@ -1262,7 +1303,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/4thtech/agentlink/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/4thtech/agentlink/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/4thtech/agentlink/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/4thtech/agentlink/compare/v0.5.1...v0.5.2

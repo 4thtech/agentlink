@@ -1,5 +1,23 @@
 # @4thtech-io/agentlink
 
+## 0.5.5
+
+### Patch Changes
+
+- ce33902: One AgentLink, browser or app: inside the desktop app no owner prompt uses a passkey (its own Touch ID / Windows Hello, else the master code); the app takes over a running `agentlink ui` host and clears a stale `app-host.json`; terminal `agentlink ui` shows a running app instead of starting a second host; a connect made inside the app writes the app form; a master-code finish with a body counts as a failed try (APP-CONTINUITY).
+- ce33902: FILES-AI-1 (D-152): `agentlink_send` takes `file: {name, content}`, so an AI that wrote a small text file (.md, .markdown, .txt or .json, up to 8 MB) can send it without access to the user's folders. AgentLink saves it into the root of the ID's own Send folder with the Attach writer (never overwriting, never through a link, `notes (2).md` on a clash) and sends the bytes it was given through the ordinary encrypted send. At most 50 files and 64 MB a day per ID; refusals are fixed codes (`FILE_NAME`, `FILE_TYPE`, `FILE_NOT_TEXT`, `FILE_TOO_LARGE`, `FILE_NAME_TAKEN`, `SEND_FOLDER_UNAVAILABLE`, `FILE_BUDGET`). The local store moves to schema version 16 (the budget ledger: times and byte counts only).
+- ce33902: FILES-AI-2 (D-152): when a file can't be sent, the fixed texts for your AI now point to the way out: no allowed folder, a file outside it or a file not found on this computer suggest the user's Send folder (named as ~/AgentLink/Send only when it is the ID's own pinned one) or, for a small text file, send it by content with file: {name, content}. Fixed strings only; no value from the call reaches them.
+- ce33902: Get started and New ID have a Files step (step 4 of 5): your Send and Inbox folders with Show in Finder (Show in Explorer on Windows), Choose another folder through the existing review and confirm, a fixed tip for your AI app, and Skip for now, which changes nothing. The Connect step says "Your AI may send files from ~/AgentLink/Send" above the one confirmation (FILES-ONB-1, D-152).
+- ce33902: First run works on any computer and in any browser: the master code is made in the app with no passkey call (finish takes `presence: 'code'`), the desktop app's own Touch ID / Windows Hello is offered right after, and a browser passkey only where it is known to work (FIRSTRUN-ANY-PLATFORM).
+- ce33902: NOTIFY-ALL-IDS: while the desktop app alerts for one ID, new messages and files for your other IDs also raise an OS notification (from the AI app's connection for that ID, which already holds its keys), under the Messages and Files switches. Fixed text; names only with Show names on and only names you gave.
+- ce33902: NOTIFY-DEDUPE: a file and its message from the same person raise one desktop notification, not two.
+- ce33902: NOTIFY-DEEPLINK: a click on a message, file or approval notification in the desktop app opens that conversation or that request instead of Home. The link carries only an opaque local ID, shape-checked on both sides of the private pipe and again by Home.
+- ce33902: NOTIFY-UPDATE-READY: the desktop app's "Update ready" notification now fires when the update is downloaded and verified (ready to install), and once at launch when one is already waiting; an update that is only available says "Update available".
+- ce33902: OWNER-START-OVER: "Forgot your master code? Start over on this computer" in the Mac app, the Windows app and the browser app. AgentLink first offers Restore from recovery kit; to go on you type `start over` and confirm with Touch ID, Windows Hello or a passkey (or, on a computer without them, type it a second time). It moves `~/.agentlink` to a dated backup folder (nothing is deleted), removes only AgentLink's own items from the Keychain or Credential Manager, then opens first run for a new master code. A step that fails is shown and can be tried again.
+- ce33902: WIN-ACL-NOTICE: the health read carries `dataAccess: "unchecked"` (only when the Windows desktop app could not check who can open the data folder), and the desktop host passes it from the shell.
+- ce33902: WIN-BROKEN-ID: an ID whose key is missing from this computer is no longer a dead end. AgentLink opens another ID instead (or starts with no ID open), and Home offers Restore from backup, Remove from this computer (moves the folder aside, then removes the leftover key parts) and Continue without it. Discarding an unfinished new ID now removes its folder before its keys, and doctor prints its fixed sentences whole.
+- ce33902: WIN-STARTUP-LOG: when the app host cannot start, it writes one fixed line (the reason and a short error code, never a message or path) through its redacting logger to stderr, so the desktop app can keep it in core.log.
+
 ## 0.5.4
 
 ### Patch Changes
