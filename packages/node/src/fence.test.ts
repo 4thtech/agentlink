@@ -89,6 +89,13 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // WIN-BROKEN-ID: a yes/no (the seed or store key is missing); the bytes read never leave.
       'osAgentIdentityMissing',
       'osAgentSeedMissing',
+      // NOTIFY-ALL-IDS: the production OS notifier (fixed title and body lines, no seam, no key);
+      // `agentlink mcp` uses it for another ID's alerts. The approval server's notifier seam
+      // (startApprovalServerWith) stays internal.
+      'osNotifier',
+      // FILES-AI-2: the ID's own Send folder name from its verified allowed folders (read-only paths,
+      // no key, no store), for the AI-side texts.
+      'ownSendFolder',
       'ownerSetupAvailable',
       'packageName',
       // U3-c: counts from clear store columns, read-only (no key, no cipher).
@@ -162,10 +169,10 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'createRelayConnectorWith',
       'createNip11FetcherWith',
       'createHostResolverWith',
-      // M1-8d: the approval server's test seams (owner store, opener, notifier) stay internal.
+      // M1-8d: the approval server's test seams (owner store, opener) stay internal. The OS notifier
+      // is exported since NOTIFY-ALL-IDS (see above); the server's notifier seam stays inside.
       'startApprovalServerWith',
       'osBrowserOpener',
-      'osNotifier',
       // M1-15: the safe-fetch test seams stay internal.
       'createSafeFetchWith',
       // M1-4a: the RPC fetch test seams and the shared safe-fetch internals stay internal.
