@@ -10868,3 +10868,12 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** UPD-5 (in-app update), NOTIFY-DEEPLINK
 - **Spec:** 08 §1; 11 §5
 - **Done when:** the update item counts 1 while available and 2 once downloaded and verified (`ready`); going from 1 to 2 is news again (once; the same state never repeats); the notification says "Update ready: a new version is ready to install" only for 2 and "Update available" for 1; an unread update already waiting at launch is alerted once per run (never again when another ID opens); the Updates switch still decides; tests.
+
+#### NOTIFY-ALL-IDS · Messages and files for an ID that is not open still raise an alert (0.5.5)
+- **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (new notification text from inbound events; I-5, I-7, 04 §2.5)
+- **Repo/path:** agentlink · `apps/cli/src/runtime/{other-id-alerts,desktop-alerts-record}.ts`, `apps/cli/src/mcp/command.ts`, `packages/node/src/index.ts` (`osNotifier`)
+- **Depends on:** N7, NOTIFY-WIRING-054 (gap 3), IR-N7-1 L-5
+- **Spec:** 04 §2.5; 08 §1; 11 §5
+- **Done when:** while the desktop app alerts for one ID, the `agentlink mcp` process of another ID (which already holds that ID's keys) alerts its new messages and files by OS notification under the owner's Messages and Files switches; nothing opens an ID's keys or store just to notify; first look only notes what is there; a file and its message are one alert; quiet for the ID the desktop app alerts for and while no desktop app runs.
+- **Threat note:** the text is fixed words; the only variable parts, shown only with Show names on, are the ID's folder name and a contact name the OWNER gave (`nameSource` `owner`), each checked against the pipe's plain-name rule (letters, numbers, single spaces, apostrophes, hyphens; no dot, slash, colon, angle bracket or control character). Message text, a file name, a counterparty's self-declared name and links never reach it (I-5). Reads only flow events (contact ID, direction, kind, time) and the owner's names through the client the process already holds; nothing is logged or sent (I-7). A same-user process can silence it by writing the alerts record, which it could already do for approvals (IR-N7-1 L-1). The OS alert has no click target (osascript / notify-send); it never approves or replies.
+- **RED:** `RED (expected): NOTIFY-ALL-IDS` (tests first).

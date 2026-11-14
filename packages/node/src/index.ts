@@ -125,6 +125,8 @@ export {
   type DesktopAlertState,
   type PendingApprovalView,
 } from './approval-server.js';
+// NOTIFY-ALL-IDS: the OS notification, for `agentlink mcp`'s alerts about another ID.
+export { osNotifier, type OsNotifier } from './approval-os.js';
 // M1-11s-b: what the caller wires into the local UI (D-118): the app's in-memory files and the
 // agent's core client. The route registry and the presence gate stay inside the package.
 export type {
