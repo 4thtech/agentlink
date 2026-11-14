@@ -51,7 +51,14 @@ export const FIRST_RUN = {
     browser === undefined
       ? `${sensor} on this computer can't protect approvals yet. Continue with a master code only.`
       : `${sensor} doesn't work in this browser for AgentLink. Open this page in ${browser} to use it, or continue with a master code only.`,
-  backupOnly: 'Continue with a master code only',
+  backupOnly: 'Continue with a master code',
+  // FIRSTRUN-ANY-PLATFORM (11 §5.5; copy proposed, owner confirms at merge): the master code first,
+  // a platform sensor offered only where it is known to work here.
+  passkeyInstead: (sensor: string): string => `Use ${sensor} instead`,
+  nativeNext: (sensor: string): string =>
+    `First you get your master code. Then you can turn on ${sensor} for approvals with one touch.`,
+  yourMasterCode: 'your master code',
+  codeNote: 'You approve with your master code on this computer. Nothing to install.',
   waiting: 'Waiting for your passkey…',
 
   // 11 §5.5 "Master code at first run" (D-130 (1)).
@@ -59,8 +66,7 @@ export const FIRST_RUN = {
   doneBody: 'Approvals on this computer are protected.',
   // M1-11s-c-c: shown prominently, before the code, when no passkey protects approvals.
   doneNoPasskeyTitle: 'Save your master code — you need it to approve.',
-  doneNoPasskeyBody:
-    "This browser can't protect approvals with a passkey here, so this master code is how you approve on this computer.",
+  doneNoPasskeyBody: 'For now this master code is how you approve on this computer. Keep it safe.',
   /** R1-UI-02: leaving the once-only code screen (Skip to Home) asks first. */
   leaveCode:
     "Your master code is shown only once. If you leave now it is gone and we can't show it again. Copy it or save it as a file first. Leave anyway?",
@@ -116,10 +122,8 @@ export const FIRST_RUN = {
   alreadyBody:
     "If you didn't set this up yourself, don't use this ID: run `agentlink doctor` in your own terminal and compare the ID tag.",
 
-  unsupportedTitle: "This browser can't make a passkey",
-  unsupportedBody:
-    'Open this page in Chrome, Edge or Safari, or set up approvals in your own terminal:',
-  unsupportedCommand: 'agentlink owner init',
+  // FIRSTRUN-ANY-PLATFORM: no "this browser can't make a passkey" dead end any more: the master
+  // code is made in the app wherever passkeys are missing (the desktop window, some browsers).
   tryAgain: 'Try again',
   startAgain: 'Start again',
   /** W4-WIZARD: step 2 without an app found on this computer. */
@@ -140,7 +144,9 @@ export const FIRST_RUN = {
  */
 export const SETUP_MESSAGES = {
   // b11 §28.3.
-  cancelled: 'Not protected yet. Try again.',
+  cancelled: 'Not protected yet. Try again, or use your master code instead.',
+  /** FIRSTRUN-ANY-PLATFORM: the browser refused the passkey: the master code goes on. */
+  passkeyUnavailable: "A passkey can't be used here. Continue with a master code.",
   no_agent: 'Set up your ID first.',
   finish_restore: 'A restore was not finished. Choose your kit again to finish it.',
   label_invalid:
