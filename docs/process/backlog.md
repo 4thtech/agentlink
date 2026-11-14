@@ -10854,3 +10854,9 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Spec:** 04 §2.5 "An ID whose key is missing"; 08 §1; 11 §5
 - **Done when:** `identity_missing` is its own start reason (`broken_id`); another ID opens, or the host starts with none; Home offers Restore from backup, Remove from this computer (typed label + presence, folder set aside then leftover keys, nothing signed) and Continue without it; discard removes the folder before the keys; doctor prints fixed sentences whole; tests on posix (win32 paths guarded).
 
+
+#### P2-RETRY-MIN · `retryNow` has a minimum interval (0.5.5)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `packages/core/src/outbox.ts`, `packages/core/src/send.test.ts`
+- **Depends on:** OUTBOX-NOW-1 (IR-MSG-ORDER-1 low)
+- **Done when:** a `retryNow` within 30 s of the last one that cut backoffs short is a plain delivery pass (deadlines untouched); a flapping relay or a repeated click cannot hammer the relay; tested.
