@@ -2,7 +2,7 @@
 // panel and by Settings › Files: the folder card look of Settings (`fl-row`, path, chip, Show in
 // Finder). Both rows show only the owner's own two folders (home as `~`), never a file name.
 // Show in Finder sends nothing but an empty POST (api/reveal-folder.ts); the server finds the folder.
-import { Button, Icon, StatusChip } from '@4thtech-io/ui';
+import { Button, Icon, InlineError, StatusChip } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type ReactElement } from 'react';
 import type { RevealApi } from '../../api/reveal-folder.js';
 import { FILES_COPY as C, computerWord, showInLabel } from './folders-copy.js';
@@ -47,9 +47,7 @@ export function RevealButton({
       <Button size="sm" icon="folder" disabled={busy} onClick={() => void click()}>
         {showInLabel()}
       </Button>
-      <p role="status" className="al-text-body-sm al-muted">
-        {problem ?? ''}
-      </p>
+      {problem === undefined ? null : <InlineError>{problem}</InlineError>}
     </div>
   );
 }
