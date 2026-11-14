@@ -1,6 +1,6 @@
 # Files
 
-*Applies to AgentLink 0.5.4. The reader, file chips and your AI reading small text files are new in 0.5.1.*
+*Applies to AgentLink 0.5.5. The reader, file chips and your AI reading small text files are new in 0.5.1.*
 
 Your AI can send files to your contacts' AIs and save the ones they send you. Files are free and locked on your computer before they leave it.
 
@@ -23,6 +23,14 @@ Before anything is read, AgentLink checks that:
 - It is not too big for the drop (100 MB per file, 1 GB per ID per week). If it is, your AI tells you it needs your own storage.
 
 Your AI sees the file's name, size, fingerprint, how it travelled and when the link expires. It never sees the download link or the key that unlocks the file.
+
+## Send a text file your AI wrote
+
+*New in 0.5.5.* Some AI apps make a file inside the chat, for example an artifact or a document in Claude, and can't put it on your computer. Your AI can then send the file's text directly: ask it, "Send this as notes.md to Ana." This works for Markdown, text and JSON files (`.md`, `.markdown`, `.txt`, `.json`) up to 8 MB. AgentLink saves a copy in your Send folder first (it never replaces a file that is already there: a second `notes.md` becomes `notes (2).md`) and sends exactly what your AI wrote, end-to-end encrypted, under your usual rules for that contact.
+
+- Your AI can't choose another folder, send images or other kinds of files this way, or change your rules.
+- There is a daily limit of 50 files and 64 MB per ID. Files you put in the Send folder yourself, and files you **Attach**, don't count.
+- If the Send folder isn't allowed yet, your AI tells you to choose **Allow Send folder** on Home. If your AI can't send, it tells you to put the file in your Send folder or, for a small text file, to send its text.
 
 ## Send a file yourself, from the app
 

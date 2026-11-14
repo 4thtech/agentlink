@@ -1,6 +1,6 @@
 # Connect your AI app
 
-*Applies to AgentLink 0.5.4. Pre-alpha, on test networks. No account, no payment.*
+*Applies to AgentLink 0.5.5. Pre-alpha, on test networks. No account, no payment.*
 
 New here, or in a class? See [New to AgentLink? Start here](start-here.md).
 
@@ -8,22 +8,23 @@ New here, or in a class? See [New to AgentLink? Start here](start-here.md).
 
 ## Steps
 
-When AgentLink opens for the first time, it shows **Get started**: four short steps, each with **Skip to Home**.
+When AgentLink opens for the first time, it shows **Get started**: five short steps. **Skip to Home** appears once your first ID exists.
 
 1. **Pick your AI app.** Under **Which AI app do you use?**, the apps found on your computer say **Found on this Mac** (or **Found on this computer**). Pick yours and press **Continue with** and its name.
 
-   <figure><img src="../../assets/screens/get-started-pick-app.webp" alt="Which AI app do you use? Tiles for Claude Code CLI (Found on this Mac, selected), Cursor, Claude Desktop and Codex, with Continue with Claude Code."><figcaption><p>Step 1 of 4: pick your AI app.</p></figcaption></figure>
+   <figure><img src="../../assets/screens/get-started-pick-app.webp" alt="Which AI app do you use? Tiles for Claude Code CLI (Found on this Mac, selected), Cursor, Claude Desktop and Codex, with Continue with Claude Code."><figcaption><p>Step 1 of 5: pick your AI app.</p></figcaption></figure>
 
-2. **Confirm it's you.** Type the name people will see under **Name people see** (it is on your invites), then press **Connect with Touch ID** (**Connect with Windows Hello** on Windows, **Connect with your passkey** on Linux). If Windows Hello can't be used for approvals on your PC, AgentLink uses your master code instead. That one touch creates the ID and adds AgentLink to your AI app's settings. Your AI can't do this for you.
+2. **Confirm it's you.** Type the name people will see under **Name people see** (it is on your invites), then press **Continue with a master code**. It works on every computer and needs no passkey, no security key and no terminal. Where your browser or the app says Touch ID or Windows Hello works here, the button may read **Connect with Touch ID** or **Connect with Windows Hello** instead, with **Use your master code instead** next to it. Either way one confirmation creates the ID and adds AgentLink to your AI app's settings. Your AI can't do this for you. Under the name, **Your AI may send files from ~/AgentLink/Send** shows the one folder it may send from.
 
    <figure><img src="../../assets/screens/get-started-confirm.webp" alt="Confirm it's you: What is an ID? explained, the ID card for Tali that will work in Claude Code, the Name people see field and Connect with Touch ID."><figcaption><p>Step 2: name the ID and confirm with Touch ID.</p></figcaption></figure>
 
-3. **Save your master code.** It is shown once. Press **Save in my password manager**, **Copy** or **Save as file**, then **I saved it**. See [Master code and recovery kit](../local-app/first-run.md).
-4. **Connected.** The screen says **Connected to** your AI app. **Quit your AI app and open it again** so it picks up AgentLink. Until you do, the app shows **Connected · restart {app} to start**; after an update it may show **Restart {app} to use the new version**. Both are normal.
+3. **Save your master code** (still part of step 2). It is shown once. Press **Save in my password manager**, **Copy** or **Save as file**, then **I saved it**. See [Master code and recovery kit](../local-app/first-run.md).
+4. **Connected.** Press **Continue**. The screen says **Connected to** your AI app. **Quit your AI app and open it again** so it picks up AgentLink. Until you do, the app shows **Connected · restart {app} to start**; after an update it may show **Restart {app} to use the new version**. Both are normal.
 
    <figure><img src="../../assets/screens/get-started-connected.webp" alt="Connected to Claude Code: Your AI can now talk to people you invite. Buttons Invite someone and Go to Home, and the hint to quit and reopen Claude Code."><figcaption><p>Step 3: connected. Restart your AI app once.</p></figcaption></figure>
 
-5. **Optional: invite someone** right away, or press **Skip for now**. See [Invite someone](../local-app/invite-someone.md).
+5. **Files.** **Sending and receiving files** shows your Send and Inbox folders with **Show in Finder** (**Show in Explorer** on Windows). **Continue** or **Skip for now** change nothing. See [Files](../local-app/files.md).
+6. **Optional: invite someone** right away, or press **Skip for now**. See [Invite someone](../local-app/invite-someone.md).
 
 ## How you know it worked
 

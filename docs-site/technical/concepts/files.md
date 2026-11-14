@@ -45,6 +45,20 @@ A send retried after a crash between the upload and the stored message uploads t
 
 Not yet built (M1-7f-2): the refresh-link request and answer, and retention (deleting the object and both sides' file keys at expiry or on receipt). On the receiving side the core will move each file key out of the stored message into its own sealed `files` row at ingest, so retention can delete it (D-98).
 
+## Send by content (since 0.5.5, D-152)
+
+Source: [06 §2.3 "Send by content"](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md), [04 §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) (FILES-AI-1, FILES-AI-2). An AI that made a text file in its own workspace often can't put it on your computer. `agentlink_send` takes `file: {name, content}` instead of a `path`: AgentLink saves the content into the ID's own Send folder and sends it as an ordinary file, under the same rules as `path`.
+
+- **Input.** `name` and `content` only (`additionalProperties: false`); exactly one of `path` and `file`, and not `file` with `body` (`INVALID_ARGUMENT`). `.md`, `.markdown`, `.txt` and `.json` only (`FILE_TYPE`); a separator in the name is `FILE_NAME`; `content` must be UTF-8 text without NUL, up to 8 MiB (`FILE_NOT_TEXT`, `FILE_TOO_LARGE`).
+- **Where it is written.** Only into the root of the ID's pinned Send folder, held by device and inode, with `O_CREAT | O_EXCL | O_NOFOLLOW` and mode 0600; never an overwrite (`notes (2).md`; `FILE_NAME_TAKEN` after many clashes), never a link, never another folder. No allowed folder: `needs_setup` `NO_ALLOWED_FOLDER`; the Send folder missing, a link or not allowed: `SEND_FOLDER_UNAVAILABLE`, nothing written.
+- **What is sent.** The bytes in memory, never read back from the folder, so the contact gets exactly what the AI wrote. The contact's file policy is checked before the write (`POLICY_DENIED`).
+- **Budget.** At most 50 files and 64 MiB per ID in any rolling 24 hours, reserved atomically before the write (`FILE_BUDGET`); the ledger is local, holds no name, hash or contact, and no MCP tool reads or changes it. Files you put in the Send folder and Attach don't count.
+- **Idempotency.** `clientRequestId` is checked before the write: a repeat writes nothing new. A sent or queued message keeps the file as the record; any other ending removes it.
+- **No pre-send approval in 0.5.5.** With `notarize`, `pending_approval` and `needs_credits` concern only the proof.
+- **Zero access unchanged.** The content leaves the computer only inside the end-to-end path of every file (inline, or ciphertext to the drop or your own storage). Nothing from `name` or `content` appears in a result, error or log line. When an AI can't send, the `nextStep` texts are fixed strings that point to the Send folder or to `file: {name, content}` (FILES-AI-2).
+
+The Files step in Get started, the Files panel on Home and **Show in Finder** (**Show in Explorer** on Windows) are app surfaces over the same Send and Inbox folders. The reveal opens only the ID's own Send folder from the rules, only while it is still the folder you allowed, and logs nothing about it (FILES-REVEAL).
+
 ## Automatic saving (since 0.4.6)
 
 Source: [04 §4.1](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) (D-142, W4-AUTO-SAVE). Before 0.4.6 a received file was downloaded only when you or your AI asked. Now a contact you keep can cause a file to land on your disk without a click, so the rules are strict.

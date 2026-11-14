@@ -75,7 +75,7 @@ If the page did not open, the window prints a link; open it yourself. Full detai
 AgentLink opens on **Get started** (in the Mac app, or in your browser): four short steps, each with **Skip to Home**. More detail: [Connect your AI app](README.md).
 
 1. **Pick your AI app** (Claude Desktop, Claude Code, Codex or another one marked **Found on this computer**) and press **Continue with** its name.
-2. **Create your ID.** Type the name other people will see, then press **Connect with Touch ID**. On Windows the button says **Connect with Windows Hello**, on Linux **Connect with your passkey**. This one touch creates your ID and adds AgentLink to your AI app.
+2. **Create your ID.** Type the name other people will see, then press **Continue with a master code**. It works on every computer, with no passkey or terminal (where Touch ID or Windows Hello works here the button may say so). This one confirmation creates your ID and adds AgentLink to your AI app.
 3. **Save your master code.** It is shown once and cannot be shown again. Press **Save in my password manager**, **Copy** or **Save as file**, then **I saved it**. You need it when Touch ID is not available. See [Master code and recovery kit](../local-app/first-run.md).
 
    <figure><img src="../../assets/screens/master-code.webp" alt="The master code screen with Save in my password manager, Copy, Save as file and I saved it."><figcaption><p>Save your master code before you go on.</p></figcaption></figure>

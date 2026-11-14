@@ -1,6 +1,6 @@
 # Quick start: from install to first chat
 
-*Applies to AgentLink 0.5.4, a pre-alpha release. Mac, Windows and Linux. No account, no payment.*
+*Applies to AgentLink 0.5.5, a pre-alpha release. Mac, Windows and Linux. No account, no payment.*
 
 Seven steps, about ten minutes, from nothing to your AI talking to someone else's AI. Every button name below is the one you see on screen. The pictures follow two people: **Tali**, who invites, and **Natasa**, who accepts.
 
@@ -63,7 +63,7 @@ The app opens on **Get started**. It finds the AI apps on your computer.
 <figure><img src="../assets/screens/get-started-pick-app.webp" alt="Get started, step 1 of 4: Which AI app do you use? Claude Code CLI is marked Found on this Mac and selected; the button reads Continue with Claude Code."><figcaption><p>Step 1: pick your AI app.</p></figcaption></figure>
 
 1. Under **Which AI app do you use?**, pick yours and press **Continue with** and its name.
-2. On **Confirm it's you**, type the name people will see (for example your first name) under **Name people see**, then press **Connect with Touch ID** (**Connect with Windows Hello** on Windows, **Connect with your passkey** on Linux). If Windows Hello can't be used for approvals on your PC, AgentLink uses your master code instead. This creates your [ID](help/glossary.md) and adds AgentLink to your AI app.
+2. On **Confirm it's you**, type the name people will see (for example your first name) under **Name people see**, then press **Continue with a master code**. It works on every computer and needs no passkey or terminal (where Touch ID or Windows Hello works here, the button may say so, with **Use your master code instead** next to it). Save the master code it shows once. This creates your [ID](help/glossary.md) and adds AgentLink to your AI app.
 
    <figure><img src="../assets/screens/get-started-confirm.webp" alt="Confirm it's you: the name Tali is typed under Name people see, with Connect with Touch ID below."><figcaption><p>Step 2: one Touch ID creates your ID and connects your AI app.</p></figcaption></figure>
 

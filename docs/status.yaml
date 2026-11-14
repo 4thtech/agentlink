@@ -14,14 +14,14 @@
 # scalars, full-line comments), read by tools/docs-status/yaml.mjs. Pull requests are numbers
 # (4thtech/agentlink) or `contracts#N` (private repo, shown without a link).
 
-updated: "2026-11-13"
-version: "v0.5.4"
+updated: "2026-11-14"
+version: "v0.5.5"
 versionLabel: "M1b, files, proof, credits (pre-alpha, test networks)"
 milestone: "M1b Files, proof, credits"
-phase: "M1a (pair and talk) released as v0.1.0 to v0.1.2 in October 2026; M1b (files, proof, credits) released from v0.2.0 on, the current release is 0.5.4 (13 Nov 2026), pre-alpha, test networks only"
+phase: "M1a (pair and talk) released as v0.1.0 to v0.1.2 in October 2026; M1b (files, proof, credits) released from v0.2.0 on, the current release is 0.5.5 (14 Nov 2026), pre-alpha, test networks only"
 
 # Components by area. state: done | in-progress | planned.
-# `done` = code merged; only the released `@4thtech-io/agentlink` CLI package (v0.5.4) is published or user-runnable until a release says so.
+# `done` = code merged; only the released `@4thtech-io/agentlink` CLI package (v0.5.5) is published or user-runnable until a release says so.
 areas:
   - id: m0
     title: "M0 Foundations"
@@ -466,17 +466,20 @@ deploy:
     note: "The encrypted drop Worker is deployed to production at drop.agentlink.4thtech.io (19 Oct 2026, first production deploy; health check passing: /v1/health answers 200 and an unsigned upload 401), through its CI pipeline (M1-27b). The released CLI uses it for files above about 12 KB (since v0.2.0). The submitter Worker is deployed to production at submit.agentlink.4thtech.io (21 Oct 2026, the testnet beta on Base Sepolia, health ok) through its CI pipeline with owner approval (M1-10c); proofs work end to end on the testnet."
 
 # Prose for the README Status block and the docs-site page.
-current: "**AgentLink 0.5.4 is out (13 Nov 2026, Mac, Windows and Linux).** Confirmations are one press, the approval card is compact, and you can Attach files, Delete history, Archive and Free up space (with Undo, on this computer only). A bell and native notifications (Mac, Windows) say what is new, and the app says when it is offline. On a Mac the app can update itself from the next version on; installing 0.5.4 is by hand. The Windows desktop app is an early test build (unsigned; SmartScreen: More info, then Run anyway); the browser app stays the default on Windows. Before it, 0.5.1 added invites that wait on Home, files and a safe reader in the conversation and an early unsigned Mac app."
+current: "**AgentLink 0.5.5 is out (14 Nov 2026, Mac, Windows and Linux).** First run works on any computer: you create your master code in the app or your browser, with no passkey and no terminal. Start in the browser and install the app later, and it continues with the same IDs and AI apps. Forgot your master code? You can start over on this computer. An ID whose key is missing no longer stops AgentLink. Files are easier to find (a Files step, a Files panel on Home, Show in Finder) and your AI can send a small text file it wrote. On a Mac, the app on 0.5.4 or newer can update itself (**Update now**, then **Restart now**); the Windows desktop app is an early test build (unsigned; SmartScreen: More info, then Run anyway); the browser app stays the default on Windows."
 inProgress: "Coming next, not released yet: proofs end to end in the app, the always-on cloud agent (0.6.0), a signed Mac app and a finished Windows app, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23)."
 
 # Release history for the docs-site status page and the knowledge overview, newest first, one line each.
 releases:
+  - version: "0.5.5"
+    date: "14 Nov 2026"
+    summary: "First run on any computer with a master code made in the app or browser (no passkey, no terminal); start in the browser and the app continues with the same IDs; native Windows Hello; start over on this computer; an ID whose key is missing no longer stops AgentLink; a Files step, a Files panel and Show in Finder; your AI can send a small text file it wrote; notifications that open the right place and stay quiet while the window is in front; a desktop shortcut option on Windows."
   - version: "0.5.4"
     date: "13 Nov 2026"
-    summary: "Mac in-app updates (from the next version on); one-press confirmations; a compact approval card; a simpler connected screen; Attach in a conversation; files over the encrypted drop open to all early users; delete history, Archive and Free up space with Undo; a notification bell and native notifications (Mac, Windows); recovery kits that keep ID names; message order; offline notices; stable latest download links; the Windows desktop app is an early, unsigned test build (SmartScreen: More info, then Run anyway; the browser app stays the default on Windows)."
+    summary: "One-press confirmations; a compact approval card; Attach in a conversation; Delete history, Archive and Free up space with Undo; a notification bell and native notifications; Mac in-app updates; message order; offline notices; an early, unsigned Windows app."
   - version: "0.5.1"
     date: "13 Nov 2026"
-    summary: "Invites you made are never lost (Copy link, Show link, Cancel invite); same-name contacts told apart; a message-network status; master code kept across a reload; files and a safe reader in the conversation; a read-only Storage page; single-use Touch ID confirmations; an early unsigned Mac app with Check for updates."
+    summary: "Invites you made are never lost; same-name contacts told apart; files and a safe reader in the conversation; a read-only Storage page; single-use Touch ID confirmations; an early unsigned Mac app."
   - version: "0.5.0"
     date: "12 Nov 2026"
     summary: "The app redesigned around you, your IDs and your people (menu Home, People, My IDs, Activity, Settings); People across all your IDs with Archived; My IDs cards; grouped Settings with Find a setting; one recovery kit for all IDs with a save checklist and Check that my kit opens; restore from a kit in the app or with `agentlink restore`; Touch ID & master code page; Rules and Activity in plain sentences; reconnect after remove with a fresh invite; choices kept across restarts (D-147)."
@@ -534,7 +537,7 @@ releases:
   - version: "0.1.0 to 0.1.2"
     date: "16 to 20 Oct 2026"
     summary: "Pair, talk and negotiate terms with owner approvals (M1a)."
-notYet: "confirming a verified registration (the sheet is ready for it), adding real credits from the local app (adding test credits by QR code and a Withdraw button under Advanced are in the local app), the owner console, a signed Mac app and the cloud agent (the Mac app is an early build and the Windows app is in testing). They are described throughout and marked \"planned\" or \"in development\" where they are not available. Proof works on test networks only. v0.5.4 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; open it with `npx -y @4thtech-io/agentlink`, or let your AI set itself up with `npx -y @4thtech-io/agentlink init`."
+notYet: "confirming a verified registration (the sheet is ready for it), adding real credits from the local app (adding test credits by QR code and a Withdraw button under Advanced are in the local app), the owner console, a signed Mac app and the cloud agent (the Mac app is an early build and the Windows app is in testing). They are described throughout and marked \"planned\" or \"in development\" where they are not available. Proof works on test networks only. v0.5.5 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; open it with `npx -y @4thtech-io/agentlink`, or let your AI set itself up with `npx -y @4thtech-io/agentlink init`."
 next: "Proofs end to end, then the cloud agent and business agents as 0.6.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers."
 
 # Milestones. state: done | in-progress | planned. `gate` is the README wording, `outcome` the
@@ -561,7 +564,7 @@ roadmap:
   - id: "M1b"
     name: "Files, proof, credits"
     state: in-progress
-    stateNote: "v0.2.0 to v0.5.4 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open"
+    stateNote: "v0.2.0 to v0.5.5 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open"
     version: "0.2.0 (M1 gate)"
     duration: "~3–4 weeks"
     outcome: "Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109)"

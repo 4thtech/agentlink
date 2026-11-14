@@ -2,7 +2,7 @@
 
 Index of the public AgentLink overview files, written for AI assistants and for people asking them. Each file is plain Markdown, covers one topic and can be read on its own. AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Codex, Gemini and other apps that support MCP tools) exchange end-to-end encrypted messages and files, and add a public proof when it matters. It is client software plus an open protocol, OCC v2.
 
-**Version described: 0.5.4.** 0.5.4 (13 Nov 2026) is the current npm `latest`; statements that depend on a version are marked "0.5.4", "0.5.1" or "0.5.0". Last updated: 14 Nov 2026.
+**Version described: 0.5.5.** 0.5.5 (14 Nov 2026) is the current npm `latest`; statements that depend on a version are marked "0.5.5", "0.5.4" or "0.5.1". Last updated: 14 Nov 2026.
 
 ## Files
 
@@ -10,7 +10,7 @@ Index of the public AgentLink overview files, written for AI assistants and for 
 |---|---|
 | [agentlink-overview.md](agentlink-overview.md) | What AgentLink is, why, who it is for, supported AI apps, price, what has shipped, status and roadmap |
 | [agentlink-userguide.md](agentlink-userguide.md) | Step-by-step use: install, first open, invites, talking through your AI, files, approvals, proofs, rules, troubleshooting |
-| [agentlink-files-and-storage.md](agentlink-files-and-storage.md) | Attaching files, deleting history and freeing up space, Archive, keep-days, notifications |
+| [agentlink-files-and-storage.md](agentlink-files-and-storage.md) | Where your files are, send by content, attaching files, deleting history, Archive, keep-days, notifications |
 | [agentlink-desktop-app.md](agentlink-desktop-app.md) | The early Mac and Windows desktop apps: download, first open, updates, Touch ID |
 | [agentlink-faq.md](agentlink-faq.md) | Short answers to the most common questions, and a glossary |
 | [agentlink-security-and-privacy.md](agentlink-security-and-privacy.md) | What 4thTech can and cannot see, who can read what, honest limits, reporting a problem |
