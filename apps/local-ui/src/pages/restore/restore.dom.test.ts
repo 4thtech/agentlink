@@ -14,6 +14,8 @@ import { createSetupApi } from '../first-run/setup-api.js';
 import { createRestoreApi } from './api.js';
 import { RestoreWizard, type RestoreWizardProps } from './index.js';
 import { setFinishRestore, setOutcome } from './outcome.js';
+import { navigate } from '../../router.js';
+import { SETUP_EXIT } from '../start/strings.js';
 import { ReviewStep, rowName } from './steps.js';
 import * as S from './strings.js';
 
@@ -761,6 +763,31 @@ describe('step 4: protect and reconnect', () => {
     confirm.mockReturnValue(true);
     await click(S.WIZARD.cancel);
     expect(left).toEqual(['/']);
+    confirm.mockRestore();
+  });
+
+  it('IR-FIRSTRUN-EXIT-1: Check for updates on step 4 asks first while the new code is not saved', async () => {
+    const { left } = await newComputer();
+    const updates = [...host.querySelectorAll('a')].find(
+      (a) => a.textContent === SETUP_EXIT.updates,
+    );
+    expect(updates?.getAttribute('href')).toBe('/settings/updates');
+    const start = location.pathname;
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    // The link is routed (router.tsx onDocumentClick → navigate), which asks through the guard.
+    act(() => navigate('/settings/updates'));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(String(confirm.mock.calls[0]?.[0])).toMatch(/only once/);
+    expect(location.pathname).toBe(start);
+    expect(left).toEqual([]);
+    expect(text()).toContain(S.PROTECT.codeTitle);
+    // Typed back: the guard is off, the move goes through without asking.
+    confirm.mockClear();
+    await typeBack(MASTER);
+    act(() => navigate('/settings/updates'));
+    expect(confirm).not.toHaveBeenCalled();
+    expect(location.pathname).toBe('/settings/updates');
+    history.replaceState(null, '', start);
     confirm.mockRestore();
   });
 
