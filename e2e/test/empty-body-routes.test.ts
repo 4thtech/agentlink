@@ -143,9 +143,7 @@ async function world() {
   const shell = await get(port, '/', { Cookie: cookie });
   const csrf =
     /<meta name="agentlink-csrf" content="([A-Za-z0-9_-]+)">/.exec(shell.body)?.[1] ?? '';
-  const generation = /<meta name="agentlink-generation" content="([0-9]+)">/.exec(
-    shell.body,
-  )?.[1];
+  const generation = /<meta name="agentlink-generation" content="([0-9]+)">/.exec(shell.body)?.[1];
   expect(csrf).not.toBe('');
   expect(generation).toBeDefined();
 
@@ -229,6 +227,6 @@ describe('UPD-BUTTON-FIX: the page’s bodyless POSTs pass the real server gate'
     const result = await w.api.post(BACKUP_REVEAL_PATH);
     // No agent is open in this world, so the route itself answers no agent (409); what matters is
     // that the request got past the gate the page used to fail (415 content_type).
-    expect(result).not.toEqual({ kind: 'error', status: 415 });
+    expect(result).toEqual({ kind: 'error', status: 409 });
   });
 });

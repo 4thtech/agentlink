@@ -85,10 +85,10 @@ describe('Settings › Updates: a refused Update now or Restart now (UPD-BUTTON-
     expect(text()).toContain(S.keeps);
   });
 
-  it('Update now while offline: the offline words', async () => {
+  it('Update now when the app does not answer: a plain error', async () => {
     await mount('available', () => Promise.resolve({ kind: 'offline' }));
     await click(S.updateNow);
-    expect(alert()).toContain(S.stepOffline);
+    expect(alert()).toContain(S.updateFailed);
   });
 
   it('Update now, a request that throws: a plain error', async () => {
