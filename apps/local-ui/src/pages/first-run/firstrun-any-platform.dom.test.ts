@@ -71,7 +71,8 @@ function fakeApi(): SetupApi & Calls {
   return Object.assign(calls, {
     status: () => Promise.resolve({ kind: 'ok', owner: 'missing' } as const),
     labelCheck: () => Promise.resolve({ kind: 'ok' } as const),
-    begin: () => Promise.resolve({ kind: 'ready', publicKey: VALUES, nonce: 'N'.repeat(43) } as const),
+    begin: () =>
+      Promise.resolve({ kind: 'ready', publicKey: VALUES, nonce: 'N'.repeat(43) } as const),
     finish: () => {
       calls.finished += 1;
       return Promise.resolve(done(true));
@@ -282,7 +283,7 @@ describe('FIRSTRUN-ANY-PLATFORM: the master code path makes no WebAuthn call', (
   it('a browser that cannot make a passkey (Firefox profile, the app window): master code, no terminal', async () => {
     const { api } = await mount({ platform: 'other', passkeysAvailable: () => false });
     expect(h1()).toBe(CONNECT_STEP.title);
-    expect(h1()).not.toBe(FIRST_RUN.unsupportedTitle);
+    expect(text()).not.toContain("can't make a passkey");
     expect(text()).not.toMatch(/owner init|terminal|Chrome, Edge or Safari/);
     await click(FIRST_RUN.backupOnly);
     expect(api.codeOnly).toHaveLength(1);
@@ -317,7 +318,7 @@ describe('FIRSTRUN-ANY-PLATFORM: the master code path makes no WebAuthn call', (
       createPasskey: () => Promise.resolve({ kind: 'unsupported' }),
     });
     await click(CONNECT_STEP.connect('Touch ID'));
-    expect(h1()).not.toBe(FIRST_RUN.unsupportedTitle);
+    expect(text()).not.toContain("can't make a passkey");
     expect(button(FIRST_RUN.backupOnly).className).toContain('al-btn-primary');
     await click(FIRST_RUN.backupOnly);
     expect(api.codeOnly).toHaveLength(1);
@@ -327,8 +328,8 @@ describe('FIRSTRUN-ANY-PLATFORM: the master code path makes no WebAuthn call', (
 describe('FIRSTRUN-ANY-PLATFORM: the desktop app uses its own Touch ID / Windows Hello', () => {
   it('Mac app: master code first, then "Turn on Touch ID for approvals" through the bridge', async () => {
     const registered: string[] = [];
-    const status = vi.fn(
-      (): Promise<NativeStatus> => Promise.resolve({ available: true, registered: false }),
+    const status = vi.fn((): Promise<NativeStatus> =>
+      Promise.resolve({ available: true, registered: false }),
     );
     const { api, passkeys } = await mount({
       platform: 'mac',
@@ -359,7 +360,10 @@ describe('FIRSTRUN-ANY-PLATFORM: the desktop app uses its own Touch ID / Windows
   it('regression (owner, 14 Nov): desktop shell, no owner, WebAuthn unavailable → master-code step, no dead end', async () => {
     // The app's own window: no PublicKeyCredential, and the helper not reachable either.
     for (const native of [
-      { userAgent: MAC_APP, status: () => Promise.resolve({ available: false, registered: false }) },
+      {
+        userAgent: MAC_APP,
+        status: () => Promise.resolve({ available: false, registered: false }),
+      },
       { userAgent: MAC_APP, status: () => Promise.resolve({ available: true, registered: false }) },
     ]) {
       const { api } = await mount({
@@ -370,11 +374,10 @@ describe('FIRSTRUN-ANY-PLATFORM: the desktop app uses its own Touch ID / Windows
         native,
       });
       expect(h1()).toBe(CONNECT_STEP.title);
-      expect(text()).not.toContain(FIRST_RUN.unsupportedTitle);
+      expect(text()).not.toContain("can't make a passkey");
       expect(text()).not.toMatch(/Chrome, Edge or Safari|owner init|terminal/);
       // No owner yet: there is no Home to skip to.
-      expect(buttons()).not.toContain('Skip to Home');
-      expect(text()).not.toContain('Skip to Home');
+      expect(host.querySelector('a.st-skip')).toBeNull();
       expect(buttons()).toContain(CONNECT_STEP.back);
       await click(FIRST_RUN.backupOnly);
       expect(webauthn.create).not.toHaveBeenCalled();
@@ -397,16 +400,20 @@ describe('FIRSTRUN-ANY-PLATFORM: the desktop app uses its own Touch ID / Windows
           platform: 'mac',
           passkeysAvailable: () => true,
           prfSupport: () => new Promise<PrfSupport>((resolve) => (answer = resolve)),
-          native: { userAgent: MAC_APP, status: () => Promise.resolve({ available: false, registered: false }) },
-          readJoin: () => Promise.resolve({ kind: 'failed' }),
+          native: {
+            userAgent: MAC_APP,
+            status: () => Promise.resolve({ available: false, registered: false }),
+          },
+          readJoin: () => Promise.resolve({ kind: 'failed' } as const),
         }),
       );
     });
     await settle();
-    expect(text()).not.toContain('Skip to Home');
+    // The link is not there to use (its room is kept, hidden from everyone).
+    expect(host.querySelector('a.st-skip')).toBeNull();
     answer('no');
     await settle();
-    expect(text()).not.toContain('Skip to Home');
+    expect(host.querySelector('a.st-skip')).toBeNull();
   });
 
   it('Windows app with the helper unavailable: master code, no Touch ID word, no USB key', async () => {

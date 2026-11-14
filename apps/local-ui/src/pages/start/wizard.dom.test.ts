@@ -103,6 +103,18 @@ function fakeSetup(o: { status?: StatusResult; connected?: boolean } = {}): Setu
         ...(picked === undefined ? {} : { app: picked, connected: o.connected ?? true }),
       } as FinishResult);
     },
+    finishCode: (nonce: string): Promise<FinishResult> => {
+      calls.finished.push(nonce);
+      return Promise.resolve({
+        kind: 'done',
+        confirmed: true,
+        passkey: false,
+        ownerCode: CODE,
+        fingerprint: '7F3A·19C2',
+        sendFolder: 'allowed',
+        computerName: 'Mac',
+      } as FinishResult);
+    },
   }) as SetupApi & Calls;
 }
 
@@ -978,7 +990,8 @@ describe('W4-WIZARD: accessibility, motion and words', () => {
       PICK_STEP.notFound,
       PICK_STEP.next('Claude Code'),
       CONNECT_STEP.title,
-      CONNECT_STEP.body('Claude Code'),
+      CONNECT_STEP.body('Claude Code', 'Touch ID'),
+      CONNECT_STEP.bodyConnect('Claude Code', 'work', 'your master code'),
       CONNECT_STEP.restartNote('Claude Code'),
       CONNECTED_STEP.title('Claude Code'),
       CONNECTED_STEP.body,

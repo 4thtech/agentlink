@@ -10742,3 +10742,15 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** RET-1 (0.5.1 part), RET-4 and RET-6 (0.5.2 part)
 - **Spec:** 08 §1; 11 §5.7
 - **Done when:** README Status and docs-site "Free up space" match what shipped; drift checks green; never claims an unbuilt part.
+
+#### FIRSTRUN-ANY-PLATFORM · First run works on any computer and in any browser (0.5.5, owner test on real machines, 14 Nov)
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/pages/start/strings.ts`, `packages/node/src/approval-server.ts` (setup finish), tests
+- **Depends on:** — (consumes WIN-HELLO-NATIVE through `/api/owner/native`; works without it)
+- **Spec:** 04 §2.2 "Creating it on the first-run page"; 08 §1 first run; 11 §5
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - Symptoms: the Mac desktop app's first run showed "This browser can't make a passkey" with `agentlink owner init`; on Windows 11 21H2 both buttons asked for a passkey with PRF and Windows offered only a USB security key; the step said "Touch ID" on Windows; "Skip to Home" was usable with no owner.
+  - Fix: a master-code-only finish (`{nonce, presence: 'code'}`, empty body, no WebAuthn); presence detected first (the desktop helper, the platform authenticator, PRF); on Windows the master code first; only ever the platform authenticator; the desktop app's Touch ID / Windows Hello offered after the code; no dead-end screen; platform words from SENSOR.
+- **Acceptance:**
+  - `RED (expected):` commit first; the master-code path never calls `navigator.credentials`; no `create` without a platform authenticator; desktop shell with no owner and no WebAuthn reaches the master-code step; Opus independent review, Fable 5.1 audit, Tali's "merge"; changelog.d fragment and changeset.

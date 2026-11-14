@@ -408,7 +408,8 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
   it('shows the folders setup creates before the gesture, and one button named for the platform', async () => {
     for (const [platform, label] of [
       ['mac', GO.mac],
-      ['windows', GO.windows],
+      // FIRSTRUN-ANY-PLATFORM: on Windows the master code comes first (Windows Hello is offered).
+      ['windows', FIRST_RUN.backupOnly],
       ['other', GO.other],
     ] as const) {
       await mount(fakeApi(), undefined, true, { platform });

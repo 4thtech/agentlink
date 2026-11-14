@@ -74,6 +74,10 @@ function existingOwner(): SetupApi & { calls: string[] } {
       calls.push('finish');
       return Promise.resolve({ kind: 'owner_exists' });
     },
+    finishCode: () => {
+      calls.push('finishCode');
+      return Promise.resolve({ kind: 'owner_exists' });
+    },
   };
 }
 
@@ -304,7 +308,9 @@ describe('switch to Touch ID on the first-run page (M1-UX-FIRSTRUN-V2-c, B-9)', 
   });
 
   it('FIRSTRUN-ANY-PLATFORM: the switch asks only the platform authenticator, never any passkey', async () => {
-    const { gestures } = await mount(fakeUpgrade(), { prfSupport: () => Promise.resolve('unknown') });
+    const { gestures } = await mount(fakeUpgrade(), {
+      prfSupport: () => Promise.resolve('unknown'),
+    });
     typeCode(CODE);
     await submit();
     expect(gestures).toEqual([{ platform: true }]);
