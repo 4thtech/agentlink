@@ -10853,3 +10853,10 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** WIN-DESK-2
 - **Scope:** the shell spawns the core with a fixed `AGENTLINK_LOG=warn` (the user's own value is still dropped); the core's redacting logger writes one fixed line when the app host cannot start (`reason=` and a short `code=` only) to stderr; core-log.ts redacts again and keeps it in `core.log` (1 MB, then `core.1.log`).
 - **Acceptance:** unit tests for the spawn env and the note; no message, path or secret in the line.
+
+#### WIN-ACL-NOTICE · Visible notice when the data folder access cannot be checked on Windows (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build · **Security:** S1
+- **Repo/path:** agentlink · `apps/desktop/src/main/{core-process,main}.ts`, `apps/cli/src/desktop/host-main.ts`, `packages/node/src/{approval-server.ts,local-ui/api/health.ts}`, `apps/local-ui/src/layout/data-access-notice.tsx`
+- **Depends on:** WIN-DESK-2 (OD-M)
+- **Scope:** when the shell icacls check is `unchecked`, it passes one fixed flag to the core at spawn; the health read carries `dataAccess: unchecked` (a flag only, absent otherwise); the app shows a non-blocking, closable PageNotice (tone warning, existing component, no new design) with fixed plain words. The app continues. The existing core.log line stays.
+- **Acceptance:** unit tests (spawn env, health answer, notice); the flag cannot come from the user own environment.

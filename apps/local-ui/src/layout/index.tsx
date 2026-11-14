@@ -68,6 +68,7 @@ import {
 } from './connection.js';
 import { healthWord } from './health-word.js';
 import { BackOnlineToast, HealthBanner } from './health-notices.js';
+import { DataAccessNotice } from './data-access-notice.js';
 
 export { setConnectionState, useConnectionState, type ConnectionState };
 
@@ -315,6 +316,8 @@ export function Layout({
             <div className="al-route" {...(settings ? { 'data-settings': '' } : {})}>
               {/* N2: the offline banner, after 5 s offline. Home says it in its own words. */}
               {path === '/' ? null : <HealthBanner />}
+              {/* WIN-ACL-NOTICE: the Windows app could not check the data folder's access. */}
+              <DataAccessNotice {...(readHealth === undefined ? {} : { read: readHealth })} />
               {switchNeeded ? <SwitchToPasskeyBanner platform={platform} /> : null}
               <StartHereContext.Provider value={start}>
                 {/* The one-time Tidy up note (b11 §29.7), on Home. */}

@@ -126,12 +126,27 @@ export function cleanCoreEnv(
  */
 export const CORE_LOG_LEVEL = 'warn';
 
-/** The environment the core is spawned with: the clean one, plus the fixed log level. */
+/**
+ * WIN-ACL-NOTICE: set (to the one fixed value) when the shell could not check who can open the data
+ * folder; the core's app page then shows a non-blocking notice. Never taken from the user's env.
+ */
+export const DATA_ACL_ENV = 'AGENTLINK_DESKTOP_DATA_ACL';
+export const DATA_ACL_UNCHECKED = 'unchecked';
+
+/**
+ * The environment the core is spawned with: the clean one, plus the fixed log level and, when the
+ * data folder check could not run, the fixed unchecked flag.
+ */
 export function coreSpawnEnv(
   env: Readonly<Record<string, string | undefined>>,
   platform: string,
+  dataFolderUnchecked = false,
 ): Record<string, string> {
-  return { ...cleanCoreEnv(env, platform), AGENTLINK_LOG: CORE_LOG_LEVEL };
+  return {
+    ...cleanCoreEnv(env, platform),
+    AGENTLINK_LOG: CORE_LOG_LEVEL,
+    ...(dataFolderUnchecked ? { [DATA_ACL_ENV]: DATA_ACL_UNCHECKED } : {}),
+  };
 }
 
 /** The child process as the supervisor uses it (node:child_process ChildProcess). */
@@ -175,6 +190,8 @@ export interface CoreSupervisorOptions {
   readonly cwd: string;
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly platform: string;
+  /** WIN-ACL-NOTICE: true when the data folder access could not be checked (read at each spawn). */
+  readonly dataFolderUnchecked?: () => boolean;
   readonly spawn: SpawnFn;
   readonly timers: Timers;
   readonly onMessage: (message: CoreMessage) => void;
@@ -265,7 +282,7 @@ export class CoreSupervisor {
     let child: CoreChild;
     try {
       child = o.spawn(o.nodePath, [o.hostScript], {
-        env: coreSpawnEnv(o.env, o.platform),
+        env: coreSpawnEnv(o.env, o.platform, o.dataFolderUnchecked?.() === true),
         stdio: ['ignore', 'ignore', 'pipe', 'overlapped'],
         windowsHide: true,
         shell: false,

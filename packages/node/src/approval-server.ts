@@ -1003,6 +1003,11 @@ export interface ApprovalServerOptions {
    */
   readonly appUpdate?: LocalUiAppUpdateDesk;
   /**
+   * WIN-ACL-NOTICE: the desktop app (Windows) could not check who can open the data folder. The
+   * health read then carries `dataAccess: 'unchecked'` and the app shows a notice. A flag only.
+   */
+  readonly dataFolderUnchecked?: boolean;
+  /**
    * DESK-NATIVE-DEBUG: receives ONE fixed diagnostic line per native presence operation outcome
    * (nativeDiagnostic: fixed words, step names and error codes only; never a secret, a path, a
    * handle, a record or a system message). The desktop host writes it to stderr, which the shell's
@@ -2113,6 +2118,7 @@ export async function startApprovalServerWith(
         ...(options.localUi?.dataFolder === undefined
           ? {}
           : { dataFolder: options.localUi.dataFolder }),
+        ...(options.dataFolderUnchecked === true ? { dataFolderUnchecked: true } : {}),
         startedAt: serverStartedAt,
         now: () => now(),
       }),

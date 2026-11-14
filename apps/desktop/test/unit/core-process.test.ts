@@ -129,6 +129,16 @@ describe('coreSpawnEnv', () => {
     });
     expect(coreSpawnEnv({ agentlink_log: 'debug' }, 'win32')).toEqual({ AGENTLINK_LOG: 'warn' });
   });
+
+  it('WIN-ACL-NOTICE: the unchecked flag is set only by the shell, never from the user env', () => {
+    const user = { HOME: '/h', AGENTLINK_DESKTOP_DATA_ACL: 'unchecked' };
+    expect(coreSpawnEnv(user, 'darwin')).toEqual({ HOME: '/h', AGENTLINK_LOG: 'warn' });
+    expect(coreSpawnEnv({ HOME: '/h' }, 'darwin', true)).toEqual({
+      HOME: '/h',
+      AGENTLINK_LOG: 'warn',
+      AGENTLINK_DESKTOP_DATA_ACL: 'unchecked',
+    });
+  });
 });
 
 describe('CoreSupervisor', () => {
