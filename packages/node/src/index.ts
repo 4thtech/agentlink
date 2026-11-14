@@ -267,6 +267,7 @@ export {
 // among the verified policy's folders; fixed refusal codes, nothing logged. Exported only in the form
 // whose budget `reserve` is required; the optional form stays inside for the attach route.
 export {
+  ownSendFolder,
   writeSendFolderContentFile as writeSendFolderFile,
   type SendFolderWrite,
   type SendFolderWriteRefusal,

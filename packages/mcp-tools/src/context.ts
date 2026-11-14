@@ -276,6 +276,11 @@ export type AttachOutcome =
  */
 export interface FileOpener {
   attach(path: string, allowedFolders: readonly string[]): Promise<AttachOutcome>;
+  /**
+   * FILES-AI-2: the ID's own pinned Send folder among `allowedFolders`, in its fixed `~` form
+   * (for example `~/AgentLink/Send`), or undefined. For the AI-side texts only (06 §2.3).
+   */
+  sendFolder?(allowedFolders: readonly string[]): Promise<string | undefined>;
 }
 
 /** The file calls of `agentlink_send` with `path` and `agentlink_fetch_file` (M1-9d-1; 06 §2.3). */
@@ -289,6 +294,11 @@ export interface FileTools {
    * `<envelope ID>.<index>`. Absent: the inbox shows no `savedTo`.
    */
   savedPaths?(refs: readonly SavedFileRef[]): Promise<ReadonlyMap<string, string>>;
+  /**
+   * FILES-AI-2 (06 §2.3): the ID's own pinned Send folder in its fixed `~` form, for the AI-side
+   * texts of a refused `path`. Absent or undefined: the texts say "their Send folder" alone.
+   */
+  sendFolder?(): Promise<string | undefined>;
 }
 
 /** The two folders a proof pack `path` may name (06 §2.4, D-87): policy paths, `~/` allowed. */
@@ -689,6 +699,15 @@ function coreFileTools(client: AgentLinkClient, opener: FileOpener): FileTools {
     },
     fetch: (input) => client.fetchFile(input),
     savedPaths: (refs) => client.savedFilePaths(refs),
+    ...(opener.sendFolder === undefined
+      ? {}
+      : {
+          async sendFolder() {
+            const effective = await client.ownerActions.loadPolicy();
+            if (effective.mode === 'fail_closed') return undefined;
+            return opener.sendFolder?.(effective.policy.files.allowedFolders);
+          },
+        }),
   });
 }
 

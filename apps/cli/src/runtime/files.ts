@@ -36,6 +36,7 @@ import {
   nodeSafeFetch,
   openAllowedFile,
   openInboxDir,
+  ownSendFolder,
   quarantineMark,
   resolveAllowedFile,
   trashSavedFile,
@@ -117,6 +118,15 @@ function readStream(
 export function nodeFileOpener(options: NodeFileOpenerOptions = {}): FileOpener {
   const home = options.home ?? homedir();
   return Object.freeze<FileOpener>({
+    // FILES-AI-2 (06 §2.3): the ID's own pinned Send folder in its fixed `~` form, for the AI-side
+    // texts only (never a path from a call; nothing is opened).
+    async sendFolder(allowedFolders) {
+      try {
+        return (await ownSendFolder(allowedFolders, home))?.shown;
+      } catch {
+        return undefined;
+      }
+    },
     async attach(requested, allowedFolders): Promise<AttachOutcome> {
       const guard = { allowedFolders, home };
       let checked;

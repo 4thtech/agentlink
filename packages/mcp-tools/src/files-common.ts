@@ -12,20 +12,43 @@ import type { AttachRefusal, ToolContext } from './context.js';
 import { fail, resultIsValid, type HandlerOutput } from './result.js';
 import { NPX_COMMAND } from './cli-command.js';
 
+/** The Send folders a result may name (04 §4: the fixed `~` slot, never a path from a call). */
+const SEND_FOLDER_SLOT = /^~\/AgentLink\/Send(?:-[2-9])?$/;
+
+/** Where the slot sits in a template: a parenthesised folder after "their Send folder". */
+const FOLDER_SLOT = ' ({sendFolder})';
+
+/**
+ * FILES-AI-2 (06 §2.3; D-152; I-5): fills `{sendFolder}` with the ID's own pinned Send folder in its
+ * fixed `~` form, and only when it has exactly that form (no other string, so no path from a call and
+ * no agent-written or inbound text can reach a result). Anything else drops the slot: "their Send
+ * folder" stands alone.
+ */
+export function withSendFolder(template: string, sendFolder: unknown): string {
+  const ok = typeof sendFolder === 'string' && SEND_FOLDER_SLOT.test(sendFolder);
+  return template.replace(FOLDER_SLOT, () => (ok ? ` (${sendFolder})` : ''));
+}
+
+const OUTSIDE_FOLDER_TEMPLATE = `Ask the user to move the file into their Send folder${FOLDER_SLOT} and call again with its new path, or, for a text file, send it with file: {name, content}. They can also open Settings, then Files, then Allow a folder in the AgentLink app, and choose the folder the file is in. You can't allow it for them. Without the app, in a terminal they opened themselves they run \`${NPX_COMMAND} policy allow-folder <path>\` (add \`--agent <name>\` if they have more than one ID).`;
+
+const NOT_FOUND_TEMPLATE = `If you made this file in your own workspace, it may not be on the user's computer. For a text file (.md, .markdown, .txt or .json, up to 8 MB), call agentlink_send again with file: {name, content}. Otherwise ask the user to save the file into their Send folder${FOLDER_SLOT} and call again with that path.`;
+
 export const FILE_TEXT = Object.freeze({
   noFolder: 'No folder is allowed for sending files yet, so nothing was sent.',
   // ATT-ALLOW-LINK: the app only, never a terminal command. Home offers "Allow Send folder"; Settings,
   // Files, Allow a folder is the other way. No tool can allow a folder (I-4), only the user, with
   // Touch ID or the master code in the app.
   noFolderNextStep:
-    "Tell the user: files can only be sent from a folder they allow. On Home in the AgentLink app they choose Allow Send folder, or they open Settings, then Files, then Allow a folder. You can't allow it for them. Then put the file in their Send folder, or in the folder they allowed, and call again.",
+    "Tell the user: files can only be sent from a folder they allow. On Home in the AgentLink app they choose Allow Send folder. You can't allow it for them. Then call again, with the path of a file in their Send folder, or, for a text file you wrote, with file: {name, content}.",
   outsideFolder: "That file isn't in a folder the user allows for sending, so nothing was sent.",
-  outsideFolderNextStep: `Tell the user: this file's folder isn't allowed yet. In the AgentLink app they open Settings, then Files, then Allow a folder, and choose the folder the file is in. You can't allow it for them. Then call again. Without the app, in a terminal they opened themselves they run \`${NPX_COMMAND} policy allow-folder <path>\` (add \`--agent <name>\` if they have more than one ID).`,
+  // FILES-AI-2 (06 §2.3 "AI-side texts for files"): the slot is the ID's own Send folder, never a
+  // value from the call; without it the sentence says "their Send folder" alone (withSendFolder).
+  outsideFolderNextStep: withSendFolder(OUTSIDE_FOLDER_TEMPLATE, undefined),
   notAllowed: "That path can't be sent: it must be a full path to a regular, visible file.",
   notAllowedNextStep:
     "Use the file's full path. Hidden files and protected private folders can never be sent.",
   notFound: "That file wasn't found, so nothing was sent.",
-  notFoundNextStep: 'Check the full path of the file and call again.',
+  notFoundNextStep: withSendFolder(NOT_FOUND_TEMPLATE, undefined),
   ownStorage: 'This file is too large for the free encrypted file service, so nothing was sent.',
   ownStorageNextStep:
     "Tell the user this file needs their own file storage, which isn't set up yet. Only they can set it up. A smaller file can be sent now.",
@@ -89,7 +112,7 @@ function allowFolderOrigin(url: string): string | undefined {
  */
 export function allowFolderLinkNextStep(url: string): string {
   if (allowFolderOrigin(url) === undefined) throw new Error('not the allow-folder link');
-  return `Never open or fetch this link yourself. Tell the user: files can only be sent from a folder they allow. They allow their Send folder in the AgentLink app, on Home or at ${url}, and confirm it themselves. You can't allow it for them. Then put the file in their Send folder and call again.`;
+  return `Never open or fetch this link yourself. Tell the user: files can only be sent from a folder they allow. They allow their Send folder in the AgentLink app, on Home or at ${url}, and confirm it themselves. You can't allow it for them. Then call again, with the path of a file in their Send folder, or, for a text file you wrote, with file: {name, content}.`;
 }
 
 /**
@@ -131,7 +154,7 @@ export async function withAllowFolderLink(
 }
 
 /** The `needs_setup` for a path the platform refused (06 §2.3; nothing was opened or sent). */
-export function attachRefusal(reason: AttachRefusal): HandlerOutput {
+export function attachRefusal(reason: AttachRefusal, sendFolder?: unknown): HandlerOutput {
   switch (reason) {
     case 'no_folder':
       return fail(
@@ -144,11 +167,16 @@ export function attachRefusal(reason: AttachRefusal): HandlerOutput {
       return fail(
         'needs_setup',
         FILE_TEXT.outsideFolder,
-        FILE_TEXT.outsideFolderNextStep,
+        withSendFolder(OUTSIDE_FOLDER_TEMPLATE, sendFolder),
         'OUTSIDE_ALLOWED_FOLDER',
       );
     case 'not_found':
-      return fail('not_found', FILE_TEXT.notFound, FILE_TEXT.notFoundNextStep, 'FILE_NOT_FOUND');
+      return fail(
+        'not_found',
+        FILE_TEXT.notFound,
+        withSendFolder(NOT_FOUND_TEMPLATE, sendFolder),
+        'FILE_NOT_FOUND',
+      );
     default:
       return fail(
         'rejected',
@@ -160,11 +188,11 @@ export function attachRefusal(reason: AttachRefusal): HandlerOutput {
 }
 
 /** The core's file `needs_setup` reasons (06 §2.3, 07 §5.6) in plain language. */
-export function filesNeedsSetup(reason: FilesNeedsSetup): HandlerOutput {
+export function filesNeedsSetup(reason: FilesNeedsSetup, sendFolder?: unknown): HandlerOutput {
   switch (reason) {
     case 'no_folder':
     case 'outside_folder':
-      return attachRefusal(reason);
+      return attachRefusal(reason, sendFolder);
     case 'no_own_storage':
       return fail(
         'needs_setup',
@@ -249,9 +277,6 @@ export function contentFileRefusal(code: string): HandlerOutput | undefined {
       return undefined;
   }
 }
-
-/** The Send folder forms a result may name (04 §4: the fixed `~` slot, never a path from a call). */
-const SEND_FOLDER_SLOT = /^~\/AgentLink\/Send(?:-[2-9])?$/;
 
 /**
  * FILES-AI-1: the ok summary of a `file` send, then `tail` (the queued line, or nothing). The saved

@@ -33,6 +33,21 @@ afterEach(async () => {
   await rm(home, { recursive: true, force: true });
 });
 
+describe('nodeFileOpener.sendFolder (FILES-AI-2)', () => {
+  it('is the ID own pinned Send folder in its ~ form, never another allowed folder', async () => {
+    await mkdir(path.join(home, 'AgentLink', 'Send'), { recursive: true });
+    const opener = nodeFileOpener({ home });
+    expect(await opener.sendFolder?.(['~/Work', '~/AgentLink/Send'])).toBe('~/AgentLink/Send');
+    expect(await opener.sendFolder?.(['~/Work'])).toBeUndefined();
+    expect(await opener.sendFolder?.([])).toBeUndefined();
+  });
+  it('is undefined for a Send folder that became a link', async () => {
+    await mkdir(path.join(home, 'AgentLink'), { recursive: true });
+    await symlink(path.join(home, 'Work'), path.join(home, 'AgentLink', 'Send'));
+    expect(await nodeFileOpener({ home }).sendFolder?.(['~/AgentLink/Send'])).toBeUndefined();
+  });
+});
+
 describe('nodeFileOpener', () => {
   it('attaches a file inside an allowed folder; opens it only when read; hashes what it read', async () => {
     let opens = 0;
