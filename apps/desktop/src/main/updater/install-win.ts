@@ -339,12 +339,21 @@ const disarm = () => {
   try { cp.execFileSync(reg, ['delete', ${JSON.stringify(RUNONCE_KEY)}, '/v', ${JSON.stringify(RUNONCE_VALUE)}, '/f'], { stdio: 'ignore', timeout: 15000, windowsHide: true }); } catch {}
   armed = false;
 };
-const done = (code, reason, removeStaging) => {
-  if (code !== 5) disarm();
+// The outcome on disk, once: the failed version (never offered again) and no pending nonce. Before
+// the old copy starts, so it never re-offers the version, a killed watchdog has still recorded it,
+// and a late unlink cannot hit the pending file of an update started after it.
+let recorded = false;
+const record = (reason) => {
+  if (recorded) return;
+  recorded = true;
   if (reason !== null) {
     try { writeAtomic(FAILED, JSON.stringify({ failedVersion: version, reason }) + '\\n'); } catch {}
   }
   unlink(PENDING);
+};
+const done = (code, reason, removeStaging) => {
+  if (code !== 5) disarm();
+  record(reason);
   if (removeStaging) {
     // The setup first (read-only); node.exe is this process and stays until the sweeper (24 h).
     try { fs.chmodSync(installer, 0o600); } catch {}
@@ -394,14 +403,16 @@ const stopNewCopy = async () => {
 // The new (or half-written) copy goes aside, the old one back, and the old one starts.
 const restore = async (code, reason) => {
   if (exists(dir)) {
-    if ((await renameRetry(dir, failedDir, 15000)) !== null) { await launch(exe); done(5, 'rollback_incomplete', false); }
+    if ((await renameRetry(dir, failedDir, 15000)) !== null) { record('rollback_incomplete'); await launch(exe); done(5, 'rollback_incomplete', false); }
   }
   if ((await renameRetry(aside, dir, 15000)) !== null) {
     if (!exists(dir) && exists(failedDir)) { try { fs.renameSync(failedDir, dir); } catch {} }
+    record('rollback_incomplete');
     await launch(exe);
     done(5, 'rollback_incomplete', false);
   }
   disarm();
+  record(reason);
   await launch(exe);
   await rmRetry(failedDir);
   done(code, reason, true);
