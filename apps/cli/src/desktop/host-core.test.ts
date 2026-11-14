@@ -822,7 +822,9 @@ describe('N7: native notifications from the desktop host', () => {
     s.pipe.shell({ v: 1, type: 'show', route: 'inbox', target: person });
     s.pipe.shell({ v: 1, type: 'show', route: 'inbox' });
     await until(() => readies(s.pipe.sent).length === 4);
-    const urls = readies(s.pipe.sent).slice(1).map((u) => new URL(u));
+    const urls = readies(s.pipe.sent)
+      .slice(1)
+      .map((u) => new URL(u));
     expect(urls.map((u) => u.pathname)).toEqual([`/approve/${apr}`, '/', '/']);
     expect(urls.map((u) => u.hash)).toEqual(['', `#person=${person}`, '']);
     s.pipe.shell({ v: 1, type: 'shutdown' });

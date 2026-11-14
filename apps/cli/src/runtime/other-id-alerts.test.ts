@@ -79,9 +79,9 @@ describe('otherIdLines: fixed words, local sanitised names only (I-5)', () => {
   });
 
   it('Show names on: the ID name and the owner-given contact name', () => {
-    expect(
-      otherIdLines(news, { ...ALL, showNames: true }, 'work', new Map([[A, 'Ana']])),
-    ).toEqual([['New message', 'New message for work from Ana.']]);
+    expect(otherIdLines(news, { ...ALL, showNames: true }, 'work', new Map([[A, 'Ana']]))).toEqual([
+      ['New message', 'New message for work from Ana.'],
+    ]);
   });
 
   it('a name that is not a plain name is never shown (no link, no markup, no counterparty text)', () => {
@@ -147,7 +147,9 @@ describe('createOtherIdAlerts: the runner', () => {
     m.push(ev(A, 'message', 1005));
     m.advance(30);
     await m.runner.tick();
-    expect(m.shown).toEqual([['New message', 'There is a new message for another one of your IDs.']]);
+    expect(m.shown).toEqual([
+      ['New message', 'There is a new message for another one of your IDs.'],
+    ]);
   });
 
   it('stays quiet when the desktop app alerts for THIS ID (it shows its own) or is not running', async () => {
@@ -161,7 +163,7 @@ describe('createOtherIdAlerts: the runner', () => {
     }
   });
 
-  it('the owner\'s switch decides, read on each look', async () => {
+  it("the owner's switch decides, read on each look", async () => {
     const m = make({ prefs: { ...ALL, messages: false } });
     await m.runner.tick();
     m.push(ev(A, 'message', 1005));
@@ -178,7 +180,10 @@ describe('createOtherIdAlerts: the runner', () => {
       agentName: 'work',
       desktopOwner: () => Promise.resolve('personal'),
       prefs: () => Promise.resolve(ALL),
-      events: () => (fail ? Promise.reject(new Error('x')) : Promise.resolve({ events: [ev(A, 'message', 1005)], capped: false })),
+      events: () =>
+        fail
+          ? Promise.reject(new Error('x'))
+          : Promise.resolve({ events: [ev(A, 'message', 1005)], capped: false }),
       ownerNames: () => Promise.resolve(new Map()),
       notify: (l) => (shown.push(l), Promise.resolve(true)),
       now: () => t,

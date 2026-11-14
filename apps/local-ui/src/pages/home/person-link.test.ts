@@ -10,7 +10,16 @@ describe('personFromHash', () => {
   });
 
   it('ignores any other fragment, shape or extra part', () => {
-    for (const hash of ['', '#', '#person=', '#person=0x12', `#person=${ID}&x=1`, `#x=${ID}`, `#person=${ID.toUpperCase()}`, '#person=../../etc']) {
+    for (const hash of [
+      '',
+      '#',
+      '#person=',
+      '#person=0x12',
+      `#person=${ID}&x=1`,
+      `#x=${ID}`,
+      `#person=${ID.toUpperCase()}`,
+      '#person=../../etc',
+    ]) {
       expect(personFromHash(hash)).toBeUndefined();
     }
   });

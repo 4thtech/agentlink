@@ -54,7 +54,10 @@ describe('the target is an opaque local ID of the right shape', () => {
 
   it('notify with a target parses; a wrong shape, a wrong kind or a number is refused', () => {
     const base = { v: 1, type: 'notify', kind: 'messages', count: 1, name: '' };
-    expect(parseCoreMessage(line({ ...base, target: PERSON }))).toEqual({ ...base, target: PERSON });
+    expect(parseCoreMessage(line({ ...base, target: PERSON }))).toEqual({
+      ...base,
+      target: PERSON,
+    });
     expect(parseCoreMessage(line({ ...base, target: APR }))).toBeUndefined();
     expect(parseCoreMessage(line({ ...base, target: 5 }))).toBeUndefined();
     expect(parseCoreMessage(line({ ...base, kind: 'update', target: PERSON }))).toBeUndefined();
@@ -64,9 +67,9 @@ describe('the target is an opaque local ID of the right shape', () => {
   });
 
   it('show with a target parses only for its route', () => {
-    expect(parseShellMessage(line({ v: 1, type: 'show', route: 'approvals', target: APR }))).toEqual(
-      { v: 1, type: 'show', route: 'approvals', target: APR },
-    );
+    expect(
+      parseShellMessage(line({ v: 1, type: 'show', route: 'approvals', target: APR })),
+    ).toEqual({ v: 1, type: 'show', route: 'approvals', target: APR });
     expect(parseShellMessage(line({ v: 1, type: 'show', route: 'inbox', target: PERSON }))).toEqual(
       { v: 1, type: 'show', route: 'inbox', target: PERSON },
     );
@@ -116,13 +119,10 @@ describe('a click carries the notification target', () => {
     const notifier = new NativeNotifier({
       Notification: FakeNotification,
       timers,
-      onClick: (route, target) => clicks.push({ route, ...(target === undefined ? {} : { target }) }),
+      onClick: (route, target) =>
+        clicks.push({ route, ...(target === undefined ? {} : { target }) }),
     });
-    const msg = (
-      kind: NotifyMessage['kind'],
-      count: number,
-      target?: string,
-    ): NotifyMessage => ({
+    const msg = (kind: NotifyMessage['kind'], count: number, target?: string): NotifyMessage => ({
       v: 1,
       type: 'notify',
       kind,
@@ -173,7 +173,11 @@ describe('NOTIFY-UPDATE-READY: the words follow the state', () => {
   it('coalesced: the more advanced state wins (never counts added)', () => {
     FakeNotification.shown = [];
     const timers = new FakeTimers();
-    const notifier = new NativeNotifier({ Notification: FakeNotification, timers, onClick: () => {} });
+    const notifier = new NativeNotifier({
+      Notification: FakeNotification,
+      timers,
+      onClick: () => {},
+    });
     const update = (count: number): NotifyMessage => ({
       v: 1,
       type: 'notify',

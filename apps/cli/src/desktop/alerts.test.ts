@@ -157,7 +157,11 @@ describe('NOTIFY-DEEPLINK: the notification names the one thing it is about', ()
     expect(notifyMessages(one.news, NOTIFY_DEFAULTS, new Map())).toEqual([
       { v: 1, type: 'notify', kind: 'approvals', count: 1, name: '', target: APR },
     ]);
-    const two = planAlerts(planAlerts(undefined, [], src([])).baseline, [APR, `apr_${'B'.repeat(22)}`], src([]));
+    const two = planAlerts(
+      planAlerts(undefined, [], src([])).baseline,
+      [APR, `apr_${'B'.repeat(22)}`],
+      src([]),
+    );
     expect(notifyMessages(two.news, NOTIFY_DEFAULTS, new Map())[0]).toEqual({
       v: 1,
       type: 'notify',
@@ -194,7 +198,13 @@ describe('NOTIFY-DEEPLINK: the notification names the one thing it is about', ()
 });
 
 describe('NOTIFY-UPDATE-READY: an update ready to install is news, once', () => {
-  const available: NotificationItem = { id: 'update', kind: 'update', count: 1, at: 50, read: false };
+  const available: NotificationItem = {
+    id: 'update',
+    kind: 'update',
+    count: 1,
+    at: 50,
+    read: false,
+  };
   const ready: NotificationItem = { ...available, count: 2, at: 60 };
 
   it('available then ready: two alerts (count 1, then 2), the same state never twice', () => {
@@ -218,9 +228,9 @@ describe('NOTIFY-UPDATE-READY: an update ready to install is news, once', () => 
   });
 
   it('a read update is not alerted at launch; the Updates switch still decides', () => {
-    expect(planAlerts(undefined, ids(0), src([{ ...ready, read: true }]), { launch: true }).news).toEqual(
-      [],
-    );
+    expect(
+      planAlerts(undefined, ids(0), src([{ ...ready, read: true }]), { launch: true }).news,
+    ).toEqual([]);
     expect(notifyMessages([{ kind: 'update', count: 2 }], NOTIFY_DEFAULTS, new Map())).toEqual([]);
   });
 });

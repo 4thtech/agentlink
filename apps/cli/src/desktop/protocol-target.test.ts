@@ -34,9 +34,9 @@ describe('opaque targets', () => {
   });
 
   it('show: only a target that fits its route', () => {
-    expect(parseShellMessage(line({ v: 1, type: 'show', route: 'approvals', target: APR }))).toEqual(
-      { v: 1, type: 'show', route: 'approvals', target: APR },
-    );
+    expect(
+      parseShellMessage(line({ v: 1, type: 'show', route: 'approvals', target: APR })),
+    ).toEqual({ v: 1, type: 'show', route: 'approvals', target: APR });
     expect(parseShellMessage(line({ v: 1, type: 'show', route: 'inbox', target: PERSON }))).toEqual(
       { v: 1, type: 'show', route: 'inbox', target: PERSON },
     );

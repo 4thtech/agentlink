@@ -272,8 +272,11 @@ const TOKEN = '[A-Za-z0-9_-]{43}';
 const PORT = '([1-9][0-9]{0,4})';
 // NOTIFY-DEEPLINK: `/approve/<id>` and a `#person=<id>` fragment (the window keeps it; it is never sent
 // to the server). Mirrors apps/cli/src/desktop/protocol.ts.
-const PATH = '(?:/|/first-run|/settings/home|/settings/join|/settings/updates|/approve/apr_[A-Za-z0-9_-]{22})';
-const SESSION_URL = new RegExp(`^http://localhost:${PORT}${PATH}\\?t=${TOKEN}(?:#person=0x[0-9a-f]{40})?$`);
+const PATH =
+  '(?:/|/first-run|/settings/home|/settings/join|/settings/updates|/approve/apr_[A-Za-z0-9_-]{22})';
+const SESSION_URL = new RegExp(
+  `^http://localhost:${PORT}${PATH}\\?t=${TOKEN}(?:#person=0x[0-9a-f]{40})?$`,
+);
 
 /** NOTIFY-DEEPLINK: the opaque targets (a request's or a person's local ID). Mirrors the core. */
 const APPROVAL_TARGET = /^apr_[A-Za-z0-9_-]{22}$/;
@@ -393,7 +396,14 @@ export function parseCoreMessage(line: string): CoreMessage | undefined {
     case 'notify': {
       const withTarget = Object.hasOwn(value, 'target');
       if (
-        !hasExactKeys(value, ['v', 'type', 'kind', 'count', 'name', ...(withTarget ? ['target'] : [])])
+        !hasExactKeys(value, [
+          'v',
+          'type',
+          'kind',
+          'count',
+          'name',
+          ...(withTarget ? ['target'] : []),
+        ])
       ) {
         return undefined;
       }
