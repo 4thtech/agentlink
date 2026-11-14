@@ -1,14 +1,20 @@
 # Updates
 
-*Applies to AgentLink 0.5.6. Updates is new in 0.5.1, in the desktop app and in the browser app. **Update now** in the Mac app works from 0.5.4 on, in the browser app from 0.5.6 on.*
+*Applies to AgentLink 0.5.6. Updates is new in 0.5.1. **Update now** works in the Mac app, the Windows app and the browser app from 0.5.6 on (the buttons in the Mac app did nothing in 0.5.4 and 0.5.5).*
+
+**If you have 0.5.4 or 0.5.5, install 0.5.6 once by hand:** on a Mac, download the DMG and replace AgentLink in Applications; on Windows, run the new setup.exe; for the browser app, run `npx -y @4thtech-io/agentlink@latest`. From 0.5.6 on, an update is one click. Your IDs, people and messages stay as they are.
 
 Open **Settings** › **Updates** (in the **This app** group). It is the one place to update AgentLink. It shows the version you have and a **Check for updates** button. AgentLink also checks by itself once a day while it runs. The button asks at most once a minute.
 
 When a newer version is out, the page says so, for example **AgentLink 0.5.2 is ready**, with the one step that fits how you installed AgentLink. Your IDs, people and messages stay as they are: they live in your AgentLink folder, not in the program.
 
+## Before AgentLink is set up
+
+You can leave setup at any step. Every step of Get started and of restoring shows **Check for updates** and **Help**, in the browser and in the desktop app. Before AgentLink is set up, pages that need it say **Set up AgentLink first** with **Continue setup**, and Settings › Updates works: your version and **Check for updates**; **Update now** and **Restart now** in the Mac app; **Download the new version** in the Windows app; and how to update in the browser app. Nothing that needs your Touch ID, Windows Hello or master code opens without it.
+
 ## Desktop app
 
-Press **Download update** and follow the short steps on the page. A Mac app on 0.5.4 or newer, and the Windows app from 0.5.6, update themselves: **Update now**, a progress bar, then **Restart now**. See [Desktop app: Updating](../apps/desktop-app.md#updating). A new version also shows in the [bell](notifications.md), and the desktop app can say **Update ready** in a notification.
+Press **Download update** and follow the short steps on the page. The Mac app and the Windows app, from 0.5.6, update themselves: **Update now**, a progress bar, then **Restart now**. See [Desktop app: Updating](../apps/desktop-app.md#updating). A new version also shows in the [bell](notifications.md), and the desktop app can say **Update ready** in a notification.
 
 ## Browser app
 

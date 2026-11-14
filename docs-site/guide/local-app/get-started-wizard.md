@@ -1,6 +1,6 @@
 # Get started
 
-*Applies to AgentLink 0.5.5. Before your first ID exists there is no **Skip to Home**. Since 0.5.5 there are five steps, with a Files step, and no passkey is needed.*
+*Applies to AgentLink 0.5.5. Before your first ID exists there is no **Skip to Home**. Since 0.5.6 every step shows **Check for updates** and **Help** as a way out, see [Updates](updates.md). Since 0.5.5 there are five steps, with a Files step, and no passkey is needed.*
 
 Get started is a short guided path: pick your AI app, create your ID with your master code (Touch ID or Windows Hello is optional), see that you are connected, check your Files, then invite someone if you like. Step by step with every screen: [Connect your AI app](../get-started/README.md).
 
