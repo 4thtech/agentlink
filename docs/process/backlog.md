@@ -10891,6 +10891,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** NOTIFY-ALL-IDS, N7
 - **Spec:** 08 §1; 11 §5
 - **Done when:** a person's file and message arriving together (one look) or within 20 s (either order, across looks) raise one alert (whichever arrives first is shown; within one look the file's); only alerts the owner's switches let through are counted, so an off switch never hides the other kind; different people and approvals/updates are untouched. A file alone is one flow event (kind `file`), never a file plus a message.
+
 #### APP-CONTINUITY · One AgentLink, browser or app: either way start to finish, and moving between them keeps everything (0.5.5, owner requirement 14 Nov)
 - **Status:** in review · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.2
 - **Repo/path:** agentlink · `apps/local-ui/src/presence/{offer.ts,webauthn-here.ts}`, every owner-presence prompt (`pages/contacts/presence-{prompt,button}.tsx`, `pages/apps/create-agent-gate.tsx`, `pages/approvals/index.tsx`, `pages/first-run/index.tsx`) and the WebAuthn defaults (`api/presence-ceremony.ts`, the approvals, rules, inbox, files, pay-confirm, create-agent and restore clients); `packages/node/src/{approval-server.ts,local-ui/{invite-paths.ts,routes.ts,app-host.ts,api/join.ts}}` (host takeover and show, code-finish tries); `apps/cli/src/{runtime/app-host-record.ts,commands/ui.ts,desktop/{host-core.ts,host-main.ts},harness/app-desk.ts}`; tests
