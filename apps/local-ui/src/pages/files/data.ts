@@ -39,10 +39,34 @@ const isObject = (v: unknown): v is Record<string, unknown> =>
 const isPath = (v: unknown): v is string =>
   typeof v === 'string' && v.length > 0 && v.length <= MAX_PATH;
 
+/**
+ * FILES-ALLOWED-STATE: the ID's own Send folder as the server decided it (what sending uses). The
+ * page never compares paths itself: the rules hold the realpath, not `~/AgentLink/Send`.
+ */
+export interface SendFolderAnswer {
+  readonly state: 'allowed' | 'not_found' | 'not_allowed';
+  /** The fixed `~` form; undefined when not allowed. */
+  readonly path: string | undefined;
+}
+
 export interface FolderList {
   readonly folders: readonly FolderRow[];
   /** The rules version this list was read at; null when the rules can't be read. */
   readonly version: number | null;
+  /** Undefined from a server that doesn't answer it. */
+  readonly sendFolder?: SendFolderAnswer | undefined;
+}
+
+const SEND_STATES: ReadonlySet<string> = new Set(['allowed', 'not_found', 'not_allowed']);
+
+function parseSendFolder(data: unknown): SendFolderAnswer | undefined {
+  if (!isObject(data) || typeof data['state'] !== 'string' || !SEND_STATES.has(data['state'])) {
+    return undefined;
+  }
+  const state = data['state'] as SendFolderAnswer['state'];
+  const path = isPath(data['path']) ? data['path'] : undefined;
+  if (state !== 'not_allowed' && path === undefined) return undefined;
+  return { state, path: state === 'not_allowed' ? undefined : path };
 }
 
 export function parseList(data: unknown): FolderList | undefined {
@@ -55,7 +79,10 @@ export function parseList(data: unknown): FolderList | undefined {
     const resolved = row['resolved'];
     rows.push({ path: row['path'], resolved: isPath(resolved) ? resolved : null });
   }
-  return { folders: rows, version };
+  const sendFolder = parseSendFolder(data['sendFolder']);
+  return sendFolder === undefined
+    ? { folders: rows, version }
+    : { folders: rows, version, sendFolder };
 }
 
 export function parseReview(data: unknown): Review | undefined {

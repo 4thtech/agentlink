@@ -2,7 +2,9 @@
 //
 // - GET /api/ui/files: the folders the AI may send files from, read through core
 //   `files.resolvedFolders()`. Display paths only: each folder as the rules write it and its realpath
-//   when core resolved it. Never a file, a key, a URL or an error's text.
+//   when core resolved it. Never a file, a key, a URL or an error's text. FILES-ALLOWED-STATE: also
+//   `sendFolder: { state, path }`, the ID's own Send folder as sending sees it (`allowed`,
+//   `not_found`, `not_allowed`; the path in its fixed `~` form), so no page compares paths.
 // - GET /api/ui/files/review?add=<path> | ?remove=<path>: nothing is signed and nothing changes.
 //   - add: the 04 §4 checks on the path the owner typed, before anything is prepared: a full path
 //     (`~/` is the home folder), no `.` or `..`, showable (no control, format or bidi character, so
@@ -60,6 +62,7 @@ import {
   type JsonValue,
 } from '@4thtech-io/crypto';
 import { prepareSendFolder } from '../../owner-first-policy.js';
+import { sendFolderState, type SendFolderState } from '../../send-folder-file.js';
 import type { LocalUiContext } from '../context.js';
 import {
   UI_INVALID_QUERY,
@@ -340,7 +343,15 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
         return { path, resolved: real !== undefined && resolvedByCore.has(real) ? real : null };
       }),
     );
-    return result(200, { folders: rows, max: MAX_FOLDERS, version });
+    // FILES-ALLOWED-STATE: the ID's own Send folder, decided here (the rules hold its realpath, so a
+    // page comparing it with `~/AgentLink/Send` said "not allowed" for an allowed folder).
+    let sendFolder: SendFolderState;
+    try {
+      sendFolder = await sendFolderState(folders.configured, home);
+    } catch {
+      sendFolder = { state: 'not_allowed', path: null };
+    }
+    return result(200, { folders: rows, max: MAX_FOLDERS, version, sendFolder: { ...sendFolder } });
   }
 
   async function review(context: LocalUiContext, request: LocalUiRequest): Promise<LocalUiResult> {

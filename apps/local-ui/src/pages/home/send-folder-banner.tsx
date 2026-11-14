@@ -2,7 +2,8 @@
 // ID that allows no folder yet (made when ~/AgentLink/Send could not be used, or before the first
 // rules carried it), so the owner's AI can send files without a terminal. FILES-HOME-PANEL: Home's Files panel (files-panel.tsx) now holds this action and replaced the banner on Home; the banner stays where an Attach answers no_folder, and its api is shared.
 //
-// - Reads `GET /api/ui/files` (a read; signs nothing). Shown only when it answers an empty list.
+// - Reads `GET /api/ui/files` (a read; signs nothing). Shown only when its `sendFolder` is
+//   `not_allowed` (FILES-ALLOWED-STATE; an older server: an empty list).
 // - Its one button asks the local server to set up the Send folder (`POST /api/ui/files/send-folder`,
 //   a mark-kind route: an empty octet-stream body, no input, no presence, nothing signed, no rule
 //   changed), then opens Settings > Files with that folder filled in and checked (`check=1`, honoured
@@ -67,7 +68,13 @@ export function createSendFolderApi(
         });
         if (res.status !== 200) return false;
         const body = await json(res);
-        return isObject(body) && Array.isArray(body['folders']) && body['folders'].length === 0;
+        if (!isObject(body)) return false;
+        // FILES-ALLOWED-STATE: the server's answer for the ID's own Send folder when it gives one.
+        const send = body['sendFolder'];
+        if (isObject(send) && typeof send['state'] === 'string') {
+          return send['state'] === 'not_allowed';
+        }
+        return Array.isArray(body['folders']) && body['folders'].length === 0;
       } catch {
         return false;
       }

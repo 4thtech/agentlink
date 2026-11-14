@@ -11176,3 +11176,16 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** UPD-5 (Settings › Updates), FIRSTRUN-ANY-PLATFORM
 - **Spec:** 08 §1 "A way out of first run" (proposed); 08 §8 "Signed updates" (installing a verified update is not an owner operation); 11 §5
 - **Done when:** `RED (expected):` commit first; every Get started step (all five, Connect another AI app, before an ID exists), every restore step and Start over show **Check for updates** (Settings › Updates) and **Help** (the user guide), in the browser and the desktop window; before an owner exists every shell page but Home, Settings, Settings › Updates and Appearance shows only "Set up AgentLink first" with **Continue setup**; Settings › Updates shows the version and checks with no owner; the Windows app always offers **Download the new version** (the stable `releases/latest/download/AgentLink-win-x64-setup.exe`), the browser app always shows how to update; an unanswered owner read gates nothing; no server route changes gating.
+
+#### UPDATE-TEST-057 · Version-only release 0.5.7 to check Update now from 0.5.6 (owner request, 14 Nov)
+- **Status:** in review (branch `rel057/update-test`) · **Size:** XS · **Tier:** Sonnet · **Security:** S0
+- **Repo/path:** agentlink · `.changeset/`, `changelog.d/`, `docs/status.yaml` and generated status blocks only
+- **Depends on:** the 0.5.6 release
+- **Done when:** 0.5.7 is released with no code change; Update now from 0.5.6 reaches 0.5.7 in the Mac app, the Windows app and the browser app.
+
+#### FILES-ALLOWED-STATE · Home Files panel and the Files step say an allowed Send folder is allowed (0.5.7, owner report 14 Nov)
+- **Status:** in review (branch `rel057/files-allowed`) · **Size:** S · **Tier:** Opus · **Security:** S1
+- **Repo/path:** agentlink · `packages/node/src/send-folder-file.ts` (`sendFolderState`), `packages/node/src/local-ui/api/files.ts` (`GET /api/ui/files` answers `sendFolder`), `apps/local-ui/src/pages/files/{data,folders-summary,folders-copy}.ts`, `apps/local-ui/src/pages/home/{files-panel,home-screen,send-folder-banner}.tsx`; tests
+- **Depends on:** FILES-HOME-PANEL, FILES-ONB-1
+- **Spec:** 08 §1 "Home Files panel", "Files step"; 11 §5.7
+- **Done when:** `RED (expected):` commit first; the server decides the ID's own Send folder state (`allowed` / `not_found` / `not_allowed`, the path in its `~` form) exactly as sending does (`ownSendFolder`), whether the rules hold the realpath or `~/AgentLink/Send`; Home's Files panel, the Files step and the Send folder banner use it and never compare paths, so Allow Send folder is never offered for an allowed folder; with several IDs the panel says which ID it describes.

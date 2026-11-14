@@ -147,6 +147,44 @@ export async function ownSendFolder(
   return undefined;
 }
 
+/** FILES-ALLOWED-STATE: what the app shows about the ID's own Send folder. */
+export type SendFolderState =
+  | { readonly state: 'allowed'; readonly path: string }
+  | { readonly state: 'not_found'; readonly path: string }
+  | { readonly state: 'not_allowed'; readonly path: null };
+
+/**
+ * FILES-ALLOWED-STATE: the one answer for "is the Send folder allowed", decided here and never by a
+ * page comparing paths. The rules hold the realpath the owner confirmed (`/Users/<u>/AgentLink/Send`)
+ * or, from older set-ups, `~/AgentLink/Send`; both name the same folder. `allowed` is exactly what
+ * sending uses (`ownSendFolder`: listed and pinned); `not_found` when the ID's own Send folder is
+ * listed but missing or no longer where it was allowed; otherwise `not_allowed`. The path is the
+ * fixed `~` form only.
+ */
+export async function sendFolderState(
+  allowedFolders: readonly string[],
+  home: string,
+): Promise<SendFolderState> {
+  const own = await ownSendFolder(allowedFolders, home);
+  if (own !== undefined) return { state: 'allowed', path: own.shown };
+  const realHome = await realpath(home).catch(() => home);
+  const listed = new Set<string>();
+  for (const entry of allowedFolders) {
+    if (typeof entry !== 'string') continue;
+    for (const base of [realHome, home]) {
+      const at = pinnedLocation(entry, base);
+      if (at !== undefined) listed.add(at);
+    }
+  }
+  for (const candidate of SEND_CANDIDATES) {
+    const forms = [realHome, home].map((base) => pinnedLocation(candidate, base));
+    if (forms.some((at) => at !== undefined && listed.has(at))) {
+      return { state: 'not_found', path: candidate };
+    }
+  }
+  return { state: 'not_allowed', path: null };
+}
+
 /**
  * FILES-AI-1: the package-entry form for the runtime's files platform (core's `contentFile` sends):
  * `reserve` is REQUIRED, so no caller outside this package writes without the budget step. Without

@@ -1,10 +1,10 @@
 // What Home's Files panel and Settings › Files show about the two folders (D-152; 08 §1 "Home Files
 // panel"; FILES-HOME-PANEL, FILES-SETTINGS-COPY). Reads only (GET), signs nothing:
 //
-// - Send: from `GET /api/ui/files` (the rules' folder list, each with its real location when found):
-//   the ID's own Send folder is `~/AgentLink/Send` or `Send-2` ... `Send-9` (never another allowed
-//   folder). `allowed` when listed and found, `not_found` when listed but missing, `not_allowed`
-//   when none of them is listed.
+// - Send: from `GET /api/ui/files` `sendFolder` (FILES-ALLOWED-STATE: the server decides, as
+//   sending does): the ID's own Send folder, `~/AgentLink/Send` or `Send-2` ... `Send-9` (never
+//   another allowed folder). `allowed` when listed and found, `not_found` when listed but missing,
+//   `not_allowed` when none of them is listed.
 // - Inbox: the folder of the received page's `autoSave` block (home shown as `~`).
 // - "{n} new": the received files saved since the person last opened Files; a count only, never a
 //   name (I-5). The time is remembered in `localStorage` under try/catch and works without it.
@@ -70,11 +70,16 @@ export async function loadFilesSummary(
   const list = folders.status === 200 ? parseList(folders.json) : undefined;
   if (list === undefined) return { kind: 'error' };
 
+  // FILES-ALLOWED-STATE: the server's answer (the rules hold the realpath the owner confirmed, so
+  // matching `~/AgentLink/Send` here said "not allowed" for an allowed folder). The match below is
+  // only for a server that doesn't answer it.
   const row = list.folders.find((r) => SEND_FOLDER.test(r.path));
   const send: FilesSummary['send'] =
-    row === undefined
-      ? { state: 'not_allowed', folder: undefined }
-      : { state: row.resolved === null ? 'not_found' : 'allowed', folder: row.path };
+    list.sendFolder !== undefined
+      ? { state: list.sendFolder.state, folder: list.sendFolder.path }
+      : row === undefined
+        ? { state: 'not_allowed', folder: undefined }
+        : { state: row.resolved === null ? 'not_found' : 'allowed', folder: row.path };
 
   let inbox: string | undefined;
   let newCount = 0;

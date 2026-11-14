@@ -52,6 +52,8 @@ const TOKEN = 'r'.repeat(43);
 interface World {
   folders: { path: string; resolved: string | null }[];
   warnings?: string[];
+  /** FILES-ALLOWED-STATE: the server's answer for the ID's own Send folder. */
+  sendFolder?: { state: string; path: string | null };
 }
 
 function fakes(world: World) {
@@ -68,7 +70,12 @@ function fakes(world: World) {
     get: (path) => {
       gets.push(path);
       if (path === '/api/ui/files') {
-        return answer(200, { folders: world.folders, max: 32, version: 7 });
+        return answer(200, {
+          folders: world.folders,
+          max: 32,
+          version: 7,
+          ...(world.sendFolder === undefined ? {} : { sendFolder: world.sendFolder }),
+        });
       }
       if (path.startsWith('/api/ui/files/received')) {
         return answer(200, {
@@ -209,6 +216,18 @@ describe('FILES-ONB-1: the Files step, read-only by default', () => {
     expect(f.reveals).toEqual(['send']);
     expect(lintVocabulary(host.textContent ?? '')).toEqual([]);
     expect(host.textContent).not.toMatch(/harness/i);
+  });
+
+  it('FILES-ALLOWED-STATE: an allowed absolute-path Send folder shows as allowed', async () => {
+    await mount({
+      folders: [{ path: '/Users/u/AgentLink/Send', resolved: '/Users/u/AgentLink/Send' }],
+      sendFolder: { state: 'allowed', path: '~/AgentLink/Send' },
+    });
+    expect(host.textContent).not.toContain(FILES_COPY.notAllowedLine);
+    expect(buttonNamed(FILES_COPY.allowSendFolder)).toBeUndefined();
+    const send = host.querySelector('[data-row="send"]');
+    expect(send?.textContent).toContain('~/AgentLink/Send');
+    expect(send?.textContent).toContain(FILES_COPY.chipAllowed);
   });
 
   it('Choose another folder sits in the Send row (11 §5.7)', async () => {
