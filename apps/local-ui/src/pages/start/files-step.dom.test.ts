@@ -205,10 +205,20 @@ describe('FILES-ONB-1: the Files step, read-only by default', () => {
     expect(host.querySelector('[data-row="inbox"]')?.textContent).toContain('~/AgentLink/Inbox');
     expect(host.textContent).toContain(FILES_COPY.aiAppHeading);
     expect(host.textContent).toContain(appTip('Claude Code', 'Mac'));
-    await click(send?.querySelector('button') ?? undefined);
+    await click(buttonNamed('Show in Finder'));
     expect(f.reveals).toEqual(['send']);
     expect(lintVocabulary(host.textContent ?? '')).toEqual([]);
     expect(host.textContent).not.toMatch(/harness/i);
+  });
+
+  it('Choose another folder sits in the Send row (11 §5.7)', async () => {
+    await mount({ folders: [ALLOWED] });
+    const send = host.querySelector('[data-row="send"]');
+    expect(
+      [...(send?.querySelectorAll('button') ?? [])].some(
+        (b) => b.textContent?.trim() === FILES_STEP.choose,
+      ),
+    ).toBe(true);
   });
 
   it('the unknown-app tip when no AI app is known', async () => {

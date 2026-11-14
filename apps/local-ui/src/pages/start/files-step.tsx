@@ -141,8 +141,13 @@ export function FilesStep({
             </Banner>
           )
         ) : null}
-        <FolderRows summary={summary} reveal={reveal} />
-        <AddFolder api={api} label={F.choose} open={chooseFirst} onAdded={() => void read()} />
+        <FolderRows
+          summary={summary}
+          reveal={reveal}
+          sendAction={
+            <AddFolder api={api} label={F.choose} open={chooseFirst} onAdded={() => void read()} />
+          }
+        />
       </>
     );
   }

@@ -223,6 +223,13 @@ describe('first run: protect approvals (D-120 (1))', () => {
     // FILES-ONB-1 (11 §5.7): the files card above the one button, and its line under it.
     expect(text()).toContain(`${CONNECT_STEP.filesLabel}~/AgentLink/Send`);
     expect(text()).toContain(CONNECT_STEP.filesLine('confirmation', 'computer'));
+    // Change only notes the wish: pressed, with the caption; nothing is sent.
+    const change = host.querySelector<HTMLButtonElement>('[data-send-folder-card] button');
+    expect(change?.getAttribute('aria-pressed')).toBe('false');
+    expect(text()).not.toContain(CONNECT_STEP.filesChangeLater);
+    await act(async () => change?.click());
+    expect(change?.getAttribute('aria-pressed')).toBe('true');
+    expect(text()).toContain(CONNECT_STEP.filesChangeLater);
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
     expect(button(GO.other).className).toContain('al-btn-primary');
     expect(text()).not.toMatch(BANNED);

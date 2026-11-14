@@ -3,7 +3,7 @@
 // Finder). Both rows show only the owner's own two folders (home as `~`), never a file name.
 // Show in Finder sends nothing but an empty POST (api/reveal-folder.ts); the server finds the folder.
 import { Button, Icon, InlineError, StatusChip } from '@4thtech-io/ui';
-import { useEffect, useRef, useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import type { RevealApi } from '../../api/reveal-folder.js';
 import { FILES_COPY as C, computerWord, showInLabel } from './folders-copy.js';
 import { FILES_IO_STRINGS as IO } from './io-strings.js';
@@ -57,10 +57,17 @@ export interface FolderRowsProps {
   readonly reveal: RevealApi;
   /** Show the Inbox row's line "{n} new" (Home). */
   readonly showNew?: boolean;
+  /** FILES-ONB-1: an action inside the Send row (the Files step's Choose another folder). */
+  readonly sendAction?: ReactNode;
 }
 
 /** Send, then Inbox. When the Send folder is not allowed the caller shows the action instead. */
-export function FolderRows({ summary, reveal, showNew = false }: FolderRowsProps): ReactElement {
+export function FolderRows({
+  summary,
+  reveal,
+  showNew = false,
+  sendAction,
+}: FolderRowsProps): ReactElement {
   const computer = computerWord();
   const { send } = summary;
   const chip =
@@ -80,6 +87,7 @@ export function FolderRows({ summary, reveal, showNew = false }: FolderRowsProps
           {send.folder === undefined ? null : <span className="al-text-code">{send.folder}</span>}
           <span className="al-text-caption al-muted">{C.sendLine}</span>
           <span>{chip}</span>
+          {sendAction}
         </div>
         {send.state === 'allowed' ? <RevealButton which="send" reveal={reveal} /> : null}
       </li>

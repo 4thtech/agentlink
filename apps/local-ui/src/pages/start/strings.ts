@@ -96,6 +96,8 @@ export const CONNECT_STEP = {
   filesLabel: 'Your AI may send files from',
   filesChange: 'Change',
   filesChangeLabel: 'Change the folder your AI may send files from',
+  /** Under the folder once "Change" is pressed: the choice comes on the Files step. */
+  filesChangeLater: "You'll choose after this step",
   /** Under the button. `{proof}`: "Touch ID", "Windows Hello", else "confirmation". */
   filesLine: (proof: string, computer: string): string =>
     `One ${proof} creates this ID and allows your Send folder. Nothing else on this ${computer} can be sent.`,

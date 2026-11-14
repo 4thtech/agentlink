@@ -8,7 +8,13 @@
 // kit turns every one into a fade. Names from the server (an app, the agent) are rendered as text.
 import { IdExplainerCard } from './id-explainer.js';
 import { Button, Icon, Lockup, Skeleton, TextField } from '@4thtech-io/ui';
-import { type FormEvent, type MouseEvent, type ReactElement, type ReactNode } from 'react';
+import {
+  useState,
+  type FormEvent,
+  type MouseEvent,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { useTitleFocus } from '../welcome/index.js';
 import type { DetectedApp } from '../first-run/apps-api.js';
 import { skipToHome } from './guard.js';
@@ -663,10 +669,14 @@ export function InviteStep({
 export function SendFolderCard({
   folder,
   onChange,
+  chosen = false,
 }: {
   readonly folder: string;
   readonly onChange?: () => void;
+  /** The wish was already noted (kept while the steps change). */
+  readonly chosen?: boolean;
 }): ReactElement {
+  const [pressed, setPressed] = useState(chosen);
   return (
     <div className="st-agent" data-send-folder-card>
       <span className="st-tile-icon" aria-hidden="true">
@@ -675,9 +685,23 @@ export function SendFolderCard({
       <span className="st-agent-words">
         <span className="al-text-caption al-muted">{C.filesLabel}</span>
         <span className="al-text-code">{folder}</span>
+        {pressed ? (
+          <span className="al-text-caption al-muted" data-change-later>
+            {C.filesChangeLater}
+          </span>
+        ) : null}
       </span>
       {onChange === undefined ? null : (
-        <Button variant="ghost" size="sm" aria-label={C.filesChangeLabel} onClick={onChange}>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={C.filesChangeLabel}
+          aria-pressed={pressed}
+          onClick={() => {
+            setPressed(true);
+            onChange?.();
+          }}
+        >
           {C.filesChange}
         </Button>
       )}

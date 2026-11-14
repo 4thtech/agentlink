@@ -10828,6 +10828,41 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Spec:** 08 §1 "Settings › Files"; 11 §5.7 "Files explainer"
 - **Done when:** the explainer is the 11 §5.7 string exactly (`io.test.ts` updated) and "You don't upload here" appears nowhere in the app; the Send folders tab shows the one line and the AI app tip above the list; Show in Finder on the Send folder card and on the Inbox line, and on no other folder card; 11 §5.7 drift check green.
 
+#### FILES-ONB-STOP-OLD · "Also stop sending from {sendFolder}" in Choose another folder (after 0.5.5)
+- **Status:** new · **Size:** M · **Tier:** Opus · **Security:** S2 (policy edit)
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/files.ts` (review of an add plus a remove in one signed edit), `apps/local-ui/src/pages/files/add-folder.tsx`, the Files step
+- **Depends on:** FILES-ONB-1 (deferred from it: the review signs one change per edit)
+- **Spec:** 08 §1 "Choose another folder"; 11 §5.7 "Files step"
+- **Done when:** an unticked "Also stop sending from {sendFolder}" puts the removal in the same signed `policy.set`, both listed in the review; `RED (expected):` commit; independent review.
+
+#### FILES-ONB-SERVER-FOLDER · The Connect card shows the server's folder (after 0.5.5)
+- **Status:** new · **Size:** S · **Tier:** Opus · **Security:** S1
+- **Repo/path:** agentlink · `packages/node/src/approval-server.ts` (a read of the folder the first rules would allow, `Send-2` … `Send-9` when Send is unusable; no folder created), the Connect card
+- **Depends on:** FILES-ONB-1 (it shows the default `~/AgentLink/Send`; the server names the folder only at `begin`)
+- **Spec:** 08 §1 "Connect step"
+- **Done when:** the card shows the server's folder before the gesture; `begin`/`finish` take no new input; tests.
+
+#### FILES-FOLDER-PICKER · OS folder picker for Choose another folder in the app (after 0.5.5)
+- **Status:** new · **Size:** M · **Tier:** Opus · **Security:** S2 (host bridge)
+- **Repo/path:** agentlink · `apps/desktop` (NSOpenPanel / IFileOpenDialog through the host), `apps/local-ui/src/pages/files/add-folder.tsx`
+- **Depends on:** FILES-ONB-1 (typed path only today)
+- **Spec:** 08 §1 "Choose another folder"
+- **Done when:** in the desktop app the OS picker fills the folder, which still goes through the server's review; the typed path stays in a browser; tests.
+
+#### FILES-CONFIRM-NATIVE · Touch ID / Windows Hello for folder confirms in the app (after 0.5.5)
+- **Status:** new · **Size:** M · **Tier:** Opus · **Security:** S2 (owner presence)
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/files/add-folder.tsx` (`Confirm`), the native presence ceremony (DESK051-C6)
+- **Depends on:** FILES-ONB-1 (the app offers the master code only for folder confirms)
+- **Spec:** 04 §2.5 "Desktop app owner presence"; 08 §1
+- **Done when:** in the desktop app the folder confirm offers the app's own Touch ID / Windows Hello once it is on, the master code always; never WebAuthn in the app window; tests.
+
+#### FILES-ONB-ALLOW-RETURN · Allow Send folder returns to the wizard (after 0.5.5)
+- **Status:** new · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/start/files-step.tsx`, `pages/files/index.tsx` (`check=1` hand-over)
+- **Depends on:** FILES-ONB-1 (Allow Send folder opens Settings › Files and does not come back)
+- **Spec:** 08 §1 "Files step"
+- **Done when:** after the confirm in Settings › Files, the owner is back on the Files step with the chip Allowed (or the confirm runs inline); tests.
+
 #### FILES-DOCS-055 · Docs for sending files in 0.5.5
 - **Status:** new · **Size:** S · **Tier:** Sonnet build, Haiku verifier · **Security:** S0
 - **Repo/path:** agentlink · `README.md` Status, `docs-site/` ("Sending files": the two questions, Send and Inbox, send-by-content, the per-app tips), `knowledge/`, `changelog.d/`, changesets

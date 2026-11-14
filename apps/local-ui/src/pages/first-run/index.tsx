@@ -610,6 +610,7 @@ function ConnectFirstStep({
       <SendFolderCard
         folder={shownFolder(DEFAULT_SEND_FOLDER, platform)}
         onChange={onChangeFolder}
+        chosen={wizardMemory().chooseFolder === true}
       />
       {choice.primary === 'native' ? (
         <Banner tone="info">{T.nativeNext(sensor)}</Banner>
@@ -1762,6 +1763,7 @@ export function FirstRunPage({
         <SendFolderCard
           folder={shownFolder(DEFAULT_SEND_FOLDER, platform)}
           onChange={() => rememberWizard({ chooseFolder: true })}
+          chosen={wizardMemory().chooseFolder === true}
         />
         <CreateAgentGate
           label={label}
@@ -1782,7 +1784,14 @@ export function FirstRunPage({
         />
         {chosenApp === undefined ? null : <p className="st-note">{S.restartNote(appName)}</p>}
         <p className="st-note" data-files-line>
-          {S.filesLine(proofWord(platform), COMPUTER[platform])}
+          {/* The sensor's name only where the gate can use a passkey here; else "confirmation"
+              (the master code, or the app's own Touch ID / Windows Hello once it is on). */}
+          {S.filesLine(
+            inAppWindow(native?.userAgent) || !available()
+              ? T.oneConfirmation
+              : proofWord(platform),
+            COMPUTER[platform],
+          )}
         </p>
       </section>,
     );
