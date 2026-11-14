@@ -577,9 +577,11 @@ describe('ATT-APP-ATTACH: the MCP side cannot reach the attach route (I-4)', () 
     expect(scanned).toBeGreaterThan(10);
   });
 
-  it('the package entry exports nothing of it', async () => {
+  it('the package entry exports nothing of the route or its desk', async () => {
     const entry = (await import('../index.js')) as Record<string, unknown>;
-    for (const key of Object.keys(entry)) {
+    // D-152 (FILES-AI-1) amends D-150 (2) for the writer only: the runtime's files platform takes it
+    // for core's `contentFile` sends. No MCP or CLI tool source names it (the test above).
+    for (const key of Object.keys(entry).filter((k) => k !== 'writeSendFolderFile')) {
       expect(/attach|sendfolderfile/i.test(key), key).toBe(false);
     }
   });

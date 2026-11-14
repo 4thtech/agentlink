@@ -151,6 +151,9 @@ export function msvcArgs({ src, out, arch = 'x64' }) {
     '/DEPENDENTLOADFLAG:0x800',
     'windowsapp.lib',
     'bcrypt.lib',
+    // WIN-HELLO-NATIVE: the TPM check (Platform Crypto Provider) and the prompt focus.
+    'ncrypt.lib',
+    'user32.lib',
   ];
 }
 

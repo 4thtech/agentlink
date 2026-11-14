@@ -284,6 +284,23 @@ export {
   type SendMessageResult,
   type SendMessageType,
 } from './send.js';
+// FILES-AI-1 (D-152; 06 §2.3 "Send by content"): the checks, codes and daily budget of a file the AI
+// wrote and passes as content (`sendMessage` `contentFile`).
+export {
+  CONTENT_FILE_BUDGET,
+  CONTENT_FILE_EXTENSIONS,
+  CONTENT_FILE_MAX_BYTES,
+  CONTENT_FILE_MAX_NAME_CHARS,
+  FILE_BUDGET,
+  FILE_NAME,
+  FILE_NAME_TAKEN,
+  FILE_NOT_TEXT,
+  FILE_TYPE,
+  SEND_FOLDER_UNAVAILABLE,
+  contentFileBytes,
+  contentFileName,
+  type ContentFileCode,
+} from './files/content-file.js';
 export {
   nostrTransport,
   type NostrTransportOptions,
@@ -590,6 +607,7 @@ export {
   DOWNLOAD_SUFFIX,
   FALLBACK_FILE_NAME,
   MAX_FILE_NAME_BYTES,
+  hasFolderPart,
   needsDownloadSuffix,
   sanitizeFileName,
   savedFileName,
@@ -619,6 +637,9 @@ export type {
   OutgoingFile,
   QuarantineMark,
   SavedFileIdentity,
+  SendFolderWriteInput,
+  SendFolderWriteRefusal,
+  SendFolderWriteResult,
 } from './files/platform.js';
 // RET-3 (D-148; 04 §4.2): the owner's history delete (plan, then apply) and the Trash outcome codes.
 export {

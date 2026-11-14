@@ -329,6 +329,27 @@ describe('Windows Hello machines need no master code after registration', () => 
   });
 });
 
+describe('unavailable, with a reason (WIN-HELLO-NATIVE)', () => {
+  it('status carries the helper reason when Windows Hello is not set up, and never prompts', async () => {
+    const keychain = await withOwner();
+    const helper = new StandInHelper(NATIVE_PRESENCE_WINDOWS);
+    helper.unavailable = 'not_set_up';
+    expect(await nativePresenceStatus(keychain, helper, owner.ownerNostr)).toEqual({
+      available: false,
+      registered: false,
+      unavailable: 'not_set_up',
+    });
+    helper.unavailable = 'no_secure_hardware';
+    expect(await nativePresenceStatus(keychain, helper, owner.ownerNostr)).toEqual({
+      available: false,
+      registered: false,
+      unavailable: 'no_secure_hardware',
+    });
+    expect(helper.availabilityCalls).toBeGreaterThan(0);
+    expect(helper.calls).toEqual([]);
+  });
+});
+
 describe('cross-type and cross-platform refusal, before the helper runs', () => {
   it('ALKP in owner-native, the other platform, another owner: presence_rejected, no prompt', async () => {
     const keychain = await withOwner();

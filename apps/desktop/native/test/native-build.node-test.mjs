@@ -86,11 +86,68 @@ test('helpers print nothing but the result: no logging calls in either source', 
     'std::wcout',
     'std::wcerr',
     'OutputDebugString',
-    'STD_ERROR_HANDLE',
     'fprintf',
     'puts(',
   ]) {
     assert.ok(!winSrc.includes(bad), `cpp uses ${bad}`);
+  }
+  // WIN-HELLO-NATIVE: stderr is written in exactly one place, the fixed `unavailable <reason>` line.
+  assert.equal(winSrc.split('STD_ERROR_HANDLE').length - 1, 1, 'one stderr write in the cpp');
+  const unavail = winSrc.slice(
+    winSrc.indexOf('static void FinishUnavailable'),
+    winSrc.indexOf('// ---- end FinishUnavailable'),
+  );
+  assert.match(unavail, /STD_ERROR_HANDLE/);
+});
+
+test('Windows available: says why not, as one fixed token (WIN-HELLO-NATIVE)', () => {
+  const lines = [...winSrc.matchAll(/"unavailable ([a-z_]+)\\n"/g)].map((m) => m[1]).sort();
+  assert.deepEqual(lines, ['no_secure_hardware', 'not_set_up']);
+  // No TPM: Windows Hello would make a software key, which create refuses (16); say so up front.
+  assert.match(winSrc, /MS_PLATFORM_CRYPTO_PROVIDER/);
+  assert.match(winSrc, /KeyCredentialManager::IsSupportedAsync\(\)/);
+  // Every command that needs Windows Hello says unavailable before it touches a credential.
+  for (const cmd of ['CmdCreate', 'CmdCheck', 'CmdSign']) {
+    const body = winSrc.slice(winSrc.indexOf(`static void ${cmd}`));
+    const end = body.indexOf('\n}\n');
+    const fn = body.slice(0, end);
+    assert.match(fn, /RequireHello\(\)/, `${cmd} checks Windows Hello first`);
+    if (cmd !== 'CmdCreate') {
+      assert.ok(fn.indexOf('RequireHello()') < fn.indexOf('OpenMatching'), `${cmd}: gate first`);
+    }
+  }
+  // Fable r1 L2: delete never prompts and must work while Hello is briefly unavailable: no gate.
+  const del = winSrc.slice(winSrc.indexOf('static void CmdDelete'));
+  assert.ok(!del.slice(0, del.indexOf('\n}\n')).includes('RequireHello'), 'CmdDelete is not gated');
+  // Fable r1 L3: the reason is an enum of two values, never a caller-supplied string.
+  assert.match(winSrc, /enum class Unavailable \{ NoSecureHardware, NotSetUp \};/);
+  assert.match(winSrc, /static void FinishUnavailable\(Unavailable why\)/);
+  assert.ok(!/FinishUnavailable\(const char/.test(winSrc));
+  // Never a WebAuthn / security-key path in the helper's code (comments may name it).
+  const code = winSrc.replace(/\/\/.*$/gm, '');
+  assert.ok(!/webauthn|fido/i.test(code));
+});
+
+test('Windows prompts are brought in front of the AgentLink window (WIN-HELLO-NATIVE)', () => {
+  assert.match(winSrc, /L"Credential Dialog Xaml Host"/);
+  assert.match(winSrc, /SetForegroundWindow/);
+  // Fable r1 L1: only a window owned by System32\CredentialUIBroker.exe is brought forward.
+  assert.match(winSrc, /GetWindowThreadProcessId/);
+  assert.match(winSrc, /QueryFullProcessImageNameW/);
+  assert.match(winSrc, /GetSystemDirectoryW/);
+  assert.match(winSrc, /L"\\\\CredentialUIBroker\.exe"/);
+  assert.equal(winSrc.split('SetForegroundWindow(').length - 1, 1, 'one SetForegroundWindow call');
+  const focus = winSrc.slice(winSrc.indexOf('class PromptFocus'));
+  const run = focus.slice(focus.indexOf('void Run()'), focus.indexOf('std::atomic'));
+  assert.ok(
+    run.indexOf('OwnedByCredentialBroker(w)') < run.indexOf('SetForegroundWindow('),
+    'the owner is checked before the window is raised',
+  );
+  assert.ok(!winSrc.includes('getenv') && !winSrc.includes('GetEnvironmentVariable'));
+  for (const cmd of ['CmdCreate', 'CmdSign']) {
+    const body = winSrc.slice(winSrc.indexOf(`static void ${cmd}`));
+    const fn = body.slice(0, body.indexOf('\n}\n'));
+    assert.match(fn, /PromptFocus /, `${cmd} raises the Windows Hello prompt`);
   }
 });
 
@@ -215,6 +272,8 @@ test('MSVC args: static CRT, hardening flags, WinRT + bcrypt only, no debug info
     '/guard:cf',
     'windowsapp.lib',
     'bcrypt.lib',
+    'ncrypt.lib',
+    'user32.lib',
     '/SUBSYSTEM:CONSOLE',
     '/guard:ehcont',
     '/DEPENDENTLOADFLAG:0x800',

@@ -59,8 +59,25 @@ export class StandInHelper implements NativeHelper {
     readonly record: Uint8Array = kind === NATIVE_PRESENCE_MACOS ? MAC_RECORD : WIN_RECORD,
     private readonly keychain?: { readonly writes: readonly string[] },
   ) {}
+  /** WIN-HELLO-NATIVE: why `available` says no (undefined: available). */
+  unavailable: 'not_set_up' | 'no_secure_hardware' | 'unknown' | undefined;
+  availabilityCalls = 0;
   available(): Promise<boolean> {
-    return Promise.resolve(true);
+    return Promise.resolve(this.unavailable === undefined);
+  }
+  availability(): Promise<
+    | { readonly available: true }
+    | {
+        readonly available: false;
+        readonly reason: 'not_set_up' | 'no_secure_hardware' | 'unknown';
+      }
+  > {
+    this.availabilityCalls += 1;
+    return Promise.resolve(
+      this.unavailable === undefined
+        ? { available: true }
+        : { available: false, reason: this.unavailable },
+    );
   }
   #created = 0;
   /** Each `create` after the first makes a new credential (as the real helpers do). */

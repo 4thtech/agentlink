@@ -56,6 +56,8 @@ export interface AgentsListRow {
   readonly current: boolean;
   readonly available: boolean;
   readonly removing: boolean;
+  /** WIN-BROKEN-ID: the ID's key is missing from this computer; it can't be opened here. */
+  readonly broken?: boolean;
   readonly contacts: number | null;
   /** W4-LIVE-STATUS (D-143): a live MCP session row of this agent (never the lease). */
   readonly running: boolean;

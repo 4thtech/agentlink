@@ -16,7 +16,8 @@
 # Jobs (4, or 3 with `windows: false`; well inside the Free-plan cap of 20 concurrent jobs)
 #   build   matrix: macos-26 arm64, macos-26 x64 (cross-build), windows-2022 x64.
 #           Builds the CLI tarball and the shell bundle, the native presence helper (macOS: the
-#           AgentLink.app helper bundle; Windows: MSVC via Enter-VsDevShell), then the app with it, then runs on the built
+#           AgentLink.app helper bundle; Windows: MSVC via Enter-VsDevShell, then its protocol tests,
+#           WIN-HELLO-NATIVE), then the app with it, then runs on the built
 #           binaries: check-fuses (fuse read-back and ASAR integrity), check-preview-string,
 #           check-switch-lockdown, check-tampered-asar, and the smoke test
 #           (apps/desktop/test/smoke/smoke.mjs). The x64 macOS binaries are launched only when
@@ -173,6 +174,17 @@ jobs:
           node apps/desktop/build/native.mjs --arch x64 --out (Join-Path $env:RUNNER_TEMP 'native')
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (-not (Test-Path (Join-Path $env:RUNNER_TEMP 'native\agentlink-presence.exe'))) { throw 'agentlink-presence.exe was not built.' }
+
+      # WIN-HELLO-NATIVE: the built helper's protocol on a real Windows (argv, stdin, `available` and
+      # its fixed reason line, every command refusing with "unavailable" before any prompt when the
+      # runner has no Windows Hello). Never shows a prompt; never touches an AgentLink credential.
+      - name: Presence helper protocol tests (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          export AGENTLINK_WIN_HELPER="$RUNNER_TEMP/native/agentlink-presence.exe"
+          node --test --test-concurrency=1 apps/desktop/native/test/windows-helper.node-test.mjs
 
       - name: Build the app (macOS)
         if: runner.os == 'macOS'
