@@ -35,7 +35,7 @@
 // cancel, a missing sensor or a timeout does not count.
 //
 // I-7: nothing here is logged; answers are fixed codes. The backup path is shown with `~`.
-import { lstat, open, readFile, readdir, rename as fsRename } from 'node:fs/promises';
+import { lstat, open, readdir, rename as fsRename } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   NATIVE_PRESENCE_MACOS,
@@ -47,6 +47,7 @@ import {
   wipe,
   type JsonValue,
 } from '@4thtech-io/crypto';
+import { readSmallRegularText } from './approval-os.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, eraseKeychainAgent, guarded } from './keychain-keystore.js';
 import type { KeychainBackend } from './keychain.js';
 import { NativeHelperError, type NativeHelper } from './owner-native-helper.js';
@@ -226,15 +227,13 @@ async function absent(path: string): Promise<boolean> {
   }
 }
 
-/** A small regular file's text (not a link), or undefined. */
-async function smallText(path: string): Promise<string | undefined> {
-  try {
-    const info = await lstat(path);
-    if (!info.isFile() || info.size > MAX_RECORD_BYTES) return undefined;
-    return await readFile(path, 'utf8');
-  } catch {
-    return undefined;
-  }
+/**
+ * A small regular file's text (not a link), or undefined. Opened first (no link followed, never
+ * blocking) and checked through the open handle, then read from that same handle, so nothing can
+ * swap the file between the check and the read (CodeQL js/file-system-race).
+ */
+function smallText(path: string): Promise<string | undefined> {
+  return readSmallRegularText(path, MAX_RECORD_BYTES);
 }
 
 function parseRecord(text: string | undefined): StartOverRecord | undefined {
