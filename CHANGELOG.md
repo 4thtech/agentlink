@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-11-14
+
+### Added
+
+- Update the browser app from Settings › Updates, no terminal command (BROWSER-UPDATE, S2, 08 §1). When a newer version is out, press **Update now**: AgentLink gets the new version and checks it, then press **Restart now**. AgentLink closes and opens again in a new browser tab with the new version, in the same terminal window. Then quit and reopen your AI apps so they use the new version too. Your IDs, people and messages stay as they are. AgentLink installs only the exact version the npm registry names as the latest, and only when it was built by AgentLink's own release workflow and its signatures check out; no install scripts run. If you installed AgentLink with `npm install -g`, the page shows the one update command as before. The desktop apps keep their own updater.
+- The Windows app updates itself: Settings › Updates › Update now, then Restart now (WIN-INAPP-UPDATE, S2, 08 §8). AgentLink downloads the new version, checks it, closes, installs it and opens again. If anything goes wrong, your current version keeps working and Settings › Updates says so next time, with the download link. Your IDs, people, messages and your desktop shortcut stay as they are. This works from the copy the AgentLink setup installed; if you have 0.5.5 or older, install 0.5.6 once by hand.
+
+### Fixed
+
+- You can leave first run at any time (FIRSTRUN-EXIT, S2, 08 §1, owner requirement 14 Nov): every Get started step, every restore step and Start over now show **Check for updates** and **Help**, in the browser and in the desktop app, even before an ID exists. Before AgentLink is set up, pages that need it say "Set up AgentLink first" with **Continue setup**, and Settings › Updates works: your version, Check for updates, Update now and Restart now in the Mac app, **Download the new version** in the Windows app (the newest setup file, opened in your browser), and how to update in the browser app (`npx -y @4thtech-io/agentlink@latest`). Nothing that needs your Touch ID, Windows Hello or master code became reachable without it.
+- Update now and Restart now work in Settings › Updates in the Mac app (UPD-BUTTON-FIX, S2, 08 §8). In 0.5.4 and 0.5.5 the buttons did nothing. If something stops an update, the page now says so in one line. If you have 0.5.4 or 0.5.5, install 0.5.6 once by hand (Download update, then replace AgentLink in Applications); after that, Update now updates the app for you. Your IDs, people and messages stay as they are. Show in Finder for the recovery kit in Settings › Backup now works too.
+
 ## [0.5.5] - 2026-11-14
 
 ### Added
@@ -1303,7 +1315,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.6...HEAD
+[0.5.6]: https://github.com/4thtech/agentlink/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/4thtech/agentlink/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/4thtech/agentlink/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/4thtech/agentlink/compare/v0.5.2...v0.5.3

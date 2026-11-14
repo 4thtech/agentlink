@@ -1,5 +1,13 @@
 # @4thtech-io/agentlink
 
+## 0.5.6
+
+### Patch Changes
+
+- 49f23b1: BROWSER-UPDATE: Settings › Updates in the browser app gets Update now and Restart now. Update now first requires the registry's SLSA provenance for exactly that version (this repository's release workflow on main, the same sha512 as the tarball), then installs it into `~/.agentlink/updates/<version>` with the npm that ships with Node (argv only, no shell, no inherited npm configuration, empty npmrc files, `--ignore-scripts`, `--strict-ssl=true`, a lockfile, the public registry), requires every lockfile entry from registry.npmjs.org with sha512, `npm audit signatures` with nothing invalid or missing, and the installed name and version. Restart now closes this app host first (store and keys with it), records `updated`, then runs the new version's `agentlink ui` in the same terminal; it opens in a new browser tab. A global npm install keeps the one update command. Not reachable from MCP; `spawn` is limited to two source files by a new bundle-check source gate.
+- 49f23b1: First run always has a way out: Check for updates and Help on every Get started, restore and Start over screen; before setup, pages that need it say "Set up AgentLink first" with Continue setup, and Settings › Updates works (the Windows app links the newest setup file, the browser app shows how to update) (FIRSTRUN-EXIT).
+- 49f23b1: UPD-BUTTON-FIX: Settings › Updates "Update now" and "Restart now" work in the Mac app. The page's API client now sends a POST with no body as an empty `application/octet-stream` request, the one form the server's gate takes for routes with no input (it used to answer 415 before the update desk ran, and the page redrew the same card in silence). The same fix makes the recovery kit's Show in Finder reach its route. A refused or failed Update now or Restart now now shows one plain line on the card.
+
 ## 0.5.5
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @4thtech-io/desktop
 
+## 0.0.2
+
+### Patch Changes
+
+- 49f23b1: UPD-BUTTON-FIX: Settings › Updates "Update now" and "Restart now" work in the Mac app. The page's API client now sends a POST with no body as an empty `application/octet-stream` request, the one form the server's gate takes for routes with no input (it used to answer 415 before the update desk ran, and the page redrew the same card in silence). The same fix makes the recovery kit's Show in Finder reach its route. A refused or failed Update now or Restart now now shows one plain line on the card.
+- 49f23b1: WIN-INAPP-UPDATE: the Windows app updates itself from Settings › Updates (Update now, then Restart now), on the same signed update document as the Mac app. The app downloads the Windows setup, checks its size and SHA-256 against the signed document, and after Restart now a small helper waits for the app to close, moves the old copy aside, runs the setup silently, starts the new version and keeps the old one if anything fails. The release's update document now lists the Windows setup. The setup upgrades silently in place and never skips a file it cannot write.
+
 ## 0.0.1
 
 ### Patch Changes
