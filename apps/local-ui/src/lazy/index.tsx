@@ -44,7 +44,12 @@ export function lazyPart<P extends object>(
     const [attempt, setAttempt] = useState(0);
     const Ready = loaded;
     useEffect(() => {
-      if (loaded !== undefined) return;
+      // CI-830: the load can finish (a prefetch, another caller) after this part painted its
+      // fallback and before this effect ran; then nothing else re-renders it, so do it here.
+      if (loaded !== undefined) {
+        if (Ready === undefined) rerender();
+        return;
+      }
       let live = true;
       load().then(
         () => {

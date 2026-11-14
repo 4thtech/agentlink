@@ -305,6 +305,21 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      # WIN-INAPP-UPDATE: the in-app update's Windows path on this throwaway runner, with the setup this
+      # job built and the shell's real watchdog (tsc output): silent install and in-place upgrade,
+      # exit 2 while a file is in use, then move aside → setup /S → start through Explorer → health,
+      # a failing setup, a changed setup, and a watchdog killed during the setup that its RunOnce
+      # recovery undoes (old copy back each time). After the upload, so the uploaded build is never
+      # touched by it. Installs into this runner's %LOCALAPPDATA% only; never runs anywhere else.
+      - name: In-app update rehearsal (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm --filter @4thtech-io/desktop run build
+          setup="$(ls apps/desktop/out/*-setup.exe)"
+          node apps/desktop/test/smoke/win-update-rehearsal.mjs --setup "$setup"
+
   attest:
     name: attest
     needs: build

@@ -15,13 +15,19 @@
 // - IR-UPD-8-1 #9: the offer may be days old. "Update now" checks the signed manifest again and
 //   installs only when it still names exactly the same update (version, URL, SHA-256, size);
 //   "Restart now" checks it once more, and the swap goes ahead only if it still does.
+// WIN-INAPP-UPDATE: the same on the Windows app installed per user in
+// %LOCALAPPDATA%\Programs\AgentLink (install-win.ts); the page then shows the Windows setup link.
+// After a failed in-app update the next launch says "Couldn't update here" with the download link
+// (the failed version is never offered in-app again).
 import { appBundleOf } from './swap-mac.js';
 import { configuredRoot } from './index.js';
+import { winInstallDirOf } from './install-win.js';
 import type { InstallOutcome } from './install.js';
 import type { AcceptedUpdate } from './manifest.js';
 import {
   isNewerVersion,
   macDownloadUrl,
+  winDownloadUrl,
   type AppUpdatePipeView,
   type AppUpdateView,
   type MacArch,
@@ -33,11 +39,19 @@ export function inAppEnabled(opts: {
   readonly packaged: boolean;
   readonly preview: boolean;
   readonly execPath: string;
+  /** Windows: %LOCALAPPDATA% (the one install folder is under it). */
+  readonly localAppData?: string | undefined;
   /** Tests only: a root other than root-key.json. */
   readonly root?: unknown;
 }): boolean {
-  if (opts.platform !== 'darwin' || !opts.packaged || opts.preview) return false;
-  if (appBundleOf(opts.execPath) === null) return false;
+  if (!opts.packaged || opts.preview) return false;
+  if (opts.platform === 'darwin') {
+    if (appBundleOf(opts.execPath) === null) return false;
+  } else if (opts.platform === 'win32') {
+    if (winInstallDirOf(opts.execPath, opts.localAppData) === null) return false;
+  } else {
+    return false;
+  }
   return (opts.root === undefined ? configuredRoot() : configuredRoot(opts.root)) !== undefined;
 }
 
@@ -53,8 +67,12 @@ export interface InAppUpdaterDeps {
   readonly enabled: boolean;
   readonly currentVersion: string;
   readonly arch: MacArch;
-  /** The signed manifest's update for this Mac (`zip`), or undefined. May reject (quiet). */
+  /** `win32`: the download link is the Windows setup. Default: a Mac. */
+  readonly platform?: string;
+  /** The signed manifest's update for this computer (`zip` / `nsis`), or undefined. May reject (quiet). */
   readonly check: () => Promise<AcceptedUpdate | undefined>;
+  /** The version a failed in-app update recorded (state.ts), or null. May reject (none). */
+  readonly failedVersion?: () => Promise<string | null>;
   /** installFromProcess wrapped in restartForUpdate (it quits the app on `restarting`). */
   readonly install: (accepted: AcceptedUpdate, hooks: InstallHooks) => Promise<InstallOutcome>;
   /** The view changed (main.ts sends it to the core). */
@@ -80,6 +98,7 @@ export function sameUpdate(a: AcceptedUpdate | undefined, b: AcceptedUpdate): bo
 export class InAppUpdater {
   readonly #deps: InAppUpdaterDeps;
   #offered: AcceptedUpdate | undefined;
+  #failed: string | null = null;
   #phase: Phase = 'idle';
   #percent = 0;
   #confirm: (() => void) | undefined;
@@ -97,7 +116,14 @@ export class InAppUpdater {
     } catch {
       accepted = undefined;
     }
+    let failed: string | null;
+    try {
+      failed = (await this.#deps.failedVersion?.()) ?? null;
+    } catch {
+      failed = null;
+    }
     if (this.#phase !== 'idle' && this.#phase !== 'failed') return;
+    this.#failed = failed;
     const plain =
       accepted !== undefined && isNewerVersion(accepted.version, this.#deps.currentVersion);
     this.#offered = plain ? accepted : undefined;
@@ -109,11 +135,20 @@ export class InAppUpdater {
   view(base: AppUpdateView): AppUpdatePipeView {
     const plainBase: AppUpdatePipeView = Object.freeze({ ...base, installable: false, percent: 0 });
     const offered = this.#offered;
-    if (!this.#deps.enabled || offered === undefined) return plainBase;
+    if (!this.#deps.enabled) return plainBase;
+    if (offered === undefined) {
+      // The last in-app update of exactly this version failed: say so, keep the download link.
+      if (base.state === 'available' && this.#failed !== null && base.latest === this.#failed)
+        return Object.freeze({ ...plainBase, state: 'install_failed' });
+      return plainBase;
+    }
     const release = {
       current: this.#deps.currentVersion,
       latest: offered.version,
-      download: macDownloadUrl(offered.version, this.#deps.arch),
+      download:
+        this.#deps.platform === 'win32'
+          ? winDownloadUrl(offered.version)
+          : macDownloadUrl(offered.version, this.#deps.arch),
     };
     switch (this.#phase) {
       case 'idle':

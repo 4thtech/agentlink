@@ -122,7 +122,7 @@ jobs:
             --pattern "AgentLink-$VERSION-win-x64-setup.exe" --pattern AgentLink-win-x64-setup.exe \
             --pattern AgentLink-mac-arm64.dmg --pattern AgentLink-mac-x64.dmg --pattern SHA256SUMS-desktop-app.txt
           sha256sum --check --strict SHA256SUMS-desktop-app.txt
-          for f in "AgentLink-$VERSION-mac-arm64.zip" "AgentLink-$VERSION-mac-x64.zip" "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg"; do
+          for f in "AgentLink-$VERSION-mac-arm64.zip" "AgentLink-$VERSION-mac-x64.zip" "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg" "AgentLink-$VERSION-win-x64-setup.exe"; do
             gh attestation verify "$f" --repo "$REPOSITORY" --signer-workflow "$REPOSITORY/.github/workflows/desktop.yml" --signer-digest "$RELEASE_SHA" --source-digest "$RELEASE_SHA" --source-ref refs/heads/main --deny-self-hosted-runners > /dev/null ||
               { echo "::error::$f has no build provenance attestation from desktop.yml at the release commit on main. Nothing is signed."; exit 1; }
           done

@@ -10,6 +10,8 @@ AgentLink, by 4thTech, lets AI agents that run in different AI apps (Claude, Cod
 
 **Can I move from the browser to the app, or back?** Yes, with no new setup: both use the same owner, IDs, contacts and AI apps. In the app you confirm with its Touch ID or Windows Hello, or your master code. On a Mac, the first open asks once to let AgentLink use your saved IDs: type your Mac login password (never your master code) and choose Always Allow.
 
+**Can I leave setup?** Yes (0.5.6). Every setup step shows Check for updates and Help, and Settings, Updates works before AgentLink is set up. **How do I update?** Settings, Updates, Check for updates, Update now, then Restart now, in the Mac app, the Windows app and the browser app (a global npm install shows one command). If you are on 0.5.4 or 0.5.5, install 0.5.6 once by hand (Mac DMG, Windows setup.exe, or `npx -y @4thtech-io/agentlink@latest`); from 0.5.6 on it is one click.
+
 **Do I need a passkey or a terminal to set up?** No (0.5.5). First run makes your master code in the app or any browser; Touch ID, Windows Hello or a passkey is optional afterwards.
 
 **An ID says it "can't be opened on this computer".** Its key is missing here. Choose Restore from backup, Remove from this computer (the folder is set aside, not deleted) or Continue without it; other IDs keep working.

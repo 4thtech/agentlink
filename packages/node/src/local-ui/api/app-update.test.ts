@@ -235,12 +235,82 @@ describe('app-update routes', () => {
     expect(appUpdateBody(view, 'desktop')).toBeUndefined();
   });
 
-  it('UPD-5: the in-app states never reach the browser app', () => {
-    for (const state of ['downloading', 'verifying', 'ready', 'restarting', 'install_failed']) {
+  it('UPD-5, BROWSER-UPDATE: the running in-app states reach the browser app only when installable', () => {
+    for (const state of ['downloading', 'verifying', 'ready', 'restarting']) {
       expect(
         appUpdateBody({ ...AVAILABLE, state, download: '' } as AppUpdateView, 'npx'),
       ).toBeUndefined();
     }
+    // install_failed carries no Update now (installable) in either app.
+    expect(
+      appUpdateBody(
+        { ...AVAILABLE, state: 'install_failed', download: '', installable: true },
+        'npx',
+      ),
+    ).toBeUndefined();
+  });
+
+  // BROWSER-UPDATE: the browser app's own Update now (stages the registry's exact version) and
+  // Restart now (the new version takes over this terminal). Never a link.
+  const BROWSER_IN_APP: AppUpdateView = {
+    state: 'available',
+    current: '0.5.1',
+    latest: '0.5.2',
+    download: '',
+    installable: true,
+    percent: 0,
+  };
+  it.each(['available', 'downloading', 'verifying', 'ready', 'restarting'] as const)(
+    'BROWSER-UPDATE: the browser app answers %s with installable, never a link',
+    (state) => {
+      for (const install of ['installer', 'npx', 'global'] as const) {
+        expect(appUpdateBody({ ...BROWSER_IN_APP, state }, install)).toEqual({
+          ...BROWSER_IN_APP,
+          state,
+          install,
+          busy: false,
+        });
+        expect(appUpdateBody({ ...BROWSER_IN_APP, state, download: DMG }, install)).toBeUndefined();
+      }
+    },
+  );
+
+  it('BROWSER-UPDATE: a failed browser update is install_failed with the version, not installable', () => {
+    expect(
+      appUpdateBody({ ...BROWSER_IN_APP, state: 'install_failed', installable: false }, 'npx'),
+    ).toEqual({
+      ...BROWSER_IN_APP,
+      state: 'install_failed',
+      installable: false,
+      install: 'npx',
+      busy: false,
+    });
+  });
+
+  it('BROWSER-UPDATE: Update now and Restart now reach a browser desk that has the steps', async () => {
+    const calls: string[] = [];
+    const d: LocalUiAppUpdateDesk = {
+      install: 'npx',
+      view: () => BROWSER_IN_APP,
+      check: () => BROWSER_IN_APP,
+      startInstall: () => {
+        calls.push('install');
+        return { ...BROWSER_IN_APP, state: 'downloading' };
+      },
+      restart: () => {
+        calls.push('restart');
+        return { ...BROWSER_IN_APP, state: 'restarting' };
+      },
+    };
+    expect(await installRoute?.handler(ctx(d), {})).toMatchObject({
+      status: 200,
+      body: { state: 'downloading', install: 'npx', download: '' },
+    });
+    expect(await restartRoute?.handler(ctx(d), {})).toMatchObject({
+      status: 200,
+      body: { state: 'restarting', install: 'npx' },
+    });
+    expect(calls).toEqual(['install', 'restart']);
   });
 
   // REL051-UPD2: the browser app (the local app server) has its own desk: the npm registry's latest

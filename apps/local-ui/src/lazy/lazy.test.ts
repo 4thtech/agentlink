@@ -3,7 +3,7 @@
 // shows the skeleton, a failed one a plain retry message; the Under the hood panel is not fetched
 // while the switch is off; a route change waits briefly for its page and still uses the view
 // transition (and skips it with reduced motion).
-import { createElement as h, act, type ReactElement } from 'react';
+import { createElement as h, act, Fragment, useLayoutEffect, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { lazyPart } from './index.js';
@@ -82,6 +82,26 @@ describe('lazyPart', () => {
     await part.load();
     act(() => root.render(h(part.Part, { name: 'b' })));
     expect(host.querySelector('.real')?.textContent).toBe('b');
+  });
+
+  it('shows the part when its load finishes between the first paint and the load start (CI-830)', async () => {
+    // A prefetch (or another caller) can finish the load after the part painted its fallback but
+    // before the part's own load effect runs; the part must still show, not stay on the skeleton.
+    const sync = { then: (done: (c: typeof Real) => void) => (done(Real), Promise.resolve()) };
+    const part = lazyPart<{ name: string }>(() => sync as unknown as Promise<typeof Real>);
+    function Prefetch(): null {
+      useLayoutEffect(() => {
+        void part.load();
+      }, []);
+      return null;
+    }
+    act(() => root.render(h(Fragment, null, h(part.Part, { name: 'a' }), h(Prefetch))));
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+    });
+    expect(part.ready()).toBe(true);
+    expect(host.querySelector('.al-skeleton')).toBeNull();
+    expect(host.querySelector('.real')?.textContent).toBe('a');
   });
 
   it('shows a plain retry message when the chunk fails, and loads on retry', async () => {

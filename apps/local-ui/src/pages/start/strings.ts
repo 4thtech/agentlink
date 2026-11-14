@@ -28,6 +28,31 @@ export const WIZARD = {
 } as const;
 
 /**
+ * FIRSTRUN-EXIT (owner, 14 Nov 2026; 08 §1 "A way out of first run"; 11 §5): the way out of every
+ * first-run screen, the notice on pages that need an owner, and the update fallbacks of Settings ›
+ * Updates. Plain words only.
+ */
+export const SETUP_EXIT = {
+  label: 'Leave setup',
+  updates: 'Check for updates',
+  help: 'Help',
+  firstTitle: 'Set up AgentLink first',
+  firstBody: 'This page works once AgentLink is set up on this computer. It takes a minute.',
+  pendingTitle: 'AgentLink isn’t set up yet',
+  pendingBody: 'You can check for updates now. Finish setup to use the rest of AgentLink.',
+  continueSetup: 'Continue setup',
+  // The Windows app has no in-app update: the stable setup file, opened in the default browser.
+  windowsTitle: 'Get the newest version',
+  windowsLead:
+    'Download the newest AgentLink for Windows and open it. Your IDs, people and messages stay as they are.',
+  windowsDownload: 'Download the new version',
+  // The browser app: npx starts the newest version every time.
+  browserHowTitle: 'How to update',
+  browserHowLead:
+    'In the terminal window where AgentLink is running, press Ctrl+C. Then start it again with this command:',
+} as const;
+
+/**
  * W4-WIRE-2 (owner Decision 52 (2)): Add agent's first screen, before the pick. The name rules are
  * the agent-name rules of first run (1 to 32 characters; the server checks the name before any
  * Touch ID).

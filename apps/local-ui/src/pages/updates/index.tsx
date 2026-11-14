@@ -13,15 +13,25 @@
 // "Checking the new version" → "Restart now" (a note first when a request waits for the owner) →
 // "Restarting"; "Couldn't update here" keeps the download link. Both buttons are POSTs with no body
 // (owner session + CSRF); the shell installs only the update it verified itself.
+// UPD-BUTTON-FIX: a refused or failed answer (or one that did not start anything) shows one plain
+// line on the card; the page never just draws the same card again in silence.
+// BROWSER-UPDATE: the browser app gets the same Update now → Restart now card when its server can
+// update here (`installable`): downloading has no percentage (npm gives none), Restart now says the
+// new version opens in a new tab, and both say to quit and reopen AI apps. A failed update, or a
+// global install this user cannot write, shows the steps and fixed commands instead.
 import { Button, CopyButton, InlineError, ProgressBar, Skeleton, Surface } from '@4thtech-io/ui';
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { createApiClient, type ApiClient } from '../../api/client.js';
+import { inDesktopApp } from '../../desktop.js';
+import { detectOs, type OsName } from '../../layout/os.js';
 import { SettingsIcon } from '../settings/icons.js';
+import { SETUP_EXIT as X } from '../start/strings.js';
 import {
   APP_UPDATE_CHECK_PATH,
   APP_UPDATE_INSTALL_PATH,
   APP_UPDATE_PATH,
   APP_UPDATE_RESTART_PATH,
+  WINDOWS_SETUP_URL,
   parseUpdate,
   type UpdateState,
   type UpdateView,
@@ -34,6 +44,9 @@ export interface UpdatesPageProps {
   readonly api?: ApiClient;
   /** How long to wait between reads while a check runs (tests pass 0). */
   readonly pollMs?: number;
+  /** FIRSTRUN-EXIT test seams: the platform and whether this is the desktop app's window. */
+  readonly os?: OsName;
+  readonly desktop?: boolean;
 }
 
 type Load =
@@ -100,6 +113,7 @@ function BrowserReady({ view }: { readonly view: UpdateView }): ReactElement {
       <h2 id="upd-ready-t" className="al-text-h3">
         {S.ready(view.latest)}
       </h2>
+      {view.state === 'install_failed' ? <InlineError>{S.cantUpdateBrowser}</InlineError> : null}
       <p className="al-text-body-sm al-muted">{global ? S.commandLead : S.restartLead}</p>
       <ol className="upd-steps" aria-label={S.stepsLabel}>
         <li className="al-text-body-sm">{S.stopStep}</li>
@@ -120,19 +134,25 @@ function BrowserReady({ view }: { readonly view: UpdateView }): ReactElement {
   );
 }
 
+/** UPD-BUTTON-FIX: which button's last press was refused or failed. */
+type Refused = 'update' | 'restart' | undefined;
+
 /** UPD-5: the in-app update, one card per state. */
 function InApp({
   view,
   onUpdate,
   onRestart,
   sending,
+  refused,
 }: {
   readonly view: UpdateView;
   readonly onUpdate: () => void;
   readonly onRestart: () => void;
   readonly sending: boolean;
+  readonly refused: Refused;
 }): ReactElement {
   const title = view.state === 'available' ? S.availableTitle(view.latest) : S.ready(view.latest);
+  const browser = view.install !== 'desktop';
   return (
     <Surface
       as="section"
@@ -147,6 +167,7 @@ function InApp({
       {view.state === 'available' ? (
         <>
           <p className="al-text-body-sm al-muted">{S.availableLead}</p>
+          {refused === 'update' ? <InlineError>{S.updateFailed}</InlineError> : null}
           <div>
             <Button variant="primary" onClick={onUpdate} disabled={sending}>
               {S.updateNow}
@@ -154,22 +175,29 @@ function InApp({
           </div>
         </>
       ) : view.state === 'downloading' ? (
-        <ProgressBar
-          label={S.downloading}
-          value={view.percent}
-          max={100}
-          amount={S.percent(view.percent)}
-        />
+        browser ? (
+          <ProgressBar label={S.downloading} indeterminate />
+        ) : (
+          <ProgressBar
+            label={S.downloading}
+            value={view.percent}
+            max={100}
+            amount={S.percent(view.percent)}
+          />
+        )
       ) : view.state === 'verifying' ? (
         <ProgressBar label={S.verifying} indeterminate />
       ) : view.state === 'ready' ? (
         <>
-          <p className="al-text-body-sm al-muted">{S.readyRestartLead}</p>
+          <p className="al-text-body-sm al-muted">
+            {browser ? S.browserReadyLead : S.readyRestartLead}
+          </p>
           {view.busy ? (
             <p className="al-text-body-sm upd-warn" role="note">
               {S.busy}
             </p>
           ) : null}
+          {refused === 'restart' ? <InlineError>{S.restartFailed}</InlineError> : null}
           <div>
             <Button variant="primary" onClick={onRestart} disabled={sending}>
               {S.restartNow}
@@ -178,10 +206,68 @@ function InApp({
         </>
       ) : (
         <p className="al-text-body-sm" role="status" aria-live="polite">
-          {S.restarting}
+          {browser ? S.browserRestarting : S.restarting}
         </p>
       )}
+      {browser && (view.state === 'ready' || view.state === 'restarting') ? (
+        <p className="al-text-body-sm">{S.aiAppsReopen}</p>
+      ) : null}
       <p className="al-text-body-sm al-muted">{S.keeps}</p>
+    </Surface>
+  );
+}
+
+/**
+ * FIRSTRUN-EXIT: the Windows app has no in-app update, so it always offers the newest setup file,
+ * also when the check can't run (a broken first run, offline, no answer).
+ */
+function WindowsDownload(): ReactElement {
+  return (
+    <Surface as="section" level={1} className="upd-card" aria-labelledby="upd-win-t">
+      <h2 id="upd-win-t" className="al-text-h3">
+        {X.windowsTitle}
+      </h2>
+      <p className="al-text-body-sm al-muted">{X.windowsLead}</p>
+      <div>
+        <a
+          className="al-btn al-btn-secondary"
+          href={WINDOWS_SETUP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {X.windowsDownload}
+        </a>
+      </div>
+      <ol className="upd-steps" aria-label={S.stepsLabel}>
+        {S.winSteps.map((step) => (
+          <li key={step} className="al-text-body-sm">
+            {step}
+          </li>
+        ))}
+      </ol>
+    </Surface>
+  );
+}
+
+/** FIRSTRUN-EXIT: the browser app, always: how to update (the fixed commands of REL051-UPD2). */
+function BrowserHow({
+  install,
+}: {
+  readonly install: UpdateView['install'] | undefined;
+}): ReactElement {
+  const global = install === 'global';
+  const command = global
+    ? S.globalCommand
+    : install === 'installer'
+      ? S.installerCommand
+      : S.npxCommand;
+  return (
+    <Surface as="section" level={1} className="upd-card" aria-labelledby="upd-how-t">
+      <h2 id="upd-how-t" className="al-text-h3">
+        {X.browserHowTitle}
+      </h2>
+      <p className="al-text-body-sm al-muted">{global ? S.commandLead : X.browserHowLead}</p>
+      <Command command={command} />
     </Surface>
   );
 }
@@ -219,7 +305,14 @@ function Ready({ view }: { readonly view: UpdateView }): ReactElement {
   );
 }
 
-export function UpdatesPage({ api: givenApi, pollMs = 1000 }: UpdatesPageProps): ReactElement {
+export function UpdatesPage({
+  api: givenApi,
+  pollMs = 1000,
+  os: givenOs,
+  desktop: givenDesktop,
+}: UpdatesPageProps): ReactElement {
+  const [os] = useState<OsName>(() => givenOs ?? detectOs());
+  const [desktop] = useState<boolean>(() => givenDesktop ?? inDesktopApp());
   const [api] = useState<ApiClient>(() => givenApi ?? createApiClient());
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
   const alive = useRef(true);
@@ -284,11 +377,16 @@ export function UpdatesPage({ api: givenApi, pollMs = 1000 }: UpdatesPageProps):
     void readOnce(APP_UPDATE_CHECK_PATH).then(follow);
   };
 
-  // UPD-5: Update now / Restart now: one POST with no body each; the answer is the new state.
+  // UPD-5: Update now / Restart now: one POST with no body each (the client sends it as the empty
+  // octet-stream the server's gate takes); the answer is the new state.
   const [sending, setSending] = useState(false);
-  const step = (path: string): void => {
+  const [refused, setRefused] = useState<Refused>(undefined);
+  const step = (path: string, which: 'update' | 'restart'): void => {
     if (sending) return;
     setSending(true);
+    setRefused(undefined);
+    // The state the button was pressed in: an answer still in it started nothing.
+    const pressedIn: UpdateState = which === 'update' ? 'available' : 'ready';
     void api
       .post(path)
       .then(
@@ -302,6 +400,9 @@ export function UpdatesPage({ api: givenApi, pollMs = 1000 }: UpdatesPageProps):
       )
       .then(async (next) => {
         if (alive.current) setSending(false);
+        // UPD-BUTTON-FIX: refused, failed, unreadable or nothing started: say so on the card.
+        const started = next !== undefined && next !== 'not_here' && next.state !== pressedIn;
+        if (!started && next !== 'not_here' && alive.current) setRefused(which);
         // A refused or unreadable answer: read the state again rather than guess.
         await follow(next === undefined ? await readOnce(APP_UPDATE_PATH) : next);
       });
@@ -314,9 +415,20 @@ export function UpdatesPage({ api: givenApi, pollMs = 1000 }: UpdatesPageProps):
     view.state !== 'off' &&
     view.state !== 'checking' &&
     !RUNNING.includes(view.state);
+  // FIRSTRUN-EXIT: the always-there fallbacks, unless the page already shows that version's card.
+  // BROWSER-UPDATE: a running in-app update (the browser app's too) is that version's card.
+  const versionCard =
+    view !== undefined &&
+    (view.state === 'available' || view.state === 'install_failed' || RUNNING.includes(view.state));
+  const settled = load.kind !== 'loading';
+  const appWindow = view === undefined ? desktop : view.install === 'desktop';
+  // Not when the check just said this is the newest version (IR-FIRSTRUN-EXIT-1).
+  const upToDate = view?.state === 'current';
+  const windowsFallback = settled && appWindow && os === 'windows' && !versionCard && !upToDate;
+  const browserHow = settled && !appWindow && !versionCard;
+  // BROWSER-UPDATE: the browser app too, when its server can update here.
   const inApp =
     view !== undefined &&
-    view.install === 'desktop' &&
     (RUNNING.includes(view.state) || (view.state === 'available' && view.installable));
 
   return (
@@ -372,14 +484,22 @@ export function UpdatesPage({ api: givenApi, pollMs = 1000 }: UpdatesPageProps):
             <InApp
               view={load.view}
               sending={sending}
-              onUpdate={() => step(APP_UPDATE_INSTALL_PATH)}
-              onRestart={() => step(APP_UPDATE_RESTART_PATH)}
+              refused={
+                (refused === 'update' && load.view.state === 'available') ||
+                (refused === 'restart' && load.view.state === 'ready')
+                  ? refused
+                  : undefined
+              }
+              onUpdate={() => step(APP_UPDATE_INSTALL_PATH, 'update')}
+              onRestart={() => step(APP_UPDATE_RESTART_PATH, 'restart')}
             />
           ) : load.view.state === 'available' || load.view.state === 'install_failed' ? (
             <Ready view={load.view} />
           ) : null}
         </>
       )}
+      {windowsFallback ? <WindowsDownload /> : null}
+      {browserHow ? <BrowserHow install={view?.install} /> : null}
     </div>
   );
 }

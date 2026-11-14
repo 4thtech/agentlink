@@ -6,7 +6,7 @@
 //
 // Needs the build: CI runs `pnpm build` before `pnpm test`. Locally: `pnpm build` first.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
@@ -147,16 +147,20 @@ describe('bundle-check (M1-9c-c, IR-M1-9c-1 F07)', () => {
       },
     );
 
-    // M1-11a-b: node:child_process only as `import { execFile }` (the approval UI's OS opener).
-    it('allows node:child_process only as the named execFile import', () => {
+    // M1-11a-b: node:child_process only as `import { execFile }` (the approval UI's OS opener);
+    // BROWSER-UPDATE: and `spawn` (Restart now's relaunch with the terminal inherited).
+    it('allows node:child_process only as the named execFile and spawn imports', () => {
       const ok = checkInjected(
         'cp-execfile',
-        'import { execFile as run2 } from "node:child_process";',
+        'import { execFile as run2, spawn as start2 } from "node:child_process";',
       );
       expect(ok.stderr).toBe('');
       expect(ok.code).toBe(0);
       for (const [name, line] of [
-        ['spawn', 'import { spawn } from "node:child_process";'],
+        ['exec', 'import { exec } from "node:child_process";'],
+        ['execSync', 'import { execSync } from "node:child_process";'],
+        ['spawnSync', 'import { spawnSync } from "node:child_process";'],
+        ['fork', 'import { fork } from "node:child_process";'],
         ['mixed', 'import { execFile as e2, exec } from "node:child_process";'],
         ['namespace', 'import * as cp from "node:child_process";'],
         ['default', 'import cp from "node:child_process";'],
@@ -167,8 +171,43 @@ describe('bundle-check (M1-9c-c, IR-M1-9c-1 F07)', () => {
         expect(run.code, name).toBe(1);
         expect(run.stderr, name).toContain('"node:child_process"');
       }
-      // Seven sequential bundle checks: ~20 s on a loaded CI runner, so a longer per-test budget.
-    }, 90_000);
+      // Ten sequential bundle checks: ~30 s on a loaded CI runner, so a longer per-test budget.
+    }, 120_000);
+
+    // BROWSER-UPDATE: the spawn gate. Only SPAWN_SOURCES may import spawn; tests may.
+    it('the spawn gate: spawn only in the listed source files', () => {
+      const root = mkdtempSync(join(work, 'spawn-gate-'));
+      const put = (path: string, text: string): void => {
+        mkdirSync(join(root, path, '..'), { recursive: true });
+        writeFileSync(join(root, path), text);
+      };
+      put(
+        'apps/cli/src/runtime/browser-update.ts',
+        'import { execFile, spawn } from "node:child_process";\n',
+      );
+      put(
+        'packages/node/src/owner-native-helper.ts',
+        "import { spawn } from 'node:child_process';\n",
+      );
+      put('apps/cli/src/ok.ts', "import { execFile } from 'node:child_process';\n");
+      put('apps/cli/src/ok.test.ts', "import { spawn } from 'node:child_process';\n");
+      const gate = (): Run => check(['--skip-bundle', '--skip-tools', '--sources-root', root]);
+      const clean = gate();
+      expect(clean.stderr).toBe('');
+      expect(clean.stdout).toContain('bundle-check: spawn gate ok');
+      for (const [name, line] of [
+        ['named', "import { execFile, spawn as s } from 'node:child_process';"],
+        ['bare name', "import { spawn } from 'child_process';"],
+        ['namespace', "import * as cp from 'node:child_process';"],
+        ['default', "import cp from 'node:child_process';"],
+        ['dynamic', "const cp = await import('node:child_process');"],
+      ] as const) {
+        put('packages/core/src/sneaky.ts', `${line}\n`);
+        const run = gate();
+        expect(run.code, name).toBe(1);
+        expect(run.stderr, name).toContain('packages/core/src/sneaky.ts');
+      }
+    }, 60_000);
 
     // IR-M1-9c-c-1 L1: require-equivalents that load a module without an import.
     it.each([

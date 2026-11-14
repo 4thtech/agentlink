@@ -573,6 +573,46 @@ describe('APP-CONTINUITY: agentlink ui and the desktop app', () => {
   );
 });
 
+describe('BROWSER-UPDATE: Restart now hands this terminal to the new version', () => {
+  it('closes this host first (no port clash, no second owner), then runs the new one and returns its code', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({ stop: 'never' });
+    let closedBeforeRelaunch = false;
+    const updating: UiDeps = {
+      ...deps,
+      interrupt: (stop) => {
+        setTimeout(() => stop('update'), 10);
+        return () => undefined;
+      },
+      relaunch: () => {
+        closedBeforeRelaunch = calls.closed === 1;
+        return Promise.resolve(0);
+      },
+    };
+    await expect(uiStep(p.context, updating, PREFIX)).resolves.toBe(EXIT_OK);
+    expect(calls.closed).toBe(1);
+    expect(closedBeforeRelaunch).toBe(true);
+    expect(p.out).toContain(UI_TEXT.updating);
+    expectNoLink(p);
+  });
+
+  it('a new version that cannot start: one fixed line naming the start command', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({ stop: 'never' });
+    const updating: UiDeps = {
+      ...deps,
+      interrupt: (stop) => {
+        setTimeout(() => stop('update'), 10);
+        return () => undefined;
+      },
+      relaunch: () => Promise.resolve(undefined),
+    };
+    await expect(uiStep(p.context, updating, PREFIX)).resolves.toBe(EXIT_FAILED);
+    expect(calls.closed).toBe(1);
+    expect(p.out.at(-1)).toBe(UI_TEXT.updateNotStarted(PREFIX));
+  });
+});
+
 describe('a failed app host start leaves one fixed diagnostic line (WIN-STARTUP-LOG)', () => {
   it('names the reason and a short error code, never the error message or a path', async () => {
     const notes: string[] = [];

@@ -27,6 +27,12 @@
 // anchor is the shell's verification, not the page (I-4: nothing here changes a policy, a key or an
 // approval). Every desktop answer also carries `installable`, `percent` and `busy` (a request is
 // waiting for the owner: the page warns before Restart now).
+//
+// BROWSER-UPDATE: the terminal `agentlink ui` host's desk (apps/cli/src/runtime/browser-update.ts)
+// has the same two steps for the browser app: Update now stages the exact version the registry
+// named (provenance from this repository required, npm by argv with no inherited npm configuration, scripts off, lockfile all registry.npmjs.org sha512, `npm audit signatures`), Restart now hands
+// the terminal to it. Its answers carry `installable` (and the same in-app states), never a link.
+// The same mark gate; the MCP server's page has no desk (501), and no MCP tool reaches it (I-4).
 import type { JsonObject } from '@4thtech-io/crypto';
 import type { LocalUiContext } from '../context.js';
 import type {
@@ -149,12 +155,17 @@ export function appUpdateBody(
     return undefined;
   }
   if (WITH_RELEASE.includes(state)) {
-    // The in-app update is the desktop app's alone (the browser app's restart is its update).
-    if (install !== 'desktop' && (state !== 'available' || installable)) return undefined;
+    // BROWSER-UPDATE: the browser app's in-app update (its desk says `installable`) follows the
+    // same state rules as the desktop app's, never with a link; a browser view without
+    // `installable` is the restart or the one command, as before (available only).
+    const browserInApp = install !== 'desktop' && view.installable !== undefined;
+    if (install !== 'desktop' && !browserInApp && state !== 'available') return undefined;
     if (typeof latest !== 'string' || !newer(latest, current)) return undefined;
     if (install === 'desktop' ? !linkFor(download, latest) : download !== '') return undefined;
   } else if (latest !== '' || download !== '') return undefined;
-  if (install !== 'desktop') return { state, current, latest, download, install };
+  if (install !== 'desktop' && view.installable === undefined) {
+    return { state, current, latest, download, install };
+  }
   return { state, current, latest, download, install, installable, percent, busy };
 }
 
@@ -206,7 +217,9 @@ const stepRoute = (path: string, step: 'startInstall' | 'restart'): LocalUiMarkR
     handler: (context: LocalUiContext): Promise<LocalUiResult> => {
       const desk = context.appUpdate;
       const run = desk?.[step];
-      if (desk === undefined || desk.install !== 'desktop' || run === undefined) {
+      // BROWSER-UPDATE: any desk with the step (the desktop app's, or the terminal `agentlink ui`
+      // host's BrowserUpdater desk); the MCP server's page has no desk at all.
+      if (desk === undefined || run === undefined) {
         return Promise.resolve(NOT_AVAILABLE);
       }
       try {

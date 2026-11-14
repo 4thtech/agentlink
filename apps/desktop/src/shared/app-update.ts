@@ -103,7 +103,8 @@ export function macDownloadUrl(version: string, arch: MacArch): string {
 
 /**
  * WIN-DESK-2: the Windows setup the release attaches (release.yml, build-win.mjs). x64 only: Windows
- * on Arm runs the x64 app emulated. No in-app update on Windows in this release: the link only.
+ * on Arm runs the x64 app emulated. WIN-INAPP-UPDATE: the in-app update runs the same setup; this
+ * link stays the fallback.
  */
 export function winAssetName(version: string): string {
   return `AgentLink-${checked(version)}-win-x64-setup.exe`;

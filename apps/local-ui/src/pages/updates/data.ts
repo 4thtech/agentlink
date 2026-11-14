@@ -5,7 +5,7 @@
 // the desktop app ever has a link (the browser app shows a restart or a fixed command instead).
 export const APP_UPDATE_PATH = '/api/ui/app-update';
 export const APP_UPDATE_CHECK_PATH = '/api/ui/app-update/check';
-// UPD-5: "Update now" and "Restart now" (POST, no body; the Mac app only).
+// UPD-5: "Update now" and "Restart now" (POST, no body; the Mac app, and BROWSER-UPDATE the browser app).
 export const APP_UPDATE_INSTALL_PATH = '/api/ui/app-update/install';
 export const APP_UPDATE_RESTART_PATH = '/api/ui/app-update/restart';
 
@@ -72,6 +72,12 @@ const NUM = '(0|[1-9][0-9]{0,5})';
 const RELEASE = new RegExp(`^${NUM}\\.${NUM}\\.${NUM}$`);
 const APP = new RegExp(`^${NUM}\\.${NUM}\\.${NUM}(?:-[0-9A-Za-z][0-9A-Za-z.]{0,31})?$`);
 const RELEASES = 'https://github.com/4thtech/agentlink/releases';
+/**
+ * FIRSTRUN-EXIT: the Windows app has no in-app update; its fallback is the stable link to the latest
+ * release's setup file (a fixed string, never from an answer; the window opens it in the default
+ * browser, apps/desktop security.ts allows only this repository on github.com).
+ */
+export const WINDOWS_SETUP_URL = `${RELEASES}/latest/download/AgentLink-win-x64-setup.exe`;
 
 function newer(latest: string, current: string): boolean {
   const a = RELEASE.exec(latest);
@@ -129,10 +135,11 @@ export function parseUpdate(data: unknown): UpdateView | undefined {
     return undefined;
   }
   if (how !== 'desktop') {
-    // The in-app update is the Mac app's alone.
-    if (download !== '' || st !== 'available' || installable) return undefined;
+    // BROWSER-UPDATE: the browser app's in-app update (Update now, Restart now) follows the same
+    // state rules as the Mac app's (checked above); the browser app never has a link.
+    if (download !== '') return undefined;
     return {
-      state: 'available',
+      state: st,
       install: how,
       current,
       latest,

@@ -1,4 +1,4 @@
-// UPD-4: every reason the Mac in-app install stops, as a fixed code. A refusal never carries a URL,
+// UPD-4: every reason the in-app install (Mac; Windows since WIN-INAPP-UPDATE) stops, as a fixed code. A refusal never carries a URL,
 // a path or anything from the network; the person sees one fixed sentence and the existing download
 // link (release-check.ts, the DMG link built from the version), whatever the code.
 import { UpdateRefusal } from './manifest.js';
@@ -33,7 +33,10 @@ export type InstallRefusalCode =
   | 'not_permitted'
   | 'did_not_start'
   | 'did_not_quit'
-  | 'rollback_incomplete';
+  | 'rollback_incomplete'
+  // the Windows setup (WIN-INAPP-UPDATE, reported by its watchdog)
+  | 'installer_failed'
+  | 'installer_changed';
 
 const MESSAGES: Readonly<Record<InstallRefusalCode, string>> = Object.freeze({
   not_zip: 'the update has no in-app package for this computer',
@@ -60,6 +63,8 @@ const MESSAGES: Readonly<Record<InstallRefusalCode, string>> = Object.freeze({
   did_not_start: 'the new version did not start in time',
   did_not_quit: 'the app did not close for the update',
   rollback_incomplete: 'the previous version could not be fully restored',
+  installer_failed: 'the new version could not be installed',
+  installer_changed: 'the downloaded update changed before it was installed',
 });
 
 export class InstallRefusal extends Error {
@@ -87,6 +92,11 @@ export function failedReasonCode(reason: FailedReason | null): InstallRefusalCod
       return 'swap_failed';
     case 'rollback_incomplete':
       return 'rollback_incomplete';
+    case 'installer_failed':
+    case 'interrupted':
+      return 'installer_failed';
+    case 'installer_changed':
+      return 'installer_changed';
     default:
       return 'did_not_start';
   }

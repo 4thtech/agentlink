@@ -37,6 +37,10 @@ export type OwnerApiResult =
 
 export interface ApiClient {
   get<T = unknown>(path: string): Promise<ApiResult<T>>;
+  /**
+   * A POST. With `body`: JSON. Without (UPD-BUTTON-FIX): an empty `application/octet-stream` POST,
+   * the one form the server's mutating gate takes for routes with no input (no body byte is sent).
+   */
   post<T = unknown>(path: string, body?: unknown): Promise<ApiResult<T>>;
   /**
    * One owner operation (M1-11c-a4c; 04 §2.5): `input` travels base64url JSON in
@@ -111,6 +115,10 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     if (body !== undefined) {
       headers.set('content-type', 'application/json');
       init.body = JSON.stringify(body);
+    } else if (method === 'POST') {
+      // UPD-BUTTON-FIX: a POST with no body is the server's empty octet-stream kind (mark, reveal,
+      // Update now, Restart now): its gate refuses any other content type (415) before the route.
+      headers.set('content-type', 'application/octet-stream');
     }
     let res: Response;
     try {

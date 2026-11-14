@@ -8,6 +8,7 @@
 // recovery code lives in this component's state until the kit opens; the new master code lives in
 // state until "Go to Home". Neither is stored, put in a URL or rendered into an attribute.
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
+import { mayLeave, useLeaveGuard } from '../../leave-guard.js';
 import { navigate } from '../../router.js';
 import { createOwnerClient, passkeyProof as browserPasskeyProof } from '../contacts/owner.js';
 import type { OwnerClient, PasskeyInfo, PresenceProof } from '../contacts/owner.js';
@@ -73,15 +74,6 @@ export interface RestoreWizardProps {
 function leaveDefault(to: string): void {
   markLeavingStart();
   window.location.assign(to);
-}
-
-/** R1-UI-02: the once-only master code may be lost: confirm before leaving without ticking "I saved it". */
-function askLeaveCode(): boolean {
-  try {
-    return window.confirm(PROTECT.leaveUnsaved);
-  } catch {
-    return true;
-  }
 }
 
 const stepOf = (view: View): StepId =>
@@ -222,9 +214,15 @@ export function RestoreWizard({
     [onLeave],
   );
 
+  // R1-UI-02 (IR-FIRSTRUN-EXIT-1 High): the restore is done and its new master code is on screen,
+  // shown once: every way out asks first (Cancel, the header's Check for updates and Help, the router,
+  // closing the window), with the one fixed sentence. Off once "I saved it" is ticked.
+  const codeUnsaved = outcome?.masterCode !== undefined && !saved;
+  useLeaveGuard(codeUnsaved ? PROTECT.leaveUnsaved : undefined);
+
   const cancel = (): void => {
-    // R1-UI-02: the restore is done and its new master code is on screen, shown once: ask first.
-    if (outcome?.masterCode !== undefined && !saved && !askLeaveCode()) return;
+    // mayLeave asks with the guard's sentence and turns it off on yes, so the move asks only once.
+    if (codeUnsaved && !mayLeave()) return;
     if (kitHandle !== undefined) void api.cancel(kitHandle);
     leave('/');
   };

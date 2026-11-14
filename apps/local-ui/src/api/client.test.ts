@@ -48,6 +48,24 @@ describe('createApiClient', () => {
     expect(new Headers(init.headers).get('content-type')).toBe('application/json');
   });
 
+  it('UPD-BUTTON-FIX: a post with no body is an empty octet-stream POST (the server gate)', async () => {
+    const fetchMock = vi.fn(async () => json(200, { ok: true }));
+    const api = createApiClient({ fetch: fetchMock, token: 't' });
+    await api.post('/api/ui/app-update/install');
+    const init = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1];
+    expect(init.method).toBe('POST');
+    expect(init.body).toBeUndefined();
+    expect(new Headers(init.headers).get('content-type')).toBe('application/octet-stream');
+    expect(new Headers(init.headers).get('X-AgentLink-CSRF')).toBe('t');
+  });
+
+  it('UPD-BUTTON-FIX: a GET carries no content type', async () => {
+    const fetchMock = vi.fn(async () => json(200, {}));
+    await createApiClient({ fetch: fetchMock, token: 't' }).get('/api/x');
+    const init = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1];
+    expect(new Headers(init.headers).get('content-type')).toBeNull();
+  });
+
   it.each([
     [401, { kind: 'session_expired' }],
     [403, { kind: 'forbidden' }],
