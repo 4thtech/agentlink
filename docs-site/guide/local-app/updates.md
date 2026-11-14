@@ -26,7 +26,7 @@ From 0.5.6 the browser app updates itself, with no command to type:
 2. Press **Restart now**. AgentLink closes and opens again in a new browser tab with the new version, in the same terminal window. You can close the old tab.
 3. Quit and reopen your AI apps so they use the new version too. The page says so.
 
-AgentLink installs only the exact version the npm registry names as the latest, and only when the registry shows it was built by AgentLink's own release workflow; it checks npm's signatures for every package and runs no install scripts. Your own npm settings are not used for it. Your IDs, people and messages stay as they are.
+AgentLink installs only the exact version the npm registry names as the latest, and only when the registry shows it was built by AgentLink's own release workflow; it checks every package it gets and runs no install scripts. Your own npm settings are not used for it. Your IDs, people and messages stay as they are.
 
 If AgentLink can't update itself here, the page shows the steps instead:
 
