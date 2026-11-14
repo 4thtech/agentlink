@@ -105,7 +105,7 @@ test('Windows available: says why not, as one fixed token (WIN-HELLO-NATIVE)', (
   assert.match(winSrc, /MS_PLATFORM_CRYPTO_PROVIDER/);
   assert.match(winSrc, /KeyCredentialManager::IsSupportedAsync\(\)/);
   // Every command that needs Windows Hello says unavailable before it touches a credential.
-  for (const cmd of ['CmdCreate', 'CmdCheck', 'CmdSign', 'CmdDelete']) {
+  for (const cmd of ['CmdCreate', 'CmdCheck', 'CmdSign']) {
     const body = winSrc.slice(winSrc.indexOf(`static void ${cmd}`));
     const end = body.indexOf('\n}\n');
     const fn = body.slice(0, end);
@@ -114,6 +114,13 @@ test('Windows available: says why not, as one fixed token (WIN-HELLO-NATIVE)', (
       assert.ok(fn.indexOf('RequireHello()') < fn.indexOf('OpenMatching'), `${cmd}: gate first`);
     }
   }
+  // Fable r1 L2: delete never prompts and must work while Hello is briefly unavailable: no gate.
+  const del = winSrc.slice(winSrc.indexOf('static void CmdDelete'));
+  assert.ok(!del.slice(0, del.indexOf('\n}\n')).includes('RequireHello'), 'CmdDelete is not gated');
+  // Fable r1 L3: the reason is an enum of two values, never a caller-supplied string.
+  assert.match(winSrc, /enum class Unavailable \{ NoSecureHardware, NotSetUp \};/);
+  assert.match(winSrc, /static void FinishUnavailable\(Unavailable why\)/);
+  assert.ok(!/FinishUnavailable\(const char/.test(winSrc));
   // Never a WebAuthn / security-key path in the helper's code (comments may name it).
   const code = winSrc.replace(/\/\/.*$/gm, '');
   assert.ok(!/webauthn|fido/i.test(code));
@@ -122,6 +129,19 @@ test('Windows available: says why not, as one fixed token (WIN-HELLO-NATIVE)', (
 test('Windows prompts are brought in front of the AgentLink window (WIN-HELLO-NATIVE)', () => {
   assert.match(winSrc, /L"Credential Dialog Xaml Host"/);
   assert.match(winSrc, /SetForegroundWindow/);
+  // Fable r1 L1: only a window owned by System32\CredentialUIBroker.exe is brought forward.
+  assert.match(winSrc, /GetWindowThreadProcessId/);
+  assert.match(winSrc, /QueryFullProcessImageNameW/);
+  assert.match(winSrc, /GetSystemDirectoryW/);
+  assert.match(winSrc, /L"\\\\CredentialUIBroker\.exe"/);
+  assert.equal(winSrc.split('SetForegroundWindow(').length - 1, 1, 'one SetForegroundWindow call');
+  const focus = winSrc.slice(winSrc.indexOf('class PromptFocus'));
+  const run = focus.slice(focus.indexOf('void Run()'), focus.indexOf('std::atomic'));
+  assert.ok(
+    run.indexOf('OwnedByCredentialBroker(w)') < run.indexOf('SetForegroundWindow('),
+    'the owner is checked before the window is raised',
+  );
+  assert.ok(!winSrc.includes('getenv') && !winSrc.includes('GetEnvironmentVariable'));
   for (const cmd of ['CmdCreate', 'CmdSign']) {
     const body = winSrc.slice(winSrc.indexOf(`static void ${cmd}`));
     const fn = body.slice(0, body.indexOf('\n}\n'));

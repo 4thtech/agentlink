@@ -409,7 +409,25 @@ export const NATIVE_HELPER_TIMEOUT_MS = 120_000;
 export const NATIVE_HELPER_KILL_GRACE_MS = 3_000;
 
 /**
- * Spawns the helper at `path` (no shell, empty environment, stdin/stdout/stderr pipes, stderr only
+ * Fable r1 L4 (WIN-HELLO-NATIVE): the helper's whole environment. Empty, except on Windows
+ * `SystemRoot` (WinRT and NCrypt misreport without it), taken from `env` only when it is a plain
+ * absolute drive path (`C:\Windows`): no `..`, no UNC or device path, no `%` expansion, no control
+ * characters. Anything else gives the empty environment.
+ */
+export function nativeHelperEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+): Record<string, string> {
+  if (platform !== 'win32') return {};
+  const root = env['SystemRoot'] ?? env['SYSTEMROOT'];
+  if (typeof root !== 'string' || root.length > 200) return {};
+  if (!/^[A-Za-z]:\\[A-Za-z0-9 _.()\\-]*$/.test(root)) return {};
+  if (root.split('\\').some((part) => part === '..' || part === '.')) return {};
+  return { SystemRoot: root };
+}
+
+/**
+ * Spawns the helper at `path` (no shell, empty environment but SystemRoot on Windows, stdin/stdout/stderr pipes, stderr only
  * read for its fixed diagnostic line,
  * stdout capped, killed after `timeoutMs`). A helper that cannot start, is killed or prints too much
  * resolves with code null (the `error` state). Never rejects.
@@ -458,7 +476,7 @@ export function spawnNativeHelper(
       try {
         child = spawn(path, [...args], {
           shell: false,
-          env: {},
+          env: nativeHelperEnv(),
           stdio: ['pipe', 'pipe', 'pipe'],
           windowsHide: true,
         });

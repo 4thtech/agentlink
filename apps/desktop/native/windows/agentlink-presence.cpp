@@ -31,8 +31,8 @@
 //                        exists and its public key matches the record, else 13
 //     sign <reason-id>   stdin: record; the `available` gate (no prompt when it fails); one Windows
 //                        Hello prompt; prints the signature
-//     delete             stdin: record; the `available` gate; removes the credential (no prompt);
-//                        exit 0 or 13
+//     delete             stdin: record; removes the credential (no prompt, no `available` gate,
+//                        so it works while Windows Hello is briefly unavailable); exit 0 or 13
 //   The record is parsed (65 on any defect) before the gate, so bad input never depends on the PC.
 //   reason-id is one of: setup | approve | pay | code. Windows Hello draws its own fixed text and takes no
 //   caller text; the id is accepted for symmetry with macOS and otherwise unused.
@@ -262,8 +262,13 @@ static void Random(std::uint8_t* p, size_t n) {
 
 // ---- Windows Hello gate (WIN-HELLO-NATIVE) ----
 
+// Why Windows Hello cannot hold the owner key here: two fixed values, two fixed lines.
+enum class Unavailable { NoSecureHardware, NotSetUp };
+
 // The one stderr write: a fixed line, then exit 69. Nothing else is ever written to stderr.
-[[noreturn]] static void FinishUnavailable(const char* line) {
+[[noreturn]] static void FinishUnavailable(Unavailable why) {
+  const char* line = why == Unavailable::NoSecureHardware ? "unavailable no_secure_hardware\n"
+                                                          : "unavailable not_set_up\n";
   HANDLE err = GetStdHandle(STD_ERROR_HANDLE);
   if (err != nullptr && err != INVALID_HANDLE_VALUE) {
     DWORD n = 0;
@@ -289,20 +294,38 @@ static bool HelloSetUp() {
   }
 }
 
-// The fixed line for why Windows Hello cannot hold the owner key here, or nullptr when it can.
+// Exits 69 with its fixed line when Windows Hello cannot hold the owner key here.
 // No TPM first: setting up a PIN would not help there.
-static const char* UnavailableLine() {
-  if (!HasTpm()) return "unavailable no_secure_hardware\n";
-  if (!HelloSetUp()) return "unavailable not_set_up\n";
-  return nullptr;
+static void RequireHello() {
+  if (!HasTpm()) FinishUnavailable(Unavailable::NoSecureHardware);
+  if (!HelloSetUp()) FinishUnavailable(Unavailable::NotSetUp);
 }
 
-static void RequireHello() {
-  if (const char* line = UnavailableLine()) FinishUnavailable(line);
+// True only when `window` belongs to the system's own %SystemRoot%\System32\CredentialUIBroker.exe
+// (the folder from GetSystemDirectoryW, never from the environment). A same-user process can make a
+// window with the same class name; that one is never brought to the front.
+static bool OwnedByCredentialBroker(HWND window) {
+  DWORD pid = 0;
+  if (GetWindowThreadProcessId(window, &pid) == 0 || pid == 0) return false;
+  HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+  if (process == nullptr) return false;
+  wchar_t image[MAX_PATH];
+  DWORD imageLen = MAX_PATH;
+  const BOOL named = QueryFullProcessImageNameW(process, 0, image, &imageLen);
+  CloseHandle(process);
+  if (!named || imageLen == 0 || imageLen >= MAX_PATH) return false;
+  wchar_t sys[MAX_PATH];
+  const UINT sysLen = GetSystemDirectoryW(sys, MAX_PATH);
+  if (sysLen == 0 || sysLen >= MAX_PATH) return false;
+  std::wstring broker(sys, sysLen);
+  broker += L"\\CredentialUIBroker.exe";
+  return CompareStringOrdinal(image, static_cast<int>(imageLen), broker.c_str(),
+                              static_cast<int>(broker.size()), TRUE) == CSTR_EQUAL;
 }
 
 // Brings the system's Windows Hello dialog in front, once, while a prompt is pending. Best effort:
-// it only calls SetForegroundWindow on the OS's own dialog window, found by its class name.
+// it only calls SetForegroundWindow on a window of the dialog's class that CredentialUIBroker.exe
+// owns (OwnedByCredentialBroker); any other window of that class is skipped.
 class PromptFocus {
  public:
   PromptFocus() : worker_([this] { Run(); }) {}
@@ -316,10 +339,12 @@ class PromptFocus {
  private:
   void Run() {
     for (int i = 0; i < 100 && !stop_; i++) {
-      HWND dialog = FindWindowW(L"Credential Dialog Xaml Host", nullptr);
-      if (dialog != nullptr) {
-        SetForegroundWindow(dialog);
-        return;
+      for (HWND w = FindWindowExW(nullptr, nullptr, L"Credential Dialog Xaml Host", nullptr);
+           w != nullptr; w = FindWindowExW(nullptr, w, L"Credential Dialog Xaml Host", nullptr)) {
+        if (OwnedByCredentialBroker(w)) {
+          SetForegroundWindow(w);
+          return;
+        }
       }
       Sleep(100);
     }
@@ -459,9 +484,10 @@ static KeyCredential OpenMatching(const Record& r) {
   WriteOut(FromBuffer(sig));
 }
 
+// No Windows Hello gate here: delete never prompts, and a credential must still go away while the
+// TPM or Windows Hello is briefly unavailable (Fable r1 L2).
 [[noreturn]] static void CmdDelete() {
   Record r = ParseRecord(ReadInput());
-  RequireHello();
   OpenMatching(r);
   KeyCredentialManager::DeleteAsync(hstring(r.name)).get();
   Finish(EXIT_OK);

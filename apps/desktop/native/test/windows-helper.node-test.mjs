@@ -139,11 +139,17 @@ test(
     assert.equal(refused(['create'], '', EXIT.unavailable).err, reason);
     for (const args of [
       ['check'],
-      ['delete'],
       ...['setup', 'approve', 'pay', 'code'].map((r) => ['sign', r]),
     ]) {
       assert.equal(refused(args, `${record()}\n`, EXIT.unavailable).err, reason);
     }
+    // Fable r1 L2: delete has no gate (it never prompts), so it is not "unavailable": a credential
+    // that does not exist is refused by Windows Hello itself, quietly.
+    const del = runHelper(['delete'], `${record()}\n`);
+    assert.notEqual(del.code, EXIT.unavailable);
+    assert.notEqual(del.code, EXIT.ok);
+    assert.equal(del.out, '');
+    assert.equal(del.err, '');
   },
 );
 

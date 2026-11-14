@@ -16,6 +16,7 @@ import {
   nativeUiState,
   readHelperDiagnostic,
   readHelperStderr,
+  nativeHelperEnv,
   spawnNativeHelper,
   NATIVE_UNAVAILABLE_REASONS,
   type NativeHelperRunner,
@@ -555,5 +556,32 @@ describe('why native presence is unavailable (WIN-HELLO-NATIVE)', () => {
     chmodSync(script, 0o700);
     const helper = createNativeHelper({ kind: 2, run: spawnNativeHelper(script) });
     expect(await helper.availability()).toEqual({ available: false, reason: 'not_set_up' });
+  });
+});
+
+describe('the helper environment (Fable r1 L4)', () => {
+  it('empty everywhere but Windows; on Windows only a plain absolute SystemRoot', () => {
+    const full = { SystemRoot: 'C:\\Windows', PATH: 'C:\\x', AGENTLINK_LOG: 'debug', HOME: 'h' };
+    expect(nativeHelperEnv(full, 'darwin')).toEqual({});
+    expect(nativeHelperEnv(full, 'linux')).toEqual({});
+    expect(nativeHelperEnv(full, 'win32')).toEqual({ SystemRoot: 'C:\\Windows' });
+    expect(nativeHelperEnv({ SYSTEMROOT: 'D:\\WINDOWS' }, 'win32')).toEqual({
+      SystemRoot: 'D:\\WINDOWS',
+    });
+    for (const bad of [
+      '',
+      'Windows',
+      '\\\\server\\share',
+      '\\\\?\\C:\\Windows',
+      'C:\\Windows\\..\\Users\\x',
+      'C:\\Windows\\.',
+      '%SystemDrive%\\Windows',
+      'C:/Windows',
+      'C:\\Windows\nPATH=x',
+      `C:\\${'a'.repeat(300)}`,
+    ]) {
+      expect(nativeHelperEnv({ SystemRoot: bad }, 'win32')).toEqual({});
+    }
+    expect(nativeHelperEnv({}, 'win32')).toEqual({});
   });
 });
