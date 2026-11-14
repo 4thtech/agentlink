@@ -131,7 +131,7 @@ function numbered(name: string, n: number): string {
 }
 
 /** The ID's own pinned Send folder: its realpath and its fixed `~` form; never another folder. */
-async function sendFolder(
+export async function ownSendFolder(
   allowedFolders: readonly string[],
   home: string,
 ): Promise<{ readonly where: string; readonly shown: string } | undefined> {
@@ -181,7 +181,7 @@ export async function writeSendFolderFile(input: {
   if (base === undefined) return { ok: false, reason: 'type' };
   const home = input.home ?? homedir();
   const allowed = Array.isArray(input.allowedFolders) ? input.allowedFolders : [];
-  const send = await sendFolder(allowed, home);
+  const send = await ownSendFolder(allowed, home);
   if (send === undefined) return { ok: false, reason: 'no_folder' };
   const folder = send.where;
   const info = await lstat(folder).catch(() => undefined);

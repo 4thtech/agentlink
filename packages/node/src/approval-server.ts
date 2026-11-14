@@ -344,6 +344,7 @@ import {
   type PasskeyAssertion,
 } from './owner-passkey.js';
 import { attachDesk } from './local-ui/attach-desk.js';
+import { revealOwnSendFolder } from './send-folder-reveal.js';
 import { ATTACH_MAX_BODY_BYTES } from './local-ui/api/attach.js';
 import {
   creditsPort,
@@ -2000,6 +2001,19 @@ export async function startApprovalServerWith(
       return 'not_opened';
     }
   };
+  // FILES-REVEAL (08 §1): Show in Finder for the open ID's own pinned Send folder; the folder is
+  // the verified policy's, checked again by send-folder-reveal.ts, never a page path.
+  const revealSendFolder = (): Promise<
+    'shown' | 'not_found' | 'refused' | 'unavailable' | 'not_opened'
+  > => {
+    const client = agentUi?.client;
+    if (client === undefined) return Promise.resolve('unavailable');
+    return revealOwnSendFolder({
+      loadPolicy: () => readOnlyClient(client).policy.load() as never,
+      revealer: fileRevealer,
+      ...(filesHome === undefined ? {} : { home: filesHome }),
+    });
+  };
   /**
    * WP-R2b (04 §2.3.3 "Kit record"): what `GET /api/ui/backup` and Show in Finder read. Reads only;
    * it signs nothing, opens no other ID's core and reads no keychain item. Built where an ID can
@@ -2121,7 +2135,7 @@ export async function startApprovalServerWith(
       ...(peopleAllDesk === undefined ? {} : { peopleAll: peopleAllDesk }),
       ...(storageDesk === undefined ? {} : { storage: storageDesk }),
       // RET-4: Show in Finder for the Inbox folder (the history desk is bound per request).
-      ...(agentUi?.client === undefined ? {} : { revealInbox }),
+      ...(agentUi?.client === undefined ? {} : { revealInbox, revealSendFolder }),
       // DESK051-UPD: the desktop host's update state (no agent needed).
       ...(options.appUpdate === undefined ? {} : { appUpdate: options.appUpdate }),
       // W4-SHELL-V2: the app's UI settings, in the app host only (one desk for every context).

@@ -89,6 +89,7 @@ import {
   HISTORY_FINISH_PATH,
   HISTORY_STEP_PATHS,
   INBOX_REVEAL_PATH,
+  SEND_FOLDER_REVEAL_PATH,
   isHistoryStep,
 } from './history-paths.js';
 import {
@@ -397,14 +398,19 @@ export class LocalUiRouteRegistry {
         throw invalid('this history step is already registered');
       }
     } else if (presence === 'inbox-reveal') {
-      // RET-4: Show in Finder for the Inbox folder only; no input, no presence.
+      // RET-4 / FILES-REVEAL: Show in Finder for the Inbox folder or the Send folder only; no
+      // input, no presence. One route per fixed path.
       if (method !== 'POST') throw invalid('an inbox-reveal route is a POST');
-      if (route.path !== INBOX_REVEAL_PATH) {
+      if (route.path !== INBOX_REVEAL_PATH && route.path !== SEND_FOLDER_REVEAL_PATH) {
         throw invalid('an inbox-reveal route is only at its fixed path');
       }
       if (typeof handler !== 'function') throw invalid('an inbox-reveal route needs a handler');
-      if (this.#entries.some((e) => e.route.presence === 'inbox-reveal')) {
-        throw invalid('the inbox-reveal route is already registered');
+      if (
+        this.#entries.some(
+          (e) => e.route.presence === 'inbox-reveal' && e.route.path === route.path,
+        )
+      ) {
+        throw invalid('this inbox-reveal route is already registered');
       }
     } else if (presence === 'invite') {
       // UX2-d1 (decision 1.1): create and check an invite only; the server's invite gate runs it.

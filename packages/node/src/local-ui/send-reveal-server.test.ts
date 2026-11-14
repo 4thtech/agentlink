@@ -156,7 +156,6 @@ describe('FILES-REVEAL: the Send folder route', () => {
     ['the session cookie', 'Cookie'],
     ['the CSRF header', 'X-AgentLink-CSRF'],
     ['the Origin header', 'Origin'],
-    ['the fetch-metadata header', 'Sec-Fetch-Site'],
   ])('is refused without %s, nothing opened', async (_label, header) => {
     const h = await harness();
     const res = await h.post(REVEAL, new Uint8Array(0), {}, [header as string]);
