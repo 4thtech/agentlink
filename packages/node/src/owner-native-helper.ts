@@ -2,7 +2,7 @@
 // first-party presence helper of the desktop app (DESK-D12b, apps/desktop/native/*/agentlink-presence.*,
 // whose header is the contract). Fixed argv only:
 //   available · create · check (macOS) · ecdh <reason> (macOS) · sign <reason> (Windows) · delete (Windows)
-// with <reason> one of the fixed ids setup | approve | pay | code (display-only: the helper shows its own
+// with <reason> one of the fixed ids setup | approve | pay | code | reset (display-only: the helper shows its own
 // fixed text and releases the same secret for every reason). The record goes on stdin as lowercase
 // hex and one newline; stdout is lowercase hex and one newline on success, nothing else is accepted;
 // stderr carries at most one fixed diagnostic line of the macOS helper (DESK-NATIVE-DEBUG,
@@ -41,8 +41,9 @@ import {
 /**
  * The fixed reason ids (display-only). `code` (D15-04): Replace master code, the one operation that
  * mints a new root secret, is named on the OS sheet instead of reading like a routine approval.
+ * `reset` (OWNER-START-OVER, D-153): Start over on this computer names itself on the sheet.
  */
-export const NATIVE_REASONS = Object.freeze(['setup', 'approve', 'pay', 'code'] as const);
+export const NATIVE_REASONS = Object.freeze(['setup', 'approve', 'pay', 'code', 'reset'] as const);
 export type NativeReason = (typeof NATIVE_REASONS)[number];
 
 /** The helpers' fixed exit codes (identical on macOS and Windows; apps/desktop/build/native.mjs). */
@@ -229,7 +230,15 @@ export type NativeUnavailableReason = (typeof NATIVE_UNAVAILABLE_REASONS)[number
 
 export type NativeAvailability =
   | { readonly available: true }
-  | { readonly available: false; readonly reason: NativeUnavailableReason };
+  | {
+      readonly available: false;
+      readonly reason: NativeUnavailableReason;
+      /**
+       * OWNER-START-OVER (D-153): the helper did not answer "unavailable" (exit 69): a lockout (14),
+       * a timeout, an error. The sensor may be there; try again later, never treat it as absent.
+       */
+      readonly transient?: true;
+    };
 
 /** The Windows helper's one stderr line for `available` exit 69 (agentlink-presence.cpp header). */
 const HELPER_UNAVAILABLE = /^unavailable (not_set_up|no_secure_hardware)\n?$/;
@@ -352,7 +361,7 @@ export function createNativeHelper(options: {
       const result = await run(['available'], undefined);
       if (result.code === 0) return { available: true };
       if (result.code !== NATIVE_HELPER_EXIT.unavailable)
-        return { available: false, reason: 'unknown' };
+        return { available: false, reason: 'unknown', transient: true };
       const reason: NativeUnavailableReason = mac
         ? macUnavailableReason(result.diag)
         : (result.unavailable ?? 'unknown');

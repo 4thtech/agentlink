@@ -9,7 +9,7 @@
 //
 // CONTRACT WITH THE CORE (WP-D12a / WP-D12c) — keep in sync with ../windows/agentlink-presence.cpp
 //   argv (fixed; anything else exits 64 before any key is touched):
-//     available          exit 0 if the Secure Enclave and Touch ID (enrolled) are usable, else 69
+//     available          exit 0 if the Secure Enclave and Touch ID (enrolled) are usable, else 69; 14 on biometry lockout (D-153)
 //     version            prints "01\n" (record version)
 //     create             no gesture; prints a new record (below)
 //     check              stdin: record; ECDH with interaction NOT allowed; exit 0 only when the
@@ -20,7 +20,7 @@
 //                        right now (DESK-NATIVE-DEBUG: a closed lid, a keyboard without Touch ID or
 //                        no enrolled finger exits 69, lockout 14, without a sheet), then one Touch ID
 //                        sheet; prints the 32-byte secret
-//   reason-id is one of: setup | approve | pay | code. The sheet text is fixed here (reasonText below);
+//   reason-id is one of: setup | approve | pay | code | reset. The sheet text is fixed here (reasonText below);
 //   the caller cannot supply text. macOS shows it as "<app> is trying to <text>".
 //
 //   stdin: lowercase hex of the record, optionally followed by exactly one "\n"; at most 8192 bytes.
@@ -202,6 +202,8 @@ func reasonText(_ id: String) -> String? {
   case "pay": return "confirm this payment in AgentLink"
   // D15-04: Replace master code mints a new root secret; the sheet names it.
   case "code": return "replace your AgentLink master code"
+  // OWNER-START-OVER (D-153): moves the AgentLink folder to a backup and erases its items.
+  case "reset": return "start over AgentLink on this computer"
   default: return nil
   }
 }
@@ -353,6 +355,11 @@ func cmdAvailable() -> Never {
   var err: NSError?
   guard LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err) else {
     if let e = err { noteError(e) }
+    // OWNER-START-OVER (D-153): a locked-out Touch ID is there, just not usable right now: 14, so
+    // the core never treats it as "no sensor" (69 means no Secure Enclave or Touch ID not set up).
+    if let e = err, e.domain == LAErrorDomain, e.code == LAError.biometryLockout.rawValue {
+      finish(.lockout)
+    }
     finish(.unavailable)
   }
   finish(.ok)

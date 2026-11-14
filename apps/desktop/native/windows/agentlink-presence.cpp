@@ -19,6 +19,7 @@
 //                                                           software key with 16 anyway)
 //                          unavailable not_set_up           Windows Hello / PIN not set up, turned
 //                                                           off by policy, or not usable here
+//                        D-153: when the Windows Hello check itself fails, 70 (not 69)
 //                        (each line ends in one "\n")
 //                        The core passes the token on; the page offers the master code and plain
 //                        set-up text, never a WebAuthn security key.
@@ -34,7 +35,7 @@
 //     delete             stdin: record; removes the credential (no prompt, no `available` gate,
 //                        so it works while Windows Hello is briefly unavailable); exit 0 or 13
 //   The record is parsed (65 on any defect) before the gate, so bad input never depends on the PC.
-//   reason-id is one of: setup | approve | pay | code. Windows Hello draws its own fixed text and takes no
+//   reason-id is one of: setup | approve | pay | code | reset. Windows Hello draws its own fixed text and takes no
 //   caller text; the id is accepted for symmetry with macOS and otherwise unused.
 //
 //   stdin: lowercase hex of the record, optionally followed by exactly one "\n"; at most 8192 bytes.
@@ -150,7 +151,7 @@ static bool CallerAllowed() {
 [[noreturn]] static void Finish(int code) { ExitProcess(static_cast<UINT>(code)); }
 
 static bool IsReason(const wchar_t* id) {
-  for (const wchar_t* r : {L"setup", L"approve", L"pay", L"code"}) {
+  for (const wchar_t* r : {L"setup", L"approve", L"pay", L"code", L"reset"}) {
     if (wcscmp(id, r) == 0) return true;
   }
   return false;
@@ -286,11 +287,13 @@ static bool HasTpm() {
   return true;
 }
 
+// OWNER-START-OVER (D-153): IsSupportedAsync answering false is "not set up" (69); the call itself
+// failing is a transient error (70), so the core never mistakes it for "no Windows Hello here".
 static bool HelloSetUp() {
   try {
     return KeyCredentialManager::IsSupportedAsync().get();
   } catch (...) {
-    return false;
+    Finish(EXIT_INTERNAL_ERROR);
   }
 }
 

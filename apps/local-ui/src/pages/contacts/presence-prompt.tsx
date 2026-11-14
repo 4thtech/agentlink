@@ -13,6 +13,7 @@
 import { Button, InlineError } from '@4thtech-io/ui';
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { EARLIER_OWNER_CODE_HINT } from '../../strings.js';
+import { ForgotCodeLink } from '../start-over/forgot-link.js';
 import { detectPlatform } from '../first-run/passkey.js';
 import { BackupCodeField, UseCodeInstead } from '../first-run/backup-code.js';
 import {
@@ -314,6 +315,8 @@ export function PresencePrompt({
               value={code}
               onValue={setCode}
             />
+            {/* OWNER-START-OVER (D-153): the way out when the master code is lost. */}
+            <ForgotCodeLink />
             {/* F49: one primary action, the master code confirms. The switch is a quiet link. */}
             <div className="ct-actions">
               <Button type="submit" variant="primary" disabled={busy} data-confirm-code="">

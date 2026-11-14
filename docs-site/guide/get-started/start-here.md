@@ -130,7 +130,7 @@ Their AI saves it in their `AgentLink/Inbox` folder and tells them. Files are fr
 
 ## Questions and answers
 
-**I lost my master code.** It cannot be shown again. If AgentLink still opens and Touch ID works, replace it under **Settings** › **Touch ID & master code**. Save a recovery kit under **Settings** › **Backup & restore** so you are covered next time. See [Touch ID & master code](../local-app/touch-id-and-master-code.md) and [Backup & restore](../local-app/backup-and-restore.md).
+**I lost my master code.** It cannot be shown again. If AgentLink still opens and Touch ID works, replace it under **Settings** › **Touch ID & master code**. Save a recovery kit under **Settings** › **Backup & restore** so you are covered next time. With neither Touch ID nor a recovery kit, choose **Forgot your master code?** to start over on this computer: AgentLink keeps the old folder as a backup and sets up a new master code, but your old IDs stop working. See [Touch ID & master code](../local-app/touch-id-and-master-code.md) and [Backup & restore](../local-app/backup-and-restore.md).
 
 **How do I open AgentLink again?** Mac app: open **AgentLink** from Applications. One command: open a new Terminal or PowerShell and type `agentlink`.
 

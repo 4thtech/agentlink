@@ -26,6 +26,9 @@
 // - UX1113-R1 (D-147): a `presence: 'restore'` route is one of the eleven fixed RESTORE_PATHS, each
 //   registered once, `found` a GET and every other step a POST, with no handler; the server's restore
 //   gate runs it (recovery-kit-restore.ts). No other path, method or route can use the kind.
+// - OWNER-START-OVER (D-153): a `presence: 'start-over'` route is one of the three fixed
+//   START_OVER_PATHS, each registered once, `state` a GET and `begin` / `finish` POSTs, with no
+//   handler; the server's start-over gate runs it (start-over.ts). No other path can use the kind.
 // - WP-R2b (04 §2.3.3 "Kit record"): a `presence: 'kit-reveal'` route (Show in Finder for the
 //   recovery kit) is only a POST at BACKUP_REVEAL_PATH with a handler, registered once; the server's
 //   kit-reveal gate runs it with no input at all. No other path, method or route can use the kind.
@@ -82,6 +85,8 @@ import { ownerPresenceRoutes } from './api/owner-presence.js';
 import { OWNER_CODE_PATHS, isOwnerCodeStep } from './owner-code-paths.js';
 // UX1113-R1: restore from a recovery kit (the restore kind).
 import { restoreRoutes } from './api/restore.js';
+// OWNER-START-OVER (D-153): start over on this computer (the start-over kind).
+import { startOverRoutes } from './api/start-over.js';
 // RET-4 (D-148): Delete history (begin, finish, undo, status) and Show in Finder for the Inbox.
 import { historyRoutes } from './api/history.js';
 import { retentionRoutes } from './api/retention.js';
@@ -103,6 +108,7 @@ import {
   CREATE_AGENT_PATHS,
   MARK_PATHS,
   RESTORE_PATHS,
+  START_OVER_PATHS,
   UI_SETTINGS_WRITE_PATH,
   type LocalUiRoute,
 } from './route-types.js';
@@ -282,6 +288,20 @@ export class LocalUiRouteRegistry {
       if (handler !== undefined) throw invalid('a restore route has no handler');
       if (this.#entries.some((e) => e.route.presence === 'restore' && e.route.step === step)) {
         throw invalid('this restore step is already registered');
+      }
+    } else if (presence === 'start-over') {
+      // OWNER-START-OVER (D-153): start over on this computer; the server's start-over gate runs it.
+      const paths = START_OVER_PATHS as Readonly<Record<string, string>>;
+      if (typeof step !== 'string' || !Object.hasOwn(paths, step)) {
+        throw invalid('unknown start-over step');
+      }
+      if (route.path !== paths[step]) throw invalid('a start-over route is only at its fixed path');
+      if (method !== (step === 'state' ? 'GET' : 'POST')) {
+        throw invalid('a start-over route has its fixed method');
+      }
+      if (handler !== undefined) throw invalid('a start-over route has no handler');
+      if (this.#entries.some((e) => e.route.presence === 'start-over' && e.route.step === step)) {
+        throw invalid('this start-over step is already registered');
       }
     } else if (presence === 'handoff') {
       // U3-invite: `agentlink join` to a running app host; the server's handoff gate runs it.
@@ -555,6 +575,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     ownerPresenceRoutes,
     // UX1113-R1 (D-147): restore from a recovery kit, in the app.
     restoreRoutes,
+    // OWNER-START-OVER (D-153): start over on this computer.
+    startOverRoutes,
     // RET-4 (D-148): Delete history and Show in Finder for the Inbox folder.
     historyRoutes,
     // RET-6 (D-148): Settings > Storage > Keep automatically (a read; the save behind presence).

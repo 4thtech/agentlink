@@ -183,7 +183,7 @@ test(
     assert.match(rec, /^01[0-9a-f]+\n$/);
     parseMacRecord(rec);
     assert.equal(refused(['check'], rec, EXIT.keyUnusable), 'gate none 0\n');
-    for (const reason of ['setup', 'approve', 'pay', 'code'])
+    for (const reason of ['setup', 'approve', 'pay', 'code', 'reset'])
       assert.equal(refused(['ecdh', reason], rec, EXIT.keyUnusable), 'gate none 0\n');
   },
 );

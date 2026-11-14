@@ -270,6 +270,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
         r.presence !== 'restore' &&
         // APP-CONTINUITY: the host takeover and show (handoff kind) are covered in join-server.test.ts.
         r.presence !== 'handoff' &&
+        // OWNER-START-OVER: the three start-over routes are covered in start-over-server.test.ts.
+        r.presence !== 'start-over' &&
         r.path !== '/api/ui/first-run' &&
         !built.has(r.path),
     );
