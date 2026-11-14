@@ -19,6 +19,7 @@
 //                                                           software key with 16 anyway)
 //                          unavailable not_set_up           Windows Hello / PIN not set up, turned
 //                                                           off by policy, or not usable here
+//                        D-153: when the Windows Hello check itself fails, 70 (not 69)
 //                        (each line ends in one "\n")
 //                        The core passes the token on; the page offers the master code and plain
 //                        set-up text, never a WebAuthn security key.
@@ -286,11 +287,13 @@ static bool HasTpm() {
   return true;
 }
 
+// OWNER-START-OVER (D-153): IsSupportedAsync answering false is "not set up" (69); the call itself
+// failing is a transient error (70), so the core never mistakes it for "no Windows Hello here".
 static bool HelloSetUp() {
   try {
     return KeyCredentialManager::IsSupportedAsync().get();
   } catch (...) {
-    return false;
+    Finish(EXIT_INTERNAL_ERROR);
   }
 }
 

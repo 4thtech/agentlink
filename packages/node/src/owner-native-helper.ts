@@ -230,7 +230,15 @@ export type NativeUnavailableReason = (typeof NATIVE_UNAVAILABLE_REASONS)[number
 
 export type NativeAvailability =
   | { readonly available: true }
-  | { readonly available: false; readonly reason: NativeUnavailableReason };
+  | {
+      readonly available: false;
+      readonly reason: NativeUnavailableReason;
+      /**
+       * OWNER-START-OVER (D-153): the helper did not answer "unavailable" (exit 69): a lockout (14),
+       * a timeout, an error. The sensor may be there; try again later, never treat it as absent.
+       */
+      readonly transient?: true;
+    };
 
 /** The Windows helper's one stderr line for `available` exit 69 (agentlink-presence.cpp header). */
 const HELPER_UNAVAILABLE = /^unavailable (not_set_up|no_secure_hardware)\n?$/;
@@ -353,7 +361,7 @@ export function createNativeHelper(options: {
       const result = await run(['available'], undefined);
       if (result.code === 0) return { available: true };
       if (result.code !== NATIVE_HELPER_EXIT.unavailable)
-        return { available: false, reason: 'unknown' };
+        return { available: false, reason: 'unknown', transient: true };
       const reason: NativeUnavailableReason = mac
         ? macUnavailableReason(result.diag)
         : (result.unavailable ?? 'unknown');

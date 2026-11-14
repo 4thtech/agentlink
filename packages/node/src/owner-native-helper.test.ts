@@ -510,8 +510,25 @@ describe('why native presence is unavailable (WIN-HELLO-NATIVE)', () => {
       reason: 'no_secure_hardware',
     });
     expect(await win({ code: 69 })).toEqual({ available: false, reason: 'unknown' });
-    expect(await win({ code: null })).toEqual({ available: false, reason: 'unknown' });
-    expect(await win({ code: 70 })).toEqual({ available: false, reason: 'unknown' });
+    expect(await win({ code: null })).toEqual({
+      available: false,
+      reason: 'unknown',
+      transient: true,
+    });
+    expect(await win({ code: 70 })).toEqual({
+      available: false,
+      reason: 'unknown',
+      transient: true,
+    });
+  });
+
+  it('OWNER-START-OVER: a Touch ID lockout (14) is transient, never "no sensor"', async () => {
+    const mac = createNativeHelper({ kind: 1, run: runner({ code: 14 }) });
+    expect(await mac.availability()).toEqual({
+      available: false,
+      reason: 'unknown',
+      transient: true,
+    });
   });
 
   it('macOS: the fixed diagnostic line maps to the same reasons', async () => {

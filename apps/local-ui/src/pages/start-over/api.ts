@@ -19,6 +19,7 @@ export type StartOverProblem =
   | 'busy'
   | 'wait'
   | 'open_app'
+  | 'try_again'
   | 'unsupported'
   | 'cancelled'
   | 'failed'
@@ -32,6 +33,7 @@ const PROBLEMS: ReadonlySet<string> = new Set<StartOverProblem>([
   'busy',
   'wait',
   'open_app',
+  'try_again',
 ]);
 
 export type Presence = 'native' | 'passkey' | 'typed';

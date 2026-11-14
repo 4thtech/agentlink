@@ -65,14 +65,20 @@ export class StandInHelper implements NativeHelper {
   available(): Promise<boolean> {
     return Promise.resolve(this.unavailable === undefined);
   }
+  /** OWNER-START-OVER: `available` exited other than 69 (lockout, timeout, error). */
+  transient = false;
   availability(): Promise<
     | { readonly available: true }
     | {
         readonly available: false;
         readonly reason: 'not_set_up' | 'no_secure_hardware' | 'unknown';
+        readonly transient?: true;
       }
   > {
     this.availabilityCalls += 1;
+    if (this.transient) {
+      return Promise.resolve({ available: false, reason: 'unknown', transient: true });
+    }
     return Promise.resolve(
       this.unavailable === undefined
         ? { available: true }

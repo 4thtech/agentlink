@@ -90,6 +90,8 @@ export const PROBLEM_TEXT = {
   busy: 'AgentLink is already starting over. Wait a moment.',
   wait: (seconds: number): string => `Too many tries. Try again in ${String(seconds)} seconds.`,
   open_app: 'Open the AgentLink app to start over. Nothing was changed.',
+  try_again:
+    "Touch ID or Windows Hello can't be used right now. Nothing was changed. Unlock your computer or wait a moment, then try again.",
   failed: 'Something went wrong. Try again: starting over again is safe.',
   offline: "AgentLink isn't answering. Check that the app is running, then try again.",
 } as const;

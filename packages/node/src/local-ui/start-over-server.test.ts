@@ -268,7 +268,7 @@ describe('the start-over gate (08 §1; I-4)', () => {
 
   it('without Touch ID: the phrase typed twice, server-checked both times; no session, no start over', async () => {
     const h = await harness();
-    h.native.available = () => Promise.resolve(false);
+    h.native.unavailable = 'not_set_up';
     const port = h.server.port;
     const begin = async () =>
       JSON.parse(

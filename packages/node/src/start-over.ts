@@ -316,11 +316,15 @@ export function createStartOverEngine(options: StartOverOptions): StartOverEngin
    * for less). Browser: a passkey creation, unless the page found no user-verifying platform
    * authenticator (`noSensor`; a page claim, see 04 §2.5.4).
    */
-  async function presenceFor(noSensor: boolean): Promise<StartOverPresence> {
+  async function presenceFor(noSensor: boolean): Promise<StartOverPresence | 'retry'> {
     const helper = options.native;
     if (helper !== undefined) {
-      const usable = await helper.available().catch(() => false);
-      return usable ? 'native' : 'typed';
+      // Typing only when the helper answered "unavailable" (exit 69: no Touch ID / Windows Hello,
+      // or not set up). A lockout, a timeout or an error is `retry`: never a drop to typing.
+      const state = await helper.availability().catch(() => undefined);
+      if (state === undefined) return 'retry';
+      if (state.available) return 'native';
+      return state.transient === true ? 'retry' : 'typed';
     }
     return noSensor ? 'typed' : 'passkey';
   }
@@ -470,7 +474,13 @@ export function createStartOverEngine(options: StartOverOptions): StartOverEngin
       } catch {
         return answer(200, { status: 'partial', backup: null, failed: 'keychain' });
       }
-      const newOwnerHere = current !== null && earlier.every((b) => b.record.ownerTag !== current);
+      // A keychain owner that is not the recorded one; or (Fable r2) no `owner` item although every
+      // earlier record had one, and the folder holds an ID or key file: a new owner on the file
+      // KeyStore (04 §2.8). Either way its folder is never moved and its items never erased.
+      const newOwnerHere =
+        current !== null
+          ? earlier.every((b) => b.record.ownerTag !== current)
+          : earlier.every((b) => b.record.ownerTag !== null) && !(await ownerSlotFree());
       if (newOwnerHere) {
         const agents = [...new Set(earlier.flatMap((b) => b.record.agents))];
         const ok = (await eraseAgents(keychain, agents)) && (await markDone(earlier));
@@ -611,7 +621,9 @@ export function createStartOverEngine(options: StartOverOptions): StartOverEngin
   return Object.freeze<StartOverEngine>({
     async state() {
       const unfinished = (await backups()).some((b) => !b.record.done);
-      return answer(200, { presence: await presenceFor(false), unfinished });
+      const presence = await presenceFor(false);
+      // A sensor that is there but not usable right now still shows its own button.
+      return answer(200, { presence: presence === 'retry' ? 'native' : presence, unfinished });
     },
 
     async begin(session, input) {
@@ -623,6 +635,8 @@ export function createStartOverEngine(options: StartOverOptions): StartOverEngin
       const given = beginInput(input);
       if (given === undefined) return refuse(400, 'phrase');
       const presence = await presenceFor(given.noSensor);
+      // Touch ID locked out, or the helper did not answer: a fixed "try again", nothing started.
+      if (presence === 'retry') return refuse(503, 'try_again');
       wipePending();
       const nonce = encodeBase64url(randomBytes(16));
       const challenge = randomBytes(32);

@@ -9,7 +9,7 @@
 //
 // CONTRACT WITH THE CORE (WP-D12a / WP-D12c) — keep in sync with ../windows/agentlink-presence.cpp
 //   argv (fixed; anything else exits 64 before any key is touched):
-//     available          exit 0 if the Secure Enclave and Touch ID (enrolled) are usable, else 69
+//     available          exit 0 if the Secure Enclave and Touch ID (enrolled) are usable, else 69; 14 on biometry lockout (D-153)
 //     version            prints "01\n" (record version)
 //     create             no gesture; prints a new record (below)
 //     check              stdin: record; ECDH with interaction NOT allowed; exit 0 only when the
@@ -355,6 +355,11 @@ func cmdAvailable() -> Never {
   var err: NSError?
   guard LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &err) else {
     if let e = err { noteError(e) }
+    // OWNER-START-OVER (D-153): a locked-out Touch ID is there, just not usable right now: 14, so
+    // the core never treats it as "no sensor" (69 means no Secure Enclave or Touch ID not set up).
+    if let e = err, e.domain == LAErrorDomain, e.code == LAError.biometryLockout.rawValue {
+      finish(.lockout)
+    }
     finish(.unavailable)
   }
   finish(.ok)

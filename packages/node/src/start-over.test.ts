@@ -502,7 +502,7 @@ describe('start over without a user-verifying sensor: the phrase typed twice (ow
     kind: typeof NATIVE_PRESENCE_MACOS | typeof NATIVE_PRESENCE_WINDOWS,
   ): StandInHelper => {
     const helper = new StandInHelper(kind);
-    helper.available = () => Promise.resolve(false);
+    helper.unavailable = 'not_set_up';
     return helper;
   };
 
@@ -581,6 +581,53 @@ describe('start over without a user-verifying sensor: the phrase typed twice (ow
     const e = engine({ native: undefined });
     expect((await e.begin(SESSION, { phrase: START_OVER_PHRASE, sensor: 'yes' })).status).toBe(400);
     expect((await e.begin(SESSION, { phrase: START_OVER_PHRASE, other: 1 })).status).toBe(400);
+    e.close();
+  });
+
+  it('a lockout, a timeout or a helper error is "try again", never a drop to typing (Fable r2)', async () => {
+    await seed();
+    const locked = new StandInHelper(NATIVE_PRESENCE_MACOS);
+    locked.transient = true;
+    const e = engine({ native: locked });
+    expect(await e.begin(SESSION, { phrase: START_OVER_PHRASE, sensor: 'none' })).toEqual({
+      status: 503,
+      body: { error: 'try_again' },
+    });
+    expect((await e.state()).body).toMatchObject({ presence: 'native' });
+    e.close();
+    const broken = new StandInHelper(NATIVE_PRESENCE_WINDOWS);
+    broken.availability = () => Promise.reject(new Error('helper gone'));
+    const e2 = engine({ native: broken });
+    expect((await e2.begin(SESSION, { phrase: START_OVER_PHRASE })).body).toEqual({
+      error: 'try_again',
+    });
+    expect(await exists(join(root.home, '.agentlink'))).toBe(true);
+    expect(keychain.items.has('owner')).toBe(true);
+    e2.close();
+  });
+});
+
+describe('start over: a new owner on the file KeyStore (Fable r2)', () => {
+  it('no owner item although the record had one, and a folder with a key file: earlier IDs only', async () => {
+    await seed();
+    const real = keychain.delete.bind(keychain);
+    let failing = true;
+    keychain.delete = (account: string) =>
+      failing && account === AGENT_B ? Promise.reject(new Error('refused')) : real(account);
+    const e = engine();
+    expect((await nativeRun(e)).body).toMatchObject({ status: 'partial', failed: 'keychain' });
+    // The old owner went; first run made a new owner on the file KeyStore (no keychain item).
+    for (const account of OWNER_ITEMS) keychain.items.delete(account);
+    await mkdir(join(root.home, '.agentlink', 'keystore'), { recursive: true });
+    await writeFile(join(root.home, '.agentlink', 'keystore', 'owner.alko'), 'new owner');
+    failing = false;
+    const retry = await nativeRun(e);
+    expect(retry.body).toEqual({ status: 'done', backup: join('~', BACKUP), earlierOnly: true });
+    expect(await readFile(join(root.home, '.agentlink', 'keystore', 'owner.alko'), 'utf8')).toBe(
+      'new owner',
+    );
+    expect(keychain.items.has(AGENT_B)).toBe(false);
+    expect((await readdir(root.home)).filter((n) => n.startsWith('.agentlink.'))).toEqual([BACKUP]);
     e.close();
   });
 });
