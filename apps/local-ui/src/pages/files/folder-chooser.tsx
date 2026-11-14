@@ -1,4 +1,4 @@
-// FILES-FOLDER-PICKER (D-161, proposed, owner confirms at merge; 08 §1 "Choosing a folder"; 04 §4,
+// FILES-FOLDER-PICKER (D-154, proposed, owner confirms at merge; 08 §1 "Choosing a folder"; 04 §4,
 // §4.1; D-99, D-116, D-119; I-4). One folder control for Settings › Files, the Files step and
 // Home's Files panel, in the way mature desktop apps choose a download location:
 //

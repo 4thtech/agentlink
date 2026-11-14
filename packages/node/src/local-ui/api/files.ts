@@ -251,14 +251,48 @@ export async function inboxRealpath(
   }
 }
 
+/** The default Inbox (06 §3), used when the rules can't be read (fail closed: still kept apart). */
+const DEFAULT_INBOX = '~/AgentLink/Inbox';
+
+/**
+ * Every form of the Inbox folder a Send folder must stay apart from: as the rules write it (`~`
+ * expanded, also against the home folder's realpath) and its realpath when it exists. When the rules
+ * can't be read, or the folder isn't created yet, the lexical forms still count (Fable r1).
+ */
+async function inboxForms(
+  client: LocalUiContext['client'],
+  home: string,
+  flavor: PathFlavor,
+): Promise<readonly string[]> {
+  let setting = DEFAULT_INBOX;
+  if (client !== undefined && (client as { policy?: unknown }).policy !== undefined) {
+    try {
+      const policy = await client.policy.load();
+      const given =
+        policy.mode === 'fail_closed'
+          ? undefined
+          : (policy.policy.files as { inboxFolder?: unknown } | undefined)?.inboxFolder;
+      if (typeof given === 'string' && given.length > 0) setting = given;
+    } catch {
+      // The default stays.
+    }
+  }
+  const forms = new Set<string>([expandHome(setting, home, flavor)]);
+  const homeReal = await realpathOrUndefined(home);
+  if (homeReal !== undefined) forms.add(expandHome(setting, homeReal, flavor));
+  const real = await realpathOrUndefined(expandHome(setting, home, flavor));
+  if (real !== undefined) forms.add(real);
+  return [...forms].filter((f) => parseAbsolutePath(f, flavor) !== undefined);
+}
+
 async function overlapsInbox(
   client: LocalUiContext['client'],
   folder: string,
   home: string,
   flavor: PathFlavor,
 ): Promise<boolean> {
-  const inbox = await inboxRealpath(client, home, flavor);
-  return inbox !== undefined && foldersOverlap(folder, inbox, flavor);
+  const forms = await inboxForms(client, home, flavor);
+  return forms.some((inbox) => foldersOverlap(folder, inbox, flavor));
 }
 
 /** A body kept for one review (per server). */
@@ -530,6 +564,10 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
     if (kept.change === 'add') {
       const again = await checkFolder(kept.folder, homeOf(), flavor);
       if (!again.ok || again.folder !== kept.folder) return fixed(409, 'folder_changed');
+      // Fable r1: the Inbox may have changed since the review; still never a Send folder.
+      if (await overlapsInbox(context.client, kept.folder, homeOf(), flavor)) {
+        return fixed(409, 'folder_changed');
+      }
     }
     const lines =
       kept.change === 'add'

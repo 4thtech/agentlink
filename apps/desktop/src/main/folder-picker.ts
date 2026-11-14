@@ -1,4 +1,4 @@
-// FILES-FOLDER-PICKER (D-161, proposed, owner confirms at merge; 08 §1 "Choosing a folder"): the
+// FILES-FOLDER-PICKER (D-154, proposed, owner confirms at merge; 08 §1 "Choosing a folder"): the
 // native folder dialog for Settings › Files, the Files step and Home's Files panel in the app's
 // window. Owner (14 Nov): "users should be able to click and then select via Finder."
 //
@@ -93,7 +93,11 @@ export function defaultPathOf(
   const sep = platform === 'win32' ? /^~[\\/]/ : /^~\//;
   const expanded =
     current === '~' ? home : sep.test(current) ? api.join(home, current.slice(2)) : current;
-  return api.isAbsolute(expanded) ? expanded : undefined;
+  if (!api.isAbsolute(expanded)) return undefined;
+  // Fable r1: on Windows only a drive path (never UNC `\\server\share` or `\\?\`): opening the
+  // dialog at a network share could reach out before the person chose anything.
+  if (platform === 'win32' && !/^[A-Za-z]:[\\/]/.test(expanded)) return undefined;
+  return expanded;
 }
 
 /** The dialog's answer as ONE absolute, showable path, or null. */

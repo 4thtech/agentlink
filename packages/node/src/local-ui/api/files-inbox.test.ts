@@ -284,3 +284,57 @@ describe('a Send folder never overlaps the Inbox', () => {
     expect(body(answer)).toEqual({ error: 'folder_refused', reason: 'inbox_folder' });
   });
 });
+
+describe('Fable r1 fixes', () => {
+  it('a Send folder around an Inbox that is not created yet is still refused', async () => {
+    mkdirSync(join(home, 'Later'), { recursive: true, mode: 0o700 });
+    fake.inboxFolder = '~/Later/Inbox';
+    const routes = createFilesRoutes({ home, flavor: FLAVOR });
+    const reviewRoute = routes.find((r) => r.path === '/api/ui/files/review') as LocalUiReadRoute;
+    const answer = await reviewRoute.handler(ctx(), {
+      params: {},
+      query: new URLSearchParams({ add: join(home, 'Later'), version: '3' }),
+    });
+    expect(body(answer)).toEqual({ error: 'folder_refused', reason: 'inbox_folder' });
+  });
+
+  it('a Send folder add is checked against the Inbox again at commit', async () => {
+    const routes = createFilesRoutes({ home, flavor: FLAVOR });
+    const context = ctx();
+    const reviewRoute = routes.find((r) => r.path === '/api/ui/files/review') as LocalUiReadRoute;
+    const commitRoute = routes.find((r) => r.presence === true) as LocalUiOwnerRoute;
+    const reviewed = await reviewRoute.handler(context, {
+      params: {},
+      query: new URLSearchParams({ add: received, version: '3' }),
+    });
+    expect(reviewed.status).toBe(200);
+    // The Inbox moved into that folder after the review.
+    fake.inboxFolder = received;
+    const calls: SignCall[] = [];
+    const answer = await commitRoute.handler(
+      context,
+      {
+        params: {},
+        query: new URLSearchParams(),
+        input: {
+          review: body(reviewed)['review'],
+          acknowledged: ['allowed_folders_added'],
+        } as never,
+      },
+      owner(calls),
+    );
+    expect(answer).toMatchObject({ status: 409, body: { error: 'folder_changed' } });
+    expect(calls).toHaveLength(0);
+  });
+
+  it('an Inbox commit without a client signs nothing (not set up)', async () => {
+    const { review, commit, context } = setup();
+    const token = body(await review(received))['review'] as string;
+    (context as { client?: unknown }).client = undefined;
+    const calls: SignCall[] = [];
+    const answer = await commit({ review: token, acknowledged: ['folder_changed'] }, calls);
+    expect(answer.status).toBe(409);
+    expect(body(answer)).toMatchObject({ error: 'not_set_up' });
+    expect(calls).toHaveLength(0);
+  });
+});

@@ -1,4 +1,4 @@
-// FILES-FOLDER-PICKER (D-161, proposed, owner confirms at merge; 04 §4.1 "The folder"; 08 §1
+// FILES-FOLDER-PICKER (D-154, proposed, owner confirms at merge; 04 §4.1 "The folder"; 08 §1
 // "Choosing a folder"; I-4, I-5): changing where received files are saved, the Inbox folder
 // (`files.inboxFolder`). 04 §4.1 already said "changeable in Settings with a `policy.set` behind
 // presence"; these are the routes that do it, the same way as a Send folder (files.ts).
@@ -306,9 +306,11 @@ export function createInboxRoutes(options: InboxRouteOptions = {}): readonly Loc
     }
     if (hashOf(canonicalize(one.body)) !== input.review) return fixed(409, 'unknown_review');
     // Checked again: a folder swapped for a link, or made a Send folder, since the review is refused.
+    // Fable r1: without a client the Send-folder rule can't be checked: nothing is signed.
+    if (context.client === undefined) return UI_NOT_SET_UP;
     let configured: readonly string[];
     try {
-      configured = (await context.client?.files.resolvedFolders())?.configured ?? [];
+      configured = (await context.client.files.resolvedFolders()).configured;
     } catch {
       return UI_UNAVAILABLE;
     }

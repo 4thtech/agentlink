@@ -157,6 +157,10 @@ describe('main process: who may open the dialog', () => {
     expect(parseChooseRequest({ purpose: 'inbox' })).toEqual({ purpose: 'inbox' });
     expect(defaultPathOf('relative', '/Users/a', 'darwin')).toBeUndefined();
     expect(defaultPathOf('~\\Docs', 'C:\\Users\\a', 'win32')).toBe('C:\\Users\\a\\Docs');
+    // Fable r1: never a UNC or device path on Windows.
+    expect(defaultPathOf('\\\\server\\share\\Inbox', 'C:\\Users\\a', 'win32')).toBeUndefined();
+    expect(defaultPathOf('\\\\?\\C:\\Inbox', 'C:\\Users\\a', 'win32')).toBeUndefined();
+    expect(defaultPathOf('C:/Users/a/Inbox', 'C:\\Users\\a', 'win32')).toBe('C:/Users/a/Inbox');
   });
 });
 
