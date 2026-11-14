@@ -9,6 +9,7 @@
 // here when cl.exe is on PATH (a Developer PowerShell). Gesture paths are the manual list in the .cpp.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { Buffer } from 'node:buffer';
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
