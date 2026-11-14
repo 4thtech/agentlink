@@ -1,8 +1,9 @@
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { checkAsar, main, pinOf } from './desktop-update-renewal-pin.mjs';
+import { checkAsar, main, pinOf, readAsarFromZip } from './desktop-update-renewal-pin.mjs';
 
 const pin = '7'.repeat(64);
 const other = 'a'.repeat(64);
@@ -40,5 +41,42 @@ describe('renewal pin check', () => {
     expect(
       main(['--root-key', rk, '--zip', 'one.zip'], { out, readAsar: () => Buffer.from(pin) }),
     ).toBe(1);
+  });
+
+  describe('real unzip path', () => {
+    const A = 'AgentLink.app/Contents/Resources/app.asar';
+    const make = (entries) => {
+      const dir = mkdtempSync(join(tmpdir(), 'zip-'));
+      const zip = join(dir, 'x.zip');
+      for (const [name, text] of entries) {
+        const f = join(dir, 'stage', name);
+        mkdirSync(join(f, '..'), { recursive: true });
+        writeFileSync(f, text);
+      }
+      const names = entries.map(([n]) => n);
+      execFileSync('zip', ['-q', '-X', zip, ...names], { cwd: join(dir, 'stage') });
+      return zip;
+    };
+    it('passes with exactly one asar that carries the pin', () => {
+      expect(readAsarFromZip(make([[A, `k${pin}`]])).toString()).toContain(pin);
+    });
+    it('ignores a nested asar: the main one is checked, so a pin only in the nested one fails', () => {
+      const nested = 'AgentLink.app/Contents/Frameworks/X.app/Contents/Resources/app.asar';
+      const asar = readAsarFromZip(
+        make([
+          [A, 'no pin'],
+          [nested, pin],
+        ]),
+      );
+      expect(() => checkAsar(asar, pin, 'x.zip')).toThrow(/does not carry/);
+    });
+    it('fails with no asar or a duplicate entry name', () => {
+      expect(() => readAsarFromZip(make([['AgentLink.app/other', 'x']]))).toThrow(/exactly one/);
+      const a = make([[A, 'one']]);
+      const b = make([[A, `two${pin}`]]);
+      const cat = join(mkdtempSync(join(tmpdir(), 'cat-')), 'c.zip');
+      writeFileSync(cat, Buffer.concat([readFileSync(a), readFileSync(b)]));
+      expect(() => readAsarFromZip(cat)).toThrow();
+    });
   });
 });

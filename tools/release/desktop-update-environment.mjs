@@ -19,6 +19,8 @@ export class EnvironmentError extends Error {}
 
 /** The only account allowed to approve a signing run (Tali, the owner). */
 export const OWNER_LOGIN = 'talirezun';
+/** talirezun's numeric GitHub id (a login can be renamed; the id cannot). */
+export const OWNER_ID = 61226945;
 
 const SETUP = 'Owner: set it up as in docs/runbooks/desktop-update-keys.md (RB-23), step 1.';
 
@@ -36,7 +38,9 @@ export function checkEnvironment(env, policies) {
   }
   if (env.can_admins_bypass !== false) fail('lets administrators bypass its rules');
   const rules = Array.isArray(env.protection_rules) ? env.protection_rules : [];
-  const reviewers = rules.find((r) => r?.type === 'required_reviewers');
+  const reviewerRules = rules.filter((r) => r?.type === 'required_reviewers');
+  if (reviewerRules.length > 1) fail('has more than one required-reviewers rule');
+  const reviewers = reviewerRules[0];
   if (!reviewers || !Array.isArray(reviewers.reviewers) || reviewers.reviewers.length < 1) {
     fail('has no required reviewer');
   }
@@ -45,7 +49,8 @@ export function checkEnvironment(env, policies) {
     (entry) =>
       entry?.type === 'User' &&
       typeof entry.reviewer?.login === 'string' &&
-      entry.reviewer.login.toLowerCase() === OWNER_LOGIN,
+      entry.reviewer.login.toLowerCase() === OWNER_LOGIN &&
+      entry.reviewer.id === OWNER_ID,
   );
   if (!onlyOwner) fail(`has a required reviewer who is not ${OWNER_LOGIN}`);
   const branch = env.deployment_branch_policy;

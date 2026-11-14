@@ -15,7 +15,7 @@ export class RenewalPinError extends Error {}
 const HEX32 = /^[0-9a-f]{64}$/;
 const UPDATES_OFF_MARK = 'AGENTLINK-DESKTOP-UPDATES-OFF';
 const PLACEHOLDER_MARK = 'PLACEHOLDER-AGENTLINK-DESKTOP-ROOT-KEY';
-const ASAR_IN_ZIP = '*/Contents/Resources/app.asar';
+const ASAR_IN_ZIP = 'AgentLink.app/Contents/Resources/app.asar';
 
 const fail = (why) => {
   throw new RenewalPinError(`${why}. Nothing is signed; ship a release instead of renewing.`);
@@ -46,11 +46,20 @@ export function checkAsar(asar, pin, label) {
 
 function asarOf(zip) {
   try {
+    const names = execFileSync('unzip', ['-Z1', zip], { maxBuffer: 64 * 1024 * 1024 })
+      .toString('utf8')
+      .split('\n')
+      .filter((n) => n === ASAR_IN_ZIP);
+    if (names.length !== 1)
+      return fail(`${zip.split('/').pop()} must hold exactly one ${ASAR_IN_ZIP}`);
     return execFileSync('unzip', ['-p', zip, ASAR_IN_ZIP], { maxBuffer: 1024 * 1024 * 1024 });
-  } catch {
-    return fail(`Cannot read app.asar from ${zip}`);
+  } catch (error) {
+    if (error instanceof RenewalPinError) throw error;
+    return fail(`Cannot read app.asar from ${zip.split('/').pop()}`);
   }
 }
+
+export const readAsarFromZip = asarOf;
 
 export function main(argv, { out = (l) => console.log(l), readAsar = asarOf } = {}) {
   try {

@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { checkEnvironment, main } from './desktop-update-environment.mjs';
 
-const owner = { type: 'User', reviewer: { login: 'talirezun', type: 'User' } };
+const owner = { type: 'User', reviewer: { login: 'talirezun', id: 61226945, type: 'User' } };
 const env = (reviewers = [owner], extra = {}) => ({
   name: 'desktop-update',
   can_admins_bypass: false,
@@ -25,6 +25,13 @@ describe('desktop-update environment guard', () => {
   it('fails closed when another reviewer is added next to the owner', () => {
     const other = { type: 'User', reviewer: { login: 'someone' } };
     expect(() => checkEnvironment(env([owner, other]), policies)).toThrow(/not talirezun/);
+  });
+  it('fails closed for the right login with another id, and for two reviewer rules', () => {
+    const imposter = { type: 'User', reviewer: { login: 'talirezun', id: 1 } };
+    expect(() => checkEnvironment(env([imposter]), policies)).toThrow(/not talirezun/);
+    const two = env();
+    two.protection_rules.push({ type: 'required_reviewers', reviewers: [owner] });
+    expect(() => checkEnvironment(two, policies)).toThrow(/more than one/);
   });
   it('fails closed for a team or a reviewer with no login', () => {
     expect(() =>
