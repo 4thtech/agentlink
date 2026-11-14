@@ -50,6 +50,12 @@ import {
 import { joinStep } from '../../apps/cli/dist/commands/join.js';
 import { uiRemovalPort } from '../../apps/cli/dist/commands/ui-remove.js';
 import { createAiAppsDesk } from '../../apps/cli/dist/harness/app-desk.js';
+import {
+  desktopHostAppears,
+  removeAppHostRecord,
+  showRunningApp,
+  writeAppHostRecord,
+} from '../../apps/cli/dist/runtime/app-host-record.js';
 import { createMcpCommand, processHeartbeat } from '../../apps/cli/dist/mcp/command.js';
 import { localUiOptions, type LocalUiWiringDeps } from '../../apps/cli/dist/mcp/local-ui-wiring.js';
 import {
@@ -222,7 +228,21 @@ export interface UiDepsSeams {
   readonly wrapRemoval?: (
     port: ReturnType<typeof uiRemovalPort>,
   ) => ReturnType<typeof uiRemovalPort>;
+  /**
+   * FIRSTRUN-MATRIX (APP-CONTINUITY): which kind of host this run stands in for. `terminal` is a
+   * plain `agentlink ui` (a record without `host`, answers a takeover with its own stop); `desktop`
+   * is the app's host (`host: "desktop"`, answers `show`). The record is the real file in this
+   * computer's home, with the live pid of the test runner's parent (never this process's own: the
+   * takeover code ignores its own pid). Absent: no record, as before.
+   */
+  readonly host?: 'terminal' | 'desktop';
 }
+
+/** A live pid that is not this process (the record's pid for the in-process hosts). */
+export const HOST_RECORD_PID = process.ppid;
+
+/** How many times a desktop host was asked to show its window, per computer home. */
+export const shownCount = new Map<string, number>();
 
 /**
  * The `UiDeps` of `agentlink ui` / `join` on this computer: the same steps as the CLI's nodeUiDeps
@@ -304,8 +324,35 @@ export function uiDepsOf(
     now,
   };
   const servers: UiServer[] = [];
-  let stopWait: (() => void) | undefined;
+  let stopWait: ((signal?: string) => void) | undefined;
   const startServer = startServerOf(pc);
+  const handoff =
+    seams.host === undefined
+      ? undefined
+      : {
+          write: (record: { port: number; handoffToken: string }) =>
+            writeAppHostRecord(pc.home, {
+              pid: HOST_RECORD_PID,
+              port: record.port,
+              handoffToken: record.handoffToken,
+              ...(seams.host === 'desktop' ? { host: 'desktop' as const } : {}),
+            }),
+          remove: () => removeAppHostRecord(pc.home, HOST_RECORD_PID),
+          ...(seams.host === 'terminal'
+            ? {
+                onYield: (): boolean => {
+                  if (stopWait === undefined) return false;
+                  stopWait('yield');
+                  return true;
+                },
+              }
+            : {
+                onShow: (): boolean => {
+                  shownCount.set(pc.home, (shownCount.get(pc.home) ?? 0) + 1);
+                  return true;
+                },
+              }),
+        };
   const deps: UiDeps = {
     agents: async () => (await pc.directory.list()).filter((e) => !e.removing).map((e) => e.name),
     lastUsed: () => pc.directory.readCurrent(),
@@ -322,6 +369,7 @@ export function uiDepsOf(
         aiApps: () => wiring.aiApps(),
         // HOTFIX-045-REMOVE-FIRSTRUN: Remove works in the session first run started.
         removal: removal(),
+        ...(handoff === undefined ? {} : { handoff: handoff as never }),
       });
       if (server !== undefined) servers.push(server);
       return server;
@@ -354,6 +402,7 @@ export function uiDepsOf(
           aiAppsList: { list: () => wiring.aiApps().list() },
           removal: removal(),
           ...(invite === undefined ? {} : { waitingInvite: invite }),
+          ...(handoff === undefined ? {} : { handoff: handoff as never }),
         },
       });
       const ui: UiServer = {
@@ -374,6 +423,13 @@ export function uiDepsOf(
         stopWait = undefined;
       };
     },
+    // APP-CONTINUITY: a terminal `ui` shows a running desktop app instead of starting a second host.
+    ...(seams.host === 'terminal'
+      ? {
+          runningApp: () => showRunningApp(pc.home),
+          appTookOver: () => desktopHostAppears(pc.home, 5_000),
+        }
+      : {}),
   };
   return Object.assign(deps, { stop: () => stopWait?.(), servers });
 }

@@ -566,6 +566,23 @@ describe('OUTBOX-NOW-1: retryNow sends rows in backoff at once (relays back)', (
     expect(a.spy.published).toHaveLength(8);
   });
 
+  it('P2-RETRY-MIN: a second call within the minimum interval does not cut the backoff again', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    a.spy.mode = 'none';
+    await a.client.sendMessage({ to: b.id, text: 'hello' });
+    expect((await a.client.outbox.retryNow()).retrying).toBe(4); // first call: sent again, failed again
+    const after = (await rows(a.store)).outbox.map((r) => r.next_attempt_at);
+    clock.t += 5;
+    expect((await a.client.outbox.retryNow()).sent).toBe(0); // too soon: backoff stays
+    expect(a.spy.published).toHaveLength(8);
+    expect((await rows(a.store)).outbox.map((r) => r.next_attempt_at)).toEqual(after);
+    clock.t += 30; // interval passed (and the 60 s backoff is still pending): cut again
+    a.spy.mode = 'ack';
+    expect((await a.client.outbox.retryNow()).sent).toBe(4);
+  });
+
   it('publishes nothing while the agent is paused, and keeps every deadline', async () => {
     const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
     const b = await openAgent(2, ownerB, 'bob', RELAYS_B);

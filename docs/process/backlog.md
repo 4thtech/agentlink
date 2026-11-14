@@ -10854,6 +10854,37 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Spec:** 04 §2.5 "An ID whose key is missing"; 08 §1; 11 §5
 - **Done when:** `identity_missing` is its own start reason (`broken_id`); another ID opens, or the host starts with none; Home offers Restore from backup, Remove from this computer (typed label + presence, folder set aside then leftover keys, nothing signed) and Continue without it; discard removes the folder before the keys; doctor prints fixed sentences whole; tests on posix (win32 paths guarded).
 
+
+#### P2-RETRY-MIN · `retryNow` has a minimum interval (0.5.5)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `packages/core/src/outbox.ts`, `packages/core/src/send.test.ts`
+- **Depends on:** OUTBOX-NOW-1 (IR-MSG-ORDER-1 low)
+- **Done when:** a `retryNow` within 30 s of the last one that cut backoffs short is a plain delivery pass (deadlines untouched); a flapping relay or a repeated click cannot hammer the relay; tested.
+
+#### P2-CLOUD-MIGRATE · The cloud agent store migrates any older schema to the current one (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `apps/cloud-agent/src/do-store.ts`, `apps/cloud-agent/test/store.test.ts`
+- **Depends on:** M2-3a-store6 (IR-RET-2-1 low)
+- **Done when:** a Durable Object store of any older schema version (v6, v15 fixtures) opens by one forward-only, all-or-nothing migration (missing tables created, missing nullable columns appended, version bumped, shape verified) instead of `store_needs_migration`; rows kept; a second open is a no-op; a newer version is still refused; tested.
+
+#### P2-UNREAD-AGE · Unread received messages with a pruned seen row age out (0.5.5)
+- **Status:** deferred: needs envelopes.received_at (v17), see card UNREAD-AGE-RECEIVED-AT · **Size:** XS · **Tier:** Sonnet · **Security:** S2
+- **Repo/path:** agentlink · `packages/core/src/history/delete.ts`
+- **Depends on:** RET-6, RET-7 (IR-RET-67-2 note b)
+- **Done when:** see UNREAD-AGE-RECEIVED-AT. A `createdAt` fallback was tried and dropped (Fable r1 Medium: the sender signs `createdAt` with no lower bound, so a contact could have an unread message deleted a week after arrival, IR-RET-67-1 M1, I-5). Unread messages without a local time keep, as before.
+
+#### UNREAD-AGE-RECEIVED-AT · A local arrival time for received messages (v17)
+- **Status:** backlog · **Size:** M · **Tier:** Opus · **Security:** S2
+- **Repo/path:** agentlink · `packages/core/src/{store/schema,envelopes,sync,history/delete}.ts`, `packages/node/src/sqlite-schema.ts`, `apps/cloud-agent/src/do-store.ts`
+- **Depends on:** P2-UNREAD-AGE
+- **Done when:** a nullable `envelopes.received_at` (migration v17) is set at receive from the local clock; `#prune` copies `first_seen_at` into it before pruning the seen row; the local age falls back to `max(createdAt, received_at)`; legacy rows without it keep; tests for backdating, pruning and legacy rows; docs say unread history ages by arrival.
+
+#### P2-TRUNCATED-COUNT · `truncated` is counted after the local-age filter (0.5.5)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `packages/core/src/history/delete.ts`, `packages/core/src/files/history-retention.test.ts`
+- **Depends on:** RET-6, RET-7 (IR-RET-67-2 note a)
+- **Done when:** the plan walks keyset pages until it holds one plan's worth of rows that pass the local-age filter (bounded scan), so a block of rows old by `createdAt` but new here neither hides later rows nor makes `truncated` read false; tested with the cap as a test seam. Independent of P2-UNREAD-AGE. The scan bound never overshoots and `truncated` is not set falsely at exactly the bound.
+
 #### WIN-INSTALLER-SHORTCUT · Desktop shortcut choice on the Windows installer's finish page (0.5.5)
 - **Status:** in review · **Size:** S · **Tier:** Sonnet build · **Security:** S1
 - **Repo/path:** agentlink · `apps/desktop/build/lib/nsis.mjs`, `apps/desktop/build/test/nsis.node-test.mjs`
@@ -11061,3 +11092,15 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Repo/path:** agentlink · `.github/workflows/desktop-update-renew.yml`, `tools/release/desktop-update-renewal-pin.mjs` (+ test)
 - **Depends on:** UPD-3 (IR-UPD-8-1 R2-1)
 - **Done when:** before the unsigned manifest is built, renew-manifest opens app.asar in both attested Mac zips and fails closed unless each is an updates-on build carrying exactly the key in the root-key.json of main (no updates-off mark, no placeholder); runs with `contents: read` only, no key; tests.
+
+#### FIRSTRUN-MATRIX · First run can't silently break again: automated browser and desktop coverage plus the owner's manual matrix (0.5.5, owner requirement 14 Nov)
+- **Status:** in review · **Size:** M · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `e2e/test/{firstrun-matrix,firstrun-continuity}.test.ts`, `e2e/test/app-world.ts` (host seam), `apps/desktop/test/smoke/{smoke.mjs,first-run-code.mjs}`, `docs/runbooks/firstrun-matrix.md`
+- **Depends on:** FIRSTRUN-ANY-PLATFORM, APP-CONTINUITY
+- **Spec:** 08 §1 first run and "One AgentLink, browser or app"; 04 §2.2
+- **Scope:** owner acceptance (fresh profile → master code in the app or browser with no WebAuthn on that path → optional Touch ID / Windows Hello / platform passkey → ID → AI app → Home; no terminal, no browser hand-off, no USB key) is covered by tests so a regression fails CI.
+- **Done when:**
+  - Browser e2e (Chromium, CDP virtual authenticator, temp HOME, real built app and server): no authenticator (also with `PublicKeyCredential` removed) → master code with zero `navigator.credentials` calls; authenticator without PRF → master code finishes; with PRF → one create; Windows → master code first, never "Touch ID"; cancelled gesture → "Try again, or use your master code instead" and Back works; no "Skip to Home" before an owner exists. Firefox and WebKit are not run here: the virtual authenticator is Chromium-only (ci.yml installs both browsers for other jobs).
+  - Desktop smoke (`desktop.yml`): the built app's host record says `host: "desktop"`, and first run goes through to an owner with the master code over the host's own calls. The Electron window cannot be driven (the shell refuses debugging switches); its WebAuthn switch is covered by `apps/desktop/test/unit/security.test.ts`.
+  - Continuity e2e: browser first then the app takes over by yield (same owner, no setup); app first then `agentlink ui` shows the app and starts no second host.
+  - `docs/runbooks/firstrun-matrix.md` (RB-22): the manual matrix with exact clicks and screen text from the strings files.
