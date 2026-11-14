@@ -72,8 +72,11 @@ export async function eraseBrokenAgentItems(
   let accounts: string[];
   try {
     const storeKey = keychainAccount(agentId, 'store-key');
+    const seedAccount = keychainAccount(agentId, 'seed');
+    // r2 Low: never the seed account (it was read as absent just below; nothing to erase there).
     accounts = agentEraseAccounts(agentId, []).filter(
-      (account) => options.keepStoreKey !== true || account !== storeKey,
+      (account) =>
+        account !== seedAccount && (options.keepStoreKey !== true || account !== storeKey),
     );
   } catch {
     throw eraseRefused();

@@ -130,4 +130,16 @@ describe('setAsideBrokenAgent (WIN-BROKEN-ID)', () => {
       code: 'agent_name_invalid',
     });
   });
+
+  it('a seed check that fails is its own error, never "the key is here" (r2)', async () => {
+    await writeAgentConfig(home, { v: 1, name: 'default', agentId: newId(), keyStore: 'keychain' });
+    await expect(
+      setAsideBrokenAgent(home, 'default', {
+        seedMissing: () => Promise.reject(new Error('locked')),
+        eraseLeftovers: () => Promise.resolve(),
+        now: () => NOW,
+      }),
+    ).rejects.toMatchObject({ code: 'agent_keys_unchecked' });
+    expect(await readAgentConfig(home, 'default')).toBeDefined();
+  });
 });

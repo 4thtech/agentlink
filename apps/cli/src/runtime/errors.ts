@@ -25,7 +25,9 @@ export type RuntimeErrorCode =
   /** WIN-BROKEN-ID: the ID's key is here (or it is not a keychain ID); it is not set aside. */
   | 'agent_not_broken'
   /** WIN-BROKEN-ID: the folder was set aside but some of the ID's leftover keys stayed. */
-  | 'agent_keys_left';
+  | 'agent_keys_left'
+  /** WIN-BROKEN-ID r2: the keychain did not answer whether the ID's seed is here. */
+  | 'agent_keys_unchecked';
 
 export const RUNTIME_MESSAGES: Readonly<Record<RuntimeErrorCode, string>> = Object.freeze({
   get agent_name_invalid(): string {
@@ -47,6 +49,8 @@ export const RUNTIME_MESSAGES: Readonly<Record<RuntimeErrorCode, string>> = Obje
   approval_id_invalid: "That approval ID isn't valid. Check it and try again.",
   agent_not_broken:
     'This ID can be opened on this computer, so it was not moved. Nothing was changed.',
+  agent_keys_unchecked:
+    "AgentLink couldn't check this computer's keys. Nothing was changed. Try again.",
   agent_keys_left:
     "AgentLink moved this ID's folder aside, but couldn't remove all of its leftover keys. Try again.",
 });

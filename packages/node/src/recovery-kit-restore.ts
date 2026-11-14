@@ -1116,6 +1116,8 @@ function build(options: RestoreEngineOptions): TerminalRestore {
    */
   async function existingFolders(
     labels?: Map<string, string>,
+    /** WIN-BROKEN-ID r2: receives the folder names whose config records `keyStore: 'keychain'`. */
+    keychainNames?: Set<string>,
   ): Promise<Map<string, string | undefined>> {
     const out = new Map<string, string | undefined>();
     let names: string[];
@@ -1133,10 +1135,12 @@ function build(options: RestoreEngineOptions): TerminalRestore {
           const parsed = JSON.parse(text) as {
             agentId?: unknown;
             label?: unknown;
+            keyStore?: unknown;
           };
           if (typeof parsed.agentId === 'string' && AGENT_ID.test(parsed.agentId)) {
             agentId = parsed.agentId;
             if (isConfigLabel(parsed.label)) labels?.set(agentId, parsed.label);
+            if (parsed.keyStore === 'keychain') keychainNames?.add(name);
           }
         }
       } catch {
@@ -1149,7 +1153,10 @@ function build(options: RestoreEngineOptions): TerminalRestore {
 
   async function summaryOf(kit: RecoveryKitImport): Promise<SummaryRow[]> {
     const localLabels = new Map<string, string>();
-    const folders = await existingFolders(localLabels);
+    // WIN-BROKEN-ID r2: only a keychain ID's folder can have "lost its seed" (a file-KeyStore ID
+    // keeps its key in its own file and never has a keychain seed).
+    const keychainNames = new Set<string>();
+    const folders = await existingFolders(localLabels, keychainNames);
     const ids = new Set([...folders.values()].filter((v): v is string => v !== undefined));
     const taken = new Set([...folders.keys()]);
     const kitNames = new Set(kit.agents.map((a) => ascii(a.name)));
@@ -1177,7 +1184,7 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         if (seed !== null) {
           wipe(seed);
           state = 'already_here';
-        } else if (hereFolder !== undefined) {
+        } else if (hereFolder !== undefined && keychainNames.has(hereFolder)) {
           state = 'new';
           rowName = hereFolder;
         } else state = 'already_here';
@@ -1582,15 +1589,24 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         ascii(agent.name);
       let written = false;
       let installed = false;
+      let oldStoreKey: Uint8Array | null = null;
+      let erased = false;
       try {
         // WIN-BROKEN-ID: the folder of this ID that is here (seed missing), kept as it is. A folder
         // of this ID under any other name refuses (never a second folder of the same ID).
-        const here = await existingFolders();
-        const kept = here.get(name) === agent.agentId;
+        const keychainNames = new Set<string>();
+        const here = await existingFolders(undefined, keychainNames);
+        const kept = here.get(name) === agent.agentId && keychainNames.has(name);
         if (!kept && [...here.values()].includes(agent.agentId)) throw new Error('folder');
+        // r2 Low: the leftover store key, held in memory only, put back if this ID rolls back.
+        oldStoreKey = await guarded(
+          () => keychain.get(keychainAccount(agent.agentId, 'store-key')),
+          keychainTimeoutMs,
+        );
         // Leftover items of this ID (its seed is gone, checked again right before the deletes; any
         // seed refuses) would refuse the import; the kit carries every one of them.
         await eraseBrokenAgentItems(keychain, agent.agentId, keychainTimeoutMs);
+        erased = true;
         await control.importAgent(current.kit, agent.agentId, {
           name,
           ...(owner === undefined ? {} : { owner: owner.session }),
@@ -1618,7 +1634,17 @@ function build(options: RestoreEngineOptions): TerminalRestore {
       } catch {
         if (installed) await removeInstalledFolder(name);
         if (written) await discardImportedAgent(keychain, agent.agentId);
+        // r2 Low: the store key that was here goes back, so a kept store stays readable.
+        if (erased && oldStoreKey !== null) {
+          const account = keychainAccount(agent.agentId, 'store-key');
+          const value = oldStoreKey;
+          await guarded(() => keychain.set(account, value), keychainTimeoutMs).catch(
+            () => undefined,
+          );
+        }
         out.push({ agentId: agent.agentId, name, label: name, outcome: 'failed' });
+      } finally {
+        if (oldStoreKey !== null) wipe(oldStoreKey);
       }
     }
     return out;

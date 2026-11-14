@@ -34,6 +34,7 @@ export type OwnerKind =
   | 'label_mismatch'
   /** WIN-BROKEN-ID: the ID's key is still here; it was not removed from this computer. */
   | 'key_here'
+  | 'keys_unchecked'
   | 'invalid'
   | 'not_applied'
   | 'agent_removing'
@@ -101,6 +102,7 @@ const WORDS: ReadonlySet<string> = new Set([
   'label_invalid',
   'label_mismatch',
   'key_here',
+  'keys_unchecked',
   'invalid',
   'not_applied',
   'agent_removing',

@@ -325,6 +325,7 @@ export function RemoveSheet({
           }
           // WIN-BROKEN-ID: its key is still here, so it was not moved; nothing changed.
           if (outcome.kind === 'key_here') return setError(S.brokenKeyHere);
+          if (outcome.kind === 'keys_unchecked') return setError(S.brokenKeysUnchecked);
           const said = gateMessage(outcome);
           if (said !== undefined) return setError(said);
           if (outcome.kind === 'in_use') {

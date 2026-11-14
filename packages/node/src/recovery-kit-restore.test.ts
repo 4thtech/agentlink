@@ -1645,3 +1645,25 @@ describe.runIf(POSIX)('UX1113-QA2 N4: a restored ID keeps the name people know',
     expect(rows[0]).not.toHaveProperty('label');
   }, 60_000);
 });
+
+describe.runIf(POSIX)('a file-KeyStore ID is never "missing its key" (WIN-BROKEN-ID r2)', () => {
+  it('a folder of this ID with keyStore file stays already_here; nothing goes to the keychain', async () => {
+    const { code: c, agents } = await kitOnDisk([{ name: 'helper' }]);
+    const a = agents[0] as (typeof agents)[0];
+    const dir = join(t.home, '.agentlink', 'agents', 'helper');
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    const config = `${JSON.stringify({ v: 1, name: 'helper', agentId: a.agentId, keyStore: 'file' })}\n`;
+    await writeFile(join(dir, 'config.json'), config, { mode: 0o600 });
+    const opened = await openKit('S1', await foundHandle(), c);
+    const ids = (body(opened)['summary'] as { ids: Record<string, unknown>[] }).ids;
+    expect(ids[0]?.['state']).toBe('already_here');
+    const refused = await engine.applyBegin('S1', {
+      kit: body(opened)['kit'] as string,
+      selection: [a.agentId],
+      names: {},
+    });
+    expect(body(refused)['error']).toBe('invalid');
+    expect([...keychain.items.keys()]).toEqual([]);
+    expect(await readFile(join(dir, 'config.json'), 'utf8')).toBe(config);
+  });
+});

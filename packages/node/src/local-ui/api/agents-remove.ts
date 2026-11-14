@@ -204,6 +204,8 @@ export type RemoveOutcome =
    * store key is gone): it is never set aside; nothing changed.
    */
   | 'key_here'
+  /** WIN-BROKEN-ID r2: the keychain did not answer the seed check; nothing changed, try again. */
+  | 'keys_unchecked'
   | 'failed';
 
 /** The HTTP status of each outcome. */
@@ -217,6 +219,7 @@ export const REMOVE_STATUS: Readonly<Record<RemoveOutcome, number>> = Object.fre
   not_available: 501,
   invalid: 400,
   key_here: 409,
+  keys_unchecked: 503,
   failed: 500,
 });
 

@@ -253,6 +253,8 @@ interface Faults {
   folder?: boolean;
   /** WIN-BROKEN-ID: the set-aside move fails. */
   setAside?: boolean;
+  /** WIN-BROKEN-ID r2: the seed check gets no answer from the keychain. */
+  setAsideUnchecked?: boolean;
   contacts?: number;
   delivery?: 'delivered' | 'undeliverable';
   /** Runs inside queueCarriers, while the gesture is live. */
@@ -368,6 +370,9 @@ async function world(
     // WIN-BROKEN-ID: the folder moved aside (the CLI's setAsideBrokenAgent is tested in the CLI).
     setAside: (name) => {
       if (faults.setAside === true) return Promise.reject(new Error('disk'));
+      if (faults.setAsideUnchecked === true) {
+        return Promise.reject(Object.assign(new Error('x'), { code: 'agent_keys_unchecked' }));
+      }
       // As the CLI's setAsideBrokenAgent (r1 M1): only an ID whose SEED is gone is set aside.
       const id = entries.get(name)?.agentId ?? '';
       if (keychain.items.has(id)) {
@@ -1341,5 +1346,14 @@ describe('WIN-BROKEN-ID: Remove this ID from this computer (an ID whose key is m
     } finally {
       keychain.items.delete(OWNER_PASSKEY_ACCOUNT);
     }
+  });
+
+  it('r2: a seed check the keychain did not answer is keys_unchecked, nothing moved', async () => {
+    const w = await world({ broken: true });
+    w.faults.setAsideUnchecked = true;
+    const res = await remove(w, { name: 'work', typedLabel: 'Work' });
+    expect(res.status).toBe(503);
+    expect(res.json).toEqual({ status: 'keys_unchecked' });
+    expect(w.entries.has('work')).toBe(true);
   });
 });

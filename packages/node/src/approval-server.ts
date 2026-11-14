@@ -8146,9 +8146,18 @@ export async function startApprovalServerWith(
               await setAside(input.name);
             } catch (error) {
               // r1 M1: the seed is here (only the store key is gone): never set aside, nothing moved.
-              if ((error as { code?: unknown } | null)?.code === 'agent_not_broken') {
+              const code = (error as { code?: unknown } | null)?.code;
+              if (code === 'agent_not_broken') {
                 emit({ kind: 'remove', outcome: 'key_here' });
                 return { status: REMOVE_STATUS.key_here, body: { status: 'key_here' } };
+              }
+              // r2: the keychain did not answer the seed check: its own answer, nothing moved.
+              if (code === 'agent_keys_unchecked') {
+                emit({ kind: 'remove', outcome: 'keys_unchecked' });
+                return {
+                  status: REMOVE_STATUS.keys_unchecked,
+                  body: { status: 'keys_unchecked' },
+                };
               }
               emit({ kind: 'remove', outcome: 'failed', step: 'set_aside' });
               return { status: REMOVE_STATUS.failed, body: { status: 'failed' } };

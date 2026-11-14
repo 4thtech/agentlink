@@ -66,7 +66,13 @@ export async function setAsideBrokenAgent(
   const { agentId, keyStore } = found.config;
   // A file-KeyStore ID's key is its passphrase-protected file, never "missing" this way.
   if (keyStore !== 'keychain') throw new RuntimeError('agent_not_broken');
-  const missing = await (deps.seedMissing ?? osAgentSeedMissing)(agentId).catch(() => false);
+  // r2: a check that fails is its own answer (never "the key is here").
+  let missing: boolean;
+  try {
+    missing = await (deps.seedMissing ?? osAgentSeedMissing)(agentId);
+  } catch {
+    throw new RuntimeError('agent_keys_unchecked');
+  }
   if (!missing) throw new RuntimeError('agent_not_broken');
   // 1. The folder, whole, out of `agents`: the ID is no longer listed and can be moved back.
   await moveAgentFolderAside(home, name, stampOf((deps.now ?? Date.now)()), check);

@@ -88,3 +88,22 @@ describe('agentSeedMissing and keepStoreKey (WIN-BROKEN-ID r1)', () => {
     expect([...k.items.keys()]).toEqual([keychainAccount(id, 'store-key')]);
   });
 });
+
+describe('eraseBrokenAgentItems never deletes the seed account (WIN-BROKEN-ID r2)', () => {
+  it('a seed written between the check and the deletes is not erased', async () => {
+    const id = newId();
+    const deleted: string[] = [];
+    const k = new MapKeychain();
+    const spy: KeychainBackend = {
+      get: (a) => k.get(a),
+      set: (a, v) => k.set(a, v),
+      delete: (a) => {
+        deleted.push(a);
+        return k.delete(a);
+      },
+    };
+    await eraseBrokenAgentItems(spy, id);
+    expect(deleted).not.toContain(keychainAccount(id, 'seed'));
+    expect(deleted).toContain(keychainAccount(id, 'store-key'));
+  });
+});
