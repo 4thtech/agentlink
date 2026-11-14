@@ -592,7 +592,7 @@ export interface LocalUiRestoreRoute {
   readonly step: LocalUiRestoreStep;
 }
 
-/** OWNER-START-OVER (D-152): the steps of the start-over kind, each at one fixed path (04 §2.5.4). */
+/** OWNER-START-OVER (D-153): the steps of the start-over kind, each at one fixed path (04 §2.5.4). */
 export const START_OVER_PATHS = Object.freeze({
   state: '/api/ui/start-over/state',
   begin: '/api/ui/start-over/begin',
@@ -602,7 +602,7 @@ export const START_OVER_PATHS = Object.freeze({
 export type LocalUiStartOverStep = keyof typeof START_OVER_PATHS;
 
 /**
- * OWNER-START-OVER (D-152; 04 §2.5.4 "Start over on this computer"; 08 §1): "Forgot your master
+ * OWNER-START-OVER (D-153; 04 §2.5.4 "Start over on this computer"; 08 §1): "Forgot your master
  * code? Start over on this computer". Three fixed paths (START_OVER_PATHS), each registered once,
  * `state` a GET and the others POSTs, with no handler: the server's start-over gate runs them after
  * the session, CSRF, Host and fetch-metadata (and, for a POST, Origin and octet-stream) checks,

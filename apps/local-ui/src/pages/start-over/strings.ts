@@ -1,4 +1,4 @@
-// OWNER-START-OVER (D-152; 11 §5): the copy of "Forgot your master code? Start over on this
+// OWNER-START-OVER (D-153; 11 §5): the copy of "Forgot your master code? Start over on this
 // computer". 11 §5.1: ID, master code, recovery kit; never wallet, key, seed phrase or password.
 // String keys `local.startOver.*` (11 §5.4).
 import type { Platform } from '../first-run/strings.js';
@@ -40,16 +40,32 @@ export const CONFIRM = {
   button: (sensor: string | undefined): string =>
     sensor === undefined ? 'Start over' : `Start over with ${sensor}`,
   browserNote:
-    'Your browser asks you to confirm it’s you, with Touch ID, Windows Hello or a security key.',
+    'Your browser asks you to confirm it’s you with Touch ID or Windows Hello. Without them, you type start over once more.',
+  /** Desktop app without Touch ID or Windows Hello: the second typing comes next. */
+  next: 'Continue',
   working: 'Starting over…',
   back: 'Back',
+} as const;
+
+/** Owner decision (14 Nov 2026): no sensor on this computer, so the phrase is typed twice. */
+export const AGAIN = {
+  title: 'Type start over once more',
+  lead: "This computer can't confirm it's you with Touch ID or Windows Hello, so type it again to be sure. AgentLink then starts over.",
+  label: 'Type start over again',
+  button: 'Start over',
 } as const;
 
 export const DONE = {
   title: 'You can start fresh',
   backup: (path: string): string => `Your old folder is kept as ${path}.`,
-  apps: 'Restart your AI apps so they stop using the old ID.',
+  appsTitle: 'Quit and reopen your AI apps',
+  apps: 'Until you do, they keep using the old ID and keep writing into the backup folder.',
+  passkeys:
+    'Passkeys named AgentLink stay in your browser or system settings. You can delete them there.',
   next: 'Set up AgentLink',
+  earlierTitle: 'The earlier start over is finished',
+  earlier:
+    'AgentLink removed what an earlier start over left behind. Your current IDs and master code were not changed.',
 } as const;
 
 export const PARTIAL = {

@@ -2262,7 +2262,7 @@ export async function startApprovalServerWith(
         },
       },
     }));
-  // OWNER-START-OVER (D-152; 04 §2.5.4): the start-over engine of the start-over gate (its only
+  // OWNER-START-OVER (D-153; 04 §2.5.4): the start-over engine of the start-over gate (its only
   // caller). The app host closes the open ID before the move and opens first run after it.
   let startOverInstance: StartOverEngine | undefined;
   /** OWNER-START-OVER: first run with no ID, once a start over emptied this host. */
@@ -6491,7 +6491,7 @@ export async function startApprovalServerWith(
    * A presence header only on the presence step. Nothing here reads, logs or echoes a body.
    */
   /**
-   * OWNER-START-OVER (D-152; 04 §2.5.4): the start-over kind. After the session, CSRF, Host and
+   * OWNER-START-OVER (D-153; 04 §2.5.4): the start-over kind. After the session, CSRF, Host and
    * fetch-metadata checks of handleUi: no query; a POST needs Origin and an octet-stream body; only
    * the app host offers it (`open_app` otherwise: the ID is open in another process). `begin` takes
    * the typed phrase as input and no body; `finish` takes the nonce, the presence mode
@@ -6522,7 +6522,7 @@ export async function startApprovalServerWith(
     if (type !== 'application/octet-stream') return refuse(415, 'content_type');
     const mode = header(req, 'x-agentlink-presence');
     if (route.step === 'begin' && mode !== undefined) return refuse(400, 'invalid');
-    if (mode !== undefined && mode !== 'native' && mode !== 'passkey') {
+    if (mode !== undefined && mode !== 'native' && mode !== 'passkey' && mode !== 'typed') {
       return refuse(400, 'invalid');
     }
     const input = operationInput(req);
@@ -7120,7 +7120,7 @@ export async function startApprovalServerWith(
       return;
     }
     if (route.presence === 'start-over') {
-      // OWNER-START-OVER (D-152): its own gate, like restore: no agent needed, no generation.
+      // OWNER-START-OVER (D-153): its own gate, like restore: no agent needed, no generation.
       if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return fail(403, 'csrf');
       await startOverGate(req, res, url, route, cookie as string, originHeader);
       return;
@@ -7726,7 +7726,7 @@ export async function startApprovalServerWith(
    */
   function noAgentFirstRun(): AppHostFirstRun | undefined {
     const slot = host;
-    // OWNER-START-OVER (D-152): a host that started with an ID gets first run after a start over.
+    // OWNER-START-OVER (D-153): a host that started with an ID gets first run after a start over.
     const firstRun = options.host?.firstRun ?? startedOver;
     if (slot === undefined || firstRun === undefined || slot.current !== undefined)
       return undefined;

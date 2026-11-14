@@ -1,4 +1,4 @@
-// OWNER-START-OVER (D-152): the quiet link under a master code field, to "Start over on this
+// OWNER-START-OVER (D-153): the quiet link under a master code field, to "Start over on this
 // computer" (/restore/start-over). A plain link: the page it opens explains what is lost and offers
 // Restore from recovery kit first. Kept tiny so code fields do not load the start-over page.
 import type { ReactElement } from 'react';

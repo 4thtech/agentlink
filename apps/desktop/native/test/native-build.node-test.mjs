@@ -56,9 +56,11 @@ test('exit code table is fixed and the same in both helpers', () => {
 });
 
 test('reason ids are a fixed set and the macOS reason texts live in the helper', () => {
-  assert.deepEqual(REASONS, ['setup', 'approve', 'pay', 'code']);
+  assert.deepEqual(REASONS, ['setup', 'approve', 'pay', 'code', 'reset']);
   // D15-04: Replace master code names the operation on the OS sheet.
   assert.match(macSrc, /case "code": return "replace your AgentLink master code"/);
+  // OWNER-START-OVER (D-153): Start over names itself on the OS sheet.
+  assert.match(macSrc, /case "reset": return "start over AgentLink on this computer"/);
   for (const r of REASONS) {
     assert.match(macSrc, new RegExp(`case "${r}": return "[^"]+"`));
     assert.match(winSrc, new RegExp(`L"${r}"`));

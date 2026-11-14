@@ -2,7 +2,7 @@
 // first-party presence helper of the desktop app (DESK-D12b, apps/desktop/native/*/agentlink-presence.*,
 // whose header is the contract). Fixed argv only:
 //   available · create · check (macOS) · ecdh <reason> (macOS) · sign <reason> (Windows) · delete (Windows)
-// with <reason> one of the fixed ids setup | approve | pay | code (display-only: the helper shows its own
+// with <reason> one of the fixed ids setup | approve | pay | code | reset (display-only: the helper shows its own
 // fixed text and releases the same secret for every reason). The record goes on stdin as lowercase
 // hex and one newline; stdout is lowercase hex and one newline on success, nothing else is accepted;
 // stderr carries at most one fixed diagnostic line of the macOS helper (DESK-NATIVE-DEBUG,
@@ -41,8 +41,9 @@ import {
 /**
  * The fixed reason ids (display-only). `code` (D15-04): Replace master code, the one operation that
  * mints a new root secret, is named on the OS sheet instead of reading like a routine approval.
+ * `reset` (OWNER-START-OVER, D-153): Start over on this computer names itself on the sheet.
  */
-export const NATIVE_REASONS = Object.freeze(['setup', 'approve', 'pay', 'code'] as const);
+export const NATIVE_REASONS = Object.freeze(['setup', 'approve', 'pay', 'code', 'reset'] as const);
 export type NativeReason = (typeof NATIVE_REASONS)[number];
 
 /** The helpers' fixed exit codes (identical on macOS and Windows; apps/desktop/build/native.mjs). */

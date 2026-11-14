@@ -81,7 +81,7 @@ export const TOUCH_ID_STRINGS = {
     `If ${sensor} still works, replace the code now. If neither works, restore from your recovery kit on this computer. No kit? You can start over on this computer.`,
   lostReplace: 'Replace master code now',
   lostRestore: 'Backup & restore',
-  // OWNER-START-OVER (D-152).
+  // OWNER-START-OVER (D-153).
   lostStartOver: 'Start over on this computer',
 
   // Card 3: what asks.

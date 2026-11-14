@@ -10747,8 +10747,8 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Status:** in review (branch `rel055/owner-start-over`) · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2
 - **Repo/path:** agentlink · new `packages/node/src/start-over.ts`, `packages/node/src/local-ui/api/start-over.ts` (the start-over route kind), `approval-server.ts` start-over gate, `apps/local-ui/src/pages/start-over/*`
 - **Depends on:** D-147 (restore in the app); consumes the platform-neutral `NativeHelper` (WIN-HELLO-NATIVE in parallel); links into first run (FIRSTRUN-ANY-PLATFORM owns those pages)
-- **Spec:** D-152; 04 §2.5.4; 08 §1; 11 §5
-- **Done when:** `RED (expected):` commit first; the routes refuse a caller without the page session (no MCP tool, no agent credential, I-4); begin needs the typed phrase, finish a fresh OS presence gesture; `~/.agentlink` is moved to `~/.agentlink.backup-YYYYMMDD-HHMMSS`, never deleted; only AgentLink's keychain accounts are erased, by exact name; a failed move or erase is answered and safe to retry; Restore from recovery kit is offered first; copy per 11 §5.
+- **Spec:** D-153; 04 §2.5.4; 08 §1; 11 §5
+- **Done when:** `RED (expected):` commit first; the routes refuse a caller without the page session (no MCP tool, no agent credential, I-4); begin needs the typed phrase, finish a fresh OS presence gesture, or the phrase typed again where no user-verifying presence exists (owner, 14 Nov), never a downgrade where it exists; the owner items only after every ID erase and never a new owner's; `~/.agentlink` is moved to `~/.agentlink.backup-YYYYMMDD-HHMMSS`, never deleted; only AgentLink's keychain accounts are erased, by exact name; a failed move or erase is answered and safe to retry; Restore from recovery kit is offered first; copy per 11 §5.
 
 #### FILES-SPEC-055 · Files UX spec and decision D-152: send-by-content, AI-side texts, Files step, Home panel (0.5.5)
 - **Status:** in review · **Size:** S · **Tier:** Opus build, Opus independent review (spec only) · **Security:** S2 (spec: MCP-reachable filesystem write, I-4 boundary)

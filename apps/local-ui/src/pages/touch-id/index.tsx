@@ -501,7 +501,7 @@ export function TouchIdPage({
               <a className="al-btn al-btn-ghost al-btn-md" href="/settings/backup">
                 {S.lostRestore}
               </a>
-              {/* OWNER-START-OVER (D-152): no kit and no Touch ID: start over on this computer. */}
+              {/* OWNER-START-OVER (D-153): no kit and no Touch ID: start over on this computer. */}
               <a className="al-btn al-btn-ghost al-btn-md" href="/restore/start-over">
                 {S.lostStartOver}
               </a>

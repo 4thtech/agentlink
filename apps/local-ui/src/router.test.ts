@@ -93,7 +93,7 @@ const FOCUSED = [
   '/restore/kit',
   '/restore/check',
   '/restore/move',
-  // OWNER-START-OVER (D-152): start over on this computer.
+  // OWNER-START-OVER (D-153): start over on this computer.
   '/restore/start-over',
 ];
 

@@ -1,4 +1,4 @@
-// OWNER-START-OVER (D-152; 04 §2.5.4 "Start over on this computer"; I-4, I-7): the engine behind
+// OWNER-START-OVER (D-153; 04 §2.5.4 "Start over on this computer"; I-4, I-7): the engine behind
 // "Forgot your master code? Start over on this computer". Tests run on a temporary HOME and an
 // in-memory keychain only (never the real ~/.agentlink or the OS keychain).
 //
@@ -10,7 +10,7 @@
 //   exact names; nothing else in the keychain is touched.
 // - A partial failure is answered (never silent) and is safe to retry: a retry finishes the erase
 //   from the record in the backup and never moves or erases twice.
-import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import {
   NATIVE_PRESENCE_MACOS,
@@ -178,11 +178,11 @@ describe('start over: the typed phrase and the presence gesture (I-4)', () => {
     e.close();
   });
 
-  it('macOS: a throwaway key and one Touch ID sheet (reason `code`); Windows: one Hello prompt', async () => {
+  it('macOS: a throwaway key and one Touch ID sheet (reason `reset`); Windows: one Hello prompt', async () => {
     const mac = new StandInHelper(NATIVE_PRESENCE_MACOS);
     const e1 = engine({ native: mac });
     expect((await nativeRun(e1)).status).toBe(200);
-    expect(mac.calls).toEqual(['create@0', 'release:code@0']);
+    expect(mac.calls).toEqual(['create@0', 'release:reset@0']);
     e1.close();
     const win = new StandInHelper(NATIVE_PRESENCE_WINDOWS);
     const e2 = engine({ native: win });
@@ -318,7 +318,6 @@ describe('start over: partial failure is reported and safe to retry', () => {
     await seed();
     let fail = true;
     const reopened: number[] = [];
-    const { rename } = await import('node:fs/promises');
     const e = engine({
       rename: (from, to) => {
         if (fail) {
@@ -397,6 +396,191 @@ describe('start over: partial failure is reported and safe to retry', () => {
       done: boolean;
     };
     expect(first.done).toBe(true);
+    e.close();
+  });
+});
+
+describe('start over: review round 1 (IR M1, M2, lows)', () => {
+  it('M1: a folder that comes back between the move and the erase keeps the owner and the records undone', async () => {
+    await seed();
+    const e = engine({
+      rename: async (from, to) => {
+        await rename(from, to);
+        // A running AI app recreates its folder at once.
+        await mkdir(join(from, 'agents', 'default'), { recursive: true });
+      },
+    });
+    const answer = await nativeRun(e);
+    expect(answer.body).toEqual({
+      status: 'partial',
+      backup: join('~', BACKUP),
+      failed: 'keychain',
+    });
+    expect(keychain.items.has('owner')).toBe(true);
+    const record = JSON.parse(
+      await readFile(join(root.home, BACKUP, START_OVER_RECORD), 'utf8'),
+    ) as {
+      done: boolean;
+    };
+    expect(record.done).toBe(false);
+    expect((await e.state()).body).toMatchObject({ unfinished: true });
+    e.close();
+  });
+
+  it('M2: the owner items stay while any ID erase failed', async () => {
+    await seed();
+    const real = keychain.delete.bind(keychain);
+    keychain.delete = (account: string) =>
+      account === AGENT_A ? Promise.reject(new Error('refused')) : real(account);
+    const e = engine();
+    expect((await nativeRun(e)).body).toMatchObject({ status: 'partial', failed: 'keychain' });
+    for (const account of OWNER_ITEMS) expect(keychain.items.has(account)).toBe(true);
+    e.close();
+  });
+
+  it('M2: a record write that fails is a partial answer, never done', async () => {
+    await seed();
+    let backupDir = '';
+    const e = engine({
+      rename: async (from, to) => {
+        await rename(from, to);
+        backupDir = to;
+        await chmod(to, 0o500);
+      },
+    });
+    const first = await nativeRun(e);
+    await chmod(backupDir, 0o700);
+    expect(first.body).toMatchObject({ status: 'partial', failed: 'keychain' });
+    expect((await e.state()).body).toMatchObject({ unfinished: true });
+    const second = await nativeRun(e);
+    expect(second.body).toEqual({ status: 'done', backup: join('~', BACKUP) });
+    e.close();
+  });
+
+  it("M2: an unfinished record and a NEW owner: the new owner's folder and items are untouched", async () => {
+    await seed();
+    const real = keychain.delete.bind(keychain);
+    let failing = true;
+    keychain.delete = (account: string) =>
+      failing && account === AGENT_B ? Promise.reject(new Error('refused')) : real(account);
+    const e = engine();
+    expect((await nativeRun(e)).body).toMatchObject({ status: 'partial', failed: 'keychain' });
+    // The case M2 guards: the old owner went (e.g. erased by hand), then first run made a new owner.
+    for (const account of OWNER_ITEMS) keychain.items.delete(account);
+    await mkdir(join(root.home, '.agentlink', 'agents', 'default'), { recursive: true });
+    await writeFile(join(root.home, '.agentlink', 'agents', 'default', 'config.json'), '{}');
+    keychain.items.set('owner', bytes(9));
+    keychain.items.set('owner-passkey', bytes(9));
+    failing = false;
+    const retry = await nativeRun(e);
+    expect(retry.body).toEqual({ status: 'done', backup: join('~', BACKUP), earlierOnly: true });
+    expect(await exists(join(root.home, '.agentlink', 'agents', 'default', 'config.json'))).toBe(
+      true,
+    );
+    expect(keychain.items.get('owner')).toEqual(bytes(9));
+    expect(keychain.items.get('owner-passkey')).toEqual(bytes(9));
+    expect(keychain.items.has(AGENT_B)).toBe(false);
+    expect((await readdir(root.home)).filter((n) => n.startsWith('.agentlink.'))).toEqual([BACKUP]);
+    expect((await e.state()).body).toMatchObject({ unfinished: false });
+    e.close();
+  });
+
+  it('only gestures that were made and not recognised count toward the wait', async () => {
+    for (const state of ['cancelled', 'unavailable', 'timeout'] as const) {
+      const helper = new StandInHelper(NATIVE_PRESENCE_MACOS);
+      helper.gesture = state;
+      const e = engine({ native: helper });
+      for (let i = 0; i < 5; i += 1) expect((await nativeRun(e)).status).toBe(403);
+      expect((await begin(e)).status).toBe(200);
+      e.close();
+    }
+  });
+});
+
+describe('start over without a user-verifying sensor: the phrase typed twice (owner decision)', () => {
+  const noSensor = (
+    kind: typeof NATIVE_PRESENCE_MACOS | typeof NATIVE_PRESENCE_WINDOWS,
+  ): StandInHelper => {
+    const helper = new StandInHelper(kind);
+    helper.available = () => Promise.resolve(false);
+    return helper;
+  };
+
+  async function typedRun(e: Engine, second: unknown, input: Record<string, unknown> = {}) {
+    const started = await e.begin(SESSION, { phrase: START_OVER_PHRASE, ...input } as never);
+    expect(started.body).toMatchObject({ status: 'presence', presence: 'typed' });
+    const nonce = (started.body as { nonce: string }).nonce;
+    const finishInput = second === undefined ? { nonce } : { nonce, phrase: second };
+    return e.finish(SESSION, finishInput as never, 'typed', new Uint8Array(0));
+  }
+
+  it('a browser without a platform authenticator, a Mac without Touch ID, a PC without Hello', async () => {
+    const cases = [
+      { native: undefined, input: { sensor: 'none' } },
+      { native: noSensor(NATIVE_PRESENCE_MACOS), input: {} },
+      { native: noSensor(NATIVE_PRESENCE_WINDOWS), input: {} },
+    ];
+    for (const [i, c] of cases.entries()) {
+      await seed();
+      const e = engine({ native: c.native, now: () => NOW + i * 1000 });
+      if (c.native !== undefined) {
+        expect((await e.state()).body).toMatchObject({ presence: 'typed' });
+      }
+      const done = await typedRun(e, ' Start Over ', c.input);
+      expect(done.body).toMatchObject({ status: 'done' });
+      expect(await exists(join(root.home, '.agentlink'))).toBe(false);
+      expect(keychain.items.has('owner')).toBe(false);
+      e.close();
+    }
+  });
+
+  it('a wrong or missing second phrase changes nothing, and the nonce is spent', async () => {
+    await seed();
+    const e = engine({ native: undefined });
+    for (const second of [undefined, '', 'start', 'yes', 7]) {
+      const answer = await typedRun(e, second, { sensor: 'none' });
+      expect(answer).toEqual({ status: 400, body: { error: 'phrase' } });
+    }
+    expect(await exists(join(root.home, '.agentlink'))).toBe(true);
+    expect(keychain.items.has('owner')).toBe(true);
+    e.close();
+  });
+
+  it('where a gesture is available, typing alone is refused (no downgrade)', async () => {
+    await seed();
+    // Desktop app with Touch ID: the page asks for less, the server still wants the sheet.
+    const e = engine();
+    const started = await e.begin(SESSION, { phrase: START_OVER_PHRASE, sensor: 'none' });
+    expect(started.body).toMatchObject({ presence: 'native' });
+    const nonce = (started.body as { nonce: string }).nonce;
+    const typed = await e.finish(
+      SESSION,
+      { nonce, phrase: START_OVER_PHRASE },
+      'typed',
+      new Uint8Array(0),
+    );
+    expect(typed).toEqual({ status: 400, body: { error: 'presence_required' } });
+    // A browser without the claim: a passkey is required, typing is refused.
+    const b = engine({ native: undefined });
+    const web = await b.begin(SESSION, { phrase: START_OVER_PHRASE });
+    expect(web.body).toMatchObject({ presence: 'passkey' });
+    const webNonce = (web.body as { nonce: string }).nonce;
+    const webTyped = await b.finish(
+      SESSION,
+      { nonce: webNonce, phrase: START_OVER_PHRASE },
+      'typed',
+      new Uint8Array(0),
+    );
+    expect(webTyped.status).toBe(400);
+    expect(await exists(join(root.home, '.agentlink'))).toBe(true);
+    e.close();
+    b.close();
+  });
+
+  it('begin refuses an unknown sensor value or extra fields', async () => {
+    const e = engine({ native: undefined });
+    expect((await e.begin(SESSION, { phrase: START_OVER_PHRASE, sensor: 'yes' })).status).toBe(400);
+    expect((await e.begin(SESSION, { phrase: START_OVER_PHRASE, other: 1 })).status).toBe(400);
     e.close();
   });
 });

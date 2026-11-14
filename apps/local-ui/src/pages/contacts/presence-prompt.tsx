@@ -301,7 +301,7 @@ export function PresencePrompt({
               value={code}
               onValue={setCode}
             />
-            {/* OWNER-START-OVER (D-152): the way out when the master code is lost. */}
+            {/* OWNER-START-OVER (D-153): the way out when the master code is lost. */}
             <ForgotCodeLink />
             {/* F49: one primary action, the master code confirms. The switch is a quiet link. */}
             <div className="ct-actions">

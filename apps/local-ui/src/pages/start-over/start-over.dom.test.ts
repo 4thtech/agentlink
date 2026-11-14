@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// OWNER-START-OVER (D-152; 11 §5): "Forgot your master code? Start over on this computer". The page
+// OWNER-START-OVER (D-153; 11 §5): "Forgot your master code? Start over on this computer". The page
 // warns first and offers Restore from recovery kit first; going on needs the typed phrase; every
 // outcome (done, partial, refused) has its own fixed text; the API sends the phrase, the nonce and
 // the presence mode only.
@@ -191,7 +191,10 @@ describe('start over api', () => {
       return Promise.resolve(new Response(JSON.stringify(json), { status: 200 }));
     }) as typeof fetch;
     const api = createStartOverApi({ fetch: fetcher, token: 'csrf' });
-    expect(await api.run('start over')).toEqual({ kind: 'done', backup: '~/.agentlink.backup-x' });
+    expect(await api.run('start over', { noSensor: false })).toEqual({
+      kind: 'done',
+      backup: '~/.agentlink.backup-x',
+    });
     expect(seen.map((s) => s.path)).toEqual([
       '/api/ui/start-over/begin',
       '/api/ui/start-over/finish',
@@ -232,7 +235,78 @@ describe('start over api', () => {
       token: 'csrf',
       create: () => Promise.resolve('cancelled'),
     });
-    expect(await api.run('start over')).toEqual({ kind: 'error', problem: 'cancelled' });
+    expect(await api.run('start over', { noSensor: false })).toEqual({
+      kind: 'error',
+      problem: 'cancelled',
+    });
     expect(paths).toEqual(['/api/ui/start-over/begin']);
+  });
+
+  it('no sensor: begin says so, then the second typing travels with the nonce', async () => {
+    const seen: { path: string; headers: Headers }[] = [];
+    const fetcher = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      seen.push({ path, headers: new Headers(init?.headers) });
+      const json = path.endsWith('/begin')
+        ? { status: 'presence', presence: 'typed', nonce: 'n'.repeat(22), expiresInMs: 120000 }
+        : { status: 'done', backup: '~/.agentlink.backup-x' };
+      return Promise.resolve(new Response(JSON.stringify(json), { status: 200 }));
+    }) as typeof fetch;
+    const api = createStartOverApi({ fetch: fetcher, token: 'csrf' });
+    const asked: number[] = [];
+    const result = await api.run('start over', {
+      noSensor: true,
+      confirm: () => {
+        asked.push(1);
+        return Promise.resolve('start over');
+      },
+    });
+    expect(result).toEqual({ kind: 'done', backup: '~/.agentlink.backup-x' });
+    expect(asked).toHaveLength(1);
+    const input = (h2: Headers) =>
+      JSON.parse(atob((h2.get('X-AgentLink-Input') ?? '').replace(/-/g, '+').replace(/_/g, '/')));
+    expect(input(seen[0]!.headers)).toEqual({ phrase: 'start over', sensor: 'none' });
+    expect(input(seen[1]!.headers)).toEqual({ nonce: 'n'.repeat(22), phrase: 'start over' });
+    expect(seen[1]!.headers.get('X-AgentLink-Presence')).toBe('typed');
+  });
+});
+
+describe('start over page without a sensor (owner decision: type it twice)', () => {
+  it('a second, empty field on its own step; Start over only once it reads start over', async () => {
+    const seconds: (string | undefined)[] = [];
+    const api: StartOverApi = {
+      state: () => Promise.resolve({ presence: 'typed', unfinished: false }),
+      run: async (_phrase, how) => {
+        seconds.push(await how?.confirm?.());
+        return { kind: 'done', backup: '~/.agentlink.backup-1' };
+      },
+    };
+    await mount({ api, desktop: 'mac' });
+    await click(S.WARN.goOn);
+    await typeIn('start over');
+    await click(S.CONFIRM.next);
+    expect(text()).toContain(S.AGAIN.title);
+    const field = host.querySelector<HTMLInputElement>('input') as HTMLInputElement;
+    expect(field.value).toBe('');
+    expect(field.getAttribute('placeholder')).toBeNull();
+    const go = button(S.AGAIN.button) as HTMLButtonElement;
+    expect(go.disabled).toBe(true);
+    await typeIn('start');
+    expect(go.disabled).toBe(true);
+    await typeIn('start over');
+    await click(S.AGAIN.button);
+    expect(seconds).toEqual(['start over']);
+    expect(text()).toContain(S.DONE.title);
+    expect(text()).toContain(S.DONE.apps);
+    expect(text()).toContain(S.DONE.passkeys);
+  });
+
+  it('the done screen of an earlier start over says the current IDs were not changed', async () => {
+    const { api } = fakeApi([{ kind: 'done', backup: '~/.agentlink.backup-1', earlierOnly: true }]);
+    await mount({ api, desktop: 'mac' });
+    await click(S.WARN.goOn);
+    await typeIn('start over');
+    await click('Start over with Touch ID');
+    expect(text()).toContain(S.DONE.earlier);
   });
 });

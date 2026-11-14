@@ -1,4 +1,4 @@
-// OWNER-START-OVER (D-152; 04 §2.5.4; 08 §1): the start-over page's calls. Three fixed routes under
+// OWNER-START-OVER (D-153; 04 §2.5.4; 08 §1): the start-over page's calls. Three fixed routes under
 // /api/ui/start-over/, no query. POST bodies are `application/octet-stream` (empty, or the passkey
 // creation). The input travels base64url JSON in `X-AgentLink-Input`. Answers become fixed codes; the
 // server's text is never shown. Nothing is logged. The page never runs the OS gesture itself in the
@@ -34,7 +34,31 @@ const PROBLEMS: ReadonlySet<string> = new Set<StartOverProblem>([
   'open_app',
 ]);
 
-export type Presence = 'native' | 'passkey';
+export type Presence = 'native' | 'passkey' | 'typed';
+
+/** How the page runs one start over. */
+export interface RunOptions {
+  /** True: this browser has no user-verifying platform authenticator (default: ask the browser). */
+  readonly noSensor?: boolean;
+  /** The typed confirmation step: resolves the second typing, or undefined when the person backs out. */
+  readonly confirm?: () => Promise<string | undefined>;
+}
+
+/** True when a browser reports no user-verifying platform authenticator (Touch ID, Hello…). */
+async function noPlatformAuthenticator(): Promise<boolean> {
+  if (!passkeysAvailable()) return true;
+  try {
+    const check = (
+      PublicKeyCredential as unknown as {
+        isUserVerifyingPlatformAuthenticatorAvailable?: () => Promise<boolean>;
+      }
+    ).isUserVerifyingPlatformAuthenticatorAvailable;
+    if (typeof check !== 'function') return false;
+    return !(await check());
+  } catch {
+    return false;
+  }
+}
 
 export interface StartOverState {
   readonly presence: Presence;
@@ -42,7 +66,7 @@ export interface StartOverState {
 }
 
 export type StartOverOutcome =
-  | { readonly kind: 'done'; readonly backup: string | null }
+  | { readonly kind: 'done'; readonly backup: string | null; readonly earlierOnly?: true }
   | {
       readonly kind: 'partial';
       readonly backup: string | null;
@@ -61,7 +85,7 @@ interface Creation {
 export interface StartOverApi {
   state(): Promise<StartOverState | undefined>;
   /** begin, the gesture, finish: one call for the page. */
-  run(phrase: string): Promise<StartOverOutcome>;
+  run(phrase: string, how?: RunOptions): Promise<StartOverOutcome>;
 }
 
 export interface StartOverApiOptions {
@@ -217,15 +241,29 @@ export function createStartOverApi(options: StartOverApiOptions = {}): StartOver
       return { presence, unfinished };
     },
 
-    async run(phrase) {
-      const begun = await call('POST', 'begin', { phrase });
+    async run(phrase, how = {}) {
+      // A browser page that found no user-verifying platform authenticator says so; the desktop
+      // app's server decides itself, and never accepts less than a gesture where one is set up.
+      const noSensor = how.noSensor ?? (await noPlatformAuthenticator());
+      const begun = await call('POST', 'begin', noSensor ? { phrase, sensor: 'none' } : { phrase });
       if (begun === 'offline' || begun.status !== 200) return failure(begun);
       const nonce = begun.json?.['nonce'];
       const presence = begun.json?.['presence'];
-      if (typeof nonce !== 'string' || (presence !== 'native' && presence !== 'passkey')) {
+      if (
+        typeof nonce !== 'string' ||
+        (presence !== 'native' && presence !== 'passkey' && presence !== 'typed')
+      ) {
         return { kind: 'error', problem: 'failed' };
       }
       let body: Uint8Array | undefined;
+      let second: string | undefined;
+      if (presence === 'typed') {
+        // Owner decision (14 Nov 2026): no sensor here, so the person types the phrase again on its
+        // own step. The page never fills that field from the first one.
+        if (how.confirm === undefined) return { kind: 'error', problem: 'presence_required' };
+        second = await how.confirm();
+        if (second === undefined) return { kind: 'error', problem: 'cancelled' };
+      }
       if (presence === 'passkey') {
         const creation = creationOf(begun.json?.['publicKey']);
         if (creation === undefined) return { kind: 'error', problem: 'failed' };
@@ -233,12 +271,22 @@ export function createStartOverApi(options: StartOverApiOptions = {}): StartOver
         if (made === 'cancelled' || made === 'unsupported') return { kind: 'error', problem: made };
         body = made;
       }
-      const done = await call('POST', 'finish', { nonce }, presence, body);
+      const done = await call(
+        'POST',
+        'finish',
+        second === undefined ? { nonce } : { nonce, phrase: second },
+        presence,
+        body,
+      );
       if (done === 'offline' || done.status !== 200) return failure(done);
       const status = done.json?.['status'];
       const backup = done.json?.['backup'];
       const shownBackup = typeof backup === 'string' ? backup : null;
-      if (status === 'done') return { kind: 'done', backup: shownBackup };
+      if (status === 'done') {
+        return done.json?.['earlierOnly'] === true
+          ? { kind: 'done', backup: shownBackup, earlierOnly: true }
+          : { kind: 'done', backup: shownBackup };
+      }
       const failed = done.json?.['failed'];
       if (status === 'partial' && (failed === 'move' || failed === 'keychain')) {
         return { kind: 'partial', backup: shownBackup, failed };

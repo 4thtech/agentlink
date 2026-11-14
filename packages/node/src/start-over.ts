@@ -1,4 +1,4 @@
-// OWNER-START-OVER (D-152; 04 §2.5.4 "Start over on this computer"; 08 §1; I-4, I-7): the engine
+// OWNER-START-OVER (D-153; 04 §2.5.4 "Start over on this computer"; 08 §1; I-4, I-7): the engine
 // behind "Forgot your master code? Start over on this computer", in the desktop app (Mac, Windows)
 // and the browser app. Its only caller is the approval server's start-over gate (approval-server.ts);
 // the package entry never exports it (the 04 §8.1 fence), and no MCP tool reaches it (I-4).
@@ -9,22 +9,30 @@
 //   2. closes the ID the app has open, then MOVES ~/.agentlink to ~/.agentlink.backup-YYYYMMDD-HHMMSS
 //      (one rename, never a delete; `-2`… when that name is taken; a link is refused, 04 §4);
 //   3. erases the keychain accounts of those IDs (eraseKeychainAgent: the exact agent items, seed
-//      last) and then this owner's fixed accounts, by exact name under the one service `agentlink`
-//      (the owner's own items last, so first run stays refused until every one is gone);
-//   4. marks the record done and lets the app open first run (no ID is open any more).
+//      last) and, only when every one went and ~/.agentlink has not come back with an ID or key
+//      file, this owner's fixed accounts, by exact name under the one service `agentlink` (`owner`
+//      last, so first run stays refused until every one is gone);
+//   4. marks the records done (a failed write is a failure) and lets the app open first run.
 // A failure at any step is answered (`partial`, with the step), never silent. A move that fails
 // erases nothing and the ID is opened again. A retry is a new start over: it moves the folder that is
 // there now (if any) and also finishes every unfinished record found in a backup, so nothing is moved
-// or erased twice and nothing is left behind.
+// or erased twice and nothing is left behind. IR M2: when an earlier record is unfinished and the
+// `owner` item is no longer the one it recorded (`ownerTag`), a new owner exists: the run only
+// finishes the earlier IDs and never moves that owner's folder or erases its items.
 //
-// Presence (the gesture proves a person is at this computer now; it unlocks nothing):
-//   - native (desktop app): a throwaway key through the platform-neutral NativeHelper. macOS: `create`
-//     (no sheet), then one Touch ID sheet (`ecdh code`) whose secret is wiped at once. Windows:
-//     `create` is itself the one Windows Hello prompt; the throwaway key is then removed.
+// Presence (the gesture proves a person is at this computer now; it unlocks nothing). It stops web
+// origins, AI apps over MCP and accidents; it is no barrier against a same-user process (04 §2.5),
+// which could move the folder itself anyway:
+//   - native (desktop app): the server spawns the helper, so a real OS sheet is shown. macOS:
+//     `create` (no sheet), then one Touch ID sheet (`ecdh reset`: "start over AgentLink on this
+//     computer") whose secret is wiped at once. Windows: `create` is the one Windows Hello prompt;
+//     the throwaway key is then removed.
 //   - passkey (browser): a WebAuthn creation with user verification for this begin's challenge and
 //     this origin (owner-setup.ts checkSetupRegistration: UP, UV, rpIdHash, attested credential ID).
-// Begin answers a single-use nonce bound to the page session, 120 s. Three refused gestures in a row
-// make the next begin wait (60 s, doubling, at most 15 minutes).
+//     Attestation is `none`, so a same-user process could forge one.
+// Begin answers a single-use nonce bound to the page session, 120 s. Three gestures in a row that
+// were made and not recognised make the next begin wait (60 s, doubling, at most 15 minutes); a
+// cancel, a missing sensor or a timeout does not count.
 //
 // I-7: nothing here is logged; answers are fixed codes. The backup path is shown with `~`.
 import { lstat, open, readFile, readdir, rename as fsRename } from 'node:fs/promises';
@@ -32,8 +40,10 @@ import { join } from 'node:path';
 import {
   NATIVE_PRESENCE_MACOS,
   encodeBase64url,
+  encodeHex,
   equalBytes,
   randomBytes,
+  sha256,
   wipe,
   type JsonValue,
 } from '@4thtech-io/crypto';
@@ -84,7 +94,12 @@ export const OWNER_ERASE_ORDER: readonly string[] = Object.freeze([
   OWNER_ACCOUNT,
 ]);
 
-export type StartOverPresence = 'native' | 'passkey';
+/**
+ * `native`: the desktop app's OS sheet. `passkey`: a browser's user-verified creation. `typed`
+ * (owner decision, 14 Nov 2026): no user-verifying presence here, so the phrase is typed a second
+ * time on its own confirmation step. Never chosen where a gesture is available.
+ */
+export type StartOverPresence = 'native' | 'passkey' | 'typed';
 
 export interface StartOverAnswer {
   readonly status: number;
@@ -114,7 +129,7 @@ export interface StartOverEngine {
   state(): Promise<StartOverAnswer>;
   /** `POST begin` input `{phrase}`. */
   begin(session: string, input: JsonValue | undefined): Promise<StartOverAnswer>;
-  /** `POST finish` input `{nonce}`; `mode` is the `X-AgentLink-Presence` value; `body` the creation. */
+  /** `POST finish` input `{nonce}` (typed: `{nonce, phrase}`); `mode` is the `X-AgentLink-Presence` value; `body` the creation. */
   finish(
     session: string,
     input: JsonValue | undefined,
@@ -137,6 +152,12 @@ interface StartOverRecord {
   readonly startedAt: number;
   readonly agents: readonly string[];
   readonly done: boolean;
+  /**
+   * IR M2: SHA-256 (hex) of the `owner` keychain item's stored bytes (its ciphertext) when the run
+   * began, or null when there was none. An `owner` item that differs later is a NEW owner's (first
+   * run ran): it and its folder are never touched again. Not a secret: a digest of ciphertext.
+   */
+  readonly ownerTag: string | null;
   readonly finishedAt?: number;
 }
 
@@ -147,21 +168,40 @@ const refuse = (status: number, error: string): StartOverAnswer => answer(status
 const code = (error: unknown): unknown => (error as { code?: unknown } | null)?.code;
 
 /** The phrase as typed: trimmed, lower case, inner runs of spaces as one. */
-function phraseOk(input: JsonValue | undefined): boolean {
-  if (typeof input !== 'object' || input === null || Array.isArray(input)) return false;
-  const keys = Object.keys(input);
-  if (keys.length !== 1 || keys[0] !== 'phrase') return false;
-  const phrase = (input as { phrase?: unknown }).phrase;
+function phraseMatches(phrase: unknown): boolean {
   if (typeof phrase !== 'string' || phrase.length > 64) return false;
   return phrase.trim().toLowerCase().replace(/\s+/g, ' ') === START_OVER_PHRASE;
 }
 
-function nonceOf(input: JsonValue | undefined): string | undefined {
+/**
+ * Begin's input: `{phrase}`, or `{phrase, sensor: "none"}` from a browser page that found no
+ * user-verifying platform authenticator. Undefined when malformed or the phrase is wrong.
+ */
+function beginInput(input: JsonValue | undefined): { readonly noSensor: boolean } | undefined {
   if (typeof input !== 'object' || input === null || Array.isArray(input)) return undefined;
   const keys = Object.keys(input);
-  if (keys.length !== 1 || keys[0] !== 'nonce') return undefined;
-  const nonce = (input as { nonce?: unknown }).nonce;
-  return typeof nonce === 'string' && NONCE.test(nonce) ? nonce : undefined;
+  const value = input as Record<string, unknown>;
+  if (!keys.includes('phrase') || !keys.every((k) => k === 'phrase' || k === 'sensor')) {
+    return undefined;
+  }
+  if (keys.includes('sensor') && value['sensor'] !== 'none') return undefined;
+  if (!phraseMatches(value['phrase'])) return undefined;
+  return { noSensor: value['sensor'] === 'none' };
+}
+
+/** Finish's input: `{nonce}`, or `{nonce, phrase}` for the typed confirmation. */
+function finishInput(
+  input: JsonValue | undefined,
+): { readonly nonce: string; readonly phrase?: unknown } | undefined {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) return undefined;
+  const keys = Object.keys(input);
+  if (!keys.includes('nonce') || !keys.every((k) => k === 'nonce' || k === 'phrase')) {
+    return undefined;
+  }
+  const value = input as Record<string, unknown>;
+  const nonce = value['nonce'];
+  if (typeof nonce !== 'string' || !NONCE.test(nonce)) return undefined;
+  return keys.includes('phrase') ? { nonce, phrase: value['phrase'] } : { nonce };
 }
 
 const two = (n: number): string => String(n).padStart(2, '0');
@@ -216,6 +256,10 @@ function parseRecord(text: string | undefined): StartOverRecord | undefined {
       startedAt: raw['startedAt'],
       agents: raw['agents'] as string[],
       done: raw['done'],
+      ownerTag:
+        typeof raw['ownerTag'] === 'string' && /^[0-9a-f]{64}$/.test(raw['ownerTag'])
+          ? raw['ownerTag']
+          : null,
       ...(typeof raw['finishedAt'] === 'number' ? { finishedAt: raw['finishedAt'] } : {}),
     };
   } catch {
@@ -266,7 +310,20 @@ export function createStartOverEngine(options: StartOverOptions): StartOverEngin
   const dir = join(home, '.agentlink');
   const timeoutMs = options.keychainTimeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
   const move = options.rename ?? ((from: string, to: string) => fsRename(from, to));
-  const presence: StartOverPresence = options.native === undefined ? 'passkey' : 'native';
+  /**
+   * The gesture this computer uses. Desktop app: the OS sheet when the helper says Touch ID or
+   * Windows Hello is set up, else the typed confirmation (the server decides; the page cannot ask
+   * for less). Browser: a passkey creation, unless the page found no user-verifying platform
+   * authenticator (`noSensor`; a page claim, see 04 §2.5.4).
+   */
+  async function presenceFor(noSensor: boolean): Promise<StartOverPresence> {
+    const helper = options.native;
+    if (helper !== undefined) {
+      const usable = await helper.available().catch(() => false);
+      return usable ? 'native' : 'typed';
+    }
+    return noSensor ? 'typed' : 'passkey';
+  }
   let pending: Pending | undefined;
   let refused = { count: 0, until: 0 };
   let running = false;
@@ -341,32 +398,88 @@ export function createStartOverEngine(options: StartOverOptions): StartOverEngin
     return true;
   }
 
-  /** Erases the items of `agents`, then the owner's; the count of accounts that are not gone. */
-  async function erase(agents: readonly string[]): Promise<number> {
-    const keychain = options.keychain();
-    let failed = 0;
+  /** The digest of the `owner` item's stored bytes, or null without one (rejects on a keychain error). */
+  async function ownerTagNow(keychain: KeychainBackend): Promise<string | null> {
+    const item = await guarded(() => keychain.get(OWNER_ACCOUNT), timeoutMs);
+    if (item === null) return null;
+    try {
+      return encodeHex(sha256(item));
+    } finally {
+      wipe(item);
+    }
+  }
+
+  /** Erases the items of `agents`; true when every one is gone. */
+  async function eraseAgents(
+    keychain: KeychainBackend,
+    agents: readonly string[],
+  ): Promise<boolean> {
+    let ok = true;
     for (const agentId of agents) {
       try {
         await eraseKeychainAgent(keychain, agentId, [], { timeoutMs });
       } catch {
-        failed += 1;
+        ok = false;
       }
     }
-    if (!(await ownerSlotFree())) return failed;
+    return ok;
+  }
+
+  /**
+   * IR M1/M2: the owner's items, only after every ID's items went and only while ~/.agentlink holds
+   * no ID folder and no key file (a folder that came back, e.g. a running AI app recreating it, is
+   * a failure: the records stay undone). The rest stay at the first failure: `owner` goes last.
+   */
+  async function eraseOwner(keychain: KeychainBackend): Promise<boolean> {
+    if (!(await ownerSlotFree())) return false;
     for (const account of OWNER_ERASE_ORDER) {
-      if (!(await eraseAccount(keychain, account))) {
-        failed += 1;
-        // The rest stay until the retry: `owner` is erased only after every other owner item.
-        break;
+      if (!(await eraseAccount(keychain, account))) return false;
+    }
+    return true;
+  }
+
+  /** Marks the records done; false when a write failed (never swallowed, IR M2). */
+  async function markDone(
+    todo: readonly { readonly path: string; readonly record: StartOverRecord }[],
+  ): Promise<boolean> {
+    let ok = true;
+    for (const b of todo) {
+      try {
+        await writeRecord(b.path, { ...b.record, done: true, finishedAt: now() });
+      } catch {
+        ok = false;
       }
     }
-    return failed;
+    return ok;
   }
 
   const shown = (path: string): string => join('~', path.slice(home.length + 1));
 
   /** The run after the gesture. */
   async function run(): Promise<StartOverAnswer> {
+    const keychain = options.keychain();
+    const earlier = (await backups()).filter((b) => !b.record.done);
+    // IR M2: an earlier start over did not finish, and the `owner` item here now is not the one it
+    // started with: that is a NEW owner (first run ran, so the old owner was fully erased). Finish
+    // the earlier records' IDs only; never move this folder or erase the owner again. The next
+    // start over (no unfinished record left) is a full one.
+    if (earlier.length > 0) {
+      let current: string | null;
+      try {
+        current = await ownerTagNow(keychain);
+      } catch {
+        return answer(200, { status: 'partial', backup: null, failed: 'keychain' });
+      }
+      const newOwnerHere = current !== null && earlier.every((b) => b.record.ownerTag !== current);
+      if (newOwnerHere) {
+        const agents = [...new Set(earlier.flatMap((b) => b.record.agents))];
+        const ok = (await eraseAgents(keychain, agents)) && (await markDone(earlier));
+        const backup = shown((earlier[0] as { path: string }).path);
+        return ok
+          ? answer(200, { status: 'done', backup, earlierOnly: true })
+          : answer(200, { status: 'partial', backup, failed: 'keychain' });
+      }
+    }
     let moved: string | undefined;
     let movedRecord: StartOverRecord | undefined;
     // 1–2: the folder that is here now, if any.
@@ -381,7 +494,13 @@ export function createStartOverEngine(options: StartOverOptions): StartOverEngin
         const info = await lstat(dir);
         // 04 §4: never follow a link; the folder must be the OS user's real one.
         if (!info.isDirectory()) throw new Error('not a folder');
-        movedRecord = { v: 1, startedAt: now(), agents: await agentIdsIn(dir), done: false };
+        movedRecord = {
+          v: 1,
+          startedAt: now(),
+          agents: await agentIdsIn(dir),
+          ownerTag: await ownerTagNow(keychain),
+          done: false,
+        };
         await writeRecord(dir, movedRecord);
       } catch {
         return answer(200, { status: 'partial', backup: null, failed: 'move' });
@@ -396,52 +515,65 @@ export function createStartOverEngine(options: StartOverOptions): StartOverEngin
         return answer(200, { status: 'partial', backup: null, failed: 'move' });
       }
     }
-    // 3: the IDs of this run and of every unfinished earlier one.
+    // 3: the IDs of this run and of every unfinished earlier one, then (only if all went) the owner.
     const todo = (await backups()).filter((b) => !b.record.done);
     if (moved !== undefined && movedRecord !== undefined && !todo.some((b) => b.path === moved)) {
       todo.unshift({ path: moved, record: movedRecord });
     }
     const agents = [...new Set(todo.flatMap((b) => b.record.agents))];
-    const failed = await erase(agents);
-    // 4: the records are done only when every account is gone.
-    if (failed === 0) {
-      for (const b of todo) {
-        await writeRecord(b.path, { ...b.record, done: true, finishedAt: now() }).catch(
-          () => undefined,
-        );
-      }
-    }
+    const ok =
+      (await eraseAgents(keychain, agents)) &&
+      (await eraseOwner(keychain)) &&
+      // 4: the records are done only when every account is gone, and the write must land.
+      (await markDone(todo));
     await options.reopen?.().catch(() => undefined);
     const backupPath = moved ?? todo[0]?.path;
     const backup = backupPath === undefined ? null : shown(backupPath);
-    return failed === 0
+    return ok
       ? answer(200, { status: 'done', backup })
       : answer(200, { status: 'partial', backup, failed: 'keychain' });
   }
 
-  /** The gesture of this finish; undefined when it was made, else the refusal. */
-  async function gesture(p: Pending, body: Uint8Array): Promise<StartOverAnswer | undefined> {
-    if (p.presence === 'native') {
-      const helper = options.native;
-      if (helper === undefined) return refuse(400, 'presence_required');
-      let record: Uint8Array | undefined;
-      try {
-        record = await helper.create();
-        if (helper.kind === NATIVE_PRESENCE_MACOS) {
-          // `create` shows no sheet on macOS: the one Touch ID sheet is this release.
-          wipe(await helper.release(record, 'code'));
-        } else {
-          // Windows: `create` was the one Windows Hello prompt; the throwaway key goes.
-          await helper.remove(record).catch(() => undefined);
-        }
-        return undefined;
-      } catch (error) {
-        const state = error instanceof NativeHelperError ? error.state : 'error';
-        return answer(403, { error: 'presence_rejected', native: state });
-      } finally {
-        if (record !== undefined) wipe(record);
-      }
+  /**
+   * A refused gesture: its answer, and whether it counts toward the wait (only a gesture that was
+   * made and not recognised does; a cancel, a missing sensor or a timeout does not).
+   */
+  interface Refusal {
+    readonly answer: StartOverAnswer;
+    readonly counts: boolean;
+  }
+
+  /** Desktop app: one OS sheet the server raises itself (the page cannot fake it). */
+  async function nativeGesture(): Promise<Refusal | undefined> {
+    const helper = options.native;
+    if (helper === undefined) {
+      return { answer: refuse(400, 'presence_required'), counts: false };
     }
+    let record: Uint8Array | undefined;
+    try {
+      record = await helper.create();
+      if (helper.kind === NATIVE_PRESENCE_MACOS) {
+        // `create` shows no sheet on macOS: the one Touch ID sheet is this release (Q-153-3: the
+        // sheet reads "start over AgentLink on this computer").
+        wipe(await helper.release(record, 'reset'));
+      } else {
+        // Windows: `create` was the one Windows Hello prompt; the throwaway key goes.
+        await helper.remove(record).catch(() => undefined);
+      }
+      return undefined;
+    } catch (error) {
+      const state = error instanceof NativeHelperError ? error.state : 'error';
+      return {
+        answer: answer(403, { error: 'presence_rejected', native: state }),
+        counts: state === 'failed',
+      };
+    } finally {
+      if (record !== undefined) wipe(record);
+    }
+  }
+
+  /** Browser: a user-verified creation for this begin's challenge and origin. */
+  function passkeyGesture(p: Pending, body: Uint8Array): Refusal | undefined {
     try {
       const registration = parseSetupRegistration(body);
       try {
@@ -451,48 +583,68 @@ export function createStartOverEngine(options: StartOverOptions): StartOverEngin
       }
       return undefined;
     } catch {
-      return refuse(403, 'presence_rejected');
+      return { answer: refuse(403, 'presence_rejected'), counts: true };
+    }
+  }
+
+  /**
+   * The gesture of this finish, by kind; undefined when it was made. A further kind (the no-sensor
+   * path, owner decision pending: e.g. a second typed confirmation) is one more entry here plus a
+   * `presence` value that begin answers.
+   */
+  function gesture(p: Pending, body: Uint8Array, phrase: unknown): Promise<Refusal | undefined> {
+    switch (p.presence) {
+      case 'native':
+        return nativeGesture();
+      case 'passkey':
+        return Promise.resolve(passkeyGesture(p, body));
+      case 'typed':
+        // The second typing of the phrase, on its own step, checked here again. No body.
+        return Promise.resolve(
+          body.length === 0 && phraseMatches(phrase)
+            ? undefined
+            : { answer: refuse(400, 'phrase'), counts: false },
+        );
     }
   }
 
   return Object.freeze<StartOverEngine>({
     async state() {
       const unfinished = (await backups()).some((b) => !b.record.done);
-      return answer(200, { presence, unfinished });
+      return answer(200, { presence: await presenceFor(false), unfinished });
     },
 
-    begin(session, input) {
-      if (closed) return Promise.resolve(refuse(503, 'closed'));
+    async begin(session, input) {
+      if (closed) return refuse(503, 'closed');
       const at = now();
       if (refused.until > at) {
-        return Promise.resolve(
-          answer(429, { error: 'wait', retryAfter: Math.ceil((refused.until - at) / 1000) }),
-        );
+        return answer(429, { error: 'wait', retryAfter: Math.ceil((refused.until - at) / 1000) });
       }
-      if (!phraseOk(input)) return Promise.resolve(refuse(400, 'phrase'));
+      const given = beginInput(input);
+      if (given === undefined) return refuse(400, 'phrase');
+      const presence = await presenceFor(given.noSensor);
       wipePending();
       const nonce = encodeBase64url(randomBytes(16));
       const challenge = randomBytes(32);
-      pending = { session, nonce, challenge, presence, expires: at + START_OVER_TTL_MS };
+      pending = { session, nonce, challenge, presence, expires: now() + START_OVER_TTL_MS };
       const base = { status: 'presence', presence, nonce, expiresInMs: START_OVER_TTL_MS };
-      if (presence === 'native') return Promise.resolve(answer(200, base));
-      return Promise.resolve(
-        answer(200, {
-          ...base,
-          publicKey: {
-            rpId: PASSKEY_RP_ID,
-            rpName: 'AgentLink',
-            userId: encodeBase64url(randomBytes(16)),
-            userName: 'AgentLink start over',
-            challenge: encodeBase64url(challenge),
-          },
-        }),
-      );
+      if (presence !== 'passkey') return answer(200, base);
+      return answer(200, {
+        ...base,
+        publicKey: {
+          rpId: PASSKEY_RP_ID,
+          rpName: 'AgentLink',
+          userId: encodeBase64url(randomBytes(16)),
+          userName: 'AgentLink start over',
+          challenge: encodeBase64url(challenge),
+        },
+      });
     },
 
     async finish(session, input, mode, body) {
       if (closed) return refuse(503, 'closed');
-      const nonce = nonceOf(input);
+      const given = finishInput(input);
+      const nonce = given?.nonce;
       const p = pending;
       // Single use: whatever the outcome, this begin is spent (its challenge is wiped below).
       pending = undefined;
@@ -511,8 +663,9 @@ export function createStartOverEngine(options: StartOverOptions): StartOverEngin
         if (running) return refuse(409, 'busy');
         running = true;
         try {
-          const refusal = await gesture(p, body);
+          const refusal = await gesture(p, body, given?.phrase);
           if (refusal !== undefined) {
+            if (!refusal.counts) return refusal.answer;
             refused.count += 1;
             if (refused.count >= FREE_TRIES) {
               const seconds = Math.min(
@@ -521,7 +674,7 @@ export function createStartOverEngine(options: StartOverOptions): StartOverEngin
               );
               refused.until = now() + seconds * 1000;
             }
-            return refusal;
+            return refusal.answer;
           }
           refused = { count: 0, until: 0 };
           return await run();

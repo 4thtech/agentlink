@@ -1,4 +1,4 @@
-// OWNER-START-OVER (D-152; 04 §2.5.4; 11 §5): "Forgot your master code? Start over on this
+// OWNER-START-OVER (D-153; 04 §2.5.4; 11 §5): "Forgot your master code? Start over on this
 // computer", in the focused shell at /restore/start-over (the restore wizard's column and styles,
 // D-116: no new design). Three screens of one page:
 //   warn     what is lost and what is kept; Restore from recovery kit first (D-147)
@@ -8,7 +8,7 @@
 // The page sends only the phrase, the nonce and the creation. It never reads or shows a key, and the
 // server checks the phrase and the gesture again (a page that lies gains nothing).
 import { Banner, Button, InlineError, Lockup } from '@4thtech-io/ui';
-import { useEffect, useId, useState, type FormEvent, type ReactElement } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { START_PATH } from '../../nav.js';
 import { desktopPlatform, nativeSensor, type DesktopPlatform } from '../../presence/desktop.js';
 import { detectPlatform } from '../first-run/passkey.js';
@@ -17,6 +17,7 @@ import { useTitleFocus } from '../welcome/index.js';
 import { markLeavingStart } from '../start/guard.js';
 import { createStartOverApi, type StartOverApi, type StartOverOutcome } from './api.js';
 import {
+  AGAIN,
   CONFIRM,
   DONE,
   PARTIAL,
@@ -46,7 +47,7 @@ function leaveDefault(to: string): void {
 
 const normalized = (text: string): string => text.trim().toLowerCase().replace(/\s+/g, ' ');
 
-type View = 'warn' | 'confirm' | 'working' | 'result';
+type View = 'warn' | 'confirm' | 'again' | 'working' | 'result';
 
 function Title({ children }: { readonly children: string }): ReactElement {
   const ref = useTitleFocus<HTMLHeadingElement>(children);
@@ -68,14 +69,32 @@ interface ResultProps {
 }
 
 function Result({ outcome: o, sensor, store, onRetry, onLeave }: ResultProps): ReactElement {
+  if (o?.kind === 'done' && o.earlierOnly === true) {
+    return (
+      <section className="rs-screen" aria-labelledby="so-h" data-screen="done-earlier">
+        <div className="rs-intro">
+          <Title>{DONE.earlierTitle}</Title>
+          <p className="rs-lead">{DONE.earlier}</p>
+        </div>
+        <div className="rs-actions">
+          <Button variant="primary" size="lg" onClick={() => onLeave('/')}>
+            {WARN.back}
+          </Button>
+        </div>
+      </section>
+    );
+  }
   if (o?.kind === 'done') {
     return (
       <section className="rs-screen" aria-labelledby="so-h" data-screen="done">
         <div className="rs-intro">
           <Title>{DONE.title}</Title>
           {o.backup === null ? null : <p className="rs-lead">{DONE.backup(o.backup)}</p>}
-          <p className="rs-lead">{DONE.apps}</p>
         </div>
+        <Banner tone="warning" title={DONE.appsTitle}>
+          {DONE.apps}
+        </Banner>
+        <p className="al-text-body-sm al-muted">{DONE.passkeys}</p>
         <div className="rs-actions">
           <Button variant="primary" size="lg" onClick={() => onLeave(START_PATH)}>
             {DONE.next}
@@ -142,23 +161,50 @@ export function StartOverPage(props: StartOverPageProps): ReactElement {
   const [outcome, setOutcome] = useState<StartOverOutcome | undefined>(undefined);
   const [unfinished, setUnfinished] = useState(false);
   const fieldId = useId();
+  const againId = useId();
+  const [second, setSecond] = useState('');
+  const answerAgain = useRef<((value: string | undefined) => void) | undefined>(undefined);
+  const [typedHere, setTypedHere] = useState(false);
 
   useEffect(() => {
     let live = true;
     void api.state().then((state) => {
-      if (live && state?.unfinished === true) setUnfinished(true);
+      if (!live) return;
+      if (state?.unfinished === true) setUnfinished(true);
+      // Desktop app without Touch ID or Windows Hello: the second typing instead of a sheet.
+      if (state?.presence === 'typed' && desktop !== undefined) setTypedHere(true);
     });
     return () => {
       live = false;
     };
-  }, [api]);
+  }, [api, desktop]);
 
   const ready = normalized(typed) === PHRASE;
 
-  /** begin, the gesture, finish. The person typed the phrase on this page before any run. */
+  /**
+   * Owner decision (14 Nov 2026): with no sensor, the second typing on its own step. The field
+   * starts empty every time and is never filled from the first one.
+   */
+  function askAgain(): Promise<string | undefined> {
+    return new Promise((resolve) => {
+      answerAgain.current = resolve;
+      setSecond('');
+      setView('again');
+    });
+  }
+
+  function settleAgain(value: string | undefined): void {
+    const resolve = answerAgain.current;
+    answerAgain.current = undefined;
+    setSecond('');
+    setView('working');
+    resolve?.(value);
+  }
+
+  /** begin, the gesture (or the second typing), finish. The phrase was typed on this page first. */
   async function run(): Promise<void> {
     setView('working');
-    const result = await api.run(PHRASE);
+    const result = await api.run(PHRASE, { confirm: askAgain });
     setOutcome(result);
     setView(result.kind === 'error' && result.problem === 'phrase' ? 'confirm' : 'result');
   }
@@ -209,6 +255,49 @@ export function StartOverPage(props: StartOverPageProps): ReactElement {
         </div>
       </section>
     );
+  } else if (view === 'again') {
+    const againReady = normalized(second) === PHRASE;
+    screen = (
+      <section className="rs-screen" aria-labelledby="so-h" data-screen="again">
+        <div className="rs-intro">
+          <Title>{AGAIN.title}</Title>
+          <p className="rs-lead">{AGAIN.lead}</p>
+        </div>
+        <form
+          className="al-field"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (againReady) settleAgain(second);
+          }}
+          autoComplete="off"
+        >
+          <label className="al-field-label" htmlFor={againId}>
+            {AGAIN.label}
+          </label>
+          {/* Its own empty field: never filled from the first one, no placeholder to copy. */}
+          <input
+            id={againId}
+            name="start-over-again"
+            className="al-input"
+            type="text"
+            value={second}
+            autoComplete="off"
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+            onChange={(event) => setSecond(event.target.value)}
+          />
+          <div className="rs-actions">
+            <Button variant="danger" size="lg" type="submit" disabled={!againReady}>
+              {AGAIN.button}
+            </Button>
+            <Button variant="ghost" size="lg" onClick={() => settleAgain(undefined)}>
+              {CONFIRM.back}
+            </Button>
+          </div>
+        </form>
+      </section>
+    );
   } else if (view === 'result') {
     screen = (
       <Result
@@ -252,7 +341,7 @@ export function StartOverPage(props: StartOverPageProps): ReactElement {
           {problem === undefined ? null : <InlineError>{problem}</InlineError>}
           <div className="rs-actions">
             <Button variant="danger" size="lg" type="submit" disabled={!ready || working}>
-              {working ? CONFIRM.working : CONFIRM.button(sensor)}
+              {working ? CONFIRM.working : typedHere ? CONFIRM.next : CONFIRM.button(sensor)}
             </Button>
             <Button variant="ghost" size="lg" onClick={() => setView('warn')} disabled={working}>
               {CONFIRM.back}

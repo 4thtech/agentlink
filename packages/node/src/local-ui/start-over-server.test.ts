@@ -1,4 +1,4 @@
-// OWNER-START-OVER (D-152; 04 §2.5.4; 08 §1; I-4): the start-over routes are their own route kind,
+// OWNER-START-OVER (D-153; 04 §2.5.4; 08 §1; I-4): the start-over routes are their own route kind,
 // behind the session, CSRF, Host, Origin and fetch-metadata gate of every /api/ui/ route, run by the
 // server's start-over gate (never a page handler), with fixed answers only. Nothing an AI app holds
 // reaches them: no MCP tool, no handoff token and no agent credential is a session; the engine is not
@@ -250,7 +250,7 @@ describe('the start-over gate (08 §1; I-4)', () => {
     });
     expect(done.status).toBe(200);
     expect(JSON.parse(done.body)).toMatchObject({ status: 'done' });
-    expect(h.native.calls).toEqual(['create@0', 'release:code@0']);
+    expect(h.native.calls).toEqual(['create@0', 'release:reset@0']);
     expect(existsSync(join(h.home, '.agentlink'))).toBe(false);
     const backups = readdirSync(h.home).filter((n) => n.startsWith('.agentlink.backup-'));
     expect(backups).toHaveLength(1);
@@ -264,6 +264,56 @@ describe('the start-over gate (08 §1; I-4)', () => {
       headers: h.headers({ 'X-AgentLink-Generation': await generationOf(h) }),
     });
     expect(firstRun.status).toBe(200);
+  });
+
+  it('without Touch ID: the phrase typed twice, server-checked both times; no session, no start over', async () => {
+    const h = await harness();
+    h.native.available = () => Promise.resolve(false);
+    const port = h.server.port;
+    const begin = async () =>
+      JSON.parse(
+        (
+          await send(port, START_OVER_PATHS.begin, {
+            method: 'POST',
+            headers: h.headers({ 'X-AgentLink-Input': input({ phrase: 'start over' }) }),
+          })
+        ).body,
+      ) as { presence: string; nonce: string };
+    const first = await begin();
+    expect(first.presence).toBe('typed');
+    // An agent credential instead of the session: refused before anything runs.
+    const agent = await send(port, START_OVER_PATHS.finish, {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer agent-token',
+        Origin: h.server.origin,
+        'Content-Type': 'application/octet-stream',
+        'X-AgentLink-Presence': 'typed',
+        'X-AgentLink-Input': input({ nonce: first.nonce, phrase: 'start over' }),
+      },
+    });
+    expect(agent.status).toBe(401);
+    // The second typing missing: refused.
+    const missing = await send(port, START_OVER_PATHS.finish, {
+      method: 'POST',
+      headers: h.headers({
+        'X-AgentLink-Presence': 'typed',
+        'X-AgentLink-Input': input({ nonce: first.nonce }),
+      }),
+    });
+    expect(JSON.parse(missing.body)).toEqual({ error: 'phrase' });
+    expect(existsSync(join(h.home, '.agentlink'))).toBe(true);
+    const second = await begin();
+    const done = await send(port, START_OVER_PATHS.finish, {
+      method: 'POST',
+      headers: h.headers({
+        'X-AgentLink-Presence': 'typed',
+        'X-AgentLink-Input': input({ nonce: second.nonce, phrase: 'start over' }),
+      }),
+    });
+    expect(JSON.parse(done.body)).toMatchObject({ status: 'done' });
+    expect(h.native.calls).toEqual([]);
+    expect(existsSync(join(h.home, '.agentlink'))).toBe(false);
   });
 
   it('first run is not offered by a host that did not start over', async () => {

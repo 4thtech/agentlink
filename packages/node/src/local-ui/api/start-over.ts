@@ -1,4 +1,4 @@
-// OWNER-START-OVER (D-152; 04 §2.5.4 "Start over on this computer"; 08 §1): the start-over routes
+// OWNER-START-OVER (D-153; 04 §2.5.4 "Start over on this computer"; 08 §1): the start-over routes
 // of the app. Each is the start-over kind (route-types.ts LocalUiStartOverRoute) at its fixed path,
 // with no handler: the approval server's start-over gate runs the engine (start-over.ts). This file
 // only declares them; no page file and no MCP tool module imports the engine (I-4).

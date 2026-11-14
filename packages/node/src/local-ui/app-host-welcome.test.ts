@@ -511,7 +511,7 @@ const SETUP_TIME = new Set([
   // REL051-CF3: first run's own master code, again after a reload (restore-kind gate).
   'POST /api/ui/master-code/show',
   'POST /api/ui/master-code/saved',
-  // OWNER-START-OVER (D-152): finishing a start over needs no open ID; its own gate
+  // OWNER-START-OVER (D-153): finishing a start over needs no open ID; its own gate
   // (local-ui/start-over-server.test.ts, start-over.test.ts).
   'GET /api/ui/start-over/state',
   'POST /api/ui/start-over/begin',
