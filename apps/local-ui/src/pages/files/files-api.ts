@@ -23,6 +23,7 @@ import {
   type PreviewError,
 } from '@4thtech-io/types/ui-contract/file-preview';
 import { REVEAL_PATH } from './io-api.js';
+import { webAuthnHere } from '../../presence/webauthn-here.js';
 
 const CSRF_HEADER = 'X-AgentLink-CSRF';
 const PASSKEY_PATH = '/api/owner/passkey';
@@ -281,7 +282,9 @@ export function createFilesApi(options: FilesApiOptions = {}): FilesApi {
 
 /** True when this browser can use a passkey at all. */
 export function passkeysAvailable(): boolean {
+  // APP-CONTINUITY: never in the desktop app's window (presence/webauthn-here.ts).
   return (
+    webAuthnHere() &&
     typeof window !== 'undefined' &&
     typeof window.PublicKeyCredential === 'function' &&
     typeof navigator !== 'undefined' &&

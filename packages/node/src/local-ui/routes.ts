@@ -120,6 +120,9 @@ import {
   INVITE_CREATE_PATH,
   JOIN_ACCEPT_PATH,
   JOIN_DISMISS_PATH,
+  HANDOFF_KIND_PATHS,
+  HOST_SHOW_PATH,
+  HOST_YIELD_PATH,
   JOIN_HANDOFF_PATH,
   JOIN_PATH,
 } from './invite-paths.js';
@@ -138,6 +141,8 @@ export {
   INVITE_CREATE_PATH,
   JOIN_ACCEPT_PATH,
   JOIN_DISMISS_PATH,
+  HOST_SHOW_PATH,
+  HOST_YIELD_PATH,
   JOIN_HANDOFF_PATH,
   JOIN_PATH,
   REVEAL_PATH,
@@ -281,11 +286,14 @@ export class LocalUiRouteRegistry {
     } else if (presence === 'handoff') {
       // U3-invite: `agentlink join` to a running app host; the server's handoff gate runs it.
       if (method !== 'POST') throw invalid('a handoff route is a POST');
-      if (route.path !== JOIN_HANDOFF_PATH) {
+      // APP-CONTINUITY: the host's takeover and show paths are the same kind (HANDOFF_KIND_PATHS).
+      if (!HANDOFF_KIND_PATHS.includes(route.path)) {
         throw invalid('a handoff route is only at its fixed path');
       }
       if (handler !== undefined) throw invalid('a handoff route has no handler');
-      if (this.#entries.some((e) => e.route.presence === 'handoff')) {
+      if (
+        this.#entries.some((e) => e.route.presence === 'handoff' && e.route.path === route.path)
+      ) {
         throw invalid('the handoff route is already registered');
       }
     } else if (presence === 'mark') {

@@ -84,6 +84,11 @@ import { scheduleUpdateChecks } from './updater/schedule.js';
 import { MainWindow } from './window.js';
 import { macArch, type AppUpdatePipeView, type AppUpdateView } from '../shared/app-update.js';
 import type { InviteOutcome } from '../shared/protocol.js';
+import {
+  keychainNoticeDialog,
+  markKeychainNoticeShown,
+  needsKeychainNotice,
+} from './keychain-notice.js';
 
 declare const __AGENTLINK_DESKTOP_PREVIEW__: boolean | undefined;
 
@@ -210,6 +215,11 @@ export interface ShellProcess {
   readonly instance?: (app: App) => InstanceOps;
   /** D15-07: the startup tripwire for the bundled files (bundle-check.ts). Absent: not checked. */
   readonly verifyBundle?: () => Promise<'ok' | 'changed' | 'unchecked'>;
+  /**
+   * APP-CONTINUITY: before the core's first start, the one-time macOS keychain notice
+   * (keychain-notice.ts) when AgentLink was set up in the browser first. Absent: none (tests).
+   */
+  readonly keychainNotice?: (electron: ElectronModule) => Promise<void>;
   /**
    * OD-M (WIN-DESK-2, data-acl.ts): whether the data folder's ACL lets other people on this
    * computer open it (Windows; 'ok' elsewhere). Absent: not checked.
@@ -697,6 +707,8 @@ export async function runShell(
     coreLog.ensureDir();
     void electron.shell.openPath(proc.logDir).catch(() => undefined);
   };
+  // APP-CONTINUITY: say what the macOS keychain dialog will ask before the core first reads it.
+  await proc.keychainNotice?.(electron).catch(() => undefined);
   await startCore();
   if (launch.deepLink !== null) handleDeepLink(launch.deepLink);
   if (app.isPackaged && preview === null) proc.startUpdates?.(electron);
@@ -741,6 +753,18 @@ export function realProcess(): ShellProcess {
       if (proc.platform !== 'darwin') startUpdates(electron, proc.platform, proc.arch);
     },
     inAppUpdater: (electron, onChange) => inAppUpdaterFor(electron, proc, onChange),
+    keychainNotice: async (electron) => {
+      const stateDir = electron.app.getPath?.('userData') ?? '';
+      const input = {
+        platform: proc.platform,
+        homeDir: homedir(),
+        stateDir,
+        exists: (path: string) => existsSync(path),
+      };
+      if (!needsKeychainNotice(input)) return;
+      await electron.dialog.showMessageBox(keychainNoticeDialog());
+      markKeychainNoticeShown(stateDir);
+    },
     updateHealth: (app) => {
       const dir = app.getPath?.('userData');
       const version = app.getVersion?.();

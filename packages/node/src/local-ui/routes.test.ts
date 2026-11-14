@@ -268,6 +268,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
         r.presence !== 'create-agent' &&
         // UX1113-R1: the nine restore routes are covered in restore-server.test.ts.
         r.presence !== 'restore' &&
+        // APP-CONTINUITY: the host takeover and show (handoff kind) are covered in join-server.test.ts.
+        r.presence !== 'handoff' &&
         r.path !== '/api/ui/first-run' &&
         !built.has(r.path),
     );
@@ -604,11 +606,16 @@ describe('the handoff route kind and the join routes (U3-invite, I-4)', () => {
   const route = (over: Record<string, unknown>): LocalUiRoute =>
     ({ method: 'POST', path: HANDOFF, presence: 'handoff', ...over }) as unknown as LocalUiRoute;
 
-  it('the default registry has one handoff route with no handler; accept needs presence', () => {
+  it('the default registry has the handoff routes with no handler; accept needs presence', () => {
     const routes = createLocalUiRoutes().routes();
     const handoffs = routes.filter((r) => r.presence === 'handoff');
-    expect(handoffs.map((r) => `${r.method} ${r.path}`)).toEqual([`POST ${HANDOFF}`]);
-    expect('handler' in (handoffs[0] as object)).toBe(false);
+    // APP-CONTINUITY: the join handoff, the desktop app's takeover and terminal `ui`'s show.
+    expect(handoffs.map((r) => `${r.method} ${r.path}`)).toEqual([
+      `POST ${HANDOFF}`,
+      'POST /api/ui/host/yield',
+      'POST /api/ui/host/show',
+    ]);
+    for (const h of handoffs) expect('handler' in (h as object)).toBe(false);
     expect(routes.find((r) => r.path === '/api/ui/join/accept')).toMatchObject({
       method: 'POST',
       presence: true,

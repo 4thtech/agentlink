@@ -295,3 +295,38 @@ describe('the launcher (optional)', () => {
     expect(logs.join('\n')).not.toContain(SENTINEL);
   });
 });
+
+// APP-CONTINUITY (owner requirement 14 Nov; 08 §1 "One AgentLink, browser or app"): connecting an
+// AI app from inside the desktop app writes the app form, so an app-only computer (no Node, no npx)
+// gets a working MCP entry. From the browser / CLI (or an app in a refused place) it stays npx, and
+// an existing entry keeps its form either way (a→b: browser-made npx entries keep working).
+describe('APP-CONTINUITY: the form a connect writes', () => {
+  it('inside the app: a new connect is the app form', async () => {
+    await writeClaude({ other });
+    const plan = await desk(() => OK, { runningInApp: true }).plan('claude-code', 'work');
+    expect(plan).toMatchObject({ status: 'change', kind: 'connect', newEntry: app('work') });
+  });
+
+  it('from the browser or CLI: npx, as before', async () => {
+    await writeClaude({ other });
+    const plan = await desk(() => OK, { runningInApp: false }).plan('claude-code', 'work');
+    expect(plan).toMatchObject({ status: 'change', kind: 'connect', newEntry: npx('work') });
+  });
+
+  it('inside an app in a refused place: app_location, nothing written (never npx silently)', async () => {
+    const before = claudeJson({ other });
+    await writeClaude({ other });
+    const plan = await desk(() => TRANSLOCATED, { runningInApp: true }).plan('claude-code', 'work');
+    expect(plan.status).toBe('app_location');
+    expect(await readClaude()).toBe(before);
+  });
+
+  it('a move keeps the entry’s form (a browser-made npx entry stays npx in the app)', async () => {
+    await writeClaude({ agentlink: npx('home') });
+    const plan = await desk(() => OK, {
+      runningInApp: true,
+      agentIdOf: (name) => Promise.resolve(name === 'work' || name === 'home' ? WORK : undefined),
+    }).plan('claude-code', 'work');
+    expect(plan).toMatchObject({ status: 'change', kind: 'move', newEntry: npx('work') });
+  });
+});

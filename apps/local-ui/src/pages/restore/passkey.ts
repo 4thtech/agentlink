@@ -110,6 +110,8 @@ export async function getRestorePrf(
   request: PrfRequest,
   created: readonly Uint8Array[],
 ): Promise<PrfResult> {
+  // APP-CONTINUITY: never in the desktop app's window (passkeysAvailable is false there).
+  if (!passkeysAvailable()) return { kind: 'unsupported' };
   let used: Credential | null;
   try {
     used = await navigator.credentials.get({

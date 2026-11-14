@@ -24,6 +24,7 @@ import {
   type ApprovalsPageProps,
 } from '../approvals/index.js';
 import { APPROVAL_STRINGS as S } from '../approvals/strings.js';
+import { webAuthnHere } from '../../presence/webauthn-here.js';
 
 const APPROVE_PATH = /^\/approve\/(apr_[A-Za-z0-9_-]{22})$/;
 
@@ -74,9 +75,8 @@ export function ApprovePage({
   const client = useMemo(() => given ?? createApprovalsClient(), [given]);
   const canPasskey =
     givenCanPasskey ??
-    (typeof window !== 'undefined' &&
-      'PublicKeyCredential' in window &&
-      navigator.credentials !== undefined);
+    // APP-CONTINUITY: never in the desktop app's window (presence/webauthn-here.ts).
+    webAuthnHere();
   const owner = useOwner(client, canPasskey);
   const id = approvalIdOf(typeof location === 'undefined' ? '' : location.pathname);
   const one = useOne(client, id);

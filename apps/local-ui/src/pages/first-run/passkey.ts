@@ -14,6 +14,7 @@
 // assertion go to `finish`, which checks the assertion before using the output.
 import type { CreationValues, UpgradeValues } from './setup-api.js';
 import type { Platform } from './strings.js';
+import { webAuthnHere } from '../../presence/webauthn-here.js';
 
 /** How the passkey is asked for. */
 export interface PasskeyOptions {
@@ -135,7 +136,9 @@ export function encodeRegistration(fields: readonly Uint8Array[]): Uint8Array {
 
 /** True when this browser can make a passkey at all. */
 export function passkeysAvailable(): boolean {
+  // APP-CONTINUITY: never in the desktop app's window (presence/webauthn-here.ts).
   return (
+    webAuthnHere() &&
     typeof window !== 'undefined' &&
     typeof window.PublicKeyCredential === 'function' &&
     typeof navigator !== 'undefined' &&

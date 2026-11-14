@@ -21,6 +21,7 @@ export const DOCTOR_LOCAL_TEXT = Object.freeze({
     sigterm: 'your computer asked it to stop',
     sighup: 'its terminal window was closed',
     idle: 'it was not used for 30 minutes',
+    moved_to_app: 'the AgentLink app took over',
     uncaught: 'of an unexpected problem',
     rejections: 'of a run of unexpected problems',
     start_no_owner: "it wasn't set up yet",
@@ -42,7 +43,13 @@ export const DOCTOR_LOCAL_TEXT = Object.freeze({
 });
 
 /** The reasons that mean something went wrong, not that the person closed AgentLink. */
-const NORMAL: ReadonlySet<LastExitReason> = new Set(['ctrl_c', 'sigterm', 'sighup', 'idle']);
+const NORMAL: ReadonlySet<LastExitReason> = new Set([
+  'ctrl_c',
+  'sigterm',
+  'sighup',
+  'idle',
+  'moved_to_app',
+]);
 
 export interface LocalChecksOptions {
   readonly home?: string;

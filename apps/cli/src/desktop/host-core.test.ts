@@ -925,3 +925,46 @@ describe('N7: native notifications from the desktop host', () => {
     expect(marks).toEqual(['write:default', 'write:work', 'remove']);
   });
 });
+
+// APP-CONTINUITY (owner requirement 14 Nov; 08 §1 "One AgentLink, browser or app"; 08 §4): the app
+// installed after starting in the browser continues exactly where the person left off. Before its
+// own server starts, the core takes over a running `agentlink ui` host (or clears a stale record),
+// so there is one host, one record and no second owner. Its record says `host: "desktop"`, and a
+// terminal `agentlink ui` asking it to show (the record's token) brings its window forward.
+describe('APP-CONTINUITY: the desktop host continues a browser host', () => {
+  it('takes over first, then starts; its record says desktop; show brings the window forward', async () => {
+    const s = setup();
+    const order: string[] = [];
+    const run = runDesktopHost({
+      ...s.deps,
+      takeOver: () => {
+        order.push('take over');
+        return Promise.resolve('yielded' as const);
+      },
+      startServer: (options, sink) => {
+        order.push('start');
+        return s.deps.startServer(options, sink);
+      },
+    });
+    await until(() => readies(s.pipe.sent).length === 1);
+    expect(order).toEqual(['take over', 'start']);
+    const written = JSON.parse(
+      readFileSync(join(home, '.agentlink', APP_HOST_FILE), 'utf8'),
+    ) as Record<string, unknown>;
+    expect(written['host']).toBe('desktop');
+    const handoff = s.options()?.host?.handoff;
+    expect(handoff?.onYield?.() ?? false).toBe(false);
+    expect(handoff?.onShow?.()).toBe(true);
+    await until(() => readies(s.pipe.sent).length === 2);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await expect(run).resolves.toBe(0);
+  });
+
+  it('a takeover that fails or is kept never stops the app from starting', async () => {
+    const s = setup();
+    const run = runDesktopHost({ ...s.deps, takeOver: () => Promise.reject(new Error('x')) });
+    await until(() => readies(s.pipe.sent).length === 1);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await expect(run).resolves.toBe(0);
+  });
+});

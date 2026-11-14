@@ -104,6 +104,12 @@ export interface DesktopHostDeps {
    * RECORD_RENEW_MS; removed when no ID is open and when the host stops. Absent: no mark (tests).
    */
   readonly alertsRecord?: { write(scope: string): Promise<void>; remove(): Promise<void> };
+  /**
+   * APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): before this host's server starts, take
+   * over a terminal `agentlink ui` host or clear a stale record (app-host-record.ts
+   * takeOverAppHost). Its outcome never stops the start. Absent: nothing is looked for (tests).
+   */
+  takeOver?(): Promise<'none' | 'stale' | 'yielded' | 'kept'>;
 }
 
 /** Exit codes: 0 for a clean stop, 1 when it could not start or a fatal error ended it. */
@@ -141,6 +147,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     stopWith = resolve;
   });
   let stopping = false;
+  /** APP-CONTINUITY: shows Home in the window once the server runs (terminal `agentlink ui`). */
+  const later: { showHome?: () => void } = {};
   const stop = (reason: StopReason): void => {
     if (stopping) return;
     stopping = true;
@@ -262,13 +270,24 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
                 : {
                     handoff: {
                       // Held in memory for the shell's invites; the file is `join`'s (0600).
+                      // APP-CONTINUITY: it says `host: "desktop"`, so terminal `agentlink ui`
+                      // shows this window instead of starting a second host.
                       write: async (value: AppHostHandoffRecordValue) => {
-                        record = value;
-                        await host.handoff?.write(value);
+                        record = { ...value, host: 'desktop' };
+                        await host.handoff?.write(record);
                       },
                       remove: async () => {
                         record = undefined;
                         await host.handoff?.remove();
+                      },
+                      // Never taken over: the desktop app is the one that stays.
+                      onYield: () => false,
+                      // Terminal `agentlink ui`: a fresh one-shot link to Home over the pipe; the
+                      // shell shows its window on `ready`.
+                      onShow: () => {
+                        if (stopping || later.showHome === undefined) return false;
+                        later.showHome();
+                        return true;
                       },
                     },
                   }),
@@ -297,6 +316,10 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   });
   sendStatus();
 
+  // APP-CONTINUITY: one host: a terminal `agentlink ui` host is taken over (it closes cleanly; its
+  // browser tab says so), and a stale record of a crashed host is cleared. Same ~/.agentlink, same
+  // keychain, same IDs: nothing is set up again, and AI app entries are untouched.
+  await deps.takeOver?.().catch(() => 'kept' as const);
   let started: { ok: true; server: UiServer } | { ok: false; failure: StopReason };
   try {
     const result = await startUiServer(deps.uiDeps(startServer), undefined);
@@ -338,6 +361,10 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     else if (server.page === 'first-run' && !openedSinceStart) {
       await approvalServer.openFirstRun().catch(() => false);
     } else await approvalServer.openHome().catch(() => false);
+  };
+
+  later.showHome = () => {
+    queue = queue.then(() => show('home')).catch(() => undefined);
   };
 
   const invite = async (link: string): Promise<InviteOutcome> => {

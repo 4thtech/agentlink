@@ -517,3 +517,56 @@ describe('agentlink ui with no agent at all opens Welcome (U3-g-b)', () => {
     expect(source).toContain('startUiWelcome(');
   });
 });
+
+// APP-CONTINUITY (owner requirement 14 Nov; 08 §1 "One AgentLink, browser or app"): terminal
+// `agentlink ui` while the desktop app runs shows the app's window (no second host, no browser); and
+// a browser host the desktop app takes over closes with one plain line.
+describe('APP-CONTINUITY: agentlink ui and the desktop app', () => {
+  it('the desktop app is running: its window is shown, nothing is started', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({});
+    const withApp: UiDeps = { ...deps, runningApp: () => Promise.resolve('shown') };
+    await expect(uiStep(p.context, withApp, PREFIX)).resolves.toBe(EXIT_OK);
+    expect(calls).toMatchObject({ start: 0, opened: 0 });
+    expect(p.out).toEqual([UI_TEXT.inApp]);
+    expectNoLink(p);
+  });
+
+  it('no desktop app running: the browser host starts as before', async () => {
+    const p = probe(TTY);
+    const { deps, calls } = fakeDeps({});
+    const noApp: UiDeps = { ...deps, runningApp: () => Promise.resolve('none') };
+    await expect(uiStep(p.context, noApp, PREFIX)).resolves.toBe(EXIT_OK);
+    expect(calls).toMatchObject({ start: 1, opened: 1, closed: 1 });
+  });
+
+  it.each([
+    [true, UI_TEXT.movedToApp],
+    [false, UI_TEXT.closed(PREFIX)],
+  ] as const)(
+    'asked to yield: closes once; "moved to the app" only when the app host appeared (%s)',
+    async (appeared, line) => {
+      const p = probe(TTY);
+      const { deps, calls } = fakeDeps({ stop: 'never' });
+      let handler: ((signal?: string) => void) | undefined;
+      let closedBeforeLook = false;
+      const yielding: UiDeps = {
+        ...deps,
+        interrupt: (stop) => {
+          handler = stop;
+          setTimeout(() => handler?.('yield'), 10);
+          return () => undefined;
+        },
+        appTookOver: () => {
+          // The app starts only after this host closed (its record removed).
+          closedBeforeLook = calls.closed === 1;
+          return Promise.resolve(appeared);
+        },
+      };
+      await expect(uiStep(p.context, yielding, PREFIX)).resolves.toBe(EXIT_OK);
+      expect(calls.closed).toBe(1);
+      expect(closedBeforeLook).toBe(true);
+      expect(p.out.at(-1)).toBe(line);
+    },
+  );
+});

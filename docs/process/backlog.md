@@ -10836,7 +10836,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** README Status, docs-site and `knowledge/` match what shipped (send-by-content limits, the Files step, the Home panel); no untested claim about an AI app's own features; drift checks green.
 
 #### FIRSTRUN-ANY-PLATFORM · First run works on any computer and in any browser (0.5.5, owner test on real machines, 14 Nov)
-- **Status:** in review · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.2
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/pages/start/strings.ts`, `packages/node/src/approval-server.ts` (setup finish), tests
 - **Depends on:** — (consumes WIN-HELLO-NATIVE through `/api/owner/native`; works without it)
 - **Spec:** 04 §2.2 "Creating it on the first-run page"; 08 §1 first run; 11 §5
@@ -10845,7 +10845,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
   - Symptoms: the Mac desktop app's first run showed "This browser can't make a passkey" with `agentlink owner init`; on Windows 11 21H2 both buttons asked for a passkey with PRF and Windows offered only a USB security key; the step said "Touch ID" on Windows; "Skip to Home" was usable with no owner.
   - Fix: a master-code-only finish (`{nonce, presence: 'code'}`, empty body, no WebAuthn); presence detected first (the desktop helper, the platform authenticator, PRF); on Windows the master code first; only ever the platform authenticator; the desktop app's Touch ID / Windows Hello offered after the code; no dead-end screen; platform words from SENSOR.
 - **Acceptance:**
-  - `RED (expected):` commit first; the master-code path never calls `navigator.credentials`; no `create` without a platform authenticator; desktop shell with no owner and no WebAuthn reaches the master-code step; Opus independent review, Fable 5.1 audit, Tali's "merge"; changelog.d fragment and changeset.
+  - `RED (expected):` commit first; the master-code path never calls `navigator.credentials`; no `create` without a platform authenticator; desktop shell with no owner and no WebAuthn reaches the master-code step; Opus independent review, Fable 5.2 audit, Tali's "merge"; changelog.d fragment and changeset.
 
 #### WIN-BROKEN-ID · An ID whose key is missing: Restore, Remove from this computer, Continue (0.5.5)
 - **Status:** in review · **Size:** M · **Tier:** Opus · **Security:** S2 (owner presence, keychain erase)
@@ -10891,3 +10891,15 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** NOTIFY-ALL-IDS, N7
 - **Spec:** 08 §1; 11 §5
 - **Done when:** a person's file and message arriving together (one look) or within 20 s (either order, across looks) raise one alert (whichever arrives first is shown; within one look the file's); only alerts the owner's switches let through are counted, so an off switch never hides the other kind; different people and approvals/updates are untouched. A file alone is one flow event (kind `file`), never a file plus a message.
+#### APP-CONTINUITY · One AgentLink, browser or app: either way start to finish, and moving between them keeps everything (0.5.5, owner requirement 14 Nov)
+- **Status:** in review · **Size:** L · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.2
+- **Repo/path:** agentlink · `apps/local-ui/src/presence/{offer.ts,webauthn-here.ts}`, every owner-presence prompt (`pages/contacts/presence-{prompt,button}.tsx`, `pages/apps/create-agent-gate.tsx`, `pages/approvals/index.tsx`, `pages/first-run/index.tsx`) and the WebAuthn defaults (`api/presence-ceremony.ts`, the approvals, rules, inbox, files, pay-confirm, create-agent and restore clients); `packages/node/src/{approval-server.ts,local-ui/{invite-paths.ts,routes.ts,app-host.ts,api/join.ts}}` (host takeover and show, code-finish tries); `apps/cli/src/{runtime/app-host-record.ts,commands/ui.ts,desktop/{host-core.ts,host-main.ts},harness/app-desk.ts}`; tests
+- **Depends on:** FIRSTRUN-ANY-PLATFORM; folds in WIN-HELLO-NATIVE's `desktopPresenceOffer(platform, status)` (same API)
+- **Spec:** 08 §1 "One AgentLink, browser or app" (proposed; owner approved the requirement 14 Nov); 08 §4; 04 §2.2, §2.5
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - Symptoms (0.5.4 live): an owner made in the browser opened in the app with a passkey switch or a passkey button that cannot work in the app's window; an `agentlink ui` host and the app ran side by side with `app-host.json` naming whichever started last; connecting an AI app from the app wrote `npx …`, which fails on a computer with only the app.
+  - Fix: inside the app's window no WebAuthn call anywhere (presence offers native once on, else the master code; Home and Approvals offer "Turn on Touch ID / Windows Hello", master code once); the app takes over a running `agentlink ui` host (`POST /api/ui/host/yield`, the handoff kind, empty body) and clears a stale record; its record says `host: "desktop"`, and terminal `agentlink ui` shows its window (`POST /api/ui/host/show`) instead of a second host; a new connect from inside the app writes the app form (moves keep the entry's form).
+  - Folded-in FIRSTRUN Fable lows: a code finish with a body counts as a failed try; Skip to Home after an `owner_exists` answer; 04 §2.2 / 08 §1 name `{nonce, presence: "code"}`; route tests (another session, a wrong nonce, `presence` on begin); this card's audit model.
+- **Acceptance:**
+  - `RED (expected):` commit first; browser owner then app: no setup, no passkey, native offer, IDs listed; app owner then browser: the master code; takeover, stale record and show; the app-form connect in the app; prompts in the app never call `navigator.credentials`; Opus independent review, Fable 5.2 audit, Tali's "merge"; changelog.d fragment and changeset.
