@@ -12,7 +12,9 @@
 //     network: 'checking' | null,            // REL051-CF2: the first relay check has not finished
 //     version: string | null,                // a plain x.y.z[-pre] version
 //     dataFolder: string | null,             // REL051-B3b: home-relative (`~/.agentlink`) only
-//     uptimeSeconds: number | null }         // REL051-B3b: whole seconds since the server started
+//     uptimeSeconds: number | null,          // REL051-B3b: whole seconds since the server started
+//     dataAccess?: 'unchecked' }             // WIN-ACL-NOTICE: present only when the desktop app
+//                                            // could not check who can open the data folder
 // Never a relay address, key, token, agent ID or error text, whatever the source holds, and no path
 // but the data folder with the home folder shown as `~` (the account name never shows): a folder
 // outside the home folder, or one that is not showable, answers null, never the path.
@@ -56,6 +58,8 @@ export interface LocalUiHealthBody extends JsonObject {
   readonly dataFolder: string | null;
   /** REL051-B3b: whole seconds since the server started. */
   readonly uptimeSeconds: number | null;
+  /** WIN-ACL-NOTICE: only ever `unchecked`, and only when the desktop app says so; else absent. */
+  readonly dataAccess?: 'unchecked';
 }
 
 /** REL051-B3b: the data folder the caller passes (absolute), with the home folder it is under. */
@@ -132,12 +136,14 @@ interface ServerFacts {
   readonly version: string | null;
   readonly dataFolder: string | null;
   readonly uptimeSeconds: number | null;
+  readonly dataAccess: 'unchecked' | null;
 }
 
 const NO_FACTS: ServerFacts = Object.freeze({
   version: null,
   dataFolder: null,
   uptimeSeconds: null,
+  dataAccess: null,
 });
 
 const body = (
@@ -155,6 +161,7 @@ const body = (
     version: facts.version,
     dataFolder: facts.dataFolder,
     uptimeSeconds: facts.uptimeSeconds,
+    ...(facts.dataAccess === 'unchecked' ? { dataAccess: 'unchecked' as const } : {}),
   });
 
 export interface HealthReaderOptions {
@@ -166,6 +173,8 @@ export interface HealthReaderOptions {
   readonly version?: string;
   /** REL051-B3b: the data folder (answered home-relative only, see healthDataFolder). */
   readonly dataFolder?: LocalUiDataFolder;
+  /** WIN-ACL-NOTICE: the desktop app could not check who can open the data folder (a flag only). */
+  readonly dataFolderUnchecked?: boolean;
   /** REL051-B3b: when the server started, in milliseconds (for the uptime). */
   readonly startedAt?: number;
   /** The clock in milliseconds. */
@@ -203,7 +212,12 @@ export function createHealthReader(options: HealthReaderOptions): () => Promise<
   };
 
   const readSource = async (): Promise<LocalUiHealthBody> => {
-    const facts: ServerFacts = { version, dataFolder, uptimeSeconds: uptimeOf(startedAt, now()) };
+    const facts: ServerFacts = {
+      version,
+      dataFolder,
+      uptimeSeconds: uptimeOf(startedAt, now()),
+      dataAccess: options.dataFolderUnchecked === true ? 'unchecked' : null,
+    };
     if (!options.hasClient) return body('needs_setup', facts);
     if (source === undefined) return body('running', facts);
     let timer: ReturnType<typeof setTimeout> | undefined;

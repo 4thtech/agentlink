@@ -99,10 +99,14 @@ export function nodeDesktopHostDeps(pipe: DesktopPipe): DesktopHostDeps {
         undefined,
         writeDiagnosticLine,
       );
+      // WIN-ACL-NOTICE: the shell sets this fixed value only when it could not check the data
+      // folder's access; the page then shows a notice (the health read's `dataAccess`).
+      const unchecked = process.env['AGENTLINK_DESKTOP_DATA_ACL'] === 'unchecked';
+      const base = unchecked ? { ...options, dataFolderUnchecked: true } : options;
       return startApprovalServerWithLinkSink(
         nativePresence === undefined
-          ? options
-          : { ...options, nativePresence, diagnose: writeDiagnosticLine },
+          ? base
+          : { ...base, nativePresence, diagnose: writeDiagnosticLine },
         sink,
       );
     },

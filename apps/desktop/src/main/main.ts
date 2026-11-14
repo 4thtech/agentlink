@@ -553,12 +553,15 @@ export async function runShell(
       supervisor?.send({ v: 1, type: 'show', route, ...(target === undefined ? {} : { target }) });
     },
   });
+  // WIN-ACL-NOTICE: the last data folder check could not run; the core shows a notice in the app.
+  let dataFolderUnchecked = false;
   supervisor = new CoreSupervisor({
     nodePath,
     hostScript,
     cwd: proc.homeDir,
     env: proc.env,
     platform: proc.platform,
+    dataFolderUnchecked: () => dataFolderUnchecked,
     spawn: proc.spawn,
     timers: proc.timers,
     onStart: () => {
@@ -682,6 +685,7 @@ export async function runShell(
           ? 'ok'
           : await checkFolder().catch((): 'unchecked' => 'unchecked');
       verifying = false;
+      dataFolderUnchecked = folder === 'unchecked';
       if (quitting) return;
       if (bundle === 'changed') blocked('changed_files');
       else if (folder === 'too_open') blocked('shared_data_folder');

@@ -18,6 +18,8 @@ import {
   UI_WAIT_MS,
   onStopSignals,
   openUiPage,
+  startFailureNote,
+  startUiServer,
   uiStep,
   type UiDeps,
   type UiPage,
@@ -569,4 +571,50 @@ describe('APP-CONTINUITY: agentlink ui and the desktop app', () => {
       expect(p.out.at(-1)).toBe(line);
     },
   );
+});
+
+describe('a failed app host start leaves one fixed diagnostic line (WIN-STARTUP-LOG)', () => {
+  it('names the reason and a short error code, never the error message or a path', async () => {
+    const notes: string[] = [];
+    const thrown = Object.assign(new Error('C:\\Users\\me\\.agentlink\\agents\\x secret=abc'), {
+      code: 'identity_missing',
+    });
+    const { deps } = fakeDeps({ agents: ['solo'] });
+    const result = await startUiServer(
+      {
+        ...deps,
+        start: () => Promise.reject(thrown),
+        diagnose: () => Promise.resolve('open' as const),
+        note: (line) => notes.push(line),
+      },
+      undefined,
+    );
+    expect(result.ok).toBe(false);
+    expect(notes).toEqual(['app host did not start: reason=open code=identity_missing']);
+  });
+
+  it('a code that is not a short identifier becomes none', () => {
+    expect(startFailureNote('open', Object.assign(new Error('x'), { code: 'a b/c' }))).toBe(
+      'app host did not start: reason=open code=none',
+    );
+    expect(startFailureNote('no_owner', undefined)).toBe(
+      'app host did not start: reason=no_owner code=none',
+    );
+  });
+
+  it('a note that throws does not change the result', async () => {
+    const { deps } = fakeDeps({ agents: ['solo'] });
+    const result = await startUiServer(
+      {
+        ...deps,
+        start: () => Promise.resolve(undefined),
+        diagnose: () => Promise.resolve('keychain' as const),
+        note: () => {
+          throw new Error('boom');
+        },
+      },
+      undefined,
+    );
+    expect(result).toEqual({ ok: false, failure: 'keychain' });
+  });
 });

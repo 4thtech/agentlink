@@ -11,6 +11,7 @@ import {
   STABLE_RUN_MS,
   aiAppMarkerSet,
   cleanCoreEnv,
+  coreSpawnEnv,
   type SupervisorState,
 } from '../../src/main/core-process.js';
 import type { CoreMessage } from '../../src/shared/protocol.js';
@@ -120,6 +121,26 @@ describe('cleanCoreEnv', () => {
   });
 });
 
+describe('coreSpawnEnv', () => {
+  it('always sets the fixed log level and ignores the user-supplied one', () => {
+    expect(coreSpawnEnv({ HOME: '/h', AGENTLINK_LOG: 'debug' }, 'darwin')).toEqual({
+      HOME: '/h',
+      AGENTLINK_LOG: 'warn',
+    });
+    expect(coreSpawnEnv({ agentlink_log: 'debug' }, 'win32')).toEqual({ AGENTLINK_LOG: 'warn' });
+  });
+
+  it('WIN-ACL-NOTICE: the unchecked flag is set only by the shell, never from the user env', () => {
+    const user = { HOME: '/h', AGENTLINK_DESKTOP_DATA_ACL: 'unchecked' };
+    expect(coreSpawnEnv(user, 'darwin')).toEqual({ HOME: '/h', AGENTLINK_LOG: 'warn' });
+    expect(coreSpawnEnv({ HOME: '/h' }, 'darwin', true)).toEqual({
+      HOME: '/h',
+      AGENTLINK_LOG: 'warn',
+      AGENTLINK_DESKTOP_DATA_ACL: 'unchecked',
+    });
+  });
+});
+
 describe('CoreSupervisor', () => {
   it('refuses relative paths', () => {
     const { spawn } = fakeSpawn();
@@ -145,7 +166,8 @@ describe('CoreSupervisor', () => {
     expect(child?.command).toBe(NODE);
     expect(child?.args).toEqual([HOST]);
     expect(child?.options).toEqual({
-      env: { HOME: '/Users/x' },
+      // WIN-STARTUP-LOG: the log level is fixed by the shell, never taken from the user's env.
+      env: { HOME: '/Users/x', AGENTLINK_LOG: 'warn' },
       // WIN-DESK-1: 'overlapped' (the same as 'pipe' outside Windows) so the core can read and
       // write fd 3 at the same time on Windows.
       stdio: ['ignore', 'ignore', 'pipe', 'overlapped'],
