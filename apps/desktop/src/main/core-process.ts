@@ -119,6 +119,21 @@ export function cleanCoreEnv(
   return out;
 }
 
+/**
+ * WIN-STARTUP-LOG: the one logging variable the core gets, always this fixed value (never the user's
+ * own). The core's redacting logger (@4thtech-io/log) then writes its warnings, with fixed codes only,
+ * to stderr, which core-log.ts redacts again and keeps in core.log.
+ */
+export const CORE_LOG_LEVEL = 'warn';
+
+/** The environment the core is spawned with: the clean one, plus the fixed log level. */
+export function coreSpawnEnv(
+  env: Readonly<Record<string, string | undefined>>,
+  platform: string,
+): Record<string, string> {
+  return { ...cleanCoreEnv(env, platform), AGENTLINK_LOG: CORE_LOG_LEVEL };
+}
+
 /** The child process as the supervisor uses it (node:child_process ChildProcess). */
 export interface CoreChild {
   readonly stdio: readonly unknown[];
@@ -250,7 +265,7 @@ export class CoreSupervisor {
     let child: CoreChild;
     try {
       child = o.spawn(o.nodePath, [o.hostScript], {
-        env: cleanCoreEnv(o.env, o.platform),
+        env: coreSpawnEnv(o.env, o.platform),
         stdio: ['ignore', 'ignore', 'pipe', 'overlapped'],
         windowsHide: true,
         shell: false,

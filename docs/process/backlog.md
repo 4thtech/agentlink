@@ -10846,3 +10846,10 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** WIN-DESK-2
 - **Scope:** finish page with a ticked "Create a desktop shortcut" box (per-user `$DESKTOP`, same icon and AppUserModelID as the Start menu entry); the uninstaller deletes it; still per-user, no admin.
 - **Acceptance:** NSIS script test; the Windows CI leg builds the installer.
+
+#### WIN-STARTUP-LOG · Core start diagnostics reach core.log on Windows (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build · **Security:** S1
+- **Repo/path:** agentlink · `apps/desktop/src/main/core-process.ts`, `apps/cli/src/commands/ui.ts`
+- **Depends on:** WIN-DESK-2
+- **Scope:** the shell spawns the core with a fixed `AGENTLINK_LOG=warn` (the user's own value is still dropped); the core's redacting logger writes one fixed line when the app host cannot start (`reason=` and a short `code=` only) to stderr; core-log.ts redacts again and keeps it in `core.log` (1 MB, then `core.1.log`).
+- **Acceptance:** unit tests for the spawn env and the note; no message, path or secret in the line.
