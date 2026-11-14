@@ -98,6 +98,7 @@ import { HOME_STRINGS as S, fmt, idWithApp } from './people-strings.js';
 import { filesOf, PersonFiles, type Reveal } from './person-files.js';
 import { PersonMenu } from './person-menu.js';
 import { PersonName } from './person-name.js';
+import { clearPersonHash, personFromHash } from './person-link.js';
 import './people.css';
 
 /** How often Home looks again while the tab is visible. */
@@ -775,6 +776,15 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   };
 
   const data = view.state === 'ready' ? view.data : undefined;
+  // NOTIFY-DEEPLINK: a notification click opens that person's conversation (checked against the people
+  // Home holds; an unknown ID opens nothing).
+  useEffect(() => {
+    if (data === undefined) return;
+    const wanted = personFromHash(location.hash);
+    if (wanted === undefined) return;
+    if (data.people.some((p) => p.contactId === wanted)) setOpen(wanted);
+    clearPersonHash();
+  }, [data]);
   const many = agents.length > 1;
   const otherAgent =
     filter !== 'all' && current !== undefined && filter !== current.name

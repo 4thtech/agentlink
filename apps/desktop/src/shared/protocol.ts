@@ -227,6 +227,8 @@ export interface NotifyMessage {
   readonly count: number;
   /** "" or an owner-given alias (messages, files only). */
   readonly name: string;
+  /** NOTIFY-DEEPLINK: the one request or person a click opens (isNotifyTarget); absent for none. */
+  readonly target?: string;
 }
 /** UPD-5: "Update now" and "Restart now" (no other key). */
 export interface AppUpdateStepMessage {
@@ -252,6 +254,8 @@ export interface ShowMessage {
   readonly v: 1;
   readonly type: 'show';
   readonly route: ShowRoute;
+  /** NOTIFY-DEEPLINK: the one request or person to open (isNotifyTarget). */
+  readonly target?: string;
 }
 export interface ShutdownMessage {
   readonly v: 1;
@@ -266,8 +270,20 @@ export type ShellMessage = InviteMessage | ShowMessage | ShutdownMessage | AppUp
 
 const TOKEN = '[A-Za-z0-9_-]{43}';
 const PORT = '([1-9][0-9]{0,4})';
-const PATH = '(/|/first-run|/settings/home|/settings/join|/settings/updates)';
-const SESSION_URL = new RegExp(`^http://localhost:${PORT}${PATH}\\?t=${TOKEN}$`);
+// NOTIFY-DEEPLINK: `/approve/<id>` and a `#person=<id>` fragment (the window keeps it; it is never sent
+// to the server). Mirrors apps/cli/src/desktop/protocol.ts.
+const PATH = '(?:/|/first-run|/settings/home|/settings/join|/settings/updates|/approve/apr_[A-Za-z0-9_-]{22})';
+const SESSION_URL = new RegExp(`^http://localhost:${PORT}${PATH}\\?t=${TOKEN}(?:#person=0x[0-9a-f]{40})?$`);
+
+/** NOTIFY-DEEPLINK: the opaque targets (a request's or a person's local ID). Mirrors the core. */
+const APPROVAL_TARGET = /^apr_[A-Za-z0-9_-]{22}$/;
+const PERSON_TARGET = /^0x[0-9a-f]{40}$/;
+export function isNotifyTarget(kind: NotifyKind | ShowRoute, value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  if (kind === 'approvals') return APPROVAL_TARGET.test(value);
+  if (kind === 'messages' || kind === 'files' || kind === 'inbox') return PERSON_TARGET.test(value);
+  return false;
+}
 
 const SHORT_INVITE = /^2\.[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/;
 const LONG_INVITE = /^[A-Za-z0-9_-]+$/;
@@ -375,12 +391,22 @@ export function parseCoreMessage(line: string): CoreMessage | undefined {
       if (!hasExactKeys(value, ['v', 'type'])) return undefined;
       return { v: 1, type: 'app-update-check' };
     case 'notify': {
-      if (!hasExactKeys(value, ['v', 'type', 'kind', 'count', 'name'])) return undefined;
+      const withTarget = Object.hasOwn(value, 'target');
+      if (
+        !hasExactKeys(value, ['v', 'type', 'kind', 'count', 'name', ...(withTarget ? ['target'] : [])])
+      ) {
+        return undefined;
+      }
       const { kind, count, name } = value;
       if (!isOneOf(NOTIFY_KINDS, kind) || !isCount(count) || count < 1) return undefined;
       if (typeof name !== 'string') return undefined;
       if (name !== '' && (!NOTIFY_NAME_KINDS.includes(kind) || !isNotifyName(name))) {
         return undefined;
+      }
+      if (withTarget) {
+        const target = value['target'];
+        if (!isNotifyTarget(kind, target)) return undefined;
+        return { v: 1, type: 'notify', kind, count, name, target };
       }
       return { v: 1, type: 'notify', kind, count, name };
     }
@@ -405,9 +431,17 @@ export function parseShellMessage(line: string): ShellMessage | undefined {
       return { v: 1, type: 'invite', link };
     }
     case 'show': {
-      if (!hasExactKeys(value, ['v', 'type', 'route'])) return undefined;
+      const withTarget = Object.hasOwn(value, 'target');
+      if (!hasExactKeys(value, ['v', 'type', 'route', ...(withTarget ? ['target'] : [])])) {
+        return undefined;
+      }
       const route = value['route'];
       if (!isOneOf(SHOW_ROUTES, route)) return undefined;
+      if (withTarget) {
+        const target = value['target'];
+        if (!isNotifyTarget(route, target)) return undefined;
+        return { v: 1, type: 'show', route, target };
+      }
       return { v: 1, type: 'show', route };
     }
     case 'shutdown':
@@ -452,7 +486,12 @@ export function encodeShellMessage(message: ShellMessage): string {
       line = JSON.stringify({ v: 1, type: 'invite', link: message.link });
       break;
     case 'show':
-      line = JSON.stringify({ v: 1, type: 'show', route: message.route });
+      line = JSON.stringify({
+        v: 1,
+        type: 'show',
+        route: message.route,
+        ...(message.target === undefined ? {} : { target: message.target }),
+      });
       break;
     case 'shutdown':
       line = JSON.stringify({ v: 1, type: 'shutdown' });
@@ -515,6 +554,7 @@ export function encodeCoreMessage(message: CoreMessage): string {
         kind: message.kind,
         count: message.count,
         name: message.name,
+        ...(message.target === undefined ? {} : { target: message.target }),
       });
       break;
     default:

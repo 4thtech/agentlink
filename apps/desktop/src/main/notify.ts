@@ -7,8 +7,10 @@
 //   (the pipe parser refuses any other shape). Never message text, a file name, a link or an amount
 //   (11 §5.2, §5.7; I-5).
 // - A click focuses the window and opens the kind's ONE fixed route (NOTIFY_ROUTES, a `show` enum);
-//   nothing from a notification can choose a page, and no notification has an action that approves,
-//   accepts or replies (11 §10).
+//   nothing from a notification can choose a page. NOTIFY-DEEPLINK: it may also carry one opaque local
+//   ID (a request's or a person's), shape-checked by the pipe parser and again by the core before it
+//   opens that one request or conversation; never content. No notification has an action that
+//   approves, accepts or replies (11 §10).
 // - At most one notification per kind per NOTIFY_GAP_MS (30 s, 06's OS-alert rule). What arrives
 //   meanwhile is coalesced into one later notification: approvals keep the latest number waiting,
 //   messages and files add up; a name stays only while it is the same person.
@@ -83,12 +85,12 @@ export interface NativeNotifierOptions {
   readonly Notification?: NotificationConstructor;
   readonly timers: Timers;
   /** A notification was clicked: focus the window and open this fixed route. */
-  readonly onClick: (route: ShowRoute) => void;
+  readonly onClick: (route: ShowRoute, target?: string) => void;
 }
 
 interface KindState {
   lastShownAt: number | undefined;
-  pending: { count: number; name: string } | undefined;
+  pending: { count: number; name: string; target: string } | undefined;
   timer: unknown;
 }
 
@@ -112,16 +114,18 @@ export class NativeNotifier {
     const free = state.lastShownAt === undefined || now - state.lastShownAt >= NOTIFY_GAP_MS;
     if (free && state.pending === undefined) {
       state.lastShownAt = now;
-      this.show(message.kind, message.count, message.name);
+      this.show(message.kind, message.count, message.name, message.target ?? '');
       return;
     }
     const before = state.pending;
     state.pending =
       before === undefined
-        ? { count: message.count, name: message.name }
+        ? { count: message.count, name: message.name, target: message.target ?? '' }
         : {
             count: message.kind === 'approvals' ? message.count : before.count + message.count,
             name: before.name === message.name ? before.name : '',
+            // One target only while it is the same one (NOTIFY-DEEPLINK); else the kind's page.
+            target: before.target === (message.target ?? '') ? before.target : '',
           };
     if (state.timer === undefined) {
       const wait = Math.max(0, (state.lastShownAt ?? now) + NOTIFY_GAP_MS - now);
@@ -148,10 +152,10 @@ export class NativeNotifier {
     state.pending = undefined;
     if (pending === undefined || this.disposed) return;
     state.lastShownAt = this.options.timers.now();
-    this.show(kind, pending.count, pending.name);
+    this.show(kind, pending.count, pending.name, pending.target);
   }
 
-  private show(kind: NotifyKind, count: number, name: string): void {
+  private show(kind: NotifyKind, count: number, name: string, target: string): void {
     const Notification = this.options.Notification;
     try {
       if (Notification === undefined || !Notification.isSupported()) return;
@@ -162,7 +166,8 @@ export class NativeNotifier {
       };
       notification.on('click', () => {
         release();
-        this.options.onClick(route);
+        if (target === '') this.options.onClick(route);
+        else this.options.onClick(route, target);
       });
       notification.on('close', release);
       if (this.held.size >= MAX_HELD) {

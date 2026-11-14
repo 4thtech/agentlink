@@ -45,6 +45,7 @@ import { notifyMessages, planAlerts, refsToName, type AlertBaseline } from './al
 import type { FatalReason } from '../runtime/ui-lifecycle.js';
 import type { DesktopPipe } from './pipe.js';
 import {
+  isNotifyTarget,
   isSessionUrl,
   type HostCounts,
   type HostState,
@@ -320,8 +321,15 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   // The first page: Home, first run while no owner exists (the sink sends `ready`).
   await server.open().catch(() => false);
 
-  const show = async (route: ShowRoute): Promise<void> => {
+  const show = async (route: ShowRoute, target?: string): Promise<void> => {
     if (approvalServer === undefined) return;
+    // NOTIFY-DEEPLINK: the one request or person a notification named; the server checks the shape
+    // again, and a stale or unknown ID falls back to the page's own list.
+    if (route === 'approvals' && target !== undefined && isNotifyTarget('approvals', target)) {
+      if (await approvalServer.open(target).catch(() => false)) return;
+    } else if (route === 'inbox' && target !== undefined && isNotifyTarget('inbox', target)) {
+      if (await approvalServer.openPerson(target).catch(() => false)) return;
+    }
     if (route === 'approvals' || route === 'inbox') await approvalServer.open().catch(() => false);
     else if (route === 'updates') await approvalServer.openUpdates().catch(() => false);
     else if (route === 'join') await approvalServer.openJoin().catch(() => false);
@@ -356,7 +364,7 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   const handle = async (message: ShellMessage): Promise<void> => {
     if (stopping) return;
     if (message.type === 'shutdown') stop('shutdown');
-    else if (message.type === 'show') await show(message.route);
+    else if (message.type === 'show') await show(message.route, message.target);
     else if (message.type === 'app-update')
       return; // kept by its own listener above
     else {

@@ -38,7 +38,7 @@ describe('planAlerts', () => {
   it('IR-N7-1 L-3: one approval decided and another raised within one look is still news', () => {
     const first = planAlerts(undefined, ['apr_1'], src([]));
     expect(planAlerts(first.baseline, ['apr_2'], src([])).news).toEqual([
-      { kind: 'approvals', count: 1 },
+      { kind: 'approvals', count: 1, approvalId: 'apr_2' },
     ]);
   });
 
@@ -144,5 +144,51 @@ describe('notifyMessages: the switches and the owner-name rule', () => {
       expect(encoded).toBeDefined();
       expect(parseHostMessage((encoded ?? '').trim())).toEqual(m);
     }
+  });
+});
+
+// NOTIFY-DEEPLINK, NOTIFY-UPDATE-READY (S1).
+describe('NOTIFY-DEEPLINK: the notification names the one thing it is about', () => {
+  const APR = `apr_${'A'.repeat(22)}`;
+  const on = { ...NOTIFY_DEFAULTS, messages: true, files: true };
+
+  it('one approval waiting: its ID as the target; several: none (the list)', () => {
+    const one = planAlerts(planAlerts(undefined, [], src([])).baseline, [APR], src([]));
+    expect(notifyMessages(one.news, NOTIFY_DEFAULTS, new Map())).toEqual([
+      { v: 1, type: 'notify', kind: 'approvals', count: 1, name: '', target: APR },
+    ]);
+    const two = planAlerts(planAlerts(undefined, [], src([])).baseline, [APR, `apr_${'B'.repeat(22)}`], src([]));
+    expect(notifyMessages(two.news, NOTIFY_DEFAULTS, new Map())[0]).toEqual({
+      v: 1,
+      type: 'notify',
+      kind: 'approvals',
+      count: 2,
+      name: '',
+    });
+  });
+
+  it('a person: their opaque ID, with or without Show names; never a name as the target', () => {
+    const news = [{ kind: 'messages' as const, count: 1, ref: A }];
+    expect(notifyMessages(news, on, new Map([[A, 'Ana']]))[0]).toEqual({
+      v: 1,
+      type: 'notify',
+      kind: 'messages',
+      count: 1,
+      name: '',
+      target: A,
+    });
+  });
+
+  it('an ID of any other shape is never put on the pipe', () => {
+    const news = [{ kind: 'messages' as const, count: 1, ref: '../../etc' }];
+    expect(notifyMessages(news, on, new Map())[0]).toEqual({
+      v: 1,
+      type: 'notify',
+      kind: 'messages',
+      count: 1,
+      name: '',
+    });
+    const bad = [{ kind: 'approvals' as const, count: 1, approvalId: 'apr_1' }];
+    expect(notifyMessages(bad, NOTIFY_DEFAULTS, new Map())[0]).not.toHaveProperty('target');
   });
 });

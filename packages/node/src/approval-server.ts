@@ -541,6 +541,8 @@ export function presenceBackoffSeconds(failures: number): number {
 }
 
 const APPROVAL_ID = /^apr_[A-Za-z0-9_-]{22}$/;
+/** NOTIFY-DEEPLINK: a person's opaque local contact ID. */
+const PERSON_ID = /^0x[0-9a-f]{40}$/;
 const DIGEST = /^[0-9a-f]{64}$/;
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
 const APPROVE_PAGE = /^\/approve\/(apr_[A-Za-z0-9_-]{22})$/;
@@ -1151,6 +1153,12 @@ export interface ApprovalServer {
    * desktop app's "Update ready" notification opens. A fixed path.
    */
   openUpdates(): Promise<boolean>;
+  /**
+   * NOTIFY-DEEPLINK: Home with one person's conversation open (the link carries only that person's
+   * opaque local ID, after `#`, so it never reaches the server). A malformed ID rejects. Home checks
+   * the ID against its own people before it opens anything.
+   */
+  openPerson(contactId: string): Promise<boolean>;
   /**
    * N7 (desktop app): the open ID's notification items (brought up to date first; kind, ref, count
    * and times only) and the Settings › Notifications switches in force. Undefined while no ID with a
@@ -8374,6 +8382,10 @@ export async function startApprovalServerWith(
     openUpdates: async () =>
       opener(`${origin}/settings/updates?t=${mintLink()}`).catch(() => false),
     openJoin: () => openJoinPage(false),
+    openPerson: async (contactId: string) => {
+      if (typeof contactId !== 'string' || !PERSON_ID.test(contactId)) throw invalidId();
+      return opener(`${origin}/?t=${mintLink()}#person=${contactId}`).catch(() => false);
+    },
     desktopAlerts: async () => {
       const desk = notificationsPart(source).notifications;
       if (desk === undefined) return undefined;

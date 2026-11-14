@@ -10854,3 +10854,10 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Spec:** 04 §2.5 "An ID whose key is missing"; 08 §1; 11 §5
 - **Done when:** `identity_missing` is its own start reason (`broken_id`); another ID opens, or the host starts with none; Home offers Restore from backup, Remove from this computer (typed label + presence, folder set aside then leftover keys, nothing signed) and Continue without it; discard removes the folder before the keys; doctor prints fixed sentences whole; tests on posix (win32 paths guarded).
 
+
+#### NOTIFY-DEEPLINK · A notification click opens that approval or conversation, not Home (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (an opaque local ID on the private pipe; shape-checked on both sides)
+- **Repo/path:** agentlink · `apps/cli/src/desktop/{alerts,host-core,protocol}.ts`, `apps/desktop/src/{main/notify,main/main,shared/protocol}.ts`, `packages/node/src/approval-server.ts` (`openPerson`), `apps/local-ui/src/pages/home/{person-link,home-screen}`
+- **Depends on:** N7 (native notifications), NOTIFY-WIRING-054
+- **Spec:** 08 §1 (notification centre); 11 §5
+- **Done when:** a click on an approval notification opens `/approve/<id>` when one request is waiting (the list when several); a click on a message or file notification opens Home with that person's conversation open; the link carries only an opaque local ID (a request's or a person's), never content or a name; the ID is checked by the pipe parser, the core and Home (an unknown one opens Home as before); tests for the pipe, the shell, the core and Home's reader.

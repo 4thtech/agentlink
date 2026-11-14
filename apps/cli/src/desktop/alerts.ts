@@ -12,7 +12,7 @@
 //   only with Show names on, only from the owner-given names the server answered (nameSource
 //   'owner'), and only in the pipe's plain name shape; otherwise "".
 import type { NotificationItem, NotifyPrefKey } from '@4thtech-io/types/ui-contract/notifications';
-import { isNotifyName, type NotifyKind, type NotifyMessage } from './protocol.js';
+import { isNotifyName, isNotifyTarget, type NotifyKind, type NotifyMessage } from './protocol.js';
 
 /** The open ID's alert inputs (ApprovalServer.desktopAlerts). */
 export interface AlertSource {
@@ -34,6 +34,8 @@ export interface AlertNews {
   readonly count: number;
   /** A contact's ID (messages, files): for the owner-name lookup only, never on the pipe. */
   readonly ref?: string;
+  /** NOTIFY-DEEPLINK: the one approval that is news, when it is the only one waiting. */
+  readonly approvalId?: string;
 }
 
 const MAX_COUNT = 1_000_000;
@@ -63,7 +65,12 @@ export function planAlerts(
   if (prev === undefined || prev.scope !== source.scope) return { news: [], baseline };
   const news: AlertNews[] = [];
   if (approvals.some((id) => !prev.approvals.has(id))) {
-    news.push({ kind: 'approvals', count: approvals.length });
+    const only = approvals.length === 1 ? approvals[0] : undefined;
+    news.push({
+      kind: 'approvals',
+      count: approvals.length,
+      ...(only === undefined ? {} : { approvalId: only }),
+    });
   }
   for (const item of source.items) {
     if (item.read) continue;
@@ -117,7 +124,18 @@ export function notifyMessages(
       if (isNotifyName(owner)) name = owner;
     }
     const count = Math.min(MAX_COUNT, Math.max(1, Math.floor(n.count)));
-    out.push(Object.freeze({ v: 1, type: 'notify', kind: n.kind, count, name }));
+    // NOTIFY-DEEPLINK: only an opaque local ID of the shape the click may open (never content).
+    const target = n.kind === 'approvals' ? n.approvalId : n.ref;
+    out.push(
+      Object.freeze({
+        v: 1,
+        type: 'notify',
+        kind: n.kind,
+        count,
+        name,
+        ...(isNotifyTarget(n.kind, target) ? { target } : {}),
+      }),
+    );
   }
   return out;
 }
