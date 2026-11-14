@@ -10897,3 +10897,9 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Repo/path:** agentlink · `tools/release/desktop-update-environment.mjs` (+ test), `docs/runbooks/desktop-update-keys.md`
 - **Depends on:** UPD-3 (IR-UPD-8-2 low)
 - **Done when:** the guard used by release and renewal fails closed unless every required reviewer of `desktop-update` is the user `talirezun` (no teams, no other person); tests; no permission change.
+
+#### P2-RENEW-PIN · A renewal checks the update key and mode inside the Mac apps before signing (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S2 (`.github/**`, signing key)
+- **Repo/path:** agentlink · `.github/workflows/desktop-update-renew.yml`, `tools/release/desktop-update-renewal-pin.mjs` (+ test)
+- **Depends on:** UPD-3 (IR-UPD-8-1 R2-1)
+- **Done when:** before the unsigned manifest is built, renew-manifest opens app.asar in both attested Mac zips and fails closed unless each is an updates-on build carrying exactly the key in the root-key.json of main (no updates-off mark, no placeholder); runs with `contents: read` only, no key; tests.
