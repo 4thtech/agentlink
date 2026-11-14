@@ -15,7 +15,10 @@ import {
   nativeExitName,
   nativeUiState,
   readHelperDiagnostic,
+  readHelperStderr,
+  nativeHelperEnv,
   spawnNativeHelper,
+  NATIVE_UNAVAILABLE_REASONS,
   type NativeHelperRunner,
 } from './owner-native-helper.js';
 
@@ -458,5 +461,127 @@ describe('stopping the helper and its secure-input note (DESK-TOUCHID-FIX)', () 
     const r = await spawnNativeHelper(odd)(['ecdh', 'approve'], undefined);
     expect(r.secureInput).toBeUndefined();
     expect(r.diag).toBeUndefined();
+  });
+});
+
+// WIN-HELLO-NATIVE (S2): `available` says WHY it is not: Windows Hello not set up (no PIN, e.g.
+// Windows 11 21H2 without one) or no secure hardware (no TPM: the helper would refuse the software
+// key at create). The page then offers the master code and plain set-up text, never the WebAuthn
+// security-key path. The reason is a fixed token; nothing from the system is kept.
+describe('why native presence is unavailable (WIN-HELLO-NATIVE)', () => {
+  const runner =
+    (result: { code: number | null; diag?: string; unavailable?: string }): NativeHelperRunner =>
+    () =>
+      Promise.resolve({ ...result, stdout: new Uint8Array(0) } as never);
+
+  it('the reasons are a fixed, platform-neutral set', () => {
+    expect(NATIVE_UNAVAILABLE_REASONS).toEqual(['not_set_up', 'no_secure_hardware', 'unknown']);
+  });
+
+  it('the Windows helper line `unavailable <reason>` is read strictly', () => {
+    const enc = (t: string): Uint8Array => new TextEncoder().encode(t);
+    expect(readHelperStderr(enc('unavailable not_set_up\n'))).toEqual({
+      unavailable: 'not_set_up',
+    });
+    expect(readHelperStderr(enc('unavailable no_secure_hardware\n'))).toEqual({
+      unavailable: 'no_secure_hardware',
+    });
+    for (const bad of [
+      'unavailable unknown\n',
+      'unavailable not_set_up extra\n',
+      'unavailable NOT_SET_UP\n',
+      'unavailable not_set_up\nunavailable not_set_up\n',
+      'unavailable C:\\Users\\x\n',
+    ]) {
+      expect(readHelperStderr(enc(bad))).toEqual({});
+    }
+  });
+
+  it('Windows: exit 0 is available; exit 69 carries the helper reason, else unknown', async () => {
+    const win = (r: Parameters<typeof runner>[0]) =>
+      createNativeHelper({ kind: 2, run: runner(r) }).availability();
+    expect(await win({ code: 0 })).toEqual({ available: true });
+    expect(await win({ code: 69, unavailable: 'not_set_up' })).toEqual({
+      available: false,
+      reason: 'not_set_up',
+    });
+    expect(await win({ code: 69, unavailable: 'no_secure_hardware' })).toEqual({
+      available: false,
+      reason: 'no_secure_hardware',
+    });
+    expect(await win({ code: 69 })).toEqual({ available: false, reason: 'unknown' });
+    expect(await win({ code: null })).toEqual({ available: false, reason: 'unknown' });
+    expect(await win({ code: 70 })).toEqual({ available: false, reason: 'unknown' });
+  });
+
+  it('macOS: the fixed diagnostic line maps to the same reasons', async () => {
+    const mac = (r: Parameters<typeof runner>[0]) =>
+      createNativeHelper({ kind: 1, run: runner(r) }).availability();
+    expect(await mac({ code: 0 })).toEqual({ available: true });
+    // LAError.biometryNotEnrolled (-7): Touch ID has no finger.
+    expect(await mac({ code: 69, diag: 'sensor la -7' })).toEqual({
+      available: false,
+      reason: 'not_set_up',
+    });
+    // No Secure Enclave (no LAError at all).
+    expect(await mac({ code: 69, diag: 'sensor none 0' })).toEqual({
+      available: false,
+      reason: 'no_secure_hardware',
+    });
+    // Lid closed, no sensor, anything else.
+    expect(await mac({ code: 69, diag: 'sensor la -6' })).toEqual({
+      available: false,
+      reason: 'unknown',
+    });
+  });
+
+  it('available() stays exit 0 only, on both platforms', async () => {
+    for (const kind of [1, 2] as const) {
+      expect(await createNativeHelper({ kind, run: runner({ code: 0 }) }).available()).toBe(true);
+      expect(
+        await createNativeHelper({
+          kind,
+          run: runner({ code: 69, unavailable: 'not_set_up' }),
+        }).available(),
+      ).toBe(false);
+    }
+  });
+
+  itStandIn('a spawned helper: its one reason line reaches availability()', async () => {
+    const script = join(root, 'unavailable-win');
+    writeFileSync(
+      script,
+      `#!${process.execPath}\nprocess.stderr.write('unavailable not_set_up\\n'); process.exitCode = 69;\n`,
+    );
+    chmodSync(script, 0o700);
+    const helper = createNativeHelper({ kind: 2, run: spawnNativeHelper(script) });
+    expect(await helper.availability()).toEqual({ available: false, reason: 'not_set_up' });
+  });
+});
+
+describe('the helper environment (Fable r1 L4)', () => {
+  it('empty everywhere but Windows; on Windows only a plain absolute SystemRoot', () => {
+    const full = { SystemRoot: 'C:\\Windows', PATH: 'C:\\x', AGENTLINK_LOG: 'debug', HOME: 'h' };
+    expect(nativeHelperEnv(full, 'darwin')).toEqual({});
+    expect(nativeHelperEnv(full, 'linux')).toEqual({});
+    expect(nativeHelperEnv(full, 'win32')).toEqual({ SystemRoot: 'C:\\Windows' });
+    expect(nativeHelperEnv({ SYSTEMROOT: 'D:\\WINDOWS' }, 'win32')).toEqual({
+      SystemRoot: 'D:\\WINDOWS',
+    });
+    for (const bad of [
+      '',
+      'Windows',
+      '\\\\server\\share',
+      '\\\\?\\C:\\Windows',
+      'C:\\Windows\\..\\Users\\x',
+      'C:\\Windows\\.',
+      '%SystemDrive%\\Windows',
+      'C:/Windows',
+      'C:\\Windows\nPATH=x',
+      `C:\\${'a'.repeat(300)}`,
+    ]) {
+      expect(nativeHelperEnv({ SystemRoot: bad }, 'win32')).toEqual({});
+    }
+    expect(nativeHelperEnv({}, 'win32')).toEqual({});
   });
 });

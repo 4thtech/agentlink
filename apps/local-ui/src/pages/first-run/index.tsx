@@ -34,7 +34,7 @@
 // begin/finish). `?add=agent` stays on every step, so an open agent never turns it into Connect
 // another AI app, and a new Add agent starts with nothing kept from an earlier run. It ends on Home
 // in the app (no reload), and the agents are read again.
-import { Banner, Button, CopyPrompt, InlineError, ProgressBar, TextField } from '@4thtech-io/ui';
+import { Banner, Button, InlineError, ProgressBar, TextField } from '@4thtech-io/ui';
 import {
   useCallback,
   useEffect,
@@ -115,9 +115,12 @@ import {
   createUpgradePasskey as browserUpgradePasskey,
   detectPlatform,
   encodeUpgradeBody,
+  passkeySwitchOffered,
   passkeysAvailable,
   prfSupport as browserPrfSupport,
+  setupChoice,
   type PasskeyOptions,
+  type SetupChoice,
   type PasskeyResult,
   type PrfSupport,
   type UpgradePasskeyResult,
@@ -127,6 +130,7 @@ import {
   createUpgradeApi,
   type CreationValues,
   type SendFolderOutcome,
+  type FinishResult,
   type SetupApi,
   type SetupError,
   type UpgradeApi,
@@ -135,6 +139,12 @@ import {
 } from './setup-api.js';
 import './first-run.css';
 import { NativeSetupOffer } from '../../presence/native-setup.js';
+import { desktopPlatform } from '../../presence/desktop.js';
+import {
+  readNativeStatus,
+  type NativeRegistration,
+  type NativeStatus,
+} from '../../presence/native-api.js';
 import {
   BACKUP_CODE_FIELD,
   BackupCodeField,
@@ -253,6 +263,28 @@ export interface FirstRunPageProps {
    * (with a test `api` and none given: nothing held).
    */
   readonly masterCodeApi?: MasterCodeApi;
+  /**
+   * FIRSTRUN-ANY-PLATFORM: the desktop app's own Touch ID / Windows Hello (test seams). Default: the
+   * browser's user agent, `GET /api/owner/native` and its registration.
+   */
+  readonly native?: {
+    readonly userAgent?: string;
+    readonly status?: () => Promise<NativeStatus>;
+    readonly register?: (code: string) => Promise<NativeRegistration>;
+  };
+}
+
+/**
+ * FIRSTRUN-ANY-PLATFORM: whether the desktop app's own Touch ID / Windows Hello can be turned on
+ * here (inside the app's window, with its helper available). A browser never asks the server.
+ */
+async function nativeHere(native: FirstRunPageProps['native']): Promise<boolean> {
+  if (desktopPlatform(native?.userAgent) === undefined) return false;
+  const status = await (native?.status ?? readNativeStatus)().catch((): NativeStatus => ({
+    available: false,
+    registered: false,
+  }));
+  return status.available && !status.registered;
 }
 
 /** REL051-CF3: a test seam's default when only `api` is given (nothing held). */
@@ -288,6 +320,10 @@ type View =
       readonly fieldError?: string;
       /** M1-UX-PRF-MATRIX: the browser reports no passkey with PRF here. */
       readonly noPrf?: boolean;
+      /** FIRSTRUN-ANY-PLATFORM: what is offered (detected before the step shows). */
+      readonly choice: SetupChoice;
+      /** While working: the way being asked (the passkey dialog, or the master code). */
+      readonly asking?: 'passkey' | 'code';
       /** ATT-SENDFOLDER-FIX: the Send folder already holds files; shown before the gesture. */
       readonly notice?: string;
     }
@@ -301,7 +337,6 @@ type View =
       readonly folder: string;
       readonly label: string;
     }
-  | { readonly k: 'unsupported' }
   | {
       /** M1-UX-FIRSTRUN-V2-c (B-9): an owner without a passkey: master code once, one gesture. */
       readonly k: 'upgrade';
@@ -490,16 +525,21 @@ function ConnectFirstStep({
   platform: Platform;
   onName: (value: string) => void;
   onBack: () => void;
-  onGo: (withoutPasskey: boolean) => void;
+  onGo: (how: 'passkey' | 'code') => void;
 }): ReactElement {
   const title = useTitleFocus<HTMLHeadingElement>();
+  const { choice } = view;
+  // FIRSTRUN-ANY-PLATFORM: the primary button's way; the master code never asks for a passkey.
+  const primary: 'passkey' | 'code' = choice.primary === 'passkey' ? 'passkey' : 'code';
+  const sensor = SENSOR[platform];
   const press = (event: KeyboardEvent<HTMLInputElement>): void => {
     if (event.key !== 'Enter') return;
     event.preventDefault();
     // R1-UI-16: Enter submits like every other form here (the button's one gesture).
-    if (!view.working && name.trim() !== '') onGo(noPrf);
+    if (!view.working && name.trim() !== '') onGo(primary);
     else document.getElementById('fr-go')?.focus();
   };
+  const proof = primary === 'passkey' ? sensor : T.yourMasterCode;
   // W7-ID-B1: the name is asked for (the owner's name is not known here); nothing goes on without it.
   const shown = name.trim() === '' ? (appName ?? T.yourAiApp) : name.trim();
   const unnamed = name.trim() === '';
@@ -513,7 +553,9 @@ function ConnectFirstStep({
         <h1 id="fr-h" ref={title} tabIndex={-1} className="st-title">
           {S.title}
         </h1>
-        <p className="st-lead">{appName === undefined ? T.noAppCreateBody : S.body(appName)}</p>
+        <p className="st-lead">
+          {appName === undefined ? T.noAppCreateBody : S.body(appName, proof)}
+        </p>
       </div>
       <IdExplainerCard />
       <AgentCard name={shown} line={appName === undefined ? T.noAppYet : S.worksIn(appName)} />
@@ -533,8 +575,12 @@ function ConnectFirstStep({
           onKeyDown={press}
         />
       }
-      {noPrf ? (
-        <Banner tone="warning">{T.noPrf(SENSOR[platform], otherBrowser(platform))}</Banner>
+      {choice.primary === 'native' ? (
+        <Banner tone="info">{T.nativeNext(sensor)}</Banner>
+      ) : noPrf ? (
+        <Banner tone="warning">{T.noPrf(sensor, otherBrowser(platform))}</Banner>
+      ) : primary === 'code' ? (
+        <Banner tone="info">{T.codeNote}</Banner>
       ) : null}
       {view.notice === undefined ? null : (
         <div data-holds-files>
@@ -552,22 +598,34 @@ function ConnectFirstStep({
             size="lg"
             className="st-go al-press"
             disabled={unnamed}
-            onClick={() => onGo(noPrf)}
+            onClick={() => onGo(primary)}
           >
-            {noPrf ? null : <FingerprintGlyph />}
-            {view.message !== undefined ? T.tryAgain : noPrf ? T.backupOnly : sensorWords}
+            {primary === 'code' ? null : <FingerprintGlyph />}
+            {view.message !== undefined && primary === 'passkey'
+              ? T.tryAgain
+              : primary === 'code'
+                ? T.backupOnly
+                : sensorWords}
           </Button>
         )}
-        {noPrf || view.working ? null : (
-          <Button variant="ghost" size="sm" disabled={unnamed} onClick={() => onGo(true)}>
+        {view.working ? null : primary === 'passkey' ? (
+          <Button variant="ghost" size="sm" disabled={unnamed} onClick={() => onGo('code')}>
             {N.backupInstead}
           </Button>
-        )}
+        ) : choice.passkeyOffered ? (
+          <Button variant="ghost" size="sm" disabled={unnamed} onClick={() => onGo('passkey')}>
+            {T.passkeyInstead(sensor)}
+          </Button>
+        ) : null}
         <p className="st-note" role="status" aria-live="polite">
           {view.working
-            ? T.waiting
+            ? view.asking === 'passkey'
+              ? T.waiting
+              : N.setting
             : appName === undefined
-              ? T.passkeyNote
+              ? primary === 'passkey'
+                ? T.passkeyNote
+                : ''
               : S.restartNote(appName)}
         </p>
       </div>
@@ -669,6 +727,7 @@ export function FirstRunPage({
   openJoin = () => window.location.assign(JOIN),
   agentsApi: givenAgents,
   masterCodeApi: givenMasterCode,
+  native,
 }: FirstRunPageProps = {}): ReactElement {
   // W4-WIRE-2: decided once per mount, before the remembered choices are read.
   useState(startRun);
@@ -731,7 +790,13 @@ export function FirstRunPage({
     setNamedState(value);
     rememberWizard({ named: value });
   };
-  const [noPrfHere, setNoPrfHere] = useState(false);
+  // FIRSTRUN-ANY-PLATFORM: what this computer offers, detected once before step 2 shows.
+  const [here, setHere] = useState<{ readonly choice: SetupChoice; readonly noPrf: boolean }>({
+    choice: { primary: 'code', passkeyOffered: false },
+    noPrf: false,
+  });
+  // R1-UI-01 / FIRSTRUN-ANY-PLATFORM: no owner yet (or not known yet): no Home to skip to.
+  const [ownerKnown, setOwnerKnown] = useState(false);
   const backupTitle = useTitleFocus<HTMLHeadingElement>(view.k);
   const mounted = useRef(true);
   // REL051-R2C (R2-UI-01): the master code step came back after a reload: this page no longer knows
@@ -808,10 +873,13 @@ export function FirstRunPage({
       }
       if (info.kind === 'ok' && !info.registered && available()) {
         const prf = await prfSupport().catch((): PrfSupport => 'unknown');
-        if (isLive()) {
-          setView({ k: 'upgrade', values: info.values, working: false, noPrf: prf === 'no' });
+        if (!isLive()) return;
+        // FIRSTRUN-ANY-PLATFORM: offered only where the platform passkey is known to work here
+        // (never "any passkey": that is the USB security key on Windows).
+        if (passkeySwitchOffered(platform, prf)) {
+          setView({ k: 'upgrade', values: info.values, working: false, noPrf: false });
+          return;
         }
-        return;
       }
       const agent = await appsApi.currentAgent();
       if (!isLive()) return;
@@ -821,7 +889,7 @@ export function FirstRunPage({
       lookForApps();
       setView({ k: 'step' });
     },
-    [upgradeApi, available, prfSupport, appsApi, lookForApps],
+    [upgradeApi, available, prfSupport, appsApi, lookForApps, platform],
   );
 
   /**
@@ -877,21 +945,34 @@ export function FirstRunPage({
     void api.status().then((result) => {
       if (!live) return;
       if (result.kind === 'ok') {
-        if (result.owner === 'set_up') void heldCode(() => live);
+        if (result.owner === 'set_up') {
+          setOwnerKnown(true);
+          void heldCode(() => live);
+        }
         // IR-M1-11b-1-1 L-1: a failed check is never "no owner": doctor, not setup.
         else if (result.owner === 'unknown') {
           setView({ k: 'stuck', message: SETUP_MESSAGES.unknown });
-        } else if (!available()) setView({ k: 'unsupported' });
-        else {
-          void prfSupport()
-            .catch((): PrfSupport => 'unknown')
-            .then((prf) => {
-              if (!live) return;
-              setNoPrfHere(prf === 'no');
-              setMode({ k: 'first' });
-              lookForApps();
-              setView({ k: 'step' });
+        } else {
+          // FIRSTRUN-ANY-PLATFORM: no owner. Never a dead end: without passkeys here (the desktop
+          // app's window, some browsers) the master code is made in the app, with no WebAuthn call;
+          // the desktop app's own Touch ID / Windows Hello is offered right after it.
+          const passkeys = available();
+          void Promise.all([
+            passkeys
+              ? prfSupport().catch((): PrfSupport => 'unknown')
+              : Promise.resolve<PrfSupport>('no'),
+            nativeHere(native).catch(() => false),
+          ]).then(([prf, nativeOn]) => {
+            if (!live) return;
+            setHere({
+              choice: setupChoice({ platform, prf, passkeys, native: nativeOn }),
+              // "Doesn't work in this browser" only where a browser has passkeys but no PRF.
+              noPrf: passkeys && prf === 'no' && !nativeOn,
             });
+            setMode({ k: 'first' });
+            lookForApps();
+            setView({ k: 'step' });
+          });
         }
       } else if (result.problem === 'session_expired') setView({ k: 'expired' });
       else if (result.problem === 'offline') setView({ k: 'down' });
@@ -900,6 +981,7 @@ export function FirstRunPage({
     return () => {
       live = false;
     };
+    // `native` and `platform` are read once per mount (test seams and the detected platform).
   }, [api, available, prfSupport, heldCode, lookForApps]);
 
   // The look's answer, when it arrived while another step was on screen.
@@ -985,13 +1067,19 @@ export function FirstRunPage({
   const sendNoticeShown = useRef<string | undefined>(undefined);
 
   const protect = useCallback(
-    async (noPrf: boolean) => {
-      // The same protect view, with the PRF hint kept for "Try again".
+    async (
+      how: 'passkey' | 'code',
+      shown: { readonly choice: SetupChoice; readonly noPrf: boolean },
+    ) => {
+      const { noPrf } = shown;
+      let { choice } = shown;
+      // The same protect view, with what is offered kept for "Try again".
       const again = (message?: string, fieldError?: string): void =>
         setView({
           k: 'protect',
           working: false,
           noPrf,
+          choice,
           ...(message === undefined ? {} : { message }),
           ...(fieldError === undefined ? {} : { fieldError }),
         });
@@ -1008,7 +1096,7 @@ export function FirstRunPage({
       const size = [...label].length;
       if (size === 0) return again(undefined, N.empty);
       if (size > NAME_MAX) return again(undefined, N.tooLong);
-      setView({ k: 'protect', working: true, noPrf });
+      setView({ k: 'protect', working: true, noPrf, choice, asking: how });
       // The server says whether it would sign this name before Touch ID is asked for.
       const checked = await api.labelCheck(label);
       if (checked.kind === 'refused') return again(undefined, SETUP_MESSAGES.label_invalid);
@@ -1031,18 +1119,28 @@ export function FirstRunPage({
           k: 'protect',
           working: false,
           noPrf,
+          choice,
           notice: holdsFilesNotice(review.folder),
         });
       }
-      // Without PRF here, any passkey: the gesture proves presence, the master code approves.
-      const made = await createPasskey(begun.publicKey, { platform: !noPrf });
-      if (made.kind === 'unsupported') return setView({ k: 'unsupported' });
-      if (made.kind === 'cancelled') return again(SETUP_MESSAGES.cancelled);
-      let finished;
-      try {
-        finished = await api.finish(made.body, begun.nonce);
-      } finally {
-        made.body.fill(0);
+      let finished: FinishResult;
+      if (how === 'code') {
+        // FIRSTRUN-ANY-PLATFORM: the master code only. No navigator.credentials call at all.
+        finished = await api.finishCode(begun.nonce);
+      } else {
+        // Only ever the platform authenticator (never "any passkey", the USB security key).
+        const made = await createPasskey(begun.publicKey, { platform: true });
+        if (made.kind === 'unsupported') {
+          // Never a dead end: the master code goes on, on this same step.
+          choice = { primary: 'code', passkeyOffered: false };
+          return again(SETUP_MESSAGES.passkeyUnavailable);
+        }
+        if (made.kind === 'cancelled') return again(SETUP_MESSAGES.cancelled);
+        try {
+          finished = await api.finish(made.body, begun.nonce);
+        } finally {
+          made.body.fill(0);
+        }
       }
       if (finished.kind === 'owner_exists') return existingOwner(undefined, true);
       if (finished.kind === 'error') {
@@ -1112,7 +1210,8 @@ export function FirstRunPage({
       };
       if (typed.length === 0) return again(UPGRADE_MESSAGES.empty, false);
       setView({ k: 'upgrade', values, working: true, noPrf });
-      const made = await createUpgradePasskey(values, { platform: !noPrf });
+      // FIRSTRUN-ANY-PLATFORM: only ever the platform authenticator (never the USB-key path).
+      const made = await createUpgradePasskey(values, { platform: true });
       if (made.kind === 'cancelled') return again(UPGRADE_MESSAGES.cancelled, false);
       if (made.kind === 'unsupported') {
         return again(unsupportedHere(), true);
@@ -1231,9 +1330,11 @@ export function FirstRunPage({
       if (wizardMemory().choice === undefined) return toStep('app', true);
       // W4-WIRE-2: Add agent's connect step needs its name first.
       if (mode.k === 'add' && wizardMemory().named !== true) return toStep('app', true);
-      if (mode.k === 'first') setView({ k: 'protect', working: false, noPrf: noPrfHere });
+      if (mode.k === 'first') {
+        setView({ k: 'protect', working: false, noPrf: here.noPrf, choice: here.choice });
+      }
     }
-  }, [view, mode, step, noPrfHere]);
+  }, [view, mode, step, here]);
 
   // Connected (A2), opened without this page's outcome (a reload, a deep link): from the real state.
   const [derived, setDerived] = useState<WizardOutcome | 'none' | undefined>(undefined);
@@ -1271,8 +1372,12 @@ export function FirstRunPage({
       : onSkip;
   // R1-UI-01: before an ID exists (first run, the pick and the connect step) there is no Home to
   // skip to: it would be a dead end. From the master code on, the ID exists.
+  // FIRSTRUN-ANY-PLATFORM: and never while it is not yet known that an owner exists (the checks
+  // and every view before setup): Home can't work before the owner and the first ID exist.
   const noIdYet =
-    mode?.k === 'first' && view.k !== 'done' && (step === 'app' || step === 'connect');
+    view.k !== 'done' &&
+    (step === 'app' || step === 'connect') &&
+    (!ownerKnown || mode?.k === 'first');
   const frame = (body: ReactElement, at: StepId = step): ReactElement => (
     <WizardFrame
       step={at}
@@ -1432,16 +1537,6 @@ export function FirstRunPage({
           <p className="st-lead">{T.alreadyBody}</p>
         </section>,
       );
-    case 'unsupported':
-      return frame(
-        <section className="st-screen st-w-560" aria-labelledby="fr-h">
-          <h1 id="fr-h" className="st-title-2">
-            {T.unsupportedTitle}
-          </h1>
-          <p className="st-lead">{T.unsupportedBody}</p>
-          <CopyPrompt command={T.unsupportedCommand} />
-        </section>,
-      );
     case 'leaving':
       return frame(<LoadingState text={T.leaving} />);
     case 'connect':
@@ -1477,7 +1572,7 @@ export function FirstRunPage({
           platform={platform}
           onName={setName}
           onBack={() => toStep('app')}
-          onGo={(withoutPasskey) => void protect(withoutPasskey)}
+          onGo={(how) => void protect(how, { choice: view.choice, noPrf })}
         />,
       );
     }
@@ -1508,7 +1603,14 @@ export function FirstRunPage({
             <Banner tone={done.sendFolder === 'allowed' ? 'success' : 'warning'}>{line}</Banner>
           )}
           {/* DESK-D12c: in the desktop app, "Turn on Touch ID for approvals" (one gesture). */}
-          {done.ownerCode === undefined ? null : <NativeSetupOffer backupCode={done.ownerCode} />}
+          {done.ownerCode === undefined ? null : (
+            <NativeSetupOffer
+              backupCode={done.ownerCode}
+              {...(native?.userAgent === undefined ? {} : { userAgent: native.userAgent })}
+              {...(native?.status === undefined ? {} : { nativeStatus: native.status })}
+              {...(native?.register === undefined ? {} : { register: native.register })}
+            />
+          )}
           <BackupCode
             code={done.ownerCode ?? ''}
             computer={done.computerName ?? ''}
@@ -1568,7 +1670,7 @@ export function FirstRunPage({
             {S.title}
           </h1>
           <p className="st-lead">
-            {chosenApp === undefined ? T.notFoundCreateBody(appName) : S.body(appName)}
+            {chosenApp === undefined ? T.notFoundCreateBody(appName) : S.body(appName, sensor)}
           </p>
         </div>
         <AgentCard name={label} line={chosenApp === undefined ? T.noAppYet : S.worksIn(appName)} />

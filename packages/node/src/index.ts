@@ -283,7 +283,9 @@ export {
 // host (apps/cli/src/desktop/host-main.ts passes it to the approval server as `nativePresence`).
 export {
   desktopNativeHelper,
+  type NativeAvailability,
   type NativeHelper,
   type NativeReason,
+  type NativeUnavailableReason,
   type NativeUiState,
 } from './owner-native-helper.js';

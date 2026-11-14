@@ -9667,6 +9667,23 @@ D-145 replaces the M2-11a comparison with a decision and splits M2-11a to M2-11f
 - **Acceptance:**
   - Spec merged before any code; the owner schedules the build.
 
+
+#### WIN-HELLO-NATIVE · Windows Hello in the Windows app, like Touch ID on the Mac (0.5.5)
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Fable review · **Security:** S2 (owner presence)
+- **Repo/path:** agentlink · `apps/desktop/native/windows/**`, `apps/desktop/build/native.mjs`, `.github/workflows/desktop.yml` (helper protocol tests on the Windows leg), the Windows branch of the presence bridge in `packages/node/src/owner-native*.ts` and `GET /api/owner/native`; `apps/local-ui/src/presence/{offer,native-api,strings}.ts` (no first-run page changes: FIRSTRUN-ANY-PLATFORM consumes `desktopPresenceOffer`)
+- **Depends on:** DESK-D12b, DESK-D12c, WIN-DESK-2
+- **Spec:** 04 §2.3.4 (kind 2), §2.5 "Desktop app owner presence" phase 2
+- **Scope:**
+  - The helper's `available` says why not, as one fixed stderr token: `no_secure_hardware` (no TPM: the Platform Crypto Provider does not open, so create would refuse the software key anyway) or `not_set_up` (no PIN / Windows Hello, e.g. Windows 11 21H2 without one; or turned off by policy). Every command that needs Windows Hello (`create`, `check`, `sign`, `delete`) runs that gate first, after parsing its input and before any credential or prompt.
+  - Core: `NativeHelper.availability()`; `nativePresenceStatus` and `GET /api/owner/native` carry `unavailable: not_set_up | no_secure_hardware | unknown` (the Mac maps its fixed `sensor` diagnostic to the same set).
+  - Page: `desktopPresenceOffer(platform, status)` is `native` or `code` with plain set-up text; inside the app it is never the WebAuthn security-key path (WIN-FIRSTRUN-NOPRF).
+  - The Windows Hello dialog is brought in front of the AgentLink window once per prompt (its system window class only).
+  - The real helper's protocol (argv, stdin, `available`, the unavailable gate) runs on the Windows CI leg.
+- **Acceptance:**
+  - `RED (expected):` commit first; helper protocol tests green on the Windows leg; bridge and page tests green.
+  - Manual on a real PC (owner): Hello set up → turn on and approve with one prompt each, in front of the app window; no PIN → the master code with the set-up text; a VM without TPM → `no_secure_hardware`, nothing left in Windows Hello.
+  - Caller check stays at macOS parity (phase 2: off; phase 3 with signed builds).
+
 ---
 
 ## 5. M3 — Mainnet beta
@@ -10810,3 +10827,15 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** FILES-AI-1, FILES-ONB-1, FILES-HOME-PANEL, FILES-SETTINGS-COPY
 - **Spec:** D-152; 06 §2.3; 08 §1; 11 §5.7
 - **Done when:** README Status, docs-site and `knowledge/` match what shipped (send-by-content limits, the Files step, the Home panel); no untested claim about an AI app's own features; drift checks green.
+
+#### FIRSTRUN-ANY-PLATFORM · First run works on any computer and in any browser (0.5.5, owner test on real machines, 14 Nov)
+- **Status:** in review · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 · **Audit:** Fable 5.1
+- **Repo/path:** agentlink · `apps/local-ui/src/pages/first-run/**`, `apps/local-ui/src/pages/start/strings.ts`, `packages/node/src/approval-server.ts` (setup finish), tests
+- **Depends on:** — (consumes WIN-HELLO-NATIVE through `/api/owner/native`; works without it)
+- **Spec:** 04 §2.2 "Creating it on the first-run page"; 08 §1 first run; 11 §5
+- **Invariants:** I-1, I-4, I-7
+- **Scope:**
+  - Symptoms: the Mac desktop app's first run showed "This browser can't make a passkey" with `agentlink owner init`; on Windows 11 21H2 both buttons asked for a passkey with PRF and Windows offered only a USB security key; the step said "Touch ID" on Windows; "Skip to Home" was usable with no owner.
+  - Fix: a master-code-only finish (`{nonce, presence: 'code'}`, empty body, no WebAuthn); presence detected first (the desktop helper, the platform authenticator, PRF); on Windows the master code first; only ever the platform authenticator; the desktop app's Touch ID / Windows Hello offered after the code; no dead-end screen; platform words from SENSOR.
+- **Acceptance:**
+  - `RED (expected):` commit first; the master-code path never calls `navigator.credentials`; no `create` without a platform authenticator; desktop shell with no owner and no WebAuthn reaches the master-code step; Opus independent review, Fable 5.1 audit, Tali's "merge"; changelog.d fragment and changeset.

@@ -208,6 +208,11 @@ export interface SetupApi {
   begin(label?: string, app?: string): Promise<BeginResult>;
   /** W4-ONE-TOUCH (04 §2.8): only the begin nonce and the creation response. */
   finish(body: Uint8Array, nonce: string): Promise<FinishResult>;
+  /**
+   * FIRSTRUN-ANY-PLATFORM: finish with the master code only (`{nonce, presence: 'code'}`, an empty
+   * body). No WebAuthn call is made for it.
+   */
+  finishCode(nonce: string): Promise<FinishResult>;
   /** U3-g: asked before Touch ID, so the gesture is only asked for a name that can be signed. */
   labelCheck(label: string): Promise<LabelCheckResult>;
 }
@@ -399,9 +404,20 @@ export function createSetupApi(options: SetupApiOptions = {}): SetupApi {
       return problemOf(answer);
     },
 
-    async finish(body, nonce) {
+    finish(body, nonce) {
       // W4-ONE-TOUCH (04 §2.8): finish carries only the begin nonce and the creation response.
-      const answer = await call('POST', FINISH_PATH, body, { nonce });
+      return finishWith(body, { nonce });
+    },
+
+    finishCode(nonce) {
+      // FIRSTRUN-ANY-PLATFORM (04 §2.2): the master code only: no WebAuthn, an empty body.
+      return finishWith(new Uint8Array(0), { nonce, presence: 'code' });
+    },
+  };
+
+  async function finishWith(body: Uint8Array, input: unknown): Promise<FinishResult> {
+    {
+      const answer = await call('POST', FINISH_PATH, body, input);
       if (answer === 'offline') return { kind: 'error', problem: 'offline' };
       const status = str(answer.json?.['status']);
       if (status === 'owner_exists') return { kind: 'owner_exists' };
@@ -442,8 +458,8 @@ export function createSetupApi(options: SetupApiOptions = {}): SetupApi {
         };
       }
       return problemOf(answer);
-    },
-  };
+    }
+  }
 }
 
 // --- M1-UX-FIRSTRUN-V2-c (B-9): an owner set up before 0.3.0 switches to a passkey ---------------

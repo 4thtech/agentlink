@@ -58,8 +58,10 @@ import type { KeychainBackend } from './keychain.js';
 import {
   NativeHelperError,
   isAborted,
+  type NativeAvailability,
   type NativeHelper,
   type NativeReason,
+  type NativeUnavailableReason,
 } from './owner-native-helper.js';
 import {
   OWNER_NATIVE_ACCOUNT,
@@ -191,6 +193,12 @@ export interface NativePresenceStatus {
    * e.g. after a fingerprint change (`reregister`). The last two are fixed by turning it on again.
    */
   readonly reason?: 'other_owner' | 'damaged' | 'reregister';
+  /**
+   * WIN-HELLO-NATIVE: why it is not available (only when `available` is false and the helper is
+   * here): Windows Hello / Touch ID not set up, no secure hardware (TPM / Secure Enclave), unknown.
+   * The page then offers the master code with plain set-up text, never a WebAuthn security key.
+   */
+  readonly unavailable?: NativeUnavailableReason;
 }
 
 /** Whether native presence can be offered here, and whether it is turned on for `ownerNostr`. */
@@ -202,14 +210,18 @@ export async function nativePresenceStatus(
 ): Promise<NativePresenceStatus> {
   if (helper === undefined) return { available: false, registered: false };
   const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
-  const available = await helper.available().catch(() => false);
+  const availability = await helper
+    .availability()
+    .catch((): NativeAvailability => ({ available: false, reason: 'unknown' }));
+  const available = availability.available;
+  const why = availability.available ? {} : { unavailable: availability.reason };
   const blob = await readItem(keychain, timeoutMs).catch(() => null);
-  if (blob === null) return { available, registered: false };
+  if (blob === null) return { available, registered: false, ...why };
   let header: NativeBlobHeader;
   try {
     header = readNativeBlobHeader(blob);
   } catch {
-    return { available, registered: false, reason: 'damaged' };
+    return { available, registered: false, reason: 'damaged', ...why };
   } finally {
     wipe(blob);
   }
@@ -217,12 +229,12 @@ export async function nativePresenceStatus(
     header.kind === helper.kind &&
     ownerNostr !== undefined &&
     equalBytes(header.ownerNostr, ownerNostr);
-  if (!ours) return { available, registered: false, reason: 'other_owner' };
+  if (!ours) return { available, registered: false, reason: 'other_owner', ...why };
   const revoked = await guarded(() => keychain.get(OWNER_NATIVE_REVOKED_ACCOUNT), timeoutMs).catch(
     () => null,
   );
   if (nativeTagRevoked(revoked, nativeCredentialTag(header))) {
-    return { available, registered: false, reason: 'damaged' };
+    return { available, registered: false, reason: 'damaged', ...why };
   }
   // No prompt: the helper's `check` only asks whether the key is still valid.
   const valid = await helper
@@ -232,8 +244,8 @@ export async function nativePresenceStatus(
       (error: unknown) => !(error instanceof NativeHelperError && error.state === 'reregister'),
     );
   return valid
-    ? { available, registered: true }
-    : { available, registered: true, reason: 'reregister' };
+    ? { available, registered: true, ...why }
+    : { available, registered: true, reason: 'reregister', ...why };
 }
 
 /**
