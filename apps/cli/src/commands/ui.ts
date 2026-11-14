@@ -232,6 +232,11 @@ export interface UiDeps {
    * lists it as broken (Restore, Remove, Continue). Absent: nothing is noted.
    */
   noteBroken?(name: string): void;
+  /**
+   * WIN-STARTUP-LOG: one fixed diagnostic line when the app host could not start: the failure reason
+   * and a short error code only (`startFailureNote`), never the error's message. Must not throw.
+   */
+  note?(line: string): void;
   /** R1: stray background errors keep the host up; `onFatal` ends it. Returns the unsubscribe. */
   guard?(onFatal: (reason: FatalReason) => void): () => void;
   /** R1: writes why this run closed (~/.agentlink/last-exit.json). Must not throw. */
@@ -334,7 +339,24 @@ export async function startUiServer(
       : await (deps.diagnose?.() ?? Promise.resolve('failed' as const)).catch(
           () => 'failed' as const,
         );
+  try {
+    deps.note?.(startFailureNote(failure, thrown));
+  } catch {
+    // A diagnostic that cannot be written is skipped.
+  }
   return { ok: false, failure };
+}
+
+/**
+ * WIN-STARTUP-LOG: the diagnostic line for a failed start. Only the failure reason (a fixed set)
+ * and the error's `code` when it is a short identifier (`identity_missing`, `EADDRINUSE`); the
+ * error's message, path or anything else never goes in.
+ */
+export function startFailureNote(failure: StartFailure, thrown: unknown): string {
+  const raw =
+    typeof thrown === 'object' && thrown !== null ? (thrown as { code?: unknown }).code : undefined;
+  const code = typeof raw === 'string' && /^[A-Za-z0-9_]{1,40}$/.test(raw) ? raw : 'none';
+  return `app host did not start: reason=${failure} code=${code}`;
 }
 
 /**
@@ -650,6 +672,9 @@ export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
     interrupt: (stop) => onStopSignals(stop),
     // F40: Enter in the owner's terminal tries the browser again with a fresh one-shot link.
     ...optionalEnter(),
+    // WIN-STARTUP-LOG: to stderr through the redacting logger (the desktop shell sets AGENTLINK_LOG
+    // and keeps stderr in core.log); silent in a terminal unless AGENTLINK_LOG is set.
+    note: (line) => logger.warn(line),
     // R1: stray background errors are logged with a fixed code and the host keeps serving.
     guard: (onFatal) => guardProcess({ log: logger, onFatal }),
     recordExit: (reason) => writeLastExit(homedir(), { reason, version: cliVersion() }),

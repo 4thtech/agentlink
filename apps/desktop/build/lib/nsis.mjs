@@ -26,7 +26,13 @@ SetCompressor /SOLID lzma
 BrandingText "4thTech AgentLink ${version}"
 
 !define MUI_ABORTWARNING
+; WIN-INSTALLER-SHORTCUT: the finish page offers "Create a desktop shortcut" (ticked by default). The
+; checkbox reuses the MUI run-checkbox slot with its own function; nothing is started from it.
+!define MUI_FINISHPAGE_RUN
+!define MUI_FINISHPAGE_RUN_TEXT "Create a desktop shortcut"
+!define MUI_FINISHPAGE_RUN_FUNCTION CreateDesktopShortcut
 ${iconFile ? `!define MUI_ICON "${q(iconFile)}"\n!define MUI_UNICON "${q(iconFile)}"\n` : ''}!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "English"
@@ -91,6 +97,15 @@ aumid_link:
 aumid_done:
 FunctionEnd
 
+; WIN-INSTALLER-SHORTCUT: runs when the finish page is closed with the box ticked. Per-user desktop
+; ($DESKTOP is the user's own folder under a user-level install); same icon and AppUserModelID as the
+; Start menu entry. Silent installs (/S) skip the finish page, so they create no desktop shortcut.
+Function CreateDesktopShortcut
+  CreateShortCut "$DESKTOP\\AgentLink.lnk" "$INSTDIR\\${exe}" "" "$INSTDIR\\${exe}" 0 SW_SHOWNORMAL "" "AgentLink"
+  StrCpy $0 "$DESKTOP\\AgentLink.lnk"
+  Call SetShortcutAumid
+FunctionEnd
+
 ; WIN-DESK-2 (R-WIN §6 item 11): AgentLink's files are in use while it runs, so install and uninstall
 ; first check that it is not running. A running .exe cannot be opened for writing; FileOpen in append
 ; mode only opens it (nothing is written, nothing is closed by force). Retry checks again; a silent
@@ -132,6 +147,7 @@ Section "Uninstall"
   DeleteRegKey HKCU "Software\\Classes\\agentlink"
   DeleteRegKey HKCU "${uninstKey}"
   Delete "$SMPROGRAMS\\AgentLink\\AgentLink.lnk"
+  Delete "$DESKTOP\\AgentLink.lnk"
   RMDir "$SMPROGRAMS\\AgentLink"
   ; Recursive delete only of the exact per-user install dir, and only when it really is an AgentLink
   ; install (a /D= override or a stray Uninstall.exe elsewhere must never delete a user directory).

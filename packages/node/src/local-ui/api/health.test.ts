@@ -82,6 +82,15 @@ describe('the health reader (M1-11s-a-d)', () => {
     });
   });
 
+  it('WIN-ACL-NOTICE: dataAccess is present only when the desktop app says it is unchecked', async () => {
+    const off = createHealthReader({ hasClient: true, now: Date.now });
+    expect(Object.keys(await off())).not.toContain('dataAccess');
+    const on = createHealthReader({ hasClient: true, now: Date.now, dataFolderUnchecked: true });
+    expect((await on()).dataAccess).toBe('unchecked');
+    const flagOff = createHealthReader({ hasClient: true, now: Date.now, dataFolderUnchecked: false });
+    expect(Object.keys(await flagOff())).not.toContain('dataAccess');
+  });
+
   it('passes relay counts, last sync and version through only in their fixed shape', async () => {
     const c = clock();
     const read = createHealthReader({

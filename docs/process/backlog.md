@@ -10854,3 +10854,23 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Spec:** 04 §2.5 "An ID whose key is missing"; 08 §1; 11 §5
 - **Done when:** `identity_missing` is its own start reason (`broken_id`); another ID opens, or the host starts with none; Home offers Restore from backup, Remove from this computer (typed label + presence, folder set aside then leftover keys, nothing signed) and Continue without it; discard removes the folder before the keys; doctor prints fixed sentences whole; tests on posix (win32 paths guarded).
 
+#### WIN-INSTALLER-SHORTCUT · Desktop shortcut choice on the Windows installer's finish page (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build · **Security:** S1
+- **Repo/path:** agentlink · `apps/desktop/build/lib/nsis.mjs`, `apps/desktop/build/test/nsis.node-test.mjs`
+- **Depends on:** WIN-DESK-2
+- **Scope:** finish page with a ticked "Create a desktop shortcut" box (per-user `$DESKTOP`, same icon and AppUserModelID as the Start menu entry); the uninstaller deletes it; still per-user, no admin.
+- **Acceptance:** NSIS script test; the Windows CI leg builds the installer.
+
+#### WIN-STARTUP-LOG · Core start diagnostics reach core.log on Windows (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build · **Security:** S1
+- **Repo/path:** agentlink · `apps/desktop/src/main/core-process.ts`, `apps/cli/src/commands/ui.ts`
+- **Depends on:** WIN-DESK-2
+- **Scope:** the shell spawns the core with a fixed `AGENTLINK_LOG=warn` (the user's own value is still dropped); the core's redacting logger writes one fixed line when the app host cannot start (`reason=` and a short `code=` only) to stderr; core-log.ts redacts again and keeps it in `core.log` (1 MB, then `core.1.log`).
+- **Acceptance:** unit tests for the spawn env and the note; no message, path or secret in the line.
+
+#### WIN-ACL-NOTICE · Visible notice when the data folder access cannot be checked on Windows (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build · **Security:** S1
+- **Repo/path:** agentlink · `apps/desktop/src/main/{core-process,main}.ts`, `apps/cli/src/desktop/host-main.ts`, `packages/node/src/{approval-server.ts,local-ui/api/health.ts}`, `apps/local-ui/src/layout/data-access-notice.tsx`
+- **Depends on:** WIN-DESK-2 (OD-M)
+- **Scope:** when the shell icacls check is `unchecked`, it passes one fixed flag to the core at spawn; the health read carries `dataAccess: unchecked` (a flag only, absent otherwise); the app shows a non-blocking, closable PageNotice (tone warning, existing component, no new design) with fixed plain words. The app continues. The existing core.log line stays.
+- **Acceptance:** unit tests (spawn env, health answer, notice); the flag cannot come from the user own environment.
