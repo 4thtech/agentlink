@@ -10866,3 +10866,15 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Repo/path:** agentlink · `apps/cloud-agent/src/do-store.ts`, `apps/cloud-agent/test/store.test.ts`
 - **Depends on:** M2-3a-store6 (IR-RET-2-1 low)
 - **Done when:** a Durable Object store of any older schema version (v6, v15 fixtures) opens by one forward-only, all-or-nothing migration (missing tables created, missing nullable columns appended, version bumped, shape verified) instead of `store_needs_migration`; rows kept; a second open is a no-op; a newer version is still refused; tested.
+
+#### P2-UNREAD-AGE · Unread received messages with a pruned seen row age out (0.5.5)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `packages/core/src/history/delete.ts`, `packages/core/src/files/history-retention.test.ts`
+- **Depends on:** RET-6, RET-7 (IR-RET-67-2 note b)
+- **Done when:** a received message with no local time (seen row pruned after 7+ days, never read, nothing saved) ages by `createdAt` under the same keep-days rule, in the pass and in the manual older-than filter; tested.
+
+#### P2-TRUNCATED-COUNT · `truncated` is counted after the local-age filter (0.5.5)
+- **Status:** in review · **Size:** XS · **Tier:** Sonnet · **Security:** S1
+- **Repo/path:** agentlink · `packages/core/src/history/delete.ts`, `packages/core/src/files/history-retention.test.ts`
+- **Depends on:** RET-6, RET-7 (IR-RET-67-2 note a)
+- **Done when:** the plan walks keyset pages until it holds one plan's worth of rows that pass the local-age filter (bounded scan), so a block of rows old by `createdAt` but new here neither hides later rows nor makes `truncated` read false; tested with the cap as a test seam. Landed with P2-UNREAD-AGE in one commit (the test needs both).

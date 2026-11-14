@@ -104,6 +104,8 @@ export interface HistoryDeleteResult {
 export const MAX_PLAN_MESSAGES = 20_000;
 /** An `envelopeIds` selector names at most this many IDs. */
 export const MAX_PLAN_IDS = 20_000;
+/** P2-TRUNCATED-COUNT: the most rows one plan reads while looking for MAX_PLAN_MESSAGES to take. */
+export const MAX_PLAN_SCAN_ROWS = 200_000;
 
 const INCLUDES: readonly HistoryDeleteInclude[] = Object.freeze(['messages', 'files', 'both']);
 const PAIRING_TYPES: readonly string[] = Object.freeze([
@@ -170,12 +172,14 @@ function whereOf(
  * contact could backdate a message into an age filter; an age therefore never comes from it alone.
  * - Own sent messages: `createdAt` is this computer's own send time.
  * - Received messages: the earliest time this computer recorded for the message (first seen, read,
- *   a file of it saved; each is at or after its arrival), and never earlier than `createdAt`. A
- *   received message with none of these (its first-seen row pruned, never read, nothing saved) has
- *   no local age and is never aged out (kept: the safe side).
- * Undefined: no local age.
+ *   a file of it saved; each is at or after its arrival), and never earlier than `createdAt`.
+ *   P2-UNREAD-AGE: with none of these (its first-seen row pruned, never read, nothing saved) the
+ *   age is `createdAt`. Sync prunes first-seen rows only once they are at least 7 days old, so such
+ *   a message arrived at least 7 days ago; a contact that backdates it can therefore hasten its
+ *   deletion only for a message already a week old here, and unread history ages out under the
+ *   same keep-days rule instead of staying for ever.
  */
-export function localAgeTx(tx: StoreTx, row: Row<'envelopes'>): number | undefined {
+export function localAgeTx(tx: StoreTx, row: Row<'envelopes'>): number {
   if (row.direction === 'out') return row.created_at;
   const local: number[] = [];
   const seen = tx.get('seen', { kind: 'envelope', id: row.envelope_hash });
@@ -184,7 +188,7 @@ export function localAgeTx(tx: StoreTx, row: Row<'envelopes'>): number | undefin
   for (const f of tx.select('saved_files', { envelope_id: row.envelope_id })) {
     local.push(f.saved_at);
   }
-  if (local.length === 0) return undefined;
+  if (local.length === 0) return row.created_at;
   return Math.max(row.created_at, Math.min(...local));
 }
 
@@ -200,10 +204,14 @@ function oldEnoughTx(tx: StoreTx, row: Row<'envelopes'>, input: HistoryDeleteInp
   return age !== undefined && age < before;
 }
 
-/** The live (not deleted, processed) messages the selector names, oldest first, capped. */
-function selectTx(
+/**
+ * The live (not deleted, processed) messages the selector names, oldest first, capped. `cap` is a
+ * test seam (package-internal: not exported from the index); production always uses the default.
+ */
+export function selectTx(
   tx: StoreTx,
   input: HistoryDeleteInput,
+  cap: number = MAX_PLAN_MESSAGES,
 ): { rows: Row<'envelopes'>[]; truncated: boolean } {
   const live: Where<'envelopes'> = { state: 'ok', deleted_at: null };
   let rows: Row<'envelopes'>[];
@@ -217,15 +225,58 @@ function selectTx(
       if (row !== undefined && row.state === 'ok' && row.deleted_at === null) rows.push(row);
     }
   } else {
-    rows = tx.select('envelopes', whereOf(live, input), {
-      orderBy: [
-        ['created_at', 'asc'],
-        ['envelope_id', 'asc'],
-      ],
-      limit: MAX_PLAN_MESSAGES + 1,
-    });
-    // `createdAt` before the cutoff is necessary (the local age is never earlier), not enough.
-    rows = rows.filter((row) => oldEnoughTx(tx, row, input));
+    // P2-TRUNCATED-COUNT: the local-age filter runs per page, so `truncated` means "more than
+    // MAX_PLAN_MESSAGES rows pass the filter", not "more rows matched before it". Pages follow the
+    // (created_at, envelope_id) order; the scan is bounded (MAX_PLAN_SCAN_ROWS), and hitting that
+    // bound also reads as truncated (run again for the rest).
+    rows = [];
+    const base = whereOf(live, input);
+    const upper = 'before' in input ? input.before : undefined;
+    let from: number | undefined;
+    let after: string | undefined;
+    let scanned = 0;
+    const order: [['created_at', 'asc'], ['envelope_id', 'asc']] = [
+      ['created_at', 'asc'],
+      ['envelope_id', 'asc'],
+    ];
+    const size = cap + 1;
+    while (rows.length <= cap && scanned < MAX_PLAN_SCAN_ROWS) {
+      let page: Row<'envelopes'>[];
+      if (from === undefined || after === undefined) {
+        page = tx.select('envelopes', base, { orderBy: order, limit: size });
+      } else {
+        // Keyset: the rest of the cursor's own second first, then the later seconds.
+        page = tx.select(
+          'envelopes',
+          { ...base, created_at: from, envelope_id: { gt: after } },
+          { orderBy: order, limit: size },
+        );
+        if (page.length < size) {
+          const later = upper === undefined ? { gt: from } : { gt: from, lt: upper };
+          page = [
+            ...page,
+            ...tx.select(
+              'envelopes',
+              { ...base, created_at: later },
+              { orderBy: order, limit: size - page.length },
+            ),
+          ];
+        }
+      }
+      let last: Row<'envelopes'> | undefined;
+      for (const row of page) {
+        scanned += 1;
+        last = row;
+        // `createdAt` before the cutoff is necessary (the local age is never earlier), not enough.
+        if (oldEnoughTx(tx, row, input)) rows.push(row);
+      }
+      if (page.length < size || last === undefined) break;
+      from = last.created_at;
+      after = last.envelope_id;
+    }
+    if (scanned >= MAX_PLAN_SCAN_ROWS && rows.length <= cap) {
+      return { rows, truncated: true };
+    }
   }
   rows.sort((a, b) =>
     a.created_at !== b.created_at
@@ -236,8 +287,8 @@ function selectTx(
           ? 1
           : 0,
   );
-  const truncated = rows.length > MAX_PLAN_MESSAGES;
-  return { rows: truncated ? rows.slice(0, MAX_PLAN_MESSAGES) : rows, truncated };
+  const truncated = rows.length > cap;
+  return { rows: truncated ? rows.slice(0, cap) : rows, truncated };
 }
 
 /** Why `row` must be kept, or undefined when it may go (04 §4.2). Inside the caller's transaction. */
