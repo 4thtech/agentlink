@@ -325,7 +325,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   const show = async (route: ShowRoute, target?: string): Promise<void> => {
     if (approvalServer === undefined) return;
     // NOTIFY-DEEPLINK: the one request or person a notification named; the server checks the shape
-    // again, and a stale or unknown ID falls back to the page's own list.
+    // again. A request that is no longer waiting opens the approve page's own "no longer waiting" state
+    // (the page decides); an unknown person opens Home (the fallback below).
     if (route === 'approvals' && target !== undefined && isNotifyTarget('approvals', target)) {
       if (await approvalServer.open(target).catch(() => false)) return;
     } else if (route === 'inbox' && target !== undefined && isNotifyTarget('inbox', target)) {

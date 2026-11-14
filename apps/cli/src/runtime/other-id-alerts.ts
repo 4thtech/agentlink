@@ -92,6 +92,12 @@ export function planOtherIdAlerts(
   return { news, look };
 }
 
+/** A look that hit the scan cap: one fixed alert, no counts, no names. */
+const OTHER_ID_MANY = [
+  'New messages',
+  'There are new messages for another one of your IDs.',
+] as const;
+
 const TITLES = { messages: 'New message', files: 'File received' } as const;
 
 /** The `[title, body]` lines for this news under these switches: fixed words, local names only. */
@@ -141,6 +147,11 @@ export interface OtherIdAlertsDeps {
   readonly notify: (lines: readonly [title: string, body: string]) => Promise<boolean>;
   /** Unix seconds. */
   readonly now: () => number;
+  /**
+   * Several `agentlink mcp` processes can serve one ID (several AI apps): only the one holding the
+   * publisher lease alerts, the others skip the look. Absent: always.
+   */
+  readonly leader?: () => boolean;
 }
 
 export interface OtherIdAlerts {
@@ -160,6 +171,10 @@ export function createOtherIdAlerts(deps: OtherIdAlertsDeps): OtherIdAlerts {
     if (running) return;
     running = true;
     try {
+      if (deps.leader?.() === false) {
+        look = undefined;
+        return;
+      }
       const owner = await deps.desktopOwner();
       // Quiet while the desktop app alerts for this ID, or none runs: the next time it does, a
       // fresh first look (no backfill).
@@ -177,6 +192,11 @@ export function createOtherIdAlerts(deps: OtherIdAlertsDeps): OtherIdAlerts {
       const read = await deps.events(since, now);
       const plan = planOtherIdAlerts(look, read.events, now);
       look = plan.look;
+      if (read.capped) {
+        // Too many to count: one generic alert, never a silent drop.
+        await deps.notify(OTHER_ID_MANY).catch(() => false);
+        return;
+      }
       if (plan.news.length === 0) return;
       const news = dedupeFileAndMessage(
         plan.news,

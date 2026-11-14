@@ -789,7 +789,7 @@ describe('N7: native notifications from the desktop host', () => {
     count = 2;
     await until(() => notifies(s.pipe.sent).length === 1);
     expect(notifies(s.pipe.sent)).toEqual([
-      { v: 1, type: 'notify', kind: 'messages', count: 2, name: 'Ana' },
+      { v: 1, type: 'notify', kind: 'messages', count: 2, name: 'Ana', target: A },
     ]);
     expect(asked).toEqual([[A]]);
     s.pipe.shell({ v: 1, type: 'shutdown' });

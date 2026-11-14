@@ -1820,7 +1820,7 @@ export async function startApprovalServerWith(
         approvals?: number;
         inbound?: readonly NotificationInbound[];
         scannedUntil?: number;
-        update?: boolean;
+        update?: boolean | 0 | 1 | 2;
         networkDown?: boolean;
       } = {};
       try {

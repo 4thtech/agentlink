@@ -86,7 +86,11 @@ export interface McpCommandDeps {
    * NOTIFY-ALL-IDS: the OS alerts for this ID's new messages and files while the desktop app alerts
    * for another ID (runtime/other-id-alerts.ts). Started with the server, stopped with it.
    */
-  readonly otherIdAlerts?: (agent: OpenedAgent, logger: Logger) => OtherIdAlerts;
+  readonly otherIdAlerts?: (
+    agent: OpenedAgent,
+    logger: Logger,
+    holdsLease: () => boolean,
+  ) => OtherIdAlerts;
   /**
    * M1-11b-8: true only while owner setup may be wired for the opened agent (fail closed). With
    * it and the approval UI, the start opens the first-run page once (first-run-on-start.ts).
@@ -188,7 +192,10 @@ export function createMcpCommand(deps: McpCommandDeps): CommandHandler {
       await server.connect(deps.transport());
       logger.info('mcp server started', { setUp: agent !== undefined });
       loop?.start();
-      otherIds = agent === undefined ? undefined : deps.otherIdAlerts?.(agent, logger);
+      otherIds =
+        agent === undefined
+          ? undefined
+          : deps.otherIdAlerts?.(agent, logger, () => loop?.holding === true);
       otherIds?.start();
       // M1-11b-8: once per start, in the background (the tools answer meanwhile); never a tool.
       const available = deps.firstRunAvailable;
@@ -289,9 +296,10 @@ export const mcpCommand = (version: string): CommandHandler => {
     heartbeat: processHeartbeat,
     // NOTIFY-ALL-IDS: this process already holds this ID's keys and store; the alert only reads what
     // it holds (flow events, owner-given names), while the desktop app alerts for another ID.
-    otherIdAlerts: (agent) =>
+    otherIdAlerts: (agent, _logger, holdsLease) =>
       createOtherIdAlerts({
         agentName: agent.name,
+        leader: holdsLease,
         desktopOwner: () => desktopAlertsOwner(homedir()),
         prefs: async () => notifyPrefsInForce((await readUiSettingsFile(homedir()))?.notify),
         events: async (since, until) => {

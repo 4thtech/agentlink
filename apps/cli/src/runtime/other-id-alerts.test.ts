@@ -194,4 +194,50 @@ describe('createOtherIdAlerts: the runner', () => {
     await runner.tick();
     expect(shown).toEqual([]);
   });
+
+  it('only the process that holds the lease alerts: two instances, one alert', async () => {
+    const shown: unknown[] = [];
+    let t = 1000;
+    let events: OtherIdEvent[] = [];
+    const make = (leader: boolean) =>
+      createOtherIdAlerts({
+        agentName: 'work',
+        desktopOwner: () => Promise.resolve('personal'),
+        prefs: () => Promise.resolve(ALL),
+        events: () => Promise.resolve({ events, capped: false }),
+        ownerNames: () => Promise.resolve(new Map()),
+        notify: (l) => (shown.push(l), Promise.resolve(true)),
+        now: () => t,
+        leader: () => leader,
+      });
+    const a = make(true);
+    const b = make(false);
+    await Promise.all([a.tick(), b.tick()]);
+    events = [ev(A, 'message', 1005)];
+    t += 30;
+    await Promise.all([a.tick(), b.tick()]);
+    expect(shown).toHaveLength(1);
+  });
+
+  it('a look that hit the scan cap sends one generic alert, not nothing', async () => {
+    const shown: (readonly [string, string])[] = [];
+    let t = 1000;
+    let capped = false;
+    const runner = createOtherIdAlerts({
+      agentName: 'work',
+      desktopOwner: () => Promise.resolve('personal'),
+      prefs: () => Promise.resolve(ALL),
+      events: () => Promise.resolve({ events: [], capped }),
+      ownerNames: () => Promise.resolve(new Map()),
+      notify: (l) => (shown.push(l), Promise.resolve(true)),
+      now: () => t,
+    });
+    await runner.tick();
+    capped = true;
+    t += 30;
+    await runner.tick();
+    expect(shown).toEqual([
+      ['New messages', 'There are new messages for another one of your IDs.'],
+    ]);
+  });
 });

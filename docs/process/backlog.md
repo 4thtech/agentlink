@@ -10890,4 +10890,4 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Repo/path:** agentlink · `apps/cli/src/desktop/{alert-dedupe,host-core}.ts`, `apps/cli/src/runtime/other-id-alerts.ts`
 - **Depends on:** NOTIFY-ALL-IDS, N7
 - **Spec:** 08 §1; 11 §5
-- **Done when:** a person's file and message arriving together (one look) or within 20 s (either order, across looks) raise one alert, the file's; only alerts the owner's switches let through are counted, so an off switch never hides the other kind; different people and approvals/updates are untouched. A file alone is one flow event (kind `file`), never a file plus a message.
+- **Done when:** a person's file and message arriving together (one look) or within 20 s (either order, across looks) raise one alert (whichever arrives first is shown; within one look the file's); only alerts the owner's switches let through are counted, so an off switch never hides the other kind; different people and approvals/updates are untouched. A file alone is one flow event (kind `file`), never a file plus a message.

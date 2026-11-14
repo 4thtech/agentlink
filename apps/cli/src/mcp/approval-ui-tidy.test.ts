@@ -29,6 +29,7 @@ function server(origin = ORIGIN, homes: number[] = [], opens = true): ApprovalSe
     },
     openJoin: () => Promise.resolve(true),
     openUpdates: () => Promise.resolve(true),
+    openPerson: () => Promise.resolve(true),
     desktopAlerts: () => Promise.resolve(undefined),
     ownerNames: () => Promise.resolve(new Map<string, string>()),
     notifyNewApproval: (id: string) => Promise.resolve(`${origin}/approve/${id}`),
