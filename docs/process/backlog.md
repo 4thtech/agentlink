@@ -10839,3 +10839,10 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
   - Fix: a master-code-only finish (`{nonce, presence: 'code'}`, empty body, no WebAuthn); presence detected first (the desktop helper, the platform authenticator, PRF); on Windows the master code first; only ever the platform authenticator; the desktop app's Touch ID / Windows Hello offered after the code; no dead-end screen; platform words from SENSOR.
 - **Acceptance:**
   - `RED (expected):` commit first; the master-code path never calls `navigator.credentials`; no `create` without a platform authenticator; desktop shell with no owner and no WebAuthn reaches the master-code step; Opus independent review, Fable 5.1 audit, Tali's "merge"; changelog.d fragment and changeset.
+
+#### WIN-INSTALLER-SHORTCUT · Desktop shortcut choice on the Windows installer's finish page (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet build · **Security:** S1
+- **Repo/path:** agentlink · `apps/desktop/build/lib/nsis.mjs`, `apps/desktop/build/test/nsis.node-test.mjs`
+- **Depends on:** WIN-DESK-2
+- **Scope:** finish page with a ticked "Create a desktop shortcut" box (per-user `$DESKTOP`, same icon and AppUserModelID as the Start menu entry); the uninstaller deletes it; still per-user, no admin.
+- **Acceptance:** NSIS script test; the Windows CI leg builds the installer.
