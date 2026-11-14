@@ -514,7 +514,10 @@ if (v === process.env.HEALTHY) {
       await writeFile(join(locked, 'in-use.dll'), 'old');
       await chmod(locked, 0o555);
       const aside = `${s.installDir}.previous-u-abc123`;
-      const release = setTimeout(() => void chmod(join(aside, 'locked'), 0o755).catch(() => {}), 1500);
+      const release = setTimeout(
+        () => void chmod(join(aside, 'locked'), 0o755).catch(() => {}),
+        1500,
+      );
       try {
         const code = await run(await s.args(await deadPid(), 5000), { ...s.env, HEALTHY: '0.5.3' });
         expect(code).toBe(0);
