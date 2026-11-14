@@ -88,6 +88,7 @@ const FOCUSED = [
   '/start/app',
   '/start/connect',
   '/start/connected',
+  '/start/files',
   '/start/invite',
   '/settings/join',
   '/restore/kit',

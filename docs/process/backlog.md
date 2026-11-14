@@ -10808,7 +10808,7 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Done when:** `RED (expected):` commit first; `POST /api/ui/files/send-folder/reveal` takes no input (a query, body or path is refused) and sits behind the session, CSRF, Origin and fetch-metadata gate (tests per header); it opens only the open ID's own allowed, pinned Send folder; a Send folder that became a link, a file or is missing → fixed `not_found`, never opened; answers carry no path; nothing logged; the Inbox reuses `POST /api/ui/storage/inbox/reveal`.
 
 #### FILES-ONB-1 · Files in Get started: the Connect card and the new Files step (0.5.5)
-- **Status:** new · **Size:** M · **Tier:** Sonnet build, Opus UX review · **Security:** S1 (UI; the add-folder confirm reuses the existing S2 flow unchanged)
+- **Status:** built (rel055/files-onb) · **Size:** M · **Tier:** Sonnet build, Opus UX review · **Security:** S1 (UI; the add-folder confirm reuses the existing S2 flow unchanged)
 - **Repo/path:** agentlink · `apps/local-ui/src/pages/start/*` (`STEP_IDS`, strings, the new step), `pages/first-run/strings.ts` (the collapsed "Your folders"); e2e golden path
 - **Depends on:** FILES-SPEC-055; FILES-REVEAL for Show in Finder of the Send folder (stub until it merges)
 - **Spec:** 08 §1 "Files in Get started, on Home and in Settings"; 11 §5.7 (Connect card, Files step, AI app tips)

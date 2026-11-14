@@ -30,15 +30,10 @@ export const FIRST_RUN = {
 
   // U3-g (b11 §28.3): one screen names the agent and protects it.
   protectTitle: "Create your AI app's ID",
-  // 11 §6.2.1: the folders setup creates, shown before the gesture.
-  foldersTitle: 'Your folders',
-  folders: [
-    ['Send from', '~/AgentLink/Send'],
-    ['Receive into', '~/AgentLink/Inbox'],
-    ['Proofs in', '~/AgentLink/Proofs'],
-  ] as const,
-  foldersNote:
-    'One confirmation protects approvals, sets up this ID and lets your AI send files you put in the Send folder. Changing folders is optional, later in Files.',
+  // FILES-ONB-1 (D-152; 11 §5.7): the collapsed "Your folders" became the Connect step's files card
+  // (start/strings.ts CONNECT_STEP.files*); the gesture's name where it is not Touch ID or Windows
+  // Hello ("One confirmation creates this ID …").
+  oneConfirmation: 'confirmation',
   // The button names the platform (08 §1 first run v2).
   useTouchId: 'Use Touch ID',
   useWindowsHello: 'Use Windows Hello',

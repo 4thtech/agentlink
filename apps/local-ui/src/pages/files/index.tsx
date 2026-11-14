@@ -20,13 +20,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactElement } from 're
 import { createApiClient } from '../../api/client.js';
 import { createRevealApi } from '../../api/reveal-folder.js';
 import { useFileMarks } from '../moving/use-file-marks.js';
-import {
-  EARLIER_OWNER_CODE_HINT,
-  HOLDS_FILES_LINE,
-  PAGE_TITLES,
-  SEND_FOLDER_CHECK_KEY,
-} from '../../strings.js';
-import { BackupCodeField } from '../first-run/backup-code.js';
+import { PAGE_TITLES, SEND_FOLDER_CHECK_KEY } from '../../strings.js';
 import {
   COMMIT_PATH,
   LIST_PATH,
@@ -36,7 +30,6 @@ import {
   reviewPath,
   type FolderRow,
   type Review,
-  type ReviewProblem,
 } from './data.js';
 import {
   createFilesApi,
@@ -47,21 +40,21 @@ import {
   type PasskeyInfo,
 } from './files-api.js';
 import { createSaveApi } from '../inbox/save-api.js';
+import {
+  Confirm,
+  NoticeBanner,
+  RETRYABLE,
+  outcomeText,
+  problemText,
+  type Notice,
+} from './add-folder.js';
 import { RevealButton } from './folder-rows.js';
 import { FILES_COPY as C, appTip, computerWord } from './folders-copy.js';
 import { RECEIVED_PATH, listPath, parseInboxFolder } from './io-api.js';
 import { markSeen } from './folders-summary.js';
 import { useAppName } from './use-app-name.js';
 import { FilesSkeleton, FilesTabs, ReceivedPanel, SentPanel, type FilesTab } from './io.js';
-import {
-  FILES_IO_STRINGS as IO,
-  FILES_STRINGS as S,
-  WARNING_TEXT,
-  opensAt,
-  refusalText,
-  removeLabel,
-  waitText,
-} from './strings.js';
+import { FILES_IO_STRINGS as IO, FILES_STRINGS as S, opensAt, removeLabel } from './strings.js';
 import './files.css';
 
 type ListState =
@@ -78,195 +71,6 @@ type Step =
   | { readonly kind: 'idle' }
   | { readonly kind: 'enter'; readonly checking: boolean; readonly problem?: string }
   | { readonly kind: 'confirm'; readonly review: Review };
-
-interface Notice {
-  readonly tone: 'success' | 'warning' | 'danger' | 'info';
-  readonly text: string;
-  readonly rules?: boolean;
-  /** L-1: the list is out of date; the banner offers to reload it. */
-  readonly reload?: boolean;
-}
-
-function problemText(problem: ReviewProblem): Notice {
-  switch (problem.kind) {
-    case 'folder':
-      return { tone: 'warning', text: refusalText(problem.reason, problem.protectedFolder) };
-    case 'rules_unreadable':
-      return { tone: 'warning', text: S.rulesUnreadable };
-    case 'receipts_question':
-      return { tone: 'info', text: S.receiptsQuestion, rules: true };
-    case 'changed':
-      return { tone: 'warning', text: S.changed };
-    case 'stale':
-      return { tone: 'warning', text: S.stale, reload: true };
-    case 'not_set_up':
-      return { tone: 'info', text: S.notSetUp };
-    case 'unavailable':
-      return { tone: 'warning', text: S.unavailable };
-    default:
-      return { tone: 'warning', text: S.failed };
-  }
-}
-
-function outcomeText(outcome: CommitOutcome, change: 'add' | 'remove'): Notice {
-  switch (outcome.kind) {
-    case 'applied':
-      return outcome.confirmed
-        ? { tone: 'success', text: change === 'add' ? S.added : S.removed }
-        : { tone: 'warning', text: S.notConfirmed };
-    case 'wait':
-      return { tone: 'warning', text: waitText(outcome.seconds) };
-    case 'presence_rejected':
-      return { tone: 'warning', text: S.presenceRejected };
-    case 'presence_required':
-      return { tone: 'warning', text: S.presenceRequired };
-    case 'busy':
-      return { tone: 'info', text: S.busy };
-    case 'changed':
-      return { tone: 'warning', text: S.changed };
-    case 'expired':
-      return { tone: 'warning', text: S.expired };
-    case 'refused':
-      return { tone: 'warning', text: S.refused };
-    case 'not_set_up':
-      return { tone: 'info', text: S.notSetUp };
-    case 'session_expired':
-      return { tone: 'warning', text: S.sessionExpired };
-    case 'offline':
-      return { tone: 'warning', text: S.offline };
-    default:
-      return { tone: 'warning', text: S.failed };
-  }
-}
-
-/** The answers after which the same review can be confirmed again (nothing was used up). */
-const RETRYABLE: ReadonlySet<CommitOutcome['kind']> = new Set([
-  'presence_rejected',
-  'presence_required',
-  'wait',
-  'busy',
-  'offline',
-]);
-
-function NoticeBanner({ notice }: { notice: Notice }): ReactElement {
-  return (
-    <Banner
-      tone={notice.tone}
-      action={
-        notice.rules === true ? (
-          <a className="al-btn al-btn-secondary al-btn-sm" href="/settings/rules">
-            {S.openRules}
-          </a>
-        ) : undefined
-      }
-    >
-      {notice.text}
-    </Banner>
-  );
-}
-
-interface ConfirmProps {
-  readonly review: Review;
-  readonly passkey: PasskeyInfo | undefined;
-  readonly sending: boolean;
-  readonly notice: Notice | undefined;
-  readonly onConfirm: (acknowledged: readonly string[], code: string | undefined) => void;
-  readonly onCancel: () => void;
-}
-
-function Confirm({
-  review,
-  passkey,
-  sending,
-  notice,
-  onConfirm,
-  onCancel,
-}: ConfirmProps): ReactElement {
-  const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
-  const [useCode, setUseCode] = useState(passkey === undefined);
-  const [code, setCode] = useState('');
-  const add = review.change === 'add';
-  const allTicked = review.warnings.every((w) => ticked.has(w));
-  const ready = allTicked && !sending && (!useCode || code.length > 0);
-  const toggle = (w: string): void => {
-    setTicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(w)) next.delete(w);
-      else next.add(w);
-      return next;
-    });
-  };
-  return (
-    <section className="fl-confirm" aria-labelledby="fl-confirm-title">
-      <h2 id="fl-confirm-title" className="al-text-title-3">
-        {add ? S.confirmAddTitle : S.confirmRemoveTitle}
-      </h2>
-      <p className="fl-folder al-text-code">
-        <Icon name="folder" size={16} />
-        <span>{review.folder}</span>
-      </p>
-      {add && review.elsewhere ? (
-        <p className="al-text-body-sm al-muted">{S.elsewhere(review.typed)}</p>
-      ) : null}
-      <p className="al-text-body-sm">{add ? S.confirmAddBody : S.confirmRemoveBody}</p>
-      {add && review.holdsFiles ? (
-        <p className="al-text-body-sm" data-holds-files>
-          {HOLDS_FILES_LINE}
-        </p>
-      ) : null}
-      {review.warnings.length > 0 ? (
-        <fieldset className="fl-warnings">
-          <legend className="al-text-body-sm">{S.warningsTitle}</legend>
-          {review.warnings.map((w) => (
-            <label key={w} className="al-check al-text-body">
-              <input
-                type="checkbox"
-                checked={ticked.has(w)}
-                onChange={() => toggle(w)}
-                disabled={sending}
-              />
-              <span>{WARNING_TEXT[w] ?? S.failed}</span>
-            </label>
-          ))}
-        </fieldset>
-      ) : null}
-      {useCode ? (
-        <BackupCodeField
-          name="owner-code"
-          label={S.ownerCode}
-          hint={`${S.ownerCodeHint} ${EARLIER_OWNER_CODE_HINT}`}
-          value={code}
-          onValue={setCode}
-          disabled={sending}
-        />
-      ) : (
-        <p className="al-text-caption al-muted">{S.withPasskey}</p>
-      )}
-      {notice === undefined ? null : <NoticeBanner notice={notice} />}
-      <div className="fl-actions">
-        <Button
-          variant="primary"
-          disabled={!ready}
-          onClick={() => {
-            const given = useCode ? code : undefined;
-            setCode('');
-            onConfirm(review.warnings, given);
-          }}
-        >
-          {sending ? S.sending : add ? S.confirmAdd : S.confirmRemove}
-        </Button>
-        <Button variant="ghost" onClick={onCancel} disabled={sending}>
-          {S.cancel}
-        </Button>
-        {!useCode ? (
-          <Button variant="ghost" onClick={() => setUseCode(true)} disabled={sending}>
-            {S.useCode}
-          </Button>
-        ) : null}
-      </div>
-    </section>
-  );
-}
 
 export interface FilesPageProps {
   /** The tab to open on; by default Received, or Send folders for a `?folder=` link. */
