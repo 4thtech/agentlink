@@ -94,3 +94,41 @@ test('install and uninstall check for a running copy first', () => {
   assert.ok(s.includes('!insertmacro CHECK_NOT_RUNNING ""'));
   assert.ok(s.includes('!insertmacro CHECK_NOT_RUNNING "un."'));
 });
+
+// WIN-INAPP-UPDATE: the app's in-app update runs this setup silently (`/S`) after the app quit. A
+// silent run must fail loudly (exit code) rather than skip a file, must also wait for the presence
+// helper, never touch the person's data or desktop shortcut choice, and keep the one install folder.
+test('silent upgrade: no skipped files, the helper checked too, data and the desktop shortcut kept', () => {
+  const s = nsisScript({ version: '0.5.6', sourceDir: 'a', outFile: 'b' });
+  // A file that cannot be written fails the silent run (exit code ≠ 0), never "ignored" with exit 0.
+  assert.match(s, /\nAllowSkipFiles off\n/);
+  assert.match(s, /\nSetOverwrite on\n/);
+  // Same install folder every time (no directory page; the app updates only this folder).
+  assert.match(s, /\nInstallDir "\$LOCALAPPDATA\\Programs\\AgentLink"\n/);
+  assert.doesNotMatch(s, /MUI_PAGE_DIRECTORY/);
+  // The presence helper is in use while AgentLink runs, like the app and node.exe.
+  const check = s.slice(s.indexOf('!macro CHECK_NOT_RUNNING'), s.indexOf('!macroend'));
+  const helper = '$INSTDIR\\resources\\native\\agentlink-presence.exe';
+  assert.ok(check.includes(`IfFileExists "${helper}"`));
+  assert.ok(check.includes(`FileOpen $R0 "${helper}" a`));
+  // In place over an older copy: the old resources go first (no stale core files), only after the
+  // same folder guards as the uninstaller; nothing else is removed.
+  const install = s.slice(s.indexOf('Section "Install"'), s.indexOf('SectionEnd'));
+  const rm = install.indexOf('RMDir /r "$INSTDIR\\resources"');
+  const file = install.indexOf('File /r');
+  assert.ok(rm > 0 && rm < file, 'old resources removed before the new files');
+  for (const guard of [
+    'StrCmp "$INSTDIR" "$LOCALAPPDATA\\Programs\\AgentLink"',
+    'IfFileExists "$INSTDIR\\AgentLink.exe"',
+  ]) {
+    const at = install.indexOf(guard);
+    assert.ok(at >= 0 && at < rm, guard);
+  }
+  assert.equal(install.split('RMDir /r').length - 1, 1);
+  assert.doesNotMatch(install, /\.agentlink|\$PROFILE|\$APPDATA|\$DOCUMENTS/);
+  // The desktop shortcut: only the finish page creates it (a silent run has none), nothing in the
+  // install deletes it, so the person's choice stays as it was.
+  assert.doesNotMatch(install, /\$DESKTOP/);
+  const desktop = s.slice(s.indexOf('Function CreateDesktopShortcut'));
+  assert.ok(desktop.includes('CreateShortCut "$DESKTOP\\AgentLink.lnk"'));
+});
