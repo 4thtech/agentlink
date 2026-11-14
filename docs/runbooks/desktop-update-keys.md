@@ -36,7 +36,7 @@ The first release after step 4 is the first one that apps can update **to by the
 ## Each release (one click)
 
 After you approve npm `latest` and the app is attached to the GitHub Release, two jobs run in `release.yml`:
-- `desktop-update-environment` (no secret) checks that `desktop-update` still has you as required reviewer, `main` only and no admin bypass.
+- `desktop-update-environment` (no secret) checks that `desktop-update` still has you (`talirezun`) as its only required reviewer, `main` only and no admin bypass.
 - `desktop-update-manifest` (no secret) downloads the app files from the Release, checks that each is the file this run built, that its build provenance was made by `desktop.yml` at this very commit of `main`, that both built apps carry exactly the key in `root-key.json`, and writes the unsigned update document.
 - `sign-update-manifest` waits for **your approval** (environment `desktop-update`). Approve it when the release is the one you just approved. It checks the release is still the Latest one; then one step reads the key, signs, and the next step checks the result with the app's own checks; a bad or unsigned document stops the job before anything is uploaded. It publishes `desktop-update-<key id>.json` (the first 16 characters of the public key) and the same file as `desktop-update.json` on the Release.
 

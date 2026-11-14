@@ -4,12 +4,13 @@
 # A manifest is valid 30 days; desktop-update-expiry.yml goes red 7 days before it expires. This
 # re-signs the same release with a new 30-day window, rebuilt only from what is on the Release and
 # verified (no build artifacts, which GitHub keeps 14 days):
-#   renew-environment  no secret: `desktop-update` exists with a required reviewer, main only, no admin
-#                      bypass (IR-UPD-8-1 #2).
+#   renew-environment  no secret: `desktop-update` exists with talirezun as its only required reviewer,
+#                      main only, no admin bypass (IR-UPD-8-1 #2, P2-ENV-GUARD).
 #   renew-manifest     no secret, read-only: the Latest release's tag must point at a commit on main
 #                      whose root-key.json equals main's; each zip and DMG must match the Release's sums
 #                      and carry a build provenance attestation made by desktop.yml AT THAT COMMIT of
-#                      main; builds the unsigned manifest (`--renewal`).
+#                      main; both Mac apps are updates-on and carry main's pinned key inside their
+#                      app.asar (P2-RENEW-PIN); builds the unsigned manifest (`--renewal`).
 #   renew-sign         environment `desktop-update` (the owner's approval click), the same steps as
 #                      release.yml `sign-update-manifest`: Latest check, one step with the key, the app's
 #                      own checks, then the upload of desktop-update-<key id>.json and desktop-update.json.
@@ -126,6 +127,18 @@ jobs:
               { echo "::error::$f has no build provenance attestation from desktop.yml at the release commit on main. Nothing is signed."; exit 1; }
           done
           echo "The Release assets of v$VERSION match their sums and attestations."
+
+      # P2-RENEW-PIN (IR-UPD-8-1 R2-1): a renewal has no build records, so look inside the Mac zips (the
+      # attested bytes): updates-on builds that carry exactly main's pinned key. Fails closed, no key read.
+      - name: Check the update key inside the Mac apps
+        shell: bash
+        env:
+          VERSION: ${{ steps.latest.outputs.version }}
+          DIR: ${{ runner.temp }}/update-assets
+        run: |
+          set -euo pipefail
+          node tools/release/desktop-update-renewal-pin.mjs --root-key apps/desktop/src/main/updater/root-key.json \
+            --zip "$DIR/AgentLink-$VERSION-mac-arm64.zip" --zip "$DIR/AgentLink-$VERSION-mac-x64.zip"
 
       - name: Build the unsigned manifest
         shell: bash
