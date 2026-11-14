@@ -311,6 +311,29 @@ describe('start over: the backup move and the keychain erase by exact name', () 
     expect(keychain.items.has('owner')).toBe(true);
     e.close();
   });
+
+  // CodeQL js/file-system-race: an ID's config.json is read through the handle that was checked, so
+  // a link (here to another ID's config outside the folder) is never followed and names no ID.
+  it.skipIf(process.platform === 'win32')(
+    "never follows a linked config.json: the link's ID is not erased",
+    async () => {
+      const { symlink } = await import('node:fs/promises');
+      await seed();
+      const other = `0x${'c'.repeat(40)}`;
+      const outside = join(root.root, 'other-config.json');
+      await writeFile(outside, JSON.stringify({ agentId: other }));
+      await mkdir(join(root.home, '.agentlink', 'agents', 'linked'), { recursive: true });
+      await symlink(outside, join(root.home, '.agentlink', 'agents', 'linked', 'config.json'));
+      const e = engine();
+      expect((await nativeRun(e)).body).toEqual({ status: 'done', backup: join('~', BACKUP) });
+      const record = JSON.parse(
+        await readFile(join(root.home, BACKUP, START_OVER_RECORD), 'utf8'),
+      ) as { agents: string[] };
+      expect([...record.agents].sort()).toEqual([AGENT_A, AGENT_B]);
+      expect(keychain.items.has(other)).toBe(true);
+      e.close();
+    },
+  );
 });
 
 describe('start over: partial failure is reported and safe to retry', () => {
@@ -438,24 +461,29 @@ describe('start over: review round 1 (IR M1, M2, lows)', () => {
     e.close();
   });
 
-  it('M2: a record write that fails is a partial answer, never done', async () => {
-    await seed();
-    let backupDir = '';
-    const e = engine({
-      rename: async (from, to) => {
-        await rename(from, to);
-        backupDir = to;
-        await chmod(to, 0o500);
-      },
-    });
-    const first = await nativeRun(e);
-    await chmod(backupDir, 0o700);
-    expect(first.body).toMatchObject({ status: 'partial', failed: 'keychain' });
-    expect((await e.state()).body).toMatchObject({ unfinished: true });
-    const second = await nativeRun(e);
-    expect(second.body).toEqual({ status: 'done', backup: join('~', BACKUP) });
-    e.close();
-  });
+  // A folder made read-only with chmod still takes new files on Windows, so the failing record write
+  // is simulated on POSIX only (macOS and Linux CI run it).
+  it.skipIf(process.platform === 'win32')(
+    'M2: a record write that fails is a partial answer, never done',
+    async () => {
+      await seed();
+      let backupDir = '';
+      const e = engine({
+        rename: async (from, to) => {
+          await rename(from, to);
+          backupDir = to;
+          await chmod(to, 0o500);
+        },
+      });
+      const first = await nativeRun(e);
+      await chmod(backupDir, 0o700);
+      expect(first.body).toMatchObject({ status: 'partial', failed: 'keychain' });
+      expect((await e.state()).body).toMatchObject({ unfinished: true });
+      const second = await nativeRun(e);
+      expect(second.body).toEqual({ status: 'done', backup: join('~', BACKUP) });
+      e.close();
+    },
+  );
 
   it("M2: an unfinished record and a NEW owner: the new owner's folder and items are untouched", async () => {
     await seed();
