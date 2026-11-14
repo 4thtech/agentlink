@@ -11057,6 +11057,15 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Owner requirement (Tali, 14 Nov):** "Settings › Updates › Check for updates › Update now, and that's it: it updates, restarts, new version — on the Windows app too, no installer by hand."
 - **Done when:** `RED (expected):` commit first; the signed manifest lists the Windows setup and its signature covers it; win32/x64 selects it; the app verifies before it runs, refuses a setup changed after the check, keeps the old app when the setup fails or the new copy does not answer (failed version recorded, "Couldn't update here" next launch); the NSIS script upgrades silently in place keeping data and the desktop shortcut; the Windows CI rehearsal passes. What only a real release proves: the signed document on a Release, the real health answer of the new app, Explorer's launch on a person's desktop.
 
+#### WIN-UPDATE-CLEANUP · The old Windows copy is removed reliably after an update (0.5.8)
+- **Status:** built (rel058/win-cleanup) · **Size:** S · **Tier:** Opus build, Fable independent audit (updater) · **Security:** S2
+- **Repo/path:** agentlink · `apps/desktop/src/main/updater/install-win.ts` (watchdog `rmRetry`, `record` before the old copy starts, `watchdogOwns` sweep); `apps/desktop/test/smoke/win-update-rehearsal.mjs`
+- **Depends on:** WIN-INAPP-UPDATE
+- **Spec:** 08 §8 "Signed updates" (Windows in-app install)
+- **Why:** release run 43650479110: the update succeeded but `AgentLink.previous-u-…` stayed (one removal try, a file briefly in use), and the healthy-start sweep only removed it after the 24 h staging sweep.
+- **Done when:** `RED (expected):` commit first; removing the old or failed copy retries with bounded backoff and never delays the update; after a rollback the failed version is recorded and the pending nonce removed before the old copy starts; a healthy start removes a copy whose staging folder holds only node.exe (and an empty tmp\), keeps it while the setup or recover.cjs is there or the folder cannot be listed; the Windows rehearsal waits for the cleanup.
+- **Open (Fable r1 Low, card only):** the 24 h staging sweep (`sweepStaging`) can remove the staged node.exe that a still-registered RunOnce recovery entry (`rollback_incomplete`, or a watchdog killed and the computer off > 24 h) would run at the next logon; the recovery then cannot start. Decide: keep staging folders that hold recover.cjs, or point RunOnce at the installed node.exe.
+
 #### KIT-NAMES · Recovery kit carries each ID's name (kit format v2) (0.5.4)
 - **Status:** done (released 0.5.4) · **Security:** S2
 - **Spec:** 04 §2.3.3; 07 §9.4

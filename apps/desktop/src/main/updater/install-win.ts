@@ -301,6 +301,18 @@ const writeAtomic = (file, text) => {
 };
 const unlink = (f) => { try { fs.unlinkSync(f); } catch {} };
 const rmQuiet = (p) => { try { fs.rmSync(p, { recursive: true, force: true, maxRetries: 3 }); } catch {} };
+// A copy that is no longer needed: a file in it can stay in use for a while after its process ended
+// (antivirus, Explorer, the search indexer). Retry with backoff, bounded; whatever is still left is
+// removed at a later healthy start (afterHealthyStartWin). Never blocks the update itself.
+const RM_RETRY_MS = 30000;
+const rmRetry = async (p) => {
+  const deadline = Date.now() + RM_RETRY_MS;
+  for (let delay = 250; ; delay = Math.min(delay * 2, 2000)) {
+    rmQuiet(p);
+    if (!exists(p) || Date.now() >= deadline) return;
+    await sleep(delay);
+  }
+};
 const launch = (target) => new Promise((resolve) => {
   if (!isFile(target)) { resolve(); return; }
   let child;
@@ -327,12 +339,21 @@ const disarm = () => {
   try { cp.execFileSync(reg, ['delete', ${JSON.stringify(RUNONCE_KEY)}, '/v', ${JSON.stringify(RUNONCE_VALUE)}, '/f'], { stdio: 'ignore', timeout: 15000, windowsHide: true }); } catch {}
   armed = false;
 };
-const done = (code, reason, removeStaging) => {
-  if (code !== 5) disarm();
+// The outcome on disk, once: the failed version (never offered again) and no pending nonce. Before
+// the old copy starts, so it never re-offers the version, a killed watchdog has still recorded it,
+// and a late unlink cannot hit the pending file of an update started after it.
+let recorded = false;
+const record = (reason) => {
+  if (recorded) return;
+  recorded = true;
   if (reason !== null) {
     try { writeAtomic(FAILED, JSON.stringify({ failedVersion: version, reason }) + '\\n'); } catch {}
   }
   unlink(PENDING);
+};
+const done = (code, reason, removeStaging) => {
+  if (code !== 5) disarm();
+  record(reason);
   if (removeStaging) {
     // The setup first (read-only); node.exe is this process and stays until the sweeper (24 h).
     try { fs.chmodSync(installer, 0o600); } catch {}
@@ -382,16 +403,18 @@ const stopNewCopy = async () => {
 // The new (or half-written) copy goes aside, the old one back, and the old one starts.
 const restore = async (code, reason) => {
   if (exists(dir)) {
-    if ((await renameRetry(dir, failedDir, 15000)) !== null) { await launch(exe); done(5, 'rollback_incomplete', false); }
+    if ((await renameRetry(dir, failedDir, 15000)) !== null) { record('rollback_incomplete'); await launch(exe); done(5, 'rollback_incomplete', false); }
   }
   if ((await renameRetry(aside, dir, 15000)) !== null) {
     if (!exists(dir) && exists(failedDir)) { try { fs.renameSync(failedDir, dir); } catch {} }
+    record('rollback_incomplete');
     await launch(exe);
     done(5, 'rollback_incomplete', false);
   }
   disarm();
-  rmQuiet(failedDir);
+  record(reason);
   await launch(exe);
+  await rmRetry(failedDir);
   done(code, reason, true);
 };
 (async () => {
@@ -422,7 +445,7 @@ const restore = async (code, reason) => {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     const h = readJson(HEALTH, ['nonce', 'pid', 'version']);
-    if (h !== null && h.version === version && h.nonce === nonce) { disarm(); rmQuiet(aside); done(0, null, true); }
+    if (h !== null && h.version === version && h.nonce === nonce) { disarm(); await rmRetry(aside); done(0, null, true); }
     await sleep(250);
   }
   await stopNewCopy();
@@ -583,9 +606,32 @@ export type RunQuiet = (command: string, args: readonly string[]) => Promise<voi
 const SIBLING = /^AgentLink\.(previous|failed)-(u-[A-Za-z0-9]{6})$/;
 
 /**
+ * Whether a watchdog may still need the copy beside the install folder: its staging folder exists and
+ * holds more than what a finished watchdog leaves (its own node.exe, in use until it exits and then
+ * swept after 24 h, and an empty tmp\). The setup and recover.cjs stay until the watchdog is done, and
+ * stay after `rollback_incomplete`, so those copies are never touched.
+ */
+async function watchdogOwns(staging: string): Promise<boolean> {
+  let names: string[];
+  try {
+    names = await readdir(staging);
+  } catch (e) {
+    return (e as NodeJS.ErrnoException | null)?.code !== 'ENOENT';
+  }
+  if (!names.includes(STAGED_NODE)) return true;
+  for (const n of names) {
+    if (n === STAGED_NODE) continue;
+    if (n !== TEMP_DIR) return true;
+    const tmp = await readdir(join(staging, n)).catch(() => null);
+    if (tmp === null || tmp.length > 0) return true;
+  }
+  return false;
+}
+
+/**
  * At a healthy start of the Windows app (the core said `ready`; IR Fable r1 M and L): this copy is
  * in place for good, so the RunOnce recovery entry goes (always, IR Fable r2), and left-over `AgentLink.previous-u-…` / `AgentLink.failed-u-…` folders beside the install
- * folder are removed when their staging folder is gone (no watchdog owns them any more). Never throws.
+ * folder are removed when no watchdog owns them any more (watchdogOwns). Never throws.
  */
 export async function afterHealthyStartWin(opts: {
   readonly stateDir: string;
@@ -605,13 +651,7 @@ export async function afterHealthyStartWin(opts: {
       const p = join(parent, name);
       const st = await lstat(p).catch(() => null);
       if (st === null || st.isSymbolicLink() || !st.isDirectory()) continue;
-      if (
-        await lstat(join(opts.stateDir, UPDATES_DIR, m[2]!)).then(
-          () => true,
-          () => false,
-        )
-      )
-        continue;
+      if (await watchdogOwns(join(opts.stateDir, UPDATES_DIR, m[2]!))) continue;
       await rm(p, { recursive: true, force: true }).catch(() => undefined);
     }
   } catch {

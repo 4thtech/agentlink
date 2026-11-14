@@ -64,6 +64,18 @@ const runSetup = (path) =>
   spawnSync(path, ['/S'], { stdio: 'ignore', timeout: 10 * 60_000 }).status;
 const siblings = () =>
   readdirSync(join(LOCAL, 'Programs')).filter((n) => n.startsWith('AgentLink'));
+// The watchdog retries removing a copy whose files are still in use for a moment (antivirus,
+// Explorer; CI 43650479110): wait for that, bounded, instead of looking once.
+const onlyInstall = async (ms = 60_000) => {
+  for (const end = Date.now() + ms; ; await sleep(1000)) {
+    if (siblings().join(',') === 'AgentLink') return true;
+    if (Date.now() >= end) {
+      const left = siblings().filter((n) => /^AgentLink\.(previous|failed)-u-rehea[0-9]$/.test(n));
+      console.error(`win-update-rehearsal: left beside the install: ${left.join(', ') || 'other'}`);
+      return false;
+    }
+  }
+};
 const stopApp = () => {
   try {
     execFileSync(tools.taskkill, ['/IM', 'AgentLink.exe', '/T', '/F'], { stdio: 'ignore' });
@@ -178,7 +190,7 @@ const success = await watchdog('u-rehea1', values.setup, {
 });
 hold.kill();
 if (success !== 0) fail(`the watchdog's update exited ${String(success)}, not 0`);
-if (!existsSync(exe) || siblings().join(',') !== 'AgentLink') fail('the old copy was not removed');
+if (!existsSync(exe) || !(await onlyInstall())) fail('the old copy was not removed');
 if (!keptAll()) fail('data folders or the desktop shortcut changed during the update');
 let started = false;
 for (let i = 0; i < 60 && !started; i += 1) {
@@ -205,7 +217,7 @@ await sleep(3000);
 // 5. A setup that fails (node.exe under the setup's name: `/S` is no script, exit 1).
 const failed = await watchdog('u-rehea2', process.execPath);
 if (failed !== 6) fail(`a failing setup exited ${String(failed)}, not 6`);
-if (!readFileSync(exe).equals(exeBefore) || siblings().join(',') !== 'AgentLink')
+if (!readFileSync(exe).equals(exeBefore) || !(await onlyInstall()))
   fail('the old copy is not back after a failing setup');
 const rec = await state.loadFailedRecord(stateDir);
 if (rec?.reason !== 'installer_failed') fail('installer_failed was not recorded');

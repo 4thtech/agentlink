@@ -10,6 +10,7 @@
 import { spawn } from 'node:child_process';
 import {
   appendFile,
+  chmod,
   mkdir,
   mkdtemp,
   readFile,
@@ -43,7 +44,7 @@ import {
 } from '../../src/main/updater/install-win.js';
 import type { AcceptedUpdate, UpdateAsset } from '../../src/main/updater/manifest.js';
 import { HEALTH_FILE, PENDING_FILE } from '../../src/main/updater/health.js';
-import { FAILED_REASONS, loadFailedRecord } from '../../src/main/updater/state.js';
+import { FAILED_FILE, FAILED_REASONS, loadFailedRecord } from '../../src/main/updater/state.js';
 import {
   isAppUpdatePipeView,
   winDownloadUrl,
@@ -398,6 +399,7 @@ case "$FAKE_MODE" in
   ok) mkdir -p "$FAKE_DIR"; printf 0.5.3 > "$FAKE_DIR/AgentLink.exe"; exit 0 ;;
   slow) mkdir -p "$FAKE_DIR"; printf partial > "$FAKE_DIR/junk"; echo $$ > "$FAKE_SETUP_PID"; sleep 30; exit 0 ;;
   fail) mkdir -p "$FAKE_DIR"; printf partial > "$FAKE_DIR/junk"; exit 1 ;;
+  faillock) mkdir -p "$FAKE_DIR/locked"; printf partial > "$FAKE_DIR/locked/junk"; chmod 555 "$FAKE_DIR/locked"; exit 1 ;;
   *) exit 0 ;;
 esac
 `,
@@ -410,6 +412,11 @@ esac
 const exe = process.argv[2];
 const v = fs.readFileSync(exe, 'utf8');
 fs.appendFileSync(process.env.FAKE_LOG, 'launch ' + v + '\\n');
+if (process.env.FAKE_CHECK === '1') {
+  const state = process.env.FAKE_STATE;
+  const has = (f) => fs.existsSync(path.join(state, f));
+  fs.appendFileSync(process.env.FAKE_LOG, 'at-launch failed=' + has(${JSON.stringify(FAILED_FILE)}) + ' pending=' + has(${JSON.stringify(PENDING_FILE)}) + '\\n');
+}
 if (v === process.env.HEALTHY) {
   const state = process.env.FAKE_STATE;
   const p = JSON.parse(fs.readFileSync(path.join(state, ${JSON.stringify(PENDING_FILE)}), 'utf8'));
@@ -502,6 +509,34 @@ if (v === process.env.HEALTHY) {
     expect(await loadFailedRecord(s.state)).toBeNull();
   });
 
+  // CI 43650479110: on Windows a file in the old copy can stay in use for a while after its process
+  // ended (antivirus, Explorer). The removal is retried with backoff instead of tried once.
+  it.skipIf(process.getuid?.() === 0)(
+    'success: a file of the old copy that cannot be removed for a moment is retried until it goes',
+    async () => {
+      const s = await setup();
+      const locked = join(s.installDir, 'locked');
+      await mkdir(locked);
+      await writeFile(join(locked, 'in-use.dll'), 'old');
+      await chmod(locked, 0o555);
+      const aside = `${s.installDir}.previous-u-abc123`;
+      const release = setTimeout(
+        () => void chmod(join(aside, 'locked'), 0o755).catch(() => {}),
+        1500,
+      );
+      try {
+        const code = await run(await s.args(await deadPid(), 5000), { ...s.env, HEALTHY: '0.5.3' });
+        expect(code).toBe(0);
+        expect(await versionAt(s.installDir)).toBe('0.5.3');
+        expect((await readdir(s.programs)).sort()).toEqual(['AgentLink']);
+      } finally {
+        clearTimeout(release);
+        await chmod(join(aside, 'locked'), 0o755).catch(() => {});
+      }
+    },
+    20_000,
+  );
+
   it('a setup that fails: the old copy is put back and started; the version is recorded as failed', async () => {
     const s = await setup();
     const code = await run(await s.args(await deadPid(), 5000), { ...s.env, FAKE_MODE: 'fail' });
@@ -517,6 +552,40 @@ if (v === process.env.HEALTHY) {
     expect((await readdir(s.programs)).sort()).toEqual(['AgentLink']);
     await expect(stat(s.runOnce)).rejects.toThrow(); // the old copy is back: no recovery entry
   });
+
+  // Fable r1 M: the outcome is on disk before the old copy starts; the half-written copy, whose file
+  // cannot be removed for a moment, is retried after it started.
+  it.skipIf(process.getuid?.() === 0)(
+    'a failing setup: the failed version is recorded before the old copy starts; a locked failed copy is retried',
+    async () => {
+      const s = await setup();
+      const failedCopy = `${s.installDir}.failed-u-abc123`;
+      const release = setTimeout(
+        () => void chmod(join(failedCopy, 'locked'), 0o755).catch(() => {}),
+        1500,
+      );
+      try {
+        const code = await run(await s.args(await deadPid(), 5000), {
+          ...s.env,
+          FAKE_MODE: 'faillock',
+          FAKE_CHECK: '1',
+        });
+        expect(code).toBe(6);
+        expect(await lines(s.log)).toEqual([
+          'setup /S',
+          'launch 0.5.2',
+          'at-launch failed=true pending=false',
+        ]);
+        expect(await versionAt(s.installDir)).toBe('0.5.2');
+        expect((await readdir(s.programs)).sort()).toEqual(['AgentLink']);
+        expect((await loadFailedRecord(s.state))?.reason).toBe('installer_failed');
+      } finally {
+        clearTimeout(release);
+        await chmod(join(failedCopy, 'locked'), 0o755).catch(() => {});
+      }
+    },
+    20_000,
+  );
 
   it('a setup that exits 0 but writes no app counts as failed (old copy back)', async () => {
     const s = await setup();
@@ -686,6 +755,53 @@ if (v === process.env.HEALTHY) {
     calls.length = 0;
     await tidy();
     expect(calls).toEqual([['/x/reg.exe', 'delete', RUNONCE_KEY, '/v', RUNONCE_VALUE, '/f']]);
+  });
+
+  it('a healthy start removes a copy a finished watchdog left (only its node.exe in staging), never one in use', async () => {
+    const programs = join(root, 'P3');
+    const installDir = join(programs, 'AgentLink');
+    const state = join(root, 'state3');
+    const updates = join(state, 'updates');
+    for (const d of [
+      installDir,
+      join(programs, 'AgentLink.previous-u-done01'),
+      join(programs, 'AgentLink.previous-u-done02'),
+      join(programs, 'AgentLink.previous-u-wait01'),
+      join(programs, 'AgentLink.failed-u-roll01'),
+      join(programs, 'AgentLink.previous-u-tmpf01'),
+      join(programs, 'AgentLink.previous-u-nonode'),
+      join(programs, 'AgentLink.previous-u-unread'),
+      join(updates, 'u-done02', 'tmp'),
+      join(updates, 'u-tmpf01', 'tmp'),
+      join(updates, 'u-wait01'),
+      join(updates, 'u-roll01'),
+      join(updates, 'u-done01'),
+    ])
+      await mkdir(d, { recursive: true });
+    for (const t of ['u-done01', 'u-done02', 'u-wait01', 'u-roll01', 'u-tmpf01'])
+      await writeFile(join(updates, t, STAGED_NODE), 'node');
+    // Still waiting for health: the setup is there. After rollback_incomplete: the recovery stays.
+    await writeFile(join(updates, 'u-wait01', SETUP), 'setup');
+    await writeFile(join(updates, 'u-roll01', RECOVERY_FILE), 'recover');
+    await writeFile(join(updates, 'u-tmpf01', 'tmp', 'x'), 'x');
+    // No node.exe (not a finished watchdog's folder) and a staging path that cannot be listed: kept.
+    await mkdir(join(updates, 'u-nonode', 'tmp'), { recursive: true });
+    await writeFile(join(updates, 'u-unread'), 'not a folder');
+    await afterHealthyStartWin({
+      stateDir: state,
+      installDir,
+      version: '0.5.3',
+      reg: '/x/reg.exe',
+      run: async () => {},
+    });
+    expect((await readdir(programs)).sort()).toEqual([
+      'AgentLink',
+      'AgentLink.failed-u-roll01',
+      'AgentLink.previous-u-nonode',
+      'AgentLink.previous-u-tmpf01',
+      'AgentLink.previous-u-unread',
+      'AgentLink.previous-u-wait01',
+    ]);
   });
 
   it('the new reasons are fixed and map to fixed refusal codes', () => {
