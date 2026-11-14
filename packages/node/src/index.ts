@@ -269,6 +269,15 @@ export {
   type InboxFolderProblem,
   type InboxFolderRulesInput,
 } from './inbox-folder.js';
+// FILES-AI-1 (D-152; 06 §2.3 "Send by content"): the Attach writer, for the runtime's files platform
+// (core's `sendMessage` with `contentFile`). It writes only into the ID's own pinned Send folder
+// among the verified policy's folders; fixed refusal codes, nothing logged. Exported only in the form
+// whose budget `reserve` is required; the optional form stays inside for the attach route.
+export {
+  writeSendFolderContentFile as writeSendFolderFile,
+  type SendFolderWrite,
+  type SendFolderWriteRefusal,
+} from './send-folder-file.js';
 // M1-36b-2-c: the Send folder for an agent that already has its card (`policy allow-send-folder`
 // †). The owner signs through the given owner operation (performOwnerOperation); the folder checks
 // and the byte-exact policy check stay inside.

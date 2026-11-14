@@ -305,6 +305,8 @@ export interface FileAgentOptions {
   readonly autoSavePause?: AutoSavePause;
   /** W4-AUTO-SAVE: runs each time a save resolves the Inbox folder (inside the file's lock). */
   readonly beforeInbox?: () => Promise<void>;
+  /** FILES-AI-1 (D-152): the Send folder writer of `contentFile` sends. */
+  readonly writeSendFolderFile?: FilesPlatform['writeSendFolderFile'];
 }
 
 /** An agent with a files platform whose allowed folder is WORK and whose inbox is INBOX. */
@@ -330,6 +332,9 @@ export async function openFileAgent(
         ? {}
         : { ownStorage: options.ownAdapter }),
     ...(options.drop === undefined ? {} : { drop: options.drop }),
+    ...(options.writeSendFolderFile === undefined
+      ? {}
+      : { writeSendFolderFile: options.writeSendFolderFile }),
     download:
       options.download ??
       ((url: string) => {

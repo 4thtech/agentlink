@@ -7,6 +7,7 @@
 // the app link to Settings > Files with the Send folder filled in (withAllowFolderLink); otherwise
 // only an approval request has a local app link (06 §2.5).
 import type { CoreErrorCode, FilesNeedsSetup } from '@4thtech-io/core';
+import { MAX_TOOL_TEXT_CHARS } from '@4thtech-io/types';
 import type { AttachRefusal, ToolContext } from './context.js';
 import { fail, resultIsValid, type HandlerOutput } from './result.js';
 import { NPX_COMMAND } from './cli-command.js';
@@ -40,6 +41,26 @@ export const FILE_TEXT = Object.freeze({
   storageFailedNextStep: `Try again later. If it keeps failing, the user can run \`${NPX_COMMAND} doctor\` in their own terminal.`,
   fileChanged: 'The file changed while it was being sent, so nothing was sent.',
   fileChangedNextStep: 'Wait until the file is no longer being written, then call again.',
+  // FILES-AI-1 (D-152; 06 §2.3 "AI-side texts for files"; 11 §5.7): `file: {name, content}`.
+  fileName: "A file name can't contain a folder, so nothing was sent.",
+  fileNameNextStep: 'Pass a plain file name such as notes.md.',
+  fileType:
+    'Only .md, .markdown, .txt and .json files can be sent by content, so nothing was sent.',
+  fileTypeNextStep: "Send other files by path from the user's Send folder.",
+  fileNotText: "That content isn't plain text, so nothing was sent.",
+  fileNotTextNextStep: "Send text only, or send the file by path from the user's Send folder.",
+  fileNameTaken: 'The Send folder already has many files with this name, so nothing was sent.',
+  fileNameTakenNextStep: 'Use another file name and call again.',
+  sendFolderUnavailable: "The user's Send folder isn't available right now, so nothing was sent.",
+  sendFolderUnavailableNextStep:
+    'Tell the user to check their Send folder on Home in the AgentLink app.',
+  fileBudget: 'Your AI has saved a lot of files today, so nothing was saved or sent.',
+  fileBudgetNextStep:
+    'Try again tomorrow, or ask the user to put the file in their Send folder and call again with its path.',
+  // The ok summary of a `file` send: the saved name and the Send folder in their own slots.
+  savedAndSent:
+    "Saved {savedName} in the user's Send folder ({sendFolder}) and sent it to {contact}.",
+  savedAndSentNoFolder: "Saved {savedName} in the user's Send folder and sent it to {contact}.",
   filesUnavailable: "Files can't be sent or saved here right now, so nothing was done.",
   filesUnavailableNextStep: `Tell the user AgentLink could not use files on this machine. They can run \`${NPX_COMMAND} doctor\` in their own terminal.`,
 });
@@ -192,6 +213,69 @@ export function fileErrorOutput(code: CoreErrorCode): HandlerOutput | undefined 
     default:
       return undefined;
   }
+}
+
+/** FILES-AI-1: the fixed result for a `file` refusal code, or undefined for any other code. */
+export function contentFileRefusal(code: string): HandlerOutput | undefined {
+  switch (code) {
+    case 'FILE_NAME':
+      return fail('rejected', FILE_TEXT.fileName, FILE_TEXT.fileNameNextStep, 'FILE_NAME');
+    case 'FILE_TYPE':
+      return fail('rejected', FILE_TEXT.fileType, FILE_TEXT.fileTypeNextStep, 'FILE_TYPE');
+    case 'FILE_NOT_TEXT':
+      return fail(
+        'rejected',
+        FILE_TEXT.fileNotText,
+        FILE_TEXT.fileNotTextNextStep,
+        'FILE_NOT_TEXT',
+      );
+    case 'FILE_NAME_TAKEN':
+      return fail(
+        'rejected',
+        FILE_TEXT.fileNameTaken,
+        FILE_TEXT.fileNameTakenNextStep,
+        'FILE_NAME_TAKEN',
+      );
+    case 'SEND_FOLDER_UNAVAILABLE':
+      return fail(
+        'error',
+        FILE_TEXT.sendFolderUnavailable,
+        FILE_TEXT.sendFolderUnavailableNextStep,
+        'SEND_FOLDER_UNAVAILABLE',
+      );
+    case 'FILE_BUDGET':
+      return fail('rejected', FILE_TEXT.fileBudget, FILE_TEXT.fileBudgetNextStep, 'FILE_BUDGET');
+    default:
+      return undefined;
+  }
+}
+
+/** The Send folder forms a result may name (04 §4: the fixed `~` slot, never a path from a call). */
+const SEND_FOLDER_SLOT = /^~\/AgentLink\/Send(?:-[2-9])?$/;
+
+/**
+ * FILES-AI-1: the ok summary of a `file` send, then `tail` (the queued line, or nothing). The saved
+ * name is the sanitised one (no control, format or bidi character: the text rule allows no isolate
+ * marks) in its own quoted run, as contact names are; the folder only in its fixed form, else the
+ * sentence without it. A summary over `maxChars` (the 500-character text rule, less room for what
+ * follows) leaves the name out ("the file"); `file.name` still carries it.
+ */
+export function savedAndSentSummary(
+  savedName: string,
+  sendFolder: unknown,
+  contact: string,
+  tail = '',
+  maxChars: number = MAX_TOOL_TEXT_CHARS,
+): string {
+  const folder = typeof sendFolder === 'string' && SEND_FOLDER_SLOT.test(sendFolder);
+  const template = folder ? FILE_TEXT.savedAndSent : FILE_TEXT.savedAndSentNoFolder;
+  const fill = (name: string): string =>
+    `${template
+      .replace('{savedName}', () => name)
+      .replace('{sendFolder}', () => (folder ? (sendFolder as string) : ''))
+      .replace('{contact}', () => contact)}${tail === '' ? '' : ` ${tail}`}`;
+  const full = fill(`\u201c${savedName}\u201d`);
+  return [...full].length <= maxChars ? full : fill('the file');
 }
 
 /** RFC 3339 UTC, seconds, from unix seconds. */

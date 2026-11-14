@@ -67,6 +67,8 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         'auto_save_state',
         // RET-2 (D-148; 07 §3.8, schema 15): the saved-file index.
         'saved_files',
+        // FILES-AI-1 (D-152; 06 §2.3 "Daily budget", schema 16): times and byte counts only.
+        'content_file_budget',
         // W4-PAUSE (D-143 (5); 07 §3.2, schema 12): the owner's pause of the agent.
         'agent_pause',
         'idempotency',

@@ -475,9 +475,9 @@ describe(
       // add a migration with the next version instead (07 §3.7: forward migrations only).
       const digestOf = (i: number) =>
         encodeHex(sha256(encodeUtf8(MIGRATIONS[i]?.statements.join(';\n') ?? '')));
-      expect(STORE_SCHEMA_VERSION).toBe(15);
+      expect(STORE_SCHEMA_VERSION).toBe(16);
       expect(MIGRATIONS.map((m) => m.version)).toEqual([
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
       ]);
       // Version 1 (G-9) is unchanged by D-72.
       expect(digestOf(0)).toMatchInlineSnapshot(
@@ -632,6 +632,13 @@ describe(
         'saved_files',
       ]);
       expect(digestOf(14)).toBe('50902f16376634ee24fa10a2f35f4e54129ed24115fdb7f79f28d1e18a2a4681');
+      // Version 16 (FILES-AI-1, D-152; 06 §2.3 "Daily budget"): the `content_file_budget` table only
+      // (time and byte count). Versions 1 to 15 keep their statements above.
+      const v16 = MIGRATIONS[15]?.statements ?? [];
+      expect(v16.filter((s) => s.startsWith('CREATE TABLE')).map((s) => s.split('"')[1])).toEqual([
+        'content_file_budget',
+      ]);
+      expect(v16.every((s) => !s.startsWith('ALTER TABLE'))).toBe(true);
     });
 
     it('migrates a version 13 file to version 14 (REL051-B2): invites kept, invite_link null', async () => {

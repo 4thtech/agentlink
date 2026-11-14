@@ -122,6 +122,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'unlockFileKeyStoreAgent',
       // U3-c (card U3-e uses it): removal takes the folder lock exclusive.
       'withAgentFolderExclusive',
+      // FILES-AI-1 (D-152): the Attach writer for the runtime's files platform (`contentFile` sends):
+      // the ID's own pinned Send folder only, no folder or path seam; fixed codes.
+      'writeSendFolderFile',
     ]);
   });
 
