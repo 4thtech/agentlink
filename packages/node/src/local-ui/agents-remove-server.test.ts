@@ -251,6 +251,8 @@ interface Faults {
   /** Claude Desktop runs: its entry cannot be written (step 5 fails before the keys). */
   desktop?: boolean;
   folder?: boolean;
+  /** WIN-BROKEN-ID: the set-aside move fails. */
+  setAside?: boolean;
   contacts?: number;
   delivery?: 'delivered' | 'undeliverable';
   /** Runs inside queueCarriers, while the gesture is live. */
@@ -284,7 +286,7 @@ afterEach(async () => {
  * `noneOpen`: the host starts with no agent open (HOTFIX-045-TOUCHID).
  */
 async function world(
-  options: { solo?: boolean; noneOpen?: true; workName?: string } = {},
+  options: { solo?: boolean; noneOpen?: true; workName?: string; broken?: true } = {},
 ): Promise<World> {
   const workName = options.workName ?? 'work';
   const work = await makeAgent(workName);
@@ -334,6 +336,10 @@ async function world(
       label: e.label,
       available: true,
       removing: marked.has(name) || revoked.has(e.agentId),
+      // WIN-BROKEN-ID: the directory reports an ID whose key is missing.
+      ...(options.broken === true && name === workName && !keychain.items.has(e.agentId)
+        ? { broken: 'identity_missing' as const }
+        : {}),
     };
   };
   const directory: AgentDirectory = {
@@ -355,6 +361,13 @@ async function world(
     },
     readCurrent: () => Promise.resolve(undefined),
     writeCurrent: () => Promise.resolve(),
+    // WIN-BROKEN-ID: the folder moved aside (the CLI's setAsideBrokenAgent is tested in the CLI).
+    setAside: (name) => {
+      if (faults.setAside === true) return Promise.reject(new Error('disk'));
+      log.push(`setAside ${name}`);
+      entries.delete(name);
+      return Promise.resolve();
+    },
   };
   const sourceOf = (agent: Agent): ApprovalServerSource => ({
     context: () => Promise.resolve({ agent: agent.agentId, owner }),
@@ -452,8 +465,13 @@ async function world(
     },
   };
   const opened: string[] = [];
+  // WIN-BROKEN-ID: `broken` takes the work ID's seed out of the keychain; the other ID is open.
+  if (options.broken === true) await keychain.delete(work.agentId);
   // HOTFIX-045-TOUCHID: `noneOpen` starts the host with no agent open (as after a failed removal).
-  const initial = options.noneOpen === true ? undefined : hostAgent(workName);
+  const initial =
+    options.noneOpen === true
+      ? undefined
+      : hostAgent(options.broken === true && options.solo !== true ? 'default' : workName);
   const server = await startApprovalServerWith(
     {
       source: initial?.source ?? sourceOf(work),
@@ -1194,5 +1212,82 @@ describe('HOTFIX-045-TOUCHID: Remove with no agent open, with Touch ID', () => {
     const recorded = w.revoked.get(w.work.agentId) ?? '';
     const ownerHex = `0x${encodeHex(owner.ownerNostr)}`;
     expect(verifyRevokedEntry(recorded, w.work.agentId, ownerHex).ok).toBe(true);
+  });
+});
+
+describe('WIN-BROKEN-ID: Remove this ID from this computer (an ID whose key is missing)', () => {
+  it('sets the folder aside with the master code: nothing signed, nothing recorded, the open ID stays', async () => {
+    const w = await world({ broken: true });
+    const ownerBefore = OWNER_ACCOUNTS.filter((a) => keychain.items.has(a));
+    const res = await remove(w, { name: 'work', typedLabel: 'Work' });
+    expect(res.json).toEqual({ status: 'removed' });
+    expect(res.status).toBe(200);
+    expect(w.log).toContain('setAside work');
+    expect(w.log).not.toContain('removeFolder work');
+    expect(w.log).not.toContain('mark work');
+    expect(w.revoked.has(w.work.agentId)).toBe(false);
+    expect(w.carriers).toEqual([]);
+    expect(OWNER_ACCOUNTS.filter((a) => keychain.items.has(a))).toEqual(ownerBefore);
+    // The ID that was open is never closed for this.
+    expect(w.log).not.toContain('close default');
+    expectFixedEvents(w);
+  });
+
+  it('a wrong master code or no presence sets nothing aside', async () => {
+    const w = await world({ broken: true });
+    const wrong = await remove(w, { name: 'work', typedLabel: 'Work' }, { presence: '0000-0000' });
+    expect(wrong.status).toBe(403);
+    expect(wrong.json).toEqual({ status: 'presence_rejected' });
+    const none = await remove(w, { name: 'work', typedLabel: 'Work' }, { presence: '' });
+    expect(none.json).toEqual({ status: 'presence_required' });
+    expect(w.log).not.toContain('setAside work');
+  });
+
+  it('needs the typed label (the confirmation); a wrong one changes nothing', async () => {
+    const w = await world({ broken: true });
+    const res = await remove(w, { name: 'work', typedLabel: 'Wrok' });
+    expect(res.json).toEqual({ status: 'label_mismatch' });
+    const bare = await remove(w, { name: 'work' });
+    expect(bare.json).toEqual({ status: 'invalid' });
+    expect(w.log).not.toContain('setAside work');
+  });
+
+  it('a move that fails is told to the page (failed), and the ID stays listed', async () => {
+    const w = await world({ broken: true });
+    w.faults.setAside = true;
+    const res = await remove(w, { name: 'work', typedLabel: 'Work' });
+    expect(res.json).toEqual({ status: 'failed' });
+    expect(w.entries.has('work')).toBe(true);
+  });
+
+  it('with no ID open (a one-ID computer), the master code still works', async () => {
+    const w = await world({ broken: true, solo: true, noneOpen: true });
+    const res = await remove(
+      w,
+      { name: 'work', typedLabel: 'Work' },
+      { generation: (await generationOf(w)) ?? '1' },
+    );
+    expect(res.json).toEqual({ status: 'removed' });
+    expect(w.log).toContain('setAside work');
+    expect(w.revoked.has(w.work.agentId)).toBe(false);
+  });
+
+  it('an ID whose key is back is not set aside by this path (the full removal runs instead)', async () => {
+    const w = await world({ broken: true });
+    // The seed is back: the directory no longer reports it broken.
+    keychain.items.set(w.work.agentId, randomBytes(32));
+    await remove(w, { name: 'work', typedLabel: 'Work' });
+    expect(w.log).not.toContain('setAside work');
+  });
+
+  it('the IDs list marks the broken ID', async () => {
+    const w = await world({ broken: true });
+    const cookie = await w.cookie();
+    const res = await send(w.server.port, '/api/ui/agents', {
+      headers: { Cookie: cookie, 'X-AgentLink-CSRF': await w.csrf(cookie) },
+    });
+    const rows = (JSON.parse(res.body) as { agents: { name: string; broken?: boolean }[] }).agents;
+    expect(rows.find((r) => r.name === 'work')?.broken).toBe(true);
+    expect(rows.find((r) => r.name === 'default')?.broken).toBe(false);
   });
 });
