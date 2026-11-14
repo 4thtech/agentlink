@@ -11,11 +11,11 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
 import { spawnSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
+import { encodeHex, randomBytes } from '@4thtech-io/crypto';
 import { EXIT, buildWinHelper } from '../../build/native.mjs';
 
 const onWin = process.platform === 'win32';
@@ -57,13 +57,17 @@ const available = () => !skip && runHelper(['available']).code === EXIT.ok;
 
 /** A well-formed record v1 naming a credential that does not exist. */
 function record({ spki = '30'.repeat(8) } = {}) {
-  const name = Buffer.from(`AgentLink-owner-${randomBytes(16).toString('hex')}`, 'ascii');
+  const name = Buffer.from(`AgentLink-owner-${encodeHex(randomBytes(16))}`, 'ascii');
   const s = Buffer.from(spki, 'hex');
   const len = Buffer.alloc(2);
   len.writeUInt16BE(s.length);
-  return Buffer.concat([Buffer.from([0x01, name.length]), name, len, s, randomBytes(32)]).toString(
-    'hex',
-  );
+  return Buffer.concat([
+    Buffer.from([0x01, name.length]),
+    name,
+    len,
+    s,
+    Buffer.from(randomBytes(32)),
+  ]).toString('hex');
 }
 
 test('argv: only the fixed commands, with exactly their fixed arguments', { skip }, () => {
