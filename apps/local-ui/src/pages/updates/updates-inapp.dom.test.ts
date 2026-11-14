@@ -193,3 +193,28 @@ describe('Settings › Updates, in-app update (UPD-5)', () => {
     expect(APP_UPDATE_PATH).toBe('/api/ui/app-update');
   });
 });
+
+// WIN-INAPP-UPDATE: the Windows app gets the same Update now; the setup link only after a failure.
+describe('the Windows app: Update now, the download link only as the fallback', () => {
+  const SETUP =
+    'https://github.com/4thtech/agentlink/releases/download/v0.5.3/AgentLink-0.5.3-win-x64-setup.exe';
+  it('shows Update now (no download steps) and posts the install', async () => {
+    const calls = await mount(() => Promise.resolve(ok(at('available', { download: SETUP }))));
+    expect(button('Update now')).toBeDefined();
+    expect(text()).not.toContain('Download update');
+    expect(text()).not.toContain('Run anyway');
+    await act(async () => {
+      button('Update now')!.click();
+    });
+    await settle();
+    expect(calls.posts.map((c) => c.path)).toContain(APP_UPDATE_INSTALL_PATH);
+  });
+  it('after a failed update: "Couldn’t update here" with the setup link', async () => {
+    await mount(() =>
+      Promise.resolve(ok(at('install_failed', { download: SETUP, installable: false }))),
+    );
+    expect(text()).toContain('Couldn’t update here. Download the new version instead.');
+    expect(host.querySelector(`a[href="${SETUP}"]`)).not.toBeNull();
+    expect(button('Update now')).toBeUndefined();
+  });
+});
