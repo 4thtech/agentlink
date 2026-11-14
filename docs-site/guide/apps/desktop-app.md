@@ -54,7 +54,7 @@ That command only removes the "downloaded from the internet" mark from this one 
 
 1. **Download** [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe). It is also on the [latest release](https://github.com/4thtech/agentlink/releases/latest) under **Assets**, with its fingerprint in `SHA256SUMS-desktop-app.txt` (check it with `certutil -hashfile AgentLink-win-x64-setup.exe SHA256` if you like).
 2. **Open the file.** Windows may say "Windows protected your PC". That is SmartScreen: it shows for files few people have downloaded yet. Choose **More info**, then **Run anyway**. You only do this once per download.
-3. The setup installs AgentLink for you only (no administrator rights) and adds it to the Start menu. Open **AgentLink** from the Start menu.
+3. The setup installs AgentLink for you only (no administrator rights) and adds it to the Start menu. Newer setup files end with a **Create a desktop shortcut** option, ticked by default; untick it if you don't want one. Open **AgentLink** from the Start menu (or the shortcut).
 
 **Smart App Control.** On some Windows 11 computers Smart App Control is on, and it blocks apps that are not signed, with no way to allow them. If AgentLink does not open and Windows says Smart App Control blocked it, use the browser app (the one command) instead. Never turn Smart App Control off for AgentLink.
 

@@ -29,7 +29,8 @@
 Pick one way to install:
 
 - **On a Mac?** [Get the app](#on-a-mac-get-the-app). No terminal needed.
-- **Windows, Linux, or prefer the terminal?** [One command](#windows-linux-or-the-terminal-one-command).
+- **On Windows?** [Get the app](#on-windows-get-the-app), an early build.
+- **Windows without the app, Linux, or prefer the terminal?** [One command](#windows-linux-or-the-terminal-one-command).
 
 ### On a Mac? Get the app
 
@@ -47,6 +48,18 @@ Not sure which? Click the Apple menu (top left of your screen), then **About Thi
 **Why step 3?** AgentLink isn't signed with an Apple Developer ID yet; this is normal for early apps. It does not mean something is wrong with the file. Never turn off your Mac's security settings for it.
 
 If macOS says the app is "damaged", and for updates: [Mac app](docs-site/guide/apps/desktop-app.md).
+
+### On Windows? Get the app
+
+**[Download for Windows 10 or 11](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe)** → file `AgentLink-win-x64-setup.exe`
+
+This is an **early build**, not signed yet. The one-command install below stays the main way on Windows; use the app if you prefer AgentLink in its own window.
+
+1. **Open the file you downloaded.** Windows may say "Windows protected your PC" (SmartScreen). Choose **More info**, then **Run anyway**.
+2. **Follow the setup.** It installs for you only (no administrator rights). Newer setup files end with a **Create a desktop shortcut** option (ticked by default); untick it if you don't want one.
+3. **Open AgentLink** from the Start menu (or the shortcut). It opens on **Get started**. Go on with [Connect your AI app](#then-connect-your-ai-app-and-talk) below.
+
+If Smart App Control blocks the app (some Windows 11 computers), use the one command instead, and for updates: [Desktop app](docs-site/guide/apps/desktop-app.md#windows).
 
 ### Windows, Linux, or the terminal? One command
 
