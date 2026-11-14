@@ -56,6 +56,10 @@ export const PAGE_PARTS: Readonly<Record<string, LazyPart<object>>> = {
   '/restore/kit': part(async () => (await import('../pages/restore/index.js')).RestoreKitPage),
   '/restore/check': part(async () => (await import('../pages/restore/index.js')).RestoreCheckPage),
   '/restore/move': part(async () => (await import('../pages/restore/index.js')).RestoreMovePage),
+  // OWNER-START-OVER (D-152): "Forgot your master code? Start over on this computer".
+  '/restore/start-over': part(
+    async () => (await import('../pages/start-over/index.js')).StartOverPage,
+  ),
   // U3-invite: "Accept {name}'s invite?" (b11 §33.2), in the focused shell.
   '/settings/join': part(async () => (await import('../pages/join/index.js')).JoinPage),
 };

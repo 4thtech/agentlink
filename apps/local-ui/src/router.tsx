@@ -81,6 +81,8 @@ export const ROUTES: readonly RouteDef[] = [
   { path: '/restore/kit', page: lazyPage('/restore/kit') },
   { path: '/restore/check', page: lazyPage('/restore/check') },
   { path: '/restore/move', page: lazyPage('/restore/move') },
+  // OWNER-START-OVER (D-152): start over on this computer (focused shell, like restore).
+  { path: '/restore/start-over', page: lazyPage('/restore/start-over') },
 ];
 
 /**

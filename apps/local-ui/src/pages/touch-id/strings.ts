@@ -78,9 +78,11 @@ export const TOUCH_ID_STRINGS = {
     "That didn't work. Nothing was changed. Your current master code still works. Try again in a minute.",
   lost: 'I lost my master code',
   lostBody: (sensor: string): string =>
-    `If ${sensor} still works, replace the code now. If neither works, restore from your recovery kit on this computer.`,
+    `If ${sensor} still works, replace the code now. If neither works, restore from your recovery kit on this computer. No kit? You can start over on this computer.`,
   lostReplace: 'Replace master code now',
   lostRestore: 'Backup & restore',
+  // OWNER-START-OVER (D-152).
+  lostStartOver: 'Start over on this computer',
 
   // Card 3: what asks.
   asksTitle: (sensor: string): string => `What asks for ${sensor}`,

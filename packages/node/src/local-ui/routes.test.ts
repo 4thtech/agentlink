@@ -266,6 +266,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
         r.presence !== 'create-agent' &&
         // UX1113-R1: the nine restore routes are covered in restore-server.test.ts.
         r.presence !== 'restore' &&
+        // OWNER-START-OVER: the three start-over routes are covered in start-over-server.test.ts.
+        r.presence !== 'start-over' &&
         r.path !== '/api/ui/first-run' &&
         !built.has(r.path),
     );

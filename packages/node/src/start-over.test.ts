@@ -12,7 +12,12 @@
 //   from the record in the backup and never moves or erases twice.
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { NATIVE_PRESENCE_MACOS, NATIVE_PRESENCE_WINDOWS, encodeBase64url } from '@4thtech-io/crypto';
+import {
+  NATIVE_PRESENCE_MACOS,
+  NATIVE_PRESENCE_WINDOWS,
+  encodeBase64url,
+} from '@4thtech-io/crypto';
+import { newWebauthnTestCredential } from '@4thtech-io/crypto/testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MemoryKeychain, tempRoot, webauthnCreate } from './recovery-kit-restore.fixture.js';
 import { StandInHelper } from './owner-native.fixture.js';
@@ -203,7 +208,10 @@ describe('start over: the typed phrase and the presence gesture (I-4)', () => {
     expect(started.presence).toBe('passkey');
     expect(started.publicKey.rpId).toBe('localhost');
     // Not verified by the user (UV off): refused.
-    const noUv = new VirtualPrfAuthenticator({ uv: false });
+    const noUv = new VirtualPrfAuthenticator({
+      uv: false,
+      credential: newWebauthnTestCredential(),
+    });
     const weak = webauthnCreate(
       noUv,
       { ...started.publicKey, prfSalt: encodeBase64url(new Uint8Array(32)) },
@@ -215,7 +223,7 @@ describe('start over: the typed phrase and the presence gesture (I-4)', () => {
     // Another origin: refused.
     const next = (await begin(e)).body as typeof started;
     const other = webauthnCreate(
-      new VirtualPrfAuthenticator(),
+      new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() }),
       { ...next.publicKey, prfSalt: encodeBase64url(new Uint8Array(32)) },
       'http://localhost:9999',
       false,
@@ -224,7 +232,7 @@ describe('start over: the typed phrase and the presence gesture (I-4)', () => {
     // The real thing.
     const last = (await begin(e)).body as typeof started;
     const good = webauthnCreate(
-      new VirtualPrfAuthenticator(),
+      new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() }),
       { ...last.publicKey, prfSalt: encodeBase64url(new Uint8Array(32)) },
       ORIGIN,
       false,
@@ -383,7 +391,9 @@ describe('start over: partial failure is reported and safe to retry', () => {
       backup: join('~', '.agentlink.backup-20261114-090607'),
     });
     expect(keychain.items.has(AGENT_B)).toBe(false);
-    const first = JSON.parse(await readFile(join(root.home, BACKUP, START_OVER_RECORD), 'utf8')) as {
+    const first = JSON.parse(
+      await readFile(join(root.home, BACKUP, START_OVER_RECORD), 'utf8'),
+    ) as {
       done: boolean;
     };
     expect(first.done).toBe(true);

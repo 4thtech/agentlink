@@ -40,6 +40,7 @@ const emptyDirectory = {
   stats: () => Promise.resolve(undefined),
   readCurrent: () => Promise.resolve(undefined),
   writeCurrent: () => Promise.resolve(),
+  create: () => Promise.reject(new Error('unused')),
 } as unknown as AgentDirectory;
 
 let homes = 0;
@@ -97,6 +98,12 @@ async function harness(over: { host?: boolean } = {}) {
     ...extra,
   });
   return { server, home, keychain, native, headers, cookie, csrf };
+}
+
+/** The generation the page is built against now (a start over opens a new one). */
+async function generationOf(h: { server: ApprovalServer; cookie: string }): Promise<string> {
+  const page = await send(h.server.port, '/', { headers: { Cookie: h.cookie } });
+  return /<meta name="agentlink-generation" content="([0-9]+)">/.exec(page.body)?.[1] ?? '';
 }
 
 describe('start-over route registration (I-4)', () => {
@@ -168,16 +175,25 @@ describe('the start-over gate (08 §1; I-4)', () => {
     expect(bearer.status).toBe(401);
     const noCsrf = await send(port, START_OVER_PATHS.begin, {
       method: 'POST',
-      headers: h.headers({ 'X-AgentLink-CSRF': 'x', 'X-AgentLink-Input': input({ phrase: 'start over' }) }),
+      headers: h.headers({
+        'X-AgentLink-CSRF': 'x',
+        'X-AgentLink-Input': input({ phrase: 'start over' }),
+      }),
     });
     expect(noCsrf.status).toBe(403);
-    const { Origin: _origin, ...noOrigin } = h.headers({
+    const noOrigin: Record<string, string> = h.headers({
       'X-AgentLink-Input': input({ phrase: 'start over' }),
     });
-    expect((await send(port, START_OVER_PATHS.begin, { method: 'POST', headers: noOrigin })).status).toBe(403);
+    Reflect.deleteProperty(noOrigin, 'Origin');
+    expect(
+      (await send(port, START_OVER_PATHS.begin, { method: 'POST', headers: noOrigin })).status,
+    ).toBe(403);
     const cross = await send(port, START_OVER_PATHS.begin, {
       method: 'POST',
-      headers: h.headers({ 'Sec-Fetch-Site': 'cross-site', 'X-AgentLink-Input': input({ phrase: 'start over' }) }),
+      headers: h.headers({
+        'Sec-Fetch-Site': 'cross-site',
+        'X-AgentLink-Input': input({ phrase: 'start over' }),
+      }),
     });
     expect(cross.status).toBe(403);
     const query = await send(port, `${START_OVER_PATHS.begin}?phrase=start%20over`, {
@@ -242,6 +258,21 @@ describe('the start-over gate (08 §1; I-4)', () => {
       true,
     );
     expect([...h.keychain.items.keys()]).toEqual(['someone-else']);
+    // The host started with no first run of its own; now, with no ID left, it offers first run.
+    const firstRun = await send(port, '/api/ui/first-run/owner/begin', {
+      method: 'POST',
+      headers: h.headers({ 'X-AgentLink-Generation': await generationOf(h) }),
+    });
+    expect(firstRun.status).toBe(200);
+  });
+
+  it('first run is not offered by a host that did not start over', async () => {
+    const h = await harness();
+    const firstRun = await send(h.server.port, '/api/ui/first-run/owner/begin', {
+      method: 'POST',
+      headers: h.headers({ 'X-AgentLink-Generation': await generationOf(h) }),
+    });
+    expect(firstRun.status).toBe(503);
   });
 
   it('is not offered on a server that is not the app (the ID is open in another process)', async () => {

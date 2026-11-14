@@ -287,6 +287,7 @@ import {
   checkSetupRegistration,
   completeOwnerSetup,
   computerNameOf,
+  defaultOwnerFiles,
   noOwnerAndNoAgent,
   noOwnerAnywhere,
   parseSetupRegistration,
@@ -296,6 +297,7 @@ import {
   type SetupRegistration,
 } from './owner-setup.js';
 import { createRestoreEngine, type RestoreEngine } from './recovery-kit-restore.js';
+import { createStartOverEngine, type StartOverEngine } from './start-over.js';
 import { removeStaleRestoreFiles } from './restore-quarantine.js';
 import { MasterCodeHold } from './local-ui/master-code-hold.js';
 import {
@@ -374,6 +376,7 @@ import type {
   LocalUiSwitchRoute,
   LocalUiPauseRoute,
   LocalUiRestoreRoute,
+  LocalUiStartOverRoute,
   LocalUiCreateAgentStep,
   LocalUiOwnerOperation,
   LocalUiPayConfirmStep,
@@ -2257,6 +2260,37 @@ export async function startApprovalServerWith(
         succeeded: () => {
           presenceSucceeded();
         },
+      },
+    }));
+  // OWNER-START-OVER (D-152; 04 §2.5.4): the start-over engine of the start-over gate (its only
+  // caller). The app host closes the open ID before the move and opens first run after it.
+  let startOverInstance: StartOverEngine | undefined;
+  /** OWNER-START-OVER: first run with no ID, once a start over emptied this host. */
+  let startedOver: AppHostFirstRun | undefined;
+  const startOverEngine = (): StartOverEngine =>
+    (startOverInstance ??= createStartOverEngine({
+      home: internals.restore?.home ?? homedir(),
+      keychain: keychainOf,
+      origin,
+      now,
+      native: options.nativePresence,
+      ...(internals.restore?.keychainTimeoutMs === undefined
+        ? {}
+        : { keychainTimeoutMs: internals.restore.keychainTimeoutMs }),
+      closeOpen: async () => {
+        const name = host?.current;
+        if (host !== undefined && name !== undefined) await host.closeForRemoval(name);
+      },
+      reopen: async () => {
+        if (host === undefined) return;
+        await host.openAfterRemoval(true);
+        if (host.current === undefined) {
+          const startHome = internals.restore?.home ?? homedir();
+          startedOver = Object.freeze<AppHostFirstRun>({
+            home: startHome,
+            ownerFiles: defaultOwnerFiles(startHome),
+          });
+        }
       },
     }));
   // REL051-SF3 (T-7): stale uploads and quarantined stores of a crashed run go at start-up, not on
@@ -6427,6 +6461,63 @@ export async function startApprovalServerWith(
    * body; the engine gets only the page session, the parsed `X-AgentLink-Input` and the body bytes.
    * A presence header only on the presence step. Nothing here reads, logs or echoes a body.
    */
+  /**
+   * OWNER-START-OVER (D-152; 04 §2.5.4): the start-over kind. After the session, CSRF, Host and
+   * fetch-metadata checks of handleUi: no query; a POST needs Origin and an octet-stream body; only
+   * the app host offers it (`open_app` otherwise: the ID is open in another process). `begin` takes
+   * the typed phrase as input and no body; `finish` takes the nonce, the presence mode
+   * (`native`, empty body; `passkey`, the creation) and nothing else. Nothing is logged or echoed.
+   */
+  async function startOverGate(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    route: LocalUiStartOverRoute,
+    cookie: string,
+    originHeader: string | undefined,
+  ): Promise<void> {
+    const refuse = (status: number, error: string): void => {
+      req.resume();
+      sendJson(res, status, { error });
+    };
+    if (url.search !== '') return refuse(400, 'invalid');
+    if (host === undefined) return refuse(409, 'open_app');
+    const engine = startOverEngine();
+    if (route.step === 'state') {
+      req.resume();
+      sendResult(res, await engine.state());
+      return;
+    }
+    if (originHeader === undefined) return refuse(403, 'origin');
+    const type = (header(req, 'content-type') ?? '').split(';')[0]?.trim().toLowerCase();
+    if (type !== 'application/octet-stream') return refuse(415, 'content_type');
+    const mode = header(req, 'x-agentlink-presence');
+    if (route.step === 'begin' && mode !== undefined) return refuse(400, 'invalid');
+    if (mode !== undefined && mode !== 'native' && mode !== 'passkey') {
+      return refuse(400, 'invalid');
+    }
+    const input = operationInput(req);
+    if (input === 'invalid') return refuse(400, 'invalid');
+    const limit = route.step === 'finish' && mode === 'passkey' ? MAX_SETUP_REGISTRATION_BYTES : 0;
+    const body = await boundedBody(req, res, limit);
+    if (body === undefined) return;
+    try {
+      const answer =
+        route.step === 'begin'
+          ? await engine.begin(cookie, input)
+          : await engine.finish(cookie, input, mode, body);
+      if (answer.status === 429) {
+        const retry = (answer.body as { retryAfter?: unknown }).retryAfter;
+        if (typeof retry === 'number') res.setHeader('Retry-After', String(retry));
+      }
+      sendResult(res, answer);
+    } catch {
+      sendJson(res, 500, { error: 'failed' });
+    } finally {
+      wipe(body);
+    }
+  }
+
   async function restoreGate(
     req: IncomingMessage,
     res: ServerResponse,
@@ -6999,6 +7090,12 @@ export async function startApprovalServerWith(
       await restoreGate(req, res, url, route, cookie as string, originHeader);
       return;
     }
+    if (route.presence === 'start-over') {
+      // OWNER-START-OVER (D-152): its own gate, like restore: no agent needed, no generation.
+      if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return fail(403, 'csrf');
+      await startOverGate(req, res, url, route, cookie as string, originHeader);
+      return;
+    }
     if (route.presence && originHeader === undefined) return fail(403, 'origin');
     if (!matches(header(req, 'x-agentlink-csrf'), csrfBytes)) return fail(403, 'csrf');
     if (!route.presence && route.stream === true) {
@@ -7083,6 +7180,7 @@ export async function startApprovalServerWith(
       | LocalUiPauseRoute
       | LocalUiUiSettingsRoute
       | LocalUiRestoreRoute
+      | LocalUiStartOverRoute
     >,
     params: Readonly<Record<string, string>>,
     cookie: string,
@@ -7599,7 +7697,8 @@ export async function startApprovalServerWith(
    */
   function noAgentFirstRun(): AppHostFirstRun | undefined {
     const slot = host;
-    const firstRun = options.host?.firstRun;
+    // OWNER-START-OVER (D-152): a host that started with an ID gets first run after a start over.
+    const firstRun = options.host?.firstRun ?? startedOver;
     if (slot === undefined || firstRun === undefined || slot.current !== undefined)
       return undefined;
     if (slot.directory.create === undefined) return undefined;
@@ -8292,6 +8391,7 @@ export async function startApprovalServerWith(
     },
     close: async () => {
       await restoreInstance?.close();
+      startOverInstance?.close();
       dropSetup();
       payHolds.clear();
       ceremonies.clear();
