@@ -67,3 +67,8 @@ _Updated 2026-11-12 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
   - Classroom handout: docs/runbooks/classroom-handout.md.
 - Merged PRs: #790, #791, #792, #793.
 - Owner op still open: Submitter pool (Gnosis faucet low).
+
+## 2026-11-14 — 0.5.4 released
+- 0.5.4 live: npm latest, GitHub release (Mac arm64/x64 DMG + zip, Windows early-build setup.exe), signed desktop update file; wiki.4thtech.io synced (wiki #27).
+- Contents: Mac in-app updates (signed), one-press confirmations, attach text files, delete/archive/keep-days/tidy, notification centre + native notifications, recovery-kit names, message order, Windows desktop early build, stable latest download links.
+- Next: small 0.5.5 to test Update now; real Windows PC check; cards from review lows.
