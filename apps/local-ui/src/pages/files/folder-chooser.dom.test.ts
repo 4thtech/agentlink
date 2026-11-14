@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// FILES-FOLDER-PICKER (D-161): the one folder control. Row states: default, pending (checking),
+// FILES-FOLDER-PICKER (D-154): the one folder control. Row states: default, pending (checking),
 // confirming, error, success. In the app the click opens the native dialog (the preload's
 // chooseFolder) and the picked path is only reviewed, never trusted; cancelling changes nothing and
 // focus returns to the button. In a browser the click opens the path field with an example, paste

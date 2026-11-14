@@ -510,6 +510,8 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   // Files step of Get started both use its Confirm).
   'pages/files/add-folder.tsx': { offers: /S\.useCode/ },
   'pages/files/index.tsx': { offers: /<Confirm\b/ },
+  // FILES-FOLDER-PICKER: Add folder… and the Inbox's Change… confirm with add-folder.tsx Confirm.
+  'pages/files/folder-chooser.tsx': { offers: /<Confirm\b/ },
   'pages/first-run/index.tsx': { offers: /N\.backupInstead/ },
   'pay-confirm/index.tsx': { offers: /phase: 'backup'/ },
   // Not confirm screens.

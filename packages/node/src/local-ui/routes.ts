@@ -61,6 +61,7 @@ import { flowRoutes } from './api/flow.js';
 import { backupRoutes } from './api/backup.js';
 import { contactsRoutes } from './api/contacts.js';
 import { filesRoutes } from './api/files.js';
+import { inboxRoutes } from './api/files-inbox.js';
 // MSG-FILES-IO-d: Files, Received and Sent (read-only); MSG-FILES-IO-h: Show in Finder.
 import { filesIoRoutes, filesRevealRoute } from './api/files-io.js';
 import { notificationsRoutes } from './api/notifications.js';
@@ -535,6 +536,7 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     // UX2-d1: create and check an invite (the invite kind) and accept one (owner presence).
     invitesRoutes,
     filesRoutes,
+    inboxRoutes,
     // MSG-FILES-IO-d: Files, Received and Sent (read-only).
     filesIoRoutes,
     // MSG-FILES-IO-h: Show in Finder (the one reveal route, D-134).

@@ -1,7 +1,8 @@
 // Window and session lockdown (plan Decision 3 "Window", §3 "Renderer compromise"; Fable H1).
 //
-// - webPreferences: sandbox, contextIsolation, no nodeIntegration (anywhere), no webview, no preload
-//   (none is ever set), devtools off, and an IN-MEMORY session partition (no `persist:` prefix: no
+// - webPreferences: sandbox, contextIsolation, no nodeIntegration (anywhere), no webview, devtools
+//   off, at most ONE preload (FILES-FOLDER-PICKER, D-154: preload.cjs exposes only `chooseFolder`,
+//   on a user activation; folder-picker.ts checks every call), and an IN-MEMORY session partition (no `persist:` prefix: no
 //   cookies, storage or cache on disk; the session cookie dies with the app).
 // - Origin lock: the window may show only the core's origin `http://localhost:<port>`, learned from
 //   the first valid `ready` session link of a core process. will-navigate / will-redirect to anything
@@ -75,8 +76,11 @@ export function markWebContents(contents: WebContents, platform: string): void {
 /** The Blink feature that turns WebAuthn (navigator.credentials publicKey) on in a renderer. */
 export const WEBAUTHN_BLINK_FEATURE = 'WebAuth';
 
-/** The window's webPreferences: fixed, nothing optional, no preload. */
-export function webPreferences(platform: string): WebPreferences {
+/**
+ * The window's webPreferences: fixed. `preload` is only ever folder-picker.ts preloadPath() (the one
+ * bundled preload.cjs); without it the page offers the typed folder field.
+ */
+export function webPreferences(platform: string, preload?: string): WebPreferences {
   const base = {
     sandbox: true,
     contextIsolation: true,
@@ -98,11 +102,15 @@ export function webPreferences(platform: string): WebPreferences {
   // can end on "Insert your security key". The page offers the app's own Touch ID / Windows Hello
   // (the native helper) or the master code instead (local-ui presence/offer.ts).
   void platform;
-  return { ...base, disableBlinkFeatures: WEBAUTHN_BLINK_FEATURE };
+  return {
+    ...base,
+    disableBlinkFeatures: WEBAUTHN_BLINK_FEATURE,
+    ...(preload === undefined ? {} : { preload }),
+  };
 }
 
 /** The main window's options. */
-export function windowOptions(platform: string): BrowserWindowOptions {
+export function windowOptions(platform: string, preload?: string): BrowserWindowOptions {
   return {
     width: 1180,
     height: 800,
@@ -111,7 +119,7 @@ export function windowOptions(platform: string): BrowserWindowOptions {
     show: false,
     title: 'AgentLink',
     backgroundColor: '#0f1115',
-    webPreferences: webPreferences(platform),
+    webPreferences: webPreferences(platform, preload),
   };
 }
 

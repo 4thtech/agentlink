@@ -30,7 +30,7 @@ From 0.4.6, a file from a contact you keep is downloaded, checked and saved for 
 - Saved files get the system's downloaded mark on macOS and Windows, are never made runnable and never replace another file. Names the system could act on get `.download` added.
 - AgentLink never opens a file.
 
-A file that is not saved reads **Arrived · not saved**. Press **Save with Touch ID**: one press, one prompt. **Use your master code instead** sits next to it; without Touch ID here the button reads **Save to Inbox** and opens the master code field. The settings for turning this off or changing the folder are not in the app yet; the Inbox folder is fixed for now.
+A file that is not saved reads **Arrived · not saved**. Press **Save with Touch ID**: one press, one prompt. **Use your master code instead** sits next to it; without Touch ID here the button reads **Save to Inbox** and opens the master code field. To save received files somewhere else, press **Change…** on the Inbox row (see [Change where received files are saved](#change-where-received-files-are-saved), 0.5.8). Turning automatic saving off is not in the app yet.
 
 ## The three views
 
@@ -73,20 +73,21 @@ The rest of this page is about the **Send folders** tab.
 | **Folders your AI can send files from** | The list of your [allowed folders](../help/glossary.md). Subfolders count too | Read from your rules on your computer. Nothing is sent anywhere |
 | A folder, then **Opens at** another folder | The folder you allowed is a link to somewhere else. Your AI sends from the real folder | AgentLink always follows the link and checks the real folder |
 | **Not found on this computer. Your AI can't send from it.** | The folder was moved or deleted | Nothing can be sent from it until it is back |
-| The **×** button (**Stop sending from** …) | Stop your AI using this folder | Opens a confirm step first |
-| **Allow a folder** | Add a folder | Opens the **Folder** field |
+| A folder row | The folder's name, with its full path under it (a long path is shortened in the middle; point at it to see all of it) | Shown from your rules |
+| **Remove** (**Stop sending from** …) | Stop your AI using this folder | Opens a confirm step first |
+| **Add folder…** | Add a folder | In the AgentLink app: the Finder (Explorer) folder dialog. In a browser: the **Folder path** field |
 | **Every change here needs your passkey or master code.** | Your AI cannot change this list | No tool your AI uses can add a folder |
 
 With no folders yet, the page says **Your AI can't send files yet. Allow a folder it may send from.** New setups already have the `~/AgentLink/Send` folder. See [Folders for sending files](../everyday-use/allowed-folders.md).
 
 ## Allow a folder
 
-Your AI can't send a file from a folder that isn't allowed. When that happens, it tells you to open **Settings**, then **Files**, then **Allow a folder** in the AgentLink app, not a terminal command.
+Your AI can't send a file from a folder that isn't allowed. When that happens, it tells you to open **Settings**, then **Files**, then **Add folder…** in the AgentLink app, not a terminal command.
 
 <figure><img src="../.gitbook/assets/local-files--enter.png" alt="The Folder field with ~/Documents/Shared typed in, and the Check folder button."><figcaption><p>The Folder field after you press Allow a folder.</p></figcaption></figure>
 
-1. Press **Allow a folder**.
-2. In **Folder**, type the full path, for example `~/Documents/Shared`. Press **Check folder**.
+1. Press **Add folder…**.
+2. In the AgentLink app, Finder (Explorer on Windows) opens: pick the folder and press **Choose**. In a browser, paste the full path into **Folder path**, for example `~/Documents/Shared`, and press **Use folder**. (On a Mac, select the folder in Finder and press Option-Command-C to copy its path; on Windows, choose **Copy as path**.) The folder shows at once in a row marked **Checking…**, then **Not saved yet**. If it can't be used, the row says why.
 3. The confirm step asks **Allow your AI to send files from this folder?** It shows the real folder that will be allowed. If you typed a link or another spelling, it says so: "You typed … It leads to the folder above, so that is the folder allowed."
 4. Under **Before you confirm, tick each one:**, tick every line. Each line says, in plain words, what the change lets your AI do. **Allow folder** stays off until all are ticked.
 5. Press **Allow folder** and confirm with your passkey. No passkey? Press **Use your master code instead** and type your master code.
@@ -101,12 +102,27 @@ Your AI can't send a file from a folder that isn't allowed. When that happens, i
 Your AI can send any file in the folder and its subfolders to your contacts. Hidden files, such as `.env`, are never sent.
 
 {% hint style="info" %}
+**Good to know:** picking a folder in Finder only fills in the path. AgentLink checks it exactly as if you typed it, and nothing changes until you confirm.
+{% endhint %}
+
+{% hint style="info" %}
 **Good to know:** your AI can open this page with the folder already filled in. That only fills the field. Nothing is allowed until you check, tick and confirm.
 {% endhint %}
 
+## Change where received files are saved
+
+From 0.5.8 the Inbox row has **Change…**.
+
+1. Press **Change…** on the **Inbox** row.
+2. In the AgentLink app, Finder (Explorer on Windows) opens at your Inbox: pick another folder, or make a new one, and press **Choose**. In a browser, paste the folder's full path and press **Use folder**.
+3. The page asks **Save received files in this folder?** Tick the line, then press **Use this folder** and confirm with your passkey or master code.
+4. The page says **Done. New files people send you are saved in this folder.** Files already saved stay where they are.
+
+The folder must be your own, on this computer, not shared with other users, not a system or app folder, not a shortcut to another place, and not one of the folders your AI can send from (or inside or around one): received files are always kept apart from what your AI can send. If a folder can't be used, the row says why, for example **That folder can't be used: it’s a shortcut to another place. Choose the folder itself.**
+
 ## Stop sending from a folder
 
-1. Press the **×** next to the folder.
+1. Press **Remove** next to the folder.
 2. The page asks **Stop your AI sending files from this folder?**
 3. Press **Stop sending** and confirm with your passkey or master code.
 
@@ -126,7 +142,7 @@ AgentLink refuses these, and says why:
 
 | Message | What to do |
 |---|---|
-| **This check timed out. Nothing was changed.** | Press **Check folder** again |
+| **This check timed out. Nothing was changed.** | Choose the folder again |
 | **Your rules changed in the meantime. Nothing was changed.** | Something else changed your rules. Check the folder again |
 | **That didn't match your passkey or master code. Nothing was changed.** | Try again. After too many tries, the page asks you to wait |
 | **Before changing folders, answer one question about delivery receipts on the Rules page.** | Press **Open Rules**, answer, then come back |
@@ -145,7 +161,7 @@ sequenceDiagram
   participant You
   participant Page as Files page (browser)
   participant Local as AgentLink on your computer
-  You->>Page: Type a folder, press Check folder
+  You->>Page: Pick a folder (or type it), press Use folder
   Page->>Local: Review this folder
   Local-->>Page: The real folder, the warnings, a one-time token
   You->>Page: Tick every warning, confirm with passkey
@@ -157,7 +173,7 @@ sequenceDiagram
 | On the page | What happens | Where it is built |
 |---|---|---|
 | Folder list, **Opens at**, **Not found** | The allowed folders and where each really points | `GET /api/ui/files` · [`files.ts`](https://github.com/4thtech/agentlink/blob/main/packages/node/src/local-ui/api/files.ts) · [06 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md) `files.allowedFolders` |
-| **Check folder** | Full path, no `.` or `..`, real folder found, protected and too-broad folders refused | `GET /api/ui/files/review?add=` · [04 §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) · D-99 |
+| **Add folder…** / **Use folder** | Full path, no `.` or `..`, real folder found, protected and too-broad folders refused | `GET /api/ui/files/review?add=` · [04 §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) · D-99 |
 | The tick list | Allowed only when the ticked set is exactly the warnings for this change | `preparePolicyEdit` in `@4thtech-io/core` · D-119 |
 | **Allow folder**, **Stop sending** | Your passkey or master code is checked first; then the local server signs exactly the reviewed change, once. The browser never signs | `POST /api/ui/files/folders` (`presence: true`) · [04 §2.5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) · I-4 |
 | Delivery receipts question | A folder change never switches receipts off silently | D-109 · [Rules page](rules.md) |

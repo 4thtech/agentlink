@@ -1,4 +1,4 @@
-// FILES-FOLDER-PICKER (D-161): the native folder dialog. The preload calls the main process only on
+// FILES-FOLDER-PICKER (D-154): the native folder dialog. The preload calls the main process only on
 // a user activation and answers only a path string or null; the main process answers only the main
 // window's top frame on the locked origin, one dialog at a time, and only ONE absolute path.
 import { readFileSync } from 'node:fs';

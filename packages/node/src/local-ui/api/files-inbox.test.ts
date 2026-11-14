@@ -1,4 +1,4 @@
-// FILES-FOLDER-PICKER (D-161; 04 §4.1 "The folder"; I-4, I-5): changing the Inbox folder. A picked
+// FILES-FOLDER-PICKER (D-154; 04 §4.1 "The folder"; I-4, I-5): changing the Inbox folder. A picked
 // or typed path grants nothing: the server checks it (realpath, not a link, not home or a root, not
 // hidden or protected, owned, not shared-writable, not an OS folder, not a Send folder, writable),
 // signs only behind the presence gate with every warning acknowledged, and checks it again first.

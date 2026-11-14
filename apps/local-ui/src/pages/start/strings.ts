@@ -156,7 +156,7 @@ export const CONNECTED_STEP = {
 export const FILES_STEP = {
   eyebrow: 'Files',
   title: 'Sending and receiving files',
-  choose: 'Choose another folder',
+  choose: 'Add folder…',
   next: 'Continue',
   skip: 'Skip for now',
   back: 'Back',

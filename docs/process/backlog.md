@@ -11189,3 +11189,12 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** FILES-HOME-PANEL, FILES-ONB-1
 - **Spec:** 08 §1 "Home Files panel", "Files step"; 11 §5.7
 - **Done when:** `RED (expected):` commit first; the server decides the ID's own Send folder state (`allowed` / `not_found` / `not_allowed`, the path in its `~` form) exactly as sending does (`ownSendFolder`), whether the rules hold the realpath or `~/AgentLink/Send`; Home's Files panel, the Files step and the Send folder banner use it and never compare paths, so Allow Send folder is never offered for an allowed folder; with several IDs the panel says which ID it describes.
+
+#### FILES-FOLDER-PICKER · Pick folders in Finder or Explorer; change the Inbox folder (0.5.8, owner requirement 14 Nov)
+- **Status:** in review (branch `rel058/folder-picker`) · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (folder policy; where received files are written; a new desktop preload)
+- **Repo/path:** agentlink · `apps/desktop/src/main/{folder-picker.ts,preload.cjs,security.ts,window.ts,main.ts,electron-api.ts}`, `apps/desktop/bundle.config.mjs`; `packages/node/src/local-ui/api/{files-inbox.ts,files.ts}`, `local-ui/routes.ts`; `apps/local-ui/src/pages/files/{folder-chooser.tsx,folder-rows.tsx,index.tsx,add-folder.tsx,data.ts,folders-copy.ts,strings.ts,files.css}`, `pages/start/files-step.tsx`, `pages/home/files-panel.tsx`
+- **Depends on:** FILES-ONB-1, FILES-HOME-PANEL, FILES-ALLOWED-STATE
+- **Spec:** D-154 (proposed); 04 §4.1 "The folder"; 08 §1 "Folder rows and the picker"; 11 §5.7
+- **Done when:** `RED (expected):` commit first; one folder row in Settings › Files, the Files step and Home's Files panel (name, path cut in the middle with its title, chip, Show in Finder/Explorer, Remove, Add folder…, Change… on Inbox; pending, confirming, error, success states); the desktop window's one preload answers one absolute path from the native dialog only on a user activation, one at a time, to the main window's top frame on the locked origin; a browser gets the path field with example, paste help and the app tip; the server reviews a picked path exactly as a typed one; a Send folder never overlaps the Inbox; the Inbox changes only through its review and `POST /api/ui/files/inbox` with presence and every warning; DOM, route and desktop unit tests; independent review and Fable audit.
+- **Follow-up:** Touch ID / Windows Hello (native presence) in the Files confirm sheet inside the app window (today the master code, as before).
+

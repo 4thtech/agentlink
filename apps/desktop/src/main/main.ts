@@ -89,6 +89,7 @@ import { procTranslated, updateChannel, updaterArch } from './updater/host.js';
 import { ReleaseChecker, updateChecksAllowed } from './updater/release-check.js';
 import { scheduleUpdateChecks } from './updater/schedule.js';
 import { MainWindow } from './window.js';
+import { preloadPath, registerFolderPicker } from './folder-picker.js';
 import { macArch, type AppUpdatePipeView, type AppUpdateView } from '../shared/app-update.js';
 import type { InviteOutcome } from '../shared/protocol.js';
 import {
@@ -514,7 +515,19 @@ export async function runShell(
     platform: proc.platform,
     quitting: () => quitting,
     onStatusAction: (action) => onStatusAction(action),
+    // FILES-FOLDER-PICKER: the picker exists only with both the IPC module and the bundled preload.
+    ...(electron.ipcMain === undefined || electron.dialog.showOpenDialog === undefined
+      ? {}
+      : { preload: preloadPath() }),
   });
+  if (electron.ipcMain !== undefined) {
+    registerFolderPicker(electron.ipcMain, {
+      lock,
+      sessionWindow: () => window?.sessionWindow ?? null,
+      dialog: electron.dialog,
+      platform: proc.platform,
+    });
+  }
   // The window comes up at once: the person sees AgentLink starting, never nothing.
   window.showStatus('starting');
 

@@ -155,3 +155,71 @@
     align-items: flex-start;
   }
 }
+
+/* FILES-FOLDER-PICKER (D-154): one folder row everywhere (Settings › Files, the Files step, Home):
+   the folder's name, its full path under it on one line (cut in the middle by the page; the title
+   has it all), a chip and the actions at the end. A pending row (chosen, not confirmed yet) has a
+   dashed accent outline. Tokens only. */
+.fl-line {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding: var(--al-space-3) var(--al-space-4);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+}
+.fl-line[data-pending] {
+  border-style: dashed;
+  border-color: var(--al-color-accent-default);
+}
+.fl-line-icon {
+  display: inline-flex;
+  padding-block-start: var(--al-space-1);
+  color: var(--al-color-fg-muted);
+}
+.fl-line-head {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.fl-line .fl-row-main {
+  flex: 1 1 9rem;
+  gap: var(--al-space-1);
+}
+.fl-line-below {
+  padding-inline-start: calc(18px + var(--al-space-4));
+}
+.fl-line-name {
+  font-weight: var(--al-font-weight-semibold);
+}
+.fl-line-path {
+  overflow-wrap: anywhere;
+}
+.fl-line-chip {
+  display: flex;
+  align-items: flex-start;
+}
+.fl-line-chip > * {
+  flex: 0 0 auto;
+}
+.fl-row-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--al-space-2);
+}
+.fl-chooser {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+}
+.fl-chooser-btn {
+  display: inline-flex;
+}
+@media (max-width: 40rem) {
+  .fl-line-below {
+    padding-inline-start: 0;
+  }
+}
