@@ -46,7 +46,6 @@ import {
   lstat,
   mkdir,
   mkdtemp,
-  readFile,
   readdir,
   rm,
   stat,
@@ -585,8 +584,7 @@ const SIBLING = /^AgentLink\.(previous|failed)-(u-[A-Za-z0-9]{6})$/;
 
 /**
  * At a healthy start of the Windows app (the core said `ready`; IR Fable r1 M and L): this copy is
- * in place for good, so the RunOnce recovery entry goes (unless an update of another version is still
- * pending), and left-over `AgentLink.previous-u-…` / `AgentLink.failed-u-…` folders beside the install
+ * in place for good, so the RunOnce recovery entry goes (always, IR Fable r2), and left-over `AgentLink.previous-u-…` / `AgentLink.failed-u-…` folders beside the install
  * folder are removed when their staging folder is gone (no watchdog owns them any more). Never throws.
  */
 export async function afterHealthyStartWin(opts: {
@@ -597,16 +595,9 @@ export async function afterHealthyStartWin(opts: {
   readonly run: RunQuiet;
 }): Promise<void> {
   try {
-    let pendingVersion: unknown = null;
-    try {
-      const text = await readFile(join(opts.stateDir, PENDING_FILE), 'utf8');
-      pendingVersion =
-        text.length <= 512 ? (JSON.parse(text) as { version?: unknown }).version : '';
-    } catch {
-      pendingVersion = null;
-    }
-    if (pendingVersion === null || pendingVersion === opts.version)
-      await opts.run(opts.reg, ['delete', RUNONCE_KEY, '/v', RUNONCE_VALUE, '/f']);
+    // IR Fable r2: at ANY healthy start, so a copy installed by hand after an interrupted update is
+    // never swapped back to the old one at the next logon.
+    await opts.run(opts.reg, ['delete', RUNONCE_KEY, '/v', RUNONCE_VALUE, '/f']);
     const parent = dirname(opts.installDir);
     for (const name of await readdir(parent)) {
       const m = SIBLING.exec(name);

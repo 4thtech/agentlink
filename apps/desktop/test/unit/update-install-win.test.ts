@@ -677,14 +677,15 @@ if (v === process.env.HEALTHY) {
       'AgentLink.other',
       'AgentLink.previous-u-busy01',
     ]);
-    // An update of another version is pending: the entry stays.
+    // IR Fable r2: also when an update of another version is pending (a copy installed by hand
+    // after an interrupted update is never swapped back at the next logon).
     await writeFile(
       join(state, PENDING_FILE),
       JSON.stringify({ version: '0.5.4', nonce: 'n'.repeat(16) }),
     );
     calls.length = 0;
     await tidy();
-    expect(calls).toEqual([]);
+    expect(calls).toEqual([['/x/reg.exe', 'delete', RUNONCE_KEY, '/v', RUNONCE_VALUE, '/f']]);
   });
 
   it('the new reasons are fixed and map to fixed refusal codes', () => {
