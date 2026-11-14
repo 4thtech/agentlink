@@ -68,7 +68,14 @@ export interface AppChange {
 }
 
 export type PreviewStatus =
-  'present' | 'not_connected' | 'conflict' | 'quit_first' | 'unreadable' | 'not_found';
+  | 'present'
+  | 'not_connected'
+  | 'conflict'
+  | 'quit_first'
+  | 'unreadable'
+  | 'not_found'
+  /** APP-CONTINUITY: the app runs from a translocated or temporary place (move it first). */
+  | 'app_location';
 
 export type PreviewResult =
   | { readonly kind: 'change'; readonly change: AppChange }
@@ -272,7 +279,15 @@ export function createAppsApi(options: AppsApiOptions = {}): AppsApi {
         return change === undefined ? { kind: 'failed' } : { kind: 'change', change };
       }
       const known = (
-        ['present', 'not_connected', 'conflict', 'quit_first', 'unreadable', 'not_found'] as const
+        [
+          'present',
+          'not_connected',
+          'conflict',
+          'quit_first',
+          'unreadable',
+          'not_found',
+          'app_location',
+        ] as const
       ).find((s) => s === json['status']);
       return known === undefined ? { kind: 'failed' } : { kind: 'status', status: known };
     },

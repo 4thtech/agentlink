@@ -27,7 +27,10 @@ type View =
   | { readonly k: 'loading' }
   | { readonly k: 'change'; readonly change: AppChange; readonly message?: string }
   | { readonly k: 'working'; readonly change: AppChange }
-  | { readonly k: 'status'; readonly status: 'quit_first' | 'conflict' | 'unreadable' | 'present' }
+  | {
+      readonly k: 'status';
+      readonly status: 'quit_first' | 'conflict' | 'unreadable' | 'present' | 'app_location';
+    }
   | { readonly k: 'failed'; readonly change: AppChange }
   | { readonly k: 'done' }
   | { readonly k: 'expired' }
@@ -100,7 +103,10 @@ export function ConnectApp({
         const s = result.status;
         setView({
           k: 'status',
-          status: s === 'quit_first' || s === 'conflict' || s === 'present' ? s : 'unreadable',
+          status:
+            s === 'quit_first' || s === 'conflict' || s === 'present' || s === 'app_location'
+              ? s
+              : 'unreadable',
         });
       } else if (result.kind === 'session_expired') setView({ k: 'expired' });
       else if (result.kind === 'offline') setView({ k: 'down' });
@@ -233,12 +239,14 @@ export function ConnectApp({
             <Banner tone={status === 'present' ? 'success' : 'warning'}>
               {status === 'conflict'
                 ? `${T.foreign} ${T.foreignNote}`
-                : status === 'present'
-                  ? T.alreadyDone(appName)
-                  : T.unreadable}
+                : status === 'app_location'
+                  ? T.appLocation
+                  : status === 'present'
+                    ? T.alreadyDone(appName)
+                    : T.unreadable}
             </Banner>
             <div className="fr-actions">
-              {status === 'unreadable' ? (
+              {status === 'unreadable' || status === 'app_location' ? (
                 <Button variant="secondary" onClick={() => void preview()}>
                   {T.tryAgain}
                 </Button>

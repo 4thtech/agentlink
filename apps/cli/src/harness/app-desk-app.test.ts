@@ -313,10 +313,12 @@ describe('APP-CONTINUITY: the form a connect writes', () => {
     expect(plan).toMatchObject({ status: 'change', kind: 'connect', newEntry: npx('work') });
   });
 
-  it('inside an app in a refused place: npx (never a translocated path)', async () => {
+  it('inside an app in a refused place: app_location, nothing written (never npx silently)', async () => {
+    const before = claudeJson({ other });
     await writeClaude({ other });
     const plan = await desk(() => TRANSLOCATED, { runningInApp: true }).plan('claude-code', 'work');
-    expect(plan).toMatchObject({ status: 'change', kind: 'connect', newEntry: npx('work') });
+    expect(plan.status).toBe('app_location');
+    expect(await readClaude()).toBe(before);
   });
 
   it('a move keeps the entry’s form (a browser-made npx entry stays npx in the app)', async () => {

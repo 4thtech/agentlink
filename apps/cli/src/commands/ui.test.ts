@@ -540,20 +540,33 @@ describe('APP-CONTINUITY: agentlink ui and the desktop app', () => {
     expect(calls).toMatchObject({ start: 1, opened: 1, closed: 1 });
   });
 
-  it('taken over by the desktop app: closes with one plain line', async () => {
-    const p = probe(TTY);
-    const { deps, calls } = fakeDeps({ stop: 'never' });
-    let handler: ((signal?: string) => void) | undefined;
-    const yielding: UiDeps = {
-      ...deps,
-      interrupt: (stop) => {
-        handler = stop;
-        setTimeout(() => handler?.('yield'), 10);
-        return () => undefined;
-      },
-    };
-    await expect(uiStep(p.context, yielding, PREFIX)).resolves.toBe(EXIT_OK);
-    expect(calls.closed).toBe(1);
-    expect(p.out.at(-1)).toBe(UI_TEXT.movedToApp);
-  });
+  it.each([
+    [true, UI_TEXT.movedToApp],
+    [false, UI_TEXT.closed(PREFIX)],
+  ] as const)(
+    'asked to yield: closes once; "moved to the app" only when the app host appeared (%s)',
+    async (appeared, line) => {
+      const p = probe(TTY);
+      const { deps, calls } = fakeDeps({ stop: 'never' });
+      let handler: ((signal?: string) => void) | undefined;
+      let closedBeforeLook = false;
+      const yielding: UiDeps = {
+        ...deps,
+        interrupt: (stop) => {
+          handler = stop;
+          setTimeout(() => handler?.('yield'), 10);
+          return () => undefined;
+        },
+        appTookOver: () => {
+          // The app starts only after this host closed (its record removed).
+          closedBeforeLook = calls.closed === 1;
+          return Promise.resolve(appeared);
+        },
+      };
+      await expect(uiStep(p.context, yielding, PREFIX)).resolves.toBe(EXIT_OK);
+      expect(calls.closed).toBe(1);
+      expect(closedBeforeLook).toBe(true);
+      expect(p.out.at(-1)).toBe(line);
+    },
+  );
 });

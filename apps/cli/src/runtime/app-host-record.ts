@@ -357,3 +357,21 @@ export async function showRunningApp(
   const asked = await sendHostCall(record, 'show').catch(() => 'failed' as const);
   return asked === 'done' ? 'shown' : 'none';
 }
+
+/**
+ * APP-CONTINUITY: after a terminal host yielded, whether the desktop app's host record (a live
+ * process, `host: "desktop"`) appears within `waitMs`. Never throws.
+ */
+export async function desktopHostAppears(
+  home: string,
+  waitMs: number = TAKEOVER_WAIT_MS,
+  alive: (pid: number) => boolean = pidAlive,
+): Promise<boolean> {
+  const until = Date.now() + waitMs;
+  for (;;) {
+    const record = await readAppHostRecord(home);
+    if (record?.host === 'desktop' && record.pid !== process.pid && alive(record.pid)) return true;
+    if (Date.now() >= until) return false;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}

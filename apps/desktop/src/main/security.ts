@@ -93,9 +93,12 @@ export function webPreferences(platform: string): WebPreferences {
     spellcheck: false,
     partition: WINDOW_PARTITION,
   } as const;
-  return passkeyPolicy(platform) === 'browser'
-    ? { ...base, disableBlinkFeatures: WEBAUTHN_BLINK_FEATURE }
-    : base;
+  // APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): WebAuthn is off in the window on every
+  // platform (Windows too): a passkey made in the browser can't be used here, and on Windows a call
+  // can end on "Insert your security key". The page offers the app's own Touch ID / Windows Hello
+  // (the native helper) or the master code instead (local-ui presence/offer.ts).
+  void platform;
+  return { ...base, disableBlinkFeatures: WEBAUTHN_BLINK_FEATURE };
 }
 
 /** The main window's options. */

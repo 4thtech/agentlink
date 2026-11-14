@@ -340,6 +340,9 @@ export const CONNECT = {
   foreign: "This app already has an AgentLink entry we didn't write.",
   foreignNote: 'AgentLink does not change it. You can connect this app later.',
   unreadable: "Couldn't read its settings.",
+  // APP-CONTINUITY: the app runs from a translocated or temporary place; nothing was written.
+  appLocation:
+    'Move AgentLink to your Applications folder, open it from there, then try again. Nothing was changed.',
   couldntChange: (app: string): string => `Couldn't change ${app}'s settings. Nothing was changed.`,
   changed: 'The settings changed since you looked. Review them again.',
   reviewAgain: 'Review again',

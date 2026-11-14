@@ -84,3 +84,37 @@ it('a double click on Apply with Touch ID asks once and applies once', async () 
   });
   expect(apply).toHaveBeenCalledTimes(1);
 });
+
+// APP-CONTINUITY: inside an app running from a translocated or temporary place nothing is written
+// (never npx silently instead): the step says to move AgentLink to Applications, with Try again.
+it('app_location: says to move AgentLink to Applications; nothing to apply', async () => {
+  const apply = vi.fn();
+  const appsApi = {
+    preview: () => Promise.resolve({ kind: 'status' as const, status: 'app_location' as const }),
+    passkey: () => Promise.resolve(undefined),
+    apply,
+  } as unknown as AppsApi;
+  await act(async () => {
+    root.render(
+      createElement(ConnectApp, {
+        appsApi,
+        appId: 'claude-code',
+        appName: 'Claude Code',
+        folder: 'default',
+        agentLabel: 'Ana',
+        sensor: 'Touch ID',
+        passkeyProof: vi.fn(),
+        onDone: () => undefined,
+        onConnected: () => undefined,
+      }),
+    );
+  });
+  await act(async () => {
+    for (let i = 0; i < 5; i += 1) await Promise.resolve();
+  });
+  expect(host.textContent).toContain(T.appLocation);
+  expect([...host.querySelectorAll('button')].map((b) => b.textContent?.trim())).toContain(
+    T.tryAgain,
+  );
+  expect(apply).not.toHaveBeenCalled();
+});

@@ -59,6 +59,7 @@ import {
 } from './ui-host.js';
 import { uiRemovalPort } from './ui-remove.js';
 import {
+  desktopHostAppears,
   removeAppHostRecord,
   showRunningApp,
   writeAppHostRecord,
@@ -255,6 +256,11 @@ export interface UiDeps {
    * started here); `none` starts as before. Absent: not looked for.
    */
   runningApp?(): Promise<'shown' | 'none'>;
+  /**
+   * APP-CONTINUITY: after a takeover, true once the desktop app's host record appears (a short
+   * wait). Absent or false: the plain closed line.
+   */
+  appTookOver?(): Promise<boolean>;
 }
 
 /** The command. Returns the process exit code. */
@@ -384,6 +390,7 @@ export async function serveUi(
   let unguard: (() => void) | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let watch: OpenWatch | undefined;
+  let closed = false;
   try {
     const fatal = new Promise<FatalReason>((resolve) => {
       unguard = deps.guard?.(resolve);
@@ -441,7 +448,16 @@ export async function serveUi(
       await deps.recordExit?.(reason.why);
       return EXIT_FAILED;
     }
-    const moved = reason.kind === 'stop' && reason.signal === 'yield';
+    const yielded = reason.kind === 'stop' && reason.signal === 'yield';
+    // APP-CONTINUITY: "moved to the app" only once the desktop app's host is really there. It
+    // starts after this host's record is gone, so this server closes first, then its record is
+    // looked for (a short wait); otherwise the plain closed line.
+    let moved = false;
+    if (yielded) {
+      closed = true;
+      await server.close().catch(() => undefined);
+      moved = (await deps.appTookOver?.().catch(() => false)) === true;
+    }
     output.print(
       reason.kind === 'idle'
         ? UI_TEXT.closedIdle(prefix)
@@ -466,7 +482,7 @@ export async function serveUi(
     if (timer !== undefined) clearTimeout(timer);
     unsubscribe?.();
     unguard?.();
-    await server.close().catch(() => undefined);
+    if (!closed) await server.close().catch(() => undefined);
   }
 }
 
@@ -697,7 +713,12 @@ export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
       };
     },
     // APP-CONTINUITY: terminal `ui` shows a running desktop app instead of a second host.
-    ...(terminalHost ? { runningApp: () => showRunningApp(homedir()) } : {}),
+    ...(terminalHost
+      ? {
+          runningApp: () => showRunningApp(homedir()),
+          appTookOver: () => desktopHostAppears(homedir()),
+        }
+      : {}),
     // F40: Enter in the owner's terminal tries the browser again with a fresh one-shot link.
     ...optionalEnter(),
     // R1: stray background errors are logged with a fixed code and the host keeps serving.

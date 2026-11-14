@@ -6983,7 +6983,15 @@ export async function startApprovalServerWith(
    * one wrong token per HANDOFF_INTERVAL_MS (R1-SEC-15: counted apart, so a caller without the token
    * cannot hold the real handoff at 429); parses exactly `{"invite":"<link>"}`; and
    * hands the link to the join desk, which runs Accept step 1 and stores it in memory. Nothing is
-   * signed, written or logged; the body is wiped. The token grants nothing else.
+   * signed, written or logged; the body is wiped.
+   *
+   * APP-CONTINUITY (08 §1 "One AgentLink, browser or app"): the same gate also runs
+   * `POST /api/ui/host/yield` (the desktop app takes over a terminal `agentlink ui` host: the host's
+   * `onYield` answers, then that host closes) and `POST /api/ui/host/show` (terminal `agentlink ui`
+   * asks a running desktop app to show its window: `onShow`). Both need the token and an empty body,
+   * share one throttle (one per HANDOFF_INTERVAL_MS) apart from the invite handoff, answer
+   * `yielding` / `shown` or 409 `kept`, and sign, open in a browser or log nothing. The token grants
+   * nothing else: a same-user process can already stop a process or open the app.
    */
   async function handoffGate(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
     const refuse = (status: number, error: string): void => {

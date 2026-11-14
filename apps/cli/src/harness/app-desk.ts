@@ -330,15 +330,14 @@ export function createAiAppsDesk(options: AiAppsDeskOptions): LocalUiAiApps {
           }
         } else {
           kind = state.kind === 'agent' ? 'move' : 'connect';
-          // APP-CONTINUITY: a new connect from inside the app (where it may be written) is the
-          // app form; a move keeps the entry's form (a browser-made npx entry stays npx).
-          form = wantApp
-            ? 'app'
-            : state.kind === 'agent'
-              ? state.form
-              : inApp && located?.status === 'ok'
-                ? 'app'
-                : 'npx';
+          // APP-CONTINUITY: a new connect from inside the app is the app form; a move keeps the
+          // entry's form (a browser-made npx entry stays npx). An app in a translocated, temporary
+          // or read-only place is never written, and npx is not written silently instead (it may
+          // not exist on an app-only computer): `app_location` ("move AgentLink to Applications").
+          if (!wantApp && state.kind !== 'agent' && inApp && located?.status !== 'ok') {
+            return brief('app_location');
+          }
+          form = wantApp ? 'app' : state.kind === 'agent' ? state.form : inApp ? 'app' : 'npx';
           // A move keeps an app-form entry only while the app may be written.
           if (form === 'app' && located?.status !== 'ok') return brief('app_location');
           text = setEntry(def, before.text, agent, { ...recognise, form });

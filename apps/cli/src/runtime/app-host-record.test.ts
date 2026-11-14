@@ -18,6 +18,7 @@ import {
   pidAlive,
   readAppHostRecord,
   removeAppHostRecord,
+  desktopHostAppears,
   sendHandoff,
   showRunningApp,
   takeOverAppHost,
@@ -324,5 +325,20 @@ describe('APP-CONTINUITY: take over or show the running host', () => {
     });
     expect(await showRunningApp(home)).toBe('none');
     expect(h.seen).toHaveLength(1);
+  });
+
+  it('after a yield: the desktop host record appearing is seen; a terminal record is not', async () => {
+    const proc = sleeper();
+    await writeAppHostRecord(home, { pid: proc.pid ?? 0, port: 9, handoffToken: TOKEN });
+    expect(await desktopHostAppears(home, 150)).toBe(false);
+    setTimeout(() => {
+      void writeAppHostRecord(home, {
+        pid: proc.pid ?? 0,
+        port: 9,
+        handoffToken: TOKEN,
+        host: 'desktop',
+      });
+    }, 100);
+    expect(await desktopHostAppears(home, 3_000)).toBe(true);
   });
 });
