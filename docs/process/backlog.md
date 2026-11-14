@@ -10912,3 +10912,128 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** NOTIFY-ALL-IDS, N7
 - **Spec:** 08 §1; 11 §5
 - **Done when:** a person's file and message arriving together (one look) or within 20 s (either order, across looks) raise one alert (whichever arrives first is shown; within one look the file's); only alerts the owner's switches let through are counted, so an off switch never hides the other kind; different people and approvals/updates are untouched. A file alone is one flow event (kind `file`), never a file plus a message.
+
+#### UPD-0 · Update key held as a release secret, update signed after the owner's approval click (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8; D-151
+- **Done when:** one update key in the `desktop-update` environment secret signs the update document in `release.yml` only after the owner approves; the document is checked with the app's own checks before upload. Details: CHANGELOG 0.5.4.
+
+#### UPD-1 · Desktop update format v2: channel, expiry, asset kind (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8
+- **Done when:** manifests carry `channel`, `expires` and asset `kind` under `agentlink-desktop-update/v2`; v1 documents are refused; a version that failed to start is never offered again; shared vectors in `test-vectors/desktop-update`. Details: CHANGELOG 0.5.4.
+
+#### UPD-2 · Pin the owner's update key in the app (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8; D-151
+- **Done when:** `root-key.json` holds the public key and release builds ship with updates on; copies from 0.5.2 and earlier never check, so 0.5.4 is installed by hand once. Details: CHANGELOG 0.5.4.
+
+#### UPD-3 · Release signs the desktop update and publishes the update document (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8; D-151
+- **Done when:** the release attaches the Mac zips, builds the update document from the checked Release files and publishes `desktop-update-<key id>.json` and `desktop-update.json`. Details: CHANGELOG 0.5.4.
+
+#### UPD-4 · Mac in-app update groundwork: download, check, swap with rollback (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 04 §7
+- **Done when:** the app downloads its signed package, checks it and swaps it in through a helper that restores the previous version if the new one does not start; threat-model row added. Details: CHANGELOG 0.5.4.
+
+#### UPD-4b · Update helper keeps a copy it could not confirm as stopped (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 04 §7
+- **Done when:** the helper keeps such a copy and starts the previous version when the new one fails. Details: CHANGELOG 0.5.4.
+
+#### UPD-5 · Update now in Settings > Updates (Mac) (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8
+- **Done when:** Settings › Updates shows Update now, a progress bar, Restart now and a fallback download link; the app installs only an update it verified itself. Details: CHANGELOG 0.5.4.
+
+#### KIT-NAMES · Recovery kit carries each ID's name (kit format v2) (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 04 §2.3.3; 07 §9.4
+- **Done when:** restoring on a new computer lists IDs by the names the owner gave; names are only inside the encrypted kit; kits saved earlier still restore; an older AgentLink refuses a newer kit before asking for the code. Details: CHANGELOG 0.5.4.
+
+#### ATT-APP-ATTACH · Attach files in a conversation (Markdown, text, JSON) (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §1; D-150
+- **Done when:** Attach or drag and drop, chips, a note, sent end-to-end encrypted from the Send folder without asking the AI; never over an existing file. Details: CHANGELOG 0.5.4.
+
+#### ATT-SENDFOLDER-FIX · A new ID can use a Send folder that already holds files (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §1
+- **Done when:** the folder is allowed with a clear note, or a fresh Send-2 is set up; Home offers one button to allow the Send folder. Details: CHANGELOG 0.5.4.
+
+#### ATT-ALLOW-LINK · AI gives a Settings > Files link when there is no Send folder (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 06; 08 §1
+- **Done when:** the AI gets a link with the Send folder filled in and no terminal command; it cannot allow a folder itself. Details: CHANGELOG 0.5.4.
+
+#### ATT-POLISH · Reader polish for attached files (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** 11 §5
+- **Done when:** table headers no longer break inside a word; each file button names its file. Details: CHANGELOG 0.5.4.
+
+#### MSG-ORDER-1 · Messages sent within the same second keep their order (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** 08 §1
+- **Done when:** ties of the protocol time are broken by the order this computer stored them; no protocol or schema change. Details: CHANGELOG 0.5.4.
+
+#### DROP-OPEN-1 · Files on the encrypted drop open to all early users (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** D-129; D-139 (7)
+- **Done when:** the internal-tester rollout rule is lifted; limits stay (100 MB per file, 1 GB per ID per week, 7 days, ciphertext only); decided by Tali in chat, 2026-11-13. Details: CHANGELOG 0.5.4.
+
+#### WIN-DESK-1 · Windows app starts its core (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8
+- **Done when:** the core recognises the app's private pipe on Windows and still refuses anything else; a missing data folder is logged clearly. Details: CHANGELOG 0.5.4.
+
+#### WIN-DESK-1d · Early Windows app download and guide (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** 08 §8; 11 §5
+- **Done when:** each release attaches the versioned and the stable-named setup file (in `SHA256SUMS-desktop-app.txt`); the invite page offers it; the guide covers SmartScreen and Smart App Control. Details: CHANGELOG 0.5.4.
+
+#### WIN-DESK-2 · Windows app: bundled-file check, tray icon, updates link, data-folder access check (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 08 §8; OD-M
+- **Done when:** start-time file check, tray icons for light and dark, new setup file linked in Settings › Updates, setup asks to quit AgentLink first, and the app refuses a data folder open to other people. Details: CHANGELOG 0.5.4.
+
+#### N1 · One notice style and one set of connection words (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** 11 §5
+- **Done when:** errors, reminders and Copy buttons share one style (a check stops ad-hoc notice markup); status bar, top bar and Home use the same words. Details: CHANGELOG 0.5.4.
+
+#### N2 · Every owner action is one step (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** 11 §5
+- **Done when:** the action's own button is the Touch ID (or Windows Hello or passkey), with the master code as a link; same signed objects and owner-presence checks. Details: CHANGELOG 0.5.4.
+
+#### N3 · Compact approval card on Home (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 11 §5
+- **Done when:** one line, Approve, Deny and Review with Touch ID; terms can be approved only after Review shows them in full; AI-written text is marked as content. Details: CHANGELOG 0.5.4.
+
+#### N4 · Notification centre in the local app (routes and store) (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** PLAN-NOTIFY §3.1, §3.4
+- **Done when:** read and mark-read routes behind the session, CSRF and Origin checks; per-ID `notifications.json` holds kinds and counts only. Details: CHANGELOG 0.5.4.
+
+#### N5 · Bell in the top bar (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** PLAN-NOTIFY §4.1
+- **Done when:** count (9+), tab title and dot, grouped Needs you, New, Earlier; names only as given by the owner; keyboard support. Details: CHANGELOG 0.5.4.
+
+#### N6 · Settings > Notifications (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S1
+- **Spec:** PLAN-NOTIFY §4.4
+- **Done when:** one switch, Approvals waiting, kept per install; more switches arrive with native notifications. Details: CHANGELOG 0.5.4.
+
+#### N7 · Native notifications in the desktop app (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** PLAN-NOTIFY §3.5
+- **Done when:** fixed codes only over the private pipe (no message text, file name or link); at most one per kind every 30 s; the app owns alerts for the ID it has open. Details: CHANGELOG 0.5.4.
+
+#### RET-67-1 · Retention fixes from the security audit (0.5.4)
+- **Status:** done (released 0.5.4) · **Security:** S2
+- **Spec:** 04 §4.2; 06 §3
+- **Done when:** ages count from when an item reached this computer; a first rules change keeps everything; a failing daily pass waits before retrying; the tidy link only fills filters. Details: CHANGELOG 0.5.4.
