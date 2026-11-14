@@ -326,6 +326,28 @@ describe('writeSendFolderFile', () => {
       expect(await readdir(outside)).toEqual([]);
     });
 
+    it('the package entry form requires reserve: without one it writes nothing', async () => {
+      const { writeSendFolderFile: entryWrite } = await import('./index.js');
+      const out = await entryWrite({
+        allowedFolders: ['~/AgentLink/Send'],
+        name: 'a.md',
+        bytes: utf8('x'),
+        home,
+      } as unknown as Parameters<typeof entryWrite>[0]);
+      expect(out).toEqual({ ok: false, reason: 'budget_unavailable' });
+      expect(await readdir(send)).toEqual([]);
+      const log: string[] = [];
+      const ok = await entryWrite({
+        allowedFolders: ['~/AgentLink/Send'],
+        name: 'a.md',
+        bytes: utf8('x'),
+        home,
+        reserve: reserving('ok', log),
+      });
+      expect(ok.ok).toBe(true);
+      expect(log).toEqual(['reserve']);
+    });
+
     it('the attempt limit is name_taken, nothing overwritten', async () => {
       await writeFile(path.join(send, 'n.md'), 'one');
       for (let i = 2; i <= 100; i += 1)

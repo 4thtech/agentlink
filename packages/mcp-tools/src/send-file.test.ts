@@ -312,6 +312,29 @@ describe('result (06 §2.3 "Result")', () => {
     }
   });
 
+  it('a resumed send without file fields: the plain sent summary, no file slot, never INTERNAL', async () => {
+    const client = fake({
+      send: () =>
+        Promise.resolve({
+          status: 'ok',
+          envelopeId: ENVELOPE,
+          thread: THREAD,
+          sentAt: '2026-11-14T10:00:00Z',
+          delivery: 'sent',
+        } as SendMessageResult),
+    });
+    const result = await send({ to: 'Marko', file: { name: 'a.md', content: 'x' } }, client);
+    expect(structured(result)).toEqual({
+      status: 'ok',
+      summary:
+        'Sent to “Marko” (self-declared). End-to-end encrypted: only you, “Marko” (self-declared) and your AIs can read it.',
+      envelopeId: ENVELOPE,
+      thread: THREAD,
+      sentAt: '2026-11-14T10:00:00Z',
+      delivery: 'sent',
+    });
+  });
+
   it('queued adds the "not sent yet" line', async () => {
     const client = fake({ send: () => Promise.resolve(okResult('a.md', { delivery: 'queued' })) });
     const result = await send({ to: 'Marko', file: { name: 'a.md', content: 'x' } }, client);

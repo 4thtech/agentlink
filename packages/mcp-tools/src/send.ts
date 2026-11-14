@@ -264,10 +264,13 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
             : copy('chat.status.ok.sent', { contactName: name, contactFirstName: name });
       let sentFields: Record<string, unknown> = fields;
       let shown = summary;
-      if (byContent) {
-        const saved = result.contentFile;
-        const sent = result.files?.find((f) => f.index === 0);
-        if (saved === undefined || sent === undefined) return internalError();
+      const saved = byContent ? result.contentFile : undefined;
+      const sentContent = byContent ? result.files?.find((f) => f.index === 0) : undefined;
+      if (byContent && (saved === undefined || sentContent === undefined)) {
+        // A send resumed after a crash (07 §3.3 "Resume") keeps no file fields: the message went
+        // out, so the plain sent summary without the file slot, never INTERNAL.
+      } else if (saved !== undefined && sentContent !== undefined) {
+        const sent = sentContent;
         sentFields = {
           ...fields,
           file: {

@@ -147,6 +147,24 @@ async function sendFolder(
   return undefined;
 }
 
+/**
+ * FILES-AI-1: the package-entry form for the runtime's files platform (core's `contentFile` sends):
+ * `reserve` is REQUIRED, so no caller outside this package writes without the budget step. Without
+ * a function it writes nothing (`budget_unavailable`). The attach route keeps the optional form.
+ */
+export function writeSendFolderContentFile(input: {
+  readonly allowedFolders: readonly string[];
+  readonly name: unknown;
+  readonly bytes: Uint8Array;
+  readonly home?: string;
+  readonly reserve: () => Promise<'ok' | 'over' | 'unavailable'>;
+}): Promise<SendFolderWrite> {
+  if (typeof input?.reserve !== 'function') {
+    return Promise.resolve({ ok: false, reason: 'budget_unavailable' });
+  }
+  return writeSendFolderFile(input);
+}
+
 /** Writes `bytes` as a new file in the open ID's Send folder (see the header). */
 export async function writeSendFolderFile(input: {
   readonly allowedFolders: readonly string[];
