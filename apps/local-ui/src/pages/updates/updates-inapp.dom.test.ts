@@ -182,7 +182,12 @@ describe('Settings › Updates, in-app update (UPD-5)', () => {
     expect(parseUpdate(at('ready', { installable: false }))).toBeUndefined();
     expect(parseUpdate(at('install_failed'))).toBeUndefined();
     expect(parseUpdate(at('ready', { download: 'https://evil.example/x.dmg' }))).toBeUndefined();
-    expect(parseUpdate(at('ready', { install: 'npx', download: '' }))).toBeUndefined();
+    // BROWSER-UPDATE: the browser app has the in-app states too, but only when installable and
+    // never with a link (updates-browser.dom.test.ts has the positive cases).
+    expect(
+      parseUpdate(at('ready', { install: 'npx', download: '', installable: false })),
+    ).toBeUndefined();
+    expect(parseUpdate(at('ready', { install: 'npx' }))).toBeUndefined();
     expect(parseUpdate(at('ready', { busy: 'yes' }))).toBeUndefined();
     expect(parseUpdate(at('ready'))).toMatchObject({ state: 'ready', installable: true });
     expect(APP_UPDATE_PATH).toBe('/api/ui/app-update');

@@ -79,11 +79,13 @@ export const BUNDLE_BUILTINS = [
  * Node built-ins the bundle may import only as the named bindings listed, in static `import { … }`
  * declarations (no default, namespace or bare import, no re-export, no `import()`). M1-11a-b: the
  * local approval UI's OS browser opener and notifier (@4thtech-io/node approval-os.ts) run a fixed
- * program with fixed arguments through `execFile` (no shell); `spawn`, `exec`, `fork` and the rest
- * stay findings.
+ * program with fixed arguments through `execFile` (no shell). BROWSER-UPDATE: `spawn` too, for one
+ * call only: Restart now runs the staged new version (`node <entry> ui`, argv, `shell: false`) with
+ * the terminal inherited, which `execFile` cannot do (apps/cli/src/runtime/browser-update.ts
+ * relaunch). `exec`, `execSync`, `spawnSync`, `fork` and the rest stay findings.
  */
 export const BUNDLE_BUILTIN_NAMED = Object.freeze({
-  'node:child_process': Object.freeze(['execFile']),
+  'node:child_process': Object.freeze(['execFile', 'spawn']),
 });
 
 /** Names that load a module without an import declaration (IR-M1-9c-c-1 L1). */

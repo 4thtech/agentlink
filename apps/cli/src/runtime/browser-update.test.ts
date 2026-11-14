@@ -3,7 +3,7 @@
 // registry named, with npm run by argv (never a shell), scripts off, npm's integrity check and
 // `npm audit signatures`; Restart now hands over to the staged copy (the old host closes first).
 import { EventEmitter } from 'node:events';
-import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -12,6 +12,7 @@ import {
   PACKAGE_NAME,
   STAGED_ENTRY,
   BrowserUpdater,
+  execFileRunner,
   browserUpdateDeskWith,
   findNpmCli,
   globalInstallArgs,
@@ -20,7 +21,6 @@ import {
   packageSpec,
   parseAuditSignatures,
   relaunch,
-  spawnRunner,
   updateEnv,
   verifyArgs,
   type Runner,
@@ -154,7 +154,10 @@ describe('findNpmCli', () => {
 describe('globalPrefix', () => {
   it('the prefix of a global install, from the script that runs', () => {
     expect(
-      globalPrefix('/Users/me/.npm-global/lib/node_modules/@4thtech-io/agentlink/dist/agentlink.js', 'darwin'),
+      globalPrefix(
+        '/Users/me/.npm-global/lib/node_modules/@4thtech-io/agentlink/dist/agentlink.js',
+        'darwin',
+      ),
     ).toBe('/Users/me/.npm-global');
     expect(
       globalPrefix(
@@ -167,22 +170,25 @@ describe('globalPrefix', () => {
   });
 });
 
-describe('spawnRunner', () => {
-  it('runs the argv with no shell, stdin closed, the update environment and a timeout', async () => {
+describe('execFileRunner', () => {
+  it('runs the argv with execFile: no shell, the update environment, a timeout and a cap', async () => {
     const seen: { file: string; args: readonly string[]; options: Record<string, unknown> }[] = [];
-    const runner = spawnRunner(((file: string, args: readonly string[], options: object) => {
+    let stdinEnded = false;
+    const runner = execFileRunner(((
+      file: string,
+      args: readonly string[],
+      options: object,
+      callback: (error: Error | null, stdout: Buffer) => void,
+    ) => {
       seen.push({ file, args, options: options as Record<string, unknown> });
-      const child = new EventEmitter() as EventEmitter & {
-        stdout: EventEmitter;
-        kill: () => boolean;
+      setTimeout(() => callback(null, Buffer.from('{"invalid":[],"missing":[]}')), 1);
+      return {
+        stdin: {
+          end: () => {
+            stdinEnded = true;
+          },
+        },
       };
-      child.stdout = new EventEmitter();
-      child.kill = () => true;
-      setTimeout(() => {
-        child.stdout.emit('data', Buffer.from('{"invalid":[],"missing":[]}'));
-        child.emit('close', 0, null);
-      }, 1);
-      return child;
     }) as never);
     const result = await runner(NODE, [NPM, 'audit', 'signatures'], {
       cwd: '/h',
@@ -194,10 +200,32 @@ describe('spawnRunner', () => {
     expect(seen[0]?.file).toBe(NODE);
     expect(seen[0]?.args).toEqual([NPM, 'audit', 'signatures']);
     expect(seen[0]?.options['shell']).toBe(false);
-    expect(seen[0]?.options['stdio']).toEqual(['ignore', 'pipe', 'ignore']);
+    expect(seen[0]?.options['timeout']).toBe(1_000);
+    expect(typeof seen[0]?.options['maxBuffer']).toBe('number');
     expect((seen[0]?.options['env'] as Record<string, string>)['npm_config_ignore_scripts']).toBe(
       'true',
     );
+    expect(stdinEnded).toBe(true);
+  });
+
+  it('a non-zero exit, a timeout or a start error is never success', async () => {
+    const failing = (error: Error) =>
+      execFileRunner(((
+        _f: string,
+        _a: readonly string[],
+        _o: object,
+        callback: (error: Error | null, stdout: Buffer) => void,
+      ) => {
+        setTimeout(() => callback(error, Buffer.alloc(0)), 1);
+        return { stdin: null };
+      }) as never);
+    const opts = { cwd: '/h', timeoutMs: 10 };
+    const exit1 = Object.assign(new Error('x'), { code: 1 });
+    const enoent = Object.assign(new Error('x'), { code: 'ENOENT' });
+    const killed = Object.assign(new Error('x'), { killed: true, code: null });
+    expect((await failing(exit1)(NODE, [], opts)).code).toBe(1);
+    expect((await failing(enoent)(NODE, [], opts)).code).toBeNull();
+    expect((await failing(killed)(NODE, [], opts)).code).toBeNull();
   });
 });
 
@@ -319,8 +347,17 @@ describe('BrowserUpdater.stage', () => {
 
   it('a user-writable global install is updated in place after the verified staging', async () => {
     const home = await tempHome();
-    const prefix = await tempHome();
-    const script = join(prefix, 'lib', 'node_modules', '@4thtech-io', 'agentlink', 'dist', 'agentlink.js');
+    // The real path (a temporary folder may sit behind a link, as /var on macOS).
+    const prefix = await realpath(await tempHome());
+    const script = join(
+      prefix,
+      'lib',
+      'node_modules',
+      '@4thtech-io',
+      'agentlink',
+      'dist',
+      'agentlink.js',
+    );
     await mkdir(join(prefix, 'lib', 'node_modules', '@4thtech-io', 'agentlink', 'dist'), {
       recursive: true,
     });
@@ -360,7 +397,16 @@ describe('BrowserUpdater.stage', () => {
     expect(
       JSON.parse(
         await readFile(
-          join(home, '.agentlink', 'updates', '0.5.6', 'node_modules', '@4thtech-io', 'agentlink', 'package.json'),
+          join(
+            home,
+            '.agentlink',
+            'updates',
+            '0.5.6',
+            'node_modules',
+            '@4thtech-io',
+            'agentlink',
+            'package.json',
+          ),
           'utf8',
         ),
       ),
@@ -368,10 +414,15 @@ describe('BrowserUpdater.stage', () => {
   });
 });
 
-const latest = (v: string): RegistryFetch => () =>
-  Promise.resolve(
-    new Response(`{"latest":"${v}"}`, { status: 200, headers: { 'content-type': 'application/json' } }),
-  );
+const latest =
+  (v: string): RegistryFetch =>
+  () =>
+    Promise.resolve(
+      new Response(`{"latest":"${v}"}`, {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
 
 async function deskHarness(install: 'npx' | 'global' | 'installer' = 'npx', canWrite = true) {
   const home = await tempHome();
@@ -460,7 +511,11 @@ describe('browserUpdateDeskWith (Settings › Updates in the browser app)', () =
       script: '/x/_npx/a/node_modules/@4thtech-io/agentlink/dist/agentlink.js',
       run: fakeNpm({ installCode: 1 }).run,
     });
-    const checker = new NpmUpdateChecker({ currentVersion: '0.5.5', enabled: true, fetch: latest('0.5.6') });
+    const checker = new NpmUpdateChecker({
+      currentVersion: '0.5.5',
+      enabled: true,
+      fetch: latest('0.5.6'),
+    });
     await checker.check();
     const desk = browserUpdateDeskWith(checker, 'npx', failing, {
       requestRestart: () => true,
@@ -468,7 +523,11 @@ describe('browserUpdateDeskWith (Settings › Updates in the browser app)', () =
     });
     desk.startInstall?.();
     await vi_wait(() => failing.phase() === 'failed');
-    expect(desk.view()).toMatchObject({ state: 'install_failed', latest: '0.5.6', installable: false });
+    expect(desk.view()).toMatchObject({
+      state: 'install_failed',
+      latest: '0.5.6',
+      installable: false,
+    });
     void h;
   });
 

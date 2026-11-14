@@ -281,11 +281,21 @@ describe('Settings > Updates through the server (DESK051-UPD)', () => {
     };
     const without = (name: string): Record<string, string> =>
       Object.fromEntries(Object.entries(good).filter(([k]) => k !== name));
-    expect((await send(h.port, APP_UPDATE_INSTALL_PATH, without('Cookie'), 'POST')).status).toBe(401);
-    expect((await send(h.port, APP_UPDATE_INSTALL_PATH, without('X-AgentLink-CSRF'), 'POST')).status).toBe(403);
+    expect((await send(h.port, APP_UPDATE_INSTALL_PATH, without('Cookie'), 'POST')).status).toBe(
+      401,
+    );
     expect(
-      (await send(h.port, APP_UPDATE_INSTALL_PATH, { ...good, Origin: 'http://evil.example' }, 'POST'))
-        .status,
+      (await send(h.port, APP_UPDATE_INSTALL_PATH, without('X-AgentLink-CSRF'), 'POST')).status,
+    ).toBe(403);
+    expect(
+      (
+        await send(
+          h.port,
+          APP_UPDATE_INSTALL_PATH,
+          { ...good, Origin: 'http://evil.example' },
+          'POST',
+        )
+      ).status,
     ).toBe(403);
     // A bearer token (what an MCP client or script might hold) is not the page's session.
     expect(

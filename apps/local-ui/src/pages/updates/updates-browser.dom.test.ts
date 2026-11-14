@@ -7,7 +7,12 @@ import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ApiClient, ApiResult } from '../../api/client.js';
-import { APP_UPDATE_INSTALL_PATH, APP_UPDATE_PATH, APP_UPDATE_RESTART_PATH, parseUpdate } from './data.js';
+import {
+  APP_UPDATE_INSTALL_PATH,
+  APP_UPDATE_PATH,
+  APP_UPDATE_RESTART_PATH,
+  parseUpdate,
+} from './data.js';
 import { UpdatesPage } from './index.js';
 import { UPDATES_STRINGS as S } from './strings.js';
 
@@ -76,7 +81,9 @@ describe('parseUpdate (BROWSER-UPDATE)', () => {
     for (const state of ['available', 'downloading', 'verifying', 'ready', 'restarting']) {
       expect(parseUpdate(at(state))).toMatchObject({ state, install: 'npx', installable: true });
       expect(
-        parseUpdate(at(state, { download: 'https://github.com/4thtech/agentlink/releases/tag/v0.5.6' })),
+        parseUpdate(
+          at(state, { download: 'https://github.com/4thtech/agentlink/releases/tag/v0.5.6' }),
+        ),
       ).toBeUndefined();
     }
     expect(parseUpdate(at('install_failed', { installable: false }))).toMatchObject({
@@ -93,7 +100,9 @@ describe('Settings › Updates in the browser app (BROWSER-UPDATE)', () => {
       () => Promise.resolve(ok(at(state))),
       (path) => {
         state = path === APP_UPDATE_INSTALL_PATH ? 'ready' : 'restarting';
-        return Promise.resolve(ok(at(path === APP_UPDATE_INSTALL_PATH ? 'downloading' : 'restarting')));
+        return Promise.resolve(
+          ok(at(path === APP_UPDATE_INSTALL_PATH ? 'downloading' : 'restarting')),
+        );
       },
     );
     expect(text()).toContain(S.availableTitle('0.5.6'));
@@ -130,7 +139,9 @@ describe('Settings › Updates in the browser app (BROWSER-UPDATE)', () => {
   it('a global install this user cannot write: the one update command (no Update now)', async () => {
     await mount((path) =>
       Promise.resolve(
-        path === APP_UPDATE_PATH ? ok(at('available', { install: 'global', installable: false })) : ok({}),
+        path === APP_UPDATE_PATH
+          ? ok(at('available', { install: 'global', installable: false }))
+          : ok({}),
       ),
     );
     expect(button(S.updateNow)).toBeUndefined();

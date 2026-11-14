@@ -340,13 +340,24 @@ export function withUpdates<O extends { readonly appUpdate?: unknown }, R>(
   };
 }
 
-/** The production desk: this process's version, environment and launch. Starts the quiet checks. */
-export function nodeBrowserUpdateDesk(version: string): LocalUiAppUpdateDesk {
+/**
+ * The production desk: this process's version, environment and launch. Starts the quiet checks.
+ * BROWSER-UPDATE: with `withUpdater` (only the terminal `agentlink ui` host passes it), the desk
+ * also has Update now and Restart now (browser-update.ts); without it, the restart or the one
+ * command as before.
+ */
+export function nodeBrowserUpdateDesk(
+  version: string,
+  withUpdater?: (install: BrowserInstall, checker: NpmUpdateChecker) => LocalUiAppUpdateDesk,
+): LocalUiAppUpdateDesk {
   const env = process.env;
   const checker = new NpmUpdateChecker({
     currentVersion: version,
     enabled: updateChecksAllowed(env, version),
   });
   checker.start();
-  return browserUpdateDesk(checker, browserInstall(env, process.argv[1]));
+  const install = browserInstall(env, process.argv[1]);
+  return withUpdater === undefined
+    ? browserUpdateDesk(checker, install)
+    : withUpdater(install, checker);
 }

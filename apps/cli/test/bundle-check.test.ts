@@ -147,16 +147,20 @@ describe('bundle-check (M1-9c-c, IR-M1-9c-1 F07)', () => {
       },
     );
 
-    // M1-11a-b: node:child_process only as `import { execFile }` (the approval UI's OS opener).
-    it('allows node:child_process only as the named execFile import', () => {
+    // M1-11a-b: node:child_process only as `import { execFile }` (the approval UI's OS opener);
+    // BROWSER-UPDATE: and `spawn` (Restart now's relaunch with the terminal inherited).
+    it('allows node:child_process only as the named execFile and spawn imports', () => {
       const ok = checkInjected(
         'cp-execfile',
-        'import { execFile as run2 } from "node:child_process";',
+        'import { execFile as run2, spawn as start2 } from "node:child_process";',
       );
       expect(ok.stderr).toBe('');
       expect(ok.code).toBe(0);
       for (const [name, line] of [
-        ['spawn', 'import { spawn } from "node:child_process";'],
+        ['exec', 'import { exec } from "node:child_process";'],
+        ['execSync', 'import { execSync } from "node:child_process";'],
+        ['spawnSync', 'import { spawnSync } from "node:child_process";'],
+        ['fork', 'import { fork } from "node:child_process";'],
         ['mixed', 'import { execFile as e2, exec } from "node:child_process";'],
         ['namespace', 'import * as cp from "node:child_process";'],
         ['default', 'import cp from "node:child_process";'],
@@ -167,8 +171,8 @@ describe('bundle-check (M1-9c-c, IR-M1-9c-1 F07)', () => {
         expect(run.code, name).toBe(1);
         expect(run.stderr, name).toContain('"node:child_process"');
       }
-      // Seven sequential bundle checks: ~20 s on a loaded CI runner, so a longer per-test budget.
-    }, 90_000);
+      // Ten sequential bundle checks: ~30 s on a loaded CI runner, so a longer per-test budget.
+    }, 120_000);
 
     // IR-M1-9c-c-1 L1: require-equivalents that load a module without an import.
     it.each([

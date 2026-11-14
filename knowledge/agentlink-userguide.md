@@ -32,7 +32,7 @@ irm https://agentlink.4thtech.io/install.ps1 | iex
 powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 | iex"
 ```
 
-It downloads Node.js from nodejs.org only if needed, adds an `agentlink` command and opens the app; no admin rights. Run it again to update; next time, type `agentlink`. Browser app updates: Settings, Updates shows "Restart AgentLink to update" (Ctrl+C, then `agentlink`).
+It downloads Node.js from nodejs.org only if needed, adds an `agentlink` command and opens the app; no admin rights. Run it again to update; next time, type `agentlink`. Browser app updates (0.5.6): Settings, Updates, Check for updates, then "Update now" and "Restart now": AgentLink gets and checks the new version, closes and opens again in a new browser tab, in the same terminal window; then quit and reopen your AI apps. A global `npm install -g` copy in a folder you can't change shows the one update command instead.
 
 If you already have Node.js 22.14 or newer (older Node makes `npx` fail), you can instead run `npx -y @4thtech-io/agentlink@latest`. Your browser opens the app. Keep that window open while you use AgentLink; Ctrl+C closes it, and the same command opens it again. The package name must be exactly `@4thtech-io/agentlink`.
 

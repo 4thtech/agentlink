@@ -270,9 +270,7 @@ describe('app-update routes', () => {
           install,
           busy: false,
         });
-        expect(
-          appUpdateBody({ ...BROWSER_IN_APP, state, download: DMG }, install),
-        ).toBeUndefined();
+        expect(appUpdateBody({ ...BROWSER_IN_APP, state, download: DMG }, install)).toBeUndefined();
       }
     },
   );
