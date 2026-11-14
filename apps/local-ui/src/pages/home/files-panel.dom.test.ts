@@ -39,6 +39,8 @@ interface World {
   readonly received?: readonly unknown[];
   readonly sent?: readonly unknown[];
   readonly inbox?: string;
+  /** FILES-ALLOWED-STATE: the server's answer for the ID's own Send folder. */
+  readonly sendFolder?: { state: string; path: string | null };
 }
 
 const get =
@@ -46,7 +48,14 @@ const get =
   (path) => {
     const answer = (status: number, json: unknown) =>
       Promise.resolve({ kind: 'answer', status, json } as const);
-    if (path === '/api/ui/files') return answer(200, { folders: w.folders, max: 32, version: 1 });
+    if (path === '/api/ui/files') {
+      return answer(200, {
+        folders: w.folders,
+        max: 32,
+        version: 1,
+        ...(w.sendFolder === undefined ? {} : { sendFolder: w.sendFolder }),
+      });
+    }
     if (path.startsWith('/api/ui/files/received')) {
       return answer(200, {
         items: w.received ?? [],
@@ -102,7 +111,7 @@ async function settle(): Promise<void> {
   }
 }
 
-async function mount(world: World, props: { appName?: string } = {}) {
+async function mount(world: World, props: { appName?: string; idLabel?: string } = {}) {
   const f = fakes();
   await act(async () => {
     root.render(
@@ -218,6 +227,35 @@ describe('the Files panel states', () => {
   it('only the ID own Send folder counts: another allowed folder is not a Send folder', async () => {
     await mount({ folders: [{ path: '~/Documents/Shared', resolved: '/h/Documents/Shared' }] });
     expect(q('[data-files-panel]')?.textContent).toContain(FILES_COPY.noFolder);
+  });
+});
+
+describe('FILES-ALLOWED-STATE: the server says whether the Send folder is allowed', () => {
+  // The rules hold the realpath the owner confirmed, never `~/AgentLink/Send` (the 0.5.6 bug).
+  const REAL = { path: '/Users/u/AgentLink/Send', resolved: '/Users/u/AgentLink/Send' };
+
+  it('an allowed absolute-path Send folder shows as allowed; no Allow Send folder', async () => {
+    await mount({ folders: [REAL], sendFolder: { state: 'allowed', path: '~/AgentLink/Send' } });
+    const text = q('[data-files-panel]')?.textContent ?? '';
+    expect(text).not.toContain(FILES_COPY.noFolder);
+    expect(byLabel(FILES_COPY.allowSendFolder)).toBeUndefined();
+    expect(text).toContain(FILES_COPY.chipAllowed);
+    expect(text).toContain('~/AgentLink/Send');
+  });
+
+  it('the server answer wins over the list: not_allowed offers the action', async () => {
+    await mount({ folders: [REAL], sendFolder: { state: 'not_allowed', path: null } });
+    expect(byLabel(FILES_COPY.allowSendFolder)).toBeTruthy();
+  });
+
+  it('All IDs: the panel names the open ID it describes', async () => {
+    await mount(
+      { folders: [REAL], sendFolder: { state: 'allowed', path: '~/AgentLink/Send' } },
+      { idLabel: "Tali's MacBook Pro · Claude Code" },
+    );
+    const text = q('[data-files-panel]')?.textContent ?? '';
+    expect(text).toContain(FILES_COPY.forId("Tali's MacBook Pro · Claude Code"));
+    expect(byLabel(FILES_COPY.allowSendFolder)).toBeUndefined();
   });
 });
 

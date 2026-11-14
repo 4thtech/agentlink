@@ -305,6 +305,7 @@ describe('GET /api/ui/files: the allowed folders', () => {
       ],
       max: 32,
       version: 3,
+      sendFolder: { state: 'not_allowed', path: null },
     });
   });
 
@@ -732,6 +733,46 @@ describe('POST /api/ui/files/folders: D-119, every warning acknowledged for this
 // prepares the Send folder (owner-first-policy prepareSendFolder with fallback) and answers the folder
 // to review. A mark-kind route: no presence, no input, and nothing is prepared, signed or applied, so
 // the rules never change here (I-4). Allowing it is the ordinary review and confirm with presence.
+describe("FILES-ALLOWED-STATE: the ID's own Send folder, decided by the server", () => {
+  // The rules sign the realpath (`/Users/<u>/AgentLink/Send`), never `~/AgentLink/Send`: the page
+  // must not compare paths itself. The answer names the state and the folder in its `~` form.
+  const stateHome = join(root, 'state-home');
+  const send = join(stateHome, 'AgentLink', 'Send');
+  mkdirSync(send, { recursive: true });
+  const list = (configured: string[]) => {
+    fake.configured = configured;
+    fake.resolved = configured.filter((p) => !p.endsWith('Send-2'));
+    const routes = createFilesRoutes({ home: stateHome, flavor: FLAVOR });
+    return read(routes, '/api/ui/files').handler(ctx(), req());
+  };
+
+  it('an allowed absolute-path Send folder is allowed', async () => {
+    const res = await list([send]);
+    expect(res.status).toBe(200);
+    expect(body(res)['sendFolder']).toEqual({ state: 'allowed', path: '~/AgentLink/Send' });
+  });
+
+  it('an allowed `~` Send folder is allowed too, beside another folder', async () => {
+    const res = await list([work, '~/AgentLink/Send']);
+    expect(body(res)['sendFolder']).toEqual({ state: 'allowed', path: '~/AgentLink/Send' });
+  });
+
+  it('a trailing separator is the same folder', async () => {
+    const res = await list([`${send}${WIN ? '\\' : '/'}`]);
+    expect(body(res)['sendFolder']).toEqual({ state: 'allowed', path: '~/AgentLink/Send' });
+  });
+
+  it('a listed Send-2 that is missing is not_found; no Send folder listed is not_allowed', async () => {
+    const missing = join(stateHome, 'AgentLink', 'Send-2');
+    expect(body(await list([missing]))['sendFolder']).toEqual({
+      state: 'not_found',
+      path: '~/AgentLink/Send-2',
+    });
+    expect(body(await list([work]))['sendFolder']).toEqual({ state: 'not_allowed', path: null });
+    expect(body(await list([]))['sendFolder']).toEqual({ state: 'not_allowed', path: null });
+  });
+});
+
 describe('ATT-SENDFOLDER-FIX: the Send folder for the Home banner', () => {
   const sendHome = join(root, 'send-home');
   mkdirSync(sendHome, { recursive: true });
