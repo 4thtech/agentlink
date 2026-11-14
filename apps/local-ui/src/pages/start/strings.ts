@@ -67,15 +67,16 @@ export const PICK_STEP = {
   lookFailed: "Couldn't look for AI apps. You can still pick one.",
 } as const;
 
-/** A1, step 2: connect with Touch ID. */
+/** A1, step 2: confirm it's you (the platform's sensor, or the master code). */
 export const CONNECT_STEP = {
   back: 'Back',
   eyebrow: (app: string): string => `Create ${app}'s ID`,
   title: "Confirm it's you",
-  body: (app: string): string =>
-    `We create ${app}'s ID and add AgentLink to ${app}. Touch ID proves it's you. Your AI can't approve things for you.`,
-  bodyConnect: (app: string, agent: string): string =>
-    `We add AgentLink to ${app}, using the ID ${agent}. Touch ID proves it's you. Your AI can't approve things for you.`,
+  // FIRSTRUN-ANY-PLATFORM: the platform's own word (first-run SENSOR), or "your master code".
+  body: (app: string, sensor: string): string =>
+    `We create ${app}'s ID and add AgentLink to ${app}. Confirming with ${sensor} proves it's you. Your AI can't approve things for you.`,
+  bodyConnect: (app: string, agent: string, sensor: string): string =>
+    `We add AgentLink to ${app}, using the ID ${agent}. Confirming with ${sensor} proves it's you. Your AI can't approve things for you.`,
   worksIn: (app: string): string => `Will work in ${app}`,
   rename: 'Change name',
   renameLabel: (name: string): string => `Change the ID's name (${name})`,

@@ -92,11 +92,13 @@ function fakeApi(
     /** What the status re-check answers after the first status call. */
     statusAfter?: StatusResult;
   } = {},
-): SetupApi & { finished: Uint8Array[] } {
+): SetupApi & { finished: Uint8Array[]; codeOnly: string[] } {
   const finished: Uint8Array[] = [];
+  const codeOnly: string[] = [];
   let statusCalls = 0;
   return {
     finished,
+    codeOnly,
     status: () => {
       statusCalls += 1;
       const first = options.status ?? { kind: 'ok', owner: 'missing' };
@@ -108,6 +110,11 @@ function fakeApi(
     finish: (body) => {
       finished.push(body.slice());
       return Promise.resolve(options.finish ?? done());
+    },
+    // FIRSTRUN-ANY-PLATFORM: the master code only (no WebAuthn).
+    finishCode: (nonce) => {
+      codeOnly.push(nonce);
+      return Promise.resolve(options.finish ?? done({ passkey: false }));
     },
   };
 }
@@ -359,10 +366,14 @@ describe('first run: protect approvals (D-120 (1))', () => {
     expect(button(FIRST_RUN.tryAgain)).toBeDefined();
   });
 
-  it('a browser without passkeys gets the terminal fallback', async () => {
-    await mount(fakeApi(), undefined, false);
-    expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.unsupportedTitle);
-    expect(text()).toContain('agentlink owner init');
+  it('FIRSTRUN-ANY-PLATFORM: a browser without passkeys continues with a master code, no terminal', async () => {
+    const api = fakeApi();
+    await mount(api, undefined, false);
+    expect(host.querySelector('h1')?.textContent).toBe(CONNECT_STEP.title);
+    expect(text()).not.toContain('agentlink owner init');
+    await click(FIRST_RUN.backupOnly);
+    expect(api.codeOnly).toHaveLength(1);
+    expect(api.finished).toHaveLength(0);
   });
 
   it('an expired link and a stopped agent show the shared states', async () => {
@@ -397,7 +408,8 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
   it('shows the folders setup creates before the gesture, and one button named for the platform', async () => {
     for (const [platform, label] of [
       ['mac', GO.mac],
-      ['windows', GO.windows],
+      // FIRSTRUN-ANY-PLATFORM: on Windows the master code comes first (Windows Hello is offered).
+      ['windows', FIRST_RUN.backupOnly],
       ['other', GO.other],
     ] as const) {
       await mount(fakeApi(), undefined, true, { platform });
@@ -621,7 +633,8 @@ describe('M1-UX-FIRSTRUN-V2: passkey-first first run', () => {
     expect(text()).toContain(FIRST_RUN.noPrf('Touch ID', 'Safari'));
     expect(host.querySelectorAll('.al-btn-primary')).toHaveLength(1);
     await click(FIRST_RUN.backupOnly);
-    expect(asked).toEqual([{ platform: false }]);
+    // FIRSTRUN-ANY-PLATFORM: the master code only makes no passkey call at all.
+    expect(asked).toEqual([]);
     expect(host.querySelector('h1')?.textContent).toBe(FIRST_RUN.backupTitle);
     expect(text()).toContain(FIRST_RUN.doneNoPasskeyBody);
     expect(button(FIRST_RUN.savedIt)).toBeDefined();
