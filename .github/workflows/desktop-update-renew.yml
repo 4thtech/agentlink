@@ -118,6 +118,7 @@ jobs:
           gh release download "v$VERSION" --repo "$REPOSITORY" --dir . \
             --pattern "AgentLink-$VERSION-mac-arm64.zip" --pattern "AgentLink-$VERSION-mac-x64.zip" \
             --pattern "AgentLink-$VERSION-mac-arm64.dmg" --pattern "AgentLink-$VERSION-mac-x64.dmg" \
+            --pattern "AgentLink-$VERSION-win-x64-setup.exe" --pattern AgentLink-win-x64-setup.exe \
             --pattern AgentLink-mac-arm64.dmg --pattern AgentLink-mac-x64.dmg --pattern SHA256SUMS-desktop-app.txt
           sha256sum --check --strict SHA256SUMS-desktop-app.txt
           for f in "AgentLink-$VERSION-mac-arm64.zip" "AgentLink-$VERSION-mac-x64.zip" "AgentLink-$VERSION-mac-arm64.dmg" "AgentLink-$VERSION-mac-x64.dmg"; do
