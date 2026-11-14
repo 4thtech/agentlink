@@ -15,6 +15,7 @@
 //   desktop app runs (then nothing here changes for the CLI and browser app).
 // - Nothing is logged; a failed look keeps its place and alerts nothing.
 import type { NotifyPrefKey } from '@4thtech-io/types/ui-contract/notifications';
+import { dedupeFileAndMessage, type RecentAlerts } from '../desktop/alert-dedupe.js';
 import { isNotifyName } from '../desktop/protocol.js';
 
 /** One flow event as this module reads it (the core's FlowEvent without its state). */
@@ -65,7 +66,11 @@ export function planOtherIdAlerts(
     equal.set(base, n + 1);
     const key = `${base}:${String(n)}`;
     keep.add(key);
-    if (prev !== undefined && !prev.seen.has(key) && e.at >= prev.cursor - OTHER_ID_OVERLAP_SECONDS) {
+    if (
+      prev !== undefined &&
+      !prev.seen.has(key) &&
+      e.at >= prev.cursor - OTHER_ID_OVERLAP_SECONDS
+    ) {
       fresh.push(e);
     }
   }
@@ -149,6 +154,8 @@ export function createOtherIdAlerts(deps: OtherIdAlertsDeps): OtherIdAlerts {
   let look: OtherIdLook | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
   let running = false;
+  /** NOTIFY-DEDUPE: across looks, a person's file and its message are one alert. */
+  const recent: RecentAlerts = new Map();
   const tick = async (): Promise<void> => {
     if (running) return;
     running = true;
@@ -171,9 +178,15 @@ export function createOtherIdAlerts(deps: OtherIdAlertsDeps): OtherIdAlerts {
       const plan = planOtherIdAlerts(look, read.events, now);
       look = plan.look;
       if (plan.news.length === 0) return;
-      const refs = prefs.showNames ? [...new Set(plan.news.map((n) => n.ref))] : [];
+      const news = dedupeFileAndMessage(
+        plan.news,
+        (kind) => prefs[kind === 'files' ? 'files' : 'messages'],
+        recent,
+        deps.now() * 1000,
+      );
+      const refs = prefs.showNames ? [...new Set(news.map((n) => n.ref))] : [];
       const names = refs.length === 0 ? new Map<string, string>() : await deps.ownerNames(refs);
-      for (const line of otherIdLines(plan.news, prefs, deps.agentName, names)) {
+      for (const line of otherIdLines(news, prefs, deps.agentName, names)) {
         await deps.notify(line).catch(() => false);
       }
     } catch {

@@ -10884,3 +10884,10 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** N7, NOTIFY-DEEPLINK
 - **Spec:** 08 §1; 11 §5
 - **Done when:** while the window is shown, not minimised and focused, no native notification is raised (the in-app centre, tray and badge still update from the core); a hidden, minimised, background or closed window alerts as before; the check is made when the alert would be shown; tests.
+
+#### NOTIFY-DEDUPE · One alert, not two, for a file plus its message (0.5.5)
+- **Status:** in review · **Size:** S · **Tier:** Sonnet · **Security:** S1 (drops alerts; adds none)
+- **Repo/path:** agentlink · `apps/cli/src/desktop/{alert-dedupe,host-core}.ts`, `apps/cli/src/runtime/other-id-alerts.ts`
+- **Depends on:** NOTIFY-ALL-IDS, N7
+- **Spec:** 08 §1; 11 §5
+- **Done when:** a person's file and message arriving together (one look) or within 20 s (either order, across looks) raise one alert, the file's; only alerts the owner's switches let through are counted, so an off switch never hides the other kind; different people and approvals/updates are untouched. A file alone is one flow event (kind `file`), never a file plus a message.

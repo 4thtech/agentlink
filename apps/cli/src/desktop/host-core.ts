@@ -44,6 +44,7 @@ import { startUiServer, type UiDeps, type UiServer } from '../commands/ui.js';
 import { notifyMessages, planAlerts, refsToName, type AlertBaseline } from './alerts.js';
 import type { FatalReason } from '../runtime/ui-lifecycle.js';
 import type { DesktopPipe } from './pipe.js';
+import { dedupeFileAndMessage, type RecentAlerts } from './alert-dedupe.js';
 import {
   isNotifyTarget,
   isSessionUrl,
@@ -391,6 +392,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   let recordScope: string | undefined;
   /** NOTIFY-UPDATE-READY: the first look of this run is done (an update already waiting is alerted once). */
   let firstLookDone = false;
+  /** NOTIFY-DEDUPE: who was alerted about lately (a file and its message are one alert). */
+  const recentAlerts: RecentAlerts = new Map();
   let recordAt = 0;
   const mark = async (scope: string | undefined): Promise<void> => {
     if (deps.alertsRecord === undefined) return;
@@ -431,13 +434,20 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     baselineOf = source;
     await mark(state.scope);
     if (news.length === 0) return;
-    const refs = refsToName(news, state.prefs);
+    // NOTIFY-DEDUPE: a person's file and its message are one alert.
+    const alerts = dedupeFileAndMessage(
+      news,
+      (kind) => state.prefs[kind === 'files' ? 'files' : 'messages'],
+      recentAlerts,
+      Date.now(),
+    );
+    const refs = refsToName(alerts, state.prefs);
     const names =
       refs.length === 0
         ? new Map<string, string>()
         : await server.ownerNames(refs).catch(() => new Map<string, string>());
     if (stopping) return;
-    for (const message of notifyMessages(news, state.prefs, names)) pipe.send(message);
+    for (const message of notifyMessages(alerts, state.prefs, names)) pipe.send(message);
   };
 
   const every = deps.statusEveryMs ?? STATUS_EVERY_MS;
