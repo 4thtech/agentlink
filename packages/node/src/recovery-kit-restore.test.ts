@@ -1646,6 +1646,41 @@ describe.runIf(POSIX)('UX1113-QA2 N4: a restored ID keeps the name people know',
   }, 60_000);
 });
 
+describe.runIf(POSIX)('a partly failed leftover erase rolls back (WIN-BROKEN-ID r3)', () => {
+  it('the store key already deleted is put back when a later delete fails', async () => {
+    const { code: c, agents } = await kitOnDisk([{ name: 'helper' }]);
+    const a = agents[0] as (typeof agents)[0];
+    const dir = join(t.home, '.agentlink', 'agents', 'mine');
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    const config = `${JSON.stringify({ v: 1, name: 'mine', agentId: a.agentId, keyStore: 'keychain' })}\n`;
+    await writeFile(join(dir, 'config.json'), config, { mode: 0o600 });
+    const oldKey = new Uint8Array(32).fill(9);
+    keychain.items.set(keychainAccount(a.agentId, 'store-key'), oldKey.slice());
+    keychain.items.set(keychainAccount(a.agentId, 'policy-version'), new TextEncoder().encode('0'));
+    // The store key goes first, then this delete fails: the erase throws part-way.
+    keychain.failDeleteAccount = keychainAccount(a.agentId, 'policy-version');
+    try {
+      const opened = await openKit('S1', await foundHandle(), c);
+      const kit = body(opened)['kit'] as string;
+      const begun = await engine.applyBegin('S1', { kit, selection: [a.agentId], names: {} });
+      expect(body(begun)['status']).toBe('gesture');
+      const auth = new VirtualPrfAuthenticator({ credential: newWebauthnTestCredential() });
+      const pk = body(begun)['publicKey'] as { challenge: string; userId: string; prfSalt: string };
+      const done = await engine.applyFinish(
+        'S1',
+        { nonce: body(begun)['nonce'] as JsonValue },
+        webauthnCreate(auth, pk, ORIGIN),
+      );
+      // The ID was not restored (the answer is a failure, whatever its form).
+      expect(JSON.stringify(body(done))).not.toContain('"restored"');
+      expect(keychain.items.get(keychainAccount(a.agentId, 'store-key'))).toEqual(oldKey);
+      expect(keychain.items.has(keychainAccount(a.agentId, 'seed'))).toBe(false);
+    } finally {
+      keychain.failDeleteAccount = undefined;
+    }
+  });
+});
+
 describe.runIf(POSIX)('a file-KeyStore ID is never "missing its key" (WIN-BROKEN-ID r2)', () => {
   it('a folder of this ID with keyStore file stays already_here; nothing goes to the keychain', async () => {
     const { code: c, agents } = await kitOnDisk([{ name: 'helper' }]);

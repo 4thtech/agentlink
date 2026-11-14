@@ -48,7 +48,10 @@ export class MemoryKeychain implements KeychainBackend {
     this.items.set(account, value.slice());
     return Promise.resolve();
   }
+  /** WIN-BROKEN-ID r3: a delete() of this account fails (a keychain refusal at that delete). */
+  failDeleteAccount: string | undefined;
   delete(account: string): Promise<boolean> {
+    if (account === this.failDeleteAccount) return Promise.reject(new Error('native failure'));
     return Promise.resolve(this.items.delete(account));
   }
 }

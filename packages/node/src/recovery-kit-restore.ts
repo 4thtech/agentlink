@@ -1605,8 +1605,10 @@ function build(options: RestoreEngineOptions): TerminalRestore {
         );
         // Leftover items of this ID (its seed is gone, checked again right before the deletes; any
         // seed refuses) would refuse the import; the kit carries every one of them.
-        await eraseBrokenAgentItems(keychain, agent.agentId, keychainTimeoutMs);
+        // r3: set before the erase, so a partly failed erase that already took the store key still
+        // puts it back on rollback.
         erased = true;
+        await eraseBrokenAgentItems(keychain, agent.agentId, keychainTimeoutMs);
         await control.importAgent(current.kit, agent.agentId, {
           name,
           ...(owner === undefined ? {} : { owner: owner.session }),
