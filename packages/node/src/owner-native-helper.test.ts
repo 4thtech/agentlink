@@ -538,8 +538,10 @@ describe('why native presence is unavailable (WIN-HELLO-NATIVE)', () => {
     for (const kind of [1, 2] as const) {
       expect(await createNativeHelper({ kind, run: runner({ code: 0 }) }).available()).toBe(true);
       expect(
-        await createNativeHelper({ kind, run: runner({ code: 69, unavailable: 'not_set_up' }) })
-          .available(),
+        await createNativeHelper({
+          kind,
+          run: runner({ code: 69, unavailable: 'not_set_up' }),
+        }).available(),
       ).toBe(false);
     }
   });

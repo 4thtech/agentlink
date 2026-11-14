@@ -14,7 +14,12 @@ describe('GET /api/owner/native: the unavailable reason', () => {
   it('keeps a known reason and drops anything else', async () => {
     expect(
       await readNativeStatus(
-        answer({ available: false, registered: false, unavailable: 'not_set_up', platform: 'windows' }),
+        answer({
+          available: false,
+          registered: false,
+          unavailable: 'not_set_up',
+          platform: 'windows',
+        }),
         't',
       ),
     ).toEqual({ available: false, registered: false, unavailable: 'not_set_up' });
@@ -92,7 +97,9 @@ describe('desktopPresenceOffer', () => {
           unavailable,
         });
         const text = offer.kind === 'code' ? offer.help : '';
-        expect(text).not.toMatch(/wallet|gas|seed phrase|transaction|TPM|WebAuthn|passkey|security key/i);
+        expect(text).not.toMatch(
+          /wallet|gas|seed phrase|transaction|TPM|WebAuthn|passkey|security key/i,
+        );
       }
     }
   });

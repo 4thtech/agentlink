@@ -67,7 +67,10 @@ export class StandInHelper implements NativeHelper {
   }
   availability(): Promise<
     | { readonly available: true }
-    | { readonly available: false; readonly reason: 'not_set_up' | 'no_secure_hardware' | 'unknown' }
+    | {
+        readonly available: false;
+        readonly reason: 'not_set_up' | 'no_secure_hardware' | 'unknown';
+      }
   > {
     this.availabilityCalls += 1;
     return Promise.resolve(

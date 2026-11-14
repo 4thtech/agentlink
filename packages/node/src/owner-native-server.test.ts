@@ -232,7 +232,12 @@ describe('GET and POST /api/owner/native', () => {
     const h = await harness({ helper });
     const page = await h.page();
     expect(json(await send(h.port, '/api/owner/native', { headers: page }))).toEqual({
-      native: { available: false, registered: false, unavailable: 'not_set_up', platform: 'windows' },
+      native: {
+        available: false,
+        registered: false,
+        unavailable: 'not_set_up',
+        platform: 'windows',
+      },
     });
     helper.createState = 'unavailable';
     const reg = await register(h, page);

@@ -114,8 +114,9 @@ test('Windows available: says why not, as one fixed token (WIN-HELLO-NATIVE)', (
       assert.ok(fn.indexOf('RequireHello()') < fn.indexOf('OpenMatching'), `${cmd}: gate first`);
     }
   }
-  // Never a WebAuthn / security-key path in the helper.
-  assert.ok(!/webauthn|WebAuthN|fido/i.test(winSrc));
+  // Never a WebAuthn / security-key path in the helper's code (comments may name it).
+  const code = winSrc.replace(/\/\/.*$/gm, '');
+  assert.ok(!/webauthn|fido/i.test(code));
 });
 
 test('Windows prompts are brought in front of the AgentLink window (WIN-HELLO-NATIVE)', () => {

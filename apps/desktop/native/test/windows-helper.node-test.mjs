@@ -60,13 +60,9 @@ function record({ spki = '30'.repeat(8) } = {}) {
   const s = Buffer.from(spki, 'hex');
   const len = Buffer.alloc(2);
   len.writeUInt16BE(s.length);
-  return Buffer.concat([
-    Buffer.from([0x01, name.length]),
-    name,
-    len,
-    s,
-    randomBytes(32),
-  ]).toString('hex');
+  return Buffer.concat([Buffer.from([0x01, name.length]), name, len, s, randomBytes(32)]).toString(
+    'hex',
+  );
 }
 
 test('argv: only the fixed commands, with exactly their fixed arguments', { skip }, () => {
@@ -122,7 +118,10 @@ test('malformed stdin is refused before any credential is used', { skip }, () =>
     ' ' + good,
     'a'.repeat(9000),
     // a name that is not AgentLink-owner-<32 hex>
-    record().replace(Buffer.from('AgentLink').toString('hex'), Buffer.from('Microsoft').toString('hex')),
+    record().replace(
+      Buffer.from('AgentLink').toString('hex'),
+      Buffer.from('Microsoft').toString('hex'),
+    ),
   ]) {
     for (const args of [['sign', 'approve'], ['check'], ['delete']]) {
       refused(args, input, EXIT.badInput);
@@ -138,7 +137,11 @@ test(
     assert.match(reason, UNAVAILABLE_LINE);
     // create would prompt where Windows Hello is set up; here it must stop first.
     assert.equal(refused(['create'], '', EXIT.unavailable).err, reason);
-    for (const args of [['check'], ['delete'], ...['setup', 'approve', 'pay', 'code'].map((r) => ['sign', r])]) {
+    for (const args of [
+      ['check'],
+      ['delete'],
+      ...['setup', 'approve', 'pay', 'code'].map((r) => ['sign', r]),
+    ]) {
       assert.equal(refused(args, `${record()}\n`, EXIT.unavailable).err, reason);
     }
   },
