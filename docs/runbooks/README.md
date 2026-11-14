@@ -29,6 +29,7 @@ Private procedures (incident response, secret rotation, deploy keys, Safe operat
 | RB-19 | [Submitter and faucet deploy: owner setup](submitter-deploy.md) | Owner (Tali) | Owner |
 | RB-20 | [M1 gate: tester runbook](m1-gate-testing.md) | Coordinator (orchestrator or Tali) with 10 internal testers | Sonnet (coordinator) |
 | RB-21 | [Owner feedback loop: local first, CI once](owner-feedback-loop.md) | Orchestrator; owner looks | Opus orchestrates, Sonnet builds |
+| RB-22 | [First-run matrix (manual, real machines)](firstrun-matrix.md) | Owner, with a builder for the e2e | Sonnet |
 | RB-22 | [Classroom handout: students and teacher](classroom-handout.md) | Teacher and students | Any |
 | RB-23 | [Desktop update key: one-time setup, renewal and changing the key](desktop-update-keys.md) | Owner (Tali) only | Owner |
 
