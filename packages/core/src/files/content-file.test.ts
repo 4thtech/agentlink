@@ -88,13 +88,16 @@ let folder: MemorySendFolder;
 let a: FileAgent;
 let b: FileAgent;
 
-async function open(edit: Parameters<typeof pairForFiles>[3] = () => {}): Promise<void> {
+async function open(
+  edit: Parameters<typeof pairForFiles>[3] = () => {},
+  withOwn = true,
+): Promise<void> {
   clock = new FakeClock();
   own = new MemoryOwnStorage();
   folder = new MemorySendFolder();
   a = await openFileAgent(clock, new MemoryKeyStore(seed(41)), ownerA, 'alice', {
     relays: RELAYS_A,
-    own,
+    ...(withOwn ? { own } : {}),
     writeSendFolderFile: folder.write,
   });
   b = await openFileAgent(clock, new MemoryKeyStore(seed(42)), ownerB, 'bob', {
@@ -300,7 +303,7 @@ describe('order of checks: nothing written before the write step (06 §2.3)', ()
 
   it('the contact policy refuses before the write (POLICY_DENIED, nothing written)', async () => {
     await open((p) => {
-      p.contacts.allowed = [];
+      p.contacts.allowed = [`0x${'c'.repeat(40)}`];
     });
     expect(await send('notes.md', 'x')).toEqual({ status: 'rejected', code: 'POLICY_DENIED' });
     expect(folder.calls).toEqual([]);
@@ -353,19 +356,18 @@ describe('what stays (06 §2.3 "What stays")', () => {
   });
 
   it('needs_setup after the write removes it; the same clientRequestId writes again', async () => {
+    // No own storage for alice under `files.storage: own`: a stored file needs setup.
     await open((p) => {
       p.files.storage = 'own';
-    });
-    // No own storage for this agent: a stored file needs setup.
-    const lone = await openFileAgent(clock, new MemoryKeyStore(seed(43)), ownerA, 'carol', {
-      relays: RELAYS_A,
-      writeSendFolderFile: folder.write,
-    });
-    await pairForFiles(clock, lone, b, (p) => {
-      p.files.storage = 'own';
-    });
+    }, false);
+    const lone = a;
     const big = 'b'.repeat(40_000);
-    const args = { to: b.id, contentFile: { name: 'big.md', content: big }, clientRequestId: 'r1' };
+    const args = {
+      to: b.id,
+      text: '',
+      contentFile: { name: 'big.md', content: big },
+      clientRequestId: 'r1',
+    };
     expect(await lone.client.sendMessage(args)).toEqual({
       status: 'needs_setup',
       reason: 'no_own_storage',

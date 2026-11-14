@@ -25,18 +25,28 @@
 //    A repeat with `approvalId` must carry the same `clientRequestId`, so the core returns the kept
 //    send instead of sending again; without one it is refused before anything is sent.
 //
-// I-5, I-7: the message text, the body, the path and the `to` query are agent-written (steerable)
-// text: none of it reaches a summary, `nextStep`, error or log line. Summaries name the contact under the
+// 7. With `file: {name, content}` (FILES-AI-1, D-152; 06 §2.3 "Send by content"): exactly one of
+//    `path` and `file`, never with `body`. The core gets `contentFile`: it checks the name and the
+//    content, the contact policy, the Send folder and the daily budget, has the platform's Attach
+//    writer save it into the root of the ID's own Send folder, and sends the bytes in memory. Its
+//    refusals become the fixed 06 §2.3 texts; the result's `file.name` is the saved name, and the
+//    summary names only it and the Send folder in its fixed `~` form. Neither `name` nor `content`
+//    reaches a summary, `nextStep`, error or log line otherwise. Nothing here picks a folder (I-4).
+//
+// I-5, I-7: the message text, the body, the path, the file's name and content and the `to` query
+// are agent-written (steerable) text: none of it reaches a summary, `nextStep`, error or log line. Summaries name the contact under the
 // 06 §2.1 rule only. Core errors become fixed text by their code; any other failure is INTERNAL.
 import { CoreError, type CoreErrorCode, type SendMessageInput } from '@4thtech-io/core';
 import { contactRef, renderRef, resolveContact } from './contacts.js';
 import type { AttachedFile, ToolContext } from './context.js';
 import {
   attachRefusal,
+  contentFileRefusal,
   fileErrorOutput,
   filesNeedsSetup,
   FILE_TEXT,
   isoSeconds,
+  savedAndSentSummary,
 } from './files-common.js';
 import {
   fail,
@@ -134,7 +144,8 @@ function coreErrorOutput(code: CoreErrorCode): HandlerOutput | undefined {
 
 export async function sendHandler(input: unknown, context: ToolContext): Promise<HandlerOutput> {
   if (!isPlainObject(input)) return invalidArgument();
-  const { to, text, body, type, replyTo, clientRequestId, path, notarize, approvalId } = input;
+  const { to, text, body, type, replyTo, clientRequestId, path, file, notarize, approvalId } =
+    input;
   const requestReceipt = input['requestReceipt'] === true;
   // 1. D-55: before anything else, so a negotiation never even resolves a contact.
   if (isPlainObject(body) && Object.hasOwn(body, 'terms')) return useTermsTools();
@@ -142,7 +153,20 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
   if (
     typeof to !== 'string' ||
     (text !== undefined && body !== undefined) ||
-    (text === undefined && body === undefined && path === undefined)
+    (text === undefined && body === undefined && path === undefined && file === undefined)
+  ) {
+    return invalidArgument();
+  }
+  // 7. D-152: exactly one of `path` and `file`, and `file` never with `body`.
+  const byContent = file !== undefined;
+  if (
+    byContent &&
+    (path !== undefined ||
+      body !== undefined ||
+      !isPlainObject(file) ||
+      typeof file['name'] !== 'string' ||
+      typeof file['content'] !== 'string' ||
+      Object.keys(file).some((k) => k !== 'name' && k !== 'content'))
   ) {
     return invalidArgument();
   }
@@ -185,6 +209,8 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
     }
     attached = outcome.file;
   }
+  // 7. The cloud agent has no file platform: answered as for `path`, nothing written.
+  if (byContent && client.files === undefined) return notAvailable();
 
   // 4. The core send.
   // A file sent with no text or body travels with an empty text (06 §2.2: `text` then travels as
@@ -198,6 +224,9 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
     ...(typeof replyTo === 'string' ? { replyTo } : {}),
     ...(typeof clientRequestId === 'string' ? { clientRequestId } : {}),
     ...(attached === undefined ? {} : { files: [attached.file] }),
+    ...(byContent && isPlainObject(file)
+      ? { contentFile: { name: String(file['name']), content: String(file['content']) } }
+      : {}),
   };
   let result;
   try {
@@ -212,7 +241,10 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
   switch (result.status) {
     case 'ok': {
       const name = renderRef(ref);
-      logger.info('message sent', { messages: 1, files: attached === undefined ? 0 : 1 });
+      logger.info('message sent', {
+        messages: 1,
+        files: attached === undefined && !byContent ? 0 : 1,
+      });
       // REL051-CF2: `delivery` says whether the relays took it (sent) or it waits (queued); a core
       // that does not report it keeps the old answer.
       const delivery = result.delivery;
@@ -231,7 +263,31 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
             ? copy('chat.status.ok.notDelivered', { contactName: name })
             : copy('chat.status.ok.sent', { contactName: name, contactFirstName: name });
       let sentFields: Record<string, unknown> = fields;
-      if (attached !== undefined) {
+      let shown = summary;
+      if (byContent) {
+        const saved = result.contentFile;
+        const sent = result.files?.find((f) => f.index === 0);
+        if (saved === undefined || sent === undefined) return internalError();
+        sentFields = {
+          ...fields,
+          file: {
+            name: saved.name,
+            size: saved.size,
+            plaintextSha256: saved.plaintextSha256,
+            delivery: sent.delivery,
+            expiresAt: sent.expiresAt === null ? null : isoSeconds(sent.expiresAt),
+          },
+        };
+        // 06 §2.3 "Result": the fixed sentence; with `queued` the 06 §2.2 "not sent yet" line too.
+        // With a proof its words follow, so the sentence keeps room for them (06 §1 rule 2).
+        const room = withProof ? 300 : undefined;
+        shown =
+          delivery === 'not_delivered'
+            ? summary
+            : delivery === 'queued'
+              ? savedAndSentSummary(saved.name, saved.sendFolder, name, summary, room)
+              : savedAndSentSummary(saved.name, saved.sendFolder, name, '', room);
+      } else if (attached !== undefined) {
         const sent = result.files?.find((f) => f.index === 0);
         if (sent === undefined) return internalError();
         sentFields = {
@@ -245,10 +301,10 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
           },
         };
       }
-      if (!withProof) return ok(summary, sentFields);
+      if (!withProof) return ok(shown, sentFields);
       return withProofOf(
         result.envelopeId,
-        summary,
+        shown,
         sentFields,
         approvalId,
         self.agentId,
@@ -295,9 +351,16 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
             FILE_TEXT.payloadTooLargeNextStep,
             'PAYLOAD_TOO_LARGE',
           );
-        default:
+        default: {
+          // FILES-AI-1: the `file` refusals (06 §2.3), fixed text by code.
+          const content = byContent ? contentFileRefusal(result.code) : undefined;
+          if (content !== undefined) {
+            logger.info('file send refused', { code: result.code });
+            return content;
+          }
           // A refusal code this version does not know: fixed text, never undefined (IR-M1-9p-1 F03).
           return internalError();
+        }
       }
     default:
       return internalError();

@@ -107,6 +107,11 @@ const ARG_ALLOWLIST: Readonly<Record<string, Readonly<Record<string, string>>>> 
     // folder (`files.allowedFolders`); hidden and protected paths refused; outside → needs_setup,
     // the file never opened (04 §4; test/files-mcp.test.ts).
     path: 'attaches one file from an owner-allowed folder only (04 §4)',
+    // FILES-AI-1 (D-152; 06 §2.3 "Send by content"): `{name, content}`, a text file the AI wrote. It
+    // reads nothing: the Attach writer saves it only into the root of the ID's own pinned Send
+    // folder (exclusive create, no link followed, 0600, a type allowlist, 8 MiB, a daily budget);
+    // nothing in it names or picks a folder (test/files-by-content.test.ts).
+    file: 'saves a text file the AI wrote into the Send folder only (04 §4, D-152)',
   },
   agentlink_fetch_file: {
     // 06 §2.3: an index into the received message's files[], not a path; the file is saved only

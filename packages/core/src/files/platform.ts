@@ -138,4 +138,42 @@ export interface FilesPlatform {
    * be inside or contain.
    */
   inbox(folder: string, allowedFolders?: readonly string[]): Promise<InboxFolder>;
+  /**
+   * FILES-AI-1 (D-152): the Send folder writer for `sendMessage` with `contentFile`. Absent where the
+   * runtime has no folders (the cloud agent): such a send fails with `files_unavailable`.
+   */
+  writeSendFolderFile?(input: SendFolderWriteInput): Promise<SendFolderWriteResult>;
 }
+
+/**
+ * FILES-AI-1 (D-152; 06 §2.3 "Send by content"; 04 §4 "Written by the AI into the Send folder"): one
+ * write of a file the AI wrote into the root of the ID's own Send folder, by the Attach writer.
+ * `allowedFolders` come from the verified policy only (never from the call); the writer uses only the
+ * ID's own pinned Send folder among them. `reserve` is the core's budget step: the writer calls it
+ * once, after the folder is held and before it creates anything.
+ */
+export interface SendFolderWriteInput {
+  readonly allowedFolders: readonly string[];
+  /** The sanitised, allowlisted name (the writer checks it again). */
+  readonly name: string;
+  readonly bytes: Uint8Array;
+  reserve(): Promise<'ok' | 'over' | 'unavailable'>;
+}
+
+/** Fixed reasons only: never a path or a name (I-5, I-7). */
+export type SendFolderWriteRefusal =
+  'type' | 'no_folder' | 'folder_unavailable' | 'name_taken' | 'budget' | 'budget_unavailable';
+
+export type SendFolderWriteResult =
+  | {
+      readonly ok: true;
+      /** The written file's real path (stays on this device; never shown or logged). */
+      readonly realpath: string;
+      /** The name it got (`notes (2).md` after a clash). */
+      readonly name: string;
+      /** The Send folder in its fixed home-relative form (`~/AgentLink/Send`, `Send-2` … `Send-9`). */
+      readonly sendFolder: string;
+      /** Removes the file this call wrote, only while it is still that file. */
+      remove(): Promise<void>;
+    }
+  | { readonly ok: false; readonly reason: SendFolderWriteRefusal };

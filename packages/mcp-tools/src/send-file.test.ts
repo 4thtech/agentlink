@@ -4,7 +4,12 @@
 // redaction of `name` and `content`, the tool description line, and that no input of this path
 // takes an envelope or a received file. The core and disk runs are core/src/files/content-file.test.ts
 // and apps/cli/test/files-by-content.test.ts.
-import type { ContactView, SendMessageInput, SendMessageResult } from '@4thtech-io/core';
+import {
+  CoreError,
+  type ContactView,
+  type SendMessageInput,
+  type SendMessageResult,
+} from '@4thtech-io/core';
 import { createLogger, type Logger } from '@4thtech-io/log';
 import type { ContactDisplayName, RestrictedName } from '@4thtech-io/types';
 import { Ajv } from 'ajv';
@@ -184,7 +189,10 @@ describe('order: paused and the cloud agent before any write (06 §2.3)', () => 
 
   it('no file platform (the cloud agent) → answered as for path, the core never called', async () => {
     const client = fake({ files: false });
-    const byFile = await send({ to: 'Marko', file: { name: 'a.md', content: 'x' } }, fake({ files: false }));
+    const byFile = await send(
+      { to: 'Marko', file: { name: 'a.md', content: 'x' } },
+      fake({ files: false }),
+    );
     const byPath = await send({ to: 'Marko', path: '/home/u/a.md' }, client);
     expect(structured(byFile).code).toBe(structured(byPath).code);
     expect(structured(byFile).status).toBe(structured(byPath).status);
@@ -194,13 +202,43 @@ describe('order: paused and the cloud agent before any write (06 §2.3)', () => 
 
 describe('fixed refusals (06 §2.3 "AI-side texts for files")', () => {
   const cases: Array<[string, string, string, string]> = [
-    ['FILE_NAME', 'rejected', "A file name can't contain a folder, so nothing was sent.", 'Pass a plain file name such as notes.md.'],
-    ['FILE_TYPE', 'rejected', 'Only .md, .markdown, .txt and .json files can be sent by content, so nothing was sent.', "Send other files by path from the user's Send folder."],
-    ['FILE_NOT_TEXT', 'rejected', "That content isn't plain text, so nothing was sent.", "Send text only, or send the file by path from the user's Send folder."],
+    [
+      'FILE_NAME',
+      'rejected',
+      "A file name can't contain a folder, so nothing was sent.",
+      'Pass a plain file name such as notes.md.',
+    ],
+    [
+      'FILE_TYPE',
+      'rejected',
+      'Only .md, .markdown, .txt and .json files can be sent by content, so nothing was sent.',
+      "Send other files by path from the user's Send folder.",
+    ],
+    [
+      'FILE_NOT_TEXT',
+      'rejected',
+      "That content isn't plain text, so nothing was sent.",
+      "Send text only, or send the file by path from the user's Send folder.",
+    ],
     ['FILE_TOO_LARGE', 'rejected', FILE_TEXT.fileTooLarge, FILE_TEXT.fileTooLargeNextStep],
-    ['FILE_NAME_TAKEN', 'rejected', 'The Send folder already has many files with this name, so nothing was sent.', 'Use another file name and call again.'],
-    ['SEND_FOLDER_UNAVAILABLE', 'error', "The user's Send folder isn't available right now, so nothing was sent.", 'Tell the user to check their Send folder on Home in the AgentLink app.'],
-    ['FILE_BUDGET', 'rejected', 'Your AI has saved a lot of files today, so nothing was saved or sent.', 'Try again tomorrow, or ask the user to put the file in their Send folder and call again with its path.'],
+    [
+      'FILE_NAME_TAKEN',
+      'rejected',
+      'The Send folder already has many files with this name, so nothing was sent.',
+      'Use another file name and call again.',
+    ],
+    [
+      'SEND_FOLDER_UNAVAILABLE',
+      'error',
+      "The user's Send folder isn't available right now, so nothing was sent.",
+      'Tell the user to check their Send folder on Home in the AgentLink app.',
+    ],
+    [
+      'FILE_BUDGET',
+      'rejected',
+      'Your AI has saved a lot of files today, so nothing was saved or sent.',
+      'Try again tomorrow, or ask the user to put the file in their Send folder and call again with its path.',
+    ],
   ];
   for (const [code, status, summary, nextStep] of cases) {
     it(`${code} → ${status}, fixed text`, async () => {
@@ -238,7 +276,6 @@ describe('fixed refusals (06 §2.3 "AI-side texts for files")', () => {
   });
 
   it('files_unavailable (an unreadable ledger) → FILES_UNAVAILABLE', async () => {
-    const { CoreError } = await import('@4thtech-io/core');
     const client = fake({
       send: () => Promise.reject(new CoreError('files_unavailable', 'x')),
     });
@@ -252,15 +289,11 @@ describe('result (06 §2.3 "Result")', () => {
     const client = fake({ send: () => Promise.resolve(okResult('notes (2).md')) });
     const { logger, lines } = capture();
     const content = `${CANARY} body`;
-    const result = await send(
-      { to: 'Marko', file: { name: 'notes.md', content } },
-      client,
-      logger,
-    );
+    const result = await send({ to: 'Marko', file: { name: 'notes.md', content } }, client, logger);
     expect(structured(result)).toEqual({
       status: 'ok',
       summary:
-        'Saved “notes (2).md” in the user\'s Send folder (~/AgentLink/Send) and sent it to “Marko” (self-declared).',
+        "Saved “notes (2).md” in the user's Send folder (~/AgentLink/Send) and sent it to “Marko” (self-declared).",
       envelopeId: ENVELOPE,
       thread: THREAD,
       sentAt: '2026-11-14T10:00:00Z',
@@ -297,8 +330,20 @@ describe('result (06 §2.3 "Result")', () => {
     });
     const result = await send({ to: 'Marko', file: { name: 'a.md', content: 'x' } }, client);
     expect(String(structured(result).summary)).toBe(
-      'Saved “a.md” in the user\'s Send folder and sent it to “Marko” (self-declared).',
+      "Saved “a.md” in the user's Send folder and sent it to “Marko” (self-declared).",
     );
+  });
+
+  it('a 255-byte saved name keeps the summary within the text rule (the name then left out)', async () => {
+    const long = `${'n'.repeat(252)}.md`;
+    const client = fake({
+      send: () => Promise.resolve(okResult(long, { delivery: 'queued' })),
+    });
+    const result = await send({ to: 'Marko', file: { name: long, content: 'x' } }, client);
+    expect(structured(result)).toMatchObject({ status: 'ok', file: { name: long } });
+    const summary = String(structured(result).summary);
+    expect([...summary].length).toBeLessThanOrEqual(500);
+    expect(summary).toMatch(/^Saved the file in the user's Send folder/);
   });
 
   it('the requested name never appears, only the saved one', async () => {

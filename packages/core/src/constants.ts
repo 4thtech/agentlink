@@ -13,11 +13,12 @@
  * (W4-AUTO-SAVE, D-142) adds the `files.auto_*` columns, `auto_save_log` and `auto_save_state`.
  * Version 12 (W4-PAUSE, D-143 (5)) adds `agent_pause` (07 §3.2). Version 13 (WP-13, F45) adds
  * `mcp_sessions.version` (07 §3.2). Version 14 (REL051-B2) adds `invites.invite_link` (07 §3).
- * Version 15 (RET-2, D-148) adds `envelopes.deleted_at` and `saved_files` (07 §3.8). An
+ * Version 15 (RET-2, D-148) adds `envelopes.deleted_at` and `saved_files` (07 §3.8). Version 16
+ * (FILES-AI-1, D-152) adds `content_file_budget` (06 §2.3 "Daily budget"). An
  * older build refuses a newer store (`store_schema_newer`) when it opens it, so an upgrade cannot be
  * rolled back.
  */
-export const STORE_SCHEMA_VERSION = 15;
+export const STORE_SCHEMA_VERSION = 16;
 
 /** 04 §2.9: `storagePrefix` is 16 random bytes, base64url, generated at init. */
 export const STORAGE_PREFIX_BYTES = 16;

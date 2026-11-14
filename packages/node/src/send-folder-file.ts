@@ -18,9 +18,14 @@
 //   04 §4 check (`resolveAllowedFile`: realpath inside an allowed folder, not hidden, not protected,
 //   a regular file) and the folder must still be the held one; otherwise the file is removed.
 //
-// Not exported from the package entry and never reached from MCP (I-4): only the local app's attach
-// route (local-ui/api/attach.ts, behind the session, CSRF and Origin gate) calls it. Nothing here
-// logs. Results and errors are fixed codes, never a path or a name (I-5, I-7).
+// Two callers (D-152 amends D-150 (2) for this writer only): the local app's attach route
+// (local-ui/api/attach.ts, behind the session, CSRF and Origin gate), and, since FILES-AI-1, core's
+// `sendMessage` with `contentFile` (agentlink_send `file: {name, content}`, 06 §2.3 "Send by content")
+// through the runtime's files platform. MCP reaches it only that way: the folders are the verified
+// policy's, the call names no folder, and the writer picks only the ID's own pinned Send folder
+// (I-4). For that caller, `reserve` (the core's budget step) runs once the folder is held and before
+// anything is created; the attempt limit is `name_taken`. Nothing here logs. Results and errors are
+// fixed codes, never a path or a name (I-5, I-7).
 import { constants } from 'node:fs';
 import { lstat, open, realpath, unlink } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -48,7 +53,16 @@ export const ATTACH_MAX_TOTAL_BYTES = ATTACH_MAX_FILE_BYTES;
 export type AttachProblem = 'too_large' | 'not_text';
 
 /** Why a write did not happen (fixed codes only). */
-export type SendFolderWriteRefusal = 'type' | 'no_folder' | 'folder_unavailable';
+export type SendFolderWriteRefusal =
+  | 'type'
+  | 'no_folder'
+  | 'folder_unavailable'
+  /** FILES-AI-1: every name up to the attempt limit is taken. */
+  | 'name_taken'
+  /** FILES-AI-1: the budget reservation refused (over the daily budget). */
+  | 'budget'
+  /** FILES-AI-1: the budget ledger could not be read (fail closed). */
+  | 'budget_unavailable';
 
 export type SendFolderWrite =
   | {
@@ -57,6 +71,8 @@ export type SendFolderWrite =
       readonly realpath: string;
       /** The name it got (`name (2).md` after a clash). */
       readonly name: string;
+      /** The Send folder in its fixed home-relative form (`~/AgentLink/Send`, `Send-2` … `Send-9`). */
+      readonly sendFolder: string;
       /** Removes the file this call wrote (best effort; only that name in that folder). */
       remove(): Promise<void>;
     }
@@ -114,11 +130,11 @@ function numbered(name: string, n: number): string {
   return `${truncateUtf8(stem, room).replace(/\s+$/u, '')}${tail}`;
 }
 
-/** The folder to write into: the pinned default Send folder, else the first pinned allowed one. */
+/** The ID's own pinned Send folder: its realpath and its fixed `~` form; never another folder. */
 async function sendFolder(
   allowedFolders: readonly string[],
   home: string,
-): Promise<string | undefined> {
+): Promise<{ readonly where: string; readonly shown: string } | undefined> {
   const pinned = await pinnedAllowedFolders(allowedFolders, home);
   if (pinned.length === 0) return undefined;
   const realHome = await realpath(home).catch(() => home);
@@ -126,7 +142,7 @@ async function sendFolder(
   // set-up made beside an unusable one), never another allowed folder the owner allowed for his AI.
   for (const candidate of SEND_CANDIDATES) {
     const where = pinnedLocation(candidate, realHome);
-    if (where !== undefined && pinned.includes(where)) return where;
+    if (where !== undefined && pinned.includes(where)) return { where, shown: candidate };
   }
   return undefined;
 }
@@ -137,18 +153,34 @@ export async function writeSendFolderFile(input: {
   readonly name: unknown;
   readonly bytes: Uint8Array;
   readonly home?: string;
+  /**
+   * FILES-AI-1: the core's budget step, called once after the folder is held and before anything is
+   * created. Anything but 'ok' writes nothing.
+   */
+  readonly reserve?: () => Promise<'ok' | 'over' | 'unavailable'>;
 }): Promise<SendFolderWrite> {
   const base = attachName(input.name);
   if (base === undefined) return { ok: false, reason: 'type' };
   const home = input.home ?? homedir();
   const allowed = Array.isArray(input.allowedFolders) ? input.allowedFolders : [];
-  const folder = await sendFolder(allowed, home);
-  if (folder === undefined) return { ok: false, reason: 'no_folder' };
+  const send = await sendFolder(allowed, home);
+  if (send === undefined) return { ok: false, reason: 'no_folder' };
+  const folder = send.where;
   const info = await lstat(folder).catch(() => undefined);
   if (info === undefined || !info.isDirectory()) return { ok: false, reason: 'no_folder' };
   const held = await openInboxDir(folder, info);
   if (held === undefined) return { ok: false, reason: 'folder_unavailable' };
   try {
+    if (input.reserve !== undefined) {
+      let reserved: 'ok' | 'over' | 'unavailable';
+      try {
+        reserved = await input.reserve();
+      } catch {
+        reserved = 'unavailable';
+      }
+      if (reserved === 'over') return { ok: false, reason: 'budget' };
+      if (reserved !== 'ok') return { ok: false, reason: 'budget_unavailable' };
+    }
     for (let n = 1; n <= MAX_ATTEMPTS; n += 1) {
       const name = numbered(base, n);
       const target = path.join(folder, name);
@@ -205,9 +237,9 @@ export async function writeSendFolderFile(input: {
         await remove();
         return { ok: false, reason: 'folder_unavailable' };
       }
-      return { ok: true, realpath: target, name, remove };
+      return { ok: true, realpath: target, name, sendFolder: send.shown, remove };
     }
-    return { ok: false, reason: 'folder_unavailable' };
+    return { ok: false, reason: 'name_taken' };
   } finally {
     await held.close();
   }

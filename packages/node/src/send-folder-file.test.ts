@@ -328,7 +328,8 @@ describe('writeSendFolderFile', () => {
 
     it('the attempt limit is name_taken, nothing overwritten', async () => {
       await writeFile(path.join(send, 'n.md'), 'one');
-      for (let i = 2; i <= 100; i += 1) await writeFile(path.join(send, `n (${String(i)}).md`), 'x');
+      for (let i = 2; i <= 100; i += 1)
+        await writeFile(path.join(send, `n (${String(i)}).md`), 'x');
       const out = await write('n.md', utf8('new'));
       expect(out).toEqual({ ok: false, reason: 'name_taken' });
       expect(await readFile(path.join(send, 'n.md'), 'utf8')).toBe('one');

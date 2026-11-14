@@ -55,6 +55,12 @@ let bob: Agent;
 let aliceMcp: Client;
 let bobMcp: Client;
 let tamper = false;
+/** Each owner policy change needs a higher version. */
+let policyVersion = 1;
+const setAlicePolicy = (edit: Parameters<typeof setPolicy>[1]) => {
+  policyVersion += 1;
+  return setPolicy(alice, edit, policyVersion);
+};
 
 beforeAll(async () => {
   root = await realpath(await mkdtemp(path.join(tmpdir(), 'agentlink-bycontent-')));
@@ -102,7 +108,10 @@ beforeAll(async () => {
   await setPolicy(bob, () => {});
   await pair(alice, bob);
   aliceMcp = await connect(
-    toolContext(coreToolClient(alice.client, { files: nodeFileOpener({ home: aliceHome }) }), 'alice'),
+    toolContext(
+      coreToolClient(alice.client, { files: nodeFileOpener({ home: aliceHome }) }),
+      'alice',
+    ),
   );
   bobMcp = await connect(
     toolContext(coreToolClient(bob.client, { files: nodeFileOpener({ home: bobHome }) }), 'bob'),
@@ -115,7 +124,7 @@ afterAll(async () => {
 
 beforeEach(async () => {
   tamper = false;
-  await setPolicy(alice, (p) => {
+  await setAlicePolicy((p) => {
     p.files.allowedFolders = ['~/AgentLink/Send', '~/Work'];
   });
 });
@@ -136,7 +145,10 @@ async function bobGets(): Promise<{ name: string; bytes: Uint8Array }> {
   if (last === undefined) throw new Error('nothing received');
   const fetched = await call(bobMcp, 'agentlink_fetch_file', { envelopeId: last.envelopeId });
   const savedTo = String(fetched.structured['savedTo']);
-  return { name: String(fetched.structured['name']), bytes: new Uint8Array(await readFile(savedTo)) };
+  return {
+    name: String(fetched.structured['name']),
+    bytes: new Uint8Array(await readFile(savedTo)),
+  };
 }
 
 describe('agentlink_send with file on disk (06 §2.3)', () => {
@@ -196,7 +208,7 @@ describe('agentlink_send with file on disk (06 §2.3)', () => {
   });
 
   it('no folder allowed: needs_setup NO_ALLOWED_FOLDER, nothing written', async () => {
-    await setPolicy(alice, (p) => {
+    await setAlicePolicy((p) => {
       p.files.allowedFolders = [];
     });
     const before = await readdir(send);
@@ -209,7 +221,7 @@ describe('agentlink_send with file on disk (06 §2.3)', () => {
   });
 
   it('Send folder not allowed, a link or missing while another is allowed: SEND_FOLDER_UNAVAILABLE, the other untouched', async () => {
-    await setPolicy(alice, (p) => {
+    await setAlicePolicy((p) => {
       p.files.allowedFolders = ['~/Work'];
     });
     const notAllowed = await aliceSend({
@@ -222,7 +234,7 @@ describe('agentlink_send with file on disk (06 §2.3)', () => {
     });
     expect(await readdir(work)).toEqual(['hello.txt']);
 
-    await setPolicy(alice, (p) => {
+    await setAlicePolicy((p) => {
       p.files.allowedFolders = ['~/AgentLink/Send', '~/Work'];
     });
     const moved = `${send}-moved`;

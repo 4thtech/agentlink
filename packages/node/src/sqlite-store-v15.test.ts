@@ -100,9 +100,9 @@ const pragma = (name: string): number => {
 };
 
 describe('schema version 15 (RET-2)', () => {
-  it('is the code schema version, with one migration appended', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(15);
-    expect(MIGRATIONS.at(-1)?.version).toBe(15);
+  it('is migration 15, one migration appended after version 14', () => {
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(15);
+    expect(MIGRATIONS[14]?.version).toBe(15);
     const v15 = MIGRATIONS[14]?.statements ?? [];
     expect(v15[0]).toMatch(/^ALTER TABLE "envelopes" ADD COLUMN "deleted_at" INTEGER /);
     expect(v15.filter((s) => s.startsWith('CREATE TABLE')).map((s) => s.split('"')[1])).toEqual([
@@ -116,7 +116,7 @@ describe('schema version 15 (RET-2)', () => {
     expect(before.get('files')).toHaveLength(3);
 
     const store = await SqliteStore.open(path());
-    expect(store.schemaVersion).toBe(15);
+    expect(store.schemaVersion).toBe(STORE_SCHEMA_VERSION);
     await store.close();
 
     const raw = new Database(path(), { readonly: true });
@@ -144,7 +144,7 @@ describe('schema version 15 (RET-2)', () => {
 
     // Reopening changes nothing.
     const again = await SqliteStore.open(path());
-    expect(again.schemaVersion).toBe(15);
+    expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
     expect(await again.transaction((tx) => tx.count('envelopes'))).toBe(3);
     await again.close();
   });
@@ -201,7 +201,7 @@ describe('auto_vacuum=INCREMENTAL (RET-2, 04 §4.2 "Space on disk")', () => {
   it('is skipped while the disk has less than twice the store size free, and tried again later', async () => {
     v14Fixture();
     const tight = await SqliteStore.open(path(), { freeBytes: () => Promise.resolve(1024) });
-    expect(tight.schemaVersion).toBe(15);
+    expect(tight.schemaVersion).toBe(STORE_SCHEMA_VERSION);
     await tight.close();
     expect(pragma('auto_vacuum')).toBe(0);
     const roomy = await SqliteStore.open(path(), {
@@ -216,7 +216,7 @@ describe('auto_vacuum=INCREMENTAL (RET-2, 04 §4.2 "Space on disk")', () => {
     const store = await SqliteStore.open(path(), {
       freeBytes: () => Promise.reject(new Error('no statfs')),
     });
-    expect(store.schemaVersion).toBe(15);
+    expect(store.schemaVersion).toBe(STORE_SCHEMA_VERSION);
     await store.close();
     expect(pragma('auto_vacuum')).toBe(0);
   });
@@ -225,7 +225,7 @@ describe('auto_vacuum=INCREMENTAL (RET-2, 04 §4.2 "Space on disk")', () => {
     v14Fixture();
     await withInterProcessLock(`${path()}.lock`, async () => {
       const store = await SqliteStore.open(path(), { vacuumLockTimeoutMs: 50 });
-      expect(store.schemaVersion).toBe(15);
+      expect(store.schemaVersion).toBe(STORE_SCHEMA_VERSION);
       await store.close();
     });
     expect(pragma('auto_vacuum')).toBe(0);

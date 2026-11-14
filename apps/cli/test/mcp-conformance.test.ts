@@ -88,6 +88,13 @@ describe('MCP conformance over stdio (06 §9)', () => {
         const result = await client.callTool({ name: tool.name, arguments: args! });
         expect(result.structuredContent, tool.name).toMatchObject({ status: expect.any(String) });
       }
+      // FILES-AI-1 (D-152): `agentlink_send` with `file: {name, content}` passes the input schema
+      // and gives a schema-valid result (here `needs_setup`: the test home has no ID).
+      const byContent = await client.callTool({
+        name: 'agentlink_send',
+        arguments: { to: 'nobody', file: { name: 'notes.md', content: '# Notes' } },
+      });
+      expect(byContent.structuredContent).toMatchObject({ status: expect.any(String) });
     } catch (error) {
       // The child runs against an empty test home: its stderr holds no secret.
       const reason = error instanceof Error ? error.message : String(error);

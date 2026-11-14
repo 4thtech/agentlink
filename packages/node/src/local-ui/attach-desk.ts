@@ -73,7 +73,10 @@ export function attachDesk(
         });
         if (!w.ok) {
           await removeAll(written);
-          return refused(w.reason);
+          // The attach route reserves no budget; a full run of names reads as unavailable here.
+          return refused(
+            w.reason === 'type' || w.reason === 'no_folder' ? w.reason : 'folder_unavailable',
+          );
         }
         written.push(w);
       }
