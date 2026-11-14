@@ -272,14 +272,42 @@ describe('switch to Touch ID on the first-run page (M1-UX-FIRSTRUN-V2-c, B-9)', 
     expect(codeInput().value).toBe('');
   });
 
-  it('where the browser reports no PRF it names a browser that works, and asks any passkey', async () => {
+  it('FIRSTRUN-ANY-PLATFORM: where the browser reports no PRF, no switch is offered (no USB-key path)', async () => {
     const upgrade = fakeUpgrade();
-    const { gestures } = await mount(upgrade, { prfSupport: () => Promise.resolve('no') });
-    expect(text()).toContain(UPGRADE.noPrf('Touch ID', 'Safari'));
-    expect(host.querySelector('button[type="submit"]')?.textContent).toBe('Use a passkey');
+    const apps = {
+      list: () => Promise.resolve({ kind: 'ok', apps: [], desktopRunning: false } as const),
+      currentAgent: () => Promise.resolve({ kind: 'ok', folder: 'default' } as const),
+      preview: () => Promise.resolve({ kind: 'not_available' } as const),
+      passkey: () => Promise.resolve(undefined),
+      apply: () => Promise.resolve({ kind: 'failed' } as const),
+    };
+    for (const [platform, prf] of [
+      ['mac', 'no'],
+      ['windows', 'no'],
+      ['windows', 'unknown'],
+      ['other', 'unknown'],
+    ] as const) {
+      const { gestures } = await mount(upgrade, {
+        platform,
+        prfSupport: () => Promise.resolve(prf),
+        appsApi: apps,
+      });
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 0));
+      });
+      expect(host.querySelector('input[name="backup-code"]')).toBeNull();
+      expect(heading()).toBe('Which AI app do you use?');
+      expect(gestures).toEqual([]);
+      act(() => root.unmount());
+      root = createRoot(host);
+    }
+  });
+
+  it('FIRSTRUN-ANY-PLATFORM: the switch asks only the platform authenticator, never any passkey', async () => {
+    const { gestures } = await mount(fakeUpgrade(), { prfSupport: () => Promise.resolve('unknown') });
     typeCode(CODE);
     await submit();
-    expect(gestures).toEqual([{ platform: false }]);
+    expect(gestures).toEqual([{ platform: true }]);
   });
 
   it('a passkey registered meanwhile shows "already protected"', async () => {
