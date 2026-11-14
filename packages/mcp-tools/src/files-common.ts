@@ -29,7 +29,7 @@ export function withSendFolder(template: string, sendFolder: unknown): string {
   return template.replace(FOLDER_SLOT, () => (ok ? ` (${sendFolder})` : ''));
 }
 
-const OUTSIDE_FOLDER_TEMPLATE = `Ask the user to move the file into their Send folder${FOLDER_SLOT} and call again with its new path, or, for a text file, send it with file: {name, content}. They can also open Settings, then Files, then Allow a folder in the AgentLink app, and choose the folder the file is in. You can't allow it for them. Without the app, in a terminal they opened themselves they run \`${NPX_COMMAND} policy allow-folder <path>\` (add \`--agent <name>\` if they have more than one ID).`;
+const OUTSIDE_FOLDER_TEMPLATE = `Ask the user to move the file into their Send folder${FOLDER_SLOT} and call again with its new path, or, for a text file, send it with file: {name, content}. They can open Settings, then Files, then Allow a folder in the AgentLink app, and choose the folder the file is in. You can't allow it for them. Then call again. Without the app, in a terminal they opened themselves they run \`${NPX_COMMAND} policy allow-folder <path>\` (add \`--agent <name>\` if they have more than one ID).`;
 
 const NOT_FOUND_TEMPLATE = `If you made this file in your own workspace, it may not be on the user's computer. For a text file (.md, .markdown, .txt or .json, up to 8 MB), call agentlink_send again with file: {name, content}. Otherwise ask the user to save the file into their Send folder${FOLDER_SLOT} and call again with that path.`;
 

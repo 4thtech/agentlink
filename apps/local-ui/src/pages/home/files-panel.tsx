@@ -185,7 +185,7 @@ export function FilesPanel({
                   size="sm"
                   icon="info"
                   aria-expanded={tips}
-                  aria-controls="hm-files-tip"
+                  aria-controls={tips ? 'hm-files-tip' : undefined}
                   onClick={() => setTips((v) => !v)}
                 >
                   {known ? C.tipsFor(appName) : C.tipsForUnknown}

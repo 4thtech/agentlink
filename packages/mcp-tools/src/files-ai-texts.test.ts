@@ -38,7 +38,7 @@ describe('OUTSIDE_ALLOWED_FOLDER', () => {
   it('with the Send folder: move it there, or send a text file by content, then the Settings and terminal sentences', () => {
     const text = step(attachRefusal('outside_folder', '~/AgentLink/Send'));
     expect(text).toBe(
-      "Ask the user to move the file into their Send folder (~/AgentLink/Send) and call again with its new path, or, for a text file, send it with file: {name, content}. They can also open Settings, then Files, then Allow a folder in the AgentLink app, and choose the folder the file is in. You can't allow it for them. Without the app, in a terminal they opened themselves they run `npx -y @4thtech-io/agentlink policy allow-folder <path>` (add `--agent <name>` if they have more than one ID).",
+      "Ask the user to move the file into their Send folder (~/AgentLink/Send) and call again with its new path, or, for a text file, send it with file: {name, content}. They can open Settings, then Files, then Allow a folder in the AgentLink app, and choose the folder the file is in. You can't allow it for them. Then call again. Without the app, in a terminal they opened themselves they run `npx -y @4thtech-io/agentlink policy allow-folder <path>` (add `--agent <name>` if they have more than one ID).",
     );
     expect(text.length).toBeLessThanOrEqual(500);
   });

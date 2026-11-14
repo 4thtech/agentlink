@@ -310,8 +310,11 @@ const autoCheck = (folder: string): boolean => {
   }
 };
 
-/** The ID's own Send folder in the rules' words (send-folder-file.ts): the only card with Show in Finder. */
-const SEND_FOLDER = /^~\/AgentLink\/Send(?:-[2-9])?$/;
+/** The ID's own Send folders in the server's order (send-folder-file.ts): the first found gets Show in Finder. */
+const SEND_ORDER = [
+  '~/AgentLink/Send',
+  ...[2, 3, 4, 5, 6, 7, 8, 9].map((n) => `~/AgentLink/Send-${String(n)}`),
+];
 
 /** Send folders: the folders the AI may send files from. */
 function SendFolders({
@@ -335,6 +338,14 @@ function SendFolders({
     [givenFetch, token],
   );
   const appName = useAppName();
+  // Show in Finder on one card only: the one the server opens (the first Send folder, in its order,
+  // that is found), never another allowed folder.
+  const revealable =
+    list.phase === 'ok'
+      ? SEND_ORDER.map((path) => list.folders.find((r) => r.path === path)).find(
+          (r) => r !== undefined && r.resolved !== null,
+        )?.path
+      : undefined;
   const [inbox, setInbox] = useState<string | undefined>(undefined);
   useEffect(() => {
     let live = true;
@@ -514,9 +525,7 @@ function SendFolders({
                     <span className="al-text-caption al-muted">{opensAt(row.resolved)}</span>
                   ) : null}
                 </div>
-                {SEND_FOLDER.test(row.path) && row.resolved !== null ? (
-                  <RevealButton which="send" reveal={reveal} />
-                ) : null}
+                {row.path === revealable ? <RevealButton which="send" reveal={reveal} /> : null}
                 <Button
                   variant="ghost"
                   size="sm"
