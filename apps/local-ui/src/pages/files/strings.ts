@@ -8,6 +8,7 @@ export const FILES_STRINGS = {
   foldersLabel: 'Folders your AI can send files from',
   folderMissing: "Not found on this computer. Your AI can't send from it.",
   allowFolder: 'Allow a folder',
+  remove: 'Remove',
   get everyChange(): string {
     return `Every change here needs ${sensorWord()} or your master code.`;
   },
@@ -137,6 +138,9 @@ export function refusalText(reason: string, protectedFolder?: string): string {
       return 'You can allow at most 32 folders. Remove one first.';
     case 'not_allowed':
       return "That folder isn't one of your allowed folders.";
+    // FILES-FOLDER-PICKER: a Send folder is never the Inbox, inside it or around it (04 §4.1).
+    case 'inbox_folder':
+      return "That folder can't be used: received files are saved there, and they are kept apart from what your AI can send. Choose another folder.";
     default:
       return "That folder can't be allowed. Choose another folder.";
   }

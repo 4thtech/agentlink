@@ -2,9 +2,13 @@
 // panel and by Settings › Files: the folder card look of Settings (`fl-row`, path, chip, Show in
 // Finder). Both rows show only the owner's own two folders (home as `~`), never a file name.
 // Show in Finder sends nothing but an empty POST (api/reveal-folder.ts); the server finds the folder.
-import { Button, Icon, InlineError, StatusChip } from '@4thtech-io/ui';
-import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
+// FILES-FOLDER-PICKER (D-154): the rows are folder-chooser.tsx FolderLine rows, with Add folder… on
+// Send and Change… on Inbox when the page passes its files API (the same control everywhere).
+import { Button, InlineError, StatusChip } from '@4thtech-io/ui';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import type { RevealApi } from '../../api/reveal-folder.js';
+import type { FilesApi } from './files-api.js';
+import { FolderChooser, FolderLine } from './folder-chooser.js';
 import { FILES_COPY as C, computerWord, showInLabel } from './folders-copy.js';
 import { FILES_IO_STRINGS as IO } from './io-strings.js';
 import type { FilesSummary } from './folders-summary.js';
@@ -57,8 +61,15 @@ export interface FolderRowsProps {
   readonly reveal: RevealApi;
   /** Show the Inbox row's line "{n} new" (Home). */
   readonly showNew?: boolean;
-  /** FILES-ONB-1: an action inside the Send row (the Files step's Choose another folder). */
-  readonly sendAction?: ReactNode;
+  /**
+   * FILES-FOLDER-PICKER: with the page's files API, each row has its folder control: "Add folder…"
+   * on Send (another folder the AI may send from) and "Change…" on Inbox (folder-chooser.tsx).
+   */
+  readonly api?: FilesApi;
+  /** Open the Send row's folder choice at once (the Files step's Connect card "Change"). */
+  readonly chooseFirst?: boolean;
+  /** A folder changed: the caller reads the summary again. */
+  readonly onChanged?: () => void;
 }
 
 /** Send, then Inbox. When the Send folder is not allowed the caller shows the action instead. */
@@ -66,7 +77,9 @@ export function FolderRows({
   summary,
   reveal,
   showNew = false,
-  sendAction,
+  api,
+  chooseFirst = false,
+  onChanged,
 }: FolderRowsProps): ReactElement {
   const computer = computerWord();
   const { send } = summary;
@@ -80,33 +93,55 @@ export function FolderRows({
     );
   return (
     <ul className="fl-list" data-files-rows>
-      <li className="fl-row" data-row="send">
-        <Icon name="folder" size={16} />
-        <div className="fl-row-main">
-          <span className="al-text-label">{C.sendLabel}</span>
-          {send.folder === undefined ? null : <span className="al-text-code">{send.folder}</span>}
-          <span className="al-text-caption al-muted">{C.sendLine}</span>
-          <span>{chip}</span>
-          {sendAction}
-        </div>
-        {send.state === 'allowed' ? <RevealButton which="send" reveal={reveal} /> : null}
-      </li>
-      <li className="fl-row" data-row="inbox">
-        <Icon name="inbox" size={16} />
-        <div className="fl-row-main">
-          <span className="al-text-label">{C.inboxLabel}</span>
-          {summary.inbox === undefined ? null : (
-            <span className="al-text-code">{summary.inbox}</span>
-          )}
-          <span className="al-text-caption al-muted">{C.inboxLine}</span>
-          {showNew && summary.newCount > 0 ? (
+      <FolderLine
+        row="send"
+        icon="folder"
+        label={C.sendLabel}
+        path={send.folder}
+        line={C.sendLine}
+        chip={chip}
+        actions={
+          send.state === 'allowed' ? <RevealButton which="send" reveal={reveal} /> : undefined
+        }
+        below={
+          api === undefined ? undefined : (
+            <FolderChooser
+              api={api}
+              purpose="send"
+              {...(send.folder === undefined ? {} : { current: send.folder })}
+              open={chooseFirst}
+              {...(onChanged === undefined ? {} : { onDone: onChanged })}
+            />
+          )
+        }
+      />
+      <FolderLine
+        row="inbox"
+        icon="inbox"
+        label={C.inboxLabel}
+        path={summary.inbox}
+        line={C.inboxLine}
+        chip={
+          showNew && summary.newCount > 0 ? (
             <span className="al-text-label" data-inbox-new>
               {C.inboxNew(summary.newCount)}
             </span>
-          ) : null}
-        </div>
-        {summary.inbox === undefined ? null : <RevealButton which="inbox" reveal={reveal} />}
-      </li>
+          ) : undefined
+        }
+        actions={
+          summary.inbox === undefined ? undefined : <RevealButton which="inbox" reveal={reveal} />
+        }
+        below={
+          api === undefined || summary.inbox === undefined ? undefined : (
+            <FolderChooser
+              api={api}
+              purpose="inbox"
+              current={summary.inbox}
+              {...(onChanged === undefined ? {} : { onDone: onChanged })}
+            />
+          )
+        }
+      />
     </ul>
   );
 }

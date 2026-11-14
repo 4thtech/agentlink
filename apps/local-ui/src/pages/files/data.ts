@@ -2,6 +2,10 @@
 // only; a value of the wrong shape is dropped, never guessed).
 export const LIST_PATH = '/api/ui/files';
 export const COMMIT_PATH = '/api/ui/files/folders';
+/** FILES-FOLDER-PICKER: changing the Inbox folder (api/files-inbox.ts). */
+export const INBOX_COMMIT_PATH = '/api/ui/files/inbox';
+export const inboxReviewPath = (path: string, version: number): string =>
+  `/api/ui/files/inbox/review?${new URLSearchParams({ set: path, version: String(version) }).toString()}`;
 
 /** `version`: the rules version the folder list was read at (the server's `baseVersion`, L-1). */
 export const reviewPath = (change: 'add' | 'remove', path: string, version: number): string =>
@@ -17,7 +21,8 @@ export interface FolderRow {
 export interface Review {
   /** Opaque: names the exact change the server prepared. Never shown. */
   readonly review: string;
-  readonly change: 'add' | 'remove';
+  /** FILES-FOLDER-PICKER: `inbox` changes where received files are saved. */
+  readonly change: 'add' | 'remove' | 'inbox';
   /** The folder that will be signed: the real one for an add. */
   readonly folder: string;
   readonly typed: string;
@@ -89,7 +94,7 @@ export function parseReview(data: unknown): Review | undefined {
   if (!isObject(data)) return undefined;
   const { review, change, folder, typed, elsewhere, warnings, expiresAt } = data;
   if (typeof review !== 'string' || !TOKEN.test(review)) return undefined;
-  if (change !== 'add' && change !== 'remove') return undefined;
+  if (change !== 'add' && change !== 'remove' && change !== 'inbox') return undefined;
   if (!isPath(folder) || !isPath(typed) || typeof elsewhere !== 'boolean') return undefined;
   if (!Array.isArray(warnings) || warnings.length > 64) return undefined;
   if (!warnings.every((w): w is string => typeof w === 'string' && CODE.test(w))) return undefined;

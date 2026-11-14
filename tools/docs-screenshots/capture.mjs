@@ -50,8 +50,9 @@ const origin = `http://127.0.0.1:${server.address().port}`;
 const heading = (name) => (page) => page.getByRole('heading', { name, level: 1 }).waitFor();
 const openEnter = async (page) => {
   await page.getByRole('tab', { name: 'Send folders' }).click();
-  await page.getByRole('button', { name: 'Allow a folder' }).click();
-  await page.getByRole('textbox', { name: 'Folder' }).fill('~/Documents/Shared');
+  // FILES-FOLDER-PICKER: a browser (no app window) gets the path field after Add folder….
+  await page.getByRole('button', { name: /^Add folder…/ }).click();
+  await page.getByRole('textbox', { name: 'Folder path' }).fill('~/Documents/Shared');
 };
 const SHOTS = [
   { name: 'local-activity--list', path: '/settings/activity', ready: heading('Activity') },
@@ -125,7 +126,7 @@ const SHOTS = [
     ready: heading('Files'),
     steps: async (page) => {
       await openEnter(page);
-      await page.getByRole('button', { name: 'Check folder' }).click();
+      await page.getByRole('button', { name: 'Use folder' }).click();
       await page.getByText('Before you confirm, tick each one:').waitFor();
       await page.getByRole('checkbox').first().check();
     },

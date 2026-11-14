@@ -89,6 +89,7 @@ const UNSHOWABLE = /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/u;
 const CODES: ReadonlySet<string> = new Set(POLICY_EDIT_WARNING_CODES);
 
 export type FolderRefusal =
+  | 'inbox_folder'
   | 'not_full_path'
   | 'dot_segments'
   | 'not_showable'
@@ -102,7 +103,7 @@ export type FolderRefusal =
   | 'too_many'
   | 'not_allowed';
 
-type Checked =
+export type Checked =
   | { readonly ok: true; readonly folder: string; readonly elsewhere: boolean }
   | { readonly ok: false; readonly reason: FolderRefusal; readonly protectedFolder?: string };
 
@@ -165,7 +166,11 @@ export function shownProtectedFolder(root: string, home: string, flavor: PathFla
 }
 
 /** The 04 §4 and D-99 checks for a folder the owner allows (see the header). */
-async function checkFolder(typed: string, home: string, flavor: PathFlavor): Promise<Checked> {
+export async function checkFolder(
+  typed: string,
+  home: string,
+  flavor: PathFlavor,
+): Promise<Checked> {
   const shaped = lexical(typed, home, flavor);
   if (!shaped.ok) return shaped;
   const { path } = shaped;
@@ -216,6 +221,80 @@ async function checkFolder(typed: string, home: string, flavor: PathFlavor): Pro
   return { ok: true, folder: real, elsewhere: real !== path };
 }
 
+/**
+ * FILES-FOLDER-PICKER: whether two real folders are the same, or one is inside the other (case
+ * ignored, as the 04 §4 checks do).
+ */
+export function foldersOverlap(a: string, b: string, flavor: PathFlavor): boolean {
+  const ci = { caseInsensitive: true } as const;
+  return (
+    segmentsBelow(a, b, flavor, ci) !== undefined || segmentsBelow(b, a, flavor, ci) !== undefined
+  );
+}
+
+/** The Inbox folder of the rules in force, as its realpath; undefined when unknown or missing. */
+export async function inboxRealpath(
+  client: LocalUiContext['client'],
+  home: string,
+  flavor: PathFlavor,
+): Promise<string | undefined> {
+  if (client === undefined || (client as { policy?: unknown }).policy === undefined)
+    return undefined;
+  try {
+    const policy = await client.policy.load();
+    if (policy.mode === 'fail_closed') return undefined;
+    const setting = (policy.policy.files as { inboxFolder?: unknown } | undefined)?.inboxFolder;
+    if (typeof setting !== 'string' || setting.length === 0) return undefined;
+    return await realpathOrUndefined(expandHome(setting, home, flavor));
+  } catch {
+    return undefined;
+  }
+}
+
+/** The default Inbox (06 §3), used when the rules can't be read (fail closed: still kept apart). */
+const DEFAULT_INBOX = '~/AgentLink/Inbox';
+
+/**
+ * Every form of the Inbox folder a Send folder must stay apart from: as the rules write it (`~`
+ * expanded, also against the home folder's realpath) and its realpath when it exists. When the rules
+ * can't be read, or the folder isn't created yet, the lexical forms still count (Fable r1).
+ */
+async function inboxForms(
+  client: LocalUiContext['client'],
+  home: string,
+  flavor: PathFlavor,
+): Promise<readonly string[]> {
+  let setting = DEFAULT_INBOX;
+  if (client !== undefined && (client as { policy?: unknown }).policy !== undefined) {
+    try {
+      const policy = await client.policy.load();
+      const given =
+        policy.mode === 'fail_closed'
+          ? undefined
+          : (policy.policy.files as { inboxFolder?: unknown } | undefined)?.inboxFolder;
+      if (typeof given === 'string' && given.length > 0) setting = given;
+    } catch {
+      // The default stays.
+    }
+  }
+  const forms = new Set<string>([expandHome(setting, home, flavor)]);
+  const homeReal = await realpathOrUndefined(home);
+  if (homeReal !== undefined) forms.add(expandHome(setting, homeReal, flavor));
+  const real = await realpathOrUndefined(expandHome(setting, home, flavor));
+  if (real !== undefined) forms.add(real);
+  return [...forms].filter((f) => parseAbsolutePath(f, flavor) !== undefined);
+}
+
+async function overlapsInbox(
+  client: LocalUiContext['client'],
+  folder: string,
+  home: string,
+  flavor: PathFlavor,
+): Promise<boolean> {
+  const forms = await inboxForms(client, home, flavor);
+  return forms.some((inbox) => foldersOverlap(folder, inbox, flavor));
+}
+
 /** A body kept for one review (per server). */
 interface Review {
   readonly change: 'add' | 'remove';
@@ -226,7 +305,7 @@ interface Review {
   readonly expiresAtMs: number;
 }
 
-const hashOf = (jcs: string): string => encodeBase64url(sha256(encodeUtf8(jcs)));
+export const hashOf = (jcs: string): string => encodeBase64url(sha256(encodeUtf8(jcs)));
 
 /** The one query parameter of a review: `add` or `remove`, once, 1–4096 characters. */
 function parseReviewQuery(
@@ -247,7 +326,7 @@ function parseReviewQuery(
 }
 
 /** The POST input, strictly: `{ review, acknowledged }` and nothing else. */
-function parseCommit(
+export function parseCommit(
   input: JsonValue | undefined,
 ): { readonly review: string; readonly acknowledged: readonly string[] } | undefined {
   if (typeof input !== 'object' || input === null || Array.isArray(input)) return undefined;
@@ -277,7 +356,7 @@ function foldersOf(body: JsonObject): readonly unknown[] | undefined {
   return Array.isArray(folders) ? folders : undefined;
 }
 
-function applyAnswer(outcome: OwnerActionOutcome): LocalUiResult {
+export function applyAnswer(outcome: OwnerActionOutcome): LocalUiResult {
   if (outcome.status === 'applied') {
     return result(200, { status: 'applied', confirmed: outcome.markRaised !== false });
   }
@@ -380,6 +459,9 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
         (entries) => entries.length > 0,
         () => true,
       );
+      // FILES-FOLDER-PICKER (04 §4.1): a received file never becomes sendable without the owner
+      // moving it, so a Send folder is never the Inbox, inside it or around it.
+      if (await overlapsInbox(client, folder, homeOf(), flavor)) return refused('inbox_folder');
       if (configured.includes(folder)) return refused('already_allowed');
       if (configured.length >= MAX_FOLDERS) return refused('too_many');
       next = [...configured, folder];
@@ -482,6 +564,10 @@ export function createFilesRoutes(options: FilesRouteOptions = {}): readonly Loc
     if (kept.change === 'add') {
       const again = await checkFolder(kept.folder, homeOf(), flavor);
       if (!again.ok || again.folder !== kept.folder) return fixed(409, 'folder_changed');
+      // Fable r1: the Inbox may have changed since the review; still never a Send folder.
+      if (await overlapsInbox(context.client, kept.folder, homeOf(), flavor)) {
+        return fixed(409, 'folder_changed');
+      }
     }
     const lines =
       kept.change === 'add'

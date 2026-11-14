@@ -164,6 +164,11 @@ export interface WebPreferences {
   readonly spellcheck: false;
   readonly partition: string;
   readonly disableBlinkFeatures?: string;
+  /**
+   * FILES-FOLDER-PICKER: the one preload (folder-picker.ts PRELOAD_FILE), set only when the file is
+   * in the bundle. It exposes `chooseFolder` and nothing else.
+   */
+  readonly preload?: string;
 }
 
 export interface BrowserWindowOptions {
@@ -178,7 +183,7 @@ export interface BrowserWindowOptions {
 }
 
 export interface BrowserWindow {
-  readonly webContents: WebContents;
+  readonly webContents: WebContents & { readonly id?: number };
   loadURL(url: string): Promise<void>;
   show(): void;
   focus(): void;
@@ -227,8 +232,42 @@ export interface MessageBoxOptions {
   readonly noLink?: boolean;
 }
 
+/** FILES-FOLDER-PICKER: the native folder dialog's options (only what the shell sets). */
+export interface OpenDialogOptions {
+  readonly title: string;
+  readonly buttonLabel: string;
+  readonly defaultPath?: string;
+  readonly properties: ('openDirectory' | 'createDirectory' | 'dontAddToRecent')[];
+}
+
+export interface OpenDialogResult {
+  readonly canceled: boolean;
+  readonly filePaths: string[];
+}
+
 export interface Dialog {
   showMessageBox(options: MessageBoxOptions): Promise<{ response: number }>;
+  /** FILES-FOLDER-PICKER: modal to `window`. */
+  showOpenDialog?(window: BrowserWindow, options: OpenDialogOptions): Promise<OpenDialogResult>;
+}
+
+/** FILES-FOLDER-PICKER: the frame an IPC call came from. */
+export interface WebFrameMain {
+  readonly url: string;
+  readonly parent: WebFrameMain | null;
+}
+
+/** FILES-FOLDER-PICKER: what an `ipcMain.handle` listener sees of the call. */
+export interface IpcMainInvokeEvent {
+  readonly sender: { readonly id: number };
+  readonly senderFrame: WebFrameMain | null;
+}
+
+export interface IpcMain {
+  handle(
+    channel: string,
+    listener: (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<unknown>,
+  ): void;
 }
 
 export interface Shell {
@@ -274,6 +313,8 @@ export interface ElectronModule {
   readonly Menu: { buildFromTemplate(template: MenuItemOptions[]): Menu };
   readonly dialog: Dialog;
   readonly shell: Shell;
+  /** FILES-FOLDER-PICKER: the one IPC channel (folder-picker.ts). */
+  readonly ipcMain?: IpcMain;
   /** DESK051-UPD: whether the computer is online (no request is made while it is not). */
   readonly net?: { isOnline(): boolean };
   /** N7: native notifications (main process). */

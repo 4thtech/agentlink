@@ -84,3 +84,78 @@ export function isKnownApp(app: string | undefined): app is string {
     app === 'Windsurf'
   );
 }
+
+/**
+ * FILES-FOLDER-PICKER (D-154; 11 §5.7; proposed, owner confirms at merge): the folder row's actions,
+ * its states and the browser's path field. Fixed text; a path is the owner's own folder, shown as
+ * text only.
+ */
+export const PICKER_COPY = {
+  change: 'Change…',
+  addFolder: 'Add folder…',
+  changeInboxLabel: '(where received files are saved)',
+  addSendLabel: '(a folder your AI can send from)',
+  checking: 'Checking…',
+  pending: 'Not saved yet',
+  inboxConfirmTitle: 'Save received files in this folder?',
+  inboxConfirmBody:
+    'Files people send you from now on are saved here. Files already saved stay where they are. AgentLink never opens received files.',
+  inboxConfirm: 'Use this folder',
+  inboxChanged: 'Done. New files people send you are saved in this folder.',
+  pathField: 'Folder path',
+  sendExample: 'For example ~/Documents/Shared',
+  inboxExample: 'For example ~/Documents/Received',
+  pasteHelp: (computer: string): string =>
+    computer === 'Mac'
+      ? 'Paste a folder path. In Finder, select the folder and press Option-Command-C to copy its path.'
+      : computer === 'PC'
+        ? 'Paste a folder path. In Explorer, select the folder and choose Copy as path.'
+        : 'Paste the full path of a folder.',
+  appTip: (computer: string): string =>
+    computer === 'Mac'
+      ? 'Tip: in the AgentLink app you can pick the folder in Finder.'
+      : 'Tip: in the AgentLink app you can pick the folder in Explorer.',
+  use: 'Use folder',
+  cancel: 'Cancel',
+  cantUse: (why: string): string => `That folder can't be used: ${why}`,
+} as const;
+
+const INBOX_WHY: Readonly<Record<string, string>> = {
+  link: 'it’s a shortcut to another place. Choose the folder itself.',
+  not_owned: 'it belongs to another user on this computer.',
+  shared_writable: 'other users on this computer can change what’s in it.',
+  os_folder: 'it’s a system or app folder.',
+  send_folder:
+    'it’s a folder your AI can send from, or inside or around one. Received files are kept apart.',
+  not_writable: 'AgentLink can’t save files in it.',
+  already_inbox: 'it’s already where received files are saved.',
+  too_broad: 'it’s your whole computer or your whole home folder. Choose a folder inside it.',
+  protected: 'it holds keys or AgentLink’s own data.',
+  contains_protected: 'it holds keys or AgentLink’s own data.',
+  hidden: 'it’s a hidden folder, or inside one.',
+  missing: 'it doesn’t exist. Check the path.',
+  not_folder: 'it isn’t a folder.',
+  not_full_path: 'use the full path, for example ~/Documents/Received.',
+  dot_segments: 'use the path without . or .. in it.',
+  not_showable: 'its name has characters AgentLink can’t show safely.',
+};
+
+/** Why a folder can't hold received files (api/files-inbox.ts InboxRefusal), in plain words. */
+export function inboxRefusalText(reason: string): string {
+  return PICKER_COPY.cantUse(INBOX_WHY[reason] ?? 'choose another folder.');
+}
+
+/** The last part of a folder path, for the row's name (`~` stays `~`). */
+export function folderName(path: string): string {
+  const parts = path.split(/[\\/]+/).filter((p) => p.length > 0);
+  return parts.length === 0 ? path : (parts[parts.length - 1] ?? path);
+}
+
+/** A long path cut in the middle (the start and the folder's own name stay); the row's title has it all. */
+export function middleTruncate(path: string, max = 52): string {
+  const chars = [...path];
+  if (chars.length <= max) return path;
+  const tail = Math.ceil((max - 1) * 0.6);
+  const head = max - 1 - tail;
+  return `${chars.slice(0, head).join('')}…${chars.slice(chars.length - tail).join('')}`;
+}

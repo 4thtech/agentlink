@@ -23,6 +23,8 @@ export interface MainWindowDeps {
   readonly shell: Shell;
   readonly lock: OriginLock;
   readonly platform: string;
+  /** FILES-FOLDER-PICKER: the one preload (folder-picker.ts preloadPath); undefined: none. */
+  readonly preload?: string | undefined;
   /** True once the app is quitting: then a close really closes. */
   readonly quitting: () => boolean;
   /** A button on the status page (Try again, Open log folder). */
@@ -43,7 +45,9 @@ export class MainWindow {
   /** The window, created on first use. */
   #ensure(): BrowserWindow {
     if (this.#window !== null && !this.#window.isDestroyed()) return this.#window;
-    const window = new this.#deps.BrowserWindow(windowOptions(this.#deps.platform));
+    const window = new this.#deps.BrowserWindow(
+      windowOptions(this.#deps.platform, this.#deps.preload),
+    );
     lockWebContents(window.webContents, this.#deps.lock, this.#deps.shell);
     markWebContents(window.webContents, this.#deps.platform);
     // The status page's buttons. lockWebContents blocks the navigation itself (the action host is
@@ -83,6 +87,16 @@ export class MainWindow {
       void window.loadURL(statusPageUrl(kind)).catch(() => undefined);
     }
     this.show();
+  }
+
+  /**
+   * FILES-FOLDER-PICKER: the window, only while it shows a session page (never the status page), for
+   * the folder dialog to be modal to it; else null.
+   */
+  get sessionWindow(): BrowserWindow | null {
+    const window = this.#window;
+    if (window === null || window.isDestroyed() || this.#page !== 'session') return null;
+    return window;
   }
 
   /** What the window shows now. */

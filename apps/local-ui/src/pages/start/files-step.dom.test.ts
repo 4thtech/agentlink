@@ -14,6 +14,7 @@ import { COMMIT_PATH, reviewPath } from '../files/data.js';
 import type { Answer, CommitOutcome, FilesApi, Presence } from '../files/files-api.js';
 import { FILES_COPY, appTip } from '../files/folders-copy.js';
 import { FILES_STRINGS } from '../files/strings.js';
+import { PICKER_COPY } from '../files/folders-copy.js';
 import { FIRST_RUN } from '../first-run/strings.js';
 import { filesLinkFor, type SendFolderApi } from '../home/send-folder-banner.js';
 import { FilesStep, type FilesStepProps } from './files-step.js';
@@ -174,7 +175,9 @@ async function mount(world: World, props: Partial<FilesStepProps> = {}) {
 }
 
 const buttonNamed = (name: string): HTMLButtonElement | undefined =>
-  [...host.querySelectorAll('button')].find((b) => b.textContent?.trim() === name);
+  [...host.querySelectorAll('button')].find(
+    (b) => b.textContent?.trim() === name || b.textContent?.startsWith(`${name} `) === true,
+  );
 const click = async (el: Element | undefined): Promise<void> => {
   expect(el).toBeDefined();
   await act(async () => {
@@ -235,7 +238,7 @@ describe('FILES-ONB-1: the Files step, read-only by default', () => {
     const send = host.querySelector('[data-row="send"]');
     expect(
       [...(send?.querySelectorAll('button') ?? [])].some(
-        (b) => b.textContent?.trim() === FILES_STEP.choose,
+        (b) => b.textContent?.startsWith(`${FILES_STEP.choose} `) === true,
       ),
     ).toBe(true);
   });
@@ -296,7 +299,7 @@ describe('FILES-ONB-1 (S2): Choose another folder is the existing add review and
     const field = host.querySelector<HTMLInputElement>('input[name="folder"]');
     expect(field).not.toBeNull();
     await typeInto(field as HTMLInputElement, OTHER);
-    await click(buttonNamed(FILES_STRINGS.check));
+    await click(buttonNamed(PICKER_COPY.use));
     expect(f.gets).toContain(reviewPath('add', OTHER, 7));
     expect(host.textContent).toContain(FILES_STRINGS.confirmAddTitle);
     expect(host.textContent).toContain(FILES_STRINGS.confirmAddBody);
@@ -325,7 +328,7 @@ describe('FILES-ONB-1 (S2): Choose another folder is the existing add review and
     const f = await mount({ folders: [ALLOWED] });
     await click(buttonNamed(FILES_STEP.choose));
     await typeInto(host.querySelector<HTMLInputElement>('input[name="folder"]')!, OTHER);
-    await click(buttonNamed(FILES_STRINGS.check));
+    await click(buttonNamed(PICKER_COPY.use));
     await click(buttonNamed(FILES_STRINGS.cancel));
     expect(f.commits).toEqual([]);
     expect(host.textContent).not.toContain(FILES_STRINGS.confirmAddTitle);
@@ -348,7 +351,7 @@ describe('FILES-ONB-1 (S2): Choose another folder is the existing add review and
     const f = await mount({ folders: [ALLOWED] });
     await click(buttonNamed(FILES_STEP.choose));
     await typeInto(host.querySelector<HTMLInputElement>('input[name="folder"]')!, OTHER);
-    await click(buttonNamed(FILES_STRINGS.check));
+    await click(buttonNamed(PICKER_COPY.use));
     expect(f.passkeyReads()).toBe(0);
     const code = host.querySelector<HTMLInputElement>('input[name="owner-code"]');
     expect(code).not.toBeNull();

@@ -6,6 +6,8 @@ Detail for the AgentLink user guide (agentlink-userguide.md): where your files a
 
 Your **Send** folder (`~/AgentLink/Send`) is where your AI may send from; **Inbox** (`~/AgentLink/Inbox`) is where received files are saved. Both show on Home in the Files panel (Inbox says how many are new, "Manage folders" opens Settings, Files), in the Files step of Get started and in Settings, Files, each with **Show in Finder** (**Show in Explorer** on Windows). Show in Finder opens only your own Send folder, only while it is still the folder you allowed. A folder shows Allowed, Not allowed or Not found.
 
+**Choosing folders (0.5.8).** In the app, **Add folder…** (send folders) and **Change…** (Inbox) open the Finder or Explorer dialog; in a browser you paste the path. A picked folder is checked like a typed one and changes nothing until you confirm. A new Inbox keeps old files where they are, and is never a send folder or inside or around one.
+
 If your AI made a text file in the chat and can't put it on your computer, it can send the text itself: `agentlink_send` with `file: {name, content}`. It works for .md, .markdown, .txt and .json up to 8 MB. AgentLink saves the file into your Send folder first (never over another file, never through a link) and sends exactly what your AI wrote, end-to-end encrypted. Up to 50 files and 64 MB a day per ID; your AI can't choose another folder or change your rules.
 
 ## Attach files in a conversation (0.5.4)

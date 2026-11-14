@@ -115,7 +115,7 @@ describe('Settings › Files copy', () => {
     expect(rows[1]).toContain('~/AgentLink/Inbox');
     expect(host.textContent).toContain('~/Documents/Shared');
     // The other folder's card has none.
-    const other = [...host.querySelectorAll('li.fl-row')].find((li) =>
+    const other = [...host.querySelectorAll('li.fl-line')].find((li) =>
       li.textContent?.includes('~/Documents/Shared'),
     );
     expect(other?.textContent).not.toContain(showInLabel());
