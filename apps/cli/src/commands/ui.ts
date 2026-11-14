@@ -30,8 +30,8 @@
 // BROWSER-UPDATE (runtime/browser-update.ts): a terminal host's Settings › Updates can stage the
 // registry's latest version and, on Restart now, stop itself (`update`, like a yield) and run that
 // version in this terminal. The new code runs as this OS user with the same reach as `npx …@latest`
-// already has at every start; its trust anchors are npm's sha512 integrity and `npm audit
-// signatures` (registry signatures, provenance). A same-user process could already replace the
+// already has at every start; its trust anchors are the registry's SLSA provenance for that exact
+// version (this repository's release workflow), npm's sha512 integrity, a lockfile of only registry.npmjs.org sha512 entries and `npm audit signatures`. A same-user process could already replace the
 // files npx or a global install runs, so this adds no authority beyond the page's session.
 import { homedir } from 'node:os';
 import process from 'node:process';
@@ -497,9 +497,12 @@ export async function serveUi(
     }
     // BROWSER-UPDATE: Restart now. Like a yield, this server closes first (its app-host.json goes
     // with it: no port clash, never a second owner); then the new version runs in this terminal.
+    // The close awaits the app host's close, which closes the open ID (its store and keys) before
+    // anything new starts.
     if (reason.kind === 'stop' && reason.signal === 'update' && deps.relaunch !== undefined) {
       closed = true;
       await server.close().catch(() => undefined);
+      await deps.recordExit?.('updated');
       output.print(UI_TEXT.updating);
       const code = await deps.relaunch().catch(() => undefined);
       if (code === undefined) {
@@ -792,7 +795,7 @@ export function nodeUiDeps(hooks: UiHostHooks = {}): UiDeps {
           runningApp: () => showRunningApp(homedir()),
           appTookOver: () => desktopHostAppears(homedir()),
           relaunch: async () => {
-            const launch = updater?.launch();
+            const launch = await updater?.launch();
             return launch === undefined ? undefined : relaunch(launch);
           },
         }

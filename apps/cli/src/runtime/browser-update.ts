@@ -1,58 +1,80 @@
-// BROWSER-UPDATE (08 §8; 04 §4, §6; I-4, I-7): "Update now" and "Restart now" in the browser app,
-// the local app server that `agentlink ui`, the installers' launcher or npx start. The desktop apps
-// keep their own updater (apps/desktop); nothing here runs there.
+// BROWSER-UPDATE (08 §1 "Updating the browser app"; 04 §4, §6; I-4, I-7): "Update now" and
+// "Restart now" in the browser app, the local app server that `agentlink ui`, the installers'
+// launcher or npx start. The desktop apps keep their own updater (apps/desktop); nothing here runs
+// there. A global npm install is never updated from the page: it keeps the one update command.
 //
-// Update now (stage):
-// - The version is the one the registry's `latest` dist-tag named (npm-update-check.ts: one fixed
-//   HTTPS URL, no redirects, a byte cap, a timeout) and is checked again here as plain x.y.z
-//   (packageSpec). The package spec is the fixed name plus that version: nothing from the page, the
-//   person or an inbound message ever goes into an argument, a path or the environment.
-// - npm runs as `node <npm-cli.js> …` (the npm that ships with this Node, found next to
-//   process.execPath), through `execFile` with `shell: false`: no shell, no PATH lookup, no `.cmd`
-//   shim. Only the relaunch uses `spawn` (it needs the terminal inherited; scripts/bundle-check.mjs).
-// - Into `~/.agentlink/updates/<version>` (0700, refused when it is a link): `npm install` with
-//   `--ignore-scripts` (and npm_config_ignore_scripts=true: no install script of any package runs),
-//   `--omit=dev`, and the public registry forced for the package and its scope (an npmrc registry or
-//   scoped registry cannot send it elsewhere). A fresh install with no lockfile checks every
-//   tarball against the sha512 `integrity` the registry's metadata names.
-// - Then `npm audit signatures --json` in that folder: every installed package's ECDSA registry
-//   signature, and the Sigstore provenance attestation of every package that has one (ours is
-//   published with provenance from this repository's release workflow). Anything invalid or missing,
-//   or an answer that is not exactly that JSON, fails the update and removes the folder.
-// - Then the installed package must be this package at exactly that version, its entry a plain file
-//   (no link). A global npm install is updated in place the same way (`--global --prefix <the prefix
-//   it runs from>`, scripts off, from npm's cache the verified install just filled) only when this
-//   user can write that prefix; otherwise the page shows the one update command (11 §5).
+// Update now (stage), each step must pass or the staged folder is removed and nothing can launch:
+// 1. The version is the one the registry's `latest` dist-tag named (npm-update-check.ts), checked
+//    again as plain x.y.z (packageSpec). The spec is the fixed name plus that version: nothing from
+//    the page, the person or an inbound message goes into an argument, a URL, a path or the
+//    environment.
+// 2. Provenance, before anything is installed: the registry's document for exactly that version
+//    (one fixed HTTPS URL, no redirects, no credentials, a byte cap, a timeout) must name the
+//    expected tarball URL, a sha512 `integrity` and a SLSA v1 provenance attestation at the expected
+//    URL. That attestation's statement (fetched the same way) must name exactly this package and
+//    version, the same sha512 as `integrity`, and the build workflow
+//    https://github.com/4thtech/agentlink `.github/workflows/release.yml` on `refs/heads/main`.
+//    This step reads the statement; its Sigstore signature is checked by step 5 (npm verifies the
+//    attestation bundle npm publishes for the installed package).
+// 3. npm runs as `node <npm-cli.js> …` (the npm that ships with this Node, next to
+//    process.execPath) through `execFile`, `shell: false`, with a clean environment (every inherited
+//    `npm_config_*` dropped) and an empty user and global npmrc we write, so no npmrc can redirect
+//    any package or scope. `npm install` into `~/.agentlink/updates/<version>` (0700, never through
+//    a link) with `--ignore-scripts` (no install script of any package runs), `--omit=dev`,
+//    `--strict-ssl=true`, `--package-lock=true` and the public registry. npm checks every tarball
+//    against the sha512 in the registry's metadata.
+// 4. The lockfile npm wrote: every package `resolved` from https://registry.npmjs.org/ with a sha512
+//    `integrity`, no links; this package at exactly that version with the integrity of step 2.
+// 5. `npm audit signatures --json` (same clean configuration): every installed package's registry
+//    signature and every published attestation (Sigstore) must verify; anything invalid or missing,
+//    or an answer that is not exactly that JSON, fails.
+// 6. The installed package.json names this package at exactly that version; its entry is a plain
+//    file, no link on the way (checked again at Restart now).
 //
-// Restart now (relaunch, ui.ts): this host stops like a yield (APP-CONTINUITY): its server closes and
-// its app-host.json goes, so there is no port clash and never a second owner; then this process runs
-// the staged entry (`node <entry> ui`) in the same terminal (stdio inherited, so the owner-terminal
-// check, Ctrl+C and the idle limit work as before), waits for it and exits with its code. The new
-// version opens Home in a new browser tab with a fresh one-shot link (the old tab's session is gone).
-// AI apps whose MCP entry runs `npx …@latest` pick up the new version when they start again (the page
-// says so in fixed text).
+// Restart now (relaunch, ui.ts): this host stops like a yield (APP-CONTINUITY): its server closes
+// (the open ID's store and keys with it) and its app-host.json goes, so there is no port clash and
+// never a second owner; then this process runs the staged entry (`node <entry> ui`) in the same
+// terminal (stdio inherited, so the owner-terminal check, Ctrl+C and the idle limit work as
+// before), waits for it and exits with its code. The new version opens Home in a new browser tab
+// with a fresh one-shot link. AI apps whose MCP entry runs `npx …@latest` pick up the new version
+// when they start again (the page says so in fixed text).
 //
 // Never: from an MCP tool (no tool, and the MCP server's page has no desk: 501), without the page's
 // session, CSRF and Origin (the mark gate), in a development build (no check, no offer). Nothing of
-// npm's output is shown, logged or stored; only the audit's two lists are read.
+// npm's output or the registry's answers is shown, logged or stored beyond the checks above.
 import {
   execFile as nodeExecFile,
   spawn as nodeSpawn,
   type ChildProcess,
 } from 'node:child_process';
-import { accessSync, constants, lstatSync, realpathSync, statSync } from 'node:fs';
-import { chmod, lstat, mkdir, open, readdir, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, posix as pathPosix, win32 as pathWin32, sep } from 'node:path';
+import { constants, lstatSync, statSync } from 'node:fs';
+import { chmod, lstat, mkdir, open, readdir, realpath, rm, writeFile } from 'node:fs/promises';
+import { join, posix as pathPosix, win32 as pathWin32, sep } from 'node:path';
 import process from 'node:process';
 import { parseJson } from '@4thtech-io/crypto';
 import type { AppUpdateView, LocalUiAppUpdateDesk } from '@4thtech-io/node';
-import type { BrowserInstall, NpmUpdateChecker } from './npm-update-check.js';
+import {
+  readCapped,
+  type BrowserInstall,
+  type NpmUpdateChecker,
+  type RegistryFetch,
+} from './npm-update-check.js';
 
 export const PACKAGE_NAME = '@4thtech-io/agentlink';
 export const NPM_REGISTRY = 'https://registry.npmjs.org/';
 const SCOPE_REGISTRY = `--@4thtech-io:registry=${NPM_REGISTRY}`;
 /** Under ~/.agentlink. */
 export const UPDATES_DIR = 'updates';
+/** The two empty npmrc files written into the staged folder (npm refuses one file for both). */
+export const EMPTY_NPMRC = Object.freeze({
+  user: 'empty-user-npmrc',
+  global: 'empty-global-npmrc',
+});
+/** The npmrc files npm is pointed at (both empty). */
+export interface NpmrcFiles {
+  readonly user: string;
+  readonly global: string;
+}
 /** The published CLI entry inside a staged folder (apps/cli package.json `bin`). */
 export const STAGED_ENTRY: readonly string[] = Object.freeze([
   'node_modules',
@@ -63,26 +85,50 @@ export const STAGED_ENTRY: readonly string[] = Object.freeze([
 ]);
 export const INSTALL_TIMEOUT_MS = 10 * 60_000;
 export const VERIFY_TIMEOUT_MS = 5 * 60_000;
+export const FETCH_TIMEOUT_MS = 30_000;
 /** The audit's JSON answer is small; anything larger is not one. */
 const MAX_AUDIT_BYTES = 256 * 1024;
 const MAX_PACKAGE_JSON_BYTES = 64 * 1024;
+const MAX_VERSION_DOC_BYTES = 256 * 1024;
+const MAX_ATTESTATIONS_BYTES = 1024 * 1024;
+const MAX_LOCKFILE_BYTES = 8 * 1024 * 1024;
 /** Restart now answers first; the host stops this long after. */
 export const RESTART_DELAY_MS = 300;
+
+/** The provenance every release must carry (apps/cli package.json publishConfig.provenance). */
+export const PROVENANCE = Object.freeze({
+  predicateType: 'https://slsa.dev/provenance/v1',
+  repository: 'https://github.com/4thtech/agentlink',
+  workflow: '.github/workflows/release.yml',
+  ref: 'refs/heads/main',
+});
 
 const NUM = '(0|[1-9][0-9]{0,5})';
 const RELEASE_VERSION = new RegExp(`^${NUM}\\.${NUM}\\.${NUM}$`);
 const isRelease = (v: unknown): v is string => typeof v === 'string' && RELEASE_VERSION.test(v);
+const SHA512_SRI = /^sha512-[A-Za-z0-9+/]{86}==$/;
 
 /** `@4thtech-io/agentlink@x.y.z` for a plain release version; undefined for anything else. */
 export function packageSpec(version: unknown): string | undefined {
   return isRelease(version) ? `${PACKAGE_NAME}@${version}` : undefined;
 }
 
-const common = (): readonly string[] => [
-  '--ignore-scripts',
-  '--omit=dev',
-  '--no-audit',
-  '--no-fund',
+/** The registry's document for exactly that version (fixed form). */
+export const versionDocUrl = (version: string): string =>
+  `${NPM_REGISTRY}@4thtech-io%2fagentlink/${version}`;
+const tarballUrl = (version: string): string =>
+  `${NPM_REGISTRY}@4thtech-io/agentlink/-/agentlink-${version}.tgz`;
+/** The attestations of exactly that version (fixed form). */
+export const attestationsUrl = (version: string): string =>
+  `${NPM_REGISTRY}-/npm/v1/attestations/@4thtech-io%2fagentlink@${version}`;
+
+/** The npm configuration every run gets: an empty npmrc, TLS checked, the public registry. */
+const config = (npmrc: NpmrcFiles): readonly string[] => [
+  '--userconfig',
+  npmrc.user,
+  '--globalconfig',
+  npmrc.global,
+  '--strict-ssl=true',
   '--no-update-notifier',
   '--registry',
   NPM_REGISTRY,
@@ -90,41 +136,40 @@ const common = (): readonly string[] => [
 ];
 
 /** `npm install` of the spec into the staging folder (argv for `node`). */
-export function installArgs(npmCli: string, prefix: string, spec: string): readonly string[] {
-  return [npmCli, 'install', spec, '--prefix', prefix, ...common()];
-}
-
-/** `npm audit signatures` of the staging folder (argv for `node`). */
-export function verifyArgs(npmCli: string, prefix: string): readonly string[] {
+export function installArgs(
+  npmCli: string,
+  prefix: string,
+  spec: string,
+  npmrc: NpmrcFiles,
+): readonly string[] {
   return [
     npmCli,
-    'audit',
-    'signatures',
-    '--json',
+    'install',
+    spec,
     '--prefix',
     prefix,
-    '--no-update-notifier',
-    '--registry',
-    NPM_REGISTRY,
-    SCOPE_REGISTRY,
+    '--ignore-scripts',
+    '--omit=dev',
+    '--package-lock=true',
+    '--no-audit',
+    '--no-fund',
+    ...config(npmrc),
   ];
 }
 
-/** The global install in place, at the prefix this copy runs from (argv for `node`). */
-export function globalInstallArgs(npmCli: string, prefix: string, spec: string): readonly string[] {
-  return [npmCli, 'install', spec, '--global', '--prefix', prefix, '--prefer-offline', ...common()];
+/** `npm audit signatures` of the staging folder (argv for `node`). */
+export function verifyArgs(npmCli: string, prefix: string, npmrc: NpmrcFiles): readonly string[] {
+  return [npmCli, 'audit', 'signatures', '--json', '--prefix', prefix, ...config(npmrc)];
 }
 
-/** The environment npm runs with: scripts off, no registry overrides, no update notice. */
+/** The environment npm runs with: no inherited npm configuration at all, scripts off. */
 export function updateEnv(
   env: Readonly<Record<string, string | undefined>>,
 ): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined) continue;
-    const lower = key.toLowerCase();
-    if (lower === 'npm_config_registry' || /^npm_config_@[^:]*:registry$/.test(lower)) continue;
-    if (lower === 'npm_config_ignore_scripts' || lower === 'npm_config_update_notifier') continue;
+    if (key.toLowerCase().startsWith('npm_config_')) continue;
     out[key] = value;
   }
   out['npm_config_ignore_scripts'] = 'true';
@@ -135,20 +180,128 @@ export function updateEnv(
 const isObject = (v: unknown): v is Readonly<Record<string, unknown>> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
 
+const decodeJson = (bytes: Uint8Array, max: number): unknown => {
+  if (bytes.length === 0 || bytes.length > max) return undefined;
+  try {
+    return parseJson(new TextDecoder('utf-8', { fatal: true }).decode(bytes).trim());
+  } catch {
+    return undefined;
+  }
+};
+
 /** True only for the audit's JSON with an empty `invalid` and an empty `missing` list. */
 export function parseAuditSignatures(bytes: Uint8Array): boolean {
-  if (bytes.length === 0 || bytes.length > MAX_AUDIT_BYTES) return false;
-  let value: unknown;
-  try {
-    value = parseJson(new TextDecoder('utf-8', { fatal: true }).decode(bytes).trim());
-  } catch {
-    return false;
-  }
+  const value = decodeJson(bytes, MAX_AUDIT_BYTES);
   if (!isObject(value)) return false;
   const { invalid, missing } = value;
   return (
     Array.isArray(invalid) && invalid.length === 0 && Array.isArray(missing) && missing.length === 0
   );
+}
+
+/**
+ * The registry's version document: the sha512 `integrity` when it names exactly this package and
+ * version, the expected tarball and a SLSA v1 provenance attestation at the expected URL.
+ */
+export function checkVersionDoc(bytes: Uint8Array, version: string): string | undefined {
+  const doc = decodeJson(bytes, MAX_VERSION_DOC_BYTES);
+  if (!isObject(doc) || doc['name'] !== PACKAGE_NAME || doc['version'] !== version)
+    return undefined;
+  const dist = doc['dist'];
+  if (!isObject(dist) || dist['tarball'] !== tarballUrl(version)) return undefined;
+  const integrity = dist['integrity'];
+  if (typeof integrity !== 'string' || !SHA512_SRI.test(integrity)) return undefined;
+  const attestations = dist['attestations'];
+  if (!isObject(attestations) || attestations['url'] !== attestationsUrl(version)) return undefined;
+  const provenance = attestations['provenance'];
+  if (!isObject(provenance) || provenance['predicateType'] !== PROVENANCE.predicateType) {
+    return undefined;
+  }
+  return integrity;
+}
+
+/** The hex of a `sha512-<base64>` integrity. */
+export function integrityHex(integrity: string): string {
+  return Buffer.from(integrity.slice('sha512-'.length), 'base64').toString('hex');
+}
+
+/**
+ * The provenance statement: exactly one subject (this package at this version, the sha512 of
+ * `integrity`), built by this repository's release workflow on main.
+ */
+export function checkProvenance(bytes: Uint8Array, version: string, integrity: string): boolean {
+  const doc = decodeJson(bytes, MAX_ATTESTATIONS_BYTES);
+  if (!isObject(doc) || !Array.isArray(doc['attestations'])) return false;
+  const found = (doc['attestations'] as unknown[]).filter(
+    (a) => isObject(a) && a['predicateType'] === PROVENANCE.predicateType,
+  );
+  if (found.length !== 1) return false;
+  const bundle = (found[0] as Readonly<Record<string, unknown>>)['bundle'];
+  const envelope = isObject(bundle) ? bundle['dsseEnvelope'] : undefined;
+  if (!isObject(envelope) || envelope['payloadType'] !== 'application/vnd.in-toto+json') {
+    return false;
+  }
+  const payload = envelope['payload'];
+  if (typeof payload !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(payload)) return false;
+  const statement = decodeJson(
+    new Uint8Array(Buffer.from(payload, 'base64')),
+    MAX_ATTESTATIONS_BYTES,
+  );
+  if (!isObject(statement) || statement['predicateType'] !== PROVENANCE.predicateType) return false;
+  const subject = statement['subject'];
+  if (!Array.isArray(subject) || subject.length !== 1) return false;
+  const only: unknown = subject[0];
+  if (!isObject(only) || only['name'] !== `pkg:npm/%404thtech-io/agentlink@${version}`)
+    return false;
+  const digest = only['digest'];
+  if (!isObject(digest) || digest['sha512'] !== integrityHex(integrity)) return false;
+  const predicate = statement['predicate'];
+  const build = isObject(predicate) ? predicate['buildDefinition'] : undefined;
+  const external = isObject(build) ? build['externalParameters'] : undefined;
+  const workflow = isObject(external) ? external['workflow'] : undefined;
+  return (
+    isObject(workflow) &&
+    workflow['repository'] === PROVENANCE.repository &&
+    workflow['path'] === PROVENANCE.workflow &&
+    workflow['ref'] === PROVENANCE.ref
+  );
+}
+
+/**
+ * The lockfile npm wrote: every package from the public registry with a sha512 integrity, no
+ * links; this package at exactly `version` with `integrity`.
+ */
+export function checkLockfile(text: string, version: string, integrity: string): boolean {
+  let lock: unknown;
+  try {
+    lock = parseJson(text);
+  } catch {
+    return false;
+  }
+  if (!isObject(lock) || !isObject(lock['packages'])) return false;
+  const packages = lock['packages'];
+  let ours = false;
+  for (const [key, entry] of Object.entries(packages)) {
+    if (key === '') continue;
+    // Only packages inside the staged folder (never `../…`, an entry outside it).
+    if (!key.startsWith('node_modules/') || key.split('/').includes('..')) return false;
+    if (!isObject(entry) || entry['link'] !== undefined) return false;
+    const resolved = entry['resolved'];
+    if (typeof resolved !== 'string' || !resolved.startsWith(NPM_REGISTRY)) return false;
+    try {
+      if (new URL(resolved).origin !== 'https://registry.npmjs.org') return false;
+    } catch {
+      return false;
+    }
+    const sri = entry['integrity'];
+    if (typeof sri !== 'string' || !/^sha512-[A-Za-z0-9+/]+={0,2}$/.test(sri)) return false;
+    if (key === 'node_modules/@4thtech-io/agentlink') {
+      if (entry['version'] !== version || sri !== integrity) return false;
+      if (resolved !== tarballUrl(version)) return false;
+      ours = true;
+    }
+  }
+  return ours;
 }
 
 const defaultIsFile = (path: string): boolean => {
@@ -172,29 +325,6 @@ export function findNpmCli(
       ? p.join(bin, 'node_modules', 'npm', 'bin', 'npm-cli.js')
       : p.join(bin, '..', 'lib', 'node_modules', 'npm', 'bin', 'npm-cli.js');
   return isFile(candidate) ? candidate : undefined;
-}
-
-/**
- * The prefix of the global install `script` belongs to, from its layout only
- * (`<prefix>/lib/node_modules/@4thtech-io/agentlink/dist/agentlink.js`; on Windows without `lib`).
- */
-export function globalPrefix(
-  script: string,
-  platform: NodeJS.Platform = process.platform,
-): string | undefined {
-  const p = platform === 'win32' ? pathWin32 : pathPosix;
-  const parts = p.normalize(script).split(p.sep);
-  const tail = ['node_modules', '@4thtech-io', 'agentlink', 'dist', 'agentlink.js'];
-  if (parts.length < tail.length + 1) return undefined;
-  const end = parts.slice(-tail.length);
-  if (end.some((part, i) => part !== tail[i])) return undefined;
-  let head = parts.slice(0, -tail.length);
-  if (platform !== 'win32') {
-    if (head.at(-1) !== 'lib') return undefined;
-    head = head.slice(0, -1);
-  }
-  const prefix = head.join(p.sep);
-  return prefix === '' ? undefined : prefix;
 }
 
 export interface RunResult {
@@ -257,6 +387,34 @@ export function execFileRunner(
     });
 }
 
+/** One GET of a fixed registry URL: no redirects, no credentials, a byte cap. Never throws. */
+async function fetchFixed(
+  fetchImpl: RegistryFetch,
+  url: string,
+  max: number,
+  timeoutMs: number = FETCH_TIMEOUT_MS,
+): Promise<Uint8Array | undefined> {
+  try {
+    const response = await fetchImpl(url, {
+      method: 'GET',
+      redirect: 'error',
+      credentials: 'omit',
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: { accept: 'application/json' },
+    });
+    if (response.status !== 200) {
+      await response.body?.cancel().catch(() => undefined);
+      return undefined;
+    }
+    return await readCapped(response, max);
+  } catch {
+    return undefined;
+  }
+}
+
+const defaultFetch: RegistryFetch = (url, init) =>
+  fetch(url, { ...init, headers: { ...init.headers } });
+
 export type UpdaterPhase = 'idle' | 'downloading' | 'verifying' | 'ready' | 'failed';
 
 export interface BrowserUpdaterDeps {
@@ -269,19 +427,9 @@ export interface BrowserUpdaterDeps {
   /** process.argv[1]. */
   readonly script: string | undefined;
   readonly run: Runner;
-  readonly platform?: NodeJS.Platform;
-  /** Whether this user may write `path` (default: an access check). */
-  readonly writable?: (path: string) => boolean;
+  /** The registry reads (default: fetch). */
+  readonly fetch?: RegistryFetch;
 }
-
-const defaultWritable = (path: string): boolean => {
-  try {
-    accessSync(path, constants.W_OK);
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 /** Reads a small regular file (never through a link), or undefined. */
 async function readSmall(path: string, max: number): Promise<string | undefined> {
@@ -307,7 +455,7 @@ export class BrowserUpdater {
   readonly #deps: BrowserUpdaterDeps;
   #phase: UpdaterPhase = 'idle';
   #version = '';
-  #entry: string | undefined;
+  #dir: string | undefined;
   #running: Promise<boolean> | undefined;
 
   constructor(deps: BrowserUpdaterDeps) {
@@ -323,37 +471,16 @@ export class BrowserUpdater {
     return this.#version;
   }
 
-  /** The prefix of a global install this user can write, or undefined. */
-  #globalTarget(): string | undefined {
-    const { script } = this.#deps;
-    if (script === undefined) return undefined;
-    const platform = this.#deps.platform ?? process.platform;
-    let real = script;
-    try {
-      real = realpathSync(script);
-    } catch {
-      // Judged from the path as given.
-    }
-    const prefix = globalPrefix(real, platform);
-    if (prefix === undefined) return undefined;
-    const p = platform === 'win32' ? pathWin32 : pathPosix;
-    const scopeDir = p.dirname(p.dirname(p.dirname(real)));
-    const binDir = platform === 'win32' ? prefix : p.join(prefix, 'bin');
-    const writable = this.#deps.writable ?? defaultWritable;
-    return writable(scopeDir) && writable(binDir) ? prefix : undefined;
-  }
-
   /** Whether Update now can run here (else the page shows the one command). */
   canInstall(): boolean {
-    if (this.#deps.npmCli === undefined) return false;
-    if (this.#deps.install !== 'global') return true;
-    return this.#globalTarget() !== undefined;
+    // A global npm install keeps its own command (it is never changed from the page).
+    return this.#deps.npmCli !== undefined && this.#deps.install !== 'global';
   }
 
   /** Update now: stages `version`. True once it is ready to launch. Never throws. */
   stage(version: string): Promise<boolean> {
     if (this.#running !== undefined) return this.#running;
-    const running = this.#stage(version).catch(() => false);
+    const running = this.#stage(version).catch(() => this.#fail(undefined));
     this.#running = running;
     void running.finally(() => {
       if (this.#running === running) this.#running = undefined;
@@ -365,64 +492,65 @@ export class BrowserUpdater {
     const spec = packageSpec(version);
     const npmCli = this.#deps.npmCli;
     if (spec === undefined || npmCli === undefined || !this.canInstall()) return false;
-    const globalTarget = this.#deps.install === 'global' ? this.#globalTarget() : undefined;
-    if (this.#deps.install === 'global' && globalTarget === undefined) return false;
     this.#version = version;
-    this.#entry = undefined;
+    this.#dir = undefined;
     this.#phase = 'downloading';
-    const root = join(this.#deps.home, '.agentlink', UPDATES_DIR);
-    const dir = join(root, version);
+    // Step 2: provenance before anything is installed.
+    const fetchImpl = this.#deps.fetch ?? defaultFetch;
+    const docBytes = await fetchFixed(fetchImpl, versionDocUrl(version), MAX_VERSION_DOC_BYTES);
+    const integrity = docBytes === undefined ? undefined : checkVersionDoc(docBytes, version);
+    if (integrity === undefined) return this.#fail(undefined);
+    const attBytes = await fetchFixed(fetchImpl, attestationsUrl(version), MAX_ATTESTATIONS_BYTES);
+    if (attBytes === undefined || !checkProvenance(attBytes, version, integrity)) {
+      return this.#fail(undefined);
+    }
+    const given = join(this.#deps.home, '.agentlink', UPDATES_DIR);
+    let dir: string | undefined;
     try {
       await mkdir(join(this.#deps.home, '.agentlink'), { recursive: true, mode: 0o700 });
-      await mkdir(root, { recursive: true, mode: 0o700 });
-      const info = await lstat(root);
+      await mkdir(given, { recursive: true, mode: 0o700 });
+      const info = await lstat(given);
       // Never through a link (another place would get the code this process then runs).
-      if (!info.isDirectory() || info.isSymbolicLink()) return this.#fail(undefined);
-      if (process.platform !== 'win32' && (info.mode & 0o077) !== 0) {
-        await chmod(root, 0o700);
-      }
+      if (!info.isDirectory() || info.isSymbolicLink()) return await this.#fail(undefined);
+      if (process.platform !== 'win32' && (info.mode & 0o077) !== 0) await chmod(given, 0o700);
+      // The real path (a home behind a link, as /var on macOS): npm names lockfile entries from
+      // the real location, and the checks below read exactly what npm wrote.
+      const root = await realpath(given);
+      dir = join(root, version);
       await rm(dir, { recursive: true, force: true });
       await mkdir(dir, { mode: 0o700 });
       await writeFile(join(dir, 'package.json'), '{"private":true}\n', { mode: 0o600 });
+      const npmrc: NpmrcFiles = {
+        user: join(dir, EMPTY_NPMRC.user),
+        global: join(dir, EMPTY_NPMRC.global),
+      };
+      await writeFile(npmrc.user, '', { mode: 0o600 });
+      await writeFile(npmrc.global, '', { mode: 0o600 });
       const { execPath, run } = this.#deps;
-      const installed = await run(execPath, installArgs(npmCli, dir, spec), {
+      // Step 3.
+      const installed = await run(execPath, installArgs(npmCli, dir, spec, npmrc), {
         cwd: dir,
         timeoutMs: INSTALL_TIMEOUT_MS,
       });
-      if (installed.code !== 0) return this.#fail(dir);
+      if (installed.code !== 0) return await this.#fail(dir);
       this.#phase = 'verifying';
-      const audited = await run(execPath, verifyArgs(npmCli, dir), {
+      // Step 4.
+      const lock = await readSmall(join(dir, 'package-lock.json'), MAX_LOCKFILE_BYTES);
+      if (lock === undefined || !checkLockfile(lock, version, integrity)) {
+        return await this.#fail(dir);
+      }
+      // Step 5.
+      const audited = await run(execPath, verifyArgs(npmCli, dir, npmrc), {
         cwd: dir,
         timeoutMs: VERIFY_TIMEOUT_MS,
       });
-      if (audited.code !== 0 || !parseAuditSignatures(audited.stdout)) return this.#fail(dir);
-      const pkgRoot = join(dir, ...STAGED_ENTRY.slice(0, 3));
-      const text = await readSmall(join(pkgRoot, 'package.json'), MAX_PACKAGE_JSON_BYTES);
-      let pkg: unknown;
-      try {
-        pkg = text === undefined ? undefined : parseJson(text);
-      } catch {
-        pkg = undefined;
+      if (audited.code !== 0 || !parseAuditSignatures(audited.stdout)) {
+        return await this.#fail(dir);
       }
-      if (!isObject(pkg) || pkg['name'] !== PACKAGE_NAME || pkg['version'] !== version) {
-        return this.#fail(dir);
-      }
-      const entry = join(dir, ...STAGED_ENTRY);
-      const entryInfo = await lstat(entry).catch(() => undefined);
-      if (entryInfo === undefined || !entryInfo.isFile()) return this.#fail(dir);
-      for (const part of [pkgRoot, dirname(entry)]) {
-        const linkInfo = lstatSync(part, { throwIfNoEntry: false });
-        if (linkInfo === undefined || linkInfo.isSymbolicLink()) return this.#fail(dir);
-      }
-      if (globalTarget !== undefined) {
-        const updated = await run(execPath, globalInstallArgs(npmCli, globalTarget, spec), {
-          cwd: dir,
-          timeoutMs: INSTALL_TIMEOUT_MS,
-        });
-        if (updated.code !== 0) return this.#fail(dir);
-      }
+      // Step 6.
+      if (!(await stagedOk(dir, version))) return await this.#fail(dir);
       await this.#tidy(root, version);
-      this.#entry = entry;
+      this.#dir = dir;
       this.#phase = 'ready';
       return true;
     } catch {
@@ -432,7 +560,7 @@ export class BrowserUpdater {
 
   async #fail(dir: string | undefined): Promise<false> {
     this.#phase = 'failed';
-    this.#entry = undefined;
+    this.#dir = undefined;
     if (dir !== undefined) await rm(dir, { recursive: true, force: true }).catch(() => undefined);
     return false;
   }
@@ -448,11 +576,50 @@ export class BrowserUpdater {
     }
   }
 
-  /** Restart now: what to run (`node <entry> ui`), only once a version is ready. */
-  launch(): { readonly file: string; readonly args: readonly string[] } | undefined {
-    if (this.#phase !== 'ready' || this.#entry === undefined) return undefined;
-    return Object.freeze({ file: this.#deps.execPath, args: Object.freeze([this.#entry, 'ui']) });
+  /** Whether a version is staged and ready (Restart now can be offered). */
+  ready(): boolean {
+    return this.#phase === 'ready' && this.#dir !== undefined;
   }
+
+  /**
+   * Restart now: what to run (`node <entry> ui`), after checking the staged files again (this
+   * package at that version, the entry a plain file, no link on the way). Undefined otherwise.
+   */
+  async launch(): Promise<{ readonly file: string; readonly args: readonly string[] } | undefined> {
+    const dir = this.#dir;
+    if (!this.ready() || dir === undefined) return undefined;
+    if (!(await stagedOk(dir, this.#version))) {
+      await this.#fail(dir);
+      return undefined;
+    }
+    return Object.freeze({
+      file: this.#deps.execPath,
+      args: Object.freeze([join(dir, ...STAGED_ENTRY), 'ui']),
+    });
+  }
+}
+
+/** Step 6: the staged package is this package at `version`; no link from the folder to the entry. */
+async function stagedOk(dir: string, version: string): Promise<boolean> {
+  const chain: string[] = [dir];
+  for (let i = 1; i <= STAGED_ENTRY.length; i += 1)
+    chain.push(join(dir, ...STAGED_ENTRY.slice(0, i)));
+  for (const [i, part] of chain.entries()) {
+    const info = lstatSync(part, { throwIfNoEntry: false });
+    if (info === undefined || info.isSymbolicLink()) return false;
+    if (i === chain.length - 1 ? !info.isFile() : !info.isDirectory()) return false;
+  }
+  const text = await readSmall(
+    join(dir, ...STAGED_ENTRY.slice(0, 3), 'package.json'),
+    MAX_PACKAGE_JSON_BYTES,
+  );
+  let pkg: unknown;
+  try {
+    pkg = text === undefined ? undefined : parseJson(text);
+  } catch {
+    return false;
+  }
+  return isObject(pkg) && pkg['name'] === PACKAGE_NAME && pkg['version'] === version;
 }
 
 /**
@@ -510,8 +677,8 @@ export interface BrowserRestart {
 
 /**
  * The browser app's desk with Update now and Restart now: the checker's view, overlaid with the
- * updater's phase. `installable` only where the updater can run (a global install this user cannot
- * write keeps the one command).
+ * updater's phase. `installable` only where the updater can run (a global npm install keeps the
+ * one command).
  */
 export function browserUpdateDeskWith(
   checker: NpmUpdateChecker,
@@ -568,7 +735,7 @@ export function browserUpdateDeskWith(
       return view();
     },
     restart: () => {
-      if (updater.launch() === undefined || restarting) return view();
+      if (!updater.ready() || restarting) return view();
       restarting = true;
       later(() => {
         let taken: boolean;

@@ -20,7 +20,7 @@ From 0.5.6 the browser app updates itself, with no command to type:
 2. Press **Restart now**. AgentLink closes and opens again in a new browser tab with the new version, in the same terminal window. You can close the old tab.
 3. Quit and reopen your AI apps so they use the new version too. The page says so.
 
-AgentLink installs only the exact version the npm registry names as the latest, checks npm's signatures for it, and runs no install scripts. Your IDs, people and messages stay as they are.
+AgentLink installs only the exact version the npm registry names as the latest, and only when the registry shows it was built by AgentLink's own release workflow; it checks npm's signatures for every package and runs no install scripts. Your own npm settings are not used for it. Your IDs, people and messages stay as they are.
 
 If AgentLink can't update itself here, the page shows the steps instead:
 
@@ -28,7 +28,7 @@ If AgentLink can't update itself here, the page shows the steps instead:
   1. In the terminal window where AgentLink is running, press **Ctrl+C**.
   2. Start it again: type `agentlink` (installer) or `npx -y @4thtech-io/agentlink@latest` (npx). The page shows the right command with **Copy**.
   3. AgentLink opens in your browser again.
-- **You installed it with `npm install -g` into a folder you can't change** (for example one that needs admin rights). The page shows the one command, with **Copy**:
+- **You installed it with `npm install -g`.** That copy is never changed from the page. The page shows the one command, with **Copy**:
   1. Press **Ctrl+C** in the terminal window where AgentLink is running.
   2. Run `npm install -g @4thtech-io/agentlink@latest`.
   3. Start it again with `agentlink`.

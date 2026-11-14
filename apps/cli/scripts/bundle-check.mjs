@@ -22,9 +22,10 @@
 //
 // Usage: node scripts/bundle-check.mjs [--bundle <file>] [--tools-entry <file>]
 //                                      [--skip-bundle] [--skip-tools]
+//                                      [--sources-root <dir>] [--skip-sources]
 // Exit code 0 when every check passes, 1 on a finding (each one on stderr), 2 on an error.
-import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { join, relative, resolve, sep } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -79,14 +80,84 @@ export const BUNDLE_BUILTINS = [
  * Node built-ins the bundle may import only as the named bindings listed, in static `import { … }`
  * declarations (no default, namespace or bare import, no re-export, no `import()`). M1-11a-b: the
  * local approval UI's OS browser opener and notifier (@4thtech-io/node approval-os.ts) run a fixed
- * program with fixed arguments through `execFile` (no shell). BROWSER-UPDATE: `spawn` too, for one
- * call only: Restart now runs the staged new version (`node <entry> ui`, argv, `shell: false`) with
- * the terminal inherited, which `execFile` cannot do (apps/cli/src/runtime/browser-update.ts
- * relaunch). `exec`, `execSync`, `spawnSync`, `fork` and the rest stay findings.
+ * program with fixed arguments through `execFile` (no shell). `spawn` is allowed in the bundle, but
+ * the source gate below (SPAWN_SOURCES) limits which source files may import it: the desktop
+ * presence helper runner (DESK-D12c, packages/node/src/owner-native-helper.ts: fixed argv, empty
+ * environment, pipes) and BROWSER-UPDATE's relaunch (apps/cli/src/runtime/browser-update.ts:
+ * Restart now runs the staged new version, `node <entry> ui`, argv, `shell: false`, with the
+ * terminal inherited, which `execFile` cannot do). `exec`, `execSync`, `spawnSync`, `fork` and the
+ * rest stay findings.
  */
 export const BUNDLE_BUILTIN_NAMED = Object.freeze({
   'node:child_process': Object.freeze(['execFile', 'spawn']),
 });
+
+/** The only source files (repository paths) that may import `spawn` from node:child_process. */
+export const SPAWN_SOURCES = Object.freeze([
+  'apps/cli/src/runtime/browser-update.ts',
+  'packages/node/src/owner-native-helper.ts',
+]);
+
+/** The source folders the spawn gate reads (tests and fixtures are not bundled). */
+function sourceFiles(repoRoot) {
+  const roots = [join(repoRoot, 'apps', 'cli', 'src')];
+  const packages = join(repoRoot, 'packages');
+  if (existsSync(packages)) {
+    for (const name of readdirSync(packages)) roots.push(join(packages, name, 'src'));
+  }
+  const files = [];
+  const walk = (dir) => {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== 'node_modules' && entry.name !== '__snapshots__') walk(path);
+      } else if (
+        /\.(ts|tsx|mts|js|mjs)$/.test(entry.name) &&
+        !/\.(test|dom\.test|fixture)\.[a-z]+$/.test(entry.name) &&
+        !entry.name.endsWith('.d.ts')
+      ) {
+        files.push(path);
+      }
+    }
+  };
+  for (const root of roots) walk(root);
+  return files;
+}
+
+/**
+ * BROWSER-UPDATE: the spawn gate. A source file outside SPAWN_SOURCES that imports `spawn` (or the
+ * whole module, which reaches it) from node:child_process is a finding.
+ */
+export function checkSpawnSources(repoRoot) {
+  const findings = [];
+  const named = /import\s*(type\s+)?\{([^}]*)\}\s*from\s*['"](?:node:)?child_process['"]/g;
+  const whole =
+    /import\s+(?:\*\s+as\s+\w+|\w+)\s+from\s*['"](?:node:)?child_process['"]|import\(\s*['"](?:node:)?child_process['"]\s*\)|require\(\s*['"](?:node:)?child_process['"]\s*\)/;
+  for (const file of sourceFiles(repoRoot)) {
+    const source = readFileSync(file, 'utf8');
+    if (!source.includes('child_process')) continue;
+    const path = relative(repoRoot, file).split(sep).join('/');
+    let spawns = whole.test(source);
+    for (const match of source.matchAll(named)) {
+      if (match[1] !== undefined) continue;
+      const names = match[2].split(',').map(
+        (n) =>
+          n
+            .trim()
+            .replace(/^type\s+/, '')
+            .split(/\s+as\s+/)[0],
+      );
+      if (names.includes('spawn')) spawns = true;
+    }
+    if (spawns && !SPAWN_SOURCES.includes(path)) {
+      findings.push(
+        `${path}: imports spawn from node:child_process (only ${SPAWN_SOURCES.join(', ')} may)`,
+      );
+    }
+  }
+  return findings;
+}
 
 /** Names that load a module without an import declaration (IR-M1-9c-c-1 L1). */
 const LOADER_NAMES = new Set(['require', 'createRequire', 'getBuiltinModule']);
@@ -371,6 +442,9 @@ async function main() {
       },
       'skip-bundle': { type: 'boolean', default: false },
       'skip-tools': { type: 'boolean', default: false },
+      // BROWSER-UPDATE: the spawn gate's repository root (tests pass a temporary one).
+      'sources-root': { type: 'string', default: join(packageDir, '..', '..') },
+      'skip-sources': { type: 'boolean', default: false },
     },
   });
   const banned = bannedPackages();
@@ -398,6 +472,11 @@ async function main() {
       ),
     );
     if (toolFindings.length === 0) ok.push('bundle-check: packages/mcp-tools neutral bundle ok');
+  }
+  if (!values['skip-sources']) {
+    const spawnFindings = checkSpawnSources(resolve(values['sources-root']));
+    findings.push(...spawnFindings.map((f) => `spawn gate: ${f}`));
+    if (spawnFindings.length === 0) ok.push('bundle-check: spawn gate ok');
   }
   if (ok.length > 0) process.stdout.write(`${ok.join('\n')}\n`);
   if (findings.length > 0) {

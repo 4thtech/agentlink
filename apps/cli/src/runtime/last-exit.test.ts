@@ -60,6 +60,8 @@ describe('the last-exit record (R1)', () => {
         'start_port',
         'start_removing',
         'uncaught',
+        // BROWSER-UPDATE: Restart now handed this terminal to the new version.
+        'updated',
       ].sort(),
     );
   });

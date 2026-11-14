@@ -92,7 +92,7 @@ export function parseDistTags(bytes: Uint8Array): string | undefined {
 }
 
 /** Reads the body up to `max` bytes; undefined once it is longer (the rest is not read). */
-async function readCapped(response: Response, max: number): Promise<Uint8Array | undefined> {
+export async function readCapped(response: Response, max: number): Promise<Uint8Array | undefined> {
   const declared = response.headers.get('content-length');
   if (declared !== null && Number(declared) > max) {
     await response.body?.cancel().catch(() => undefined);

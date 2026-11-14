@@ -30,7 +30,7 @@
 //
 // BROWSER-UPDATE: the terminal `agentlink ui` host's desk (apps/cli/src/runtime/browser-update.ts)
 // has the same two steps for the browser app: Update now stages the exact version the registry
-// named (npm by argv, scripts off, npm's integrity check, `npm audit signatures`), Restart now hands
+// named (provenance from this repository required, npm by argv with no inherited npm configuration, scripts off, lockfile all registry.npmjs.org sha512, `npm audit signatures`), Restart now hands
 // the terminal to it. Its answers carry `installable` (and the same in-app states), never a link.
 // The same mark gate; the MCP server's page has no desk (501), and no MCP tool reaches it (I-4).
 import type { JsonObject } from '@4thtech-io/crypto';
