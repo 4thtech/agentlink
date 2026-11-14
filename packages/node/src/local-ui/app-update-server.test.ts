@@ -248,6 +248,63 @@ describe('Settings > Updates through the server (DESK051-UPD)', () => {
     expect(JSON.parse(res.body)).toEqual({ ...browser, install: 'global' });
   });
 
+  it('BROWSER-UPDATE: the browser app’s Update now passes the same gates as the Mac app’s', async () => {
+    const calls: string[] = [];
+    const view: AppUpdateView = {
+      state: 'available',
+      current: '0.5.1',
+      latest: '0.5.2',
+      download: '',
+      installable: true,
+      percent: 0,
+    };
+    const h = await harness({
+      install: 'npx',
+      view: () => view,
+      check: () => view,
+      startInstall: () => {
+        calls.push('install');
+        return { ...view, state: 'downloading' };
+      },
+      restart: () => {
+        calls.push('restart');
+        return view;
+      },
+    });
+    const origin = `http://localhost:${String(h.port)}`;
+    const good = {
+      Cookie: h.cookie,
+      'X-AgentLink-CSRF': h.csrf,
+      Origin: origin,
+      'Content-Type': 'application/octet-stream',
+      'X-AgentLink-Generation': h.generation,
+    };
+    const without = (name: string): Record<string, string> =>
+      Object.fromEntries(Object.entries(good).filter(([k]) => k !== name));
+    expect((await send(h.port, APP_UPDATE_INSTALL_PATH, without('Cookie'), 'POST')).status).toBe(401);
+    expect((await send(h.port, APP_UPDATE_INSTALL_PATH, without('X-AgentLink-CSRF'), 'POST')).status).toBe(403);
+    expect(
+      (await send(h.port, APP_UPDATE_INSTALL_PATH, { ...good, Origin: 'http://evil.example' }, 'POST'))
+        .status,
+    ).toBe(403);
+    // A bearer token (what an MCP client or script might hold) is not the page's session.
+    expect(
+      (
+        await send(
+          h.port,
+          APP_UPDATE_INSTALL_PATH,
+          { ...without('Cookie'), Authorization: 'Bearer x' },
+          'POST',
+        )
+      ).status,
+    ).toBe(401);
+    expect(calls).toEqual([]);
+    const ok = await send(h.port, APP_UPDATE_INSTALL_PATH, good, 'POST');
+    expect(ok.status).toBe(200);
+    expect(JSON.parse(ok.body)).toMatchObject({ state: 'downloading', install: 'npx' });
+    expect(calls).toEqual(['install']);
+  });
+
   it('a server with no desk: 501 not_available', async () => {
     const h = await harness();
     const res = await send(h.port, APP_UPDATE_PATH, {
