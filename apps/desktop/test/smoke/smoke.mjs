@@ -310,8 +310,11 @@ async function appStarts() {
     if (existsSync(record)) {
       try {
         const parsed = JSON.parse(readFileSync(record, 'utf8'));
+        // APP-CONTINUITY: the desktop app's record also carries `host: "desktop"`.
+        const keys = Object.keys(parsed).sort().join(',');
         if (
-          Object.keys(parsed).sort().join(',') === 'handoffToken,pid,port,v' &&
+          (keys === 'handoffToken,pid,port,v' ||
+            (keys === 'handoffToken,host,pid,port,v' && parsed.host === 'desktop')) &&
           parsed.v === 1 &&
           Number.isSafeInteger(parsed.port) &&
           pidAlive(parsed.pid)
