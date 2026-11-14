@@ -28,7 +28,7 @@ Not automated: a real Touch ID or Windows Hello prompt, Safari, Firefox and Edge
 ## The common path (every row follows it; the row says what differs)
 | Step | You do | You see |
 |---|---|---|
-| 1 | Open AgentLink (the app, or `agentlink ui` in your own terminal for the browser row) | **Which AI app do you use?** with "Step 1 of 4 · Pick your AI app". No "Skip to Home". |
+| 1 | Open AgentLink (the app, or `agentlink ui` in your own terminal for the browser row) | **Which AI app do you use?** with "Step 1 of 5 · Pick your AI app". No "Skip to Home". |
 | 2 | Press **Continue with** your AI app | **Confirm it's you**, a field **Name people see** (empty), and the button disabled until you type a name |
 | 3 | Type a name (for example `Test`) | The button enables |
 | 4 | Press the primary button (see the row) | **Your master code** screen: "Shown once", **Save in my password manager**, **Copy**, **Save as file**, **I saved it** |

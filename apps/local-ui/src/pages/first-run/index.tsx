@@ -87,9 +87,11 @@ import {
   type WizardOutcome,
 } from '../start/store.js';
 import {
+  CONNECT_ONLY_STEP_IDS,
   CONNECT_STEP as S,
   NAME_STEP as NS,
   PICK_STEP as P,
+  STEP_IDS,
   type StepId,
 } from '../start/strings.js';
 import {
@@ -100,6 +102,7 @@ import {
   InviteStep,
   NameStep,
   PickStep,
+  SendFolderCard,
   WizardFrame,
   appTiles,
   defaultChoice,
@@ -107,6 +110,7 @@ import {
   stepOf,
   stepPath,
 } from '../start/wizard.js';
+import { FilesStep, type FilesStepProps } from '../start/files-step.js';
 import { createAppsApi, type AppsApi, type DetectedApp } from './apps-api.js';
 import { ConnectApp } from './connect-app.js';
 import type { PickList } from './pick-app.js';
@@ -225,6 +229,8 @@ export function endFirstRun(read: () => Promise<JoinRead>): Promise<void> {
 export interface FirstRunPageProps {
   /** Test seams; the page uses the real server and browser by default. */
   readonly api?: SetupApi;
+  /** FILES-ONB-1: the Files step's reads, Show in Finder and add-folder calls. */
+  readonly filesStep?: Pick<FilesStepProps, 'api' | 'reveal' | 'sendFolder' | 'go'>;
   readonly createPasskey?: (
     values: CreationValues,
     options: PasskeyOptions,
@@ -500,6 +506,27 @@ function sendLine(outcome: SendFolderOutcome, folder?: string): string | undefin
   return undefined;
 }
 
+/** FILES-ONB-1 (08 §1 "Connect step"): the Send folder the first rules allow (home as `~`). */
+const DEFAULT_SEND_FOLDER = '~/AgentLink/Send';
+
+/** The folder as this platform writes it: on Windows with backslashes. */
+export function shownFolder(folder: string, platform: Platform): string {
+  return platform === 'windows' ? folder.split('/').join('\\') : folder;
+}
+
+/** 11 §5.7 `{computer}`: "Mac" on macOS, "PC" on Windows, "computer" elsewhere. */
+const COMPUTER: Readonly<Record<Platform, string>> = {
+  mac: 'Mac',
+  windows: 'PC',
+  other: 'computer',
+};
+
+/** The one gesture's name in "One {proof} creates this ID …". */
+function proofWord(platform: Platform): string {
+  if (platform === 'mac') return 'Touch ID';
+  return platform === 'windows' ? 'Windows Hello' : T.oneConfirmation;
+}
+
 /**
  * W4-WIZARD (A1 step 2, "Confirm it's you"): the agent card with its suggested name ("Change name"
  * opens the field), and one primary button for the one gesture (D-140: it creates the owner and the
@@ -516,6 +543,7 @@ function ConnectFirstStep({
   onName,
   onBack,
   onGo,
+  onChangeFolder,
 }: {
   view: Extract<View, { k: 'protect' }>;
   name: string;
@@ -527,6 +555,8 @@ function ConnectFirstStep({
   onName: (value: string) => void;
   onBack: () => void;
   onGo: (how: 'passkey' | 'code') => void;
+  /** FILES-ONB-1: the files card's "Change" (a wish only; the Files step opens the choice). */
+  onChangeFolder: () => void;
 }): ReactElement {
   const title = useTitleFocus<HTMLHeadingElement>();
   const { choice } = view;
@@ -576,6 +606,12 @@ function ConnectFirstStep({
           onKeyDown={press}
         />
       }
+      {/* FILES-ONB-1 (D-152): the folder the one confirmation allows, before it is given. */}
+      <SendFolderCard
+        folder={shownFolder(DEFAULT_SEND_FOLDER, platform)}
+        onChange={onChangeFolder}
+        chosen={wizardMemory().chooseFolder === true}
+      />
       {choice.primary === 'native' ? (
         <Banner tone="info">{T.nativeNext(sensor)}</Banner>
       ) : noPrf ? (
@@ -629,20 +665,13 @@ function ConnectFirstStep({
                 : ''
               : S.restartNote(appName)}
         </p>
+        <p className="st-note" data-files-line>
+          {S.filesLine(
+            primary === 'code' ? T.oneConfirmation : proofWord(platform),
+            COMPUTER[platform],
+          )}
+        </p>
       </div>
-      {/* D-130 (2): what the one confirmation also sets up, before it is given. */}
-      <details className="st-folders">
-        <summary className="st-note">{T.foldersTitle}</summary>
-        <dl>
-          {T.folders.map(([what, where]) => (
-            <div key={where}>
-              <dt className="st-note">{what}</dt>
-              <dd className="al-text-code">{where}</dd>
-            </div>
-          ))}
-        </dl>
-        <p className="st-note">{T.foldersNote}</p>
-      </details>
     </section>
   );
 }
@@ -729,6 +758,7 @@ export function FirstRunPage({
   agentsApi: givenAgents,
   masterCodeApi: givenMasterCode,
   native,
+  filesStep,
 }: FirstRunPageProps = {}): ReactElement {
   // W4-WIRE-2: decided once per mount, before the remembered choices are read.
   useState(startRun);
@@ -894,9 +924,14 @@ export function FirstRunPage({
       }
       const agent = await appsApi.currentAgent();
       if (!isLive()) return;
+      // FILES-ONB-1: Connect another AI app has no Files step (the ID already has its folders).
       if (agent.kind === 'ok' && !wantsNewAgent()) {
+        rememberWizard({ connectOnly: true });
         setMode({ k: 'more', folder: agent.folder });
-      } else setMode({ k: 'add' });
+      } else {
+        rememberWizard({ connectOnly: false });
+        setMode({ k: 'add' });
+      }
       lookForApps();
       setView({ k: 'step' });
     },
@@ -980,6 +1015,7 @@ export function FirstRunPage({
               // "Doesn't work in this browser" only where a browser has passkeys but no PRF.
               noPrf: passkeys && prf === 'no' && !nativeOn,
             });
+            rememberWizard({ connectOnly: false });
             setMode({ k: 'first' });
             lookForApps();
             setView({ k: 'step' });
@@ -1297,7 +1333,11 @@ export function FirstRunPage({
           toStep('connected');
           return;
         }
-        finishStep({ label, ...(done.app === undefined ? {} : { app: done.app }) });
+        finishStep({
+          label,
+          ...(done.app === undefined ? {} : { app: done.app }),
+          sendFolder: done.sendFolder,
+        });
       });
   };
 
@@ -1327,7 +1367,11 @@ export function FirstRunPage({
       // REL051-CF3: the code leaves the page, but the server keeps it (Back is not "I saved it").
       rememberRecoveryKitLater();
       rememberWizard({
-        outcome: { label, ...(view.done.app === undefined ? {} : { app: view.done.app }) },
+        outcome: {
+          label,
+          ...(view.done.app === undefined ? {} : { app: view.done.app }),
+          sendFolder: view.done.sendFolder,
+        },
       });
       setView({ k: 'step' });
       return;
@@ -1346,6 +1390,11 @@ export function FirstRunPage({
       }
     }
   }, [view, mode, step, here]);
+
+  // FILES-ONB-1: Connect another AI app has no Files step (a typed or remembered /start/files).
+  useEffect(() => {
+    if (step === 'files' && mode?.k === 'more') toStep('invite', true);
+  }, [step, mode]);
 
   // Connected (A2), opened without this page's outcome (a reload, a deep link): from the real state.
   const [derived, setDerived] = useState<WizardOutcome | 'none' | undefined>(undefined);
@@ -1389,9 +1438,13 @@ export function FirstRunPage({
     view.k !== 'done' &&
     (step === 'app' || step === 'connect') &&
     (!ownerKnown || (mode?.k === 'first' && view.k !== 'already'));
+  // FILES-ONB-1: five steps (Files fourth); Connect another AI app has four.
+  const connectOnly = mode?.k === 'more' || (mode === undefined && memory.connectOnly === true);
+  const steps = connectOnly ? CONNECT_ONLY_STEP_IDS : STEP_IDS;
   const frame = (body: ReactElement, at: StepId = step): ReactElement => (
     <WizardFrame
       step={at}
+      steps={steps}
       {...(guardedSkip === undefined ? {} : { onSkip: guardedSkip })}
       {...(noIdYet ? { hideSkip: true } : {})}
     >
@@ -1412,6 +1465,7 @@ export function FirstRunPage({
           ? { onOpen: () => void openNewAgent(outcome.agent ?? '') }
           : {})}
         onInvite={() => toStep('invite')}
+        {...(connectOnly ? {} : { onFiles: () => toStep('files') })}
         onHome={goHome}
         {...(app === undefined || app.connected || app.id === ''
           ? {}
@@ -1419,9 +1473,28 @@ export function FirstRunPage({
       />,
     );
   }
+  if (step === 'files') {
+    // Connect another AI app has no Files step: its Connected goes on to Invite.
+    if (connectOnly) return frame(<LoadingState text={T.loading} />, 'invite');
+    const outcome = wizardMemory().outcome ?? (typeof derived === 'object' ? derived : undefined);
+    const appName =
+      outcome?.app?.name ?? (pickedTile?.found === true ? pickedTile.name : undefined);
+    return frame(
+      <FilesStep
+        appName={appName}
+        sendOutcome={outcome?.sendFolder}
+        chooseFirst={memory.chooseFolder === true}
+        onBack={() => toStep('connected')}
+        onContinue={() => toStep('invite')}
+        onSkip={() => toStep('invite')}
+        {...filesStep}
+      />,
+    );
+  }
   if (step === 'invite') {
     return frame(
       <InviteStep
+        onBack={() => toStep(connectOnly ? 'connected' : 'files')}
         inviteHref={INVITE_PATH}
         onHome={invitePanel === undefined ? () => leaveInvite(true) : goHome}
         onSkip={invitePanel === undefined ? () => leaveInvite(false) : goHome}
@@ -1584,6 +1657,7 @@ export function FirstRunPage({
           onName={setName}
           onBack={() => toStep('app')}
           onGo={(how) => void protect(how, { choice: view.choice, noPrf })}
+          onChangeFolder={() => rememberWizard({ chooseFolder: true })}
         />,
       );
     }
@@ -1685,6 +1759,12 @@ export function FirstRunPage({
           </p>
         </div>
         <AgentCard name={label} line={chosenApp === undefined ? T.noAppYet : S.worksIn(appName)} />
+        {/* FILES-ONB-1 (D-152): the folder the one confirmation allows, before it is given. */}
+        <SendFolderCard
+          folder={shownFolder(DEFAULT_SEND_FOLDER, platform)}
+          onChange={() => rememberWizard({ chooseFolder: true })}
+          chosen={wizardMemory().chooseFolder === true}
+        />
         <CreateAgentGate
           label={label}
           summary=""
@@ -1703,6 +1783,16 @@ export function FirstRunPage({
           }
         />
         {chosenApp === undefined ? null : <p className="st-note">{S.restartNote(appName)}</p>}
+        <p className="st-note" data-files-line>
+          {/* The sensor's name only where the gate can use a passkey here; else "confirmation"
+              (the master code, or the app's own Touch ID / Windows Hello once it is on). */}
+          {S.filesLine(
+            inAppWindow(native?.userAgent) || !available()
+              ? T.oneConfirmation
+              : proofWord(platform),
+            COMPUTER[platform],
+          )}
+        </p>
       </section>,
     );
   }

@@ -17,7 +17,13 @@ export const SETTINGS_PATH = '/settings';
 export const SETTINGS_HOME = '/settings';
 /** Get started, step 1 (U2 builds the steps). */
 export const START_PATH = '/start/app';
-export const START_STEPS = ['/start/app', '/start/connect', '/start/connected', '/start/invite'];
+export const START_STEPS = [
+  '/start/app',
+  '/start/connect',
+  '/start/connected',
+  '/start/files',
+  '/start/invite',
+];
 /**
  * Interim (until U3 Home and U4 People land): today's Messages and Contacts pages stay reachable
  * from Cmd+K and Home's own links, out of the section menu. Their builders turn these paths into

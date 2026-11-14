@@ -2,17 +2,25 @@
 // (11 §5.1): no wallet, gas, seed phrase, transaction, chain, address or hash. Names that come from
 // the server (an app name, the agent's name) are passed in and rendered as text.
 
-/** The four steps, in order (`/start/<step>`). */
-export const STEP_IDS = ['app', 'connect', 'connected', 'invite'] as const;
+/**
+ * The steps, in order (`/start/<step>`). FILES-ONB-1 (D-152; 08 §1 "Files step"): Get started and
+ * New ID have five, Files fourth; Connect another AI app has no Files step (the ID already has its
+ * folders).
+ */
+export const STEP_IDS = ['app', 'connect', 'connected', 'files', 'invite'] as const;
 export type StepId = (typeof STEP_IDS)[number];
+/** Connect another AI app: the same steps without Files. */
+export const CONNECT_ONLY_STEP_IDS: readonly StepId[] = ['app', 'connect', 'connected', 'invite'];
 
 export const WIZARD = {
-  /** The progress line: "Step 1 of 4 · Pick your AI app". */
-  stepLabel: (n: number, name: string): string => `Step ${String(n)} of 4 · ${name}`,
+  /** The progress line: "Step 4 of 5 · Files". */
+  stepLabel: (n: number, total: number, name: string): string =>
+    `Step ${String(n)} of ${String(total)} · ${name}`,
   stepNames: {
     app: 'Pick your AI app',
     connect: 'Connect',
     connected: 'Connected',
+    files: 'Files',
     invite: 'Invite someone',
   } satisfies Record<StepId, string>,
   skip: 'Skip to Home',
@@ -84,11 +92,22 @@ export const CONNECT_STEP = {
   restartNote: (app: string): string =>
     `Nothing to copy or paste. If ${app} is open, we ask you to restart it.`,
   noApp: 'Pick your AI app first.',
+  // FILES-ONB-1 (D-152; 11 §5.7 "Connect step, files card"; proposed, owner confirms at merge).
+  filesLabel: 'Your AI may send files from',
+  filesChange: 'Change',
+  filesChangeLabel: 'Change the folder your AI may send files from',
+  /** Under the folder once "Change" is pressed: the choice comes on the Files step. */
+  filesChangeLater: "You'll choose after this step",
+  /** Under the button. `{proof}`: "Touch ID", "Windows Hello", else "confirmation". */
+  filesLine: (proof: string, computer: string): string =>
+    `One ${proof} creates this ID and allows your Send folder. Nothing else on this ${computer} can be sent.`,
 } as const;
 
 /** A2, step 3: connected. */
 export const CONNECTED_STEP = {
   title: (app: string): string => `Connected to ${app}`,
+  /** FILES-ONB-1: the primary button when the Files step comes next. */
+  next: 'Continue',
   body: 'Your AI can now talk to people you invite.',
   /** E1 (D-140): the ID is kept; the app's entry could not be written. */
   /** No AI app was connected (none found, or the picked one is not installed yet). */
@@ -108,7 +127,17 @@ export const CONNECTED_STEP = {
   example: (app: string): string => `just ask ${app}, like "send Denis the brief".`,
 } as const;
 
-/** A3, step 4: invite someone (optional). */
+/** FILES-ONB-1 (D-152; 11 §5.7 "Files step"; proposed, owner confirms at merge): step 4 of 5. */
+export const FILES_STEP = {
+  eyebrow: 'Files',
+  title: 'Sending and receiving files',
+  choose: 'Choose another folder',
+  next: 'Continue',
+  skip: 'Skip for now',
+  back: 'Back',
+} as const;
+
+/** A3, the last step: invite someone (optional). */
 export const INVITE_STEP = {
   title: 'Invite someone',
   body: 'Send them a link. When they accept, your AIs can talk. You can also do this later from Home.',
