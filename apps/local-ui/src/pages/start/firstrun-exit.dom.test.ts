@@ -20,6 +20,7 @@ import {
   WINDOWS_SETUP_URL,
   needsOwner,
   SetupGate,
+  resetOwnerWordForTests,
 } from './setup-exit.js';
 import { CONNECT_ONLY_STEP_IDS, SETUP_EXIT, STEP_IDS } from './strings.js';
 import { WizardFrame } from './wizard.js';
@@ -29,6 +30,7 @@ import { WizardFrame } from './wizard.js';
 let host: HTMLElement;
 let root: Root;
 beforeEach(() => {
+  resetOwnerWordForTests();
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -168,6 +170,19 @@ describe('FIRSTRUN-EXIT: pages that need an owner', () => {
     expect(link(SETUP_EXIT.continueSetup)?.getAttribute('href')).toBe('/start/app');
   });
 
+  it('SetupGate: while the owner read is pending, an owner page shows nothing; Updates shows', async () => {
+    const never = (): Promise<'missing'> => new Promise(() => undefined);
+    await render(
+      h(SetupGate, { path: '/contacts', read: never }, h('p', { id: 'page' }, 'People')),
+    );
+    expect(host.querySelector('#page')).toBeNull();
+    expect(host.textContent).toBe('');
+    await render(
+      h(SetupGate, { path: '/settings/updates', read: never }, h('p', { id: 'page' }, 'Updates')),
+    );
+    expect(host.querySelector('#page')).not.toBeNull();
+  });
+
   it('SetupGate: an owner, or an unanswered read, changes nothing', async () => {
     for (const read of [
       () => Promise.resolve('set_up' as const),
@@ -264,6 +279,20 @@ describe('FIRSTRUN-EXIT: Settings › Updates before an owner exists', () => {
       expect(dl?.getAttribute('target')).toBe('_blank');
       expect(dl?.getAttribute('rel')).toBe('noopener noreferrer');
     }
+  });
+
+  it('the Windows app: no download card when the check says it is up to date', async () => {
+    const get = (): Promise<ApiResult<unknown>> => Promise.resolve(ok(view('current', 'desktop')));
+    await render(
+      h(UpdatesPage, {
+        api: { get } as unknown as ApiClient,
+        pollMs: 0,
+        os: 'windows',
+        desktop: true,
+      }),
+    );
+    expect(host.textContent).toContain('AgentLink is up to date.');
+    expect(link(SETUP_EXIT.windowsDownload)).toBeUndefined();
   });
 
   it('the Mac app has no Windows link (it updates in the app)', async () => {

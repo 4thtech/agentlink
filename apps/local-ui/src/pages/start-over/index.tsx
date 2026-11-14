@@ -358,8 +358,8 @@ export function StartOverPage(props: StartOverPageProps): ReactElement {
       <header className="rs-head">
         <Lockup size={22} />
         <div className="rs-head-end">
-          {/* FIRSTRUN-EXIT: Check for updates and Help here too. */}
-          <SetupExitLinks />
+          {/* FIRSTRUN-EXIT: Check for updates and Help here too (not while the start over runs). */}
+          {view === 'working' ? null : <SetupExitLinks />}
           <button
             type="button"
             className="rs-cancel al-text-body-sm"

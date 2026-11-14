@@ -405,7 +405,9 @@ export function UpdatesPage({
     view !== undefined && (view.state === 'available' || view.state === 'install_failed');
   const settled = load.kind !== 'loading';
   const appWindow = view === undefined ? desktop : view.install === 'desktop';
-  const windowsFallback = settled && appWindow && os === 'windows' && !versionCard;
+  // Not when the check just said this is the newest version (IR-FIRSTRUN-EXIT-1).
+  const upToDate = view?.state === 'current';
+  const windowsFallback = settled && appWindow && os === 'windows' && !versionCard && !upToDate;
   const browserHow = settled && !appWindow && !versionCard;
   const inApp =
     view !== undefined &&

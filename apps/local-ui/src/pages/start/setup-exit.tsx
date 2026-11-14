@@ -106,8 +106,21 @@ export async function readOwnerWord(): Promise<OwnerWord> {
  * The owner word, read when the shell opens and again on each page change until an owner is seen
  * (an owner never goes away within a page's life: Start over ends with a full load).
  */
-function useOwnerWord(read: () => Promise<OwnerWord>, path: string): OwnerWord {
-  const [word, setWord] = useState<OwnerWord>(undefined);
+let lastWord: OwnerWord | 'pending' = 'pending';
+
+/** Tests: forget the last answer (the next gate waits for its read again). */
+export function resetOwnerWordForTests(): void {
+  lastWord = 'pending';
+}
+
+function useOwnerWord(read: () => Promise<OwnerWord>, path: string): OwnerWord | 'pending' {
+  // 'pending' until the first read of this page's life answers (IR-FIRSTRUN-EXIT-1: no owner page
+  // shows meanwhile); a gate mounted again later (another frame) starts from the last answer.
+  const [word, setState] = useState<OwnerWord | 'pending'>(lastWord);
+  const setWord = (next: OwnerWord): void => {
+    lastWord = next;
+    setState(next);
+  };
   const known = word === 'set_up';
   useEffect(() => {
     if (known) return undefined;
@@ -137,6 +150,9 @@ export interface SetupGateProps {
 /** The shell's page slot before setup (see the file comment). Only a clear "missing" gates. */
 export function SetupGate({ path, children, read = readOwnerWord }: SetupGateProps): ReactElement {
   const word = useOwnerWord(read, path);
+  // Before the first answer, a page that needs an owner shows nothing (no flash of it, and none of
+  // its reads); an owner-free page shows at once. A failed read shows the page, as before.
+  if (word === 'pending') return needsOwner(path) ? <></> : <>{children}</>;
   if (word !== 'missing') return <>{children}</>;
   if (needsOwner(path)) return <SetUpFirstNotice />;
   if (path === '/') return <>{children}</>;
