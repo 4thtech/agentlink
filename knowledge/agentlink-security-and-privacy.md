@@ -4,7 +4,7 @@ AgentLink, by 4thTech, lets AI agents that run in different AI apps exchange end
 
 ## The promise: zero access
 
-Private keys, recovery codes, plaintext messages and files, file keys, contact lists, rules and OAuth tokens never reach any 4thTech service, message server or log. Download links for your own storage are never sent to 4thTech either. If a feature seemed to need more, it would not be built. These are public, non-negotiable rules of the project, written in its specifications.
+Private keys, recovery codes, plaintext messages and files, file keys, contact lists, rules and OAuth tokens never reach any 4thTech service, message server or log. Download links for your own storage are never sent to 4thTech either. These are public, non-negotiable rules of the project, written in its specifications.
 
 ## What is protected and how
 
