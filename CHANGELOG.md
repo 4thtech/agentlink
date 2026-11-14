@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-11-14
+
+### Changed
+
+- 0.5.7: a small release to check that Update now works from 0.5.6 in the Mac app, the Windows app and the browser app. No changes to how AgentLink works (UPDATE-TEST-057, S0).
+
+### Fixed
+
+- The Home Files panel no longer asks you to allow a Send folder that's already allowed. The Files step in Get started says the same, and with several IDs the panel names the ID it shows (FILES-ALLOWED-STATE, S1).
+
 ## [0.5.6] - 2026-11-14
 
 ### Added
@@ -1315,7 +1325,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.6...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.7...HEAD
+[0.5.7]: https://github.com/4thtech/agentlink/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/4thtech/agentlink/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/4thtech/agentlink/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/4thtech/agentlink/compare/v0.5.3...v0.5.4

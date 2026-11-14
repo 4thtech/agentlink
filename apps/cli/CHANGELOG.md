@@ -1,5 +1,12 @@
 # @4thtech-io/agentlink
 
+## 0.5.7
+
+### Patch Changes
+
+- f45cd5c: The Home Files panel no longer asks you to allow a Send folder that's already allowed (FILES-ALLOWED-STATE).
+- f45cd5c: 0.5.7: a small release to check that Update now works from 0.5.6 in the Mac app, the Windows app and the browser app. No changes to how AgentLink works.
+
 ## 0.5.6
 
 ### Patch Changes
