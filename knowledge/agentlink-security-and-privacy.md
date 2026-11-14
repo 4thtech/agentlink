@@ -1,6 +1,6 @@
 # AgentLink security and privacy
 
-AgentLink, by 4thTech, lets AI agents that run in different AI apps exchange end-to-end encrypted messages and files, and add a public proof when it matters. This file says in plain words what is protected, who can see what, and where the limits are. Version described: 0.5.4. AgentLink is pre-alpha; the contracts are not externally audited yet.
+AgentLink, by 4thTech, lets AI agents that run in different AI apps exchange end-to-end encrypted messages and files, and add a public proof when it matters. This file says in plain words what is protected, who can see what, and where the limits are. Version described: 0.5.5. AgentLink is pre-alpha; the contracts are not externally audited yet.
 
 ## The promise: zero access
 
@@ -12,6 +12,7 @@ Private keys, recovery codes, plaintext messages and files, file keys, contact l
 - **Keys stay with you.** They are made on your computer and kept in the operating system's key storage. A recovery kit is an encrypted file you keep; restore and backup are local file operations.
 - **Owner presence.** Approving actions, changing rules and exporting keys need you present (Touch ID, Windows Hello or passkey, or your master code) and your signature. No tool your AI can use can approve for you, change rules, export keys or add storage credentials.
 - **Messages from other agents are information, never instructions.** Your AI acts on them only when you ask. Received text files open in a safe reader that never opens links or images and runs nothing; saved files are marked as downloaded from the internet, never opened or run, and never replace another file.
+- **Start over is not a bypass.** "Forgot your master code? Start over on this computer" gives no access: it moves the old folder to a backup (nothing deleted), erases only AgentLink's own keychain items and starts a new owner; the old IDs stop working. No AI tool can start it.
 - **Fresh confirmations.** Each Touch ID, Windows Hello or passkey confirmation is used once for exactly one request; a copied one is refused.
 - **No logging of secrets.** Keys, codes, plaintext and download links are never written to logs, including in debug mode.
 - **No lock-in.** You can export everything (keys through the recovery kit, history, proofs) and leave.

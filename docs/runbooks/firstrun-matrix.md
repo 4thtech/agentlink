@@ -77,11 +77,22 @@ Run on a Mac with Touch ID, plus one Windows machine for Edge.
 | E3 | App, owner created | Connect another AI app from Settings › AI apps | The app writes its own form of the entry: it works on a computer with no Node installed. |
 | E4 | Mac, first time the app asks for the keychain | Open the app on a Mac that used the browser app | The one-time keychain note appears once; **Always Allow** keeps it from asking again. |
 
-### F. Forgot the master code (when OWNER-START-OVER is in the build)
-Settings or the code field shows **Forgot your master code?** and leads to `/restore/start-over`. Check the words on the real screen and write them here; this row is filled in when that card lands (take the strings from `apps/local-ui/src/pages/restore/`). Expected: it never leaves the person at a dead end, never says "terminal" or "agentlink init", and never deletes anything without a plain confirmation naming what will be lost.
+### F. Forgot the master code (start over on this computer, D-153)
+Use a test machine or a fresh profile with an owner already created (rows A or B). This row deletes nothing, but it moves `~/.agentlink` away and removes AgentLink's own Keychain (Windows: Credential Manager) items, so your AI apps lose their ID.
+
+| Row | Machine | Do | Expected |
+|---|---|---|---|
+| F1 | Mac with Touch ID, the app | Settings › **Touch ID & master code**, or any master code field: press **Forgot your master code?** Read **Start over on this computer?** (it lists what you lose). Press **Restore from recovery kit** to check it leads to Restore, go **Back**. Press **Start over instead**. In **Type start over** type `start over`; the button reads **Start over with Touch ID**. Press it and touch the sensor. | **You can start fresh**, the line "Your old folder is kept as ~/.agentlink.backup-YYYYMMDD-HHMMSS.", **Quit and reopen your AI apps**, and **Set up AgentLink**. The backup folder exists and nothing in it is deleted. **Set up AgentLink** opens first run (rows A and the common path) with a new master code. |
+| F2 | Windows 11 with a Windows Hello PIN, the app | As F1; the button reads **Start over with Windows Hello** | As F1; the Windows Hello prompt opens in front of AgentLink. Credential Manager items named `agentlink` are gone. |
+| F3 | Mac without Touch ID, or a PC without Windows Hello, the app | As F1 up to the phrase; the button reads **Continue** | The next screen is **Type start over once more**; type it in **Type start over again** and press **Start over**. No sensor prompt at any point. |
+| F4 | A browser (`agentlink ui`) on a computer with a platform sensor | As F1; the page says "Your browser asks you to confirm it's you with Touch ID or Windows Hello." | The browser's own dialog appears; the rest is as F1. Without a sensor, F3's second typing. |
+| F5 | Wrong or cancelled | Type `start over` wrongly, or cancel the sensor | "Type start over exactly as shown." or "You closed the prompt. Nothing was changed."; the folder is unchanged. |
+| F6 | After F1 | Look at your AI app | It still uses the old ID until you quit and reopen it (the done screen says so). |
+
+It never leaves the person at a dead end, never says "terminal" or "agentlink init", and never changes anything before the phrase and the confirmation. The strings are in `apps/local-ui/src/pages/start-over/strings.ts`.
 
 ## Reporting
 For a Fail, record: row, OS and version, browser and version (or app version), what you pressed, the exact screen text, and a screenshot. The master code and any link never go into the report. File it under the release's backlog row; do not fix on `main`: follow [RB-21 owner feedback loop](owner-feedback-loop.md).
 
 ## Changing this runbook
-Each click and screen text above comes from the strings files: `apps/local-ui/src/pages/first-run/strings.ts`, `pages/start/strings.ts`, `presence/strings.ts`, `pages/touch-id/strings.ts` and `apps/cli/src/commands/ui.ts` (`UI_TEXT`). When one of those changes, the e2e tests in `e2e/test/firstrun-matrix.test.ts` read the same files and fail first; then update this page.
+Each click and screen text above comes from the strings files: `apps/local-ui/src/pages/first-run/strings.ts`, `pages/start/strings.ts`, `pages/start-over/strings.ts`, `presence/strings.ts`, `pages/touch-id/strings.ts` and `apps/cli/src/commands/ui.ts` (`UI_TEXT`). When one of those changes, the e2e tests in `e2e/test/firstrun-matrix.test.ts` read the same files and fail first; then update this page.

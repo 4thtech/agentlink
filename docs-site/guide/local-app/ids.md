@@ -1,6 +1,6 @@
 # My IDs: rename, pause and remove
 
-*Applies to AgentLink 0.5.4. A recovery kit remembers each ID's name since 0.5.4. In 0.4.14 and earlier this page was called **IDs** and each ID had its own **Back up**; since 0.5.0 one recovery kit covers all your IDs (see [Backup & restore](backup-and-restore.md)).*
+*Applies to AgentLink 0.5.5. An ID that can't be opened is new in 0.5.5. A recovery kit remembers each ID's name since 0.5.4. In 0.4.14 and earlier this page was called **IDs** and each ID had its own **Back up**; since 0.5.0 one recovery kit covers all your IDs (see [Backup & restore](backup-and-restore.md)).*
 
 An ID is how your AI app shows up to other people on AgentLink: its own name, inbox, rules and people. Every chat in that AI app uses it, and several AI apps can share one ID. All your IDs live in the same window. For the big picture, read [Your IDs and your people](../your-ids-and-your-people.md).
 
@@ -57,6 +57,14 @@ Removing retires an ID for good.
 <figure><img src="../../assets/screens/id-remove.webp" alt="Remove Tali: the list of what will be deleted from this computer, This can't be undone, Save recovery kit first, Type the ID's name to confirm and a disabled Remove with Touch ID."><figcaption><p>Removing names exactly what goes, and can't be undone.</p></figcaption></figure>
 
 If an AI app still uses the ID, quit it first and press **Check again**. If your contacts can't be told right now, the app asks **Remove anyway?** It can't be undone.
+
+## An ID that can't be opened
+
+*New in 0.5.5.* If an ID's key is no longer on this computer (for example after a clean-up of the system's saved items), AgentLink no longer stops with "couldn't open its page". Your other IDs and your master code are fine, and Home names the ID: **{name} can't be opened on this computer** ("Its key isn't on this computer any more."). Its card says **Can't be opened here**. Choose one of three:
+
+- **Restore from backup.** Brings the ID back from your recovery kit. See [Backup & restore](backup-and-restore.md).
+- **Remove from this computer.** Confirm with Touch ID, Windows Hello or your master code, and type the ID's name. AgentLink moves the ID's folder to a dated folder in `~/.agentlink/set-aside` (nothing is deleted) and removes the leftover parts of its key. Nothing is sent to your contacts, and you can still restore the ID from a backup later. If part of the key is still on this computer, AgentLink says so and doesn't move it: choose **Continue without it** for now.
+- **Continue without it.** Does nothing to the ID; your other IDs keep working.
 
 ## Pause and resume
 

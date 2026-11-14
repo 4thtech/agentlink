@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Applies to AgentLink 0.5.4, a pre-alpha release.
+Applies to AgentLink 0.5.5, a pre-alpha release.
 
 Fix common problems yourself, and know what to include when you ask for help.
 
@@ -27,6 +27,21 @@ Restart the app after setup, then run `doctor`. If setup could not find your app
 
 **How do I open the AgentLink app?**
 Run `npx -y @4thtech-io/agentlink@latest` (from 0.4.4; before that `npx -y @4thtech-io/agentlink@latest ui`). In 0.2.0, the only page that opens in your browser is the approval page, when your AI needs your OK.
+
+**I forgot my master code.**
+Choose **Forgot your master code?** under any master code field. With a recovery kit, **Restore from recovery kit** keeps everything. Without one, you can start over on this computer: your old IDs stop working but nothing is deleted. See [Start over on this computer](../local-app/touch-id-and-master-code.md#start-over-on-this-computer).
+
+**An ID says "can't be opened on this computer".**
+Its key is missing here. Choose **Restore from backup**, **Remove from this computer** or **Continue without it**: see [An ID that can't be opened](../local-app/ids.md#an-id-that-cant-be-opened). Your other IDs are not affected.
+
+**Windows says "Insert your security key", or Windows Hello does nothing.**
+Update to 0.5.5: first run no longer asks for a passkey and the Windows app uses Windows Hello directly. If your PC has no Windows Hello PIN, the app says so: open Settings, then Accounts, then Sign-in options, set up a PIN (Windows Hello), and come back. Until then, use your master code.
+
+**The Windows app does not open.**
+Look at `core.log` in `%LOCALAPPDATA%\AgentLink\logs`. It holds a fixed reason and error code, never keys, codes, links or message content. On a Mac the same file is in `~/Library/Logs/AgentLink`. Share only the lines that name the reason.
+
+**My Mac asks to let AgentLink use my saved IDs.**
+You started in the browser, then opened the app: your IDs are saved in the keychain. Enter what you use to unlock your Mac, your Mac login (never your master code), and choose **Always Allow**. See [One AgentLink, browser or app](../apps/desktop-app.md#one-agentlink-browser-or-app).
 
 ## Pairing and contacts
 

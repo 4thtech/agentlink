@@ -1,6 +1,6 @@
 # Rules page
 
-*Applies to AgentLink 0.5.4. Open it from **Settings** › **Rules** (in the **Your AI** group) or from **Rules** on an ID's card in [My IDs](ids.md). The one-row-per-rule layout, the **Changed** tag and the **Rules for** picker are new in 0.5.0.*
+*Applies to AgentLink 0.5.5. Open it from **Settings** › **Rules** (in the **Your AI** group) or from **Rules** on an ID's card in [My IDs](ids.md). The one-row-per-rule layout, the **Changed** tag and the **Rules for** picker are new in 0.5.0.*
 
 Rules decide what your AI may do without asking you: *"What your AI may do without asking you. Everything else waits for your approval on Home."* **Rules in force** at the top sums up what your AI follows right now. With two or more IDs, **Rules for** picks the ID; each ID has its own rules.
 

@@ -1,6 +1,6 @@
 # Your master code and recovery kit
 
-*Applies to AgentLink 0.5.4. Saving a recovery kit in the app is new in 0.4.14; one kit for all your IDs, the save checklist and restoring in the app are new in 0.5.0. The words "backup code" and "owner code" became **master code** in 0.4.14; it is the same code.*
+*Applies to AgentLink 0.5.5. Saving a recovery kit in the app is new in 0.4.14; one kit for all your IDs, the save checklist and restoring in the app are new in 0.5.0. The words "backup code" and "owner code" became **master code** in 0.4.14; it is the same code.*
 
 Two things keep you in charge of your IDs when your fingerprint reader or your computer is not there: your **master code** and your **recovery kit**.
 
@@ -12,9 +12,22 @@ Two things keep you in charge of your IDs when your fingerprint reader or your c
 | Use it for | **Use your master code instead**, on any confirm | Getting your IDs back on a new computer or this one: **I have a recovery kit** |
 | Never | Give it to your AI or paste it into a chat | Share it with anyone |
 
+## First run on any computer
+
+Since 0.5.5, first run works the same on a Mac, a Windows PC and in any browser (Firefox too), in the desktop app or in the browser app. You never need a passkey, a security key or a terminal.
+
+1. Pick your AI app, then type the name people see. The button says **Continue with a master code** (or **Use Touch ID** / **Use Windows Hello** where your browser says they work here).
+2. AgentLink shows your **master code** once. Save it, then press **I saved it**.
+3. In the desktop app, AgentLink then offers Touch ID (on a Mac) or Windows Hello (on Windows) for approvals. You can choose **Not now**: your master code works until you turn it on. In a browser, Touch ID, Windows Hello or a passkey is offered only where the browser says it works here. On Windows the master code always comes first, and **Use Windows Hello instead** is the alternative.
+4. Connect your AI app, then **Go to Home**.
+
+**Use your master code instead** makes no passkey request at all, so Windows never asks you to "Insert your security key". **Skip to Home** is not offered until your first ID exists, so you can't end up on a Home that does not work yet.
+
+The same page for each step is in [Get started](get-started-wizard.md).
+
 ## Your master code
 
-The master code is shown once, right after the Touch ID that creates your first ID.
+The master code is shown once, when your first ID is created.
 
 <figure><img src="../../assets/screens/master-code.webp" alt="The master code screen: Approvals on this computer are protected. The code in groups of four, Shown once, Hide, Save in my password manager, Copy, Save as file and I saved it."><figcaption><p>Shown once. Save it before you press I saved it.</p></figcaption></figure>
 
@@ -45,6 +58,14 @@ If you set up AgentLink in the terminal before the app existed, your approvals u
 
 ## If your browser has no passkey
 
-The page tells you which browser works, or lets you continue with the master code only. Nothing breaks. See [Protect your approvals](../get-started/protect-your-approvals.md).
+Nothing breaks. First run makes your master code in the app, with no passkey request. See [Protect your approvals](../get-started/protect-your-approvals.md).
+
+## If you forgot your master code
+
+Choose **Forgot your master code?** under any master code field. AgentLink first offers **Restore from recovery kit**, so you keep your IDs, people and history. Only if you have no kit do you start over: see [Start over on this computer](touch-id-and-master-code.md#start-over-on-this-computer).
+
+## Start in the browser, move to the app later
+
+See [One AgentLink, browser or app](../apps/desktop-app.md#one-agentlink-browser-or-app).
 
 Back to [The local app](README.md).

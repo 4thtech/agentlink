@@ -1,6 +1,6 @@
 # Windows
 
-*Applies to AgentLink 0.4.13. Windows 10 and 11. Windows support for AI apps arrived in 0.4.7. Pre-alpha, on test networks. No account, no payment.*
+*Applies to AgentLink 0.5.5. Windows 10 and 11. Windows support for AI apps arrived in 0.4.7. Pre-alpha, on test networks. No account, no payment.*
 
 AgentLink works on Windows the same way as on a Mac. These are the Windows details.
 
@@ -23,7 +23,7 @@ If PowerShell refuses to run it, run the command from **Command Prompt** (`cmd`)
 
 ## Prefer an app? (early build)
 
-From 0.5.4 there is also an early **Windows app**: AgentLink in its own window, no Node.js and no PowerShell needed. Download [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) and open it. It is not signed yet, so Windows may say "Windows protected your PC": choose **More info**, then **Run anyway**. If Smart App Control blocks it, use the command above instead. Steps and details: [Desktop app, Windows](../apps/desktop-app.md#windows).
+From 0.5.4 there is also an early **Windows app**: AgentLink in its own window, no Node.js and no PowerShell needed. Download [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) and open it. The last page of the setup offers **Create a desktop shortcut** (ticked by default; new in 0.5.5). It is not signed yet, so Windows may say "Windows protected your PC": choose **More info**, then **Run anyway**. If Smart App Control blocks it, use the command above instead. Steps and details: [Desktop app, Windows](../apps/desktop-app.md#windows).
 
 ## How your AI app starts AgentLink
 
@@ -36,8 +36,14 @@ If your home folder already has a folder named `agentlink` in another letter cas
 - **SmartScreen.** Windows may say "Windows protected your PC" when you open a downloaded file. That is not specific to AgentLink: it appears for any file that few people have downloaded yet. Check the file against `SHA256SUMS` on the release page (`certutil -hashfile <file> SHA256`), then choose **More info** and **Run anyway** only if the fingerprint matches.
 - **Smart App Control** (some Windows 11 computers) blocks apps that are not signed, with no way to allow them. The early Windows app is not signed yet, so where Smart App Control is on, use the command above. Do not turn Smart App Control off for AgentLink.
 - **The `.mcpb` download is not signed with a certificate Windows knows.** 4thTech signs it with its own beta certificate, so Windows and Claude Desktop can warn. The one-click download for Claude Desktop is optional; the command line works without it. See [Claude Desktop](claude-desktop.md).
-- **Windows Hello.** Use it as your passkey when the setup page asks. On some Windows computers setup asks for one more touch right away; that lets your approvals use the passkey instead of the master code. See [Protect your approvals](protect-your-approvals.md).
+- **Windows Hello.** Since 0.5.5 you never need a passkey or a USB security key to set up. First run gives you a **master code** (shown once; save it), and Windows Hello is the optional extra: in the Windows app, **Turn on Windows Hello** (Settings › **Windows Hello & master code**) asks for your master code once, then the Windows Hello prompt opens in front of AgentLink. In a browser, **Use Windows Hello instead** appears only where the browser says it works. **No Windows Hello PIN?** AgentLink says so and uses your master code. To set Hello up: open Windows **Settings**, then **Accounts**, then **Sign-in options**, set up a **PIN (Windows Hello)**, and come back. A PC without the security chip Windows Hello needs keeps using the master code. See [Protect your approvals](protect-your-approvals.md).
+
+## Start in the browser, move to the app later
+
+The browser app and the Windows app share the same IDs, contacts and AI apps. Start with the one command, install the app later and open it: it continues with no new setup, and the browser window says "AgentLink moved to the AgentLink app." See [One AgentLink, browser or app](../apps/desktop-app.md#one-agentlink-browser-or-app).
 
 ## If something does not work
+
+If the Windows app does not open, `core.log` in `%LOCALAPPDATA%\AgentLink\logs` says why (a fixed reason and error code only, never keys or message content).
 
 Run `npx -y @4thtech-io/agentlink@latest doctor` in PowerShell. It shows what is set up, why AgentLink last closed, whether anything was left behind, and how to fix the rest.

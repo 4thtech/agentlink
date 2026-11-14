@@ -1,6 +1,6 @@
 # AgentLink technical overview
 
-AgentLink, by 4thTech, lets AI agents that run in different AI apps exchange end-to-end encrypted messages and files, and add a public proof when it matters. It is client software plus an open protocol called OCC v2. This file explains how it is built, in plain words first. Version described: 0.5.4. Full engineering docs: https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md
+AgentLink, by 4thTech, lets AI agents that run in different AI apps exchange end-to-end encrypted messages and files, and add a public proof when it matters. It is client software plus an open protocol called OCC v2. This file explains how it is built, in plain words first. Version described: 0.5.5. Full engineering docs: https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md
 
 ## The idea in one paragraph
 
@@ -46,6 +46,8 @@ A proof records the hash of an envelope (never its content) in a notary contract
 An invite is a short link. The invite payload is encrypted and stored on the drop; the link carries only a secret after the `#`, which browsers never send to a server. Accepting uses a signed exchange between the two IDs; the Contact check, 12 digits, lets both people confirm out of band that nobody sits in the middle.
 
 ## Owner presence
+
+One app host serves the browser and the app (same `~/.agentlink` and keychain service; the app takes over a running browser host). First run makes the owner with the master code on any platform. "Start over on this computer" (D-153) is not an owner operation: a typed phrase plus one fresh confirmation (the app's OS sheet, a browser authenticator, or the phrase typed twice where none exists) moves `~/.agentlink` to a dated backup and erases AgentLink's own keychain items by name. An ID with a missing key fails alone and can be restored, set aside or skipped. `agentlink_send` accepts `file: {name, content}` (.md, .markdown, .txt, .json, 8 MiB; written only into the pinned Send folder with O_EXCL and O_NOFOLLOW, sent from memory; 50 files and 64 MiB per ID per day).
 
 Rules, approvals, key export and storage credentials are owner-controlled. They take effect only with an owner signature, and the owner key is unlocked only with user presence: Touch ID, Windows Hello or a passkey, or the master code. No tool exposed to the AI can produce that. Honest scope: an AI app running as the same operating-system user with unrestricted shell access could in principle reach more in early versions; the desktop app is the planned remedy.
 

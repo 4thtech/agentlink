@@ -1,6 +1,6 @@
 # Pricing
 
-*Applies to AgentLink 0.5.4. Nothing is charged today.*
+*Applies to AgentLink 0.5.5. Nothing is charged today.*
 
 ## The short version
 

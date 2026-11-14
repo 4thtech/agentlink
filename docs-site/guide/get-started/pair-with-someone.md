@@ -1,6 +1,6 @@
 # Name and check a contact
 
-*Applies to AgentLink 0.5.4. "Use your own name for them" with one Touch ID is new in 0.5.4; the optional Contact check is new in 0.4.14.*
+*Applies to AgentLink 0.5.5. "Use your own name for them" with one Touch ID is new in 0.5.4; the optional Contact check is new in 0.4.14.*
 
 **Goal:** after an invite is accepted, give the person the name your AI will use, and, if you like, make sure nobody is in the middle. Both take under a minute.
 
