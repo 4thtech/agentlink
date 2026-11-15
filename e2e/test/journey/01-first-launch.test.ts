@@ -92,7 +92,10 @@ describe('chapter 1: onboarding', () => {
       .first()
       .waitFor();
     expect(await text(page)).toContain('~/AgentLink/Inbox');
-    await page.getByRole('button', { name: 'Choose another folder' }).waitFor();
+    // FILES-FOLDER-PICKER (D-154, 11 §5.7): the Send row's action is "Add folder…" in 0.5.8.
+    await page
+      .getByRole('button', { name: 'Add folder… (a folder your AI can send from)' })
+      .waitFor();
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
 
     // Step 5 (A3): optional; Skip for now is always there.
