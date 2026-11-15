@@ -1,4 +1,5 @@
-// FILES-FOLDER-PICKER (D-154): the window's one preload. Sandboxed, context-isolated: it exposes
+// FILES-FOLDER-PICKER (D-154): the window's one preload (bundled as dist/main/preload.cjs; kept .js here,
+// deps-check allows no .cjs in apps/). Sandboxed, context-isolated: it exposes
 // exactly one function to the page, `window.agentlinkDesktop.chooseFolder({purpose, current?})`,
 // which resolves ONE absolute folder path the person picked in the native dialog, or null.
 // - Only on a fresh user activation (a real click or key press; a script can't make one).

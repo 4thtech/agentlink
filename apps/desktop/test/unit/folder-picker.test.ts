@@ -2,6 +2,7 @@
 // a user activation and answers only a path string or null; the main process answers only the main
 // window's top frame on the locked origin, one dialog at a time, and only ONE absolute path.
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import type {
@@ -23,7 +24,7 @@ import { OriginLock, webPreferences, windowOptions } from '../../src/main/securi
 import { SESSION_URL } from './fakes.js';
 
 const ORIGIN = 'http://localhost:4567';
-const PRELOAD = new URL('../../src/main/preload.cjs', import.meta.url);
+const PRELOAD = new URL('../../src/main/preload.js', import.meta.url);
 
 function lockedTo(): OriginLock {
   const lock = new OriginLock();
@@ -174,9 +175,9 @@ describe('the window has the one preload, nothing else changes', () => {
   });
 
   it('finds the preload next to the main bundle, or none', () => {
-    expect(preloadPath(new URL('../../src/main/main.ts', import.meta.url).href)).toMatch(
-      /preload\.cjs$/,
-    );
+    // The source is preload.js (no .cjs in apps/); the bundle emits it as dist/main/preload.cjs.
+    const bundled = fileURLToPath('file:///app/dist/main/preload.cjs');
+    expect(preloadPath('file:///app/dist/main/main.js', (p) => p === bundled)).toBe(bundled);
     expect(preloadPath('file:///nowhere/main.js', () => false)).toBeUndefined();
   });
 });

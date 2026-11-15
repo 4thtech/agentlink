@@ -21,9 +21,9 @@ const updatesOffFile = fileURLToPath(
   new URL('./src/main/updater/root-key.updates-off.json', import.meta.url),
 );
 
-// FILES-FOLDER-PICKER (D-154): the window's one preload goes next to entry.js unchanged (a sandboxed
+// FILES-FOLDER-PICKER (D-154): the window's one preload goes next to entry.js unchanged as preload.cjs (a sandboxed
 // preload is a plain CommonJS script; folder-picker.ts preloadPath finds it there).
-const preloadFile = fileURLToPath(new URL('./src/main/preload.cjs', import.meta.url));
+const preloadFile = fileURLToPath(new URL('./src/main/preload.js', import.meta.url));
 const preloadAsset = {
   name: 'agentlink-preload',
   generateBundle() {
