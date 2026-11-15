@@ -12,9 +12,11 @@
 // the owner lands on the confirm step. Checking reads only; confirming still needs presence.
 //
 // Three tabs (MSG-FILES-IO-f): Received and Sent (io.tsx, read-only) and this page as Send folders.
-// Out of scope here: inbox folder and link expiry (UX audit 4b "More options"), and Storage
+// FILES-FOLDER-PICKER (D-154): every folder is a FolderLine row; Add folder… and the Inbox's Change…
+// are folder-chooser.tsx (the native dialog in the app, the path field in a browser); a `?folder=`
+// link fills that field. Out of scope here: link expiry (UX audit 4b "More options"), and Storage
 // (folded in by D-120 later).
-import { Banner, Button, EmptyState, Icon, TextField } from '@4thtech-io/ui';
+import { Banner, Button, EmptyState } from '@4thtech-io/ui';
 import { UnderTheHood } from '../../lazy/hood.js';
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { createApiClient } from '../../api/client.js';
@@ -49,6 +51,7 @@ import {
   type Notice,
 } from './add-folder.js';
 import { RevealButton } from './folder-rows.js';
+import { FolderChooser, FolderLine } from './folder-chooser.js';
 import { FILES_COPY as C, appTip, computerWord } from './folders-copy.js';
 import { RECEIVED_PATH, listPath, parseInboxFolder } from './io-api.js';
 import { markSeen } from './folders-summary.js';
@@ -67,10 +70,7 @@ type ListState =
       readonly version: number | null;
     };
 
-type Step =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'enter'; readonly checking: boolean; readonly problem?: string }
-  | { readonly kind: 'confirm'; readonly review: Review };
+type Step = { readonly kind: 'idle' } | { readonly kind: 'confirm'; readonly review: Review };
 
 export interface FilesPageProps {
   /** The tab to open on; by default Received, or Send folders for a `?folder=` link. */
@@ -151,6 +151,7 @@ function SendFolders({
         )?.path
       : undefined;
   const [inbox, setInbox] = useState<string | undefined>(undefined);
+  const [inboxReads, setInboxReads] = useState(0);
   useEffect(() => {
     let live = true;
     void api.get(listPath(RECEIVED_PATH, null)).then((answer) => {
@@ -161,13 +162,10 @@ function SendFolders({
     return () => {
       live = false;
     };
-  }, [api]);
+  }, [api, inboxReads]);
   const [initial] = useState(prefill);
-  const [checkOnce, setCheckOnce] = useState(() => initial.length > 0 && autoCheck(initial));
-  const [step, setStep] = useState<Step>(
-    initial.length > 0 ? { kind: 'enter', checking: false } : { kind: 'idle' },
-  );
-  const [typed, setTyped] = useState(initial);
+  const [checkOnce] = useState(() => initial.length > 0 && autoCheck(initial));
+  const [step, setStep] = useState<Step>({ kind: 'idle' });
   const [notice, setNotice] = useState<Notice | undefined>(undefined);
   const [passkey, setPasskey] = useState<PasskeyInfo | undefined>(undefined);
   const [sending, setSending] = useState(false);
@@ -184,17 +182,16 @@ function SendFolders({
     void load();
   }, [load]);
 
-  const startReview = async (change: 'add' | 'remove', path: string): Promise<void> => {
+  /** Remove (Stop sending): the server's review, then the confirm. Adding is FolderChooser's. */
+  const startRemove = async (path: string): Promise<void> => {
     setNotice(undefined);
     // L-1: the review names the version this list was read at; without one, nothing can change.
     const version = list.phase === 'ok' ? list.version : null;
     if (version === null) {
-      if (change === 'add') setStep({ kind: 'enter', checking: false, problem: S.rulesUnreadable });
       setNotice({ tone: 'warning', text: S.rulesUnreadable });
       return;
     }
-    if (change === 'add') setStep({ kind: 'enter', checking: true });
-    const answer = await api.get(reviewPath(change, path, version));
+    const answer = await api.get(reviewPath('remove', path, version));
     const review =
       answer.kind === 'answer' && answer.status === 200 ? parseReview(answer.json) : undefined;
     if (review === undefined) {
@@ -202,14 +199,7 @@ function SendFolders({
         answer.kind === 'offline'
           ? { tone: 'warning', text: S.offline }
           : problemText(parseReviewProblem(answer.status, answer.json));
-      if (change === 'add') {
-        setStep(
-          problem.rules === true
-            ? { kind: 'enter', checking: false }
-            : { kind: 'enter', checking: false, problem: problem.text },
-        );
-      }
-      if (change === 'remove') setStep({ kind: 'idle' });
+      setStep({ kind: 'idle' });
       setNotice(problem);
       // The rules changed since this list was read: read it again, so trying again works.
       if (problem.reload === true) await load();
@@ -258,28 +248,17 @@ function SendFolders({
           { kind: 'code', code: code ?? '' },
         );
       }
-      const shown = outcomeText(outcome, review.change);
-      setNotice(shown);
+      setNotice(outcomeText(outcome, review.change));
       if (outcome.kind === 'applied') {
         setStep({ kind: 'idle' });
-        setTyped('');
         await load();
       } else if (!RETRYABLE.has(outcome.kind)) {
-        // The review was used up: start again from the folder.
-        setStep(review.change === 'add' ? { kind: 'enter', checking: false } : { kind: 'idle' });
+        setStep({ kind: 'idle' });
       }
     } finally {
       setSending(false);
     }
   };
-
-  // ATT-SENDFOLDER-FIX: once the list (and its version) is read, check the filled-in folder once.
-  useEffect(() => {
-    if (!checkOnce || list.phase !== 'ok') return;
-    setCheckOnce(false);
-    void startReview('add', initial);
-    // startReview is recreated each render; the one-shot flag keeps this to a single review.
-  }, [checkOnce, list.phase]);
 
   const cancel = (): void => {
     setStep({ kind: 'idle' });
@@ -300,104 +279,41 @@ function SendFolders({
         <p className="al-text-body-sm al-muted" data-app-tip>
           <span className="al-text-label">{C.aiAppHeading}</span> {appTip(appName, computerWord())}
         </p>
-        {list.folders.length === 0 && step.kind === 'idle' ? (
-          <EmptyState
-            icon="folder"
-            title={S.emptyTitle}
-            prompt={S.emptyPrompt}
-            action={
-              <Button
-                variant="primary"
-                icon="plus"
-                onClick={() => setStep({ kind: 'enter', checking: false })}
-              >
-                {S.allowFolder}
-              </Button>
-            }
-          />
-        ) : null}
-        {list.folders.length > 0 ? (
+        {list.folders.length === 0 ? (
+          <EmptyState icon="folder" title={S.emptyTitle} prompt={S.emptyPrompt} />
+        ) : (
           <ul className="fl-list">
             {list.folders.map((row) => (
-              <li key={row.path} className="fl-row">
-                <Icon name="folder" size={16} />
-                <div className="fl-row-main">
-                  <span className="al-text-code">{row.path}</span>
-                  {row.resolved === null ? (
-                    <span className="al-text-caption al-muted">{S.folderMissing}</span>
-                  ) : row.resolved !== row.path ? (
-                    <span className="al-text-caption al-muted">{opensAt(row.resolved)}</span>
-                  ) : null}
-                </div>
-                {row.path === revealable ? <RevealButton which="send" reveal={reveal} /> : null}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon="x"
-                  aria-label={removeLabel(row.path)}
-                  title={removeLabel(row.path)}
-                  disabled={step.kind !== 'idle'}
-                  onClick={() => void startReview('remove', row.path)}
-                />
-              </li>
+              <FolderLine
+                key={row.path}
+                path={row.path}
+                line={
+                  row.resolved === null
+                    ? S.folderMissing
+                    : row.resolved !== row.path
+                      ? opensAt(row.resolved)
+                      : undefined
+                }
+                actions={
+                  <>
+                    {row.path === revealable ? <RevealButton which="send" reveal={reveal} /> : null}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      icon="x"
+                      title={removeLabel(row.path)}
+                      disabled={step.kind !== 'idle'}
+                      onClick={() => void startRemove(row.path)}
+                    >
+                      {S.remove}
+                      <span className="fl-sr-only"> {removeLabel(row.path)}</span>
+                    </Button>
+                  </>
+                }
+              />
             ))}
           </ul>
-        ) : null}
-        {inbox === undefined ? null : (
-          <div className="fl-row" data-row="inbox">
-            <Icon name="inbox" size={16} />
-            <div className="fl-row-main">
-              <span className="al-text-label">{C.inboxLabel}</span>
-              <span className="al-text-code">{inbox}</span>
-              <span className="al-text-caption al-muted">{C.inboxLine}</span>
-            </div>
-            <RevealButton which="inbox" reveal={reveal} />
-          </div>
         )}
-        {step.kind === 'idle' && list.folders.length > 0 ? (
-          <Button
-            block
-            icon="plus"
-            onClick={() => {
-              setNotice(undefined);
-              setStep({ kind: 'enter', checking: false });
-            }}
-          >
-            {S.allowFolder}
-          </Button>
-        ) : null}
-        {step.kind === 'enter' ? (
-          <form
-            className="fl-enter"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (typed.length > 0 && !step.checking) void startReview('add', typed);
-            }}
-          >
-            <TextField
-              name="folder"
-              label={S.folderField}
-              {...(step.problem === undefined ? { hint: S.folderHint } : { error: step.problem })}
-              value={typed}
-              onChange={(e) => setTyped(e.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-              mono
-            />
-            <div className="fl-actions">
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={typed.length === 0 || step.checking}
-              >
-                {step.checking ? S.checking : S.check}
-              </Button>
-              <Button variant="ghost" onClick={cancel}>
-                {S.cancel}
-              </Button>
-            </div>
-          </form>
-        ) : null}
         {step.kind === 'confirm' ? (
           <Confirm
             key={step.review.review}
@@ -409,10 +325,37 @@ function SendFolders({
             onCancel={cancel}
           />
         ) : null}
-        {step.kind !== 'confirm' && notice !== undefined && step.kind !== 'enter' ? (
-          <NoticeBanner notice={notice} />
+        {step.kind !== 'confirm' && notice !== undefined ? <NoticeBanner notice={notice} /> : null}
+        {step.kind === 'idle' ? (
+          <FolderChooser
+            api={api}
+            purpose="send"
+            variant={list.folders.length === 0 ? 'primary' : 'secondary'}
+            initialPath={initial}
+            check={checkOnce}
+            onDone={() => void load()}
+          />
         ) : null}
-        {step.kind === 'enter' && notice?.rules === true ? <NoticeBanner notice={notice} /> : null}
+        {inbox === undefined ? null : (
+          <ul className="fl-list">
+            <FolderLine
+              row="inbox"
+              icon="inbox"
+              label={C.inboxLabel}
+              path={inbox}
+              line={C.inboxLine}
+              actions={<RevealButton which="inbox" reveal={reveal} />}
+              below={
+                <FolderChooser
+                  api={api}
+                  purpose="inbox"
+                  current={inbox}
+                  onDone={() => setInboxReads((n) => n + 1)}
+                />
+              }
+            />
+          </ul>
+        )}
         <p className="al-text-caption al-muted">{S.everyChange}</p>
       </>
     );

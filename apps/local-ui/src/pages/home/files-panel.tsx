@@ -24,6 +24,7 @@ import { createRevealApi, type RevealApi } from '../../api/reveal-folder.js';
 import { navigate } from '../../router.js';
 import { SEND_FOLDER_CHECK_KEY } from '../../strings.js';
 import { FolderRows } from '../files/folder-rows.js';
+import { createFilesApi, type FilesApi } from '../files/files-api.js';
 import { FILES_COPY as C, appTip, computerWord, isKnownApp } from '../files/folders-copy.js';
 import { loadFilesSummary, type FilesSummary, type Getter } from '../files/folders-summary.js';
 import { filesLinkFor, type SendFolderApi } from './send-folder-banner.js';
@@ -67,6 +68,8 @@ export interface FilesPanelProps {
    */
   readonly idLabel?: string | undefined;
   readonly go?: (to: string) => void;
+  /** FILES-FOLDER-PICKER: the files API for the rows' Add folder… and Change…; the page's own by default. */
+  readonly api?: FilesApi;
 }
 
 export function FilesPanel({
@@ -77,7 +80,10 @@ export function FilesPanel({
   agentKey,
   idLabel,
   go = navigate,
+  api: givenApi,
 }: FilesPanelProps): ReactElement | null {
+  const [api] = useState<FilesApi>(() => givenApi ?? createFilesApi());
+  const [reads, setReads] = useState(0);
   const [summary, setSummary] = useState<FilesSummary | undefined>(undefined);
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [tips, setTips] = useState(false);
@@ -95,6 +101,17 @@ export function FilesPanel({
       live = false;
     };
   }, [get, agentKey]);
+  // FILES-FOLDER-PICKER: after a folder change, read again in place (the row keeps its success line).
+  useEffect(() => {
+    if (reads === 0) return;
+    let live = true;
+    void loadFilesSummary(get).then((result) => {
+      if (live && result.kind === 'ok') setSummary(result.summary);
+    });
+    return () => {
+      live = false;
+    };
+  }, [reads]);
 
   const allow = useCallback(async (): Promise<void> => {
     setPhase('working');
@@ -189,7 +206,13 @@ export function FilesPanel({
                   {C.panelEmpty}
                 </p>
               ) : null}
-              <FolderRows summary={summary} reveal={revealApi} showNew />
+              <FolderRows
+                summary={summary}
+                reveal={revealApi}
+                showNew
+                api={api}
+                onChanged={() => setReads((n) => n + 1)}
+              />
               <div className="fl-actions">
                 <a className="al-btn al-btn-secondary al-btn-sm" href={MANAGE_FOLDERS_PATH}>
                   {C.manageFolders}

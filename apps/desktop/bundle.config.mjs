@@ -3,6 +3,7 @@
 // the branch that reads the preview environment variables. build/lib/stage.mjs packs only this into
 // app.asar (never plain tsc output) and fails the build if the preview name is still in the ASAR.
 // A preview (owner-feedback) build sets AGENTLINK_DESKTOP_PREVIEW_BUILD=1 when bundling.
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 
@@ -20,8 +21,23 @@ const updatesOffFile = fileURLToPath(
   new URL('./src/main/updater/root-key.updates-off.json', import.meta.url),
 );
 
+// FILES-FOLDER-PICKER (D-154): the window's one preload goes next to entry.js unchanged as preload.cjs (a sandboxed
+// preload is a plain CommonJS script; folder-picker.ts preloadPath finds it there).
+const preloadFile = fileURLToPath(new URL('./src/main/preload.js', import.meta.url));
+const preloadAsset = {
+  name: 'agentlink-preload',
+  generateBundle() {
+    this.emitFile({
+      type: 'asset',
+      fileName: 'preload.cjs',
+      source: readFileSync(preloadFile, 'utf8'),
+    });
+  },
+};
+
 export default defineConfig({
   configFile: false,
+  plugins: [preloadAsset],
   publicDir: false,
   envDir: false,
   logLevel: 'warn',

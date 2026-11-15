@@ -8,7 +8,8 @@
 // - Not allowed (the first rules carried no Send folder): the line of 11 §5.7 and Allow Send folder,
 //   the Home banner's flow (a mark-kind POST, nothing signed here; the owner confirms in Settings ›
 //   Files with their own presence).
-// - Choose another folder: the existing Settings › Files add review and confirm (files/add-folder.tsx;
+// - Add folder… / Change… (FILES-FOLDER-PICKER, D-154: files/folder-chooser.tsx, the native dialog in
+//   the app, the path field in a browser), then the existing Settings › Files review and confirm (
 //   D-99 checks, D-119 ticks, Touch ID / Windows Hello in a browser or the master code; never WebAuthn
 //   in the desktop app's window). It only adds a folder through the one existing signed route.
 // - The tip of the AI app picked in step 1: fixed text, never a status (the app can't see it).
@@ -17,7 +18,6 @@ import { useCallback, useEffect, useRef, useState, type ReactElement } from 'rea
 import { createRevealApi, type RevealApi } from '../../api/reveal-folder.js';
 import { navigate } from '../../router.js';
 import { SEND_FOLDER_CHECK_KEY } from '../../strings.js';
-import { AddFolder } from '../files/add-folder.js';
 import { createFilesApi, type FilesApi } from '../files/files-api.js';
 import { FolderRows } from '../files/folder-rows.js';
 import { FILES_COPY as C, appTip, computerWord } from '../files/folders-copy.js';
@@ -144,9 +144,9 @@ export function FilesStep({
         <FolderRows
           summary={summary}
           reveal={reveal}
-          sendAction={
-            <AddFolder api={api} label={F.choose} open={chooseFirst} onAdded={() => void read()} />
-          }
+          api={api}
+          chooseFirst={chooseFirst}
+          onChanged={() => void read()}
         />
       </>
     );

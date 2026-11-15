@@ -17,6 +17,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FilesPage, type FilesPageProps } from './index.js';
 import { FILES_STRINGS as S, WARNING_TEXT, refusalText } from './strings.js';
+import { PICKER_COPY as P } from './folders-copy.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -106,7 +107,11 @@ async function mount(routes: Record<string, Handler>) {
 
 function button(name: string): HTMLButtonElement {
   const found = [...host.querySelectorAll('button')].find(
-    (b) => b.textContent?.trim() === name || b.getAttribute('aria-label') === name,
+    (b) =>
+      b.textContent?.trim() === name ||
+      b.textContent?.startsWith(`${name} `) === true ||
+      b.getAttribute('aria-label') === name ||
+      b.title === name,
   );
   if (found === undefined) throw new Error(`no button ${name}`);
   return found;
@@ -154,7 +159,7 @@ describe('the folder list', () => {
     expect(text).toContain('/Volumes/Shared/Contracts');
     expect(text).toContain(S.folderMissing);
     expect(button('Stop sending from /Users/tali/Work')).toBeDefined();
-    expect(button(S.allowFolder)).toBeDefined();
+    expect(button(P.addFolder)).toBeDefined();
     expect(text).toContain(S.everyChange);
   });
 
@@ -193,11 +198,11 @@ describe('allow a folder (04 §4, D-119)', () => {
       [PASSKEY]: NO_PASSKEY,
       [`POST ${COMMIT}`]: { status: 'applied', confirmed: true },
     });
-    await click(button(S.allowFolder));
+    await click(button(P.addFolder));
     const input = host.querySelector<HTMLInputElement>('input[name="folder"]');
     expect(input).not.toBeNull();
     await type(input as HTMLInputElement, typed);
-    await click(button(S.check));
+    await click(button(P.use));
     return s;
   }
 
@@ -287,12 +292,12 @@ describe('allow a folder (04 §4, D-119)', () => {
 
   it('L-1: without a rules version, nothing is reviewed', async () => {
     const s = await mount({ [LIST]: { folders: [], max: 32, version: null } });
-    await click(button(S.allowFolder));
+    await click(button(P.addFolder));
     await type(
       host.querySelector<HTMLInputElement>('input[name="folder"]') as HTMLInputElement,
       '/x/y',
     );
-    await click(button(S.check));
+    await click(button(P.use));
     expect(host.textContent).toContain(S.rulesUnreadable);
     expect(s.calls.some((c) => c.url.startsWith('/api/ui/files/review'))).toBe(false);
   });
@@ -316,12 +321,12 @@ describe('allow a folder (04 §4, D-119)', () => {
       );
     });
     await flush();
-    await click(button(S.allowFolder));
+    await click(button(P.addFolder));
     await type(
       host.querySelector<HTMLInputElement>('input[name="folder"]') as HTMLInputElement,
       '/x/y',
     );
-    await click(button(S.check));
+    await click(button(P.use));
     await type(
       host.querySelector<HTMLInputElement>('input[name="owner-code"]') as HTMLInputElement,
       'X',

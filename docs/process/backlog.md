@@ -11057,6 +11057,15 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Owner requirement (Tali, 14 Nov):** "Settings › Updates › Check for updates › Update now, and that's it: it updates, restarts, new version — on the Windows app too, no installer by hand."
 - **Done when:** `RED (expected):` commit first; the signed manifest lists the Windows setup and its signature covers it; win32/x64 selects it; the app verifies before it runs, refuses a setup changed after the check, keeps the old app when the setup fails or the new copy does not answer (failed version recorded, "Couldn't update here" next launch); the NSIS script upgrades silently in place keeping data and the desktop shortcut; the Windows CI rehearsal passes. What only a real release proves: the signed document on a Release, the real health answer of the new app, Explorer's launch on a person's desktop.
 
+#### WIN-UPDATE-CLEANUP · The old Windows copy is removed reliably after an update (0.5.8)
+- **Status:** built (rel058/win-cleanup) · **Size:** S · **Tier:** Opus build, Fable independent audit (updater) · **Security:** S2
+- **Repo/path:** agentlink · `apps/desktop/src/main/updater/install-win.ts` (watchdog `rmRetry`, `record` before the old copy starts, `watchdogOwns` sweep); `apps/desktop/test/smoke/win-update-rehearsal.mjs`
+- **Depends on:** WIN-INAPP-UPDATE
+- **Spec:** 08 §8 "Signed updates" (Windows in-app install)
+- **Why:** release run 43650479110: the update succeeded but `AgentLink.previous-u-…` stayed (one removal try, a file briefly in use), and the healthy-start sweep only removed it after the 24 h staging sweep.
+- **Done when:** `RED (expected):` commit first; removing the old or failed copy retries with bounded backoff and never delays the update; after a rollback the failed version is recorded and the pending nonce removed before the old copy starts; a healthy start removes a copy whose staging folder holds only node.exe (and an empty tmp\), keeps it while the setup or recover.cjs is there or the folder cannot be listed; the Windows rehearsal waits for the cleanup.
+- **Open (Fable r1 Low, card only):** the 24 h staging sweep (`sweepStaging`) can remove the staged node.exe that a still-registered RunOnce recovery entry (`rollback_incomplete`, or a watchdog killed and the computer off > 24 h) would run at the next logon; the recovery then cannot start. Decide: keep staging folders that hold recover.cjs, or point RunOnce at the installed node.exe.
+
 #### KIT-NAMES · Recovery kit carries each ID's name (kit format v2) (0.5.4)
 - **Status:** done (released 0.5.4) · **Security:** S2
 - **Spec:** 04 §2.3.3; 07 §9.4
@@ -11189,3 +11198,13 @@ Only the owner (@talirezun) can do these. Agents may prepare material, never exe
 - **Depends on:** FILES-HOME-PANEL, FILES-ONB-1
 - **Spec:** 08 §1 "Home Files panel", "Files step"; 11 §5.7
 - **Done when:** `RED (expected):` commit first; the server decides the ID's own Send folder state (`allowed` / `not_found` / `not_allowed`, the path in its `~` form) exactly as sending does (`ownSendFolder`), whether the rules hold the realpath or `~/AgentLink/Send`; Home's Files panel, the Files step and the Send folder banner use it and never compare paths, so Allow Send folder is never offered for an allowed folder; with several IDs the panel says which ID it describes.
+
+#### FILES-FOLDER-PICKER · Pick folders in Finder or Explorer; change the Inbox folder (0.5.8, owner requirement 14 Nov)
+- **Status:** in review (branch `rel058/folder-picker`) · **Size:** M · **Tier:** Opus build, Fable audit · **Security:** S2 (folder policy; where received files are written; a new desktop preload)
+- **Repo/path:** agentlink · `apps/desktop/src/main/{folder-picker.ts,preload.cjs,security.ts,window.ts,main.ts,electron-api.ts}`, `apps/desktop/bundle.config.mjs`; `packages/node/src/local-ui/api/{files-inbox.ts,files.ts}`, `local-ui/routes.ts`; `apps/local-ui/src/pages/files/{folder-chooser.tsx,folder-rows.tsx,index.tsx,add-folder.tsx,data.ts,folders-copy.ts,strings.ts,files.css}`, `pages/start/files-step.tsx`, `pages/home/files-panel.tsx`
+- **Depends on:** FILES-ONB-1, FILES-HOME-PANEL, FILES-ALLOWED-STATE
+- **Spec:** D-154 (proposed); 04 §4.1 "The folder"; 08 §1 "Folder rows and the picker"; 11 §5.7
+- **Done when:** `RED (expected):` commit first; one folder row in Settings › Files, the Files step and Home's Files panel (name, path cut in the middle with its title, chip, Show in Finder/Explorer, Remove, Add folder…, Change… on Inbox; pending, confirming, error, success states); the desktop window's one preload answers one absolute path from the native dialog only on a user activation, one at a time, to the main window's top frame on the locked origin; a browser gets the path field with example, paste help and the app tip; the server reviews a picked path exactly as a typed one; a Send folder never overlaps the Inbox; the Inbox changes only through its review and `POST /api/ui/files/inbox` with presence and every warning; DOM, route and desktop unit tests; independent review and Fable audit.
+- **Follow-up:** Touch ID / Windows Hello (native presence) in the Files confirm sheet inside the app window (today the master code, as before).
+- **Follow-up (Fable r1, card only):** after an Inbox change, Received rows still resolve their saved name in the Inbox folder in force: store the folder per saved record so older files keep Show in Finder and the reader. The review GETs follow realpath to UNC paths on Windows (pre-existing in Send folders): refuse UNC and device paths there.
+

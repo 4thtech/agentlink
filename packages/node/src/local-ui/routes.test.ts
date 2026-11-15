@@ -148,6 +148,9 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/files',
       '/api/ui/files/review',
       '/api/ui/files/folders',
+      // FILES-FOLDER-PICKER: the Inbox folder (api/files-inbox.test.ts).
+      '/api/ui/files/inbox/review',
+      '/api/ui/files/inbox',
       // MSG-FILES-IO-d: Files, Received and Sent (api/files-io.test.ts).
       '/api/ui/files/received',
       // W4-AUTO-SAVE: the one-time notice's dismiss (api/files-io-auto-save.test.ts).

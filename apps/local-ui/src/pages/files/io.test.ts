@@ -92,7 +92,9 @@ async function mount(
 
 const tabs = (): HTMLElement[] => [...host.querySelectorAll<HTMLElement>('[role="tab"]')];
 const buttonNamed = (name: string): HTMLButtonElement | undefined =>
-  [...host.querySelectorAll('button')].find((b) => b.textContent?.trim() === name);
+  [...host.querySelectorAll('button')].find(
+    (b) => b.textContent?.trim() === name || b.textContent?.startsWith(`${name} `) === true,
+  );
 async function click(el: Element | undefined): Promise<void> {
   if (el === undefined) throw new Error('nothing to click');
   await act(async () => {
@@ -171,7 +173,7 @@ describe('tabs', () => {
     });
     await click(tabs()[2]);
     expect(host.textContent).toContain('/Users/tali/Work');
-    expect(buttonNamed('Allow a folder')).toBeDefined();
+    expect(buttonNamed('Add folder…')).toBeDefined();
     expect(s.calls.some((c) => c.url.includes('/sent'))).toBe(false);
   });
 
