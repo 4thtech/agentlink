@@ -1,5 +1,17 @@
 # @4thtech-io/node
 
+## 0.5.8
+
+### Patch Changes
+
+- 18b26c5: The Home Files panel no longer asks you to allow a Send folder that's already allowed (FILES-ALLOWED-STATE).
+- 18b26c5: Pick folders in Finder or Explorer in the AgentLink app, and change where received files are saved (FILES-FOLDER-PICKER, D-154).
+- 18b26c5: 0.5.7: a small release to check that Update now works from 0.5.6 in the Mac app, the Windows app and the browser app. No changes to how AgentLink works.
+- Updated dependencies [18b26c5]
+  - @4thtech-io/crypto@0.5.8
+  - @4thtech-io/transport-nostr@0.5.8
+  - @4thtech-io/core@0.5.8
+
 ## 0.5.7
 
 ### Patch Changes

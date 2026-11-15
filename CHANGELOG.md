@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-11-15
+
+### Added
+
+- Choose folders in Finder or Explorer: in the AgentLink app, **Add folder…** and **Change…** open the system's folder dialog, so you no longer type or paste paths. In a browser you paste the path, with an example and a tip. Every folder shows its name and full path, and the change is still checked and confirmed with Touch ID, Windows Hello or your master code (FILES-FOLDER-PICKER, D-154, S2).
+- Change where received files are saved: **Change…** on the Inbox row. Files already saved stay where they are; new files go to the new folder. A folder your AI can send from can't be your Inbox, and the other way round.
+
+### Changed
+
+- 0.5.7: a small release to check that Update now works from 0.5.6 in the Mac app, the Windows app and the browser app. No changes to how AgentLink works (UPDATE-TEST-057, S0).
+
+### Fixed
+
+- The Home Files panel no longer asks you to allow a Send folder that's already allowed. The Files step in Get started says the same, and with several IDs the panel names the ID it shows (FILES-ALLOWED-STATE, S1).
+- After a Windows update, the old copy's folder beside AgentLink is removed reliably: AgentLink tries again for a short while if Windows still has a file in it open, and tidies up at the next start otherwise (WIN-UPDATE-CLEANUP, S2, 08 §8). The update itself was never affected.
+
 ## [0.5.7] - 2026-11-14
 
 ### Changed
@@ -1325,7 +1341,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.7...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.8...HEAD
+[0.5.8]: https://github.com/4thtech/agentlink/compare/v0.5.7...v0.5.8
 [0.5.7]: https://github.com/4thtech/agentlink/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/4thtech/agentlink/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/4thtech/agentlink/compare/v0.5.4...v0.5.5
