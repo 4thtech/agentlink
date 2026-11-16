@@ -28,7 +28,7 @@ export const WIDGET_BUCKETS = 24;
 export const WIDGET_KEYS = Object.freeze({
   answer: ['now', 'previews', 'unread', 'today', 'contacts'],
   unread: ['contactId', 'count', 'lastAt', 'preview'],
-  today: ['start', 'bucketSeconds', 'in', 'out', 'proofs', 'files'],
+  today: ['start', 'bucketSeconds', 'in', 'out', 'proofs', 'files', 'partial'],
   contact: ['contactId', 'lastAt', 'activity'],
 } as const);
 
@@ -59,6 +59,8 @@ export interface WidgetToday {
   readonly out: readonly number[];
   readonly proofs: readonly number[];
   readonly files: readonly number[];
+  /** True when a read cap (200 exchanges per direction, or the activity page cap) left some out. */
+  readonly partial: boolean;
 }
 
 /** The last exchange only: the protocol has no presence, so never "online". */

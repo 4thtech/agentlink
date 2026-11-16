@@ -399,7 +399,7 @@ import {
 } from '@4thtech-io/types/ui-contract/ui-settings';
 import { createUiSettingsDesk } from './local-ui/api/ui-settings.js';
 import type { LocalUiNotificationsDesk } from './local-ui/api/notifications.js';
-import { widgetActivityMark } from './local-ui/api/widget.js';
+import { widgetActivityMark, type WidgetMarkMemo } from './local-ui/api/widget.js';
 import {
   notifyPrefsInForce,
   type NotificationItem,
@@ -1689,6 +1689,8 @@ export async function startApprovalServerWith(
    * W4-LIVE-STATUS (08 §1 `GET /api/ui/events`): the live event hub. It reads the host's agents list
    * (read-only peeks, no lock, never the lease) every 2 s while a stream is open.
    */
+  /** TRAY-WIDGET-API: the activity mark's memory of the newest exchange (never sent). */
+  const widgetMarkMemo: WidgetMarkMemo = {};
   const liveEvents = new LiveEvents({
     read: async () => {
       if (host === undefined) return undefined;
@@ -1705,7 +1707,7 @@ export async function startApprovalServerWith(
       const activityMark =
         readClient === undefined
           ? undefined
-          : await widgetActivityMark(readClient, uiContext.notifications, now());
+          : await widgetActivityMark(readClient, uiContext.notifications, now(), widgetMarkMemo);
       return {
         generation: list.generation,
         current: list.current,

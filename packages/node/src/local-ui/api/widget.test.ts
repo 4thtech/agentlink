@@ -70,6 +70,7 @@ interface World {
   items?: Item[];
   texts?: Record<string, string>;
   failText?: string[];
+  flowCapped?: boolean;
   flow?: { contactId: string; direction: 'in' | 'out'; kind: string; state: string; at: number }[];
   activity?: Record<string, unknown>[];
   pulse?: { contactId: string; at: number }[];
@@ -106,7 +107,7 @@ function contextOf(w: World = {}) {
   const flowEvents = vi.fn(() =>
     w.failCore === 'flow'
       ? Promise.reject(new Error(CANARY))
-      : Promise.resolve({ events: w.flow ?? [], capped: false }),
+      : Promise.resolve({ events: w.flow ?? [], capped: w.flowCapped === true }),
   );
   const pulseTimes = vi.fn(() =>
     w.failCore === 'pulse'
@@ -183,6 +184,7 @@ type Body = {
     out: number[];
     proofs: number[];
     files: number[];
+    partial: boolean;
   };
   contacts: { contactId: string; lastAt: number; activity: string }[];
 };
@@ -257,9 +259,11 @@ describe('GET /api/ui/widget: the answer', () => {
       'files',
       'in',
       'out',
+      'partial',
       'proofs',
       'start',
     ]);
+    expect(b.today.partial).toBe(false);
     expect(Object.keys(b.contacts[0] ?? {}).sort()).toEqual(['activity', 'contactId', 'lastAt']);
   });
 
@@ -493,7 +497,26 @@ describe('GET /api/ui/widget: today', () => {
     });
     const t = bodyOf(await call(w.context)).today;
     expect(pages).toBeLessThanOrEqual(10);
+    // The page cap ended before the local midnight: some of today is not counted.
+    expect(t.partial).toBe(true);
     expect(t.proofs.reduce((a, b) => a + b, 0)).toBe(pages * 100);
+  });
+});
+
+describe('GET /api/ui/widget: today.partial (IR Low 1)', () => {
+  it('is true when core capped the exchange read (200 per direction)', async () => {
+    const w = contextOf({ flowCapped: true });
+    expect(bodyOf(await call(w.context)).today.partial).toBe(true);
+  });
+
+  it('is false when every read reached the local midnight', async () => {
+    const w = contextOf({
+      activity: [
+        { kind: 'proof', id: 'p1', at: NOON - 10 },
+        { kind: 'proof', id: 'p0', at: MIDNIGHT - 1 },
+      ],
+    });
+    expect(bodyOf(await call(w.context)).today.partial).toBe(false);
   });
 });
 
@@ -535,12 +558,14 @@ describe('widgetActivityMark (the activity event)', () => {
       activity: [{ kind: 'proof', id: 'p1', at: NOON }],
       pulse: [{ contactId: BOB, at: NOON - 10 }],
     };
+    const memo = {};
     const mark = async (): Promise<string | undefined> => {
       const { context } = contextOf(w);
       return widgetActivityMark(
         context.client as LocalUiReadClient,
         context.notifications,
         NOON_MS,
+        memo,
       );
     };
     const m1 = await mark();
@@ -554,6 +579,34 @@ describe('widgetActivityMark (the activity event)', () => {
     expect(m3).not.toBe(m2);
     w.pulse = [{ contactId: CAROL, at: NOON + 3 }];
     expect(await mark()).not.toBe(m3);
+  });
+
+  it('does not change when an exchange ages out of its window, or when more come at once (IR Low 2)', async () => {
+    const w: World = { pulse: [{ contactId: BOB, at: NOON - 10 }] };
+    const memo = {};
+    const mark = async (): Promise<string | undefined> => {
+      const { context } = contextOf(w);
+      return widgetActivityMark(
+        context.client as LocalUiReadClient,
+        context.notifications,
+        NOON_MS,
+        memo,
+      );
+    };
+    const m1 = await mark();
+    // The newest stays the newest while an older one leaves or joins the window: no change.
+    w.pulse = [
+      { contactId: BOB, at: NOON - 10 },
+      { contactId: CAROL, at: NOON - 20 },
+    ];
+    expect(await mark()).toBe(m1);
+    // Every exchange aged out of the window: the last newest is kept, no spurious event.
+    w.pulse = [];
+    expect(await mark()).toBe(m1);
+    expect(await mark()).toBe(m1);
+    // A newer exchange changes it.
+    w.pulse = [{ contactId: BOB, at: NOON + 5 }];
+    expect(await mark()).not.toBe(m1);
   });
 
   it('is undefined when it cannot be read', async () => {

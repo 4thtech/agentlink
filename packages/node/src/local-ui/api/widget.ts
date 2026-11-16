@@ -6,7 +6,7 @@
 // gate as every /api/ui/ route (approval-server.ts), no query:
 //
 //   { now, previews, unread: [{contactId, count, lastAt, preview?}],
-//     today: {start, bucketSeconds: 3600, in[], out[], proofs[], files[]},
+//     today: {start, bucketSeconds: 3600, in[], out[], proofs[], files[], partial},
 //     contacts: [{contactId, lastAt, activity}] }
 //
 // - `unread`: the open ID's unread `messages` and `files` notification items (the bell's store,
@@ -16,7 +16,8 @@
 //   (widgetPreview). While off, no message is read at all. Never a file name, subject or size.
 // - `today`: WIDGET_BUCKETS hourly buckets since the local midnight; in and out from the store's
 //   exchange times (core `flowEvents`), proofs and files from the activity feed (at most
-//   ACTIVITY_PAGES pages of 100, newest first, stopping at the midnight).
+//   ACTIVITY_PAGES pages of 100, newest first, stopping at the midnight). `partial` is true when
+//   core's 200-per-direction cap or the page cap left some of today out.
 // - `contacts`: exchanged since the earlier of 24 hours ago and the local midnight (core
 //   `pulseTimes`), `active_now` (within 5 minutes) or `today` as the pulse defines them; a contact
 //   that is `quiet` is not listed. There is no presence in the protocol.
@@ -27,6 +28,7 @@
 import type { JsonObject } from '@4thtech-io/crypto';
 import { refusedCategory15 } from '@4thtech-io/types';
 import { readNotificationItem } from '@4thtech-io/types/ui-contract/notifications';
+import type { UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 import {
   WIDGET_BUCKETS,
   WIDGET_BUCKET_SECONDS,
@@ -146,8 +148,9 @@ async function previewsOn(context: LocalUiContext): Promise<boolean> {
     return false;
   }
   if (typeof settings !== 'object' || settings === null) return false;
-  // TODO(TRAY-TOGGLE): read the typed `widgetPreviews` field once rel059/toggle lands.
-  const value = (settings as { readonly widgetPreviews?: unknown }).widgetPreviews;
+  // TRAY-TOGGLE: the typed field (absent = on). Checked again at run time: anything but a boolean
+  // is off.
+  const value: unknown = (settings as UiSettings).widgetPreviews;
   return value === undefined || value === true;
 }
 
@@ -216,6 +219,8 @@ async function todayOf(client: LocalUiReadClient, start: number, now: number): P
   const flow: unknown = await client.messages.flowEvents(start, now + MAX_SKEW_SECONDS);
   const events = (flow as { events?: unknown } | null)?.events;
   if (!Array.isArray(events)) throw new Error('flow');
+  // Core reads at most FLOW_SCAN_CAP (200) per direction: then some of today is not counted.
+  let partial = (flow as { capped?: unknown }).capped === true || events.length > MAX_FLOW;
   for (const e of (events as unknown[]).slice(0, MAX_FLOW)) {
     if (typeof e !== 'object' || e === null) continue;
     const { contactId, direction, at } = e as Record<string, unknown>;
@@ -244,6 +249,8 @@ async function todayOf(client: LocalUiReadClient, start: number, now: number): P
     }
     const next = (read as { nextCursor?: unknown }).nextCursor;
     if (older || typeof next !== 'string' || items.length === 0) break;
+    // The last page allowed ended before the local midnight: the rest of today is not counted.
+    if (page === ACTIVITY_PAGES - 1) partial = true;
     cursor = next;
   }
   return {
@@ -253,6 +260,7 @@ async function todayOf(client: LocalUiReadClient, start: number, now: number): P
     out: outbound,
     proofs,
     files,
+    partial,
   };
 }
 
@@ -327,15 +335,22 @@ export const widgetRoute: LocalUiReadRoute = Object.freeze<LocalUiReadRoute>({
   },
 });
 
+/** What the activity mark remembers between reads (the newest exchange seen; memory only). */
+export interface WidgetMarkMemo {
+  newest?: string;
+}
+
 /**
  * The opaque mark behind the `activity` event (events.ts): the open ID's notification items, its
  * activity head and its newest exchange. Compared by the hub in memory, never sent or logged.
- * Undefined when any part cannot be read (the hub then keeps the last mark).
+ * Undefined when any part cannot be read (the hub then keeps the last mark). Pass the same `memo`
+ * on every read of one host.
  */
 export async function widgetActivityMark(
   client: LocalUiReadClient,
   notifications: LocalUiNotificationsDesk | undefined,
   nowMs: number,
+  memo: WidgetMarkMemo = {},
 ): Promise<string | undefined> {
   try {
     const now = Math.floor(nowMs / 1000);
@@ -358,8 +373,14 @@ export async function widgetActivityMark(
       );
       const times = (read as { times?: unknown } | null)?.times;
       if (!Array.isArray(times)) return undefined;
+      // Low 2 (IR): only the newest exchange's contact and time, never how many are in the window,
+      // and an exchange that ages out of the window keeps the last one seen, so ageing out never
+      // changes the mark.
       const newest = times[0] as Record<string, unknown> | undefined;
-      parts.push(`|${times.length}:${String(newest?.['contactId'])}:${String(newest?.['at'])}`);
+      if (newest !== undefined && isContact(newest['contactId']) && isTime(newest['at'])) {
+        memo.newest = `${newest['contactId']}:${String(newest['at'])}`;
+      }
+      parts.push(`|${memo.newest ?? '-'}`);
     }
     return parts.join(',');
   } catch {
