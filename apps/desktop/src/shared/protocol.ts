@@ -59,6 +59,17 @@
 //   {"v":1,"type":"app-update-restart"}
 //       UPD-5: the person chose "Restart now". No other key: the shell restarts only when its own
 //       update is ready.
+//   {"v":1,"type":"tray-state","link":<TRAY_LINKS>,"unread":n,"approvals":n}
+//       TRAY-PIPE (D-155): what the icon shows: the open ID's link word and two counts (unread
+//       messages and files, approvals waiting). Sent on change. The `update` variant is the shell's
+//       own (its release check), never this message's.
+//   {"v":1,"type":"tray-pulse","kind":<TRAY_PULSE_KINDS>}
+//       TRAY-PIPE: news for one animation (message in, this ID's AI sent a message, an approval).
+//       Never on the core's first look; at most one per kind per 2 s (the core's gate, and
+//       createTrayFeed's again).
+//   {"v":1,"type":"shell-prefs","menuBarIcon":<bool>,"motion":<SHELL_MOTIONS>}
+//       TRAY-PIPE: the icon switch and the app's motion setting. After every "ready" and on change.
+//       These three carry fixed words, counts and booleans only: never text, a name, a ref or an ID.
 //
 // Shell -> core
 //   {"v":1,"type":"invite","link":"https://agentlink.4thtech.io/i#<payload>"}
@@ -105,6 +116,18 @@ export const SESSION_PATHS = [
   // N7: a click on an "Update ready" notification (show `updates`).
   '/settings/updates',
 ] as const;
+
+/** TRAY-PIPE (D-155): the open ID's link word on the icon. Mirrors the core. */
+export const TRAY_LINKS = ['connecting', 'connected', 'paused', 'offline'] as const;
+export type TrayLink = (typeof TRAY_LINKS)[number];
+/** TRAY-PIPE: the icon's one-shot animations. Mirrors the core. */
+export const TRAY_PULSE_KINDS = ['message_in', 'ai_sent', 'approval'] as const;
+export type TrayPulseKind = (typeof TRAY_PULSE_KINDS)[number];
+/** TRAY-PIPE: the app's own motion setting (`off`: end frames only). Mirrors the core. */
+export const SHELL_MOTIONS = ['system', 'on', 'off'] as const;
+export type ShellMotion = (typeof SHELL_MOTIONS)[number];
+/** TRAY-PIPE: at most one pulse per kind this often. */
+export const TRAY_PULSE_GAP_MS = 2_000;
 
 /** The core's states the tray can show (numbers and states only). */
 export const HOST_STATES = ['starting', 'running', 'closing'] as const;
@@ -235,8 +258,36 @@ export interface AppUpdateStepMessage {
   readonly v: 1;
   readonly type: 'app-update-install' | 'app-update-restart';
 }
+/** TRAY-PIPE: what the icon shows. */
+export interface TrayStateView {
+  readonly link: TrayLink;
+  readonly unread: number;
+  readonly approvals: number;
+}
+export interface TrayStateMessage extends TrayStateView {
+  readonly v: 1;
+  readonly type: 'tray-state';
+}
+/** TRAY-PIPE: one animation for news. */
+export interface TrayPulseMessage {
+  readonly v: 1;
+  readonly type: 'tray-pulse';
+  readonly kind: TrayPulseKind;
+}
+/** TRAY-PIPE: the shell's two switches. */
+export interface ShellPrefs {
+  readonly menuBarIcon: boolean;
+  readonly motion: ShellMotion;
+}
+export interface ShellPrefsMessage extends ShellPrefs {
+  readonly v: 1;
+  readonly type: 'shell-prefs';
+}
 export type CoreMessage =
   | NotifyMessage
+  | TrayStateMessage
+  | TrayPulseMessage
+  | ShellPrefsMessage
   | ReadyMessage
   | StatusMessage
   | ApprovalWaitingMessage
@@ -424,6 +475,24 @@ export function parseCoreMessage(line: string): CoreMessage | undefined {
     case 'app-update-restart':
       if (!hasExactKeys(value, ['v', 'type'])) return undefined;
       return { v: 1, type: value['type'] };
+    case 'tray-state': {
+      if (!hasExactKeys(value, ['v', 'type', 'link', 'unread', 'approvals'])) return undefined;
+      const { link, unread, approvals } = value;
+      if (!isOneOf(TRAY_LINKS, link) || !isCount(unread) || !isCount(approvals)) return undefined;
+      return { v: 1, type: 'tray-state', link, unread, approvals };
+    }
+    case 'tray-pulse': {
+      if (!hasExactKeys(value, ['v', 'type', 'kind'])) return undefined;
+      const kind = value['kind'];
+      if (!isOneOf(TRAY_PULSE_KINDS, kind)) return undefined;
+      return { v: 1, type: 'tray-pulse', kind };
+    }
+    case 'shell-prefs': {
+      if (!hasExactKeys(value, ['v', 'type', 'menuBarIcon', 'motion'])) return undefined;
+      const { menuBarIcon, motion } = value;
+      if (typeof menuBarIcon !== 'boolean' || !isOneOf(SHELL_MOTIONS, motion)) return undefined;
+      return { v: 1, type: 'shell-prefs', menuBarIcon, motion };
+    }
     default:
       return undefined;
   }
@@ -567,9 +636,117 @@ export function encodeCoreMessage(message: CoreMessage): string {
         ...(message.target === undefined ? {} : { target: message.target }),
       });
       break;
+    case 'tray-state':
+      line = JSON.stringify({
+        v: 1,
+        type: 'tray-state',
+        link: message.link,
+        unread: message.unread,
+        approvals: message.approvals,
+      });
+      break;
+    case 'tray-pulse':
+      line = JSON.stringify({ v: 1, type: 'tray-pulse', kind: message.kind });
+      break;
+    case 'shell-prefs':
+      line = JSON.stringify({
+        v: 1,
+        type: 'shell-prefs',
+        menuBarIcon: message.menuBarIcon,
+        motion: message.motion,
+      });
+      break;
     default:
       throw new Error('protocol: unknown core message');
   }
   if (parseCoreMessage(line) === undefined) throw new Error('protocol: invalid core message');
   return `${line}\n`;
+}
+
+/** TRAY-PIPE: what TRAY-SHELL wires into the tray (each optional; none receives text). */
+export interface TrayFeedListeners {
+  /** The icon's state changed (link word, unread and approvals counts). */
+  readonly onState?: (state: TrayStateView) => void;
+  /** One animation, at most once per kind per TRAY_PULSE_GAP_MS. */
+  readonly onPulse?: (kind: TrayPulseKind) => void;
+  /** The icon switch or the app's motion changed. */
+  readonly onPrefs?: (prefs: ShellPrefs) => void;
+}
+
+export interface TrayFeed {
+  /**
+   * Takes a parsed core message: true when it was a tray message (handled here), false for every
+   * other message (main handles those). Never throws: a failing listener is contained.
+   */
+  handle(message: CoreMessage): boolean;
+  /** A new core: the next state and prefs are delivered even when equal to the last ones. */
+  reset(): void;
+}
+
+/**
+ * TRAY-PIPE: the shell's side of the tray messages, as typed callbacks. A state or prefs only when it
+ * changed; pulses gated again per kind (defence in depth: a misbehaving core cannot make the icon
+ * flicker). The values handed on are fresh frozen objects with exactly the spec's keys.
+ */
+export function createTrayFeed(
+  listeners: TrayFeedListeners,
+  options: { readonly now?: () => number } = {},
+): TrayFeed {
+  const now = options.now ?? Date.now;
+  let lastState = '';
+  let lastPrefs = '';
+  const lastPulse = new Map<TrayPulseKind, number>();
+  const call = <T>(listener: ((value: T) => void) | undefined, value: T): void => {
+    if (listener === undefined) return;
+    try {
+      listener(value);
+    } catch {
+      // Contained: the tray never takes main down (nothing of the error is kept).
+    }
+  };
+  return {
+    handle: (message) => {
+      switch (message.type) {
+        case 'tray-state': {
+          const key = `${message.link}:${String(message.unread)}:${String(message.approvals)}`;
+          if (key === lastState) return true;
+          lastState = key;
+          call(
+            listeners.onState,
+            Object.freeze({
+              link: message.link,
+              unread: message.unread,
+              approvals: message.approvals,
+            }),
+          );
+          return true;
+        }
+        case 'tray-pulse': {
+          const at = now();
+          const last = lastPulse.get(message.kind);
+          if (last !== undefined && at >= last && at < last + TRAY_PULSE_GAP_MS) return true;
+          lastPulse.set(message.kind, at);
+          call(listeners.onPulse, message.kind);
+          return true;
+        }
+        case 'shell-prefs': {
+          const key = `${String(message.menuBarIcon)}:${message.motion}`;
+          if (key === lastPrefs) return true;
+          lastPrefs = key;
+          call(
+            listeners.onPrefs,
+            Object.freeze({ menuBarIcon: message.menuBarIcon, motion: message.motion }),
+          );
+          return true;
+        }
+        default:
+          return false;
+      }
+    },
+    reset: () => {
+      lastState = '';
+      lastPrefs = '';
+      lastPulse.clear();
+    },
+  };
 }

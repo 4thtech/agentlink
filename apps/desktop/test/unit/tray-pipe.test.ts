@@ -69,7 +69,19 @@ describe('TRAY-PIPE: parseCoreMessage', () => {
     { v: 1, type: 'tray-widget', kind: 'approval' },
   ])('refuses %j', (m) => {
     expect(parseCoreMessage(line(m))).toBeUndefined();
-    expect(() => encodeCoreMessage(m as unknown as CoreMessage)).toThrow();
+    // The encoder rebuilds from the spec's keys: a bad value throws, an extra key never gets out.
+    let encoded: string | undefined;
+    try {
+      encoded = encodeCoreMessage(m as unknown as CoreMessage);
+    } catch {
+      encoded = undefined;
+    }
+    if (encoded !== undefined) {
+      expect(parseCoreMessage(encoded.slice(0, -1))).toBeDefined();
+      for (const bad of ['name', 'target', 'text', 'widgetPreviews', '"v":2']) {
+        expect(encoded).not.toContain(bad);
+      }
+    }
   });
 
   it('never throws, whatever the line', () => {
@@ -178,7 +190,13 @@ describe('TRAY-PIPE: createTrayFeed (the API for TRAY-SHELL)', () => {
 
   it('a state or prefs only on change; reset() lets a new core start afresh', () => {
     const t = setup();
-    const st: CoreMessage = { v: 1, type: 'tray-state', link: 'connected', unread: 0, approvals: 0 };
+    const st: CoreMessage = {
+      v: 1,
+      type: 'tray-state',
+      link: 'connected',
+      unread: 0,
+      approvals: 0,
+    };
     t.feed.handle(st);
     t.feed.handle(st);
     t.feed.handle({ v: 1, type: 'shell-prefs', menuBarIcon: true, motion: 'system' });

@@ -125,7 +125,8 @@ function fakePipe(): {
 interface FakeAlerts {
   /** TRAY-PIPE: `link` and `outAt` default to connected and none sent. */
   state: () =>
-    | (Omit<DesktopAlertState, 'link' | 'outAt'> & Partial<Pick<DesktopAlertState, 'link' | 'outAt'>>)
+    | (Omit<DesktopAlertState, 'link' | 'outAt'> &
+        Partial<Pick<DesktopAlertState, 'link' | 'outAt'>>)
     | undefined;
   names?: ReadonlyMap<string, string>;
   /** The refs ownerNames was asked for. */
@@ -1107,8 +1108,9 @@ describe('TRAY-PIPE: what the icon shows (tray-state, tray-pulse, shell-prefs)',
     // A fresh ready (a show): the prefs follow it again.
     s.pipe.shell({ v: 1, type: 'show', route: 'home' });
     await until(() => of(s.pipe.sent, 'shell-prefs').length === 2);
-    const secondReady = s.pipe.sent.findLastIndex((m) => m.type === 'ready');
-    const secondPrefs = s.pipe.sent.findLastIndex((m) => m.type === 'shell-prefs');
+    const types = s.pipe.sent.map((m) => m.type);
+    const secondReady = types.lastIndexOf('ready');
+    const secondPrefs = types.lastIndexOf('shell-prefs');
     expect(secondPrefs).toBeGreaterThan(secondReady);
     // A change: sent at the next look.
     settings = undefined;

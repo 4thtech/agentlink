@@ -509,7 +509,9 @@ describe('TRAY-PIPE: desktopAlerts carries the link and the newest outbound time
 
   it('outAt: null when nothing was sent; undefined when the read fails (unknown)', async () => {
     const none = await harness({
-      client: flow([{ contactId: A, direction: 'in', kind: 'message', state: 'received', at: NOW }]),
+      client: flow([
+        { contactId: A, direction: 'in', kind: 'message', state: 'received', at: NOW },
+      ]),
     });
     expect((await none.server.desktopAlerts())?.outAt).toBeNull();
     const failing = await harness({
