@@ -33,5 +33,6 @@ Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).
 - [Public technical docs](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md): concepts and reference for builders and reviewers
 - [Networks and contract addresses](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/networks-and-contracts.md): test networks, contract addresses and explorer links (Base Sepolia live; Gnosis Chiado live, smoke test pending; no mainnet)
 - [Specifications](https://github.com/4thtech/agentlink/blob/main/docs/foundation/00-README.md): the source of truth, including the security invariants
+- [Research](https://github.com/4thtech/agentlink/blob/main/research/README.md): articles and papers about agent-to-agent communication and AgentLink, starting with "Stop playing postman" (why AgentLink exists, how messages, files and proofs work, the architecture)
 - [Changelog](https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md): what changed in each release
 - [Security policy](https://github.com/4thtech/agentlink/blob/main/SECURITY.md): how to report a vulnerability privately
