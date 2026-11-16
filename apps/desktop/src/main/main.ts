@@ -31,6 +31,7 @@ import {
   closeSync,
   constants as fsConstants,
   existsSync,
+  lstatSync,
   fstatSync,
   openSync,
   readFileSync,
@@ -1256,7 +1257,11 @@ export function realProcess(): ShellProcess {
  * TRAY-SHELL (plan risk 7): the icon switch as last saved, or undefined. A small regular file only
  * (never a link), read once at launch; it holds the app's own UI booleans (nothing secret).
  */
-function readMenuBarIconPref(path: string): boolean | undefined {
+export function readMenuBarIconPref(
+  path: string,
+  platform: NodeJS.Platform = process.platform,
+  lstat: (p: string) => { isSymbolicLink(): boolean } = lstatSync,
+): boolean | undefined {
   let fd: number | null = null;
   try {
     // No lstat before the open (a check-then-open race): O_NOFOLLOW refuses a link at the open, and
@@ -1267,6 +1272,9 @@ function readMenuBarIconPref(path: string): boolean | undefined {
     );
     const info = fstatSync(fd);
     if (!info.isFile() || info.size > MAX_UI_SETTINGS_FILE_BYTES) return undefined;
+    // Windows has no O_NOFOLLOW: refuse a link here, after the open (a check after the open, so
+    // there is no check-then-open gap on the path that was opened).
+    if (platform === 'win32' && lstat(path).isSymbolicLink()) return undefined;
     return menuBarIconFromSettings(readFileSync(fd, 'utf8'));
   } catch {
     return undefined;

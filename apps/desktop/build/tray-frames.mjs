@@ -3,6 +3,7 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { format, resolveConfig } from 'prettier';
 import { FRAME_MS, allFrames, contactSheet, framePng, toSvg } from './lib/tray-frames.mjs';
 
 const DESKTOP_DIR = join(dirname(fileURLToPath(import.meta.url)), '..'); // not stage.mjs: it needs the workspace installed
@@ -38,7 +39,13 @@ for (const f of frames) {
   const s = (manifest.sequences[f.sequence] ??= { loop: f.loop, frameMs: FRAME_MS, frames: [] });
   s.frames.push({ id: f.id, ...files });
 }
-writeFileSync(join(out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+// Written in the repository's Prettier format, so regenerating leaves the committed file unchanged.
+const manifestPath = join(out, 'manifest.json');
+const prettierConfig = (await resolveConfig(manifestPath)) ?? {};
+writeFileSync(
+  manifestPath,
+  await format(JSON.stringify(manifest, null, 2), { ...prettierConfig, filepath: manifestPath }),
+);
 
 const i = process.argv.indexOf('--sheet');
 if (i > 0) writeFileSync(process.argv[i + 1], contactSheet(frames, 8));

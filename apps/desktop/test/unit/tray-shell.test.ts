@@ -2,12 +2,17 @@
 // into runShell (src/main/main.ts) with a fake Electron. The tray-state / tray-pulse / shell-prefs
 // pipe messages drive the icon; the left click toggles the popover; the right click pops the
 // minimal menu; the popover's requests go through the session's popover backstop.
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ElectronModule, IpcMainInvokeEvent } from '../../src/main/electron-api.js';
-import { menuBarIconFromSettings, runShell, type ShellProcess } from '../../src/main/main.js';
+import {
+  menuBarIconFromSettings,
+  readMenuBarIconPref,
+  runShell,
+  type ShellProcess,
+} from '../../src/main/main.js';
 import { popoverFallbackUrl } from '../../src/main/popover-page.js';
 import { WINDOW_PARTITION } from '../../src/main/security.js';
 import { statusPageUrl } from '../../src/main/status-page.js';
@@ -513,5 +518,21 @@ describe('TRAY-SHELL icon switch', () => {
     expect(menuBarIconFromSettings('{"v":1,"settings":{"menuBarIcon":"no"}}')).toBeUndefined();
     expect(menuBarIconFromSettings('not json')).toBeUndefined();
     expect(menuBarIconFromSettings('[]')).toBeUndefined();
+  });
+
+  it('readMenuBarIconPref refuses a link on Windows, after the open', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'al-pref-'));
+    try {
+      const path = join(dir, 'ui-settings.json');
+      writeFileSync(path, '{"v":1,"settings":{"menuBarIcon":false}}');
+      const link = { isSymbolicLink: () => true };
+      const plain = { isSymbolicLink: () => false };
+      expect(readMenuBarIconPref(path, 'win32', () => link)).toBeUndefined();
+      expect(readMenuBarIconPref(path, 'win32', () => plain)).toBe(false);
+      // Other systems rely on O_NOFOLLOW at the open and never consult lstat.
+      expect(readMenuBarIconPref(path, 'darwin', () => link)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

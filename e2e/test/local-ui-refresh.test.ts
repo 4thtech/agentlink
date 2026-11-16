@@ -45,9 +45,10 @@ const AXE = readFileSync(
 /** 0.4.0's local app (tag v0.4.0, `vite build`, gzip -9), measured once for card q. */
 const BASELINE_040 = { jsGzip: 131_357, cssGzip: 12_685 } as const;
 // Owner decision 2026-11-12 (Tali): initial-load CSS <= 15 KB growth, total <= 30 KB growth; page CSS loads with its route.
+// Tali, 2026-11-16: raised to 32 KB for the menu bar widget (0.5.9).
 const BUDGET = {
   cssGzip: 15 * 1024,
-  totalCssGzip: 30 * 1024,
+  totalCssGzip: 32 * 1024,
   jsGzip: 10 * 1024,
 } as const; // plan §7, amended
 
