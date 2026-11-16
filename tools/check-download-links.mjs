@@ -13,7 +13,10 @@ export const STABLE_BASE = 'https://github.com/4thtech/agentlink/releases/latest
 // Only this project's releases: a link to another project's `releases/download/v...` is not a problem.
 // A version is a number, with or without `v`, or a placeholder (`<version>`, `{version}`, `$VERSION`).
 const VERSIONED_URL = /4thtech\/agentlink\/releases\/download\/(?:v|\d|<|\{|\$)/;
-const VERSIONED_NAME = /AgentLink-v?(?:\d|<|\{|\$)[^\s`'")]*-mac-(?:arm64|x64)\.dmg/;
+const VERSIONED_NAME =
+  /AgentLink-v?(?:\d|<|\{|\$)[^\s`'")]*-(?:mac-(?:arm64|x64)\.dmg|win-x64-setup\.exe)/;
+// A link to one release's page goes stale; use /releases/latest. Not checked in docs/, where runbooks name tags.
+const VERSIONED_TAG = /4thtech\/agentlink\/releases\/tag\/(?:v|\d|<|\{|\$)/;
 
 /** Returns the problems of one file's text (empty when it is fine). */
 export function checkText(file, text) {
@@ -28,7 +31,14 @@ export function checkText(file, text) {
       );
     }
     if (!namesAllowed && VERSIONED_NAME.test(line)) {
-      problems.push(`${file}:${i + 1}: versioned .dmg name; use AgentLink-mac-<arch>.dmg`);
+      problems.push(
+        `${file}:${i + 1}: versioned installer name; use AgentLink-mac-<arch>.dmg or AgentLink-win-x64-setup.exe`,
+      );
+    }
+    if (!namesAllowed && VERSIONED_TAG.test(line)) {
+      problems.push(
+        `${file}:${i + 1}: release link names a version; use https://github.com/4thtech/agentlink/releases/latest`,
+      );
     }
   });
   return problems;
