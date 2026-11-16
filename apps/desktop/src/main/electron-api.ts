@@ -6,6 +6,8 @@
 // obtains the real module with `createRequire(import.meta.url)('electron')` inside Electron only.
 // Shapes follow the Electron 45 API documentation; only what the shell calls is declared.
 
+import type { PopoverWindowOptions } from './security.js';
+
 export interface ElectronEvent {
   preventDefault(): void;
 }
@@ -128,7 +130,19 @@ export interface WindowOpenHandlerResponse {
   readonly action: 'deny';
 }
 
+/** TRAY-SHELL: a key press in `before-input-event` (only what the shell and the popover read). */
+export interface InputEvent {
+  readonly type: string;
+  readonly key: string;
+  readonly meta?: boolean;
+  readonly control?: boolean;
+  readonly alt?: boolean;
+  readonly shift?: boolean;
+}
+
 export interface WebContents {
+  /** TRAY-SHELL: the id the popover backstop and its IPC compare (present on every real one). */
+  readonly id?: number;
   setWindowOpenHandler(handler: (details: { url: string }) => WindowOpenHandlerResponse): void;
   on(
     event: 'will-navigate' | 'will-redirect',
@@ -140,6 +154,30 @@ export interface WebContents {
     event: 'select-bluetooth-device',
     listener: (event: ElectronEvent, devices: unknown[], callback: (id: string) => void) => void,
   ): void;
+  /** TRAY-SHELL / TRAY-POPOVER: the events the popover listens to. */
+  on(
+    event: 'before-input-event',
+    listener: (event: ElectronEvent, input: InputEvent) => void,
+  ): void;
+  on(
+    event: 'did-fail-load',
+    listener: (
+      event: ElectronEvent,
+      errorCode: number,
+      errorDescription: string,
+      validatedUrl: string,
+      isMainFrame: boolean,
+    ) => void,
+  ): void;
+  on(
+    event: 'did-navigate',
+    listener: (event: ElectronEvent, url: string, httpResponseCode: number) => void,
+  ): void;
+  on(
+    event: 'did-navigate-in-page',
+    listener: (event: ElectronEvent, url: string, isMainFrame: boolean) => void,
+  ): void;
+  on(event: 'render-process-gone', listener: () => void): void;
   closeDevTools(): void;
   /** The committed URL of the main frame. */
   getURL(): string;
@@ -183,7 +221,7 @@ export interface BrowserWindowOptions {
 }
 
 export interface BrowserWindow {
-  readonly webContents: WebContents & { readonly id?: number };
+  readonly webContents: WebContents;
   loadURL(url: string): Promise<void>;
   show(): void;
   focus(): void;
@@ -196,13 +234,26 @@ export interface BrowserWindow {
   isFocused(): boolean;
   isVisible(): boolean;
   restore(): void;
+  /** TRAY-SHELL: the popover places itself under the icon (popover.ts). */
+  setBounds(bounds: Rectangle): void;
   destroy(): void;
-  on(event: 'close', listener: (event: ElectronEvent) => void): void;
-  on(event: 'page-title-updated', listener: (event: ElectronEvent) => void): void;
+  on(event: 'close' | 'page-title-updated', listener: (event: ElectronEvent) => void): void;
+  /** TRAY-SHELL: `blur` hides the popover; `focus` / `show` of the main window hide it too. */
+  on(event: 'blur' | 'closed' | 'focus' | 'show', listener: () => void): void;
   once(event: 'ready-to-show', listener: () => void): void;
 }
 
-export type BrowserWindowConstructor = new (options: BrowserWindowOptions) => BrowserWindow;
+/** TRAY-SHELL: the main window's options, or the popover's (security.ts popoverOptions). */
+export type BrowserWindowConstructor = new (
+  options: BrowserWindowOptions | PopoverWindowOptions,
+) => BrowserWindow;
+
+export interface Rectangle {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
 
 export interface MenuItemOptions {
   readonly label?: string;
@@ -217,7 +268,13 @@ export interface Menu {
 export interface Tray {
   setToolTip(text: string): void;
   setContextMenu(menu: Menu): void;
-  on(event: 'click', listener: () => void): void;
+  /** TRAY-SHELL: the frames engine's images (tray.ts). */
+  setImage?(image: NativeImage): void;
+  /** TRAY-SHELL: the right-click menu (macOS and Windows). */
+  popUpContextMenu?(menu?: Menu): void;
+  /** TRAY-SHELL: where the icon is (the popover anchors to it; macOS and Windows). */
+  getBounds?(): Rectangle;
+  on(event: 'click' | 'right-click', listener: () => void): void;
   destroy(): void;
 }
 
@@ -279,6 +336,8 @@ export interface Shell {
 export interface NativeImage {
   isEmpty(): boolean;
   setTemplateImage(template: boolean): void;
+  /** TRAY-ENGINE: the Windows frame sizes (tray-frames.ts). */
+  addRepresentation?(options: { scaleFactor: number; buffer: Uint8Array }): void;
 }
 
 export interface NativeImageModule {
@@ -319,6 +378,36 @@ export interface ElectronModule {
   readonly net?: { isOnline(): boolean };
   /** N7: native notifications (main process). */
   readonly Notification?: NotificationConstructor;
-  /** WIN-DESK-2: Windows only, whether the taskbar is dark (picks the tray icon). */
-  readonly nativeTheme?: { readonly shouldUseDarkColorsForSystemIntegratedUI?: boolean };
+  /**
+   * WIN-DESK-2: Windows only, whether the taskbar is dark (picks the tray icon). TRAY-SHELL: its
+   * `updated` event switches the light / dark taskbar frames.
+   */
+  readonly nativeTheme?: {
+    readonly shouldUseDarkColorsForSystemIntegratedUI?: boolean;
+    on?(event: 'updated', listener: () => void): unknown;
+    removeListener?(event: 'updated', listener: () => void): unknown;
+  };
+  /** TRAY-SHELL: where the popover goes (popover.ts PopoverScreen). Main process, after ready. */
+  readonly screen?: Screen;
+  /** TRAY-SHELL: the OS reduced-motion setting, read at each trigger (tray.ts). */
+  readonly systemPreferences?: {
+    getAnimationSettings?(): {
+      readonly shouldRenderRichAnimation?: boolean;
+      readonly prefersReducedMotion?: boolean;
+    };
+  };
+}
+
+/** TRAY-SHELL: a display's bounds and work area. */
+export interface Display {
+  readonly bounds: Rectangle;
+  readonly workArea: Rectangle;
+}
+
+/** TRAY-SHELL: Electron's `screen` (only what the popover reads). */
+export interface Screen {
+  getDisplayMatching(rect: Rectangle): Display;
+  getDisplayNearestPoint(point: { x: number; y: number }): Display;
+  getPrimaryDisplay(): Display;
+  getCursorScreenPoint(): { x: number; y: number };
 }

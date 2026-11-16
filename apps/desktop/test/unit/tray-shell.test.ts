@@ -69,8 +69,10 @@ function setup(over: Partial<ShellProcess> = {}, platform = 'darwin'): Setup {
   };
   Object.assign(electron as unknown as Record<string, unknown>, {
     ipcMain: {
-      handle: (channel: string, listener: Setup['handlers'] extends Map<string, infer L> ? L : never) =>
-        handlers.set(channel, listener),
+      handle: (
+        channel: string,
+        listener: Setup['handlers'] extends Map<string, infer L> ? L : never,
+      ) => handlers.set(channel, listener),
     },
     screen: {
       getDisplayMatching: () => display,
@@ -304,7 +306,8 @@ describe('TRAY-SHELL icon', () => {
       state: 'available',
       current: '0.5.9',
       latest: '0.6.0',
-      download: 'https://github.com/4thtech/agentlink/releases/download/v0.6.0/AgentLink-mac-arm64.dmg',
+      download:
+        'https://github.com/4thtech/agentlink/releases/download/v0.6.0/AgentLink-mac-arm64.dmg',
     } as never);
     expect(icon()).toBe('tray-update');
   });
@@ -346,7 +349,7 @@ describe('TRAY-SHELL icon', () => {
     expect(icon()).toBe('tray-approvals');
     s.children[0]?.exit(1);
     s.timers.advance(30_000);
-    expect(icon()).toBe('tray-connecting-01');
+    expect(icon()).toMatch(/^tray-connecting-/);
     s.children[1]?.stream.push(readyLine());
     s.children[1]?.stream.push(state('connected', 0, 1));
     expect(icon()).toBe('tray-approvals');

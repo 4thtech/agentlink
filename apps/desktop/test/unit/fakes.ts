@@ -20,6 +20,7 @@ import type {
   WebContents,
 } from '../../src/main/electron-api.js';
 import type { CoreChild, SpawnOptions, Timers } from '../../src/main/core-process.js';
+import type { PopoverWindowOptions } from '../../src/main/security.js';
 
 export class FakeEvent implements ElectronEvent {
   defaultPrevented = false;
@@ -91,7 +92,7 @@ export class FakeBrowserWindow extends Emitter implements BrowserWindow {
   shows = 0;
   /** DESK-TOUCHID-FIX: how often the page's focus was taken away (blurWebView). */
   blurs = 0;
-  constructor(readonly options: BrowserWindowOptions) {
+  constructor(readonly options: BrowserWindowOptions | PopoverWindowOptions) {
     super();
     FakeBrowserWindow.created.push(this);
   }

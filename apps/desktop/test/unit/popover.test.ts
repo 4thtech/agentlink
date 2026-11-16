@@ -49,13 +49,13 @@ class FakePopoverWindow extends FakeBrowserWindow implements PopoverWindow {
     new FakeWebContents(),
     { id: 40 + FakePopoverWindow.all.length },
   );
-  bounds: Rect | null = null;
+  override bounds: Rect | null = null;
   focusCount = 0;
   constructor(readonly popoverOptions: PopoverWindowOptions) {
     super(popoverOptions as unknown as BrowserWindowOptions);
     FakePopoverWindow.all.push(this);
   }
-  setBounds(bounds: Rect): void {
+  override setBounds(bounds: Rect): void {
     this.bounds = bounds;
   }
   override focus(): void {
