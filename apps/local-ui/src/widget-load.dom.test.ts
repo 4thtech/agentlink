@@ -32,13 +32,24 @@ describe('loading /settings/widget end to end', () => {
     const push = vi.spyOn(history, 'pushState');
     const replace = vi.spyOn(history, 'replaceState');
 
+    const bridge = {
+      open: vi.fn(() => Promise.resolve(true)),
+      quit: vi.fn(() => Promise.resolve(true)),
+      close: vi.fn(() => Promise.resolve(true)),
+    };
+    window.agentlinkWidget = bridge;
     await import('./main.js');
     await new Promise((r) => setTimeout(r, 1_500));
+
+    // Click every button and row: each only calls the bridge.
+    for (const b of [...document.querySelectorAll('button')]) b.click();
+    expect(bridge.open.mock.calls.length + bridge.quit.mock.calls.length).toBeGreaterThan(0);
+    await new Promise((r) => setTimeout(r, 600));
 
     expect(location.pathname).toBe('/settings/widget');
     expect(push).not.toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalled();
-    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.filter((s) => s.startsWith('GET ')).length).toBeGreaterThanOrEqual(1);
     expect(seen.filter((s) => !/^(GET|HEAD) /.test(s))).toEqual([]);
     expect(document.querySelector('[data-block="status"]')).not.toBeNull();
   });

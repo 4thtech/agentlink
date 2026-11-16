@@ -414,3 +414,17 @@ body {
     transition: none !important;
   }
 }
+
+.wg-kbd {
+  font-family: var(--al-font-family-mono);
+  font-size: 11px;
+  line-height: 16px;
+  padding: 0 2px;
+  min-inline-size: 16px;
+  text-align: center;
+  border-radius: var(--al-radius-xs);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-block-end-width: var(--al-border-width-thick);
+  background: var(--al-color-bg-sunken);
+  color: var(--al-color-fg-muted);
+}
