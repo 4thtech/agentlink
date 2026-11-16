@@ -75,11 +75,11 @@ function diamond(dx = 0, scale = 1) {
 const shape = (subs, extra = {}) => ({ subs, rule: 'nonzero', opacity: 1, layer: 'content', ...extra });
 const base = (right = RIGHT) => [shape([LEFT]), shape([right])];
 const connected = (d = {}) => [...base(), shape([diamond(d.dx ?? 0, d.scale ?? 1)])];
-// The unread dot: a gap is cut around it, then the dot is drawn on top.
+// The unread mark: a hollow ring (differs in shape from the filled approvals dot); a gap is cut around it first.
 const withDot = (shapes) => [
   ...shapes,
   shape([circle(13, 3, 3.4)], { layer: 'erase' }),
-  shape([circle(13, 3, 2.2)], { layer: 'overlay' }),
+  shape([circle(13, 3, 2.5), circle(13, 3, 1.5)], { layer: 'overlay', rule: 'evenodd' }),
 ];
 const approvals = (scale = 1) => [
   ...base(RIGHT_CUT),
