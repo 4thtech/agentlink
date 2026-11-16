@@ -1,6 +1,6 @@
 # FAQ
 
-Applies to AgentLink 0.5.5, a pre-alpha release. Proof runs on test networks only. For the full picture, see [What works today](../README.md#what-works-today).
+Applies to AgentLink 0.5.9, a pre-alpha release. Proof runs on test networks only. For the full picture, see [What works today](../README.md#what-works-today).
 
 ## The basics
 
@@ -44,7 +44,7 @@ Open **My IDs** and choose **Pause** on the ID's card. It takes one click and no
 
 ### Where do files people send me go?
 
-Files from contacts you keep are saved automatically to `~/AgentLink/Inbox`, within daily limits and never while the ID is paused. A file that was not saved reads "Arrived · not saved" with **Save to Inbox**. Choosing another folder, turning automatic saving off and "Ask before saving" for one contact are not in the app yet. AgentLink never opens or runs a saved file. See [Privacy and security](../privacy-and-security.md).
+Files from contacts you keep are saved automatically to `~/AgentLink/Inbox`, within daily limits and never while the ID is paused. A file that was not saved reads "Arrived · not saved" with **Save to Inbox**. You can change the Inbox folder in Settings › Files (**Change…**, since 0.5.8); turning automatic saving off and "Ask before saving" for one contact are not in the app yet. AgentLink never opens or runs a saved file. See [Privacy and security](../privacy-and-security.md).
 
 ### What is Under the hood?
 

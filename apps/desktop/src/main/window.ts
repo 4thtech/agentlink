@@ -3,7 +3,8 @@
 // core sent it over the pipe (never from argv, a deep link or the OS opener). Until then, and when
 // the core could not start, it shows the fixed local status page (status-page.ts), whose two buttons
 // are fixed URLs intercepted here and acted on ONLY while that exact page is shown. Closing the window
-// hides it; the app keeps running in the tray until the person quits. The title stays "AgentLink"
+// hides it; the app keeps running in the tray until the person quits (TRAY-SHELL: on Windows with
+// the icon turned off, a close quits, D-155 (7)). The title stays "AgentLink"
 // (a page title could carry a name; the window switcher and screen sharing would show it).
 import type { BrowserWindow, BrowserWindowConstructor, Shell } from './electron-api.js';
 import { OriginLock, lockWebContents, markWebContents, windowOptions } from './security.js';
@@ -29,6 +30,15 @@ export interface MainWindowDeps {
   readonly quitting: () => boolean;
   /** A button on the status page (Try again, Open log folder). */
   readonly onStatusAction?: (action: StatusAction) => void;
+  /** TRAY-SHELL: the window was shown or got focus (the popover hides then). */
+  readonly onShown?: () => void;
+  /**
+   * TRAY-SHELL (D-155 (7)): true while a close should quit the app (Windows with the icon hidden:
+   * otherwise AgentLink would keep running with no way back). Absent or false: a close hides.
+   */
+  readonly quitOnClose?: () => boolean;
+  /** TRAY-SHELL: quits the app (app.quit) when quitOnClose says so. */
+  readonly quit?: () => void;
 }
 
 export class MainWindow {
@@ -37,6 +47,8 @@ export class MainWindow {
   #loaded = false;
   #page: WindowPage = 'none';
   #status: StatusKind | null = null;
+  /** TRAY-SHELL: counts session-link loads, so only the latest one reports it finished. */
+  #sessionLoad = 0;
 
   constructor(deps: MainWindowDeps) {
     this.#deps = deps;
@@ -65,7 +77,10 @@ export class MainWindow {
       if (this.#deps.quitting()) return;
       event.preventDefault();
       window.hide();
+      if (this.#deps.quitOnClose?.() === true) this.#deps.quit?.();
     });
+    window.on('focus', () => this.#shown());
+    window.on('show', () => this.#shown());
     window.once('ready-to-show', () => window.show());
     this.#window = window;
     this.#loaded = false;
@@ -81,6 +96,7 @@ export class MainWindow {
   showStatus(kind: StatusKind): void {
     const window = this.#ensure();
     if (this.#page !== 'status' || this.#status !== kind) {
+      this.#sessionLoad += 1;
       this.#page = 'status';
       this.#status = kind;
       this.#loaded = false;
@@ -108,13 +124,33 @@ export class MainWindow {
    * Loads a session link from the core's `ready` message. Refused (false, nothing loaded) unless the
    * link is valid and on the locked origin. The link is never logged or kept.
    */
-  loadSessionUrl(url: string): boolean {
+  loadSessionUrl(url: string, onLoaded?: () => void): boolean {
     if (!this.#deps.lock.acceptSessionUrl(url)) return false;
     const window = this.#ensure();
     this.#loaded = true;
     this.#page = 'session';
     this.#status = null;
-    void window.loadURL(url).catch(() => undefined);
+    const load = ++this.#sessionLoad;
+    // TRAY-SHELL: `onLoaded` once the page finished loading (its session cookie is set by then), and
+    // only if this is still the window's latest session load.
+    void window.loadURL(url).then(
+      () => {
+        if (
+          onLoaded === undefined ||
+          load !== this.#sessionLoad ||
+          this.#window !== window ||
+          this.#page !== 'session'
+        ) {
+          return;
+        }
+        try {
+          onLoaded();
+        } catch {
+          // Never throws into Electron.
+        }
+      },
+      () => undefined,
+    );
     return true;
   }
 
@@ -130,7 +166,23 @@ export class MainWindow {
     if (window.isMinimized()) window.restore();
     window.show();
     window.focus();
+    this.#shown();
     return true;
+  }
+
+  #shown(): void {
+    try {
+      this.#deps.onShown?.();
+    } catch {
+      // Never throws into Electron.
+    }
+  }
+
+  /** TRAY-SHELL: true while the window is on screen (shown and not minimised). */
+  get visible(): boolean {
+    const window = this.#window;
+    if (window === null || window.isDestroyed()) return false;
+    return window.isVisible() && !window.isMinimized();
   }
 
   /**
@@ -158,6 +210,7 @@ export class MainWindow {
   resetForNewCore(): void {
     this.#deps.lock.reset();
     this.#loaded = false;
+    this.#sessionLoad += 1;
   }
 
   destroy(): void {

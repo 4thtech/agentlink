@@ -363,6 +363,7 @@ import {
   type LocalUiAssets,
   type LocalUiContext,
   type LocalUiOptions,
+  type LocalUiReadClient,
   type LocalUiRecoveryKitSource,
   type LocalUiOwnerSetup as LocalUiOwnerSetupOption,
 } from './local-ui/context.js';
@@ -399,6 +400,7 @@ import {
 } from '@4thtech-io/types/ui-contract/ui-settings';
 import { createUiSettingsDesk } from './local-ui/api/ui-settings.js';
 import type { LocalUiNotificationsDesk } from './local-ui/api/notifications.js';
+import { widgetActivityMark, type WidgetMarkMemo } from './local-ui/api/widget.js';
 import {
   notifyPrefsInForce,
   type NotificationItem,
@@ -1199,6 +1201,44 @@ export interface DesktopAlertState {
   readonly scope: string;
   readonly items: readonly NotificationItem[];
   readonly prefs: Readonly<Record<NotifyPrefKey, boolean>>;
+  /**
+   * TRAY-PIPE (D-155): the open ID's link word for the icon, from its health read (desktopTrayLink):
+   * never `connected` without a well-formed running answer.
+   */
+  readonly link: DesktopTrayLink;
+  /**
+   * TRAY-PIPE: the newest message this ID's AI sent (relay state `sent`; unix seconds) in the last
+   * DESKTOP_OUT_WINDOW_SECONDS; null for none; absent when the read failed (unknown). A time only.
+   */
+  readonly outAt?: number | null;
+}
+
+/** TRAY-PIPE: the icon's link words (the pipe's TRAY_LINKS). */
+export type DesktopTrayLink = 'connecting' | 'connected' | 'paused' | 'offline';
+
+/** TRAY-PIPE: how far back desktopAlerts looks for the newest outbound message. */
+export const DESKTOP_OUT_WINDOW_SECONDS = 600;
+
+/**
+ * TRAY-PIPE: the icon's link word for one health answer (the status bar's rules, apps/local-ui
+ * layout/health.ts): running and still checking is `connecting`; running with relays known and none
+ * connected is `offline`; paused is `paused`; anything else (not running, no answer) is `offline`.
+ */
+export function desktopTrayLink(health: unknown): DesktopTrayLink {
+  if (typeof health !== 'object' || health === null) return 'offline';
+  const { agent, network, relays } = health as {
+    agent?: unknown;
+    network?: unknown;
+    relays?: unknown;
+  };
+  if (agent === 'paused') return 'paused';
+  if (agent !== 'running') return 'offline';
+  if (network === 'checking') return 'connecting';
+  if (typeof relays === 'object' && relays !== null) {
+    const { connected, total } = relays as { connected?: unknown; total?: unknown };
+    if (connected === 0 && typeof total === 'number' && total > 0) return 'offline';
+  }
+  return 'connected';
 }
 
 type DecisionOutcome = Extract<ApprovalServerEvent, { kind: 'decision' }>['outcome'];
@@ -1688,6 +1728,8 @@ export async function startApprovalServerWith(
    * W4-LIVE-STATUS (08 §1 `GET /api/ui/events`): the live event hub. It reads the host's agents list
    * (read-only peeks, no lock, never the lease) every 2 s while a stream is open.
    */
+  /** TRAY-WIDGET-API: the activity mark's memory of the newest exchange (never sent). */
+  const widgetMarkMemo: WidgetMarkMemo = {};
   const liveEvents = new LiveEvents({
     read: async () => {
       if (host === undefined) return undefined;
@@ -1698,11 +1740,19 @@ export async function startApprovalServerWith(
       const client = agentUi?.client;
       const contactsMark =
         client === undefined ? undefined : await client.pairing.changeMark().catch(() => undefined);
+      // TRAY-WIDGET-API (D-155): the open ID's activity mark (notification items, activity head,
+      // newest exchange), compared by the hub for the `activity` event, never sent.
+      const readClient = uiContext.client;
+      const activityMark =
+        readClient === undefined
+          ? undefined
+          : await widgetActivityMark(readClient, uiContext.notifications, now(), widgetMarkMemo);
       return {
         generation: list.generation,
         current: list.current,
         agents: list.agents.map(liveAgentRecord),
         contactsMark,
+        activityMark,
       };
     },
     now,
@@ -8584,7 +8634,41 @@ export async function startApprovalServerWith(
       } catch {
         return undefined;
       }
-      return Object.freeze({ scope, items, prefs: Object.freeze(await notifyPrefsNow()) });
+      // TRAY-PIPE: the icon's link word and the newest time this ID's AI sent a message (a time
+      // only, from the store's clear columns; never a contact, an envelope or content).
+      const context = uiContext;
+      let link: DesktopTrayLink = 'offline';
+      try {
+        // No health read wired: an opened agent answers `running` (context.ts LocalUiOptions.health).
+        link = context.health === undefined ? 'connected' : desktopTrayLink(await context.health());
+      } catch {
+        // Offline: never connected without evidence.
+      }
+      let outAt: number | null | undefined;
+      const messages = (context.client as Partial<LocalUiReadClient> | undefined)?.messages;
+      if (typeof messages?.flowEvents === 'function') {
+        try {
+          const until = Math.floor(now() / 1000);
+          const read = await messages.flowEvents(until - DESKTOP_OUT_WINDOW_SECONDS, until + 60);
+          outAt = null;
+          for (const event of read.events) {
+            const at = event.at;
+            // Sent user messages only: a queued or not delivered one never counts as sent.
+            if (event.direction !== 'out' || event.state !== 'sent') continue;
+            if (!Number.isSafeInteger(at) || at < 0) continue;
+            if (outAt === null || at > outAt) outAt = at;
+          }
+        } catch {
+          outAt = undefined;
+        }
+      }
+      return Object.freeze({
+        scope,
+        items,
+        prefs: Object.freeze(await notifyPrefsNow()),
+        link,
+        ...(outAt === undefined ? {} : { outAt }),
+      });
     },
     ownerNames: async (refs: readonly string[]) => {
       const out = new Map<string, string>();

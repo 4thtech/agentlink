@@ -12,6 +12,9 @@
 //   HEALTH_MAX_BACKOFF_MS, and a healthy answer resets it. The server caches its answer for 3 s, so
 //   reads stay cheap. Paused while the tab is hidden (B-11 §6 performance), read again when shown.
 // - States are reported only when they change, so the live region is not spammed.
+// - HEALTH-BAR-STUCK: a refresh (the browser came back online) forgets the last reported state,
+//   reads at once and starts a new "Checking…" window: the page set Checking… itself, so the next
+//   answer must be reported even when it equals the one before the computer went offline.
 import { createApiClient, type ApiResult } from '../api/client.js';
 
 export const HEALTH_PATH = '/api/ui/health';
@@ -97,6 +100,8 @@ export interface HealthPollerOptions {
   readonly hidden?: () => boolean;
   /** Subscribes to visibility changes; returns the unsubscribe (default: visibilitychange). */
   readonly onVisibility?: (listener: () => void) => () => void;
+  /** HEALTH-BAR-STUCK: subscribes to refresh requests; returns the unsubscribe. */
+  readonly onRefresh?: (listener: () => void) => () => void;
 }
 
 const browserTimers: HealthTimers = {
@@ -173,11 +178,26 @@ export function startHealthPoller(options: HealthPollerOptions): () => void {
     schedule(HEALTH_POLL_MS);
   };
 
-  const firstAnswer = timers.set(() => {
-    if (!stopped && !answered) report('not_running', undefined);
-  }, FIRST_ANSWER_MS);
+  const armFirstAnswer = (): unknown =>
+    timers.set(() => {
+      if (!stopped && !answered) report('not_running', undefined);
+    }, FIRST_ANSWER_MS);
+  let firstAnswer = armFirstAnswer();
   const unsubscribe = (options.onVisibility ?? documentVisibility)(() => {
     if (stopped || hidden()) return;
+    if (next !== undefined) {
+      timers.clear(next);
+      next = undefined;
+    }
+    void poll();
+  });
+  const unsubscribeRefresh = options.onRefresh?.(() => {
+    if (stopped) return;
+    last = undefined;
+    answered = false;
+    backoff = 0;
+    timers.clear(firstAnswer);
+    firstAnswer = armFirstAnswer();
     if (next !== undefined) {
       timers.clear(next);
       next = undefined;
@@ -192,6 +212,7 @@ export function startHealthPoller(options: HealthPollerOptions): () => void {
     if (next !== undefined) timers.clear(next);
     next = undefined;
     unsubscribe();
+    unsubscribeRefresh?.();
   };
 }
 

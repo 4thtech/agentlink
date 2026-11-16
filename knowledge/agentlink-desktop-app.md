@@ -50,9 +50,13 @@ Yes, from 0.5.4, as an early, unsigned build for Windows 10 and 11: download Age
 
 The browser app and the desktop app are one AgentLink: start in the browser, install the app later and it continues with the same IDs and AI apps, no new setup (the browser window says "AgentLink moved to the AgentLink app"). On a Mac, the first open explains (a note first) that macOS asks to let AgentLink use your saved IDs: type your Mac login password, never your master code, and choose Always Allow. In the Windows app, Windows Hello works like Touch ID (Settings, Windows Hello & master code); with no Windows Hello PIN the app says so and uses your master code (set one up in Windows Settings, Accounts, Sign-in options). If the Windows app won't open, `core.log` is in `%LOCALAPPDATA%\AgentLink\logs`.
 
+## The menu bar widget (0.5.9)
+
+From 0.5.9 the Mac and Windows apps show the AgentLink mark in the menu bar (Mac) or near the clock (Windows). Its shape shows the state: connected, connecting, an approval waiting (a filled dot), paused, offline, update ready; a hollow ring means unread messages. It moves briefly when a message arrives, when your AI sends one and when an approval is waiting, and stays still when the computer asks for reduced motion. A click opens a read-only widget: Needs you, Connected now (your AI apps), Contacts (last exchange only, never "online"), New messages with a one-line preview (up to 80 characters, plain text), Today by the hour, Live and a footer. Approvals, Pause, Resume and Update open the main window; the widget approves nothing. Right-click gives Open AgentLink and Quit. Settings › Appearance has "Show AgentLink in the menu bar" ("near the clock" on Windows) and "Show message previews", both on by default; on Windows, with the icon hidden, closing the window quits AgentLink. New Windows icons start in the hidden ^ area; drag it out or use Settings › Personalization › Taskbar › Other system tray icons. Guide: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/apps/menu-bar-widget.md
+
 ## Other things to know
 
-- Closing the window keeps AgentLink running in the menu bar; it comes back when you click its menu-bar or Dock icon, or when it has a page to show you. Quit it with Cmd+Q, or with **Quit AgentLink** in its menu-bar menu. Your AI app runs its own AgentLink either way.
+- Closing the window keeps AgentLink running in the menu bar; it comes back when you click its menu-bar or Dock icon, or when it has a page to show you. Quit it with Cmd+Q, or with **Quit** in the menu you get by right-clicking its menu-bar icon. Your AI app runs its own AgentLink either way.
 -
 - To remove it, drag AgentLink to the Trash. Your IDs and messages stay until you delete your AgentLink folder.
 - Problems: open an issue at https://github.com/4thtech/agentlink/issues without your master code or any invite link. Full guide: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/apps/desktop-app.md

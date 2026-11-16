@@ -51,6 +51,9 @@ function body(settings: UiSettings): JsonObject {
   const out: Record<string, boolean | Record<string, string> | Record<string, boolean>> = {};
   if (typeof settings.underTheHood === 'boolean') out['underTheHood'] = settings.underTheHood;
   if (typeof settings.menuExpanded === 'boolean') out['menuExpanded'] = settings.menuExpanded;
+  // TRAY-TOGGLE (D-155): the menu bar widget switches; absent = on (never filled in here).
+  if (typeof settings.menuBarIcon === 'boolean') out['menuBarIcon'] = settings.menuBarIcon;
+  if (typeof settings.widgetPreviews === 'boolean') out['widgetPreviews'] = settings.widgetPreviews;
   if (settings.kept !== undefined) {
     const kept: Record<string, string> = {};
     for (const key of UI_KEPT_KEYS) {

@@ -1,6 +1,6 @@
 # Files page
 
-*Applies to AgentLink 0.5.5. Show in Finder for your Send folder, the Files panel on Home and the Files step are new in 0.5.5. File chips in the conversation and the reader are new in 0.5.1. Files you exchange with a person are on their page on [Home](home.md). Folders your AI may send from are in Settings, under Files folder. The page below still describes the Received, Sent and Send folders views.*
+*Applies to AgentLink 0.5.9. Show in Finder for your Send folder, the Files panel on Home and the Files step are new in 0.5.5. File chips in the conversation and the reader are new in 0.5.1. Files you exchange with a person are on their page on [Home](home.md). Folders your AI may send from are in Settings, under Files folder. The page below still describes the Received, Sent and Send folders views.*
 
 ## Files in the conversation
 
@@ -26,7 +26,7 @@ From 0.4.6, a file from a contact you keep is downloaded, checked and saved for 
 
 - Limits per day: 50 files and 500 MB per contact, 200 files and 2 GB in total. A file over a limit waits for you.
 - 1 GiB of disk space is always kept free.
-- Nothing is saved while the ID is [paused](ids.md). Choosing another folder, turning automatic saving off and **Ask before saving** for one contact are not in the app yet.
+- Nothing is saved while the ID is [paused](ids.md). Changing the Inbox folder is in the app since 0.5.8 (**Change…** on the Inbox row); turning automatic saving off and **Ask before saving** for one contact are not in the app yet.
 - Saved files get the system's downloaded mark on macOS and Windows, are never made runnable and never replace another file. Names the system could act on get `.download` added.
 - AgentLink never opens a file.
 

@@ -20,6 +20,7 @@ import type {
   WebContents,
 } from '../../src/main/electron-api.js';
 import type { CoreChild, SpawnOptions, Timers } from '../../src/main/core-process.js';
+import type { PopoverWindowOptions } from '../../src/main/security.js';
 
 export class FakeEvent implements ElectronEvent {
   defaultPrevented = false;
@@ -51,6 +52,9 @@ class Emitter {
 }
 
 export class FakeWebContents extends Emitter implements WebContents {
+  static nextId = 1;
+  /** TRAY-SHELL: Electron's webContents.id (the popover backstop and its IPC compare it). */
+  readonly id: number = FakeWebContents.nextId++;
   windowOpenHandler: ((details: { url: string }) => { action: 'deny' }) | null = null;
   devToolsClosed = 0;
   /** The committed URL (FakeBrowserWindow.loadURL sets it). */
@@ -88,14 +92,16 @@ export class FakeBrowserWindow extends Emitter implements BrowserWindow {
   shows = 0;
   /** DESK-TOUCHID-FIX: how often the page's focus was taken away (blurWebView). */
   blurs = 0;
-  constructor(readonly options: BrowserWindowOptions) {
+  constructor(readonly options: BrowserWindowOptions | PopoverWindowOptions) {
     super();
     FakeBrowserWindow.created.push(this);
   }
+  /** TRAY-SHELL: when set, every load is rejected with it (a cancelled load). */
+  loadError: Error | null = null;
   loadURL(url: string): Promise<void> {
     this.loaded.push(url);
     this.webContents.url = url;
-    return Promise.resolve();
+    return this.loadError === null ? Promise.resolve() : Promise.reject(this.loadError);
   }
   show(): void {
     this.visible = true;
@@ -123,6 +129,11 @@ export class FakeBrowserWindow extends Emitter implements BrowserWindow {
     return false;
   }
   restore(): void {}
+  /** TRAY-SHELL: the popover places itself (popover.ts). */
+  bounds: { x: number; y: number; width: number; height: number } | null = null;
+  setBounds(bounds: { x: number; y: number; width: number; height: number }): void {
+    this.bounds = bounds;
+  }
   destroy(): void {
     this.destroyed = true;
   }
@@ -260,9 +271,22 @@ export class FakeTray extends Emitter implements Tray {
   tooltip = '';
   menu: Menu | null = null;
   destroyed = false;
+  /** TRAY-SHELL: the images set by the frames engine, and the menus popped on right click. */
+  readonly images: unknown[] = [];
+  readonly popped: (Menu | undefined)[] = [];
+  bounds = { x: 1000, y: 0, width: 24, height: 24 };
   constructor(readonly icon: string | NativeImage) {
     super();
     FakeTray.created.push(this);
+  }
+  setImage(image: NativeImage): void {
+    this.images.push(image);
+  }
+  popUpContextMenu(menu?: Menu): void {
+    this.popped.push(menu);
+  }
+  getBounds(): { x: number; y: number; width: number; height: number } {
+    return this.bounds;
   }
   setToolTip(text: string): void {
     this.tooltip = text;

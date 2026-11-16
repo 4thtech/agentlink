@@ -48,6 +48,8 @@ const AGO_TICK_MS = 30_000;
 const CHANGED = 'agentlink:agents-changed';
 /** W5-INVITE-FEEDBACK: contact-changes.ts CONTACTS_CHANGED (kept here so the two never import each other). */
 const CONTACTS_CHANGED = 'agentlink:contacts-changed';
+/** The widget page listens for this (pages/widget WIDGET_ACTIVITY_DOM_EVENT). */
+const ACTIVITY_CHANGED = 'agentlink:activity-changed';
 
 /** A plain status (08 §1): Working (pulsing) / Ready / Idle / Not running / Not set up / Paused. */
 export type LiveState = 'working' | 'ready' | 'idle' | 'off' | 'none' | 'paused' | 'removing';
@@ -529,6 +531,12 @@ function onStreamEvent(e: SseEvent): void {
   if (e.event === 'contacts') {
     attempt = 0;
     window.dispatchEvent(new Event(CONTACTS_CHANGED));
+    return;
+  }
+  // TRAY-WIDGET-API/UI: the open agent's activity changed (`{at}` only). The menu bar widget reads again.
+  if (e.event === 'activity') {
+    attempt = 0;
+    window.dispatchEvent(new Event(ACTIVITY_CHANGED));
     return;
   }
   const generation = timeOf(data['generation']);

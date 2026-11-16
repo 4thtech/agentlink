@@ -1,6 +1,6 @@
 # Appearance and Under the hood
 
-*Applies to AgentLink 0.4.8. It is not in 0.4.0.*
+*Applies to AgentLink 0.5.9. The two menu bar switches are new in 0.5.9.*
 
 **Settings** is one list with a line under each setting. **Appearance** holds a few choices about how the app looks. They are kept in this browser only and are never sent anywhere.
 
@@ -12,6 +12,8 @@ The choices, in this order. Each group has its name written above it.
 | **Reduce motion** | **System**, **On** or **Off**. **Off** still follows your computer if it asks for less motion |
 | **Transparency** | **System** or **Reduce**, for solid panels instead of frosted ones |
 | **Show Under the hood by default** | Off or on |
+| **Show AgentLink in the menu bar** (Mac) or **Show AgentLink near the clock** (Windows) | On or off. Only in the desktop app. On by default. On Windows, while the icon is hidden, closing the window quits AgentLink |
+| **Show message previews** | On or off. On by default. Shows the first line of new messages in the [menu bar widget](../apps/menu-bar-widget.md); off shows only the name, count and time |
 
 ## Under the hood
 

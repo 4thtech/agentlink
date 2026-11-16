@@ -19,6 +19,7 @@ import { basename, join, resolve } from 'node:path';
 import { BUNDLE_HASHES_FILE, bundleHashesJson } from './lib/bundle-hashes.mjs';
 import { constants } from './lib/constants.mjs';
 import { TRAY_ICO_NAMES, icoFromPngs, trayIcoSources } from './lib/ico.mjs';
+import { copyTrayAssets } from './lib/tray-assets.mjs';
 import { BUILD_FUSES } from './lib/fuses.mjs';
 import { asarIntegrity, writeWinIcon, writeWinIntegrity } from './lib/integrity.mjs';
 import { winIcoPath } from './lib/icon.mjs';
@@ -112,6 +113,8 @@ for (const taskbar of ['dark', 'light']) {
   const pngs = traySources[taskbar].map((file) => readFileSync(file));
   writeFileSync(join(assetsDir, TRAY_ICO_NAMES[taskbar]), icoFromPngs(pngs));
 }
+// TRAY-ENGINE: the animated tray frames (both taskbar sets) under resources\assets\tray.
+copyTrayAssets(assetsDir, 'win32');
 
 // WIN-DESK-2 (D15-07 on Windows): the SHA-256 of node.exe, the core's desktop host and the helper go
 // into app.asar (bundle-hashes.json), which ASAR integrity covers; the shell compares them before

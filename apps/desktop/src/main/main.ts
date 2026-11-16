@@ -13,7 +13,10 @@
 //    status-page.ts) and loads only a session link the core sent over fd 3 (`ready`), on the locked
 //    origin. When the core cannot start, the window shows a fixed page for the reason with Try again
 //    and Open log folder. The core's stderr is kept, redacted, in a capped ring and a 0600 log file
-//    (core-log.ts). The tray always exists (built-in image when the icon file is missing).
+//    (core-log.ts). The tray exists unless the person turned the icon off (D-155 (7), read early
+//    from ui-settings.json); built-in image when the icon file is missing. TRAY-SHELL: its left
+//    click toggles the popover (popover.ts; macOS and Windows), its right click pops Open / Quit;
+//    tray-state, tray-pulse and shell-prefs from the pipe drive the icon.
 // 5. Quit sends `shutdown`, waits for the core (kill after the grace period), then exits.
 //
 // Preview mode (owner-feedback loop, dev builds only): `__AGENTLINK_DESKTOP_PREVIEW__` is a
@@ -25,8 +28,12 @@
 // entry point is entry.ts (it imports the `electron` module; this file takes it by injection).
 import {
   accessSync,
+  closeSync,
   constants as fsConstants,
   existsSync,
+  lstatSync,
+  fstatSync,
+  openSync,
   readFileSync,
   readlinkSync,
   rmSync,
@@ -42,7 +49,7 @@ import { checkDataFolderAcl, dataFolderFor, type AclScratch, type AclVerdict } f
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { CoreSupervisor, aiAppMarkerSet, type SpawnFn, type Timers } from './core-process.js';
 import { INVITE_RESULT_TITLE, inviteResultCopy, toInviteLink } from './deep-link.js';
-import type { App, ElectronModule } from './electron-api.js';
+import type { App, ElectronEvent, ElectronModule, WebContents } from './electron-api.js';
 import {
   INSTANCE_FILE,
   forwardedBuild,
@@ -58,7 +65,14 @@ import {
 } from './instance.js';
 import { ensureGoodLocation, locationProblem } from './move.js';
 import RESOURCE_LAYOUT from '../shared/resource-layout.json' with { type: 'json' };
-import { OriginLock, WINDOW_PARTITION, hardenSession, lockWebContents } from './security.js';
+import {
+  OriginLock,
+  WINDOW_PARTITION,
+  hardenSession,
+  lockWebContents,
+  popoverUrl,
+  type PopoverWindowOptions,
+} from './security.js';
 import {
   DEEP_LINK_SCHEME,
   MAX_DEEP_LINK_CHARS,
@@ -67,7 +81,11 @@ import {
   forwardedDeepLink,
 } from './switches.js';
 import type { StatusAction } from './status-page.js';
-import { AppTray, trayImage } from './tray.js';
+import { AppTray, BUILTIN_TRAY_PNG, trayImage } from './tray.js';
+import type { TrayIndicator, TrayPulse, TrayState } from './tray-engine.js';
+import { loadTrayFrames, trayFramesDir, type TrayFrames } from './tray-frames.js';
+import { Popover, type PopoverWindow, type PopoverWindowConstructor } from './popover.js';
+import { registerWidgetIpc, widgetPreloadPath } from './widget-ipc.js';
 import { APP_USER_MODEL_ID, NativeNotifier } from './notify.js';
 import { writeHealthIfPending, writeStarting } from './updater/health.js';
 import { InAppUpdater, inAppEnabled } from './updater/in-app.js';
@@ -91,7 +109,13 @@ import { scheduleUpdateChecks } from './updater/schedule.js';
 import { MainWindow } from './window.js';
 import { preloadPath, registerFolderPicker } from './folder-picker.js';
 import { macArch, type AppUpdatePipeView, type AppUpdateView } from '../shared/app-update.js';
-import type { InviteOutcome } from '../shared/protocol.js';
+import {
+  createTrayFeed,
+  type HostState,
+  type InviteOutcome,
+  type TrayPulseKind,
+  type TrayStateView,
+} from '../shared/protocol.js';
 import {
   keychainNoticeDialog,
   markKeychainNoticeShown,
@@ -109,6 +133,47 @@ export const LAUNCH_REFUSED_EXIT = 64;
  * the start must not be reported as "another AgentLink is running".
  */
 export const PROFILE_UNAVAILABLE_EXIT = 66;
+
+/** TRAY-SHELL: the pipe's pulse words → the engine's. */
+const PULSES: Readonly<Record<TrayPulseKind, TrayPulse>> = Object.freeze({
+  message_in: 'msg-in',
+  ai_sent: 'msg-out',
+  approval: 'approval',
+});
+
+/** TRAY-SHELL: the update states that show the icon's `update` variant (a newer version is known). */
+const UPDATE_ICON_STATES: readonly string[] = Object.freeze([
+  'available',
+  'downloading',
+  'verifying',
+  'ready',
+  'install_failed',
+]);
+
+/** TRAY-SHELL: the largest ui-settings.json the shell reads at launch. */
+const MAX_UI_SETTINGS_FILE_BYTES = 16 * 1024;
+
+/**
+ * TRAY-SHELL (plan risk 7): the icon switch from the text of `~/.agentlink/ui-settings.json`
+ * (`{"v":1,"settings":{…}}`): false when `menuBarIcon` is false, true when it is true or absent
+ * (D-155 (7): on by default), undefined for anything malformed. Only this one boolean is read.
+ */
+export function menuBarIconFromSettings(text: string): boolean | undefined {
+  let record: unknown;
+  try {
+    record = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (typeof record !== 'object' || record === null || Array.isArray(record)) return undefined;
+  const { v, settings } = record as { v?: unknown; settings?: unknown };
+  if (v !== 1 || typeof settings !== 'object' || settings === null || Array.isArray(settings)) {
+    return undefined;
+  }
+  if (!Object.hasOwn(settings, 'menuBarIcon')) return true;
+  const value = (settings as { menuBarIcon?: unknown }).menuBarIcon;
+  return typeof value === 'boolean' ? value : undefined;
+}
 
 /** The preview settings of a development build (owner-feedback loop). */
 export interface PreviewSettings {
@@ -233,6 +298,16 @@ export interface ShellProcess {
    * computer open it (Windows; 'ok' elsewhere). Absent: not checked.
    */
   readonly checkDataFolder?: () => Promise<AclVerdict>;
+  /**
+   * TRAY-SHELL (TRAY-ENGINE): the brand-mark frames (tray-frames.ts loadTrayFrames). Absent or null:
+   * the single tray image.
+   */
+  readonly trayFrames?: (electron: ElectronModule) => TrayFrames | null;
+  /**
+   * TRAY-SHELL (plan risk 7): the icon switch as last saved (ui-settings.json), read once at launch
+   * so a hidden icon does not flash before the core's first `shell-prefs`. Absent or undefined: on.
+   */
+  readonly menuBarIconPref?: () => boolean | undefined;
 }
 
 /** UPD-5: what the shell uses of updater/in-app.ts InAppUpdater. */
@@ -353,6 +428,57 @@ export async function runShell(
   let tray: AppTray | null = null;
   let notifier: NativeNotifier | null = null;
   let pendingInvite: string | null = null;
+  // TRAY-SHELL (D-155): the menu bar icon, the popover and the icon switch. The core's tray-state,
+  // tray-pulse and shell-prefs (fixed words, counts, booleans) drive them; the update variant is the
+  // shell's own release check. Nothing here holds text, a name or an ID.
+  let popover: Popover | null = null;
+  let lastTray: TrayStateView | null = null;
+  let hostState: HostState | 'failed' = 'starting';
+  let approvals = 0;
+  let updateReady = false;
+  let coreBlocked = false;
+  // C1 (owner): opening the popover clears the ring until more messages come in (the per-contact
+  // counts stay until that chat is opened).
+  let ringCleared = false;
+  let unreadAtClear = 0;
+  let appMotion = true;
+  let menuBarIcon = true;
+  try {
+    menuBarIcon = proc.menuBarIconPref?.() !== false;
+  } catch {
+    menuBarIcon = true;
+  }
+  let reapplyTimer: unknown = null;
+  const unreadShown = (): boolean => {
+    const unread = lastTray?.unread ?? 0;
+    if (unread === 0) {
+      ringCleared = false;
+      return false;
+    }
+    if (ringCleared && unread <= unreadAtClear) return false;
+    ringCleared = false;
+    return true;
+  };
+  const coreDown = (): boolean => coreBlocked || supervisor?.state === 'failed';
+  const indicator = (): TrayIndicator => {
+    const down = coreDown();
+    const link = down ? 'offline' : (lastTray?.link ?? 'connecting');
+    const state: TrayState =
+      link === 'offline' || link === 'paused' ? link : updateReady ? 'update' : link;
+    return {
+      state,
+      unread: !down && unreadShown(),
+      approvals: !down && (lastTray?.approvals ?? 0) > 0,
+    };
+  };
+  /** The full state again (after a pulse, a new tray, a new core or an update change). */
+  const applyIndicator = (): void => {
+    tray?.setIndicator(indicator());
+  };
+  const setTooltip = (state: HostState | 'failed'): void => {
+    hostState = state;
+    tray?.update(state, approvals);
+  };
   const toInviteLink = proc.toInviteLink ?? ((): null => null);
   // DESK051-UPD: the update state goes to the core (Settings > Updates) after every `ready` and on
   // every change; the core can only ask for a check.
@@ -362,6 +488,11 @@ export async function runShell(
   const sendAppUpdate = (view: AppUpdateView): void => {
     const full: AppUpdatePipeView =
       inApp === null ? { ...view, installable: false, percent: 0 } : inApp.view(view);
+    const ready = UPDATE_ICON_STATES.includes(full.state);
+    if (ready !== updateReady) {
+      updateReady = ready;
+      applyIndicator();
+    }
     try {
       supervisor?.send({ v: 1, type: 'app-update', ...full });
     } catch {
@@ -408,6 +539,7 @@ export async function runShell(
       });
   };
   const showWindow = (): void => {
+    popover?.hide();
     const shown = window?.show() === true;
     if (shown && window?.loaded === true) return;
     supervisor?.send({ v: 1, type: 'show', route: 'home' });
@@ -466,10 +598,13 @@ export async function runShell(
     if (quitting) return;
     quitting = true;
     event.preventDefault();
+    if (reapplyTimer !== null) proc.timers.clearTimeout(reapplyTimer);
+    reapplyTimer = null;
     const stop = supervisor?.stop() ?? Promise.resolve();
     void stop.then(() => {
       notifier?.dispose();
       removeRecord();
+      popover?.destroy();
       tray?.destroy();
       window?.destroy();
       app.quit();
@@ -499,12 +634,115 @@ export async function runShell(
     }
   }
 
+  // TRAY-SHELL: the popover (macOS and Windows; Linux keeps the native tray menu). Its window is
+  // created on the first click; its web contents are named to the session's backstop below.
+  const screen = electron.screen;
+  if ((proc.platform === 'darwin' || proc.platform === 'win32') && screen !== undefined) {
+    // A plain function (called with `new`, it yields the object it returns), so the shell wires its
+    // own listeners before the popover adds its own.
+    const popoverWindow = function (options: PopoverWindowOptions): PopoverWindow {
+      const created = new electron.BrowserWindow(options);
+      const wired = wirePopoverContents(created.webContents);
+      // IR-TRAY-SHELL L2: a cancelled load may end in a rejected loadURL only (popover.ts swallows
+      // it); the shell sees the rejection too.
+      const load = created.loadURL;
+      created.loadURL = (url: string): Promise<void> => {
+        const loading = load.call(created, url);
+        loading.catch(() => wired.loadFailed());
+        return loading;
+      };
+      return created;
+    };
+    popover = new Popover({
+      BrowserWindow: popoverWindow as unknown as PopoverWindowConstructor,
+      shell: electron.shell,
+      lock,
+      platform: proc.platform,
+      preload: electron.ipcMain === undefined ? undefined : widgetPreloadPath(),
+      screen,
+      trayBounds: () => tray?.getBounds() ?? null,
+      // The fixed page's Open AgentLink: the main window with a fresh session link (the popover
+      // follows that link: setSessionReady below).
+      openMain: () => {
+        window?.show();
+        supervisor?.send({ v: 1, type: 'show', route: 'home' });
+      },
+      quitting: () => quitting,
+    });
+  }
+  /**
+   * TRAY-SHELL: the shell's own listeners on the popover's web contents (added before the popover's):
+   * - a redirect away from the widget is blocked (popover.ts pins it), which cancels the load: the
+   *   session is not usable, so the fixed page until a new session link. The end of that load is
+   *   taken from whichever comes: did-fail-load, did-fail-provisional-load or the loadURL rejection;
+   * - every Cmd / Ctrl combination is swallowed, so the default menu's accelerators (reload, zoom,
+   *   close, …) never act in the popover; only Cmd+Q on macOS, exactly, quits (the widget's footer
+   *   shows that hint, and the popover has focus).
+   */
+  function wirePopoverContents(contents: WebContents): { loadFailed: () => void } {
+    let redirectBlocked = false;
+    const loadFailed = (): void => {
+      const blocked = redirectBlocked;
+      redirectBlocked = false;
+      if (blocked && popover?.page === 'widget') popover.setSessionReady(false);
+    };
+    const isWidget = (url: string): boolean => {
+      const widget = popoverUrl(lock);
+      const hash = url.indexOf('#');
+      return widget !== null && (hash === -1 ? url : url.slice(0, hash)) === widget;
+    };
+    contents.on('will-redirect', (_event, url) => {
+      redirectBlocked = !isWidget(url);
+    });
+    contents.on('did-navigate', () => {
+      redirectBlocked = false;
+    });
+    // Any other failure: popover.ts shows the fixed page itself (and tries the widget again on the
+    // next show). A failure without a blocked redirect (ERR_ABORTED: a newer load replaced this one)
+    // changes nothing here.
+    const onFail = (
+      _event: ElectronEvent,
+      _code: number,
+      _description: string,
+      _url: string,
+      isMainFrame: boolean,
+    ): void => {
+      if (isMainFrame) loadFailed();
+    };
+    contents.on('did-fail-load', onFail);
+    contents.on('did-fail-provisional-load', onFail);
+    contents.on('before-input-event', (event, input) => {
+      if (input.meta !== true && input.control !== true) return;
+      event.preventDefault();
+      if (
+        proc.platform === 'darwin' &&
+        input.type === 'keyDown' &&
+        input.meta === true &&
+        input.control !== true &&
+        input.alt !== true &&
+        input.shift !== true &&
+        typeof input.key === 'string' &&
+        input.key.toLowerCase() === 'q'
+      ) {
+        app.quit();
+      }
+    });
+    return { loadFailed };
+  }
+
   const windowSession = electron.session.fromPartition(WINDOW_PARTITION, { cache: false });
   // DESK-TOUCHID-FIX: before a request that starts the presence helper reaches the core, focus
   // leaves the page (secure input off), so the Touch ID sheet can become key.
-  await hardenSession(windowSession, lock, proc.platform, () => {
-    window?.blurPage();
-  });
+  await hardenSession(
+    windowSession,
+    lock,
+    proc.platform,
+    () => {
+      window?.blurPage();
+    },
+    // TRAY-SHELL: the popover's requests outside the read-only allowlist are cancelled.
+    (id) => popover?.ownsWebContents(id) === true,
+  );
 
   // Set below, once the supervisor and the checks exist.
   let onStatusAction: (action: StatusAction) => void = () => undefined;
@@ -515,6 +753,12 @@ export async function runShell(
     platform: proc.platform,
     quitting: () => quitting,
     onStatusAction: (action) => onStatusAction(action),
+    // TRAY-SHELL: the popover never stays up over the main window.
+    onShown: () => popover?.hide(),
+    // D-155 (7): with the icon hidden the only way back is the Dock (macOS); elsewhere a close
+    // quits while it is hidden.
+    quitOnClose: () => proc.platform !== 'darwin' && tray === null,
+    quit: () => app.quit(),
     // FILES-FOLDER-PICKER: the picker exists only with both the IPC module and the bundled preload.
     ...(electron.ipcMain === undefined || electron.dialog.showOpenDialog === undefined
       ? {}
@@ -526,6 +770,26 @@ export async function runShell(
       sessionWindow: () => window?.sessionWindow ?? null,
       dialog: electron.dialog,
       platform: proc.platform,
+    });
+  }
+  // TRAY-SHELL: the popover's one IPC channel (widget-ipc.ts checks the sender and the input).
+  if (electron.ipcMain !== undefined && popover !== null) {
+    const widget = popover;
+    registerWidgetIpc(electron.ipcMain, {
+      lock,
+      widgetContentsId: () => widget.widgetContentsId(),
+      // The existing `show`: the main window on that page (the core mints its link).
+      openPage: (route, target) => {
+        window?.show();
+        supervisor?.send({
+          v: 1,
+          type: 'show',
+          route,
+          ...(target === undefined ? {} : { target }),
+        });
+      },
+      quit: () => app.quit(),
+      close: () => widget.hide(),
     });
   }
   // The window comes up at once: the person sees AgentLink starting, never nothing.
@@ -542,15 +806,112 @@ export async function runShell(
     hostScript = preview.hostScript ?? hostScript;
   }
 
-  // Always a tray (the only way back after the window is closed): built-in image as a fallback.
+  // A tray unless the person turned the icon off (D-155 (7)); it is the way back after the window
+  // is closed (macOS also keeps the Dock; elsewhere a close quits while it is off). Built-in image
+  // as a fallback.
   const icon = proc.exists(paths.trayIcon) ? paths.trayIcon : '';
-  tray = new AppTray(electron, trayImage(electron.nativeImage, icon, proc.platform), {
-    open: showWindow,
-    retry: () => tryAgain(),
-    quit: () => app.quit(),
-  });
+  let frames: TrayFrames | null = null;
+  try {
+    frames = proc.trayFrames?.(electron) ?? null;
+  } catch {
+    frames = null;
+  }
+  // The longest a pulse (and one queued behind it) can play before the icon settles.
+  const settleMs = ((): number => {
+    if (frames === null) return 0;
+    const sequences = frames.sequences;
+    const longest = Math.max(
+      ...(['msg-in', 'msg-out', 'approval'] as const).map(
+        (kind) => sequences[kind].frames.length * sequences[kind].frameMs,
+      ),
+    );
+    return Number.isFinite(longest) ? 2 * longest + 100 : 0;
+  })();
+  const onTrayClick = (): void => {
+    // With the core failed, the main window's status page (Try again lives there).
+    if (coreDown()) {
+      showWindow();
+      return;
+    }
+    popover?.toggle();
+    if (popover?.visible === true) {
+      ringCleared = true;
+      unreadAtClear = lastTray?.unread ?? 0;
+      tray?.clearUnread();
+    }
+  };
+  const createTray = (): void => {
+    if (tray !== null || quitting) return;
+    tray = new AppTray(
+      electron,
+      trayImage(electron.nativeImage, icon, proc.platform),
+      popover === null
+        ? { open: showWindow, retry: () => tryAgain(), quit: () => app.quit() }
+        : { open: showWindow, quit: () => app.quit(), click: onTrayClick },
+      {
+        frames,
+        system: {
+          ...(electron.nativeTheme === undefined ? {} : { nativeTheme: electron.nativeTheme }),
+          ...(electron.systemPreferences === undefined
+            ? {}
+            : { systemPreferences: electron.systemPreferences }),
+        },
+        timers: proc.timers,
+        platform: proc.platform,
+        appMotion,
+        initial: indicator(),
+      },
+    );
+    tray.update(hostState, approvals);
+    applyIndicator();
+  };
+  const setMenuBarIcon = (on: boolean): void => {
+    menuBarIcon = on;
+    if (on) {
+      createTray();
+      return;
+    }
+    popover?.hide();
+    popover?.destroy();
+    if (reapplyTimer !== null) proc.timers.clearTimeout(reapplyTimer);
+    reapplyTimer = null;
+    tray?.destroy();
+    tray = null;
+    // IR-TRAY-SHELL L3: without the icon (and without a Dock), a hidden window would leave
+    // AgentLink running with no way back: bring the window up (a close then quits).
+    if (proc.platform !== 'darwin' && window?.visible !== true && !quitting) showWindow();
+  };
+  const feed = createTrayFeed(
+    {
+      onState: (view) => {
+        lastTray = view;
+        applyIndicator();
+      },
+      onPulse: (kind) => {
+        if (kind === 'message_in') ringCleared = false;
+        tray?.pulse(PULSES[kind]);
+        // IR-TRAY-ENGINE L3: the engine's pulse sets its own unread / approvals marks; the core's
+        // last full state decides where the icon settles (now, and again once the pulse ended).
+        applyIndicator();
+        if (tray === null || settleMs === 0) return;
+        if (reapplyTimer !== null) proc.timers.clearTimeout(reapplyTimer);
+        reapplyTimer = proc.timers.setTimeout(() => {
+          reapplyTimer = null;
+          applyIndicator();
+        }, settleMs);
+      },
+      onPrefs: (prefs) => {
+        appMotion = prefs.motion !== 'off';
+        tray?.setAppMotion(appMotion);
+        if (prefs.menuBarIcon !== menuBarIcon || (prefs.menuBarIcon && tray === null)) {
+          setMenuBarIcon(prefs.menuBarIcon);
+        }
+      },
+    },
+    { now: () => proc.timers.now() },
+  );
+  if (menuBarIcon) createTray();
 
-  let approvals = 0;
   // N7: the dock badge is the number of approvals waiting (never unread messages).
   let badge: number | undefined;
   const setBadge = (count: number): void => {
@@ -587,6 +948,12 @@ export async function runShell(
     onStart: () => {
       coreLog.note('core started');
       window?.resetForNewCore();
+      // TRAY-SHELL: a new core: its tray messages start afresh; the popover waits for its session.
+      feed.reset();
+      lastTray = null;
+      ringCleared = false;
+      popover?.setSessionReady(false);
+      applyIndicator();
       // The old page's server is gone: show the starting page until the new core is ready.
       if (window?.page === 'session') window.showStatus('starting');
     },
@@ -596,18 +963,25 @@ export async function runShell(
       const how =
         signal !== null ? `signal ${signal.replace(/[^A-Z0-9]/g, '')}` : `code ${String(code)}`;
       coreLog.note(`core exited (${how})`);
+      popover?.setSessionReady(false);
       // D15-12: the session page's server is gone; never leave that page up while nothing (or
       // something else) answers on its port until the next start.
       if (!quitting && window?.page === 'session') window.showStatus('starting');
     },
     onMessage: (message) => {
+      // TRAY-SHELL: tray-state, tray-pulse and shell-prefs.
+      if (feed.handle(message)) return;
       switch (message.type) {
         case 'ready':
           // WIN-DESK-1: proof the pipe works both ways (fixed text, never the link).
           coreLog.note('core ready');
           updateHealth?.ready();
           if (releaseChecker !== null) sendAppUpdate(releaseChecker.view());
-          if (window?.loadSessionUrl(message.sessionUrl) === true) {
+          // TRAY-SHELL: once the main window has this core's session, the popover loads the widget.
+          if (
+            window?.loadSessionUrl(message.sessionUrl, () => popover?.setSessionReady(true)) ===
+            true
+          ) {
             window.show();
             if (pendingInvite !== null) {
               const link = pendingInvite;
@@ -618,7 +992,7 @@ export async function runShell(
           return;
         case 'status':
           approvals = message.counts.waitingApprovals;
-          tray?.update(message.state, approvals);
+          setTooltip(message.state);
           setBadge(approvals);
           return;
         case 'approval-waiting':
@@ -656,7 +1030,9 @@ export async function runShell(
     },
     onStateChange: (state) => {
       if (state !== 'failed') return;
-      tray?.update('failed', approvals);
+      setTooltip('failed');
+      popover?.setSessionReady(false);
+      applyIndicator();
       if (quitting) return;
       window?.showStatus(supervisor?.failureKind ?? 'exited');
     },
@@ -672,10 +1048,14 @@ export async function runShell(
   const blocked = (
     kind: 'ai_app' | 'missing_files' | 'changed_files' | 'shared_data_folder',
   ): void => {
-    tray?.update('failed', approvals);
+    coreBlocked = true;
+    setTooltip('failed');
+    popover?.setSessionReady(false);
+    applyIndicator();
     window?.showStatus(kind);
   };
   const launchCore = (): void => {
+    coreBlocked = false;
     if (supervisor?.state === 'failed') supervisor.retry();
     else supervisor?.start();
   };
@@ -855,6 +1235,14 @@ export function realProcess(): ShellProcess {
       }
       return verifyBundle(record, bundleFilePaths(resources, proc.platform));
     },
+    trayFrames: (electron) =>
+      loadTrayFrames({
+        dir: trayFramesDir(proc.resourcesPath ?? ''),
+        platform: proc.platform,
+        nativeImage: electron.nativeImage,
+        fallback: () => electron.nativeImage.createFromBuffer(BUILTIN_TRAY_PNG, { scaleFactor: 2 }),
+      }),
+    menuBarIconPref: () => readMenuBarIconPref(join(homedir(), '.agentlink', 'ui-settings.json')),
     checkDataFolder: () =>
       checkDataFolderAcl(
         proc.platform,
@@ -863,6 +1251,42 @@ export function realProcess(): ShellProcess {
         { run: runQuiet, scratch: aclScratch },
       ),
   };
+}
+
+/**
+ * TRAY-SHELL (plan risk 7): the icon switch as last saved, or undefined. A small regular file only
+ * (never a link), read once at launch; it holds the app's own UI booleans (nothing secret).
+ */
+export function readMenuBarIconPref(
+  path: string,
+  platform: NodeJS.Platform = process.platform,
+  lstat: (p: string) => { isSymbolicLink(): boolean } = lstatSync,
+): boolean | undefined {
+  let fd: number | null = null;
+  try {
+    // No lstat before the open (a check-then-open race): O_NOFOLLOW refuses a link at the open, and
+    // the descriptor's own fstat below confirms a regular file of a small size.
+    fd = openSync(
+      path,
+      fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0) | (fsConstants.O_NONBLOCK ?? 0),
+    );
+    const info = fstatSync(fd);
+    if (!info.isFile() || info.size > MAX_UI_SETTINGS_FILE_BYTES) return undefined;
+    // Windows has no O_NOFOLLOW: refuse a link here, after the open (a check after the open, so
+    // there is no check-then-open gap on the path that was opened).
+    if (platform === 'win32' && lstat(path).isSymbolicLink()) return undefined;
+    return menuBarIconFromSettings(readFileSync(fd, 'utf8'));
+  } catch {
+    return undefined;
+  } finally {
+    if (fd !== null) {
+      try {
+        closeSync(fd);
+      } catch {
+        // Best effort.
+      }
+    }
+  }
 }
 
 /** OD-M: runs a System32 tool without a shell, window or inherited environment; stdout only. */

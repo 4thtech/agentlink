@@ -20,11 +20,16 @@
 //   carries a fixed marker naming the policy for the page. Pages detect support ONLY with
 //   isUserVerifyingPlatformAuthenticatorAvailable(), never getClientCapabilities(). On Windows,
 //   WebAuthn stays on in the window (Windows Hello through webauthn.dll; no PRF).
+// - TRAY-POPOVER (D-155): the menu-bar popover is a second window with the SAME webPreferences and
+//   partition (popoverOptions), its own preload (widget-preload.cjs, one IPC channel, widget-ipc.ts)
+//   and the same lockWebContents; it loads only the locked origin's `/settings/widget`. Its requests
+//   outside a read-only allowlist are cancelled (isPopoverRequestRefused).
 //
 // Everything takes the Electron objects by injection (electron-api.ts) and is unit-tested.
 import { sessionUrlOrigin } from '../shared/protocol.js';
 import type {
   BrowserWindowOptions,
+  OnBeforeSendHeadersDetails,
   Session,
   Shell,
   WebContents,
@@ -121,6 +126,66 @@ export function windowOptions(platform: string, preload?: string): BrowserWindow
     backgroundColor: '#0f1115',
     webPreferences: webPreferences(platform, preload),
   };
+}
+
+/**
+ * TRAY-POPOVER (D-155): the popover's fixed size. 360 px wide; the height is fixed too (at most 560,
+ * popover-position.ts shrinks it on a small screen): no IPC carries a size from the page.
+ */
+export const POPOVER_WIDTH = 360;
+export const POPOVER_HEIGHT = 560;
+
+/** TRAY-POPOVER: the only page the popover loads from the core (an app page path, app-pages.ts). */
+export const POPOVER_PATH = '/settings/widget';
+
+/**
+ * TRAY-POPOVER: the popover's options (the fields beyond BrowserWindowOptions). Its webPreferences
+ * are the main window's, unchanged: the same in-memory partition (the main window's HttpOnly session
+ * cookie serves it, so its URL never carries a token), sandbox, context isolation, no node, no
+ * webview, no devtools, WebAuthn off. `preload` is only ever widget-ipc.ts widgetPreloadPath() (the
+ * bundled widget-preload.cjs); the folder picker's preload is never loaded here.
+ */
+export interface PopoverWindowOptions extends Omit<BrowserWindowOptions, 'minWidth' | 'minHeight'> {
+  readonly frame: false;
+  readonly resizable: false;
+  readonly movable: false;
+  readonly minimizable: false;
+  readonly maximizable: false;
+  readonly fullscreenable: false;
+  readonly alwaysOnTop: true;
+  readonly skipTaskbar: true;
+  readonly hasShadow: true;
+  readonly transparent: false;
+}
+
+/** TRAY-POPOVER: a frameless, fixed-size, always-on-top window that stays off the taskbar. */
+export function popoverOptions(platform: string, preload?: string): PopoverWindowOptions {
+  return {
+    width: POPOVER_WIDTH,
+    height: POPOVER_HEIGHT,
+    show: false,
+    frame: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    hasShadow: true,
+    transparent: false,
+    title: 'AgentLink',
+    backgroundColor: '#0f1115',
+    webPreferences: webPreferences(platform, preload),
+  };
+}
+
+/**
+ * TRAY-POPOVER: the widget page on the locked origin (`http://localhost:<port>/settings/widget`, no
+ * query, no token), or null before the origin is locked.
+ */
+export function popoverUrl(lock: OriginLock): string | null {
+  return lock.origin === null ? null : `${lock.origin}${POPOVER_PATH}`;
 }
 
 /**
@@ -269,18 +334,62 @@ export function isNativePresenceRequest(
 }
 
 /**
+ * TRAY-POPOVER (Fable r1 M1): the only non-GET paths the popover may call. None: Pause, Resume,
+ * Approve, Update and every owner operation open the main window instead.
+ */
+export const POPOVER_WRITE_PATHS: readonly string[] = Object.freeze([]);
+
+/**
+ * TRAY-POPOVER: true for a request from the popover's web contents that is refused. An ALLOWLIST:
+ * only GET and HEAD without any `X-AgentLink-Presence` header pass, plus a non-GET to an exact path
+ * in POPOVER_WRITE_PATHS (empty). Everything else (approval decisions, review, master-code routes,
+ * owner routes, any presence) is cancelled. The partition is shared with the main window, so the
+ * request's web contents decides; an `isPopover` that throws counts as the popover.
+ */
+export function isPopoverRequestRefused(
+  details: OnBeforeSendHeadersDetails,
+  isPopover: (webContentsId: number | undefined) => boolean,
+): boolean {
+  const raw = (details as { readonly webContentsId?: unknown }).webContentsId;
+  const id = typeof raw === 'number' ? raw : undefined;
+  let popover: boolean;
+  try {
+    popover = isPopover(id);
+  } catch {
+    popover = true;
+  }
+  if (!popover) return false;
+  for (const name of Object.keys(details.requestHeaders)) {
+    if (name.toLowerCase() === 'x-agentlink-presence') return true;
+  }
+  const method = details.method.toUpperCase();
+  if (method === 'GET' || method === 'HEAD') return false;
+  const parsed = parseUrl(details.url);
+  return parsed === null || parsed.search !== '' || !POPOVER_WRITE_PATHS.includes(parsed.pathname);
+}
+
+/** Fable r1 L: a service worker's script fetch (Chromium sends `Service-Worker: script`). */
+export function isServiceWorkerRequest(headers: Record<string, string>): boolean {
+  return Object.keys(headers).some((name) => name.toLowerCase() === 'service-worker');
+}
+
+/**
  * Hardens the window's session: permissions, device pickers, screen capture, requests, downloads,
  * a direct proxy (a system proxy never sees the loopback traffic) and the user-agent marker.
  * DESK-TOUCHID-FIX: `onNativePresence` runs before a request that starts the presence helper leaves
  * the window (main.ts takes focus off the page with it, so a focused master-code field cannot keep
  * macOS secure input on while the Touch ID sheet wants to become key). The page blurs the field
  * itself first; this is the backstop. Headers pass unchanged.
+ * TRAY-POPOVER: `isPopover` (required, fail-closed) names the popover's web contents; its requests
+ * outside the allowlist are cancelled (isPopoverRequestRefused). No service worker is ever
+ * registered: its script fetch is cancelled for every window.
  */
 export async function hardenSession(
   session: Session,
   lock: OriginLock,
   platform: string,
-  onNativePresence?: () => void,
+  onNativePresence: (() => void) | undefined,
+  isPopover: (webContentsId: number | undefined) => boolean,
 ): Promise<void> {
   session.setPermissionRequestHandler((_contents, permission, callback, details) => {
     callback(permissionAllowed(lock, permission, details.requestingUrl));
@@ -300,6 +409,17 @@ export async function hardenSession(
     callback({ cancel: !requestAllowed(lock, details.url) });
   });
   session.webRequest.onBeforeSendHeaders((details, callback) => {
+    // No service workers (they would outlive the page and serve it from a cache).
+    if (isServiceWorkerRequest(details.requestHeaders)) {
+      callback({ cancel: true });
+      return;
+    }
+    // TRAY-POPOVER: the popover only reads (it hides on blur; Touch ID would blur it). Resume,
+    // Approve and every change open the main window instead; this is the backstop.
+    if (isPopoverRequestRefused(details, isPopover)) {
+      callback({ cancel: true });
+      return;
+    }
     if (
       onNativePresence !== undefined &&
       lock.allows(details.url) &&
