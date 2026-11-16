@@ -80,3 +80,9 @@ _Updated 2026-11-12 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 - 0.5.5 live: npm latest, GitHub release v0.5.5 (Mac arm64/x64 DMG + zip, Windows setup.exe, extension files), signed desktop update file; wiki.4thtech.io synced (wiki #28). Release PR #828, version PR #829.
 - Contents: first run on any computer (master code in the app or browser, no passkey, no terminal); browser and app continue each other; native Windows Hello; start over on this computer (D-153); an ID that can't be opened offers Restore / Remove / Continue; files (send a small text file by content, Files step, Home Files panel, Show in Finder/Explorer); notification fixes; Windows installer shortcut and logs; release-pipeline guards.
 - Next: owner tests Update now on both Macs, the Windows setup on a real PC and a fresh first run; follow-up cards from review lows.
+
+## 2026-11-15 — 0.5.6, 0.5.7, 0.5.8 released
+- 0.5.6: one-click Update now in the Mac app, Windows app and browser app; a way out of setup at any step.
+- 0.5.7: Home Files panel shows the Send folder correctly. Owner confirmed Mac in-app update 0.5.6 → 0.5.7.
+- 0.5.8: choose Send and Inbox folders in Finder/Explorer; Windows updates clean up after themselves.
+- Next: owner checks Windows and browser updates; follow-up cards.
