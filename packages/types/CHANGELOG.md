@@ -1,5 +1,11 @@
 # @4thtech-io/types
 
+## 0.5.9
+
+### Patch Changes
+
+- 9dd72fe: TRAY-TOGGLE: two new switches in Settings › Appearance, kept by the app in ui-settings: "Show AgentLink in the menu bar" (Mac) or "near the clock" (Windows), shown only in the desktop app, and "Show message previews". Both are on unless turned off; any other value is refused.
+
 ## 0.5.8
 
 ### Patch Changes

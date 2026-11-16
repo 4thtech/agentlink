@@ -1,5 +1,12 @@
 # @4thtech-io/agentlink
 
+## 0.5.9
+
+### Patch Changes
+
+- 9dd72fe: TRAY-PIPE: the desktop app's core tells its shell what the menu bar icon shows over the private pipe: `tray-state` (connecting, connected, paused or offline, with the unread and approvals counts), `tray-pulse` (a message in, your AI sent a message, an approval; never at startup, at most one per kind every 2 seconds) and `shell-prefs` (the menu bar switch and the app's motion setting). Fixed words, counts and booleans only: never a name, an ID or message text.
+- 9dd72fe: TRAY-TOGGLE: two new switches in Settings › Appearance, kept by the app in ui-settings: "Show AgentLink in the menu bar" (Mac) or "near the clock" (Windows), shown only in the desktop app, and "Show message previews". Both are on unless turned off; any other value is refused.
+
 ## 0.5.8
 
 ### Patch Changes
