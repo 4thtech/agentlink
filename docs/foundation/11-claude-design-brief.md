@@ -448,9 +448,9 @@ The desktop app's menu bar / notification-area icon and its popover widget (08 �
 
 | Where | String |
 |---|---|
-| Settings switch (Mac) | "Show AgentLink in the menu bar" (helper: "See new messages and anything waiting at a glance.") |
-| Settings switch (Windows) | "Show AgentLink near the clock" (same helper; while off: "With the icon hidden, closing the window quits AgentLink.") |
-| Settings switch, previews | "Show message previews" (helper: "Shows the start of new messages in the menu bar widget.") |
+| Settings switch (Mac) | "Show AgentLink in the menu bar" (helper: "Quick look at messages, approvals and your connected AI apps.") |
+| Settings switch (Windows) | "Show AgentLink near the clock" (same helper, plus: "While it is hidden, closing the window quits AgentLink.") |
+| Settings switch, previews | "Show message previews" (helper: "Show the first line of new messages in the menu bar widget.") |
 | Right-click menu | "Open AgentLink" · "Quit" |
 | Before the app is ready | "Starting AgentLink…" · **Open AgentLink** |
 | Status | The live words of 08 §1 and b11 §25.2 ("Running", "Paused", "Not running", "Connecting…") |

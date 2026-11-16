@@ -181,9 +181,13 @@ describe('Appearance', () => {
       const group = host.querySelector(`[role="radiogroup"][aria-label="${g}"]`);
       expect(group?.classList.contains('al-seg'), g).toBe(true);
     }
-    expect(
-      all('[role="switch"]').map((s) => s.getAttribute('aria-labelledby')).length,
-    ).toBeLessThanOrEqual(1);
+    // TRAY-TOGGLE: the only switches are Under the hood and (D-155) the menu bar widget's previews
+    // (the menu bar icon row is desktop only); Transparency is never one.
+    const switchLabels = all('[role="switch"]').map(
+      (s) => document.getElementById(s.getAttribute('aria-labelledby') ?? '')?.textContent,
+    );
+    expect(switchLabels).toEqual([P.hoodLabel, P.previewsLabel]);
+    expect(switchLabels).not.toContain(P.transparency);
     expect(host.querySelectorAll('[role="radiogroup"]')).toHaveLength(3);
   });
 });
