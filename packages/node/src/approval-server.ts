@@ -1207,7 +1207,7 @@ export interface DesktopAlertState {
    */
   readonly link: DesktopTrayLink;
   /**
-   * TRAY-PIPE: the newest message this ID's AI sent (unix seconds) in the last
+   * TRAY-PIPE: the newest message this ID's AI sent (relay state `sent`; unix seconds) in the last
    * DESKTOP_OUT_WINDOW_SECONDS; null for none; absent when the read failed (unknown). A time only.
    */
   readonly outAt?: number | null;
@@ -8639,7 +8639,8 @@ export async function startApprovalServerWith(
       const context = uiContext;
       let link: DesktopTrayLink = 'offline';
       try {
-        link = desktopTrayLink(await context.health?.());
+        // No health read wired: an opened agent answers `running` (context.ts LocalUiOptions.health).
+        link = context.health === undefined ? 'connected' : desktopTrayLink(await context.health());
       } catch {
         // Offline: never connected without evidence.
       }
@@ -8652,7 +8653,9 @@ export async function startApprovalServerWith(
           outAt = null;
           for (const event of read.events) {
             const at = event.at;
-            if (event.direction !== 'out' || !Number.isSafeInteger(at) || at < 0) continue;
+            // Sent user messages only: a queued or not delivered one never counts as sent.
+            if (event.direction !== 'out' || event.state !== 'sent') continue;
+            if (!Number.isSafeInteger(at) || at < 0) continue;
             if (outAt === null || at > outAt) outAt = at;
           }
         } catch {

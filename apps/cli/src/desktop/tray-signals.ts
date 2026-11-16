@@ -59,8 +59,11 @@ export interface TrayBaseline {
   readonly scope: string;
   readonly approvals: ReadonlySet<string>;
   readonly inbound: ReadonlyMap<string, { count: number; at: number; read: boolean }>;
-  /** The newest outbound time seen so far (never goes back); null before any. */
-  readonly outAt: number | null;
+  /**
+   * The newest outbound time seen so far (never goes back); null before any; 'unknown' while no
+   * read has answered since the first look (the next answer only sets it, never pulses).
+   */
+  readonly outAt: number | null | 'unknown';
 }
 
 const isInbound = (item: NotificationItem): boolean =>
@@ -94,8 +97,9 @@ export function planTray(
   readonly state: TrayStateView;
 } {
   const first = prev === undefined || prev.scope !== look.scope;
-  const seenOut = first ? null : prev.outAt;
   const out = isTime(look.outAt) ? look.outAt : undefined;
+  const known = look.outAt === null || out !== undefined;
+  const seenOut: number | null | 'unknown' = first ? (known ? null : 'unknown') : prev.outAt;
   const baseline: TrayBaseline = Object.freeze({
     scope: look.scope,
     approvals: new Set(look.approvals),
@@ -104,7 +108,16 @@ export function planTray(
         .filter(isInbound)
         .map((i) => [i.id, { count: i.count, at: i.at, read: i.read }] as const),
     ),
-    outAt: out === undefined ? seenOut : seenOut === null ? out : Math.max(seenOut, out),
+    outAt:
+      seenOut === 'unknown'
+        ? known
+          ? (out ?? null)
+          : 'unknown'
+        : out === undefined
+          ? seenOut
+          : seenOut === null
+            ? out
+            : Math.max(seenOut, out),
   });
   const state = trayStateOf(look);
   if (first) return { pulses: [], baseline, state };
@@ -118,7 +131,10 @@ export function planTray(
       break;
     }
   }
-  if (out !== undefined && (prev.outAt === null || out > prev.outAt)) pulses.add('ai_sent');
+  // An unknown baseline (the first reads failed) is only set by this answer, never a pulse.
+  if (out !== undefined && prev.outAt !== 'unknown' && (prev.outAt === null || out > prev.outAt)) {
+    pulses.add('ai_sent');
+  }
   return { pulses: TRAY_PULSE_KINDS.filter((k) => pulses.has(k)), baseline, state };
 }
 

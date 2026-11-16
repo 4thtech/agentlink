@@ -534,6 +534,21 @@ describe('TRAY-PIPE: desktopAlerts carries the link and the newest outbound time
     expect((await h.server.desktopAlerts())?.link).toBe(link);
   });
 
+  it('outAt: queued and not delivered messages never count as sent', async () => {
+    const h = await harness({
+      client: flow([
+        { contactId: A, direction: 'out', kind: 'message', state: 'queued', at: NOW - 1 },
+        { contactId: A, direction: 'out', kind: 'message', state: 'not_delivered', at: NOW - 2 },
+      ]),
+    });
+    expect((await h.server.desktopAlerts())?.outAt).toBeNull();
+  });
+
+  it('no health source wired: an opened agent is connected (context.ts: absent = running)', async () => {
+    const h = await harness({ client: flow([]) });
+    expect((await h.server.desktopAlerts())?.link).toBe('connected');
+  });
+
   it('a failing health source is offline (never connected without evidence)', async () => {
     const h = await harness({
       client: flow([]),
