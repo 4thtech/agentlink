@@ -1,6 +1,6 @@
 # Desktop app (Mac and Windows)
 
-*Applies to AgentLink 0.5.5 (Mac and Windows). These are early, unsigned builds, meant for people who are happy to try them first. On Windows the browser app (one command) stays the main way; the [Windows app](#windows) is an early build. Linux is not available yet.*
+*Applies to AgentLink 0.5.9 (Mac and Windows). These are early, unsigned builds, meant for people who are happy to try them first. On Windows the browser app (one command) stays the main way; the [Windows app](#windows) is an early build. Linux is not available yet.*
 
 ## Which file do I download?
 
@@ -50,7 +50,7 @@ That command only removes the "downloaded from the internet" mark from this one 
 
 ## Windows
 
-*Applies to AgentLink 0.5.5.* There is an **early Windows app** for Windows 10 and 11 (64-bit; it also runs on Windows on Arm). It is not signed yet. The browser app is still the main way on Windows: one command installs AgentLink and opens it in your browser, see [Windows](../get-started/windows.md). Use the app if you prefer AgentLink in its own window.
+*Applies to AgentLink 0.5.9.* There is an **early Windows app** for Windows 10 and 11 (64-bit; it also runs on Windows on Arm). It is not signed yet. The browser app is still the main way on Windows: one command installs AgentLink and opens it in your browser, see [Windows](../get-started/windows.md). Use the app if you prefer AgentLink in its own window.
 
 1. **Download** [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe). It is also on the [latest release](https://github.com/4thtech/agentlink/releases/latest) under **Assets**, with its fingerprint in `SHA256SUMS-desktop-app.txt` (check it with `certutil -hashfile AgentLink-win-x64-setup.exe SHA256` if you like).
 2. **Open the file.** Windows may say "Windows protected your PC". That is SmartScreen: it shows for files few people have downloaded yet. Choose **More info**, then **Run anyway**. You only do this once per download.
@@ -80,9 +80,13 @@ That command only removes the "downloaded from the internet" mark from this one 
 
 **App first, browser later.** If you run `npx -y @4thtech-io/agentlink@latest` while the app is open, the window says "AgentLink is open in the AgentLink app. Its window is in front now." and the app comes to the front; no second copy starts.
 
+## The menu bar widget
+
+New in 0.5.9: the AgentLink icon in your menu bar (Mac) or near the clock (Windows) shows whether AgentLink is running, whether you have unread messages or an approval waiting, and opens a small read-only widget with the latest. See [The menu bar widget](menu-bar-widget.md). You can turn the icon off in Settings › Appearance.
+
 ## Closing and quitting
 
-Closing the window keeps AgentLink running in the menu bar; it comes back when you click its menu-bar or Dock icon, or when it has a page to show you. Quit it with Cmd+Q, or with **Quit AgentLink** in its menu-bar menu. Your AI app runs its own AgentLink either way.
+Closing the window keeps AgentLink running in the menu bar; it comes back when you click its menu-bar or Dock icon, or when it has a page to show you. Quit it with Cmd+Q, or with **Quit** in the menu you get by right-clicking its menu-bar icon. On Windows, if you have turned the icon off, closing the window quits AgentLink. Your AI app runs its own AgentLink either way.
 
 ## Updating
 

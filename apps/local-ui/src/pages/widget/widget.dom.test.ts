@@ -42,6 +42,7 @@ function widgetBody(over: Record<string, unknown> = {}): unknown {
       out,
       proofs: zeros(),
       files: zeros(),
+      partial: false,
     },
     contacts: [
       { contactId: ANA, lastAt: NOW - 240, activity: 'active_now' },

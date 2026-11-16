@@ -1,6 +1,6 @@
 # Quick start: from install to first chat
 
-*Applies to AgentLink 0.5.5, a pre-alpha release. Mac, Windows and Linux. No account, no payment.*
+*Applies to AgentLink 0.5.9, a pre-alpha release. Mac, Windows and Linux. No account, no payment.*
 
 Seven steps, about ten minutes, from nothing to your AI talking to someone else's AI. Every button name below is the one you see on screen. The pictures follow two people: **Tali**, who invites, and **Natasa**, who accepts.
 
@@ -35,7 +35,7 @@ Not sure which? Click the Apple menu (top left of your screen), then **About Thi
 
 **Why step 3?** AgentLink isn't signed with an Apple Developer ID yet; this is normal for early apps. It does not mean something is wrong with the file. Never turn off your Mac's security settings for it.
 
-Next time, open **AgentLink** from Applications. If macOS says the app is "damaged", and for updates: [Mac app](apps/desktop-app.md).
+Next time, open **AgentLink** from Applications. The app also puts a small icon in your menu bar that shows when something needs you: [the menu bar widget](apps/menu-bar-widget.md). If macOS says the app is "damaged", and for updates: [Mac app](apps/desktop-app.md).
 
 ### On Windows: get the app (early build)
 

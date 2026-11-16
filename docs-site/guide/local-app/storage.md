@@ -1,6 +1,6 @@
 # Storage and Free up space
 
-*Applies to AgentLink 0.5.5. Storage showed sizes only in 0.5.1; Free up space, Keep automatically, Delete history and Archive are new, and your AI can suggest a cleanup.*
+*Applies to AgentLink 0.5.9. Storage showed sizes only in 0.5.1; Free up space, Keep automatically, Delete history and Archive are new, and your AI can suggest a cleanup.*
 
 Open **Settings** › **Storage** (in the **Your AI** group). It shows how much room your messages and saved files take on this computer, and lets you free up space.
 
@@ -10,7 +10,7 @@ Open **Settings** › **Storage** (in the **Your AI** group). It shows how much 
 
 - **For each ID:** how much room its messages and saved files take.
 - **For each person:** the same, so you can see where the room goes.
-- **The Inbox folder:** how big `~/AgentLink/Inbox` is, where received files are saved. **Show in Finder** opens it (Windows: **Show in folder**).
+- **The Inbox folder:** how big `~/AgentLink/Inbox` (or the folder you chose in Settings › Files since 0.5.8) is, where received files are saved. **Show in Finder** opens it (Windows: **Show in folder**).
 
 ## Free up space
 
