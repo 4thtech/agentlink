@@ -178,6 +178,13 @@ export class MainWindow {
     }
   }
 
+  /** TRAY-SHELL: true while the window is on screen (shown and not minimised). */
+  get visible(): boolean {
+    const window = this.#window;
+    if (window === null || window.isDestroyed()) return false;
+    return window.isVisible() && !window.isMinimized();
+  }
+
   /**
    * NOTIFY-FOCUS: true while the window is shown, not minimised and has focus (the person is looking
    * at AgentLink); no window, a hidden or a background one: false.

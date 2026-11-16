@@ -96,10 +96,12 @@ export class FakeBrowserWindow extends Emitter implements BrowserWindow {
     super();
     FakeBrowserWindow.created.push(this);
   }
+  /** TRAY-SHELL: when set, every load is rejected with it (a cancelled load). */
+  loadError: Error | null = null;
   loadURL(url: string): Promise<void> {
     this.loaded.push(url);
     this.webContents.url = url;
-    return Promise.resolve();
+    return this.loadError === null ? Promise.resolve() : Promise.reject(this.loadError);
   }
   show(): void {
     this.visible = true;

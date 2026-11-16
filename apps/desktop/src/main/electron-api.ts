@@ -160,7 +160,7 @@ export interface WebContents {
     listener: (event: ElectronEvent, input: InputEvent) => void,
   ): void;
   on(
-    event: 'did-fail-load',
+    event: 'did-fail-load' | 'did-fail-provisional-load',
     listener: (
       event: ElectronEvent,
       errorCode: number,

@@ -260,21 +260,78 @@ describe('TRAY-SHELL popover session', () => {
     expect(popoverWindow()?.visible).toBe(false);
   });
 
-  it('Cmd+Q in the popover quits AgentLink', async () => {
+  it('Cmd+Q (exactly) in the popover quits; every other Cmd / Ctrl combination is swallowed', async () => {
     const s = setup();
+    await started(s);
+    tray().emit('click');
+    const press = (input: Record<string, unknown>): boolean => {
+      const event = new FakeEvent();
+      popoverWindow()?.webContents.emit('before-input-event', event, { type: 'keyDown', ...input });
+      return event.defaultPrevented;
+    };
+    // Menu accelerators never act in the popover: reload, zoom, close, Ctrl variants.
+    expect(press({ key: 'r', meta: true })).toBe(true);
+    expect(press({ key: '=', meta: true })).toBe(true);
+    expect(press({ key: 'w', meta: true })).toBe(true);
+    expect(press({ key: 'r', control: true })).toBe(true);
+    // Cmd+Shift+Q and Cmd+Alt+Q are swallowed, not a quit.
+    expect(press({ key: 'Q', meta: true, shift: true })).toBe(true);
+    expect(press({ key: 'q', meta: true, alt: true })).toBe(true);
+    expect(s.electron.app.quitCalls).toBe(0);
+    // Plain keys pass (Escape is the popover's own and hides it).
+    expect(press({ key: 'q' })).toBe(false);
+    expect(press({ key: 'q', meta: true })).toBe(true);
+    expect(s.electron.app.quitCalls).toBe(1);
+  });
+
+  it('Windows: Ctrl combinations are swallowed and never quit', async () => {
+    const s = setup({}, 'win32');
     await started(s);
     tray().emit('click');
     const event = new FakeEvent();
     popoverWindow()?.webContents.emit('before-input-event', event, {
       type: 'keyDown',
       key: 'q',
-      meta: true,
+      control: true,
     });
     expect(event.defaultPrevented).toBe(true);
-    expect(s.electron.app.quitCalls).toBe(1);
-    const plain = new FakeEvent();
-    popoverWindow()?.webContents.emit('before-input-event', plain, { type: 'keyDown', key: 'q' });
-    expect(plain.defaultPrevented).toBe(false);
+    expect(s.electron.app.quitCalls).toBe(0);
+  });
+
+  it('a blocked redirect ending in did-fail-provisional-load → the fixed page', async () => {
+    const s = setup();
+    await started(s);
+    tray().emit('click');
+    const contents = popoverWindow()?.webContents;
+    expect(contents?.navigate('will-redirect', `${ORIGIN}/first-run`)).toBe(true);
+    contents?.emit('did-fail-provisional-load', new FakeEvent(), -3, 'ERR_ABORTED', WIDGET, true);
+    expect(popoverWindow()?.loaded.at(-1)).toBe(popoverFallbackUrl());
+  });
+
+  it('a blocked redirect ending only in a rejected load → the fixed page', async () => {
+    const s = setup();
+    await started(s);
+    tray().emit('click');
+    const win = popoverWindow() as FakeBrowserWindow;
+    expect(win.webContents.navigate('will-redirect', `${ORIGIN}/first-run`)).toBe(true);
+    // No fail event at all: the widget's (re)load is rejected (cancelled).
+    win.loadError = new Error('ERR_ABORTED (-3)');
+    s.children[0]?.stream.push(readyLine());
+    await flush();
+    await flush();
+    expect(win.loaded.at(-1)).toBe(popoverFallbackUrl());
+  });
+
+  it('a rejected load without a blocked redirect keeps the widget', async () => {
+    const s = setup();
+    await started(s);
+    tray().emit('click');
+    const win = popoverWindow() as FakeBrowserWindow;
+    win.loadError = new Error('ERR_ABORTED (-3)');
+    s.children[0]?.stream.push(readyLine());
+    await flush();
+    await flush();
+    expect(win.loaded.at(-1)).toBe(WIDGET);
   });
 });
 
@@ -397,6 +454,36 @@ describe('TRAY-SHELL icon switch', () => {
     s.children[0]?.stream.push(prefs(false));
     close();
     expect(s.electron.app.quitCalls).toBe(1);
+  });
+
+  it('Windows: turning the icon off while the window is hidden brings the window up', async () => {
+    const s = setup({}, 'win32');
+    await started(s);
+    mainWindow().hide();
+    s.children[0]?.stream.push(prefs(false));
+    expect(mainWindow().visible).toBe(true);
+  });
+
+  it('macOS: turning the icon off leaves a hidden window hidden (the Dock is the way back)', async () => {
+    const s = setup();
+    await started(s);
+    mainWindow().hide();
+    s.children[0]?.stream.push(prefs(false));
+    expect(mainWindow().visible).toBe(false);
+  });
+
+  it('quit clears the pending re-apply timer', async () => {
+    const s = setup();
+    await started(s);
+    s.children[0]?.stream.push(state('connected', 0, 0));
+    const before = new Set(s.timers.pending.keys());
+    s.children[0]?.stream.push(pulse('ai_sent'));
+    // The re-apply timer is the latest one the pulse added (the frame timers come first).
+    const added = [...s.timers.pending.entries()].filter(([id]) => !before.has(id));
+    const reapply = added.sort((a, b) => b[1].at - a[1].at)[0]?.[0];
+    expect(reapply).toBeDefined();
+    s.electron.app.emit('before-quit', new FakeEvent());
+    expect(s.timers.pending.has(reapply as number)).toBe(false);
   });
 
   it('macOS: with the icon hidden, closing the window still only hides it (the Dock stays)', async () => {

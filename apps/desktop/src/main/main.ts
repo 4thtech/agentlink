@@ -49,7 +49,7 @@ import { checkDataFolderAcl, dataFolderFor, type AclScratch, type AclVerdict } f
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { CoreSupervisor, aiAppMarkerSet, type SpawnFn, type Timers } from './core-process.js';
 import { INVITE_RESULT_TITLE, inviteResultCopy, toInviteLink } from './deep-link.js';
-import type { App, ElectronModule } from './electron-api.js';
+import type { App, ElectronEvent, ElectronModule, WebContents } from './electron-api.js';
 import {
   INSTANCE_FILE,
   forwardedBuild,
@@ -598,6 +598,8 @@ export async function runShell(
     if (quitting) return;
     quitting = true;
     event.preventDefault();
+    if (reapplyTimer !== null) proc.timers.clearTimeout(reapplyTimer);
+    reapplyTimer = null;
     const stop = supervisor?.stop() ?? Promise.resolve();
     void stop.then(() => {
       notifier?.dispose();
@@ -639,8 +641,16 @@ export async function runShell(
     // A plain function (called with `new`, it yields the object it returns), so the shell wires its
     // own listeners before the popover adds its own.
     const popoverWindow = function (options: PopoverWindowOptions): PopoverWindow {
-      const created: PopoverWindow = new electron.BrowserWindow(options);
-      wirePopoverContents(created.webContents);
+      const created = new electron.BrowserWindow(options);
+      const wired = wirePopoverContents(created.webContents);
+      // IR-TRAY-SHELL L2: a cancelled load may end in a rejected loadURL only (popover.ts swallows
+      // it); the shell sees the rejection too.
+      const load = created.loadURL;
+      created.loadURL = (url: string): Promise<void> => {
+        const loading = load.call(created, url);
+        loading.catch(() => wired.loadFailed());
+        return loading;
+      };
       return created;
     };
     popover = new Popover({
@@ -662,12 +672,20 @@ export async function runShell(
   }
   /**
    * TRAY-SHELL: the shell's own listeners on the popover's web contents (added before the popover's):
-   * - a redirect away from the widget is blocked (popover.ts pins it), which ends the load with
-   *   ERR_ABORTED: the session is not usable, so the fixed page until a new session link;
-   * - Cmd+Q quits on macOS (the widget's footer shows the hint, and the popover has focus).
+   * - a redirect away from the widget is blocked (popover.ts pins it), which cancels the load: the
+   *   session is not usable, so the fixed page until a new session link. The end of that load is
+   *   taken from whichever comes: did-fail-load, did-fail-provisional-load or the loadURL rejection;
+   * - every Cmd / Ctrl combination is swallowed, so the default menu's accelerators (reload, zoom,
+   *   close, …) never act in the popover; only Cmd+Q on macOS, exactly, quits (the widget's footer
+   *   shows that hint, and the popover has focus).
    */
-  function wirePopoverContents(contents: PopoverWindow['webContents']): void {
+  function wirePopoverContents(contents: WebContents): { loadFailed: () => void } {
     let redirectBlocked = false;
+    const loadFailed = (): void => {
+      const blocked = redirectBlocked;
+      redirectBlocked = false;
+      if (blocked && popover?.page === 'widget') popover.setSessionReady(false);
+    };
     const isWidget = (url: string): boolean => {
       const widget = popoverUrl(lock);
       const hash = url.indexOf('#');
@@ -679,27 +697,37 @@ export async function runShell(
     contents.on('did-navigate', () => {
       redirectBlocked = false;
     });
-    contents.on('did-fail-load', (_event, errorCode, _description, _url, isMainFrame) => {
-      if (!isMainFrame) return;
-      const blocked = redirectBlocked;
-      redirectBlocked = false;
-      // Any other failure: popover.ts shows the fixed page itself (and tries the widget again on the
-      // next show). ERR_ABORTED without a blocked redirect is a newer load replacing this one.
-      if (errorCode === -3 && blocked && popover?.page === 'widget') popover.setSessionReady(false);
-    });
+    // Any other failure: popover.ts shows the fixed page itself (and tries the widget again on the
+    // next show). A failure without a blocked redirect (ERR_ABORTED: a newer load replaced this one)
+    // changes nothing here.
+    const onFail = (
+      _event: ElectronEvent,
+      _code: number,
+      _description: string,
+      _url: string,
+      isMainFrame: boolean,
+    ): void => {
+      if (isMainFrame) loadFailed();
+    };
+    contents.on('did-fail-load', onFail);
+    contents.on('did-fail-provisional-load', onFail);
     contents.on('before-input-event', (event, input) => {
-      const keys = input as { type?: unknown; key?: unknown; meta?: unknown };
+      if (input.meta !== true && input.control !== true) return;
+      event.preventDefault();
       if (
         proc.platform === 'darwin' &&
-        keys.type === 'keyDown' &&
-        keys.meta === true &&
-        typeof keys.key === 'string' &&
-        keys.key.toLowerCase() === 'q'
+        input.type === 'keyDown' &&
+        input.meta === true &&
+        input.control !== true &&
+        input.alt !== true &&
+        input.shift !== true &&
+        typeof input.key === 'string' &&
+        input.key.toLowerCase() === 'q'
       ) {
-        event.preventDefault();
         app.quit();
       }
     });
+    return { loadFailed };
   }
 
   const windowSession = electron.session.fromPartition(WINDOW_PARTITION, { cache: false });
@@ -849,6 +877,9 @@ export async function runShell(
     reapplyTimer = null;
     tray?.destroy();
     tray = null;
+    // IR-TRAY-SHELL L3: without the icon (and without a Dock), a hidden window would leave
+    // AgentLink running with no way back: bring the window up (a close then quits).
+    if (proc.platform !== 'darwin' && window?.visible !== true && !quitting) showWindow();
   };
   const feed = createTrayFeed(
     {
