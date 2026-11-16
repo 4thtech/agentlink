@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-11-16
+
+### Added
+
+- Menu bar widget (0.5.9; TRAY-PIPE, TRAY-TOGGLE, TRAY-ENGINE, TRAY-WIDGET-API, TRAY-POPOVER, TRAY-SHELL, TRAY-WIDGET-UI, DOCS-059; D-155): the Mac and Windows apps show the AgentLink mark in the menu bar or near the clock, with a ring for unread messages, a dot for approvals waiting and short animations for news. A click opens a read-only widget (what needs you, connected AI apps, new messages with a short preview, today by the hour). Settings › Appearance has "Show AgentLink in the menu bar" ("near the clock" on Windows) and "Show message previews". New guide page: the menu bar widget.
+
+### Changed
+
+- The download links for the Mac (Apple silicon and Intel) and Windows apps are now in the first screen of the README, the guide's start pages, the quick guide, Start here and Install AgentLink; the Windows page opens with the Windows download. The docs, the knowledge files and the 0.5.8 stamps now describe one-click Update now (0.5.6) and choosing the Send and Inbox folders in Finder or Explorer (0.5.8) (DOCS-ENTRY-DOWNLOADS, S0).
+- Install docs always point to the latest release (DOCS-INSTALL-LATEST, S0): the Claude Desktop, upgrade and FAQ pages no longer pin an old version, and the quick guide, Start here and Start fast pages now carry the Windows app (download, SmartScreen "More info, then Run anyway", Start menu) next to the Mac app. The download-link check also rejects versioned release-page links and versioned Windows installer names.
+- Spec for the menu bar widget (TRAY-SPEC, S1, D-155; 08 §1, §8; b11 §17.4, §25.4; 11 §5.9): the tray icon becomes the brand mark with animations, a read-only popover widget with short message previews (on by default, with a switch) replaces the tray menu, and Settings gains "Show AgentLink in the menu bar" / "near the clock".
+
+### Fixed
+
+- The status bar no longer stays on "Checking…" after the computer sleeps and wakes or changes network (HEALTH-BAR-STUCK, most visible in the desktop app, whose window lives in the menu bar): it reads the app's health again at once and shows Connected, or Not running after 4 s with no answer.
+
 ## [0.5.8] - 2026-11-15
 
 ### Added
@@ -1341,7 +1357,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.8...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.9...HEAD
+[0.5.9]: https://github.com/4thtech/agentlink/compare/v0.5.8...v0.5.9
 [0.5.8]: https://github.com/4thtech/agentlink/compare/v0.5.7...v0.5.8
 [0.5.7]: https://github.com/4thtech/agentlink/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/4thtech/agentlink/compare/v0.5.5...v0.5.6
