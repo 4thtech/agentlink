@@ -144,7 +144,8 @@ describe('HistoryDesk: begin binds the server plan to a ticket', () => {
     expect(begun.undoSeconds).toBe(10);
     // The random nonce may contain 'h1' or 'e1' by chance, so check every other field: the exact
     // key set, and no id or hash anywhere in the rest of the answer.
-    const { nonce: _nonce, ...rest } = JSON.parse(JSON.stringify(begun)) as Record<string, unknown>;
+    const rest = JSON.parse(JSON.stringify(begun)) as Record<string, unknown>;
+    delete rest['nonce'];
     expect(Object.keys(rest).sort()).toEqual(
       ['files', 'kept', 'messages', 'notarized', 'status', 'truncated', 'undoSeconds'].sort(),
     );
