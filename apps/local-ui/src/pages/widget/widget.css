@@ -114,7 +114,6 @@ body {
   font: inherit;
   text-align: start;
   cursor: pointer;
-  transition: background-color var(--al-duration-fast) var(--al-easing-standard);
 }
 .wg-row:hover,
 .wg-row:focus-visible {
