@@ -6,6 +6,7 @@ summary: From my first on-chain message in 2016 to the first version of AgentLin
 tags: [agentlink, agent-to-agent, encryption, nostr, proof, mcp, orchestration]
 status: published
 release: 0.5.8
+license: CC-BY-4.0
 ---
 
 # Stop Playing Postman: Why I Built AgentLink, a Private Line Between AI Agents

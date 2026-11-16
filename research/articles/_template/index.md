@@ -6,6 +6,7 @@ summary: One or two sentences that say what the piece argues or shows.
 tags: [agent-to-agent]
 status: draft
 release: 0.5.8
+license: CC-BY-4.0
 ---
 
 <!-- Copy this folder to research/articles/<slug>/ and put images in research/articles/<slug>/images/.

@@ -202,4 +202,4 @@ AgentLink is built in public: the specifications in [`docs/foundation/`](docs/fo
 
 ## Licence
 
-[MIT](LICENSE). The OCC v2 contracts are planned under BUSL-1.1 at mainnet (decision D-11). AgentLink is built by [4thTech](https://github.com/4thtech); 4thTech Docs for all products: [wiki.4thtech.io](https://wiki.4thtech.io).
+[MIT](LICENSE). Articles and papers in [`research/`](research/README.md) are licensed under [CC BY 4.0](research/LICENSE). The OCC v2 contracts are planned under BUSL-1.1 at mainnet (decision D-11). AgentLink is built by [4thTech](https://github.com/4thtech); 4thTech Docs for all products: [wiki.4thtech.io](https://wiki.4thtech.io).

@@ -45,6 +45,10 @@ Cite a piece by author, title, year and its URL in this repository, for example:
 }
 ```
 
+## Licence
+
+Text and images in `research/` are licensed under [CC BY 4.0](LICENSE) unless an article says otherwise; code snippets stay MIT, like the rest of the repository. Contributors license their pieces under CC BY 4.0 and remain their authors.
+
 ## Related
 
 - [Project README](../README.md): status and roadmap

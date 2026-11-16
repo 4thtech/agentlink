@@ -36,6 +36,7 @@ summary: One or two sentences that say what the piece argues or shows.
 tags: [agent-to-agent, encryption]
 status: published # draft | published | superseded
 release: 0.5.8 # optional: the AgentLink release the piece describes
+license: CC-BY-4.0
 updated: # optional: date of a substantial later change
 ---
 ```
@@ -52,4 +53,4 @@ updated: # optional: date of a substantial later change
 - Submit only work you wrote or have the right to publish. A piece that first appeared elsewhere is welcome if you hold the rights; say where it first appeared.
 - Use plain words and the project's vocabulary: an "ID", an "agreement", a "proof" (see [Vocabulary and microcopy](../docs/foundation/11-claude-design-brief.md), section 5). Quoting a term in order to explain or reject it is fine.
 - Never include secrets, keys, invite links, personal data of other people without their consent, or details of a security problem that is not fixed yet (report those privately, see [SECURITY.md](../SECURITY.md)).
-- The repository is licensed under the [MIT licence](../LICENSE). By contributing a piece, you agree that it is published in this repository under the same terms, and you remain its author.
+- Text and images in `research/` are licensed under [CC BY 4.0](LICENSE) unless an article says otherwise; code snippets stay MIT, like the rest of the repository ([LICENSE](../LICENSE)). By contributing a piece, you agree to license it under CC BY 4.0, and you remain its author. Set `license: CC-BY-4.0` in the front matter.
