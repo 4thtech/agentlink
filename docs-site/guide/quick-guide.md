@@ -1,8 +1,12 @@
 # Quick start: from install to first chat
 
-*Applies to AgentLink 0.5.5, a pre-alpha release. Mac, Windows and Linux. No account, no payment.*
+*Applies to AgentLink 0.5.9, a pre-alpha release. Mac, Windows and Linux. No account, no payment.*
 
 Seven steps, about ten minutes, from nothing to your AI talking to someone else's AI. Every button name below is the one you see on screen. The pictures follow two people: **Tali**, who invites, and **Natasa**, who accepts.
+
+**Download the app:** [Mac (Apple silicon)](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-arm64.dmg) · [Mac (Intel)](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-x64.dmg) · [Windows](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe)
+
+Not sure which Mac you have? Open the Apple menu, then **About This Mac**: "Chip: Apple M…" means Apple silicon, "Processor: Intel" means Intel. Windows 10 and 11 are supported.
 
 ```mermaid
 flowchart LR
@@ -35,7 +39,7 @@ Not sure which? Click the Apple menu (top left of your screen), then **About Thi
 
 **Why step 3?** AgentLink isn't signed with an Apple Developer ID yet; this is normal for early apps. It does not mean something is wrong with the file. Never turn off your Mac's security settings for it.
 
-Next time, open **AgentLink** from Applications. If macOS says the app is "damaged", and for updates: [Mac app](apps/desktop-app.md).
+Next time, open **AgentLink** from Applications. The app also puts a small icon in your menu bar that shows when something needs you: [the menu bar widget](apps/menu-bar-widget.md). If macOS says the app is "damaged", and for updates: [Mac app](apps/desktop-app.md). Later updates are one click: Settings › **Updates** › **Update now** (from 0.5.6, Mac and Windows apps).
 
 ### On Windows: get the app (early build)
 
@@ -47,7 +51,7 @@ No terminal needed. Download the setup file for Windows 10 or 11:
 2. **Follow the setup.** It installs for you only (no administrator rights). Its last page offers **Create a desktop shortcut** (ticked by default).
 3. **Open AgentLink** from the Start menu (or the shortcut). It opens on **Get started**. Go on with step 2.
 
-If Smart App Control blocks the app (some Windows 11 computers), use the one command below instead. Steps and updates: [Windows app](apps/desktop-app.md#windows).
+If Smart App Control blocks the app (some Windows 11 computers), use the one command below instead. Steps and updates: [Windows app](apps/desktop-app.md#windows). Updates are one click there too (**Update now**, from 0.5.6).
 
 ### Windows, Linux, or the terminal: one command
 
@@ -132,6 +136,8 @@ Open your AI app (restarted once since step 2) and ask in plain words:
 | "Check my AgentLink inbox" | Reads what arrived and tells you who wrote |
 | "Who are my AgentLink contacts?" | Lists the people you are connected with |
 | "Send report.pdf from my AgentLink Send folder to Natasa" | Sends the file (only from `~/AgentLink/Send` or folders you allow) |
+
+Want to allow another folder, or change where received files are saved? In the app, Settings › **Files**: **Add folder…** and **Change…** open Finder or Explorer (0.5.8), so you don't type a path.
 
 Messages from other people's AIs are information, not orders: your AI won't act on them unless you ask. Anything that needs your OK shows in the app, where you confirm it with Touch ID. Details: [Talk to a contact through your AI](get-started/first-message.md).
 

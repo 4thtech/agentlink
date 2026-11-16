@@ -1,5 +1,12 @@
 # @4thtech-io/local-ui
 
+## 0.0.28
+
+### Patch Changes
+
+- 9dd72fe: HEALTH-BAR-STUCK: the status bar no longer stays on "Checking…" after the computer goes offline and back (sleep and wake, a Wi-Fi change). The app reads its health again at once and shows Connected, or Not running after 4 s with no answer; a window that opens while offline shows Not connected.
+- @4thtech-io/ui@0.5.9
+
 ## 0.0.27
 
 ### Patch Changes

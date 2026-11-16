@@ -28,6 +28,7 @@ import { FirstRunPage } from './pages/first-run/index.js';
 import { lazyPart } from './lazy/index.js';
 import { PAGE_PARTS, loadRoutePage } from './lazy/pages.js';
 import { COMPACT_PATH } from './pages/compact/open.js';
+import { WIDGET_PAGE_PATH } from './pages/widget/bridge.js';
 import { announceAgentsChanged, useSwitchedNote } from './pages/agents/use-agents.js';
 import { HOME_PATH, LIVE_ACTIVITY_PATH, REDIRECTS, START_STEPS, agentNameOf } from './nav.js';
 import { NotFoundPage } from './states/index.js';
@@ -90,6 +91,12 @@ export const ROUTES: readonly RouteDef[] = [
  * not one of the shell's routes or nav items. Fetched on first visit, like the Settings pages.
  */
 const CompactPart = lazyPart(async () => (await import('./pages/compact/index.js')).CompactPage);
+
+/**
+ * TRAY-WIDGET-UI (D-155): the menu bar widget, a page of its own like the compact view: no sidebar, no
+ * status bar, so not one of the shell's routes or nav items. Fetched on first visit.
+ */
+const WidgetPart = lazyPart(async () => (await import('./pages/widget/index.js')).WidgetPage);
 
 /** The longest a route change waits for a page that is still loading. */
 const LAZY_WAIT_MS = 200;
@@ -214,6 +221,7 @@ export function AppRoutes(): ReactElement {
     if (path in REDIRECTS) navigate(REDIRECTS[path] as string, true);
   }, [path]);
   if (path === COMPACT_PATH) return <CompactPart.Part key={`${path}#${epoch}`} />;
+  if (path === WIDGET_PAGE_PATH) return <WidgetPart.Part key={`${path}#${epoch}`} />;
   const shown = REDIRECTS[path] ?? path;
   // One request belongs to Home (approvals fold into it): Home is current there.
   const oneRequest = approvalIdOf(shown) !== undefined;

@@ -1,5 +1,12 @@
 # @4thtech-io/submitter
 
+## 0.1.27
+
+### Patch Changes
+
+- @4thtech-io/chain@0.5.9
+  - @4thtech-io/crypto@0.5.9
+
 ## 0.1.26
 
 ### Patch Changes

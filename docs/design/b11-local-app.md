@@ -342,6 +342,7 @@ The Files page (§8 screens 12 and 13) gets three tabs (owner decision 4): **Rec
 
 - **Decrypted only on this computer.** The page shows what the local agent already holds; nothing new goes to 4thTech or any other service, and the page stays on `localhost` behind its session link.
 - Message text and other people's file names never appear in the page title, browser or OS notifications, the OS passkey prompt, toasts, Activity rows or Home tiles; those say "New message from Marko" only (11 §5, I-5).
+- **One exception, the menu bar widget (D-155, decided by the owner, 2026-11-16).** Its New messages section may show a **preview** of the newest received message per contact: **plain text, at most 80 characters, one line, never rendered as markup** (no Markdown, HTML, links or images; a text node only), built by the server with control, format and bidi characters removed and cut with "…". Previews are on by default; the Settings switch "Show message previews" turns them off, and then the server sends none. Never a file name, and never in the icon, its tooltip, notifications, the page title or logs.
 - No message text in logs or error messages: an error says what failed, never what the message said.
 - Under the hood never shows keys, codes, tokens or drop links (§7).
 
@@ -745,15 +746,20 @@ Live updates: the existing Home reads plus the pulse read, while the window is v
 
 This wave shows **this computer's agent only**. When a second agent arrives (the 0.5.0 cloud agent, D-131, or another computer; M2 owner-console and desktop work), the agent row becomes a list of up to three agent rows (name, live word, Needs-you count), then "+2 more agents". Needs you then counts across agents and lists the soonest first; Contacts and Credits follow the selected agent row. Nothing else moves, so the window keeps its height.
 
-### 25.4 The menu-bar and tray popover (M2, UX2-i)
+### 25.4 The menu-bar and tray popover (M2, UX2-i; amended by D-155, 0.5.9)
 
-- **Content and order:** exactly §25.1 blocks 1 to 5; width 360 px; height fits the content, at most 560 px. The **Open compact window** button does not exist there.
-- **macOS:** a popover under the menu-bar template icon. **Windows:** a flyout above the notification-area icon. **Linux:** a popover where the desktop supports it; otherwise today's `TrayMenu` (status, Approvals waiting (n), Open dashboard, Pause / Resume, Quit).
-- **Never approves.** Review opens the native approval window; the popover has no Approve, Deny or presence prompt.
-- **Keyboard:** opens with focus on the first actionable item; Esc and a click outside close it. Shows only counts, names under the name rule and pulses; no message text; no notifications of its own.
-- **Icon:** the existing tray variants (`connected`, `approvals`, `paused`, `offline`, `update`), different by shape, never colour. No wallet words (D-39), no network picker (D-40).
+> **Decided by the owner (Tali, 2026-11-16, D-155).** The popover is the **menu bar widget**: it replaces today's tray menu, and its content is its own, no longer exactly §25.1. Read-only; previews on by default with a switch. Mechanics in 08 §8.
 
-New strings: "Open compact window", "Most active", "+{n} more", "+{n} more agents", "Open AgentLink". The rest exist today.
+- **Content and order:** (1) **status**: the agent row of §25.1 with the live word and states of §25.2; (2) **Needs you**: approvals waiting and new files, each opening the main app there; (3) **Connected now**: per ID, its AI apps Working, Ready or Idle (from the live MCP sessions, 08 §1), or Not running with last seen; (4) **Contacts**: those with an exchange today, "Active now" or "Today" from the last exchange only, **never "online"** (the protocol has no presence); (5) **New messages** by contact: name (name rule), count, time ago and the preview (§17.4 exception); a click opens that chat in the main app; (6) **Today**: an hourly timeline since midnight of messages in and out, proofs and files; (7) **Live**: the newest activity entries, refreshed by the `activity` event; (8) **footer**: Open AgentLink, Pause or Resume, Update ready (only when one is), Quit. Width 360 px; height fits the content, at most 560 px. The **Open compact window** button does not exist there. Reads run only while it is open.
+- **macOS:** a popover under the menu-bar icon. **Windows:** a flyout at the notification-area icon, on the taskbar's edge. **Linux:** a popover where the desktop supports it; otherwise a native menu. **Right click** (macOS, Windows): a native menu with **Open AgentLink** and **Quit**.
+- **Never approves.** Review approvals, Pause, Resume and Update open the main window; the widget has no Approve, Deny or presence prompt (it closes on blur, which an OS sheet would cause) and cannot send a change, so Pause is not done in place.
+- **Keyboard:** opens with focus on the first actionable item; Esc and a click outside close it. No notifications of its own.
+- **Unread:** opening the widget clears the icon's unread ring; the per-contact counts stay until that chat is opened.
+- **Previews:** §17.4 as amended: plain text, at most 80 characters, one line, never markup; Settings › **Show message previews** (on by default) turns them off, and the server then sends none.
+- **Icon:** the brand mark (two brackets and a diamond), different by shape, never colour: static `connected`, `approvals` (a **filled dot**), `paused`, `offline`, `update`, and the unread mark, a **hollow ring**. Animations follow events: message in (the diamond slides in, then the ring), AI sent (it slides out and back), approval (it grows once, then the dot) and connecting (it breathes, looping only while connecting); paused, offline and update fade in. **Reduced motion** shows the end frame only. Tooltip: numbers only. No wallet words (D-39), no network picker (D-40).
+- **Settings switch:** "Show AgentLink in the menu bar" (Mac) / "Show AgentLink near the clock" (Windows), desktop app only, on by default. On Windows, while the icon is hidden, closing the window quits AgentLink.
+
+New strings: "Open compact window", "Most active", "+{n} more", "+{n} more agents", "Open AgentLink", and the widget strings of 11 §5.9. The rest exist today.
 
 ## 26. Approvals grid and the Grid/List control
 

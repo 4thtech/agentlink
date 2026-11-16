@@ -343,6 +343,115 @@ describe('the status bar (M1-11s-a-c)', () => {
   });
 });
 
+describe('HEALTH-BAR-STUCK: Checking… never sticks after the computer goes offline and back', () => {
+  // The desktop app lives in the menu bar for days: its window is hidden (closed to the tray) while
+  // the Mac sleeps, and the OS fires offline and online on sleep, wake and Wi-Fi changes. The
+  // loopback health read keeps answering "running" the whole time, so the answer never changes.
+  let host: HTMLElement;
+  let root: Root;
+  let visibility: DocumentVisibilityState = 'visible';
+  beforeEach(() => {
+    visibility = 'visible';
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => visibility,
+    });
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+  });
+  afterEach(() => {
+    act(() => root.unmount());
+    host.remove();
+    act(() => setConnectionState('unknown'));
+    delete (document as { visibilityState?: unknown }).visibilityState;
+    vi.useRealTimers();
+  });
+  const render = async (): Promise<void> => {
+    await act(async () => {
+      root.render(
+        h(
+          Layout,
+          {
+            path: '/settings/rules',
+            nextStep: () => Promise.resolve(false),
+            unseenMessages: () => Promise.resolve(0),
+            readHealth: () => Promise.resolve(body('running', '0.5.8')),
+          },
+          'page',
+        ),
+      );
+    });
+  };
+  const state = (): string =>
+    host.querySelector('footer.al-statusbar [aria-live]')?.textContent ?? '';
+  const fire = (type: string, target: EventTarget = window): void =>
+    act(() => {
+      target.dispatchEvent(new Event(type));
+    });
+
+  it('the window open: offline then online goes back to Connected within 4 s', async () => {
+    vi.useFakeTimers();
+    await render();
+    expect(state()).toBe('Connected');
+    fire('offline');
+    expect(state()).toBe('Not connected');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HEALTH_POLL_MS * 2);
+    });
+    fire('online');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(FIRST_ANSWER_MS);
+    });
+    expect(state()).not.toBe('Checking…');
+    expect(state()).toBe('Connected');
+    expect(host.querySelector('footer.al-statusbar .al-dot.is-connected')).not.toBeNull();
+    // And it stays settled.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HEALTH_POLL_MS * 4);
+    });
+    expect(state()).toBe('Connected');
+  });
+
+  it('the window in the menu bar (hidden) over sleep and wake: Connected once it is shown', async () => {
+    vi.useFakeTimers();
+    await render();
+    expect(state()).toBe('Connected');
+    visibility = 'hidden';
+    fire('visibilitychange', document);
+    fire('offline');
+    fire('online');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(HEALTH_POLL_MS * 6);
+    });
+    // Never stuck on Checking… while hidden either.
+    expect(state()).not.toBe('Checking…');
+    visibility = 'visible';
+    fire('visibilitychange', document);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(FIRST_ANSWER_MS);
+    });
+    expect(state()).toBe('Connected');
+  });
+
+  it('a window that opens while the browser says offline shows Not connected, never Checking…', async () => {
+    vi.useFakeTimers();
+    const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await render();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(FIRST_ANSWER_MS * 3);
+    });
+    expect(state()).toBe('Not connected');
+    online.mockReturnValue(true);
+    fire('online');
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(FIRST_ANSWER_MS);
+    });
+    expect(state()).toBe('Connected');
+    online.mockRestore();
+  });
+});
+
 describe('REL051-CF2: unreachable network', () => {
   it('parses running with network checking as checking, never connected', () => {
     const r = ok({ agent: 'running', relays: null, network: 'checking', version: '0.5.1' });

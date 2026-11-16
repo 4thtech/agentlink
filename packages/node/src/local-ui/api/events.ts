@@ -13,6 +13,10 @@
 //   one allowlist (live-status.ts liveAgentRecord) again here.
 // - W5-INVITE-FEEDBACK: `contacts` `{at}` when the open agent's contacts or invites changed (core
 //   `pairing.changeMark`, an opaque digest compared here and never sent), not for a switch.
+// - TRAY-WIDGET-API (D-155): `activity` `{at}` when the open ID's notification items, activity head
+//   or newest exchange changed (widget.ts widgetActivityMark, an opaque mark compared here and never
+//   sent), not for a switch. Content-free: the page reads `GET /api/ui/widget` and
+//   `GET /api/ui/activity` again. Limits unchanged.
 // - Changes only: while a stream is open the hub reads every 2 s (and at once on `poke`, after a
 //   switch), compares the allowlisted state with the last one sent, and emits only on a change.
 // - IDs and replay: `id: <boot>.<seq>`; `boot` is 8 random base64url characters chosen when the host
@@ -53,6 +57,11 @@ export interface LiveSnapshot {
    * undefined when it cannot be read now. Compared here only; never written to a stream.
    */
   readonly contactsMark?: string | undefined;
+  /**
+   * TRAY-WIDGET-API: the open ID's opaque activity mark (widget.ts widgetActivityMark), or undefined
+   * when it cannot be read now. Compared here only; never written to a stream.
+   */
+  readonly activityMark?: string | undefined;
 }
 
 /** One open stream's writer (the server adapts its response). */
@@ -128,6 +137,8 @@ export class LiveEvents {
   #lastText = new Map<string, string>();
   /** W5-INVITE-FEEDBACK: the last contacts mark read (never sent). */
   #mark: string | undefined;
+  /** TRAY-WIDGET-API: the last activity mark read (never sent). */
+  #activityMark: string | undefined;
   #timer: unknown;
   #reading: Promise<void> | undefined;
   #closed = false;
@@ -279,6 +290,9 @@ export class LiveEvents {
     const mark = raw.contactsMark;
     const prevMark = this.#mark;
     if (typeof mark === 'string') this.#mark = mark;
+    const activityMark = raw.activityMark;
+    const prevActivityMark = this.#activityMark;
+    if (typeof activityMark === 'string') this.#activityMark = activityMark;
     if (prev === undefined) return;
     const at = this.#seconds();
     const switched = prev.generation !== next.generation || prev.current !== next.current;
@@ -293,6 +307,15 @@ export class LiveEvents {
     if (!switched && typeof mark === 'string' && prevMark !== undefined && mark !== prevMark) {
       // Only `at`: the page reads the contacts and invites again through the usual reads.
       this.#emit('contacts', { at });
+    }
+    if (
+      !switched &&
+      typeof activityMark === 'string' &&
+      prevActivityMark !== undefined &&
+      activityMark !== prevActivityMark
+    ) {
+      // TRAY-WIDGET-API: only `at`; the widget reads its data again through the usual reads.
+      this.#emit('activity', { at });
     }
   }
 

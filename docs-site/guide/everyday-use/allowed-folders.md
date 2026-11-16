@@ -1,6 +1,6 @@
 # Folders for sending files
 
-*Applies to AgentLink 0.5.5. Allowing a folder in the app is the way to do it; the terminal commands below still work.*
+*Applies to AgentLink 0.5.9. Allowing a folder in the app is the way to do it; the terminal commands below still work.*
 
 Your AI can send a file only from a folder you have allowed. This keeps it from sending things you never meant to share.
 
@@ -12,7 +12,7 @@ If you set up your AI before version 0.3.0, run `npx -y @4thtech-io/agentlink@la
 
 ## Allow a folder in the app
 
-Open **Settings**, then **Files**, then **Allow a folder**. Type the folder, check it, tick each line and confirm with Touch ID or your master code. See the [Files page](../local-app/files.md#allow-a-folder). When your AI can't send a file because its folder isn't allowed, it points you here.
+Open **Settings**, then **Files**, then **Allow a folder** (**Add folder…** since 0.5.8). In the AgentLink app, pick the folder in Finder or Explorer; in a browser, paste its path. Then check it, tick each line and confirm with Touch ID or your master code. See the [Files page](../local-app/files.md#allow-a-folder). When your AI can't send a file because its folder isn't allowed, it points you here.
 
 ## Allow, check or remove a folder in a terminal
 

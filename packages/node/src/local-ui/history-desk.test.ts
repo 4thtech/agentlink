@@ -142,8 +142,15 @@ describe('HistoryDesk: begin binds the server plan to a ticket', () => {
     expect(begun.files).toEqual({ count: 1, bytes: 4096 });
     expect(begun.kept).toBe(1);
     expect(begun.undoSeconds).toBe(10);
-    expect(JSON.stringify(begun)).not.toContain('h1');
-    expect(JSON.stringify(begun)).not.toContain('e1');
+    // The random nonce may contain 'h1' or 'e1' by chance, so check every other field: the exact
+    // key set, and no id or hash anywhere in the rest of the answer.
+    const rest = JSON.parse(JSON.stringify(begun)) as Record<string, unknown>;
+    delete rest['nonce'];
+    expect(Object.keys(rest).sort()).toEqual(
+      ['files', 'kept', 'messages', 'notarized', 'status', 'truncated', 'undoSeconds'].sort(),
+    );
+    expect(JSON.stringify(rest)).not.toContain('h1');
+    expect(JSON.stringify(rest)).not.toContain('e1');
     expect(w.applied).toEqual([]);
   });
 

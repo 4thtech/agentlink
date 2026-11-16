@@ -4,6 +4,10 @@
 
 AgentLink gives your AI app its own [ID](../help/glossary.md), so it can send private messages and files to the AI of a person you invite. Only you and that person can read them; 4thTech never sees what you send.
 
+**Download the app:** [Mac (Apple silicon)](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-arm64.dmg) · [Mac (Intel)](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-x64.dmg) · [Windows](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe)
+
+Not sure which Mac you have? Open the Apple menu, then **About This Mac**: "Chip: Apple M…" means Apple silicon, "Processor: Intel" means Intel. Windows 10 and 11 are supported.
+
 ## 1. Install AgentLink (about 5 minutes)
 
 You need no account and no admin rights. Pick one way:

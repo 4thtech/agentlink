@@ -24,6 +24,9 @@ const updatesOffFile = fileURLToPath(
 // FILES-FOLDER-PICKER (D-154): the window's one preload goes next to entry.js unchanged as preload.cjs (a sandboxed
 // preload is a plain CommonJS script; folder-picker.ts preloadPath finds it there).
 const preloadFile = fileURLToPath(new URL('./src/main/preload.js', import.meta.url));
+// TRAY-POPOVER (D-155): the popover's own preload, next to it as widget-preload.cjs (widget-ipc.ts
+// widgetPreloadPath finds it there). Each window loads only its own one.
+const widgetPreloadFile = fileURLToPath(new URL('./src/main/widget-preload.js', import.meta.url));
 const preloadAsset = {
   name: 'agentlink-preload',
   generateBundle() {
@@ -31,6 +34,11 @@ const preloadAsset = {
       type: 'asset',
       fileName: 'preload.cjs',
       source: readFileSync(preloadFile, 'utf8'),
+    });
+    this.emitFile({
+      type: 'asset',
+      fileName: 'widget-preload.cjs',
+      source: readFileSync(widgetPreloadFile, 'utf8'),
     });
   },
 };

@@ -50,7 +50,7 @@ import { useStartHere } from '../pages/home/use-start-here.js';
 import { SwitchToPasskeyBanner } from '../states/index.js';
 import type { ApiResult } from '../api/client.js';
 import { TidyNote } from '../pages/agents/tidy-note.js';
-import { subscribeHealth } from './health-feed.js';
+import { refreshHealth, subscribeHealth } from './health-feed.js';
 import { readHealth as defaultReadHealth } from './health.js';
 import { VT_CLASS } from '@4thtech-io/ui';
 import { morph, toggleHood } from './hood.js';
@@ -86,15 +86,28 @@ function useHealthPoll(
   const [version, setVersion] = useState<string | undefined>(undefined);
   useEffect(() => {
     // A fresh poller starts from "Checking…": an earlier answer is not evidence for this one.
-    if (getConnectionState() !== 'offline') setConnectionState('unknown');
+    // HEALTH-BAR-STUCK: a page that opens while the browser is already offline gets no offline
+    // event, so it says Not connected now (the online event then starts Checking…).
+    if (browserOffline()) setConnectionState('offline');
+    else if (getConnectionState() !== 'offline') setConnectionState('unknown');
+    // HEALTH-BAR-STUCK: the online event puts the bar back on Checking… (connection.ts); the poller
+    // only reports changes, and the loopback read usually said "running" all along (the desktop
+    // window sits in the menu bar over sleep and wake). So read again now and report the answer,
+    // with a fresh 4 s limit on Checking….
+    const onOnline = (): void => refreshHealth();
+    window.addEventListener('online', onOnline);
     // The poller is shared with Home (health-feed.ts): one read per tick for the whole app.
-    return subscribeHealth(read, {
+    const unsubscribe = subscribeHealth(read, {
       onState: (state, reported) => {
         // The browser's own offline signal wins while it lasts.
         if (!browserOffline()) setConnectionState(state);
         setVersion(reported);
       },
     });
+    return () => {
+      window.removeEventListener('online', onOnline);
+      unsubscribe();
+    };
   }, [read]);
   return version;
 }

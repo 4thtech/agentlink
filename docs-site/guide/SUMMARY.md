@@ -68,6 +68,7 @@
 ## Coming later
 
 * [Desktop app (Mac and Windows)](apps/desktop-app.md)
+  * [The menu bar widget](apps/menu-bar-widget.md)
 * [Always-on cloud agent](apps/cloud-agent.md)
 
 ## Privacy
