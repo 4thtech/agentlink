@@ -186,7 +186,7 @@ describe('hardenSession', () => {
   ): Promise<{ session: FakeSession; lock: OriginLock }> => {
     const session = new FakeSession();
     const lock = lockedTo();
-    await hardenSession(session, lock, platform);
+    await hardenSession(session, lock, platform, undefined, () => false);
     return { session, lock };
   };
 
@@ -315,9 +315,15 @@ describe('native presence requests take focus off the page (DESK-TOUCHID-FIX)', 
     const session = new FakeSession();
     const lock = lockedTo();
     let blurs = 0;
-    await hardenSession(session, lock, 'darwin', () => {
-      blurs += 1;
-    });
+    await hardenSession(
+      session,
+      lock,
+      'darwin',
+      () => {
+        blurs += 1;
+      },
+      () => false,
+    );
     const headers = { 'X-AgentLink-Presence': 'native', 'X-AgentLink-CSRF': 't' };
     expect(session.sendHeaders('POST', `${ORIGIN}/api/approvals/a1/approve`, headers)).toEqual(
       headers,
