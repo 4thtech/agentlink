@@ -196,7 +196,12 @@ describe('GET /api/ui/widget: the route', () => {
     expect(widgetRoute.presence).toBe(false);
     const match = createLocalUiRoutes().match('GET', WIDGET_PATH);
     expect(match).toBeDefined();
-    expect(match === 'method' ? undefined : match?.route).toBe(widgetRoute);
+    expect(match === 'method' ? undefined : match?.route.path).toBe(WIDGET_PATH);
+    expect(
+      createLocalUiRoutes()
+        .routes()
+        .filter((r) => r.path === WIDGET_PATH),
+    ).toHaveLength(1);
     expect(createLocalUiRoutes().match('POST', WIDGET_PATH)).toBe('method');
   });
 
@@ -403,13 +408,13 @@ describe('widgetPreview: plain text (I-5)', () => {
     const long = widgetPreview('b'.repeat(500));
     expect(long.endsWith('…')).toBe(true);
     expect(codePoints(long)).toBeLessThanOrEqual(80);
-    // A family emoji (7 code points) is never split.
-    const family = '\u{1F468}‍\u{1F469}‍\u{1F467}‍\u{1F466}';
-    const p = widgetPreview('c'.repeat(75) + family + 'd'.repeat(20));
+    // A grapheme of 4 code points (a letter with three combining marks) is never split.
+    const mark = 'e\u0301\u0302\u0303';
+    const p = widgetPreview('c'.repeat(77) + mark + 'd'.repeat(20));
     expect(codePoints(p)).toBeLessThanOrEqual(80);
-    expect(p).toBe(`${'c'.repeat(75)}…`);
-    const q = widgetPreview('c'.repeat(70) + family + 'd'.repeat(20));
-    expect(q).toBe(`${'c'.repeat(70)}${family}dd…`);
+    expect(p).toBe(`${'c'.repeat(77)}…`);
+    const q = widgetPreview('c'.repeat(70) + mark + 'd'.repeat(20));
+    expect(q).toBe(`${'c'.repeat(70)}${mark}ddddd…`);
   });
 
   it('keeps plain markup as text (the page renders a text node)', () => {

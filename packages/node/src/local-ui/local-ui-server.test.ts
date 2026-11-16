@@ -624,6 +624,34 @@ describe('the /api/ui/ routes: session, CSRF and the central presence gate (I-4)
     }
   });
 
+  it('gates the widget read like every route: token, CSRF, same-origin; GET only (TRAY-WIDGET-API)', async () => {
+    const h = await harness();
+    const path = '/api/ui/widget';
+    expect((await send(h.port, path)).status).toBe(401);
+    const cookie = await h.cookie();
+    const csrf = await h.csrf(cookie);
+    expect((await send(h.port, path, { headers: { Cookie: cookie } })).status).toBe(403);
+    for (const site of ['cross-site', 'same-site', 'none']) {
+      const res = await send(h.port, path, {
+        headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf, 'Sec-Fetch-Site': site },
+      });
+      expect(res.status).toBe(403);
+    }
+    const res = await send(h.port, path, {
+      headers: { Cookie: cookie, 'X-AgentLink-CSRF': csrf, 'Sec-Fetch-Site': 'same-origin' },
+    });
+    // The handler ran: this harness has no agent client.
+    expect(res.status).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({ error: 'not_set_up' });
+    for (const method of ['POST', 'PUT', 'DELETE']) {
+      const other = await send(h.port, path, {
+        method,
+        headers: { Cookie: cookie, Origin: h.origin, 'X-AgentLink-CSRF': csrf },
+      });
+      expect(other.status).toBe(405);
+    }
+  });
+
   /** A presence route whose handler records each call and signs one contact.check. */
   function ownerRoutes(calls: { input: unknown; signed?: OwnerSignature[]; second?: unknown }[]) {
     const routes = createLocalUiRoutes();
