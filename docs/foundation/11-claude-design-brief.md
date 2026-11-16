@@ -405,7 +405,7 @@ Local app pages that show what the AI sent and received (08 §1). They are read-
 | AI asked to clean up, 0.5.1 (D-148, OD-3) | The AI says: "You can free up space in AgentLink: open Settings › Storage." |
 
 **Rules.**
-- Inbound message text and other people's file names appear only inside the untrusted-content container, as plain text: never in the page title, toasts, notifications, Activity rows, Home tiles or the OS passkey prompt. Those say "New message from {contactName}" only, with the name per §5.2.
+- Inbound message text and other people's file names appear only inside the untrusted-content container, as plain text: never in the page title, toasts, notifications, Activity rows, Home tiles or the OS passkey prompt. Those say "New message from {contactName}" only, with the name per §5.2. The one exception is the menu bar widget's preview (§5.9, D-155).
 - Reading here doesn't mark a message read for the AI. Don't write "Mark as read" or "Read by you"; the badge counts what is new since the person last looked.
 - No "Reply", "Send", "Compose" or "Forward" control. The only path is "To reply, ask your AI."
 - Errors say what failed, never what a message said.
@@ -441,6 +441,32 @@ Local app pages that hold several IDs and connect AI apps (08 §1; design b11 §
 - An ID's label is its name, the owner's own text: 1 to 32 characters in the restricted form of the §5.2 name rule (letters, digits, spaces, `.`, `'` and `-`); anything else is refused with "Use letters, digits, spaces, dots, apostrophes and hyphens, up to 32 characters." It is shown as plain text, never as a heading style or a label of ours (§5.2).
 - The live connections view shows names, activity and direction only, never message text or file names.
 - An AI app change shows only the `agentlink` entry, never the rest of the file.
+
+### 5.9 Menu bar widget (D-155)
+
+The desktop app's menu bar / notification-area icon and its popover widget (08 §8; design b11 §25.4). Read-only: the widget never approves, signs or asks for Touch ID. The switch names and the sections were decided by the owner (2026-11-16); the other strings are proposed, owner confirms at merge.
+
+| Where | String |
+|---|---|
+| Settings switch (Mac) | "Show AgentLink in the menu bar" (helper: "See new messages and anything waiting at a glance.") |
+| Settings switch (Windows) | "Show AgentLink near the clock" (same helper; while off: "With the icon hidden, closing the window quits AgentLink.") |
+| Settings switch, previews | "Show message previews" (helper: "Shows the start of new messages in the menu bar widget.") |
+| Right-click menu | "Open AgentLink" · "Quit" |
+| Before the app is ready | "Starting AgentLink…" · **Open AgentLink** |
+| Status | The live words of 08 §1 and b11 §25.2 ("Running", "Paused", "Not running", "Connecting…") |
+| Needs you | "Needs you" · "{n} waiting for you" · "{n} new files" · **Review**; nothing: "Nothing is waiting." |
+| Connected now | "Connected now" · per ID its name and its AI apps "Working", "Ready", "Idle", "Not running · last seen {time}" (08 §1); none: "No AI app is connected right now." |
+| Contacts | "Contacts" · "Active now" · "Today"; none: "No exchanges today." |
+| New messages | "New messages" · "{name} · {n} new · {time}" with the preview under it; none: "No new messages." |
+| Today | "Today" · legend "In" · "Out" · "Proofs" · "Files" |
+| Live | "Live" · rows in the Activity words of §5 (no message text) |
+| Footer | **Open AgentLink** · **Pause** / **Resume** · **Update ready** · **Quit** |
+
+**Rules.**
+- A preview is the newest received message as plain text, at most 80 characters on one line, ending in "…" when cut; never Markdown, HTML, a link or an image, never a file name. With "Show message previews" off, the row says "{name} · {n} new · {time}" only.
+- Contacts never say "online", "offline", "available" or "away": AgentLink knows only the last exchange.
+- The icon's tooltip stays as today, numbers only ("AgentLink: {state} · {n} waiting"); it never names a contact or quotes a message.
+- Never "Approve" or "Deny" in the widget; **Review** opens the main window. Never "wallet", "gas", "seed phrase" or "transaction" (§5.1).
 
 ## 6. Surfaces and information architecture
 
