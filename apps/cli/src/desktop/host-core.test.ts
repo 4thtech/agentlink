@@ -34,6 +34,7 @@ import type { DesktopPipe } from './pipe.js';
 import type { HostMessage, ShellMessage } from './protocol.js';
 import type { DesktopAlertState } from '@4thtech-io/node';
 import { NOTIFY_DEFAULTS } from '@4thtech-io/types/ui-contract/notifications';
+import type { UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
 
 const INVITE = `${INVITE_LINK_PREFIX}SECRETinvitePAYLOAD_abc-123`;
 const INVITE_MARK = 'SECRETinvitePAYLOAD';
@@ -122,7 +123,10 @@ function fakePipe(): {
 /** The approval server stand-in: real loopback handoff route, links minted like the real one. */
 /** N7: what a test's server answers for the desktop alerts (undefined: no centre). */
 interface FakeAlerts {
-  state: () => DesktopAlertState | undefined;
+  /** TRAY-PIPE: `link` and `outAt` default to connected and none sent. */
+  state: () =>
+    | (Omit<DesktopAlertState, 'link' | 'outAt'> & Partial<Pick<DesktopAlertState, 'link' | 'outAt'>>)
+    | undefined;
   names?: ReadonlyMap<string, string>;
   /** The refs ownerNames was asked for. */
   asked?: string[][];
@@ -175,7 +179,12 @@ async function fakeServer(
     openFirstRun: () => sink(`${origin}/first-run?t=${mint()}`),
     openJoin: () => sink(`${origin}/settings/join?t=${mint()}`),
     openUpdates: () => sink(`${origin}/settings/updates?t=${mint()}`),
-    desktopAlerts: () => Promise.resolve(alerts?.state()),
+    desktopAlerts: () => {
+      const state = alerts?.state();
+      return Promise.resolve(
+        state === undefined ? undefined : { link: 'connected', outAt: null, ...state },
+      );
+    },
     ownerNames: (refs: readonly string[]) => {
       alerts?.asked?.push([...refs]);
       return Promise.resolve(alerts?.names ?? new Map<string, string>());
@@ -239,6 +248,8 @@ function setup(
     other?: Pending | (() => Pending);
     failure?: 'no_owner';
     alerts?: FakeAlerts;
+    /** TRAY-PIPE: the UI settings the directory answers (absent: no reader). */
+    settings?: () => UiSettings | undefined;
   } = {},
 ): Setup {
   const pipe = fakePipe();
@@ -260,7 +271,14 @@ function setup(
           const server = await startServer({
             source: source(over.pending ?? 0),
             host: {
-              directory: {} as never,
+              directory: (over.settings === undefined
+                ? {}
+                : {
+                    readUiSettings: () => {
+                      const read = over.settings;
+                      return Promise.resolve(read?.());
+                    },
+                  }) as never,
               initial: {
                 name: 'default',
                 label: 'default',
@@ -966,5 +984,202 @@ describe('APP-CONTINUITY: the desktop host continues a browser host', () => {
     await until(() => readies(s.pipe.sent).length === 1);
     s.pipe.shell({ v: 1, type: 'shutdown' });
     await expect(run).resolves.toBe(0);
+  });
+});
+
+describe('TRAY-PIPE: what the icon shows (tray-state, tray-pulse, shell-prefs)', () => {
+  const A = `0x${'a'.repeat(40)}`;
+  const OFF = {
+    ...NOTIFY_DEFAULTS,
+    approvals: false,
+    messages: false,
+    files: false,
+    updates: false,
+  };
+  const of = <T extends HostMessage['type']>(sent: HostMessage[], type: T) =>
+    sent.filter((m): m is Extract<HostMessage, { type: T }> => m.type === type);
+  const item = (count: number) => ({
+    id: `messages-${A}`,
+    kind: 'messages' as const,
+    ref: A,
+    count,
+    at: 10 + count,
+    read: false,
+  });
+
+  it('a first look never pulses; news pulses even with every notification switched off', async () => {
+    let pending = 1;
+    let count = 1;
+    let outAt: number | null = 50;
+    const s = setup({
+      pending: () => pending,
+      alerts: {
+        state: () => ({ scope: 'default', items: [item(count)], prefs: OFF, outAt }),
+      },
+    });
+    const run = runDesktopHost(s.deps);
+    await until(() => of(s.pipe.sent, 'tray-state').some((m) => m.approvals === 1));
+    await new Promise((r) => setTimeout(r, 40));
+    expect(of(s.pipe.sent, 'tray-pulse')).toEqual([]);
+    expect(of(s.pipe.sent, 'notify')).toEqual([]);
+    expect(of(s.pipe.sent, 'tray-state').at(-1)).toEqual({
+      v: 1,
+      type: 'tray-state',
+      link: 'connected',
+      unread: 1,
+      approvals: 1,
+    });
+    pending = 2;
+    count = 2;
+    outAt = 60;
+    await until(() => of(s.pipe.sent, 'tray-pulse').length === 3);
+    expect(
+      of(s.pipe.sent, 'tray-pulse')
+        .map((m) => m.kind)
+        .sort(),
+    ).toEqual(['ai_sent', 'approval', 'message_in']);
+    expect(of(s.pipe.sent, 'notify')).toEqual([]);
+    await until(() =>
+      of(s.pipe.sent, 'tray-state').some((m) => m.unread === 2 && m.approvals === 2),
+    );
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+  });
+
+  it('at most one pulse per kind per 2 s (ticks every 10 ms here)', async () => {
+    let count = 1;
+    const s = setup({
+      alerts: { state: () => ({ scope: 'default', items: [item(count)], prefs: OFF }) },
+    });
+    const run = runDesktopHost(s.deps);
+    await until(() => of(s.pipe.sent, 'tray-state').some((m) => m.unread === 1));
+    for (let i = 2; i <= 6; i += 1) {
+      count = i;
+      await until(() => of(s.pipe.sent, 'tray-state').some((m) => m.unread === i));
+    }
+    expect(of(s.pipe.sent, 'tray-pulse')).toEqual([
+      { v: 1, type: 'tray-pulse', kind: 'message_in' },
+    ]);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+  });
+
+  it('tray-state only on change, with the link from the health state', async () => {
+    let link: DesktopAlertState['link'] = 'connecting';
+    const s = setup({
+      alerts: { state: () => ({ scope: 'default', items: [], prefs: OFF, link }) },
+    });
+    const run = runDesktopHost(s.deps);
+    await until(() => of(s.pipe.sent, 'tray-state').some((m) => m.link === 'connecting'));
+    await new Promise((r) => setTimeout(r, 40));
+    link = 'offline';
+    await until(() => of(s.pipe.sent, 'tray-state').some((m) => m.link === 'offline'));
+    link = 'paused';
+    await until(() => of(s.pipe.sent, 'tray-state').some((m) => m.link === 'paused'));
+    const states = of(s.pipe.sent, 'tray-state').map((m) => `${m.link}:${String(m.unread)}`);
+    // No repeats in a row.
+    expect(states.every((v, i) => i === 0 || v !== states[i - 1])).toBe(true);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+  });
+
+  it('shell-prefs after every ready and on change; widgetPreviews never on the pipe', async () => {
+    let settings: UiSettings | undefined = {
+      menuBarIcon: false,
+      widgetPreviews: false,
+      kept: { 'agentlink.prefs': '{"motion":"off"}' },
+    };
+    const s = setup({ settings: () => settings });
+    const run = runDesktopHost(s.deps);
+    await until(() => of(s.pipe.sent, 'shell-prefs').length >= 1);
+    const firstReady = s.pipe.sent.findIndex((m) => m.type === 'ready');
+    const firstPrefs = s.pipe.sent.findIndex((m) => m.type === 'shell-prefs');
+    expect(firstReady).toBeGreaterThanOrEqual(0);
+    expect(firstPrefs).toBeGreaterThan(firstReady);
+    expect(of(s.pipe.sent, 'shell-prefs')[0]).toEqual({
+      v: 1,
+      type: 'shell-prefs',
+      menuBarIcon: false,
+      motion: 'off',
+    });
+    await new Promise((r) => setTimeout(r, 40));
+    expect(of(s.pipe.sent, 'shell-prefs')).toHaveLength(1);
+    // A fresh ready (a show): the prefs follow it again.
+    s.pipe.shell({ v: 1, type: 'show', route: 'home' });
+    await until(() => of(s.pipe.sent, 'shell-prefs').length === 2);
+    const secondReady = s.pipe.sent.findLastIndex((m) => m.type === 'ready');
+    const secondPrefs = s.pipe.sent.findLastIndex((m) => m.type === 'shell-prefs');
+    expect(secondPrefs).toBeGreaterThan(secondReady);
+    // A change: sent at the next look.
+    settings = undefined;
+    await until(() => of(s.pipe.sent, 'shell-prefs').length === 3);
+    expect(of(s.pipe.sent, 'shell-prefs')[2]).toEqual({
+      v: 1,
+      type: 'shell-prefs',
+      menuBarIcon: true,
+      motion: 'system',
+    });
+    expect(JSON.stringify(s.pipe.sent)).not.toContain('widgetPreviews');
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+  });
+
+  it('an unreadable settings file keeps the last prefs (never flips the icon back on)', async () => {
+    let fail = false;
+    const s = setup({
+      settings: () => {
+        if (fail) throw new Error('EACCES');
+        return { menuBarIcon: false };
+      },
+    });
+    const run = runDesktopHost(s.deps);
+    await until(() => of(s.pipe.sent, 'shell-prefs').length === 1);
+    fail = true;
+    await new Promise((r) => setTimeout(r, 60));
+    expect(of(s.pipe.sent, 'shell-prefs')).toHaveLength(1);
+    expect(of(s.pipe.sent, 'shell-prefs')[0]?.menuBarIcon).toBe(false);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+  });
+
+  it('no reader: the defaults (absent = on) after the ready', async () => {
+    const s = setup();
+    const run = runDesktopHost(s.deps);
+    await until(() => of(s.pipe.sent, 'shell-prefs').length === 1);
+    expect(of(s.pipe.sent, 'shell-prefs')[0]).toEqual({
+      v: 1,
+      type: 'shell-prefs',
+      menuBarIcon: true,
+      motion: 'system',
+    });
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+  });
+
+  it('the tray messages never carry a name, ref, ID or text', async () => {
+    let count = 1;
+    const s = setup({
+      pending: () => (count > 1 ? [`apr_${'S'.repeat(22)}`] : []),
+      alerts: {
+        state: () => ({
+          scope: 'default',
+          items: [item(count)],
+          prefs: { ...NOTIFY_DEFAULTS, showNames: true, messages: true },
+          outAt: count,
+        }),
+        names: new Map([[A, 'Ana']]),
+      },
+    });
+    const run = runDesktopHost(s.deps);
+    await until(() => of(s.pipe.sent, 'tray-state').some((m) => m.unread === 1));
+    await new Promise((r) => setTimeout(r, 30));
+    count = 2;
+    await until(() => of(s.pipe.sent, 'tray-pulse').length === 3);
+    const tray = JSON.stringify(
+      s.pipe.sent.filter((m) => m.type.startsWith('tray-') || m.type === 'shell-prefs'),
+    );
+    for (const bad of ['0x', 'apr_', 'Ana', 'default']) expect(tray).not.toContain(bad);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
   });
 });

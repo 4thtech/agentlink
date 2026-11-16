@@ -138,7 +138,9 @@ const UPDATE_READY = {
   check: () => undefined,
 };
 
-async function harness(options: { updateReady?: boolean; client?: unknown } = {}) {
+async function harness(
+  options: { updateReady?: boolean; client?: unknown; health?: () => unknown } = {},
+) {
   const opened: string[] = [];
   const alerts: number[] = [];
   const ownerStores: number[] = [];
@@ -162,7 +164,11 @@ async function harness(options: { updateReady?: boolean; client?: unknown } = {}
     name: 'default',
     label: 'Personal',
     source,
-    localUi: options.client === undefined ? {} : { client: options.client as never },
+    localUi: {
+      ...(options.client === undefined ? {} : { client: options.client as never }),
+      // TRAY-PIPE: the open agent's health source (local-ui health.ts LocalUiHealthSource).
+      ...(options.health === undefined ? {} : { health: options.health as never }),
+    },
     close: () => Promise.resolve(),
   };
   const server = await startApprovalServerWith(
@@ -469,5 +475,76 @@ describe('N7: what the desktop app alerts about (desktopAlerts, ownerNames, open
     expect(opened[0]).toMatch(
       new RegExp(`^${server.origin}/settings/updates\\?t=[A-Za-z0-9_-]{43}$`),
     );
+  });
+});
+
+describe('TRAY-PIPE: desktopAlerts carries the link and the newest outbound time only', () => {
+  const flow = (events: unknown[], calls: number[][] = []) => ({
+    messages: {
+      flowEvents: (since: number, until: number) => {
+        calls.push([since, until]);
+        return Promise.resolve({ events, capped: false });
+      },
+    },
+  });
+
+  it('outAt: the newest message this agent sent, never one it received', async () => {
+    const calls: number[][] = [];
+    const h = await harness({
+      client: flow(
+        [
+          { contactId: A, direction: 'in', kind: 'message', state: 'received', at: NOW - 1 },
+          { contactId: B, direction: 'out', kind: 'file', state: 'sent', at: NOW - 3 },
+          { contactId: A, direction: 'out', kind: 'message', state: 'queued', at: NOW - 7 },
+        ],
+        calls,
+      ),
+    });
+    const state = await h.server.desktopAlerts();
+    expect(state?.outAt).toBe(NOW - 3);
+    // A short, bounded window ending near now.
+    const [since, until] = calls[0] ?? [];
+    expect((until ?? 0) - (since ?? 0)).toBeLessThanOrEqual(3_600);
+  });
+
+  it('outAt: null when nothing was sent; undefined when the read fails (unknown)', async () => {
+    const none = await harness({
+      client: flow([{ contactId: A, direction: 'in', kind: 'message', state: 'received', at: NOW }]),
+    });
+    expect((await none.server.desktopAlerts())?.outAt).toBeNull();
+    const failing = await harness({
+      client: { messages: { flowEvents: () => Promise.reject(new Error('store')) } },
+    });
+    const state = await failing.server.desktopAlerts();
+    expect(state).toBeDefined();
+    expect(state?.outAt).toBeUndefined();
+  });
+
+  it.each([
+    [{ agent: 'running' }, 'connected'],
+    [{ agent: 'running', relays: { connected: 1, total: 2 } }, 'connected'],
+    [{ agent: 'running', checking: true }, 'connecting'],
+    [{ agent: 'running', relays: { connected: 0, total: 2 } }, 'offline'],
+    [{ agent: 'paused' }, 'paused'],
+    [{ agent: 'not_running' }, 'offline'],
+  ])('link from the health state %j: %s', async (snapshot, link) => {
+    const h = await harness({ client: flow([]), health: () => snapshot });
+    expect((await h.server.desktopAlerts())?.link).toBe(link);
+  });
+
+  it('a failing health source is offline (never connected without evidence)', async () => {
+    const h = await harness({
+      client: flow([]),
+      health: () => {
+        throw new Error('boom');
+      },
+    });
+    expect((await h.server.desktopAlerts())?.link).toBe('offline');
+  });
+
+  it('nothing else is added: the exact keys', async () => {
+    const h = await harness({ client: flow([]) });
+    const state = await h.server.desktopAlerts();
+    expect(Object.keys(state ?? {}).sort()).toEqual(['items', 'link', 'outAt', 'prefs', 'scope']);
   });
 });
