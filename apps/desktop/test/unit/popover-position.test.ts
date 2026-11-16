@@ -7,6 +7,7 @@ import {
   POPOVER_MARGIN,
   popoverBounds,
   taskbarEdge,
+  validDisplayArea,
   validTrayBounds,
   type DisplayArea,
   type Rect,
@@ -203,5 +204,46 @@ describe('popoverBounds', () => {
     });
     expect(inside(r, left.workArea)).toBe(true);
     expect(Number.isInteger(r.x) && Number.isInteger(r.y)).toBe(true);
+  });
+});
+
+describe('validDisplayArea (unusable numbers fall back)', () => {
+  it('accepts a real display', () => {
+    expect(validDisplayArea(MAC)).toEqual(MAC);
+  });
+
+  it.each([
+    null,
+    {},
+    { bounds: MAC.bounds },
+    { bounds: { ...MAC.bounds, x: Number.NaN }, workArea: MAC.workArea },
+    { bounds: MAC.bounds, workArea: { ...MAC.workArea, height: Infinity } },
+    { bounds: MAC.bounds, workArea: { ...MAC.workArea, width: 0 } },
+    { bounds: MAC.bounds, workArea: { ...MAC.workArea, x: -50 } },
+  ])('refuses %j', (display) => {
+    expect(validDisplayArea(display)).toBeNull();
+  });
+
+  it('popoverBounds never answers NaN or Infinity', () => {
+    const r = popoverBounds({
+      platform: 'win32',
+      size: SIZE,
+      anchor: { x: Number.NaN, y: 0, width: 24, height: 24 },
+      display: { bounds: MAC.bounds, workArea: { ...MAC.workArea, y: Number.NaN } },
+    });
+    expect(r).toEqual({ x: 0, y: 0, width: 360, height: 560 });
+    const noAnchor = popoverBounds({
+      platform: 'darwin',
+      size: SIZE,
+      anchor: { x: Number.NaN, y: 0, width: 24, height: 24 },
+      display: MAC,
+    });
+    expect(Object.values(noAnchor).every(Number.isFinite)).toBe(true);
+    expect(noAnchor).toEqual({
+      x: 1440 - POPOVER_MARGIN - 360,
+      y: 25 + POPOVER_MARGIN,
+      width: 360,
+      height: 560,
+    });
   });
 });

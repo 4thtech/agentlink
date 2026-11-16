@@ -24,7 +24,9 @@ import {
   POPOVER_PATH,
   POPOVER_WIDTH,
   WINDOW_PARTITION,
+  POPOVER_WRITE_PATHS,
   hardenSession,
+  isServiceWorkerRequest,
   popoverOptions,
   popoverUrl,
   type PopoverWindowOptions,
@@ -281,6 +283,76 @@ describe('Popover', () => {
     });
   });
 
+  it('is pinned to the widget URL: other same-origin pages and redirects are refused', () => {
+    const s = setup();
+    ready(s);
+    s.popover.show();
+    const contents = s.win().webContents;
+    expect(contents.navigate('will-navigate', `${ORIGIN}/settings/home`)).toBe(true);
+    expect(contents.navigate('will-navigate', `${ORIGIN}/approve/apr_${'A'.repeat(22)}`)).toBe(
+      true,
+    );
+    expect(contents.navigate('will-navigate', `${WIDGET}?t=x`)).toBe(true);
+    expect(contents.navigate('will-redirect', `${ORIGIN}/`)).toBe(true);
+    expect(contents.navigate('will-redirect', WIDGET)).toBe(false);
+    expect(contents.navigate('will-navigate', `${WIDGET}#top`)).toBe(false);
+  });
+
+  it('the fallback page navigates nowhere, not even to the widget', () => {
+    const s = setup();
+    s.lock.acceptSessionUrl(SESSION_URL);
+    s.popover.show();
+    expect(s.popover.page).toBe('fallback');
+    expect(s.win().webContents.navigate('will-navigate', WIDGET)).toBe(true);
+    expect(s.win().webContents.navigate('will-redirect', WIDGET)).toBe(true);
+  });
+
+  it('a navigation to another page (also in-page pushState) reloads the widget', () => {
+    const s = setup();
+    ready(s);
+    s.popover.show();
+    const contents = s.win().webContents;
+    contents.emit('did-navigate-in-page', new FakeEvent(), `${ORIGIN}/settings/home`, true);
+    expect(s.win().loaded).toEqual([WIDGET, WIDGET]);
+    contents.emit('did-navigate', new FakeEvent(), `${ORIGIN}/inbox`, 200);
+    expect(s.win().loaded).toEqual([WIDGET, WIDGET, WIDGET]);
+    // The widget itself, a fragment change and a sub-frame are left alone.
+    contents.emit('did-navigate', new FakeEvent(), WIDGET, 200);
+    contents.emit('did-navigate-in-page', new FakeEvent(), `${WIDGET}#x`, true);
+    contents.emit('did-navigate-in-page', new FakeEvent(), `${ORIGIN}/inbox`, false);
+    expect(s.win().loaded).toHaveLength(3);
+  });
+
+  it('without a session, a stray navigation goes back to the fallback page', () => {
+    const s = setup();
+    ready(s);
+    s.popover.show();
+    s.popover.setSessionReady(false);
+    const before = s.win().loaded.length;
+    s.win().webContents.emit('did-navigate-in-page', new FakeEvent(), `${ORIGIN}/inbox`, true);
+    expect(s.win().loaded.length).toBe(before + 1);
+    expect(s.win().loaded.at(-1)).toBe(popoverFallbackUrl());
+    s.win().webContents.emit('did-navigate', new FakeEvent(), popoverFallbackUrl(), 200);
+    expect(s.win().loaded.length).toBe(before + 1);
+  });
+
+  it('an unusable display falls back to the primary display', () => {
+    const broken = {
+      bounds: { x: Number.NaN, y: 0, width: 1440, height: 900 },
+      workArea: { x: 0, y: 25, width: Infinity, height: 800 },
+    } as DisplayArea;
+    const s = setup({
+      screen: {
+        getDisplayMatching: () => broken,
+        getDisplayNearestPoint: () => broken,
+        getPrimaryDisplay: () => MAC,
+        getCursorScreenPoint: () => ({ x: 1, y: 1 }),
+      },
+    });
+    s.popover.show();
+    expect(s.win().bounds).toEqual({ x: 1440 - 8 - 360, y: 25 + 8, width: 360, height: 560 });
+  });
+
   it('hides on blur and on Escape', () => {
     const s = setup();
     ready(s);
@@ -393,8 +465,8 @@ describe('Popover', () => {
   });
 });
 
-describe('no owner presence from the popover (hardenSession)', () => {
-  it("cancels the popover's requests that would start an owner-presence prompt", async () => {
+describe('the popover only reads (hardenSession allowlist)', () => {
+  const harden = async () => {
     const session = new FakeSession();
     const lock = new OriginLock();
     lock.acceptSessionUrl(SESSION_URL);
@@ -408,7 +480,12 @@ describe('no owner presence from the popover (hardenSession)', () => {
       },
       (id) => id === 41,
     );
-    const send = (id: number, method: string, url: string, headers: Record<string, string>) => {
+    const send = (
+      id: number | undefined,
+      method: string,
+      url: string,
+      headers: Record<string, string> = {},
+    ) => {
       let answer: { cancel?: boolean } | undefined;
       session.beforeSendHeaders?.(
         { method, url, requestHeaders: headers, webContentsId: id } as never,
@@ -416,21 +493,83 @@ describe('no owner presence from the popover (hardenSession)', () => {
           answer = r;
         },
       );
-      return answer;
+      return answer?.cancel === true;
     };
-    const native = { 'X-AgentLink-Presence': 'native' };
-    expect(send(41, 'POST', `${ORIGIN}/api/approvals/a1/approve`, native)?.cancel).toBe(true);
-    expect(send(41, 'POST', `${ORIGIN}/api/owner/native`, {})?.cancel).toBe(true);
-    expect(send(41, 'POST', `${ORIGIN}/api/owner/passkey`, {})?.cancel).toBe(true);
-    expect(
-      send(41, 'POST', `${ORIGIN}/api/rules`, { 'x-agentlink-presence': 'challenge' })?.cancel,
-    ).toBe(true);
-    expect(send(41, 'GET', `${ORIGIN}/api/owner/native`, {})?.cancel).toBeFalsy();
-    expect(send(41, 'POST', `${ORIGIN}/api/ui/pause`, {})?.cancel).toBeFalsy();
-    expect(blurs).toBe(0);
-    expect(send(41, 'GET', `${ORIGIN}/api/ui/widget`, {})?.cancel).toBeFalsy();
-    // The main window is unchanged.
-    expect(send(7, 'POST', `${ORIGIN}/api/owner/native`, {})?.cancel).toBeFalsy();
-    expect(blurs).toBe(1);
+    return { send, blurs: () => blurs };
+  };
+
+  it('no non-GET path is allowed', () => {
+    expect(POPOVER_WRITE_PATHS).toEqual([]);
+  });
+
+  it.each([
+    ['POST', '/api/approvals/apr_AAAAAAAAAAAAAAAAAAAAAA/approve'],
+    ['POST', '/api/approvals/apr_AAAAAAAAAAAAAAAAAAAAAA/deny'],
+    ['POST', '/api/approvals/review'],
+    ['POST', '/api/ui/contacts/join'],
+    ['POST', '/api/ui/contacts/invite'],
+    ['POST', '/api/ui/files'],
+    ['POST', '/api/ui/files/save'],
+    ['POST', '/api/ui/files/review'],
+    ['POST', '/api/ui/pause'],
+    ['POST', '/api/ui/resume'],
+    ['POST', '/api/owner/native'],
+    ['POST', '/api/owner/passkey'],
+    ['PUT', '/api/ui/ui-settings'],
+    ['PATCH', '/api/ui/rules'],
+    ['DELETE', '/api/ui/contacts/x'],
+    ['OPTIONS', '/api/ui/widget'],
+  ])('cancels %s %s from the popover', async (method, path) => {
+    const { send } = await harden();
+    expect(send(41, method, `${ORIGIN}${path}`)).toBe(true);
+  });
+
+  it('cancels any request carrying presence, even a GET', async () => {
+    const { send, blurs } = await harden();
+    expect(send(41, 'GET', `${ORIGIN}/api/ui/widget`, { 'x-agentlink-presence': 'native' })).toBe(
+      true,
+    );
+    expect(send(41, 'POST', `${ORIGIN}/api/rules`, { 'X-AgentLink-Presence': 'challenge' })).toBe(
+      true,
+    );
+    expect(blurs()).toBe(0);
+  });
+
+  it('lets reads through', async () => {
+    const { send } = await harden();
+    expect(send(41, 'GET', `${ORIGIN}/api/ui/widget`)).toBe(false);
+    expect(send(41, 'GET', `${ORIGIN}/api/ui/events`)).toBe(false);
+    expect(send(41, 'HEAD', `${ORIGIN}/settings/widget`)).toBe(false);
+  });
+
+  it('leaves the main window unchanged', async () => {
+    const { send, blurs } = await harden();
+    expect(send(7, 'POST', `${ORIGIN}/api/owner/native`)).toBe(false);
+    expect(send(7, 'POST', `${ORIGIN}/api/approvals/review`)).toBe(false);
+    expect(blurs()).toBe(1);
+  });
+
+  it('a throwing isPopover fails closed', async () => {
+    const session = new FakeSession();
+    const lock = new OriginLock();
+    lock.acceptSessionUrl(SESSION_URL);
+    await hardenSession(session, lock, 'darwin', undefined, () => {
+      throw new Error('x');
+    });
+    let cancel: boolean | undefined;
+    session.beforeSendHeaders?.(
+      { method: 'POST', url: `${ORIGIN}/api/ui/files/save`, requestHeaders: {} } as never,
+      (r) => {
+        cancel = r.cancel;
+      },
+    );
+    expect(cancel).toBe(true);
+  });
+
+  it('no service worker is ever registered (any window)', async () => {
+    const { send } = await harden();
+    expect(send(7, 'GET', `${ORIGIN}/sw.js`, { 'Service-Worker': 'script' })).toBe(true);
+    expect(send(41, 'GET', `${ORIGIN}/sw.js`, { 'service-worker': 'script' })).toBe(true);
+    expect(isServiceWorkerRequest({ Accept: '*/*' })).toBe(false);
   });
 });

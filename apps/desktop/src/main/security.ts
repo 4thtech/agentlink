@@ -23,7 +23,7 @@
 // - TRAY-POPOVER (D-155): the menu-bar popover is a second window with the SAME webPreferences and
 //   partition (popoverOptions), its own preload (widget-preload.cjs, one IPC channel, widget-ipc.ts)
 //   and the same lockWebContents; it loads only the locked origin's `/settings/widget`. Its requests
-//   that would start owner presence are cancelled (isPopoverPresenceRequest).
+//   outside a read-only allowlist are cancelled (isPopoverRequestRefused).
 //
 // Everything takes the Electron objects by injection (electron-api.ts) and is unit-tested.
 import { sessionUrlOrigin } from '../shared/protocol.js';
@@ -334,35 +334,43 @@ export function isNativePresenceRequest(
 }
 
 /**
- * TRAY-POPOVER: true for a request from the popover's web contents that would start or carry owner
- * presence: any `X-AgentLink-Presence` header (native, passkey, challenge, …) or a change to an
- * `/api/owner/` route. Reads stay allowed. The partition is shared with the main window, so the
- * request's web contents decides; a request without one is never treated as the popover's.
+ * TRAY-POPOVER (Fable r1 M1): the only non-GET paths the popover may call. None: Pause, Resume,
+ * Approve, Update and every owner operation open the main window instead.
  */
-export function isPopoverPresenceRequest(
+export const POPOVER_WRITE_PATHS: readonly string[] = Object.freeze([]);
+
+/**
+ * TRAY-POPOVER: true for a request from the popover's web contents that is refused. An ALLOWLIST:
+ * only GET and HEAD without any `X-AgentLink-Presence` header pass, plus a non-GET to an exact path
+ * in POPOVER_WRITE_PATHS (empty). Everything else (approval decisions, review, master-code routes,
+ * owner routes, any presence) is cancelled. The partition is shared with the main window, so the
+ * request's web contents decides; an `isPopover` that throws counts as the popover.
+ */
+export function isPopoverRequestRefused(
   details: OnBeforeSendHeadersDetails,
   isPopover: (webContentsId: number | undefined) => boolean,
 ): boolean {
-  const id = (details as { readonly webContentsId?: unknown }).webContentsId;
-  if (typeof id !== 'number') return false;
+  const raw = (details as { readonly webContentsId?: unknown }).webContentsId;
+  const id = typeof raw === 'number' ? raw : undefined;
   let popover: boolean;
   try {
     popover = isPopover(id);
   } catch {
-    // Unknown: treat it as the popover (the stricter answer).
     popover = true;
   }
   if (!popover) return false;
   for (const name of Object.keys(details.requestHeaders)) {
     if (name.toLowerCase() === 'x-agentlink-presence') return true;
   }
-  if (details.method.toUpperCase() === 'GET' || details.method.toUpperCase() === 'HEAD') {
-    return false;
-  }
+  const method = details.method.toUpperCase();
+  if (method === 'GET' || method === 'HEAD') return false;
   const parsed = parseUrl(details.url);
-  return (
-    parsed === null || parsed.pathname === '/api/owner' || parsed.pathname.startsWith('/api/owner/')
-  );
+  return parsed === null || parsed.search !== '' || !POPOVER_WRITE_PATHS.includes(parsed.pathname);
+}
+
+/** Fable r1 L: a service worker's script fetch (Chromium sends `Service-Worker: script`). */
+export function isServiceWorkerRequest(headers: Record<string, string>): boolean {
+  return Object.keys(headers).some((name) => name.toLowerCase() === 'service-worker');
 }
 
 /**
@@ -372,15 +380,16 @@ export function isPopoverPresenceRequest(
  * the window (main.ts takes focus off the page with it, so a focused master-code field cannot keep
  * macOS secure input on while the Touch ID sheet wants to become key). The page blurs the field
  * itself first; this is the backstop. Headers pass unchanged.
- * TRAY-POPOVER: `isPopover` names the popover's web contents; its presence requests are cancelled
- * (isPopoverPresenceRequest).
+ * TRAY-POPOVER: `isPopover` (required, fail-closed) names the popover's web contents; its requests
+ * outside the allowlist are cancelled (isPopoverRequestRefused). No service worker is ever
+ * registered: its script fetch is cancelled for every window.
  */
 export async function hardenSession(
   session: Session,
   lock: OriginLock,
   platform: string,
-  onNativePresence?: () => void,
-  isPopover?: (webContentsId: number | undefined) => boolean,
+  onNativePresence: (() => void) | undefined,
+  isPopover: (webContentsId: number | undefined) => boolean,
 ): Promise<void> {
   session.setPermissionRequestHandler((_contents, permission, callback, details) => {
     callback(permissionAllowed(lock, permission, details.requestingUrl));
@@ -400,9 +409,14 @@ export async function hardenSession(
     callback({ cancel: !requestAllowed(lock, details.url) });
   });
   session.webRequest.onBeforeSendHeaders((details, callback) => {
-    // TRAY-POPOVER: the popover never starts owner presence (it hides on blur; Touch ID would blur
-    // it). Resume and Approve open the main window instead; this is the backstop.
-    if (isPopover !== undefined && isPopoverPresenceRequest(details, isPopover)) {
+    // No service workers (they would outlive the page and serve it from a cache).
+    if (isServiceWorkerRequest(details.requestHeaders)) {
+      callback({ cancel: true });
+      return;
+    }
+    // TRAY-POPOVER: the popover only reads (it hides on blur; Touch ID would blur it). Resume,
+    // Approve and every change open the main window instead; this is the backstop.
+    if (isPopoverRequestRefused(details, isPopover)) {
       callback({ cancel: true });
       return;
     }

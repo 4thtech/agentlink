@@ -502,9 +502,16 @@ export async function runShell(
   const windowSession = electron.session.fromPartition(WINDOW_PARTITION, { cache: false });
   // DESK-TOUCHID-FIX: before a request that starts the presence helper reaches the core, focus
   // leaves the page (secure input off), so the Touch ID sheet can become key.
-  await hardenSession(windowSession, lock, proc.platform, () => {
-    window?.blurPage();
-  });
+  await hardenSession(
+    windowSession,
+    lock,
+    proc.platform,
+    () => {
+      window?.blurPage();
+    },
+    // TODO(TRAY-SHELL): pass popover.ownsWebContents once the popover is wired in.
+    () => false,
+  );
 
   // Set below, once the supervisor and the checks exist.
   let onStatusAction: (action: StatusAction) => void = () => undefined;

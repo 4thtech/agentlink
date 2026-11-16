@@ -49,10 +49,38 @@ export function validTrayBounds(bounds: unknown): Rect | null {
   return { x, y, width, height };
 }
 
+const validRect = (r: unknown): Rect | null => {
+  if (typeof r !== 'object' || r === null) return null;
+  const { x, y, width, height } = r as Record<string, unknown>;
+  if (!finite(x) || !finite(y) || !finite(width) || !finite(height)) return null;
+  if (width <= 0 || height <= 0) return null;
+  return { x, y, width, height };
+};
+
+/**
+ * Fable r1 L: the display when its bounds and work area are finite, non-empty rectangles and the
+ * work area lies inside the bounds; else null (the caller falls back).
+ */
+export function validDisplayArea(display: unknown): DisplayArea | null {
+  if (typeof display !== 'object' || display === null) return null;
+  const { bounds, workArea } = display as Record<string, unknown>;
+  const b = validRect(bounds);
+  const wa = validRect(workArea);
+  if (b === null || wa === null) return null;
+  if (wa.x < b.x || wa.y < b.y || wa.x + wa.width > b.x + b.width) return null;
+  if (wa.y + wa.height > b.y + b.height) return null;
+  return { bounds: b, workArea: wa };
+}
+
 /** True when the rectangles overlap (a point-sized rect counts when it lies inside). */
 export function intersects(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
+
+const validAnchor = (r: Rect): Rect | null =>
+  finite(r.x) && finite(r.y) && finite(r.width) && finite(r.height) && r.width >= 0 && r.height >= 0
+    ? r
+    : null;
 
 const center = (r: Rect): Point => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
 
@@ -90,7 +118,13 @@ export interface PopoverPlacement {
 
 /** The popover's bounds (integers, inside the work area). */
 export function popoverBounds(placement: PopoverPlacement): Rect {
-  const { platform, anchor, display } = placement;
+  const { platform } = placement;
+  const display = validDisplayArea(placement.display);
+  // Not a usable display (NaN, Infinity, empty): the size at the origin; never NaN bounds.
+  if (display === null) {
+    return { x: 0, y: 0, width: placement.size.width, height: placement.size.height };
+  }
+  const anchor = placement.anchor === null ? null : validAnchor(placement.anchor);
   const wa = display.workArea;
   const width = Math.max(1, Math.min(placement.size.width, wa.width - 2 * POPOVER_MARGIN));
   const height = Math.max(1, Math.min(placement.size.height, wa.height - 2 * POPOVER_MARGIN));

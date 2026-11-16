@@ -28,6 +28,7 @@ import { POPOVER_ACTION_URL, isPopoverFallbackUrl, popoverFallbackUrl } from './
 import {
   intersects,
   popoverBounds,
+  validDisplayArea,
   validTrayBounds,
   type DisplayArea,
   type Point,
@@ -69,6 +70,10 @@ export type PopoverWebContents = WebContents & {
   on(
     event: 'did-navigate',
     listener: (event: ElectronEvent, url: string, httpResponseCode: number) => void,
+  ): void;
+  on(
+    event: 'did-navigate-in-page',
+    listener: (event: ElectronEvent, url: string, isMainFrame: boolean) => void,
   ): void;
   on(event: 'render-process-gone', listener: () => void): void;
 };
@@ -236,6 +241,21 @@ export class Popover {
     return window;
   }
 
+  /** True for the widget URL on the locked origin (a fragment aside, which never reaches the server). */
+  #isWidgetUrl(url: string): boolean {
+    const widget = popoverUrl(this.#deps.lock);
+    if (widget === null) return false;
+    const hash = url.indexOf('#');
+    return (hash === -1 ? url : url.slice(0, hash)) === widget;
+  }
+
+  /** True when `url` is the page the popover is meant to show now. */
+  #shows(url: string): boolean {
+    if (this.#page === 'widget') return this.#isWidgetUrl(url);
+    if (this.#page === 'fallback') return isPopoverFallbackUrl(url);
+    return false;
+  }
+
   #wanted(): 'widget' | 'fallback' {
     return this.#sessionReady && popoverUrl(this.#deps.lock) !== null ? 'widget' : 'fallback';
   }
@@ -271,6 +291,20 @@ export class Popover {
         // Never throws into Electron.
       }
     });
+    // Fable r1 M2: pinned to exactly the page it should show. The widget may only (re)load its own
+    // URL; the fallback page navigates nowhere (its button is handled above).
+    const pin = (event: ElectronEvent, url: string): void => {
+      if (this.#window !== window || this.#page !== 'widget' || !this.#isWidgetUrl(url)) {
+        event.preventDefault();
+      }
+    };
+    contents.on('will-navigate', pin);
+    contents.on('will-redirect', pin);
+    contents.on('did-navigate-in-page', (_event, url, isMainFrame) => {
+      if (isMainFrame && this.#window === window && !this.#shows(url)) {
+        this.#load(window, this.#wanted());
+      }
+    });
     contents.on('before-input-event', (event, input) => {
       if (input.type === 'keyDown' && input.key === 'Escape') {
         event.preventDefault();
@@ -282,10 +316,10 @@ export class Popover {
       if (!isMainFrame || errorCode === -3) return;
       if (this.#window === window && this.#page === 'widget') this.#load(window, 'fallback');
     });
-    contents.on('did-navigate', (_event, _url, httpResponseCode) => {
-      if (this.#window === window && this.#page === 'widget' && httpResponseCode >= 400) {
-        this.#load(window, 'fallback');
-      }
+    contents.on('did-navigate', (_event, url, httpResponseCode) => {
+      if (this.#window !== window) return;
+      if (this.#page === 'widget' && httpResponseCode >= 400) this.#load(window, 'fallback');
+      else if (!this.#shows(url)) this.#load(window, this.#wanted());
     });
     contents.on('render-process-gone', () => {
       // The next show loads the page again.
@@ -320,7 +354,10 @@ export class Popover {
     const tray = validTrayBounds(safe(() => this.#deps.trayBounds()));
     if (tray !== null) {
       const matching = safe(() => screen.getDisplayMatching(tray));
-      if (matching !== null && intersects(tray, matching.bounds)) {
+      if (
+        validDisplayArea(matching) !== null &&
+        intersects(tray, (matching as DisplayArea).bounds)
+      ) {
         anchor = tray;
         display = matching;
       }
@@ -328,14 +365,18 @@ export class Popover {
     if (anchor === null) {
       const cursor = safe(() => screen.getCursorScreenPoint());
       if (isPoint(cursor)) {
-        const nearest = safe(() => screen.getDisplayNearestPoint(cursor));
+        const nearest = validDisplayArea(safe(() => screen.getDisplayNearestPoint(cursor)));
         if (nearest !== null) {
           anchor = { x: cursor.x, y: cursor.y, width: 0, height: 0 };
           display = nearest;
         }
       }
     }
-    display ??= safe(() => screen.getPrimaryDisplay());
+    if (display !== null && validDisplayArea(display) === null) {
+      anchor = null;
+      display = null;
+    }
+    display ??= validDisplayArea(safe(() => screen.getPrimaryDisplay()));
     if (display === null) return;
     const bounds = popoverBounds({
       platform,
