@@ -11,7 +11,11 @@
 //   the kind already running or waiting is absorbed (a burst coalesces); otherwise the waiting slot
 //   keeps the more important kind (approval > msg-in > msg-out). msg-in sets the unread mark and
 //   approval sets the approvals variant, so the icon settles on the right frame afterwards.
-// - Reduced motion: no timers at all, the settle frame only.
+// - Entering paused, offline or update fades: a short crossfade (`fade-<from>-<to>`, 3 frames)
+//   from the static frame on screen to the target variant; instant when there is no such sequence.
+// - Reduced motion: no timers at all, the settle frame only (state changes switch instantly).
+// - A render that throws stops the animation and shows the settle frame; nothing throws out of a
+//   timer.
 // - dispose() clears the timer; the engine renders nothing after it.
 
 export const TRAY_STATES = ['connected', 'connecting', 'paused', 'offline', 'update'] as const;
@@ -35,7 +39,13 @@ export interface TraySequence {
   readonly loop: boolean;
 }
 
-export type TraySequences = Readonly<Record<TrayAnimation, TraySequence>>;
+/** The fades are keyed by sequence name, `fade-<from>-<to>` (static ids without `tray-`). */
+export type TraySequences = Readonly<Record<TrayAnimation, TraySequence>> & {
+  readonly fades?: Readonly<Record<string, TraySequence>>;
+};
+
+/** What is playing: a pulse, the connecting loop or a fade. */
+export type TrayRunning = TrayAnimation | 'fade';
 
 /** The static frame ids (manifest sequence `static`). Connecting settles on its first frame. */
 export const STATIC_FRAMES = Object.freeze({
@@ -65,6 +75,13 @@ export interface TrayEngineOptions {
   readonly reducedMotion?: boolean;
   readonly initial?: Partial<TrayIndicator>;
 }
+
+const FADE_TARGETS: ReadonlySet<string> = new Set([
+  STATIC_FRAMES.paused,
+  STATIC_FRAMES.offline,
+  STATIC_FRAMES.update,
+]);
+const STATIC_IDS: ReadonlySet<string> = new Set(Object.values(STATIC_FRAMES));
 
 const PULSE_RANK: Record<TrayPulse, number> = { 'msg-out': 1, 'msg-in': 2, approval: 3 };
 const MIN_FRAME_MS = 16;
@@ -106,7 +123,7 @@ export class TrayEngine {
   #disposed = false;
   #timer: unknown = null;
   /** The running animation and its next frame index. */
-  #running: { readonly kind: TrayAnimation; next: number } | null = null;
+  #running: { readonly kind: TrayRunning; readonly seq: TraySequence; next: number } | null = null;
   #queued: TrayPulse | null = null;
   #last: TrayFrameRef | null = null;
 
@@ -134,7 +151,7 @@ export class TrayEngine {
   }
 
   /** The pulse or loop that is playing, or null when the icon is static. */
-  get animating(): TrayAnimation | null {
+  get animating(): TrayRunning | null {
     return this.#running?.kind ?? null;
   }
 
@@ -205,12 +222,37 @@ export class TrayEngine {
       return;
     }
     this.#stop();
-    this.#show(settleFrame(this.#indicator, this.#sequences));
+    const target = settleFrame(this.#indicator, this.#sequences);
+    const fade = this.#reduced ? undefined : this.#fadeTo(target);
+    if (fade !== undefined) {
+      this.#run('fade', fade);
+      return;
+    }
+    this.#show(target);
+  }
+
+  /** The crossfade from the static frame on screen to a fade target, if the manifest has one. */
+  #fadeTo(target: string): TraySequence | undefined {
+    const last = this.#last?.id;
+    if (last === undefined || last === target || !FADE_TARGETS.has(target)) return undefined;
+    const from = STATIC_IDS.has(last)
+      ? last
+      : this.#sequences.connecting.frames.includes(last)
+        ? STATIC_FRAMES.connected
+        : undefined;
+    if (from === undefined) return undefined;
+    const name = `fade-${from.replace(/^tray-/, '')}-${target.replace(/^tray-/, '')}`;
+    const seq = this.#sequences.fades?.[name];
+    return seq !== undefined && seq.frames.length > 0 ? seq : undefined;
   }
 
   #start(kind: TrayAnimation): void {
+    this.#run(kind, this.#sequences[kind]);
+  }
+
+  #run(kind: TrayRunning, seq: TraySequence): void {
     this.#stop();
-    this.#running = { kind, next: 0 };
+    this.#running = { kind, seq, next: 0 };
     this.#tick();
   }
 
@@ -218,7 +260,7 @@ export class TrayEngine {
     this.#timer = null;
     const running = this.#running;
     if (this.#disposed || running === null) return;
-    const seq = this.#sequences[running.kind];
+    const seq = running.seq;
     if (running.next >= seq.frames.length) {
       if (seq.loop && seq.frames.length > 0) {
         running.next = 0;
@@ -232,6 +274,7 @@ export class TrayEngine {
       }
     }
     this.#show(seq.frames[running.next] as string);
+    if (this.#running !== running || this.#disposed) return; // the render failed and settled
     running.next += 1;
     const ms = Number.isFinite(seq.frameMs)
       ? Math.max(MIN_FRAME_MS, seq.frameMs)
@@ -243,6 +286,19 @@ export class TrayEngine {
     const settle = settleFrame(this.#indicator, this.#sequences);
     if (this.#last !== null && this.#last.id === id && this.#last.settle === settle) return;
     this.#last = { id, settle };
-    this.#render(this.#last);
+    try {
+      this.#render(this.#last);
+    } catch {
+      // Never throw out of a timer: stop, then show the settle frame once (if that was not it).
+      this.#stop();
+      this.#queued = null;
+      if (id === settle) return;
+      this.#last = { id: settle, settle };
+      try {
+        this.#render(this.#last);
+      } catch {
+        // Keep whatever image the tray has.
+      }
+    }
   }
 }

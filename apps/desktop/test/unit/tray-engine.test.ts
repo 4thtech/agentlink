@@ -240,3 +240,142 @@ describe('TrayEngine', () => {
     expect(clock.pendingCount).toBe(0);
   });
 });
+
+const fade = (name: string) => ({
+  frames: [0, 1, 2].map((i) => `${name}-${i}`),
+  frameMs: 40,
+  loop: false,
+});
+const WITH_FADES: TraySequences = {
+  ...SEQUENCES,
+  fades: {
+    'fade-connected-paused': fade('fade-connected-paused'),
+    'fade-connected-unread-offline': fade('fade-connected-unread-offline'),
+    'fade-paused-update': fade('fade-paused-update'),
+  },
+};
+
+function fadeSetup(reducedMotion = false, render?: (f: TrayFrameRef) => void) {
+  const clock = new ManualClock();
+  const out: string[] = [];
+  const engine = new TrayEngine({
+    sequences: WITH_FADES,
+    timers: clock,
+    render: (f) => {
+      render?.(f);
+      out.push(f.id);
+    },
+    reducedMotion,
+    initial: { state: 'connected' },
+  });
+  return { clock, out, engine };
+}
+
+describe('TrayEngine fades (M2)', () => {
+  it('paused, offline and update cross-fade in from the static frame on screen', () => {
+    const { clock, out, engine } = fadeSetup();
+    engine.set({ state: 'paused' });
+    expect(engine.animating).toBe('fade');
+    clock.advance(40 * 3);
+    expect(out).toEqual([
+      'tray-connected',
+      'fade-connected-paused-0',
+      'fade-connected-paused-1',
+      'fade-connected-paused-2',
+      'tray-paused',
+    ]);
+    expect(clock.pendingCount).toBe(0);
+    engine.set({ state: 'update' });
+    clock.advance(200);
+    expect(out.slice(5)).toEqual([
+      'fade-paused-update-0',
+      'fade-paused-update-1',
+      'fade-paused-update-2',
+      'tray-update',
+    ]);
+  });
+
+  it('the unread ring fades from its own frame; a missing pair switches instantly', () => {
+    const { clock, out, engine } = fadeSetup();
+    engine.set({ unread: true });
+    engine.set({ state: 'offline' });
+    clock.advance(200);
+    expect(out.at(-2)).toBe('fade-connected-unread-offline-2');
+    expect(out.at(-1)).toBe('tray-offline');
+    engine.set({ state: 'paused' }); // no fade-offline-paused in this set
+    expect(out.at(-1)).toBe('tray-paused');
+    engine.set({ state: 'connected', unread: false });
+    expect(out.at(-1)).toBe('tray-connected'); // leaving is instant
+  });
+
+  it('from the connecting loop it fades from the connected mark', () => {
+    const clock = new ManualClock();
+    const out: string[] = [];
+    const engine = new TrayEngine({
+      sequences: WITH_FADES,
+      timers: clock,
+      render: (f) => out.push(f.id),
+      initial: { state: 'connecting' },
+    });
+    clock.advance(80);
+    engine.set({ state: 'paused' });
+    clock.advance(200);
+    expect(out.slice(3)).toEqual([
+      'fade-connected-paused-0',
+      'fade-connected-paused-1',
+      'fade-connected-paused-2',
+      'tray-paused',
+    ]);
+  });
+
+  it('reduced motion: an instant switch, no timers', () => {
+    const { clock, out, engine } = fadeSetup(true);
+    engine.set({ state: 'paused' });
+    expect(out).toEqual(['tray-connected', 'tray-paused']);
+    expect(clock.pendingCount).toBe(0);
+  });
+
+  it('a pulse during a fade waits for it', () => {
+    const { clock, out, engine } = fadeSetup();
+    engine.set({ state: 'paused' });
+    engine.pulse('msg-out');
+    clock.advance(1000);
+    expect(out.indexOf('msg-out-0')).toBeGreaterThan(out.indexOf('fade-connected-paused-2'));
+    expect(out.at(-1)).toBe('tray-paused');
+  });
+});
+
+describe('TrayEngine render failures (L4)', () => {
+  it('a render that throws stops the animation and shows the settle frame; no throw from the timer', () => {
+    let fail = false;
+    const { clock, out, engine } = fadeSetup(false, (f) => {
+      if (fail && f.id === 'msg-out-2') throw new Error('bad image');
+    });
+    fail = true;
+    engine.pulse('msg-out');
+    expect(() => clock.advance(40 * 2)).not.toThrow();
+    expect(engine.animating).toBeNull();
+    expect(clock.pendingCount).toBe(0);
+    expect(out.at(-1)).toBe('tray-connected');
+    // The engine keeps working afterwards.
+    fail = false;
+    engine.pulse('msg-in');
+    clock.advance(1000);
+    expect(out.at(-1)).toBe('tray-connected-unread');
+  });
+
+  it('when the settle frame itself throws, it stops quietly', () => {
+    const clock = new ManualClock();
+    const engine = new TrayEngine({
+      sequences: SEQUENCES,
+      timers: clock,
+      render: () => {
+        throw new Error('no images at all');
+      },
+      initial: { state: 'connecting' },
+    });
+    expect(() => clock.advance(500)).not.toThrow();
+    expect(() => engine.pulse('approval')).not.toThrow();
+    expect(clock.pendingCount).toBe(0);
+  });
+});

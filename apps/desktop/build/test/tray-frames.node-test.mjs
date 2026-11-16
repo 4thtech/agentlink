@@ -18,7 +18,16 @@ test('tray manifest: sequences, frame counts and duration', () => {
   const n = Object.fromEntries(
     Object.entries(manifest.sequences).map(([k, v]) => [k, v.frames.length]),
   );
+  const fades = Object.keys(n).filter((k) => k.startsWith('fade-'));
+  for (const k of fades) delete n[k];
   assert.deepEqual(n, { 'msg-in': 8, 'msg-out': 8, approval: 6, connecting: 8, static: 6 });
+  // TRAY-ENGINE: a 3-step crossfade from each other static variant into paused, offline, update.
+  assert.equal(fades.length, 15);
+  for (const k of fades) {
+    assert.match(k, /^fade-[a-z-]+-(paused|offline|update)$/);
+    assert.equal(manifest.sequences[k].frames.length, 3);
+    assert.equal(manifest.sequences[k].loop, false);
+  }
   assert.equal(manifest.frameMs, 40);
   assert.equal(manifest.sequences.connecting.loop, true);
 });

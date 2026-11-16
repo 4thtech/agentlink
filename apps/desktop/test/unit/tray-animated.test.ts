@@ -70,6 +70,7 @@ function frames(platform: string) {
     },
     readFile: (p) => new TextEncoder().encode(p),
     fallback: () => new Img('builtin'),
+    isFile: () => true,
   });
 }
 
@@ -201,6 +202,55 @@ describe('AppTray with frames', () => {
     app.setAppMotion(true);
     app.setIndicator({ state: 'connected' });
     expect(last(Tray.last!)).toContain('tray-approvalsTemplate.png');
+  });
+
+  it('reads reduced motion again at each pulse and indicator change (M1)', () => {
+    const clock = new ManualClock();
+    const { sys, prefs } = system(true, false);
+    const app = new AppTray(
+      electron,
+      '/i',
+      { open: () => {}, quit: () => {}, click: () => {} },
+      {
+        frames: frames('darwin'),
+        system: sys,
+        timers: clock,
+        platform: 'darwin',
+        initial: { state: 'connected' },
+      },
+    );
+    prefs.reduced = true; // no nativeTheme 'updated' event
+    app.pulse('msg-in');
+    expect(clock.pendingCount).toBe(0);
+    expect(last(Tray.last!)).toContain('tray-connected-unreadTemplate.png');
+    prefs.reduced = false;
+    app.setIndicator({ state: 'connecting' });
+    expect(clock.pendingCount).toBe(1); // the loop runs again
+    prefs.reduced = true;
+    app.setIndicator({ state: 'paused' });
+    expect(clock.pendingCount).toBe(0); // instant, no fade
+    expect(last(Tray.last!)).toContain('tray-pausedTemplate.png');
+  });
+
+  it('a state change into paused fades with the generated frames', () => {
+    const clock = new ManualClock();
+    const { sys } = system();
+    const app = new AppTray(
+      electron,
+      '/i',
+      { open: () => {}, quit: () => {}, click: () => {} },
+      {
+        frames: frames('darwin'),
+        system: sys,
+        timers: clock,
+        platform: 'darwin',
+        initial: { state: 'connected' },
+      },
+    );
+    app.setIndicator({ state: 'paused' });
+    expect(last(Tray.last!)).toContain('fade-connected-paused-0Template.png');
+    clock.advance(200);
+    expect(last(Tray.last!)).toContain('tray-pausedTemplate.png');
   });
 
   it('destroy clears every timer', () => {

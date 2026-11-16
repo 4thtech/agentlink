@@ -3,7 +3,7 @@
 // maps frame ids to images per platform, and falls back: missing frame -> the static variant the
 // engine settles on -> the built-in image. macOS: Template PNGs (Electron picks the @2x file next to
 // it). Windows: the dark or light taskbar set, 16 px at 1x and 32 px at 2x.
-import { readFileSync } from 'node:fs';
+import { lstatSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { TrayAnimation, TraySequence, TraySequences } from './tray-engine.js';
 
@@ -46,7 +46,18 @@ const ANIMATIONS: readonly TrayAnimation[] = ['msg-in', 'msg-out', 'approval', '
 // A relative path inside the tray folder: one known sub-folder, a plain file name, .png.
 const SAFE_PATH = /^(macos|windows)\/[A-Za-z0-9][A-Za-z0-9_-]*(@2x)?\.png$/;
 const SAFE_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
-const MAX_FRAMES = 256;
+const MAX_FRAMES = 256; // per sequence
+const MAX_SEQUENCES = 64;
+const MAX_TOTAL_FRAMES = 512;
+
+/** A regular file (lstat: a symlink is refused). */
+export function isRegularFile(path: string): boolean {
+  try {
+    return lstatSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -85,7 +96,9 @@ export function parseTrayManifest(json: unknown): TrayManifest {
   }
   const frames = new Map<string, TrayFrameFiles>();
   const sequences = new Map<string, TraySequence>();
-  for (const [name, raw] of Object.entries(json.sequences)) {
+  const entries = Object.entries(json.sequences);
+  if (entries.length > MAX_SEQUENCES) fail('too many sequences');
+  for (const [name, raw] of entries) {
     if (!SAFE_ID.test(name) || !isRecord(raw)) fail(`sequence ${name}`);
     if (
       typeof raw.loop !== 'boolean' ||
@@ -108,6 +121,7 @@ export function parseTrayManifest(json: unknown): TrayManifest {
         }),
       });
       frames.set(f.id, files);
+      if (frames.size > MAX_TOTAL_FRAMES) fail('too many frames');
       ids.push(f.id);
     }
     sequences.set(
@@ -132,7 +146,11 @@ export function engineSequences(manifest: TrayManifest): TraySequences {
       loop: name === 'connecting',
     };
   }
-  return Object.freeze(out);
+  const fades: Record<string, TraySequence> = {};
+  for (const [name, seq] of manifest.sequences) {
+    if (name.startsWith('fade-') && !seq.loop) fades[name] = seq;
+  }
+  return Object.freeze({ ...out, fades: Object.freeze(fades) });
 }
 
 export interface TrayFramesOptions {
@@ -144,6 +162,8 @@ export interface TrayFramesOptions {
   /** The last fallback: the built-in image (tray.ts BUILTIN_TRAY_PNG). */
   readonly fallback: () => TrayImage;
   readonly readFile?: (path: string) => Uint8Array;
+  /** Regular files only, never a symlink (default: lstat). */
+  readonly isFile?: (path: string) => boolean;
 }
 
 export class TrayFrames {
@@ -193,6 +213,9 @@ export class TrayFrames {
     const files = this.#o.manifest.frames.get(id);
     if (files === undefined) return null;
     const { dir, nativeImage } = this.#o;
+    const isFile = this.#o.isFile ?? isRegularFile;
+    const list = this.isMac ? files.macos : files.windows[theme];
+    if (!list.every((p) => isFile(join(dir, p)))) return null;
     if (this.isMac) {
       const first = files.macos[0];
       if (first === undefined) return null;
@@ -223,6 +246,7 @@ export type LoadTrayFramesOptions = Omit<TrayFramesOptions, 'manifest'>;
 export function loadTrayFrames(options: LoadTrayFramesOptions): TrayFrames | null {
   const read = options.readFile ?? ((p: string) => readFileSync(p));
   try {
+    if (!(options.isFile ?? isRegularFile)(join(options.dir, 'manifest.json'))) return null;
     const text = new TextDecoder('utf-8', { fatal: true }).decode(
       read(join(options.dir, 'manifest.json')),
     );

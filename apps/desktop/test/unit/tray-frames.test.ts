@@ -63,7 +63,15 @@ describe('parseTrayManifest', () => {
     expect(seqs['msg-in'].loop).toBe(false);
     expect(seqs['msg-out'].frames.length).toBeGreaterThan(0);
     expect(seqs.approval.frames.length).toBeGreaterThan(0);
-    for (const s of Object.values(seqs)) expect(s.frameMs).toBeGreaterThanOrEqual(16);
+    for (const s of [seqs['msg-in'], seqs['msg-out'], seqs.approval, seqs.connecting]) {
+      expect(s.frameMs).toBeGreaterThanOrEqual(16);
+    }
+    // M2: the generated crossfades into paused, offline and update (3 frames each).
+    const fades = seqs.fades ?? {};
+    expect(Object.keys(fades)).toHaveLength(15);
+    expect(fades['fade-connected-paused']?.frames).toHaveLength(3);
+    expect(fades['fade-connected-unread-offline']?.frames).toHaveLength(3);
+    expect(fades['fade-approvals-update']?.frames).toHaveLength(3);
     const ids = new Set(manifest.frames.keys());
     for (const id of Object.values(STATIC_FRAMES)) expect(ids.has(id)).toBe(true);
   });
@@ -111,6 +119,25 @@ describe('parseTrayManifest', () => {
     expect(() => parseTrayManifest(bad('macos/aTemplate.png'))).not.toThrow();
   });
 
+  it('caps the sequence and frame counts (L6)', () => {
+    const frame = (id: string) => ({
+      id,
+      macos: ['macos/a.png', 'macos/a@2x.png'],
+      windows: { dark: ['windows/a.png'], light: ['windows/b.png'] },
+    });
+    const many = Object.fromEntries(
+      Array.from({ length: 65 }, (_, i) => [`s${i}`, { loop: false, frames: [frame(`f${i}`)] }]),
+    );
+    expect(() => parseTrayManifest({ frameMs: 40, sequences: many })).toThrow(/sequences/);
+    const big = Object.fromEntries(
+      Array.from({ length: 3 }, (_, s) => [
+        `s${s}`,
+        { loop: false, frames: Array.from({ length: 200 }, (_, i) => frame(`f${s}-${i}`)) },
+      ]),
+    );
+    expect(() => parseTrayManifest({ frameMs: 40, sequences: big })).toThrow(/frames/);
+  });
+
   it('refuses a malformed manifest', () => {
     expect(() => parseTrayManifest(null)).toThrow();
     expect(() => parseTrayManifest({ sequences: [] })).toThrow();
@@ -131,6 +158,7 @@ describe('TrayFrames', () => {
       platform: 'darwin',
       nativeImage: images,
       fallback: builtin,
+      isFile: () => true,
     });
     const img = frames.image('msg-in-3', 'tray-connected', 'light') as Img;
     expect(img.source).toBe(join('/res/assets/tray', 'macos', 'msg-in-3Template.png'));
@@ -148,6 +176,7 @@ describe('TrayFrames', () => {
       platform: 'win32',
       nativeImage: images,
       fallback: builtin,
+      isFile: () => true,
       readFile: (p) => {
         read.push(p);
         return new Uint8Array([1, 2, 3]);
@@ -170,6 +199,7 @@ describe('TrayFrames', () => {
       platform: 'darwin',
       nativeImage: images,
       fallback: builtin,
+      isFile: () => true,
     });
     expect((frames.image('msg-in-2', 'tray-connected-unread', 'dark') as Img).source).toContain(
       'tray-connected-unreadTemplate.png',
@@ -185,9 +215,26 @@ describe('TrayFrames', () => {
       platform: 'darwin',
       nativeImage: none.images,
       fallback: builtin,
+      isFile: () => true,
     });
     const img = empty.image('msg-in-2', 'tray-connected', 'dark') as Img;
     expect(img.source).toBe('builtin');
+  });
+
+  it('a frame that is not a regular file (a symlink) is never loaded (L6)', () => {
+    const { images, created } = fakeImages(() => true);
+    const frames = new TrayFrames({
+      manifest,
+      dir: '/r',
+      platform: 'darwin',
+      nativeImage: images,
+      fallback: builtin,
+      isFile: (p) => !p.includes('msg-in-2'),
+    });
+    expect((frames.image('msg-in-2', 'tray-connected', 'dark') as Img).source).toContain(
+      'tray-connectedTemplate.png',
+    );
+    expect(created.some((i) => i.source.includes('msg-in-2'))).toBe(false);
   });
 
   it('Windows: an unreadable file falls back too (no throw)', () => {
@@ -198,6 +245,7 @@ describe('TrayFrames', () => {
       platform: 'win32',
       nativeImage: images,
       fallback: builtin,
+      isFile: () => true,
       readFile: () => {
         throw new Error('ENOENT');
       },

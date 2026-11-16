@@ -128,20 +128,41 @@ function sequences() {
       ),
     },
     static: { loop: false, frames: Object.values(STATIC), ids: Object.keys(STATIC) },
+    ...fades(),
   };
+}
+
+/** The static variants that fade in (D-155 / b11 25.4): paused, offline and update. */
+export const FADE_TARGETS = ['paused', 'offline', 'update'];
+/** Opacity steps of a crossfade: 3 frames at FRAME_MS, then the target's static frame. */
+export const FADE_STEPS = [0.25, 0.5, 0.75];
+
+/** `fade-<from>-<to>`: a crossfade from any static variant to a fade target (not itself). */
+function fades() {
+  const out = {};
+  for (const to of FADE_TARGETS) {
+    for (const from of Object.keys(STATIC)) {
+      if (from === to) continue;
+      out[`fade-${from}-${to}`] = {
+        loop: false,
+        frames: FADE_STEPS.map((t) => ({ blend: { from: STATIC[from], to: STATIC[to], t } })),
+      };
+    }
+  }
+  return out;
 }
 
 /** Every frame: [{ id, sequence, index, loop, shapes }] in manifest order. */
 export function allFrames() {
   const out = [];
   for (const [name, s] of Object.entries(sequences())) {
-    s.frames.forEach((shapes, index) =>
+    s.frames.forEach((f, index) =>
       out.push({
         id: s.ids ? `tray-${s.ids[index]}` : `${name}-${index}`,
         sequence: name,
         index,
         loop: s.loop,
-        shapes,
+        ...(Array.isArray(f) ? { shapes: f } : { shapes: [], blend: f.blend }),
       }),
     );
   }
@@ -151,18 +172,28 @@ export function allFrames() {
 // ---------- SVG ----------
 const pathD = (subs) => subs.map((p) => 'M' + p.map(([x, y]) => `${R(x)} ${R(y)}`).join('L') + 'Z').join(' ');
 export function toSvg(frame) {
+  const title = `<title>AgentLink tray: ${frame.id}</title>`;
+  const open = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">';
+  if (frame.blend) {
+    const { from, to, t } = frame.blend;
+    const g = (shapes, o, m) => `<g opacity="${R(o)}">${svgBody(shapes, m)}</g>`;
+    return `${open}${title}${g(from, 1 - t, 'm0')}${g(to, t, 'm1')}</svg>\n`;
+  }
+  return `${open}${title}${svgBody(frame.shapes, 'm')}</svg>\n`;
+}
+function svgBody(shapes, maskId) {
   const el = (s, fill = '#000000') =>
     `<path fill="${fill}"${s.rule === 'evenodd' ? ' fill-rule="evenodd"' : ''}${
       s.opacity !== 1 ? ` opacity="${s.opacity}"` : ''
     } d="${pathD(s.subs)}"/>`;
-  const content = frame.shapes.filter((s) => s.layer === 'content').map((s) => el(s)).join('');
-  const erase = frame.shapes.filter((s) => s.layer === 'erase');
-  const overlay = frame.shapes.filter((s) => s.layer === 'overlay').map((s) => el(s)).join('');
+  const content = shapes.filter((s) => s.layer === 'content').map((s) => el(s)).join('');
+  const erase = shapes.filter((s) => s.layer === 'erase');
+  const overlay = shapes.filter((s) => s.layer === 'overlay').map((s) => el(s)).join('');
   const mask = erase.length
-    ? `<mask id="m"><rect width="16" height="16" fill="#fff"/>${erase.map((s) => el(s, '#000')).join('')}</mask>`
+    ? `<mask id="${maskId}"><rect width="16" height="16" fill="#fff"/>${erase.map((s) => el(s, '#000')).join('')}</mask>`
     : '';
-  const body = erase.length ? `<g mask="url(#m)">${content}</g>` : content;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16"><title>AgentLink tray: ${frame.id}</title>${mask}${body}${overlay}</svg>\n`;
+  const body = erase.length ? `<g mask="url(#${maskId})">${content}</g>` : content;
+  return `${mask}${body}${overlay}`;
 }
 
 // ---------- raster ----------
@@ -187,6 +218,13 @@ function inside(subs, rule, x, y) {
 
 /** Alpha coverage (0..1) of a frame at `size` px square, supersampled. */
 export function coverage(frame, size) {
+  if (frame.blend) {
+    // A crossfade: the two static frames' coverages mixed by t (deterministic, per pixel).
+    const { from, to, t } = frame.blend;
+    const a = coverage({ shapes: from }, size);
+    const b = coverage({ shapes: to }, size);
+    return a.map((v, i) => v * (1 - t) + b[i] * t);
+  }
   const k = 16 / size;
   const out = new Float32Array(size * size);
   const order = ['content', 'erase', 'overlay'].flatMap((l) =>

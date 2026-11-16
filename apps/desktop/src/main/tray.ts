@@ -199,12 +199,14 @@ export class AppTray {
   /** The icon's state, unread ring and approvals variant (no-op without frames). */
   setIndicator(next: Partial<TrayIndicator>): void {
     if (this.#destroyed) return;
+    this.#engine?.setReducedMotion(this.#reduced()); // read at each trigger (no OS event for it)
     this.#engine?.set(next);
   }
 
   /** A one-shot animation: msg-in, msg-out or approval (coalesced; none under reduced motion). */
   pulse(kind: TrayPulse): void {
     if (this.#destroyed) return;
+    this.#engine?.setReducedMotion(this.#reduced());
     this.#engine?.pulse(kind);
   }
 

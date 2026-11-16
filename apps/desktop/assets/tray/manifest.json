@@ -688,6 +688,906 @@
           }
         }
       ]
+    },
+    "fade-connected-paused": {
+      "loop": false,
+      "frameMs": 40,
+      "frames": [
+        {
+          "id": "fade-connected-paused-0",
+          "svg": "svg/fade-connected-paused-0.svg",
+          "macos": [
+            "macos/fade-connected-paused-0Template.png",
+            "macos/fade-connected-paused-0Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-paused-0-dark-taskbar-16.png",
+              "windows/fade-connected-paused-0-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-paused-0-light-taskbar-16.png",
+              "windows/fade-connected-paused-0-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-connected-paused-1",
+          "svg": "svg/fade-connected-paused-1.svg",
+          "macos": [
+            "macos/fade-connected-paused-1Template.png",
+            "macos/fade-connected-paused-1Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-paused-1-dark-taskbar-16.png",
+              "windows/fade-connected-paused-1-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-paused-1-light-taskbar-16.png",
+              "windows/fade-connected-paused-1-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-connected-paused-2",
+          "svg": "svg/fade-connected-paused-2.svg",
+          "macos": [
+            "macos/fade-connected-paused-2Template.png",
+            "macos/fade-connected-paused-2Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-paused-2-dark-taskbar-16.png",
+              "windows/fade-connected-paused-2-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-paused-2-light-taskbar-16.png",
+              "windows/fade-connected-paused-2-light-taskbar-32.png"
+            ]
+          }
+        }
+      ]
+    },
+    "fade-connected-unread-paused": {
+      "loop": false,
+      "frameMs": 40,
+      "frames": [
+        {
+          "id": "fade-connected-unread-paused-0",
+          "svg": "svg/fade-connected-unread-paused-0.svg",
+          "macos": [
+            "macos/fade-connected-unread-paused-0Template.png",
+            "macos/fade-connected-unread-paused-0Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-unread-paused-0-dark-taskbar-16.png",
+              "windows/fade-connected-unread-paused-0-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-unread-paused-0-light-taskbar-16.png",
+              "windows/fade-connected-unread-paused-0-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-connected-unread-paused-1",
+          "svg": "svg/fade-connected-unread-paused-1.svg",
+          "macos": [
+            "macos/fade-connected-unread-paused-1Template.png",
+            "macos/fade-connected-unread-paused-1Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-unread-paused-1-dark-taskbar-16.png",
+              "windows/fade-connected-unread-paused-1-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-unread-paused-1-light-taskbar-16.png",
+              "windows/fade-connected-unread-paused-1-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-connected-unread-paused-2",
+          "svg": "svg/fade-connected-unread-paused-2.svg",
+          "macos": [
+            "macos/fade-connected-unread-paused-2Template.png",
+            "macos/fade-connected-unread-paused-2Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-unread-paused-2-dark-taskbar-16.png",
+              "windows/fade-connected-unread-paused-2-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-unread-paused-2-light-taskbar-16.png",
+              "windows/fade-connected-unread-paused-2-light-taskbar-32.png"
+            ]
+          }
+        }
+      ]
+    },
+    "fade-approvals-paused": {
+      "loop": false,
+      "frameMs": 40,
+      "frames": [
+        {
+          "id": "fade-approvals-paused-0",
+          "svg": "svg/fade-approvals-paused-0.svg",
+          "macos": [
+            "macos/fade-approvals-paused-0Template.png",
+            "macos/fade-approvals-paused-0Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-approvals-paused-0-dark-taskbar-16.png",
+              "windows/fade-approvals-paused-0-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-approvals-paused-0-light-taskbar-16.png",
+              "windows/fade-approvals-paused-0-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-approvals-paused-1",
+          "svg": "svg/fade-approvals-paused-1.svg",
+          "macos": [
+            "macos/fade-approvals-paused-1Template.png",
+            "macos/fade-approvals-paused-1Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-approvals-paused-1-dark-taskbar-16.png",
+              "windows/fade-approvals-paused-1-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-approvals-paused-1-light-taskbar-16.png",
+              "windows/fade-approvals-paused-1-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-approvals-paused-2",
+          "svg": "svg/fade-approvals-paused-2.svg",
+          "macos": [
+            "macos/fade-approvals-paused-2Template.png",
+            "macos/fade-approvals-paused-2Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-approvals-paused-2-dark-taskbar-16.png",
+              "windows/fade-approvals-paused-2-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-approvals-paused-2-light-taskbar-16.png",
+              "windows/fade-approvals-paused-2-light-taskbar-32.png"
+            ]
+          }
+        }
+      ]
+    },
+    "fade-offline-paused": {
+      "loop": false,
+      "frameMs": 40,
+      "frames": [
+        {
+          "id": "fade-offline-paused-0",
+          "svg": "svg/fade-offline-paused-0.svg",
+          "macos": [
+            "macos/fade-offline-paused-0Template.png",
+            "macos/fade-offline-paused-0Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-offline-paused-0-dark-taskbar-16.png",
+              "windows/fade-offline-paused-0-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-offline-paused-0-light-taskbar-16.png",
+              "windows/fade-offline-paused-0-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-offline-paused-1",
+          "svg": "svg/fade-offline-paused-1.svg",
+          "macos": [
+            "macos/fade-offline-paused-1Template.png",
+            "macos/fade-offline-paused-1Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-offline-paused-1-dark-taskbar-16.png",
+              "windows/fade-offline-paused-1-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-offline-paused-1-light-taskbar-16.png",
+              "windows/fade-offline-paused-1-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-offline-paused-2",
+          "svg": "svg/fade-offline-paused-2.svg",
+          "macos": [
+            "macos/fade-offline-paused-2Template.png",
+            "macos/fade-offline-paused-2Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-offline-paused-2-dark-taskbar-16.png",
+              "windows/fade-offline-paused-2-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-offline-paused-2-light-taskbar-16.png",
+              "windows/fade-offline-paused-2-light-taskbar-32.png"
+            ]
+          }
+        }
+      ]
+    },
+    "fade-update-paused": {
+      "loop": false,
+      "frameMs": 40,
+      "frames": [
+        {
+          "id": "fade-update-paused-0",
+          "svg": "svg/fade-update-paused-0.svg",
+          "macos": [
+            "macos/fade-update-paused-0Template.png",
+            "macos/fade-update-paused-0Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-update-paused-0-dark-taskbar-16.png",
+              "windows/fade-update-paused-0-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-update-paused-0-light-taskbar-16.png",
+              "windows/fade-update-paused-0-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-update-paused-1",
+          "svg": "svg/fade-update-paused-1.svg",
+          "macos": [
+            "macos/fade-update-paused-1Template.png",
+            "macos/fade-update-paused-1Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-update-paused-1-dark-taskbar-16.png",
+              "windows/fade-update-paused-1-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-update-paused-1-light-taskbar-16.png",
+              "windows/fade-update-paused-1-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-update-paused-2",
+          "svg": "svg/fade-update-paused-2.svg",
+          "macos": [
+            "macos/fade-update-paused-2Template.png",
+            "macos/fade-update-paused-2Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-update-paused-2-dark-taskbar-16.png",
+              "windows/fade-update-paused-2-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-update-paused-2-light-taskbar-16.png",
+              "windows/fade-update-paused-2-light-taskbar-32.png"
+            ]
+          }
+        }
+      ]
+    },
+    "fade-connected-offline": {
+      "loop": false,
+      "frameMs": 40,
+      "frames": [
+        {
+          "id": "fade-connected-offline-0",
+          "svg": "svg/fade-connected-offline-0.svg",
+          "macos": [
+            "macos/fade-connected-offline-0Template.png",
+            "macos/fade-connected-offline-0Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-offline-0-dark-taskbar-16.png",
+              "windows/fade-connected-offline-0-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-offline-0-light-taskbar-16.png",
+              "windows/fade-connected-offline-0-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-connected-offline-1",
+          "svg": "svg/fade-connected-offline-1.svg",
+          "macos": [
+            "macos/fade-connected-offline-1Template.png",
+            "macos/fade-connected-offline-1Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-offline-1-dark-taskbar-16.png",
+              "windows/fade-connected-offline-1-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-offline-1-light-taskbar-16.png",
+              "windows/fade-connected-offline-1-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-connected-offline-2",
+          "svg": "svg/fade-connected-offline-2.svg",
+          "macos": [
+            "macos/fade-connected-offline-2Template.png",
+            "macos/fade-connected-offline-2Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-offline-2-dark-taskbar-16.png",
+              "windows/fade-connected-offline-2-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-offline-2-light-taskbar-16.png",
+              "windows/fade-connected-offline-2-light-taskbar-32.png"
+            ]
+          }
+        }
+      ]
+    },
+    "fade-connected-unread-offline": {
+      "loop": false,
+      "frameMs": 40,
+      "frames": [
+        {
+          "id": "fade-connected-unread-offline-0",
+          "svg": "svg/fade-connected-unread-offline-0.svg",
+          "macos": [
+            "macos/fade-connected-unread-offline-0Template.png",
+            "macos/fade-connected-unread-offline-0Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-unread-offline-0-dark-taskbar-16.png",
+              "windows/fade-connected-unread-offline-0-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-unread-offline-0-light-taskbar-16.png",
+              "windows/fade-connected-unread-offline-0-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-connected-unread-offline-1",
+          "svg": "svg/fade-connected-unread-offline-1.svg",
+          "macos": [
+            "macos/fade-connected-unread-offline-1Template.png",
+            "macos/fade-connected-unread-offline-1Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-unread-offline-1-dark-taskbar-16.png",
+              "windows/fade-connected-unread-offline-1-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-unread-offline-1-light-taskbar-16.png",
+              "windows/fade-connected-unread-offline-1-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-connected-unread-offline-2",
+          "svg": "svg/fade-connected-unread-offline-2.svg",
+          "macos": [
+            "macos/fade-connected-unread-offline-2Template.png",
+            "macos/fade-connected-unread-offline-2Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-unread-offline-2-dark-taskbar-16.png",
+              "windows/fade-connected-unread-offline-2-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-unread-offline-2-light-taskbar-16.png",
+              "windows/fade-connected-unread-offline-2-light-taskbar-32.png"
+            ]
+          }
+        }
+      ]
+    },
+    "fade-approvals-offline": {
+      "loop": false,
+      "frameMs": 40,
+      "frames": [
+        {
+          "id": "fade-approvals-offline-0",
+          "svg": "svg/fade-approvals-offline-0.svg",
+          "macos": [
+            "macos/fade-approvals-offline-0Template.png",
+            "macos/fade-approvals-offline-0Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-approvals-offline-0-dark-taskbar-16.png",
+              "windows/fade-approvals-offline-0-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-approvals-offline-0-light-taskbar-16.png",
+              "windows/fade-approvals-offline-0-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-approvals-offline-1",
+          "svg": "svg/fade-approvals-offline-1.svg",
+          "macos": [
+            "macos/fade-approvals-offline-1Template.png",
+            "macos/fade-approvals-offline-1Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-approvals-offline-1-dark-taskbar-16.png",
+              "windows/fade-approvals-offline-1-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-approvals-offline-1-light-taskbar-16.png",
+              "windows/fade-approvals-offline-1-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-approvals-offline-2",
+          "svg": "svg/fade-approvals-offline-2.svg",
+          "macos": [
+            "macos/fade-approvals-offline-2Template.png",
+            "macos/fade-approvals-offline-2Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-approvals-offline-2-dark-taskbar-16.png",
+              "windows/fade-approvals-offline-2-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-approvals-offline-2-light-taskbar-16.png",
+              "windows/fade-approvals-offline-2-light-taskbar-32.png"
+            ]
+          }
+        }
+      ]
+    },
+    "fade-paused-offline": {
+      "loop": false,
+      "frameMs": 40,
+      "frames": [
+        {
+          "id": "fade-paused-offline-0",
+          "svg": "svg/fade-paused-offline-0.svg",
+          "macos": [
+            "macos/fade-paused-offline-0Template.png",
+            "macos/fade-paused-offline-0Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-paused-offline-0-dark-taskbar-16.png",
+              "windows/fade-paused-offline-0-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-paused-offline-0-light-taskbar-16.png",
+              "windows/fade-paused-offline-0-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-paused-offline-1",
+          "svg": "svg/fade-paused-offline-1.svg",
+          "macos": [
+            "macos/fade-paused-offline-1Template.png",
+            "macos/fade-paused-offline-1Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-paused-offline-1-dark-taskbar-16.png",
+              "windows/fade-paused-offline-1-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-paused-offline-1-light-taskbar-16.png",
+              "windows/fade-paused-offline-1-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-paused-offline-2",
+          "svg": "svg/fade-paused-offline-2.svg",
+          "macos": [
+            "macos/fade-paused-offline-2Template.png",
+            "macos/fade-paused-offline-2Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-paused-offline-2-dark-taskbar-16.png",
+              "windows/fade-paused-offline-2-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-paused-offline-2-light-taskbar-16.png",
+              "windows/fade-paused-offline-2-light-taskbar-32.png"
+            ]
+          }
+        }
+      ]
+    },
+    "fade-update-offline": {
+      "loop": false,
+      "frameMs": 40,
+      "frames": [
+        {
+          "id": "fade-update-offline-0",
+          "svg": "svg/fade-update-offline-0.svg",
+          "macos": [
+            "macos/fade-update-offline-0Template.png",
+            "macos/fade-update-offline-0Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-update-offline-0-dark-taskbar-16.png",
+              "windows/fade-update-offline-0-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-update-offline-0-light-taskbar-16.png",
+              "windows/fade-update-offline-0-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-update-offline-1",
+          "svg": "svg/fade-update-offline-1.svg",
+          "macos": [
+            "macos/fade-update-offline-1Template.png",
+            "macos/fade-update-offline-1Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-update-offline-1-dark-taskbar-16.png",
+              "windows/fade-update-offline-1-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-update-offline-1-light-taskbar-16.png",
+              "windows/fade-update-offline-1-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-update-offline-2",
+          "svg": "svg/fade-update-offline-2.svg",
+          "macos": [
+            "macos/fade-update-offline-2Template.png",
+            "macos/fade-update-offline-2Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-update-offline-2-dark-taskbar-16.png",
+              "windows/fade-update-offline-2-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-update-offline-2-light-taskbar-16.png",
+              "windows/fade-update-offline-2-light-taskbar-32.png"
+            ]
+          }
+        }
+      ]
+    },
+    "fade-connected-update": {
+      "loop": false,
+      "frameMs": 40,
+      "frames": [
+        {
+          "id": "fade-connected-update-0",
+          "svg": "svg/fade-connected-update-0.svg",
+          "macos": [
+            "macos/fade-connected-update-0Template.png",
+            "macos/fade-connected-update-0Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-update-0-dark-taskbar-16.png",
+              "windows/fade-connected-update-0-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-update-0-light-taskbar-16.png",
+              "windows/fade-connected-update-0-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-connected-update-1",
+          "svg": "svg/fade-connected-update-1.svg",
+          "macos": [
+            "macos/fade-connected-update-1Template.png",
+            "macos/fade-connected-update-1Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-update-1-dark-taskbar-16.png",
+              "windows/fade-connected-update-1-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-update-1-light-taskbar-16.png",
+              "windows/fade-connected-update-1-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-connected-update-2",
+          "svg": "svg/fade-connected-update-2.svg",
+          "macos": [
+            "macos/fade-connected-update-2Template.png",
+            "macos/fade-connected-update-2Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-update-2-dark-taskbar-16.png",
+              "windows/fade-connected-update-2-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-update-2-light-taskbar-16.png",
+              "windows/fade-connected-update-2-light-taskbar-32.png"
+            ]
+          }
+        }
+      ]
+    },
+    "fade-connected-unread-update": {
+      "loop": false,
+      "frameMs": 40,
+      "frames": [
+        {
+          "id": "fade-connected-unread-update-0",
+          "svg": "svg/fade-connected-unread-update-0.svg",
+          "macos": [
+            "macos/fade-connected-unread-update-0Template.png",
+            "macos/fade-connected-unread-update-0Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-unread-update-0-dark-taskbar-16.png",
+              "windows/fade-connected-unread-update-0-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-unread-update-0-light-taskbar-16.png",
+              "windows/fade-connected-unread-update-0-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-connected-unread-update-1",
+          "svg": "svg/fade-connected-unread-update-1.svg",
+          "macos": [
+            "macos/fade-connected-unread-update-1Template.png",
+            "macos/fade-connected-unread-update-1Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-unread-update-1-dark-taskbar-16.png",
+              "windows/fade-connected-unread-update-1-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-unread-update-1-light-taskbar-16.png",
+              "windows/fade-connected-unread-update-1-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-connected-unread-update-2",
+          "svg": "svg/fade-connected-unread-update-2.svg",
+          "macos": [
+            "macos/fade-connected-unread-update-2Template.png",
+            "macos/fade-connected-unread-update-2Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-connected-unread-update-2-dark-taskbar-16.png",
+              "windows/fade-connected-unread-update-2-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-connected-unread-update-2-light-taskbar-16.png",
+              "windows/fade-connected-unread-update-2-light-taskbar-32.png"
+            ]
+          }
+        }
+      ]
+    },
+    "fade-approvals-update": {
+      "loop": false,
+      "frameMs": 40,
+      "frames": [
+        {
+          "id": "fade-approvals-update-0",
+          "svg": "svg/fade-approvals-update-0.svg",
+          "macos": [
+            "macos/fade-approvals-update-0Template.png",
+            "macos/fade-approvals-update-0Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-approvals-update-0-dark-taskbar-16.png",
+              "windows/fade-approvals-update-0-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-approvals-update-0-light-taskbar-16.png",
+              "windows/fade-approvals-update-0-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-approvals-update-1",
+          "svg": "svg/fade-approvals-update-1.svg",
+          "macos": [
+            "macos/fade-approvals-update-1Template.png",
+            "macos/fade-approvals-update-1Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-approvals-update-1-dark-taskbar-16.png",
+              "windows/fade-approvals-update-1-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-approvals-update-1-light-taskbar-16.png",
+              "windows/fade-approvals-update-1-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-approvals-update-2",
+          "svg": "svg/fade-approvals-update-2.svg",
+          "macos": [
+            "macos/fade-approvals-update-2Template.png",
+            "macos/fade-approvals-update-2Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-approvals-update-2-dark-taskbar-16.png",
+              "windows/fade-approvals-update-2-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-approvals-update-2-light-taskbar-16.png",
+              "windows/fade-approvals-update-2-light-taskbar-32.png"
+            ]
+          }
+        }
+      ]
+    },
+    "fade-paused-update": {
+      "loop": false,
+      "frameMs": 40,
+      "frames": [
+        {
+          "id": "fade-paused-update-0",
+          "svg": "svg/fade-paused-update-0.svg",
+          "macos": [
+            "macos/fade-paused-update-0Template.png",
+            "macos/fade-paused-update-0Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-paused-update-0-dark-taskbar-16.png",
+              "windows/fade-paused-update-0-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-paused-update-0-light-taskbar-16.png",
+              "windows/fade-paused-update-0-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-paused-update-1",
+          "svg": "svg/fade-paused-update-1.svg",
+          "macos": [
+            "macos/fade-paused-update-1Template.png",
+            "macos/fade-paused-update-1Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-paused-update-1-dark-taskbar-16.png",
+              "windows/fade-paused-update-1-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-paused-update-1-light-taskbar-16.png",
+              "windows/fade-paused-update-1-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-paused-update-2",
+          "svg": "svg/fade-paused-update-2.svg",
+          "macos": [
+            "macos/fade-paused-update-2Template.png",
+            "macos/fade-paused-update-2Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-paused-update-2-dark-taskbar-16.png",
+              "windows/fade-paused-update-2-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-paused-update-2-light-taskbar-16.png",
+              "windows/fade-paused-update-2-light-taskbar-32.png"
+            ]
+          }
+        }
+      ]
+    },
+    "fade-offline-update": {
+      "loop": false,
+      "frameMs": 40,
+      "frames": [
+        {
+          "id": "fade-offline-update-0",
+          "svg": "svg/fade-offline-update-0.svg",
+          "macos": [
+            "macos/fade-offline-update-0Template.png",
+            "macos/fade-offline-update-0Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-offline-update-0-dark-taskbar-16.png",
+              "windows/fade-offline-update-0-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-offline-update-0-light-taskbar-16.png",
+              "windows/fade-offline-update-0-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-offline-update-1",
+          "svg": "svg/fade-offline-update-1.svg",
+          "macos": [
+            "macos/fade-offline-update-1Template.png",
+            "macos/fade-offline-update-1Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-offline-update-1-dark-taskbar-16.png",
+              "windows/fade-offline-update-1-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-offline-update-1-light-taskbar-16.png",
+              "windows/fade-offline-update-1-light-taskbar-32.png"
+            ]
+          }
+        },
+        {
+          "id": "fade-offline-update-2",
+          "svg": "svg/fade-offline-update-2.svg",
+          "macos": [
+            "macos/fade-offline-update-2Template.png",
+            "macos/fade-offline-update-2Template@2x.png"
+          ],
+          "windows": {
+            "dark": [
+              "windows/fade-offline-update-2-dark-taskbar-16.png",
+              "windows/fade-offline-update-2-dark-taskbar-32.png"
+            ],
+            "light": [
+              "windows/fade-offline-update-2-light-taskbar-16.png",
+              "windows/fade-offline-update-2-light-taskbar-32.png"
+            ]
+          }
+        }
+      ]
     }
   }
 }
