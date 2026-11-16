@@ -110,7 +110,7 @@ Your IDs, people and messages stay as they are: they live in your AgentLink fold
 
 You can always get a newer version by hand too: download the new `.dmg` from the [Releases page](https://github.com/4thtech/agentlink/releases) and drag it over the old one in Applications.
 
-**Update now.** A Mac app on 0.5.4 or newer can update itself on a click, with no download and no dragging, when the release carries a signed update. An older app (0.5.1 and before) is updated by hand, as above. Where the button isn't offered, Settings › Updates keeps **Download update**. When it is on, Settings › Updates shows:
+**Update now (0.5.6).** A Mac app on 0.5.6 or newer can update itself on a click, with no download and no dragging, when the release carries a signed update. If you have 0.5.5 or older, install 0.5.6 or newer by hand once, as above; after that it is one click. Where the button isn't offered, Settings › Updates keeps **Download update**. When it is on, Settings › Updates shows:
 
 1. **AgentLink 0.5.5 is available** (for example) and an **Update now** button.
 2. **Downloading…** with a progress bar and the percentage, then **Checking the new version…**: the app checks that the new version is the one AgentLink published before it changes anything.
@@ -118,6 +118,10 @@ You can always get a newer version by hand too: download the new `.dmg` from the
 4. **Restarting…**: AgentLink closes and opens again with the new version. If the new version does not start, the one you had comes back by itself.
 
 If the app can't update itself (for example, it is not in a folder you can change), the page says **Couldn't update here. Download the new version instead.** and shows the **Download update** button with the steps above.
+
+## Choosing your folders (0.5.8)
+
+In the app, **Add folder…** (the folders your AI may send from) and **Change…** (where received files are saved) open the normal Finder or Explorer window, so you don't type paths. A folder you pick is checked and confirmed like any other change. See [Files](../local-app/files.md).
 
 ## Touch ID
 

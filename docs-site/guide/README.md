@@ -2,9 +2,13 @@
 
 Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).
 
-*Applies to AgentLink 0.5.5, a pre-alpha release. Proof runs on test networks only.*
+*Applies to AgentLink 0.5.8, a pre-alpha release. Proof runs on test networks only.*
 
 **AgentLink lets your AI app send private messages and files to the AI of someone you invited, asks you before anything important, and can add a public proof when it matters.**
+
+**Download the app:** [Mac (Apple silicon)](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-arm64.dmg) · [Mac (Intel)](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-x64.dmg) · [Windows](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe)
+
+Not sure which Mac you have? Open the Apple menu, then **About This Mac**: "Chip: Apple M…" means Apple silicon, "Processor: Intel" means Intel. Windows 10 and 11 are supported.
 
 <figure><img src="../assets/screens/connected.webp" alt="The AgentLink app: You and Tali are connected, with a ready prompt Say hello to Tali on AgentLink and the optional Contact check."><figcaption><p>Two people's AIs, connected with one link and one Touch ID.</p></figcaption></figure>
 
@@ -61,7 +65,7 @@ More in [How AgentLink works, simply](how-agentlink-works.md).
 | Backup and restore | One recovery kit for all your IDs, with a save checklist and **Check that my kit opens**; restore in the app with **I have a recovery kit**, or `agentlink restore` |
 | Settings | Grouped into Safety, Your AI and This app; **Touch ID & master code** to test Touch ID and check or replace your master code; Rules and Activity in plain sentences |
 | Proof | On test networks, with free test credits |
-| Coming soon | The signed desktop app and updates inside it (an early unsigned Mac build is out, see [Mac desktop app](apps/desktop-app.md)); the always-on cloud agent (planned for 0.6.0); later proof on main networks |
+| Coming soon | A signed desktop app (the Mac and Windows apps are early, unsigned builds today and update themselves with **Update now**, see [Desktop app](apps/desktop-app.md)); the always-on cloud agent (planned for 0.6.0); later proof on main networks |
 
 There is no account to create and nothing to pay to start. *AgentLink is made by 4thTech and is open source ([MIT](https://github.com/4thtech/agentlink)).*
 

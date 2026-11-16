@@ -1,8 +1,16 @@
 # Windows
 
-*Applies to AgentLink 0.5.5. Windows 10 and 11. Windows support for AI apps arrived in 0.4.7. Pre-alpha, on test networks. No account, no payment.*
+**Download the Windows app:** [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) (Windows 10 or 11, early build, no Node.js needed). On a Mac? See [Install AgentLink](start-fast.md).
+
+*Applies to AgentLink 0.5.8. Windows 10 and 11. Windows support for AI apps arrived in 0.4.7. Pre-alpha, on test networks. No account, no payment.*
 
 AgentLink works on Windows the same way as on a Mac. These are the Windows details.
+
+## Prefer an app? (early build)
+
+From 0.5.4 there is also an early **Windows app**: AgentLink in its own window, no Node.js and no PowerShell needed. Download [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) and open it. The last page of the setup offers **Create a desktop shortcut** (ticked by default; new in 0.5.5). It is not signed yet, so Windows may say "Windows protected your PC": choose **More info**, then **Run anyway**. If Smart App Control blocks it, use the command above instead. Steps and details: [Desktop app, Windows](../apps/desktop-app.md#windows).
+
+Or use the one command below (needs Node.js and PowerShell).
 
 ## What you need
 
@@ -20,10 +28,6 @@ npx -y @4thtech-io/agentlink@latest
 Your browser opens on **Welcome**. The first line in the window says "Opening AgentLink in your browser…". If the page has not loaded after 15 seconds, the window says "Your browser didn't open AgentLink. Press Enter here to try again." Set up there, as in [Get started](README.md). Keep the PowerShell window open while you use the app. AgentLink stays open while you use it and closes after 30 minutes without use; the window and the page both say "AgentLink closed. Run `agentlink` to open it again." Press Ctrl+C to close it yourself. Check that the package name is exactly `@4thtech-io/agentlink`.
 
 If PowerShell refuses to run it, run the command from **Command Prompt** (`cmd`) instead, or run `cmd /c npx -y @4thtech-io/agentlink@latest` in PowerShell.
-
-## Prefer an app? (early build)
-
-From 0.5.4 there is also an early **Windows app**: AgentLink in its own window, no Node.js and no PowerShell needed. Download [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) and open it. The last page of the setup offers **Create a desktop shortcut** (ticked by default; new in 0.5.5). It is not signed yet, so Windows may say "Windows protected your PC": choose **More info**, then **Run anyway**. If Smart App Control blocks it, use the command above instead. Steps and details: [Desktop app, Windows](../apps/desktop-app.md#windows).
 
 ## How your AI app starts AgentLink
 
