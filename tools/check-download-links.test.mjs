@@ -30,6 +30,16 @@ describe('check-download-links', () => {
     expect(checkText('a.md', '4thtech/agentlink/releases/download/{tag}/x.dmg')).toHaveLength(1);
   });
 
+  it('rejects a versioned release page and a versioned Windows installer name', () => {
+    expect(
+      checkText('a.md', '[notes](https://github.com/4thtech/agentlink/releases/tag/v0.5.8)'),
+    ).toHaveLength(1);
+    expect(checkText('a.md', 'AgentLink-0.5.8-win-x64-setup.exe')).toHaveLength(1);
+    expect(checkText('a.md', `${STABLE_BASE}/AgentLink-win-x64-setup.exe`)).toEqual([]);
+    expect(checkText('a.md', '4thtech/agentlink/releases/latest')).toEqual([]);
+    expect(checkText('docs/runbooks/x.md', '4thtech/agentlink/releases/tag/v0.5.8')).toEqual([]);
+  });
+
   it('ignores another project, and allows versioned names in the process docs', () => {
     expect(
       checkText('a.md', 'https://github.com/electron/electron/releases/download/v1.0.0/x'),
