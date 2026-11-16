@@ -31,6 +31,10 @@ See the Status and Roadmap in the [README](README.md) for where things stand.
 
 The full process is in [`docs/process/development-process.md`](docs/process/development-process.md).
 
+## Writing for the research section
+
+Articles, essays and research papers about agent-to-agent communication and AgentLink are welcome in [`research/`](research/README.md). The [research contributing guide](research/CONTRIBUTING.md) says what we accept, the layout of a piece and how review works.
+
 ## Versioning and the changelog
 
 AgentLink uses SemVer, with one shared product version during beta. You do not bump versions by hand.

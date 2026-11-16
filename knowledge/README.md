@@ -21,4 +21,5 @@ Index of the public AgentLink overview files, written for AI assistants and for 
 - Facts come from the public docs, specifications and changelog of the repository. Nothing here describes an unreleased feature; planned work is marked "planned".
 - No secrets, keys, invite links or personal data.
 - Use "AI app" and "ID" in plain language; engineering words stay in the technical overview.
+- Longer, signed articles about AgentLink (not part of this corpus): https://github.com/4thtech/agentlink/tree/main/research.
 - Source and licence (MIT): https://github.com/4thtech/agentlink. Public docs: https://wiki.4thtech.io/products/agentlink.

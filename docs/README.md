@@ -155,6 +155,7 @@ One short file per lesson (problem, symptom, cause, rule). Index: [`lessons/READ
 ### Elsewhere
 
 - [`../docs-site/`](../docs-site/README.md): source of the **public documentation** on [GitBook](https://wiki.4thtech.io) (user guide and technical docs), kept separate from these internal documents; upkeep rules in [`MAINTAINING.md`](../docs-site/MAINTAINING.md); how every page is written (page types, components, screenshots, the UI ↔ tech bridge) in the [docs model](process/docs-model.md).
+- [`../research/`](../research/README.md): **research section**: signed, dated articles and papers about agent-to-agent communication and AgentLink, with their own [contributing guide](../research/CONTRIBUTING.md).
 - [`design/`](design/README.md): design intake and status (the three design drops, and the rules for building UI before a design lands).
 - **Decision log:** the table in [`foundation/00-README.md`](foundation/00-README.md). Every decision has an ID (D-xx); changes to it go through a PR.
 - **Release history:** [`../CHANGELOG.md`](../CHANGELOG.md).

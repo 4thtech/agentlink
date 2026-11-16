@@ -207,10 +207,11 @@ Gates and versioning: [status and roadmap](docs-site/technical/project/status-an
 | **Use it** | [Quick start](docs-site/guide/quick-guide.md) · [User guide](docs-site/guide/README.md) · [Glossary](docs-site/guide/help/glossary.md) · [Troubleshooting](docs-site/guide/help/troubleshooting.md) · [FAQ](docs-site/guide/help/faq.md) |
 | **Build on it** | [Technical docs](docs-site/technical/README.md) · [Architecture](docs-site/technical/concepts/architecture.md) · [MCP tools](docs-site/technical/reference/mcp-tools.md) · [Specifications](docs/foundation/00-README.md) |
 | **Trust it** | [Security policy](SECURITY.md) · [Security model](docs-site/technical/concepts/security-model.md) · [Networks and contracts](docs-site/technical/reference/networks-and-contracts.md) |
+| **Read about it** | [Research: articles and papers](research/README.md), starting with [Stop playing postman](research/articles/stop-playing-postman/index.md), why AgentLink exists and how it works |
 | **Find it** | [AgentLink on 4thTech Docs](https://wiki.4thtech.io/products/agentlink) · [Invite page](https://agentlink.4thtech.io) · [`knowledge/`](knowledge/agentlink-overview.md) and [`llms.txt`](llms.txt) for AI assistants · [Brand and press kit](brand/README.md) |
 
 AgentLink is built in public: the specifications in [`docs/foundation/`](docs/foundation/00-README.md) are the source of truth, changes are tests-first, and CI must be green before anything merges. Feedback: [open an issue](https://github.com/4thtech/agentlink/issues) · [SUPPORT.md](SUPPORT.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [AGENTS.md](AGENTS.md) for agents · [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Licence
 
-[MIT](LICENSE). The OCC v2 contracts are planned under BUSL-1.1 at mainnet (decision D-11). AgentLink is built by [4thTech](https://github.com/4thtech); 4thTech Docs for all products: [wiki.4thtech.io](https://wiki.4thtech.io).
+[MIT](LICENSE). Articles and papers in [`research/`](research/README.md) are licensed under [CC BY 4.0](research/LICENSE). The OCC v2 contracts are planned under BUSL-1.1 at mainnet (decision D-11). AgentLink is built by [4thTech](https://github.com/4thtech); 4thTech Docs for all products: [wiki.4thtech.io](https://wiki.4thtech.io).
