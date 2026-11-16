@@ -44,7 +44,7 @@ export function popoverFallbackHtml(): string {
     `<style>${STYLE}</style>`,
     '</head><body><main role="status" aria-live="polite">',
     `<h1>${POPOVER_FALLBACK_COPY.heading}</h1>`,
-    `<p>${POPOVER_FALLBACK_COPY.body.replace("'", '&#39;')}</p>`,
+    `<p>${POPOVER_FALLBACK_COPY.body.replace(/'/g, '&#39;')}</p>`,
     `<a href="${POPOVER_ACTION_URL}" autofocus>${POPOVER_FALLBACK_COPY.button}</a>`,
     '</main></body></html>',
   ].join('');

@@ -1,14 +1,8 @@
 {
   "frameMs": 40,
   "sizes": {
-    "macos": [
-      16,
-      32
-    ],
-    "windows": [
-      16,
-      32
-    ]
+    "macos": [16, 32],
+    "windows": [16, 32]
   },
   "sequences": {
     "msg-in": {
@@ -18,10 +12,7 @@
         {
           "id": "msg-in-0",
           "svg": "svg/msg-in-0.svg",
-          "macos": [
-            "macos/msg-in-0Template.png",
-            "macos/msg-in-0Template@2x.png"
-          ],
+          "macos": ["macos/msg-in-0Template.png", "macos/msg-in-0Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-in-0-dark-taskbar-16.png",
@@ -36,10 +27,7 @@
         {
           "id": "msg-in-1",
           "svg": "svg/msg-in-1.svg",
-          "macos": [
-            "macos/msg-in-1Template.png",
-            "macos/msg-in-1Template@2x.png"
-          ],
+          "macos": ["macos/msg-in-1Template.png", "macos/msg-in-1Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-in-1-dark-taskbar-16.png",
@@ -54,10 +42,7 @@
         {
           "id": "msg-in-2",
           "svg": "svg/msg-in-2.svg",
-          "macos": [
-            "macos/msg-in-2Template.png",
-            "macos/msg-in-2Template@2x.png"
-          ],
+          "macos": ["macos/msg-in-2Template.png", "macos/msg-in-2Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-in-2-dark-taskbar-16.png",
@@ -72,10 +57,7 @@
         {
           "id": "msg-in-3",
           "svg": "svg/msg-in-3.svg",
-          "macos": [
-            "macos/msg-in-3Template.png",
-            "macos/msg-in-3Template@2x.png"
-          ],
+          "macos": ["macos/msg-in-3Template.png", "macos/msg-in-3Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-in-3-dark-taskbar-16.png",
@@ -90,10 +72,7 @@
         {
           "id": "msg-in-4",
           "svg": "svg/msg-in-4.svg",
-          "macos": [
-            "macos/msg-in-4Template.png",
-            "macos/msg-in-4Template@2x.png"
-          ],
+          "macos": ["macos/msg-in-4Template.png", "macos/msg-in-4Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-in-4-dark-taskbar-16.png",
@@ -108,10 +87,7 @@
         {
           "id": "msg-in-5",
           "svg": "svg/msg-in-5.svg",
-          "macos": [
-            "macos/msg-in-5Template.png",
-            "macos/msg-in-5Template@2x.png"
-          ],
+          "macos": ["macos/msg-in-5Template.png", "macos/msg-in-5Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-in-5-dark-taskbar-16.png",
@@ -126,10 +102,7 @@
         {
           "id": "msg-in-6",
           "svg": "svg/msg-in-6.svg",
-          "macos": [
-            "macos/msg-in-6Template.png",
-            "macos/msg-in-6Template@2x.png"
-          ],
+          "macos": ["macos/msg-in-6Template.png", "macos/msg-in-6Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-in-6-dark-taskbar-16.png",
@@ -144,10 +117,7 @@
         {
           "id": "msg-in-7",
           "svg": "svg/msg-in-7.svg",
-          "macos": [
-            "macos/msg-in-7Template.png",
-            "macos/msg-in-7Template@2x.png"
-          ],
+          "macos": ["macos/msg-in-7Template.png", "macos/msg-in-7Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-in-7-dark-taskbar-16.png",
@@ -168,10 +138,7 @@
         {
           "id": "msg-out-0",
           "svg": "svg/msg-out-0.svg",
-          "macos": [
-            "macos/msg-out-0Template.png",
-            "macos/msg-out-0Template@2x.png"
-          ],
+          "macos": ["macos/msg-out-0Template.png", "macos/msg-out-0Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-out-0-dark-taskbar-16.png",
@@ -186,10 +153,7 @@
         {
           "id": "msg-out-1",
           "svg": "svg/msg-out-1.svg",
-          "macos": [
-            "macos/msg-out-1Template.png",
-            "macos/msg-out-1Template@2x.png"
-          ],
+          "macos": ["macos/msg-out-1Template.png", "macos/msg-out-1Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-out-1-dark-taskbar-16.png",
@@ -204,10 +168,7 @@
         {
           "id": "msg-out-2",
           "svg": "svg/msg-out-2.svg",
-          "macos": [
-            "macos/msg-out-2Template.png",
-            "macos/msg-out-2Template@2x.png"
-          ],
+          "macos": ["macos/msg-out-2Template.png", "macos/msg-out-2Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-out-2-dark-taskbar-16.png",
@@ -222,10 +183,7 @@
         {
           "id": "msg-out-3",
           "svg": "svg/msg-out-3.svg",
-          "macos": [
-            "macos/msg-out-3Template.png",
-            "macos/msg-out-3Template@2x.png"
-          ],
+          "macos": ["macos/msg-out-3Template.png", "macos/msg-out-3Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-out-3-dark-taskbar-16.png",
@@ -240,10 +198,7 @@
         {
           "id": "msg-out-4",
           "svg": "svg/msg-out-4.svg",
-          "macos": [
-            "macos/msg-out-4Template.png",
-            "macos/msg-out-4Template@2x.png"
-          ],
+          "macos": ["macos/msg-out-4Template.png", "macos/msg-out-4Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-out-4-dark-taskbar-16.png",
@@ -258,10 +213,7 @@
         {
           "id": "msg-out-5",
           "svg": "svg/msg-out-5.svg",
-          "macos": [
-            "macos/msg-out-5Template.png",
-            "macos/msg-out-5Template@2x.png"
-          ],
+          "macos": ["macos/msg-out-5Template.png", "macos/msg-out-5Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-out-5-dark-taskbar-16.png",
@@ -276,10 +228,7 @@
         {
           "id": "msg-out-6",
           "svg": "svg/msg-out-6.svg",
-          "macos": [
-            "macos/msg-out-6Template.png",
-            "macos/msg-out-6Template@2x.png"
-          ],
+          "macos": ["macos/msg-out-6Template.png", "macos/msg-out-6Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-out-6-dark-taskbar-16.png",
@@ -294,10 +243,7 @@
         {
           "id": "msg-out-7",
           "svg": "svg/msg-out-7.svg",
-          "macos": [
-            "macos/msg-out-7Template.png",
-            "macos/msg-out-7Template@2x.png"
-          ],
+          "macos": ["macos/msg-out-7Template.png", "macos/msg-out-7Template@2x.png"],
           "windows": {
             "dark": [
               "windows/msg-out-7-dark-taskbar-16.png",
@@ -318,10 +264,7 @@
         {
           "id": "approval-0",
           "svg": "svg/approval-0.svg",
-          "macos": [
-            "macos/approval-0Template.png",
-            "macos/approval-0Template@2x.png"
-          ],
+          "macos": ["macos/approval-0Template.png", "macos/approval-0Template@2x.png"],
           "windows": {
             "dark": [
               "windows/approval-0-dark-taskbar-16.png",
@@ -336,10 +279,7 @@
         {
           "id": "approval-1",
           "svg": "svg/approval-1.svg",
-          "macos": [
-            "macos/approval-1Template.png",
-            "macos/approval-1Template@2x.png"
-          ],
+          "macos": ["macos/approval-1Template.png", "macos/approval-1Template@2x.png"],
           "windows": {
             "dark": [
               "windows/approval-1-dark-taskbar-16.png",
@@ -354,10 +294,7 @@
         {
           "id": "approval-2",
           "svg": "svg/approval-2.svg",
-          "macos": [
-            "macos/approval-2Template.png",
-            "macos/approval-2Template@2x.png"
-          ],
+          "macos": ["macos/approval-2Template.png", "macos/approval-2Template@2x.png"],
           "windows": {
             "dark": [
               "windows/approval-2-dark-taskbar-16.png",
@@ -372,10 +309,7 @@
         {
           "id": "approval-3",
           "svg": "svg/approval-3.svg",
-          "macos": [
-            "macos/approval-3Template.png",
-            "macos/approval-3Template@2x.png"
-          ],
+          "macos": ["macos/approval-3Template.png", "macos/approval-3Template@2x.png"],
           "windows": {
             "dark": [
               "windows/approval-3-dark-taskbar-16.png",
@@ -390,10 +324,7 @@
         {
           "id": "approval-4",
           "svg": "svg/approval-4.svg",
-          "macos": [
-            "macos/approval-4Template.png",
-            "macos/approval-4Template@2x.png"
-          ],
+          "macos": ["macos/approval-4Template.png", "macos/approval-4Template@2x.png"],
           "windows": {
             "dark": [
               "windows/approval-4-dark-taskbar-16.png",
@@ -408,10 +339,7 @@
         {
           "id": "approval-5",
           "svg": "svg/approval-5.svg",
-          "macos": [
-            "macos/approval-5Template.png",
-            "macos/approval-5Template@2x.png"
-          ],
+          "macos": ["macos/approval-5Template.png", "macos/approval-5Template@2x.png"],
           "windows": {
             "dark": [
               "windows/approval-5-dark-taskbar-16.png",
@@ -432,10 +360,7 @@
         {
           "id": "connecting-0",
           "svg": "svg/connecting-0.svg",
-          "macos": [
-            "macos/connecting-0Template.png",
-            "macos/connecting-0Template@2x.png"
-          ],
+          "macos": ["macos/connecting-0Template.png", "macos/connecting-0Template@2x.png"],
           "windows": {
             "dark": [
               "windows/connecting-0-dark-taskbar-16.png",
@@ -450,10 +375,7 @@
         {
           "id": "connecting-1",
           "svg": "svg/connecting-1.svg",
-          "macos": [
-            "macos/connecting-1Template.png",
-            "macos/connecting-1Template@2x.png"
-          ],
+          "macos": ["macos/connecting-1Template.png", "macos/connecting-1Template@2x.png"],
           "windows": {
             "dark": [
               "windows/connecting-1-dark-taskbar-16.png",
@@ -468,10 +390,7 @@
         {
           "id": "connecting-2",
           "svg": "svg/connecting-2.svg",
-          "macos": [
-            "macos/connecting-2Template.png",
-            "macos/connecting-2Template@2x.png"
-          ],
+          "macos": ["macos/connecting-2Template.png", "macos/connecting-2Template@2x.png"],
           "windows": {
             "dark": [
               "windows/connecting-2-dark-taskbar-16.png",
@@ -486,10 +405,7 @@
         {
           "id": "connecting-3",
           "svg": "svg/connecting-3.svg",
-          "macos": [
-            "macos/connecting-3Template.png",
-            "macos/connecting-3Template@2x.png"
-          ],
+          "macos": ["macos/connecting-3Template.png", "macos/connecting-3Template@2x.png"],
           "windows": {
             "dark": [
               "windows/connecting-3-dark-taskbar-16.png",
@@ -504,10 +420,7 @@
         {
           "id": "connecting-4",
           "svg": "svg/connecting-4.svg",
-          "macos": [
-            "macos/connecting-4Template.png",
-            "macos/connecting-4Template@2x.png"
-          ],
+          "macos": ["macos/connecting-4Template.png", "macos/connecting-4Template@2x.png"],
           "windows": {
             "dark": [
               "windows/connecting-4-dark-taskbar-16.png",
@@ -522,10 +435,7 @@
         {
           "id": "connecting-5",
           "svg": "svg/connecting-5.svg",
-          "macos": [
-            "macos/connecting-5Template.png",
-            "macos/connecting-5Template@2x.png"
-          ],
+          "macos": ["macos/connecting-5Template.png", "macos/connecting-5Template@2x.png"],
           "windows": {
             "dark": [
               "windows/connecting-5-dark-taskbar-16.png",
@@ -540,10 +450,7 @@
         {
           "id": "connecting-6",
           "svg": "svg/connecting-6.svg",
-          "macos": [
-            "macos/connecting-6Template.png",
-            "macos/connecting-6Template@2x.png"
-          ],
+          "macos": ["macos/connecting-6Template.png", "macos/connecting-6Template@2x.png"],
           "windows": {
             "dark": [
               "windows/connecting-6-dark-taskbar-16.png",
@@ -558,10 +465,7 @@
         {
           "id": "connecting-7",
           "svg": "svg/connecting-7.svg",
-          "macos": [
-            "macos/connecting-7Template.png",
-            "macos/connecting-7Template@2x.png"
-          ],
+          "macos": ["macos/connecting-7Template.png", "macos/connecting-7Template@2x.png"],
           "windows": {
             "dark": [
               "windows/connecting-7-dark-taskbar-16.png",
@@ -582,10 +486,7 @@
         {
           "id": "tray-connected",
           "svg": "svg/tray-connected.svg",
-          "macos": [
-            "macos/tray-connectedTemplate.png",
-            "macos/tray-connectedTemplate@2x.png"
-          ],
+          "macos": ["macos/tray-connectedTemplate.png", "macos/tray-connectedTemplate@2x.png"],
           "windows": {
             "dark": [
               "windows/tray-connected-dark-taskbar-16.png",
@@ -618,10 +519,7 @@
         {
           "id": "tray-approvals",
           "svg": "svg/tray-approvals.svg",
-          "macos": [
-            "macos/tray-approvalsTemplate.png",
-            "macos/tray-approvalsTemplate@2x.png"
-          ],
+          "macos": ["macos/tray-approvalsTemplate.png", "macos/tray-approvalsTemplate@2x.png"],
           "windows": {
             "dark": [
               "windows/tray-approvals-dark-taskbar-16.png",
@@ -636,10 +534,7 @@
         {
           "id": "tray-paused",
           "svg": "svg/tray-paused.svg",
-          "macos": [
-            "macos/tray-pausedTemplate.png",
-            "macos/tray-pausedTemplate@2x.png"
-          ],
+          "macos": ["macos/tray-pausedTemplate.png", "macos/tray-pausedTemplate@2x.png"],
           "windows": {
             "dark": [
               "windows/tray-paused-dark-taskbar-16.png",
@@ -654,10 +549,7 @@
         {
           "id": "tray-offline",
           "svg": "svg/tray-offline.svg",
-          "macos": [
-            "macos/tray-offlineTemplate.png",
-            "macos/tray-offlineTemplate@2x.png"
-          ],
+          "macos": ["macos/tray-offlineTemplate.png", "macos/tray-offlineTemplate@2x.png"],
           "windows": {
             "dark": [
               "windows/tray-offline-dark-taskbar-16.png",
@@ -672,10 +564,7 @@
         {
           "id": "tray-update",
           "svg": "svg/tray-update.svg",
-          "macos": [
-            "macos/tray-updateTemplate.png",
-            "macos/tray-updateTemplate@2x.png"
-          ],
+          "macos": ["macos/tray-updateTemplate.png", "macos/tray-updateTemplate@2x.png"],
           "windows": {
             "dark": [
               "windows/tray-update-dark-taskbar-16.png",

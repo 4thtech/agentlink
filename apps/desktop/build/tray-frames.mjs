@@ -11,7 +11,11 @@ rmSync(out, { recursive: true, force: true });
 for (const d of ['svg', 'macos', 'windows']) mkdirSync(join(out, d), { recursive: true });
 
 const frames = allFrames();
-const manifest = { frameMs: FRAME_MS, sizes: { macos: [16, 32], windows: [16, 32] }, sequences: {} };
+const manifest = {
+  frameMs: FRAME_MS,
+  sizes: { macos: [16, 32], windows: [16, 32] },
+  sequences: {},
+};
 for (const f of frames) {
   writeFileSync(join(out, 'svg', `${f.id}.svg`), toSvg(f));
   const files = { svg: `svg/${f.id}.svg` };
@@ -21,7 +25,10 @@ for (const f of frames) {
   writeFileSync(join(out, files.macos[1]), framePng(f, 32));
   // Windows: white for the dark taskbar, black for the light one (as the brand windows set).
   files.windows = {};
-  for (const [taskbar, ink] of [['dark', 255], ['light', 0]]) {
+  for (const [taskbar, ink] of [
+    ['dark', 255],
+    ['light', 0],
+  ]) {
     files.windows[taskbar] = [16, 32].map((size) => {
       const rel = `windows/${f.id}-${taskbar}-taskbar-${size}.png`;
       writeFileSync(join(out, rel), framePng(f, size, ink));

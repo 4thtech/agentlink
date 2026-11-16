@@ -32,7 +32,6 @@ import {
   constants as fsConstants,
   existsSync,
   fstatSync,
-  lstatSync,
   openSync,
   readFileSync,
   readlinkSync,
@@ -1260,7 +1259,8 @@ export function realProcess(): ShellProcess {
 function readMenuBarIconPref(path: string): boolean | undefined {
   let fd: number | null = null;
   try {
-    if (!lstatSync(path).isFile()) return undefined;
+    // No lstat before the open (a check-then-open race): O_NOFOLLOW refuses a link at the open, and
+    // the descriptor's own fstat below confirms a regular file of a small size.
     fd = openSync(
       path,
       fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0) | (fsConstants.O_NONBLOCK ?? 0),

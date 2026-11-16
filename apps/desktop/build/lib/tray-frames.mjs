@@ -9,9 +9,32 @@ const SS = 8; // supersamples per pixel edge
 
 // ---------- geometry ----------
 const R = (n) => Math.round(n * 1000) / 1000;
-const LEFT = [[1, 1.5], [5, 1.5], [5, 3.5], [3, 3.5], [3, 12.5], [5, 12.5], [5, 14.5], [1, 14.5]];
-const RIGHT = [[15, 1.5], [11, 1.5], [11, 3.5], [13, 3.5], [13, 12.5], [11, 12.5], [11, 14.5], [15, 14.5]];
-const DIAMOND = [[8, 4.5], [11.5, 8], [8, 11.5], [4.5, 8]];
+const LEFT = [
+  [1, 1.5],
+  [5, 1.5],
+  [5, 3.5],
+  [3, 3.5],
+  [3, 12.5],
+  [5, 12.5],
+  [5, 14.5],
+  [1, 14.5],
+];
+const RIGHT = [
+  [15, 1.5],
+  [11, 1.5],
+  [11, 3.5],
+  [13, 3.5],
+  [13, 12.5],
+  [11, 12.5],
+  [11, 14.5],
+  [15, 14.5],
+];
+const DIAMOND = [
+  [8, 4.5],
+  [11.5, 8],
+  [8, 11.5],
+  [4.5, 8],
+];
 
 function arcPoints() {
   // The approvals right bracket: A3.8 3.8 from (13, 8.6) to (15, 8.9), centre above the chord.
@@ -34,10 +57,38 @@ function arcPoints() {
   }
   return pts;
 }
-const RIGHT_CUT = [[15, 14.5], [11, 14.5], [11, 12.5], [13, 12.5], [13, 8.6], ...arcPoints(), [15, 8.9]];
-const RIGHT_UPDATE = [[15, 1.5], [11, 1.5], [11, 3.5], [13, 3.5], [13, 7], [15, 7]];
-const ARROW = [[12, 9.5], [12, 12], [10.5, 12], [13, 15], [15.5, 12], [14, 12], [14, 9.5]];
-const HOLE = [[8, 6.6], [6.6, 8], [8, 9.4], [9.4, 8]];
+const RIGHT_CUT = [
+  [15, 14.5],
+  [11, 14.5],
+  [11, 12.5],
+  [13, 12.5],
+  [13, 8.6],
+  ...arcPoints(),
+  [15, 8.9],
+];
+const RIGHT_UPDATE = [
+  [15, 1.5],
+  [11, 1.5],
+  [11, 3.5],
+  [13, 3.5],
+  [13, 7],
+  [15, 7],
+];
+const ARROW = [
+  [12, 9.5],
+  [12, 12],
+  [10.5, 12],
+  [13, 15],
+  [15.5, 12],
+  [14, 12],
+  [14, 9.5],
+];
+const HOLE = [
+  [8, 6.6],
+  [6.6, 8],
+  [8, 9.4],
+  [9.4, 8],
+];
 const circle = (cx, cy, r, n = 40) =>
   Array.from({ length: n }, (_, i) => [
     R(cx + r * Math.cos((2 * Math.PI * i) / n)),
@@ -46,7 +97,12 @@ const circle = (cx, cy, r, n = 40) =>
 // The offline slash: stroke (2,14)-(14,2), width 1.6, butt caps.
 const SLASH = (() => {
   const n = 0.8 * Math.SQRT1_2;
-  return [[2 - n, 14 - n], [2 + n, 14 + n], [14 + n, 2 + n], [14 - n, 2 - n]].map(([x, y]) => [R(x), R(y)]);
+  return [
+    [2 - n, 14 - n],
+    [2 + n, 14 + n],
+    [14 + n, 2 + n],
+    [14 - n, 2 - n],
+  ].map(([x, y]) => [R(x), R(y)]);
 })();
 
 // Sutherland-Hodgman against x >= lo and x <= hi.
@@ -72,7 +128,13 @@ function diamond(dx = 0, scale = 1) {
   return clipX(pts, 0, 16);
 }
 
-const shape = (subs, extra = {}) => ({ subs, rule: 'nonzero', opacity: 1, layer: 'content', ...extra });
+const shape = (subs, extra = {}) => ({
+  subs,
+  rule: 'nonzero',
+  opacity: 1,
+  layer: 'content',
+  ...extra,
+});
 const base = (right = RIGHT) => [shape([LEFT]), shape([right])];
 const connected = (d = {}) => [...base(), shape([diamond(d.dx ?? 0, d.scale ?? 1)])];
 // The unread mark: a hollow ring (differs in shape from the filled approvals dot); a gap is cut around it first.
@@ -118,7 +180,14 @@ function sequences() {
     // A small swell, settling in the approvals mark.
     approval: {
       loop: false,
-      frames: [connected(), approvals(1.12), approvals(1.25), approvals(1.15), approvals(1.05), approvals(1)],
+      frames: [
+        connected(),
+        approvals(1.12),
+        approvals(1.25),
+        approvals(1.15),
+        approvals(1.05),
+        approvals(1),
+      ],
     },
     // The diamond breathes between 0.8 and 1.0; the only loop.
     connecting: {
@@ -170,10 +239,12 @@ export function allFrames() {
 }
 
 // ---------- SVG ----------
-const pathD = (subs) => subs.map((p) => 'M' + p.map(([x, y]) => `${R(x)} ${R(y)}`).join('L') + 'Z').join(' ');
+const pathD = (subs) =>
+  subs.map((p) => 'M' + p.map(([x, y]) => `${R(x)} ${R(y)}`).join('L') + 'Z').join(' ');
 export function toSvg(frame) {
   const title = `<title>AgentLink tray: ${frame.id}</title>`;
-  const open = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">';
+  const open =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">';
   if (frame.blend) {
     const { from, to, t } = frame.blend;
     const g = (shapes, o, m) => `<g opacity="${R(o)}">${svgBody(shapes, m)}</g>`;
@@ -186,9 +257,15 @@ function svgBody(shapes, maskId) {
     `<path fill="${fill}"${s.rule === 'evenodd' ? ' fill-rule="evenodd"' : ''}${
       s.opacity !== 1 ? ` opacity="${s.opacity}"` : ''
     } d="${pathD(s.subs)}"/>`;
-  const content = shapes.filter((s) => s.layer === 'content').map((s) => el(s)).join('');
+  const content = shapes
+    .filter((s) => s.layer === 'content')
+    .map((s) => el(s))
+    .join('');
   const erase = shapes.filter((s) => s.layer === 'erase');
-  const overlay = shapes.filter((s) => s.layer === 'overlay').map((s) => el(s)).join('');
+  const overlay = shapes
+    .filter((s) => s.layer === 'overlay')
+    .map((s) => el(s))
+    .join('');
   const mask = erase.length
     ? `<mask id="${maskId}"><rect width="16" height="16" fill="#fff"/>${erase.map((s) => el(s, '#000')).join('')}</mask>`
     : '';
@@ -294,7 +371,12 @@ export function encodePng(width, height, rgba) {
 /** Single-colour PNG with the coverage as alpha (black for macOS templates). */
 export function framePng(frame, size, colour = 0) {
   const cov = coverage(frame, size);
-  return encodePng(size, size, (x, y) => [colour, colour, colour, Math.round(cov[y * size + x] * 255)]);
+  return encodePng(size, size, (x, y) => [
+    colour,
+    colour,
+    colour,
+    Math.round(cov[y * size + x] * 255),
+  ]);
 }
 
 /** Contact sheet: one row per sequence, `scale` x 16 px per frame, light half then dark half. */
@@ -307,8 +389,12 @@ export function contactSheet(frames, scale = 8) {
   const W = cols * (cell + pad) + pad;
   const H = half * 2;
   const buf = Buffer.alloc(W * H * 4);
-  const bgs = [[238, 238, 240], [28, 28, 32]];
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) buf.set([...bgs[y < half ? 0 : 1], 255], (y * W + x) * 4);
+  const bgs = [
+    [238, 238, 240],
+    [28, 28, 32],
+  ];
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) buf.set([...bgs[y < half ? 0 : 1], 255], (y * W + x) * 4);
   for (const f of frames) {
     const r = rows.indexOf(f.sequence);
     const cov = coverage(f, cell);
