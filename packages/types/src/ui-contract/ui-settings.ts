@@ -16,7 +16,16 @@ export const UI_SETTINGS_PATH = '/api/ui/ui-settings';
 
 /** The only keys the route reads, writes or stores. */
 // N6: `notify`, the switches of Settings › Notifications (booleans of fixed keys, notifications.ts).
-export const UI_SETTINGS_KEYS = ['underTheHood', 'menuExpanded', 'kept', 'notify'] as const;
+// TRAY-TOGGLE (D-155): `menuBarIcon` and `widgetPreviews`, the menu bar widget switches (booleans;
+// absent = on, see trayPrefsInForce). Display only: neither changes what an agent may do (I-4).
+export const UI_SETTINGS_KEYS = [
+  'underTheHood',
+  'menuExpanded',
+  'kept',
+  'notify',
+  'menuBarIcon',
+  'widgetPreviews',
+] as const;
 export type UiSettingKey = (typeof UI_SETTINGS_KEYS)[number];
 
 // --- kept page choices ---------------------------------------------------------------------------
@@ -141,6 +150,24 @@ export interface UiSettings {
   readonly kept?: UiKept;
   /** N6: Settings › Notifications; a key is absent until set (the D2 default applies). */
   readonly notify?: NotifyPrefs;
+  /** TRAY-TOGGLE: the AgentLink icon in the menu bar (Mac) or near the clock (Windows); absent = on. */
+  readonly menuBarIcon?: boolean;
+  /** TRAY-TOGGLE: the first line of new messages in the menu bar widget; absent = on. */
+  readonly widgetPreviews?: boolean;
+}
+
+/** TRAY-TOGGLE: the menu bar widget switches in force (absent = on). */
+export interface TrayPrefs {
+  readonly menuBarIcon: boolean;
+  readonly widgetPreviews: boolean;
+}
+
+/** TRAY-TOGGLE: the switches in force for stored settings; a key never set (or no file) is on. */
+export function trayPrefsInForce(settings: UiSettings | undefined): TrayPrefs {
+  return Object.freeze({
+    menuBarIcon: settings?.menuBarIcon !== false,
+    widgetPreviews: settings?.widgetPreviews !== false,
+  });
 }
 
 /** The longest kept value (the largest list of the largest entries fits). */
@@ -186,10 +213,17 @@ export function readUiSettings(value: unknown, minKeys = 0): UiSettings | undefi
     menuExpanded?: boolean;
     kept?: UiKept;
     notify?: NotifyPrefs;
+    menuBarIcon?: boolean;
+    widgetPreviews?: boolean;
   } = {};
   for (const key of keys) {
     const v = value[key];
-    if (key === 'underTheHood' || key === 'menuExpanded') {
+    if (
+      key === 'underTheHood' ||
+      key === 'menuExpanded' ||
+      key === 'menuBarIcon' ||
+      key === 'widgetPreviews'
+    ) {
       if (typeof v !== 'boolean') return undefined;
       out[key] = v;
     } else if (key === 'kept') {
@@ -214,6 +248,8 @@ export function mergeUiSettings(stored: UiSettings, change: UiSettings): UiSetti
     menuExpanded?: boolean;
     kept?: UiKept;
     notify?: NotifyPrefs;
+    menuBarIcon?: boolean;
+    widgetPreviews?: boolean;
   } = {
     ...stored,
     ...change,
@@ -241,6 +277,8 @@ export const UI_SETTINGS_SAMPLES = {
     {},
     { underTheHood: 'yes' },
     { underTheHood: true, theme: 'dark' },
+    { menuBarIcon: 'off' },
+    { widgetPreviews: 1 },
     { path: '/etc/passwd' },
     [true],
     null,

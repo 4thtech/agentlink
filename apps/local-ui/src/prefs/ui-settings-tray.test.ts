@@ -11,7 +11,10 @@ import {
 
 afterEach(() => resetUiSettingsForTests());
 
-function seam(answer: unknown): { calls: { method: string; body: unknown }[]; fetch: typeof fetch } {
+function seam(answer: unknown): {
+  calls: { method: string; body: unknown }[];
+  fetch: typeof fetch;
+} {
   const calls: { method: string; body: unknown }[] = [];
   const fetchImpl = ((_: unknown, init?: RequestInit) => {
     calls.push({

@@ -33,17 +33,16 @@ async function render(
   props: Partial<AppearancePageProps> & { stored?: UiSettings; ok?: boolean },
 ): Promise<void> {
   const { stored, ok, ...rest } = props;
+  const pageProps: AppearancePageProps = {
+    read: () => Promise.resolve(stored),
+    save: (change: UiSettings) => {
+      saved.push(change);
+      return Promise.resolve(ok ?? true);
+    },
+    ...rest,
+  };
   await act(async () => {
-    root.render(
-      h(AppearancePage, {
-        read: () => Promise.resolve(stored),
-        save: (change: UiSettings) => {
-          saved.push(change);
-          return Promise.resolve(ok ?? true);
-        },
-        ...rest,
-      }),
-    );
+    root.render(h(AppearancePage, pageProps));
     await Promise.resolve();
   });
 }
@@ -118,7 +117,14 @@ describe('Appearance: menu bar widget switches', () => {
     expect(S.previewsHint).toBe('Show the first line of new messages in the menu bar widget.');
     expect(
       lintVocabulary(
-        [S.menuBarMac, S.menuBarWindows, S.menuBarHint, S.menuBarWindowsHint, S.previewsLabel, S.previewsHint].join('\n'),
+        [
+          S.menuBarMac,
+          S.menuBarWindows,
+          S.menuBarHint,
+          S.menuBarWindowsHint,
+          S.previewsLabel,
+          S.previewsHint,
+        ].join('\n'),
       ),
     ).toEqual([]);
   });
