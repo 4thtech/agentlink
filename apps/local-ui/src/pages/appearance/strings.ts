@@ -14,4 +14,12 @@ export const APPEARANCE_STRINGS = {
   motionHint: 'Off still follows your system setting if it asks for less motion.',
   hoodLabel: 'Show Under the hood by default',
   hoodHint: 'Adds a small technical panel to each page. Nothing in it changes how the app works.',
+  // TRAY-TOGGLE (D-155): the menu bar widget switches.
+  menuBarMac: 'Show AgentLink in the menu bar',
+  menuBarWindows: 'Show AgentLink near the clock',
+  menuBarHint: 'Quick look at messages, approvals and your connected AI apps.',
+  menuBarWindowsHint: 'While it is hidden, closing the window quits AgentLink.',
+  previewsLabel: 'Show message previews',
+  previewsHint: 'Show the first line of new messages in the menu bar widget.',
+  traySaveFailed: "Couldn't save this choice. Try again.",
 } as const;

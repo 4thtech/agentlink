@@ -590,3 +590,54 @@ describe('kept page choices (UI settings `kept`)', () => {
     expect(JSON.parse(read.body)).toEqual({ kept });
   });
 });
+
+describe('TRAY-TOGGLE: the menu bar widget switches (`menuBarIcon`, `widgetPreviews`)', () => {
+  it('stores and answers each switch, merged with what is kept', async () => {
+    const h = await harness();
+    expect((await h.put({ underTheHood: true })).status).toBe(200);
+    const icon = await h.put({ menuBarIcon: false });
+    expect(icon.status).toBe(200);
+    expect(JSON.parse(icon.body)).toEqual({ underTheHood: true, menuBarIcon: false });
+    const previews = await h.put({ widgetPreviews: false });
+    expect(JSON.parse(previews.body)).toEqual({
+      underTheHood: true,
+      menuBarIcon: false,
+      widgetPreviews: false,
+    });
+    expect(h.world.stored).toEqual({
+      underTheHood: true,
+      menuBarIcon: false,
+      widgetPreviews: false,
+    });
+    await h.put({ menuBarIcon: true });
+    expect(JSON.parse((await h.read()).body)).toEqual({
+      underTheHood: true,
+      menuBarIcon: true,
+      widgetPreviews: false,
+    });
+    expect(h.ownerStores).toEqual([]);
+  });
+
+  it('refuses a wrong type or an unknown key before the store, never echoing it', async () => {
+    const h = await harness();
+    for (const bad of [
+      { menuBarIcon: 'false' },
+      { menuBarIcon: 0 },
+      { widgetPreviews: null },
+      { widgetPreviews: 'on' },
+      { menuBarIcons: true },
+      { menuBarIcon: true, trayPath: '/etc/passwd' },
+    ]) {
+      const res = await h.put(bad);
+      expect(res.status, JSON.stringify(bad)).toBe(400);
+      expect(JSON.parse(res.body)).toEqual({ error: 'invalid' });
+      expect(res.body).not.toContain('passwd');
+    }
+    expect(h.world.writes).toEqual([]);
+  });
+
+  it('an older stored file without the keys answers without them (absent = on)', async () => {
+    const h = await harness({ world: { stored: { underTheHood: false }, writes: [] } });
+    expect(JSON.parse((await h.read()).body)).toEqual({ underTheHood: false });
+  });
+});
