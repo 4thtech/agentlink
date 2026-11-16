@@ -25,7 +25,11 @@ const SEQUENCES: TraySequences = {
 function setup(
   options: {
     reducedMotion?: boolean;
-    initial?: Partial<{ state: 'connected' | 'connecting' | 'paused' | 'offline' | 'update'; unread: boolean; approvals: boolean }>;
+    initial?: Partial<{
+      state: 'connected' | 'connecting' | 'paused' | 'offline' | 'update';
+      unread: boolean;
+      approvals: boolean;
+    }>;
   } = {},
 ) {
   const clock = new ManualClock();
@@ -42,8 +46,11 @@ function setup(
 }
 
 describe('settleFrame (the static variant by priority)', () => {
-  const s = (state: 'connected' | 'connecting' | 'paused' | 'offline' | 'update', unread = false, approvals = false) =>
-    settleFrame({ state, unread, approvals }, SEQUENCES);
+  const s = (
+    state: 'connected' | 'connecting' | 'paused' | 'offline' | 'update',
+    unread = false,
+    approvals = false,
+  ) => settleFrame({ state, unread, approvals }, SEQUENCES);
 
   it('approvals > offline > paused > update > connecting > connected', () => {
     expect(s('offline', true, true)).toBe(STATIC_FRAMES.approvals);

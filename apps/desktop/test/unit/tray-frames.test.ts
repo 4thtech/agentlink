@@ -37,7 +37,7 @@ class Img implements TrayImage {
 
 function fakeImages(existing: (path: string) => boolean) {
   const created: Img[] = [];
-  const module: TrayImageModule = {
+  const images: TrayImageModule = {
     createFromPath: (path) => {
       const img = new Img(path, !existing(path));
       created.push(img);
@@ -50,7 +50,7 @@ function fakeImages(existing: (path: string) => boolean) {
       return img;
     },
   };
-  return { module, created };
+  return { images, created };
 }
 
 const builtin = () => new Img('builtin', false);
@@ -89,13 +89,23 @@ describe('parseTrayManifest', () => {
             {
               id: 'tray-connected',
               macos: [path, 'macos/a@2x.png'],
-              windows: { dark: ['windows/a.png', 'windows/b.png'], light: ['windows/c.png', 'windows/d.png'] },
+              windows: {
+                dark: ['windows/a.png', 'windows/b.png'],
+                light: ['windows/c.png', 'windows/d.png'],
+              },
             },
           ],
         },
       },
     });
-    for (const p of ['../evil.png', '/etc/passwd', 'macos/../../x.png', 'macos/a.svg', 'macos\\a.png', '']) {
+    for (const p of [
+      '../evil.png',
+      '/etc/passwd',
+      'macos/../../x.png',
+      'macos/a.svg',
+      'macos\\a.png',
+      '',
+    ]) {
       expect(() => parseTrayManifest(bad(p)), p).toThrow();
     }
     expect(() => parseTrayManifest(bad('macos/aTemplate.png'))).not.toThrow();
@@ -104,7 +114,9 @@ describe('parseTrayManifest', () => {
   it('refuses a malformed manifest', () => {
     expect(() => parseTrayManifest(null)).toThrow();
     expect(() => parseTrayManifest({ sequences: [] })).toThrow();
-    expect(() => parseTrayManifest({ frameMs: 40, sequences: { connecting: { loop: 'yes', frames: [] } } })).toThrow();
+    expect(() =>
+      parseTrayManifest({ frameMs: 40, sequences: { connecting: { loop: 'yes', frames: [] } } }),
+    ).toThrow();
   });
 });
 
@@ -112,8 +124,14 @@ describe('TrayFrames', () => {
   const manifest = parseTrayManifest(REAL);
 
   it('macOS: the Template PNG (Electron adds @2x), marked as a template image', () => {
-    const { module } = fakeImages(() => true);
-    const frames = new TrayFrames({ manifest, dir: '/res/assets/tray', platform: 'darwin', nativeImage: module, fallback: builtin });
+    const { images } = fakeImages(() => true);
+    const frames = new TrayFrames({
+      manifest,
+      dir: '/res/assets/tray',
+      platform: 'darwin',
+      nativeImage: images,
+      fallback: builtin,
+    });
     const img = frames.image('msg-in-3', 'tray-connected', 'light') as Img;
     expect(img.source).toBe(join('/res/assets/tray', 'macos', 'msg-in-3Template.png'));
     expect(img.template).toBe(true);
@@ -122,13 +140,13 @@ describe('TrayFrames', () => {
   });
 
   it('Windows: the light or dark taskbar set, 16 px at 1x and 32 px at 2x, never a template', () => {
-    const { module } = fakeImages(() => true);
+    const { images } = fakeImages(() => true);
     const read: string[] = [];
     const frames = new TrayFrames({
       manifest,
       dir: 'C:\\res\\assets\\tray',
       platform: 'win32',
-      nativeImage: module,
+      nativeImage: images,
       fallback: builtin,
       readFile: (p) => {
         read.push(p);
@@ -145,24 +163,40 @@ describe('TrayFrames', () => {
   });
 
   it('a missing frame falls back to the static variant, then the built-in image', () => {
-    const { module } = fakeImages((p) => !p.includes('msg-in-2'));
-    const frames = new TrayFrames({ manifest, dir: '/r', platform: 'darwin', nativeImage: module, fallback: builtin });
-    expect((frames.image('msg-in-2', 'tray-connected-unread', 'dark') as Img).source).toContain('tray-connected-unreadTemplate.png');
-    expect((frames.image('no-such-frame', 'tray-offline', 'dark') as Img).source).toContain('tray-offlineTemplate.png');
+    const { images } = fakeImages((p) => !p.includes('msg-in-2'));
+    const frames = new TrayFrames({
+      manifest,
+      dir: '/r',
+      platform: 'darwin',
+      nativeImage: images,
+      fallback: builtin,
+    });
+    expect((frames.image('msg-in-2', 'tray-connected-unread', 'dark') as Img).source).toContain(
+      'tray-connected-unreadTemplate.png',
+    );
+    expect((frames.image('no-such-frame', 'tray-offline', 'dark') as Img).source).toContain(
+      'tray-offlineTemplate.png',
+    );
 
     const none = fakeImages(() => false);
-    const empty = new TrayFrames({ manifest, dir: '/r', platform: 'darwin', nativeImage: none.module, fallback: builtin });
+    const empty = new TrayFrames({
+      manifest,
+      dir: '/r',
+      platform: 'darwin',
+      nativeImage: none.images,
+      fallback: builtin,
+    });
     const img = empty.image('msg-in-2', 'tray-connected', 'dark') as Img;
     expect(img.source).toBe('builtin');
   });
 
   it('Windows: an unreadable file falls back too (no throw)', () => {
-    const { module } = fakeImages(() => true);
+    const { images } = fakeImages(() => true);
     const frames = new TrayFrames({
       manifest,
       dir: '/r',
       platform: 'win32',
-      nativeImage: module,
+      nativeImage: images,
       fallback: builtin,
       readFile: () => {
         throw new Error('ENOENT');
@@ -174,23 +208,28 @@ describe('TrayFrames', () => {
 
 describe('loadTrayFrames', () => {
   it('reads manifest.json from the folder; null when it is missing or bad', () => {
-    const { module } = fakeImages(() => true);
+    const { images } = fakeImages(() => true);
     const ok = loadTrayFrames({
       dir: ASSETS,
       platform: 'darwin',
-      nativeImage: module,
+      nativeImage: images,
       fallback: builtin,
     });
     expect(ok).not.toBeNull();
     expect(ok?.sequences.connecting.loop).toBe(true);
     expect(
-      loadTrayFrames({ dir: '/nowhere', platform: 'darwin', nativeImage: module, fallback: builtin }),
+      loadTrayFrames({
+        dir: '/nowhere',
+        platform: 'darwin',
+        nativeImage: images,
+        fallback: builtin,
+      }),
     ).toBeNull();
     expect(
       loadTrayFrames({
         dir: '/x',
         platform: 'darwin',
-        nativeImage: module,
+        nativeImage: images,
         fallback: builtin,
         readFile: () => new TextEncoder().encode('{not json'),
       }),

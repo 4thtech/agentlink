@@ -74,8 +74,16 @@ function frames(platform: string) {
 }
 
 function system(dark = true, reduced = false) {
-  const theme = Object.assign(new EventEmitter(), { shouldUseDarkColorsForSystemIntegratedUI: dark });
-  const prefs = { reduced, getAnimationSettings: () => ({ shouldRenderRichAnimation: true, prefersReducedMotion: prefs.reduced }) };
+  const theme = Object.assign(new EventEmitter(), {
+    shouldUseDarkColorsForSystemIntegratedUI: dark,
+  });
+  const prefs = {
+    reduced,
+    getAnimationSettings: () => ({
+      shouldRenderRichAnimation: true,
+      prefersReducedMotion: prefs.reduced,
+    }),
+  };
   const sys: TraySystem = { nativeTheme: theme, systemPreferences: prefs };
   return { sys, theme, prefs };
 }
@@ -115,12 +123,17 @@ describe('AppTray with frames', () => {
   it('macOS: template frames, connecting breathes, a pulse settles on the ring', () => {
     const clock = new ManualClock();
     const { sys } = system();
-    const app = new AppTray(electron, '/icon.png', { open: () => {}, quit: () => {}, click: () => {} }, {
-      frames: frames('darwin'),
-      system: sys,
-      timers: clock,
-      platform: 'darwin',
-    });
+    const app = new AppTray(
+      electron,
+      '/icon.png',
+      { open: () => {}, quit: () => {}, click: () => {} },
+      {
+        frames: frames('darwin'),
+        system: sys,
+        timers: clock,
+        platform: 'darwin',
+      },
+    );
     const tray = Tray.last!;
     expect(last(tray)).toContain('connecting-0Template.png');
     expect(tray.images.every((i) => i.template)).toBe(true);
@@ -139,13 +152,18 @@ describe('AppTray with frames', () => {
   it('Windows: follows the taskbar theme when nativeTheme updates', () => {
     const clock = new ManualClock();
     const { sys, theme } = system(true);
-    const app = new AppTray(electron, 'x.ico', { open: () => {}, quit: () => {}, click: () => {} }, {
-      frames: frames('win32'),
-      system: sys,
-      timers: clock,
-      platform: 'win32',
-      initial: { state: 'connected' },
-    });
+    const app = new AppTray(
+      electron,
+      'x.ico',
+      { open: () => {}, quit: () => {}, click: () => {} },
+      {
+        frames: frames('win32'),
+        system: sys,
+        timers: clock,
+        platform: 'win32',
+        initial: { state: 'connected' },
+      },
+    );
     const tray = Tray.last!;
     const darkImg = tray.images.at(-1)!;
     expect(darkImg.template).toBe(false);
@@ -161,12 +179,17 @@ describe('AppTray with frames', () => {
   it('reduced motion (system or the app setting): static only, no timers', () => {
     const clock = new ManualClock();
     const { sys, prefs, theme } = system(true, true);
-    const app = new AppTray(electron, '/i', { open: () => {}, quit: () => {}, click: () => {} }, {
-      frames: frames('darwin'),
-      system: sys,
-      timers: clock,
-      platform: 'darwin',
-    });
+    const app = new AppTray(
+      electron,
+      '/i',
+      { open: () => {}, quit: () => {}, click: () => {} },
+      {
+        frames: frames('darwin'),
+        system: sys,
+        timers: clock,
+        platform: 'darwin',
+      },
+    );
     expect(clock.pendingCount).toBe(0);
     prefs.reduced = false;
     theme.emit('updated'); // the system settings are read again
@@ -183,12 +206,17 @@ describe('AppTray with frames', () => {
   it('destroy clears every timer', () => {
     const clock = new ManualClock();
     const { sys } = system();
-    const app = new AppTray(electron, '/i', { open: () => {}, quit: () => {}, click: () => {} }, {
-      frames: frames('darwin'),
-      system: sys,
-      timers: clock,
-      platform: 'darwin',
-    });
+    const app = new AppTray(
+      electron,
+      '/i',
+      { open: () => {}, quit: () => {}, click: () => {} },
+      {
+        frames: frames('darwin'),
+        system: sys,
+        timers: clock,
+        platform: 'darwin',
+      },
+    );
     app.pulse('msg-out');
     app.destroy();
     expect(clock.pendingCount).toBe(0);

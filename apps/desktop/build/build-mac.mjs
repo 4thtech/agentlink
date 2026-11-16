@@ -32,6 +32,7 @@ import { APP_NAME, infoPlist } from './lib/plist.mjs';
 import { parseArgs, run } from './lib/run.mjs';
 import { HELPER_APP, HELPER_ID, buildMacHelper, macHelperLayout } from './native.mjs';
 import { HELPER_BUNDLE_PATH, HELPER_PATH } from './lib/sign-plan.mjs';
+import { copyTrayAssets } from './lib/tray-assets.mjs';
 import {
   CACHE_DIR,
   DESKTOP_DIR,
@@ -143,6 +144,10 @@ if (!existsSync(join(contents, 'Resources', ...LAYOUT.hostScript))) {
     `The core has no desktop host at Resources/${LAYOUT.hostScript.join('/')}: pack the CLI after \`pnpm --filter @4thtech-io/agentlink build\` (it builds dist/desktop-host.js).`,
   );
 }
+// TRAY-ENGINE (0.5.9 plan risk #5): the menu-bar icon frames and the static trayTemplate.png under
+// Resources/assets (before signing, so the bundle seal covers them).
+const trayFiles = copyTrayAssets(join(contents, 'Resources', ...LAYOUT.assetsDir), 'darwin');
+console.log(`      menu-bar icon: ${trayFiles} files`);
 
 console.log('[5/9] ASAR payload (with bundle-hashes.json)');
 const payload = buildPayload({

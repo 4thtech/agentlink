@@ -64,6 +64,6 @@ test('build-mac and build-win package the tray frames', () => {
   ]) {
     const src = readFileSync(join(DESKTOP_DIR, 'build', script), 'utf8');
     assert.match(src, /from '\.\/lib\/tray-assets\.mjs'/, script);
-    assert.match(src, new RegExp(`copyTrayAssets\\([^)]*'${platform}'\\)`), script);
+    assert.match(src, new RegExp(`copyTrayAssets\\(.*'${platform}'\\)`), script);
   }
 });
