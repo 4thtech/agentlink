@@ -25,6 +25,12 @@
 //   osascript / notify-send alert (approvalAlerts: false), and `~/.agentlink/desktop-alerts.json`
 //   ({v, pid, started, at, id}) tells `agentlink mcp` not to either, for the open ID only, while this
 //   host runs (no double alerts; mcp still alerts for every other ID).
+// - TRAY-PIPE (D-155; 08 §8): on the same tick as the N7 alerts, independent of the notification
+//   switches, the icon's `tray-state` (link word and two counts, on change) and `tray-pulse` (news
+//   only: never on a first look, at most one per kind per 2 s; tray-signals.ts). `shell-prefs` (the
+//   icon switch and the app's motion, from ~/.agentlink/ui-settings.json through the app host's
+//   reader) after every `ready` and on change; an unreadable file keeps the last value. Fixed words,
+//   counts and booleans only: never a name, a ref, an ID or text.
 // - `shutdown`, the pipe closing, a stop signal or a fatal error: the server closes, `stopped`
 //   goes out, the pipe closes, and the run ends.
 //
@@ -45,6 +51,15 @@ import { notifyMessages, planAlerts, refsToName, type AlertBaseline } from './al
 import type { FatalReason } from '../runtime/ui-lifecycle.js';
 import type { DesktopPipe } from './pipe.js';
 import { dedupeFileAndMessage, type RecentAlerts } from './alert-dedupe.js';
+import type { UiSettings } from '@4thtech-io/types/ui-contract/ui-settings';
+import {
+  createPulseGate,
+  planTray,
+  shellPrefsOf,
+  type ShellPrefsView,
+  type TrayBaseline,
+  type TrayStateView,
+} from './tray-signals.js';
 import {
   isNotifyTarget,
   isSessionUrl,
@@ -141,6 +156,13 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   let waitingOf: ApprovalServerSource | undefined;
   /** DESK051-UPD: the shell's last update state (undefined until it sends one). */
   let appUpdate: AppUpdateView | undefined;
+  /** TRAY-PIPE: the app host's UI settings reader (absent: the defaults apply). */
+  let readSettings: (() => Promise<UiSettings | undefined>) | undefined;
+  /** TRAY-PIPE: the last shell prefs read, and the last sent (a change is sent). */
+  let shellPrefs: ShellPrefsView | undefined;
+  let sentPrefs = '';
+  /** TRAY-PIPE: the last tray-state sent. */
+  let sentTray = '';
 
   let stopWith: (reason: StopReason) => void = () => undefined;
   const stopped = new Promise<StopReason>((resolve) => {
@@ -171,6 +193,36 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     }
   };
 
+  /** TRAY-PIPE: the icon's state, when it changed. */
+  const sendTray = (view: TrayStateView): void => {
+    const key = `${view.link}:${String(view.unread)}:${String(view.approvals)}`;
+    if (key === sentTray || stopping) return;
+    if (pipe.send({ v: 1, type: 'tray-state', ...view })) sentTray = key;
+  };
+
+  /** TRAY-PIPE: the shell's two switches (after each `ready`, or when they changed). */
+  const sendPrefs = (always: boolean): void => {
+    const prefs = shellPrefs;
+    if (prefs === undefined || stopping) return;
+    const key = `${String(prefs.menuBarIcon)}:${prefs.motion}`;
+    if (!always && key === sentPrefs) return;
+    if (pipe.send({ v: 1, type: 'shell-prefs', ...prefs })) sentPrefs = key;
+  };
+
+  /** TRAY-PIPE: reads the UI settings; a failed read keeps the last prefs. */
+  const refreshPrefs = async (): Promise<void> => {
+    const read = readSettings;
+    if (read === undefined) {
+      shellPrefs = shellPrefsOf(undefined);
+      return;
+    }
+    try {
+      shellPrefs = shellPrefsOf(await read());
+    } catch {
+      // Unreadable: the last prefs stay (never flip the icon back on by a failed read).
+    }
+  };
+
   /** The only place a session link goes: the pipe, as `ready`, after it is checked. */
   const sink = (sessionUrl: string): Promise<boolean> => {
     // Fail closed: nothing before the server is known, and only its own origin.
@@ -178,7 +230,10 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
       return Promise.resolve(false);
     }
     if (!sessionUrl.startsWith(`${approvalServer.origin}/`)) return Promise.resolve(false);
-    return Promise.resolve(pipe.send({ v: 1, type: 'ready', sessionUrl }));
+    const sent = pipe.send({ v: 1, type: 'ready', sessionUrl });
+    // TRAY-PIPE: the shell's prefs follow every `ready` (a new core, a new window page).
+    if (sent) sendPrefs(true);
+    return Promise.resolve(sent);
   };
 
   const tracked = (agent: AppHostAgent): AppHostAgent => {
@@ -238,6 +293,12 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     const host = options.host;
     const initial = host?.initial;
     current = initial?.source ?? options.source;
+    // TRAY-PIPE: the same ui-settings.json the server reads (read only here).
+    const directory = host?.directory as { readUiSettings?: unknown } | undefined;
+    if (typeof directory?.readUiSettings === 'function') {
+      const reader = directory.readUiSettings as () => Promise<UiSettings | undefined>;
+      readSettings = () => reader.call(directory);
+    }
     const wrapped: ApprovalServerOptions = {
       ...options,
       appUpdate: appUpdateDesk,
@@ -315,6 +376,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     });
   });
   sendStatus();
+  // TRAY-PIPE: the icon breathes until the first look at an ID says otherwise.
+  sendTray({ link: 'connecting', unread: 0, approvals: 0 });
 
   // APP-CONTINUITY: one host: a terminal `agentlink ui` host is taken over (it closes cleanly; its
   // browser tab says so), and a stale record of a crashed host is cleared. Same ~/.agentlink, same
@@ -342,6 +405,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   const { server } = started;
   state = 'running';
   sendStatus();
+  // TRAY-PIPE: the prefs are known before the first `ready`, which they follow.
+  await refreshPrefs();
   // The first page: Home, first run while no owner exists (the sink sends `ready`).
   await server.open().catch(() => false);
 
@@ -422,6 +487,10 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   let firstLookDone = false;
   /** NOTIFY-DEDUPE: who was alerted about lately (a file and its message are one alert). */
   const recentAlerts: RecentAlerts = new Map();
+  /** TRAY-PIPE: the icon's last look (its own baseline; a first look never pulses), and whose. */
+  let trayBaseline: TrayBaseline | undefined;
+  let trayOf: ApprovalServerSource | undefined;
+  const pulseGate = createPulseGate();
   let recordAt = 0;
   const mark = async (scope: string | undefined): Promise<void> => {
     if (deps.alertsRecord === undefined) return;
@@ -447,6 +516,10 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     const source = current;
     if (server === undefined || source === undefined) {
       alertBaseline = undefined;
+      // TRAY-PIPE: no ID open: nothing connected, nothing waiting; the next ID starts afresh.
+      trayBaseline = undefined;
+      trayOf = undefined;
+      sendTray({ link: 'offline', unread: 0, approvals: 0 });
       await mark(undefined);
       return;
     }
@@ -454,6 +527,21 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     if (waitingOf !== source) return;
     const state = await server.desktopAlerts().catch(() => undefined);
     if (state === undefined) return;
+    // TRAY-PIPE: the icon, from the same look, whatever the notification switches say.
+    const tray = planTray(trayOf === source ? trayBaseline : undefined, {
+      scope: state.scope,
+      approvals: waitingIds,
+      items: state.items,
+      outAt: state.outAt,
+      link: state.link,
+    });
+    trayBaseline = tray.baseline;
+    trayOf = source;
+    if (stopping) return;
+    sendTray(tray.state);
+    for (const kind of pulseGate.pass(tray.pulses, Date.now())) {
+      pipe.send({ v: 1, type: 'tray-pulse', kind });
+    }
     // Another ID's approvals (a switch): a fresh first look, whatever the scope says yet.
     const prev = baselineOf === source ? alertBaseline : undefined;
     const { news, baseline } = planAlerts(prev, waitingIds, state, { launch: !firstLookDone });
@@ -496,6 +584,9 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     }
     if (stopping) return;
     sendStatus();
+    // TRAY-PIPE: a changed icon switch or motion goes out at once.
+    await refreshPrefs();
+    sendPrefs(false);
     await alert().catch(() => undefined);
     if (stopping) return;
     timer = setTimeout(() => void tick(), every);

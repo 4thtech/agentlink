@@ -38,6 +38,16 @@
 //   {"v":1,"type":"app-update-install"} / {"v":1,"type":"app-update-restart"}  (UPD-5)
 //       "Update now" / "Restart now" in Settings (owner session + CSRF). No other key: the shell
 //       installs only the update it verified itself, and restarts only once it is ready.
+//   {"v":1,"type":"tray-state","link":<TRAY_LINKS>,"unread":n,"approvals":n}   (TRAY-PIPE, D-155)
+//       What the icon shows: the open ID's link word (from its health state) and two counts (unread
+//       messages and files, approvals waiting). Sent when any of them changes.
+//   {"v":1,"type":"tray-pulse","kind":<TRAY_PULSE_KINDS>}                    (TRAY-PIPE, D-155)
+//       News for the icon's animation, from the same look as the N7 alerts but independent of the
+//       notification switches. A first look never pulses; at most one per kind per 2 s.
+//   {"v":1,"type":"shell-prefs","menuBarIcon":<bool>,"motion":<SHELL_MOTIONS>} (TRAY-PIPE, D-155)
+//       The two UI settings the shell needs (the icon switch, the app's motion). After every `ready`
+//       and on change. These three carry fixed words, counts and booleans only: never text, a name,
+//       a ref or an ID.
 //
 // Shell -> core:
 //   {"v":1,"type":"invite","link":"https://agentlink.4thtech.io/i#…"}
@@ -92,6 +102,16 @@ export function isNotifyName(value: unknown): value is string {
   if (value.endsWith(' ')) return false;
   return NOTIFY_NAME.test(value);
 }
+
+/** TRAY-PIPE (D-155): the open ID's link word on the icon (from its health state). */
+export const TRAY_LINKS = Object.freeze(['connecting', 'connected', 'paused', 'offline'] as const);
+export type TrayLink = (typeof TRAY_LINKS)[number];
+/** TRAY-PIPE: the icon's one-shot animations. `ai_sent` only for a message this ID's AI sent. */
+export const TRAY_PULSE_KINDS = Object.freeze(['message_in', 'ai_sent', 'approval'] as const);
+export type TrayPulseKind = (typeof TRAY_PULSE_KINDS)[number];
+/** TRAY-PIPE: the app's own motion setting (Appearance); `off` shows end frames only. */
+export const SHELL_MOTIONS = Object.freeze(['system', 'on', 'off'] as const);
+export type ShellMotion = (typeof SHELL_MOTIONS)[number];
 
 /** The core's states, as the tray shows them. */
 export const HOST_STATES = Object.freeze(['starting', 'running', 'closing'] as const);
@@ -274,7 +294,32 @@ export type HostMessage =
   | { readonly v: 1; readonly type: 'app-update-check' }
   | { readonly v: 1; readonly type: 'app-update-install' }
   | { readonly v: 1; readonly type: 'app-update-restart' }
-  | NotifyMessage;
+  | NotifyMessage
+  | TrayStateMessage
+  | TrayPulseMessage
+  | ShellPrefsMessage;
+
+/** TRAY-PIPE: what the icon shows (a link word and two counts). */
+export interface TrayStateMessage {
+  readonly v: 1;
+  readonly type: 'tray-state';
+  readonly link: TrayLink;
+  readonly unread: number;
+  readonly approvals: number;
+}
+/** TRAY-PIPE: one animation for news (a fixed word only). */
+export interface TrayPulseMessage {
+  readonly v: 1;
+  readonly type: 'tray-pulse';
+  readonly kind: TrayPulseKind;
+}
+/** TRAY-PIPE: the shell's two switches. */
+export interface ShellPrefsMessage {
+  readonly v: 1;
+  readonly type: 'shell-prefs';
+  readonly menuBarIcon: boolean;
+  readonly motion: ShellMotion;
+}
 
 /** N7: one native notification as a fixed code. */
 export interface NotifyMessage {
@@ -463,6 +508,29 @@ export function parseHostMessage(line: string): HostMessage | undefined {
         return Object.freeze({ v: 1, type: 'notify', kind, count, name, target: m['target'] });
       }
       return Object.freeze({ v: 1, type: 'notify', kind, count, name });
+    }
+    case 'tray-state': {
+      const m = exactObject(value, ['v', 'type', 'link', 'unread', 'approvals']);
+      if (m?.['v'] !== DESKTOP_PIPE_VERSION || !isOneOf(TRAY_LINKS, m['link'])) return undefined;
+      const { unread, approvals } = m;
+      if (!isCount(unread) || !isCount(approvals)) return undefined;
+      return Object.freeze({ v: 1, type: 'tray-state', link: m['link'], unread, approvals });
+    }
+    case 'tray-pulse': {
+      const m = exactObject(value, ['v', 'type', 'kind']);
+      if (m?.['v'] !== DESKTOP_PIPE_VERSION || !isOneOf(TRAY_PULSE_KINDS, m['kind'])) {
+        return undefined;
+      }
+      return Object.freeze({ v: 1, type: 'tray-pulse', kind: m['kind'] });
+    }
+    case 'shell-prefs': {
+      const m = exactObject(value, ['v', 'type', 'menuBarIcon', 'motion']);
+      if (m?.['v'] !== DESKTOP_PIPE_VERSION || !isOneOf(SHELL_MOTIONS, m['motion'])) {
+        return undefined;
+      }
+      const menuBarIcon = m['menuBarIcon'];
+      if (typeof menuBarIcon !== 'boolean') return undefined;
+      return Object.freeze({ v: 1, type: 'shell-prefs', menuBarIcon, motion: m['motion'] });
     }
     default:
       return undefined;
