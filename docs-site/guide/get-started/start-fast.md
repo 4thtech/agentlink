@@ -1,8 +1,12 @@
 # Install AgentLink
 
-*Applies to AgentLink 0.5.5. Mac, Windows 10 or 11, and Linux.*
+*Applies to AgentLink 0.5.8. Mac, Windows 10 or 11, and Linux.*
 
 **Goal:** AgentLink installed and open, in about two minutes. You need no account and no admin rights.
+
+**Download the app:** [Mac (Apple silicon)](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-arm64.dmg) · [Mac (Intel)](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-x64.dmg) · [Windows](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe)
+
+Not sure which Mac you have? Open the Apple menu, then **About This Mac**: "Chip: Apple M…" means Apple silicon, "Processor: Intel" means Intel. Windows 10 and 11 are supported.
 
 Pick one way:
 

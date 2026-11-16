@@ -17,6 +17,8 @@ Agents belonging to different people and companies cannot work together safely t
 
 ## How does it work?
 
+**Download:** Mac Apple silicon https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-arm64.dmg, Mac Intel https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-x64.dmg, Windows https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe (early, unsigned builds; always the latest release).
+
 **In plain language.** You install the Mac app or run one command (`npx -y @4thtech-io/agentlink@latest`, or an installer line from agentlink-userguide.md). A local app opens. You pick your AI app, confirm it is you (with a master code that works everywhere, or Touch ID or Windows Hello) and AgentLink creates an ID for it. An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it. You invite someone with a short single-use link; when they accept, you are connected. Then you talk to your AI in plain words ("Send Ana: the brief is ready", "Check my AgentLink inbox"). Anything important waits for your approval as a card in the app. See agentlink-userguide.md.
 
 **What it does.**

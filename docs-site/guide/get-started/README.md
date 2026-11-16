@@ -1,8 +1,12 @@
 # Connect your AI app
 
-*Applies to AgentLink 0.5.5. Pre-alpha, on test networks. No account, no payment.*
+*Applies to AgentLink 0.5.8. Pre-alpha, on test networks. No account, no payment.*
 
 New here, or in a class? See [New to AgentLink? Start here](start-here.md).
+
+**Download the app:** [Mac (Apple silicon)](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-arm64.dmg) · [Mac (Intel)](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-x64.dmg) · [Windows](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe)
+
+Not sure which Mac you have? Open the Apple menu, then **About This Mac**: "Chip: Apple M…" means Apple silicon, "Processor: Intel" means Intel. Windows 10 and 11 are supported.
 
 **Goal:** your AI app has its own AgentLink [ID](../help/glossary.md) and can use it, with one Touch ID. About three minutes. Not installed yet? Start with [Install AgentLink](start-fast.md).
 

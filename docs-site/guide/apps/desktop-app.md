@@ -1,6 +1,6 @@
 # Desktop app (Mac and Windows)
 
-*Applies to AgentLink 0.5.5 (Mac and Windows). These are early, unsigned builds, meant for people who are happy to try them first. On Windows the browser app (one command) stays the main way; the [Windows app](#windows) is an early build. Linux is not available yet.*
+*Applies to AgentLink 0.5.8 (Mac and Windows). These are early, unsigned builds, meant for people who are happy to try them first. On Windows the browser app (one command) stays the main way; the [Windows app](#windows) is an early build. Linux is not available yet.*
 
 ## Which file do I download?
 
@@ -50,7 +50,7 @@ That command only removes the "downloaded from the internet" mark from this one 
 
 ## Windows
 
-*Applies to AgentLink 0.5.5.* There is an **early Windows app** for Windows 10 and 11 (64-bit; it also runs on Windows on Arm). It is not signed yet. The browser app is still the main way on Windows: one command installs AgentLink and opens it in your browser, see [Windows](../get-started/windows.md). Use the app if you prefer AgentLink in its own window.
+*Applies to AgentLink 0.5.8.* From 0.5.4 there is an **early Windows app** for Windows 10 and 11 (64-bit; it also runs on Windows on Arm). It is not signed yet. The browser app is still the main way on Windows: one command installs AgentLink and opens it in your browser, see [Windows](../get-started/windows.md). Use the app if you prefer AgentLink in its own window.
 
 1. **Download** [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe). It is also on the [latest release](https://github.com/4thtech/agentlink/releases/latest) under **Assets**, with its fingerprint in `SHA256SUMS-desktop-app.txt` (check it with `certutil -hashfile AgentLink-win-x64-setup.exe SHA256` if you like).
 2. **Open the file.** Windows may say "Windows protected your PC". That is SmartScreen: it shows for files few people have downloaded yet. Choose **More info**, then **Run anyway**. You only do this once per download.
@@ -106,7 +106,7 @@ Your IDs, people and messages stay as they are: they live in your AgentLink fold
 
 You can always get a newer version by hand too: download the new `.dmg` from the [Releases page](https://github.com/4thtech/agentlink/releases) and drag it over the old one in Applications.
 
-**Update now.** A Mac app on 0.5.4 or newer can update itself on a click, with no download and no dragging, when the release carries a signed update. An older app (0.5.1 and before) is updated by hand, as above. Where the button isn't offered, Settings › Updates keeps **Download update**. When it is on, Settings › Updates shows:
+**Update now (0.5.6).** A Mac app on 0.5.6 or newer can update itself on a click, with no download and no dragging, when the release carries a signed update. If you have 0.5.5 or older, install 0.5.6 or newer by hand once, as above; after that it is one click. Where the button isn't offered, Settings › Updates keeps **Download update**. When it is on, Settings › Updates shows:
 
 1. **AgentLink 0.5.5 is available** (for example) and an **Update now** button.
 2. **Downloading…** with a progress bar and the percentage, then **Checking the new version…**: the app checks that the new version is the one AgentLink published before it changes anything.
@@ -114,6 +114,10 @@ You can always get a newer version by hand too: download the new `.dmg` from the
 4. **Restarting…**: AgentLink closes and opens again with the new version. If the new version does not start, the one you had comes back by itself.
 
 If the app can't update itself (for example, it is not in a folder you can change), the page says **Couldn't update here. Download the new version instead.** and shows the **Download update** button with the steps above.
+
+## Choosing your folders (0.5.8)
+
+In the app, **Add folder…** (the folders your AI may send from) and **Change…** (where received files are saved) open the normal Finder or Explorer window, so you don't type paths. A folder you pick is checked and confirmed like any other change. See [Files](../local-app/files.md).
 
 ## Touch ID
 

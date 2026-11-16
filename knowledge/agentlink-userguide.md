@@ -42,7 +42,7 @@ If you already have Node.js 22.14 or newer (older Node makes `npx` fail), you ca
 
 ## Is there a desktop app?
 
-Yes, early builds for Mac and Windows 10 or 11 (links above, details in agentlink-desktop-app.md). The browser app (one command) stays the default on Windows. Settings, Updates (checked once a day, or Check for updates) offers Update now in a Mac app on 0.5.4 or newer, a progress bar, then Restart now. Updates are signed with a key pinned in the app; the check asks GitHub only (no ID or version is sent); `AGENTLINK_UPDATE_CHECK=off` turns it off.
+Yes, early builds for Mac and Windows 10 or 11 (links above, details in agentlink-desktop-app.md). The browser app (one command) stays the default on Windows. Settings, Updates (checked once a day, or Check for updates) offers Update now (0.5.6, Mac and Windows apps), a progress bar, then Restart now. Updates are signed with a key pinned in the app; the check asks GitHub only (no ID or version is sent); `AGENTLINK_UPDATE_CHECK=off` turns it off.
 
 **Browser or app, one AgentLink (0.5.5).** Start in the browser and install the app later: it continues with the same IDs, people and AI apps, no new setup. On a Mac the first open asks (a note first) to let AgentLink use your saved IDs: type your Mac login password, never your master code, and choose Always Allow. The browser window says "AgentLink moved to the AgentLink app". If the app is open and you run `agentlink`, the app comes to the front.
 
