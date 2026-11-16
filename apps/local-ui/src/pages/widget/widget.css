@@ -1,0 +1,416 @@
+/* Menu bar widget (D-155; b11 §25.4; approved prototype 16 Nov 2026): about 360 px wide, at most 560
+   high, one scrolling column of raised blocks. Tokens only; no inline styles (CSP). Light and dark come
+   from the tokens. Motion is the row highlight and the shared dots; reduced motion turns it off. */
+html,
+body {
+  margin: 0;
+  background: var(--al-color-bg-surface);
+}
+.wg {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--al-space-3);
+  align-content: start;
+  inline-size: 100%;
+  max-inline-size: 360px;
+  max-block-size: 560px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--al-space-3);
+  background: var(--al-color-bg-surface);
+  color: var(--al-color-fg-default);
+  font-family: var(--al-font-family-sans);
+}
+.wg :focus-visible {
+  outline: 2px solid var(--al-color-focus-ring);
+  outline-offset: 2px;
+}
+.wg-blk {
+  box-sizing: border-box;
+  min-inline-size: 0;
+  margin: 0;
+  padding: var(--al-space-3) var(--al-space-4);
+  display: grid;
+  gap: var(--al-space-2);
+  background: var(--al-color-bg-raised);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+}
+.wg-blk p {
+  margin: 0;
+}
+.wg-blk[data-attention='true'] {
+  border-inline-start: var(--al-space-2) solid var(--al-color-accent-default);
+}
+.wg-head {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  margin: 0;
+  font-weight: var(--al-font-weight-medium);
+  color: var(--al-color-fg-muted);
+}
+.wg-grow {
+  flex: 1;
+  min-inline-size: 0;
+}
+.wg-agent {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  min-block-size: 36px;
+  min-inline-size: 0;
+}
+.wg-agent-name {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  font-weight: var(--al-font-weight-medium);
+}
+.wg-line {
+  margin: 0;
+}
+.wg-note {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  color: var(--al-color-fg-muted);
+}
+.wg-empty {
+  margin: 0;
+  color: var(--al-color-fg-muted);
+}
+.muted,
+.al-muted {
+  color: var(--al-color-fg-muted);
+}
+.subtle {
+  color: var(--al-color-fg-subtle);
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rows: one keyboard stop each. */
+.wg-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.wg-row {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  box-sizing: border-box;
+  inline-size: calc(100% + 2 * var(--al-space-2));
+  min-inline-size: 0;
+  margin: 0 calc(-1 * var(--al-space-2));
+  padding: var(--al-space-2);
+  border: 0;
+  border-radius: var(--al-radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: background-color var(--al-duration-fast) var(--al-easing-standard);
+}
+.wg-row:hover,
+.wg-row:focus-visible {
+  background: var(--al-color-bg-sunken);
+}
+.wg-row:disabled {
+  opacity: var(--al-opacity-disabled);
+  cursor: default;
+}
+.wg-chev {
+  flex: none;
+  opacity: 0;
+  color: var(--al-color-fg-muted);
+}
+.wg-row:hover .wg-chev,
+.wg-row:focus-visible .wg-chev {
+  opacity: 1;
+}
+.wg-ico {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 32px;
+  block-size: 32px;
+  border-radius: var(--al-radius-md);
+  background: var(--al-color-accent-subtle);
+  color: var(--al-color-accent-fg);
+}
+.wg-main {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  display: grid;
+  gap: 1px;
+}
+.wg-top {
+  display: flex;
+  align-items: baseline;
+  gap: var(--al-space-2);
+  min-inline-size: 0;
+}
+.wg-name {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  font-weight: var(--al-font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wg-time {
+  flex: none;
+  margin-inline-start: auto;
+  color: var(--al-color-fg-subtle);
+}
+.wg-sub {
+  display: block;
+}
+.wg-block-btn {
+  inline-size: 100%;
+}
+.wg-avatar {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 32px;
+  block-size: 32px;
+  border-radius: var(--al-radius-full);
+  background: var(--al-color-bg-sunken);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  color: var(--al-color-fg-muted);
+  font-size: 12px;
+  font-weight: var(--al-font-weight-semibold);
+}
+.wg-avatar-dot {
+  position: absolute;
+  inset-inline-end: -1px;
+  inset-block-end: -1px;
+  inline-size: 9px;
+  block-size: 9px;
+  border-radius: var(--al-radius-full);
+  background: var(--al-color-status-success-icon);
+  box-shadow: 0 0 0 2px var(--al-color-bg-raised);
+}
+/* Untrusted preview (06 §4): plain text, one line, untrusted colours and a dashed edge. */
+.wg-preview {
+  display: block;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-inline-start: 6px;
+  color: var(--al-color-untrusted-fg);
+  border-inline-start: 2px dashed var(--al-color-untrusted-border);
+}
+.wg-untrusted {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--al-color-untrusted-label-fg);
+}
+.wg-count {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: 20px;
+  block-size: 20px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: var(--al-radius-full);
+  background: var(--al-color-bg-sunken);
+  border: var(--al-border-width-thin) solid var(--al-color-border-strong);
+  font-size: 11px;
+  font-weight: var(--al-font-weight-semibold);
+}
+
+/* Connected now */
+.wg-id {
+  display: grid;
+  gap: 2px;
+  padding-block: var(--al-space-2);
+}
+.wg-id-name {
+  font-weight: var(--al-font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wg-apps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.wg-app {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-2);
+  min-inline-size: 0;
+}
+.wg-app-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wg-appdot {
+  flex: none;
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: var(--al-radius-full);
+  border: 1px solid var(--al-color-status-neutral-icon);
+  box-sizing: border-box;
+}
+.wg-appdot.is-working,
+.wg-appdot.is-ready {
+  background: var(--al-color-status-success-icon);
+  border-color: var(--al-color-status-success-icon);
+}
+.wg-appdot.is-idle {
+  background: transparent;
+  border-color: var(--al-color-status-success-icon);
+}
+.wg-appdot.is-off {
+  border-color: var(--al-color-status-warning-icon);
+}
+
+/* Contacts: a shape and a word, never colour alone. */
+.wg-contact,
+.wg-event {
+  display: flex;
+  align-items: baseline;
+  gap: var(--al-space-3);
+  min-inline-size: 0;
+  padding-block: var(--al-space-1);
+}
+.wg-contact-name {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.wg-when {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.wg-marker {
+  inline-size: 8px;
+  block-size: 8px;
+  box-sizing: border-box;
+  border-radius: var(--al-radius-full);
+  border: 1px solid var(--al-color-status-neutral-icon);
+}
+.wg-marker.is-active_now {
+  background: var(--al-color-status-success-icon);
+  border-color: var(--al-color-status-success-icon);
+}
+.wg-event-text {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Today */
+.wg-strip {
+  inline-size: 100%;
+  block-size: 28px;
+}
+.wg-bar.is-in {
+  fill: var(--al-color-fg-default);
+}
+.wg-bar.is-out {
+  fill: var(--al-color-fg-muted);
+}
+.wg-bar.is-proofs {
+  fill: var(--al-color-accent-default);
+}
+.wg-bar.is-files {
+  fill: var(--al-color-status-info-icon);
+}
+.wg-bar.is-empty {
+  fill: var(--al-color-border-strong);
+  opacity: 0.55;
+}
+.wg-hour.is-future {
+  opacity: 0.18;
+}
+.wg-axis {
+  display: flex;
+  justify-content: space-between;
+}
+.wg-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-2) var(--al-space-4);
+}
+.wg-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.wg-key {
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: var(--al-radius-xs);
+}
+.wg-key.is-in {
+  background: var(--al-color-fg-default);
+}
+.wg-key.is-out {
+  background: var(--al-color-fg-muted);
+}
+.wg-key.is-proofs {
+  background: var(--al-color-accent-default);
+}
+.wg-key.is-files {
+  background: var(--al-color-status-info-icon);
+}
+
+/* Footer */
+.wg-foot {
+  display: grid;
+  gap: var(--al-space-2);
+}
+.wg-foot-actions {
+  display: flex;
+  gap: var(--al-space-2);
+}
+.wg-foot-actions .al-btn {
+  flex: 1 1 0;
+  min-inline-size: 0;
+}
+.al-sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wg *,
+  .wg *::before,
+  .wg *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
