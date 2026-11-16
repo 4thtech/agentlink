@@ -9,7 +9,8 @@ AgentLink gives your AI app its own [ID](../help/glossary.md), so it can send pr
 You need no account and no admin rights. Pick one way:
 
 - **On a Mac?** Get the Mac app (recommended for Mac): download, drag to Applications, open. No terminal needed.
-- **Windows, Linux, or prefer the terminal on a Mac?** Paste one command into a window where you type commands (Terminal or PowerShell). AgentLink then runs on your computer and opens in your browser.
+- **On Windows?** Get the Windows app (early build): download, open, done. No terminal needed.
+- **Linux, or prefer the terminal on a Mac or Windows?** Paste one command into a window where you type commands (Terminal or PowerShell). AgentLink then runs on your computer and opens in your browser.
 
 ### On a Mac: get the app (recommended)
 
@@ -28,6 +29,18 @@ Not sure which? Click the Apple menu (top left of your screen), then **About Thi
 **Why step 3?** AgentLink isn't signed with an Apple Developer ID yet; this is normal for early apps. It does not mean something is wrong with the file. Never turn off your Mac's security settings for it.
 
 Next time, open **AgentLink** from Applications. If macOS says the app is "damaged", and for updates: [Mac app](../apps/desktop-app.md).
+
+### On Windows: get the app (early build)
+
+No terminal needed. Download the setup file for Windows 10 or 11:
+
+- **[Download for Windows 10 or 11](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe)** → file `AgentLink-win-x64-setup.exe`
+
+1. **Open the file you downloaded.** Windows may say "Windows protected your PC" (SmartScreen). This is an early build that is not signed yet. Choose **More info**, then **Run anyway**.
+2. **Follow the setup.** It installs for you only (no administrator rights). Its last page offers **Create a desktop shortcut** (ticked by default).
+3. **Open AgentLink** from the Start menu (or the shortcut). It opens on **Get started**. Go on with the next step.
+
+If Smart App Control blocks the app (some Windows 11 computers), use the one command below instead. Steps and updates: [Windows app](../apps/desktop-app.md#windows).
 
 ### Windows, Linux, or the terminal: one command
 
