@@ -12,7 +12,7 @@ import {
   type UiSettings,
 } from '@4thtech-io/types/ui-contract/ui-settings';
 import { InlineError, PreviewTile, Segmented, Switch } from '@4thtech-io/ui';
-import { useEffect, useId, useState, type ReactElement } from 'react';
+import { useEffect, useId, useRef, useState, type ReactElement } from 'react';
 import { desktopPlatform, type DesktopPlatform } from '../../presence/desktop.js';
 import {
   readStoredUiSettings,
@@ -42,11 +42,30 @@ export function AppearancePage(props: AppearancePageProps): ReactElement {
   const [tray, setTray] = useState<TrayPrefs>(() => trayPrefsInForce(undefined));
   const [trayFailed, setTrayFailed] = useState(false);
 
+  // Per switch: how many saves were started (the newest decides what shows), the value the app is
+  // known to hold, and which save that value came from. A switch the owner already touched ignores
+  // the first read when it lands late.
+  const traySeq = useRef<Record<keyof TrayPrefs, number>>({ menuBarIcon: 0, widgetPreviews: 0 });
+  const trayKept = useRef<TrayPrefs>(trayPrefsInForce(undefined));
+  const trayKeptSeq = useRef<Record<keyof TrayPrefs, number>>({
+    menuBarIcon: 0,
+    widgetPreviews: 0,
+  });
+
   useEffect(() => {
     let live = true;
     read().then(
       (stored) => {
-        if (live) setTray(trayPrefsInForce(stored));
+        if (!live) return;
+        const inForce = trayPrefsInForce(stored);
+        const untouched = (key: keyof TrayPrefs): boolean => traySeq.current[key] === 0;
+        for (const key of ['menuBarIcon', 'widgetPreviews'] as const) {
+          if (untouched(key)) trayKept.current = { ...trayKept.current, [key]: inForce[key] };
+        }
+        setTray((t) => ({
+          menuBarIcon: untouched('menuBarIcon') ? inForce.menuBarIcon : t.menuBarIcon,
+          widgetPreviews: untouched('widgetPreviews') ? inForce.widgetPreviews : t.widgetPreviews,
+        }));
       },
       () => undefined,
     );
@@ -56,12 +75,23 @@ export function AppearancePage(props: AppearancePageProps): ReactElement {
   }, [read]);
 
   const changeTray = (key: keyof TrayPrefs, on: boolean): void => {
-    const before = tray[key];
+    const seq = traySeq.current[key] + 1;
+    traySeq.current = { ...traySeq.current, [key]: seq };
     setTray((t) => ({ ...t, [key]: on }));
     setTrayFailed(false);
     void save(key === 'menuBarIcon' ? { menuBarIcon: on } : { widgetPreviews: on }).then((ok) => {
-      if (ok) return;
-      setTray((t) => ({ ...t, [key]: before }));
+      if (ok) {
+        // Saves run one at a time in the app; the newest stored one is what the app holds.
+        if (seq > trayKeptSeq.current[key]) {
+          trayKeptSeq.current = { ...trayKeptSeq.current, [key]: seq };
+          trayKept.current = { ...trayKept.current, [key]: on };
+        }
+        return;
+      }
+      // Only the newest change reverts, and to what the app holds now (never an older value).
+      if (seq !== traySeq.current[key]) return;
+      const kept = trayKept.current[key];
+      setTray((t) => ({ ...t, [key]: kept }));
       setTrayFailed(true);
     });
   };

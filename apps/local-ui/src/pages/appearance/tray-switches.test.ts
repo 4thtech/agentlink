@@ -110,6 +110,84 @@ describe('Appearance: menu bar widget switches', () => {
     expect(sw(S.previewsLabel).getAttribute('aria-checked')).toBe('true');
   });
 
+  it('a late first read never overrides a switch the owner already toggled', async () => {
+    let answer: (s: UiSettings | undefined) => void = () => undefined;
+    const pending = new Promise<UiSettings | undefined>((r) => {
+      answer = r;
+    });
+    const pageProps: AppearancePageProps = {
+      platform: 'mac',
+      read: () => pending,
+      save: (change) => {
+        saved.push(change);
+        return Promise.resolve(true);
+      },
+    };
+    await act(async () => {
+      root.render(h(AppearancePage, pageProps));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      sw(S.previewsLabel).click();
+      await Promise.resolve();
+    });
+    expect(sw(S.previewsLabel).getAttribute('aria-checked')).toBe('false');
+    await act(async () => {
+      answer({ menuBarIcon: false, widgetPreviews: true });
+      await pending;
+      await Promise.resolve();
+    });
+    // The untouched switch takes the stored value; the toggled one keeps the owner's choice.
+    expect(sw(S.menuBarMac).getAttribute('aria-checked')).toBe('false');
+    expect(sw(S.previewsLabel).getAttribute('aria-checked')).toBe('false');
+    expect(saved).toEqual([{ widgetPreviews: false }]);
+  });
+
+  it('a quick double toggle with a failed save never reverts to an outdated value', async () => {
+    const answers: ((ok: boolean) => void)[] = [];
+    const pageProps: AppearancePageProps = {
+      platform: null,
+      read: () => Promise.resolve({ widgetPreviews: true }),
+      save: (change) => {
+        saved.push(change);
+        return new Promise<boolean>((r) => answers.push(r));
+      },
+    };
+    await act(async () => {
+      root.render(h(AppearancePage, pageProps));
+      await Promise.resolve();
+    });
+    const tick = async (fn: () => void): Promise<void> => {
+      await act(async () => {
+        fn();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+    };
+    // off (save 1), then on again (save 2) before either answers.
+    await tick(() => sw(S.previewsLabel).click());
+    await tick(() => sw(S.previewsLabel).click());
+    expect(saved).toEqual([{ widgetPreviews: false }, { widgetPreviews: true }]);
+    expect(sw(S.previewsLabel).getAttribute('aria-checked')).toBe('true');
+    // Both fail: the older failure changes nothing; the newest reverts to what the app holds (on),
+    // never to the value seen when it was clicked (off).
+    await tick(() => answers[0]?.(false));
+    expect(sw(S.previewsLabel).getAttribute('aria-checked')).toBe('true');
+    expect(host.textContent).not.toContain(S.traySaveFailed);
+    await tick(() => answers[1]?.(false));
+    expect(sw(S.previewsLabel).getAttribute('aria-checked')).toBe('true');
+    expect(host.textContent).toContain(S.traySaveFailed);
+
+    // Saved off (3) lands, then on (4) fails: it shows what the app holds (off), not the
+    // value from before save 3.
+    await tick(() => sw(S.previewsLabel).click());
+    await tick(() => sw(S.previewsLabel).click());
+    await tick(() => answers[2]?.(true));
+    await tick(() => answers[3]?.(false));
+    expect(sw(S.previewsLabel).getAttribute('aria-checked')).toBe('false');
+    expect(host.textContent).toContain(S.traySaveFailed);
+  });
+
   it('copy is exact and uses plain words (11 §5)', () => {
     expect(S.menuBarHint).toBe('Quick look at messages, approvals and your connected AI apps.');
     expect(S.menuBarWindowsHint).toBe('While it is hidden, closing the window quits AgentLink.');
