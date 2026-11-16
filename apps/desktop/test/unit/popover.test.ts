@@ -27,20 +27,30 @@ import {
   hardenSession,
   popoverOptions,
   popoverUrl,
+  type PopoverWindowOptions,
 } from '../../src/main/security.js';
 import type { DisplayArea, Rect } from '../../src/main/popover-position.js';
-import { FakeBrowserWindow, FakeEvent, FakeSession, SESSION_URL } from './fakes.js';
+import {
+  FakeBrowserWindow,
+  FakeEvent,
+  FakeSession,
+  FakeWebContents,
+  SESSION_URL,
+} from './fakes.js';
 
 const ORIGIN = 'http://localhost:4567';
 const WIDGET = `${ORIGIN}/settings/widget`;
 
 class FakePopoverWindow extends FakeBrowserWindow implements PopoverWindow {
   static all: FakePopoverWindow[] = [];
+  override readonly webContents: FakeWebContents & { id: number } = Object.assign(
+    new FakeWebContents(),
+    { id: 40 + FakePopoverWindow.all.length },
+  );
   bounds: Rect | null = null;
   focusCount = 0;
-  constructor(options: BrowserWindowOptions) {
-    super(options);
-    (this.webContents as unknown as { id: number }).id = 40 + FakePopoverWindow.all.length;
+  constructor(readonly popoverOptions: PopoverWindowOptions) {
+    super(popoverOptions as unknown as BrowserWindowOptions);
     FakePopoverWindow.all.push(this);
   }
   setBounds(bounds: Rect): void {
@@ -424,5 +434,3 @@ describe('no owner presence from the popover (hardenSession)', () => {
     expect(blurs).toBe(1);
   });
 });
-
-void FakeBrowserWindow;

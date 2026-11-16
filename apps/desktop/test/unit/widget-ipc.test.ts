@@ -111,9 +111,9 @@ describe('parseWidgetRequest', () => {
 describe('the handler checks the caller', () => {
   it('open goes to the main window, then the popover closes', async () => {
     const { handler, calls } = setup();
-    await expect(handler(event(), { action: 'open', route: 'inbox', target: PERSON })).resolves.toBe(
-      true,
-    );
+    await expect(
+      handler(event(), { action: 'open', route: 'inbox', target: PERSON }),
+    ).resolves.toBe(true);
     await expect(handler(event(), { action: 'open', route: 'home' })).resolves.toBe(true);
     expect(calls).toEqual([`open inbox ${PERSON}`, 'close', 'open home', 'close']);
   });
