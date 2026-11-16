@@ -75,6 +75,7 @@ import { invitesRoutes } from './api/invites.js';
 import { messagesRoutes } from './api/messages.js';
 // UX2-f1: the per-contact activity pulse (read-only).
 import { pulseRoute } from './api/messages-pulse.js';
+import { widgetRoute } from './api/widget.js';
 import { payConfirmRoutes } from './api/pay-confirm.js';
 import { peopleAllRoutes } from './api/people-all.js';
 import { storageRoutes } from './api/storage.js';
@@ -585,6 +586,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     retentionRoutes,
     // ATT-APP-ATTACH: the owner attaches light text files in a conversation (the attach kind).
     [attachRoute],
+    // TRAY-WIDGET-API (D-155): the menu bar widget's one read.
+    [widgetRoute],
   ]) {
     for (const route of routes) registry.register(route);
   }

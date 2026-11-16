@@ -399,6 +399,7 @@ import {
 } from '@4thtech-io/types/ui-contract/ui-settings';
 import { createUiSettingsDesk } from './local-ui/api/ui-settings.js';
 import type { LocalUiNotificationsDesk } from './local-ui/api/notifications.js';
+import { widgetActivityMark } from './local-ui/api/widget.js';
 import {
   notifyPrefsInForce,
   type NotificationItem,
@@ -1698,11 +1699,19 @@ export async function startApprovalServerWith(
       const client = agentUi?.client;
       const contactsMark =
         client === undefined ? undefined : await client.pairing.changeMark().catch(() => undefined);
+      // TRAY-WIDGET-API (D-155): the open ID's activity mark (notification items, activity head,
+      // newest exchange), compared by the hub for the `activity` event, never sent.
+      const readClient = uiContext.client;
+      const activityMark =
+        readClient === undefined
+          ? undefined
+          : await widgetActivityMark(readClient, uiContext.notifications, now());
       return {
         generation: list.generation,
         current: list.current,
         agents: list.agents.map(liveAgentRecord),
         contactsMark,
+        activityMark,
       };
     },
     now,

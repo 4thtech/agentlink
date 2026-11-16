@@ -257,6 +257,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       // UPD-5: Update now and Restart now (api/app-update.test.ts).
       '/api/ui/app-update/install',
       '/api/ui/app-update/restart',
+      // TRAY-WIDGET-API (D-155): the menu bar widget's read (api/widget.test.ts).
+      '/api/ui/widget',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).
