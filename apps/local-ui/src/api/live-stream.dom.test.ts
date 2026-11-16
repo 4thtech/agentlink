@@ -479,3 +479,35 @@ describe('the contacts event (W5-INVITE-FEEDBACK)', () => {
     }
   });
 });
+
+// TRAY-WIDGET-UI: the stream's activity {at} becomes agentlink:activity-changed (the widget reads again).
+describe('the activity event (TRAY-WIDGET-UI)', () => {
+  it('announces agentlink:activity-changed, not agentlink:agents-changed', async () => {
+    const s = serve();
+    let activity = 0;
+    const onActivity = (): void => {
+      activity += 1;
+    };
+    window.addEventListener('agentlink:activity-changed', onActivity);
+    try {
+      subscribeLive(() => undefined);
+      await flush();
+      s.streams[0]?.push(
+        block('BOOTboot.1', 'snapshot', {
+          generation: 1,
+          current: 'default',
+          agents: [record()],
+          at: NOW,
+        }),
+      );
+      await flush();
+      const agentsBefore = changed;
+      s.streams[0]?.push(block('BOOTboot.2', 'activity', { at: NOW }));
+      await flush();
+      expect(activity).toBe(1);
+      expect(changed).toBe(agentsBefore);
+    } finally {
+      window.removeEventListener('agentlink:activity-changed', onActivity);
+    }
+  });
+});
