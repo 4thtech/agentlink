@@ -16,6 +16,15 @@ const subscribers = new Set<HealthSubscriber>();
 let stop: (() => void) | undefined;
 let lastState: { state: HealthState; version: string | undefined } | undefined;
 let lastResult: ApiResult<unknown> | undefined;
+const refreshers = new Set<() => void>();
+
+/**
+ * HEALTH-BAR-STUCK: read again now and report the next answer even when it is unchanged (the page
+ * went back to Checking… on its own, for example on the browser's online event). No poller: nothing.
+ */
+export function refreshHealth(): void {
+  for (const refresh of [...refreshers]) refresh();
+}
 
 function each(call: (s: HealthSubscriber) => void): void {
   for (const s of [...subscribers]) {
@@ -58,6 +67,10 @@ export function subscribeHealth(
       onState: (state, version) => {
         lastState = { state, version };
         each((s) => s.onState?.(state, version));
+      },
+      onRefresh: (listener) => {
+        refreshers.add(listener);
+        return () => refreshers.delete(listener);
       },
     });
   } else {
