@@ -44,7 +44,7 @@ import { subscribeHealth } from '../../layout/health-feed.js';
 import { HEALTH_PATH } from '../../layout/health.js';
 import { initials } from '../../initials.js';
 import type { WidgetRoute } from '../../desktop.js';
-import { parseItem, render, type ActivityItem, type Part } from '../activity/clean.js';
+import { parseItem, render, type ActivityItem } from '../activity/clean.js';
 import { LIST_PATH, parseList, type ContactRow } from '../contacts/data.js';
 import { parseHealthSnapshot, type HealthSnapshot } from '../home/data.js';
 import { APP_UPDATE_PATH, parseUpdate, type UpdateView } from '../updates/data.js';
@@ -55,8 +55,10 @@ import {
   agoWords,
   appsActive,
   lastActivity,
+  moreMessages,
   newCount,
   newFiles,
+  rowLabel,
   shortAgo,
   todayLabel,
   waitingForYou,
@@ -81,14 +83,13 @@ export interface WidgetPageProps {
 interface Model {
   readonly widget?: WidgetView;
   readonly widgetFailed: boolean;
-  readonly offline: boolean;
   readonly contacts: readonly ContactRow[];
   readonly notes?: NotificationList;
   readonly feed: readonly ActivityItem[];
   readonly update?: UpdateView;
   readonly loaded: boolean;
 }
-const EMPTY: Model = { widgetFailed: false, offline: false, contacts: [], feed: [], loaded: false };
+const EMPTY: Model = { widgetFailed: false, contacts: [], feed: [], loaded: false };
 
 const nameOfRow = (c: ContactRow): string =>
   formatContactName(
@@ -97,9 +98,7 @@ const nameOfRow = (c: ContactRow): string =>
       : { name: c.name, ...(c.fingerprint === undefined ? {} : { fingerprint: c.fingerprint }) },
   ).text;
 
-function sentence(parts: readonly Part[]): string {
-  return parts.map((p) => (typeof p === 'string' ? p : 'name' in p ? p.name : S.aFile)).join('');
-}
+const isMac = (): boolean => typeof navigator !== 'undefined' && /Mac/i.test(navigator.userAgent);
 
 type Link = 'connecting' | 'connected' | 'paused' | 'offline' | 'update' | 'setup';
 
@@ -279,7 +278,6 @@ export function WidgetPage({
           ...m,
           ...(view === undefined ? {} : { widget: view }),
           widgetFailed: view === undefined,
-          offline: w.kind === 'offline',
           contacts: list?.kind === 'ok' ? list.contacts : m.contacts,
           ...(notes === undefined ? {} : { notes }),
           feed: feed ?? m.feed,
@@ -463,7 +461,7 @@ export function WidgetPage({
       <section className="wg-blk" data-block="status" aria-label={S.statusLabel}>
         <div className="wg-agent">
           <Mark size={16} mono title="" />
-          <span className="wg-agent-name al-text-body">{S.title}</span>
+          <span className="wg-agent-name al-text-body">{S.thisComputer}</span>
           <LiveDot state={dot} label={word[link]} className="wg-dot" />
         </div>
         <p className="wg-line al-text-caption al-muted">
@@ -471,7 +469,7 @@ export function WidgetPage({
           {lastAt > 0 ? ` · ${lastActivity(agoWords(t - lastAt))}` : ''}
         </p>
         {link === 'paused' ? (
-          <p className="wg-line al-text-caption al-muted">Nothing is sent or received for now.</p>
+          <p className="wg-line al-text-caption al-muted">{S.pausedLine}</p>
         ) : null}
         {gone ? (
           <Banner tone="offline" compact>
@@ -484,60 +482,63 @@ export function WidgetPage({
         ) : null}
       </section>
 
-      {needs ? (
-        <Section id="needs" label={S.needs} attention>
-          <ul className="wg-rows">
-            {approvals > 0 ? (
-              <li>
-                <button
-                  type="button"
-                  className="wg-row"
-                  data-wg-nav
-                  onClick={go('approvals')}
-                  disabled={offline}
-                >
-                  <span className="wg-ico">
-                    <Icon name="approval" size={16} />
-                  </span>
-                  <span className="wg-main al-text-body-sm">{waitingForYou(approvals)}</span>
-                  <span className="wg-chev">
-                    <Icon name="chevron-right" size={14} />
-                  </span>
-                </button>
-              </li>
+      <Section id="needs" label={S.needs} attention={needs}>
+        {!needs ? <p className="wg-empty al-text-body-sm">{S.noneWaiting}</p> : null}
+        {needs ? (
+          <>
+            <ul className="wg-rows">
+              {approvals > 0 ? (
+                <li>
+                  <button
+                    type="button"
+                    className="wg-row"
+                    data-wg-nav
+                    onClick={go('approvals')}
+                    disabled={offline}
+                  >
+                    <span className="wg-ico">
+                      <Icon name="approval" size={16} />
+                    </span>
+                    <span className="wg-main al-text-body-sm">{waitingForYou(approvals)}</span>
+                    <span className="wg-chev">
+                      <Icon name="chevron-right" size={14} />
+                    </span>
+                  </button>
+                </li>
+              ) : null}
+              {files > 0 ? (
+                <li>
+                  <button
+                    type="button"
+                    className="wg-row"
+                    data-wg-nav
+                    onClick={go('inbox')}
+                    disabled={offline}
+                  >
+                    <span className="wg-ico">
+                      <Icon name="download" size={16} />
+                    </span>
+                    <span className="wg-main al-text-body-sm">{newFiles(files)}</span>
+                    <span className="wg-chev">
+                      <Icon name="chevron-right" size={14} />
+                    </span>
+                  </button>
+                </li>
+              ) : null}
+            </ul>
+            {approvals > 0 && !offline ? (
+              <button
+                type="button"
+                className="al-btn al-btn-primary al-btn-sm wg-block-btn"
+                data-wg-nav
+                onClick={go('approvals')}
+              >
+                {S.review}
+              </button>
             ) : null}
-            {files > 0 ? (
-              <li>
-                <button
-                  type="button"
-                  className="wg-row"
-                  data-wg-nav
-                  onClick={go('inbox')}
-                  disabled={offline}
-                >
-                  <span className="wg-ico">
-                    <Icon name="download" size={16} />
-                  </span>
-                  <span className="wg-main al-text-body-sm">{newFiles(files)}</span>
-                  <span className="wg-chev">
-                    <Icon name="chevron-right" size={14} />
-                  </span>
-                </button>
-              </li>
-            ) : null}
-          </ul>
-          {approvals > 0 && !offline ? (
-            <button
-              type="button"
-              className="al-btn al-btn-primary al-btn-sm wg-block-btn"
-              data-wg-nav
-              onClick={go('approvals')}
-            >
-              {S.review}
-            </button>
-          ) : null}
-        </Section>
-      ) : null}
+          </>
+        ) : null}
+      </Section>
 
       <Section id="connected" label={S.connected}>
         <Skeleton
@@ -551,12 +552,16 @@ export function WidgetPage({
             <ul className="wg-rows" aria-label={S.connected}>
               {agents.map((agent) => (
                 <li key={agent.name} className="wg-id" data-agent>
-                  <span className="wg-id-name al-text-body-sm">{agent.label}</span>
+                  <span className="wg-id-name al-text-body-sm">
+                    <bdi>{agent.label}</bdi>
+                  </span>
                   <ul className="wg-apps">
                     {agent.apps.map((app) => (
                       <li key={app.app} className="wg-app al-text-caption" data-state={app.state}>
                         <span className={`wg-appdot is-${app.state}`} aria-hidden="true" />
-                        <span className="wg-app-name">{app.app}</span>
+                        <span className="wg-app-name">
+                          <bdi>{app.app}</bdi>
+                        </span>
                         <span className="al-muted">{appWord(app.state, app.word)}</span>
                       </li>
                     ))}
@@ -614,7 +619,7 @@ export function WidgetPage({
                         className="wg-row"
                         data-wg-nav
                         data-unread
-                        aria-label={`${name}, ${newCount(u.count)}, ${agoWords(t - u.lastAt)}. Open chat`}
+                        aria-label={rowLabel(name, u.count, agoWords(t - u.lastAt))}
                         onClick={go('inbox', u.contactId)}
                         disabled={offline}
                       >
@@ -637,7 +642,11 @@ export function WidgetPage({
                             </span>
                           ) : (
                             // I-5: a text node, one line by CSS; never markup, a link or a title.
-                            <span className="wg-preview al-text-caption" data-untrusted-preview>
+                            <span
+                              className="wg-preview al-text-caption"
+                              data-untrusted-preview
+                              dir="auto"
+                            >
                               {u.preview}
                             </span>
                           )}
@@ -651,7 +660,9 @@ export function WidgetPage({
                 })}
               </ul>
               {unread.length > MAX_MESSAGES ? (
-                <span className="al-text-caption al-muted">{`+${String(unread.length - MAX_MESSAGES)} more`}</span>
+                <span className="al-text-caption al-muted">
+                  {moreMessages(unread.length - MAX_MESSAGES)}
+                </span>
               ) : null}
               {anyPreview ? (
                 <span className="wg-untrusted al-text-caption">
@@ -710,7 +721,15 @@ export function WidgetPage({
               {model.feed.map((item, i) => (
                 <li key={`${String(item.at)}-${String(i)}`} className="wg-event">
                   <span className="wg-event-text al-text-caption">
-                    <bdi>{sentence(render(item, (id) => nameFor(id), '').sentence)}</bdi>
+                    {render(item, (id) => nameFor(id), '').sentence.map((p, k) =>
+                      typeof p === 'string' ? (
+                        p
+                      ) : 'name' in p ? (
+                        <bdi key={k}>{p.name}</bdi>
+                      ) : (
+                        S.aFile
+                      ),
+                    )}
                   </span>
                   <span className="wg-time al-text-caption al-muted num">
                     {shortAgo(t - item.at)}
@@ -735,7 +754,7 @@ export function WidgetPage({
             onClick={go('updates')}
           >
             <Icon name="download" size={14} />
-            {S.updateNow}
+            {S.updateReady}
           </button>
         ) : null}
         <div className="wg-foot-actions">
@@ -755,8 +774,23 @@ export function WidgetPage({
             data-wg-nav
             onClick={() => void quitApp()}
           >
-            <Icon name="x" size={14} />
+            <svg
+              className="al-icon"
+              width={14}
+              height={14}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 2v10" />
+              <path d="M18.4 6.6a9 9 0 1 1-12.77.04" />
+            </svg>
             <span>{S.quit}</span>
+            {isMac() ? <kbd className="wg-kbd">⌘Q</kbd> : null}
           </button>
         </div>
       </footer>

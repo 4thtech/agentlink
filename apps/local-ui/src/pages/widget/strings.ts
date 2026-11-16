@@ -35,7 +35,8 @@ export const WIDGET_STRINGS = {
   openApp: 'Open AgentLink',
   pause: 'Pause',
   resume: 'Resume',
-  updateNow: 'Update now',
+  thisComputer: 'This computer',
+  pausedLine: 'Nothing is sent or received for now.',
   quit: 'Quit',
   unknownContact: 'A contact',
   working: 'Working',
@@ -75,4 +76,10 @@ export function agoWords(seconds: number): string {
 }
 export function todayLabel(inN: number, outN: number, proofs: number, files: number): string {
   return `Today by hour: ${String(inN)} in, ${String(outN)} out, ${String(proofs)} proofs, ${String(files)} files`;
+}
+export function moreMessages(n: number): string {
+  return `+${String(n)} more`;
+}
+export function rowLabel(name: string, count: number, ago: string): string {
+  return `${name}, ${newCount(count)}, ${ago}. Open chat`;
 }

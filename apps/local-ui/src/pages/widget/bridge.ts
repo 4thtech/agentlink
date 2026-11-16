@@ -18,8 +18,12 @@ const PATHS: Readonly<Record<WidgetRoute, string>> = {
 export async function openMain(route: WidgetRoute, target?: string): Promise<boolean> {
   const bridge = typeof window === 'undefined' ? undefined : window.agentlinkWidget;
   if (bridge === undefined) {
-    openInMainApp(PATHS[route]);
-    return true;
+    try {
+      openInMainApp(PATHS[route]);
+      return true;
+    } catch {
+      return false;
+    }
   }
   try {
     return await bridge.open(target === undefined ? { route } : { route, target });

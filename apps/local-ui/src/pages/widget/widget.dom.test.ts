@@ -115,6 +115,8 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
   calls = [];
+  postSpy.mockClear();
+  ownerSpy.mockClear();
   bridge = {
     open: vi.fn(() => Promise.resolve(true)),
     quit: vi.fn(() => Promise.resolve(true)),
@@ -129,6 +131,9 @@ afterEach(() => {
   delete window.agentlinkWidget;
   vi.restoreAllMocks();
 });
+
+const postSpy = vi.fn(() => Promise.resolve({ kind: 'error', status: 404 } as ApiResult<unknown>));
+const ownerSpy = vi.fn(() => Promise.reject(new Error('never')));
 
 function fakeApi(s: Setup): ApiClient {
   return {
@@ -148,8 +153,8 @@ function fakeApi(s: Setup): ApiClient {
       }
       return Promise.resolve({ kind: 'error', status: 404 } as ApiResult<unknown>);
     },
-    post: () => Promise.resolve({ kind: 'error', status: 404 } as ApiResult<unknown>),
-    owner: () => Promise.reject(new Error('never')),
+    post: postSpy,
+    owner: ownerSpy,
   } as unknown as ApiClient;
 }
 
@@ -226,12 +231,13 @@ describe('widget page', () => {
     expect(q('[data-block="live"] li')).not.toBeNull();
     // Footer
     for (const label of [S.openApp, S.pause, S.quit]) expect(buttonNamed(label)).toBeDefined();
-    expect(buttonNamed(S.updateNow)).toBeUndefined();
+    expect(buttonNamed(S.updateReady)).toBeUndefined();
   });
 
-  it('hides Needs you when nothing waits', async () => {
+  it('always shows Needs you, with "Nothing is waiting." when empty', async () => {
     await mount();
-    expect(q('[data-block="needs"]')).toBeNull();
+    expect(q('[data-block="needs"]')?.textContent).toContain(S.noneWaiting);
+    expect(q('[data-block="needs"]')?.getAttribute('data-attention')).toBeNull();
   });
 
   it('with previews off shows the count line only, and drops a preview that still arrives', async () => {
@@ -263,6 +269,7 @@ describe('widget page', () => {
       ),
     ).toBe(false);
     expect(el?.hasAttribute('title')).toBe(false);
+    expect(el?.getAttribute('dir')).toBe('auto');
     expect(q('[data-block="messages"] [title]')).toBeNull();
   });
 
@@ -294,7 +301,7 @@ describe('widget page', () => {
     expect(bridge.open).toHaveBeenLastCalledWith({ route: 'inbox' });
     await click(buttonNamed(S.openApp) ?? null);
     expect(bridge.open).toHaveBeenLastCalledWith({ route: 'home' });
-    await click(buttonNamed(S.updateNow) ?? null);
+    await click(buttonNamed(S.updateReady) ?? null);
     expect(bridge.open).toHaveBeenLastCalledWith({ route: 'updates' });
     await click(buttonNamed(S.quit) ?? null);
     expect(bridge.quit).toHaveBeenCalledTimes(1);
@@ -335,6 +342,10 @@ describe('widget page', () => {
     expect(push).not.toHaveBeenCalled();
     expect(replace).not.toHaveBeenCalled();
     expect(host.querySelector('a[href]')).toBeNull();
+    expect(postSpy).not.toHaveBeenCalled();
+    expect(ownerSpy).not.toHaveBeenCalled();
+    expect(calls.length).toBeGreaterThanOrEqual(1);
+    expect(calls.every((c) => c.startsWith('/api/'))).toBe(true);
     vi.unstubAllGlobals();
   });
 
