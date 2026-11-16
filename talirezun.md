@@ -1,31 +1,20 @@
 # @talirezun — sync
-**Headline:** 12 Nov: AgentLink 0.4.14 is live on npm latest. It brings rename to contacts, one-command install from the invite, master code naming (D-146) and the docs overhaul. Desktop apps (Mac and Windows, unsigned early builds, D-145) are in progress on `desktop/integration`. Next: the UX redesign on `ux1113/base`.
-_Updated 2026-11-12 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
+**Headline:** 16 Nov: AgentLink 0.5.9 is live (npm latest, signed desktop update for Mac and Windows): menu bar widget with an animated brand icon, live status, approvals waiting, connected AI apps, contacts, new messages and a Today timeline; Settings switches to hide the icon or previews; stuck Checking… bar fixed. Docs: download links for Mac and Windows on every entry page, wiki synced to v0.5.9, research section with the first article (CC BY 4.0).
+_Updated 2026-11-16 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 
 ## Now
-- 0.4.14 LIVE on npm latest. Included:
-  - Rename reaches contacts.
-  - One-command install from the invite.
-  - Master code naming (D-146), and use your code on every confirm.
-  - Email invite and "Name this contact".
-  - AI addresses contacts by name.
-  - Block a contact.
-  - Restart hint.
-  - Recovery kit in the app.
-  - Doctor output in plain words.
-- Docs overhaul merged: README landing page, step-by-step guide with screenshots, glossary, knowledge overview.
-- Merged PRs: #795 (UX1112 fixes), #796 (version packages), #797 (DOCS-0414), #798 (hotfix: honest recovery kit copy until restore ships). No open PRs at the time of this update.
-- Desktop apps (Mac and Windows, unsigned early builds, D-145) in progress on branch `desktop/integration`:
-  - Shell, packaging, CI, invite links, use-the-app, updater, installer desktop mode.
-  - Touch ID in the app (phase 2).
-  - All reviewed.
-  - Touch ID registration does not work yet on a real Mac; under investigation.
-  - No external builds yet.
+- 0.5.9 LIVE on npm latest and as a signed desktop update for Mac and Windows. Included:
+  - Menu bar widget with an animated brand icon: live status, approvals waiting, connected AI apps, contacts, new messages and a Today timeline (D-155).
+  - Settings switches to hide the icon or show previews.
+  - Stuck "Checking…" status bar fixed.
+  - Docs: download links for Mac and Windows on every entry page; wiki synced to v0.5.9.
+  - Research section with the first article (CC BY 4.0).
+- Merged PRs: #836, #837, #838 (release), #840 (version), wiki #31, #32, #33.
 
 ## Next
-1. Fix Touch ID registration on a real Mac, then decide on the first external desktop build.
-2. UX redesign (design-1112 approved: My IDs, People, Settings, Activity, restore in the app, D-147) on branch `ux1113/base`.
-3. Restore spec `ux1113/wp-r0` is reviewed; build restore after the redesign base is in place.
+1. Owner production test of 0.5.9 (Mac + Surface).
+2. Follow-up cards to backlog: AI app name per contact in the widget, widget screenshot, knowledge size, Windows CI timeout flake.
+3. Dependabot alert 19; PR #809.
 
 ## Owner steps
 - Visual QA of the refreshed local app on his Mac (checklist ready).
