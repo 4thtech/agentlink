@@ -724,7 +724,11 @@ export function createTrayFeed(
         case 'tray-pulse': {
           const at = now();
           const last = lastPulse.get(message.kind);
-          if (last !== undefined && at >= last && at < last + TRAY_PULSE_GAP_MS) return true;
+          if (last !== undefined && at < last + TRAY_PULSE_GAP_MS) {
+            // A clock that went back never opens the gate early (the core's rule).
+            if (at < last) lastPulse.set(message.kind, at);
+            return true;
+          }
           lastPulse.set(message.kind, at);
           call(listeners.onPulse, message.kind);
           return true;

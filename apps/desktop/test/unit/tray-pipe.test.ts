@@ -222,6 +222,19 @@ describe('TRAY-PIPE: createTrayFeed (the API for TRAY-SHELL)', () => {
     expect(t.pulses).toEqual(['message_in', 'ai_sent', 'message_in']);
   });
 
+  it('pulses: a clock that went back never opens the gate early', () => {
+    const t = setup();
+    t.feed.handle({ v: 1, type: 'tray-pulse', kind: 'approval' });
+    t.advance(-5_000);
+    t.feed.handle({ v: 1, type: 'tray-pulse', kind: 'approval' });
+    t.advance(1_999);
+    t.feed.handle({ v: 1, type: 'tray-pulse', kind: 'approval' });
+    expect(t.pulses).toEqual(['approval']);
+    t.advance(1);
+    t.feed.handle({ v: 1, type: 'tray-pulse', kind: 'approval' });
+    expect(t.pulses).toEqual(['approval', 'approval']);
+  });
+
   it('a throwing callback never reaches main', () => {
     const feed = createTrayFeed({
       onState: () => {

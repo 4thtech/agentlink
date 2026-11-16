@@ -122,6 +122,18 @@ describe('planTray: pulses', () => {
     expect(t.pulses).toEqual(['ai_sent']);
   });
 
+  it('AI sent: a first look whose outbound read failed stays unknown; the next answer never pulses', () => {
+    let t = planTray(undefined, look({ outAt: undefined }));
+    t = planTray(t.baseline, look({ outAt: undefined }));
+    expect(t.pulses).toEqual([]);
+    t = planTray(t.baseline, look({ outAt: 500 }));
+    expect(t.pulses).toEqual([]);
+    t = planTray(t.baseline, look({ outAt: 500 }));
+    expect(t.pulses).toEqual([]);
+    t = planTray(t.baseline, look({ outAt: 501 }));
+    expect(t.pulses).toEqual(['ai_sent']);
+  });
+
   it('another ID is a fresh first look (silent)', () => {
     const base = planTray(undefined, look({ scope: 'work' })).baseline;
     const t = planTray(
