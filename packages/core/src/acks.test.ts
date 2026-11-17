@@ -1,5 +1,5 @@
 // SEC-RECEIPTS-DEFAULT: the sender's check of a stored "received" ack (02 F-23; 04 §3.4).
-import type { Payload } from '@4thtech-io/types';
+import { payloadSchema, type Payload } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { ACK_KIND_RECEIVED, DEVICE_RECEIPT_LABEL, ackPayload, classifyAck } from './acks.js';
 import { ACK_DELAY_MAX_SECONDS, ACK_DELAY_MIN_SECONDS } from './constants.js';
@@ -130,5 +130,29 @@ describe('ack delay (D-156)', () => {
 describe('proof pack label', () => {
   it('names the off-chain ack an automatic device receipt', () => {
     expect(DEVICE_RECEIPT_LABEL).toBe('automatic device receipt');
+  });
+});
+
+// L2: the receiving side of a 0.5.9 app, as it shipped (acks.ts `status` and ui-messages `ackedOf`):
+// the payload's strict schema, then `kind`, `envelopeId` and `replyTo`. A v2 body (with and without
+// `recordId`) must count there, so an older peer still shows "received".
+describe('0.5.9 compatibility fixture', () => {
+  const countsIn059 = (payload: unknown, envelopeId: string): boolean => {
+    const parsed = payloadSchema.safeParse(payload);
+    if (!parsed.success || parsed.data.type !== 'ack') return false;
+    const body = parsed.data.body;
+    return (
+      parsed.data.replyTo === envelopeId &&
+      typeof body === 'object' &&
+      body.kind === ACK_KIND_RECEIVED &&
+      body.envelopeId === envelopeId
+    );
+  };
+
+  it('a 0.5.9 app reads the v2 ack as received', () => {
+    expect(countsIn059(ackPayload(ID, HASH), ID)).toBe(true);
+    expect(countsIn059(ackPayload(ID, HASH, `0x${'33'.repeat(32)}`), ID)).toBe(true);
+    // The fixture itself refuses what 0.5.9 refused.
+    expect(countsIn059({ ...ackPayload(ID, HASH), replyTo: OTHER_ID }, ID)).toBe(false);
   });
 });

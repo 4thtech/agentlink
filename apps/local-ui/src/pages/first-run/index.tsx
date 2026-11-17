@@ -34,6 +34,8 @@
 // begin/finish). `?add=agent` stays on every step, so an open agent never turns it into Connect
 // another AI app, and a new Add agent starts with nothing kept from an earlier run. It ends on Home
 // in the app (no reload), and the agents are read again.
+import { RECEIPTS_NOTICE_KEY } from '../../layout/receipts-notice.js';
+import { dismissNotice } from '../../notices/index.js';
 import { Banner, Button, InlineError, ProgressBar, TextField } from '@4thtech-io/ui';
 import {
   useCallback,
@@ -1196,6 +1198,9 @@ export function FirstRunPage({
         }
       }
       if (finished.kind === 'owner_exists') return existingOwner(undefined, true);
+      // SEC-RECEIPTS-DEFAULT (11 §5.10): the "now on" notice is for people who upgraded; a new owner
+      // starts with receipts on, so it is closed for them from the start.
+      if (finished.kind !== 'error') dismissNotice(RECEIPTS_NOTICE_KEY);
       if (finished.kind === 'error') {
         if (finished.problem === 'session_expired') return setView({ k: 'expired' });
         if (finished.problem === 'offline') {

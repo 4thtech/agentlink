@@ -469,6 +469,11 @@ export interface ToolClient {
   /** The backend for files above the inline limit under the current policy (06 §2.1). */
   storageMode(): Promise<'drop' | 'own'>;
   /**
+   * SEC-RECEIPTS-DEFAULT (11 §5.10): true while the "received receipts are now on" note is due
+   * (receipts on, an active contact, no receipt sent yet). Optional: absent means never.
+   */
+  receiptsNoticeDue?(): Promise<boolean>;
+  /**
    * The number of approvals waiting for the owner (core `approvalService.countPending`, M1-7e-3):
    * undecided, not cancelled, not voided and not lapsed. A display count only.
    */
@@ -666,6 +671,7 @@ export function coreToolClient(
     approvalState: (approvalId) => client.approvalService.read(approvalId),
     approvalResume: (approvalId) => client.approvalService.resumeOf(approvalId),
     openOffers: () => client.terms.openOffers(),
+    receiptsNoticeDue: () => client.receiptsNoticeDue(),
     invites: coreInviteTools(client),
     terms: coreTermsTools(client),
     ...(options.files === undefined ? {} : { files: coreFileTools(client, options.files) }),

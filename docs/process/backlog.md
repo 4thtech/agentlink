@@ -11301,6 +11301,13 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Spec:** D-156 (1); 04 §3.4 (`ack` "and its per-contact override"); 06 §3; 11 §5.10 "Per contact"
 - **Done when:** `RED (expected):` commit first; a contact rule can set `receipts.sendReceived` for one contact, which replaces the global value for that contact only (the D-109 contact-rule pattern); absent = the global value; the contact page offers "Tell {contactName} when your AI receives a message" and "Use my default"; turning it off for a contact sends that contact none; the loosening classification covers the new field.
 
+#### RECEIPTS-EXPORT-UI · Proof export in the app, with the automatic receipt choice (later)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S1 (S2 if the route writes outside `proofs.exportFolder`)
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/` (an export route over core `exportProofPack`), `apps/local-ui` proof views; tests
+- **Depends on:** SEC-RECEIPTS-DEFAULT
+- **Spec:** D-156 (1); 07 §8 "Automatic device receipts"; 11 §5.10 "Proof export"
+- **Done when:** the app can save a proof file for a recorded message (today only `agentlink_export_proof_pack` can); the export choices include "Includes {contactName}'s automatic receipt" (checkbox, off) with the helper "It shows who received this exact item, and when."; turning it on also discloses the recipient (07 §8); the file goes only to `proofs.exportFolder`.
+
 #### RECEIPTS-STATE-COLUMN · Delivery state `delivered` stored with the envelope (later)
 - **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 (store schema, delivery state)
 - **Repo/path:** agentlink · `packages/core/src/store/` (schema and migration), `packages/core/src/{acks.ts,ui-messages.ts,outbox.ts}`, `packages/mcp-tools/src/status.ts`; tests
