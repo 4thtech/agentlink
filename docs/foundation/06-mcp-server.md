@@ -379,6 +379,7 @@ proofs:
 receipts:
   autoDelivered: false         # D-109: delivery receipts are public, so off unless the owner turns them on (here or per contact)
   autoOpened: false            # "opened" only via explicit acknowledge
+  sendReceived: true           # D-156: free signed off-chain "received" ack to active contacts (04 §3.4); absent = true; per contact: contactRules[].receipts.sendReceived
 commitments:
   accept: approval          # accepting terms (`agentlink_respond_to_terms`) and signing ACCEPTED/REJECTED receipts; one approval per agreement, 04 §3.4.2 (approval | allow | deny)
   autoAcceptContacts: []    # optional allowlist of contact IDs eligible for auto-accept
@@ -403,7 +404,7 @@ contactRules: []            # per-contact proof rules (G-32), at most 256; creat
 | Retention days (D-148) | `history.messagesKeepDays` (`0`, `90`, `365`, `730`); `history.filesKeepDays` (`0`, `30`, `90`, `180`, `365`) | A JSON integer from that list; any other value is rejected |
 | Contact list | `contacts.allowed` | The string `"paired"`, or a JSON array of 1–256 agent IDs |
 | Contact list | `commitments.autoAcceptContacts` | A JSON array of 0–256 agent IDs |
-| Boolean | `files.ownerArchive`, `files.autoSave.on` (D-142), `receipts.autoDelivered`, `receipts.autoOpened`, `contactRules[].receipts.autoDelivered` (D-109) | `true` or `false`; `contactRules[].files.askBeforeSaving` (D-142) is exactly `true` |
+| Boolean | `files.ownerArchive`, `files.autoSave.on` (D-142), `receipts.autoDelivered`, `receipts.autoOpened`, `contactRules[].receipts.autoDelivered` (D-109), `receipts.sendReceived`, `contactRules[].receipts.sendReceived` (D-156; absent = `true`) | `true` or `false`; `contactRules[].files.askBeforeSaving` (D-142) is exactly `true` |
 | Integer | `contacts.rateLimitPerContactPerHour` [1, 3600]; `files.maxSendSizeMB` and `files.maxReceiveSizeMB` [1, 10 240]; `files.defaultExpiryDays` [1, 7]; `envelopes.maxEnvelopeKB` [1, 24]; `files.autoSave.perContactFilesPerDay` and `totalFilesPerDay` [1, 1000]; `files.autoSave.perContactMBPerDay` and `totalMBPerDay` [1, 10 240] (D-142) | JSON integer (04 §2.4.1 integer rule) in the range shown |
 | USD amount | `proofs.dailyBudgetUSD`, `proofs.perActionMaxUSD`, `commitments.autoAcceptMaxUSD`; `commitments.autoAcceptMinUSD` (or `null`); `contactRules[].proofs.perActionMaxUSD` | A USD amount (04 §2.4.1): the single spelling `^(0\|[1-9][0-9]{0,8})(\.[0-9]{0,5}[1-9])?$` (`"5"`, `"0.5"`; never `"5.00"` or `"0.50"`), compared as an exact decimal and never as a binary float. A JSON number is rejected |
 | Path | `files.allowedFolders` (array of 0–32, unique), `files.inboxFolder`, `proofs.exportFolder` | String of 1–4096 UTF-8 bytes with no C0 or C1 control character. A leading `~/` means the user's home folder. The core resolves each path with realpath when it is used (04 §4) |
