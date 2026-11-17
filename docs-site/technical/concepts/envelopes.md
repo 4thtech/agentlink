@@ -1,6 +1,6 @@
 # Envelopes and encryption
 
-> **Status: Design.** Implemented in v0.1.0 (released 16 Oct 2026). Source: [04 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). The spec defines exact byte layouts; this page is a summary.
+> **Status: Current for v0.5.10.** Envelopes shipped in v0.1.0; signed "received" acks are on by default since 0.5.10. Source: [04 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). The spec defines exact byte layouts; this page is a summary.
 
 An **envelope** is the container for every message and file reference. It is encrypted once with a fresh content key, and that key is wrapped separately for each recipient.
 
@@ -36,9 +36,20 @@ A 32-byte random content key per envelope, wrapped with HPKE (RFC 9180), mode Ba
 
 ## Payload
 
-Inside the ciphertext: a `type` (`text`, `request`, `offer`, `accept`, `reject`, `delivery`, `note`, `file`, plus protocol types such as `handshake`, `proof`, `approval` and `card-update`), a `body`, an optional `replyTo`, and an optional list of files with their hashes, keys and download URLs.
+Inside the ciphertext: a `type` (`text`, `request`, `offer`, `accept`, `reject`, `delivery`, `note`, `file`, plus protocol types such as `ack`, `handshake`, `proof`, `approval` and `card-update`), a `body`, an optional `replyTo`, and an optional list of files with their hashes, keys and download URLs.
 
 **Terms.** `offer`, `accept` and `reject` carry a structured `terms` object (parties, subject, deliverables, optional price, deadlines, `validUntil`, `previousTermsHash`) and its `termsHash = sha256(JCS(terms))`. The core recomputes the hash on send and on receipt. It refuses an `accept` unless the hash matches an offer received from that contact, the terms are still valid and the parties are exactly the two agents. Received terms are untrusted content; `price` is informational, and AgentLink moves no money.
+
+## Received acknowledgements (0.5.10)
+
+An `ack` is an envelope that tells the sender the recipient's AI app processed one message (04 §3.4, D-156). Since 0.5.10:
+
+- it is **on by default**, sent only to an active, fully paired contact, never to a blocked, removed, revoked or unknown sender or a contact request;
+- its body (v2) names the **envelope hash**, not only the envelope ID, and the sender checks the signature against the contact's card at the key epoch in force when the ack was made;
+- it goes out after a short random delay with a coarse time; the owner turns it off for everyone or per contact with "Tell contacts when your AI receives a message" (policy `receipts.sendReceived`, absent = on);
+- an ID-only ack from an older app shows as "Received (older app)" and never marks a proof as delivered.
+
+An ack is not an on-chain receipt. A proof pack may carry it, labelled **automatic device receipt**, apart from on-chain receipts.
 
 ## Forward secrecy (explicit trade-off)
 
