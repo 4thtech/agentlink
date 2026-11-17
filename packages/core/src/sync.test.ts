@@ -171,6 +171,8 @@ interface OpenOptions {
    * with the same assertions, relative to the limit, in a fraction of the work.
    */
   readonly rateLimit?: number;
+  /** SEC-RECEIPTS-DEFAULT: an owner-signed policy with `receipts.sendReceived` set to this value. */
+  readonly sendReceived?: boolean;
 }
 
 /** The limit the rate-limit tests set (see `OpenOptions.rateLimit`): small, and well below the default. */
@@ -194,7 +196,9 @@ async function openAgent(
     cipher,
     approvals: new RecordingApprovalChannel(),
     clock: clock.now,
-    ...(options.rateLimit === undefined ? {} : { policyMark: new MemoryPolicyMark() }),
+    ...(options.rateLimit === undefined && options.sendReceived === undefined
+      ? {}
+      : { policyMark: new MemoryPolicyMark() }),
     transport: nostrTransport({ connector: net, addressCheck: 'platform' }),
     logger: createLogger({ name: 'core', level: 'debug', sink: (_l, line) => lines.push(line) }),
     ...(options.deliveryAcks === undefined ? {} : { deliveryAcks: options.deliveryAcks }),
@@ -207,9 +211,14 @@ async function openAgent(
       relays,
     });
   }
-  if (options.rateLimit !== undefined) {
+  if (options.rateLimit !== undefined || options.sendReceived !== undefined) {
     const policy = defaultPolicy();
-    policy.contacts.rateLimitPerContactPerHour = options.rateLimit;
+    if (options.rateLimit !== undefined) {
+      policy.contacts.rateLimitPerContactPerHour = options.rateLimit;
+    }
+    if (options.sendReceived !== undefined) {
+      policy.receipts = { ...policy.receipts, sendReceived: options.sendReceived };
+    }
     const signed = await signWith(owner, {
       v: 1,
       agent: client.agentId,
@@ -694,20 +703,103 @@ describe('catchUp (M1-7h addendum, D-73; 06 §2.0): fetch-only', () => {
 
 // --- Delivery acknowledgements --------------------------------------------------------------------
 
-describe('delivery acknowledgements (02 F-23, behind a flag)', () => {
-  it('off by default: no ack is sent', async () => {
+describe('delivery acknowledgements (02 F-23; SEC-RECEIPTS-DEFAULT: on by default)', () => {
+  it('on by default: the contact acks a message once, bound to its envelopeHash', async () => {
     const net = new RelayNetwork();
     const a = await openAgent(1, 'alice', RELAYS_A, net);
     const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    const sent = await a.client.sendMessage({ to: b.id, text: 'hi' });
+    if (sent.status !== 'ok') throw new Error('test: not sent');
+    const result = await b.client.syncInbox();
+    expect(result.items).toHaveLength(1);
+    expect(result.acksSent).toBe(1);
+    await b.client.outbox.processDue();
+    await a.client.syncInbox();
+    const status = await a.client.acks.status(sent.envelopeId);
+    expect(status).toMatchObject({ received: true, verified: true, receipt: 'verified' });
+    const page = await a.client.messages.list(b.id, 'out');
+    expect(page.items[0]).toMatchObject({ id: sent.envelopeId, receipt: true });
+    expect(page.items[0]).not.toHaveProperty('receivedOlder');
+    // One ack per message: a second pass and a second processing of the same message add none.
+    expect((await b.client.syncInbox()).acksSent).toBe(0);
+    expect(await b.client.acks.sendFor(result.reports)).toBe(0);
+  });
+
+  it('the owner setting "Send received receipts" off: zero acks', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { sendReceived: false });
     await pair(a, b);
     await a.client.sendMessage({ to: b.id, text: 'hi' });
     const result = await b.client.syncInbox();
     expect(result.items).toHaveLength(1);
     expect(result.acksSent).toBe(0);
     expect((await rowsOf(b)).outbox).toEqual([]);
+    expect((await rowsOf(b)).envelopes.filter((r) => r.type === 'ack')).toEqual([]);
   });
 
-  it('with the flag, the contact acks each message once, the sender sees it, and an ack is never acked', async () => {
+  it('an unknown sender (a queued request) gets no ack', async () => {
+    const net = new RelayNetwork();
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    const c = await openAgent(3, 'carol', RELAYS_C, net);
+    const crafted = await textCrafter(c, b);
+    await deliverRaw(net, c, b, await crafted('who is this'));
+    const result = await b.client.syncInbox();
+    expect(result.acksSent).toBe(0);
+    expect((await rowsOf(b)).envelopes.filter((r) => r.type === 'ack')).toEqual([]);
+  });
+
+  it('a v2 ack naming another hash is ignored; an id-only ack from an older app counts as weaker', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { deliveryAcks: false });
+    await pair(a, b);
+    const sent = await a.client.sendMessage({ to: b.id, text: 'bind me' });
+    if (sent.status !== 'ok') throw new Error('test: not sent');
+    const wrongHash = await b.client.envelopes.build({
+      to: { contact: a.id },
+      payload: {
+        type: 'ack',
+        body: {
+          kind: ACK_KIND_RECEIVED,
+          envelopeId: sent.envelopeId,
+          envelopeHash: `0x${'ab'.repeat(32)}`,
+        },
+        replyTo: sent.envelopeId,
+        files: [],
+      },
+    });
+    await deliverRaw(net, b, a, wrongHash.envelope);
+    await a.client.syncInbox();
+    expect(await a.client.acks.status(sent.envelopeId)).toMatchObject({
+      received: false,
+      verified: false,
+      receipt: null,
+    });
+
+    const older = await b.client.envelopes.build({
+      to: { contact: a.id },
+      payload: {
+        type: 'ack',
+        body: { kind: ACK_KIND_RECEIVED, envelopeId: sent.envelopeId },
+        replyTo: sent.envelopeId,
+        files: [],
+      },
+    });
+    await deliverRaw(net, b, a, older.envelope);
+    await a.client.syncInbox();
+    expect(await a.client.acks.status(sent.envelopeId)).toMatchObject({
+      received: true,
+      verified: false,
+      receipt: 'older_app',
+    });
+    // Never "delivered" (receipt) from an id-only ack: the page shows it as received by an older app.
+    const page = await a.client.messages.list(b.id, 'out');
+    expect(page.items[0]).toMatchObject({ id: sent.envelopeId, receipt: false, receivedOlder: true });
+  });
+
+  it('the contact acks each message once, the sender sees it, and an ack is never acked', async () => {
     const net = new RelayNetwork();
     const a = await openAgent(1, 'alice', RELAYS_A, net, { deliveryAcks: true });
     const b = await openAgent(2, 'bob', RELAYS_B, net, { deliveryAcks: true });
