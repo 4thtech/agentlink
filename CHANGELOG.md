@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.10] - 2026-11-17
+
+### Added
+
+- A research section in the repository (RESEARCH-SECTION, S0): `research/` holds signed, dated articles and papers about agent-to-agent communication and AgentLink, with a contributing guide and a template. The first article is "Stop playing postman" by Tali Režun: why AgentLink exists, how messages, files and proofs work, and how it was built, with links into the user guide, the technical docs and the specs.
+
+### Changed
+
+- Security documentation refresh after a community review by Roger (rogerclaw) (DOCS-UNDER-THE-HOOD, S1). A new Under the hood page maps every specification to the page that explains it, with a reading order for engineers, and a technical glossary joins it. The security model and threat model are rewritten for 0.5.10: all threats of the security spec, owner approval with Touch ID, Windows Hello or the master code, Start over, the folder picker, menu bar previews, received acknowledgements on by default and the agent key's signing allowlist. The policies page now lists the real defaults, and the MCP tools page is current. The decision log moved to one file per decision in `docs/foundation/decisions/`, and a new CI check keeps the security pages in step with the spec.
+- Security hardening plan for 0.5.10 to 0.5.12 and mainnet (REL0510-SPEC, S1, D-156): decision D-156 records the direction, and the spec now describes what 0.5.10 ships. Your AI app tells your contacts when it has received their message, with a signed receipt bound to the exact message, on by default for active contacts with a switch in Settings; the agent key signs only AgentLink's own formats; quitting the desktop app closes its windows first, and the menu bar widget opens reliably and opens the exact conversation or approval. Thanks to Roger (rogerclaw) for the public community review that raised these points.
+- Received receipts are on by default (SEC-RECEIPTS-DEFAULT, S2, D-156): when your AI app receives a message from one of your contacts, it tells them, so their app shows "Received by <name>'s app". Each receipt waits a random 5 to 90 seconds and carries its time rounded to the minute. Turn it off in Settings › Rules with "Tell contacts when your AI receives a message"; a one-time notice on Home (and once in an AI app's status) says so to people who upgraded. Receipts from older apps show as "Received (older app)", and a message sent with proof shows as delivered only with the new receipt. On request (off by default), a proof file includes the contact's receipt, labelled "automatic device receipt" and kept apart from public receipts; it then also names the recipient, and a checker accepts the receipt only for that recipient. Proof packs made with 0.5.10 need 0.5.10 or later to verify; 0.5.10 verifies packs from both versions.
+
+### Fixed
+
+- Clicking a new message in the menu bar widget (or the bell) opens that contact's conversation, scrolled to and highlighted, instead of plain Home; a contact that is not in the list says so with a way to the archived; the widget's approval and file rows open the exact request or person (DESK-WIDGET-TARGET, S1).
+
+### Security
+
+- The agent key now signs only AgentLink's own record, receipt, card and credits top-up formats, each checked against the known networks, contracts, fee limits and short time windows before any key is read; anything else is refused (SEC-KS-712-ALLOWLIST, S2, D-156).
+
 ## [0.5.9] - 2026-11-16
 
 ### Added
@@ -1357,7 +1377,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.9...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.10...HEAD
+[0.5.10]: https://github.com/4thtech/agentlink/compare/v0.5.9...v0.5.10
 [0.5.9]: https://github.com/4thtech/agentlink/compare/v0.5.8...v0.5.9
 [0.5.8]: https://github.com/4thtech/agentlink/compare/v0.5.7...v0.5.8
 [0.5.7]: https://github.com/4thtech/agentlink/compare/v0.5.6...v0.5.7
