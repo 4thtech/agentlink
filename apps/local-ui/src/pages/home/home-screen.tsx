@@ -810,6 +810,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
     if (data.people.some((p) => p.contactId === wanted)) {
       setMissing(false);
       setQuery('');
+      setFilter('all');
       setOpen(wanted);
       setJump({ id: wanted });
     } else {

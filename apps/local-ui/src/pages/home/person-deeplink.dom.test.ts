@@ -147,4 +147,23 @@ describe('#person= on Home', () => {
     expect(document.body.textContent).not.toContain(S.contactNotListed);
     expect(document.body.querySelector('[data-person-open]')).toBeNull();
   });
+
+  it('when the conversation never appears the jump gives up quietly', async () => {
+    vi.useFakeTimers();
+    try {
+      history.replaceState(null, '', `/#person=${DENIS}`);
+      const f = server();
+      vi.stubGlobal('fetch', f);
+      const spy = vi.spyOn(document, 'querySelector').mockImplementation(() => null);
+      await act(async () => {
+        root.render(h(HomeScreen, { fetch: f, token: 't', pollMs: 0 }));
+        await vi.advanceTimersByTimeAsync(1500);
+      });
+      expect(spy).toHaveBeenCalled();
+      expect(scroll).not.toHaveBeenCalled();
+      expect(document.body.textContent).not.toContain(S.contactNotListed);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

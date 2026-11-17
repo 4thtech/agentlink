@@ -33,8 +33,12 @@
   border-top: 1px solid var(--al-color-border-subtle);
 }
 /* NOTIFY-DEEPLINK: the conversation a notification or widget row opened, marked for a moment. */
-.hm-open:focus {
+.hm-open:focus:not(:focus-visible) {
   outline: none;
+}
+.hm-open:focus-visible {
+  outline: 1px solid var(--al-color-border-strong, currentColor);
+  outline-offset: -1px;
 }
 .hm-open.hm-target {
   animation: hm-target-flash 1.6s ease-out;

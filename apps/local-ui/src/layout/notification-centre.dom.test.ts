@@ -179,6 +179,16 @@ describe('the bell', () => {
     expect(bell().getAttribute('aria-expanded')).toBe('false');
   });
 
+  it('a files row opens that person on Home too', async () => {
+    await mount(FULL);
+    const menu = await openPanel();
+    await act(async () => {
+      menu.querySelector<HTMLElement>('[data-kind="files"]')?.click();
+    });
+    expect(location.pathname).toBe('/');
+    expect(location.hash).toBe(`#person=${B}`);
+  });
+
   it('a row opens its page and marks it read; an approval row is never marked read', async () => {
     await mount(FULL);
     let menu = await openPanel();

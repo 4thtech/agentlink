@@ -436,8 +436,9 @@ export function WidgetPage({
   // One person with new files: their conversation (and files) open; several: no target.
   const fileRefs = (model.notes?.items ?? [])
     .filter((i) => i.kind === 'files' && !i.read && i.ref !== undefined)
-    .map((i) => i.ref as string);
-  const filesTarget = fileRefs.length === 1 ? fileRefs[0] : undefined;
+    .map((i) => i.ref as string)
+    .filter((r) => /^0x[0-9a-f]{40}$/.test(r));
+  const filesTarget = new Set(fileRefs).size === 1 ? fileRefs[0] : undefined;
   const needs = approvals + files > 0;
   const paused = link === 'paused';
   const offline = link === 'offline';
