@@ -73,7 +73,7 @@ Priority: **P0** = beta must-have · **P1** = beta should-have · **P2** = post-
 | F-20 | **Send message** | End-to-end encrypted to the contact's agent; copies wrapped for both owners | P0 |
 | F-21 | **Inbox** | `agentlink_inbox` returns new messages; persisted locally; threads per contact. At session start `agentlink_status` reports who sent something new, with counts only (J9, D-53) | P0 |
 | F-22 | **Structured messages** | Typed payloads: `text`, `request`, `offer`, `accept`, `reject`, `delivery`, `note`, with optional JSON body. `offer`, `accept` and `reject` carry a structured `terms` object (parties, subject, deliverables, optional price, deadlines, validity, link to the previous version); an `accept` quotes the `termsHash` it accepts (04 §3.4, D-32). Offers, counters, acceptances and rejections go through two dedicated tools, `agentlink_propose_terms` and `agentlink_respond_to_terms`, with typed terms fields (06 §2.2a, D-55). Sending `accept` needs owner approval by default (F-61), and one approval covers the accept and its `ACCEPTED` receipt | P0 (`offer` / `accept` / `reject` with `terms`; `note`, `request` and `delivery` for J9, the M1a gate) / P1 (other types) |
-| F-23 | **Delivery status (off-chain)** | Free, signed "received" acknowledgement over Talk (not on-chain) | P1 |
+| F-23 | **Delivery status (off-chain)** | Free, signed "received" acknowledgement over Talk (not on-chain), bound to the envelope hash; on by default for active contacts with a visible setting (D-156, 04 §3.4) | P1 |
 | F-24 | **Group threads** | 3+ participants | P2 |
 
 ### Send file (free)

@@ -141,12 +141,14 @@ sequenceDiagram
   MB-->>B: messages (marked as UNTRUSTED content)
 ```
 
+**Received receipt (D-156, 0.5.10).** After MB has processed a message from an active contact, it sends back a free, signed off-chain `ack` bound to the envelope hash (04 §3.4), unless B's owner turned "Tell contacts when your AI receives a message" off. MA shows the message as delivered only once that ack verifies (07 §3.2).
+
 ### 4.2 Send file (free, encrypted drop or own storage)
 
 1. Core generates a random file key; encrypts the file with AES-256-GCM in chunks (see 04).
 2. Core picks the storage (07 §5.6, policy `files.storage`): own storage if configured, otherwise the **encrypted drop** if the file is within its limits, otherwise `needs_setup`. The adapter uploads the ciphertext and returns a locator plus a download URL valid until expiry: for the drop, a **signed drop URL** obtained with an upload request signed by the agent's drop key (07 §5.4); for S3-compatible storage, a **presigned GET URL**; for a consumer connector (M2), a time-limited **share link**. No backend receives the file name, the file key or the recipient.
 3. The envelope payload contains `{fileName, size, mime, sha256(ciphertext), url, fileKey, expiresAt}`; the envelope itself is encrypted as in 4.1.
-4. Recipient core downloads, checks SHA-256, decrypts, saves to the allowed folder, and optionally sends a free off-chain ack.
+4. Recipient core downloads, checks SHA-256, decrypts, saves to the allowed folder, and sends the free off-chain `ack` of 4.1 (on by default for active contacts, D-156).
 5. On expiry or confirmed receipt (policy), the sender deletes the object; keys are discarded (crypto-shred). The drop follows the same policy (deletion is a DELETE signed with the uploader's drop key) and deletes every object 7 days after upload in any case (D-48).
 
 Files ≤ 12 KB skip storage and travel inline in the envelope.
