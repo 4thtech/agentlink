@@ -24,6 +24,7 @@ import {
   FakeEvent,
   FakeTimers,
   FakeTray,
+  TOKEN,
   fakeElectron,
   fakeSpawn,
   readyLine,
@@ -534,5 +535,112 @@ describe('TRAY-SHELL icon switch', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('DESK-QUIT-ORDER and DESK-WIDGET-OPEN (main)', () => {
+  const PERSON = `0x${'ab'.repeat(20)}`;
+  const APPROVAL = `apr_${'A'.repeat(22)}`;
+  /** Started, the popover up on the widget page, the main window hidden. */
+  async function withWidget(): Promise<Setup> {
+    const s = setup();
+    await started(s);
+    tray().emit('click');
+    expect(popoverWindow()?.loaded.at(-1)).toBe(WIDGET);
+    mainWindow().hide();
+    return s;
+  }
+  const invoke = (s: Setup, input: unknown): Promise<unknown> | undefined =>
+    s.handlers.get(WIDGET_CHANNEL)?.(
+      {
+        sender: { id: popoverWindow()?.webContents.id ?? -1 },
+        senderFrame: { url: WIDGET, parent: null },
+      } as IpcMainInvokeEvent,
+      input,
+    );
+  const sent = (s: Setup): unknown[] =>
+    (s.children[0]?.stream.written ?? []).map((l) => JSON.parse(l) as unknown);
+
+  it('quit hides the popover and the main window before the core is stopped', async () => {
+    const s = setup();
+    await started(s);
+    tray().emit('click');
+    expect(popoverWindow()?.visible).toBe(true);
+    expect(mainWindow().visible).toBe(true);
+    s.electron.app.emit('before-quit', new FakeEvent());
+    // Synchronously, while the core is still stopping: nothing of the page is on screen.
+    expect(s.children[0]?.exitCode).toBeNull();
+    expect(mainWindow().visible).toBe(false);
+    expect(popoverWindow()?.visible).toBe(false);
+  });
+
+  it('a main-window focus does not hide the popover; a main-window show does', async () => {
+    const s = setup();
+    await started(s);
+    tray().emit('click');
+    mainWindow().emit('focus');
+    expect(popoverWindow()?.visible).toBe(true);
+    mainWindow().emit('show');
+    expect(popoverWindow()?.visible).toBe(false);
+  });
+
+  it('showing the popover on macOS brings AgentLink forward', async () => {
+    const s = setup();
+    await started(s);
+    tray().emit('click');
+    expect(s.electron.app.focusCalls).toEqual([{ steal: true }]);
+  });
+
+  it('a targeted open shows the main window only once the new page loaded', async () => {
+    const s = await withWidget();
+    await expect(invoke(s, { action: 'open', route: 'inbox', target: PERSON })).resolves.toBe(true);
+    expect(sent(s)).toContainEqual({ v: 1, type: 'show', route: 'inbox', target: PERSON });
+    expect(mainWindow().visible).toBe(false);
+    s.children[0]?.stream.push(readyLine(`${ORIGIN}/?t=${TOKEN}#person=${PERSON}`));
+    expect(mainWindow().visible).toBe(false);
+    await flush();
+    expect(mainWindow().visible).toBe(true);
+    expect(mainWindow().loaded.at(-1)).toBe(`${ORIGIN}/?t=${TOKEN}#person=${PERSON}`);
+  });
+
+  it('a targeted approval open waits for its page too', async () => {
+    const s = await withWidget();
+    await expect(invoke(s, { action: 'open', route: 'approvals', target: APPROVAL })).resolves.toBe(
+      true,
+    );
+    // The core maps it to the existing /approve/<id> page.
+    expect(sent(s)).toContainEqual({ v: 1, type: 'show', route: 'approvals', target: APPROVAL });
+    expect(mainWindow().visible).toBe(false);
+    s.children[0]?.stream.push(readyLine(`${ORIGIN}/approve/${APPROVAL}?t=${TOKEN}`));
+    await flush();
+    expect(mainWindow().visible).toBe(true);
+  });
+
+  it('a targeted open with no answer from the core still shows the window', async () => {
+    const s = await withWidget();
+    await invoke(s, { action: 'open', route: 'inbox', target: PERSON });
+    expect(mainWindow().visible).toBe(false);
+    s.timers.advance(5_000);
+    expect(mainWindow().visible).toBe(true);
+  });
+
+  it('an untargeted open shows the main window at once (unchanged)', async () => {
+    const s = await withWidget();
+    await expect(invoke(s, { action: 'open', route: 'home' })).resolves.toBe(true);
+    expect(mainWindow().visible).toBe(true);
+  });
+
+  it('bad target ids are refused and nothing opens', async () => {
+    const s = await withWidget();
+    for (const input of [
+      { action: 'open', route: 'inbox', target: 'apr_x' },
+      { action: 'open', route: 'approvals', target: PERSON },
+      { action: 'open', route: 'approvals', target: `${APPROVAL}x` },
+      { action: 'open', route: 'inbox', target: PERSON, file: 'abc.01' },
+    ]) {
+      await expect(invoke(s, input)).resolves.toBe(false);
+    }
+    expect(sent(s).filter((m) => (m as { type?: string }).type === 'show')).toEqual([]);
+    expect(mainWindow().visible).toBe(false);
   });
 });

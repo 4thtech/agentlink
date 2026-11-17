@@ -358,6 +358,8 @@ describe('Popover', () => {
     ready(s);
     s.popover.show();
     expect(s.popover.visible).toBe(true);
+    // DESK-WIDGET-OPEN: a blur right after the show is ignored (the app coming forward).
+    s.advance(200);
     s.win().emit('blur');
     expect(s.popover.visible).toBe(false);
     s.advance(1_000);
@@ -376,7 +378,8 @@ describe('Popover', () => {
   });
 
   it('a second click toggles it closed (also when that click blurred it first)', () => {
-    const s = setup();
+    // DESK-WIDGET-OPEN: the pointer is on the icon when that click blurs it.
+    const s = setup({ screen: { ...fakeScreen(), getCursorScreenPoint: () => ({ x: 1010, y: 10 }) } });
     ready(s);
     s.popover.toggle();
     expect(s.popover.visible).toBe(true);
@@ -385,6 +388,7 @@ describe('Popover', () => {
     s.advance(1_000);
     s.popover.toggle();
     expect(s.popover.visible).toBe(true);
+    s.advance(500);
     // Clicking the icon blurs the popover first, then the click arrives.
     s.win().emit('blur');
     s.advance(50);
@@ -393,6 +397,87 @@ describe('Popover', () => {
     s.advance(1_000);
     s.popover.toggle();
     expect(s.popover.visible).toBe(true);
+  });
+
+  it('DESK-WIDGET-OPEN: macOS: a panel on every Space and over full screen', () => {
+    expect(popoverOptions('darwin').type).toBe('panel');
+    expect(popoverOptions('win32').type).toBeUndefined();
+    expect(popoverOptions('linux').type).toBeUndefined();
+    const s = setup();
+    s.popover.show();
+    expect(s.win().allWorkspaces).toEqual([[true, { visibleOnFullScreen: true }]]);
+    s.popover.hide();
+    s.popover.show();
+    expect(s.win().allWorkspaces).toHaveLength(1);
+    const w = setup({ platform: 'win32' });
+    w.popover.show();
+    expect(w.win().allWorkspaces).toEqual([]);
+  });
+
+  it('DESK-WIDGET-OPEN: macOS: showing it brings AgentLink forward (steal)', () => {
+    const focused: unknown[] = [];
+    const s = setup({ focusApp: () => focused.push('mac') });
+    s.popover.show();
+    expect(focused).toEqual(['mac']);
+    const w = setup({ platform: 'win32', focusApp: () => focused.push('win') });
+    w.popover.show();
+    expect(focused).toEqual(['mac']);
+  });
+
+  it('DESK-WIDGET-OPEN: an early blur (the app coming forward) does not hide it', () => {
+    const s = setup();
+    ready(s);
+    s.popover.toggle();
+    s.advance(50);
+    s.win().emit('blur');
+    expect(s.popover.visible).toBe(true);
+    s.advance(200);
+    s.win().emit('blur');
+    expect(s.popover.visible).toBe(false);
+  });
+
+  it('DESK-WIDGET-OPEN: an unrelated blur, then a click on the icon, opens it', () => {
+    // The pointer is elsewhere (another app took focus), not on the icon.
+    const s = setup();
+    ready(s);
+    s.popover.toggle();
+    s.advance(500);
+    s.win().emit('blur');
+    expect(s.popover.visible).toBe(false);
+    s.advance(50);
+    s.popover.toggle();
+    expect(s.popover.visible).toBe(true);
+  });
+
+  it('DESK-WIDGET-OPEN: the first show waits for the first paint (no blank flash)', () => {
+    class HeldWindow extends FakePopoverWindow {
+      override autoReady: boolean | null = false;
+    }
+    const s = setup({ BrowserWindow: HeldWindow });
+    ready(s);
+    s.popover.toggle();
+    expect(s.win().loaded).toEqual([WIDGET]);
+    expect(s.popover.visible).toBe(false);
+    expect(s.win().focusCount).toBe(0);
+    s.win().emit('ready-to-show');
+    expect(s.popover.visible).toBe(true);
+    expect(s.win().focusCount).toBe(1);
+    // Painted once: later shows are immediate.
+    s.popover.hide();
+    s.advance(1_000);
+    s.popover.toggle();
+    expect(s.popover.visible).toBe(true);
+  });
+
+  it('DESK-WIDGET-OPEN: a hide before the first paint cancels the pending show', () => {
+    class HeldWindow extends FakePopoverWindow {
+      override autoReady: boolean | null = false;
+    }
+    const s = setup({ BrowserWindow: HeldWindow });
+    s.popover.toggle();
+    s.popover.hide();
+    s.win().emit('ready-to-show');
+    expect(s.popover.visible).toBe(false);
   });
 
   it('is placed under the tray icon in the work area and focused', () => {
