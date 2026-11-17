@@ -276,6 +276,12 @@ describe('KeychainKeyStore (KeyStore contract, 04 §3.1.1)', () => {
     expect(`0x${encodeHex(signer)}`).toBe(ID_A);
   });
 
+  it('refuses typed data outside the allowed shapes without reading the seed', async () => {
+    const before = keychain.reads;
+    expect(await codeOf(() => store.sign712(TYPED))).toBe('typed_data_refused');
+    expect(keychain.reads).toBe(before);
+  });
+
   it('reads the seed for every operation and wipes it afterwards', async () => {
     const before = keychain.reads;
     await store.getPublicBundle();
