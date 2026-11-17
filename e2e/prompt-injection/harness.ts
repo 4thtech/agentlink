@@ -450,7 +450,10 @@ const TABLES = [
 
 export interface Effects {
   readonly published: number;
+  /** Outbound envelopes other than the automatic `ack` (D-156): anything our code sends. */
   readonly outbound: number;
+  /** Outbound automatic `ack` envelopes: the transport-level "received" receipt (D-156). */
+  readonly outboundAcks: number;
   readonly rows: Readonly<Record<string, number>>;
   readonly notarizeCalls: number;
   readonly acknowledgeCalls: number;
@@ -481,12 +484,17 @@ export async function effects(world: World, agent: PiAgent): Promise<Effects> {
       await agent.store.transaction((tx) => tx.select(table as never, {} as never))
     ).length;
   }
-  const outbound = (
-    await agent.store.transaction((tx) => tx.select('envelopes', { direction: 'out' } as never))
-  ).length;
+  const sent = await agent.store.transaction((tx) =>
+    tx.select('envelopes', { direction: 'out' } as never),
+  );
+  // 0.5.10 (D-156, 04 §3.4): a received message from an active contact gets one automatic signed
+  // `ack`, without the model. It is counted apart, so every other outbound envelope stays at zero.
+  const outboundAcks = sent.filter((r) => (r as { type?: string }).type === 'ack').length;
+  const outbound = sent.length - outboundAcks;
   return {
     published: world.net.published,
     outbound,
+    outboundAcks,
     rows,
     notarizeCalls: world.chain.calls.notarize,
     acknowledgeCalls: world.chain.calls.acknowledge,

@@ -161,6 +161,12 @@ beforeAll(async () => {
   afterSync = await effects(world, bob);
   expect(afterSync.published).toBe(beforeSync.published);
   expect(afterSync.outbound).toBe(beforeSync.outbound);
+  // The one thing receiving does since 0.5.10 (D-156): an automatic `ack` per processed message,
+  // only to active contacts (never a request or unknown sender) and never more than one per message.
+  expect(afterSync.outboundAcks).toBeGreaterThan(beforeSync.outboundAcks);
+  expect(afterSync.outboundAcks - beforeSync.outboundAcks).toBeLessThanOrEqual(
+    TEXT_CORPUS.length + BODY_CORPUS.length + named.length + 3,
+  );
   expect(afterSync.rows['approvals']).toBe(beforeSync.rows['approvals']);
   expect(afterSync.rows['contacts']).toBe(beforeSync.rows['contacts']);
   expect(afterSync.rows['receipts']).toBe(beforeSync.rows['receipts']);
