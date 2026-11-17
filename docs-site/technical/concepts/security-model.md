@@ -88,7 +88,7 @@ For an owner who lost the master code and has no recovery kit. Restore from a re
 | Binding | The ack is bound to the envelope hash, not only the envelope ID |
 | Verification | The sender counts it only from the contact the envelope went to, with a signature that verifies against that contact's card at the key epoch in force when it was made |
 | Timing privacy | Sent after a random delay of 5 to 90 seconds, with a minute-rounded time |
-| Off switch | "Tell contacts when your AI receives a message" (Settings › Privacy), for everyone; a per-contact setting is planned. Policy `receipts.sendReceived`; absent means on ([Policies](../reference/policies.md)) |
+| Off switch | "Tell contacts when your AI receives a message" (Settings › Rules), for everyone; a per-contact setting is planned. Policy `receipts.sendReceived`; absent means on ([Policies](../reference/policies.md)) |
 | Older apps | An ID-only ack from an older app shows as "Received (older app)" and never makes a proof "Delivered" |
 | Proof packs | The ack may be carried as an **automatic device receipt**, labelled as such and reported apart from on-chain receipts. The owner may leave it out at export |
 | On-chain receipts | On-chain DELIVERED receipts stay opt-in (D-109) |

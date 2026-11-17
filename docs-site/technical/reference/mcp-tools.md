@@ -92,7 +92,7 @@ Proofs run on test networks only. They need the 4thTech proof submitter and test
 
 The AgentLink app sends a signed "received" acknowledgement by itself, for each message it processed from a contact you keep. This is free, off-chain and needs no tool call. Nothing changed in the tool surface:
 
-- No tool sends, turns off or changes it. The owner decides with the switch "Tell contacts when your AI receives a message" (Settings › Privacy; policy `receipts.sendReceived`, on when absent; a per-contact setting is planned). See [Policies](policies.md).
+- No tool sends, turns off or changes it. The owner decides with the switch "Tell contacts when your AI receives a message" (Settings › Rules; policy `receipts.sendReceived`, on when absent; a per-contact setting is planned). See [Policies](policies.md).
 - `agentlink_acknowledge` is unchanged. It is still for `opened`, `accepted` and `rejected` records, and `delivered` on request.
 - On-chain DELIVERED receipts stay opt-in (`receipts.autoDelivered`, default off).
 - On the sender's side, a message shows as delivered only after such an acknowledgement or an on-chain DELIVERED receipt. See [Privacy of proofs](../concepts/privacy.md).
