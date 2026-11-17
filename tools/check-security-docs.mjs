@@ -7,7 +7,7 @@
 //      (D-N) on a security page, or listed in tools/security-docs.json `decisions` with a reason; the
 //      index docs/foundation/decisions/README.md has exactly one row per decision file;
 //   3. stale wording: "Status: Design" and "next release" are refused on pages whose subject has shipped
-//      (`shippedPages`), and a "Current for vX.Y" stamp older than the current minor version
+//      (every docs-site/technical page, plus `shippedPages`), and a "Current for vX.Y" stamp older than the current minor version
 //      (apps/cli/package.json) is refused on every docs-site and knowledge page;
 //   4. section references: every "NN §x.y" on docs-site and knowledge pages names a numbered heading
 //      that exists in spec NN.
@@ -238,13 +238,15 @@ export function runChecks(base = root) {
 
   const version = JSON.parse(read('apps/cli/package.json')).version;
   const shipped = new Set(config.shippedPages);
+  // Every technical page counts as shipped: an unbuilt subject says "Planned for vX" instead.
+  const isShipped = (p) => shipped.has(p) || p.startsWith('docs-site/technical/');
   const pages = [...walk(join(base, 'docs-site')), ...walk(join(base, 'knowledge'))]
     .map((f) => relative(base, f).split('\\').join('/'))
     .filter((p) => !p.startsWith('docs-site/_templates/') && p !== 'docs-site/MAINTAINING.md');
   let refs = 0;
   for (const p of pages) {
     const text = read(p);
-    for (const w of checkWording(text, { shipped: shipped.has(p), currentVersion: version }))
+    for (const w of checkWording(text, { shipped: isShipped(p), currentVersion: version }))
       problems.push(`${p}: ${w}`);
     refs += sectionRefs(text).length;
     for (const s of checkSectionRefs(text, specs)) problems.push(`${p}: ${s}`);
