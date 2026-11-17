@@ -105,6 +105,12 @@ import {
   type DirectTxChain,
   type TransactionRefusal,
 } from './evm-tx.js';
+import {
+  TYPED_DATA_REFUSED,
+  typedDataClock,
+  typedDataSnapshot,
+  type TypedDataRefusal,
+} from './typed-data-allowlist.js';
 import { wipe } from './wipe.js';
 
 export {
@@ -349,9 +355,27 @@ function entrySnapshot(
 }
 
 /** Options for MemoryKeyStore. */
+/**
+ * Signs typed data with the agent EVM key of `seed` outside any KeyStore, so without the sign712
+ * allowlist: for tests that need a signature by another key over someone else's typed data.
+ */
+export function signTypedDataWithAgentKey(seed: Uint8Array, typedData: TypedData): string {
+  const copy = copySeed(seed, 'signTypedDataWithAgentKey: seed');
+  try {
+    return withSecret(copy, KEY_LABELS.evm, 0, (key) => signTypedData(typedData, key));
+  } finally {
+    wipe(copy);
+  }
+}
+
 export interface MemoryKeyStoreOptions {
   /** The current key epoch (04 §2.6). Default 0. */
   readonly keyEpoch?: number;
+  /**
+   * The wall clock sign712 checks deadlines against, in unix seconds (SEC-KS-712-ALLOWLIST).
+   * Default the system clock; tests on a fake clock pass theirs.
+   */
+  readonly nowSeconds?: () => number;
 }
 
 const epochConflict = (): KeyStoreError =>
@@ -387,10 +411,12 @@ const KEYSTORE_STATE = new WeakMap<object, KeyStoreState>();
  */
 export class MemoryKeyStore implements KeyStore {
   readonly #state: KeyStoreState;
+  readonly #nowSeconds: () => number;
 
   constructor(masterSeed: Uint8Array, options: MemoryKeyStoreOptions = {}) {
     const keyEpoch = options.keyEpoch ?? 0;
     assertEpoch(keyEpoch);
+    this.#nowSeconds = options.nowSeconds ?? typedDataClock;
     const seed = copySeed(masterSeed, 'MemoryKeyStore: the master seed');
     this.#state = {
       seed,
@@ -475,12 +501,14 @@ export class MemoryKeyStore implements KeyStore {
   }
 
   sign712(typedData: TypedData): Promise<string> {
-    // The EVM key exists only at epoch 0 (04 §2.1), whatever the current key epoch.
-    return Promise.resolve().then(() =>
-      withSecret(this.#open(), KEY_LABELS.evm, 0, (secretKey) =>
-        signTypedData(typedData, secretKey),
-      ),
-    );
+    // SEC-KS-712-ALLOWLIST: only the agent's own shapes, checked before the seed is used. The EVM
+    // key exists only at epoch 0 (04 §2.1), whatever the current key epoch.
+    return Promise.resolve().then(() => {
+      const snapshot = typedDataSnapshot(typedData, this.#state.agentId, this.#nowSeconds());
+      return withSecret(this.#open(), KEY_LABELS.evm, 0, (secretKey) =>
+        signTypedData(snapshot, secretKey),
+      );
+    });
   }
 
   signTransaction(tx: DirectTransaction): Promise<string> {
@@ -1540,17 +1568,25 @@ function runConformanceSign712(
           domain: { name: 'AgentLink test' },
           message: { text: 'hello' },
         };
-        const cases: [string, unknown][] = [
-          ['an unknown primaryType', note],
-          ['a Record on another chain', { ...shapes.record(), domain: occV2Domain(1, other) }],
-          ['a Record over the fee ceiling', shapes.record({ maxFee: '500001' })],
-          ['a Record for another signer', shapes.record({ signer: other })],
-          ['a top-up to another address', shapes.topUp({ to: other })],
-          ['a top-up over the cap', shapes.topUp({ value: '50000001' })],
+        const cases: [string, unknown, TypedDataRefusal][] = [
+          ['an unknown primaryType', note, 'type_not_allowed'],
+          [
+            'a Record on another chain',
+            { ...shapes.record(), domain: occV2Domain(1, other) },
+            'domain_not_allowed',
+          ],
+          ['a Record over the fee ceiling', shapes.record({ maxFee: '500001' }), 'fee_not_allowed'],
+          ['a Record for another signer', shapes.record({ signer: other }), 'signer_not_allowed'],
+          ['a top-up to another address', shapes.topUp({ to: other }), 'payee_not_allowed'],
+          ['a top-up over the cap', shapes.topUp({ value: '50000001' }), 'value_not_allowed'],
         ];
-        for (const [what, typed] of cases) {
+        for (const [what, typed, reason] of cases) {
           const error = await conformanceOutcome(() => store.sign712(typed as TypedData));
           conformanceCheck(codeOfError(error) === 'typed_data_refused', `${what}: refused`);
+          conformanceCheck(
+            messageOfError(error) === TYPED_DATA_REFUSED[reason],
+            `${what}: the fixed message`,
+          );
         }
       },
     );

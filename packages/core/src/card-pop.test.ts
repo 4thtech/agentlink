@@ -69,7 +69,7 @@ async function agent(n: number, owner: MemoryOwnerKeyStore, name: string): Promi
   });
   const made = await makeAgent(
     clock,
-    new MemoryKeyStore(seed(n)),
+    new MemoryKeyStore(seed(n), { nowSeconds: () => clock.now() }),
     owner as unknown as TestAgent['owner'],
     name,
     logger,
@@ -395,8 +395,11 @@ describe('card-update carries both (04 §3.4.1)', () => {
 
 // --- end to end: a proof pack with the produced pair verifies (07 §8) ------------------------------
 
-/** The record-message vector's fee asset address (a named constant keeps secret scanners off it). */
-const FEE_ASSET = '0x05f7cddba6070777972ad9ff9df5312872a49685';
+/**
+ * Circle's USDC on Base Sepolia: a fee token the agent key signs Records in (SEC-KS-712-ALLOWLIST).
+ * A named constant keeps secret scanners off it.
+ */
+const FEE_ASSET = '0x036cbd53842c5426634e7929541ec2318f3dcf7e';
 
 /** A Base Sepolia read client that answers getRecord with `state` and has no code at any address. */
 function fakeChain(config: ChainConfig, state: Record<string, unknown>): VerifyChain {
