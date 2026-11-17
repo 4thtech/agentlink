@@ -53,7 +53,7 @@ These are the defaults of a new policy (`POLICY_DEFAULTS`). A new ID's first rul
 - Not one of the `POLICY_DEFAULTS` keys: a policy without it counts as on (since 0.5.10, D-156). Free and off-chain.
 - Label (Settings › Rules): "Tell contacts when your AI receives a message".
 - When on, the AgentLink app sends a signed off-chain acknowledgement for each message it processed from an active contact. It never does so for a blocked, removed or revoked contact, an unknown sender or a request.
-- A policy signed before 0.5.10 has no such key. Absent counts as on. Existing users see a one-time notice.
+- A policy signed before 0.5.10 has no such key. Absent counts as on. People who update from an earlier version see a one-time notice; new installs do not.
 - The owner turns it off for everyone with the switch. A per-contact setting is planned (not in 0.5.10).
 - What it tells the sender: [Privacy of proofs](../concepts/privacy.md).
 - On-chain DELIVERED receipts stay opt-in: `receipts.autoDelivered` is `false` unless the owner turns it on, here or per contact.

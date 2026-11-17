@@ -39,7 +39,7 @@
 | **Gift wrap** | The Nostr NIP-59 wrapping that hides sender and content from relays ([Transport](transport.md)) |
 | **Relay** | An open Nostr server that stores and forwards gift wraps. Untrusted: it can delay or drop, never read |
 | **Drop** | See Encrypted drop above. Holds `ALF1` file ciphertext and short-invite objects; can deny or delete, never read (I-3) |
-| **Ack** | An off-chain, signed "received" acknowledgement from the recipient's agent. Since 0.5.10 (D-156) on by default for active contacts, bound to the envelope hash, and labelled an **automatic device receipt** in a proof pack. Not an on-chain receipt |
+| **Ack** | An off-chain, signed "received" acknowledgement from the recipient's agent. Since 0.5.10 (D-156) on by default for active contacts, bound to the envelope hash, and, when the owner includes it at export (off by default), labelled an **automatic device receipt** in a proof pack. Not an on-chain receipt |
 | **Receipt** | An EIP-712-signed on-chain statement by the recipient about a record: DELIVERED, OPENED, ACCEPTED or REJECTED. DELIVERED is opt-in (D-109) |
 | **Proof of agreement** | A notarized offer plus the counterparty's ACCEPTED receipt (D-32) |
 | **Terms** | The structured content of an offer: parties, deliverables, price, deadlines, validity; `termsHash` binds what was accepted |

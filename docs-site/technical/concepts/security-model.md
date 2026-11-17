@@ -90,7 +90,7 @@ For an owner who lost the master code and has no recovery kit. Restore from a re
 | Timing privacy | Sent after a random delay of 5 to 90 seconds, with a minute-rounded time |
 | Off switch | "Tell contacts when your AI receives a message" (Settings › Rules), for everyone; a per-contact setting is planned. Policy `receipts.sendReceived`; absent means on ([Policies](../reference/policies.md)) |
 | Older apps | An ID-only ack from an older app shows as "Received (older app)" and never makes a proof "Delivered" |
-| Proof packs | The ack may be carried as an **automatic device receipt**, labelled as such and reported apart from on-chain receipts. The owner may leave it out at export |
+| Proof packs | The ack may be carried as an **automatic device receipt**, labelled as such and reported apart from on-chain receipts. It is left out by default. The owner includes it only on request (the MCP export option `includeDeviceReceipt`, or by asking their AI); including it also discloses the recipient and binds the receipt to them. A checkbox in the app's export is planned |
 | On-chain receipts | On-chain DELIVERED receipts stay opt-in (D-109) |
 
 An ack tells the sender that the recipient's AI app processed the message at about that time. The delay, the coarse time and the switch bound what it discloses.

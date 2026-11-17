@@ -49,7 +49,7 @@ An `ack` is an envelope that tells the sender the recipient's AI app processed o
 - it goes out after a short random delay with a coarse time; the owner turns it off for everyone with "Tell contacts when your AI receives a message" (a per-contact setting is planned) (policy `receipts.sendReceived`, absent = on);
 - an ID-only ack from an older app shows as "Received (older app)" and never marks a proof as delivered.
 
-An ack is not an on-chain receipt. A proof pack may carry it, labelled **automatic device receipt**, apart from on-chain receipts.
+An ack is not an on-chain receipt. A proof pack carries it only when the owner asks at export (`includeDeviceReceipt`, off by default), labelled **automatic device receipt**, apart from on-chain receipts; it then also discloses the recipient.
 
 ## Forward secrecy (explicit trade-off)
 
