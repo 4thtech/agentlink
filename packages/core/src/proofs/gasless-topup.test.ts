@@ -196,7 +196,7 @@ async function harness(
   const clock = options.clock ?? new FakeClock();
   const store = options.store ?? new MemoryStore();
   const log = spyLogger();
-  const agent = new MemoryKeyStore(AGENT_SEED);
+  const agent = new MemoryKeyStore(AGENT_SEED, { nowSeconds: () => clock.now() });
   opened.push(agent);
   const agentId = (await agent.getPublicBundle()).agentId;
   const keyStore = options.keyStore ?? agent;
@@ -323,7 +323,7 @@ describe('runGaslessTopUp (M3-4b-t-T4-a)', () => {
       vi.spyOn(owner, 'lock'),
     ];
     // The owner seed in EVM form: what a confused wiring would sign with.
-    const ownerAsEvm = new MemoryKeyStore(OWNER_SEED);
+    const ownerAsEvm = new MemoryKeyStore(OWNER_SEED, { nowSeconds: new FakeClock().now });
     opened.push(ownerAsEvm);
     const ownerEvmId = (await ownerAsEvm.getPublicBundle()).agentId;
 
@@ -344,7 +344,7 @@ describe('runGaslessTopUp (M3-4b-t-T4-a)', () => {
   });
 
   it('1b. a KeyStore that is not the agent (the owner seed) is refused: its signature is never posted', async () => {
-    const ownerAsEvm = new MemoryKeyStore(OWNER_SEED);
+    const ownerAsEvm = new MemoryKeyStore(OWNER_SEED, { nowSeconds: new FakeClock().now });
     opened.push(ownerAsEvm);
     const h = await harness({ keyStore: ownerAsEvm });
     const result = await runGaslessTopUp(h.deps, { approval: await h.approve(20n * DOLLAR) });

@@ -192,6 +192,13 @@ async function put(p: Put): Promise<string> {
   return id;
 }
 
+/** SEC-RECEIPTS-DEFAULT: the stored envelopeHash of `id`, for a v2 ack that binds it. */
+async function hashOf(id: string, agent: TestAgent = a): Promise<string> {
+  const row = await agent.store.transaction((tx) => tx.get('envelopes', { envelope_id: id }));
+  if (row === undefined) throw new Error('test: no row');
+  return row.envelope_hash;
+}
+
 /** A `files` row as ingest (received.ts) or send (records.ts) stores it: name, URL, key sealed. */
 async function putFileRow(
   envelopeId: string,
@@ -631,13 +638,13 @@ describe('MessagesView.list (plan §4 GET /api/ui/messages/:contactId)', () => {
       direction: 'out',
       delivery: 'not_delivered',
     });
-    // B's agent acknowledged `acked` (02 F-23): an `ack` from B naming it.
+    // B's agent acknowledged `acked` (02 F-23): a v2 `ack` from B naming it and its hash.
     await put({
       contact: b.id,
       createdAt: T0 + 3,
       payload: {
         type: 'ack',
-        body: { kind: 'received', envelopeId: acked },
+        body: { kind: 'received', envelopeId: acked, envelopeHash: await hashOf(acked) },
         replyTo: acked,
         files: [],
       },
@@ -920,15 +927,15 @@ describe('FilesIoView.sent (plan §4 GET /api/ui/files/sent)', () => {
       });
     const toB = await send(b.id);
     const toC = await send(c.id);
-    const ack = (id: string) => ({
+    const ack = async (id: string) => ({
       type: 'ack',
-      body: { kind: 'received', envelopeId: id },
+      body: { kind: 'received', envelopeId: id, envelopeHash: await hashOf(id) },
       replyTo: id,
       files: [],
     });
-    await put({ contact: b.id, createdAt: T0 + 1, payload: ack(toB) });
+    await put({ contact: b.id, createdAt: T0 + 1, payload: await ack(toB) });
     // C's message is acknowledged by B, not by C: no receipt.
-    await put({ contact: b.id, createdAt: T0 + 1, payload: ack(toC) });
+    await put({ contact: b.id, createdAt: T0 + 1, payload: await ack(toC) });
     const { items } = await a.client.filesIo.sent();
     const receipt = new Map(items.map((i) => [i.id, i.receipt]));
     expect(receipt.get(`${toB}.00`)).toBe(true);

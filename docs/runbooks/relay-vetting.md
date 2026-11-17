@@ -39,7 +39,7 @@ A table with the date, the Node version, one row per relay, and a verdict per ch
 A relay that fails a check stays out of any new default list; the owner decides about removal. Nothing in the script changes state beyond the single test event, which relays may keep or drop.
 
 ## Related
-`docs/foundation/00-README.md` D-75; `docs/foundation/07-sdk-transport-storage.md` §4.2, §4.3; `docs/foundation/04-security-and-crypto.md` §3.1.1, §4; backlog card M1-18.
+`docs/foundation/decisions/D-075.md`; `docs/foundation/07-sdk-transport-storage.md` §4.2, §4.3; `docs/foundation/04-security-and-crypto.md` §3.1.1, §4; backlog card M1-18.
 
 ## Results
 

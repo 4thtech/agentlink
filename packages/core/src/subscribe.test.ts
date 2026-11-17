@@ -30,6 +30,7 @@ import {
   type TestAgent,
   type TestOwner,
 } from './testing/envelopes.js';
+import { MemoryPolicyMark } from './testing/owner.js';
 import { nostrTransport, type Transport, type TransportFactory } from './transport.js';
 
 const RELAYS_A = Object.freeze(['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net']);
@@ -172,6 +173,9 @@ async function openAgent(
     cipher,
     approvals: new RecordingApprovalChannel(),
     clock: clock.now,
+    // SEC-RECEIPTS-DEFAULT: a policy mark, as every runtime has (a policy that fails closed sends
+    // no acks).
+    policyMark: new MemoryPolicyMark(),
     transport: options.transport ?? nostrTransport({ connector: net, addressCheck: 'platform' }),
     logger: createLogger({ name: 'core', level: 'debug', sink: (_l, line) => lines.push(line) }),
     ...(options.deliveryAcks === undefined ? {} : { deliveryAcks: options.deliveryAcks }),

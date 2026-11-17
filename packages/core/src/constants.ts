@@ -107,3 +107,11 @@ export const IDEMPOTENCY_KEY_REUSED = 'IDEMPOTENCY_KEY_REUSED' as const;
  * (decided at #44). A named marker so the apply path (M1-7d) and its tests cite one value.
  */
 export const POLICY_APPLY_ORDER = 'store-then-mark' as const;
+
+/**
+ * SEC-RECEIPTS-DEFAULT (04 §3.4 ack timing, D-156): each delivery ack waits a random delay in this
+ * range, in seconds, before it is first published; its signed `createdAt` is rounded down to the
+ * minute.
+ */
+export const ACK_DELAY_MIN_SECONDS = 5;
+export const ACK_DELAY_MAX_SECONDS = 90;

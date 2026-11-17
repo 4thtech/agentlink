@@ -1,20 +1,20 @@
 # Contracts
 
-> **Status: Design.** The contracts are deployed on the Base Sepolia testnet and passed a live smoke test (pre-audit); no released AgentLink version uses them yet. Gnosis Chiado is deployed at the same addresses (smoke test passed on 21 Oct 2026; used automatically once deployed, M1-3j-c), with released testnet support planned for v0.2.0 (M1); mainnet (Base, Gnosis) for v1.0.0 (M3), after the external audit. The Base Sepolia addresses below are for development and testing only. Source: [05 OCC v2 contracts](https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md).
+> **Status: Current for v0.5.10.** The contracts are deployed on test networks only (Base Sepolia and Gnosis Chiado, pre-audit) and released AgentLink versions use them for proofs since v0.2.0. There is no mainnet deployment; mainnet (Base, Gnosis) is planned for v1.0.0 (M3), after the external audit. The addresses below are for development and testing only. Source: [05 OCC v2 contracts](https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md).
 
-The contract source lives in a separate private repository during the beta. Verified source is planned to be published at mainnet (licence proposed: BUSL-1.1, to be confirmed). This repository consumes only the exported ABI JSON, through the private in-repo package `@4thtech-io/occ-v2-abi` (see [Interface package](#interface-package)), and the shared test vectors.
+The contract source lives in a separate private repository until mainnet; it is then published under BUSL-1.1. This repository consumes only the exported ABI JSON, through the private in-repo package `@4thtech-io/occ-v2-abi` (see [Interface package](#interface-package)), and the shared test vectors.
 
 ## Contracts
 
-| Contract | Purpose | Planned for |
+| Contract | Purpose | Status |
 |---|---|---|
-| `OCCFeeVault` | Non-custodial credits (deposit, `depositFor`, EIP-3009 deposits (not enabled yet; see below), withdraw any time), fee configuration within on-chain caps, quotes, charging, treasury sweeps, integrator apps and payouts | M1 (testnets), M3 (mainnet) |
-| `OCCNotary` | Signature-based records and receipts; anyone can submit | M1 (testnets), M3 (mainnet) |
+| `OCCFeeVault` | Non-custodial credits (deposit, `depositFor`, EIP-3009 deposits (not enabled yet; see below), withdraw any time), fee configuration within on-chain caps, quotes, charging, treasury sweeps, integrator apps and payouts | Deployed on test networks; mainnet planned for M3 |
+| `OCCNotary` | Signature-based records and receipts; anyone can submit | Deployed on test networks; mainnet planned for M3 |
 | `OCCRegistry` | Verified agent cards (agent and owner binding) and revocation | M2 |
 | `OCCAnchor` | Batched Merkle roots | M4 |
 | `OCCDeals` | Deal state machine | M5 |
 
-## Key interfaces (design)
+## Key interfaces
 
 ```solidity
 // OCCNotary
@@ -29,7 +29,7 @@ function withdraw(address token, uint256 amount, address to) external;
 function creditsOf(address payer, address token) external view returns (uint256);
 ```
 
-## Guarantees by design
+## Guarantees
 
 The full trust model (what the contracts guarantee, what 4thTech can and cannot do, and how to check it without the source) is in [Payments, credits and trust](../concepts/payments-credits-and-trust.md); hands-on checks are in [Verify it yourself](../guides/verify-it-yourself.md).
 
@@ -53,7 +53,7 @@ Current import: `v0.1.0-testnet.4` of the contracts repository (commit `d4f4c79`
 
 ## Addresses
 
-**Testnet only, in development.** These are the pre-audit Base Sepolia deployment (14 Oct 2026), for development and testing; they hold no real value and may be redeployed. The source of truth is the release's `addresses/84532.json`, carried by `@4thtech-io/occ-v2-abi` (`getDeployment(84532)`) and checked against the release manifest; there is no mainnet entry, and CI refuses one.
+**Testnet only.** These are the pre-audit Base Sepolia deployment (14 Oct 2026), for development and testing; they hold no real value and may be redeployed. The source of truth is the release's `addresses/84532.json`, carried by `@4thtech-io/occ-v2-abi` (`getDeployment(84532)`) and checked against the release manifest; there is no mainnet entry, and CI refuses one.
 
 | Chain | Chain ID | Contract | Address |
 |---|---|---|---|
@@ -61,13 +61,13 @@ Current import: `v0.1.0-testnet.4` of the contracts repository (commit `d4f4c79`
 | Base Sepolia | 84532 | `OCCFeeVault` (proxy) | `0x91A40104553Bd1731c3fBe05209A908B40e50f8d` |
 | Base Sepolia | 84532 | `AccessManager` | `0x7B05B6C56E4f073df60da9Fa640b1f7ffCD9D3A2` |
 
-Fee token on Base Sepolia: test USDC `0x036CbD53842c5426634e7929541eC2318f3dCF7e` (6 decimals; EIP-3009 deposits not enabled yet). On Gnosis Chiado the fee asset is native xDAI, at the same contract addresses (M1-3j); see [Networks and contract addresses](networks-and-contracts.md). Mainnet addresses differ from testnet addresses (D-71) and are published at M3.
+Fee token on Base Sepolia: test USDC `0x036CbD53842c5426634e7929541eC2318f3dCF7e` (6 decimals; EIP-3009 deposits not enabled yet). On Gnosis Chiado the fee asset is native xDAI, at the same contract addresses (smoke test passed 21 Oct 2026); see [Networks and contract addresses](networks-and-contracts.md). Mainnet addresses differ from testnet addresses (D-71) and are published with the mainnet release (M3).
 
-## Outline (filled in at deployment)
+## Outline (to come)
 
 - Full ABI reference and events
-- Addresses for mainnets (M3)
+- Addresses for mainnet (planned for M3)
 - Roles, delays and governance
 - Audit reports (after fixes)
 
-**Filled in at:** M1 (testnets) and M3 (mainnet); backlog cards DOCS-M1b and DOCS-M3.
+**Planned for:** the mainnet release (M3).

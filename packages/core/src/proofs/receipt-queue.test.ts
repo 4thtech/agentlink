@@ -64,7 +64,7 @@ async function openAgent(
 ): Promise<Agent> {
   const store = new MemoryStore();
   const cipher = new TestStoreCipher();
-  const keyStore = new MemoryKeyStore(seed(n));
+  const keyStore = new MemoryKeyStore(seed(n), { nowSeconds: () => clock.now() });
   const client = await AgentLinkClient.create({
     keyStore,
     store,

@@ -351,6 +351,12 @@ export type PackCheck =
       readonly content: unknown;
       /** Non-fatal finding codes (`signer_no_longer_confirms`, `receipt_tx_mismatch`). */
       readonly notices: readonly string[];
+      /**
+       * SEC-RECEIPTS-DEFAULT (07 §8): the pack's automatic device receipts (the contact AI's signed
+       * "received" ack over this hash), each checked apart from on-chain receipts; empty or absent
+       * when the pack carries none.
+       */
+      readonly deviceReceipts?: readonly { readonly ok: boolean; readonly agentEvm?: string }[];
     };
 
 /** The agent's credits and the price list (06 §2.1 `credits`, `prices`; D-45, G-43). */
@@ -462,6 +468,11 @@ export interface ToolClient {
   contacts(): Promise<readonly ContactView[]>;
   /** The backend for files above the inline limit under the current policy (06 §2.1). */
   storageMode(): Promise<'drop' | 'own'>;
+  /**
+   * SEC-RECEIPTS-DEFAULT (11 §5.10): true while the "received receipts are now on" note is due
+   * (receipts on, an active contact, no receipt sent yet). Optional: absent means never.
+   */
+  receiptsNoticeDue?(): Promise<boolean>;
   /**
    * The number of approvals waiting for the owner (core `approvalService.countPending`, M1-7e-3):
    * undecided, not cancelled, not voided and not lapsed. A display count only.
@@ -660,6 +671,7 @@ export function coreToolClient(
     approvalState: (approvalId) => client.approvalService.read(approvalId),
     approvalResume: (approvalId) => client.approvalService.resumeOf(approvalId),
     openOffers: () => client.terms.openOffers(),
+    receiptsNoticeDue: () => client.receiptsNoticeDue(),
     invites: coreInviteTools(client),
     terms: coreTermsTools(client),
     ...(options.files === undefined ? {} : { files: coreFileTools(client, options.files) }),

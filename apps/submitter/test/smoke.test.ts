@@ -103,10 +103,24 @@ describe('deploy smoke negative controls', () => {
 
   it('fails when the signature is refused locally (the simulation did not run)', async () => {
     const agent = await newSmokeAgent();
-    const other = await newSmokeAgent();
+    // 0.5.10 (04 §3.1.1, D-156): the agent key signs only as itself, so a signature by "another key"
+    // can no longer be made through the KeyStore. The same bad signature is a valid one with its first
+    // byte changed: it does not recover to the agent's address.
+    const signer = Object.create(agent.signer, {
+      sign712: {
+        value: async (typedData: Parameters<typeof agent.signer.sign712>[0]) => {
+          const good = await agent.signer.sign712(typedData);
+          const first = good.startsWith('0x') ? 2 : 0;
+          const flipped = ((parseInt(good.slice(first, first + 2), 16) ^ 0xff) & 0xff)
+            .toString(16)
+            .padStart(2, '0');
+          return `${good.slice(0, first)}${flipped}${good.slice(first + 2)}`;
+        },
+      },
+    }) as typeof agent.signer;
     const error = await smokeSimulatedNotarize(target(), CHAIN_ID, {
       address: agent.address,
-      signer: other.signer,
+      signer,
     }).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(SmokeFailure);
     expect(String(error)).toMatch(/InvalidSignature: the simulation did not reach the chain/);

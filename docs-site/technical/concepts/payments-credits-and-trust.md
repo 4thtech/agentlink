@@ -1,6 +1,6 @@
 # Payments, credits and trust
 
-> **Status: Design, partly live on testnets.** The OCC v2 fee vault and notary are deployed on Base Sepolia and Gnosis Chiado (pre-audit), and the proof submitter records proofs on Base Sepolia since 21 Oct 2026. `agentlink credits` reads credits since v0.1.2. Not live: gasless USDC top-ups (EIP-3009; the deployed vault refuses them until a later contracts release), the pay page, pay by card, a withdraw button, mainnet and paid proof (v1.0.0, M3). Sources: [05 OCC v2 contracts](https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md), [12 Economics and fees](https://github.com/4thtech/agentlink/blob/main/docs/foundation/12-economics-and-fees.md) and [04 Security and crypto](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). The specs win on any conflict.
+> **Status: Current for v0.5.10, on test networks only.** The OCC v2 fee vault and notary run on Base Sepolia and Gnosis Chiado (pre-audit), proofs are paid with free test credits, and there is no mainnet. Planned: gasless USDC top-ups (EIP-3009; the deployed vault refuses them until a later contracts release), the pay page, pay by card, a withdraw button, mainnet and paid proof (v1.0.0, M3). Sources: [05 OCC v2 contracts](https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md), [12 Economics and fees](https://github.com/4thtech/agentlink/blob/main/docs/foundation/12-economics-and-fees.md) and [04 Security and crypto](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). The specs win on any conflict.
 
 **Purpose:** explain exactly how money moves in AgentLink, what the smart contracts guarantee, what 4thTech can and cannot do, and how to check all of it without seeing the contract source. To check it hands-on, see [Verify it yourself](../guides/verify-it-yourself.md).
 
@@ -31,7 +31,7 @@ flowchart LR
 
 | Step | What happens | Source |
 |---|---|---|
-| Account | The agent's EVM address comes from its own key, derived on the user's side from the agent's master seed (HKDF label `agentlink/v1/evm`, epoch always 0, so credits stay tied to one address). The seed lives in the OS keychain. No key ever reaches 4thTech (I-1). | 04 §1, §2.1, §2.2 |
+| Account | The agent's EVM address comes from its own key, derived on the user's side from the agent's master seed (HKDF label `agentlink/v1/evm`, epoch always 0, so credits stay tied to one address). The seed lives in the OS keychain. Since 0.5.10 the agent key signs only AgentLink's own typed-data shapes, and refuses any other typed data before key material is loaded (D-156, 04 §3.1.1). No key ever reaches 4thTech (I-1). | 04 §1, §2.1, §2.2 |
 | Top-up | Credits are a prepaid balance per payer, per chain and per token, held by `OCCFeeVault`. `deposit` credits the caller, `depositFor` credits any agent, `depositWithAuthorization` credits the USDC sender through EIP-3009 `receiveWithAuthorization` (planned; not enabled in the deployed vault). The vault credits the measured balance increase. | 05 §2.5; 12 §4.1 |
 | Quote | The client calls `quote(feeType, token, appId)` and shows the total in USD. Official clients use `appId = 0`, so there is no integrator fee. | 05 §2.4; 12 §4 |
 | Sign | The agent signs an EIP-712 `Record` locally. It carries `feeToken` and `maxFee`, the most the agent accepts to pay. | 05 §3.1; 12 §4 |
@@ -85,7 +85,7 @@ Prices (12 §2): `NOTARIZE` $0.10 with an on-chain cap of $0.50; `REGISTER` $5 w
 
 | Path | Mechanism | Fees the user sees | Status |
 |---|---|---|---|
-| Free test credits | 4thTech faucet calls `depositFor` for the agent (05 §9). D-120 (00-README, automatic test credits): claimed automatically once per agent, a small fixed amount, testnets only | None | Faucet live in the submitter Worker since 21 Oct 2026 (one claim per agent per day, per-IP and global caps). Claimed automatically with the first proof since v0.2.0 |
+| Free test credits | 4thTech faucet calls `depositFor` for the agent (05 §9). [D-120](https://github.com/4thtech/agentlink/blob/main/docs/foundation/decisions/D-120.md) (automatic test credits): claimed automatically once per agent, a small fixed amount, testnets only | None | Faucet live in the submitter Worker since 21 Oct 2026 (one claim per agent per day, per-IP and global caps). Claimed automatically with the first proof since v0.2.0 |
 | Send from an exchange | Transfer USDC to the agent's address (shown with a QR code, the network named only inside the exchange steps, D-117 B), then a gasless top-up: the agent signs EIP-3009 `receiveWithAuthorization` with the vault as payee, and a submitter submits it | The exchange's withdrawal fee | Planned (testnets in M2, M2-18c). Needs a contracts release that enables `depositWithAuthorization` |
 | Use crypto you already have | One transfer from the user's own account to the agent's address, then the same gasless top-up | The network's own fee for the transfer | Planned (testnets in M2, M2-18b) |
 | Pay by card | A regulated provider delivers a US-dollar stablecoin to the agent's address; the agent turns it into credits with the gasless top-up | The provider's fee and minimum, shown before paying | Planned, last step: after the legal entity exists and after the crypto paths are live (D-111; M2-18a, M3-4c) |
@@ -108,7 +108,7 @@ Every top-up is public and links the paying account to the agent: `Deposited` na
 flowchart TB
   subgraph User["User's side"]
     AK["Agent master seed and keys<br/>(OS keychain)"]
-    OK["Owner key<br/>(passkey or master code)"]
+    OK["Owner key<br/>(Touch ID, Windows Hello,<br/>passkey or master code)"]
     PT["Plaintext: messages, files,<br/>file keys, contacts, rules"]
   end
   subgraph Chain["Public chain"]
@@ -130,8 +130,8 @@ flowchart TB
 
 | Asset | Held by | 4thTech's access |
 |---|---|---|
-| Agent keys and seed | User's OS keychain (or the user's own Cloudflare account for a self-hosted cloud agent) | None (I-1) |
-| Owner key | Passkey, master code or console, behind user presence | None (I-4) |
+| Agent keys and seed | User's OS keychain (planned: the user's own Cloudflare account for a self-hosted cloud agent) | None (I-1) |
+| Owner key | User's side, opened only with the owner's presence (Touch ID, Windows Hello, a passkey or the master code) | None (I-4) |
 | Plaintext (messages, files, file keys, contacts, rules) | User's side only | None (I-2) |
 | Credits | `OCCFeeVault`, under the agent's address | Cannot move, freeze or reduce them (05 §2.5) |
 | Records and receipts | `OCCNotary`: hashes, salted recipient commitments, kind and timestamps, never content | Cannot alter them (fields are immutable; 05 §8) |

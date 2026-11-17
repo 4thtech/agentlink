@@ -20,7 +20,7 @@ import type { CreateOutcome, InviteApi } from '../contacts/invite-api.js';
 import { InviteScreen } from '../invite/invite-screen.js';
 import { HomeScreen, type HomeScreenProps } from './home-screen.js';
 import { CONTACTS_STRINGS as C } from '../contacts/strings.js';
-import { HOME_STRINGS as S } from './people-strings.js';
+import { HOME_STRINGS as S, fmt } from './people-strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -370,9 +370,9 @@ describe('Home simple (A4)', () => {
     expect(inbound.some((t) => t.includes('Got them. Here is a first sketch.'))).toBe(true);
     const heads = all('h1, h2, h3, button, [role="status"]').map((e) => e.textContent ?? '');
     expect(heads.some((t) => t.includes('Got them'))).toBe(false);
-    // Outbound: Sent / Waiting to send / Not delivered.
+    // Outbound: received (a signed receipt; SEC-RECEIPTS-DEFAULT) / Waiting to send / Not delivered.
     expect(document.body.textContent).toContain('Sending the brief.');
-    expect(byText('span', S.sent)).toBeTruthy();
+    expect(byText('span', fmt(S.proofDelivered, { name: 'Denis' }))).toBeTruthy();
     expect(byText('span', S.waitingToSend)).toBeTruthy();
     expect(byText('span', S.notDelivered)).toBeTruthy();
     expect(document.body.textContent).toContain(S.notDeliveredRetry);
@@ -960,7 +960,9 @@ describe('Home pro (A10, Under the hood on)', () => {
     expect(document.body.textContent).toContain(S.identityChecked);
     expect(document.body.textContent).toContain(S.paired);
     expect(document.body.textContent).toContain(ENV_OUT1);
-    expect(document.body.textContent).toContain(`${S.receipt} ${S.receiptYes}`);
+    expect(document.body.textContent).toContain(
+      `${S.receipt} ${fmt(S.proofDelivered, { name: 'Denis' })}`,
+    );
     expect(document.body.textContent).toContain(`${S.proof} ${S.proofYes}`);
   });
 
@@ -1069,6 +1071,18 @@ describe('W7-ID-X1: ID chips, grouping, colour and who is asking', () => {
     expect(note?.textContent).toContain('Tali work has 1 person. Open it to see them.');
     expect(q('.hm-nomatch')?.textContent).not.toContain(S.noMatch);
     expect(row('Denis')).toBeFalsy();
+  });
+
+  it('a #person= link clears an ID filter so the person is shown', async () => {
+    await render(base(agentsAnswer(2)));
+    await click(q('[data-id-chip="tali-work"]'));
+    expect(row('Denis')).toBeFalsy();
+    history.pushState(null, '', `/#person=${DENIS.contactId}`);
+    await act(async () => {
+      window.dispatchEvent(new Event('hashchange'));
+    });
+    await settle();
+    expect(q(`[data-person-open="${DENIS.contactId}"]`)).toBeTruthy();
   });
 
   it('R1-UI-07: in All IDs, an open ID with no people does not say "No one here yet" when another ID has some', async () => {

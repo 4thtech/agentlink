@@ -35,7 +35,7 @@ Contents: §1 How to read a card · §2 M0 Foundations (incl. legacy OPS-L items
 | **Phase** | M1 cards only: `M1a` (walking skeleton: pair and talk) or `M1b` (files, proof, credits), D-33. Appended to the Status line; see §3. |
 | **Repo/path** | `agentlink` = public `4thtech/agentlink`; `occ-v2-contracts` = private contracts repo (D-19); `agentlink-ops` = private ops/internal-docs repo (D-26). |
 | **Depends on** | Cards that must be `done` (or stubbed behind an agreed interface, `development-process.md` §6.2) before this one is `ready`. |
-| **Spec** | `04 §3.5` = `docs/foundation/04-security-and-crypto.md` section 3.5. `10 M1-5` = the build-plan row. `D-xx` = decision log in `00-README.md`. |
+| **Spec** | `04 §3.5` = `docs/foundation/04-security-and-crypto.md` section 3.5. `10 M1-5` = the build-plan row. `D-xx` = decision `docs/foundation/decisions/D-0xx.md` (index: `decisions/README.md`). |
 | **Invariants** | I-1…I-10 from 04 §1 that the task touches; the PR states how each holds. |
 
 ### Status legend
@@ -11275,3 +11275,122 @@ Owner (Tali, 16 Nov 2026): the tray icon becomes the brand mark (two brackets an
 - **Depends on:** TRAY-SHELL and TRAY-WIDGET-UI final (runs after the UI is final; screenshots from the integrated build only)
 - **Spec:** D-155; 11 §5 (vocabulary and microcopy)
 - **Done when:** the new page explains the icon states (connected, unread ring, approvals, paused, offline, update; the animations and that reduced motion turns them off), the widget's sections, a click on the icon vs right-click, and both switches, for Mac and Windows; a Windows note that a new notification-area icon starts in the hidden "^" overflow and how to keep it on the taskbar (Settings › Personalization › Taskbar › Other system tray icons, or drag it out of the overflow); Settings docs list both switches with their defaults; README Status and "What's new" updated; knowledge/ and llms.txt updated (Tali re-uploads knowledge to Lumina); changelog fragment; no claim before it ships; plain words (no "wallet", "gas", "transaction").
+
+### Security hardening after community review (D-156; 0.5.10–0.5.12, M3)
+
+Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of every question. Raised in a public community review by Roger (rogerclaw). 0.5.10 ships signed "received" receipts on by default, the typed-data allowlist of the agent key, and three desktop fixes; 0.5.11, 0.5.12 and M3 cards stay placeholders here until their release starts. Every S2 card: first commit `RED (expected): <ID> …` with the failing excerpt; an independent auditor gets only the spec section and the diff (Decision 54).
+
+#### REL0510-SPEC · Decision D-156 and the 0.5.10 spec amendments (0.5.10)
+- **Status:** in review (branch `rel0510/spec`) · **Size:** S · **Tier:** Opus · **Security:** S1 (docs and spec only)
+- **Repo/path:** agentlink · `docs/foundation/{00-README.md,02-product-spec.md,03-architecture.md,04-security-and-crypto.md,06-mcp-server.md,07-sdk-transport-storage.md,08-clients-console-cloud.md,11-claude-design-brief.md}`, this section of `docs/process/backlog.md`, a `changelog.d/` fragment
+- **Depends on:** none (first; every 0.5.10 card cites it)
+- **Spec:** owner decision of 17 Nov 2026 (above)
+- **Done when:** D-156 records the direction in neutral terms with the credit; 02, 03, 04, 06, 07, 08 and 11 carry the 0.5.10 parts only; cards below; docs checks green.
+
+#### SEC-RECEIPTS-DEFAULT · Receipts on by default, bound to the envelope hash (0.5.10)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review (Fable on the proof-pack verifier hunk) · **Security:** S2 (core delivery state, envelope payload, policy, proof-pack verifier)
+- **Repo/path:** agentlink · `packages/core/src/acks.ts`, `packages/core/src/client.ts` (default), the inbox and envelope state code in `packages/core/src/`, `packages/types/src/payload.ts` (ack body v2), `packages/types/src/policy.ts` (`receipts.sendReceived`, per-contact override), the store migration (`envelopes.delivery` gains `delivered`, flag `received_legacy`), `packages/chain` proof-pack builder and verifier (`deviceReceipts`), `apps/cloud-agent/src/agent-do.ts` (follows the policy), `packages/mcp-tools/src/status.ts` and strings, `packages/node/src/local-ui/api/messages.ts`, `apps/local-ui` thread status, Settings › Privacy, contact page and proof export; tests
+- **Depends on:** REL0510-SPEC (D-156)
+- **Spec:** D-156 (1); 02 F-23; 03 §4.1; 04 §3.4 (`ack` v2), §5.1; 06 §3; 07 §3.2 "Delivered", §8 "Automatic device receipts"; 11 §5.10
+- **Done when:** `RED (expected):` commit first; acks v2 `{kind, envelopeId, envelopeHash, recordId?}` sent by default only to active, fully paired contacts after a 5–90 s random delay with `createdAt` rounded to the minute; switch off (global or per contact) sends none; `delivered` only from a verified v2 ack whose hash matches and whose signature verifies at the contact's key epoch in force at ack time (unknown epoch, other contact, wrong hash, replay for another envelope: ignored); v1 ack = "Received (older app)" for plain messages, never on proof-carrying envelopes; a 0.5.9 client fixture accepts what we send (else v1 to contacts without v2 support); proof packs carry and verify the labelled device receipt, a tampered one fails with `device_receipt_invalid`; one-time notice for existing users; microcopy of 11 §5.10; changelog fragment with the credit.
+
+#### RECEIPTS-PER-CONTACT · Received receipts: a per-contact choice (later)
+- **Status:** backlog · **Size:** S–M · **Tier:** Opus build, Opus review · **Security:** S2 (policy)
+- **Repo/path:** agentlink · `packages/types/src/policy.ts` (contact rule `receipts.sendReceived`), `packages/core/src/{acks.ts,owner-prepare.ts,policy-engine.ts}`, `packages/node/src/local-ui/api/rules.ts`, `apps/local-ui` contact page; tests
+- **Depends on:** SEC-RECEIPTS-DEFAULT
+- **Spec:** D-156 (1); 04 §3.4 (`ack` "and its per-contact override"); 06 §3; 11 §5.10 "Per contact"
+- **Done when:** `RED (expected):` commit first; a contact rule can set `receipts.sendReceived` for one contact, which replaces the global value for that contact only (the D-109 contact-rule pattern); absent = the global value; the contact page offers "Tell {contactName} when your AI receives a message" and "Use my default"; turning it off for a contact sends that contact none; the loosening classification covers the new field.
+
+#### RECEIPTS-EXPORT-UI · Proof export in the app, with the automatic receipt choice (later)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S1 (S2 if the route writes outside `proofs.exportFolder`)
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/` (an export route over core `exportProofPack`), `apps/local-ui` proof views; tests
+- **Depends on:** SEC-RECEIPTS-DEFAULT
+- **Spec:** D-156 (1); 07 §8 "Automatic device receipts"; 11 §5.10 "Proof export"
+- **Done when:** the app can save a proof file for a recorded message (today only `agentlink_export_proof_pack` can); the export choices include "Includes {contactName}'s automatic receipt" (checkbox, off) with the helper "It shows who received this exact item, and when."; turning it on also discloses the recipient (07 §8); the file goes only to `proofs.exportFolder`.
+
+#### RECEIPTS-STATE-COLUMN · Delivery state `delivered` stored with the envelope (later)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 (store schema, delivery state)
+- **Repo/path:** agentlink · `packages/core/src/store/` (schema and migration), `packages/core/src/{acks.ts,ui-messages.ts,outbox.ts}`, `packages/mcp-tools/src/status.ts`; tests
+- **Depends on:** SEC-RECEIPTS-DEFAULT
+- **Spec:** D-156 (1); 07 §3.2 "Delivered"
+- **Done when:** `RED (expected):` commit first; a schema migration adds `delivered` to `envelopes.delivery` and the flag `received_legacy`, with no backfill; a verified v2 ack (or, for a proof-carrying envelope, a read on-chain DELIVERED receipt) moves a `sent` row to `delivered` in the same transaction that stores the ack; a v1 ack sets `received_legacy` on a plain message only; ack lookup by `(contact_id, envelope_hash)`; the read paths use the stored state instead of scanning acks; a relay `OK` never sets `delivered`; a restore of an older store reads correctly.
+
+#### SEC-KS-712-ALLOWLIST · The agent key signs only AgentLink's own typed-data shapes (0.5.10)
+- **Status:** backlog · **Size:** S–M · **Tier:** Opus build, Fable audit · **Security:** S2 (KeyStore, crypto)
+- **Repo/path:** agentlink · `packages/crypto/src/{keystore-api.ts,eip712.ts,keystore.ts}` (new pure `typedDataSnapshot`), `packages/node/src/{keychain-keystore.ts,file-keystore.ts}`, `apps/cloud-agent/src/worker-keystore.ts`; the allowlist as built-in constants in `packages/crypto`, pinned by a chain test against the shipped configs; tests
+- **Depends on:** REL0510-SPEC (D-156); an audit of every `sign712` caller (proofs, receipts, terms, registration, cards, top-up, cloud agent) as the first step
+- **Spec:** D-156 (2); 04 §3.1.1 "What the agent key signs as typed data"; 07 §6.2
+- **Done when:** `RED (expected):` commit first; each allowed shape signs (OCC v2 `Record` and `Receipt` on an allowlisted chain and contract, deadline at most 1 h plus 5 min skew; `Registration` and `Revocation` refused, owner only; `AgentCard` with this agent's address; the top-up authorization to that chain's vault within the value cap and window); each field outside its bound is refused with `typed_data_refused` before the seed is read (a spy on the read); the message echoes no field; owner signing unchanged; no counters.
+
+#### DESK-QUIT-ORDER · Windows close before the core stops; no terminal instructions in the desktop app (0.5.10)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (`apps/desktop/**`, the pipe)
+- **Repo/path:** agentlink · `apps/desktop/src/main/{main.ts,window.ts,popover.ts,core-process.ts,status-page.ts,start-failure.ts}`, `apps/cli/src/desktop/host-core.ts` only if `shutdown` needs an answer; `apps/desktop/test/unit/**`
+- **Depends on:** REL0510-SPEC (D-156)
+- **Spec:** D-156; 08 §8 "Quit order and widget reliability"
+- **Done when:** `RED (expected):` commit first; every quit path (menus, widget Quit, Cmd+Q, update restart, logout) closes the popover and the main window, then sends `shutdown`, waits for the core (bounded), then exits; no window shows the core's stopped page while quitting; the desktop status and failure pages offer Try again and Quit only and never a terminal command (a test greps the shipped pages for command text).
+
+#### DESK-WIDGET-OPEN · The widget opens reliably (0.5.10)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (`apps/desktop/**`)
+- **Repo/path:** agentlink · `apps/desktop/src/main/{popover.ts,popover-position.ts,main.ts,window.ts,tray.ts}`; `apps/desktop/test/unit/**`
+- **Depends on:** REL0510-SPEC (D-156)
+- **Spec:** D-156; 08 §8 "Quit order and widget reliability"
+- **Done when:** `RED (expected):` commit first; on macOS the popover is visible on all Spaces and over full-screen apps; a click on the icon shows it on the current Space, also after it lost focus to another app; it hides on a click outside or Esc; focusing or opening the main window does not close it; a second click hides it; lockdown unchanged.
+
+#### DESK-WIDGET-TARGET · A widget row opens the exact conversation or approval (0.5.10)
+- **Status:** backlog · **Size:** S · **Tier:** Opus build, Opus review (Fable if the pipe protocol changes) · **Security:** S1 (S2 if `apps/cli/src/desktop/**` or the pipe protocol changes)
+- **Repo/path:** agentlink · `apps/desktop/src/main/{widget-ipc.ts,widget-preload.js,main.ts}`, `apps/desktop/src/shared/protocol.ts` and `apps/cli/src/desktop/{protocol.ts,host-core.ts}` for `show {route, target}`, `apps/local-ui/src/pages/widget/{bridge.ts,index.tsx}`, the route that opens a conversation or approval in `apps/local-ui`; tests
+- **Depends on:** REL0510-SPEC (D-156); DESK-WIDGET-OPEN (same files: sequence after it)
+- **Spec:** D-156; 08 §8 "Quit order and widget reliability" and the tray row (`open({route, target})`)
+- **Done when:** `RED (expected):` commit first when S2; a new-message row opens that contact's conversation and an approval row that approval, in the main window, shown and focused; the target is an ID checked against a strict pattern by the shell and accepted by the core only for an existing contact or a waiting approval (otherwise the list); never text.
+
+#### SEC-CARD-FULLTEXT · Approval card shows exact content (0.5.11)
+- **Status:** later (0.5.11) · **Security:** S2 · **Spec:** D-156 (3)
+- **Goal:** every approval card can be decided from fields the app decodes itself, shown in full.
+
+#### SEC-INVITE-CAPS · Invite limits (0.5.11)
+- **Status:** later (0.5.11) · **Security:** S2 · **Spec:** D-156 (5)
+- **Goal:** caps on invites the AI makes, and contacts it adds wait until the owner keeps them.
+
+#### SEC-HARD-CEILING · Spending ceiling (0.5.11)
+- **Status:** later (0.5.11) · **Security:** S2 · **Spec:** D-156 (4)
+- **Goal:** owner-set per-proof and per-day ceilings above which nothing is signed.
+
+#### SEC-OUTBOUND-CAPS · Sending limits (0.5.11)
+- **Status:** later (0.5.11) · **Security:** S2 · **Spec:** D-156 (6)
+- **Goal:** per-contact and per-day limits for outgoing messages and files.
+
+#### SEC-RELAY-READBACK · Relay availability check (0.5.12)
+- **Status:** later (0.5.12) · **Security:** S2 · **Spec:** D-156 (7)
+- **Goal:** a message counts as sent once a relay serves it back.
+
+#### SEC-RECORD-ATOMIC · Proof signing tied to the budget (0.5.12)
+- **Status:** later (0.5.12) · **Security:** S2 · **Spec:** D-156
+- **Goal:** a proof is signed and counted against the budget in one step.
+
+#### SEC-RESTORE-GUARD · Budget after restore (0.5.12)
+- **Status:** later (0.5.12) · **Security:** S2 · **Spec:** D-156
+- **Goal:** restoring a backup keeps spending and processed actions consistent.
+
+#### SEC-ALLOWANCE · On-chain spending allowance (M3, before mainnet)
+- **Status:** later (M3) · **Security:** S2 · **Spec:** D-156 (8)
+- **Goal:** an on-chain allowance per ID and chain that bounds spending, set by the owner.
+
+#### SEC-MAC-HELPER · Protected signing helper on macOS (M3, before mainnet)
+- **Status:** later (M3) · **Security:** S2 · **Spec:** D-156 (8)
+- **Goal:** a small signed macOS helper holds the agent key and signs on the core's behalf.
+
+#### WIDGET-APP-NAME · The menu bar widget names the AI app correctly (follow-up from 0.5.9)
+- **Status:** backlog · **Security:** S1 · **Spec:** D-155; 11 §5.9
+- **Goal:** Connected now shows each AI app under its own product name.
+
+#### WIDGET-SCREENSHOT · Menu bar widget screenshots in the user guide (follow-up from 0.5.9)
+- **Status:** backlog · **Security:** S0 · **Spec:** D-155
+- **Goal:** the guide shows the widget from the real integrated build, Mac and Windows.
+
+#### KNOWLEDGE-SIZE · Keep knowledge files within the size limit (follow-up from 0.5.9)
+- **Status:** backlog · **Security:** S0 · **Spec:** `tools/check-knowledge-size.mjs`
+- **Goal:** the knowledge corpus stays under its per-file limit without dropping content.
+
+#### CI-WINDOWS-TIMEOUT · Windows CI job finishes within its time limit (follow-up from 0.5.9)
+- **Status:** backlog · **Security:** S1 (S2 if `.github/**` changes) · **Spec:** `docs/process/ci-cd.md`
+- **Goal:** the Windows job runs reliably within its timeout, with no skipped checks.

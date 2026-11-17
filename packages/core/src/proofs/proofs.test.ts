@@ -3,8 +3,22 @@
 // D-61, D-86, D-102). Envelopes are real signed envelopes handed to the other core's receive path;
 // the chain is the in-memory Notary of testing/chain.ts behind the chain package's own submitter,
 // selector and verifier, so every chain decision runs the code that runs against a testnet.
-import { parseJson, type JsonObject, type KeyStore } from '@4thtech-io/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import {
+  decodeBase64url,
+  decryptPayload,
+  encodeBase64url,
+  encodeHex,
+  generateCek,
+  parseEnvelope,
+  parseJson,
+  type JsonObject,
+  type KeyStore,
+} from '@4thtech-io/crypto';
+import {
+  MemoryKeyStore,
+  MemoryOwnerKeyStore,
+  signTypedDataWithAgentKey,
+} from '@4thtech-io/crypto/testing';
 import { RECORD_KIND, buildRecord, signRecord, verifyProofPack, type Hex } from '@4thtech-io/chain';
 import { createLogger } from '@4thtech-io/log';
 import { defaultPolicy, type Policy, type RecordJson } from '@4thtech-io/types';
@@ -73,7 +87,7 @@ const ownerC = new MemoryOwnerKeyStore(seed(223), passphrase());
 async function openAgent(n: number, owner: TestOwner, name: string): Promise<Agent> {
   const store = new MemoryStore();
   const cipher = new TestStoreCipher();
-  const keyStore = new MemoryKeyStore(seed(n));
+  const keyStore = new MemoryKeyStore(seed(n), { nowSeconds: () => clock.now() });
   const mark = new MemoryPolicyMark();
   const lines: string[] = [];
   const client = await AgentLinkClient.create({
@@ -1133,10 +1147,9 @@ describe('the recipient checks the signed Record before storing it (04 §3.4 che
   });
 
   it('a signature by another key is dropped', async () => {
-    const c = await openAgent(33, ownerC, 'carol');
     await expectDropped(
       await tampered(async (body, { rec }) => {
-        body.signature = await signRecord(c.keyStore, rec.built);
+        body.signature = signTypedDataWithAgentKey(seed(33), rec.built.typedData);
       }),
     );
   });
@@ -1150,17 +1163,16 @@ describe('the recipient checks the signed Record before storing it (04 §3.4 che
   });
 
   it('an ERC-1271 signer that does not accept is dropped; one that accepts is stored', async () => {
-    const c = await openAgent(33, ownerC, 'carol');
     // A's address has code; the signature is not A's ECDSA signature: only the account can accept.
     const refused = await tampered(async (body, { a, rec }) => {
       chain.contractAccounts.set(a.id.toLowerCase(), false);
-      body.signature = await signRecord(c.keyStore, rec.built);
+      body.signature = signTypedDataWithAgentKey(seed(33), rec.built.typedData);
     });
     await expectDropped(refused);
 
     const accepted = await tampered(async (body, { a, rec }) => {
       chain.contractAccounts.set(a.id.toLowerCase(), true);
-      body.signature = await signRecord(c.keyStore, rec.built);
+      body.signature = signTypedDataWithAgentKey(seed(33), rec.built.typedData);
     });
     expect(await accepted.b.client.getProof({ envelopeId: accepted.envelopeId })).toMatchObject({
       recordId: accepted.rec.recordId,
@@ -2713,5 +2725,151 @@ describe('each contact has a share of the waiting pool (M1-7g-d; 04 §3.4)', () 
     expect(rows.some((r) => r.envelope_id === fromA.envelopeId)).toBe(true);
     expect(rows.some((r) => r.record_id === 'await:waitC0')).toBe(false);
     expect(rows).toHaveLength(256);
+  });
+});
+
+describe('SEC-RECEIPTS-DEFAULT: the automatic device receipt in the sender pack (07 §8)', () => {
+  it('off by default; on request it carries the contact AI signed ack bound to the recipient opening', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const sent = await a.client.sendMessage({ to: b.id, text: 'the invoice, as agreed' });
+    if (sent.status !== 'ok') throw new Error('test: send failed');
+    const envelopeId = sent.envelopeId;
+    const reports = await deliver(a, b);
+    expect(await b.client.acks.sendFor(reports)).toBe(1);
+    await deliver(b, a);
+    expect(await a.client.acks.status(envelopeId)).toMatchObject({ verified: true });
+    expect(await a.client.notarize({ envelopeId })).toMatchObject({ status: 'ok' });
+
+    // Default: no device receipt and no recipient (the card would name who received it).
+    const plain = await a.client.exportProofPack({ envelopeId });
+    expect(plain).not.toHaveProperty('deviceReceipt');
+    const plainPack = (plain as { pack: Record<string, unknown> }).pack;
+    expect(plainPack).not.toHaveProperty('deviceReceipts');
+    expect(plainPack).not.toHaveProperty('recipient');
+
+    const exported = await a.client.exportProofPack({ envelopeId, includeDeviceReceipt: true });
+    expect(exported).toMatchObject({ status: 'ok', deviceReceipt: true });
+    const pack = (exported as { pack: Record<string, unknown> }).pack;
+    expect(pack['receipts']).toEqual([]);
+    // On request, the pack also opens the recipient commitment the receipt is bound to.
+    expect(pack['recipient']).toMatchObject({ evm: b.id });
+    const entries = pack['deviceReceipts'] as Record<string, unknown>[];
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.['card']).toMatchObject({ agentCard: { agentEvm: b.id } });
+    const chains = { chains: [{ config: chain.config, client: chain.client }] };
+    expect(await verifyProofPack(JSON.stringify(pack), chains)).toMatchObject({
+      valid: true,
+      receipts: [],
+      recipient: { evm: b.id },
+      deviceReceipts: [{ ok: true, label: 'automatic device receipt', agentEvm: b.id }],
+    });
+
+    // Without the recipient opening the receipt is not bound to the record: refused.
+    const unopened = Object.fromEntries(Object.entries(pack).filter(([k]) => k !== 'recipient'));
+    expect(await verifyProofPack(JSON.stringify(unopened), chains)).toMatchObject({
+      valid: true,
+      deviceReceipts: [{ ok: false, reason: 'device_receipt_invalid' }],
+    });
+    // Tampered: the pack still verifies as a record; the device receipt alone fails.
+    const tampered = { ...pack, deviceReceipts: [{ ...entries[0], contentKey: 'A'.repeat(43) }] };
+    expect(await verifyProofPack(JSON.stringify(tampered), chains)).toMatchObject({
+      valid: true,
+      deviceReceipts: [{ ok: false, reason: 'device_receipt_invalid' }],
+    });
+  });
+
+  it('the ack of a proof-carrying envelope names its record (04 §3.4 recordId)', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const sent = await a.client.sendMessage({ to: b.id, text: 'recorded handover' });
+    if (sent.status !== 'ok') throw new Error('test: send failed');
+    const envelopeId = sent.envelopeId;
+    const reports = await deliver(a, b);
+    const proof = await a.client.notarize({ envelopeId });
+    const recordId = (proof as { recordId: string }).recordId;
+    await deliver(a, b); // the proof body: B stores the verified record for the envelope
+    expect(await b.client.acks.sendFor(reports)).toBe(1);
+    await deliver(b, a);
+    const exported = await a.client.exportProofPack({ envelopeId, includeDeviceReceipt: true });
+    const entry = (
+      (exported as { pack: Record<string, unknown> }).pack['deviceReceipts'] as {
+        envelope: unknown;
+        contentKey: string;
+      }[]
+    )[0];
+    if (entry === undefined) throw new Error('test: no device receipt');
+    const opened = await decryptPayload(
+      parseEnvelope(entry.envelope),
+      decodeBase64url(entry.contentKey, { length: 32 }),
+    );
+    expect(JSON.parse(new TextDecoder().decode(opened))).toMatchObject({
+      type: 'ack',
+      body: { kind: 'received', envelopeId, recordId },
+    });
+  });
+
+  it('a self-signed throwaway card over the public envelopeHash is refused, with or without an opening', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const envelopeId = await sendText(a, b);
+    expect(await a.client.notarize({ envelopeId })).toMatchObject({ status: 'ok' });
+    const named = await a.client.exportProofPack({ envelopeId, includeRecipient: true });
+    const pack = (named as { pack: Record<string, unknown> }).pack;
+    // Carol: her own valid card and key, an ack she signs over the pack's public envelopeHash.
+    const carol = await openAgent(33, ownerC, 'carol');
+    const carolNostr = encodeHex((await carol.keyStore.getPublicBundle()).agentNostr);
+    const card = await carol.client.contacts.proofSigner(carolNostr);
+    if (card?.agentCard === undefined || card.cardSig === undefined) throw new Error('test: card');
+    const cek = generateCek();
+    const ack = await craft({
+      signer: await agentSigner(carol.keyStore),
+      entries: [{ pk: await agentEnc(carol) }, { pk: await agentEnc(a) }],
+      payload: core.ackPayload(envelopeId, pack['envelopeHash'] as string),
+      cek,
+      createdAt: clock.t,
+    });
+    const entry = {
+      envelope: ack,
+      contentKey: encodeBase64url(cek),
+      card: { agentCard: card.agentCard, cardSig: card.cardSig },
+    };
+    const chains = { chains: [{ config: chain.config, client: chain.client }] };
+    const unopened = Object.fromEntries(Object.entries(pack).filter(([k]) => k !== 'recipient'));
+    for (const forged of [
+      { ...unopened, deviceReceipts: [entry] },
+      { ...pack, deviceReceipts: [entry] },
+    ]) {
+      expect(await verifyProofPack(JSON.stringify(forged), chains)).toMatchObject({
+        valid: true,
+        deviceReceipts: [{ ok: false, reason: 'device_receipt_invalid' }],
+      });
+    }
+  });
+
+  it('an older app id-only ack never goes into the pack', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const sent = await a.client.sendMessage({ to: b.id, text: 'older peer' });
+    if (sent.status !== 'ok') throw new Error('test: send failed');
+    await deliver(a, b);
+    const older = await b.client.envelopes.build({
+      to: { contact: a.id },
+      payload: {
+        type: 'ack',
+        body: { kind: 'received', envelopeId: sent.envelopeId },
+        replyTo: sent.envelopeId,
+        files: [],
+      },
+    });
+    await a.client.envelopes.receive({ envelope: older.envelope });
+    await a.client.envelopes.processReceived();
+    expect(await a.client.acks.status(sent.envelopeId)).toMatchObject({
+      received: true,
+      verified: false,
+    });
+    await a.client.notarize({ envelopeId: sent.envelopeId });
+    const exported = await a.client.exportProofPack({
+      envelopeId: sent.envelopeId,
+      includeDeviceReceipt: true,
+    });
+    expect(exported).toMatchObject({ status: 'ok' });
+    expect(exported).not.toHaveProperty('deviceReceipt');
   });
 });

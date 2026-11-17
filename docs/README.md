@@ -20,7 +20,7 @@ Read the documents in order. Each list is the minimum; open the rest by section 
 ### New human developer
 
 1. [`../README.md`](../README.md) and [`../CONTRIBUTING.md`](../CONTRIBUTING.md): what this is, how work is organised.
-2. [`foundation/00-README.md`](foundation/00-README.md): principles, glossary, decision log (skim the log).
+2. [`foundation/00-README.md`](foundation/00-README.md): principles and glossary; then skim the [decision index](foundation/decisions/README.md). The public map from each spec to its explanation page is [Under the hood](../docs-site/technical/concepts/under-the-hood.md).
 3. [`foundation/04-security-and-crypto.md`](foundation/04-security-and-crypto.md) §1: the invariants I-1 to I-10.
 4. [`process/delivery-process.md`](process/delivery-process.md): the 14-step lifecycle and the definition of done.
 5. [`runbooks/README.md`](runbooks/README.md), then [RB-01 session start and end](runbooks/session-start-end.md) and [RB-02 claiming a task](runbooks/claim-task.md).
@@ -101,7 +101,8 @@ When code, process or any other document disagrees with a spec, the spec wins. S
 
 | Doc | Purpose |
 |---|---|
-| [`00-README.md`](foundation/00-README.md) | Index, core principles, glossary and the **decision log** (D-01 and later), plus the revision history |
+| [`00-README.md`](foundation/00-README.md) | Index, core principles, invariants pointer, glossary and the revision history |
+| [`decisions/`](foundation/decisions/README.md) | The **decision log**: one file per decision (`D-001.md` … `D-156.md`) and an index table (ID, title, status, date, specs) |
 | 01 Commercial brief | *Private.* Positioning, market and business model; kept outside this repository |
 | [`02-product-spec.md`](foundation/02-product-spec.md) | Features, user journeys, free vs paid, non-goals |
 | [`03-architecture.md`](foundation/03-architecture.md) | Components, data flows, packagings and trust boundaries |
@@ -157,14 +158,14 @@ One short file per lesson (problem, symptom, cause, rule). Index: [`lessons/READ
 - [`../docs-site/`](../docs-site/README.md): source of the **public documentation** on [GitBook](https://wiki.4thtech.io) (user guide and technical docs), kept separate from these internal documents; upkeep rules in [`MAINTAINING.md`](../docs-site/MAINTAINING.md); how every page is written (page types, components, screenshots, the UI ↔ tech bridge) in the [docs model](process/docs-model.md).
 - [`../research/`](../research/README.md): **research section**: signed, dated articles and papers about agent-to-agent communication and AgentLink, with their own [contributing guide](../research/CONTRIBUTING.md).
 - [`design/`](design/README.md): design intake and status (the three design drops, and the rules for building UI before a design lands).
-- **Decision log:** the table in [`foundation/00-README.md`](foundation/00-README.md). Every decision has an ID (D-xx); changes to it go through a PR.
+- **Decision log:** [`foundation/decisions/`](foundation/decisions/README.md), one file per decision with an index. Every decision has an ID (D-xx); changes to it go through a PR.
 - **Release history:** [`../CHANGELOG.md`](../CHANGELOG.md).
 - **Root files:** [`../README.md`](../README.md) (status and roadmap), [`../CONTRIBUTING.md`](../CONTRIBUTING.md), [`../CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md), [`../SECURITY.md`](../SECURITY.md), [`../AGENTS.md`](../AGENTS.md) (with the harness pointers [`../CLAUDE.md`](../CLAUDE.md) and [`../GEMINI.md`](../GEMINI.md)).
 
 ## 5. How the docs change
 
 - **Specs, process documents and the decision log change only through a pull request.** A spec change that alters an interface lands in the same PR as the code, or before it. Implementation never runs ahead of the spec.
-- **Decisions are recorded.** A change to a principle, an invariant, a policy default or the build plan adds a decision-log entry (D-xx) in [`foundation/00-README.md`](foundation/00-README.md), and a revision-history line when the spec pack changes.
+- **Decisions are recorded.** A change to a principle, an invariant, a policy default or the build plan adds a decision-log entry (D-xx) in [`foundation/decisions/`](foundation/decisions/README.md) (a file plus its index row), and a revision-history line when the spec pack changes.
 - **Every user-visible, spec or process change adds a line under `[Unreleased]` in [`CHANGELOG.md`](../CHANGELOG.md).** See [`process/versioning.md`](process/versioning.md).
 - **Review depends on the security class.** Changes to `04-security-and-crypto.md` are S2; other specs and process documents are S1; see [`process/audit-rules.md`](process/audit-rules.md) and the spec-change table in [`process/development-process.md`](process/development-process.md).
 - **Keep the README honest.** Update its Status and Roadmap whenever a milestone, release or user-visible capability changes, and never describe unbuilt features as available.

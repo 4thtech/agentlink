@@ -36,6 +36,8 @@ import {
   makeAgent,
   newWorld,
   pair,
+  processedInbound,
+  sentAcks,
   surface,
   type Effects,
   type McpResult,
@@ -161,6 +163,25 @@ beforeAll(async () => {
   afterSync = await effects(world, bob);
   expect(afterSync.published).toBe(beforeSync.published);
   expect(afterSync.outbound).toBe(beforeSync.outbound);
+  // The one thing receiving does since 0.5.10 (D-156): an automatic `ack` per processed message.
+  // At most one per distinct inbound envelope, only back to the contact that sent it (an active one),
+  // and its body is exactly {kind, envelopeId, envelopeHash, recordId?}: nothing inbound is echoed.
+  const processed = await processedInbound(bob);
+  const acks = await sentAcks(bob);
+  expect(acks.length).toBeGreaterThan(0);
+  expect(acks.length).toBeLessThanOrEqual(processed.size);
+  expect(new Set(acks.map((a) => a.acked)).size).toBe(acks.length);
+  for (const a of acks) {
+    expect(processed.has(a.acked)).toBe(true);
+    expect(a.toContact).toBe(processed.get(a.acked));
+    expect(a.toStatus).toBe('active');
+    expect(a.payloadKeys).toEqual(['body', 'files', 'replyTo', 'type']);
+    expect(['envelopeHash', 'envelopeId', 'kind', 'recordId']).toEqual(
+      expect.arrayContaining(a.bodyKeys),
+    );
+    expect(a.bodyKeys).toEqual(expect.arrayContaining(['envelopeHash', 'envelopeId', 'kind']));
+    expect(a.bodyHash).toMatch(/^0x[0-9a-f]{64}$/);
+  }
   expect(afterSync.rows['approvals']).toBe(beforeSync.rows['approvals']);
   expect(afterSync.rows['contacts']).toBe(beforeSync.rows['contacts']);
   expect(afterSync.rows['receipts']).toBe(beforeSync.rows['receipts']);

@@ -94,6 +94,7 @@ const notes = (approvals: number, files = 0): unknown => ({
 });
 
 interface Setup {
+  approvals?: unknown;
   widget?: ApiResult<unknown>;
   health?: unknown;
   notes?: unknown;
@@ -141,6 +142,13 @@ function fakeApi(s: Setup): ApiClient {
     get: (path: string) => {
       calls.push(path);
       if (path.startsWith('/api/ui/widget')) return Promise.resolve(s.widget ?? ok(widgetBody()));
+      if (path === '/api/approvals') {
+        return Promise.resolve(
+          s.approvals === undefined
+            ? ({ kind: 'error', status: 404 } as ApiResult<unknown>)
+            : ok(s.approvals),
+        );
+      }
       if (path === '/api/ui/health') return Promise.resolve(ok(s.health ?? HEALTH));
       if (path === '/api/ui/contacts') return Promise.resolve(ok(contactsBody));
       if (path === '/api/ui/notifications') return Promise.resolve(ok(s.notes ?? notes(0)));
@@ -280,6 +288,29 @@ describe('widget page', () => {
     }
   });
 
+  const APR = `apr_${'B'.repeat(22)}`;
+  it('one waiting request: the row and Review send that request, and only then', async () => {
+    await mount({ notes: notes(1), approvals: { approvals: [{ approvalId: APR }] } });
+    await click(buttonNamed('1 waiting for you') ?? null);
+    expect(bridge.open).toHaveBeenLastCalledWith({ route: 'approvals', target: APR });
+    await click(buttonNamed(S.review) ?? null);
+    expect(bridge.open).toHaveBeenLastCalledWith({ route: 'approvals', target: APR });
+  });
+
+  it('several requests, an unreadable list or an odd ID: no target', async () => {
+    await mount({
+      notes: notes(2),
+      approvals: { approvals: [{ approvalId: APR }, { approvalId: `apr_${'C'.repeat(22)}` }] },
+    });
+    await click(buttonNamed('2 waiting for you') ?? null);
+    expect(bridge.open).toHaveBeenLastCalledWith({ route: 'approvals' });
+    act(() => root.unmount());
+    root = createRoot(host);
+    await mount({ notes: notes(1), approvals: { approvals: [{ approvalId: '../x' }] } });
+    await click(buttonNamed('1 waiting for you') ?? null);
+    expect(bridge.open).toHaveBeenLastCalledWith({ route: 'approvals' });
+  });
+
   it('opens the right page of the main window through the bridge, and nothing else', async () => {
     await mount({
       notes: notes(1, 2),
@@ -299,7 +330,8 @@ describe('widget page', () => {
     await click(buttonNamed(S.review) ?? null);
     expect(bridge.open).toHaveBeenLastCalledWith({ route: 'approvals' });
     await click(buttonNamed('2 new files') ?? null);
-    expect(bridge.open).toHaveBeenLastCalledWith({ route: 'inbox' });
+    // One person has the new files: their conversation opens.
+    expect(bridge.open).toHaveBeenLastCalledWith({ route: 'inbox', target: ANA });
     await click(buttonNamed(S.openApp) ?? null);
     expect(bridge.open).toHaveBeenLastCalledWith({ route: 'home' });
     await click(buttonNamed(S.updateReady) ?? null);

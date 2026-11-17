@@ -339,7 +339,7 @@ S0 tasks MAY skip `audit`. A task that hits stop-the-line (`audit-rules.md` §10
 |---|---|---|---|
 | Clarification, no behaviour change | PR editing `docs/foundation/**` | Owner | PR |
 | Interface change (cross-package API, schema, envelope, tool schema, ABI, vector) | Spec updated **in the same PR** or in a spec PR that lands first (10 §5). Implementation never runs ahead of the spec | Owner | PR + revision history in `00-README.md` |
-| Invariant (04 §1), any change to 04, or a policy default (06 §3) | Decision log entry D-xx in `00-README.md` plus spec PR; class S2; independent review | Owner, explicitly | D-xx |
+| Invariant (04 §1), any change to 04, or a policy default (06 §3) | Decision log entry D-xx in `docs/foundation/decisions/` plus spec PR; class S2; independent review | Owner, explicitly | D-xx |
 | Build-plan deviation (scope, order, acceptance) | Announced by the owner; recorded as D-xx; `10-build-plan.md` updated | Owner | D-xx |
 | Process document change | PR to `docs/process/**` | Owner | D-xx |
 
@@ -479,4 +479,4 @@ DECISION NEEDED (owner): whether submitter gas-key addresses and the mainnet dep
 
 ## Change control
 
-Changing this document requires the owner's approval and a decision log entry (D-xx) in `docs/foundation/00-README.md`. Changes land through a PR titled with the relevant task ID; agents may propose changes but MUST NOT enable auto-merge on them: the owner merges, or enables auto-merge, himself.
+Changing this document requires the owner's approval and a decision log entry (D-xx) in `docs/foundation/decisions/`. Changes land through a PR titled with the relevant task ID; agents may propose changes but MUST NOT enable auto-merge on them: the owner merges, or enables auto-merge, himself.

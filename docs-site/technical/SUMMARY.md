@@ -4,6 +4,7 @@
 
 ## Concepts
 
+* [Under the hood: the specs](concepts/under-the-hood.md)
 * [Architecture](concepts/architecture.md)
 * [Protocol OCC v2](concepts/protocol.md)
   * [Identities and keys](concepts/identities-and-keys.md)
@@ -16,6 +17,7 @@
 * [Payments, credits and trust](concepts/payments-credits-and-trust.md)
 * [Security model](concepts/security-model.md)
 * [Threat model](concepts/threat-model.md)
+* [Glossary](concepts/glossary.md)
 
 ## Guides
 

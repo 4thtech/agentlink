@@ -1,0 +1,38 @@
+{
+  "$comment": "Configuration of tools/check-security-docs.mjs (DOCS-UNDER-THE-HOOD). securityPages: where a decided decision that cites 04 must be referenced. shippedPages: pages outside docs-site/technical whose subject has shipped (every technical page is checked), so they may not say 'Status: Design' or 'next release'. sensitivePaths: a diff touching one of these should touch a security page or say 'security-docs: none (<reason>)' in the PR body. decisions: decided entries citing 04 that are not explained on a security page, each with the reason. threats: 04 section 7 threats left off threat-model.md, each with the reason (keep empty).",
+  "securityPages": [
+    "docs-site/technical/concepts/security-model.md",
+    "docs-site/technical/concepts/threat-model.md",
+    "docs-site/technical/concepts/privacy.md",
+    "docs-site/technical/concepts/identities-and-keys.md",
+    "docs-site/technical/concepts/envelopes.md",
+    "docs-site/technical/concepts/files.md",
+    "docs-site/technical/concepts/proof.md",
+    "docs-site/technical/reference/policies.md",
+    "docs-site/technical/reference/mcp-tools.md",
+    "docs-site/technical/reference/crypto-suites.md",
+    "docs-site/guide/privacy-and-security.md",
+    "knowledge/agentlink-security-and-privacy.md"
+  ],
+  "shippedPages": [
+    "docs-site/technical/concepts/security-model.md",
+    "docs-site/technical/concepts/threat-model.md",
+    "docs-site/technical/concepts/privacy.md",
+    "docs-site/technical/concepts/glossary.md",
+    "docs-site/technical/concepts/under-the-hood.md",
+    "docs-site/technical/reference/policies.md",
+    "docs-site/technical/reference/mcp-tools.md",
+    "knowledge/agentlink-security-and-privacy.md"
+  ],
+  "sensitivePaths": [
+    "^docs/foundation/04-security-and-crypto\\.md$",
+    "^packages/crypto/src/",
+    "^packages/core/src/(keystore|owner-|approval|policy|acks|envelope|pairing|contact-check|fetch-url|path-guard)",
+    "^packages/types/src/policy\\.ts$",
+    "^packages/node/src/.*(keystore|keychain|presence)",
+    "^apps/desktop/src/main/(updater|presence|native)",
+    "^apps/cli/test/fixtures/tool-surface\\.json$"
+  ],
+  "decisions": {},
+  "threats": {}
+}

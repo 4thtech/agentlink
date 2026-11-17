@@ -32,6 +32,37 @@
   padding: var(--al-space-1) var(--al-space-4) var(--al-space-5);
   border-top: 1px solid var(--al-color-border-subtle);
 }
+/* NOTIFY-DEEPLINK: the conversation a notification or widget row opened, marked for a moment. */
+.hm-open:focus:not(:focus-visible) {
+  outline: none;
+}
+.hm-open:focus-visible {
+  outline: 1px solid var(--al-color-border-strong, currentColor);
+  outline-offset: -1px;
+}
+.hm-open {
+  position: relative;
+}
+.hm-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--al-color-accent-subtle, rgba(127, 127, 127, 0.18));
+  opacity: 0;
+  transition: opacity var(--al-duration-slow);
+}
+.hm-open.hm-target {
+  box-shadow: inset 3px 0 0 var(--al-color-accent, currentColor);
+}
+.hm-open.hm-target::after {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hm-open::after {
+    transition: none;
+  }
+}
 .hm-files,
 .hm-ap-body {
   gap: var(--al-space-2);

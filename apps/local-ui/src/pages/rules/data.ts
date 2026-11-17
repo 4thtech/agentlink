@@ -22,7 +22,8 @@ export interface RulesView {
     readonly maxSendSizeMB: number;
     readonly maxReceiveSizeMB: number;
   };
-  readonly receipts: { readonly autoDelivered: boolean };
+  /** `sendReceived`: "Send received receipts" (SEC-RECEIPTS-DEFAULT); on unless the rules say off. */
+  readonly receipts: { readonly autoDelivered: boolean; readonly sendReceived: boolean };
   readonly commitments: {
     readonly accept: Rule3;
     readonly autoAcceptDirection: 'buy' | 'sell';
@@ -86,6 +87,8 @@ function parseView(v: unknown): RulesView | undefined {
     !size(f.maxSendSizeMB) ||
     !size(f.maxReceiveSizeMB) ||
     typeof r.autoDelivered !== 'boolean' ||
+    // An older server leaves `sendReceived` out: it reads as on.
+    (r.sendReceived !== undefined && typeof r.sendReceived !== 'boolean') ||
     !oneOf(m.accept, RULE3) ||
     !oneOf(m.autoAcceptDirection, ['buy', 'sell'] as const) ||
     !usd(m.autoAcceptMaxUSD) ||
@@ -108,7 +111,7 @@ function parseView(v: unknown): RulesView | undefined {
       listed: c.listed,
     },
     files: { maxSendSizeMB: f.maxSendSizeMB, maxReceiveSizeMB: f.maxReceiveSizeMB },
-    receipts: { autoDelivered: r.autoDelivered },
+    receipts: { autoDelivered: r.autoDelivered, sendReceived: r.sendReceived !== false },
     commitments: {
       accept: m.accept,
       autoAcceptDirection: m.autoAcceptDirection,
@@ -161,6 +164,7 @@ export interface Draft {
   readonly buyMaxUSD: string;
   readonly sellOn: boolean;
   readonly sellMinUSD: string;
+  readonly sendReceived: boolean;
 }
 
 /** Buy auto-accept as core reads it: live, with listed contacts and a maximum above 0. */
@@ -191,6 +195,7 @@ export function draftOf(v: RulesView): Draft {
     buyMaxUSD: v.commitments.autoAcceptMaxUSD === '0' ? '' : v.commitments.autoAcceptMaxUSD,
     sellOn: sellOn(v),
     sellMinUSD: v.commitments.autoAcceptMinUSD ?? '',
+    sendReceived: v.receipts.sendReceived,
   };
 }
 
@@ -275,6 +280,12 @@ export function checkDraft(view: RulesView, draft: Draft): DraftCheck {
     else pick(value !== view.files[key], 'files', key, value);
   }
   pick(draft.accept !== view.commitments.accept, 'commitments', 'accept', draft.accept);
+  pick(
+    draft.sendReceived !== view.receipts.sendReceived,
+    'receipts',
+    'sendReceived',
+    draft.sendReceived,
+  );
 
   // Auto-accept: one direction at a time (06 §3). Turning one on picks its direction; turning the
   // live one off clears its bound.

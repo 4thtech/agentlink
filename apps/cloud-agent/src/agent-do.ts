@@ -14,8 +14,10 @@
 //   stored unwrapped or sent anywhere (I-1, I-7). The Worker runs in the user's own Cloudflare
 //   account (D-131), never a 4thTech service (I-3).
 // - Autonomous actions are off (08 §3.4): a run only fetches, stores and processes inbound envelopes
-//   under the owner's signed rules; it sends no delivery acks (deliveryAcks false) and nothing acts
-//   on message content. Inbound content stays queued for the chat app or the owner.
+//   under the owner's signed rules; nothing acts on message content. Inbound content stays queued
+//   for the chat app or the owner. The one automatic reply is the signed "received" ack to active
+//   contacts (02 F-23, SEC-RECEIPTS-DEFAULT, D-156), which follows the owner's "Send received
+//   receipts" rule (`receipts.sendReceived`, on by default): a run that staged acks publishes them.
 // - The policy-version mark is the agent item `policy-version` (policy-mark.ts).
 // - Seams for later cards, all unused by the Worker today: `provisionSeed` (M2-3f-1 `/setup`),
 //   `syncNow` (M2-3b tools), PendingApprovalChannel (M2-3f-2), the FILES R2 binding (M2-3h).
@@ -197,10 +199,13 @@ export class AgentDO extends DurableObject<CloudAgentEnv> {
             logger: this.#log,
             policyMark: durableObjectPolicyMark(store),
             transport: nostrTransport({ connector: budget, addressCheck: 'platform' }),
-            deliveryAcks: false,
           });
           try {
             const result = await client.syncInbox({ budgetMs: ALARM_SYNC_BUDGET_MS });
+            // The acks this or an earlier run staged (one per new message from an active contact):
+            // each waits its random 5–90 s (D-156), so a later run publishes what is due then; a
+            // relay failure leaves them queued for the next run.
+            await client.outbox.processDue().catch(() => undefined);
             this.#log.info('cloud agent sync', {
               code: 'sync_ok',
               stored: result.stored,

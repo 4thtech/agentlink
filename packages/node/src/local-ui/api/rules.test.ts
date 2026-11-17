@@ -300,7 +300,7 @@ describe('GET /api/ui/rules', () => {
           listed: 0,
         },
         files: { maxSendSizeMB: 100, maxReceiveSizeMB: 200, allowedFolders: 0 },
-        receipts: { autoDelivered: false },
+        receipts: { autoDelivered: false, sendReceived: true },
         commitments: {
           accept: 'approval',
           autoAcceptDirection: 'buy',

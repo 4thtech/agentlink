@@ -1,7 +1,8 @@
 // Rules (M1-11c-a5; d1 Local-rules with DESIGN-ADJ-1 RU-2…RU-6 and LS-1; UX audit 6a–6c; 06 §3;
 // 11 §5, §6.2.1; D-118, D-119).
 //
-// The rules in two groups: "Everyday" (adding proof with its budget, new contacts, accepting terms)
+// The rules in two groups: "Everyday" (adding proof with its budget, new contacts, accepting terms,
+// "Send received receipts")
 // and a collapsed "More rules" (unknown senders, who can message, files, exports, and the limits for
 // accepting terms on their own). Each row shows its current value; edits stay on the page in a
 // draft with an unsaved-changes bar. Saving asks the server to prepare the edit (core
@@ -607,6 +608,23 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
                   { value: 'approval', label: S.askEveryTime, hint: S.recommended },
                   { value: 'allow', label: S.allow },
                   { value: 'deny', label: S.never },
+                ]}
+              />
+            }
+          />
+          {/* SEC-RECEIPTS-DEFAULT: visible, never under "More rules" (06 §3 receipts.sendReceived). */}
+          <Row
+            title={S.sendReceivedTitle}
+            changed={draft.sendReceived !== view.receipts.sendReceived}
+            help={S.sendReceivedHelp}
+            control={
+              <Segmented
+                label={S.sendReceivedTitle}
+                value={draft.sendReceived ? 'on' : 'off'}
+                onChange={(v) => edit({ sendReceived: v === 'on' })}
+                options={[
+                  { value: 'on', label: S.receiptsOn, hint: S.recommended },
+                  { value: 'off', label: S.receiptsOff },
                 ]}
               />
             }

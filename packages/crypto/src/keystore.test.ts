@@ -116,6 +116,9 @@ const TEST_SEAM = [
   'createAlf1SealerWithNoncePrefix',
   // M1-1g-h: the shared KeyStore conformance suite that every KeyStore backend's tests run.
   'runKeyStoreConformance',
+  // SEC-KS-712-ALLOWLIST: typed data signed with a seed's agent key outside any KeyStore, for tests
+  // that need a signature by another key.
+  'signTypedDataWithAgentKey',
 ];
 
 describe('@4thtech-io/crypto/keystore', () => {

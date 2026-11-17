@@ -499,7 +499,7 @@ An agent that finds a secret MUST NOT copy, print, move or use it; it reports th
 | PRs, approvals, relayed reviews, CI results | GitHub (public repo / private repo) |
 | Independent review, milestone and external audit reports | Private store (§4.5); published after closure |
 | Findings | Advisories and private issues (§9.2) |
-| Decisions, risk acceptances, gate passes | Decision log in `docs/foundation/00-README.md` |
+| Decisions, risk acceptances, gate passes | Decision log in `docs/foundation/decisions/` |
 | Deploy records, incidents | Per `release-and-deployment.md` |
 | Feedback dispositions | Owner's sync file (`development-process.md` §14) |
 
@@ -517,4 +517,4 @@ CI logs expire, so evidence used for acceptance or audits MUST be copied (key ou
 
 ## Change control
 
-Changing this document requires the owner's approval and a decision log entry (D-xx) in `docs/foundation/00-README.md`. Changes that relax any requirement are S2. Agents may propose changes but MUST NOT enable auto-merge on them: the owner merges, or enables auto-merge, himself.
+Changing this document requires the owner's approval and a decision log entry (D-xx) in `docs/foundation/decisions/`. Changes that relax any requirement are S2. Agents may propose changes but MUST NOT enable auto-merge on them: the owner merges, or enables auto-merge, himself.

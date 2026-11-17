@@ -113,8 +113,16 @@ export const HOME_STRINGS = {
   msgId: 'ID',
   msgBy: 'by',
   receipt: 'Receipt',
-  receiptYes: 'Delivered',
   receiptNo: 'No receipt yet',
+  // SEC-RECEIPTS-DEFAULT (11 §5.10): the sender's word once the contact's AI signed a receipt over
+  // this exact message; an older app's receipt is weaker; a message sent with proof never reads as
+  // delivered without the signed receipt.
+  receivedBy: "Received by {name}'s app",
+  receivedByDetail:
+    "Received by {name}'s app: their AI app confirmed it received this exact message.",
+  receivedOlder: 'Received (older app)',
+  proofDelivered: "Delivered: {name}'s AI confirmed it received this.",
+  sentNoReceipt: 'Sent. No receipt yet.',
   receiptPending: 'Pending',
   receiptTheirs: 'Sent by them',
   proof: 'Proof',
@@ -204,6 +212,9 @@ export const HOME_STRINGS = {
   restoreLabel: 'Move {name} back to People',
   archived: 'Archived',
   archivedCount: 'Archived ({count})',
+  contactNotListed: "This contact isn't in this ID's list. It may be archived.",
+  showArchived: 'Show archived',
+  conversationWith: 'Conversation with {name}',
   archivedHint:
     'People you archived and connections that were removed. Nothing is deleted, and your AI still sees them.',
   checked: 'Contact checked.',

@@ -690,12 +690,13 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     name: 'agentlink_export_proof_pack',
     title: 'AgentLink: save a proof file',
     description:
-      "Save a proof file for a message this AgentLink ID recorded into the user's AgentLink proofs folder, so others can check the proof. The message content goes into the file only with includeContentKey true, which the owner must approve first; the recipient is left out unless includeRecipient is true. Each call saves a new file.",
+      "Save a proof file for a message this AgentLink ID recorded into the user's AgentLink proofs folder, so others can check the proof. The message content goes into the file only with includeContentKey true, which the owner must approve first; the recipient is left out unless includeRecipient is true. includeDeviceReceipt true adds the contact's automatic receipt, which shows who received the message, so it also includes the recipient. Each call saves a new file.",
     inputSchema: obj({
       envelopeId,
       recordId,
       includeContentKey: bool(),
       includeRecipient: bool(),
+      includeDeviceReceipt: bool(),
       approvalId,
     }),
     outputSchema: output({ savedTo: str({ minLength: 1, maxLength: 4096 }), recordId }, true),

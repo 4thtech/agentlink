@@ -12,7 +12,9 @@
 //   3. normalizes the title prefix (pr-hygiene's own title rule);
 //   4. writes the PR body from .github/pull_request_template.md with every section filled in
 //      (placeholders marked EDIT: that the builder replaces);
-//   5. pushes the branch and runs `gh pr create` (never a draft, never auto-merge).
+//   5. pushes the branch and runs `gh pr create` (never a draft, never auto-merge);
+//   6. warns (never fails) when the diff touches a security-sensitive path but no security page
+//      and the body has no "security-docs: none (<reason>)" line (tools/check-security-docs.mjs).
 //
 // It never fills what only a person can attest: the "Independent review" line, and for S2 the
 // "Threat note" and "Tests-first evidence" sections stay empty, so review-gate stays red until
@@ -36,6 +38,7 @@ import { pathToFileURL } from 'node:url';
 import { evaluateChangelog } from '../release/check-changelog-fragment.mjs';
 import { TOOLING_DIRS } from '../release/check-changesets.mjs';
 import { parseFragment } from '../release/roll-changelog.mjs';
+import { securityDocsWarning } from '../check-security-docs.mjs';
 import { CLASS_NAMES, classifyFiles, repoRoot, titleRule } from './classes.mjs';
 
 const TASK_ID = /^[A-Z][A-Z0-9]*(-[A-Z0-9]+)*-[0-9]+[a-z]?\b|^M[0-9]+-([0-9]+[a-z]?|GATE)\b/;
@@ -345,7 +348,9 @@ export function plan({ cwd, opts, changed, branch, template, titleRe }) {
     files,
     stubs,
   });
-  return { task, title, summary, verdict, writes, body };
+  // DOCS-UNDER-THE-HOOD: a warning, not a failure (pr-hygiene has no file list and no token).
+  const warning = securityDocsWarning(paths, opts.bodyText ?? '');
+  return { task, title, summary, verdict, writes, body, warnings: warning ? [warning] : [] };
 }
 
 async function main() {
@@ -364,8 +369,10 @@ async function main() {
   );
   if (changed.length === 0) throw new Error(`No changes against ${base}.`);
   const template = readFileSync(join(cwd, '.github/pull_request_template.md'), 'utf8');
+  if (opts.bodyFile) opts.bodyText = readFileSync(opts.bodyFile, 'utf8');
   const p = plan({ cwd, opts, changed, branch, template, titleRe: titleRule() });
-  const body = opts.bodyFile ? readFileSync(opts.bodyFile, 'utf8') : p.body;
+  const body = opts.bodyText ?? p.body;
+  for (const w of p.warnings) console.warn(`warning: ${w}`);
 
   console.log(
     `Task ${p.task} · class ${p.verdict.name}${p.verdict.sensitive ? ' (sensitive paths)' : ''} · independent review ${p.verdict.reviewRequired ? 'required' : 'not required'}`,

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   CryptoInputError,
+  DIRECT_TX_ALLOWLIST,
   DROP_REQUEST_REFUSED,
   KeyStoreError,
   bip340Verify,
@@ -16,6 +17,8 @@ import {
   envelopeSignatureInput,
   hashTypedData,
   recoverEvmAddress,
+  occV2Domain,
+  receiptTypedData,
   KEY_LABELS,
   decodeBase64url,
   decodeUtf8,
@@ -67,6 +70,18 @@ const TYPED: TypedData = {
   domain: { name: 'AgentLink test' },
   message: { text: 'hello' },
 };
+
+/** A Receipt signed as agent A: a shape the agent key signs (SEC-KS-712-ALLOWLIST). */
+const OWN_RECEIPT: TypedData = receiptTypedData(
+  occV2Domain(84532, (DIRECT_TX_ALLOWLIST[84532] as { notary: string }).notary),
+  {
+    signer: ID_A,
+    recordId: `0x${'ef'.repeat(32)}`,
+    receiptType: 1,
+    salt: `0x${'12'.repeat(32)}`,
+    deadline: Math.floor(Date.now() / 1000) + 600,
+  },
+);
 
 /** An in-memory keychain: every get returns a fresh copy, recorded so a test can see it wiped. */
 class FakeKeychain implements KeychainBackend {
@@ -271,16 +286,22 @@ describe('KeychainKeyStore (KeyStore contract, 04 §3.1.1)', () => {
   });
 
   it('signs EIP-712 with the epoch-0 EVM key, whose address is the agent ID', async () => {
-    const sig = await store.sign712(TYPED);
-    const signer = recoverEvmAddress(hashTypedData(TYPED).digest, decodeEcdsaSignature(sig));
+    const sig = await store.sign712(OWN_RECEIPT);
+    const signer = recoverEvmAddress(hashTypedData(OWN_RECEIPT).digest, decodeEcdsaSignature(sig));
     expect(`0x${encodeHex(signer)}`).toBe(ID_A);
+  });
+
+  it('refuses typed data outside the allowed shapes without reading the seed', async () => {
+    const before = keychain.reads;
+    expect(await codeOf(() => store.sign712(TYPED))).toBe('typed_data_refused');
+    expect(keychain.reads).toBe(before);
   });
 
   it('reads the seed for every operation and wipes it afterwards', async () => {
     const before = keychain.reads;
     await store.getPublicBundle();
     await store.signEnvelopeHash(new Uint8Array(32));
-    await store.sign712(TYPED);
+    await store.sign712(OWN_RECEIPT);
     expect(keychain.reads - before).toBe(3);
     expect(keychain.handedOut.length).toBeGreaterThan(0);
     expect(keychain.handedOut.every(allZero)).toBe(true);
@@ -289,7 +310,7 @@ describe('KeychainKeyStore (KeyStore contract, 04 §3.1.1)', () => {
   it('close refuses every later call with keystore_closed', async () => {
     await store.close();
     expect(await codeOf(() => store.getPublicBundle())).toBe('keystore_closed');
-    expect(await codeOf(() => store.sign712(TYPED))).toBe('keystore_closed');
+    expect(await codeOf(() => store.sign712(OWN_RECEIPT))).toBe('keystore_closed');
     expect(await codeOf(() => store.withStoreKey(() => undefined))).toBe('keystore_closed');
   });
 

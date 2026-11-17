@@ -193,14 +193,16 @@ const editOf = (call: Call | undefined): unknown => {
 // --- the page --------------------------------------------------------------------------------------
 
 describe('Rules: two groups, current values (UX audit 6a; RU-2…RU-6)', () => {
-  it('Everyday shows three rules; More rules starts collapsed', async () => {
+  it('Everyday shows four rules; More rules starts collapsed', async () => {
     await mount({ 'GET /api/ui/rules': RULES() });
     expect(host.querySelector('h1')?.textContent).toBe('Rules');
     const everyday = host.querySelector('section[aria-labelledby="rules-everyday"]');
-    expect(everyday?.querySelectorAll('.rl-row')).toHaveLength(3);
+    expect(everyday?.querySelectorAll('.rl-row')).toHaveLength(4);
     expect(everyday?.textContent).toContain(S.proofTitle);
     expect(everyday?.textContent).toContain(S.invitesTitle);
     expect(everyday?.textContent).toContain(S.termsTitle);
+    // SEC-RECEIPTS-DEFAULT: "Send received receipts", visible and on by default.
+    expect(everyday?.textContent).toContain(S.sendReceivedTitle);
     expect(moreToggle()?.getAttribute('aria-expanded')).toBe('false');
     expect(host.querySelector('#rules-more')).toBeNull();
     expect(radio(S.proofTitle, S.allowed)?.getAttribute('aria-checked')).toBe('true');

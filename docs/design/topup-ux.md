@@ -1,6 +1,6 @@
 # Adding credits: top-up and own-account connection (design brief, D-111)
 
-> **Direction only.** The owner set the direction on 20 Oct 2026 (D-111, `docs/foundation/00-README.md`). Everything marked **OPEN** below is an owner decision that is not taken yet; a recommendation is a proposal, never a decision. Specs win on conflict: 08 §1 and §2.3 (pay page and top-up link), 12 §4.5 (funding paths), 06 §2.4 (`needs_credits`), 11 §5 and §6.7 (copy and the pay page). Until the pay page design lands (D2, `README.md`), build it functional and unstyled.
+> **Direction only.** The owner set the direction on 20 Oct 2026 (D-111, `docs/foundation/decisions/D-111.md`). Everything marked **OPEN** below is an owner decision that is not taken yet; a recommendation is a proposal, never a decision. Specs win on conflict: 08 §1 and §2.3 (pay page and top-up link), 12 §4.5 (funding paths), 06 §2.4 (`needs_credits`), 11 §5 and §6.7 (copy and the pay page). Until the pay page design lands (D2, `README.md`), build it functional and unstyled.
 
 ## 1. Owner direction
 

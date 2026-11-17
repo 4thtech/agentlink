@@ -64,6 +64,19 @@ export {
   type DirectTxChain,
   type TransactionRefusal,
 } from './evm-tx.js';
+// SEC-KS-712-ALLOWLIST: the public rules of KeyStore.sign712 for the agent key (no key material).
+export {
+  AGENT_APP_ID,
+  MAX_PROOF_DEADLINE_SECONDS,
+  MAX_TOP_UP_WINDOW_SECONDS,
+  TYPED_DATA_ALLOWLIST,
+  TYPED_DATA_REFUSED,
+  typedDataClock,
+  typedDataSnapshot,
+  type TopUpToken,
+  type TypedDataChain,
+  type TypedDataRefusal,
+} from './typed-data-allowlist.js';
 export {
   MAX_JSON_DEPTH,
   canonicalize,

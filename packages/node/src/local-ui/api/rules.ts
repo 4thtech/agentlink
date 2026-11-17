@@ -173,7 +173,11 @@ function view(policy: Doc): JsonObject {
       maxReceiveSizeMB: p.files.maxReceiveSizeMB as number,
       allowedFolders: count(p.files.allowedFolders),
     },
-    receipts: { autoDelivered: p.receipts.autoDelivered === true },
+    receipts: {
+      autoDelivered: p.receipts.autoDelivered === true,
+      // SEC-RECEIPTS-DEFAULT: "Send received receipts"; absent reads as on (sendReceivedOf).
+      sendReceived: p.receipts.sendReceived !== false,
+    },
     commitments: {
       accept: p.commitments.accept as string,
       autoAcceptDirection: p.commitments.autoAcceptDirection as string,

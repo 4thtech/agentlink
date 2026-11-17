@@ -351,7 +351,10 @@ export {
   ACK_KIND_RECEIVED,
   DeliveryAcks,
   MAX_ACKS_PER_PASS,
+  DEVICE_RECEIPT_LABEL,
   ackPayload,
+  classifyAck,
+  type AckStrength,
   type DeliveryAckStatus,
 } from './acks.js';
 export {

@@ -46,6 +46,9 @@ export const EXPORT_TEXT = Object.freeze({
   policyDenied: "The owner's rules don't allow sharing the message content, so nothing was saved.",
   policyDeniedNextStep:
     'Call again without includeContentKey to save a proof file without the content.',
+  // SEC-RECEIPTS-DEFAULT (11 §5.10; 07 §8): the contact's off-chain ack, labelled apart.
+  deviceReceipt:
+    "Includes the contact's automatic receipt. It shows who received this exact item, and when.",
 });
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -79,7 +82,7 @@ export async function exportProofPackHandler(
   if (!isPlainObject(input)) return invalidArgument();
   const target = oneTarget(input);
   if (target === undefined) return invalidArgument();
-  const { includeContentKey, includeRecipient, approvalId } = input;
+  const { includeContentKey, includeRecipient, includeDeviceReceipt, approvalId } = input;
   const self = await needsIdentity(context);
   if (isOutput(self)) return self;
   const proofs = context.client.proofs;
@@ -90,6 +93,8 @@ export async function exportProofPackHandler(
     ...target,
     ...(withKey ? { includeContentKey: true } : {}),
     includeRecipient: includeRecipient === true,
+    // SEC-RECEIPTS-DEFAULT (07 §8): off unless asked; it names who received the message.
+    ...(includeDeviceReceipt === true ? { includeDeviceReceipt: true } : {}),
     ...(typeof approvalId === 'string' ? { approvalId } : {}),
   };
   let result;
@@ -128,9 +133,10 @@ export async function exportProofPackHandler(
             );
       }
       context.logger.info('proof pack saved', { content: withKey });
+      const savedText = withKey ? EXPORT_TEXT.savedWithContent : EXPORT_TEXT.saved;
       return ok(
         withDisclosure(
-          withKey ? EXPORT_TEXT.savedWithContent : EXPORT_TEXT.saved,
+          result.deviceReceipt === true ? `${savedText} ${EXPORT_TEXT.deviceReceipt}` : savedText,
           exportDisclosure(),
         ),
         {

@@ -43,6 +43,7 @@ import {
   tokenDomainSeparator,
   verifyTokenDomain,
 } from './index.js';
+import { DIRECT_TX_ALLOWLIST } from './evm-tx.js';
 import { MemoryKeyStore } from './testing.js';
 
 const hex32 = (byte: string): string => '0x' + byte.repeat(32);
@@ -555,7 +556,8 @@ describe('EIP-3009 type hash, token domain check and signing (M3-4b-t-1)', () =>
     const store = new MemoryKeyStore(Uint8Array.from({ length: 32 }, (_, i) => i + 7));
     const from = encodeHex0x((await store.getPublicBundle()).agentEvm);
     const domain = verifyTokenDomain(CONFIGURED, FALLBACK);
-    const auth = { ...AUTH, from };
+    // The agent key signs a top-up only to the fee vault (SEC-KS-712-ALLOWLIST).
+    const auth = { ...AUTH, from, to: (DIRECT_TX_ALLOWLIST[84532] as { vault: string }).vault };
     const td = receiveWithAuthorizationTypedData(domain, auth);
     const signature = await store.sign712(td);
     expect(signature).toMatch(/^0x[0-9a-f]{130}$/);

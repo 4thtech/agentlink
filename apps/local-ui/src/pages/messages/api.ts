@@ -36,7 +36,10 @@ export interface MessageItem {
   readonly text: string;
   readonly files: readonly MessageFile[];
   readonly status?: SentStatus;
+  /** True only for a receipt the contact's AI signed over this exact message (delivered). */
   readonly receipt: boolean;
+  /** SEC-RECEIPTS-DEFAULT: only an older app's receipt arrived (weaker; never "delivered"). */
+  readonly receivedOlder?: boolean;
   readonly proof: boolean;
   readonly size: number;
   /** MSG-ORDER-1: the local order of one second, both boxes on one scale (core `seq`). */
@@ -81,7 +84,7 @@ function parseFile(raw: unknown): MessageFile | undefined {
 
 function parseItem(raw: unknown): MessageItem | undefined {
   if (!isRecord(raw)) return undefined;
-  const { id, at, text, files, status, receipt, proof, size, seq } = raw;
+  const { id, at, text, files, status, receipt, receivedOlder, proof, size, seq } = raw;
   if (typeof id !== 'string' || !ID_RE.test(id)) return undefined;
   if (!isTime(at) || !isTime(size)) return undefined;
   if (typeof text !== 'string' || text.length > MAX_TEXT) return undefined;
@@ -100,6 +103,7 @@ function parseItem(raw: unknown): MessageItem | undefined {
     text,
     files: parsedFiles,
     receipt: receipt === true,
+    ...(receipt !== true && receivedOlder === true ? { receivedOlder: true } : {}),
     proof: proof === true,
     size,
     ...(seq === undefined ? {} : { seq }),
