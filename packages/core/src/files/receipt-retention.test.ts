@@ -37,12 +37,14 @@ async function agents(edit: (p: Policy) => void): Promise<void> {
   clock = new FakeClock();
   chain = new FakeNotary(clock.now);
   own = new MemoryOwnStorage();
-  a = await openFileAgent(clock, new MemoryKeyStore(seed(41)), ownerA, 'alice', {
+  const keysA = new MemoryKeyStore(seed(41), { nowSeconds: () => clock.now() });
+  a = await openFileAgent(clock, keysA, ownerA, 'alice', {
     relays: RELAYS_A,
     own,
     proofs: chain.platform(),
   });
-  b = await openFileAgent(clock, new MemoryKeyStore(seed(42)), ownerB, 'bob', {
+  const keysB = new MemoryKeyStore(seed(42), { nowSeconds: () => clock.now() });
+  b = await openFileAgent(clock, keysB, ownerB, 'bob', {
     relays: RELAYS_B,
     own,
     proofs: chain.platform(),

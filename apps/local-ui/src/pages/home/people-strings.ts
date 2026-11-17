@@ -113,7 +113,6 @@ export const HOME_STRINGS = {
   msgId: 'ID',
   msgBy: 'by',
   receipt: 'Receipt',
-  receiptYes: 'Delivered',
   receiptNo: 'No receipt yet',
   // SEC-RECEIPTS-DEFAULT (11 §5.10): the sender's word once the contact's AI signed a receipt over
   // this exact message; an older app's receipt is weaker; a message sent with proof never reads as

@@ -478,13 +478,14 @@ describe('06 §2.0 table (D-53, D-55)', () => {
     }
   });
 
-  it('agentlink_export_proof_pack leaves the content key and the recipient out by default', () => {
+  it('agentlink_export_proof_pack leaves the content key, the recipient and the device receipt out by default', () => {
     const tool = surface.find((t) => t.name === 'agentlink_export_proof_pack');
     const props = (tool?.inputSchema['properties'] ?? {}) as Record<string, { default?: unknown }>;
     expect(Object.keys(props).sort()).toEqual([
       'approvalId',
       'envelopeId',
       'includeContentKey',
+      'includeDeviceReceipt',
       'includeRecipient',
       'recordId',
     ]);

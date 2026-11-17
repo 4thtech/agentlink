@@ -960,7 +960,9 @@ describe('Home pro (A10, Under the hood on)', () => {
     expect(document.body.textContent).toContain(S.identityChecked);
     expect(document.body.textContent).toContain(S.paired);
     expect(document.body.textContent).toContain(ENV_OUT1);
-    expect(document.body.textContent).toContain(`${S.receipt} ${S.receiptYes}`);
+    expect(document.body.textContent).toContain(
+      `${S.receipt} ${fmt(S.proofDelivered, { name: 'Denis' })}`,
+    );
     expect(document.body.textContent).toContain(`${S.proof} ${S.proofYes}`);
   });
 

@@ -11301,6 +11301,13 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Spec:** D-156 (1); 04 §3.4 (`ack` "and its per-contact override"); 06 §3; 11 §5.10 "Per contact"
 - **Done when:** `RED (expected):` commit first; a contact rule can set `receipts.sendReceived` for one contact, which replaces the global value for that contact only (the D-109 contact-rule pattern); absent = the global value; the contact page offers "Tell {contactName} when your AI receives a message" and "Use my default"; turning it off for a contact sends that contact none; the loosening classification covers the new field.
 
+#### RECEIPTS-EXPORT-UI · Proof export in the app, with the automatic receipt choice (later)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S1 (S2 if the route writes outside `proofs.exportFolder`)
+- **Repo/path:** agentlink · `packages/node/src/local-ui/api/` (an export route over core `exportProofPack`), `apps/local-ui` proof views; tests
+- **Depends on:** SEC-RECEIPTS-DEFAULT
+- **Spec:** D-156 (1); 07 §8 "Automatic device receipts"; 11 §5.10 "Proof export"
+- **Done when:** the app can save a proof file for a recorded message (today only `agentlink_export_proof_pack` can); the export choices include "Includes {contactName}'s automatic receipt" (checkbox, off) with the helper "It shows who received this exact item, and when."; turning it on also discloses the recipient (07 §8); the file goes only to `proofs.exportFolder`.
+
 #### RECEIPTS-STATE-COLUMN · Delivery state `delivered` stored with the envelope (later)
 - **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 (store schema, delivery state)
 - **Repo/path:** agentlink · `packages/core/src/store/` (schema and migration), `packages/core/src/{acks.ts,ui-messages.ts,outbox.ts}`, `packages/mcp-tools/src/status.ts`; tests
@@ -11310,10 +11317,10 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 
 #### SEC-KS-712-ALLOWLIST · The agent key signs only AgentLink's own typed-data shapes (0.5.10)
 - **Status:** backlog · **Size:** S–M · **Tier:** Opus build, Fable audit · **Security:** S2 (KeyStore, crypto)
-- **Repo/path:** agentlink · `packages/crypto/src/{keystore-api.ts,eip712.ts,keystore.ts}` (new pure `typedDataSnapshot`), `packages/node/src/{keychain-keystore.ts,file-keystore.ts}`, `apps/cloud-agent/src/worker-keystore.ts`; allowlists from `packages/chain` configs injected when the store is built; tests
+- **Repo/path:** agentlink · `packages/crypto/src/{keystore-api.ts,eip712.ts,keystore.ts}` (new pure `typedDataSnapshot`), `packages/node/src/{keychain-keystore.ts,file-keystore.ts}`, `apps/cloud-agent/src/worker-keystore.ts`; the allowlist as built-in constants in `packages/crypto`, pinned by a chain test against the shipped configs; tests
 - **Depends on:** REL0510-SPEC (D-156); an audit of every `sign712` caller (proofs, receipts, terms, registration, cards, top-up, cloud agent) as the first step
 - **Spec:** D-156 (2); 04 §3.1.1 "What the agent key signs as typed data"; 07 §6.2
-- **Done when:** `RED (expected):` commit first; each allowed shape signs (OCC v2 `Record`, `Receipt` and registration types on an allowlisted chain and contract; `AgentCard` with this agent's address; the top-up authorization to that chain's vault within the value cap and window); each field outside its bound is refused with `typed_data_refused` before the seed is read (a spy on the read); the message echoes no field; owner signing unchanged; no counters.
+- **Done when:** `RED (expected):` commit first; each allowed shape signs (OCC v2 `Record` and `Receipt` on an allowlisted chain and contract, deadline at most 1 h plus 5 min skew; `Registration` and `Revocation` refused, owner only; `AgentCard` with this agent's address; the top-up authorization to that chain's vault within the value cap and window); each field outside its bound is refused with `typed_data_refused` before the seed is read (a spy on the read); the message echoes no field; owner signing unchanged; no counters.
 
 #### DESK-QUIT-ORDER · Windows close before the core stops; no terminal instructions in the desktop app (0.5.10)
 - **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (`apps/desktop/**`, the pipe)

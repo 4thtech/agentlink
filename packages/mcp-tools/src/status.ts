@@ -33,6 +33,13 @@ import { TOOL_TEXT, noOwnerResult } from './text.js';
 
 /** 06 §2.1: the catch-up's time budget. */
 export const STATUS_CATCH_UP_BUDGET_MS = 3_000;
+/** 11 §5.10 "One-time notice after the update", word for word. */
+export const RECEIPTS_NOTICE =
+  'AgentLink now tells your contacts when your AI app has received their message. This also shows them that your AI app was open at about that time. You can turn this off in Settings.';
+
+/** The clients (one per session) already told about received receipts. */
+const toldReceipts = new WeakSet<object>();
+
 /** At most this many contacts are named in the summary; the rest are counted. */
 const SUMMARY_CONTACTS = 3;
 
@@ -99,7 +106,21 @@ export async function statusHandler(_input: unknown, context: ToolContext): Prom
     openOffers,
     incomplete,
   });
-  return ok(statusSummary(inbox, counts.requests, offers, self.label), {
+  // SEC-RECEIPTS-DEFAULT (11 §5.10): for an AI app (no local app needed), once per session while
+  // it is due: received receipts are now on. Fixed words only.
+  let summary = statusSummary(inbox, counts.requests, offers, self.label);
+  if (!toldReceipts.has(client)) {
+    const due = await Promise.resolve(client.receiptsNoticeDue?.()).then(
+      (v) => v === true,
+      () => false,
+    );
+    // Only when it fits the summary; otherwise a later status says it.
+    if (due && Array.from(`${summary} ${RECEIPTS_NOTICE}`).length <= MAX_TOOL_TEXT_CHARS) {
+      toldReceipts.add(client);
+      summary = `${summary} ${RECEIPTS_NOTICE}`;
+    }
+  }
+  return ok(summary, {
     // M1-5g: a relay returned a second at its cap. Fixed text only (I-5, I-7). W4-PAUSE: the
     // paused line instead (no catch-up ran, so nothing can be incomplete).
     ...(paused

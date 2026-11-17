@@ -79,6 +79,7 @@ function valid(over: Partial<chain.ProofPackValid> = {}): chain.ProofPackValid {
       sender: 'ab'.repeat(32),
     },
     ownerApproval: { status: 'none' },
+    deviceReceipts: [],
     notices: [],
     ...over,
   };

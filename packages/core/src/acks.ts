@@ -33,7 +33,7 @@ import {
   type Payload,
 } from '@4thtech-io/types';
 import type { CoreContext } from './context.js';
-import { open } from './context.js';
+import { nowOf, open } from './context.js';
 import type { EnvelopeService, InboundReport } from './envelopes.js';
 import { CoreError } from './errors.js';
 import type { IdentityService } from './identity.js';
@@ -97,9 +97,15 @@ export interface DeliveryAcksDeps {
 }
 
 /** The v2 ack payload for an inbound envelope: its ID and its envelopeHash (`0x` + 64 hex). */
-export const ackPayload = (envelopeId: string, envelopeHash: string) => ({
+export const ackPayload = (envelopeId: string, envelopeHash: string, recordId?: string) => ({
   type: 'ack' as const,
-  body: { kind: ACK_KIND_RECEIVED, envelopeId, envelopeHash },
+  body: {
+    kind: ACK_KIND_RECEIVED,
+    envelopeId,
+    envelopeHash,
+    // 04 §3.4: `recordId` only when the received envelope carried a proof (a record is known).
+    ...(recordId === undefined ? {} : { recordId }),
+  },
   replyTo: envelopeId,
   files: [],
 });
@@ -321,20 +327,25 @@ export class DeliveryAcks {
 
   /**
    * The inbound envelopes among `rows` this agent already acknowledged (one ack per message): its
-   * own outbound acks to each contact since shortly before the earliest of them, read once per
-   * contact.
+   * own outbound acks to each contact since shortly before the earliest of them was stored here,
+   * read once per contact.
    */
   async #alreadyAcked(rows: readonly Row<'envelopes'>[]): Promise<ReadonlySet<string>> {
     const done = new Set<string>();
     if (rows.length === 0) return done;
-    const since = new Map<string, number>();
-    for (const row of rows) {
-      const c = row.contact_id as string;
-      since.set(c, Math.min(since.get(c) ?? row.created_at, row.created_at));
-    }
     const wanted = new Set(rows.map((r) => r.envelope_id));
-    const own = await this.#ctx.store.transaction((tx) =>
-      [...since].flatMap(([contactId, from]) =>
+    const own = await this.#ctx.store.transaction((tx) => {
+      // From when this agent first stored each message (its seen row, our clock), never the
+      // sender-chosen `createdAt`; a message without a seen row looks back from now.
+      const now = nowOf(this.#ctx);
+      const since = new Map<string, number>();
+      for (const row of rows) {
+        const c = row.contact_id as string;
+        const stored =
+          tx.get('seen', { kind: 'envelope', id: row.envelope_hash })?.first_seen_at ?? now;
+        since.set(c, Math.min(since.get(c) ?? stored, stored));
+      }
+      return [...since].flatMap(([contactId, from]) =>
         tx
           .select(
             'envelopes',
@@ -348,8 +359,8 @@ export class DeliveryAcks {
             },
           )
           .filter((r) => r.created_at >= from - OWN_ACK_SKEW_SECONDS),
-      ),
-    );
+      );
+    });
     for (const ack of own) {
       const replyTo = (await openAck(this.#ctx, ack))?.replyTo;
       if (typeof replyTo === 'string' && wanted.has(replyTo)) done.add(replyTo);
@@ -379,9 +390,17 @@ export class DeliveryAcks {
     if (evaluate(policy, { kind: 'envelope.send', contact: contactId, sizeBytes: 0 }) !== 'allow') {
       return false;
     }
+    // 04 §3.4: a proof-carrying envelope's ack names its record (the verified record this agent
+    // stored for it from the contact's `proof` body).
+    const recordId = await this.#ctx.store.transaction((tx) =>
+      tx
+        .select('proofs', { envelope_id: inbound.envelope_id, status: 'received' })
+        .map((r) => r.record_id)
+        .find((id) => HASH.test(id)),
+    );
     const { row } = await envelopes.prepare({
       to: { contact: contactId },
-      payload: ackPayload(inbound.envelope_id, inbound.envelope_hash),
+      payload: ackPayload(inbound.envelope_id, inbound.envelope_hash, recordId),
       // D-156: the signed time is rounded down to the minute; the outbox adds the 5–90 s delay.
       roundCreatedAt: true,
     });
@@ -399,6 +418,26 @@ export class DeliveryAcks {
       tx.insert('envelopes', { ...row, delivery: 'queued' });
     });
     return true;
+  }
+
+  /**
+   * SEC-RECEIPTS-DEFAULT (11 §5.10): whether the "received receipts are now on" note is still due
+   * for an AI app: the owner's rule sends them (absent reads as on), this agent has an active
+   * contact, and it has not sent any ack yet. Store only; false when anything cannot be read.
+   */
+  async noticeDue(): Promise<boolean> {
+    if (!this.enabled) return false;
+    try {
+      const policy = await this.#deps.ownerActions.loadPolicy();
+      if (policy.mode === 'fail_closed' || !sendReceivedOf(policy.policy)) return false;
+      return await this.#ctx.store.transaction(
+        (tx) =>
+          tx.count('envelopes', { direction: 'out', type: 'ack' }) === 0 &&
+          tx.count('contacts', { status: 'active' }) > 0,
+      );
+    } catch {
+      return false;
+    }
   }
 
   /**

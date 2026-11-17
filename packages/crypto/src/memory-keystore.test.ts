@@ -18,7 +18,15 @@ import {
   type KeyStore,
   type OwnerPresence,
 } from './keystore-api.js';
-import { KEY_LABELS, derivePublicIdentity, derivePublicKey, deriveSecretKey } from './keys.js';
+import { DIRECT_TX_ALLOWLIST } from './evm-tx.js';
+import {
+  KEY_LABELS,
+  deriveAgentId,
+  derivePublicIdentity,
+  derivePublicKey,
+  deriveSecretKey,
+} from './keys.js';
+import { occV2Domain, receiptTypedData } from './proof-types.js';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from './testing.js';
 import { nip44ConversationKey, nip44DecryptWithKey, nip44EncryptWithKey } from './nip44.js';
 import {
@@ -46,7 +54,19 @@ async function codeOf(fn: () => Promise<unknown>): Promise<string> {
   return 'accepted';
 }
 
-/** The EIP-712 example ("Ether Mail"), as any typed data a KeyStore may be asked to sign. */
+/** A Receipt signed as the agent of `seed`: a shape the agent key signs (SEC-KS-712-ALLOWLIST). */
+function ownReceipt(seed: Uint8Array): TypedData {
+  const notary = (DIRECT_TX_ALLOWLIST[84532] as { notary: string }).notary;
+  return receiptTypedData(occV2Domain(84532, notary), {
+    signer: deriveAgentId(seed),
+    recordId: `0x${'ef'.repeat(32)}`,
+    receiptType: 1,
+    salt: `0x${'12'.repeat(32)}`,
+    deadline: Math.floor(Date.now() / 1000) + 600,
+  });
+}
+
+/** The EIP-712 example ("Ether Mail"), as any typed data an owner session may be asked to sign. */
 const MAIL: TypedData = {
   types: {
     EIP712Domain: [
@@ -239,15 +259,17 @@ describe('MemoryKeyStore', () => {
 
   describe('sign712', () => {
     it('signs with the agent EVM key, which is always epoch 0 (04 §2.1)', async () => {
-      const sig = await b.sign712(MAIL);
+      const typed = ownReceipt(SEED_B);
+      const sig = await b.sign712(typed);
       expect(sig).toMatch(/^0x[0-9a-f]{130}$/);
-      expect(signerOf(MAIL, sig)).toEqual(derivePublicIdentity(SEED_B, 2).agentEvm);
-      expect(signerOf(MAIL, sig)).toEqual(derivePublicIdentity(SEED_B, 0).agentEvm);
+      expect(signerOf(typed, sig)).toEqual(derivePublicIdentity(SEED_B, 2).agentEvm);
+      expect(signerOf(typed, sig)).toEqual(derivePublicIdentity(SEED_B, 0).agentEvm);
     });
 
-    it('refuses typed data that does not hash', async () => {
+    it('refuses typed data outside the agent shapes (SEC-KS-712-ALLOWLIST)', async () => {
       const typed = { domain: {}, types: {}, primaryType: 'X', message: {} };
-      expect(await codeOf(() => a.sign712(typed))).toBe('invalid_typed_data');
+      expect(await codeOf(() => a.sign712(typed))).toBe('typed_data_refused');
+      expect(await codeOf(() => b.sign712(MAIL))).toBe('typed_data_refused');
     });
   });
 
@@ -306,7 +328,7 @@ describe('MemoryKeyStore', () => {
         () => a.signEnvelopeHash(new Uint8Array(32)),
         () => a.nip44Encrypt(peer, 'x'),
         () => a.nip44Decrypt(peer, payload),
-        () => a.sign712(MAIL),
+        () => a.sign712(ownReceipt(SEED_A)),
         () => a.unwrapCek(WRAPPED, ENVELOPE_ID),
       ]) {
         expect(await codeOf(op)).toBe('keystore_closed');

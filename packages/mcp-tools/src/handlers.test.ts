@@ -1,6 +1,7 @@
 // The M1-9c handlers (agentlink_status, agentlink_list_contacts, agentlink_get_approval), the
 // "not available yet" stubs, contact resolution, the result rules and the injection suite
 // (06 §2.1 name canary, §4, §9; I-4, I-5, I-7).
+import { RECEIPTS_NOTICE } from './status.js';
 import {
   restrictName,
   type AgentLinkClient,
@@ -204,6 +205,20 @@ describe('agentlink_status (06 §2.1, §6.1)', () => {
       const validate = new Ajv({ strict: false }).compile(findTool(name)!.outputSchema);
       expect(validate(result.structured), `${name} ${JSON.stringify(validate.errors)}`).toBe(true);
     }
+  });
+
+  it('SEC-RECEIPTS-DEFAULT: says once per session, while due, that received receipts are now on', async () => {
+    const due = fakeClient({ contacts: [marko] });
+    const withNotice = Object.assign(due, { receiptsNoticeDue: () => Promise.resolve(true) });
+    const first = await callTool('agentlink_status', {}, context(withNotice));
+    expect(first.structured['summary']).toContain(RECEIPTS_NOTICE);
+    const second = await callTool('agentlink_status', {}, context(withNotice));
+    expect(second.structured['summary']).not.toContain(RECEIPTS_NOTICE);
+    const notDue = Object.assign(fakeClient({ contacts: [marko] }), {
+      receiptsNoticeDue: () => Promise.resolve(false),
+    });
+    const none = await callTool('agentlink_status', {}, context(notDue));
+    expect(none.structured['summary']).not.toContain(RECEIPTS_NOTICE);
   });
 
   it('ok: identity, counts by contact under the name rule, requests and storage', async () => {
@@ -489,6 +504,7 @@ describe('coreToolClient (read-only in fact, 06 §2.0)', () => {
       contacts: { list: () => Promise.resolve([]) },
       approvalService: { countPending: () => Promise.resolve(0) },
       terms: { openOffers: () => Promise.resolve([]) },
+      receiptsNoticeDue: () => Promise.resolve(false),
       ownerActions: {
         loadPolicy: () =>
           Promise.resolve({ mode: 'defaults', policy: { files: { storage: 'auto' } } }),
@@ -519,6 +535,7 @@ describe('coreToolClient (read-only in fact, 06 §2.0)', () => {
     const result = await callTool('agentlink_status', {}, context(tools));
     expect(result.structured.status).toBe('ok');
     const roots = [...new Set(touched.map((t) => t.split('.')[0]))].sort();
+    // SEC-RECEIPTS-DEFAULT: `receiptsNoticeDue` is a store read (whether the notice is due).
     expect(roots).toEqual([
       'approvalService',
       'catchUp',
@@ -526,6 +543,7 @@ describe('coreToolClient (read-only in fact, 06 §2.0)', () => {
       'identity',
       'ownerActions',
       'paused',
+      'receiptsNoticeDue',
       'terms',
     ]);
     expect(touched.filter((t) => t.startsWith('approvalService.'))).toEqual([

@@ -13,6 +13,8 @@ import {
   decodeHex,
   decodeHex0x,
   directTransactionSnapshot,
+  typedDataClock,
+  typedDataSnapshot,
   encodeHex0x,
   dropRequestEpoch,
   dropRequestSnapshot,
@@ -391,9 +393,12 @@ export class KeychainKeyStore implements KeyStore {
   }
 
   async sign712(typedData: TypedData): Promise<string> {
-    // The EVM key exists only at epoch 0 (04 §2.1), whatever the current key epoch.
+    // SEC-KS-712-ALLOWLIST: only the agent's own record, receipt, card and top-up shapes, checked
+    // before the seed is read; the snapshot is what gets signed. The EVM key exists only at epoch 0
+    // (04 §2.1), whatever the current key epoch.
+    const snapshot = typedDataSnapshot(typedData, this.#agentId, typedDataClock());
     return this.#withSeed((seed) =>
-      withSecret(seed, KEY_LABELS.evm, 0, (secretKey) => signTypedData(typedData, secretKey)),
+      withSecret(seed, KEY_LABELS.evm, 0, (secretKey) => signTypedData(snapshot, secretKey)),
     );
   }
 

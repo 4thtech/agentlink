@@ -110,7 +110,7 @@ async function agent(n: number, owner: MemoryOwnerKeyStore, name: string): Promi
   const mark = new MemoryPolicyMark();
   const store = new MemoryStore();
   const cipher = new TestStoreCipher();
-  const keyStore: KeyStore = new MemoryKeyStore(seed(n));
+  const keyStore: KeyStore = new MemoryKeyStore(seed(n), { nowSeconds: () => clock.now() });
   const spy = new RelaySpy();
   const client = await AgentLinkClient.create({
     keyStore,
@@ -199,8 +199,11 @@ async function editOwnCard(x: TestAgent, change: (value: Record<string, unknown>
 
 // --- proof pack helpers (07 §8) ---------------------------------------------------------------------
 
-/** The record-message vector's fee asset address (a named constant keeps secret scanners off it). */
-const FEE_ASSET = '0x05f7cddba6070777972ad9ff9df5312872a49685';
+/**
+ * Circle's USDC on Base Sepolia: a fee token the agent key signs Records in (SEC-KS-712-ALLOWLIST).
+ * A named constant keeps secret scanners off it.
+ */
+const FEE_ASSET = '0x036cbd53842c5426634e7929541ec2318f3dcf7e';
 
 function fakeChain(config: ChainConfig, state: Record<string, unknown>): VerifyChain {
   const client = {
@@ -348,7 +351,7 @@ describe('card-update sender (04 §2.6, §2.9, §3.4.1)', () => {
 
   it('refuses to send without a transport, before anything is stored', async () => {
     const store = new MemoryStore();
-    const keyStore = new MemoryKeyStore(seed(54));
+    const keyStore = new MemoryKeyStore(seed(54), { nowSeconds: () => clock.now() });
     const offline = await AgentLinkClient.create({
       keyStore,
       store,

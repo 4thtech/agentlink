@@ -40,16 +40,28 @@ async function agents(edit: (p: Policy) => void): Promise<void> {
   clock = new FakeClock();
   chain = new FakeNotary(clock.now);
   own = new MemoryOwnStorage();
-  a = await openFileAgent(clock, new MemoryKeyStore(seed(43)), ownerA, 'alice', {
-    relays: RELAYS_A,
-    own,
-    proofs: chain.platform(),
-  });
-  b = await openFileAgent(clock, new MemoryKeyStore(seed(44)), ownerB, 'bob', {
-    relays: RELAYS_B,
-    own,
-    proofs: chain.platform(),
-  });
+  a = await openFileAgent(
+    clock,
+    new MemoryKeyStore(seed(43), { nowSeconds: () => clock.now() }),
+    ownerA,
+    'alice',
+    {
+      relays: RELAYS_A,
+      own,
+      proofs: chain.platform(),
+    },
+  );
+  b = await openFileAgent(
+    clock,
+    new MemoryKeyStore(seed(44), { nowSeconds: () => clock.now() }),
+    ownerB,
+    'bob',
+    {
+      relays: RELAYS_B,
+      own,
+      proofs: chain.platform(),
+    },
+  );
   await pairForFiles(clock, a, b, edit);
   chain.fund(a.id, 10n * FEE_UNITS);
 }

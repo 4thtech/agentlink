@@ -145,8 +145,17 @@ export interface KeyStore extends EnvelopeKeys {
   getPublicBundle(options?: EpochOptions): Promise<PublicIdentity>;
 
   /**
-   * EIP-712 signature by the agent EVM key (records, receipts, `cardAgentSig`), in the canonical
-   * ECDSA form of 04 §2.4.1: `0x` + 130 lowercase hex.
+   * EIP-712 signature by the agent EVM key (records, receipts, `cardAgentSig`, the vault top-up),
+   * in the canonical ECDSA form of 04 §2.4.1: `0x` + 130 lowercase hex.
+   *
+   * It is never a general typed-data signer (SEC-KS-712-ALLOWLIST): only an OCC v2 `Record` or
+   * `Receipt` for a Notary of TYPED_DATA_ALLOWLIST signed as this agent (a Record with the official
+   * app ID, an allowed fee token, `maxFee` at most the ceiling and a short deadline; a Receipt with
+   * a short deadline), this agent's own `AgentCard`, and the EIP-3009 `ReceiveWithAuthorization`
+   * of an allowlisted top-up token from this agent to that chain's fee vault, up to a cap and a
+   * short validity (typedDataSnapshot). Anything else is CryptoInputError `typed_data_refused` with
+   * the fixed message of the rule (TYPED_DATA_REFUSED). Every check happens before a key is read,
+   * and the checked snapshot is what gets signed.
    */
   sign712(typedData: TypedData): Promise<string>;
 

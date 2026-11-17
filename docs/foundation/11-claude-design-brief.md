@@ -481,7 +481,7 @@ The free, private "received" receipt the recipient's app sends back (04 §3.4, 0
 | Sender, status detail | "Received by {contactName}'s app: their AI app confirmed it received this exact message." |
 | Sender, proof status | "Delivered: {contactName}'s AI confirmed it received this." · "Sent. No receipt yet." |
 | Recipient, under a received message (muted) | "Receipt sent to {contactName}" |
-| Proof export | "Includes {contactName}'s automatic receipt" (checkbox, on) · helper "It shows that their AI app received this exact item, and when." |
+| Proof export | "Includes {contactName}'s automatic receipt" (checkbox, off) · helper "It shows who received this exact item, and when." |
 | Verify result | "Automatic device receipt from {contactName}'s AI" · on failure "This automatic receipt could not be checked." |
 
 **Rules.**

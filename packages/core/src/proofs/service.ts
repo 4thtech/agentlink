@@ -440,9 +440,10 @@ export interface ExportProofPackInput {
   /**
    * SEC-RECEIPTS-DEFAULT (D-156): on the sender side, the contact AI's signed "received" ack over
    * this envelope's hash, as the pack's automatic device receipt (07 §8 `deviceReceipts`), with the
-   * contact's card. Included by default when one is stored; the owner may leave it out. It shows
-   * that the contact's AI received these exact bytes; it carries the ack's own content key only,
-   * never the recorded message's.
+   * contact's card. Default false: the card shows who received the message, so a pack with it also
+   * discloses the recipient and its salt (as `includeRecipient`), and the verifier binds the
+   * receipt to that opening. It carries the ack's own content key only, never the recorded
+   * message's.
    */
   readonly includeDeviceReceipt?: boolean;
 }
@@ -2584,16 +2585,18 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     };
     // The record's recipient: the contact on the sender side, this agent on the recipient side.
     const recipientEvm = received ? (await this.#self()).agentId : envelopeRow.contact_id;
+    // SEC-RECEIPTS-DEFAULT (07 §8): a device receipt names its contact through the card, so it is
+    // carried only on request, and then always with the recipient opening it is bound to.
+    const deviceReceipt =
+      received || input.includeDeviceReceipt !== true || recipientEvm === null
+        ? undefined
+        : await this.#deviceReceipt(envelopeRow);
     const salt =
-      recipientEvm === null || input.includeRecipient !== true
+      recipientEvm === null || (input.includeRecipient !== true && deviceReceipt === undefined)
         ? ''
         : await open(this.#ctx, 'proofs', 'salt', [row.record_id], row.salt);
     const ownerApproval =
       input.includeOwnerApproval === false ? null : await this.#ownerApproval(row, received);
-    const deviceReceipt =
-      received || input.includeDeviceReceipt === false
-        ? undefined
-        : await this.#deviceReceipt(envelopeRow);
     const base = {
       type: 'agentlink.proof',
       version: 1,
@@ -2612,7 +2615,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       // transaction hash (07 §8), which the submitter outcome does not carry yet.
       receipts: [],
       disclosure: contentKey === undefined ? null : { contentKey },
-      ...(deviceReceipt === undefined ? {} : { deviceReceipts: [deviceReceipt] }),
+      ...(deviceReceipt === undefined || salt === '' ? {} : { deviceReceipts: [deviceReceipt] }),
       exportedAt: iso(nowOf(this.#ctx)),
     };
     let parsed = proofPackSchema.safeParse({ ...base, ownerApproval });
@@ -2627,7 +2630,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       status: 'ok',
       recordId: row.record_id,
       pack: Object.freeze({ ...base, ownerApproval: parsed.data.ownerApproval }),
-      ...(deviceReceipt === undefined ? {} : { deviceReceipt: true as const }),
+      ...(deviceReceipt === undefined || salt === '' ? {} : { deviceReceipt: true as const }),
     });
   }
 

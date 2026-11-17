@@ -770,6 +770,21 @@ describe('delivery acknowledgements (02 F-23; SEC-RECEIPTS-DEFAULT: on by defaul
     expect(net.published).toBeGreaterThan(before);
   });
 
+  it('the received-receipts note is due until the first ack, and never with the rule off', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    const off = await openAgent(3, 'carol', RELAYS_C, net, { sendReceived: false });
+    expect(await b.client.receiptsNoticeDue()).toBe(false); // no contact yet
+    await pair(a, b);
+    await pair(a, off);
+    expect(await b.client.receiptsNoticeDue()).toBe(true);
+    expect(await off.client.receiptsNoticeDue()).toBe(false);
+    await a.client.sendMessage({ to: b.id, text: 'hi' });
+    expect((await b.client.syncInbox()).acksSent).toBe(1);
+    expect(await b.client.receiptsNoticeDue()).toBe(false);
+  });
+
   it('the owner setting "Send received receipts" off: zero acks', async () => {
     const net = new RelayNetwork();
     const a = await openAgent(1, 'alice', RELAYS_A, net);

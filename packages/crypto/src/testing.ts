@@ -34,8 +34,16 @@ import {
   verifyDropAuthorization,
   type DropAuthRequest,
 } from './drop-auth.js';
-import { decodeHex, encodeHex, encodeUtf8 } from './encoding.js';
-import { signTypedData, type TypedData } from './eip712.js';
+import { decodeHex, encodeHex, encodeHex0x, encodeUtf8 } from './encoding.js';
+import { hashTypedData, signTypedData, type TypedData } from './eip712.js';
+import { decodeEcdsaSignature, recoverEvmAddress } from './ecdsa.js';
+import { AGENT_CARD_DOMAIN, AGENT_CARD_TYPES } from './agent-card.js';
+import {
+  occV2Domain,
+  receiptTypedData,
+  receiveWithAuthorizationTypedData,
+  recordTypedData,
+} from './proof-types.js';
 import { CryptoInputError } from './errors.js';
 import { TAGS, sha256, taggedHash } from './hash.js';
 import {
@@ -97,6 +105,12 @@ import {
   type DirectTxChain,
   type TransactionRefusal,
 } from './evm-tx.js';
+import {
+  TYPED_DATA_REFUSED,
+  typedDataClock,
+  typedDataSnapshot,
+  type TypedDataRefusal,
+} from './typed-data-allowlist.js';
 import { wipe } from './wipe.js';
 
 export {
@@ -341,9 +355,27 @@ function entrySnapshot(
 }
 
 /** Options for MemoryKeyStore. */
+/**
+ * Signs typed data with the agent EVM key of `seed` outside any KeyStore, so without the sign712
+ * allowlist: for tests that need a signature by another key over someone else's typed data.
+ */
+export function signTypedDataWithAgentKey(seed: Uint8Array, typedData: TypedData): string {
+  const copy = copySeed(seed, 'signTypedDataWithAgentKey: seed');
+  try {
+    return withSecret(copy, KEY_LABELS.evm, 0, (key) => signTypedData(typedData, key));
+  } finally {
+    wipe(copy);
+  }
+}
+
 export interface MemoryKeyStoreOptions {
   /** The current key epoch (04 §2.6). Default 0. */
   readonly keyEpoch?: number;
+  /**
+   * The wall clock sign712 checks deadlines against, in unix seconds (SEC-KS-712-ALLOWLIST).
+   * Default the system clock; tests on a fake clock pass theirs.
+   */
+  readonly nowSeconds?: () => number;
 }
 
 const epochConflict = (): KeyStoreError =>
@@ -379,10 +411,12 @@ const KEYSTORE_STATE = new WeakMap<object, KeyStoreState>();
  */
 export class MemoryKeyStore implements KeyStore {
   readonly #state: KeyStoreState;
+  readonly #nowSeconds: () => number;
 
   constructor(masterSeed: Uint8Array, options: MemoryKeyStoreOptions = {}) {
     const keyEpoch = options.keyEpoch ?? 0;
     assertEpoch(keyEpoch);
+    this.#nowSeconds = options.nowSeconds ?? typedDataClock;
     const seed = copySeed(masterSeed, 'MemoryKeyStore: the master seed');
     this.#state = {
       seed,
@@ -467,12 +501,14 @@ export class MemoryKeyStore implements KeyStore {
   }
 
   sign712(typedData: TypedData): Promise<string> {
-    // The EVM key exists only at epoch 0 (04 §2.1), whatever the current key epoch.
-    return Promise.resolve().then(() =>
-      withSecret(this.#open(), KEY_LABELS.evm, 0, (secretKey) =>
-        signTypedData(typedData, secretKey),
-      ),
-    );
+    // SEC-KS-712-ALLOWLIST: only the agent's own shapes, checked before the seed is used. The EVM
+    // key exists only at epoch 0 (04 §2.1), whatever the current key epoch.
+    return Promise.resolve().then(() => {
+      const snapshot = typedDataSnapshot(typedData, this.#state.agentId, this.#nowSeconds());
+      return withSecret(this.#open(), KEY_LABELS.evm, 0, (secretKey) =>
+        signTypedData(snapshot, secretKey),
+      );
+    });
   }
 
   signTransaction(tx: DirectTransaction): Promise<string> {
@@ -1290,6 +1326,7 @@ export function runKeyStoreConformance(
   );
 
   runConformanceSignTransaction(backend, runner);
+  runConformanceSign712(backend, runner);
 }
 
 // --- signTransaction (M1-4c-b; 07 §6.2 direct mode) ----------------------------------------------
@@ -1415,5 +1452,143 @@ function runConformanceSignTransaction(
       const error = await conformanceOutcome(() => store.signTransaction(conformanceTx()));
       conformanceCheck(codeOfError(error) === 'keystore_closed', 'keystore_closed');
     });
+  });
+}
+
+// --- sign712 (SEC-KS-712-ALLOWLIST; 04 §3.1.1) ----------------------------------------------------
+
+/** The four shapes the agent key signs, for `own` on Base Sepolia, built as the callers build them. */
+function conformanceTypedData(own: string, nowSeconds: number) {
+  const base = DIRECT_TX_ALLOWLIST[84532] as DirectTxChain;
+  const usdc = base.feeTokens[0] as string;
+  const zero32 = `0x${'0'.repeat(64)}`;
+  const domain = occV2Domain(84532, base.notary);
+  const record = (over: Record<string, unknown> = {}) =>
+    recordTypedData(domain, {
+      signer: own,
+      envelopeHash: `0x${'ab'.repeat(32)}`,
+      recipientCommitment: `0x${'cd'.repeat(32)}`,
+      parentRecordId: zero32,
+      appId: zero32,
+      kind: 1,
+      feeToken: usdc,
+      maxFee: '100000',
+      nonce: '9',
+      deadline: nowSeconds + 3_600,
+      ...over,
+    });
+  const receipt = receiptTypedData(domain, {
+    signer: own,
+    recordId: `0x${'ef'.repeat(32)}`,
+    receiptType: 1,
+    salt: `0x${'12'.repeat(32)}`,
+    deadline: nowSeconds + 3_600,
+  });
+  const card: TypedData = {
+    types: AGENT_CARD_TYPES,
+    primaryType: 'AgentCard',
+    domain: { ...AGENT_CARD_DOMAIN },
+    message: {
+      version: 1,
+      agentEvm: own,
+      agentNostr: `0x${'31'.repeat(32)}`,
+      agentEnc: `0x${'32'.repeat(32)}`,
+      ownerEvm: `0x${'33'.repeat(20)}`,
+      ownerNostr: `0x${'34'.repeat(32)}`,
+      ownerEnc: `0x${'35'.repeat(32)}`,
+      nameHash: `0x${'36'.repeat(32)}`,
+      relaysHash: `0x${'37'.repeat(32)}`,
+      issuedAt: nowSeconds,
+      expiresAt: 0,
+      keyEpoch: 0,
+    },
+  };
+  const topUp = (over: Record<string, unknown> = {}) =>
+    receiveWithAuthorizationTypedData(
+      { name: 'USDC', version: '2', chainId: 84532, verifyingContract: usdc },
+      {
+        from: own,
+        to: base.vault,
+        value: '20000000',
+        validAfter: '0',
+        validBefore: String(nowSeconds + 900),
+        nonce: `0x${'5a'.repeat(32)}`,
+        ...over,
+      },
+    );
+  return { record, receipt, card, topUp };
+}
+
+function runConformanceSign712(
+  backend: KeyStoreConformanceBackend,
+  runner: ConformanceRunner,
+): void {
+  const own = deriveAgentId(backend.seed);
+  const other = `0x${'11'.repeat(20)}`;
+  const nowSeconds = (): number => Math.floor(Date.now() / 1000);
+
+  runner.describe(`${backend.name}: KeyStore conformance, sign712 (SEC-KS-712-ALLOWLIST)`, () => {
+    runner.it(
+      'signs a Record, a Receipt, its own card and the vault top-up with the EVM key',
+      async () => {
+        const store = await backend.open(CONFORMANCE_EPOCH);
+        try {
+          const shapes = conformanceTypedData(own, nowSeconds());
+          for (const typed of [shapes.record(), shapes.receipt, shapes.card, shapes.topUp()]) {
+            const sig = await store.sign712(typed);
+            const signer = recoverEvmAddress(
+              hashTypedData(typed).digest,
+              decodeEcdsaSignature(sig),
+            );
+            conformanceCheck(
+              encodeHex0x(signer) === own,
+              `${typed.primaryType}: the agent EVM key`,
+            );
+          }
+        } finally {
+          await store.close();
+        }
+      },
+    );
+
+    runner.it(
+      'refuses any other typed data with typed_data_refused, before any key is read',
+      async () => {
+        const store = await backend.open(CONFORMANCE_EPOCH);
+        // A closed store fails with keystore_closed once it touches its seed, so the fixed refusal
+        // shows each request was refused before that.
+        await store.close();
+        const shapes = conformanceTypedData(own, nowSeconds());
+        const note: TypedData = {
+          types: {
+            EIP712Domain: [{ name: 'name', type: 'string' }],
+            Note: [{ name: 'text', type: 'string' }],
+          },
+          primaryType: 'Note',
+          domain: { name: 'AgentLink test' },
+          message: { text: 'hello' },
+        };
+        const cases: [string, unknown, TypedDataRefusal][] = [
+          ['an unknown primaryType', note, 'type_not_allowed'],
+          [
+            'a Record on another chain',
+            { ...shapes.record(), domain: occV2Domain(1, other) },
+            'domain_not_allowed',
+          ],
+          ['a Record over the fee ceiling', shapes.record({ maxFee: '500001' }), 'fee_not_allowed'],
+          ['a Record for another signer', shapes.record({ signer: other }), 'signer_not_allowed'],
+          ['a top-up to another address', shapes.topUp({ to: other }), 'payee_not_allowed'],
+          ['a top-up over the cap', shapes.topUp({ value: '50000001' }), 'value_not_allowed'],
+        ];
+        for (const [what, typed, reason] of cases) {
+          const error = await conformanceOutcome(() => store.sign712(typed as TypedData));
+          conformanceCheck(codeOfError(error) === 'typed_data_refused', `${what}: refused`);
+          conformanceCheck(
+            messageOfError(error) === TYPED_DATA_REFUSED[reason],
+            `${what}: the fixed message`,
+          );
+        }
+      },
+    );
   });
 }

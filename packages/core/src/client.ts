@@ -398,6 +398,14 @@ export class AgentLinkClient {
   }
 
   /**
+   * SEC-RECEIPTS-DEFAULT (11 §5.10): whether an AI app should say once that received receipts are
+   * now on (acks.ts `noticeDue`). A store read only.
+   */
+  receiptsNoticeDue(): Promise<boolean> {
+    return this.acks.noticeDue();
+  }
+
+  /**
    * Pulls from the transport, stores, processes, and returns the new messages from contacts (07 §2;
    * M1-7h): fetch with the 48 h look-back, dedup, verify once, store, per-contact rate limit, then
    * 04 §3.1.1 steps 5 to 9 (`card-update` first) and, behind the flag, delivery acks.

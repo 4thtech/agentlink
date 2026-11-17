@@ -7,7 +7,8 @@
 // is checked fail closed, in order; any failure is the fixed code `device_receipt_invalid`:
 //   1. the strict entry (envelope, 32-byte content key, card with `cardSig`);
 //   2. the card's `cardSig` by its `ownerEvm` (04 §2.4), owner and agent keys distinct (04 §2.9);
-//      with a disclosed recipient, the card's `agentEvm` is that recipient;
+//      the pack opens the record's recipient commitment (04 §5) and the card's `agentEvm` is that
+//      recipient (without the opening, any self-made card could carry the public envelopeHash);
 //   3. the ack envelope's signature under its `from`, which must be the card's `agentNostr`, and
 //      the card in force at the ack's `createdAt`;
 //   4. the key commitment and the decryption with the carried content key (04 §3.3);
@@ -60,7 +61,8 @@ const V2_KEYS = new Set(['kind', 'envelopeId', 'envelopeHash', 'recordId']);
 
 /**
  * Checks one pack `deviceReceipts` entry against the pack's `envelopeHash` (`0x` + 64 lowercase
- * hex) and, when the pack discloses it, the recipient's EVM address. Never throws.
+ * hex) and the recipient the pack's opening proved (null when the pack opens none: then the entry
+ * is refused). Never throws.
  */
 export async function checkDeviceReceipt(
   value: unknown,
@@ -75,7 +77,8 @@ export async function checkDeviceReceipt(
   } catch {
     return INVALID;
   }
-  if (recipientEvm !== null && card.agentEvm !== recipientEvm) return INVALID;
+  // Bound to the record: the pack must open the recipient commitment to the card's agent (07 §8).
+  if (recipientEvm === null || card.agentEvm !== recipientEvm) return INVALID;
   let envelope: Envelope;
   try {
     envelope = parseEnvelope(entry.data.envelope);

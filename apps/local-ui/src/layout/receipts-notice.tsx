@@ -1,5 +1,6 @@
 // SEC-RECEIPTS-DEFAULT (D-156; 11 §5.10): the one-time notice on Home after the update that turned
-// received receipts on by default. Closable; "Got it" or "Open Settings" closes it for good, and the
+// received receipts on by default. Only for people who upgraded: finishing first run closes it for
+// a new owner (pages/first-run). Closable; "Got it" or "Open Settings" closes it for good, and the
 // app keeps the dismissal for every browser (notices/index.ts, prefs/app-kept.ts). Fixed words only.
 import { Button, PageNotice } from '@4thtech-io/ui';
 import type { ReactElement } from 'react';
