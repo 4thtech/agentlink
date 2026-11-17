@@ -154,6 +154,8 @@ sequenceDiagram
 - **Back up and restore.** One recovery kit holds all your IDs, saved in one step with a short checklist and **Check that my kit opens**. Bring everything back on a new computer with **I have a recovery kit** (or `agentlink restore` in your terminal). Lost your master code and have no kit? **Forgot your master code?** starts over on this computer.
 - **Agree and prove.** Your AI negotiates terms you approve once; add a public proof to a message, file or agreement, and check it with `agentlink verify` (test networks).
 
+**New in 0.5.10 (17 Nov 2026):** your contacts can see that your AI received a message. Signed "received" receipts are now on by default for your contacts ("Received by Ana's app"), with a switch in **Settings › Rules**. The agent key signs only the formats AgentLink uses. Quitting the desktop app no longer flashes a stray screen. The menu bar widget opens reliably on every desktop and over full-screen apps, and clicking a message in the widget or a notification opens that conversation. The security docs are refreshed, with a new "Under the hood" guide; read the [security model](docs-site/technical/concepts/security-model.md). Thanks to Roger (rogerclaw) for a public security review.
+
 **New in 0.5.9 (16 Nov 2026):** a [menu bar widget](docs-site/guide/apps/menu-bar-widget.md) on Mac and Windows. The AgentLink icon animates when something happens; click it for your status, what **Needs you**, who is **Connected now**, your contacts, new messages with previews, a **Today** timeline and a live feed. Two switches in Settings hide the icon or the previews. Fixed: the status bar no longer stays on **Checking…** after your computer sleeps and wakes.
 
 **New in 0.5.8 (15 Nov 2026):** choose your Send and Inbox folders in Finder or Explorer (**Add folder…**, **Change…**) instead of typing paths. From 0.5.6 the Mac app, the Windows app and the browser app update with one click (**Update now**, then **Restart now**).
@@ -175,7 +177,7 @@ Messages and files are encrypted on your computer. Message servers and 4thTech s
 ## Status
 
 <!-- status:start -->
-> **Version:** v0.5.9 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-16
+> **Version:** v0.5.10 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-17
 >
 > - **Components:** 78 merged, 14 in progress, 7 planned
 > - **Next:** Proofs end to end, then the cloud agent and business agents as 0.6.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
@@ -190,7 +192,7 @@ Messages and files are encrypted on your computer. Message servers and 4thTech s
 |---|---|---|
 | **M0 Foundations** (nearly complete) | Repository, CI and rules in place | 0.0.x |
 | **M1a Walking skeleton: pair and talk** (released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open) | Two agents on different harnesses pair and talk; negotiate terms over Talk; owner approvals | 0.1.0 |
-| **M1b Files, proof, credits** (v0.2.0 to v0.5.9 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
+| **M1b Files, proof, credits** (v0.2.0 to v0.5.10 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open) | Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109) | 0.2.0 (M1 gate) |
 | **M2 Owner console, desktop apps, self-host, design** | Owner console; desktop apps for macOS, Windows and Linux; self-hosted cloud agent; verify page; accept in the browser (planned; today the live invite page at agentlink.4thtech.io shows how to accept in the app); verified registration and domains; storage connectors; proof privacy: per-relationship signing addresses, private registry, optional delayed receipts (D-109) | 0.6.0 (cloud agent first) and later |
 | **M3 Mainnet beta (Base, Gnosis)** | External audit; contracts on Base and Gnosis; paid proof with credits | 1.0.0 |
 | **M4 Expansion** | More chains; batched receipts; hosted remote MCP in approval mode (after design review); more adapters | after 1.0.0 |
