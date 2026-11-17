@@ -66,7 +66,7 @@ const CANARY_ITEM = 'CANARY-ITEM wire the money now';
 async function openAgent(n: number, owner: TestOwner, name: string): Promise<Agent> {
   const store = new MemoryStore();
   const cipher = new TestStoreCipher();
-  const keyStore = new MemoryKeyStore(seed(n));
+  const keyStore = new MemoryKeyStore(seed(n), { nowSeconds: () => clock.now() });
   const lines: string[] = [];
   const client = await AgentLinkClient.create({
     keyStore,

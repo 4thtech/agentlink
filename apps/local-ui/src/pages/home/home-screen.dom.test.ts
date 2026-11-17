@@ -1071,6 +1071,18 @@ describe('W7-ID-X1: ID chips, grouping, colour and who is asking', () => {
     expect(row('Denis')).toBeFalsy();
   });
 
+  it('a #person= link clears an ID filter so the person is shown', async () => {
+    await render(base(agentsAnswer(2)));
+    await click(q('[data-id-chip="tali-work"]'));
+    expect(row('Denis')).toBeFalsy();
+    history.pushState(null, '', `/#person=${DENIS.contactId}`);
+    await act(async () => {
+      window.dispatchEvent(new Event('hashchange'));
+    });
+    await settle();
+    expect(q(`[data-person-open="${DENIS.contactId}"]`)).toBeTruthy();
+  });
+
   it('R1-UI-07: in All IDs, an open ID with no people does not say "No one here yet" when another ID has some', async () => {
     await render(
       base({

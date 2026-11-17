@@ -13,7 +13,10 @@
 //   from the tray's bounds and the display's work area (popover-position.ts); bounds that are zero
 //   or off-screen fall back to the cursor, then to the work-area corner.
 // - Hides on blur and on Escape; a second click on the icon toggles it closed (the click that blurred
-//   it counts as that second click).
+//   it counts as that second click, but only when the pointer was on the icon at that blur).
+// - DESK-WIDGET-OPEN: a blur right after a show is ignored (the app coming forward); the first show
+//   waits for the first paint (no blank flash); on macOS it is a panel on every Space and over full
+//   screen, and showing it brings the app forward.
 // - It never shows an owner-presence prompt: its presence requests are cancelled by the session
 //   (security.ts isPopoverPresenceRequest, wired through ownsWebContents), and the page sends Resume
 //   and Approve to the main window over its one IPC channel (widget-ipc.ts).
@@ -87,10 +90,15 @@ export interface PopoverWindow {
   focus(): void;
   hide(): void;
   isVisible(): boolean;
+  /** DESK-WIDGET-OPEN: re-checked after an ignored early blur. */
+  isFocused(): boolean;
   isDestroyed(): boolean;
   destroy(): void;
+  /** DESK-WIDGET-OPEN (macOS): on every Space and over full-screen apps. */
+  setVisibleOnAllWorkspaces?(visible: boolean, options?: { visibleOnFullScreen?: boolean }): void;
   on(event: 'close' | 'page-title-updated', listener: (event: ElectronEvent) => void): void;
   on(event: 'blur' | 'closed', listener: () => void): void;
+  once(event: 'ready-to-show', listener: () => void): void;
 }
 
 export type PopoverWindowConstructor = new (options: PopoverWindowOptions) => PopoverWindow;
@@ -118,7 +126,11 @@ export interface PopoverDeps {
   readonly openMain: () => void;
   /** True once the app is quitting: then a close really closes. */
   readonly quitting: () => boolean;
+  /** DESK-WIDGET-OPEN (macOS): app.focus({steal: true}) when the popover shows. May throw. */
+  readonly focusApp?: () => void;
   readonly now?: () => number;
+  /** A one-shot timer (default setTimeout): the first-paint backstop. */
+  readonly setTimer?: (callback: () => void, ms: number) => unknown;
 }
 
 /** What the popover shows. */
@@ -126,6 +138,21 @@ export type PopoverPage = 'none' | 'fallback' | 'widget';
 
 /** A click on the icon this soon after a blur-hide is the click that caused the blur. */
 export const TOGGLE_GRACE_MS = 300;
+
+/** DESK-WIDGET-OPEN: a blur this soon after a show is the app coming forward, not the person leaving. */
+export const SHOW_BLUR_IGNORE_MS = 150;
+
+/**
+ * DESK-WIDGET-OPEN: a main-window focus this soon after a show is the app coming forward (it keeps
+ * the popover); a later one hides it.
+ */
+export const MAIN_FOCUS_GRACE_MS = 500;
+
+/** DESK-WIDGET-OPEN: a first show that never got a paint event still shows after this long. */
+export const FIRST_PAINT_BACKSTOP_MS = 1_000;
+
+const inside = (p: Point, r: Rect): boolean =>
+  p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height;
 
 const safe = <T>(read: () => T): T | null => {
   try {
@@ -148,6 +175,12 @@ export class Popover {
   #page: PopoverPage = 'none';
   #sessionReady = false;
   #blurHiddenAt = Number.NEGATIVE_INFINITY;
+  #shownAt = Number.NEGATIVE_INFINITY;
+  /** Counts shows: a focus re-check from an earlier show is stale and does nothing. */
+  #showCount = 0;
+  /** DESK-WIDGET-OPEN: the window painted once (ready-to-show); until then a show waits. */
+  #painted = false;
+  #showWhenPainted = false;
 
   constructor(deps: PopoverDeps) {
     this.#deps = deps;
@@ -184,13 +217,62 @@ export class Popover {
     const wanted = this.#wanted();
     if (this.#page !== wanted) this.#load(window, wanted);
     this.#place(window);
-    window.show();
-    window.focus();
+    if (!this.#painted) {
+      if (!this.#showWhenPainted) {
+        this.#showWhenPainted = true;
+        this.#timer(() => {
+          if (this.#window !== window || this.#painted || !this.#showWhenPainted) return;
+          this.#painted = true;
+          if (!window.isDestroyed()) this.#reveal(window);
+        }, FIRST_PAINT_BACKSTOP_MS);
+      }
+      return;
+    }
+    this.#reveal(window);
   }
 
   hide(): void {
+    this.#showWhenPainted = false;
     const window = this.#live();
     if (window !== null && window.isVisible()) window.hide();
+  }
+
+  /**
+   * TRAY-SHELL: the main window got focus. Within the grace after a show it is the app coming
+   * forward (the popover stays); later it hides the popover.
+   */
+  mainWindowFocused(): void {
+    if (this.#now() - this.#shownAt < MAIN_FOCUS_GRACE_MS) return;
+    this.hide();
+  }
+
+  #timer(callback: () => void, ms: number): void {
+    const setTimer = this.#deps.setTimer ?? ((cb: () => void, t: number) => setTimeout(cb, t));
+    safe(() => setTimer(callback, ms));
+  }
+
+  /** After an ignored early blur: refocus once; still not focused at the next check: hide. */
+  #recheckFocus(window: PopoverWindow, first: boolean, show: number): void {
+    if (show !== this.#showCount) return;
+    if (this.#window !== window || window.isDestroyed() || !window.isVisible()) return;
+    if (safe(() => window.isFocused()) === true) return;
+    if (first) {
+      safe(() => window.focus());
+      this.#timer(() => this.#recheckFocus(window, false, show), SHOW_BLUR_IGNORE_MS);
+      return;
+    }
+    window.hide();
+  }
+
+  #reveal(window: PopoverWindow): void {
+    this.#showWhenPainted = false;
+    if (this.#deps.platform === 'darwin') {
+      safe(() => this.#deps.focusApp?.());
+    }
+    this.#shownAt = this.#now();
+    this.#showCount += 1;
+    window.show();
+    window.focus();
   }
 
   /**
@@ -227,6 +309,8 @@ export class Popover {
     const window = this.#live();
     this.#window = null;
     this.#page = 'none';
+    this.#painted = false;
+    this.#showWhenPainted = false;
     if (window !== null) window.destroy();
   }
 
@@ -236,6 +320,8 @@ export class Popover {
     if (window.isDestroyed()) {
       this.#window = null;
       this.#page = 'none';
+      this.#painted = false;
+      this.#showWhenPainted = false;
       return null;
     }
     return window;
@@ -276,6 +362,16 @@ export class Popover {
     const deps = this.#deps;
     const window = new deps.BrowserWindow(popoverOptions(deps.platform, deps.preload));
     const contents = window.webContents;
+    if (deps.platform === 'darwin') {
+      safe(() => window.setVisibleOnAllWorkspaces?.(true, { visibleOnFullScreen: true }));
+    }
+    // DESK-WIDGET-OPEN: the first show waits for the first paint (never a blank window).
+    const painted = (): void => {
+      if (this.#window !== window || this.#painted) return;
+      this.#painted = true;
+      if (this.#showWhenPainted && !window.isDestroyed()) this.#reveal(window);
+    };
+    window.once('ready-to-show', painted);
     lockWebContents(contents, deps.lock, deps.shell);
     // The fallback page's one button: acted on only while that exact page is shown. The navigation
     // itself is blocked (the action host is never on the locked origin).
@@ -327,8 +423,18 @@ export class Popover {
     });
     window.on('blur', () => {
       if (!window.isVisible()) return;
+      // DESK-WIDGET-OPEN: the app coming forward right after the show; not the person leaving.
+      const since = this.#now() - this.#shownAt;
+      if (since < SHOW_BLUR_IGNORE_MS) {
+        // Re-checked at the end of the window: never left up unfocused (over the main window).
+        const show = this.#showCount;
+        this.#timer(() => this.#recheckFocus(window, true, show), SHOW_BLUR_IGNORE_MS - since);
+        return;
+      }
       window.hide();
-      this.#blurHiddenAt = this.#now();
+      // The grace (a click on the icon toggling it closed) only when that blur was the click on
+      // the icon: an unrelated blur never swallows the next real click.
+      this.#blurHiddenAt = this.#pointerOnIcon() ? this.#now() : Number.NEGATIVE_INFINITY;
     });
     window.on('page-title-updated', (event) => event.preventDefault());
     window.on('close', (event) => {
@@ -344,7 +450,18 @@ export class Popover {
     });
     this.#window = window;
     this.#page = 'none';
+    this.#painted = false;
+    this.#showWhenPainted = false;
     return window;
+  }
+
+  /** True when the pointer is on the tray icon now (unknown bounds or pointer: false). */
+  #pointerOnIcon(): boolean {
+    const tray = validTrayBounds(safe(() => this.#deps.trayBounds()));
+    const cursor = safe(() => this.#deps.screen.getCursorScreenPoint());
+    // Unknown bounds or pointer: assume the icon (a click then never reopens what it just closed).
+    if (tray === null || !isPoint(cursor)) return true;
+    return inside(cursor, tray);
   }
 
   #place(window: PopoverWindow): void {

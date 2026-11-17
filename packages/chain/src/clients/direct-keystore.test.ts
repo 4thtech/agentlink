@@ -10,7 +10,9 @@ import {
   CryptoInputError,
   DIRECT_TX_ALLOWLIST,
   DIRECT_TX_SELECTORS,
+  MAX_TOP_UP_WINDOW_SECONDS,
   TRANSACTION_REFUSED,
+  TYPED_DATA_ALLOWLIST,
   directTransactionSnapshot,
   type DirectTransaction,
   type KeyStore,
@@ -27,7 +29,17 @@ import {
 import { privateKeyToAccount } from 'viem/accounts';
 import { describe, expect, it, vi } from 'vitest';
 import { ChainConfigError, type ChainConfig } from '../config/index.js';
-import { buildWithdraw, sendDeposit, sendWithdraw, buildDeposit } from '../fees/index.js';
+import { feeInTokenUnits } from '../config/fees.js';
+import { TESTNET_NETWORKS } from '../config/testnets.js';
+import {
+  GASLESS_CHAIN_IDS,
+  GASLESS_WINDOW_SECONDS,
+  buildWithdraw,
+  buildDeposit,
+  gaslessValueBounds,
+  sendDeposit,
+  sendWithdraw,
+} from '../fees/index.js';
 import type { Hex } from '../ids/index.js';
 import {
   ChainError,
@@ -305,6 +317,41 @@ describe("the KeyStore's direct-mode allowlist matches the shipped chains and AB
       );
     }
     expect(chainRegistry().some((c) => !c.testnet && DIRECT_TX_ALLOWLIST[c.chainId])).toBe(false);
+  });
+
+  it("sign712's allowlist (SEC-KS-712-ALLOWLIST): the same contracts, fee tokens, ceilings and top-up tokens", () => {
+    const testnets = chainRegistry().filter((c) => c.testnet);
+    expect(testnets.map((c) => c.chainId).sort()).toEqual(
+      Object.keys(TYPED_DATA_ALLOWLIST).map(Number).sort(),
+    );
+    for (const c of testnets) {
+      const allowed = TYPED_DATA_ALLOWLIST[c.chainId];
+      expect(allowed?.notary).toBe(c.contracts.notary.toLowerCase());
+      expect(allowed?.vault).toBe(c.contracts.vault.toLowerCase());
+      // Record fee tokens: every offered token, each up to the NOTARIZE cap in its units.
+      const ceilings = Object.fromEntries(
+        c.feeTokens.map((t) => [
+          (t.address ?? `0x${'0'.repeat(40)}`).toLowerCase(),
+          feeInTokenUnits('NOTARIZE', t.decimals).cap,
+        ]),
+      );
+      expect(allowed?.recordFeeTokens).toEqual(ceilings);
+      // Top-up tokens: the EIP-3009 tokens of a gasless chain (07 §6.1 token flag; the vault's
+      // capability gates the top-up itself), each capped at the gasless maximum.
+      const network = TESTNET_NETWORKS.find((n) => n.chainId === c.chainId);
+      const gasless = GASLESS_CHAIN_IDS.includes(c.chainId)
+        ? (network?.feeTokens ?? []).filter((t) => t.eip3009 && t.address !== null)
+        : [];
+      expect(Object.keys(allowed?.topUpTokens ?? {}).sort()).toEqual(
+        gasless.map((t) => (t.address as string).toLowerCase()).sort(),
+      );
+      for (const t of gasless) {
+        const top = allowed?.topUpTokens[(t.address as string).toLowerCase()];
+        expect(top?.maxValue).toBe(gaslessValueBounds(t.decimals).max);
+      }
+    }
+    expect(GASLESS_WINDOW_SECONDS).toBeLessThan(MAX_TOP_UP_WINDOW_SECONDS);
+    expect(chainRegistry().some((c) => !c.testnet && TYPED_DATA_ALLOWLIST[c.chainId])).toBe(false);
   });
 
   it('the selectors are the client ABI functions', () => {

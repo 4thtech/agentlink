@@ -3,8 +3,8 @@
 // EIP-3009 `ReceiveWithAuthorization` with its EVM key, and a submitter redeems it through the
 // vault's `depositWithAuthorization`, paying the network cost.
 //
-// This module is the one chokepoint for that signature (the KeyStore's sign712 signs any typed data,
-// so the rules live here, not in the KeyStore):
+// This module builds that signature and checks its rules before asking the KeyStore; the KeyStore's
+// sign712 enforces the same payee, token, cap and window again (SEC-KS-712-ALLOWLIST):
 // - `from` is the agent's own address, read from the KeyStore; the signature must recover to it,
 //   so only the agent EVM key signs (never the owner key; owner decision 2026-10-23).
 // - `to` is the fee vault of the shipped chain registry (`getChainConfig`, composed from the pinned

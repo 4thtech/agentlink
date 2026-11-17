@@ -98,9 +98,16 @@ export class FakeBrowserWindow extends Emitter implements BrowserWindow {
   }
   /** TRAY-SHELL: when set, every load is rejected with it (a cancelled load). */
   loadError: Error | null = null;
+  /**
+   * DESK-WIDGET-OPEN: whether a load paints at once (emits `ready-to-show`). Null: only the popover
+   * (always on top) does; a test sets false to hold the first paint.
+   */
+  autoReady: boolean | null = null;
   loadURL(url: string): Promise<void> {
     this.loaded.push(url);
     this.webContents.url = url;
+    const auto = this.autoReady ?? (this.options as { alwaysOnTop?: boolean }).alwaysOnTop === true;
+    if (auto) this.emit('ready-to-show');
     return this.loadError === null ? Promise.resolve() : Promise.reject(this.loadError);
   }
   show(): void {
@@ -133,6 +140,11 @@ export class FakeBrowserWindow extends Emitter implements BrowserWindow {
   bounds: { x: number; y: number; width: number; height: number } | null = null;
   setBounds(bounds: { x: number; y: number; width: number; height: number }): void {
     this.bounds = bounds;
+  }
+  /** DESK-WIDGET-OPEN: setVisibleOnAllWorkspaces calls (macOS popover). */
+  readonly allWorkspaces: unknown[][] = [];
+  setVisibleOnAllWorkspaces(visible: boolean, options?: { visibleOnFullScreen?: boolean }): void {
+    this.allWorkspaces.push([visible, options]);
   }
   destroy(): void {
     this.destroyed = true;
@@ -312,6 +324,11 @@ export class FakeApp extends Emitter implements App {
   lockData: Record<string, unknown> | undefined;
   exitCode: number | null = null;
   quitCalls = 0;
+  /** DESK-WIDGET-OPEN: app.focus calls (the options each time). */
+  readonly focusCalls: unknown[] = [];
+  focus(options?: { steal: boolean }): void {
+    this.focusCalls.push(options);
+  }
   inApplications = false;
   moveResult = true;
   moveCalls = 0;

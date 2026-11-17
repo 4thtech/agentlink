@@ -39,6 +39,12 @@ export function targetOf(item: NotificationItem): string {
       return '/settings/updates';
     case 'network':
       return '/advanced/network';
+    case 'messages':
+    case 'files':
+      // The person's conversation opens on Home (Home checks the ID against its own people).
+      return item.ref !== undefined && /^0x[0-9a-f]{40}$/.test(item.ref)
+        ? `${HOME_PATH}#person=${item.ref}`
+        : HOME_PATH;
     default:
       return HOME_PATH;
   }
@@ -320,6 +326,8 @@ export function NotificationBell({
   const go = (to: string): void => {
     close(false);
     navigate(to);
+    // pushState does not fire `hashchange`; Home listens for it to open the person (same page or not).
+    if (to.includes('#')) window.dispatchEvent(new Event('hashchange'));
   };
 
   return (

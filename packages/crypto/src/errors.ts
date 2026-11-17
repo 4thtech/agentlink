@@ -56,7 +56,12 @@ export type CryptoInputErrorCode =
    * M3-4b-t-1: a token's EIP-712 domain as read from chain does not match the configured chain and
    * token, or does not reproduce the token's own DOMAIN_SEPARATOR(); nothing may be signed under it.
    */
-  | 'token_domain_mismatch';
+  | 'token_domain_mismatch'
+  /**
+   * SEC-KS-712-ALLOWLIST: typed data KeyStore.sign712 does not sign (04 §3.1.1). The message is one
+   * of TYPED_DATA_REFUSED's fixed sentences, which name the rule, never the input.
+   */
+  | 'typed_data_refused';
 
 /**
  * The one error type @4thtech-io/crypto throws for input it refuses.

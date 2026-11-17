@@ -6,7 +6,10 @@
 import { describe, expect, it } from 'vitest';
 import type { BrowserWindowOptions } from '../../src/main/electron-api.js';
 import {
+  FIRST_PAINT_BACKSTOP_MS,
+  MAIN_FOCUS_GRACE_MS,
   Popover,
+  SHOW_BLUR_IGNORE_MS,
   type PopoverDeps,
   type PopoverScreen,
   type PopoverWindow,
@@ -88,6 +91,7 @@ function setup(over: Partial<PopoverDeps> = {}) {
   let quitting = false;
   const opened: number[] = [];
   const screen = fakeScreen();
+  const due: { at: number; callback: () => void }[] = [];
   const deps: PopoverDeps = {
     BrowserWindow: FakePopoverWindow,
     shell: { openExternal: () => Promise.resolve() },
@@ -100,6 +104,7 @@ function setup(over: Partial<PopoverDeps> = {}) {
     },
     quitting: () => quitting,
     now: () => now,
+    setTimer: (callback, ms) => due.push({ at: now + ms, callback }),
     ...over,
   };
   const popover = new Popover(deps);
@@ -109,7 +114,15 @@ function setup(over: Partial<PopoverDeps> = {}) {
     screen,
     opened,
     advance: (ms: number) => {
-      now += ms;
+      const until = now + ms;
+      for (;;) {
+        const next = due.filter((t) => t.at <= until).sort((a, b) => a.at - b.at)[0];
+        if (next === undefined) break;
+        due.splice(due.indexOf(next), 1);
+        now = next.at;
+        next.callback();
+      }
+      now = until;
     },
     quit: () => {
       quitting = true;
@@ -358,6 +371,8 @@ describe('Popover', () => {
     ready(s);
     s.popover.show();
     expect(s.popover.visible).toBe(true);
+    // DESK-WIDGET-OPEN: a blur right after the show is ignored (the app coming forward).
+    s.advance(200);
     s.win().emit('blur');
     expect(s.popover.visible).toBe(false);
     s.advance(1_000);
@@ -376,7 +391,10 @@ describe('Popover', () => {
   });
 
   it('a second click toggles it closed (also when that click blurred it first)', () => {
-    const s = setup();
+    // DESK-WIDGET-OPEN: the pointer is on the icon when that click blurs it.
+    const s = setup({
+      screen: { ...fakeScreen(), getCursorScreenPoint: () => ({ x: 1010, y: 10 }) },
+    });
     ready(s);
     s.popover.toggle();
     expect(s.popover.visible).toBe(true);
@@ -385,6 +403,7 @@ describe('Popover', () => {
     s.advance(1_000);
     s.popover.toggle();
     expect(s.popover.visible).toBe(true);
+    s.advance(500);
     // Clicking the icon blurs the popover first, then the click arrives.
     s.win().emit('blur');
     s.advance(50);
@@ -393,6 +412,172 @@ describe('Popover', () => {
     s.advance(1_000);
     s.popover.toggle();
     expect(s.popover.visible).toBe(true);
+  });
+
+  it('DESK-WIDGET-OPEN: macOS: a panel on every Space and over full screen', () => {
+    expect(popoverOptions('darwin').type).toBe('panel');
+    expect(popoverOptions('win32').type).toBeUndefined();
+    expect(popoverOptions('linux').type).toBeUndefined();
+    const s = setup();
+    s.popover.show();
+    expect(s.win().allWorkspaces).toEqual([[true, { visibleOnFullScreen: true }]]);
+    s.popover.hide();
+    s.popover.show();
+    expect(s.win().allWorkspaces).toHaveLength(1);
+    const w = setup({ platform: 'win32' });
+    w.popover.show();
+    expect(w.win().allWorkspaces).toEqual([]);
+  });
+
+  it('DESK-WIDGET-OPEN: macOS: showing it brings AgentLink forward (steal)', () => {
+    const focused: unknown[] = [];
+    const s = setup({ focusApp: () => focused.push('mac') });
+    s.popover.show();
+    expect(focused).toEqual(['mac']);
+    const w = setup({ platform: 'win32', focusApp: () => focused.push('win') });
+    w.popover.show();
+    expect(focused).toEqual(['mac']);
+  });
+
+  it('DESK-WIDGET-OPEN: an early blur (the app coming forward) does not hide it', () => {
+    const s = setup();
+    ready(s);
+    s.popover.toggle();
+    s.advance(50);
+    s.win().emit('blur');
+    expect(s.popover.visible).toBe(true);
+    s.advance(200);
+    s.win().emit('blur');
+    expect(s.popover.visible).toBe(false);
+  });
+
+  it('DESK-WIDGET-OPEN: an early blur with focus never coming back: refocused once, then hidden', () => {
+    const s = setup();
+    ready(s);
+    s.popover.toggle();
+    const focusesAtShow = s.win().focusCount;
+    s.advance(50);
+    s.win().emit('blur');
+    expect(s.popover.visible).toBe(true);
+    s.advance(SHOW_BLUR_IGNORE_MS);
+    expect(s.win().focusCount).toBe(focusesAtShow + 1);
+    expect(s.popover.visible).toBe(true);
+    s.advance(SHOW_BLUR_IGNORE_MS);
+    expect(s.popover.visible).toBe(false);
+  });
+
+  it('DESK-WIDGET-OPEN: a re-check left from an earlier show does nothing to a new show', () => {
+    const s = setup();
+    ready(s);
+    s.popover.toggle();
+    s.advance(50);
+    s.win().emit('blur');
+    s.win().webContents.emit('before-input-event', new FakeEvent(), {
+      type: 'keyDown',
+      key: 'Escape',
+    });
+    s.advance(20);
+    s.popover.toggle();
+    const focuses = s.win().focusCount;
+    s.advance(400);
+    expect(s.popover.visible).toBe(true);
+    expect(s.win().focusCount).toBe(focuses);
+  });
+
+  it('DESK-WIDGET-OPEN: an early blur with focus back stays up', () => {
+    const s = setup();
+    ready(s);
+    s.popover.toggle();
+    s.advance(50);
+    s.win().emit('blur');
+    s.win().focused = true;
+    s.advance(1_000);
+    expect(s.popover.visible).toBe(true);
+  });
+
+  it('DESK-WIDGET-OPEN: a main-window focus hides it only after the grace', () => {
+    const s = setup();
+    ready(s);
+    s.popover.toggle();
+    s.advance(100);
+    s.popover.mainWindowFocused();
+    expect(s.popover.visible).toBe(true);
+    s.advance(MAIN_FOCUS_GRACE_MS);
+    s.popover.mainWindowFocused();
+    expect(s.popover.visible).toBe(false);
+  });
+
+  it('DESK-WIDGET-OPEN: unknown tray bounds: a blur-hide then a click does not reopen', () => {
+    const s = setup({ trayBounds: () => null });
+    ready(s);
+    s.popover.toggle();
+    s.advance(500);
+    s.win().emit('blur');
+    s.advance(50);
+    s.popover.toggle();
+    expect(s.popover.visible).toBe(false);
+  });
+
+  it('DESK-WIDGET-OPEN: an unrelated blur, then a click on the icon, opens it', () => {
+    // The pointer is elsewhere (another app took focus), not on the icon.
+    const s = setup();
+    ready(s);
+    s.popover.toggle();
+    s.advance(500);
+    s.win().emit('blur');
+    expect(s.popover.visible).toBe(false);
+    s.advance(50);
+    s.popover.toggle();
+    expect(s.popover.visible).toBe(true);
+  });
+
+  it('DESK-WIDGET-OPEN: the first show waits for the first paint (no blank flash)', () => {
+    class HeldWindow extends FakePopoverWindow {
+      override autoReady: boolean | null = false;
+    }
+    const s = setup({ BrowserWindow: HeldWindow, setTimer: () => undefined });
+    ready(s);
+    s.popover.toggle();
+    expect(s.win().loaded).toEqual([WIDGET]);
+    expect(s.popover.visible).toBe(false);
+    expect(s.win().focusCount).toBe(0);
+    s.win().emit('ready-to-show');
+    expect(s.popover.visible).toBe(true);
+    expect(s.win().focusCount).toBe(1);
+    // Painted once: later shows are immediate.
+    s.popover.hide();
+    s.advance(1_000);
+    s.popover.toggle();
+    expect(s.popover.visible).toBe(true);
+  });
+
+  it('DESK-WIDGET-OPEN: no paint event at all: it still shows after the backstop', () => {
+    class HeldWindow extends FakePopoverWindow {
+      override autoReady: boolean | null = false;
+    }
+    const timers: { callback: () => void; ms: number }[] = [];
+    const s = setup({
+      BrowserWindow: HeldWindow,
+      setTimer: (callback, ms) => timers.push({ callback, ms }),
+    });
+    s.popover.toggle();
+    s.popover.toggle();
+    expect(timers).toHaveLength(1);
+    expect(timers[0]?.ms).toBe(FIRST_PAINT_BACKSTOP_MS);
+    expect(s.popover.visible).toBe(false);
+    timers[0]?.callback();
+    expect(s.popover.visible).toBe(true);
+  });
+
+  it('DESK-WIDGET-OPEN: a hide before the first paint cancels the pending show', () => {
+    class HeldWindow extends FakePopoverWindow {
+      override autoReady: boolean | null = false;
+    }
+    const s = setup({ BrowserWindow: HeldWindow, setTimer: () => undefined });
+    s.popover.toggle();
+    s.popover.hide();
+    s.win().emit('ready-to-show');
+    expect(s.popover.visible).toBe(false);
   });
 
   it('is placed under the tray icon in the work area and focused', () => {

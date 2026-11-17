@@ -3,6 +3,7 @@
 // Classes and components come from packages/ui only (CSP: no inline styles).
 import { Banner, Button, CopyPrompt, EmptyState, PageNotice } from '@4thtech-io/ui';
 import type { ReactElement } from 'react';
+import { inDesktopApp } from '../desktop.js';
 import { detectOs } from '../layout/os.js';
 import { UPGRADE, type Platform } from '../pages/first-run/strings.js';
 import { REOPEN as R, STATE_STRINGS as S } from './strings.js';
@@ -66,8 +67,13 @@ export function ReopenSteps(): ReactElement {
         <li>{R[os]}</li>
         <li>{R.ai}</li>
       </ul>
-      <p className="al-text-body-sm al-muted">{R.terminal}</p>
-      <CopyPrompt command={S.linkExpiredCommand} />
+      {/* DESK-QUIT-ORDER: the desktop app never offers a terminal command. */}
+      {inDesktopApp() ? null : (
+        <>
+          <p className="al-text-body-sm al-muted">{R.terminal}</p>
+          <CopyPrompt command={S.linkExpiredCommand} />
+        </>
+      )}
     </div>
   );
 }

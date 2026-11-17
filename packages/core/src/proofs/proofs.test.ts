@@ -4,7 +4,11 @@
 // the chain is the in-memory Notary of testing/chain.ts behind the chain package's own submitter,
 // selector and verifier, so every chain decision runs the code that runs against a testnet.
 import { parseJson, type JsonObject, type KeyStore } from '@4thtech-io/crypto';
-import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import {
+  MemoryKeyStore,
+  MemoryOwnerKeyStore,
+  signTypedDataWithAgentKey,
+} from '@4thtech-io/crypto/testing';
 import { RECORD_KIND, buildRecord, signRecord, verifyProofPack, type Hex } from '@4thtech-io/chain';
 import { createLogger } from '@4thtech-io/log';
 import { defaultPolicy, type Policy, type RecordJson } from '@4thtech-io/types';
@@ -73,7 +77,7 @@ const ownerC = new MemoryOwnerKeyStore(seed(223), passphrase());
 async function openAgent(n: number, owner: TestOwner, name: string): Promise<Agent> {
   const store = new MemoryStore();
   const cipher = new TestStoreCipher();
-  const keyStore = new MemoryKeyStore(seed(n));
+  const keyStore = new MemoryKeyStore(seed(n), { nowSeconds: () => clock.now() });
   const mark = new MemoryPolicyMark();
   const lines: string[] = [];
   const client = await AgentLinkClient.create({
@@ -1133,10 +1137,9 @@ describe('the recipient checks the signed Record before storing it (04 §3.4 che
   });
 
   it('a signature by another key is dropped', async () => {
-    const c = await openAgent(33, ownerC, 'carol');
     await expectDropped(
       await tampered(async (body, { rec }) => {
-        body.signature = await signRecord(c.keyStore, rec.built);
+        body.signature = signTypedDataWithAgentKey(seed(33), rec.built.typedData);
       }),
     );
   });
@@ -1150,17 +1153,16 @@ describe('the recipient checks the signed Record before storing it (04 §3.4 che
   });
 
   it('an ERC-1271 signer that does not accept is dropped; one that accepts is stored', async () => {
-    const c = await openAgent(33, ownerC, 'carol');
     // A's address has code; the signature is not A's ECDSA signature: only the account can accept.
     const refused = await tampered(async (body, { a, rec }) => {
       chain.contractAccounts.set(a.id.toLowerCase(), false);
-      body.signature = await signRecord(c.keyStore, rec.built);
+      body.signature = signTypedDataWithAgentKey(seed(33), rec.built.typedData);
     });
     await expectDropped(refused);
 
     const accepted = await tampered(async (body, { a, rec }) => {
       chain.contractAccounts.set(a.id.toLowerCase(), true);
-      body.signature = await signRecord(c.keyStore, rec.built);
+      body.signature = signTypedDataWithAgentKey(seed(33), rec.built.typedData);
     });
     expect(await accepted.b.client.getProof({ envelopeId: accepted.envelopeId })).toMatchObject({
       recordId: accepted.rec.recordId,
