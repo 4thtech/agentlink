@@ -330,7 +330,13 @@ function PersonOpen({
     [data.received, data.sent, data.inboxFolder, clients.reveal, clients.preview],
   );
   return (
-    <div className="hm-open hm-c al-expand" data-person-open={person.contactId}>
+    <div
+      className="hm-open hm-c al-expand"
+      data-person-open={person.contactId}
+      role="region"
+      tabIndex={-1}
+      aria-label={fmt(S.conversationWith, { name: person.name })}
+    >
       {/* UX 2026-11-12: one calm line here; the full explanation is on the contact's own page. */}
       {removed ? (
         <Banner
@@ -783,13 +789,57 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   const data = view.state === 'ready' ? view.data : undefined;
   // NOTIFY-DEEPLINK: a notification click opens that person's conversation (checked against the people
   // Home holds; an unknown ID opens nothing).
+  // Then it is scrolled to, focused and marked for a moment. The fragment is read at the start and
+  // again on `hashchange` (in-app navigation does not reload Home).
+  const [wanted, setWanted] = useState<string | undefined>(() => personFromHash(location.hash));
+  const [missing, setMissing] = useState(false);
+  const [jump, setJump] = useState<{ readonly id: string } | undefined>(undefined);
+  const archivedBox = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
-    if (data === undefined) return;
-    const wanted = personFromHash(location.hash);
-    if (wanted === undefined) return;
-    if (data.people.some((p) => p.contactId === wanted)) setOpen(wanted);
+    const onHash = (): void => {
+      const id = personFromHash(location.hash);
+      if (id !== undefined) setWanted(id);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+  useEffect(() => {
+    if (data === undefined || wanted === undefined) return;
     clearPersonHash();
-  }, [data]);
+    setWanted(undefined);
+    if (data.people.some((p) => p.contactId === wanted)) {
+      setMissing(false);
+      setQuery('');
+      setOpen(wanted);
+      setJump({ id: wanted });
+    } else {
+      setMissing(true);
+    }
+  }, [data, wanted]);
+  useEffect(() => {
+    if (jump === undefined) return;
+    let frame = 0;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const run = (): void => {
+      const el = document.querySelector<HTMLElement>(`[data-person-open="${jump.id}"]`);
+      if (el === null) {
+        if (tries++ < 20) frame = requestAnimationFrame(run);
+        return;
+      }
+      const details = el.closest('details');
+      if (details !== null) details.open = true;
+      el.scrollIntoView?.({ block: 'start', behavior: 'auto' });
+      el.focus({ preventScroll: true });
+      el.classList.add('hm-target');
+      timer = setTimeout(() => el.classList.remove('hm-target'), 2000);
+    };
+    run();
+    return () => {
+      cancelAnimationFrame(frame);
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [jump]);
   const many = agents.length > 1;
   const otherAgent =
     filter !== 'all' && current !== undefined && filter !== current.name
@@ -1155,6 +1205,28 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
             {pro ? null : <PasteEntryLink className="inv-link-button" />}
             <section aria-labelledby="hm-people-h" className="hm-people hm-c">
               {peopleHead}
+              {missing ? (
+                <Banner tone="info" compact onDismiss={() => setMissing(false)}>
+                  {S.contactNotListed}
+                  {archivedPeople.length > 0 ? (
+                    <>
+                      {' '}
+                      <button
+                        type="button"
+                        className="al-btn al-btn-ghost al-btn-sm"
+                        data-show-archived=""
+                        onClick={() => {
+                          if (archivedBox.current !== null) archivedBox.current.open = true;
+                          archivedBox.current?.scrollIntoView?.({ block: 'start' });
+                          setMissing(false);
+                        }}
+                      >
+                        {S.showArchived}
+                      </button>
+                    </>
+                  ) : null}
+                </Banner>
+              ) : null}
               {idChips}
               {many && current !== undefined && people.length > 0 ? (
                 <h3 className="hm-id-group hm-f al-text-label" data-id-group={current.name}>
@@ -1241,7 +1313,7 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
                 </div>
               )}
               {archivedPeople.length === 0 ? null : (
-                <details className="hm-archived" data-archived="">
+                <details className="hm-archived" data-archived="" ref={archivedBox}>
                   <summary className="hm-kicker al-text-label">
                     {fmt(S.archivedCount, { count: archivedPeople.length })}
                   </summary>

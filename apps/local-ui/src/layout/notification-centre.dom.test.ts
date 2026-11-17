@@ -186,6 +186,8 @@ describe('the bell', () => {
       menu.querySelector<HTMLElement>('[data-kind="messages"]')?.click();
     });
     expect(location.pathname).toBe('/');
+    // The person's conversation opens on Home (it listens for the fragment).
+    expect(location.hash).toBe(`#person=${A}`);
     const mark = calls.find((c) => c.method === 'POST');
     expect(mark?.url).toBe(`/api/ui/notifications/messages-${A}/read`);
     expect(mark?.headers['x-agentlink-csrf']).toBe('tok');

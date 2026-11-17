@@ -204,6 +204,9 @@ export const HOME_STRINGS = {
   restoreLabel: 'Move {name} back to People',
   archived: 'Archived',
   archivedCount: 'Archived ({count})',
+  contactNotListed: "This contact isn't in this ID's list. It may be archived.",
+  showArchived: 'Show archived',
+  conversationWith: 'Conversation with {name}',
   archivedHint:
     'People you archived and connections that were removed. Nothing is deleted, and your AI still sees them.',
   checked: 'Contact checked.',

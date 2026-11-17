@@ -48,6 +48,7 @@ import { parseItem, render, type ActivityItem } from '../activity/clean.js';
 import { LIST_PATH, parseList, type ContactRow } from '../contacts/data.js';
 import { parseHealthSnapshot, type HealthSnapshot } from '../home/data.js';
 import { APP_UPDATE_PATH, parseUpdate, type UpdateView } from '../updates/data.js';
+import { APPROVAL_ID } from '../approvals/client.js';
 import { closeWidget, openMain, quitApp } from './bridge.js';
 import { WIDGET_PATH, parseWidget, sum, type WidgetView } from './data.js';
 import {
@@ -85,10 +86,13 @@ interface Model {
   readonly widgetFailed: boolean;
   readonly contacts: readonly ContactRow[];
   readonly notes?: NotificationList;
+  /** The one request waiting, when exactly one does (an `apr_…` ID, checked); else none. */
+  readonly soleApproval?: string | undefined;
   readonly feed: readonly ActivityItem[];
   readonly update?: UpdateView;
   readonly loaded: boolean;
 }
+const APPROVALS_PATH = '/api/approvals';
 const EMPTY: Model = { widgetFailed: false, contacts: [], feed: [], loaded: false };
 
 const nameOfRow = (c: ContactRow): string =>
@@ -259,6 +263,21 @@ export function WidgetPage({
         get(APP_UPDATE_PATH),
       ]);
       if (!alive.current) return;
+      // Exactly one request waits: its ID goes to the main window, which opens that request.
+      let sole: string | undefined;
+      const waiting = n.kind === 'ok' ? readNotificationList(n.data)?.approvals : undefined;
+      if (waiting === 1) {
+        const list = await get(APPROVALS_PATH);
+        const raw =
+          list.kind === 'ok' && typeof list.data === 'object' && list.data !== null
+            ? (list.data as { approvals?: unknown }).approvals
+            : undefined;
+        if (Array.isArray(raw) && raw.length === 1) {
+          const id = (raw[0] as { approvalId?: unknown } | null)?.approvalId;
+          if (typeof id === 'string' && APPROVAL_ID.test(id)) sole = id;
+        }
+        if (!alive.current) return;
+      }
       setModel((m) => {
         const view = w.kind === 'ok' ? parseWidget(w.data) : undefined;
         const list = c.kind === 'ok' ? parseList(c.data) : undefined;
@@ -280,6 +299,7 @@ export function WidgetPage({
           widgetFailed: view === undefined,
           contacts: list?.kind === 'ok' ? list.contacts : m.contacts,
           ...(notes === undefined ? {} : { notes }),
+          ...(sole === undefined ? { soleApproval: undefined } : { soleApproval: sole }),
           feed: feed ?? m.feed,
           ...(upd === undefined ? {} : { update: upd }),
           loaded: true,
@@ -413,6 +433,11 @@ export function WidgetPage({
   const files = (model.notes?.items ?? [])
     .filter((i) => i.kind === 'files' && !i.read)
     .reduce((n, i) => n + i.count, 0);
+  // One person with new files: their conversation (and files) open; several: no target.
+  const fileRefs = (model.notes?.items ?? [])
+    .filter((i) => i.kind === 'files' && !i.read && i.ref !== undefined)
+    .map((i) => i.ref as string);
+  const filesTarget = fileRefs.length === 1 ? fileRefs[0] : undefined;
   const needs = approvals + files > 0;
   const paused = link === 'paused';
   const offline = link === 'offline';
@@ -493,7 +518,7 @@ export function WidgetPage({
                     type="button"
                     className="wg-row"
                     data-wg-nav
-                    onClick={go('approvals')}
+                    onClick={go('approvals', model.soleApproval)}
                     disabled={offline}
                   >
                     <span className="wg-ico">
@@ -512,7 +537,7 @@ export function WidgetPage({
                     type="button"
                     className="wg-row"
                     data-wg-nav
-                    onClick={go('inbox')}
+                    onClick={go('inbox', filesTarget)}
                     disabled={offline}
                   >
                     <span className="wg-ico">
@@ -531,7 +556,7 @@ export function WidgetPage({
                 type="button"
                 className="al-btn al-btn-primary al-btn-sm wg-block-btn"
                 data-wg-nav
-                onClick={go('approvals')}
+                onClick={go('approvals', model.soleApproval)}
               >
                 {S.review}
               </button>

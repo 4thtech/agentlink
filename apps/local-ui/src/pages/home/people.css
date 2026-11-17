@@ -32,6 +32,27 @@
   padding: var(--al-space-1) var(--al-space-4) var(--al-space-5);
   border-top: 1px solid var(--al-color-border-subtle);
 }
+/* NOTIFY-DEEPLINK: the conversation a notification or widget row opened, marked for a moment. */
+.hm-open:focus {
+  outline: none;
+}
+.hm-open.hm-target {
+  animation: hm-target-flash 1.6s ease-out;
+  box-shadow: inset 3px 0 0 var(--al-color-accent, currentColor);
+}
+@keyframes hm-target-flash {
+  from {
+    background: var(--al-color-accent-subtle, rgba(127, 127, 127, 0.18));
+  }
+  to {
+    background: transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hm-open.hm-target {
+    animation: none;
+  }
+}
 .hm-files,
 .hm-ap-body {
   gap: var(--al-space-2);
