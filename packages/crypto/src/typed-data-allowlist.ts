@@ -23,7 +23,12 @@
 // reviewed change, never by configuration). The chain package's tests check them against the
 // shipped chain configs, so the two cannot drift apart.
 import { AGENT_CARD_DOMAIN, AGENT_CARD_TYPES } from './agent-card.js';
-import type { TypedData, TypedDataField, TypedDataTypes } from './eip712.js';
+import {
+  hashTypedData,
+  type TypedData,
+  type TypedDataField,
+  type TypedDataTypes,
+} from './eip712.js';
 import { CryptoInputError } from './errors.js';
 import { DIRECT_TX_ALLOWLIST } from './evm-tx.js';
 import {
@@ -292,12 +297,20 @@ export function typedDataSnapshot(
     }
   }
 
-  return Object.freeze({
+  const snapshot: TypedData = Object.freeze({
     types,
     primaryType,
     domain: Object.freeze(domain),
     message: Object.freeze(message),
   });
+  // The snapshot must hash (every value in its EIP-712 encoding) before any key is read, so a
+  // shape that passed the checks above but does not encode never reaches the seed.
+  try {
+    hashTypedData(snapshot);
+  } catch {
+    throw refused('malformed');
+  }
+  return snapshot;
 }
 
 /** The wall clock in unix seconds, as the KeyStore backends read it. */

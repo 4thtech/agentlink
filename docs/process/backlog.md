@@ -11296,10 +11296,10 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 
 #### SEC-KS-712-ALLOWLIST · The agent key signs only AgentLink's own typed-data shapes (0.5.10)
 - **Status:** backlog · **Size:** S–M · **Tier:** Opus build, Fable audit · **Security:** S2 (KeyStore, crypto)
-- **Repo/path:** agentlink · `packages/crypto/src/{keystore-api.ts,eip712.ts,keystore.ts}` (new pure `typedDataSnapshot`), `packages/node/src/{keychain-keystore.ts,file-keystore.ts}`, `apps/cloud-agent/src/worker-keystore.ts`; allowlists from `packages/chain` configs injected when the store is built; tests
+- **Repo/path:** agentlink · `packages/crypto/src/{keystore-api.ts,eip712.ts,keystore.ts}` (new pure `typedDataSnapshot`), `packages/node/src/{keychain-keystore.ts,file-keystore.ts}`, `apps/cloud-agent/src/worker-keystore.ts`; the allowlist as built-in constants in `packages/crypto`, pinned by a chain test against the shipped configs; tests
 - **Depends on:** REL0510-SPEC (D-156); an audit of every `sign712` caller (proofs, receipts, terms, registration, cards, top-up, cloud agent) as the first step
 - **Spec:** D-156 (2); 04 §3.1.1 "What the agent key signs as typed data"; 07 §6.2
-- **Done when:** `RED (expected):` commit first; each allowed shape signs (OCC v2 `Record`, `Receipt` and registration types on an allowlisted chain and contract; `AgentCard` with this agent's address; the top-up authorization to that chain's vault within the value cap and window); each field outside its bound is refused with `typed_data_refused` before the seed is read (a spy on the read); the message echoes no field; owner signing unchanged; no counters.
+- **Done when:** `RED (expected):` commit first; each allowed shape signs (OCC v2 `Record` and `Receipt` on an allowlisted chain and contract, deadline at most 1 h plus 5 min skew; `Registration` and `Revocation` refused, owner only; `AgentCard` with this agent's address; the top-up authorization to that chain's vault within the value cap and window); each field outside its bound is refused with `typed_data_refused` before the seed is read (a spy on the read); the message echoes no field; owner signing unchanged; no counters.
 
 #### DESK-QUIT-ORDER · Windows close before the core stops; no terminal instructions in the desktop app (0.5.10)
 - **Status:** backlog · **Size:** S · **Tier:** Opus build, Fable audit · **Security:** S2 (`apps/desktop/**`, the pipe)

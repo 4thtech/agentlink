@@ -14,6 +14,7 @@ import {
   receiptTypedData,
   receiveWithAuthorizationTypedData,
   recordTypedData,
+  revocationTypedData,
 } from './proof-types.js';
 import { MemoryKeyStore } from './testing.js';
 import {
@@ -96,6 +97,11 @@ function topUp(over: Record<string, unknown> = {}, domain: object = USDC_DOMAIN)
     nonce: `0x${'5a'.repeat(32)}`,
     ...over,
   });
+}
+
+/** The typed data with some message values replaced, as raw values (no re-parse). */
+function withMessage(td: TypedData, over: Record<string, unknown>): TypedData {
+  return { ...td, message: { ...td.message, ...over } };
 }
 
 function refusal(fn: () => unknown): { code: string; message: string } | 'accepted' {
@@ -268,6 +274,62 @@ describe('typedDataSnapshot: everything else is refused with a fixed error', () 
     ],
     ['typed data with an extra member', () => ({ ...record(), extra: 1 }), 'malformed'],
     ['not an object', () => 'typed data', 'malformed'],
+    [
+      'a Record that passes the checks but does not hash',
+      () => withMessage(record(), { envelopeHash: '0xzz' }),
+      'malformed',
+    ],
+    [
+      'a chainId as a string',
+      () => ({ ...record(), domain: { ...record().domain, chainId: '84532' } }),
+      'domain_not_allowed',
+    ],
+    [
+      'a maxFee as a numeric string',
+      () => withMessage(record(), { maxFee: '100000' }),
+      'malformed',
+    ],
+    [
+      'a deadline as a numeric string',
+      () => withMessage(record(), { deadline: String(now() + 60) }),
+      'malformed',
+    ],
+    [
+      'a top-up value as a numeric string',
+      () => withMessage(topUp(), { value: '20000000' }),
+      'malformed',
+    ],
+    [
+      'a message field behind a getter',
+      () => {
+        const td = record();
+        const message = { ...td.message };
+        Object.defineProperty(message, 'signer', { get: () => OWN, enumerable: true });
+        return { ...td, message };
+      },
+      'malformed',
+    ],
+    [
+      'a domain field behind a getter',
+      () => {
+        const td = record();
+        const domain = { ...td.domain };
+        Object.defineProperty(domain, 'chainId', { get: () => 84532, enumerable: true });
+        return { ...td, domain };
+      },
+      'malformed',
+    ],
+    [
+      'a Revocation (owner-signed only)',
+      () =>
+        revocationTypedData(occV2Domain(84532, NOTARY), {
+          agentEvm: OWN,
+          keyEpoch: 0,
+          nonce: '1',
+          deadline: now() + 60,
+        }),
+      'type_not_allowed',
+    ],
   ];
 
   it.each(cases)('%s', (_what, make, reason) => {
@@ -301,5 +363,9 @@ describe('MemoryKeyStore.sign712 applies the allowlist before any key is used', 
     await expect(store.sign712(topUp({ to: OTHER }))).rejects.toMatchObject(
       fixed('payee_not_allowed'),
     );
+    // A shape that passes the allowlist but does not hash is refused before the seed, too.
+    await expect(
+      store.sign712(withMessage(record(), { envelopeHash: '0xzz' })),
+    ).rejects.toMatchObject(fixed('malformed'));
   });
 });
