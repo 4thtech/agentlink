@@ -68,4 +68,5 @@ export const REOPEN = {
   /** DESK-QUIT-ORDER (IR L3): the restart took too long (status-page.ts words). */
   desktopStopped: 'AgentLink stopped',
   desktopStoppedBody: 'Choose Try again when you are ready.',
+  desktopTryAgain: 'Try again',
 } as const;

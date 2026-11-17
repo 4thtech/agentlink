@@ -18,6 +18,7 @@ import {
   isHostClosed,
   subscribeHostClosed,
 } from '../api/host-closed.js';
+import { Button } from '@4thtech-io/ui';
 import { inDesktopApp } from '../desktop.js';
 import { ReopenSteps } from '../states/index.js';
 import { REOPEN } from '../states/strings.js';
@@ -40,6 +41,12 @@ function DesktopRestarting(): ReactElement {
       <p className="al-text-body al-muted">
         {stopped ? REOPEN.desktopStoppedBody : REOPEN.desktopRestartingBody}
       </p>
+      {stopped ? (
+        // A plain reload of the current page (a GET); the app's session cookie serves it.
+        <Button icon="refresh-cw" onClick={() => window.location.reload()}>
+          {REOPEN.desktopTryAgain}
+        </Button>
+      ) : null}
     </main>
   );
 }

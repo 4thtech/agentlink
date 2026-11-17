@@ -176,6 +176,8 @@ export class Popover {
   #sessionReady = false;
   #blurHiddenAt = Number.NEGATIVE_INFINITY;
   #shownAt = Number.NEGATIVE_INFINITY;
+  /** Counts shows: a focus re-check from an earlier show is stale and does nothing. */
+  #showCount = 0;
   /** DESK-WIDGET-OPEN: the window painted once (ready-to-show); until then a show waits. */
   #painted = false;
   #showWhenPainted = false;
@@ -250,12 +252,13 @@ export class Popover {
   }
 
   /** After an ignored early blur: refocus once; still not focused at the next check: hide. */
-  #recheckFocus(window: PopoverWindow, first: boolean): void {
+  #recheckFocus(window: PopoverWindow, first: boolean, show: number): void {
+    if (show !== this.#showCount) return;
     if (this.#window !== window || window.isDestroyed() || !window.isVisible()) return;
     if (safe(() => window.isFocused()) === true) return;
     if (first) {
       safe(() => window.focus());
-      this.#timer(() => this.#recheckFocus(window, false), SHOW_BLUR_IGNORE_MS);
+      this.#timer(() => this.#recheckFocus(window, false, show), SHOW_BLUR_IGNORE_MS);
       return;
     }
     window.hide();
@@ -267,6 +270,7 @@ export class Popover {
       safe(() => this.#deps.focusApp?.());
     }
     this.#shownAt = this.#now();
+    this.#showCount += 1;
     window.show();
     window.focus();
   }
@@ -423,7 +427,8 @@ export class Popover {
       const since = this.#now() - this.#shownAt;
       if (since < SHOW_BLUR_IGNORE_MS) {
         // Re-checked at the end of the window: never left up unfocused (over the main window).
-        this.#timer(() => this.#recheckFocus(window, true), SHOW_BLUR_IGNORE_MS - since);
+        const show = this.#showCount;
+        this.#timer(() => this.#recheckFocus(window, true, show), SHOW_BLUR_IGNORE_MS - since);
         return;
       }
       window.hide();

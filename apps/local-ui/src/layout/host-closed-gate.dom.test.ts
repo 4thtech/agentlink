@@ -89,6 +89,22 @@ describe('HostClosedGate in the desktop app (DESK-QUIT-ORDER)', () => {
       expect(text).toContain('AgentLink stopped');
       expect(text).toContain('Try again');
       expect(browserSteps(text)).toBe(false);
+      const button = [...host.querySelectorAll('button')].find(
+        (b) => b.textContent?.includes('Try again') === true,
+      );
+      expect(button).toBeDefined();
+      const reload = vi.fn();
+      const original = window.location;
+      Object.defineProperty(window, 'location', {
+        value: { ...original, reload },
+        configurable: true,
+      });
+      try {
+        await act(async () => button?.click());
+        expect(reload).toHaveBeenCalledTimes(1);
+      } finally {
+        Object.defineProperty(window, 'location', { value: original, configurable: true });
+      }
     } finally {
       vi.useRealTimers();
     }

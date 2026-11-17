@@ -466,6 +466,24 @@ describe('Popover', () => {
     expect(s.popover.visible).toBe(false);
   });
 
+  it('DESK-WIDGET-OPEN: a re-check left from an earlier show does nothing to a new show', () => {
+    const s = setup();
+    ready(s);
+    s.popover.toggle();
+    s.advance(50);
+    s.win().emit('blur');
+    s.win().webContents.emit('before-input-event', new FakeEvent(), {
+      type: 'keyDown',
+      key: 'Escape',
+    });
+    s.advance(20);
+    s.popover.toggle();
+    const focuses = s.win().focusCount;
+    s.advance(400);
+    expect(s.popover.visible).toBe(true);
+    expect(s.win().focusCount).toBe(focuses);
+  });
+
   it('DESK-WIDGET-OPEN: an early blur with focus back stays up', () => {
     const s = setup();
     ready(s);
