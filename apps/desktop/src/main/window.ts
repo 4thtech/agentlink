@@ -30,7 +30,10 @@ export interface MainWindowDeps {
   readonly quitting: () => boolean;
   /** A button on the status page (Try again, Open log folder). */
   readonly onStatusAction?: (action: StatusAction) => void;
-  /** TRAY-SHELL: the window was shown or got focus (the popover hides then). */
+  /**
+   * TRAY-SHELL: the window was shown (the popover hides then). DESK-WIDGET-OPEN: not on `focus`:
+   * showing the popover brings the app forward, which can focus this window and must not hide it.
+   */
   readonly onShown?: () => void;
   /**
    * TRAY-SHELL (D-155 (7)): true while a close should quit the app (Windows with the icon hidden:
@@ -79,7 +82,6 @@ export class MainWindow {
       window.hide();
       if (this.#deps.quitOnClose?.() === true) this.#deps.quit?.();
     });
-    window.on('focus', () => this.#shown());
     window.on('show', () => this.#shown());
     window.once('ready-to-show', () => window.show());
     this.#window = window;
@@ -211,6 +213,12 @@ export class MainWindow {
     this.#deps.lock.reset();
     this.#loaded = false;
     this.#sessionLoad += 1;
+  }
+
+  /** DESK-QUIT-ORDER: off screen at once at quit (before the core stops). */
+  hide(): void {
+    const window = this.#window;
+    if (window !== null && !window.isDestroyed() && window.isVisible()) window.hide();
   }
 
   destroy(): void {

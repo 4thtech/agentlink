@@ -152,6 +152,8 @@ const UPDATE_ICON_STATES: readonly string[] = Object.freeze([
 
 /** TRAY-SHELL: the largest ui-settings.json the shell reads at launch. */
 const MAX_UI_SETTINGS_FILE_BYTES = 16 * 1024;
+/** DESK-WIDGET-TARGET: a targeted open shows the main window after this long at the latest. */
+export const TARGETED_SHOW_BACKSTOP_MS = 3_000;
 
 /**
  * TRAY-SHELL (plan risk 7): the icon switch from the text of `~/.agentlink/ui-settings.json`
@@ -449,6 +451,16 @@ export async function runShell(
     menuBarIcon = true;
   }
   let reapplyTimer: unknown = null;
+  // DESK-WIDGET-TARGET: a targeted open from the widget (a person or a request) shows the main window
+  // only once the core's new page finished loading, never the old page first; a backstop shows it
+  // anyway when the core never answers.
+  let targetedShow = false;
+  let targetedTimer: unknown = null;
+  const clearTargetedShow = (): void => {
+    targetedShow = false;
+    if (targetedTimer !== null) proc.timers.clearTimeout(targetedTimer);
+    targetedTimer = null;
+  };
   const unreadShown = (): boolean => {
     const unread = lastTray?.unread ?? 0;
     if (unread === 0) {
@@ -600,6 +612,15 @@ export async function runShell(
     event.preventDefault();
     if (reapplyTimer !== null) proc.timers.clearTimeout(reapplyTimer);
     reapplyTimer = null;
+    clearTargetedShow();
+    // DESK-QUIT-ORDER: off screen first. Stopping the core takes up to a few seconds and the page
+    // would show its "closed" state meanwhile.
+    try {
+      popover?.hide();
+      window?.hide();
+    } catch {
+      // Never throws into Electron; the quit goes on.
+    }
     const stop = supervisor?.stop() ?? Promise.resolve();
     void stop.then(() => {
       notifier?.dispose();
@@ -668,6 +689,9 @@ export async function runShell(
         supervisor?.send({ v: 1, type: 'show', route: 'home' });
       },
       quitting: () => quitting,
+      // DESK-WIDGET-OPEN: the popover comes up in front of the app that had focus.
+      focusApp: () => app.focus?.({ steal: true }),
+      setTimer: (callback, ms) => proc.timers.setTimeout(callback, ms),
     });
   }
   /**
@@ -778,9 +802,21 @@ export async function runShell(
     registerWidgetIpc(electron.ipcMain, {
       lock,
       widgetContentsId: () => widget.widgetContentsId(),
-      // The existing `show`: the main window on that page (the core mints its link).
+      // The existing `show`: the main window on that page (the core mints its link). A targeted
+      // open (a person on inbox, a request on approvals) shows the window once that page loaded.
       openPage: (route, target) => {
-        window?.show();
+        clearTargetedShow();
+        if (target === undefined || window?.loaded !== true) {
+          window?.show();
+        } else {
+          targetedShow = true;
+          // The backstop: no answer, or a page that never finished loading.
+          targetedTimer = proc.timers.setTimeout(() => {
+            targetedTimer = null;
+            targetedShow = false;
+            if (!quitting) window?.show();
+          }, TARGETED_SHOW_BACKSTOP_MS);
+        }
         supervisor?.send({
           v: 1,
           type: 'show',
@@ -972,17 +1008,24 @@ export async function runShell(
       // TRAY-SHELL: tray-state, tray-pulse and shell-prefs.
       if (feed.handle(message)) return;
       switch (message.type) {
-        case 'ready':
+        case 'ready': {
           // WIN-DESK-1: proof the pipe works both ways (fixed text, never the link).
           coreLog.note('core ready');
           updateHealth?.ready();
           if (releaseChecker !== null) sendAppUpdate(releaseChecker.view());
           // TRAY-SHELL: once the main window has this core's session, the popover loads the widget.
+          // DESK-WIDGET-TARGET: after a targeted open, the window comes up once the page loaded.
+          const showOnLoad = targetedShow;
           if (
-            window?.loadSessionUrl(message.sessionUrl, () => popover?.setSessionReady(true)) ===
-            true
+            window?.loadSessionUrl(message.sessionUrl, () => {
+              popover?.setSessionReady(true);
+              if (!showOnLoad) return;
+              clearTargetedShow();
+              if (!quitting) window?.show();
+            }) === true
           ) {
-            window.show();
+            if (showOnLoad) targetedShow = false;
+            else window.show();
             if (pendingInvite !== null) {
               const link = pendingInvite;
               pendingInvite = null;
@@ -990,6 +1033,7 @@ export async function runShell(
             }
           }
           return;
+        }
         case 'status':
           approvals = message.counts.waitingApprovals;
           setTooltip(message.state);

@@ -28,6 +28,8 @@ export interface App {
   /** DESK051-UPD: an Intel copy running under Rosetta on Apple silicon (macOS only). */
   readonly runningUnderARM64Translation?: boolean;
   quit(): void;
+  /** DESK-WIDGET-OPEN (macOS): brings the app forward when the popover shows. */
+  focus?(options?: { steal: boolean }): void;
   exit(code?: number): void;
   /** D15-01: start an executable once this one exits (default: this app with its own arguments). */
   relaunch?(options?: { execPath?: string; args?: string[] }): void;
@@ -236,9 +238,11 @@ export interface BrowserWindow {
   restore(): void;
   /** TRAY-SHELL: the popover places itself under the icon (popover.ts). */
   setBounds(bounds: Rectangle): void;
+  /** DESK-WIDGET-OPEN (macOS popover): on every Space and over full-screen apps. */
+  setVisibleOnAllWorkspaces?(visible: boolean, options?: { visibleOnFullScreen?: boolean }): void;
   destroy(): void;
   on(event: 'close' | 'page-title-updated', listener: (event: ElectronEvent) => void): void;
-  /** TRAY-SHELL: `blur` hides the popover; `focus` / `show` of the main window hide it too. */
+  /** TRAY-SHELL: `blur` hides the popover; a `show` of the main window hides it too (not `focus`). */
   on(event: 'blur' | 'closed' | 'focus' | 'show', listener: () => void): void;
   once(event: 'ready-to-show', listener: () => void): void;
 }

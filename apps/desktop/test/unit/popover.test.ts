@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BrowserWindowOptions } from '../../src/main/electron-api.js';
 import {
+  FIRST_PAINT_BACKSTOP_MS,
   Popover,
   type PopoverDeps,
   type PopoverScreen,
@@ -379,7 +380,9 @@ describe('Popover', () => {
 
   it('a second click toggles it closed (also when that click blurred it first)', () => {
     // DESK-WIDGET-OPEN: the pointer is on the icon when that click blurs it.
-    const s = setup({ screen: { ...fakeScreen(), getCursorScreenPoint: () => ({ x: 1010, y: 10 }) } });
+    const s = setup({
+      screen: { ...fakeScreen(), getCursorScreenPoint: () => ({ x: 1010, y: 10 }) },
+    });
     ready(s);
     s.popover.toggle();
     expect(s.popover.visible).toBe(true);
@@ -453,7 +456,7 @@ describe('Popover', () => {
     class HeldWindow extends FakePopoverWindow {
       override autoReady: boolean | null = false;
     }
-    const s = setup({ BrowserWindow: HeldWindow });
+    const s = setup({ BrowserWindow: HeldWindow, setTimer: () => undefined });
     ready(s);
     s.popover.toggle();
     expect(s.win().loaded).toEqual([WIDGET]);
@@ -469,11 +472,29 @@ describe('Popover', () => {
     expect(s.popover.visible).toBe(true);
   });
 
+  it('DESK-WIDGET-OPEN: no paint event at all: it still shows after the backstop', () => {
+    class HeldWindow extends FakePopoverWindow {
+      override autoReady: boolean | null = false;
+    }
+    const timers: { callback: () => void; ms: number }[] = [];
+    const s = setup({
+      BrowserWindow: HeldWindow,
+      setTimer: (callback, ms) => timers.push({ callback, ms }),
+    });
+    s.popover.toggle();
+    s.popover.toggle();
+    expect(timers).toHaveLength(1);
+    expect(timers[0]?.ms).toBe(FIRST_PAINT_BACKSTOP_MS);
+    expect(s.popover.visible).toBe(false);
+    timers[0]?.callback();
+    expect(s.popover.visible).toBe(true);
+  });
+
   it('DESK-WIDGET-OPEN: a hide before the first paint cancels the pending show', () => {
     class HeldWindow extends FakePopoverWindow {
       override autoReady: boolean | null = false;
     }
-    const s = setup({ BrowserWindow: HeldWindow });
+    const s = setup({ BrowserWindow: HeldWindow, setTimer: () => undefined });
     s.popover.toggle();
     s.popover.hide();
     s.win().emit('ready-to-show');

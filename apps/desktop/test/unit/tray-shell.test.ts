@@ -253,13 +253,16 @@ describe('TRAY-SHELL popover session', () => {
     expect(popoverWindow()?.loaded.at(-1)).toBe(WIDGET);
   });
 
-  it('the popover hides when the main window is shown or focused', async () => {
+  it('the popover hides when the main window is shown (DESK-WIDGET-OPEN: not on focus)', async () => {
     const s = setup();
     await started(s);
     tray().emit('click');
     expect(popoverWindow()?.visible).toBe(true);
     mainWindow().emit('focus');
+    expect(popoverWindow()?.visible).toBe(true);
+    mainWindow().emit('show');
     expect(popoverWindow()?.visible).toBe(false);
+    s.timers.advance(1_000);
     tray().emit('click');
     expect(popoverWindow()?.visible).toBe(true);
     s.electron.app.emit('activate');
