@@ -32,6 +32,7 @@ import {
 import { AttachComposer, type AttachProps } from './attach-composer.js';
 import { MessageFiles, type FilesContext } from './file-reader.js';
 import { mergeThread } from './people-api.js';
+import { receiptWord, sentWord } from './delivery-word.js';
 import { HOME_STRINGS as S, fmt } from './people-strings.js';
 import { HISTORY_STRINGS as H } from '../history/strings.js';
 import { termsLine, termsStateWord, type TermsEvent } from './terms-trail.js';
@@ -151,20 +152,24 @@ export function useThread(
   return { thread, loadEarlier };
 }
 
-/** The delivery word of a message your AI sent. */
+/** The delivery word of a message your AI sent (delivery-word.ts, SEC-RECEIPTS-DEFAULT). */
 function Delivery({
-  status,
+  item,
+  name,
   removed = false,
 }: {
-  readonly status: MessageItem['status'];
+  readonly item: MessageItem;
+  /** The contact's name as shown outside the untrusted block (the owner's alias or restricted). */
+  readonly name: string;
   /** W6-FLOW-FIXES: the connection is gone, so "send it again" is no advice. */
   readonly removed?: boolean;
 }): ReactElement | null {
+  const status = item.status;
   if (status === 'sent') {
     return (
       <span className="hm-dl hm-f is-sent al-pop">
         <Icon name="check" size={13} />
-        <span>{S.sent}</span>
+        <span>{sentWord(item, name)}</span>
       </span>
     );
   }
@@ -214,13 +219,7 @@ function Details({
   readonly agent: string;
   readonly name: string;
 }): ReactElement {
-  const receipt = !out
-    ? S.receiptTheirs
-    : item.status === 'queued'
-      ? S.receiptPending
-      : item.receipt
-        ? S.receiptYes
-        : S.receiptNo;
+  const receipt = !out ? S.receiptTheirs : receiptWord(item);
   return (
     <p className="hm-msg-meta hm-f al-text-code al-reveal">
       <span>
@@ -463,7 +462,7 @@ export function Conversation({
                   <MessageFiles item={item} out={out} person={name} agent={agent} files={files} />
                 )}
                 <div className="hm-msg-actions hm-f">
-                  {out ? <Delivery status={item.status} removed={removed} /> : null}
+                  {out ? <Delivery item={item} name={name} removed={removed} /> : null}
                   {item.text === '' ? null : <CopyText text={item.text} />}
                 </div>
                 {pro ? <Details item={item} out={out} agent={agent} name={name} /> : null}

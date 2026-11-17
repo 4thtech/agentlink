@@ -351,6 +351,12 @@ export type PackCheck =
       readonly content: unknown;
       /** Non-fatal finding codes (`signer_no_longer_confirms`, `receipt_tx_mismatch`). */
       readonly notices: readonly string[];
+      /**
+       * SEC-RECEIPTS-DEFAULT: the pack's automatic device receipt (the recipient AI's signed
+       * "received" ack over this hash), checked apart from on-chain receipts; null or absent when
+       * the pack carries none.
+       */
+      readonly deviceReceipt?: { readonly ok: boolean } | null;
     };
 
 /** The agent's credits and the price list (06 §2.1 `credits`, `prices`; D-45, G-43). */

@@ -778,6 +778,19 @@ describe('agentlink_export_proof_pack (06 §2.4, 07 §8)', () => {
     expect(JSON.parse(calls.saved[0]!)).toEqual({ type: 'agentlink.proof' });
   });
 
+  it('SEC-RECEIPTS-DEFAULT: a pack with the contact device receipt says so', async () => {
+    const { client } = fake({
+      exportPack: () => ({
+        status: 'ok',
+        recordId: RECORD,
+        pack: { type: 'agentlink.proof' },
+        deviceReceipt: true,
+      }),
+    });
+    const r = await call('agentlink_export_proof_pack', { envelopeId: ENVELOPE }, client);
+    expect(r.structured.summary).toContain('automatic device receipt');
+  });
+
   it('with the content key: an approval first, and nothing written before it', async () => {
     const { client, calls } = fake({
       exportPack: (input) =>
@@ -960,6 +973,18 @@ describe('agentlink_verify_proof_pack (06 §2.4, D-87, D-95, D-96)', () => {
     const r = await call('agentlink_verify_proof_pack', { path: 'p.json' }, client);
     expect(r.structured).toMatchObject({ status: 'ok', valid: true, verdict: 'record_only' });
     expect(r.structured.summary).not.toMatch(/\bvalid proof\b|verified/i);
+  });
+
+  it('SEC-RECEIPTS-DEFAULT: an automatic device receipt is reported apart from public receipts', async () => {
+    const good = fake({ verify: () => ({ ...validPack(), deviceReceipt: { ok: true } }) });
+    const r = await call('agentlink_verify_proof_pack', { path: 'p.json' }, good.client);
+    expect(r.structured.summary).toContain('automatic device receipt');
+    expect(r.structured.summary).toContain('not a public receipt');
+    expect(r.structured['receipts']).toEqual([{ type: 'DELIVERED', at: '2026-10-19T10:05:00Z' }]);
+    const bad = fake({ verify: () => ({ ...validPack(), deviceReceipt: { ok: false } }) });
+    const r2 = await call('agentlink_verify_proof_pack', { path: 'p.json' }, bad.client);
+    expect(r2.structured.summary).toContain("doesn't check out");
+    expect(r2.structured['verdict']).toBe('verified');
   });
 
   it('the D-96 notice adds its fixed sentence; the verdict is unchanged', async () => {

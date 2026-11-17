@@ -28,6 +28,7 @@
 // block (06 §2.1). I-7: logs carry counts only.
 import { encodeUtf8 } from '@4thtech-io/crypto';
 import type { ContactDisplayName, Payload } from '@4thtech-io/types';
+import { acksFor, type AckStrength, type AckTarget } from './acks.js';
 import type { ContactBook } from './contacts.js';
 import { nowOf, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
@@ -105,10 +106,16 @@ export interface InboxMessage {
 export interface SentMessage extends InboxMessage {
   readonly status: SentStatus;
   /**
-   * True once the contact's agent acknowledged receiving it (02 F-23 `ack`, stored here). Store
-   * only: an on-chain receipt is not read (no network).
+   * True once the contact's AI signed a receipt over this exact message (02 F-23 v2 `ack`, bound to
+   * its envelopeHash; SEC-RECEIPTS-DEFAULT): the only state shown as delivered. Store only: an
+   * on-chain receipt is not read (no network).
    */
   readonly receipt: boolean;
+  /**
+   * Present (true) when only an older app's receipt arrived (an id-only `ack`): received, but
+   * weaker; never shown as delivered and never enough for a message sent with proof.
+   */
+  readonly receivedOlder?: true;
 }
 
 export type MessageItem = InboxMessage | SentMessage;
@@ -223,8 +230,6 @@ const BOXES: readonly MessageBox[] = ['in', 'out'];
 const DELIVERY_STATES = ['queued', 'sent', 'not_delivered'] as const;
 /** Proof rows that mean "this message has a proof": an own record on-chain, or a contact's record. */
 const PROOF_STATUSES = ['recorded', 'announced', 'received'] as const;
-/** At most this many stored acks of one contact are read for the receipt flags of one page. */
-const MAX_ACKS_SCANNED = 1_000;
 /** Envelopes read per store transaction while a files page is filled. */
 const FILES_BATCH = 50;
 /** At most this many envelopes are opened for one files page; the page then ends with a cursor. */
@@ -294,44 +299,27 @@ const isSentStatus = (v: unknown): v is SentStatus =>
   (DELIVERY_STATES as readonly unknown[]).includes(v);
 
 /**
- * The envelopes among `envelopeIds` that the contact's agent acknowledged (acks.ts `status`): an
- * `ack` stored as `ok` from that same contact whose `replyTo` and `body.envelopeId` both name it.
- * An ack that cannot be read counts as absent (07 §3.1).
+ * The acks of `sent` (acks.ts `acksFor`): the strongest per envelope, from that same contact, signed
+ * by a key its card history holds; `verified` only over the envelope's own hash. An ack that cannot
+ * be read counts as absent (07 §3.1).
  */
 async function ackedOf(
   ctx: CoreContext,
-  sent: readonly { readonly envelopeId: string; readonly contactId: string }[],
-): Promise<ReadonlySet<string>> {
-  const out = new Set<string>();
-  if (sent.length === 0) return out;
-  const wanted = new Map(sent.map((s) => [s.envelopeId, s.contactId]));
-  const contacts = [...new Set(sent.map((s) => s.contactId))];
-  const acks = await ctx.store.transaction((tx) =>
-    contacts.flatMap((contactId) =>
-      tx.select(
-        'envelopes',
-        { direction: 'in', contact_id: contactId, state: 'ok', type: 'ack', deleted_at: null },
-        {
-          orderBy: [
-            ['created_at', 'desc'],
-            ['envelope_id', 'asc'],
-          ],
-          limit: MAX_ACKS_SCANNED,
-        },
-      ),
-    ),
-  );
-  for (const ack of acks) {
-    const opened = await openStoredPayload(ctx, ack);
-    if (opened?.payload.type !== 'ack') continue;
-    const { body, replyTo } = opened.payload;
-    if (typeof body !== 'object' || replyTo === null) continue;
-    const named = (body as { kind?: unknown; envelopeId?: unknown }).envelopeId;
-    if ((body as { kind?: unknown }).kind !== 'received' || named !== replyTo) continue;
-    if (wanted.get(replyTo) === ack.contact_id) out.add(replyTo);
-  }
-  return out;
+  sent: readonly AckTarget[],
+): Promise<ReadonlyMap<string, AckStrength>> {
+  const found = await acksFor(ctx, sent);
+  return new Map([...found].map(([id, f]) => [id, f.strength] as const));
 }
+
+/** A sent item's receipt fields: `receipt` only for a verified ack. */
+const receiptFields = (
+  strength: AckStrength | undefined,
+): { readonly receipt: boolean; readonly receivedOlder?: true } =>
+  strength === 'verified'
+    ? { receipt: true }
+    : strength === 'older_app'
+      ? { receipt: false, receivedOlder: true }
+      : { receipt: false };
 
 /** The contact displays of a page, once each; undefined for one that cannot be read now. */
 class DisplayCache {
@@ -556,9 +544,13 @@ export class MessagesView {
       box === 'out'
         ? await ackedOf(
             this.#ctx,
-            read.rows.map((r) => ({ envelopeId: r.envelope_id, contactId })),
+            read.rows.map((r) => ({
+              envelopeId: r.envelope_id,
+              envelopeHash: r.envelope_hash,
+              contactId,
+            })),
           )
-        : new Set<string>();
+        : new Map<string, AckStrength>();
     const items: MessageItem[] = [];
     let unreadable = 0;
     for (const [i, row] of read.rows.entries()) {
@@ -588,7 +580,11 @@ export class MessagesView {
           continue;
         }
         items.push(
-          Object.freeze({ ...base, status: row.delivery, receipt: acked.has(row.envelope_id) }),
+          Object.freeze({
+            ...base,
+            status: row.delivery,
+            ...receiptFields(acked.get(row.envelope_id)),
+          }),
         );
       } else {
         items.push(Object.freeze(base));
@@ -707,7 +703,7 @@ export class FilesIoView {
     const now = nowOf(this.#ctx);
     const displays = new DisplayCache(this.#contacts);
     /** Item ID → the contact and envelope it went to, for the receipt flags below. */
-    const sentTo = new Map<string, { readonly envelopeId: string; readonly contactId: string }>();
+    const sentTo = new Map<string, AckTarget>();
     const page = await this.#page('out', query, async ({ row, entry, idx, fileRow }) => {
       if (row.contact_id === null || !isSentStatus(row.delivery)) return undefined;
       const to = await displays.get(row.contact_id);
@@ -722,7 +718,11 @@ export class FilesIoView {
         state = now >= fileRow.expires_at ? 'expired' : 'available';
       }
       const id = fileId(row.envelope_id, idx);
-      sentTo.set(id, { envelopeId: row.envelope_id, contactId: row.contact_id });
+      sentTo.set(id, {
+        envelopeId: row.envelope_id,
+        envelopeHash: row.envelope_hash,
+        contactId: row.contact_id,
+      });
       const item: SentFileItem = {
         id,
         to,
@@ -745,7 +745,8 @@ export class FilesIoView {
         page.items.map((item) =>
           Object.freeze({
             ...item,
-            receipt: acked.has(sentTo.get(item.id)?.envelopeId ?? ''),
+            // A sent file reads as delivered only on a verified receipt (SEC-RECEIPTS-DEFAULT).
+            receipt: acked.get(sentTo.get(item.id)?.envelopeId ?? '') === 'verified',
           }),
         ),
       ),

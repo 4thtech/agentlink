@@ -196,9 +196,9 @@ async function openAgent(
     cipher,
     approvals: new RecordingApprovalChannel(),
     clock: clock.now,
-    ...(options.rateLimit === undefined && options.sendReceived === undefined
-      ? {}
-      : { policyMark: new MemoryPolicyMark() }),
+    // SEC-RECEIPTS-DEFAULT: always a policy mark, as every runtime has, so the default rules apply
+    // (without one the policy fails closed, and a policy that fails closed sends no acks).
+    policyMark: new MemoryPolicyMark(),
     transport: nostrTransport({ connector: net, addressCheck: 'platform' }),
     logger: createLogger({ name: 'core', level: 'debug', sink: (_l, line) => lines.push(line) }),
     ...(options.deliveryAcks === undefined ? {} : { deliveryAcks: options.deliveryAcks }),
@@ -796,7 +796,11 @@ describe('delivery acknowledgements (02 F-23; SEC-RECEIPTS-DEFAULT: on by defaul
     });
     // Never "delivered" (receipt) from an id-only ack: the page shows it as received by an older app.
     const page = await a.client.messages.list(b.id, 'out');
-    expect(page.items[0]).toMatchObject({ id: sent.envelopeId, receipt: false, receivedOlder: true });
+    expect(page.items[0]).toMatchObject({
+      id: sent.envelopeId,
+      receipt: false,
+      receivedOlder: true,
+    });
   });
 
   it('the contact acks each message once, the sender sees it, and an ack is never acked', async () => {

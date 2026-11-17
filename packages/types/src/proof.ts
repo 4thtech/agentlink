@@ -161,6 +161,24 @@ export const proofPackDisclosureSchema = z.strictObject({
   contentKey: base64url(BYTE_LENGTHS.key),
 });
 
+/** SEC-RECEIPTS-DEFAULT (D-156): the label of the off-chain ack in a proof pack (07 §8). */
+export const DEVICE_RECEIPT_LABEL = 'automatic device receipt' as const;
+
+/**
+ * The recipient AI's signed "received" ack (02 F-23), carried in the sender's pack: the ack
+ * envelope as received and its own content key, so a verifier can open it and check that it names
+ * this pack's envelopeHash. It is an automatic device receipt, never an on-chain receipt: it is
+ * listed apart from `receipts`. The content key opens the ack only (its body is the message ID and
+ * hash), never the recorded envelope.
+ */
+export const proofPackDeviceReceiptSchema = z.strictObject({
+  label: z.literal(DEVICE_RECEIPT_LABEL),
+  envelope: envelopeSchema,
+  contentKey: base64url(BYTE_LENGTHS.key),
+});
+
+export type ProofPackDeviceReceipt = z.infer<typeof proofPackDeviceReceiptSchema>;
+
 /**
  * The exporting side's owner approval of the commitment (04 §3.4): its signed `approval.decide`
  * (an approve, by the same agent the scope names) and the commitment action it signed.
@@ -215,6 +233,8 @@ export const proofPackSchema = z
       .max(RECEIPT_TYPE_NAMES.length)
       .refine(receiptTypesValid, RECEIPTS_MESSAGE),
     disclosure: proofPackDisclosureSchema.nullable(),
+    // SEC-RECEIPTS-DEFAULT: optional; the owner can leave it out at export.
+    deviceReceipt: proofPackDeviceReceiptSchema.exactOptional(),
     ownerApproval: proofPackOwnerApprovalSchema,
     exportedAt: utcTimestampSchema,
   })

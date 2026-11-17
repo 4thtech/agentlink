@@ -2715,3 +2715,73 @@ describe('each contact has a share of the waiting pool (M1-7g-d; 04 §3.4)', () 
     expect(rows).toHaveLength(256);
   });
 });
+
+describe('SEC-RECEIPTS-DEFAULT: the automatic device receipt in the sender pack (07 §8)', () => {
+  it('carries the contact AI signed ack, labelled apart from public receipts; the owner can leave it out', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const sent = await a.client.sendMessage({ to: b.id, text: 'the invoice, as agreed' });
+    if (sent.status !== 'ok') throw new Error('test: send failed');
+    const envelopeId = sent.envelopeId;
+    const reports = await deliver(a, b);
+    expect(await b.client.acks.sendFor(reports)).toBe(1);
+    await deliver(b, a);
+    expect(await a.client.acks.status(envelopeId)).toMatchObject({ verified: true });
+    expect(await a.client.notarize({ envelopeId })).toMatchObject({ status: 'ok' });
+
+    const exported = await a.client.exportProofPack({ envelopeId });
+    expect(exported).toMatchObject({ status: 'ok', deviceReceipt: true });
+    const pack = (exported as { pack: Record<string, unknown> }).pack;
+    expect(pack['receipts']).toEqual([]);
+    expect(pack['deviceReceipt']).toMatchObject({ label: 'automatic device receipt' });
+    const chains = { chains: [{ config: chain.config, client: chain.client }] };
+    const checked = await verifyProofPack(JSON.stringify(pack), chains);
+    expect(checked).toMatchObject({
+      valid: true,
+      receipts: [],
+      deviceReceipt: { ok: true, label: 'automatic device receipt' },
+    });
+
+    // Tampered: the pack still verifies as a record; the device receipt alone fails.
+    const tampered = {
+      ...pack,
+      deviceReceipt: {
+        ...(pack['deviceReceipt'] as Record<string, unknown>),
+        contentKey: 'A'.repeat(43),
+      },
+    };
+    expect(await verifyProofPack(JSON.stringify(tampered), chains)).toMatchObject({
+      valid: true,
+      deviceReceipt: { ok: false },
+    });
+
+    const without = await a.client.exportProofPack({ envelopeId, includeDeviceReceipt: false });
+    expect(without).not.toHaveProperty('deviceReceipt');
+    expect((without as { pack: Record<string, unknown> }).pack).not.toHaveProperty('deviceReceipt');
+  });
+
+  it('an older app id-only ack never goes into the pack', async () => {
+    const { a, b } = await twoAgents({ defaults: true });
+    const sent = await a.client.sendMessage({ to: b.id, text: 'older peer' });
+    if (sent.status !== 'ok') throw new Error('test: send failed');
+    await deliver(a, b);
+    const older = await b.client.envelopes.build({
+      to: { contact: a.id },
+      payload: {
+        type: 'ack',
+        body: { kind: 'received', envelopeId: sent.envelopeId },
+        replyTo: sent.envelopeId,
+        files: [],
+      },
+    });
+    await a.client.envelopes.receive({ envelope: older.envelope });
+    await a.client.envelopes.processReceived();
+    expect(await a.client.acks.status(sent.envelopeId)).toMatchObject({
+      received: true,
+      verified: false,
+    });
+    await a.client.notarize({ envelopeId: sent.envelopeId });
+    const exported = await a.client.exportProofPack({ envelopeId: sent.envelopeId });
+    expect(exported).toMatchObject({ status: 'ok' });
+    expect(exported).not.toHaveProperty('deviceReceipt');
+  });
+});

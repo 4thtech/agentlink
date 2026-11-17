@@ -20,7 +20,7 @@ import type { CreateOutcome, InviteApi } from '../contacts/invite-api.js';
 import { InviteScreen } from '../invite/invite-screen.js';
 import { HomeScreen, type HomeScreenProps } from './home-screen.js';
 import { CONTACTS_STRINGS as C } from '../contacts/strings.js';
-import { HOME_STRINGS as S } from './people-strings.js';
+import { HOME_STRINGS as S, fmt } from './people-strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -370,9 +370,9 @@ describe('Home simple (A4)', () => {
     expect(inbound.some((t) => t.includes('Got them. Here is a first sketch.'))).toBe(true);
     const heads = all('h1, h2, h3, button, [role="status"]').map((e) => e.textContent ?? '');
     expect(heads.some((t) => t.includes('Got them'))).toBe(false);
-    // Outbound: Sent / Waiting to send / Not delivered.
+    // Outbound: received (a signed receipt; SEC-RECEIPTS-DEFAULT) / Waiting to send / Not delivered.
     expect(document.body.textContent).toContain('Sending the brief.');
-    expect(byText('span', S.sent)).toBeTruthy();
+    expect(byText('span', fmt(S.receivedBy, { name: 'Denis' }))).toBeTruthy();
     expect(byText('span', S.waitingToSend)).toBeTruthy();
     expect(byText('span', S.notDelivered)).toBeTruthy();
     expect(document.body.textContent).toContain(S.notDeliveredRetry);

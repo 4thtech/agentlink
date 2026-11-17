@@ -19,7 +19,10 @@ async function receipt(options: { readonly hash?: string; readonly tamperCt?: bo
   const cek = generateCek();
   const envelope = await craft({
     signer: await agentSigner(recipient),
-    entries: [{ pk: (await sender.getPublicBundle()).agentEnc }],
+    entries: [
+      { pk: (await sender.getPublicBundle()).agentEnc },
+      { pk: (await recipient.getPublicBundle()).agentEnc },
+    ],
     payload: ackPayload(ID, options.hash ?? HASH),
     cek,
     createdAt: 1_800_000_000,
@@ -36,9 +39,9 @@ describe('proof pack: automatic device receipt', () => {
   it('the pack member carries the label, and no other label parses', async () => {
     const { value } = await receipt();
     expect(proofPackDeviceReceiptSchema.safeParse(value).success).toBe(true);
-    expect(
-      proofPackDeviceReceiptSchema.safeParse({ ...value, label: 'delivered' }).success,
-    ).toBe(false);
+    expect(proofPackDeviceReceiptSchema.safeParse({ ...value, label: 'delivered' }).success).toBe(
+      false,
+    );
   });
 
   it('verifies a receipt signed by the recipient AI over the pack hash', async () => {

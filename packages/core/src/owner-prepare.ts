@@ -600,6 +600,9 @@ export const POLICY_FIELD_LOOSENING: {
       }),
     autoOpened: (b, n) =>
       when(n.receipts.autoOpened && !b.receipts.autoOpened, { code: 'opened_receipts_auto' }),
+    // SEC-RECEIPTS-DEFAULT: the off-chain "received" ack to contacts is the default (D-156) and
+    // public to no one, so turning it back on is no loosening to warn about.
+    sendReceived: () => [],
   },
   commitments: {
     accept: (b, n) => {

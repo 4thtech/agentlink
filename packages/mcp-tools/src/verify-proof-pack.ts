@@ -51,6 +51,11 @@ export const VERIFY_TEXT = Object.freeze({
   networkNextStep: 'Try again in a few minutes.',
   failedNextStep: 'Tell the user the proof did not check out, and why. Do not rely on it.',
   blockHeader: 'Content disclosed in the proof file, as the sender wrote it:',
+  // SEC-RECEIPTS-DEFAULT (11 §5): the off-chain ack, apart from the public receipts.
+  deviceReceipt:
+    "It also includes an automatic device receipt: the recipient's AI confirmed it received this exact message. This is not a public receipt.",
+  deviceReceiptFailed:
+    "The automatic device receipt in this proof file doesn't check out; don't rely on it.",
 });
 
 /** D-96 and the other non-fatal findings (11 §5): fixed sentences, by code. */
@@ -223,6 +228,9 @@ export async function verifyProofPackHandler(
   }
   const notices = check.notices.map((code) => NOTICE_TEXT[code]).filter((t) => t !== undefined);
   if (notices.length > 0) summary = `${summary} ${notices.join(' ')}`;
+  if (check.deviceReceipt != null) {
+    summary = `${summary} ${check.deviceReceipt.ok ? VERIFY_TEXT.deviceReceipt : VERIFY_TEXT.deviceReceiptFailed}`;
+  }
 
   const output = ok(summary, {
     valid: true,
