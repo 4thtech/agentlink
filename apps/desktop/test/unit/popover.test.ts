@@ -7,7 +7,9 @@ import { describe, expect, it } from 'vitest';
 import type { BrowserWindowOptions } from '../../src/main/electron-api.js';
 import {
   FIRST_PAINT_BACKSTOP_MS,
+  MAIN_FOCUS_GRACE_MS,
   Popover,
+  SHOW_BLUR_IGNORE_MS,
   type PopoverDeps,
   type PopoverScreen,
   type PopoverWindow,
@@ -89,6 +91,7 @@ function setup(over: Partial<PopoverDeps> = {}) {
   let quitting = false;
   const opened: number[] = [];
   const screen = fakeScreen();
+  const due: { at: number; callback: () => void }[] = [];
   const deps: PopoverDeps = {
     BrowserWindow: FakePopoverWindow,
     shell: { openExternal: () => Promise.resolve() },
@@ -101,6 +104,7 @@ function setup(over: Partial<PopoverDeps> = {}) {
     },
     quitting: () => quitting,
     now: () => now,
+    setTimer: (callback, ms) => due.push({ at: now + ms, callback }),
     ...over,
   };
   const popover = new Popover(deps);
@@ -110,7 +114,15 @@ function setup(over: Partial<PopoverDeps> = {}) {
     screen,
     opened,
     advance: (ms: number) => {
-      now += ms;
+      const until = now + ms;
+      for (;;) {
+        const next = due.filter((t) => t.at <= until).sort((a, b) => a.at - b.at)[0];
+        if (next === undefined) break;
+        due.splice(due.indexOf(next), 1);
+        now = next.at;
+        next.callback();
+      }
+      now = until;
     },
     quit: () => {
       quitting = true;
@@ -436,6 +448,55 @@ describe('Popover', () => {
     expect(s.popover.visible).toBe(true);
     s.advance(200);
     s.win().emit('blur');
+    expect(s.popover.visible).toBe(false);
+  });
+
+  it('DESK-WIDGET-OPEN: an early blur with focus never coming back: refocused once, then hidden', () => {
+    const s = setup();
+    ready(s);
+    s.popover.toggle();
+    const focusesAtShow = s.win().focusCount;
+    s.advance(50);
+    s.win().emit('blur');
+    expect(s.popover.visible).toBe(true);
+    s.advance(SHOW_BLUR_IGNORE_MS);
+    expect(s.win().focusCount).toBe(focusesAtShow + 1);
+    expect(s.popover.visible).toBe(true);
+    s.advance(SHOW_BLUR_IGNORE_MS);
+    expect(s.popover.visible).toBe(false);
+  });
+
+  it('DESK-WIDGET-OPEN: an early blur with focus back stays up', () => {
+    const s = setup();
+    ready(s);
+    s.popover.toggle();
+    s.advance(50);
+    s.win().emit('blur');
+    s.win().focused = true;
+    s.advance(1_000);
+    expect(s.popover.visible).toBe(true);
+  });
+
+  it('DESK-WIDGET-OPEN: a main-window focus hides it only after the grace', () => {
+    const s = setup();
+    ready(s);
+    s.popover.toggle();
+    s.advance(100);
+    s.popover.mainWindowFocused();
+    expect(s.popover.visible).toBe(true);
+    s.advance(MAIN_FOCUS_GRACE_MS);
+    s.popover.mainWindowFocused();
+    expect(s.popover.visible).toBe(false);
+  });
+
+  it('DESK-WIDGET-OPEN: unknown tray bounds: a blur-hide then a click does not reopen', () => {
+    const s = setup({ trayBounds: () => null });
+    ready(s);
+    s.popover.toggle();
+    s.advance(500);
+    s.win().emit('blur');
+    s.advance(50);
+    s.popover.toggle();
     expect(s.popover.visible).toBe(false);
   });
 

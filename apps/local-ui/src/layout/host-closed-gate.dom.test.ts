@@ -4,7 +4,7 @@
 // the app's own plain "Restarting AgentLink…". A browser keeps the steps.
 import { act, createElement as h } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   HOST_CLOSED_TEXT,
   markHostClosed,
@@ -12,7 +12,7 @@ import {
   noteHostUnreachable,
   resetHostClosedForTests,
 } from '../api/host-closed.js';
-import { HostClosedGate } from './host-closed-gate.js';
+import { DESKTOP_RESTART_FALLBACK_MS, HostClosedGate } from './host-closed-gate.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -69,6 +69,29 @@ describe('HostClosedGate in the desktop app (DESK-QUIT-ORDER)', () => {
     expect(text).not.toContain('the app');
     expect(text).not.toContain(HOST_CLOSED_TEXT);
     expect(browserSteps(text)).toBe(false);
+  });
+
+  it('a restart that takes too long falls back to "AgentLink stopped" (no terminal text)', async () => {
+    vi.useFakeTimers();
+    try {
+      ua = DESKTOP;
+      await render();
+      await act(async () => {
+        noteHostReached();
+        noteHostUnreachable();
+        noteHostUnreachable();
+      });
+      expect(host.textContent).toContain('Restarting AgentLink…');
+      await act(async () => {
+        vi.advanceTimersByTime(DESKTOP_RESTART_FALLBACK_MS);
+      });
+      const text = host.textContent ?? '';
+      expect(text).toContain('AgentLink stopped');
+      expect(text).toContain('Try again');
+      expect(browserSteps(text)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('a browser keeps the closed line and the steps to open it again', async () => {

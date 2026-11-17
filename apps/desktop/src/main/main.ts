@@ -551,6 +551,7 @@ export async function runShell(
       });
   };
   const showWindow = (): void => {
+    if (quitting) return;
     popover?.hide();
     const shown = window?.show() === true;
     if (shown && window?.loaded === true) return;
@@ -615,11 +616,16 @@ export async function runShell(
     clearTargetedShow();
     // DESK-QUIT-ORDER: off screen first. Stopping the core takes up to a few seconds and the page
     // would show its "closed" state meanwhile.
+    // Each on its own: one throwing never keeps the other on screen; the quit goes on.
     try {
       popover?.hide();
+    } catch {
+      // Never throws into Electron.
+    }
+    try {
       window?.hide();
     } catch {
-      // Never throws into Electron; the quit goes on.
+      // Never throws into Electron.
     }
     const stop = supervisor?.stop() ?? Promise.resolve();
     void stop.then(() => {
@@ -692,6 +698,7 @@ export async function runShell(
       // DESK-WIDGET-OPEN: the popover comes up in front of the app that had focus.
       focusApp: () => app.focus?.({ steal: true }),
       setTimer: (callback, ms) => proc.timers.setTimeout(callback, ms),
+      now: () => proc.timers.now(),
     });
   }
   /**
@@ -779,6 +786,9 @@ export async function runShell(
     onStatusAction: (action) => onStatusAction(action),
     // TRAY-SHELL: the popover never stays up over the main window.
     onShown: () => popover?.hide(),
+    // DESK-WIDGET-OPEN: a main-window focus hides it too, except the one the popover's own show
+    // caused (the app coming forward, within its grace).
+    onFocused: () => popover?.mainWindowFocused(),
     // D-155 (7): with the icon hidden the only way back is the Dock (macOS); elsewhere a close
     // quits while it is hidden.
     quitOnClose: () => proc.platform !== 'darwin' && tray === null,
@@ -864,6 +874,7 @@ export async function runShell(
     return Number.isFinite(longest) ? 2 * longest + 100 : 0;
   })();
   const onTrayClick = (): void => {
+    if (quitting) return;
     // With the core failed, the main window's status page (Try again lives there).
     if (coreDown()) {
       showWindow();

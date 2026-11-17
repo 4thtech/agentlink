@@ -35,6 +35,8 @@ export interface MainWindowDeps {
    * showing the popover brings the app forward, which can focus this window and must not hide it.
    */
   readonly onShown?: () => void;
+  /** DESK-WIDGET-OPEN: the window got focus (the popover decides: popover.mainWindowFocused). */
+  readonly onFocused?: () => void;
   /**
    * TRAY-SHELL (D-155 (7)): true while a close should quit the app (Windows with the icon hidden:
    * otherwise AgentLink would keep running with no way back). Absent or false: a close hides.
@@ -83,6 +85,13 @@ export class MainWindow {
       if (this.#deps.quitOnClose?.() === true) this.#deps.quit?.();
     });
     window.on('show', () => this.#shown());
+    window.on('focus', () => {
+      try {
+        this.#deps.onFocused?.();
+      } catch {
+        // Never throws into Electron.
+      }
+    });
     window.once('ready-to-show', () => window.show());
     this.#window = window;
     this.#loaded = false;

@@ -90,6 +90,8 @@ export interface PopoverWindow {
   focus(): void;
   hide(): void;
   isVisible(): boolean;
+  /** DESK-WIDGET-OPEN: re-checked after an ignored early blur. */
+  isFocused(): boolean;
   isDestroyed(): boolean;
   destroy(): void;
   /** DESK-WIDGET-OPEN (macOS): on every Space and over full-screen apps. */
@@ -139,6 +141,12 @@ export const TOGGLE_GRACE_MS = 300;
 
 /** DESK-WIDGET-OPEN: a blur this soon after a show is the app coming forward, not the person leaving. */
 export const SHOW_BLUR_IGNORE_MS = 150;
+
+/**
+ * DESK-WIDGET-OPEN: a main-window focus this soon after a show is the app coming forward (it keeps
+ * the popover); a later one hides it.
+ */
+export const MAIN_FOCUS_GRACE_MS = 500;
 
 /** DESK-WIDGET-OPEN: a first show that never got a paint event still shows after this long. */
 export const FIRST_PAINT_BACKSTOP_MS = 1_000;
@@ -210,15 +218,11 @@ export class Popover {
     if (!this.#painted) {
       if (!this.#showWhenPainted) {
         this.#showWhenPainted = true;
-        const setTimer =
-          this.#deps.setTimer ?? ((cb: () => void, ms: number) => setTimeout(cb, ms));
-        safe(() =>
-          setTimer(() => {
-            if (this.#window !== window || this.#painted || !this.#showWhenPainted) return;
-            this.#painted = true;
-            if (!window.isDestroyed()) this.#reveal(window);
-          }, FIRST_PAINT_BACKSTOP_MS),
-        );
+        this.#timer(() => {
+          if (this.#window !== window || this.#painted || !this.#showWhenPainted) return;
+          this.#painted = true;
+          if (!window.isDestroyed()) this.#reveal(window);
+        }, FIRST_PAINT_BACKSTOP_MS);
       }
       return;
     }
@@ -229,6 +233,32 @@ export class Popover {
     this.#showWhenPainted = false;
     const window = this.#live();
     if (window !== null && window.isVisible()) window.hide();
+  }
+
+  /**
+   * TRAY-SHELL: the main window got focus. Within the grace after a show it is the app coming
+   * forward (the popover stays); later it hides the popover.
+   */
+  mainWindowFocused(): void {
+    if (this.#now() - this.#shownAt < MAIN_FOCUS_GRACE_MS) return;
+    this.hide();
+  }
+
+  #timer(callback: () => void, ms: number): void {
+    const setTimer = this.#deps.setTimer ?? ((cb: () => void, t: number) => setTimeout(cb, t));
+    safe(() => setTimer(callback, ms));
+  }
+
+  /** After an ignored early blur: refocus once; still not focused at the next check: hide. */
+  #recheckFocus(window: PopoverWindow, first: boolean): void {
+    if (this.#window !== window || window.isDestroyed() || !window.isVisible()) return;
+    if (safe(() => window.isFocused()) === true) return;
+    if (first) {
+      safe(() => window.focus());
+      this.#timer(() => this.#recheckFocus(window, false), SHOW_BLUR_IGNORE_MS);
+      return;
+    }
+    window.hide();
   }
 
   #reveal(window: PopoverWindow): void {
@@ -390,7 +420,12 @@ export class Popover {
     window.on('blur', () => {
       if (!window.isVisible()) return;
       // DESK-WIDGET-OPEN: the app coming forward right after the show; not the person leaving.
-      if (this.#now() - this.#shownAt < SHOW_BLUR_IGNORE_MS) return;
+      const since = this.#now() - this.#shownAt;
+      if (since < SHOW_BLUR_IGNORE_MS) {
+        // Re-checked at the end of the window: never left up unfocused (over the main window).
+        this.#timer(() => this.#recheckFocus(window, true), SHOW_BLUR_IGNORE_MS - since);
+        return;
+      }
       window.hide();
       // The grace (a click on the icon toggling it closed) only when that blur was the click on
       // the icon: an unrelated blur never swallows the next real click.
@@ -419,7 +454,9 @@ export class Popover {
   #pointerOnIcon(): boolean {
     const tray = validTrayBounds(safe(() => this.#deps.trayBounds()));
     const cursor = safe(() => this.#deps.screen.getCursorScreenPoint());
-    return tray !== null && isPoint(cursor) && inside(cursor, tray);
+    // Unknown bounds or pointer: assume the icon (a click then never reopens what it just closed).
+    if (tray === null || !isPoint(cursor)) return true;
+    return inside(cursor, tray);
   }
 
   #place(window: PopoverWindow): void {

@@ -253,7 +253,7 @@ describe('TRAY-SHELL popover session', () => {
     expect(popoverWindow()?.loaded.at(-1)).toBe(WIDGET);
   });
 
-  it('the popover hides when the main window is shown (DESK-WIDGET-OPEN: not on focus)', async () => {
+  it('the popover hides when the main window is shown (DESK-WIDGET-OPEN: not on the focus its own show causes)', async () => {
     const s = setup();
     await started(s);
     tray().emit('click');
@@ -577,14 +577,45 @@ describe('DESK-QUIT-ORDER and DESK-WIDGET-OPEN (main)', () => {
     expect(popoverWindow()?.visible).toBe(false);
   });
 
-  it('a main-window focus does not hide the popover; a main-window show does', async () => {
+  it('a main-window focus during the grace keeps the popover; after it, hides it', async () => {
     const s = setup();
     await started(s);
     tray().emit('click');
     mainWindow().emit('focus');
     expect(popoverWindow()?.visible).toBe(true);
+    s.timers.advance(1_000);
+    mainWindow().emit('focus');
+    expect(popoverWindow()?.visible).toBe(false);
+  });
+
+  it('a main-window show hides the popover', async () => {
+    const s = setup();
+    await started(s);
+    tray().emit('click');
     mainWindow().emit('show');
     expect(popoverWindow()?.visible).toBe(false);
+  });
+
+  it('quit: a popover hide that throws still hides the main window', async () => {
+    const s = setup();
+    await started(s);
+    tray().emit('click');
+    const pop = popoverWindow() as FakeBrowserWindow;
+    pop.hide = () => {
+      throw new Error('gone');
+    };
+    s.electron.app.emit('before-quit', new FakeEvent());
+    expect(mainWindow().visible).toBe(false);
+  });
+
+  it('while quitting, a tray click or a dock activate opens nothing', async () => {
+    const s = setup();
+    await started(s);
+    s.electron.app.emit('before-quit', new FakeEvent());
+    tray().emit('click');
+    s.electron.app.emit('activate');
+    expect(popoverWindow()?.visible ?? false).toBe(false);
+    expect(mainWindow().visible).toBe(false);
   });
 
   it('showing the popover on macOS brings AgentLink forward', async () => {
