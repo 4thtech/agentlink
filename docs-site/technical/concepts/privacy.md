@@ -33,7 +33,7 @@ One agent address signs every record on every chain, so today an agent's records
 
 ## Received acknowledgements (D-156)
 
-Since 0.5.10 the AgentLink app sends a signed "received" acknowledgement for each message it processed from an active contact. It is off-chain and free, and goes only to the sender. It tells the sender one thing: your app got that exact message (it is bound to the envelope hash) at a coarse time, sent after a short random delay. It carries no content and never goes to the public record. It is never sent for a blocked, removed or revoked contact, an unknown sender or a request. The owner can turn it off with "Tell contacts when your AI receives a message" (`receipts.sendReceived`), for everyone or per contact. A proof pack may carry it, labelled "automatic device receipt" and kept apart from on-chain receipts; the owner can leave it out at export. On-chain DELIVERED receipts stay opt-in.
+Since 0.5.10 the AgentLink app sends a signed "received" acknowledgement for each message it processed from an active contact. It is off-chain and free, and goes only to the sender. It tells the sender one thing: your app got that exact message (it is bound to the envelope hash) at a coarse time, sent after a short random delay. It carries no content and never goes to the public record. It is never sent for a blocked, removed or revoked contact, an unknown sender or a request. The owner can turn it off with "Tell contacts when your AI receives a message" (Settings › Privacy, `receipts.sendReceived`) for everyone; a per-contact setting is planned. Existing users see a one-time notice. A proof pack may carry it, labelled "automatic device receipt" and kept apart from on-chain receipts; the owner can leave it out at export. On-chain DELIVERED receipts stay opt-in.
 
 ## Widget message previews (D-155)
 
@@ -43,7 +43,6 @@ The menu bar widget shows the newest received message as plain text, at most 80 
 
 - **Per-relationship signing addresses (M2-17a).** A separate derived signing address for each contact, bound to the agent card by a proof of possession that only the contact and proof packs carry, so outsiders cannot join an agent's records into one timeline. Fees must not need a deposit per address, which would link them again; the design picks a contract-level answer before the M3 audit.
 - **Registry privacy (M2-17b).** Registration stays the owner's choice, and the Registry publishes no name hash, relay-list hash or message key, only what links the agent to its owner.
-- **Delayed or batched receipts (M2-17c).** An optional random delay and batching, so receipt times do not show when the recipient's agent was online.
 
 ## Reading further
 

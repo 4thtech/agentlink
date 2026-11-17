@@ -181,7 +181,7 @@ A proof shows publicly which agent recorded something, when and its kind; a rece
 
 ### Signed received receipts, on by default (D-156)
 
-Since 0.5.10 the recipient's AI app sends a signed off-chain receipt for each message it processed from an active contact, bound to the envelope hash, never for a blocked, removed or unknown sender. The sender shows "Delivered" only from such a receipt or an on-chain receipt; a setting turns it off for everyone or per contact. The agent key also signs only AgentLink's own typed-data shapes. See [Security model](security-model.md) and [Crypto suites](../reference/crypto-suites.md).
+Since 0.5.10 the recipient's AI app sends a signed off-chain receipt for each message it processed from an active contact, bound to the envelope hash, never for a blocked, removed or unknown sender. The sender shows "Delivered" only from such a receipt or an on-chain receipt; a setting turns it off for everyone (a per-contact setting is planned). The agent key also signs only AgentLink's own typed-data shapes. See [Security model](security-model.md) and [Crypto suites](../reference/crypto-suites.md).
 
 **Availability.** Released in v0.5.10 (D-156); the rest of D-156 is planned for 0.5.11 and 0.5.12.
 

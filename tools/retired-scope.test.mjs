@@ -21,7 +21,10 @@ const LINE = new RegExp(`${OLD}\\\\*/`, 'i');
 const isHistory = (path, line) =>
   path === 'CHANGELOG.md' ||
   path.endsWith('/CHANGELOG.md') ||
-  /^docs\/foundation\/decisions\/D-\d{3}\.md$/.test(path) ||
+  // A decision file: only its heading, its Status line and the decision text (the paragraph lines),
+  // never the Date, Specs or Index lines or another heading.
+  (/^docs\/foundation\/decisions\/D-\d{3}\.md$/.test(path) &&
+    (/^# D-\d+: /.test(line) || /^- \*\*Status:\*\* /.test(line) || /^[^#\-\s]/.test(line))) ||
   (path === 'docs/foundation/decisions/README.md' && /^\| \[D-\d+\]/.test(line));
 
 /** Tracked files that mention the old scope with a slash: [{ path, line }]. */

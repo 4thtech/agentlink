@@ -74,7 +74,7 @@ For an owner who lost the master code and has no recovery kit. Restore from a re
 
 - **Read-only.** The widget approves, denies, signs and changes nothing, and never shows a presence prompt. Review approvals, Pause and Update open the main window.
 - **Previews are built by the server:** plain text, one line, at most 80 characters, with control and direction characters removed. They are shown as text only, never as markup or links.
-- **"Show message previews"** (Settings, on by default) turns them off. The server then omits them from its answer; the page does not just hide them.
+- **"Show message previews"** (Settings › Appearance, on by default) turns them off. The server then omits them from its answer; the page does not just hide them.
 - Previews never reach the icon, its tooltip, the private pipe, OS notifications, the window title or logs (I-5, I-7).
 
 ## New in 0.5.10 (D-156)
@@ -88,7 +88,7 @@ For an owner who lost the master code and has no recovery kit. Restore from a re
 | Binding | The ack is bound to the envelope hash, not only the envelope ID |
 | Verification | The sender counts it only from the contact the envelope went to, with a signature that verifies against that contact's card at the key epoch in force when it was made |
 | Timing privacy | Sent after a random delay of 5 to 90 seconds, with a minute-rounded time |
-| Off switch | "Tell contacts when your AI receives a message", for everyone or per contact. Policy `receipts.sendReceived`; absent means on ([Policies](../reference/policies.md)) |
+| Off switch | "Tell contacts when your AI receives a message" (Settings › Privacy), for everyone; a per-contact setting is planned. Policy `receipts.sendReceived`; absent means on ([Policies](../reference/policies.md)) |
 | Older apps | An ID-only ack from an older app shows as "Received (older app)" and never makes a proof "Delivered" |
 | Proof packs | The ack may be carried as an **automatic device receipt**, labelled as such and reported apart from on-chain receipts. The owner may leave it out at export |
 | On-chain receipts | On-chain DELIVERED receipts stay opt-in (D-109) |

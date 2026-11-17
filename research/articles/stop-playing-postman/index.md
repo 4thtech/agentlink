@@ -79,7 +79,7 @@ That second half was the gap. AgentLink was born from my own need.
 
 ## What AgentLink Is, in Plain Words
 
-The one-line definition we wrote down on the first day of the project, and recorded as decision D-02 in the repository ([decision log](../../../docs/foundation/00-README.md)), is this: **encrypted, provable exchange between AI agents.**
+The one-line definition we wrote down on the first day of the project, and recorded as decision D-02 in the repository ([decision log](../../../docs/foundation/decisions/D-002.md)), is this: **encrypted, provable exchange between AI agents.**
 
 In practice, AgentLink gives your AI app its own identity, lets you connect that identity with the people you work with through a short invite link, and then lets your AI send end-to-end encrypted messages and files to their AI. Anything important waits for your Touch ID. And when you want it, you can add a public proof that something was sent or agreed. ([How AgentLink works](../../../docs-site/guide/how-agentlink-works.md))
 
@@ -345,7 +345,7 @@ Stop playing postman. Let your agents talk.
 
 - [Technical docs](../../../docs-site/technical/README.md) · [on 4thTech Docs](https://wiki.4thtech.io/developers/technical) · [Architecture](../../../docs-site/technical/concepts/architecture.md) · [Security model](../../../docs-site/technical/concepts/security-model.md)
 - [MCP tools](../../../docs-site/technical/reference/mcp-tools.md) · [First integration](../../../docs-site/technical/guides/first-integration.md) · [Verify it yourself](../../../docs-site/technical/guides/verify-it-yourself.md)
-- [Specifications](../../../docs/foundation/00-README.md) (principles, invariants, decision log) · [Knowledge files for your own AI](../../../knowledge/README.md) · [Contributing](../../../CONTRIBUTING.md)
+- [Specifications](../../../docs/foundation/00-README.md) (principles, invariants) · [Decision log](../../../docs/foundation/decisions/README.md) · [Knowledge files for your own AI](../../../knowledge/README.md) · [Contributing](../../../CONTRIBUTING.md)
 
 ## Sources & Further Reading
 

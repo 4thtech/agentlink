@@ -40,7 +40,6 @@ These are the defaults of a new policy (`POLICY_DEFAULTS`). A new ID's first rul
 | | `defaultChain` | `base` | The proof network, picked automatically; shown only under Advanced |
 | `receipts` | `autoDelivered` | `false` | On-chain DELIVERED receipts are public, so they are opt-in |
 | | `autoOpened` | `false` | "Opened" only when the user asks |
-| | `sendReceived` | `true` | Tell contacts when your AI receives a message (since 0.5.10, D-156). Free and off-chain |
 | `commitments` | `accept` | `approval` | Accepting terms needs the owner, once per agreement |
 | | `autoAcceptContacts` | none | Contacts eligible for auto-accept |
 | | `autoAcceptMaxUSD` | `"0"` | Highest price auto-accept covers |
@@ -51,10 +50,11 @@ These are the defaults of a new policy (`POLICY_DEFAULTS`). A new ID's first rul
 
 ## Received acknowledgements (`receipts.sendReceived`)
 
-- Label: "Tell contacts when your AI receives a message".
+- Not one of the `POLICY_DEFAULTS` keys: a policy without it counts as on (since 0.5.10, D-156). Free and off-chain.
+- Label (Settings › Privacy): "Tell contacts when your AI receives a message".
 - When on, the AgentLink app sends a signed off-chain acknowledgement for each message it processed from an active contact. It never does so for a blocked, removed or revoked contact, an unknown sender or a request.
 - A policy signed before 0.5.10 has no such key. Absent counts as on. Existing users see a one-time notice.
-- The owner can turn it off for everyone, or for one contact with a contact rule.
+- The owner turns it off for everyone with the switch. A per-contact setting is planned (not in 0.5.10).
 - What it tells the sender: [Privacy of proofs](../concepts/privacy.md).
 - On-chain DELIVERED receipts stay opt-in: `receipts.autoDelivered` is `false` unless the owner turns it on, here or per contact.
 
@@ -67,7 +67,6 @@ Up to 256 rules, one per contact, sorted by ID. A rule applies only while the co
 | `proofs` | `notarize` | Replaces `proofs.notarize` for this contact (a global `deny` always wins) |
 | `proofs` | `perActionMaxUSD` | Replaces the per-proof limit for this contact |
 | `receipts` | `autoDelivered` | Replaces the on-chain DELIVERED setting for this contact |
-| `receipts` | `sendReceived` | Replaces the received-acknowledgement setting for this contact (since 0.5.10) |
 | `files` | `askBeforeSaving` | Exactly `true`: this contact's files wait for Save |
 
 "Remember for this contact" on a proof approval creates the proof rule. A file rule can only make saving stricter.
