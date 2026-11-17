@@ -511,3 +511,66 @@ export async function surface(agent: PiAgent): Promise<string> {
   const tools = await agent.mcp.listTools();
   return JSON.stringify({ tools: tools.tools, instructions: agent.mcp.getInstructions() ?? null });
 }
+
+/** One automatic `ack` this agent queued: who it went to, what it acknowledges, and its exact body keys. */
+export interface AckSent {
+  readonly toContact: string;
+  readonly toStatus: string | undefined;
+  readonly acked: string;
+  readonly bodyKeys: readonly string[];
+  readonly bodyKind: unknown;
+  readonly bodyHash: unknown;
+  readonly payloadKeys: readonly string[];
+}
+
+/** The inbound envelopes this agent processed (state `ok`, not an ack) with the contact that sent each. */
+export async function processedInbound(agent: PiAgent): Promise<Map<string, string>> {
+  const rows = await agent.store.transaction((tx) =>
+    tx.select('envelopes', { direction: 'in', state: 'ok' } as never),
+  );
+  const out = new Map<string, string>();
+  for (const r of rows as unknown as Array<{
+    envelope_id: string;
+    contact_id: string | null;
+    type: string;
+  }>) {
+    if (r.type !== 'ack' && r.contact_id !== null) out.set(r.envelope_id, r.contact_id);
+  }
+  return out;
+}
+
+/** Every outbound `ack`, opened from the sealed store (an ack carries no inbound text, I-5). */
+export async function sentAcks(agent: PiAgent): Promise<AckSent[]> {
+  const { rows, contacts } = await agent.store.transaction((tx) => ({
+    rows: tx.select('envelopes', { direction: 'out', type: 'ack' } as never),
+    contacts: tx.select('contacts', {} as never),
+  }));
+  const status = new Map(
+    (contacts as unknown as Array<{ contact_id: string; status: string }>).map((c) => [
+      c.contact_id,
+      c.status,
+    ]),
+  );
+  const out: AckSent[] = [];
+  for (const r of rows as unknown as Array<{
+    envelope_id: string;
+    contact_id: string;
+    payload_json: Sealed;
+  }>) {
+    const text = await agent.cipher.open(
+      { table: 'envelopes', column: 'payload_json', rowKey: JSON.stringify([r.envelope_id]) },
+      r.payload_json,
+    );
+    const payload = parseJson(text) as { body: Record<string, unknown> };
+    out.push({
+      toContact: r.contact_id,
+      toStatus: status.get(r.contact_id),
+      acked: String(payload.body['envelopeId']),
+      bodyKeys: Object.keys(payload.body).sort(),
+      bodyKind: payload.body['kind'],
+      bodyHash: payload.body['envelopeHash'],
+      payloadKeys: Object.keys(payload).sort(),
+    });
+  }
+  return out;
+}
