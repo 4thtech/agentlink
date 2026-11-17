@@ -47,7 +47,7 @@ The main session is the **orchestrator**: it deploys workers and audits. **The o
 
 ## Before you change anything
 
-1. Read the relevant parts of `docs/foundation/00-README.md` (principles, decision log) and `04-security-and-crypto.md`. The invariants I-1…I-10 are non-negotiable.
+1. Read the relevant parts of `docs/foundation/00-README.md` (principles; decisions in `decisions/`) and `04-security-and-crypto.md`. The invariants I-1…I-10 are non-negotiable.
 2. Read your component's spec: 03, 05, 06, 07 or 08, plus 11 §5 (vocabulary) for any user-facing copy.
 3. Find your task card in `docs/process/backlog.md`. No ID, no work.
 4. Check its security class (S0/S1/S2) and review requirements in `docs/process/audit-rules.md`.

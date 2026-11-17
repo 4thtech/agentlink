@@ -35,7 +35,7 @@ Contents: §1 How to read a card · §2 M0 Foundations (incl. legacy OPS-L items
 | **Phase** | M1 cards only: `M1a` (walking skeleton: pair and talk) or `M1b` (files, proof, credits), D-33. Appended to the Status line; see §3. |
 | **Repo/path** | `agentlink` = public `4thtech/agentlink`; `occ-v2-contracts` = private contracts repo (D-19); `agentlink-ops` = private ops/internal-docs repo (D-26). |
 | **Depends on** | Cards that must be `done` (or stubbed behind an agreed interface, `development-process.md` §6.2) before this one is `ready`. |
-| **Spec** | `04 §3.5` = `docs/foundation/04-security-and-crypto.md` section 3.5. `10 M1-5` = the build-plan row. `D-xx` = decision log in `00-README.md`. |
+| **Spec** | `04 §3.5` = `docs/foundation/04-security-and-crypto.md` section 3.5. `10 M1-5` = the build-plan row. `D-xx` = decision `docs/foundation/decisions/D-0xx.md` (index: `decisions/README.md`). |
 | **Invariants** | I-1…I-10 from 04 §1 that the task touches; the PR states how each holds. |
 
 ### Status legend

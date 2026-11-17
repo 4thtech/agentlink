@@ -13,7 +13,7 @@
 
 | Thing | Where | What it is |
 |---|---|---|
-| Specs (source of truth) | `docs/foundation/` in `4thtech/agentlink` (public) | Product, architecture, security invariants I-1…I-10, contracts, MCP, SDK, clients, build plan, decision log (`00-README.md`) |
+| Specs (source of truth) | `docs/foundation/` in `4thtech/agentlink` (public) | Product, architecture, security invariants I-1…I-10, contracts, MCP, SDK, clients, build plan, decision log (`decisions/`) |
 | Process rules | `docs/process/` | `development-process.md`, `audit-rules.md`, `release-and-deployment.md`, `ci-cd.md`, `sync-protocol.md`, `backlog.md`, this file |
 | Agent rules | `AGENTS.md` (canonical) · `CLAUDE.md` (imports it) | What every agent in any harness must and must not do |
 | **Shared live state** | the **`sync` branch** of `4thtech/agentlink` | `board.md` (who owns what and which tasks are active), `talirezun.md` (Tali's side), `denisjazbec.md` (your side) |

@@ -459,4 +459,4 @@ The `4thtech` organisation stays on the **Free** plan; revisit before M3.
 
 ## Change control
 
-Changing this document requires the owner's approval and a decision log entry (D-xx) in `docs/foundation/00-README.md`. Agents may propose changes but MUST NOT enable auto-merge on them: the owner merges, or enables auto-merge, himself.
+Changing this document requires the owner's approval and a decision log entry (D-xx) in `docs/foundation/decisions/`. Agents may propose changes but MUST NOT enable auto-merge on them: the owner merges, or enables auto-merge, himself.

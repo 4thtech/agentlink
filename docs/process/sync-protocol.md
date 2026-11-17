@@ -86,7 +86,7 @@ If a rebase conflicts on `board.md`, keep **both** sides' rows. Never drop anoth
 
 When Denis, or anyone else, takes over a specific part, **the owner decides**. Then:
 - The "Area ownership" row on the board is updated.
-- If the change is significant (for example, a whole repo or package), the decision log in `docs/foundation/00-README.md` gets a new entry via a PR.
+- If the change is significant (for example, a whole repo or package), the decision log in `docs/foundation/decisions/` gets a new entry via a PR.
 
 ## 9. How the layers fit
 

@@ -6,7 +6,7 @@
 | **Applies to** | `4thtech/agentlink` and, for §2, §6, §7, `4thtech/occ-v2-contracts`; the owner, `@denisjazbec`, all agents. |
 | **Status** | Normative · v0.3 · 12 Oct 2026 (D-43) |
 | **Companions** | `release-and-deployment.md` (§4.1, §5.1, §8) · `ci-cd.md` · `development-process.md` (§6.3, §8, §9.2) · [`CHANGELOG.md`](../../CHANGELOG.md) |
-| **Source of truth** | D-43 in [`00-README.md`](../foundation/00-README.md). Formats: the specs named in §2. |
+| **Source of truth** | [D-43](../foundation/decisions/D-043.md). Formats: the specs named in §2. |
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119 / RFC 8174.
 
@@ -156,4 +156,4 @@ Linked from `release-and-deployment.md` §5.1. Agents prepare everything except 
 
 ## Change control
 
-Changing this document requires the owner's approval and a decision log entry (D-xx) in `docs/foundation/00-README.md`. Agents may propose changes but MUST NOT enable auto-merge on them: the owner merges, or enables auto-merge, himself.
+Changing this document requires the owner's approval and a decision log entry (D-xx) in `docs/foundation/decisions/`. Agents may propose changes but MUST NOT enable auto-merge on them: the owner merges, or enables auto-merge, himself.
