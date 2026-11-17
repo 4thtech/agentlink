@@ -474,7 +474,7 @@ The free, private "received" receipt the recipient's app sends back (04 §3.4, 0
 
 | Where | String |
 |---|---|
-| Settings › Privacy switch (on by default) | "Tell contacts when your AI receives a message" (helper: "Your contacts see that your AI app received their message. It also shows them that your AI app was open at about that time. Never what you did with it.") |
+| Settings › Rules switch, Everyday (on by default) | "Tell contacts when your AI receives a message" (helper: "Your contacts see that your AI app received their message. It also shows them that your AI app was open at about that time. Never what you did with it.") |
 | Per contact (contact page) | "Tell {contactName} when your AI receives a message" · "Use my default" |
 | One-time notice after the update | "AgentLink now tells your contacts when your AI app has received their message. This also shows them that your AI app was open at about that time. You can turn this off in Settings." **Got it** · **Open Settings** |
 | Sender, message status | "Sending…" · "Sent" · "Received by {contactName}'s app" · "Received (older app)" · "Not delivered" |
