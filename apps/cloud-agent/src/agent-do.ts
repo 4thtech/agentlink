@@ -202,11 +202,10 @@ export class AgentDO extends DurableObject<CloudAgentEnv> {
           });
           try {
             const result = await client.syncInbox({ budgetMs: ALARM_SYNC_BUDGET_MS });
-            if (result.acksSent > 0) {
-              // The acks this pass staged (one per new message from an active contact); a relay
-              // failure leaves them queued for the next run.
-              await client.outbox.processDue().catch(() => undefined);
-            }
+            // The acks this or an earlier run staged (one per new message from an active contact):
+            // each waits its random 5–90 s (D-156), so a later run publishes what is due then; a
+            // relay failure leaves them queued for the next run.
+            await client.outbox.processDue().catch(() => undefined);
             this.#log.info('cloud agent sync', {
               code: 'sync_ok',
               stored: result.stored,

@@ -382,6 +382,8 @@ export class DeliveryAcks {
     const { row } = await envelopes.prepare({
       to: { contact: contactId },
       payload: ackPayload(inbound.envelope_id, inbound.envelope_hash),
+      // D-156: the signed time is rounded down to the minute; the outbox adds the 5–90 s delay.
+      roundCreatedAt: true,
     });
     const size = encodeUtf8(row.envelope_json ?? '').length;
     if (

@@ -2,6 +2,8 @@
 import type { Payload } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { ACK_KIND_RECEIVED, DEVICE_RECEIPT_LABEL, ackPayload, classifyAck } from './acks.js';
+import { ACK_DELAY_MAX_SECONDS, ACK_DELAY_MIN_SECONDS } from './constants.js';
+import { ackDelaySeconds } from './outbox.js';
 
 const ID = 'AAAAAAAAAAAAAAAAAAAAAA';
 const OTHER_ID = 'BBBBBBBBBBBBBBBBBBBBBB';
@@ -109,6 +111,18 @@ describe('classifyAck', () => {
     ];
     for (const payload of cases) {
       expect(classifyAck({ ...base, fromKey: KEY_NOW, payload })).toBeUndefined();
+    }
+  });
+});
+
+describe('ack delay (D-156)', () => {
+  it('is 5 to 90 s whatever the random bytes', () => {
+    expect(ackDelaySeconds(new Uint8Array([0, 0, 0, 0]))).toBe(ACK_DELAY_MIN_SECONDS);
+    expect(ackDelaySeconds(new Uint8Array([0, 0, 0, 85]))).toBe(ACK_DELAY_MAX_SECONDS);
+    for (let i = 0; i < 500; i += 1) {
+      const d = ackDelaySeconds();
+      expect(d).toBeGreaterThanOrEqual(ACK_DELAY_MIN_SECONDS);
+      expect(d).toBeLessThanOrEqual(ACK_DELAY_MAX_SECONDS);
     }
   });
 });

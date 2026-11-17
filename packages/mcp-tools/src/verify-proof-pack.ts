@@ -52,8 +52,8 @@ export const VERIFY_TEXT = Object.freeze({
   failedNextStep: 'Tell the user the proof did not check out, and why. Do not rely on it.',
   blockHeader: 'Content disclosed in the proof file, as the sender wrote it:',
   // SEC-RECEIPTS-DEFAULT (11 §5.10): the off-chain ack, apart from the public receipts.
-  deviceReceipt:
-    "Automatic device receipt from the recipient's AI: it confirmed it received this exact message. This is not a public receipt.",
+  deviceReceipt: "Automatic device receipt from {contactName}'s AI.",
+  deviceReceiptUnnamed: "Automatic device receipt from the recipient's AI.",
   deviceReceiptFailed: 'This automatic receipt could not be checked.',
 });
 
@@ -131,6 +131,25 @@ async function signerName(
   } catch {
     return undefined;
   }
+}
+
+/**
+ * SEC-RECEIPTS-DEFAULT (11 §5.10): one automatic device receipt's line. The name only for a stored
+ * contact whose ID the verified card names (as core shows it outside the untrusted block).
+ */
+async function deviceReceiptLine(
+  context: ToolContext,
+  device: { readonly ok: boolean; readonly agentEvm?: string },
+): Promise<string> {
+  if (!device.ok) return VERIFY_TEXT.deviceReceiptFailed;
+  if (device.agentEvm !== undefined) {
+    const views = await context.client.contacts().catch(() => []);
+    const view = views.find((v) => v.id === device.agentEvm && v.status !== 'removed');
+    if (view !== undefined) {
+      return fill(VERIFY_TEXT.deviceReceipt, { contactName: contactRef(view).name });
+    }
+  }
+  return VERIFY_TEXT.deviceReceiptUnnamed;
 }
 
 function at(timestamp: string): { date: string; time: string } | undefined {
@@ -228,7 +247,7 @@ export async function verifyProofPackHandler(
   const notices = check.notices.map((code) => NOTICE_TEXT[code]).filter((t) => t !== undefined);
   if (notices.length > 0) summary = `${summary} ${notices.join(' ')}`;
   for (const device of check.deviceReceipts ?? []) {
-    summary = `${summary} ${device.ok ? VERIFY_TEXT.deviceReceipt : VERIFY_TEXT.deviceReceiptFailed}`;
+    summary = `${summary} ${await deviceReceiptLine(context, device)}`;
   }
 
   const output = ok(summary, {

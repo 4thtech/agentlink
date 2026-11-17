@@ -104,6 +104,11 @@ export interface BuildEnvelopeInput {
   /** A 16-byte thread id (base64url). Default: the replied-to envelope's thread, else the thread
    * already in use with that party, else a new one. */
   readonly thread?: string;
+  /**
+   * SEC-RECEIPTS-DEFAULT (04 §3.4 ack timing, D-156): sign `createdAt` rounded down to the minute.
+   * Core-internal (delivery acks); never set from a tool argument.
+   */
+  readonly roundCreatedAt?: true;
 }
 
 export interface BuiltEnvelope {
@@ -602,7 +607,12 @@ export class EnvelopeService {
       { enc: bundle.agentEnc, nostr: encodeHex(bundle.agentNostr) },
     );
     const thread = await this.#threadFor(input, payload, contactId);
-    const sealed = await sealOutbound(ctx, { parties, payload, thread });
+    const sealed = await sealOutbound(ctx, {
+      parties,
+      payload,
+      thread,
+      ...(input.roundCreatedAt === true ? { roundCreatedAt: true as const } : {}),
+    });
     const row = await outboundRow(ctx, sealed, contactId ?? null);
     return {
       built: {
@@ -1845,6 +1855,8 @@ async function sealOutbound(
      * owner's Nostr key (64 lowercase hex) and `keys` the owner session. Default: the agent's KeyStore.
      */
     readonly signer?: { readonly keys: EnvelopeKeys; readonly from: string };
+    /** Sign `createdAt` rounded down to the minute (delivery acks, D-156). */
+    readonly roundCreatedAt?: true;
   },
 ): Promise<SealedOutbound> {
   const bundle = await ctx.keyStore.getPublicBundle();
@@ -1859,7 +1871,8 @@ async function sealOutbound(
     }
     if (!nostrKeys.includes(party.nostr)) nostrKeys.push(party.nostr);
   }
-  const now = nowOf(ctx);
+  const clockNow = nowOf(ctx);
+  const now = input.roundCreatedAt === true ? clockNow - (clockNow % 60) : clockNow;
   const id = input.id ?? randomBytes(ENVELOPE_ID_LENGTH);
   const payloadText = canonicalize(input.payload as unknown as JsonValue);
   const plaintext = encodeUtf8(payloadText);

@@ -219,7 +219,7 @@ function Details({
   readonly agent: string;
   readonly name: string;
 }): ReactElement {
-  const receipt = !out ? S.receiptTheirs : receiptWord(item);
+  const receipt = !out ? S.receiptTheirs : receiptWord(item, name);
   return (
     <p className="hm-msg-meta hm-f al-text-code al-reveal">
       <span>

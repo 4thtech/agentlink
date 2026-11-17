@@ -48,7 +48,7 @@ export const EXPORT_TEXT = Object.freeze({
     'Call again without includeContentKey to save a proof file without the content.',
   // SEC-RECEIPTS-DEFAULT (11 §5.10; 07 §8): the contact's off-chain ack, labelled apart.
   deviceReceipt:
-    "It includes the contact's automatic receipt: it shows that their AI app received this exact item, and when.",
+    "Includes the contact's automatic receipt. It shows that their AI app received this exact item, and when.",
 });
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>

@@ -356,7 +356,7 @@ export type PackCheck =
        * "received" ack over this hash), each checked apart from on-chain receipts; empty or absent
        * when the pack carries none.
        */
-      readonly deviceReceipts?: readonly { readonly ok: boolean }[];
+      readonly deviceReceipts?: readonly { readonly ok: boolean; readonly agentEvm?: string }[];
     };
 
 /** The agent's credits and the price list (06 §2.1 `credits`, `prices`; D-45, G-43). */

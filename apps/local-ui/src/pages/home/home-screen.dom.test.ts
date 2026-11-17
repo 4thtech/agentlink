@@ -372,7 +372,7 @@ describe('Home simple (A4)', () => {
     expect(heads.some((t) => t.includes('Got them'))).toBe(false);
     // Outbound: received (a signed receipt; SEC-RECEIPTS-DEFAULT) / Waiting to send / Not delivered.
     expect(document.body.textContent).toContain('Sending the brief.');
-    expect(byText('span', fmt(S.receivedBy, { name: 'Denis' }))).toBeTruthy();
+    expect(byText('span', fmt(S.proofDelivered, { name: 'Denis' }))).toBeTruthy();
     expect(byText('span', S.waitingToSend)).toBeTruthy();
     expect(byText('span', S.notDelivered)).toBeTruthy();
     expect(document.body.textContent).toContain(S.notDeliveredRetry);

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// SEC-RECEIPTS-DEFAULT: the owner's "Send received receipts" switch on the Rules page (06 §3
+// SEC-RECEIPTS-DEFAULT: the owner's received-receipts rule on the Rules page (06 §3
 // `receipts.sendReceived`; 11 §5). On by default; absent from an older server reads as on.
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -61,9 +61,11 @@ describe('receipts.sendReceived in the Rules data', () => {
   });
 
   it('the copy says what it tells contacts, and that it shows the AI app is running', () => {
-    expect(S.sendReceivedTitle).toBe('Send received receipts');
-    expect(S.sendReceivedHelp).toMatch(/reached your app/);
-    expect(S.sendReceivedHelp).toMatch(/AI app is running/);
+    // 11 §5.10, exactly.
+    expect(S.sendReceivedTitle).toBe('Tell contacts when your AI receives a message');
+    expect(S.sendReceivedHelp).toBe(
+      'Your contacts see that your AI app received their message. It also shows them that your AI app was open at about that time. Never what you did with it.',
+    );
     expect(`${S.sendReceivedTitle} ${S.sendReceivedHelp}`).not.toMatch(
       /wallet|gas|seed phrase|transaction/i,
     );
@@ -83,7 +85,7 @@ describe('the Rules page switch', () => {
     host.remove();
   });
 
-  it('shows "Send received receipts" in Everyday, on by default', async () => {
+  it('shows the received-receipts rule in Everyday, on by default', async () => {
     const f = (async (input: RequestInfo | URL): Promise<Response> => {
       const url = typeof input === 'string' ? input : input.toString();
       return url.startsWith('/api/ui/rules')
@@ -109,6 +111,6 @@ describe('the Rules page switch', () => {
     const checked = group?.querySelector('[role="radio"][aria-checked="true"]');
     expect(checked?.textContent).toContain(S.receiptsOn);
     const row = group?.closest('.rl-row');
-    expect(row?.textContent).toContain('AI app is running');
+    expect(row?.textContent).toContain(S.sendReceivedHelp);
   });
 });

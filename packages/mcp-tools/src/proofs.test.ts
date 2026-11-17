@@ -978,8 +978,7 @@ describe('agentlink_verify_proof_pack (06 §2.4, D-87, D-95, D-96)', () => {
   it('SEC-RECEIPTS-DEFAULT: an automatic device receipt is reported apart from public receipts', async () => {
     const good = fake({ verify: () => ({ ...validPack(), deviceReceipts: [{ ok: true }] }) });
     const r = await call('agentlink_verify_proof_pack', { path: 'p.json' }, good.client);
-    expect(r.structured.summary).toMatch(/automatic device receipt/i);
-    expect(r.structured.summary).toContain('not a public receipt');
+    expect(r.structured.summary).toContain("Automatic device receipt from the recipient's AI.");
     expect(r.structured['receipts']).toEqual([{ type: 'DELIVERED', at: '2026-10-19T10:05:00Z' }]);
     const bad = fake({ verify: () => ({ ...validPack(), deviceReceipts: [{ ok: false }] }) });
     const r2 = await call('agentlink_verify_proof_pack', { path: 'p.json' }, bad.client);

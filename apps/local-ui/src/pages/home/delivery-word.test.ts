@@ -26,7 +26,9 @@ describe('sentWord', () => {
     expect(sentWord(item({ proof: true, receivedOlder: true }), 'Ana')).toBe(
       'Sent. No receipt yet.',
     );
-    expect(sentWord(item({ proof: true, receipt: true }), 'Ana')).toBe("Received by Ana's app");
+    expect(sentWord(item({ proof: true, receipt: true }), 'Ana')).toBe(
+      "Delivered: Ana's AI confirmed it received this.",
+    );
   });
 
   it('other states keep their word', () => {
@@ -36,12 +38,19 @@ describe('sentWord', () => {
 });
 
 describe('receiptWord (Under the hood)', () => {
-  it('Delivered only with the signed receipt', () => {
-    expect(receiptWord(item({ receipt: true }))).toBe('Delivered');
-    expect(receiptWord(item({ receivedOlder: true }))).toBe('Received (older app)');
-    expect(receiptWord(item({ receivedOlder: true, proof: true }))).toBe('No receipt yet');
-    expect(receiptWord(item())).toBe('No receipt yet');
-    expect(receiptWord(item({ status: 'queued' }))).toBe('Pending');
+  it('Delivered only with the signed receipt (11 §5.10)', () => {
+    expect(receiptWord(item({ receipt: true }), 'Ana')).toBe(
+      "Received by Ana's app: their AI app confirmed it received this exact message.",
+    );
+    expect(receiptWord(item({ receipt: true, proof: true }), 'Ana')).toBe(
+      "Delivered: Ana's AI confirmed it received this.",
+    );
+    expect(receiptWord(item({ receivedOlder: true }), 'Ana')).toBe('Received (older app)');
+    expect(receiptWord(item({ receivedOlder: true, proof: true }), 'Ana')).toBe(
+      'Sent. No receipt yet.',
+    );
+    expect(receiptWord(item(), 'Ana')).toBe('No receipt yet');
+    expect(receiptWord(item({ status: 'queued' }), 'Ana')).toBe('Pending');
   });
 
   it('no word says wallet, gas, seed phrase or transaction', () => {
@@ -49,7 +58,7 @@ describe('receiptWord (Under the hood)', () => {
       sentWord(item({ receipt: true }), 'Ana'),
       sentWord(item({ receivedOlder: true }), 'Ana'),
       sentWord(item({ proof: true }), 'Ana'),
-      receiptWord(item({ receivedOlder: true })),
+      receiptWord(item({ receivedOlder: true }), 'Ana'),
     ].join(' ');
     expect(words).not.toMatch(/wallet|gas|seed phrase|transaction/i);
   });

@@ -14,16 +14,17 @@ type Item = Pick<MessageItem, 'status' | 'receipt' | 'receivedOlder' | 'proof'>;
 export function sentWord(item: Item, name: string): string {
   if (item.status === 'queued') return S.waitingToSend;
   if (item.status === 'not_delivered') return S.notDelivered;
-  if (item.receipt) return fmt(S.receivedBy, { name });
+  if (item.receipt) return fmt(item.proof ? S.proofDelivered : S.receivedBy, { name });
   if (item.proof) return S.sentNoReceipt;
   if (item.receivedOlder === true) return S.receivedOlder;
   return S.sent;
 }
 
-/** The receipt line under the hood. */
-export function receiptWord(item: Item): string {
+/** The receipt line under the hood (the 11 §5.10 status detail). */
+export function receiptWord(item: Item, name: string): string {
   if (item.status === 'queued') return S.receiptPending;
-  if (item.receipt) return S.receiptYes;
-  if (item.receivedOlder === true && !item.proof) return S.receivedOlder;
+  if (item.receipt) return fmt(item.proof ? S.proofDelivered : S.receivedByDetail, { name });
+  if (item.proof) return S.sentNoReceipt;
+  if (item.receivedOlder === true) return S.receivedOlder;
   return S.receiptNo;
 }

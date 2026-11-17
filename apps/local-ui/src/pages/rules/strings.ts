@@ -69,12 +69,12 @@ export const RULES_STRINGS = {
   exportsTitle: 'Exports that open the document',
   exportsHelp: 'Anyone with such an export can read the document.',
 
-  // SEC-RECEIPTS-DEFAULT (06 §3 `receipts.sendReceived`; 11 §5).
+  // SEC-RECEIPTS-DEFAULT (06 §3 `receipts.sendReceived`; 11 §5.10).
   receiptsOn: 'On',
   receiptsOff: 'Off',
-  sendReceivedTitle: 'Send received receipts',
+  sendReceivedTitle: 'Tell contacts when your AI receives a message',
   sendReceivedHelp:
-    'Tells your contacts their message reached your app. It also shows them your AI app is running.',
+    'Your contacts see that your AI app received their message. It also shows them that your AI app was open at about that time. Never what you did with it.',
   limitsTitle: 'Limits for accepting terms',
   limitsHelp: 'Your AI accepts on its own only within these limits.',
   buyTitle: 'Auto-accept when I pay, for listed contacts',

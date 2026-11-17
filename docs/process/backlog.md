@@ -11294,6 +11294,20 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Spec:** D-156 (1); 02 F-23; 03 §4.1; 04 §3.4 (`ack` v2), §5.1; 06 §3; 07 §3.2 "Delivered", §8 "Automatic device receipts"; 11 §5.10
 - **Done when:** `RED (expected):` commit first; acks v2 `{kind, envelopeId, envelopeHash, recordId?}` sent by default only to active, fully paired contacts after a 5–90 s random delay with `createdAt` rounded to the minute; switch off (global or per contact) sends none; `delivered` only from a verified v2 ack whose hash matches and whose signature verifies at the contact's key epoch in force at ack time (unknown epoch, other contact, wrong hash, replay for another envelope: ignored); v1 ack = "Received (older app)" for plain messages, never on proof-carrying envelopes; a 0.5.9 client fixture accepts what we send (else v1 to contacts without v2 support); proof packs carry and verify the labelled device receipt, a tampered one fails with `device_receipt_invalid`; one-time notice for existing users; microcopy of 11 §5.10; changelog fragment with the credit.
 
+#### RECEIPTS-PER-CONTACT · Received receipts: a per-contact choice (later)
+- **Status:** backlog · **Size:** S–M · **Tier:** Opus build, Opus review · **Security:** S2 (policy)
+- **Repo/path:** agentlink · `packages/types/src/policy.ts` (contact rule `receipts.sendReceived`), `packages/core/src/{acks.ts,owner-prepare.ts,policy-engine.ts}`, `packages/node/src/local-ui/api/rules.ts`, `apps/local-ui` contact page; tests
+- **Depends on:** SEC-RECEIPTS-DEFAULT
+- **Spec:** D-156 (1); 04 §3.4 (`ack` "and its per-contact override"); 06 §3; 11 §5.10 "Per contact"
+- **Done when:** `RED (expected):` commit first; a contact rule can set `receipts.sendReceived` for one contact, which replaces the global value for that contact only (the D-109 contact-rule pattern); absent = the global value; the contact page offers "Tell {contactName} when your AI receives a message" and "Use my default"; turning it off for a contact sends that contact none; the loosening classification covers the new field.
+
+#### RECEIPTS-STATE-COLUMN · Delivery state `delivered` stored with the envelope (later)
+- **Status:** backlog · **Size:** M · **Tier:** Opus build, Opus review · **Security:** S2 (store schema, delivery state)
+- **Repo/path:** agentlink · `packages/core/src/store/` (schema and migration), `packages/core/src/{acks.ts,ui-messages.ts,outbox.ts}`, `packages/mcp-tools/src/status.ts`; tests
+- **Depends on:** SEC-RECEIPTS-DEFAULT
+- **Spec:** D-156 (1); 07 §3.2 "Delivered"
+- **Done when:** `RED (expected):` commit first; a schema migration adds `delivered` to `envelopes.delivery` and the flag `received_legacy`, with no backfill; a verified v2 ack (or, for a proof-carrying envelope, a read on-chain DELIVERED receipt) moves a `sent` row to `delivered` in the same transaction that stores the ack; a v1 ack sets `received_legacy` on a plain message only; ack lookup by `(contact_id, envelope_hash)`; the read paths use the stored state instead of scanning acks; a relay `OK` never sets `delivered`; a restore of an older store reads correctly.
+
 #### SEC-KS-712-ALLOWLIST · The agent key signs only AgentLink's own typed-data shapes (0.5.10)
 - **Status:** backlog · **Size:** S–M · **Tier:** Opus build, Fable audit · **Security:** S2 (KeyStore, crypto)
 - **Repo/path:** agentlink · `packages/crypto/src/{keystore-api.ts,eip712.ts,keystore.ts}` (new pure `typedDataSnapshot`), `packages/node/src/{keychain-keystore.ts,file-keystore.ts}`, `apps/cloud-agent/src/worker-keystore.ts`; allowlists from `packages/chain` configs injected when the store is built; tests
