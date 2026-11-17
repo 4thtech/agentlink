@@ -40,21 +40,27 @@
   outline: 1px solid var(--al-color-border-strong, currentColor);
   outline-offset: -1px;
 }
+.hm-open {
+  position: relative;
+}
+.hm-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--al-color-accent-subtle, rgba(127, 127, 127, 0.18));
+  opacity: 0;
+  transition: opacity var(--al-duration-slow);
+}
 .hm-open.hm-target {
-  animation: hm-target-flash 1.6s ease-out;
   box-shadow: inset 3px 0 0 var(--al-color-accent, currentColor);
 }
-@keyframes hm-target-flash {
-  from {
-    background: var(--al-color-accent-subtle, rgba(127, 127, 127, 0.18));
-  }
-  to {
-    background: transparent;
-  }
+.hm-open.hm-target::after {
+  opacity: 1;
 }
 @media (prefers-reduced-motion: reduce) {
-  .hm-open.hm-target {
-    animation: none;
+  .hm-open::after {
+    transition: none;
   }
 }
 .hm-files,
