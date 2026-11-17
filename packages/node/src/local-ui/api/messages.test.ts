@@ -428,3 +428,23 @@ describe('the read-only messages view (context.ts, MSG-FILES-IO-c; I-4)', () => 
     expect(markRead).not.toHaveBeenCalled();
   });
 });
+
+describe('SEC-RECEIPTS-DEFAULT: an older app receipt', () => {
+  it('passes receivedOlder through for a Sent item, and only `true`', async () => {
+    const older = { ...(SENT[1] as MessageItem), receipt: false, receivedOlder: true };
+    const res = await callBox(
+      contextWith({ list: () => Promise.resolve({ items: [older] }) }),
+      BOB,
+      'box=out',
+    );
+    const items = bodyOf(res)['items'] as Record<string, unknown>[];
+    expect(items[0]).toMatchObject({ receipt: false, receivedOlder: true });
+    const bad = { ...(SENT[1] as MessageItem), receivedOlder: 'yes' };
+    const out = await callBox(
+      contextWith({ list: () => Promise.resolve({ items: [bad] }) }),
+      BOB,
+      'box=out',
+    );
+    expect(bodyOf(out)['items']).toEqual([]);
+  });
+});

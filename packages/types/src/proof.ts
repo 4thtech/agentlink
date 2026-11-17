@@ -162,6 +162,34 @@ export const proofPackDisclosureSchema = z.strictObject({
 });
 
 /**
+ * SEC-RECEIPTS-DEFAULT (D-156): what a verifier and every surface call the off-chain ack in a proof
+ * pack (07 §8 "Automatic device receipts"), never an on-chain receipt.
+ */
+export const DEVICE_RECEIPT_LABEL = 'automatic device receipt' as const;
+
+/** At most this many automatic device receipts in one pack. */
+export const MAX_DEVICE_RECEIPTS = 4;
+
+/**
+ * One automatic device receipt (07 §8, D-156): the contact's signed "received" ack v2 (02 F-23,
+ * 04 §3.4), carried in the sender's pack apart from on-chain `receipts`. `envelope` is the ack
+ * envelope as received; `contentKey` opens that ack only (its body is the message ID and hash),
+ * never the recorded envelope; `card` is the contact's agent card at the ack's key epoch with its
+ * `cardSig`, so the verifier can attribute the ack to that contact. Whether it verifies is the
+ * verifier's check (`device_receipt_invalid`).
+ */
+export const proofPackDeviceReceiptSchema = z.strictObject({
+  envelope: envelopeSchema,
+  contentKey: base64url(BYTE_LENGTHS.key),
+  card: z.strictObject({
+    agentCard: agentCardSchema,
+    cardSig: cardSigSchema,
+  }),
+});
+
+export type ProofPackDeviceReceipt = z.infer<typeof proofPackDeviceReceiptSchema>;
+
+/**
  * The exporting side's owner approval of the commitment (04 §3.4): its signed `approval.decide`
  * (an approve, by the same agent the scope names) and the commitment action it signed.
  */
@@ -215,6 +243,12 @@ export const proofPackSchema = z
       .max(RECEIPT_TYPE_NAMES.length)
       .refine(receiptTypesValid, RECEIPTS_MESSAGE),
     disclosure: proofPackDisclosureSchema.nullable(),
+    // SEC-RECEIPTS-DEFAULT (D-156): optional; the owner can leave them out at export.
+    deviceReceipts: z
+      .array(proofPackDeviceReceiptSchema)
+      .min(1)
+      .max(MAX_DEVICE_RECEIPTS)
+      .exactOptional(),
     ownerApproval: proofPackOwnerApprovalSchema,
     exportedAt: utcTimestampSchema,
   })

@@ -12,6 +12,12 @@ export {
   type ProofPackFailure,
 } from './reasons.js';
 export type { OwnerApprovalResult } from './approval.js';
+export {
+  DEVICE_RECEIPT_FAILURES,
+  checkDeviceReceipt,
+  type DeviceReceiptCheck,
+  type DeviceReceiptFailure,
+} from './device-receipt.js';
 export type { ReceiptTx } from './receipts.js';
 export {
   verifyProofPack,

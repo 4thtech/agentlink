@@ -45,6 +45,7 @@ import {
   encodeHex,
   parseJson,
   parseEnvelopeText,
+  randomBytes,
   type AgentCard,
   type Envelope,
   type EnvelopeKeys,
@@ -64,7 +65,12 @@ import {
   type OutboxSummary,
 } from '@4thtech-io/transport-nostr';
 import { agentNostrKey } from './card.js';
-import { OUTBOX_GIVE_UP_SECONDS, STAGED_MAX_AGE_SECONDS } from './constants.js';
+import {
+  ACK_DELAY_MAX_SECONDS,
+  ACK_DELAY_MIN_SECONDS,
+  OUTBOX_GIVE_UP_SECONDS,
+  STAGED_MAX_AGE_SECONDS,
+} from './constants.js';
 import type { ContactBook } from './contacts.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
@@ -294,6 +300,26 @@ class StoreOutboxPersistence implements OutboxPersistence {
 }
 
 /** The outbox of one client: routing, rows, staged envelopes and delivery passes. */
+/** A uniform delay in [ACK_DELAY_MIN_SECONDS, ACK_DELAY_MAX_SECONDS], from the CSPRNG. */
+export function ackDelaySeconds(random: Uint8Array = randomBytes(4)): number {
+  const span = ACK_DELAY_MAX_SECONDS - ACK_DELAY_MIN_SECONDS + 1;
+  const n =
+    ((random[0] ?? 0) << 24) |
+    ((random[1] ?? 0) << 16) |
+    ((random[2] ?? 0) << 8) |
+    (random[3] ?? 0);
+  return ACK_DELAY_MIN_SECONDS + ((n >>> 0) % span);
+}
+
+/** Outbox rows whose first attempt waits `seconds` (their give-up time moves with it). */
+function delayed(rows: readonly Row<'outbox'>[], seconds: number): Row<'outbox'>[] {
+  return rows.map((r) => ({
+    ...r,
+    next_attempt_at: r.next_attempt_at + seconds,
+    give_up_at: r.give_up_at + seconds,
+  }));
+}
+
 export class OutboxService {
   readonly #ctx: CoreContext;
   readonly #identity: IdentityService;
@@ -674,7 +700,8 @@ export class OutboxService {
         });
         continue;
       }
-      const ready = rows;
+      // SEC-RECEIPTS-DEFAULT (D-156): a delivery ack is first published after a random 5–90 s.
+      const ready = row.type === 'ack' ? delayed(rows, ackDelaySeconds()) : rows;
       enqueued += await this.#ctx.store.transaction((tx) => {
         const current = tx.get('envelopes', { envelope_id: row.envelope_id });
         if (

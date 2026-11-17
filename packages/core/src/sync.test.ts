@@ -28,6 +28,7 @@ import {
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ACK_KIND_RECEIVED } from './acks.js';
 import { AgentLinkClient } from './client.js';
+import { ACK_DELAY_MAX_SECONDS, ACK_DELAY_MIN_SECONDS } from './constants.js';
 import { UNOPENED_TYPE, type InboundReport } from './envelopes.js';
 import { CoreError } from './errors.js';
 import { MemoryStore } from './store/memory-store.js';
@@ -171,6 +172,8 @@ interface OpenOptions {
    * with the same assertions, relative to the limit, in a fraction of the work.
    */
   readonly rateLimit?: number;
+  /** SEC-RECEIPTS-DEFAULT: an owner-signed policy with `receipts.sendReceived` set to this value. */
+  readonly sendReceived?: boolean;
 }
 
 /** The limit the rate-limit tests set (see `OpenOptions.rateLimit`): small, and well below the default. */
@@ -194,7 +197,9 @@ async function openAgent(
     cipher,
     approvals: new RecordingApprovalChannel(),
     clock: clock.now,
-    ...(options.rateLimit === undefined ? {} : { policyMark: new MemoryPolicyMark() }),
+    // SEC-RECEIPTS-DEFAULT: always a policy mark, as every runtime has, so the default rules apply
+    // (without one the policy fails closed, and a policy that fails closed sends no acks).
+    policyMark: new MemoryPolicyMark(),
     transport: nostrTransport({ connector: net, addressCheck: 'platform' }),
     logger: createLogger({ name: 'core', level: 'debug', sink: (_l, line) => lines.push(line) }),
     ...(options.deliveryAcks === undefined ? {} : { deliveryAcks: options.deliveryAcks }),
@@ -207,9 +212,14 @@ async function openAgent(
       relays,
     });
   }
-  if (options.rateLimit !== undefined) {
+  if (options.rateLimit !== undefined || options.sendReceived !== undefined) {
     const policy = defaultPolicy();
-    policy.contacts.rateLimitPerContactPerHour = options.rateLimit;
+    if (options.rateLimit !== undefined) {
+      policy.contacts.rateLimitPerContactPerHour = options.rateLimit;
+    }
+    if (options.sendReceived !== undefined) {
+      policy.receipts = { ...policy.receipts, sendReceived: options.sendReceived };
+    }
     const signed = await signWith(owner, {
       v: 1,
       agent: client.agentId,
@@ -295,6 +305,16 @@ function flood(net: RelayNetwork, relay: string, to: Agent, second: number, n: n
       sig: '0'.repeat(128),
     } as NostrEvent);
   }
+}
+
+/**
+ * SEC-RECEIPTS-DEFAULT: an outbox pass gives staged acks their rows, which wait the random 5–90 s
+ * (D-156); the fake clock then moves past the longest wait and a second pass publishes them.
+ */
+async function publishAcks(agent: Agent): Promise<void> {
+  await agent.client.outbox.processDue();
+  clock.t += ACK_DELAY_MAX_SECONDS + 1;
+  await agent.client.outbox.processDue();
 }
 
 const rowsOf = (agent: Agent) =>
@@ -694,20 +714,140 @@ describe('catchUp (M1-7h addendum, D-73; 06 §2.0): fetch-only', () => {
 
 // --- Delivery acknowledgements --------------------------------------------------------------------
 
-describe('delivery acknowledgements (02 F-23, behind a flag)', () => {
-  it('off by default: no ack is sent', async () => {
+describe('delivery acknowledgements (02 F-23; SEC-RECEIPTS-DEFAULT: on by default)', () => {
+  it('on by default: the contact acks a message once, bound to its envelopeHash', async () => {
     const net = new RelayNetwork();
     const a = await openAgent(1, 'alice', RELAYS_A, net);
     const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    const sent = await a.client.sendMessage({ to: b.id, text: 'hi' });
+    if (sent.status !== 'ok') throw new Error('test: not sent');
+    const result = await b.client.syncInbox();
+    expect(result.items).toHaveLength(1);
+    expect(result.acksSent).toBe(1);
+    await publishAcks(b);
+    await a.client.syncInbox();
+    const status = await a.client.acks.status(sent.envelopeId);
+    expect(status).toMatchObject({ received: true, verified: true, receipt: 'verified' });
+    const page = await a.client.messages.list(b.id, 'out');
+    expect(page.items[0]).toMatchObject({ id: sent.envelopeId, receipt: true });
+    expect(page.items[0]).not.toHaveProperty('receivedOlder');
+    // One ack per message: a second pass and a second processing of the same message add none.
+    expect((await b.client.syncInbox()).acksSent).toBe(0);
+    expect(await b.client.acks.sendFor(result.reports)).toBe(0);
+  });
+
+  it('each ack waits a random 5–90 s before it is published, and its signed time is rounded to the minute', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    clock.t += 37; // not on a minute
+    await a.client.sendMessage({ to: b.id, text: 'when did you get this?' });
+    expect((await b.client.syncInbox()).acksSent).toBe(1);
+    const before = net.published;
+    const staged = clock.t;
+    await b.client.outbox.processDue();
+    const ack = (await rowsOf(b)).envelopes.find((r) => r.direction === 'out' && r.type === 'ack');
+    if (ack?.envelope_json == null) throw new Error('test: no ack');
+    const createdAt = (JSON.parse(ack.envelope_json) as { createdAt: number }).createdAt;
+    expect(createdAt % 60).toBe(0);
+    expect(createdAt).toBe(staged - (staged % 60));
+    const rows = (await rowsOf(b)).outbox.filter((r) => r.envelope_id === ack.envelope_id);
+    expect(rows.length).toBeGreaterThan(0);
+    const waits = new Set(rows.map((r) => r.next_attempt_at - staged));
+    expect(waits.size).toBe(1);
+    const wait = [...waits][0] as number;
+    expect(wait).toBeGreaterThanOrEqual(ACK_DELAY_MIN_SECONDS);
+    expect(wait).toBeLessThanOrEqual(ACK_DELAY_MAX_SECONDS);
+    // Nothing is published before the wait; after it, the ack goes out.
+    expect(net.published).toBe(before);
+    clock.t = staged + wait - 1;
+    await b.client.outbox.processDue();
+    expect(net.published).toBe(before);
+    clock.t = staged + wait;
+    await b.client.outbox.processDue();
+    expect(net.published).toBeGreaterThan(before);
+  });
+
+  it('the owner setting "Send received receipts" off: zero acks', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { sendReceived: false });
     await pair(a, b);
     await a.client.sendMessage({ to: b.id, text: 'hi' });
     const result = await b.client.syncInbox();
     expect(result.items).toHaveLength(1);
     expect(result.acksSent).toBe(0);
     expect((await rowsOf(b)).outbox).toEqual([]);
+    expect((await rowsOf(b)).envelopes.filter((r) => r.type === 'ack')).toEqual([]);
   });
 
-  it('with the flag, the contact acks each message once, the sender sees it, and an ack is never acked', async () => {
+  it('an unknown sender (a queued request) gets no ack', async () => {
+    const net = new RelayNetwork();
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    const c = await openAgent(3, 'carol', RELAYS_C, net);
+    const crafted = await textCrafter(c, b);
+    await deliverRaw(net, c, b, await crafted('who is this'));
+    const result = await b.client.syncInbox();
+    expect(result.acksSent).toBe(0);
+    expect((await rowsOf(b)).envelopes.filter((r) => r.type === 'ack')).toEqual([]);
+  });
+
+  it('a v2 ack naming another hash is ignored; an id-only ack from an older app counts as weaker', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { deliveryAcks: false });
+    await pair(a, b);
+    const sent = await a.client.sendMessage({ to: b.id, text: 'bind me' });
+    if (sent.status !== 'ok') throw new Error('test: not sent');
+    const wrongHash = await b.client.envelopes.build({
+      to: { contact: a.id },
+      payload: {
+        type: 'ack',
+        body: {
+          kind: ACK_KIND_RECEIVED,
+          envelopeId: sent.envelopeId,
+          envelopeHash: `0x${'ab'.repeat(32)}`,
+        },
+        replyTo: sent.envelopeId,
+        files: [],
+      },
+    });
+    await deliverRaw(net, b, a, wrongHash.envelope);
+    await a.client.syncInbox();
+    expect(await a.client.acks.status(sent.envelopeId)).toMatchObject({
+      received: false,
+      verified: false,
+      receipt: null,
+    });
+
+    const older = await b.client.envelopes.build({
+      to: { contact: a.id },
+      payload: {
+        type: 'ack',
+        body: { kind: ACK_KIND_RECEIVED, envelopeId: sent.envelopeId },
+        replyTo: sent.envelopeId,
+        files: [],
+      },
+    });
+    await deliverRaw(net, b, a, older.envelope);
+    await a.client.syncInbox();
+    expect(await a.client.acks.status(sent.envelopeId)).toMatchObject({
+      received: true,
+      verified: false,
+      receipt: 'older_app',
+    });
+    // Never "delivered" (receipt) from an id-only ack: the page shows it as received by an older app.
+    const page = await a.client.messages.list(b.id, 'out');
+    expect(page.items[0]).toMatchObject({
+      id: sent.envelopeId,
+      receipt: false,
+      receivedOlder: true,
+    });
+  });
+
+  it('the contact acks each message once, the sender sees it, and an ack is never acked', async () => {
     const net = new RelayNetwork();
     const a = await openAgent(1, 'alice', RELAYS_A, net, { deliveryAcks: true });
     const b = await openAgent(2, 'bob', RELAYS_B, net, { deliveryAcks: true });
@@ -719,7 +859,7 @@ describe('delivery acknowledgements (02 F-23, behind a flag)', () => {
     const atB = await b.client.syncInbox();
     expect(atB.acksSent).toBe(1);
     // M1-7h-b (IR-M1-7h-1 F04 b): the ack is staged; the outbox pass gives it rows and publishes it.
-    await b.client.outbox.processDue();
+    await publishAcks(b);
     const ackRow = (await rowsOf(b)).envelopes.find(
       (r) => r.direction === 'out' && r.type === 'ack',
     );
@@ -1375,11 +1515,20 @@ describe('M1-7h-b (IR-M1-7h-1 F04): catch-up counts, staged acks, a failing key 
     expect(acks.every((r) => r.delivery === 'queued' && r.contact_id === a.id)).toBe(true);
     expect(state.outbox).toEqual([]);
 
-    // The outbox pass gives staged acks their wraps and publishes them, a batch per pass.
+    // The outbox pass gives staged acks their wraps, a batch per pass; they wait 5–90 s (D-156).
+    await b.client.outbox.processDue();
+    const first = await rowsOf(b);
+    const batch = new Set(first.outbox.map((r) => r.envelope_id));
+    expect(batch.size).toBe(50);
+    expect(first.outbox.every((r) => r.state === 'pending')).toBe(true);
+    expect(net.published).toBe(published);
+    // After the wait, the next pass publishes that batch (and wraps the next one).
+    clock.t += ACK_DELAY_MAX_SECONDS + 1;
     await b.client.outbox.processDue();
     const after = await rowsOf(b);
-    expect(new Set(after.outbox.map((r) => r.envelope_id)).size).toBe(50);
-    expect(after.outbox.every((r) => r.state === 'sent')).toBe(true);
+    expect(
+      after.outbox.filter((r) => batch.has(r.envelope_id)).every((r) => r.state === 'sent'),
+    ).toBe(true);
     expect(net.published).toBeGreaterThan(published);
   }, 300_000);
 

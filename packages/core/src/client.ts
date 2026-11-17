@@ -124,8 +124,10 @@ export interface AgentLinkClientOptions {
    */
   readonly transport?: TransportFactory;
   /**
-   * Delivery acknowledgements (02 F-23, P1; M1-7h): when true, `syncInbox` sends a signed
-   * "received" `ack` for each new message from a contact. Default false.
+   * Delivery acknowledgements (02 F-23; M1-7h; SEC-RECEIPTS-DEFAULT, D-156): `syncInbox` sends a
+   * signed "received" `ack` for each new message from an active contact unless the owner's signed
+   * policy turns it off (`receipts.sendReceived: false`). On by default; false turns it off for this
+   * client only (tests, tools).
    */
   readonly deliveryAcks?: boolean;
   /**
@@ -188,7 +190,7 @@ export class AgentLinkClient {
   readonly pause: AgentPause;
   /** Inbox items with their untrusted-content metadata, and store-only counts (M1-7h; 06 §2.1, §4). */
   readonly inbox: InboxService;
-  /** Delivery acknowledgements (02 F-23; M1-7h): behind the `deliveryAcks` flag. */
+  /** Delivery acknowledgements (02 F-23; M1-7h): on by default, the owner's switch in the policy. */
   readonly acks: DeliveryAcks;
   /** The `card-update` sender (M1-4d-f; 04 §3.4.1): the current card to contacts that lack it. */
   readonly cardUpdates: CardUpdateSender;
@@ -759,7 +761,7 @@ export class AgentLinkClient {
       options.policyMark,
       options.receiptsKept,
       options.transport,
-      options.deliveryAcks === true,
+      options.deliveryAcks !== false,
       options.records,
       options.dropOrigins ?? [],
       options.files,

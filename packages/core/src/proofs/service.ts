@@ -88,6 +88,7 @@ import {
 import { evaluateCommitment } from '../commitments.js';
 import type { ContactBook } from '../contacts.js';
 import { CoreError } from '../errors.js';
+import { acksFor } from '../acks.js';
 import { nowOf, open, seal, type CoreContext } from '../context.js';
 import type { EnvelopeService, InboundReport } from '../envelopes.js';
 import type { IdentityService } from '../identity.js';
@@ -436,6 +437,14 @@ export interface ExportProofPackInput {
    * disclosure"; 04 §5: unlinkable unless disclosed). Default false.
    */
   readonly includeRecipient?: boolean;
+  /**
+   * SEC-RECEIPTS-DEFAULT (D-156): on the sender side, the contact AI's signed "received" ack over
+   * this envelope's hash, as the pack's automatic device receipt (07 §8 `deviceReceipts`), with the
+   * contact's card. Included by default when one is stored; the owner may leave it out. It shows
+   * that the contact's AI received these exact bytes; it carries the ack's own content key only,
+   * never the recorded message's.
+   */
+  readonly includeDeviceReceipt?: boolean;
 }
 
 export type ExportProofPackResult =
@@ -443,6 +452,8 @@ export type ExportProofPackResult =
       readonly status: 'ok';
       readonly recordId: string;
       readonly pack: Readonly<Record<string, unknown>>;
+      /** Present when the pack carries the recipient's automatic device receipt. */
+      readonly deviceReceipt?: true;
     }
   | PendingApproval
   | ProofRejected;
@@ -2579,6 +2590,10 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
         : await open(this.#ctx, 'proofs', 'salt', [row.record_id], row.salt);
     const ownerApproval =
       input.includeOwnerApproval === false ? null : await this.#ownerApproval(row, received);
+    const deviceReceipt =
+      received || input.includeDeviceReceipt === false
+        ? undefined
+        : await this.#deviceReceipt(envelopeRow);
     const base = {
       type: 'agentlink.proof',
       version: 1,
@@ -2597,6 +2612,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       // transaction hash (07 §8), which the submitter outcome does not carry yet.
       receipts: [],
       disclosure: contentKey === undefined ? null : { contentKey },
+      ...(deviceReceipt === undefined ? {} : { deviceReceipts: [deviceReceipt] }),
       exportedAt: iso(nowOf(this.#ctx)),
     };
     let parsed = proofPackSchema.safeParse({ ...base, ownerApproval });
@@ -2611,7 +2627,55 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       status: 'ok',
       recordId: row.record_id,
       pack: Object.freeze({ ...base, ownerApproval: parsed.data.ownerApproval }),
+      ...(deviceReceipt === undefined ? {} : { deviceReceipt: true as const }),
     });
+  }
+
+  /**
+   * The pack's automatic device receipt (07 §8; SEC-RECEIPTS-DEFAULT, D-156): the contact's
+   * verified v2 ack of an outbound envelope (acks.ts: from that contact, a key its card history
+   * holds, over this hash), with the ack's own content key from this agent's entry and the
+   * contact's card for the ack's key. Undefined when there is none, it cannot be opened, or that
+   * card is not the stored one (an ack under an earlier epoch is not carried).
+   */
+  async #deviceReceipt(envelopeRow: Row<'envelopes'>): Promise<
+    | {
+        readonly envelope: unknown;
+        readonly contentKey: string;
+        readonly card: { readonly agentCard: unknown; readonly cardSig: string };
+      }
+    | undefined
+  > {
+    if (envelopeRow.direction !== 'out' || envelopeRow.contact_id === null) return undefined;
+    try {
+      const found = (
+        await acksFor(this.#ctx, [
+          {
+            envelopeId: envelopeRow.envelope_id,
+            envelopeHash: envelopeRow.envelope_hash,
+            contactId: envelopeRow.contact_id,
+          },
+        ])
+      ).get(envelopeRow.envelope_id);
+      if (found?.strength !== 'verified' || found.row.envelope_json === null) return undefined;
+      const signer = await this.#deps.contacts.proofSigner(found.row.from_key);
+      if (
+        signer?.agentCard === undefined ||
+        signer.cardSig === undefined ||
+        signer.evm !== envelopeRow.contact_id
+      ) {
+        return undefined;
+      }
+      const contentKey = await this.#contentKey(found.row.envelope_json);
+      if (contentKey === undefined) return undefined;
+      return {
+        envelope: parseJson(found.row.envelope_json) as unknown,
+        contentKey,
+        card: { agentCard: signer.agentCard, cardSig: signer.cardSig },
+      };
+    } catch {
+      return undefined;
+    }
   }
 
   /** The 32-byte CEK from this agent's own entry (04 §3.3), as base64url; wiped after encoding. */

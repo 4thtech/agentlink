@@ -109,10 +109,12 @@ function itemView(box: MessageBox, item: unknown): JsonObject | undefined {
     ...(seq === undefined ? {} : { seq }),
   };
   if (box === 'in') return base;
-  const { status, receipt } = item as Record<string, unknown>;
+  const { status, receipt, receivedOlder } = item as Record<string, unknown>;
   if (typeof status !== 'string' || !SENT_STATUSES.has(status)) return undefined;
   if (typeof receipt !== 'boolean') return undefined;
-  return { ...base, status, receipt };
+  // SEC-RECEIPTS-DEFAULT: an older app's receipt (weaker than `receipt`); only `true` when present.
+  if (receivedOlder !== undefined && receivedOlder !== true) return undefined;
+  return { ...base, status, receipt, ...(receivedOlder === true ? { receivedOlder } : {}) };
 }
 
 /** The box and page query, or undefined when anything is unknown, repeated or malformed. */

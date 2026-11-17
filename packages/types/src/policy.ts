@@ -275,6 +275,9 @@ export const policySchema = z.strictObject({
   receipts: z.strictObject({
     autoDelivered: z.boolean(),
     autoOpened: z.boolean(),
+    // SEC-RECEIPTS-DEFAULT (D-156): the free, signed "received" ack to active contacts (02 F-23).
+    // May be absent: a policy signed before it existed reads as on (sendReceivedOf).
+    sendReceived: z.boolean().exactOptional(),
   }),
   commitments: z.strictObject({
     accept: z.enum(POLICY_RULES),
@@ -290,6 +293,16 @@ export const policySchema = z.strictObject({
 
 export type ContactRule = z.infer<typeof contactRuleSchema>;
 export type Policy = z.infer<typeof policySchema>;
+
+/**
+ * Whether this agent sends the signed "received" ack to its active contacts (02 F-23, D-156): the
+ * owner's "Send received receipts" switch. On unless the signed policy sets it to false.
+ */
+export function sendReceivedOf(policy: {
+  readonly receipts: { readonly sendReceived?: boolean | undefined };
+}): boolean {
+  return policy.receipts.sendReceived !== false;
+}
 
 // --- Defaults (06 §3) ----------------------------------------------------------------------------
 

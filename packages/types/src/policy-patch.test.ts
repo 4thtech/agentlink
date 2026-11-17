@@ -32,10 +32,12 @@ describe('policyPatchSchema (M1-11r-b)', () => {
       expect(Object.keys(patchSection.unwrap().shape).sort()).toEqual(
         Object.keys(policySection.shape).sort(),
       );
-      // The defaults name every one of them except `files.autoSave` (read as AUTO_SAVE_DEFAULTS).
+      // The defaults name every one of them except `files.autoSave` (read as AUTO_SAVE_DEFAULTS)
+      // and `receipts.sendReceived` (absent reads as on, sendReceivedOf; SEC-RECEIPTS-DEFAULT).
       expect(
         Object.keys(policySection.shape)
           .filter((k) => !(section === 'files' && k === 'autoSave'))
+          .filter((k) => !(section === 'receipts' && k === 'sendReceived'))
           .sort(),
       ).toEqual(Object.keys(value as object).sort());
     }

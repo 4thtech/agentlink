@@ -683,6 +683,7 @@ describe('verifyProofPack: valid packs (07 §8)', () => {
         sender: MESSAGE_ENVELOPE.from,
       },
       ownerApproval: { status: 'none' },
+      deviceReceipts: [],
       notices: [],
     });
     // One getRecord at the configured Notary, at the finalized block; an EOA needs no code read.
