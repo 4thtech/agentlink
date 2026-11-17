@@ -156,11 +156,17 @@ export interface PopoverWindowOptions extends Omit<BrowserWindowOptions, 'minWid
   readonly skipTaskbar: true;
   readonly hasShadow: true;
   readonly transparent: false;
+  /**
+   * DESK-WIDGET-OPEN (macOS only): an NSPanel, so it shows over a full-screen app and on the current
+   * Space without switching (popover.ts also sets it visible on all workspaces).
+   */
+  readonly type?: 'panel';
 }
 
 /** TRAY-POPOVER: a frameless, fixed-size, always-on-top window that stays off the taskbar. */
 export function popoverOptions(platform: string, preload?: string): PopoverWindowOptions {
   return {
+    ...(platform === 'darwin' ? { type: 'panel' as const } : {}),
     width: POPOVER_WIDTH,
     height: POPOVER_HEIGHT,
     show: false,

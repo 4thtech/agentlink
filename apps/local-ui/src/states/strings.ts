@@ -62,4 +62,11 @@ export const REOPEN = {
   ai: 'Or ask your AI app to open AgentLink for you.',
   reload: 'Then reload this page, or use the new window that opens.',
   terminal: 'If you use a terminal, run this instead:',
+  /** DESK-QUIT-ORDER: the desktop app's own words while its core restarts (status-page.ts). */
+  desktopRestarting: 'Restarting AgentLink…',
+  desktopRestartingBody: 'This takes a few seconds.',
+  /** DESK-QUIT-ORDER (IR L3): the restart took too long (status-page.ts words). */
+  desktopStopped: 'AgentLink stopped',
+  desktopStoppedBody: 'Choose Try again when you are ready.',
+  desktopTryAgain: 'Try again',
 } as const;

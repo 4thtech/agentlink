@@ -468,6 +468,27 @@ The desktop app's menu bar / notification-area icon and its popover widget (08 �
 - The icon's tooltip stays as today, numbers only ("AgentLink: {state} · {n} waiting"); it never names a contact or quotes a message.
 - Never "Approve" or "Deny" in the widget; **Review** opens the main window. Never "wallet", "gas", "seed phrase" or "transaction" (§5.1).
 
+### 5.10 Received receipts (D-156)
+
+The free, private "received" receipt the recipient's app sends back (04 §3.4, 07 §3.2). It is not a public proof: never use the words of §5.6 for it, and never "read" or "opened". Proposed, owner confirms at merge.
+
+| Where | String |
+|---|---|
+| Settings › Privacy switch (on by default) | "Tell contacts when your AI receives a message" (helper: "Your contacts see that your AI app received their message. It also shows them that your AI app was open at about that time. Never what you did with it.") |
+| Per contact (contact page) | "Tell {contactName} when your AI receives a message" · "Use my default" |
+| One-time notice after the update | "AgentLink now tells your contacts when your AI app has received their message. This also shows them that your AI app was open at about that time. You can turn this off in Settings." **Got it** · **Open Settings** |
+| Sender, message status | "Sending…" · "Sent" · "Received by {contactName}'s app" · "Received (older app)" · "Not delivered" |
+| Sender, status detail | "Received by {contactName}'s app: their AI app confirmed it received this exact message." |
+| Sender, proof status | "Delivered: {contactName}'s AI confirmed it received this." · "Sent. No receipt yet." |
+| Recipient, under a received message (muted) | "Receipt sent to {contactName}" |
+| Proof export | "Includes {contactName}'s automatic receipt" (checkbox, on) · helper "It shows that their AI app received this exact item, and when." |
+| Verify result | "Automatic device receipt from {contactName}'s AI" · on failure "This automatic receipt could not be checked." |
+
+**Rules.**
+- "Received" means the contact's AI app received and checked the exact message, never that a person read it. "Received (older app)" is never shown as delivery of a proof.
+- An automatic device receipt is always named as such, apart from public receipts (§5.6).
+- Never "wallet", "gas", "seed phrase" or "transaction" (§5.1).
+
 ## 6. Surfaces and information architecture
 
 ### 6.0 Surface map
