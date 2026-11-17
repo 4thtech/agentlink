@@ -539,6 +539,9 @@ jobs:
           # DOCS-UNIFY: docs-site still generates a clean 4thTech Docs (wiki) copy: every page in its
           # SUMMARY.md, every link and image resolves after the GitBook rewrite.
           node tools/docs/wiki-sync.mjs --preflight
+          # DOCS-UNDER-THE-HOOD: the security pages mirror 04 §7 and the decided 04 decisions, no stale
+          # "Status: Design" or old "Current for" stamps, and every "NN §x.y" names a real section.
+          node tools/check-security-docs.mjs
           # Hard rule: no Solidity source in this public repo. The script scans every tracked file,
           # Markdown included (it ran in the lint step of `checks`).
           node tools/check-no-solidity.mjs
@@ -549,6 +552,7 @@ jobs:
           pnpm exec vitest run vocabulary.test.mjs id-vocabulary.test.mjs retired-scope.test.mjs networks-page.test.mjs
           skill-file.test.mjs check-knowledge-links.test.mjs check-knowledge-size.test.mjs docs-status
           check-download-links.test.mjs release/deploy-drop.test.mjs docs/wiki-sync.test.mjs
+          check-security-docs.test.mjs
 
       - name: Prettier
         run: pnpm exec prettier --check .

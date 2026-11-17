@@ -309,6 +309,26 @@ describe('plan', () => {
     expect(p.body).toContain('`.changeset/ops-test-1.md`');
   });
 
+  it('warns when a security-sensitive path changes without a security page (DOCS-UNDER-THE-HOOD)', () => {
+    const at = (paths, bodyText) =>
+      plan({
+        cwd: repoRoot,
+        opts: { task: 'OPS-TEST-2', summary: 's', changelogSection: 'none', bodyText },
+        changed: changed(...paths),
+        branch: 'ops-test-2',
+        template,
+        titleRe,
+      }).warnings;
+    expect(at(['packages/crypto/src/a.ts'])).toEqual([
+      expect.stringMatching(/security-docs: none/),
+    ]);
+    expect(at(['packages/crypto/src/a.ts'], 'security-docs: none (refactor only)')).toEqual([]);
+    expect(
+      at(['packages/crypto/src/a.ts', 'docs-site/technical/concepts/security-model.md']),
+    ).toEqual([]);
+    expect(at(['packages/ui/src/a.tsx'])).toEqual([]);
+  });
+
   it('refuses to run without a task ID', () => {
     expect(() =>
       plan({
