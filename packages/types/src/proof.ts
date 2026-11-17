@@ -161,20 +161,30 @@ export const proofPackDisclosureSchema = z.strictObject({
   contentKey: base64url(BYTE_LENGTHS.key),
 });
 
-/** SEC-RECEIPTS-DEFAULT (D-156): the label of the off-chain ack in a proof pack (07 §8). */
+/**
+ * SEC-RECEIPTS-DEFAULT (D-156): what a verifier and every surface call the off-chain ack in a proof
+ * pack (07 §8 "Automatic device receipts"), never an on-chain receipt.
+ */
 export const DEVICE_RECEIPT_LABEL = 'automatic device receipt' as const;
 
+/** At most this many automatic device receipts in one pack. */
+export const MAX_DEVICE_RECEIPTS = 4;
+
 /**
- * The recipient AI's signed "received" ack (02 F-23), carried in the sender's pack: the ack
- * envelope as received and its own content key, so a verifier can open it and check that it names
- * this pack's envelopeHash. It is an automatic device receipt, never an on-chain receipt: it is
- * listed apart from `receipts`. The content key opens the ack only (its body is the message ID and
- * hash), never the recorded envelope.
+ * One automatic device receipt (07 §8, D-156): the contact's signed "received" ack v2 (02 F-23,
+ * 04 §3.4), carried in the sender's pack apart from on-chain `receipts`. `envelope` is the ack
+ * envelope as received; `contentKey` opens that ack only (its body is the message ID and hash),
+ * never the recorded envelope; `card` is the contact's agent card at the ack's key epoch with its
+ * `cardSig`, so the verifier can attribute the ack to that contact. Whether it verifies is the
+ * verifier's check (`device_receipt_invalid`).
  */
 export const proofPackDeviceReceiptSchema = z.strictObject({
-  label: z.literal(DEVICE_RECEIPT_LABEL),
   envelope: envelopeSchema,
   contentKey: base64url(BYTE_LENGTHS.key),
+  card: z.strictObject({
+    agentCard: agentCardSchema,
+    cardSig: cardSigSchema,
+  }),
 });
 
 export type ProofPackDeviceReceipt = z.infer<typeof proofPackDeviceReceiptSchema>;
@@ -233,8 +243,12 @@ export const proofPackSchema = z
       .max(RECEIPT_TYPE_NAMES.length)
       .refine(receiptTypesValid, RECEIPTS_MESSAGE),
     disclosure: proofPackDisclosureSchema.nullable(),
-    // SEC-RECEIPTS-DEFAULT: optional; the owner can leave it out at export.
-    deviceReceipt: proofPackDeviceReceiptSchema.exactOptional(),
+    // SEC-RECEIPTS-DEFAULT (D-156): optional; the owner can leave them out at export.
+    deviceReceipts: z
+      .array(proofPackDeviceReceiptSchema)
+      .min(1)
+      .max(MAX_DEVICE_RECEIPTS)
+      .exactOptional(),
     ownerApproval: proofPackOwnerApprovalSchema,
     exportedAt: utcTimestampSchema,
   })

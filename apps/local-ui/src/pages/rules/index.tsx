@@ -613,15 +613,22 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
             }
           />
           {/* SEC-RECEIPTS-DEFAULT: visible, never under "More rules" (06 §3 receipts.sendReceived). */}
-          <Row title={S.receiptsTitle}>
-            <Switch
-              label={S.sendReceivedTitle}
-              description={S.sendReceivedHelp}
-              checked={draft.sendReceived}
-              {...(draft.sendReceived !== view.receipts.sendReceived ? { note: S.unsaved } : {})}
-              onChange={(on) => edit({ sendReceived: on })}
-            />
-          </Row>
+          <Row
+            title={S.sendReceivedTitle}
+            changed={draft.sendReceived !== view.receipts.sendReceived}
+            help={S.sendReceivedHelp}
+            control={
+              <Segmented
+                label={S.sendReceivedTitle}
+                value={draft.sendReceived ? 'on' : 'off'}
+                onChange={(v) => edit({ sendReceived: v === 'on' })}
+                options={[
+                  { value: 'on', label: S.receiptsOn, hint: S.recommended },
+                  { value: 'off', label: S.receiptsOff },
+                ]}
+              />
+            }
+          />
         </Surface>
       </section>
 

@@ -46,9 +46,9 @@ export const EXPORT_TEXT = Object.freeze({
   policyDenied: "The owner's rules don't allow sharing the message content, so nothing was saved.",
   policyDeniedNextStep:
     'Call again without includeContentKey to save a proof file without the content.',
-  // SEC-RECEIPTS-DEFAULT (11 §5; 07 §8): the contact's off-chain ack, labelled apart.
+  // SEC-RECEIPTS-DEFAULT (11 §5.10; 07 §8): the contact's off-chain ack, labelled apart.
   deviceReceipt:
-    "It includes the contact's automatic device receipt: their AI confirmed it received this message.",
+    "It includes the contact's automatic receipt: it shows that their AI app received this exact item, and when.",
 });
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>

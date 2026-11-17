@@ -2732,31 +2732,44 @@ describe('SEC-RECEIPTS-DEFAULT: the automatic device receipt in the sender pack 
     expect(exported).toMatchObject({ status: 'ok', deviceReceipt: true });
     const pack = (exported as { pack: Record<string, unknown> }).pack;
     expect(pack['receipts']).toEqual([]);
-    expect(pack['deviceReceipt']).toMatchObject({ label: 'automatic device receipt' });
+    const entries = pack['deviceReceipts'] as Record<string, unknown>[];
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.['card']).toMatchObject({ agentCard: { agentEvm: b.id } });
     const chains = { chains: [{ config: chain.config, client: chain.client }] };
     const checked = await verifyProofPack(JSON.stringify(pack), chains);
     expect(checked).toMatchObject({
       valid: true,
       receipts: [],
-      deviceReceipt: { ok: true, label: 'automatic device receipt' },
+      deviceReceipts: [{ ok: true, label: 'automatic device receipt', agentEvm: b.id }],
     });
 
     // Tampered: the pack still verifies as a record; the device receipt alone fails.
     const tampered = {
       ...pack,
-      deviceReceipt: {
-        ...(pack['deviceReceipt'] as Record<string, unknown>),
-        contentKey: 'A'.repeat(43),
-      },
+      deviceReceipts: [{ ...entries[0], contentKey: 'A'.repeat(43) }],
     };
     expect(await verifyProofPack(JSON.stringify(tampered), chains)).toMatchObject({
       valid: true,
-      deviceReceipt: { ok: false },
+      deviceReceipts: [{ ok: false, reason: 'device_receipt_invalid' }],
+    });
+    // Another card (here the sender's own) cannot carry it.
+    const signer = pack['signer'] as Record<string, unknown>;
+    const swapped = {
+      ...pack,
+      deviceReceipts: [
+        { ...entries[0], card: { agentCard: signer['agentCard'], cardSig: signer['cardSig'] } },
+      ],
+    };
+    expect(await verifyProofPack(JSON.stringify(swapped), chains)).toMatchObject({
+      valid: true,
+      deviceReceipts: [{ ok: false, reason: 'device_receipt_invalid' }],
     });
 
     const without = await a.client.exportProofPack({ envelopeId, includeDeviceReceipt: false });
     expect(without).not.toHaveProperty('deviceReceipt');
-    expect((without as { pack: Record<string, unknown> }).pack).not.toHaveProperty('deviceReceipt');
+    expect((without as { pack: Record<string, unknown> }).pack).not.toHaveProperty(
+      'deviceReceipts',
+    );
   });
 
   it('an older app id-only ack never goes into the pack', async () => {

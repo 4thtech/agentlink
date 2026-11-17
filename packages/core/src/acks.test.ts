@@ -73,6 +73,23 @@ describe('classifyAck', () => {
     }
   });
 
+  it('a body with any other key is refused (strict v2 and v1 bodies)', () => {
+    for (const body of [
+      { kind: 'received', envelopeId: ID, envelopeHash: HASH, extra: 1 },
+      { kind: 'received', envelopeId: ID, opened: true },
+      { kind: 'received', envelopeId: ID, envelopeHash: HASH, recordId: 'nope' },
+    ]) {
+      expect(classifyAck({ ...base, fromKey: KEY_NOW, payload: ack(body) })).toBeUndefined();
+    }
+    expect(
+      classifyAck({
+        ...base,
+        fromKey: KEY_NOW,
+        payload: ack({ kind: 'received', envelopeId: ID, envelopeHash: HASH, recordId: HASH }),
+      }),
+    ).toBe('verified');
+  });
+
   it('an id-only ack from an older app is accepted as weaker', () => {
     expect(
       classifyAck({

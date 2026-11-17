@@ -70,7 +70,8 @@ export const RULES_STRINGS = {
   exportsHelp: 'Anyone with such an export can read the document.',
 
   // SEC-RECEIPTS-DEFAULT (06 §3 `receipts.sendReceived`; 11 §5).
-  receiptsTitle: 'Receipts',
+  receiptsOn: 'On',
+  receiptsOff: 'Off',
   sendReceivedTitle: 'Send received receipts',
   sendReceivedHelp:
     'Tells your contacts their message reached your app. It also shows them your AI app is running.',

@@ -1,10 +1,12 @@
-// SEC-RECEIPTS-DEFAULT: the "automatic device receipt" in a proof pack (07 §8). The recipient AI's
-// signed "received" ack travels with the pack, labelled apart from on-chain receipts, and the
-// verifier checks it on its own: signature, content key, strict ack body, and the pack's hash.
+// SEC-RECEIPTS-DEFAULT: the automatic device receipt in a proof pack (07 §8 "Automatic device
+// receipts"). The contact AI's signed "received" ack travels with the sender's pack, with the
+// contact's card, apart from on-chain receipts, and the verifier checks each entry on its own:
+// card, signature, content key, strict ack body, and the pack's hash. Any failure is the fixed code
+// `device_receipt_invalid`. The end-to-end pass (a real card) is in proofs/proofs.test.ts.
 import { checkDeviceReceipt } from '@4thtech-io/chain';
-import { encodeBase64url, encodeHex, generateCek } from '@4thtech-io/crypto';
+import { encodeBase64url, generateCek } from '@4thtech-io/crypto';
 import { MemoryKeyStore } from '@4thtech-io/crypto/testing';
-import { proofPackDeviceReceiptSchema } from '@4thtech-io/types';
+import { proofPackDeviceReceiptSchema, proofPackSchema } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { DEVICE_RECEIPT_LABEL, ackPayload } from './acks.js';
 import { seed } from './testing/fixtures.js';
@@ -13,7 +15,7 @@ import { agentSigner, craft } from './testing/envelopes.js';
 const ID = 'AAAAAAAAAAAAAAAAAAAAAA';
 const HASH = `0x${'11'.repeat(32)}`;
 
-async function receipt(options: { readonly hash?: string; readonly tamperCt?: boolean } = {}) {
+async function entry(options: { readonly hash?: string; readonly tamperCt?: boolean } = {}) {
   const recipient = new MemoryKeyStore(seed(7));
   const sender = new MemoryKeyStore(seed(8));
   const cek = generateCek();
@@ -28,41 +30,38 @@ async function receipt(options: { readonly hash?: string; readonly tamperCt?: bo
     createdAt: 1_800_000_000,
     ...(options.tamperCt === true ? { tamperCt: true } : {}),
   });
-  const signerNostr = encodeHex((await recipient.getPublicBundle()).agentNostr);
-  return {
-    value: { label: DEVICE_RECEIPT_LABEL, envelope, contentKey: encodeBase64url(cek) },
-    signerNostr,
-  };
+  return { envelope, contentKey: encodeBase64url(cek) };
 }
 
 describe('proof pack: automatic device receipt', () => {
-  it('the pack member carries the label, and no other label parses', async () => {
-    const { value } = await receipt();
-    expect(proofPackDeviceReceiptSchema.safeParse(value).success).toBe(true);
-    expect(proofPackDeviceReceiptSchema.safeParse({ ...value, label: 'delivered' }).success).toBe(
-      false,
-    );
+  it('is labelled as such, never as a public receipt', () => {
+    expect(DEVICE_RECEIPT_LABEL).toBe('automatic device receipt');
   });
 
-  it('verifies a receipt signed by the recipient AI over the pack hash', async () => {
-    const { value, signerNostr } = await receipt();
-    const result = await checkDeviceReceipt(value, HASH);
-    expect(result).toEqual({
-      ok: true,
-      label: 'automatic device receipt',
-      signer: signerNostr,
-      at: 1_800_000_000,
-    });
-  });
-
-  it('a receipt for another hash, or a tampered one, fails', async () => {
-    const other = await receipt({ hash: `0x${'22'.repeat(32)}` });
-    expect(await checkDeviceReceipt(other.value, HASH)).toMatchObject({ ok: false });
-    const tampered = await receipt({ tamperCt: true });
-    expect(await checkDeviceReceipt(tampered.value, HASH)).toMatchObject({ ok: false });
-    const relabelled = await receipt();
+  it('an entry needs the contact card; a label or any other key does not parse', async () => {
+    const e = await entry();
+    expect(proofPackDeviceReceiptSchema.safeParse(e).success).toBe(false);
     expect(
-      await checkDeviceReceipt({ ...relabelled.value, label: 'delivered' }, HASH),
-    ).toMatchObject({ ok: false });
+      proofPackDeviceReceiptSchema.safeParse({ ...e, label: DEVICE_RECEIPT_LABEL }).success,
+    ).toBe(false);
+    expect(proofPackSchema.shape.deviceReceipts).toBeDefined();
+  });
+
+  it('an entry without a valid card, for another hash, or tampered fails with device_receipt_invalid', async () => {
+    const bogusCard = { agentCard: { v: 1 }, cardSig: `0x${'00'.repeat(65)}` };
+    for (const e of [
+      await entry(),
+      await entry({ hash: `0x${'22'.repeat(32)}` }),
+      await entry({ tamperCt: true }),
+    ]) {
+      expect(await checkDeviceReceipt({ ...e, card: bogusCard }, HASH)).toEqual({
+        ok: false,
+        reason: 'device_receipt_invalid',
+      });
+    }
+    expect(await checkDeviceReceipt('not an entry', HASH)).toEqual({
+      ok: false,
+      reason: 'device_receipt_invalid',
+    });
   });
 });

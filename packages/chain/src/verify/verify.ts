@@ -167,11 +167,12 @@ export interface ProofPackValid {
   /** The owner approval the pack carries, checked against this record (07 §8; M1-4d-c). */
   readonly ownerApproval: OwnerApprovalResult;
   /**
-   * The automatic device receipt the pack carries (SEC-RECEIPTS-DEFAULT): the recipient AI's
-   * signed "received" ack over this envelopeHash. Never an on-chain receipt and never part of
-   * `receipts` or the verdict; a failing one is reported here only. Null when the pack has none.
+   * The automatic device receipts the pack carries (07 §8; SEC-RECEIPTS-DEFAULT, D-156), in pack
+   * order: each the contact AI's signed "received" ack over this envelopeHash, attributed through
+   * the contact's card. Never on-chain receipts and never part of `receipts` or the verdict; a
+   * failing one is reported here only (`device_receipt_invalid`). Empty when the pack has none.
    */
-  readonly deviceReceipt: DeviceReceiptCheck | null;
+  readonly deviceReceipts: readonly DeviceReceiptCheck[];
   /** Non-fatal findings, in a fixed order; empty when there are none. */
   readonly notices: readonly ProofNotice[];
 }
@@ -596,10 +597,12 @@ async function verifyParsed(
     if (ownerApproval === null) return invalid('owner_approval_invalid');
 
     const contentVerified = isAttributed(content);
-    const deviceReceipt =
-      pack.deviceReceipt === undefined
-        ? null
-        : await checkDeviceReceipt(pack.deviceReceipt, record.envelopeHash);
+    const deviceReceipts: DeviceReceiptCheck[] = [];
+    for (const entry of pack.deviceReceipts ?? []) {
+      deviceReceipts.push(
+        await checkDeviceReceipt(entry, record.envelopeHash, recipient?.evm ?? null),
+      );
+    }
     return Object.freeze({
       verdict: contentVerified ? 'verified' : 'record_only',
       valid: true,
@@ -619,7 +622,7 @@ async function verifyParsed(
       contentVerified,
       content,
       ownerApproval,
-      deviceReceipt,
+      deviceReceipts: Object.freeze(deviceReceipts),
       notices: Object.freeze(notices),
     });
   } catch (error) {

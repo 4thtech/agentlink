@@ -83,7 +83,7 @@ describe('the Rules page switch', () => {
     host.remove();
   });
 
-  it('shows "Send received receipts", on by default', async () => {
+  it('shows "Send received receipts" in Everyday, on by default', async () => {
     const f = (async (input: RequestInfo | URL): Promise<Response> => {
       const url = typeof input === 'string' ? input : input.toString();
       return url.startsWith('/api/ui/rules')
@@ -102,11 +102,13 @@ describe('the Rules page switch', () => {
         await Promise.resolve();
       });
     }
-    const label = [...host.querySelectorAll('.al-switch-row')].find((row) =>
-      row.textContent?.includes('Send received receipts'),
+    const group = host.querySelector(
+      `section[aria-labelledby="rules-everyday"] [role="radiogroup"][aria-label="${S.sendReceivedTitle}"]`,
     );
-    expect(label).toBeDefined();
-    expect(label?.querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe('true');
-    expect(label?.textContent).toContain('AI app is running');
+    expect(group).not.toBeNull();
+    const checked = group?.querySelector('[role="radio"][aria-checked="true"]');
+    expect(checked?.textContent).toContain(S.receiptsOn);
+    const row = group?.closest('.rl-row');
+    expect(row?.textContent).toContain('AI app is running');
   });
 });

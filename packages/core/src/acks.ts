@@ -61,6 +61,14 @@ const OWN_ACK_SKEW_SECONDS = 600;
 
 const HASH = /^0x[0-9a-f]{64}$/;
 
+/** The keys an ack body may carry (04 §3.4 v2; v1 has only `kind` and `envelopeId`). */
+const ACK_BODY_KEYS: ReadonlySet<string> = new Set([
+  'kind',
+  'envelopeId',
+  'envelopeHash',
+  'recordId',
+]);
+
 /**
  * How strongly a stored ack confirms an outbound envelope: `verified` binds its envelopeHash (v2);
  * `older_app` names its ID only (an app from before v2): received, but weaker.
@@ -115,6 +123,12 @@ export function classifyAck(input: {
   if (typeof body !== 'object' || body === null) return undefined;
   const b = body as Record<string, unknown>;
   if (b['kind'] !== ACK_KIND_RECEIVED) return undefined;
+  // Strict (04 §3.4): v2 names only these keys, v1 only `kind` and `envelopeId`.
+  if (!Object.keys(b).every((k) => ACK_BODY_KEYS.has(k))) return undefined;
+  const recordId = b['recordId'];
+  if (recordId !== undefined && (typeof recordId !== 'string' || !HASH.test(recordId))) {
+    return undefined;
+  }
   if (payload.replyTo !== input.envelopeId || b['envelopeId'] !== input.envelopeId) {
     return undefined;
   }
