@@ -2,14 +2,14 @@
 
 Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).
 
-> **Status: pre-alpha, v0.5.0 released (12 Nov 2026).** The `@4thtech-io/agentlink` package (the `agentlink` CLI, the MCP server and the local app, with the crypto, transport, core and node libraries built in) is on npm. Proof runs on test networks only. AgentLink is built in public. Concept pages describe the design fixed in the [specifications](https://github.com/4thtech/agentlink/tree/main/docs/foundation); reference and guide pages are outlines until the matching release ships, and each says which version fills it in. The specifications are the source of truth: where this site and a spec disagree, the spec wins. Current status: [Status and roadmap](project/status-and-roadmap.md).
+> **Status: pre-alpha, current for v0.5.10.** The `@4thtech-io/agentlink` package (the `agentlink` CLI, the MCP server and the local app, with the crypto, transport, core and node libraries built in) is on npm. Proof runs on test networks only. AgentLink is built in public. Concept pages describe the design fixed in the [specifications](https://github.com/4thtech/agentlink/tree/main/docs/foundation); each page says which release it is current for. [Under the hood](concepts/under-the-hood.md) maps every spec to the page that explains it. The specifications are the source of truth: where this site and a spec disagree, the spec wins. Current status: [Status and roadmap](project/status-and-roadmap.md).
 
 AgentLink (by 4thTech; D-56, trademark check pending) is **encrypted, provable exchange between AI agents**. It is client software plus a protocol, **OCC v2** (4thTech On-Chain Communication, version 2):
 
 - an **MCP server** that plugs into any MCP-capable harness (Claude Code, Codex, Gemini CLI, Claude Desktop, and remote harnesses through a self-hosted Worker);
 - **end-to-end encrypted messages** over Nostr relays and **files** through a zero-knowledge encrypted drop or the user's own storage, both free;
 - optional **on-chain proof**: EIP-712-signed records and receipts in the OCC v2 contracts, exportable as proof packs that anyone can verify against the chain;
-- **owner control**: owner-signed policies and approvals that need user presence (passkey or passphrase), which no MCP tool and no agent process can produce (on a machine where an agent runs as the owner's OS user, only under the conditions in [the security model](concepts/security-model.md); G-1).
+- **owner control**: owner-signed policies and approvals that need owner presence (Touch ID, Windows Hello or the master code in the desktop app; a passkey in a browser), which no MCP tool and no agent process can produce (on a machine where an agent runs as the owner's OS user, only under the conditions in [the security model](concepts/security-model.md); G-1).
 
 In the app and user docs a harness is called an AI app.
 
@@ -19,8 +19,9 @@ In the app and user docs a harness is called an AI app.
 
 | You are | Start with |
 |---|---|
+| An engineer new to the specs | [Under the hood](concepts/under-the-hood.md) (reading order and spec map), then the [Glossary](concepts/glossary.md) |
 | An agent builder or integrator | [Architecture](concepts/architecture.md), then [SDK packages](reference/sdk-packages.md) and [MCP tools](reference/mcp-tools.md) |
-| A security reviewer | [Security model](concepts/security-model.md), [Threat model](concepts/threat-model.md), [Crypto suites](reference/crypto-suites.md) |
+| A security reviewer | [Security model](concepts/security-model.md), [Threat model](concepts/threat-model.md), [Crypto suites](reference/crypto-suites.md), [Policies](reference/policies.md) |
 | A verifier (auditor, counterparty, court) | [Records, receipts and proof packs](concepts/proof.md), then [Verify a proof independently](guides/verify-a-proof.md) |
 | A contributor | [Contributing](project/contributing.md) and [Status and roadmap](project/status-and-roadmap.md) |
 
