@@ -127,6 +127,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // RET-3: one saved Inbox file to the Trash, only while unchanged (no key, no store).
       'trashSavedFile',
       'unlockFileKeyStoreAgent',
+      // RELAY-CARD-MIGRATION (REL-0513-FENCE): "Update your contact details" at this user's keychain
+      // and own TTY prompt; no owner-store or terminal seam (updateContactDetailsWith stays inside).
+      'updateContactDetailsAtTerminal',
       // U3-c (card U3-e uses it): removal takes the folder lock exclusive.
       'withAgentFolderExclusive',
       // FILES-AI-1 (D-152): the Attach writer for the runtime's files platform (`contentFile` sends):
@@ -196,6 +199,10 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       'prepareSendFolder',
       'signFirstPolicy',
       'isSendFolderBody',
+      // REL-0513-FENCE: the contact-details seam variant and its signing pieces stay inside.
+      'updateContactDetailsWith',
+      'signRelayMigration',
+      'RelayCardSession',
     ]) {
       expect(names).not.toContain(name);
     }
