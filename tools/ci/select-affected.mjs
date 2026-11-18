@@ -241,6 +241,7 @@ export const HEAVY_LANE = Object.freeze({
   'e2e-deterministic': [
     'e2e/src/',
     'e2e/prompt-injection/',
+    'e2e/hostile/',
     'e2e/vitest.config.ts',
     'e2e/test/pair-and-message',
     'e2e/test/negotiate-and-agree',

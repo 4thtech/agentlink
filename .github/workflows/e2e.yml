@@ -159,6 +159,48 @@ jobs:
             if (failed) process.exit(1);
           '
 
+      # E2E-HOSTILE: the hostile-contact and hostile-relay suites (e2e/hostile/): a misbehaving contact
+      # and a misbehaving relay against a real core, on in-memory relays and a temp folder. Behaviour
+      # that is already specified and shipped, so a failure is a regression. No Docker, keychain or
+      # secret needed. Run even when an earlier step failed, so one report shows everything.
+      - name: Run the hostile-contact and hostile-relay suites
+        if: always()
+        run: |
+          set -euo pipefail
+          pnpm --filter @4thtech-io/e2e exec vitest run --config hostile/vitest.config.ts --reporter=default --reporter=json --outputFile.json="$AGENTLINK_E2E_ARTIFACTS/hostile-report.json" 2>&1 | tee "$AGENTLINK_E2E_ARTIFACTS/hostile-output.log"
+
+      - name: Check that the hostile suites ran in full, with no skipped test
+        if: always()
+        run: |
+          set -euo pipefail
+          node -e '
+            const r = JSON.parse(require("node:fs").readFileSync(process.env.AGENTLINK_E2E_ARTIFACTS + "/hostile-report.json", "utf8"));
+            const fs = require("node:fs");
+            let failed = false;
+            for (const k of ["numFailedTests", "numPendingTests", "numTodoTests"]) {
+              if (r[k] !== 0) {
+                console.error(`::error::hostile suites: ${k} is ${r[k]}, must be 0`);
+                failed = true;
+              }
+            }
+            for (const name of ["relay-availability", "hostile-contact", "uploads-and-proofs"]) {
+              const count = (fs.readFileSync(`e2e/hostile/${name}.test.ts`, "utf8").match(/^\s*(?:it|test)\(/gm) || []).length;
+              const f = r.testResults.filter((x) => x.name.endsWith(`/hostile/${name}.test.ts`));
+              const t = f.length === 1 ? f[0].assertionResults : [];
+              const passed = t.filter((x) => x.status === "passed");
+              console.log(`hostile ${name}.test.ts: ${passed.length} of ${count} tests passed`);
+              if (count === 0 || passed.length !== count || t.length !== count) {
+                console.error(`::error::hostile ${name}.test.ts must run all ${count} of its tests, all passed`);
+                failed = true;
+              }
+            }
+            if (r.testResults.length !== 3) {
+              console.error("::error::the hostile suites must be exactly 3 test files");
+              failed = true;
+            }
+            if (failed) process.exit(1);
+          '
+
       - name: Canary scan of every log and artifact
         id: scan
         if: always()
