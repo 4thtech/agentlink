@@ -305,6 +305,33 @@ describe('notarize → DELIVERED → OPENED → export → verify (acceptance, t
     ).toEqual(['DELIVERED', 'OPENED']);
   });
 
+  // SEC-INVITE-CAPS (D-156; IR M3): a contact the AI connected that waits for the owner's Keep gets
+  // no receipt from any path inside the service (automatic DELIVERED, explicit acknowledge), not only
+  // through the client wrapper.
+  it('no receipt to a contact that waits for the owner, until Keep', async () => {
+    const { a, b } = await twoAgents();
+    await b.store.transaction((tx) =>
+      tx.update('contacts', { contact_id: a.id }, { waiting_owner: 1 }),
+    );
+    const envelopeId = await sendText(a, b);
+    expect(await a.client.notarize({ envelopeId })).toMatchObject({ status: 'ok' });
+    await deliver(a, b);
+    expect(await receipts(b)).toEqual([]);
+    expect(chain.calls.acknowledge).toBe(0);
+    // The service itself refuses (not only client.acknowledge).
+    expect(await b.client.proofs.acknowledge({ envelopeId, type: 'opened' })).toMatchObject({
+      status: 'rejected',
+      code: 'CONTACT_WAITING_OWNER',
+    });
+    expect(chain.calls.acknowledge).toBe(0);
+    await b.store.transaction((tx) =>
+      tx.update('contacts', { contact_id: a.id }, { waiting_owner: null }),
+    );
+    expect(await b.client.acknowledge({ envelopeId, type: 'opened' })).toMatchObject({
+      status: 'ok',
+    });
+  });
+
   it('autoDelivered off: the proof is checked and stored, and no receipt is signed', async () => {
     const { a, b } = await twoAgents();
     await setPolicy(b, (p) => {

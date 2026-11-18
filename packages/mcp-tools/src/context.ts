@@ -211,7 +211,7 @@ export interface InviteTools {
   /** Re-verifies the owner's signature against `action`'s digest and claims the approval once. */
   useApproval(approvalId: string, action: unknown, decision: PolicyDecision): Promise<ApprovalUse>;
   /** Stages the pairing and its handshake (only after `allow` or a used approval). */
-  start(link: string): Promise<PendingContact>;
+  start(link: string, byAi?: boolean): Promise<PendingContact>;
   /** Publishes the staged handshake; false when the network is unreachable (kept for later). */
   publish(): Promise<boolean>;
 }
@@ -817,8 +817,13 @@ function coreInviteTools(client: AgentLinkClient): InviteTools {
     findOpenApproval: (action) => client.approvalService.findOpen(action),
     useApproval: (approvalId, action, decision) =>
       client.approvalService.use(approvalId, action, decision),
-    async start(link) {
-      const started = await client.pairing.acceptInvite({ link, allowed: true });
+    async start(link, byAi) {
+      // SEC-INVITE-CAPS (D-156): an accept the AI started on its own (auto) is capped and its contact
+      // waits for the owner; an owner-approved one is not.
+      const started =
+        byAi === true
+          ? await client.acceptInviteByAi(link)
+          : await client.pairing.acceptInvite({ link, allowed: true });
       // `allowed` was set, so this does not happen; fail closed if it ever does.
       if (started.status !== 'pending') {
         throw new CoreError('approval_action_invalid', 'The pairing could not be started.');

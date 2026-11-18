@@ -23,15 +23,17 @@ const path = (): string => join(dir, 'store.sqlite');
 const CONTACT = '0x' + 'c1'.repeat(20);
 
 describe('schema version 17 (SEC-INVITE-CAPS)', () => {
-  it('appends exactly invites.created_by and contacts.waiting_owner, both nullable', () => {
+  it('appends invites.created_by, contacts.waiting_owner and ai_accepted_at, pairings.created_by', () => {
     expect(STORE_SCHEMA_VERSION).toBe(17);
     const v17 = MIGRATIONS[16]?.statements ?? [];
     expect(MIGRATIONS[16]?.version).toBe(17);
-    expect(v17).toHaveLength(2);
+    expect(v17).toHaveLength(4);
     expect(v17[0]).toMatch(/^ALTER TABLE "invites" ADD COLUMN "created_by" TEXT /);
     expect(v17[0]).toContain(`"created_by" IS NULL OR`);
     expect(v17[1]).toMatch(/^ALTER TABLE "contacts" ADD COLUMN "waiting_owner" INTEGER /);
     expect(v17[1]).toContain(`"waiting_owner" IS NULL OR`);
+    expect(v17[2]).toMatch(/^ALTER TABLE "contacts" ADD COLUMN "ai_accepted_at" INTEGER /);
+    expect(v17[3]).toMatch(/^ALTER TABLE "pairings" ADD COLUMN "created_by" TEXT /);
   });
 
   it('migrates a version 16 file: invites read as the owner’s, contacts stay kept', async () => {

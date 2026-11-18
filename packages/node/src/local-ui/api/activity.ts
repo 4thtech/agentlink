@@ -219,6 +219,7 @@ function view(entry: ActivityEntry): JsonObject | undefined {
         : undefined;
     case 'contact_unblocked':
     case 'contact_checked':
+    case 'contact_kept':
       return {
         kind: entry.kind,
         at,

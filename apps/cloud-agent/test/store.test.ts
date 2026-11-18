@@ -101,7 +101,9 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
         'name_change_seen',
         'declared_name',
         'waiting_owner',
+        'ai_accepted_at',
       ],
+      pairings: ['created_by'],
       files: ['auto_save', 'auto_reason', 'auto_tries', 'auto_next_at'],
       envelopes: ['deleted_at'],
     };
@@ -130,6 +132,8 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
       await store.transaction((tx) => tx.insert('seen', seen('keep')));
       state.storage.sql.exec('ALTER TABLE "invites" DROP COLUMN "created_by"');
       state.storage.sql.exec('ALTER TABLE "contacts" DROP COLUMN "waiting_owner"');
+      state.storage.sql.exec('ALTER TABLE "contacts" DROP COLUMN "ai_accepted_at"');
+      state.storage.sql.exec('ALTER TABLE "pairings" DROP COLUMN "created_by"');
       state.storage.sql.exec('UPDATE deploy_state SET schema_version = 16');
       const again = DurableObjectStore.open(state.storage);
       expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
@@ -141,6 +145,8 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
           .map((c) => c['name']);
       expect(columns('invites')).toContain('created_by');
       expect(columns('contacts')).toContain('waiting_owner');
+      expect(columns('contacts')).toContain('ai_accepted_at');
+      expect(columns('pairings')).toContain('created_by');
       expect(await again.transaction((tx) => tx.select('seen'))).toEqual([seen('keep')]);
     });
   });

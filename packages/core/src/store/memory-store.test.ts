@@ -132,7 +132,7 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
   it('contacts former name (W4-RENAME-REACHES-CONTACTS, schema 9): four nullable columns, appended last', () => {
     expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(9);
     // Followed by `waiting_owner` (SEC-INVITE-CAPS, schema 17).
-    expect(Object.keys(TABLES.contacts.columns).slice(-5, -1)).toEqual([
+    expect(Object.keys(TABLES.contacts.columns).slice(-6, -2)).toEqual([
       'former_name',
       'name_changed_at',
       'name_change_seen',
@@ -152,7 +152,12 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
       nullable: true,
       values: ['owner', 'ai'],
     });
-    expect(Object.keys(TABLES.contacts.columns).at(-1)).toBe('waiting_owner');
+    expect(Object.keys(TABLES.contacts.columns).slice(-2)).toEqual([
+      'waiting_owner',
+      'ai_accepted_at',
+    ]);
+    expect(TABLES.contacts.columns.ai_accepted_at).toEqual({ kind: 'int', nullable: true });
+    expect(Object.keys(TABLES.pairings.columns).at(-1)).toBe('created_by');
     expect(TABLES.contacts.columns.waiting_owner).toEqual({ kind: 'flag', nullable: true });
   });
 

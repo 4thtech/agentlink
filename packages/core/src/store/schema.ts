@@ -130,6 +130,10 @@ export const TABLES = {
       // AI-made invite waits for the owner's Keep (`contact.keep`): its messages arrive, but the agent
       // sends it nothing. Null (kept) on every row from before version 17 and after Keep.
       waiting_owner: opt('flag'),
+      // SEC-INVITE-CAPS (schema version 17): when the AI paired this contact by accepting an invite
+      // on its own (`contacts.acceptInvites: auto`, no owner approval): it counts toward the AI's
+      // daily invite cap for 24 hours. Null otherwise; never cleared by Keep.
+      ai_accepted_at: opt('int'),
     },
     primaryKey: ['contact_id'],
     unique: [{ columns: ['agent_nostr'] }],
@@ -151,6 +155,9 @@ export const TABLES = {
       relays: enc,
       created_at: int,
       expires_at: int,
+      // SEC-INVITE-CAPS (schema version 17): `ai` for an accept the AI started on its own (auto,
+      // no owner approval); it counts toward the daily cap and its contact waits for the owner.
+      created_by: optOneOf('owner', 'ai'),
     },
     primaryKey: ['pairing_id'],
   },

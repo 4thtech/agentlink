@@ -18,7 +18,12 @@ import { OwnStorage, type OwnStorageKeys } from './own-storage.js';
 import { OwnerActions, type PolicyVersionMark, type ReceiptsKeptMark } from './owner-actions.js';
 import { ApprovalService } from './approvals.js';
 import { IdempotencyService } from './idempotency.js';
-import { PairingService, type AiInviteInput, type CreatedInvite } from './pairing.js';
+import {
+  PairingService,
+  type AcceptInviteResult,
+  type AiInviteInput,
+  type CreatedInvite,
+} from './pairing.js';
 import { RequestsQueue } from './requests.js';
 import { OutboxService } from './outbox.js';
 import { AgentPause } from './agent-pause.js';
@@ -531,6 +536,20 @@ export class AgentLinkClient {
         ? { ...AI_INVITE_DEFAULTS }
         : aiInviteLimitsOf(effective.policy);
     return this.pairing.createAiInvite(input, limits);
+  }
+
+  /**
+   * SEC-INVITE-CAPS (D-156): the AI accepts an invite on its own (`contacts.acceptInvites: auto`, no
+   * owner approval). It counts toward the AI's daily cap (InviteLimitError over it, nothing stored)
+   * and the contact waits for the owner's Keep. An owner-approved accept uses `pairing.acceptInvite`.
+   */
+  async acceptInviteByAi(link: string): Promise<AcceptInviteResult> {
+    const effective = await this.ownerActions.loadPolicy();
+    const aiLimits =
+      effective.mode === 'fail_closed'
+        ? { ...AI_INVITE_DEFAULTS }
+        : aiInviteLimitsOf(effective.policy);
+    return this.pairing.acceptInvite({ link, allowed: true, aiLimits });
   }
 
   /** SEC-INVITE-CAPS: true when `envelopeId` is from or to a contact that waits for the owner. */

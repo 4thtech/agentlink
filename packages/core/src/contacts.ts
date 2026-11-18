@@ -213,6 +213,11 @@ export interface StagePairingInput extends CardInput {
    * gives its handshake.
    */
   readonly pairingId?: string;
+  /**
+   * SEC-INVITE-CAPS: `ai` for an accept the AI started on its own (auto, no owner approval). Set only
+   * by the core's AI accept path, never from an argument a tool passes through.
+   */
+  readonly createdBy?: 'ai';
 }
 
 /** The completion evidence: both pairing envelopes, as stored by M1-7c (04 §3.6, §3.4.1). */
@@ -908,6 +913,7 @@ export class ContactBook {
       relays: await seal(ctx, 'pairings', 'relays', key, canonicalize([...checked.relays])),
       created_at: now,
       expires_at: input.expiresAt,
+      created_by: input.createdBy === 'ai' ? 'ai' : null,
     };
     const staged: StagedPairing = {
       pairingId,
@@ -1174,6 +1180,7 @@ export class ContactBook {
           declared_name: sealedDeclared,
           // SEC-INVITE-CAPS: set by the pairing transaction for an AI-made invite (pairing.ts).
           waiting_owner: null,
+          ai_accepted_at: null,
         };
         tx.insert('contacts', written);
       } else {

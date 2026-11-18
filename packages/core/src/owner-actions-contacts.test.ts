@@ -245,6 +245,7 @@ describe('contact.remove (M1-9za; 04 §2.5.1; 07 §3; 02 F-14)', () => {
         relays: 'x' as unknown as Sealed,
         created_at: clock.t,
         expires_at: clock.t + 3600,
+        created_by: null,
       }),
     );
     await a.client.ownerActions.apply(await signed(a, 'contact.remove', { contact: b.id }));

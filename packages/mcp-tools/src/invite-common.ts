@@ -2,7 +2,7 @@
 // built from a value: an invite link, a label or a name from another party never reaches a summary,
 // `nextStep` or error except through the 06 §2.1 name rule (I-5). Moving these sentences into the
 // copy sheet is M1-9g's, after M1-9o/p/q.
-import { CoreError, type InviteLimitError } from '@4thtech-io/core';
+import { CoreError, InviteLimitError } from '@4thtech-io/core';
 import { approvalIdSchema } from '@4thtech-io/types';
 import { fail, type HandlerOutput } from './result.js';
 import { noOwnerCard } from './text.js';
@@ -132,6 +132,8 @@ export const approvedNeedsIdStep = (approvalId: string): string =>
  * results. Any other error is not mapped (the caller lets it become the generic internal error).
  */
 export function inviteFailure(error: unknown): HandlerOutput | undefined {
+  // SEC-INVITE-CAPS: an accept the AI started on its own, over the daily cap.
+  if (error instanceof InviteLimitError) return inviteLimit(error);
   if (!(error instanceof CoreError)) return undefined;
   switch (error.code) {
     case 'identity_missing':

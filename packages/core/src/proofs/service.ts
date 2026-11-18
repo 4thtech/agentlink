@@ -1164,6 +1164,9 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       );
       return;
     }
+    // SEC-INVITE-CAPS: nothing to a contact that waits for the owner's Keep; the row stays
+    // `recorded` and is announced by a later pass once kept.
+    if (await this.#waitingOwner(contactId)) return;
     try {
       const { envelopes, outbox, ownerActions } = this.#deps;
       outbox.requireTransport();
@@ -1801,7 +1804,8 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       counterparty:
         signer === null ? null : { contact: signer.agentId, ruleEligible: signer.eligible },
     });
-    if (auto === 'allow') {
+    // SEC-INVITE-CAPS: no automatic receipt to a contact that waits for the owner's Keep.
+    if (auto === 'allow' && !(await this.#waitingOwner(contactId))) {
       if ((await this.#signReceipt(stored, 'DELIVERED')).status === 'ok') signed += 1;
     }
     if (checked.kind === RECORD_KIND.OFFER || checked.kind === RECORD_KIND.ACCEPT) {
@@ -2022,6 +2026,12 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
   ): Promise<AcknowledgeResult> {
     const chain = this.#chain(row.chain_id);
     if (chain === undefined) return rejected('UNSUPPORTED_CHAIN');
+    // SEC-INVITE-CAPS: every receipt path (automatic, deferred, queued, explicit) refuses a contact
+    // that waits for the owner's Keep.
+    const sender = (await this.#envelope(row.envelope_id))?.contact_id ?? null;
+    if (sender !== null && (await this.#waitingOwner(sender))) {
+      return rejected('CONTACT_WAITING_OWNER');
+    }
     const code = RECEIPT_CODE[type];
     const id = receiptItemId(row.record_id, code);
     const existing = await this.#ctx.store.transaction((tx) => tx.get('proofs', { record_id: id }));
@@ -2861,6 +2871,13 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     } catch {
       return undefined;
     }
+  }
+
+  /** SEC-INVITE-CAPS: true while the contact waits for the owner's Keep (`waiting_owner` 1). */
+  async #waitingOwner(contactId: string): Promise<boolean> {
+    return this.#ctx.store.transaction(
+      (tx) => tx.get('contacts', { contact_id: contactId })?.waiting_owner === 1,
+    );
   }
 
   async #counterparty(contactId: string): Promise<{

@@ -384,3 +384,65 @@ describe('migration: what was there before is kept', () => {
     expect((await contactOf(a, b.id))?.waitingForOwner).toBeUndefined();
   });
 });
+
+// Fable review (IR-SEC-INVITE-CAPS): no ack, card-update or other automatic send to a waiting
+// contact; the AI's own accepts under `acceptInvites: auto` count and wait; Activity lists Keep.
+describe('review follow-ups', () => {
+  async function aiPaired(): Promise<void> {
+    const invite = await a.client.createAiInvite({});
+    await pairThrough(a, b, invite.inviteUrl);
+  }
+
+  it('no received ack to a waiting contact; one once kept (M2)', async () => {
+    await aiPaired();
+    await b.client.sendMessage({ to: a.id, text: 'hello' });
+    await deliver(a, await lastOut(b, 'text'));
+    const [inbound] = await a.store.transaction((tx) =>
+      tx.select('envelopes', { direction: 'in', type: 'text', state: 'ok' }),
+    );
+    const report = { outcome: 'ok', contactId: b.id, envelopeId: inbound!.envelope_id } as never;
+    expect(await a.client.acks.sendFor([report])).toBe(0);
+    await a.client.ownerActions.apply(await ownerAction(a, 'contact.keep', { contact: b.id }));
+    expect(await a.client.acks.sendFor([report])).toBe(1);
+  });
+
+  it('an accept the AI starts on its own counts toward the daily cap, and its contact waits', async () => {
+    await setPolicy(b, (p) => {
+      p.contacts.acceptInvites = 'auto';
+      p.contacts.aiInvites = { maxOpen: 3, perDay: 2, expiryHours: 24 };
+    });
+    await b.client.createAiInvite({});
+    const invite = await a.client.pairing.createInvite();
+    const accepted = await b.client.acceptInviteByAi(invite.inviteUrl);
+    if (accepted.status !== 'pending') throw new Error('test: not accepted');
+    // Staged: 1 AI invite + 1 AI accept = the cap of 2.
+    expect((await limitOf(b.client.createAiInvite({}))).limit).toBe('daily');
+    await deliver(a, accepted.handshake.envelope);
+    await deliver(b, await lastOut(a, 'handshake-ack'));
+    expect((await contactOf(b, a.id))?.waitingForOwner).toBe(true);
+    const row = await b.store.transaction((tx) => tx.get('contacts', { contact_id: a.id }));
+    expect(row?.ai_accepted_at).toBe(clock.t);
+    // Completed, it still counts (from the contact row now).
+    expect((await limitOf(b.client.createAiInvite({}))).limit).toBe('daily');
+    const c = await agent(64, stranger, 'carol');
+    await expect(
+      b.client.acceptInviteByAi((await c.client.pairing.createInvite()).inviteUrl),
+    ).rejects.toBeInstanceOf(InviteLimitError);
+  });
+
+  it('an owner-approved accept gives a kept contact', async () => {
+    const invite = await a.client.pairing.createInvite();
+    await pairThrough(a, b, invite.inviteUrl);
+    expect((await contactOf(b, a.id))?.waitingForOwner).toBeUndefined();
+  });
+
+  it('Activity lists the Keep', async () => {
+    await aiPaired();
+    clock.t += 5;
+    await a.client.ownerActions.apply(await ownerAction(a, 'contact.keep', { contact: b.id }));
+    const feed = await a.client.activity.list({ limit: 100 });
+    expect(feed.items.find((e) => e.kind === 'contact_kept')).toMatchObject({
+      contactId: b.id,
+    });
+  });
+});

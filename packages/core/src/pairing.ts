@@ -136,14 +136,25 @@ function aiInviteLimitTx(
   tx: StoreTx,
   now: number,
   limits: AiInviteLimits,
+  kind: 'invite' | 'accept' = 'invite',
 ): InviteLimitError | undefined {
   const ai = tx.select('invites', { created_by: 'ai' });
-  const open = ai.filter(
-    (r) => r.used_at == null && r.cancelled_at == null && r.expires_at > now,
-  ).length;
-  if (open >= limits.maxOpen) return new InviteLimitError('open', limits.maxOpen);
-  const recent = ai
-    .map((r) => r.created_at)
+  if (kind === 'invite') {
+    const open = ai.filter(
+      (r) => r.used_at == null && r.cancelled_at == null && r.expires_at > now,
+    ).length;
+    if (open >= limits.maxOpen) return new InviteLimitError('open', limits.maxOpen);
+  }
+  // The daily cap counts every pairing the AI started on its own: its invites, its accepts still
+  // staged and its accepts that completed (`contacts.ai_accepted_at`).
+  const recent = [
+    ...ai.map((r) => r.created_at),
+    ...tx.select('pairings', { created_by: 'ai' }).map((r) => r.created_at),
+    ...tx
+      .select('contacts')
+      .map((r) => r.ai_accepted_at)
+      .filter((at): at is number => typeof at === 'number'),
+  ]
     .filter((at) => at > now - DAY_SECONDS)
     .sort((x, y) => x - y);
   if (recent.length >= limits.perDay) {
@@ -194,6 +205,13 @@ export interface AcceptInviteInput {
    * (I-4). Default false: the result is `pending_approval` and nothing changes.
    */
   readonly allowed?: boolean;
+  /**
+   * SEC-INVITE-CAPS (D-156): present when the AI accepts on its own (`contacts.acceptInvites: auto`,
+   * no owner approval). The accept counts toward the daily cap (refused with InviteLimitError over
+   * it) and the contact waits for the owner's Keep. Set only by the core's AI path
+   * (`client.acceptInviteByAi`), never by an MCP argument.
+   */
+  readonly aiLimits?: AiInviteLimits;
 }
 
 export type AcceptInviteResult =
@@ -899,8 +917,19 @@ export class PairingService implements PairingHandler {
     }
     await this.#identity.assertCanSend();
     if (input.allowed !== true) return { status: 'pending_approval', contact };
+    const aiLimits = input.aiLimits;
+    if (aiLimits !== undefined) {
+      const refused = await ctx.store.transaction((tx) =>
+        aiInviteLimitTx(tx, now, aiLimits, 'accept'),
+      );
+      if (refused !== undefined) {
+        ctx.log.info('ai accept refused', { code: 'invite_limit' });
+        throw refused;
+      }
+    }
 
     const prepared = await this.#contacts.prepareStage({
+      ...(aiLimits === undefined ? {} : { createdBy: 'ai' as const }),
       card: invite.card,
       cardSig: invite.cardSig,
       cardAgentSig: invite.cardAgentSig,
@@ -1375,6 +1404,14 @@ export class PairingService implements PairingHandler {
         // it was before (a kept active contact stays kept).
         let viaAi = false;
         const before = tx.get('contacts', { contact_id: id });
+        // An accept the AI started on its own (auto): its staged row says so (deleted below).
+        const acceptedByAi =
+          staged.role === 'invitee' &&
+          tx.get('pairings', { pairing_id: staged.pairingId })?.created_by === 'ai';
+        const acceptedAt = acceptedByAi
+          ? tx.get('pairings', { pairing_id: staged.pairingId })?.created_at
+          : undefined;
+        if (acceptedByAi) viaAi = true;
         if (context.invite !== undefined) {
           const current = tx.get('invites', { invite_id: context.invite });
           // O-L2: re-checked at commit, so a Cancel after the checks above still refuses it.
@@ -1406,12 +1443,15 @@ export class PairingService implements PairingHandler {
           ? keptBefore
             ? null
             : 1
-          : before?.status === 'active' && before.waiting_owner === 1
+          : before !== undefined && before.status !== 'removed' && before.waiting_owner === 1
             ? 1
             : null;
         const after = tx.get('contacts', { contact_id: id });
         if (after !== undefined && after.waiting_owner !== waiting) {
           tx.update('contacts', { contact_id: id }, { waiting_owner: waiting });
+        }
+        if (after !== undefined && acceptedAt !== undefined) {
+          tx.update('contacts', { contact_id: id }, { ai_accepted_at: acceptedAt });
         }
         return 'done';
       });

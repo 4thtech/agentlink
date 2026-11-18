@@ -105,7 +105,8 @@ const V16_TABLES: readonly TableName[] = ['content_file_budget'];
 
 /** Columns added by version 17 (SEC-INVITE-CAPS, D-156): who made an invite; a waiting contact. */
 const V17_INVITES_COLUMNS: readonly string[] = ['created_by'];
-const V17_CONTACTS_COLUMNS: readonly string[] = ['waiting_owner'];
+const V17_CONTACTS_COLUMNS: readonly string[] = ['waiting_owner', 'ai_accepted_at'];
+const V17_PAIRINGS_COLUMNS: readonly string[] = ['created_by'];
 
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
@@ -132,6 +133,7 @@ function v1Spec(table: TableName): TableSpec {
     return without(spec, [...V8_INVITES_COLUMNS, ...V14_INVITES_COLUMNS, ...V17_INVITES_COLUMNS]);
   }
   if (table === 'contacts') return without(spec, [...V9_CONTACTS_COLUMNS, ...V17_CONTACTS_COLUMNS]);
+  if (table === 'pairings') return without(spec, V17_PAIRINGS_COLUMNS);
   return spec;
 }
 
@@ -193,13 +195,15 @@ function v15Statements(): readonly string[] {
 
 /**
  * Version 17 (SEC-INVITE-CAPS, D-156; 07 §3; proposed, owner confirms at merge): `invites.created_by`
- * (`owner` | `ai`) and `contacts.waiting_owner` (flag), appended, nullable. Nothing is rewritten:
+ * (`owner` | `ai`), `contacts.waiting_owner` (flag), `contacts.ai_accepted_at` and
+ * `pairings.created_by`, appended, nullable. Nothing is rewritten:
  * every invite made before reads as the owner's (null), and every contact paired before is kept
  * (null), so existing contacts are not affected.
  */
 function v17Statements(): readonly string[] {
   const invites = tableSpec('invites');
   const contacts = tableSpec('contacts');
+  const pairings = tableSpec('pairings');
   return [
     ...V17_INVITES_COLUMNS.map(
       (column) =>
@@ -208,6 +212,10 @@ function v17Statements(): readonly string[] {
     ...V17_CONTACTS_COLUMNS.map(
       (column) =>
         `ALTER TABLE "contacts" ADD COLUMN ${columnDef('contacts', column, contacts.columns[column] as ColumnSpec)}`,
+    ),
+    ...V17_PAIRINGS_COLUMNS.map(
+      (column) =>
+        `ALTER TABLE "pairings" ADD COLUMN ${columnDef('pairings', column, pairings.columns[column] as ColumnSpec)}`,
     ),
   ];
 }

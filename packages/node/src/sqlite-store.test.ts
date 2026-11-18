@@ -641,7 +641,7 @@ describe(
       expect(v16.every((s) => !s.startsWith('ALTER TABLE'))).toBe(true);
       // Version 17 (SEC-INVITE-CAPS, D-156): `invites.created_by` and `contacts.waiting_owner`, two
       // nullable columns appended (sqlite-store-v17.test.ts). Versions 1 to 16 keep their statements.
-      expect(MIGRATIONS[16]?.statements).toHaveLength(2);
+      expect(MIGRATIONS[16]?.statements).toHaveLength(4);
     });
 
     it('migrates a version 13 file to version 14 (REL051-B2): invites kept, invite_link null', async () => {
@@ -1399,6 +1399,7 @@ describe(
         name_change_seen: null,
         declared_name: null,
         waiting_owner: null,
+        ai_accepted_at: null,
       };
       await store.transaction((tx) => tx.insert('contacts', contact));
       expect(
