@@ -83,6 +83,12 @@ async function settle(): Promise<void> {
     });
   }
 }
+/** The mark waits for the conversation to render, checking every 100 ms. */
+async function waitMark(): Promise<void> {
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 250));
+  });
+}
 async function mount(f: typeof fetch): Promise<void> {
   vi.stubGlobal('fetch', f);
   await act(async () => {
@@ -97,6 +103,7 @@ describe('#person= on Home', () => {
   it('opens the conversation, scrolls to it, focuses it and marks it; the fragment is cleared', async () => {
     history.replaceState(null, '', `/#person=${DENIS}`);
     await mount(server());
+    await waitMark();
     const el = opened(DENIS);
     expect(el).not.toBeNull();
     expect(opened(ANA)).toBeNull();
@@ -165,5 +172,55 @@ describe('#person= on Home', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  // WIDGET-POLISH-0511: the widget's deep link showed a full-area accent box over the conversation
+  // while it loaded. Now: no overlay at all, and the mark only once the conversation has rendered.
+  it('no full-area overlay; the mark waits until the conversation content is visible', async () => {
+    let release: () => void = () => undefined;
+    const thread = new Promise<void>((r) => {
+      release = r;
+    });
+    const base = server();
+    const gated = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = (typeof input === 'string' ? input : input.toString()).split('?')[0] ?? '';
+      if (path.startsWith('/api/ui/messages/')) {
+        await thread;
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                id: 'AQEBAQEBAQEBAQEBAQEBAQ',
+                at: AT + 50,
+                text: 'Here is the plan.',
+                files: [],
+                receipt: false,
+                proof: false,
+                size: 1200,
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      return base(input, init);
+    }) as typeof fetch;
+    history.replaceState(null, '', `/#person=${DENIS}`);
+    await mount(gated);
+    await waitMark();
+    const el = opened(DENIS);
+    expect(el).not.toBeNull();
+    expect(document.activeElement).toBe(el);
+    // Still loading: focused and scrolled, but not marked.
+    expect(el?.querySelector('[aria-busy="true"]')).not.toBeNull();
+    expect(el?.classList.contains('hm-target')).toBe(false);
+    release();
+    await settle();
+    await waitMark();
+    expect(el?.querySelector('[aria-busy="true"]')).toBeNull();
+    expect(el?.classList.contains('hm-target')).toBe(true);
+    expect(el?.querySelector('.hm-open-head')).not.toBeNull();
+    expect(el?.textContent).toContain('Here is the plan.');
+    // The stylesheet side (no overlay, opacity only) is checked in deeplink-mark.css.test.ts.
   });
 });

@@ -209,6 +209,10 @@ export const HOME_STRINGS = {
   archive: 'Archive',
   restore: 'Restore',
   archiveLabel: 'Archive {name}',
+  // WIDGET-POLISH-0511: new files waiting in a conversation, and the way to dismiss them.
+  newFilesFrom: 'New files from {name}',
+  markSeen: 'Mark as seen',
+  markFilesSeenLabel: 'Mark the new files from {name} as seen',
   restoreLabel: 'Move {name} back to People',
   archived: 'Archived',
   archivedCount: 'Archived ({count})',

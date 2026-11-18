@@ -1352,3 +1352,67 @@ describe('Files in the conversation and the reader (REL051-A34)', () => {
     expect(reader?.textContent).not.toContain('Build plan');
   });
 });
+
+// WIDGET-POLISH-0511: the "new files" count (bell, widget Needs you) is the notification store's
+// `files-<ref>` item. Opening, Show in Finder or "Mark as seen" in the conversation marks it read
+// through the existing mark route (the widget itself never writes).
+describe('New files are marked seen (WIDGET-POLISH-0511)', () => {
+  const NOTES = '/api/ui/notifications';
+  const READ = `/api/ui/notifications/files-${DENIS.contactId}/read`;
+  const notes = (read: boolean): Answer =>
+    ok({
+      items: [
+        {
+          id: `files-${DENIS.contactId}`,
+          kind: 'files',
+          ref: DENIS.contactId,
+          count: 1,
+          at: AT + 40,
+          read,
+        },
+      ],
+      unread: read ? 0 : 1,
+      approvals: 0,
+    });
+  const marks = (s: { calls: Call[] }): Call[] =>
+    s.calls.filter((c) => c.url === READ && c.method === 'POST');
+
+  it('the conversation says new files wait, and Mark as seen marks them read', async () => {
+    const s = await render(
+      base({ [NOTES]: [notes(false), notes(true)], [READ]: ok({ status: 'done' }) }),
+    );
+    await click(row('Denis'));
+    expect(document.body.textContent).toContain(fmt(S.newFilesFrom, { name: 'Denis' }));
+    const button = byText('button', S.markSeen);
+    expect(button?.getAttribute('aria-label')).toBe(fmt(S.markFilesSeenLabel, { name: 'Denis' }));
+    await click(button);
+    expect(marks(s)).toHaveLength(1);
+    expect(marks(s)[0]?.headers.get('X-AgentLink-CSRF')).toBe('t');
+    expect(document.body.textContent).not.toContain(fmt(S.newFilesFrom, { name: 'Denis' }));
+    expect(lintVocabulary(document.body.textContent ?? '')).toEqual([]);
+  });
+
+  it('Show in Finder on a received file marks the new files seen', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    const s = await render(
+      base({
+        [NOTES]: [notes(false), notes(true)],
+        [READ]: ok({ status: 'done' }),
+        [REVEAL]: ok({ status: 'shown' }),
+      }),
+    );
+    await click(row('Denis'));
+    expect(marks(s)).toHaveLength(0);
+    await click(byText('button', S.showInFinder));
+    expect(marks(s)).toHaveLength(1);
+  });
+
+  it('nothing unseen: no banner, and a file action writes no mark', async () => {
+    vi.stubGlobal('navigator', { ...navigator, platform: 'MacIntel' });
+    const s = await render(base({ [NOTES]: notes(true), [REVEAL]: ok({ status: 'shown' }) }));
+    await click(row('Denis'));
+    expect(byText('button', S.markSeen)).toBeUndefined();
+    await click(byText('button', S.showInFinder));
+    expect(marks(s)).toHaveLength(0);
+  });
+});
