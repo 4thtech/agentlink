@@ -11412,7 +11412,7 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 
 #### RESTORE-GUARD-FOLLOWUPS · Restore guard follow-ups (0.5.12)
 - **Status:** backlog · **Security:** S2 · **Spec:** 04 §2.3.3
-- **Goal:** extend the guard to the cloud agent, make an older UI show the new approval reasons, and treat a transient keychain read failure as void rather than as an error.
+- **Goal:** cloud agent: add restore handling when it gains a restore path; make an older UI show the new approval reasons, and treat a transient keychain read failure as void rather than as an error.
 
 #### UPLOAD-CLEANUP-FOLLOWUPS · Upload cleanup follow-ups (0.5.12)
 - **Status:** backlog · **Security:** S1 · **Spec:** 07 §5.6
