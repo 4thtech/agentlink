@@ -39,6 +39,7 @@ import {
   termsNeedsCredits,
   ceilingOf,
   termsRefusal,
+  termsSendLimit,
   termsWithProof,
 } from './terms-common.js';
 import { PROOF_TEXT, claimFreeCredits } from './proofs-common.js';
@@ -187,6 +188,8 @@ export async function proposeTermsHandler(
       return termsNeedsCreditsAfterClaim(result, context, self.agentId, 'agentlink_propose_terms');
     case 'rejected':
       logger.info('propose terms refused', { kind: 'terms' });
+      // SEC-TERMS-CAPS: an outgoing cap, in the agentlink_send words.
+      if (result.code === 'SEND_LIMIT') return termsSendLimit(result, nameOf(ref));
       return termsRefusal(result.code, false, ceilingOf(result));
     case 'pending_approval':
       // A firm offer (M1-9d-3): one approval for the offer and its proof.

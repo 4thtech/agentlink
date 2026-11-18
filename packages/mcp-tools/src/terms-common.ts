@@ -31,7 +31,7 @@ import {
   pendingApproval,
   type HandlerOutput,
 } from './result.js';
-import { SEND_TEXT } from './send.js';
+import { SEND_TEXT, sendLimit } from './send.js';
 import { copy, formatDate } from './strings/index.js';
 import { TOOL_TEXT, noOwnerCard } from './text.js';
 import { removeInvisible } from './untrusted.js';
@@ -400,6 +400,23 @@ export function addressLabel(
   const ref = contacts.get(address);
   if (ref === undefined) return undefined;
   return oneLineName(ref.name) === '' ? A_CONTACT : nameOf(ref);
+}
+
+/**
+ * SEC-TERMS-CAPS (D-156): an offer, accept or reject over an outgoing cap, in the agentlink_send
+ * words (the cap, `name` for a per-contact cap, the time a slot frees). The typed fields stay out:
+ * the terms tools keep their output schema; the words carry the same facts.
+ */
+export function termsSendLimit(
+  result: {
+    readonly code: string;
+    readonly limit?: string;
+    readonly max?: number;
+    readonly retryAt?: string;
+  },
+  name: string,
+): HandlerOutput {
+  return sendLimit({ limit: result.limit, max: result.max, retryAt: result.retryAt }, name, false);
 }
 
 /** D-156: the SPEND_CEILING fields of a terms refusal (the ceiling and its amount), or none. */

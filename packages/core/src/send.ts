@@ -75,17 +75,13 @@ import type { IdentityService } from './identity.js';
 import type { OutboxService } from './outbox.js';
 import type { OwnerActions } from './owner-actions.js';
 import {
-  OUTGOING_WINDOW_SECONDS,
+  SEND_LIMIT,
+  limitRefusal,
   outgoingUsage,
   recordOutgoing,
-  type OutgoingUsageDetail,
+  type SendLimitRefusal,
 } from './outgoing-limits.js';
-import {
-  evaluate,
-  evaluateOutgoing,
-  type OutgoingLimit,
-  type PolicyDecision,
-} from './policy-engine.js';
+import { evaluate, evaluateOutgoing, type PolicyDecision } from './policy-engine.js';
 
 /** The MCP tool whose idempotency rows these are (06 §2.0). */
 export const SEND_TOOL = 'agentlink_send';
@@ -121,17 +117,7 @@ export const POLICY_DENIED = 'POLICY_DENIED' as const;
 export const PAYLOAD_TOO_LARGE = 'PAYLOAD_TOO_LARGE' as const;
 /** A file above `files.maxSendSizeMB`. Nothing was read or sent. */
 export const FILE_TOO_LARGE = 'FILE_TOO_LARGE' as const;
-/** D-156: an outgoing cap of the owner's rules is reached. Nothing was stored or sent. */
-export const SEND_LIMIT = 'SEND_LIMIT' as const;
-
-/** D-156: the SEND_LIMIT refusal: which cap, its number, and when a slot frees (RFC 3339 UTC). */
-export interface SendLimitRefusal {
-  readonly status: 'rejected';
-  readonly code: typeof SEND_LIMIT;
-  readonly limit: OutgoingLimit;
-  readonly max: number;
-  readonly retryAt: string;
-}
+export { SEND_LIMIT, type SendLimitRefusal } from './outgoing-limits.js';
 
 /** REL051-CF2: an outbound message's delivery state (07 §3.2). */
 export type SendDelivery = 'queued' | 'sent' | 'not_delivered';
@@ -688,31 +674,4 @@ export class SendService {
       return result;
     }
   }
-}
-
-/**
- * D-156: the SEND_LIMIT refusal for an outgoing evaluation, or undefined when it allows. `retryAt` is
- * when the oldest counted entry of that cap's scope leaves the rolling window (a slot frees then).
- */
-function limitRefusal(
-  evaluation: ReturnType<typeof evaluateOutgoing>,
-  usage: OutgoingUsageDetail,
-  now: number,
-): SendLimitRefusal | undefined {
-  if (evaluation.decision === 'allow') return undefined;
-  const oldest: Record<OutgoingLimit, number | null> = {
-    messages_contact: usage.contactOldestAt,
-    messages_day: usage.oldestAt,
-    files_contact: usage.contactFileOldestAt,
-    files_day: usage.fileOldestAt,
-    file_mb_day: usage.fileOldestAt,
-  };
-  const at = (oldest[evaluation.limit] ?? now) + OUTGOING_WINDOW_SECONDS;
-  return {
-    status: 'rejected',
-    code: SEND_LIMIT,
-    limit: evaluation.limit,
-    max: evaluation.max,
-    retryAt: iso(at),
-  };
 }
