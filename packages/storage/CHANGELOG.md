@@ -1,5 +1,13 @@
 # @4thtech-io/storage
 
+## 0.5.12
+
+### Patch Changes
+
+- 8cb862f: Harden lifecycle rule input handling.
+- @4thtech-io/crypto@0.5.12
+  - @4thtech-io/log@0.5.12
+
 ## 0.5.11
 
 ### Patch Changes
