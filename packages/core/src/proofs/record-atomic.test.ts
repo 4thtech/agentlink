@@ -496,3 +496,99 @@ describe('a failure between reserving and storing fails closed (SEC-RECORD-ATOMI
     expect(chain.calls.notarize).toBe(0);
   });
 });
+
+describe('a parallel call with an older clock reading never passes the hard daily ceiling (D-156)', () => {
+  /**
+   * A restore mark whose next armed read (a KeyStore item, read after the caller took `now`) first
+   * runs `other` to completion one second later: the deterministic interleaving of two parallel
+   * proof requests whose clock readings differ by a second.
+   */
+  function interleavingMark() {
+    let other: (() => Promise<unknown>) | undefined;
+    const box: { done: Promise<unknown> | undefined; skip: number } = { done: undefined, skip: 0 };
+    const mark: RestoreMark = {
+      read: async () => {
+        if (other !== undefined) {
+          if (box.skip > 0) box.skip -= 1;
+          else {
+            const run = other;
+            other = undefined;
+            clock.t += 1;
+            box.done = run();
+            await box.done;
+          }
+        }
+        return 0;
+      },
+    };
+    const arm = (run: () => Promise<unknown>, skip = 0) => {
+      other = run;
+      box.skip = skip;
+    };
+    return { mark, box, arm };
+  }
+
+  async function approved(a: Agent, envelopeId: string): Promise<string> {
+    const pending = await a.client.notarize({ envelopeId });
+    if (pending.status !== 'pending_approval') throw new Error('test: not pending');
+    const signed = await signWith(a.owner, {
+      v: 1,
+      agent: a.id,
+      owner: await ownerHex(a.owner),
+      op: 'approval.decide',
+      params: {
+        approvalId: pending.approvalId,
+        actionDigest: pending.actionDigest,
+        decision: 'approve',
+      },
+      nonce: newNonce(),
+      issuedAt: clock.t,
+      expiresAt: clock.t + 600,
+    });
+    expect(await a.client.ownerActions.apply(JSON.stringify(signed))).toMatchObject({
+      status: 'applied',
+    });
+    return pending.approvalId;
+  }
+
+  it('a request over the hard daily ceiling is refused, never asked, whatever its clock reading', async () => {
+    const { mark, box, arm } = interleavingMark();
+    const { a, b } = await twoAgents(mark);
+    await setPolicy(a, (p) => {
+      p.proofs.dailyBudgetUSD = '0.15';
+      p.proofs.hardDailyUSD = '0.15';
+    });
+    const first = await sendText(a, b, 'one');
+    const second = await sendText(a, b, 'two');
+    // `second` takes its clock reading, then `first` is paid a second later, then `second`'s
+    // pre-check runs.
+    arm(() => a.client.notarize({ envelopeId: first }));
+    const late = await a.client.notarize({ envelopeId: second });
+    expect(await box.done).toMatchObject({ status: 'ok' });
+    expect(late).toMatchObject({ status: 'rejected', code: 'SPEND_CEILING', ceiling: 'daily' });
+  });
+
+  it('two approved proofs in parallel under a one-proof hard daily ceiling: one is paid', async () => {
+    const { mark, box, arm } = interleavingMark();
+    const { a, b } = await twoAgents(mark);
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+      p.proofs.dailyBudgetUSD = '0.15';
+      p.proofs.hardDailyUSD = '0.15';
+    });
+    const first = await sendText(a, b, 'one');
+    const second = await sendText(a, b, 'two');
+    const firstApproval = await approved(a, first);
+    const secondApproval = await approved(a, second);
+    // Skip `second`'s pre-check and approval reads: `first` is paid between `second`'s clock reading in the
+    // reserving step and its reserving transaction.
+    arm(() => a.client.notarize({ envelopeId: first, approvalId: firstApproval }), 2);
+    const late = await a.client.notarize({ envelopeId: second, approvalId: secondApproval });
+    expect(await box.done).toMatchObject({ status: 'ok' });
+    expect(late.status).toBe('rejected');
+    expect((await ledger(a)).filter((e) => e.state !== 'released')).toHaveLength(1);
+    expect(chain.calls.notarize).toBe(1);
+    const state = await a.store.transaction((tx) => tx.select('budget_state'));
+    expect(state[0]?.status).toBe('ok');
+  });
+});
