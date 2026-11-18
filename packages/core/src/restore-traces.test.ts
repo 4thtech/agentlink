@@ -13,7 +13,7 @@ import { readBudgetLedger } from './budget.js';
 import { STORE_SCHEMA_VERSION } from './constants.js';
 import type { CoreContext } from './context.js';
 import { RESTORE_GUARD_SECONDS, type RestoreMark } from './restore-guard.js';
-import { recordRestoreTrace } from './restore-traces.js';
+import { noteReplayTx, recordRestoreTrace } from './restore-traces.js';
 import { MemoryStore } from './store/memory-store.js';
 import { TABLES } from './store/schema.js';
 import { makeAgent, type TestAgent, type TestOwner } from './testing/envelopes.js';
@@ -144,5 +144,26 @@ describe('activity: the restore entry in the spending history', () => {
     );
     const after = await a.store.transaction((tx) => readBudgetLedger(tx));
     expect(after).toEqual(before);
+  });
+});
+
+describe('noteReplayTx: only a restore from a backup labels inbound', () => {
+  const ENV = 'AAAAAAAAAAAAAAAAAAAAAA';
+  const replays = (store: MemoryStore) => store.transaction((tx) => tx.select('restore_replays'));
+
+  it('a restore labels an envelope created before it', async () => {
+    const store = new MemoryStore();
+    await store.transaction((tx) =>
+      noteReplayTx(tx, { status: 'restored', restoredAt: T0, reason: 'restore' }, ENV, T0 - 10),
+    );
+    expect(await replays(store)).toEqual([{ envelope_id: ENV, restored_at: T0 }]);
+  });
+
+  it('an update that started the guard labels nothing (nothing was restored)', async () => {
+    const store = new MemoryStore();
+    await store.transaction((tx) =>
+      noteReplayTx(tx, { status: 'restored', restoredAt: T0, reason: 'update' }, ENV, T0 - 10),
+    );
+    expect(await replays(store)).toEqual([]);
   });
 });

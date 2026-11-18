@@ -168,7 +168,7 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
   });
 
   it('SEC-RELAY-READBACK (schema 19): envelopes.availability and outbox.availability, nullable, appended last', () => {
-    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(19);
+    expect(STORE_SCHEMA_VERSION).toBe(20);
     const availability = { kind: 'enum', nullable: true, values: ['confirmed', 'unknown'] };
     expect(Object.keys(TABLES.envelopes.columns).at(-1)).toBe('availability');
     expect(TABLES.envelopes.columns.availability).toEqual(availability);

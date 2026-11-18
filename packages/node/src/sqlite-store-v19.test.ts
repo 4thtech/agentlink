@@ -24,7 +24,7 @@ const ENVELOPE = 'AAAAAAAAAAAAAAAAAAAAAA';
 
 describe('schema version 19 (SEC-RELAY-READBACK)', () => {
   it('appends outbox.availability and envelopes.availability', () => {
-    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(19);
+    expect(STORE_SCHEMA_VERSION).toBe(20);
     const v19 = MIGRATIONS[18]?.statements ?? [];
     expect(MIGRATIONS[17]?.version).toBe(18);
     expect(MIGRATIONS[18]?.version).toBe(19);

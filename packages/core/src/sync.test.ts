@@ -795,6 +795,50 @@ describe('RESTORE-TRACES: inbound received again after a restore, and the restor
     ]);
   });
 
+  it('an update that started the guard labels nothing, and stores no replay rows', async () => {
+    const net = new RelayNetwork();
+    const restoredAt = { value: 0 };
+    const restoreMark: RestoreMark = {
+      read: () => Promise.resolve(restoredAt.value),
+      reason: () => Promise.resolve('update'),
+    };
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { restoreMark });
+    await pair(a, b);
+    await a.client.sendMessage({ to: b.id, text: 'before the update' });
+    clock.t += 3_600;
+    restoredAt.value = clock.t;
+    await b.client.syncInbox();
+    const page = await b.client.messages.list(a.id, 'in');
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]).not.toHaveProperty('receivedAgain');
+    expect(await b.store.transaction((tx) => tx.select('restore_replays'))).toEqual([]);
+  });
+
+  it('a sync reads the restore mark once for its batch and passes it to every receive', async () => {
+    const net = new RelayNetwork();
+    // A restore long ago: each read gives a new state object, so one object means one read.
+    const restoreMark: RestoreMark = { read: () => Promise.resolve(1) };
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { restoreMark });
+    await pair(a, b);
+    for (const text of ['one', 'two', 'three']) await a.client.sendMessage({ to: b.id, text });
+    const inputs: unknown[] = [];
+    const receive = b.client.envelopes.receive.bind(b.client.envelopes);
+    b.client.envelopes.receive = (input) => {
+      inputs.push(input);
+      return receive(input);
+    };
+    await b.client.syncInbox();
+    expect(inputs.length).toBeGreaterThanOrEqual(3);
+    const states = inputs.map((i) => (i as { restore?: unknown }).restore);
+    for (const state of states) {
+      expect(state).toEqual({ status: 'restored', restoredAt: 1, reason: 'restore' });
+    }
+    // One object for the whole batch: read once, not per envelope.
+    expect(new Set(states).size).toBe(1);
+  });
+
   it('an unreadable restore mark labels nothing (the label needs a known restore time)', async () => {
     const net = new RelayNetwork();
     const restoreMark: RestoreMark = { read: () => Promise.reject(new Error('unreadable')) };

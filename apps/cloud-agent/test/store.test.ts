@@ -181,7 +181,7 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
       state.storage.sql.exec('UPDATE deploy_state SET schema_version = 18');
       const again = DurableObjectStore.open(state.storage);
       expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
-      expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(19);
+      expect(STORE_SCHEMA_VERSION).toBe(20);
       const columns = (table: string) =>
         state.storage.sql
           .exec(`PRAGMA table_info("${table}")`)

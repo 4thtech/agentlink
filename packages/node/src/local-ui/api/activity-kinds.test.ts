@@ -398,19 +398,21 @@ const FIELDS: Readonly<Record<string, readonly string[]>> = {
   app_connected: ['kind', 'at', 'app'],
   app_disconnected: ['kind', 'at', 'app'],
   backup_saved: ['kind', 'at'],
-  restore_guard: ['kind', 'at', 'reason'],
+  restore_guard: ['kind', 'at', 'reason', 'until'],
 };
 
 describe('GET /api/ui/activity: the restore entry (RESTORE-TRACES)', () => {
-  it('sends the time and the reason only; never an amount; an unknown reason drops it', async () => {
+  it('sends the time, the reason and the end of the window; never an amount', async () => {
     const items = await call([
       { kind: 'restore_guard', id: 'restore_guard:5', at: 5, reason: 'restore', until: 86_405 },
       { kind: 'restore_guard', id: 'restore_guard:6', at: 6, reason: 'update', until: 86_406 },
       { kind: 'restore_guard', id: 'restore_guard:7', at: 7, reason: 'charge', until: 1 },
+      { kind: 'restore_guard', id: 'restore_guard:8', at: 8, reason: 'restore', until: 'x' },
     ]);
     expect(items).toEqual([
-      { kind: 'restore_guard', at: 5, reason: 'restore' },
-      { kind: 'restore_guard', at: 6, reason: 'update' },
+      { kind: 'restore_guard', at: 5, reason: 'restore', until: 86_405 },
+      { kind: 'restore_guard', at: 6, reason: 'update', until: 86_406 },
+      { kind: 'restore_guard', at: 8, reason: 'restore' },
     ]);
   });
 });
