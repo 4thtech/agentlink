@@ -38,6 +38,7 @@ export const EXIT = Object.freeze({
   weakKey: 18,
   usage: 64,
   badInput: 65,
+  detailRefused: 66,
   unavailable: 69,
   internalError: 70,
 });

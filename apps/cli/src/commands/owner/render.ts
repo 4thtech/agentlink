@@ -27,6 +27,7 @@ import { FROM_YOUR_AI, terminalOneLine, untrustedRegion } from '../../terminal/s
 import { formatDate, formatTime, formatUsd } from '@4thtech-io/mcp-tools/strings/index.js';
 import { cardDisclosure } from '@4thtech-io/mcp-tools/strings/privacy.js';
 import type { PendingRequest } from './pending.js';
+import { contentOf, type ContentFacts } from './card-content.js';
 import { OWNER_TEXT } from './strings.js';
 import { termsCard, type TermsCardView } from './terms-card.js';
 
@@ -70,6 +71,8 @@ export interface CardFacts {
    * the stored action, its scope and the core's card data do not match (never offered).
    */
   readonly terms?: TermsCardView | 'problem';
+  /** SEC-CARD-FULLTEXT: the exact content (card-content.ts), `contentMissing`, or nothing. */
+  readonly content?: ContentFacts;
 }
 
 /** Arguments never shown on a card, by tool: a link is a capability, so the owner decides on the summary (M1-11a-ux, -c). */
@@ -180,7 +183,9 @@ export async function cardFacts(
   const cost = costOf(request.action);
   const summary = terminalOneLine(`${what} · ${who} · ${cost}`);
   const terms = await termsCard(client, request, who);
+  const content = await contentOf(client, request.action);
   return Object.freeze({
+    content,
     who,
     what,
     headline: headlineOf(tool, what, party),
@@ -239,6 +244,21 @@ export function cardLines(request: PendingRequest, facts: CardFacts, index?: num
   const shown = fieldValues(shownArgs);
   if (shown.length > 0 || hidden.length === 0) lines.push(...untrustedRegion(FROM_YOUR_AI, shown));
   if (terms !== undefined) lines.push(...terms.region);
+  // SEC-CARD-FULLTEXT: the exact content in its own marked region (it is still someone's words),
+  // then its length and check codes as fixed lines. The region shows at most MAX_REGION_LINES
+  // lines with a visible cut marker; the length line says so, and the app shows every character.
+  const content = facts.content ?? {};
+  if ('content' in content) {
+    const c = content.content;
+    lines.push(...untrustedRegion(c.label, [c.text]));
+    lines.push(OWNER_TEXT.contentLength(c.length));
+    if (c.checkCode !== undefined) lines.push(OWNER_TEXT.checkCode(c.checkCode));
+    for (const f of c.files) {
+      lines.push(terminalOneLine(OWNER_TEXT.file(f.name, f.size, f.type, f.checkCode)));
+    }
+  } else if ('contentMissing' in content) {
+    lines.push(OWNER_TEXT.contentMissing);
+  }
   lines.push(
     `Who:      ${facts.who}`,
     `What:     ${facts.what}`,

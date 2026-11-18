@@ -45,7 +45,12 @@ export function byExpiry(a: ApprovalItem, b: ApprovalItem): number {
 }
 
 /** A request that may join a bulk review: neither terms nor paid (04 §2.5.2, §2.5.3 rule 7). */
-export const pickable = (item: ApprovalItem): boolean => !item.commitment && !item.paid;
+// SEC-CARD-FULLTEXT: nor a request with exact content, which is decided on its own card.
+export const pickable = (item: ApprovalItem): boolean =>
+  !item.commitment &&
+  !item.paid &&
+  item.details?.content === undefined &&
+  item.details?.contentMissing !== true;
 
 function kindOf(item: ApprovalItem): string {
   if (item.commitment) return S.kindTerms;
@@ -78,6 +83,7 @@ const NOT_APPLIED: Readonly<Record<string, string>> = {
   not_pending: A.listNotPending,
   commitment: A.listTerms,
   paid_item_in_batch: A.listPaid,
+  content_item_in_batch: A.listContent,
 };
 
 /**

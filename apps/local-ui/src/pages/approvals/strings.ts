@@ -147,6 +147,9 @@ export const APPROVAL_STRINGS = Object.freeze({
     return `${sensorSentence()} wasn't used. Nothing was changed. You can enter your master code instead.`;
   },
   paidAlone: 'This costs credits. Approve it on its own.',
+  // SEC-CARD-FULLTEXT: a request with exact content is approved on its own card.
+  listContent:
+    'A request that shows the exact message is approved on its own card. Nothing was changed.',
   listPaid:
     'A request in this list costs credits and is approved on its own. Nothing was changed. Review the list again.',
   confirmRequired: 'This costs credits. Approve it on its own card. Nothing was changed.',

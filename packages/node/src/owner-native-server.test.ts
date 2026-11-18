@@ -1178,3 +1178,44 @@ describe('SEC-CARD-FULLTEXT: who and cost in the OS prompt; content fails closed
     expect(four?.details?.['contentMissing']).toBe(true);
   });
 });
+
+describe('SEC-CARD-FULLTEXT: content requests are never batched (08 §1 (b))', () => {
+  const facts = {
+    who: 'Ana',
+    what: 'Export a proof',
+    cost: 'Free',
+    expires: '12 Oct 2026 14:02 UTC',
+    rule: 'Ask me',
+    fromAi: [],
+  };
+  const content = {
+    label: 'The message whose content will be shared',
+    text: 'hello',
+    length: 5,
+    checkCode: 'ABCD EFGH JKMN PQRS',
+    files: [],
+  };
+  const review = (h: Harness, page: Record<string, string>, items: string) =>
+    send(h.port, '/api/approvals/review', {
+      method: 'POST',
+      headers: { ...page, 'X-AgentLink-Items': items },
+      body: encodeUtf8(world.code),
+    });
+
+  it('a review list with a content (or content-missing) request is refused whole', async () => {
+    const h = await harness();
+    const page = await h.page();
+    const plain = h.source.add(1);
+    const shown = h.source.add(2, { details: { ...facts, content } });
+    const missing = h.source.add(3, { details: { ...facts, contentMissing: true } });
+    const deny = [plain, shown, missing].map((r) => `${r.approvalId}:${r.storedDigest}:d`);
+    // Even a list that only denies: content requests are decided on their own card.
+    const res = await review(h, page, deny.join(','));
+    expect(res.status).toBe(409);
+    expect(json(res)).toEqual({
+      status: 'content_item_in_batch',
+      items: [shown.approvalId, missing.approvalId],
+    });
+    expect(h.source.applied).toHaveLength(0);
+  });
+});

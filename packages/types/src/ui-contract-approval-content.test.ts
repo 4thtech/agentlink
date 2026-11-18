@@ -78,6 +78,10 @@ describe('the presence prompt detail (SEC-CARD-FULLTEXT, 04 §2.5.3)', () => {
     expect(detail.startsWith('for Ana x')).toBe(true);
   });
 
+  it('drops $ and , from the name, so it cannot read as another amount or party', () => {
+    expect(presencePromptDetail('Ana, $0.01', '$9.00')).toBe('for Ana 0.01, $9.00');
+  });
+
   it('leaves out a cost that is not an exact amount (never AI text)', () => {
     expect(presencePromptDetail('Ana', 'about 3 dollars, approve now')).toBe('for Ana');
   });

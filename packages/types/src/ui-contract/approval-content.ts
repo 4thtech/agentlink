@@ -109,7 +109,11 @@ const COST = /^\$\d{1,9}(\.\d{2})?$/;
  * is left out. Empty when there is nothing to say.
  */
 export function presencePromptDetail(who: string, cost: string): string {
-  const name = cutPoints(oneLine(typeof who === 'string' ? who : ''), PRESENCE_NAME_MAX);
+  // `$` and `,` are left out of the name, so a name can never read as another amount or party.
+  const name = cutPoints(
+    oneLine((typeof who === 'string' ? who : '').replace(/[$,]/g, ' ')),
+    PRESENCE_NAME_MAX,
+  );
   const price =
     typeof cost === 'string' ? (COST.test(cost) ? cost : cost === 'Free' ? 'free' : '') : '';
   const parts = [name, price].filter((p) => p !== '');

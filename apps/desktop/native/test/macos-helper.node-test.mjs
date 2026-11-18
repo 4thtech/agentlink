@@ -61,12 +61,7 @@ test('argv: only the fixed commands, with exactly their fixed arguments', { skip
     ['ecdh'],
     ['ecdh', 'bogus'],
     ['ecdh', 'APPROVE'],
-    // SEC-CARD-FULLTEXT: a prompt detail that is not one short plain line, or a fourth argument.
-    ['ecdh', 'approve', ''],
-    ['ecdh', 'approve', 'for \u202EAna'],
-    ['ecdh', 'approve', 'for Ana\n$0.10'],
-    ['ecdh', 'approve', 'for\tAna'],
-    ['ecdh', 'approve', 'x'.repeat(65)],
+    // SEC-CARD-FULLTEXT: an unknown reason with a detail, or a fourth argument.
     ['ecdh', 'bogus', 'for Ana'],
     ['ecdh', 'approve', 'for Ana', 'x'],
     ['ecdh', '--reason', 'approve'],
@@ -77,6 +72,16 @@ test('argv: only the fixed commands, with exactly their fixed arguments', { skip
     refused(args, '', EXIT.usage);
   }
 });
+
+test(
+  'SEC-CARD-FULLTEXT: a detail that is not one short plain line exits 66, not usage',
+  { skip: !onMac },
+  () => {
+    for (const detail of ['', 'for \u202EAna', 'for Ana\n$0.10', 'for\tAna', 'x'.repeat(65)]) {
+      refused(['ecdh', 'approve', detail], '', EXIT.detailRefused);
+    }
+  },
+);
 
 test(
   'SEC-CARD-FULLTEXT: ecdh <reason> <detail> is accepted argv (it reads the record next)',

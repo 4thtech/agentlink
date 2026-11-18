@@ -682,9 +682,11 @@ export function SingleApproval({
   // IR-N3-1 #1: terms commit the owner, so on the compact card Approve is offered only once Review
   // shows every line of them; Deny needs no Review.
   const termsHidden = compact && item.commitment && !reviewing;
+  // SEC-CARD-FULLTEXT: the same for exact content: Approve only once Review shows it.
+  const contentHidden = compact && item.details?.content !== undefined && !reviewing;
   const open = (decision: Decision): void => {
     if (flight.current) return;
-    if (decision === 'approve' && (termsHidden || mustExpand || noContent)) return;
+    if (decision === 'approve' && (termsHidden || contentHidden || mustExpand || noContent)) return;
     // M1-PAY-CONFIRM-b: approving a request that costs credits is the confirmation sheet's.
     if (item.paid && decision === 'approve') {
       setPaying(true);
@@ -726,7 +728,7 @@ export function SingleApproval({
                 {proof === undefined ? S.deny : fmt(S.denyWith, { sensor })}
               </Button>
               {/* F30/F31: while the code step is open, its button is the one orange button. */}
-              {termsHidden || noContent ? null : (
+              {termsHidden || contentHidden || noContent ? null : (
                 <Button
                   {...(step === undefined ? { variant: 'primary' as const } : {})}
                   size="lg"

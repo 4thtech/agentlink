@@ -848,6 +848,8 @@ export type ApprovalServerEvent =
         | 'commitment'
         /** M1-PAY-CONFIRM-a (04 §2.5.3 rule 7): a paid item was in a review list. */
         | 'paid_item_in_batch'
+        /** SEC-CARD-FULLTEXT (08 §1 (b)): a request with exact content was in a review list. */
+        | 'content_item_in_batch'
         /** M1-PAY-CONFIRM-a: approving a paid item takes its own confirmation (begin, finish). */
         | 'confirm_required'
         /** REL051-SF1: the passkey has no kept credential key; the master code works. */
@@ -2888,6 +2890,20 @@ export async function startApprovalServerWith(
           const terms = live.filter((e) => e.commitment).map((e) => e.approvalId);
           if (terms.length > 0) {
             finishDecision(res, 409, 'commitment', { items: terms });
+            return;
+          }
+          // SEC-CARD-FULLTEXT (08 §1 (b)): a request with exact content (or content that could not
+          // be shown) is decided on its own card, where the content is shown whole; never batched.
+          const own = live
+            .filter((e) => {
+              const facts = detailsOf(e.details);
+              return (
+                facts === false || facts?.content !== undefined || facts?.contentMissing === true
+              );
+            })
+            .map((e) => e.approvalId);
+          if (own.length > 0) {
+            finishDecision(res, 409, 'content_item_in_batch', { items: own });
             return;
           }
         }

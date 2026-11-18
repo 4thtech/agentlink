@@ -27,7 +27,8 @@
 //                      $0.10"), after the fixed text. The detail is display-only (it binds nothing,
 //                      like the reason): at most 64 Unicode scalars, a space is the only allowed
 //                      whitespace, and no control, format (bidi, zero-width), separator, private-use
-//                      or unassigned scalar; anything else exits 64 before any key is touched.
+//                      or unassigned scalar; anything else exits 66 (detail refused) before any key
+//                      is touched, so the core can tell it from an older helper's 64 (usage).
 //
 //   stdin: lowercase hex of the record, optionally followed by exactly one "\n"; at most 8192 bytes.
 //   stdout: on success only, lowercase hex followed by "\n". Nothing else, ever.
@@ -67,7 +68,7 @@
 //     0 ok · 10 cancelled (Cancel, Use Password, system or app cancel) · 11 failed (not recognised)
 //     12 not interactive (incl. the Mac is locked) · 13 key unusable (bad or foreign handle, public key mismatch, key no longer
 //     valid e.g. fingers changed, or a key that needs no gesture) · 14 lockout (too many attempts)
-//     15 caller refused (phase 3) · 16/17/18 Windows only · 64 usage · 65 bad input · 69 unavailable
+//     15 caller refused (phase 3) · 16/17/18 Windows only · 64 usage · 65 bad input · 66 detail refused (macOS) · 69 unavailable
 //     70 internal error
 //
 // SECURITY NOTES
@@ -106,6 +107,8 @@ enum Exit: Int32 {
   case weakKey = 18
   case usage = 64
   case badInput = 65
+  // SEC-CARD-FULLTEXT: `ecdh <reason> <detail>` with a detail that is not one short plain line.
+  case detailRefused = 66
   case unavailable = 69
   case internalError = 70
 }
@@ -506,7 +509,8 @@ case (3, "ecdh"):
   guard let reason = reasonText(argv[2]) else { finish(.usage) }
   cmdEcdh(reason)
 case (4, "ecdh"):
-  guard let reason = reasonText(argv[2]), let detail = checkedDetail(argv[3]) else { finish(.usage) }
+  guard let reason = reasonText(argv[2]) else { finish(.usage) }
+  guard let detail = checkedDetail(argv[3]) else { finish(.detailRefused) }
   cmdEcdh("\(reason) \(detail)")
 default: finish(.usage)
 }

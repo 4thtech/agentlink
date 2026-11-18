@@ -81,6 +81,8 @@ export const NATIVE_HELPER_EXIT = Object.freeze({
   weakKey: 18,
   usage: 64,
   badInput: 65,
+  /** SEC-CARD-FULLTEXT (macOS): the prompt detail was refused; nothing is approved. */
+  detailRefused: 66,
   unavailable: 69,
   internalError: 70,
 } as const);
@@ -421,9 +423,15 @@ export function createNativeHelper(options: {
       }
       if (signal?.aborted === true) throw new NativeHelperError('cancelled');
       const command = mac ? 'ecdh' : 'sign';
+      // SEC-CARD-FULLTEXT: a detail that is given but not plain fails closed (never dropped).
+      if (mac && detail !== undefined && detail !== '' && !isPromptDetail(detail)) {
+        throw new NativeHelperError('error', 'exit_detailRefused');
+      }
       const extra = mac && isPromptDetail(detail) ? [detail] : [];
       let result = await run([command, reason, ...extra], stdinOf(record), signal);
-      // An older helper knows only `ecdh <reason>` and exits with usage before any sheet.
+      // An older helper knows only `ecdh <reason>` and exits with usage before any sheet; that is
+      // the only case retried without the detail. A helper that knows the detail and refused it
+      // (detailRefused) fails closed: nothing is approved without the who and cost on the sheet.
       if (extra.length > 0 && result.code === NATIVE_HELPER_EXIT.usage && !isAborted(signal)) {
         result.stdout.fill(0);
         result = await run([command, reason], stdinOf(record), signal);

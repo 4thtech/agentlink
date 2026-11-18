@@ -83,13 +83,19 @@ const button = (name: string | RegExp): HTMLButtonElement | undefined =>
     return typeof name === 'string' ? t === name : name.test(t);
   });
 
-async function mount(it: ApprovalItem): Promise<void> {
+async function mount(it: ApprovalItem, compact = false): Promise<void> {
   await act(async () => {
     root.render(
       createElement(
         PresenceSeamsContext.Provider,
         { value: { nativeStatus: () => Promise.resolve({ available: false, registered: false }) } },
-        createElement(SingleApproval, { item: it, owner: { ready: true }, client, sheet: {} }),
+        createElement(SingleApproval, {
+          item: it,
+          owner: { ready: true },
+          client,
+          sheet: {},
+          compact,
+        }),
       ),
     );
   });
@@ -168,5 +174,17 @@ describe('SEC-CARD-FULLTEXT: the approval card', () => {
     const step = host.querySelector('.al-step');
     expect(step?.textContent).toContain('Ana');
     expect(step?.textContent).toContain('$0.10');
+  });
+
+  it('the compact Home card offers Approve only once Review shows the content', async () => {
+    await mount(item('short text'), true);
+    expect(host.querySelector('[data-content-text]')).toBeNull();
+    expect(button(S.approve)).toBeUndefined();
+    await act(async () => {
+      button(S.review)?.click();
+    });
+    await settle();
+    expect(host.querySelector('[data-content-text]')?.textContent).toBe('short text');
+    expect(button(S.approve)?.disabled).toBe(false);
   });
 });

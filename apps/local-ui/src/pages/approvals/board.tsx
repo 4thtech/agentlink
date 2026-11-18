@@ -105,6 +105,7 @@ const LIST_RESULT: Readonly<Record<string, string>> = {
   changed: S.listChanged,
   commitment: S.listTerms,
   paid_item_in_batch: S.listPaid,
+  content_item_in_batch: S.listContent,
   busy: S.busy,
   refused: S.listRefused,
   invalid: S.listRefused,

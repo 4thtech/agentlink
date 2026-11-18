@@ -435,3 +435,20 @@ describe('SEC-CARD-FULLTEXT: the card is decidable from app-decoded fields alone
     expect(view?.details?.content?.files[0]?.checkCode).toMatch(CHECK);
   });
 });
+
+describe('SEC-CARD-FULLTEXT: a paid send shows the one field the core sends', () => {
+  it('a send carrying both text and body (never one the core runs) fails closed', async () => {
+    const w = await world();
+    await w.request(undefined, sendAction({ to: 'Ana', text: 'shown', body: { other: 'sent' } }));
+    const [view] = await w.source.list();
+    expect(view?.details?.contentMissing).toBe(true);
+    expect(view?.details?.content).toBeUndefined();
+  });
+
+  it('a structured body is shown as its canonical JSON when text is null', async () => {
+    const w = await world();
+    await w.request(undefined, sendAction({ to: 'Ana', text: null, body: { b: 1, a: 'x' } }));
+    const [view] = await w.source.list();
+    expect(view?.details?.content?.text).toBe('{"a":"x","b":1}');
+  });
+});

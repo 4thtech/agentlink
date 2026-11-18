@@ -612,15 +612,27 @@ describe('the prompt detail (who and cost) on the OS prompt', () => {
     expect(calls.map((c) => c.args)).toEqual([['ecdh', 'pay', 'for Ana, $0.10']]);
   });
 
-  it('macOS: a detail with control or bidi characters, or too long, is never passed', async () => {
+  it('macOS: a detail with control or bidi characters, or too long, fails closed (no run)', async () => {
     const { calls, run } = fakeRunner(() => ({ code: 0, stdout: `${'11'.repeat(32)}\n` }));
     const helper = createNativeHelper({ kind: 1, run });
-    await helper.release(RECORD, 'pay', undefined, 'for \u202EAna');
-    await helper.release(RECORD, 'pay', undefined, `for ${'x'.repeat(200)}`);
-    expect(calls.map((c) => c.args)).toEqual([
-      ['ecdh', 'pay'],
-      ['ecdh', 'pay'],
-    ]);
+    for (const bad of ['for \u202EAna', `for ${'x'.repeat(200)}`]) {
+      await expect(helper.release(RECORD, 'pay', undefined, bad)).rejects.toBeInstanceOf(
+        NativeHelperError,
+      );
+    }
+    expect(calls).toEqual([]);
+  });
+
+  it('macOS: a helper that refuses the detail (66) fails closed: no retry without it', async () => {
+    const { calls, run } = fakeRunner(() => ({
+      code: NATIVE_HELPER_EXIT.detailRefused,
+      stdout: '',
+    }));
+    const helper = createNativeHelper({ kind: 1, run });
+    const error = await helper.release(RECORD, 'pay', undefined, 'for Ana, $0.10').catch((e) => e);
+    expect(error).toBeInstanceOf(NativeHelperError);
+    expect((error as NativeHelperError).state).toBe('error');
+    expect(calls.map((c) => c.args)).toEqual([['ecdh', 'pay', 'for Ana, $0.10']]);
   });
 
   it('macOS: an older helper that refuses the detail (usage) is asked once more without it', async () => {
