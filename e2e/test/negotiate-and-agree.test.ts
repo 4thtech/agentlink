@@ -182,8 +182,28 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
     return total;
   }
 
-  /** The relay count once it stops moving (acks and the loops are quiet): two equal reads in a row. */
+  /**
+   * True once no agent has anything left to publish: nothing staged and no pending outbox row. Since
+   * 0.5.10 a received ack is queued with a random 5–90 s first delay (D-156, SEC-RECEIPTS-DEFAULT;
+   * 07 §3.2), so a quiet relay alone does not mean the outboxes are empty.
+   */
+  async function outboxesDrained(): Promise<boolean> {
+    for (const agent of [alice, bob, carol, dave]) {
+      if ((await storeRows(agent, 'outbox_staged')).length > 0) return false;
+      if ((await storeRows(agent, 'outbox', { state: 'pending' })).length > 0) return false;
+    }
+    return true;
+  }
+
+  /**
+   * The relay count once it stops moving: every outbox drained (delayed acks published), then two
+   * equal reads in a row (the loops are quiet).
+   */
   async function settledRelayCount(): Promise<number> {
+    for (let i = 0; !(await outboxesDrained()); i += 1) {
+      if (i >= 75) throw new Error('the outboxes did not drain');
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+    }
     let last = await relayCount();
     for (let i = 0; i < 20; i += 1) {
       await new Promise((resolve) => setTimeout(resolve, 2_000));

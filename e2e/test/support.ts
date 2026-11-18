@@ -187,7 +187,7 @@ export async function pendingApprovalIds(agent: TestAgent): Promise<string[]> {
 /** Rows of one store table of an agent, read the way `pendingApprovalIds` reads (a second reader). */
 export async function storeRows(
   agent: TestAgent,
-  table: 'envelopes' | 'approvals',
+  table: 'envelopes' | 'approvals' | 'outbox' | 'outbox_staged',
   where: Record<string, string> = {},
 ): Promise<Record<string, unknown>[]> {
   const deps = nodeOwnerDeps(agent.home);
