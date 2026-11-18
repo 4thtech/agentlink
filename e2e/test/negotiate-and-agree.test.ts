@@ -31,6 +31,7 @@ import {
   fileLogger,
   openLog,
   ownerApprove,
+  ownerKeepsWaitingContact,
   pendingApprovalIds,
   sentCount,
   setOwnerPolicy,
@@ -110,6 +111,7 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
 
   /** The J1 pairing, as in pair-and-message.test.ts: an invite, one owner approval on the invitee. */
   async function pairThroughInvite(
+    inviter: TestAgent,
     inviterMcp: Mcp,
     invitee: TestAgent,
     inviteeMcp: Mcp,
@@ -127,6 +129,9 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
       waitFor('inviter pairing complete', () => contactOf(inviterMcp), STEP_TIMEOUT),
       waitFor('invitee pairing complete', () => contactOf(inviteeMcp), STEP_TIMEOUT),
     ]);
+    // SEC-INVITE-CAPS (D-156; 11 §5.11): the invite was AI-made, so the inviter's owner keeps the
+    // contact before its agent can send to it.
+    await ownerKeepsWaitingContact(inviter);
   }
 
   /** Waits until the agent has `count` unread, then reads the inbox once (it marks them read). */
@@ -243,7 +248,7 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
     // Two agent processes at a time, as in M1-13a: each polls the keychain every second.
     aliceMcp = await connectMcp(alice, relays.map, openLog(dir, 'j8-alice-mcp.log'));
     bobMcp = await connectMcp(bob, relays.map, openLog(dir, 'j8-bob-mcp.log'));
-    await pairThroughInvite(aliceMcp, bob, bobMcp);
+    await pairThroughInvite(alice, aliceMcp, bob, bobMcp);
   }, 600_000);
 
   afterAll(async () => {
@@ -634,7 +639,7 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
     );
     carolMcp = await connectMcp(carol, relays.map, openLog(dir, 'j8-carol-mcp.log'));
     daveMcp = await connectMcp(dave, relays.map, openLog(dir, 'j8-dave-mcp.log'));
-    await pairThroughInvite(carolMcp, dave, daveMcp);
+    await pairThroughInvite(carol, carolMcp, dave, daveMcp);
     const inside = await step('C: propose a purchase inside the limit', async () => {
       const sent = await tool(carolMcp, 'agentlink_propose_terms', {
         to: 'Dave',

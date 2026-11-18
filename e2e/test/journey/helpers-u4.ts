@@ -1,9 +1,12 @@
 // W4-PEOPLE-INVITE journey helpers (chapter 2): the Invite screen (prototype v23 A3/A5) and the
 // Connected moment (A7). world.ts stays U1's; this unit adds its steps here.
 import type { Page } from 'playwright';
-import { navTo, type JourneyPage } from './world.js';
+import { createInviteWithPresence, navTo, type JourneyPage } from './world.js';
 
-/** People → Invite someone: the Invite screen, with its link made at once. */
+/**
+ * People → Invite someone: the Invite screen. SEC-INVITE-CAPS (owner decision 18 Nov 2026; 11
+ * §5.12): no link yet; it waits for Create invite with Touch ID.
+ */
 export async function openInviteScreen(page: Page): Promise<void> {
   await navTo(page, 'Contacts');
   await page.getByRole('button', { name: 'Invite someone', exact: true }).first().click();
@@ -19,15 +22,19 @@ export async function inviteLinkOnScreen(page: Page): Promise<string> {
   return value.startsWith('https://') ? value : `https://${value}`;
 }
 
-/** Invite screen: optional name, Copy (✓ Copied), Done. Answers the link. */
+/**
+ * Invite screen: optional name, then Create invite with Touch ID (SEC-INVITE-CAPS: the name is
+ * chosen before Create, 11 §5.12), Copy (✓ Copied), Done. Answers the link.
+ */
 export async function inviteFromScreen(jp: JourneyPage, name?: string): Promise<string> {
   const { page } = jp;
   await openInviteScreen(page);
   if (name !== undefined) {
     await page.getByLabel('Who is it for?').fill(name);
     await page.getByLabel('Who is it for?').blur();
-    await page.getByText(`Invite link for ${name}`).waitFor();
   }
+  await createInviteWithPresence(page);
+  if (name !== undefined) await page.getByText(`Invite link for ${name}`).waitFor();
   const link = await inviteLinkOnScreen(page);
   await page.getByRole('button', { name: 'Copy', exact: true }).click();
   await page.getByRole('button', { name: 'Copied', exact: true }).waitFor();

@@ -14,7 +14,13 @@ import { mkdir, mkdtemp, realpath, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { checkInviteLink, nostrTransport, type AgentLinkClient } from '@4thtech-io/core';
-import { encodeUtf8, randomBytes, type OwnerPresence } from '@4thtech-io/crypto';
+import {
+  encodeBase64url,
+  encodeHex,
+  encodeUtf8,
+  randomBytes,
+  type OwnerPresence,
+} from '@4thtech-io/crypto';
 import { MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { createLogger } from '@4thtech-io/log';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -613,10 +619,18 @@ export type { AgentLinkClient };
  * config.json under <home>/.agentlink/agents/<name>, and an owner-signed first card. The owner here is
  * the crypto test seam (no passkey; the pages are not used for these agents), as in support.ts.
  */
+export interface SeededAgent {
+  readonly agentId: string;
+  readonly ownerCode: string;
+  /** The test owner (the crypto test seam) and its presence, for later owner actions. */
+  readonly owner: MemoryOwnerKeyStore;
+  readonly presence: () => OwnerPresence;
+}
+
 export async function seedAgent(
   pc: Computer,
   options: { readonly name: string; readonly displayName: string },
-): Promise<{ agentId: string; ownerCode: string }> {
+): Promise<SeededAgent> {
   const agentId = await createKeychainAgent(pc.keychain);
   await writeAgentConfig(pc.home, { v: 1, name: options.name, agentId, keyStore: 'keychain' });
   const seed = randomBytes(32);
@@ -638,7 +652,53 @@ export async function seedAgent(
     await session.close();
     await opened.agent.close();
   }
-  return { agentId, ownerCode: code };
+  return { agentId, ownerCode: code, owner, presence };
+}
+
+/**
+ * SEC-INVITE-CAPS (D-156; 04 §2.5.1 `contact.keep`; 11 §5.11): the owner of a seeded agent keeps the
+ * contact its AI connected through an AI-made invite. The owner's presence (the test owner's master
+ * code) unlocks one signature over `contact.keep`; the core verifies and applies it, as the app's
+ * "Keep with …" does (the seeded agent has no passkey, so the app's page is not used). Answers the
+ * kept contact's id.
+ */
+export async function ownerKeepsWaitingContact(
+  pc: Computer,
+  agent: string,
+  seeded: SeededAgent,
+): Promise<string> {
+  const opened = await openAgent({ agent, home: pc.home, deps: pc.runtime });
+  if (opened.status !== 'ok') throw new Error('the seeded agent did not open');
+  try {
+    const { client } = opened.agent;
+    const waiting = (await client.contacts.list()).filter((c) => c.waitingForOwner === true);
+    if (waiting.length !== 1) throw new Error(`expected one waiting contact, saw ${waiting.length}`);
+    const contact = waiting[0]!.id;
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const keys = await seeded.owner.getPublicKeys();
+    const body = {
+      v: 1,
+      agent: seeded.agentId,
+      owner: encodeHex(keys.ownerNostr),
+      op: 'contact.keep',
+      params: { contact },
+      nonce: encodeBase64url(randomBytes(16)),
+      issuedAt,
+      expiresAt: issuedAt + 600,
+    };
+    const session = await seeded.owner.unlock(seeded.presence());
+    let sig: string;
+    try {
+      sig = await session.signOwnerAction(body);
+    } finally {
+      await session.close();
+    }
+    const applied = await client.ownerActions.apply(JSON.stringify({ body, sig }));
+    if (applied.status !== 'applied') throw new Error('the contact was not kept');
+    return contact;
+  } finally {
+    await opened.agent.close();
+  }
 }
 
 /** Runs `agentlink join '<link>'` on this computer (the shipped joinStep) until `stop()`. */

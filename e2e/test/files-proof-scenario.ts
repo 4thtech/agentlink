@@ -45,6 +45,7 @@ import {
   fileLogger,
   openLog,
   ownerApprove,
+  ownerKeepsWaitingContact,
   setOwnerPolicy,
   setupAgent,
   storeRows,
@@ -143,6 +144,7 @@ export function defineFilesProofScenario(options: ScenarioOptions): void {
 
     /** The J1 pairing: an invite, one owner approval on the invitee. */
     async function pair(
+      inviter: TestAgent,
       inviterMcp: McpHandle,
       inviterName: string,
       invitee: TestAgent,
@@ -170,6 +172,9 @@ export function defineFilesProofScenario(options: ScenarioOptions): void {
           STEP_TIMEOUT,
         ),
       ]);
+      // SEC-INVITE-CAPS (D-156; 11 §5.11): the invite was AI-made, so the inviter's owner keeps the
+      // contact before its agent can send to it.
+      await ownerKeepsWaitingContact(inviter);
     }
 
     /**
@@ -326,8 +331,8 @@ export function defineFilesProofScenario(options: ScenarioOptions): void {
     // ---- 1. J1 ---------------------------------------------------------------------------------
 
     it('pairs Alice with Bob and Carol (one owner approval each, on the invitee)', async () => {
-      await step('A-B pairing', () => pair(aliceMcp, 'Alice', bob, bobMcp, 'Bob'));
-      await step('A-C pairing', () => pair(aliceMcp, 'Alice', carol, carolMcp, 'Carol'));
+      await step('A-B pairing', () => pair(alice, aliceMcp, 'Alice', bob, bobMcp, 'Bob'));
+      await step('A-C pairing', () => pair(alice, aliceMcp, 'Alice', carol, carolMcp, 'Carol'));
       const tools = await aliceMcp.tools();
       for (const name of [
         'agentlink_notarize',

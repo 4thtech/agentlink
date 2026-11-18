@@ -349,6 +349,46 @@ export async function setOwnerPolicy(
 }
 
 /**
+ * SEC-INVITE-CAPS (D-156; 04 §2.5.1 `contact.keep`; 11 §5.11): a contact connected through an invite
+ * the AI made (`agentlink_create_invite`) waits for the owner; the agent can't send to it until the
+ * owner keeps it. The test owner (presence: its master code) signs one `contact.keep` for the one
+ * waiting contact; the core verifies and applies it (no MCP tool or CLI command signs it, I-4).
+ */
+export async function ownerKeepsWaitingContact(agent: TestAgent): Promise<void> {
+  const deps = nodeOwnerDeps(agent.home);
+  const opened = await deps.open(undefined);
+  if (opened.status !== 'ok') throw new Error(`agent ${agent.label} did not open`);
+  try {
+    const { client } = opened.agent;
+    const waiting = (await client.contacts.list()).filter((c) => c.waitingForOwner === true);
+    if (waiting.length !== 1) throw new Error(`expected one waiting contact, saw ${waiting.length}`);
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const keys = await agent.owner.getPublicKeys();
+    const body: JsonObject = {
+      v: 1,
+      agent: agent.agentId,
+      owner: encodeHex(keys.ownerNostr),
+      op: 'contact.keep',
+      params: { contact: waiting[0]!.id },
+      nonce: encodeBase64url(randomBytes(16)),
+      issuedAt,
+      expiresAt: issuedAt + 600,
+    };
+    const session = await agent.owner.unlock(agent.presence());
+    let sig: string;
+    try {
+      sig = await session.signOwnerAction(body);
+    } finally {
+      await session.close();
+    }
+    const applied = await client.ownerActions.apply(JSON.stringify({ body, sig }));
+    if (applied.status !== 'applied') throw new Error(`agent ${agent.label}: contact not kept`);
+  } finally {
+    await opened.agent.close();
+  }
+}
+
+/**
  * The owner approves one request through the CLI's `agentlink approve <id>` handler; only the TTY
  * owner-code step is the test owner's signature. Returns the handler's exit code (0: applied).
  */

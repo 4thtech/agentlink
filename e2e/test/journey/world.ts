@@ -48,6 +48,17 @@ export const TOUCH_ID = /^Use (Touch ID|Windows Hello|a passkey)$/;
 export const CONFIRM_PASSKEY = /^Confirm with (Touch ID|Windows Hello|your passkey)$/;
 /** UX1113-N1: a step whose own button is the sensor (the Connected moment's naming). */
 export const SAVE_WITH_PASSKEY = /^Save with (Touch ID|Windows Hello|your passkey)$/;
+/**
+ * SEC-INVITE-CAPS (owner decision 18 Nov 2026; 08 §1 `invite.create`, 11 §5.12): the invite panel
+ * makes no link until the owner confirms "Create invite with Touch ID" (one presence per invite).
+ */
+export const CREATE_INVITE_WITH = /^Create invite with (Touch ID|Windows Hello|your passkey)$/;
+
+/** The invite panel's Create invite step: one Touch ID (the virtual authenticator), then the link. */
+export async function createInviteWithPresence(page: Page): Promise<void> {
+  await page.getByRole('button', { name: CREATE_INVITE_WITH }).click();
+  await page.locator('.inv-link[data-state="ready"]').waitFor();
+}
 /** Format 1 (D-69) links: the whole card in the fragment. */
 export const LONG_INVITE = /https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_.-]+/;
 /** Format 2 (D-139): `https://<invite-host>/i#2.<43 characters>`. */
@@ -444,13 +455,15 @@ export async function twoOwners(
 }
 
 /**
- * W4-WIRE: Go to → Invite someone → the Invite screen (U4): the link is made at once; Copy (✓
- * Copied) → Done. Answers the link the screen showed (it shows it without https://).
+ * W4-WIRE: Go to → Invite someone → the Invite screen (U4): Create invite with Touch ID
+ * (SEC-INVITE-CAPS, 11 §5.12); Copy (✓ Copied) → Done. Answers the link the screen showed (it shows
+ * it without https://).
  */
 export async function createInviteInApp(jp: JourneyPage): Promise<string> {
   const { page } = jp;
   await goTo(page, 'Invite someone');
   await page.getByRole('heading', { name: 'Invite someone', level: 1 }).waitFor();
+  await createInviteWithPresence(page);
   const shown = page.locator('.inv-link[data-state="ready"]');
   await shown.waitFor();
   const value = (await shown.innerText()).trim();
