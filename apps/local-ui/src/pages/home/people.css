@@ -65,6 +65,34 @@
     transition: none;
   }
 }
+/* OWNER-FB-0512: the file a new-file notification opened: a 2 px bar at the row's edge that only fades,
+   never a background over the row. */
+.hm-file {
+  position: relative;
+}
+.hm-file:focus {
+  outline: none;
+}
+.hm-file::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  pointer-events: none;
+  background: var(--al-color-accent, currentColor);
+  opacity: 0;
+  transition: opacity var(--al-duration-slow) var(--al-easing-standard);
+}
+.hm-file.hm-file-target::before {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hm-file::before {
+    transition: none;
+  }
+}
 .hm-files,
 .hm-ap-body {
   gap: var(--al-space-2);

@@ -213,6 +213,11 @@ export const TABLES = {
       refused_at: opt('int'),
       request_accepted_at: opt('int'),
       deleted_at: opt('int'),
+      // SEC-RELAY-READBACK (D-156 (7); 07 §3.2; schema version 19, appended): for an outbound
+      // envelope whose `delivery` is `sent`, whether a relay served it back (`confirmed`) or none
+      // could be asked (`unknown`, shown as "Sent, availability unknown"). Follows its outbox rows;
+      // null otherwise and on every row from before version 19.
+      availability: optOneOf('confirmed', 'unknown'),
     },
     primaryKey: ['envelope_id'],
   },
@@ -346,6 +351,10 @@ export const TABLES = {
       give_up_at: int,
       state: oneOf('pending', 'sent', 'not_delivered'),
       reason: optOneOf('timeout', 'revoked', 'unreadable'),
+      // SEC-RELAY-READBACK (D-156 (7); schema version 19, appended): set with `sent`: `confirmed`
+      // when a relay that returned OK served the wrap back, `unknown` when none could be asked.
+      // Null while pending, when not delivered, and on every row from before version 19.
+      availability: optOneOf('confirmed', 'unknown'),
     },
     primaryKey: ['wrap_id'],
     unique: [

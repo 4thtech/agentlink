@@ -32,6 +32,7 @@ import { CLOCK_SKEW_SECONDS } from '@4thtech-io/types';
 import type { DepositAuthorizationRequest, GaslessToken, Hex } from '@4thtech-io/chain';
 import { nowOf, type CoreContext } from '../context.js';
 import { ownerActionHash } from '../owner-action.js';
+import { readRestoreState, requestedBeforeRestore } from '../restore-guard.js';
 import type { DepositAuthAnswer, ProofChain, ProofsPlatform } from './platform.js';
 
 export type { DepositAuthAnswer, DepositAuthPort } from './platform.js';
@@ -332,6 +333,11 @@ async function run(deps: GaslessTopUpDeps, input: GaslessTopUpInput): Promise<Ga
     params.expiresAt - params.issuedAt > APPROVAL_MAX_LIFETIME_SECONDS ||
     params.issuedAt > now + CLOCK_SKEW_SECONDS
   ) {
+    return refused('approval_invalid');
+  }
+  // SEC-RESTORE-GUARD (D-156): an owner approval issued before a restore of this ID authorises
+  // nothing after it; an unreadable restore mark, none at all (the owner approves again).
+  if (requestedBeforeRestore(await readRestoreState(deps.ctx), params.issuedAt)) {
     return refused('approval_invalid');
   }
 

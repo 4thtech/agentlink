@@ -11363,20 +11363,72 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Done:** policy `outgoing` (300 / 1000 messages, 50 / 200 files, 2000 MB per rolling 24 h, per ID; absent = these); counted from the durable `outgoing_log` (store schema 17) written in the send transaction, so a deleted file or message never frees a cap; `SEND_LIMIT` with the cap, its number and `retryAt`, never kept under a clientRequestId; acks, receipts, pairing and terms not counted; Rules page "Sending limits". Residual: a process with the agent key bypasses it; terms envelopes are not capped (SEC-TERMS-CAPS).
 
 #### SEC-TERMS-CAPS · Terms count toward the sending limits (0.5.12)
-- **Status:** later (0.5.12) · **Security:** S2 · **Spec:** D-156 (6); 06 §3 `outgoing`
+- **Status:** built for 0.5.12 (branch `rel0512/terms-caps`, releasing) · **Security:** S2 · **Spec:** D-156 (6); 06 §3 `outgoing`
 - **Goal:** `offer`, `accept` and `reject` sent through the terms tools count toward the outgoing caps per contact and per day, as `agentlink_send` messages do (the terms send path, `terms-flow.ts`), with the same `SEND_LIMIT` refusal and the same durable count.
+- **Done:** counted in the storing transaction and checked again before anything is signed; `SEND_LIMIT` with the same words; not kept under a `clientRequestId`; an approved accept that hits a cap stays approved. Spec: 06 §2.2a, §3 `outgoing`.
 
 #### SEC-RELAY-READBACK · Relay availability check (0.5.12)
-- **Status:** later (0.5.12) · **Security:** S2 · **Spec:** D-156 (7)
+- **Status:** built for 0.5.12 (branch `rel0512/relay-readback`, releasing) · **Security:** S2 · **Spec:** D-156 (7)
 - **Goal:** a message counts as sent once a relay serves it back.
+- **Done:** before "sent", the message is read back by id from at least one relay that acknowledged it (no login, fresh connection, signature checked); otherwise "Sent, availability unknown" after at most about 120 s; an empty read never makes a message `not_delivered`; a verified received receipt confirms availability; store schema 19 (two nullable `availability` columns); `agentlink_send` gains optional `availability`; `vet.mjs --live --id-readback`. Spec: 06 §2.2; 07 §3.2, §4.2, §4.3; 11 §5; `project/runbooks/relay-vetting.md`.
 
 #### SEC-RECORD-ATOMIC · Proof signing tied to the budget (0.5.12)
-- **Status:** later (0.5.12) · **Security:** S2 · **Spec:** D-156
+- **Status:** built for 0.5.12 (branch `rel0512/record-atomic`, releasing) · **Security:** S2 · **Spec:** D-156
 - **Goal:** a proof is signed and counted against the budget in one step.
+- **Done:** the fee is reserved first and a single-use ticket is issued in the same transaction; the core signs a Record only under a live ticket whose reservation is held; one live Record per message; on a failure the fee stays reserved and the same Record is signed again under the held reservation. Spec: 06 §3; 07 §3.5. Note: a Record restored from a backup while it was being signed is signed again with the same record ID, so it lands at most once.
 
 #### SEC-RESTORE-GUARD · Budget after restore (0.5.12)
-- **Status:** later (0.5.12) · **Security:** S2 · **Spec:** D-156
+- **Status:** built for 0.5.12 (branch `rel0512/restore-guard`, releasing) · **Security:** S2 · **Spec:** D-156
 - **Goal:** restoring a backup keeps spending and processed actions consistent.
+- **Done:** a restore mark in the KeyStore (reason restore or update), written before the seed and cleared on a failed restore; for 24 hours every paid action asks the owner (hard ceilings still refuse) and outgoing caps are halved; approvals, terms scopes and top-up approvals requested before the restore (5 minutes of skew) are void; replayed inbound starts no automatic action; a missing or unreadable mark fails closed; existing IDs get one 24-hour window on upgrade (owner decisions, 18 Nov). Spec: 04 §2.2, §2.3.3, §7; 06 §3; 07 §3.2; 11 §5.11.
+
+#### SEC-REFUSED-UPLOAD-CLEANUP · Uploads of a refused send are deleted (0.5.12)
+- **Status:** built for 0.5.12 (branch `rel0512/upload-cleanup`, releasing) · **Security:** S2 · **Spec:** D-156; 04 §4; 07 §5.6
+- **Done:** the contact is checked before upload; uploads of a send refused afterwards are deleted (bounded inline, then a background queue with backoff); queued drop rows stop after 8 days.
+
+#### DELETE-PLAN-ACKS · Delete history survives a late receipt (0.5.12)
+- **Status:** built for 0.5.12 (branch `rel0512/delete-plan-acks`, releasing) · **Security:** S2 · **Spec:** 04 §4.2; 07 §3.8
+- **Done:** owner-approved on 18 Nov; the plan hash leaves received acks out; at apply time acks follow the confirmed messages; a new message or file still refuses; proofs and acks of notarized messages are kept.
+
+#### OWNER-FB-0512 · Widget and notification opens, files route (0.5.12)
+- **Status:** built for 0.5.12 (branch `rel0512/owner-fb`, releasing) · **Security:** S1 · **Spec:** 08 §1, §8
+- **Done:** opening from the widget or a notification moves the app in place; the `files` route and `#person=<id>&files` fragment open a person's new file; what was opened is marked read; the status strip wraps.
+
+#### CI-HEAVY-ON-RELEASE · Release PRs run the heavy lanes (0.5.12)
+- **Status:** built for 0.5.12 (branch `rel0512/ci-heavy`, releasing) · **Security:** S2 (`.github/**`) · **Spec:** `project/process/ci-cd.md`
+- **Done:** release PRs (by title or by `rel*/release` or `rel*/integration` branch) force and require `e2e-browser` and `e2e-deterministic`; a rename does not rerun CI.
+
+#### SEC-KEYSTORE-RECORD-GATE · Record-signing gate inside the KeyStore (before mainnet)
+- **Status:** later (before M3 mainnet) · **Security:** S2 · **Spec:** D-156; 04 §3.1.1 (`sign712`); 07 §3.5
+- **Goal:** move the record-signing gate into the KeyStore itself and bind the ticket to the Record digest.
+
+#### PROOF-RECORD-LOWS · Low findings from the proof-signing review (0.5.12)
+- **Status:** backlog · **Security:** S1 · **Spec:** 07 §3.5
+- **Goal:** close the low-severity review notes on the reserve-then-sign flow.
+
+#### TERMS-CAPS-LOWS · Low findings from the terms-caps review (0.5.12)
+- **Status:** backlog · **Security:** S1 · **Spec:** 06 §2.2a
+- **Goal:** close the low-severity review notes on counting terms toward the sending limits.
+
+#### RESTORE-GUARD-FOLLOWUPS · Restore guard follow-ups (0.5.12)
+- **Status:** backlog · **Security:** S2 · **Spec:** 04 §2.3.3
+- **Goal:** cloud agent: add restore handling when it gains a restore path; make an older UI show the new approval reasons, and treat a transient keychain read failure as void rather than as an error.
+
+#### UPLOAD-CLEANUP-FOLLOWUPS · Upload cleanup follow-ups (0.5.12)
+- **Status:** backlog · **Security:** S1 · **Spec:** 07 §5.6
+- **Goal:** close the open notes on the cleanup queue.
+
+#### RELAY-DEFAULTS-HEALTH · Default relays that some networks cannot reach
+- **Status:** backlog · **Security:** S1 · **Spec:** 07 §4.3; `project/runbooks/relay-vetting.md`
+- **Goal:** two of the default relays cannot be reached from some networks; vet the default set from CI and replace or reorder entries that fail.
+
+#### GOLDEN-PATH-S6-FLAKE · Golden path step 6 on a headless runner
+- **Status:** backlog · **Security:** S0 · **Spec:** `project/process/ci-cd.md`
+- **Goal:** the published-package browser open in the golden-path check runs reliably on a headless runner.
+
+#### CODEQL-DISMISS-TOOLING · Tooling to dismiss CodeQL alerts with a reason
+- **Status:** backlog · **Security:** S1 · **Spec:** `project/process/ci-cd.md`
+- **Goal:** a repeatable, reviewed way to dismiss a code-scanning alert with its reason on record.
 
 #### SEC-ALLOWANCE · On-chain spending allowance (M3, before mainnet)
 - **Status:** later (M3) · **Security:** S2 · **Spec:** D-156 (8)

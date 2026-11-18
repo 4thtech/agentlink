@@ -17,11 +17,12 @@
  * (FILES-AI-1, D-152) adds `content_file_budget` (06 §2.3 "Daily budget"). Version 17
  * (SEC-OUTBOUND-CAPS, D-156) adds `outgoing_log` (06 §3 `outgoing`). Version 18
  * (SEC-INVITE-CAPS, D-156) adds `invites.created_by`, `contacts.waiting_owner`, `contacts.ai_accepted_at`
- * and `pairings.created_by` (07 §3). An
+ * and `pairings.created_by` (07 §3). Version 19 (SEC-RELAY-READBACK, D-156 (7)) adds
+ * `outbox.availability` and `envelopes.availability` (07 §3.2). An
  * older build refuses a newer store (`store_schema_newer`) when it opens it, so an upgrade cannot be
  * rolled back.
  */
-export const STORE_SCHEMA_VERSION = 18;
+export const STORE_SCHEMA_VERSION = 19;
 
 /** 04 §2.9: `storagePrefix` is 16 random bytes, base64url, generated at init. */
 export const STORAGE_PREFIX_BYTES = 16;

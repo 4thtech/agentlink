@@ -87,6 +87,7 @@ import {
   type ShortInviteFetch,
 } from './invite-link.js';
 import { restrictName } from './names.js';
+import { readRestoreState, restoredReplay } from './restore-guard.js';
 import { verifyPairingTranscript, type PairingTranscript } from './safety-code.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
@@ -1407,8 +1408,12 @@ export class PairingService implements PairingHandler {
       refused_at: null,
       request_accepted_at: null,
       deleted_at: null,
+      availability: null,
     };
     const ackRow = ack === undefined ? undefined : await outboundRow(ctx, ack, id);
+    // SEC-RESTORE-GUARD: a handshake sent before a restore of this ID pairs a contact that waits
+    // for the owner's Keep, as an AI-made invite does (an earlier copy of this ID handled it).
+    const replayed = restoredReplay(await readRestoreState(ctx), inbound.envelope.createdAt);
     let result: 'claimed_elsewhere' | { readonly usedAt: number } | 'done';
     try {
       result = await ctx.store.transaction((tx) => {
@@ -1424,7 +1429,7 @@ export class PairingService implements PairingHandler {
         const acceptedAt = acceptedByAi
           ? tx.get('pairings', { pairing_id: staged.pairingId })?.created_at
           : undefined;
-        if (acceptedByAi) viaAi = true;
+        if (acceptedByAi || replayed) viaAi = true;
         if (context.invite !== undefined) {
           const current = tx.get('invites', { invite_id: context.invite });
           // O-L2: re-checked at commit, so a Cancel after the checks above still refuses it.
@@ -1437,6 +1442,7 @@ export class PairingService implements PairingHandler {
           }
           if (current.used_at !== null) return { usedAt: current.used_at };
           viaAi = current.created_by === 'ai';
+          if (replayed) viaAi = true;
           tx.update(
             'invites',
             { invite_id: context.invite, used_at: null },

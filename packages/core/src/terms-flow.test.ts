@@ -21,6 +21,7 @@ import {
 } from '@4thtech-io/transport-nostr';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentLinkClient } from './client.js';
+import type { RestoreMark } from './restore-guard.js';
 import { policyDocumentHash } from './commitments.js';
 import { computeActionDigest } from './owner-action.js';
 import { MemoryStore } from './store/memory-store.js';
@@ -162,7 +163,12 @@ const RELAYS = Object.freeze(['wss://one.relay-alpha.net', 'wss://two.relay-alph
 const ownerA = new MemoryOwnerKeyStore(seed(211), passphrase());
 const ownerB = new MemoryOwnerKeyStore(seed(212), passphrase());
 
-async function openAgent(n: number, owner: TestOwner, name: string): Promise<Agent> {
+async function openAgent(
+  n: number,
+  owner: TestOwner,
+  name: string,
+  restoreMark?: RestoreMark,
+): Promise<Agent> {
   const store = new MemoryStore();
   const cipher = new TestStoreCipher();
   const keyStore = new MemoryKeyStore(seed(n));
@@ -178,6 +184,7 @@ async function openAgent(n: number, owner: TestOwner, name: string): Promise<Age
     transport: spy.factory,
     policyMark: mark,
     records,
+    ...(restoreMark === undefined ? {} : { restoreMark }),
   });
   await client.identity.init({
     owner: await owner.unlock(passphrase()),
@@ -336,9 +343,9 @@ function pending(r: RespondToTermsResult): TermsPending {
 }
 
 /** A pair with A's offer delivered to B. */
-async function offered(over: Record<string, unknown> = {}) {
+async function offered(over: Record<string, unknown> = {}, bRestoreMark?: RestoreMark) {
   const a = await openAgent(1, ownerA, 'alice');
-  const b = await openAgent(2, ownerB, 'bob');
+  const b = await openAgent(2, ownerB, 'bob', bRestoreMark);
   await pair(a, b);
   const offer = ok(await a.client.proposeTerms({ to: b.id, terms: input(over) }));
   const reports = await deliver(a, b);
@@ -667,6 +674,31 @@ describe('accept: one approval per agreement (04 §3.4.2)', () => {
     });
     expect(b.spy.published.length).toBe(sentBefore);
     expect(await outRows(b, 'accept')).toHaveLength(1);
+  });
+
+  it('SEC-RESTORE-GUARD: a scope the owner approved before a restore is void after it; nothing is sent', async () => {
+    const restoredAt = { value: 0 };
+    const { b, offer } = await offered({}, { read: () => Promise.resolve(restoredAt.value) });
+    const p = pending(
+      await b.client.respondToTerms({ envelopeId: offer.envelopeId, decision: 'accept' }),
+    );
+    expect(await approve(b, p.approvalId)).toMatchObject({ status: 'applied' });
+    clock.t += 60;
+    restoredAt.value = clock.t;
+    clock.t += 60;
+    expect(
+      await b.client.respondToTerms({
+        envelopeId: offer.envelopeId,
+        decision: 'accept',
+        approvalId: p.approvalId,
+      }),
+    ).toMatchObject({ status: 'rejected', code: 'APPROVAL_VOID' });
+    expect(await outRows(b, 'accept')).toHaveLength(0);
+    // Asked again: a new request for the owner.
+    const again = pending(
+      await b.client.respondToTerms({ envelopeId: offer.envelopeId, decision: 'accept' }),
+    );
+    expect(again.approvalId).not.toBe(p.approvalId);
   });
 
   it('refuses note or terms with accept (INVALID_ARGUMENT, IR-D55-1 F03), before anything else', async () => {

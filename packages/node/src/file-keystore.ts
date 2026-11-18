@@ -250,6 +250,8 @@ export async function writeAgentFile(
       const sealed = await sealKeystoreFile(kek, agentId, [
         { name: 'seed', value: seed },
         { name: 'store-key', value: storeKey },
+        // SEC-RESTORE-GUARD: an ID created here was never restored (restore-mark.ts).
+        { name: 'restore-mark', value: Uint8Array.of(0x30) },
       ]);
       await writeKeystoreFile(dir, agentFile(agentId), sealed, fs);
       return agentId;

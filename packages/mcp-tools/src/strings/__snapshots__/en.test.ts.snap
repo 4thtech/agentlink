@@ -76,6 +76,8 @@ exports[`copy catalogue (M1-9g) > chat.status.not_found.contactNone > renders as
 
 exports[`copy catalogue (M1-9g) > chat.status.ok.acceptedInvite > renders as designed 1`] = `"You are connected to Marko. Nothing else is needed now."`;
 
+exports[`copy catalogue (M1-9g) > chat.status.ok.availabilityUnknown > renders as designed 1`] = `"Availability unknown: AgentLink could not yet confirm that the message network holds it."`;
+
 exports[`copy catalogue (M1-9g) > chat.status.ok.contacts > renders as designed 1`] = `"You have 2 contacts: Marko Novak, Ana Kovač, Denis."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.ok.contactsNone > renders as designed 1`] = `"You have no contacts yet. Create an invite to connect with someone."`;
@@ -93,6 +95,8 @@ exports[`copy catalogue (M1-9g) > chat.status.ok.queued > renders as designed 1`
 exports[`copy catalogue (M1-9g) > chat.status.ok.queuedProof > renders as designed 1`] = `"Not sent yet: AgentLink can't reach the message network. It sends it on its own when the connection is back."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.ok.sent > renders as designed 1`] = `"Sent to Marko. End-to-end encrypted: only you, Marko and your AIs can read it."`;
+
+exports[`copy catalogue (M1-9g) > chat.status.ok.sentUnknown > renders as designed 1`] = `"Sent to Marko, availability unknown: AgentLink could not yet confirm that the message network holds it. End-to-end encrypted: only you, Marko and your AIs can read it."`;
 
 exports[`copy catalogue (M1-9g) > chat.status.ok.verified > renders as designed 1`] = `"Valid proof. Recorded by “Tali’s agent” (Registered), 20 Oct 2026, 14:02 UTC. It proves this exact document existed and was exchanged at these times; not that its content is true."`;
 

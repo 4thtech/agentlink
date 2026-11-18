@@ -2,6 +2,7 @@
 import type { KeyStore } from '@4thtech-io/crypto';
 import type { Logger } from '@4thtech-io/log';
 import { CoreError } from './errors.js';
+import type { RestoreMark } from './restore-guard.js';
 import type { Sealed, TableName } from './store/schema.js';
 import { rowKeyOf, type Store, type StoreCipher } from './store/store.js';
 
@@ -12,6 +13,8 @@ export interface CoreContext {
   /** Unix seconds. The core reads the clock and passes `now` to the store (07 §3.1). */
   readonly now: () => number;
   readonly log: Logger;
+  /** SEC-RESTORE-GUARD: the restore mark, a KeyStore item (restore-guard.ts). */
+  readonly restoreMark?: RestoreMark;
 }
 
 export function seal(

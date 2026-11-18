@@ -71,3 +71,42 @@ describe('auto-save follows the agent pause by default (W4-PAUSE)', () => {
     expect(w.b.inbox.created).toEqual([]);
   });
 });
+
+describe('SEC-RESTORE-GUARD: a file sent before a restore is not saved automatically', () => {
+  it('it waits for Save; a file sent after the restore is saved', async () => {
+    const clock = new FakeClock();
+    const own = new MemoryOwnStorage();
+    const restoredAt = { value: 0 };
+    const a = await openFileAgent(clock, new MemoryKeyStore(seed(121)), ownerA, 'alice', {
+      relays: ['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net'],
+      own,
+    });
+    const b = await openFileAgent(clock, new MemoryKeyStore(seed(122)), ownerB, 'bob', {
+      relays: ['wss://one.relay-beta.net', 'wss://two.relay-beta.net'],
+      own,
+      restoreMark: { read: () => Promise.resolve(restoredAt.value) },
+    });
+    await pairForFiles(clock, a, b);
+    const early = await a.client.sendMessage({
+      to: b.id,
+      text: 'before',
+      files: [outgoing('before.txt', fileBytes(64))],
+    });
+    if (early.status !== 'ok') throw new Error('not sent');
+    clock.t += 3_600;
+    restoredAt.value = clock.t;
+    await deliver(a, b);
+    expect((await b.client.autoSave.run()).saved).toBe(0);
+    expect(b.inbox.created).toEqual([]);
+    clock.t += 3_600;
+    const late = await a.client.sendMessage({
+      to: b.id,
+      text: 'after',
+      files: [outgoing('after.txt', fileBytes(64))],
+    });
+    if (late.status !== 'ok') throw new Error('not sent');
+    await deliver(a, b);
+    expect((await b.client.autoSave.run()).saved).toBe(1);
+    expect([...b.inbox.files().keys()]).toEqual(['after.txt']);
+  });
+});

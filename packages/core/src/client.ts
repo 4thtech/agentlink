@@ -16,6 +16,7 @@ import { CoreError } from './errors.js';
 import { IdentityService, finishPendingRotation } from './identity.js';
 import { OwnStorage, type OwnStorageKeys } from './own-storage.js';
 import { OwnerActions, type PolicyVersionMark, type ReceiptsKeptMark } from './owner-actions.js';
+import type { RestoreMark } from './restore-guard.js';
 import { ApprovalService } from './approvals.js';
 import { IdempotencyService } from './idempotency.js';
 import {
@@ -118,6 +119,12 @@ export interface AgentLinkClientOptions {
    * `policy.set` asks again.
    */
   readonly receiptsKept?: ReceiptsKeptMark;
+  /**
+   * SEC-RESTORE-GUARD (D-156): the restore mark, a KeyStore item (restore-guard.ts). For 24 h after
+   * a restore every paid action asks the owner and inbound sent before it triggers nothing
+   * automatically; an unreadable mark counts as a restore in force. Without it there is no guard.
+   */
+  readonly restoreMark?: RestoreMark;
   /**
    * The own-storage KeyStore items, `storage-mark` and the `credentialDigest` of `s3:<id>` (04 §2.2,
    * §2.5.1; M1-9i-a, D-115). Without them no `storage.set` or `storage.remove` applies, and
@@ -837,6 +844,7 @@ export class AgentLinkClient {
       cipher,
       now: options.clock ?? systemClock,
       log: options.logger ?? createLogger({ name: 'core' }),
+      ...(options.restoreMark === undefined ? {} : { restoreMark: options.restoreMark }),
     };
     if (row !== undefined) await finishPendingRotation(ctx);
     return new AgentLinkClient(

@@ -33,6 +33,11 @@
 // in the transaction that stores the envelope. Over a cap: SEND_LIMIT with the cap, its number and
 // when a slot frees, nothing stored or published; the refusal is not kept under a clientRequestId.
 //
+// SEC-REFUSED-UPLOAD-CLEANUP: a send with stored files checks the contact (active, paired, kept)
+// before anything is uploaded. A refusal after the upload (a cap, the policy, the contact in the store
+// transaction) deletes the uploaded objects through deleteUploaded, which queues any it cannot delete
+// for the retention pass (files/outgoing.ts); the refusal stands either way.
+//
 // Errors are CoreErrors with fixed sentences; nothing of the message, the contact or a key goes
 // into an error or a log line (I-5, I-7). Logs carry counts only.
 import {
@@ -75,17 +80,14 @@ import type { IdentityService } from './identity.js';
 import type { OutboxService } from './outbox.js';
 import type { OwnerActions } from './owner-actions.js';
 import {
-  OUTGOING_WINDOW_SECONDS,
+  SEND_LIMIT,
+  limitRefusal,
   outgoingUsage,
   recordOutgoing,
-  type OutgoingUsageDetail,
+  type SendLimitRefusal,
 } from './outgoing-limits.js';
-import {
-  evaluate,
-  evaluateOutgoing,
-  type OutgoingLimit,
-  type PolicyDecision,
-} from './policy-engine.js';
+import { evaluate, evaluateOutgoing, type PolicyDecision } from './policy-engine.js';
+import { restoreWindowNow } from './restore-guard.js';
 
 /** The MCP tool whose idempotency rows these are (06 §2.0). */
 export const SEND_TOOL = 'agentlink_send';
@@ -121,17 +123,7 @@ export const POLICY_DENIED = 'POLICY_DENIED' as const;
 export const PAYLOAD_TOO_LARGE = 'PAYLOAD_TOO_LARGE' as const;
 /** A file above `files.maxSendSizeMB`. Nothing was read or sent. */
 export const FILE_TOO_LARGE = 'FILE_TOO_LARGE' as const;
-/** D-156: an outgoing cap of the owner's rules is reached. Nothing was stored or sent. */
-export const SEND_LIMIT = 'SEND_LIMIT' as const;
-
-/** D-156: the SEND_LIMIT refusal: which cap, its number, and when a slot frees (RFC 3339 UTC). */
-export interface SendLimitRefusal {
-  readonly status: 'rejected';
-  readonly code: typeof SEND_LIMIT;
-  readonly limit: OutgoingLimit;
-  readonly max: number;
-  readonly retryAt: string;
-}
+export { SEND_LIMIT, type SendLimitRefusal } from './outgoing-limits.js';
 
 /** REL051-CF2: an outbound message's delivery state (07 §3.2). */
 export type SendDelivery = 'queued' | 'sent' | 'not_delivered';
@@ -152,6 +144,12 @@ export type SendMessageResult =
        * envelope at answer time, also for a repeat with the same clientRequestId; never stored.
        */
       readonly delivery?: SendDelivery;
+      /**
+       * SEC-RELAY-READBACK (D-156 (7)): present (`unknown`) only with `delivery` `sent` when no relay
+       * that accepted the message could be asked to serve it back: "Sent, availability unknown".
+       * Absent once a relay served it back. Read like `delivery`, never stored.
+       */
+      readonly availability?: 'unknown';
       /**
        * FILES-AI-1: the file written by content: the saved name (`notes (2).md` after a clash), the
        * size and SHA-256 of the in-memory bytes, and the Send folder in its fixed `~` form.
@@ -381,11 +379,17 @@ export class SendService {
   ): Promise<SendLimitRefusal | undefined> {
     const policy = await this.#deps.ownerActions.loadPolicy();
     const now = nowOf(this.#ctx);
+    // SEC-RESTORE-GUARD: tighter caps in the 24 h after a restore.
+    const restoreWindow = await restoreWindowNow(this.#ctx);
     const usage =
       tx === undefined
         ? await this.#ctx.store.transaction((t) => outgoingUsage(t, to, now))
         : outgoingUsage(tx, to, now);
-    return limitRefusal(evaluateOutgoing(policy, { contact: to, files, bytes }, usage), usage, now);
+    return limitRefusal(
+      evaluateOutgoing(policy, { contact: to, files, bytes }, usage, { restoreWindow }),
+      usage,
+      now,
+    );
   }
 
   async #run(
@@ -518,6 +522,9 @@ export class SendService {
     if (platform === undefined) {
       throw new CoreError('files_unavailable', 'This agent cannot send files here.');
     }
+    // SEC-REFUSED-UPLOAD-CLEANUP: the contact checks of the store transaction, once before anything
+    // is uploaded, so the common refusal uploads nothing. The transaction checks them again.
+    await this.#assertContactReady(request.to);
     const outcome = await prepareOutgoing(
       { ctx, platform, policy: await ownerActions.loadPolicy() },
       request.payload,
@@ -546,6 +553,19 @@ export class SendService {
       return done;
     }
     return { ...done, result: { ...done.result, files: outcome.sent } };
+  }
+
+  /** A known contact can receive now: active, paired and kept (the store transaction's errors). */
+  async #assertContactReady(to: string): Promise<void> {
+    const contact = await this.#ctx.store.transaction((tx) =>
+      tx.get('contacts', { contact_id: to }),
+    );
+    // An unknown contact is left to the envelope build, which refuses it with its own error.
+    if (contact === undefined) return;
+    if (contact.status !== 'active' || contact.pairing !== 'complete') {
+      throw new CoreError('contact_not_active', 'That contact cannot receive messages now.');
+    }
+    if (contact.waiting_owner === 1) throw waitingOwnerError();
   }
 
   /** Builds, signs and stores the envelope with its outbox rows and its files rows. */
@@ -583,6 +603,7 @@ export class SendService {
     // D-156: the caps are checked again in the transaction that stores the envelope, so two sends
     // never both pass on one count. The policy is loaded before it (no await inside, 07 §3.1).
     const policy = await this.#deps.ownerActions.loadPolicy();
+    const restoreWindow = await restoreWindowNow(ctx);
     const fileBytes = fileRows.reduce((n, f) => n + f.size, 0);
     const limited = await ctx.store.transaction((tx) => {
       const now = nowOf(ctx);
@@ -592,6 +613,7 @@ export class SendService {
           policy,
           { contact: request.to, files: fileRows.length, bytes: fileBytes },
           usage,
+          { restoreWindow },
         ),
         usage,
         now,
@@ -683,36 +705,10 @@ export class SendService {
       if (delivery !== 'queued' && delivery !== 'sent' && delivery !== 'not_delivered') {
         return result;
       }
-      return { ...result, delivery };
+      const unknown = delivery === 'sent' && row?.availability === 'unknown';
+      return { ...result, delivery, ...(unknown ? { availability: 'unknown' as const } : {}) };
     } catch {
       return result;
     }
   }
-}
-
-/**
- * D-156: the SEND_LIMIT refusal for an outgoing evaluation, or undefined when it allows. `retryAt` is
- * when the oldest counted entry of that cap's scope leaves the rolling window (a slot frees then).
- */
-function limitRefusal(
-  evaluation: ReturnType<typeof evaluateOutgoing>,
-  usage: OutgoingUsageDetail,
-  now: number,
-): SendLimitRefusal | undefined {
-  if (evaluation.decision === 'allow') return undefined;
-  const oldest: Record<OutgoingLimit, number | null> = {
-    messages_contact: usage.contactOldestAt,
-    messages_day: usage.oldestAt,
-    files_contact: usage.contactFileOldestAt,
-    files_day: usage.fileOldestAt,
-    file_mb_day: usage.fileOldestAt,
-  };
-  const at = (oldest[evaluation.limit] ?? now) + OUTGOING_WINDOW_SECONDS;
-  return {
-    status: 'rejected',
-    code: SEND_LIMIT,
-    limit: evaluation.limit,
-    max: evaluation.max,
-    retryAt: iso(at),
-  };
 }

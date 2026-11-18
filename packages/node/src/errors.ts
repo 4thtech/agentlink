@@ -51,6 +51,10 @@ export type NodeKeyStoreErrorCode =
   | 'policy_mark_not_raised'
   /** M1-33a: the receipts-kept marker did not read back as written; the owner is asked again. */
   | 'receipts_kept_not_written'
+  /** SEC-RESTORE-GUARD: the restore mark is not a canonical time. */
+  | 'restore_mark_invalid'
+  /** SEC-RESTORE-GUARD: the restore mark did not read back as written; the guard stays in force. */
+  | 'restore_mark_not_written'
   /** M1-8e: a localhost passkey is already set up for this OS user (one in M1b); never replaced. */
   | 'owner_passkey_exists'
   /** DESK-D12c: native presence (Touch ID or Windows Hello in the app) is already turned on. */

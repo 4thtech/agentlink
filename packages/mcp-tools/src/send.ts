@@ -278,11 +278,15 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
       // REL051-CF2: `delivery` says whether the relays took it (sent) or it waits (queued); a core
       // that does not report it keeps the old answer.
       const delivery = result.delivery;
+      // SEC-RELAY-READBACK (D-156 (7)): `availability: unknown` only on a sent message that no relay
+      // could be asked to serve back.
+      const unknown = delivery === 'sent' && result.availability === 'unknown';
       const fields = {
         envelopeId: result.envelopeId,
         thread: result.thread,
         sentAt: result.sentAt,
         ...(delivery === undefined ? {} : { delivery }),
+        ...(unknown ? { availability: 'unknown' as const } : {}),
       };
       const summary =
         delivery === 'queued'
@@ -291,7 +295,9 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
             : copy('chat.status.ok.queued', { contactName: name })
           : delivery === 'not_delivered'
             ? copy('chat.status.ok.notDelivered', { contactName: name })
-            : copy('chat.status.ok.sent', { contactName: name, contactFirstName: name });
+            : unknown
+              ? copy('chat.status.ok.sentUnknown', { contactName: name, contactFirstName: name })
+              : copy('chat.status.ok.sent', { contactName: name, contactFirstName: name });
       let sentFields: Record<string, unknown> = fields;
       let shown = summary;
       const saved = byContent ? result.contentFile : undefined;
@@ -319,7 +325,13 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
             ? summary
             : delivery === 'queued'
               ? savedAndSentSummary(saved.name, saved.sendFolder, name, summary, room)
-              : savedAndSentSummary(saved.name, saved.sendFolder, name, '', room);
+              : savedAndSentSummary(
+                  saved.name,
+                  saved.sendFolder,
+                  name,
+                  unknown ? copy('chat.status.ok.availabilityUnknown', {}) : '',
+                  room,
+                );
       } else if (attached !== undefined) {
         const sent = result.files?.find((f) => f.index === 0);
         if (sent === undefined) return internalError();
@@ -539,9 +551,14 @@ async function withProofOf(
 /**
  * D-156: the SEND_LIMIT refusal in plain words: which cap, its number, the contact for a
  * per-contact cap, and when a slot frees. The numbers and the time come from the core's typed
- * result and are checked here; nothing else is read from it.
+ * result and are checked here; nothing else is read from it. `withFields` false leaves the typed
+ * `limit`, `max` and `retryAt` out (the terms tools: the same words, their own output schema).
  */
-function sendLimit(result: Readonly<Record<string, unknown>>, name: string): HandlerOutput {
+export function sendLimit(
+  result: Readonly<Record<string, unknown>>,
+  name: string,
+  withFields = true,
+): HandlerOutput {
   const limit = result['limit'];
   const max = result['max'];
   const retryAt = result['retryAt'];
@@ -571,6 +588,6 @@ function sendLimit(result: Readonly<Record<string, unknown>>, name: string): Han
     template.replace('{name}', name).replace('{max}', String(max)),
     SEND_TEXT.sendLimitNextStep.replace('{time}', time),
     'SEND_LIMIT',
-    { limit, max, retryAt: time },
+    withFields ? { limit, max, retryAt: time } : {},
   );
 }

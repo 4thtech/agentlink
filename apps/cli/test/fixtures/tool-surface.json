@@ -738,6 +738,10 @@
           "type": "string",
           "enum": ["queued", "sent", "not_delivered"]
         },
+        "availability": {
+          "type": "string",
+          "enum": ["unknown"]
+        },
         "file": {
           "type": "object",
           "properties": {

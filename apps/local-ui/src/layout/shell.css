@@ -380,24 +380,26 @@
   transform: translateX(16px);
 }
 
-/* The live status strip (Under the hood). */
+/* The live status strip (Under the hood). OWNER-FB-0512: never scrolls sideways. The items wrap onto a
+   second line when they do not fit; a long value is cut with an ellipsis (the full text is the item's
+   title); the server facts (Version, Port, ...) sit together at the right edge of the line. */
 .al-strip {
   border-bottom: var(--al-border-width-thin) solid var(--al-color-border-subtle);
   background: var(--al-color-bg-sunken);
-  overflow-x: auto;
+  overflow-x: clip;
 }
 .al-strip-list {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 22px;
-  width: max-content;
-  /* A fixed height: the strip is there at once, its items fill it when the first answer comes. */
+  column-gap: 18px;
+  row-gap: 2px;
+  /* A fixed first line: the strip is there at once, its items fill it when the first answer comes. */
   box-sizing: border-box;
   min-height: 34px;
   margin: 0;
   padding: 8px clamp(16px, 4vw, 40px);
   list-style: none;
-  white-space: nowrap;
   font-size: 12px;
   line-height: 18px;
 }
@@ -405,9 +407,22 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+}
+.al-strip-item[data-fact-first] {
+  margin-inline-start: auto;
 }
 .al-strip-label {
+  flex: none;
   color: var(--al-color-fg-subtle);
+}
+.al-strip-value {
+  min-width: 0;
+  max-width: 24ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* The section rail: minimized (64 px) or expanded (240 px). */

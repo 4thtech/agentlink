@@ -30,6 +30,15 @@
 //   whose message stays, and an `ack` whose body does not name one message. Other acks follow the
 //   message they name: they go with it, or after it was deleted.
 //
+// The plan hash leaves acks out (DELETE-PLAN-ACKS, 0.5.12). Received receipts are on by default
+// (0.5.10) and land 5-90 s after their message, and an own ack moves from queued to sent on the same
+// delay, so an ack row often appears or changes between the sheet's list and the press, or inside
+// the Undo window. The sheet never lists an ack as an item: what the owner confirms is the set of
+// messages, saved files and kept messages, and that is what the hash covers. Apply's fresh plan then
+// takes the acks as they are at that moment, under the same rule: an ack goes only with (or after)
+// a message the owner confirmed, and every ack the rule keeps stays. A new message, a newly saved
+// file or a message that changed protection still changes the hash and is refused.
+//
 // A later plan with `include: files` or `both` also lists the still indexed saved files of messages
 // deleted earlier (a Trash move that did not happen), so a partial apply leaves no orphans.
 //
@@ -67,7 +76,10 @@ export interface HistoryDeletePlan {
   /** The input the plan was made from; apply plans it again and compares. */
   readonly input: HistoryDeleteInput;
   readonly include: HistoryDeleteInclude;
-  /** sha256 (hex) over the exact item set: what goes and what is kept. */
+  /**
+   * sha256 (hex) over the exact item set: the messages that go, the saved files and the messages
+   * kept. Acks are left out (DELETE-PLAN-ACKS): they follow the message they name, at apply time.
+   */
   readonly planHash: string;
   /** The messages that go, oldest first (empty for `include: 'files'`'s message side). */
   readonly envelopeIds: readonly string[];
@@ -373,6 +385,8 @@ function planTx(tx: StoreTx, input: HistoryDeleteInput, links: AckLinks): Histor
   const going: string[] = [];
   const goingSet = new Set<string>();
   const keptIds: string[] = [];
+  // DELETE-PLAN-ACKS: the acks this plan takes or keeps; none of them is in the hash.
+  const ackIds = new Set<string>();
   let bytes = 0;
   let notarized = 0;
   const savedFiles: SavedFileKey[] = [];
@@ -437,6 +451,7 @@ function planTx(tx: StoreTx, input: HistoryDeleteInput, links: AckLinks): Histor
       ) {
         continue;
       }
+      ackIds.add(id);
       const target = links.get(id) ?? null;
       const targetRow = target === null ? undefined : tx.get('envelopes', { envelope_id: target });
       const follows =
@@ -461,11 +476,11 @@ function planTx(tx: StoreTx, input: HistoryDeleteInput, links: AckLinks): Histor
     sha256(
       utf8.encode(
         JSON.stringify({
-          v: 1,
+          v: 2,
           include: input.include,
-          messages: going,
+          messages: going.filter((id) => !ackIds.has(id)),
           files: savedFiles.map((f) => [f.envelopeId, f.index]),
-          kept: keptIds,
+          kept: keptIds.filter((id) => !ackIds.has(id)),
           truncated,
         }),
       ),

@@ -26,7 +26,7 @@ export const WIDGET_CHANNEL = 'agentlink:widget';
 export const WIDGET_PRELOAD_FILE = 'widget-preload.cjs';
 
 /** The pages the popover may open in the main window (a subset of the pipe's SHOW_ROUTES). */
-export const WIDGET_ROUTES = ['home', 'inbox', 'approvals', 'updates'] as const;
+export const WIDGET_ROUTES = ['home', 'inbox', 'files', 'approvals', 'updates'] as const;
 export type WidgetRoute = (typeof WIDGET_ROUTES)[number];
 
 export type WidgetRequest =

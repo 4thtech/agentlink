@@ -37,3 +37,7 @@ overrides:
   # GHSA-3g3m-2fjr-6pw4 (first patched 14.0.2). @electron/asar 4.3.2 moves to glob ^14.0.2; remove this
   # once the pin moves to 4.3.2 (still inside the minimumReleaseAge cooldown).
   '@electron/asar>glob': 14.0.4
+  # CODEQL-TRIAGE-0512: minimatch 7.0.0 to 11.0.0 has a medium DoS (Dependabot 19); no 10.x is patched, so
+  # the ^10 pins of eslint, config-array, typescript-estree and @electron/asar (all dev-only) move to the
+  # 11.x already in the lockfile. Remove once those dependents ship 11.x ranges.
+  'minimatch@^10': 11.0.5

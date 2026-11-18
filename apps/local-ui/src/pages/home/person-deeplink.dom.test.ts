@@ -19,6 +19,7 @@ beforeEach(() => {
   resetPrefsForTests();
   history.replaceState(null, '', '/');
   scroll.mockClear();
+  posts.length = 0;
   Element.prototype.scrollIntoView = scroll;
   host = document.createElement('div');
   document.body.append(host);
@@ -52,7 +53,17 @@ const contact = (ref: string, name: string) => ({
   since: AT - 86_400,
 });
 
-function server(gate?: Promise<void>) {
+const posts: string[] = [];
+const FILE_MSG = {
+  id: 'AQEBAQEBAQEBAQEBAQEBAQ',
+  at: AT + 50,
+  text: '',
+  files: [{ name: 'plan.pdf', size: 1200 }],
+  receipt: false,
+  proof: false,
+  size: 1200,
+};
+function server(gate?: Promise<void>, withFile = false) {
   const body = (path: string): unknown => {
     if (path === '/api/ui/messages') return { conversations: people };
     if (path === '/api/ui/contacts') {
@@ -61,11 +72,12 @@ function server(gate?: Promise<void>) {
     if (path.startsWith('/api/ui/files')) return { items: [] };
     if (path === '/api/approvals') return { approvals: [] };
     if (path === '/api/owner/passkey') return { passkey: null };
-    if (path.startsWith('/api/ui/messages/')) return { items: [] };
+    if (path.startsWith('/api/ui/messages/')) return { items: withFile ? [FILE_MSG] : [] };
     return {};
   };
-  const fetchFn = async (input: RequestInfo | URL): Promise<Response> => {
+  const fetchFn = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const path = (typeof input === 'string' ? input : input.toString()).split('?')[0] ?? '';
+    if (init?.method === 'POST') posts.push(path);
     if (gate !== undefined && path === '/api/ui/messages') await gate;
     return new Response(JSON.stringify(body(path)), {
       status: 200,
@@ -222,5 +234,34 @@ describe('#person= on Home', () => {
     expect(el?.querySelector('.hm-open-head')).not.toBeNull();
     expect(el?.textContent).toContain('Here is the plan.');
     // The stylesheet side (no overlay, opacity only) is checked in deeplink-mark.css.test.ts.
+  });
+
+  // OWNER-FB-0512: opening from the widget marks what it was about as seen, as the bell does.
+  it("a message link marks that person's messages item read, nothing else", async () => {
+    history.replaceState(null, '', `/#person=${DENIS}`);
+    await mount(server());
+    await waitMark();
+    expect(posts).toEqual([`/api/ui/notifications/messages-${DENIS}/read`]);
+  });
+
+  it("a file link marks that person's files item read and focuses the newest received file", async () => {
+    history.replaceState(null, '', `/#person=${DENIS}&files`);
+    await mount(server(undefined, true));
+    await waitMark();
+    expect(posts).toEqual([`/api/ui/notifications/files-${DENIS}/read`]);
+    const row = document.body.querySelector<HTMLElement>('[data-file-newest]');
+    expect(row).not.toBeNull();
+    expect(row?.textContent).toContain('plan.pdf');
+    expect(document.activeElement).toBe(row);
+    expect(row?.classList.contains('hm-file-target')).toBe(true);
+    // The conversation itself is not marked: the file is.
+    expect(opened(DENIS)?.classList.contains('hm-target')).toBe(false);
+    expect(location.hash).toBe('');
+  });
+
+  it('a person who is not in the list marks nothing', async () => {
+    history.replaceState(null, '', `/#person=${STRANGER}`);
+    await mount(server());
+    expect(posts).toEqual([]);
   });
 });

@@ -330,8 +330,8 @@ describe('widget page', () => {
     await click(buttonNamed(S.review) ?? null);
     expect(bridge.open).toHaveBeenLastCalledWith({ route: 'approvals' });
     await click(buttonNamed('2 new files') ?? null);
-    // One person has the new files: their conversation opens.
-    expect(bridge.open).toHaveBeenLastCalledWith({ route: 'inbox', target: ANA });
+    // OWNER-FB-0512: one person has the new files: their conversation opens at the file.
+    expect(bridge.open).toHaveBeenLastCalledWith({ route: 'files', target: ANA });
     await click(buttonNamed(S.openApp) ?? null);
     expect(bridge.open).toHaveBeenLastCalledWith({ route: 'home' });
     await click(buttonNamed(S.updateReady) ?? null);

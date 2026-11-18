@@ -544,6 +544,15 @@ describe.runIf(POSIX)('the write protocol (04 §2.8 "Writes")', () => {
     unlocked.close();
   });
 
+  it('SEC-RESTORE-GUARD: an agent created here starts with the restore mark "never restored"', async () => {
+    const agentId = await createWithPassphrase();
+    const unlocked = await unlockedStore(agentId);
+    expect(await fileKeychain(unlocked).get(keychainAccount(agentId, 'restore-mark'))).toEqual(
+      utf8('0'),
+    );
+    unlocked.close();
+  });
+
   it('after a passphrase change elsewhere, the running server fails closed and loses no item', async () => {
     const agentId = await createWithPassphrase();
     const server = await unlockedStore(agentId);

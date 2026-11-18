@@ -395,7 +395,7 @@ export function combinedOk(rows, aFindings, bFinal) {
 }
 
 export function renderCombinedMd(meta, rows) {
-  const esc = (s) => plain(s).replace(/\|/g, '\\|');
+  const esc = (s) => plain(s).replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
   const pass = rows.filter((r) => r.outcome === 'pass').length;
   return [
     `# AgentLink two-Mac dogfood (${meta.mode ?? 'hands-free'}) ${meta.startedAt}`,

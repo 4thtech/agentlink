@@ -91,10 +91,22 @@ import type { IdentityService } from './identity.js';
 import { agentNostrKey } from './card.js';
 import { renderContactName } from './names.js';
 import type { OutboxService } from './outbox.js';
+import {
+  SEND_LIMIT,
+  outgoingRefusalTx,
+  recordOutgoing,
+  type SendLimitRefusal,
+} from './outgoing-limits.js';
 import type { CommitmentRecordResult, ProofRejected } from './proofs/service.js';
 import { computeActionDigest, verifyStoredOwnerAction } from './owner-action.js';
 import type { OwnerActions } from './owner-actions.js';
 import { evaluate, type EffectivePolicy } from './policy-engine.js';
+import {
+  guardCommitment,
+  readRestoreState,
+  requestedBeforeRestore,
+  restoreWindowNow,
+} from './restore-guard.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 import {
@@ -146,6 +158,11 @@ export type TermsCode =
   | 'CHAIN_UNAVAILABLE'
   /** This agent's profile expires before a Record could land (07 §8). Nothing is sent. */
   | 'CARD_EXPIRED'
+  /**
+   * D-156 (SEC-TERMS-CAPS): an outgoing cap of the owner's rules is reached. Nothing is stored,
+   * claimed or sent; carries `limit`, `max` and `retryAt` as agentlink_send does.
+   */
+  | typeof SEND_LIMIT
   /** The same clientRequestId with a different request (06 §1 rule 6, 07 §3.3). Nothing runs. */
   | typeof IDEMPOTENCY_KEY_REUSED;
 
@@ -257,6 +274,10 @@ export interface TermsRejected {
   /** With SPEND_CEILING (D-156): which hard ceiling, and its amount (a USD amount). */
   readonly ceiling?: 'per_action' | 'daily';
   readonly limitUsd?: string;
+  /** With SEND_LIMIT (D-156): which outgoing cap, its number and when a slot frees. */
+  readonly limit?: SendLimitRefusal['limit'];
+  readonly max?: number;
+  readonly retryAt?: string;
 }
 
 /** A change from the newest version this side held before (computed locally; 04 §3.4.2). */
@@ -669,12 +690,14 @@ export class TermsService {
           }
           throw error;
         }
-        // `needs_credits` sent and asked nothing: not kept, so the call runs after a top-up.
-        await idempotency.finish(
-          start.run,
-          done,
-          done.status === 'needs_credits' ? { keep: false } : {},
-        );
+        // `needs_credits` sent and asked nothing: not kept, so the call runs after a top-up. A
+        // SEND_LIMIT with no effect neither (D-156): the same clientRequestId runs once a slot frees.
+        const unkept =
+          done.status === 'needs_credits' ||
+          (done.status === 'rejected' &&
+            done.code === SEND_LIMIT &&
+            start.run.effects.length === 0);
+        await idempotency.finish(start.run, done, unkept ? { keep: false } : {});
         return done;
       }
     }
@@ -703,11 +726,16 @@ export class TermsService {
     readonly run?: IdempotencyRun | undefined;
   }): Promise<
     | { readonly kind: 'sent'; readonly envelopeId: string; readonly thread: string }
+    | { readonly kind: 'limited'; readonly refusal: SendLimitRefusal }
     | { readonly kind: 'stale' | 'denied' | 'lost' }
   > {
     const { envelopes, outbox } = this.#deps;
     outbox.requireTransport();
     if (!(await this.#sendAllowed(input.to, 0))) return { kind: 'denied' };
+    // SEC-TERMS-CAPS (D-156): the outgoing caps before anything is signed, and again below in the
+    // transaction that stores the envelope, so two calls never both pass on one count.
+    const early = await this.#limited(input.to);
+    if (early !== undefined) return { kind: 'limited', refusal: early };
     const { built, row } = await envelopes.prepare({
       to: { contact: input.to },
       payload: input.payload,
@@ -728,6 +756,10 @@ export class TermsService {
     const run = input.run;
     const effect =
       run === undefined ? undefined : await this.#idempotency().prepareEffect(run, [envelopeId]);
+    // Loaded before the transaction: no await inside it (07 §3.1).
+    const policy = await this.#policy();
+    // SEC-RESTORE-GUARD: the caps are halved in the restore window, as for agentlink_send.
+    const restoreWindow = await restoreWindowNow(this.#ctx);
     const outcome = await this.#ctx.store.transaction((tx) => {
       if (!snapshotCurrentTx(tx, input.snapshot)) return 'stale' as const;
       const contact = tx.get('contacts', { contact_id: input.to });
@@ -736,6 +768,10 @@ export class TermsService {
       }
       // SEC-INVITE-CAPS: no terms with a contact that waits for the owner's Keep.
       if (contact.waiting_owner === 1) throw waitingOwnerError();
+      // SEC-TERMS-CAPS: the authoritative cap check, before a commitment part is claimed.
+      const now = nowOf(this.#ctx);
+      const over = outgoingRefusalTx(tx, policy, input.to, now, { restoreWindow });
+      if (over !== undefined) return over;
       if (input.claimTx !== undefined && !input.claimTx(tx, envelopeId, json)) {
         return 'lost' as const;
       }
@@ -746,13 +782,25 @@ export class TermsService {
       }
       tx.insert('envelopes', row);
       for (const r of rows) tx.insert('outbox', r);
+      // D-156: the durable count of the outgoing caps, in the storing transaction.
+      recordOutgoing(tx, { envelopeId, contact: input.to, now, files: 0, bytes: 0 });
       return 'stored' as const;
     });
+    if (typeof outcome !== 'string') return { kind: 'limited', refusal: outcome };
     if (outcome !== 'stored') return { kind: outcome };
     if (run !== undefined) this.#idempotency().committed(run, effect!);
     this.#ctx.log.info('terms envelope stored for sending', { wraps: rows.length });
     await this.#publish(envelopeId);
     return { kind: 'sent', envelopeId, thread: built.thread };
+  }
+
+  /** SEC-TERMS-CAPS: the early cap check for one terms envelope to `to`, outside a transaction. */
+  async #limited(to: string): Promise<SendLimitRefusal | undefined> {
+    const policy = await this.#policy();
+    const restoreWindow = await restoreWindowNow(this.#ctx);
+    return this.#ctx.store.transaction((tx) =>
+      outgoingRefusalTx(tx, policy, to, nowOf(this.#ctx), { restoreWindow }),
+    );
   }
 
   async #publish(envelopeId: string): Promise<void> {
@@ -926,6 +974,7 @@ export class TermsService {
       run,
     });
     if (sent.kind === 'stale') return 'stale';
+    if (sent.kind === 'limited') return sent.refusal;
     if (sent.kind !== 'sent') return rejected('POLICY_DENIED');
     return {
       status: 'ok',
@@ -1252,6 +1301,7 @@ export class TermsService {
       run,
     });
     if (sent.kind === 'stale') return 'stale';
+    if (sent.kind === 'limited') return sent.refusal;
     if (sent.kind !== 'sent') return rejected('POLICY_DENIED');
     return {
       status: 'ok',
@@ -1333,7 +1383,11 @@ export class TermsService {
       supersededByOwnNewer: plan.superseded,
     };
     const policy = await this.#policy();
-    const evaluation = evaluateCommitment(policy, facts);
+    // SEC-RESTORE-GUARD: in the 24 h after a restore the rules alone never commit; the owner does.
+    const evaluation = guardCommitment(
+      evaluateCommitment(policy, facts),
+      await restoreWindowNow(this.#ctx),
+    );
     if (evaluation.decision === 'void') return rejected('APPROVAL_VOID');
     // A denial creates nothing: no request, no grant, no envelope (06 §3).
     if (evaluation.decision === 'deny') return rejected('POLICY_DENIED');
@@ -1465,6 +1519,11 @@ export class TermsService {
     const { row } = stored;
     const now = nowOf(this.#ctx);
     if (row.signed_cancel !== null) return 'APPROVAL_VOID';
+    // SEC-RESTORE-GUARD (D-156): a scope requested before a restore of this ID (an owner decision or
+    // a policy grant) authorises nothing after it; an unreadable restore mark, none at all.
+    if (requestedBeforeRestore(await readRestoreState(this.#ctx), row.created_at)) {
+      return 'APPROVAL_VOID';
+    }
     if (row.status === 'void' || row.status === 'cancelled' || row.status === 'denied') {
       return 'APPROVAL_VOID';
     }
@@ -1485,6 +1544,8 @@ export class TermsService {
       const e = evaluateCommitment(policy, facts);
       const basis = e.decision === 'allow' ? e.grant.basis : 'rule';
       const r = recheckCommitmentGrant(policy, facts, { basis, policyHash: hash });
+      // SEC-RESTORE-GUARD: a policy grant does not run in the 24 h after a restore.
+      if (r.status === 'allow' && (await restoreWindowNow(this.#ctx))) return 'ask_owner';
       if (r.status === 'allow') return 'ok';
       if (r.status === 'ask_owner') return 'ask_owner';
       return 'APPROVAL_VOID';
@@ -1831,6 +1892,8 @@ export class TermsService {
     });
     if (sent.kind === 'stale') return 'stale';
     if (sent.kind === 'denied') return rejected('POLICY_DENIED');
+    // SEC-TERMS-CAPS: nothing claimed; the approval stays runnable once a slot frees.
+    if (sent.kind === 'limited') return sent.refusal;
     if (sent.kind !== 'sent') {
       // A concurrent retry claimed it, or another scope already sent the accept: run nothing new.
       // The claim belongs to the other call, which reports `ok`; this one reports the approval as
@@ -2252,7 +2315,11 @@ export class TermsService {
       terms,
       supersededByOwnNewer: false,
     };
-    const evaluation = evaluateCommitment(await this.#policy(), facts);
+    // SEC-RESTORE-GUARD: in the 24 h after a restore the rules alone never commit; the owner does.
+    const evaluation = guardCommitment(
+      evaluateCommitment(await this.#policy(), facts),
+      await restoreWindowNow(this.#ctx),
+    );
     if (evaluation.decision === 'void') return rejected('APPROVAL_VOID');
     if (evaluation.decision === 'deny') return rejected('POLICY_DENIED');
     const commitmentAsked = evaluation.decision === 'approval';
@@ -2482,6 +2549,8 @@ export class TermsService {
       });
       if (out.kind === 'stale') return 'stale';
       if (out.kind === 'denied') return rejected('POLICY_DENIED');
+      // SEC-TERMS-CAPS: nothing claimed; the approval stays runnable once a slot frees.
+      if (out.kind === 'limited') return out.refusal;
       if (out.kind !== 'sent') {
         const now2 = await this.#ctx.store.transaction((tx) =>
           tx.get('commitment_parts', { approval_id: approvalId, part: 'envelope' }),

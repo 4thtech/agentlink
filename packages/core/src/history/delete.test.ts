@@ -552,3 +552,81 @@ describe('a partial apply leaves no orphans (IR-RET-3-1 Low 6)', () => {
     expect(w.b.inbox.trashed).toEqual(['later.pdf']);
   });
 });
+
+// DELETE-PLAN-ACKS (0.5.12): received receipts are on by default (0.5.10), and an ack lands 5-90 s
+// after its message, so one often arrives between the sheet's list and the press, or inside the
+// Undo window. An ack is not something the sheet lists: it never changes the plan hash. A new real
+// message or file still does.
+describe('an ack landing after the sheet listed the items does not change the plan (DELETE-PLAN-ACKS)', () => {
+  it('an ack arriving between plan and apply: the delete still applies, the ack goes with its message', async () => {
+    const w = await world();
+    const one = await send(w);
+    const two = await send(w);
+    const plan = await w.b.client.history.plan({ contactId: w.a.id, include: 'messages' });
+    // The contact's AI acknowledges message one after its random delay.
+    const ack = await plantLinked(w, one, 11);
+    const result = await w.b.client.history.apply(plan);
+    expect(result.messages.deleted).toBe(3);
+    for (const id of [one, two, ack]) expect((await row(w.b, id))?.deleted_at).not.toBeNull();
+  });
+
+  it('acks arriving or being sent during the Undo window (after the finish re-plan) still delete', async () => {
+    const w = await world();
+    const one = await send(w);
+    const two = await send(w);
+    const begin = await w.b.client.history.plan({ contactId: w.a.id, include: 'messages' });
+    // An own ack, still queued (kept: outbox), appears before the finish step.
+    const own = await plantLinked(w, two, 12, 'ack', 'out');
+    await w.b.store.transaction((tx) =>
+      tx.update('envelopes', { envelope_id: own }, { delivery: 'queued' }),
+    );
+    const finish = await w.b.client.history.plan({ contactId: w.a.id, include: 'messages' });
+    expect(finish.planHash).toBe(begin.planHash);
+    // Inside the Undo window: the own ack is sent, and the contact's ack of message one lands.
+    await w.b.store.transaction((tx) =>
+      tx.update('envelopes', { envelope_id: own }, { delivery: 'sent' }),
+    );
+    const theirs = await plantLinked(w, one, 13);
+    const result = await w.b.client.history.apply(begin);
+    expect(result.messages.deleted).toBe(4);
+    for (const id of [one, two, own, theirs]) {
+      expect((await row(w.b, id))?.deleted_at).not.toBeNull();
+    }
+  });
+
+  it('an ack of a message that stays lands: still applies; that message and its ack stay', async () => {
+    const w = await world();
+    const one = await send(w);
+    const two = await send(w);
+    const plan = await w.b.client.history.plan({ envelopeIds: [one], include: 'messages' });
+    const ack = await plantLinked(w, two, 14);
+    const result = await w.b.client.history.apply(plan);
+    expect(result.messages.deleted).toBe(1);
+    expect((await row(w.b, one))?.deleted_at).not.toBeNull();
+    for (const id of [two, ack]) expect((await row(w.b, id))?.deleted_at).toBeNull();
+  });
+
+  it('a new real message still refuses, with or without an ack next to it', async () => {
+    const w = await world();
+    const one = await send(w);
+    const plan = await w.b.client.history.plan({ contactId: w.a.id, include: 'messages' });
+    await plantLinked(w, one, 15);
+    const late = await send(w);
+    await expect(w.b.client.history.apply(plan)).rejects.toMatchObject({
+      code: 'history_plan_changed',
+    });
+    for (const id of [one, late]) expect((await row(w.b, id))?.deleted_at).toBeNull();
+  });
+
+  it('a newly saved file of a listed message still refuses (files are in the plan)', async () => {
+    const w = await world();
+    const id = await send(w, 'late.pdf');
+    const plan = await w.b.client.history.plan({ contactId: w.a.id, include: 'both' });
+    expect(plan.files.count).toBe(0);
+    expect(await w.b.client.fetchFile({ envelopeId: id })).toMatchObject({ status: 'ok' });
+    await expect(w.b.client.history.apply(plan)).rejects.toMatchObject({
+      code: 'history_plan_changed',
+    });
+    expect(w.b.inbox.files().has('late.pdf')).toBe(true);
+  });
+});

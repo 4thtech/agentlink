@@ -71,6 +71,7 @@ const AUTO_ACCEPT_REASON: Readonly<Record<string, string>> = Object.freeze({
   over_maximum: 'the price is over your limit',
   sell_off: 'auto-accept for selling is off',
   under_minimum: 'the price is under your minimum',
+  restored: 'this ID was restored from a backup or AgentLink was updated in the last 24 hours',
 });
 
 const CHANGE_LABEL: Readonly<Record<TermsChange['field'], string>> = Object.freeze({

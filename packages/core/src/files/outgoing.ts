@@ -14,12 +14,20 @@
 // On any failure every object already uploaded is deleted (best effort; the drop and the bucket
 // lifecycle rule expire the rest).
 //
+// SEC-REFUSED-UPLOAD-CLEANUP: the same holds when the send is refused after the upload (send.ts: in
+// the transaction that stores the envelope). deleteUploaded runs the deletes a few at a time, each
+// request with a timeout, tries again only on a timeout, a network failure, 429 or 5xx, and stops
+// after a few seconds in all. A drop or own-storage object it could not delete is queued as a `files`
+// row of its own (a fresh `x-cleanup-` key that no envelope has, no name, no file key, no link, due
+// now); the expiry retention pass (retention.ts) deletes it later, with backoff. So a failed cleanup
+// never leaves an object without a way to delete it, and never turns the refusal into a success.
+//
 // Zero access (I-2): storage gets only ciphertext. The file key, name and plaintext hash go only
 // into the end-to-end-encrypted payload and the sealed `files` row. The drop locator is a signed
 // GET URL, a bearer secret (IR-M1-6c-1): it goes only into the payload and a sealed column, and
 // never into a log line or an error (I-7). Errors are fixed CoreErrors; no storage error text or
 // cause is passed on.
-import { encodeBase64url, wipe } from '@4thtech-io/crypto';
+import { encodeBase64url, encodeHex, randomBytes, wipe } from '@4thtech-io/crypto';
 import {
   DROP_MAX_CIPHERTEXT_BYTES,
   StorageError,
@@ -34,16 +42,17 @@ import {
   type StoredObject,
 } from '@4thtech-io/storage';
 import { MAX_URL_LENGTH, mimeForName } from '@4thtech-io/types';
-import { nowOf, type CoreContext } from '../context.js';
+import { nowOf, seal, type CoreContext } from '../context.js';
 import { isBrokenOwnStorageAdapter } from '../own-storage.js';
 import { CoreError } from '../errors.js';
 import { evaluateFileSend, policyLimits, type EffectivePolicy } from '../policy-engine.js';
 import { decidePath, parseAbsolutePath } from '../path-guard.js';
+import type { Row } from '../store/schema.js';
 import { planPacking, type PackingBase, type PackingFile } from './packing.js';
 import type { FilesPlatform, OutgoingFile } from './platform.js';
 
 const DAY = 86_400;
-const MAX_EXPIRY_DAYS = 7;
+export const MAX_EXPIRY_DAYS = 7;
 const MAX_NAME_CODE_POINTS = 256;
 
 /**
@@ -124,21 +133,181 @@ export interface Uploaded {
   readonly adapter: StorageAdapter | null;
 }
 
-/** Deletes uploaded objects, best effort; never throws and never logs a locator. */
+/** Delete attempts per uploaded object before it is queued for a later pass. */
+export const CLEANUP_ATTEMPTS = 3;
+/** The wait before each retry of a delete, in milliseconds. */
+const CLEANUP_BACKOFF_MS: readonly number[] = [100, 400];
+/** One delete request is given up after this long (the adapters set no timeout of their own). */
+const CLEANUP_REQUEST_TIMEOUT_MS = 1_000;
+/** The whole inline cleanup of one refused send ends after this long; the rest is queued. */
+const CLEANUP_BUDGET_MS = 2_500;
+/** Deletes run at most this many at a time. */
+const CLEANUP_PARALLEL = 4;
+
+/**
+ * The key prefix of a queued cleanup row. It sorts after every hex envelope ID, and no envelope ID
+ * has it; CLEANUP_KEY_END is the first key after the range.
+ */
+export const CLEANUP_KEY_PREFIX = 'x-cleanup-';
+export const CLEANUP_KEY_END = 'x-cleanup.';
+
+/** The sealed locator of a queued cleanup row: the object, when it was queued, failed passes. */
+export interface CleanupLocator {
+  readonly kind: 'drop' | 's3';
+  readonly locator: string;
+  readonly keyEpoch?: number;
+  readonly queuedAt: number;
+  readonly tries: number;
+}
+
+const TIMED_OUT = Symbol('timed out');
+
+const pause = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/** The delete, or TIMED_OUT after `ms`. A late answer is ignored (a queued retry deletes again). */
+function deleteWithin(adapter: StorageAdapter, object: StoredObject, ms: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(TIMED_OUT);
+    }, ms);
+    Promise.resolve()
+      .then(() => adapter.delete(object))
+      .then(
+        () => {
+          clearTimeout(timer);
+          resolve();
+        },
+        (error: unknown) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      );
+  });
+}
+
+/**
+ * Whether a failed delete is worth trying again now: a timeout, a network failure, 429 or 5xx. Any
+ * other refusal (4xx, a bad argument) is not; an error without a storage code is a transport failure.
+ */
+function transient(error: unknown): boolean {
+  if (error === TIMED_OUT) return true;
+  if (!(error instanceof StorageError)) return true;
+  if (error.code === 'network' || error.code === 'rate_limited' || error.code === 'unavailable') {
+    return true;
+  }
+  return error.status !== undefined && (error.status === 429 || error.status >= 500);
+}
+
+/** One object's delete, tried up to CLEANUP_ATTEMPTS times before `deadline`. True once deleted. */
+async function deleteWithRetries(
+  adapter: StorageAdapter,
+  object: StoredObject,
+  deadline: number,
+): Promise<boolean> {
+  for (let attempt = 0; attempt < CLEANUP_ATTEMPTS; attempt += 1) {
+    if (attempt > 0) {
+      const wait = CLEANUP_BACKOFF_MS[attempt - 1] ?? 400;
+      if (Date.now() + wait >= deadline) return false;
+      await pause(wait);
+    }
+    const left = Math.min(CLEANUP_REQUEST_TIMEOUT_MS, deadline - Date.now());
+    if (left <= 0) return false;
+    try {
+      await deleteWithin(adapter, object, left);
+      return true;
+    } catch (error) {
+      // The error text may name the object, so it is never kept or logged.
+      if (!transient(error)) return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Queues objects whose delete failed as `files` rows the expiry retention pass deletes: a fresh key
+ * no envelope has, the sealed locator (with the drop key epoch of the upload and the queue time),
+ * due now. No name, file key or link is kept. One store transaction.
+ */
+async function queueCleanup(ctx: CoreContext, objects: readonly StoredObject[]): Promise<void> {
+  const key = `${CLEANUP_KEY_PREFIX}${encodeHex(randomBytes(16))}`;
+  const now = nowOf(ctx);
+  const rows: Row<'files'>[] = [];
+  for (let idx = 0; idx < objects.length; idx += 1) {
+    const object = objects[idx] as StoredObject;
+    const rowKey = [key, idx];
+    const locator: CleanupLocator = {
+      kind: object.kind as 'drop' | 's3',
+      locator: object.locator,
+      ...(object.keyEpoch === undefined ? {} : { keyEpoch: object.keyEpoch }),
+      queuedAt: now,
+      tries: 0,
+    };
+    rows.push({
+      envelope_id: key,
+      idx,
+      name: await seal(ctx, 'files', 'name', rowKey, ''),
+      size: object.size,
+      sha256: object.sha256,
+      locator: await seal(ctx, 'files', 'locator', rowKey, JSON.stringify(locator)),
+      url: null,
+      file_key: await seal(ctx, 'files', 'file_key', rowKey, ''),
+      expires_at: now,
+      deleted_at: null,
+      delete_after: null,
+      saved_name: null,
+      auto_save: null,
+      auto_reason: null,
+      auto_tries: null,
+      auto_next_at: null,
+    });
+  }
+  await ctx.store.transaction((tx) => {
+    for (const row of rows) tx.insert('files', row);
+  });
+}
+
+/**
+ * Deletes uploaded objects (SEC-REFUSED-UPLOAD-CLEANUP): up to CLEANUP_PARALLEL at a time, each
+ * request bounded, transient failures tried again, all within CLEANUP_BUDGET_MS. A drop or own-storage
+ * object still not deleted is queued for the expiry retention pass; any other kind is left to expire.
+ * Never throws and never logs a locator or URL.
+ */
 export async function deleteUploaded(
   ctx: CoreContext,
   objects: readonly Uploaded[],
 ): Promise<void> {
-  let failed = 0;
-  for (const r of objects) {
-    if (r.object === null || r.adapter === null) continue;
-    try {
-      await r.adapter.delete(r.object);
-    } catch {
-      failed += 1;
+  const work = objects.filter(
+    (r): r is { object: StoredObject; adapter: StorageAdapter } =>
+      r.object !== null && r.adapter !== null,
+  );
+  if (work.length === 0) return;
+  const deadline = Date.now() + CLEANUP_BUDGET_MS;
+  const done = new Array<boolean>(work.length).fill(false);
+  let next = 0;
+  const lane = async (): Promise<void> => {
+    while (next < work.length) {
+      const i = next;
+      next += 1;
+      const r = work[i] as { object: StoredObject; adapter: StorageAdapter };
+      done[i] = await deleteWithRetries(r.adapter, r.object, deadline).catch(() => false);
     }
+  };
+  await Promise.all(Array.from({ length: Math.min(CLEANUP_PARALLEL, work.length) }, lane));
+  const left = work.filter((_, i) => done[i] !== true).map((r) => r.object);
+  if (left.length === 0) return;
+  const queueable = left.filter((o) => o.kind === 'drop' || o.kind === 's3');
+  const other = left.length - queueable.length;
+  if (other > 0) ctx.log.warn('uploaded file not deleted; it expires', { files: other });
+  if (queueable.length === 0) return;
+  try {
+    await queueCleanup(ctx, queueable);
+    ctx.log.warn('uploaded file not deleted; queued for cleanup', { files: queueable.length });
+  } catch {
+    ctx.log.warn('uploaded file not deleted; it expires', { files: queueable.length });
   }
-  if (failed > 0) ctx.log.warn('uploaded file not deleted; it expires', { files: failed });
 }
 
 export interface OutgoingDeps {

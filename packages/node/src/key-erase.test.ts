@@ -101,6 +101,7 @@ describe('agentEraseAccounts: the exact erase list (04 §2.5 step 6)', () => {
       `${agentId}:receipts-kept`,
       `${agentId}:storage-mark`,
       `${agentId}:key-epoch`,
+      `${agentId}:restore-mark`,
       `${agentId}:s3:${ID_A}`,
       `${agentId}:s3:${ID_B}`,
     ]);

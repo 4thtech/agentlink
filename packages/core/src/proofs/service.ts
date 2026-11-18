@@ -4,8 +4,10 @@
 // Sender side (`notarize`): the kind comes from the payload (05 §3.1, D-86) and control types are
 // NOT_NOTARIZABLE; terms types go through the terms tools (USE_TERMS_TOOLS). The chain is selected
 // automatically (07 §6.3; nothing funded → `needs_credits` with the top-up route). Policy `proofs.*`
-// and the daily budget are evaluated, and the Record is signed and stored with its fresh salt in the
-// same store transaction that reserves its fee (06 §3, 07 §3.5); only then is it submitted. Once the
+// and the daily budget are evaluated, and the Record's fee is reserved and its row stored with its
+// fresh salt in one store transaction (06 §3, 07 §3.5); only under that held reservation is it signed,
+// and the signature is stored only while the reservation still holds (SEC-RECORD-ATOMIC,
+// record-signing.ts); only then is it submitted. Once the
 // chain shows it, a follow-up `proof` envelope `{envelopeId, chainId, recordId, salt}` carries the
 // salt to the recipient. A Record that has not landed is resent unchanged; a replacement (new nonce,
 // fresh salt, new deadline) is signed only when `replacementAllowed` says the earlier one can never
@@ -50,9 +52,11 @@ import {
   encodeBase64url,
   encodeHex0x,
   hashRecord,
+  hashTypedData,
   occV2Domain,
   parseJson,
   recipientCommitment,
+  recordTypedData,
   wipe,
   type Envelope,
   type JsonValue,
@@ -106,6 +110,12 @@ import {
   type ProofEvaluation,
   type ProofTrigger,
 } from '../policy-engine.js';
+import {
+  readRestoreState,
+  requestedBeforeRestore,
+  restoreProofContext,
+  restoredReplay,
+} from '../restore-guard.js';
 import type { Row } from '../store/schema.js';
 import type { StoreTx } from '../store/store.js';
 import type {
@@ -134,6 +144,12 @@ import {
   type ProofListItem,
 } from './reads.js';
 import { RECEIPT_REQUEST, receiptRequestKey, senderRequestedTx } from './receipt-request.js';
+import {
+  RECORD_SIGNING,
+  issueRecordTicket,
+  signUnderReservation,
+  type RecordTicket,
+} from './record-signing.js';
 
 /** A Record's `deadline` is this far after signing (proposed; 04 §5 replacement window). */
 export const RECORD_DEADLINE_SECONDS = 3_600;
@@ -194,7 +210,10 @@ type OwnStatus =
   | 'recorded'
   | 'announced'
   | 'replaced'
-  /** A refused (`failed`) Record whose reservation was released once it could never land. */
+  /**
+   * A refused (`failed`) Record, or one whose signature was never stored (`signing`,
+   * SEC-RECORD-ATOMIC), whose reservation was released once it could never land.
+   */
   | 'released';
 const LIVE: readonly OwnStatus[] = ['signed', 'pending', 'needs_credits'];
 /** The rows the proof list shows (M1-11r-a): every record, own or received, except a replaced one. */
@@ -572,7 +591,20 @@ const PARENT_MISMATCH: RecordCheck = Object.freeze({
 });
 const UNAVAILABLE: RecordCheck = Object.freeze({ status: 'unavailable' });
 
-class Abort extends Error {}
+class Abort extends Error {
+  constructor(
+    message?: string,
+    /** The in-transaction policy refusal, reported as such (SPEND_CEILING, POLICY_DENIED). */
+    readonly denial?: ProofRejected,
+  ) {
+    super(message);
+  }
+}
+/** #reserveAndSign: another live Record of the envelope is already stored. */
+const EXISTS = 'exists' as const;
+/** An own Record row that still stands for its envelope (not replaced, released or received). */
+const isLiveOwnRecord = (r: Row<'proofs'>): boolean =>
+  isRecordRow(r) && r.status !== 'replaced' && r.status !== 'released' && r.status !== 'received';
 
 type Selector = Pick<NonNullable<ProofsPlatform['selector']>, 'select' | 'clear'>;
 
@@ -588,15 +620,24 @@ function parentOf(value: unknown): string | undefined | null {
 const iso = (seconds: bigint | number): string =>
   new Date(Number(seconds) * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 
-function proofTriggers(triggers: readonly ProofTrigger[]): string[] {
+/**
+ * The approval-card triggers of a proof evaluation. SEC-RESTORE-GUARD: the restore window has its
+ * own reasons (`proofs.restored`, `proofs.updated`), never the daily budget; "remember for this
+ * contact" is never offered for them (rememberContactRules).
+ */
+export function approvalProofTriggers(triggers: readonly ProofTrigger[]): string[] {
   const out = new Set<string>();
   for (const t of triggers) {
     if (t === 'notarize' || t === 'policy_invalid') out.add('proofs.notarize');
     else if (t === 'per_action') out.add('proofs.perActionMaxUSD');
+    else if (t === 'restored') out.add('proofs.restored');
+    else if (t === 'updated') out.add('proofs.updated');
     else out.add('proofs.dailyBudgetUSD');
   }
   return [...out].sort();
 }
+
+const proofTriggers = approvalProofTriggers;
 
 /** A terms Record's outcome (M1-9d-3): as `notarize`, never a separate approval. */
 export type CommitmentRecordResult = Exclude<NotarizeResult, PendingApproval>;
@@ -612,6 +653,13 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
   readonly #receiptTries = new Map<string, number>();
   /** The receipt signing in progress, by receipt item ID (M1-33d-b: one signature, I-6). */
   readonly #signing = new Map<string, Promise<AcknowledgeResult>>();
+  /**
+   * SEC-RECORD-ATOMIC: the Records whose signing and submission one call in this process owns,
+   * from before their reservation until their submission returned, with that call's outcome
+   * (undefined: it stored or submitted nothing). Another call for the same Record waits for it and
+   * never signs or submits it again.
+   */
+  readonly #owners = new Map<string, Promise<CommitmentRecordResult | undefined>>();
   #receiptPass = 0;
 
   constructor(ctx: CoreContext, deps: ProofServiceDeps, platform: ProofsPlatform | undefined) {
@@ -714,8 +762,14 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
           ? null
           : { contact: counterparty.agentId, ruleEligible: counterparty.eligible },
     };
+    const restore = restoreProofContext(await readRestoreState(this.#ctx), now);
+    // The clock is read inside the transaction, consistent with the ledger it sums.
     const pre = await this.#ctx.store.transaction((tx) =>
-      evaluateProof(effective, action, { now, ledger: readBudgetLedger(tx) }),
+      evaluateProof(effective, action, {
+        now: nowOf(this.#ctx),
+        ledger: readBudgetLedger(tx),
+        ...restore,
+      }),
     );
     if (pre.decision === 'deny') return denied(pre);
     const files = payload.files.map((f) => ({
@@ -783,21 +837,21 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       maxFee: selection.quote.total,
       deadline,
     });
-    const signature = await this.#kit.signRecord(this.#ctx.keyStore, built);
-    const stored = await this.#storeSigned({
-      built,
-      signature,
-      envelopeId: input.envelopeId,
-      fee,
-      effective,
-      action,
-      approvalId: claim === undefined ? null : (input.approvalId ?? null),
-      claim,
-      replaces: undefined,
-      receiptRequest: input.requestReceipt === true,
-    });
-    if (stored === undefined) return rejected('POLICY_CHANGED');
-    return this.#submit(stored);
+    const out = await this.#ownedNew(built.recordId, () =>
+      this.#reserveAndSign({
+        built,
+        envelopeId: input.envelopeId,
+        fee,
+        effective,
+        action,
+        approvalId: claim === undefined ? null : (input.approvalId ?? null),
+        claim,
+        replaces: undefined,
+        receiptRequest: input.requestReceipt === true,
+      }),
+    );
+    if (out === EXISTS) return this.#continueExisting(input.envelopeId);
+    return out ?? rejected('POLICY_CHANGED');
   }
 
   // --- terms Records under a commitment scope (M1-9d-3; 04 §3.4.2; 06 §2.2a) ---------------------
@@ -828,8 +882,13 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       maxFeeUsd: priced.fee.usd,
       counterparty: { contact: counterparty.agentId, ruleEligible: counterparty.eligible },
     };
+    const restore = restoreProofContext(await readRestoreState(this.#ctx), now);
     const pre = await this.#ctx.store.transaction((tx) =>
-      evaluateProof(effective, action, { now, ledger: readBudgetLedger(tx) }),
+      evaluateProof(effective, action, {
+        now: nowOf(this.#ctx),
+        ledger: readBudgetLedger(tx),
+        ...restore,
+      }),
     );
     if (pre.decision === 'deny') return denied(pre);
     return Object.freeze({
@@ -905,21 +964,21 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       maxFee: quote.total,
       deadline,
     });
-    const signature = await this.#kit.signRecord(this.#ctx.keyStore, built);
-    const stored = await this.#storeSigned({
-      built,
-      signature,
-      envelopeId: input.envelopeId,
-      fee,
-      effective,
-      action,
-      approvalId: input.approvalId,
-      ownerApproved: input.ownerApproved,
-      claim: (tx, next) => input.claimTx(tx, next.record_id, next.record_json),
-      replaces: undefined,
-    });
-    if (stored === undefined) return rejected('POLICY_CHANGED');
-    return this.#submit(stored);
+    const out = await this.#ownedNew(built.recordId, () =>
+      this.#reserveAndSign({
+        built,
+        envelopeId: input.envelopeId,
+        fee,
+        effective,
+        action,
+        approvalId: input.approvalId,
+        ownerApproved: input.ownerApproved,
+        claim: (tx, next) => input.claimTx(tx, next.record_id, next.record_json),
+        replaces: undefined,
+      }),
+    );
+    if (out === EXISTS) return this.#continueExisting(input.envelopeId);
+    return out ?? rejected('POLICY_CHANGED');
   }
 
   /**
@@ -991,10 +1050,15 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     return String(stored.signer).toLowerCase() === self.toLowerCase() ? 'ok' : 'PARENT_NOT_OWN';
   }
 
-  /** Signs nothing: stores the signed Record with its salt and reserves its fee, all or nothing. */
-  async #storeSigned(input: {
+  /**
+   * SEC-RECORD-ATOMIC: reserves the Record's fee and stores its row (`signing`, with its salt) in
+   * one transaction, all or nothing; then signs it under that reservation and stores the signature
+   * only while the reservation still holds (record-signing.ts). Undefined: refused, nothing signed
+   * is kept. EXISTS: another live Record of this envelope is stored (a parallel call won; 04 §5).
+   * A signer error propagates with the fee still reserved, until the Record can never land.
+   */
+  async #reserveAndSign(input: {
     readonly built: BuiltRecord;
-    readonly signature: string;
     readonly envelopeId: string;
     readonly fee: ApprovalFee;
     readonly effective: EffectivePolicy;
@@ -1011,7 +1075,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     readonly replaces: { readonly recordId: string } | undefined;
     /** Keep the sender's receipt-request marker with this Record (M1-33d). */
     readonly receiptRequest?: boolean;
-  }): Promise<Row<'proofs'> | undefined> {
+  }): Promise<Row<'proofs'> | typeof EXISTS | ProofRejected | undefined> {
     const { built } = input;
     const now = nowOf(this.#ctx);
     const recordId = built.recordId;
@@ -1020,9 +1084,10 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       record_id: recordId,
       envelope_id: input.envelopeId,
       chain_id: built.domain.chainId,
-      record_json: canonicalize({ record: built.record, signature: input.signature } as never),
+      // No signature yet: it is stored only under the held reservation (record-signing.ts).
+      record_json: canonicalize({ record: built.record } as never),
       tx_hash: null,
-      status: 'signed',
+      status: RECORD_SIGNING,
       fee_token: input.fee.token,
       fee_amount: input.fee.amount,
       salt,
@@ -1034,8 +1099,13 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       input.receiptRequest === true
         ? await seal(this.#ctx, 'proofs', 'salt', [requestKey], '')
         : undefined;
+    let ticket: ReturnType<typeof issueRecordTicket>;
+    // SEC-RESTORE-GUARD: read before the transaction (a KeyStore item), checked inside it.
+    const restore = restoreProofContext(await readRestoreState(this.#ctx), now);
     try {
-      await this.#ctx.store.transaction((tx) => {
+      ticket = await this.#ctx.store.transaction((tx) => {
+        // The clock is read inside the transaction, consistent with the ledger it checks.
+        const at = nowOf(this.#ctx);
         if (input.claim !== undefined && !input.claim(tx, row)) throw new Abort();
         let replacedEntry: string | undefined;
         if (input.replaces !== undefined) {
@@ -1043,7 +1113,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
           if (
             releaseProofReservation(tx, {
               recordId: input.replaces.recordId,
-              now,
+              now: at,
               chainHasRecord: false,
             }) !== 'released'
           ) {
@@ -1052,10 +1122,14 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
           replacedEntry = old?.entry_id;
           tx.update('proofs', { record_id: input.replaces.recordId }, { status: 'replaced' });
         }
+        // One live Record per envelope (04 §5): a parallel call that stored one first wins.
+        if (tx.select('proofs', { envelope_id: input.envelopeId }).some(isLiveOwnRecord)) {
+          throw new Abort(EXISTS);
+        }
         const check = checkAndReserveProof(tx, {
           effective: input.effective,
           action: input.action,
-          now,
+          now: at,
           reservation: {
             entryId,
             recordId,
@@ -1064,9 +1138,12 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
             deadline: built.record.deadline,
           },
           ownerApproved: input.ownerApproved ?? input.approvalId !== null,
+          ...restore,
         });
         // Policy or budget moved between the check and this transaction: nothing is kept.
-        if (!check.reserved) throw new Abort();
+        if (!check.reserved) {
+          throw new Abort('', check.decision === 'deny' ? denied(check) : undefined);
+        }
         if (replacedEntry !== undefined) {
           tx.update('budget_ledger', { entry_id: entryId }, { replaces: replacedEntry });
         }
@@ -1089,16 +1166,149 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
             created_at: now,
           });
         }
+        const issued = issueRecordTicket(tx, recordId);
+        if (issued === undefined) throw new Abort();
+        return issued;
       });
     } catch (error) {
-      if (error instanceof Abort) return undefined;
+      if (error instanceof Abort) {
+        if (error.denial !== undefined) return error.denial;
+        return error.message === EXISTS ? EXISTS : undefined;
+      }
       throw error;
     }
-    return row;
+    const json = await this.#signHeld(ticket, built);
+    if (json === undefined) return undefined;
+    return { ...row, status: 'signed', record_json: json };
+  }
+
+  /** Signs under a ticket (record-signing.ts), marking the Record as being signed in this process. */
+  async #signHeld(ticket: RecordTicket, built: BuiltRecord): Promise<string | undefined> {
+    return signUnderReservation({
+      store: this.#ctx.store,
+      ticket,
+      built,
+      sign: (b) => this.#kit.signRecord(this.#ctx.keyStore, b),
+      encode: (signature) => canonicalize({ record: built.record, signature } as never),
+    });
+  }
+
+  /**
+   * Runs `work` as the one owner of this Record's signing and submission in this process
+   * (#owners). The Record ID is registered before anything awaits, so a parallel call can never
+   * see the stored row without its owner.
+   */
+  async #owned<R extends CommitmentRecordResult | typeof EXISTS | undefined>(
+    recordId: string,
+    work: () => Promise<R>,
+  ): Promise<R> {
+    let settle: (r: CommitmentRecordResult | undefined) => void = () => undefined;
+    this.#owners.set(
+      recordId,
+      new Promise((resolve) => {
+        settle = resolve;
+      }),
+    );
+    let result: CommitmentRecordResult | undefined;
+    try {
+      const r = await work();
+      if (r !== EXISTS) result = r;
+      return r;
+    } finally {
+      this.#owners.delete(recordId);
+      settle(result);
+    }
+  }
+
+  /** A new Record (fresh ID): reserve, sign and submit it as its owner. */
+  #ownedNew(
+    recordId: string,
+    reserve: () => Promise<Row<'proofs'> | typeof EXISTS | ProofRejected | undefined>,
+  ): Promise<CommitmentRecordResult | typeof EXISTS | undefined> {
+    return this.#owned(recordId, async () => {
+      const stored = await reserve();
+      if (stored === EXISTS || stored === undefined) return stored;
+      // Refused by the policy check in the reserving transaction: reported as that refusal.
+      if (!('record_id' in stored)) return stored;
+      return this.#submit(stored);
+    });
+  }
+
+  /**
+   * A Record another call in this process owns: its outcome, never a second signature or
+   * submission. Without one (it failed), the row as it stands now.
+   */
+  async #awaitOwner(
+    row: Row<'proofs'>,
+    owner: Promise<CommitmentRecordResult | undefined>,
+  ): Promise<CommitmentRecordResult> {
+    const r = await owner;
+    if (r !== undefined) return r;
+    const now =
+      (await this.#ctx.store.transaction((tx) => tx.get('proofs', { record_id: row.record_id }))) ??
+      row;
+    return this.#resultOf(now, ON_CHAIN.includes(now.status));
+  }
+
+  /**
+   * SEC-RECORD-ATOMIC: signs the SAME stored Record again (same record ID, nonce, salt and
+   * deadline) under its still-held reservation, after a signer failure or a crash left it
+   * unsigned. It cannot charge twice: one record ID lands at most once. Undefined when the
+   * reservation no longer holds or the stored item does not match its record ID; a signer error
+   * propagates with the fee still reserved.
+   */
+  async #resign(row: Row<'proofs'>): Promise<Row<'proofs'> | undefined> {
+    const chain = this.#chain(row.chain_id);
+    if (chain === undefined) return undefined;
+    const record = (parseJson(row.record_json) as unknown as Partial<SignedItem>).record;
+    if (record === undefined) return undefined;
+    const notary = chain.config.contracts.notary;
+    // The stored Record must be the one its row's ID names (signer and nonce, 04 §5).
+    const derived = this.#kit.computeRecordId(
+      row.chain_id,
+      notary,
+      record.signer,
+      BigInt(record.nonce),
+    );
+    if (derived.toLowerCase() !== row.record_id) return undefined;
+    const domain = occV2Domain(row.chain_id, notary);
+    const typedData = recordTypedData(domain, record);
+    const salt = await open(this.#ctx, 'proofs', 'salt', [row.record_id], row.salt);
+    const built = {
+      domain,
+      record,
+      salt: salt === '' ? null : salt,
+      recordId: row.record_id,
+      typedData,
+      digest: encodeHex0x(hashTypedData(typedData).digest),
+    } as unknown as BuiltRecord;
+    const ticket = await this.#ctx.store.transaction((tx) => issueRecordTicket(tx, row.record_id));
+    if (ticket === undefined) return undefined;
+    const json = await this.#signHeld(ticket, built);
+    if (json === undefined) return undefined;
+    return { ...row, status: 'signed', record_json: json };
+  }
+
+  /** The live Record of an envelope that a parallel call stored: resent or reported, never re-signed. */
+  async #continueExisting(envelopeId: string): Promise<CommitmentRecordResult> {
+    const live = (await this.#ownRows(envelopeId)).find(isLiveOwnRecord);
+    return live === undefined ? rejected('POLICY_CHANGED') : this.#continue(live);
   }
 
   /** A stored own row: resend it if it has not landed, or report it. */
   async #continue(row: Row<'proofs'>): Promise<CommitmentRecordResult> {
+    // Reserved and not signed yet (a call in progress, or one that failed before storing its
+    // signature): never signed a second time; the fee stays reserved until it can never land.
+    // Owned by a parallel call in this process: that call signs and submits it, once.
+    const owner = this.#owners.get(row.record_id);
+    if (owner !== undefined) return this.#awaitOwner(row, owner);
+    if (row.status === RECORD_SIGNING) {
+      const out = await this.#owned(row.record_id, async () => {
+        const signed = await this.#resign(row);
+        return signed === undefined ? undefined : this.#submit(signed);
+      });
+      return out ?? rejected('POLICY_CHANGED');
+    }
     if (ON_CHAIN.includes(row.status)) {
       if (row.status === 'recorded') await this.#announce(row);
       return this.#resultOf(row, true);
@@ -1164,7 +1374,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     await this.#ctx.store.transaction((tx) => {
       tx.update(
         'proofs',
-        { record_id: row.record_id, status: { in: [...LIVE, 'failed'] } },
+        { record_id: row.record_id, status: { in: [...LIVE, 'failed', RECORD_SIGNING] } },
         { status },
       );
       if (usd !== undefined)
@@ -1254,8 +1464,11 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
             chainId: row.chain_id,
             recordId: row.record_id,
             salt,
-            record: item.record as never,
-            signature: item.signature,
+            // A Record reconciled from the chain without a stored signature (SEC-RECORD-ATOMIC)
+            // goes without them, as from an older sender.
+            ...(typeof item.signature === 'string'
+              ? { record: item.record as never, signature: item.signature }
+              : {}),
             ...(requested ? { receiptRequest: 'delivered' as const } : {}),
           },
           replyTo: row.envelope_id,
@@ -1310,7 +1523,23 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       if (outcome === 'recorded' || outcome === 'replaced') recorded += 1;
       if (outcome === 'replaced' || outcome === 'replaced_open') replaced += 1;
     }
+    const unsigned = await this.#ctx.store.transaction((tx) =>
+      tx.select('proofs', { status: RECORD_SIGNING }),
+    );
+    for (const row of unsigned) {
+      try {
+        const out = await this.#settleUnsigned(row);
+        if (out.resent) resent += 1;
+        if (out.replaced) replaced += 1;
+        if (out.recorded) recorded += 1;
+      } catch {
+        // A signer failure: the fee stays reserved and the next pass tries again.
+        this.#log.warn('proof submit failed', { code: 'submit_error' });
+      }
+    }
     for (const row of rows) {
+      // A Record a call in this process owns is signed and submitted by that call alone.
+      if (this.#owners.has(row.record_id)) continue;
       if (row.status === 'recorded') {
         await this.#announce(row);
         continue;
@@ -1359,6 +1588,78 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     return { resent, replaced, recorded };
   }
 
+  /**
+   * SEC-RECORD-ATOMIC: a reserved Record whose signature was never stored (a crash or a signer
+   * failure between reserving and storing). A failed chain read keeps it reserved and unsigned.
+   * - The chain shows it (a restored copy of this store): recorded and charged, once.
+   * - Before its deadline: the same Record is signed again and submitted (#resign).
+   * - After it, with no record at the finalized block (04 §5): replaced like any Record that did
+   *   not land; where no replacement may be signed (an expired approval), its fee is released.
+   */
+  async #settleUnsigned(
+    row: Row<'proofs'>,
+  ): Promise<{ resent: boolean; replaced: boolean; recorded: boolean }> {
+    const none = { resent: false, replaced: false, recorded: false };
+    if (this.#owners.has(row.record_id)) return none;
+    const chain = this.#chain(row.chain_id);
+    if (chain === undefined) return none;
+    const item = parseJson(row.record_json) as unknown as SignedItem;
+    const deadline = item.record?.deadline;
+    if (typeof deadline !== 'number') return none;
+    let landed: boolean;
+    try {
+      landed = (await chain.state.getRecord(row.record_id as Hex)) !== null;
+    } catch {
+      return none;
+    }
+    const now = nowOf(this.#ctx);
+    if (landed) {
+      // Signing it again cannot charge twice (its nonce is spent); it gives the proof envelope
+      // and the pack their signature. Without it the row is still recorded and charged.
+      await this.#owned(row.record_id, async () => {
+        const current = (await this.#resign(row).catch(() => undefined)) ?? row;
+        await this.#settle(current, 'recorded');
+        await this.#announce({ ...current, status: 'recorded' });
+        return undefined;
+      });
+      return { ...none, recorded: true };
+    }
+    if (now <= deadline) {
+      const r = await this.#owned(row.record_id, async () => {
+        const signed = await this.#resign(row);
+        return signed === undefined ? undefined : this.#submit(signed);
+      });
+      if (r === undefined) return none;
+      return { ...none, resent: true, recorded: r.status === 'ok' };
+    }
+    let allowed: boolean;
+    try {
+      allowed = await this.#kit.replacementAllowed(chain.state, {
+        recordId: row.record_id,
+        deadline,
+      });
+    } catch {
+      allowed = false;
+    }
+    if (!allowed) return none;
+    const out = await this.#replace(row, item);
+    if (out !== undefined) return { ...none, replaced: true, recorded: out.status === 'ok' };
+    await this.#ctx.store.transaction((tx) => {
+      const released = releaseProofReservation(tx, {
+        recordId: row.record_id,
+        now,
+        chainHasRecord: false,
+      });
+      if (released !== 'released' && released !== 'not_reserved') return;
+      tx.update(
+        'proofs',
+        { record_id: row.record_id, status: RECORD_SIGNING },
+        { status: 'released' },
+      );
+    });
+    return none;
+  }
+
   /** One replacement Record: new nonce, fresh salt, new deadline, every other field unchanged. */
   async #replace(row: Row<'proofs'>, item: SignedItem): Promise<NotarizeResult | undefined> {
     const chain = this.#chain(row.chain_id) as ProofChain;
@@ -1375,6 +1676,13 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
         tx.get('approvals', { approval_id: entry.approval_id as string }),
       );
       if (approval === undefined || now > approval.expires_at) return undefined;
+      // SEC-RESTORE-GUARD (D-156): an approval (or grant) requested before a restore of this ID
+      // covers no replacement after it; an unreadable mark, none. The old Record cannot land (its
+      // deadline passed with nothing on-chain), so its reservation is released and nothing is
+      // charged; the owner is asked again by a new request.
+      if (requestedBeforeRestore(await readRestoreState(this.#ctx), approval.created_at)) {
+        return undefined;
+      }
       // A policy grant is a ledger row, never the owner's approval of a fee (04 §3.4.2).
       ownerApproved = approval.source === 'owner';
     }
@@ -1396,52 +1704,52 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       maxFee: BigInt(r.maxFee),
       deadline: now + RECORD_DEADLINE_SECONDS,
     });
-    const signature = await this.#kit.signRecord(this.#ctx.keyStore, built);
     const counterparty =
       envelope.contact_id === null ? null : await this.#counterparty(envelope.contact_id);
-    const stored = await this.#storeSigned({
-      built,
-      signature,
-      envelopeId: row.envelope_id,
-      fee,
-      effective: await this.#deps.ownerActions.loadPolicy(),
-      action: {
-        kind: 'proof',
-        feeUsd: fee.usd,
-        maxFeeUsd: fee.usd,
-        counterparty:
-          counterparty === null
-            ? null
-            : { contact: counterparty.agentId, ruleEligible: counterparty.eligible },
-      },
-      approvalId: entry.approval_id,
-      ownerApproved,
-      // A commitment's Record part follows its stored item (04 §3.4.2 "A signed item that did not
-      // land"): same part, still `claimed`, the replacement in the old item's place.
-      claim: (tx, next) => {
-        const part = tx.select('commitment_parts', {
-          part: 'record',
-          item_ref: row.record_id,
-          state: 'claimed',
-        })[0];
-        if (part !== undefined) {
-          tx.update(
-            'commitment_parts',
-            { approval_id: part.approval_id, part: 'record', item_ref: row.record_id },
-            {
-              item_ref: next.record_id,
-              item_json: next.record_json,
-              replacements: part.replacements + 1,
-              updated_at: now,
-            },
-          );
-        }
-        return true;
-      },
-      replaces: { recordId: row.record_id },
-    });
-    if (stored === undefined) return undefined;
-    return this.#submit(stored);
+    const effective = await this.#deps.ownerActions.loadPolicy();
+    const out = await this.#ownedNew(built.recordId, () =>
+      this.#reserveAndSign({
+        built,
+        envelopeId: row.envelope_id,
+        fee,
+        effective,
+        action: {
+          kind: 'proof',
+          feeUsd: fee.usd,
+          maxFeeUsd: fee.usd,
+          counterparty:
+            counterparty === null
+              ? null
+              : { contact: counterparty.agentId, ruleEligible: counterparty.eligible },
+        },
+        approvalId: entry.approval_id,
+        ownerApproved,
+        // A commitment's Record part follows its stored item (04 §3.4.2 "A signed item that did not
+        // land"): same part, still `claimed`, the replacement in the old item's place.
+        claim: (tx, next) => {
+          const part = tx.select('commitment_parts', {
+            part: 'record',
+            item_ref: row.record_id,
+            state: 'claimed',
+          })[0];
+          if (part !== undefined) {
+            tx.update(
+              'commitment_parts',
+              { approval_id: part.approval_id, part: 'record', item_ref: row.record_id },
+              {
+                item_ref: next.record_id,
+                item_json: next.record_json,
+                replacements: part.replacements + 1,
+                updated_at: now,
+              },
+            );
+          }
+          return true;
+        },
+        replaces: { recordId: row.record_id },
+      }),
+    );
+    return out === EXISTS || out?.status === 'rejected' ? undefined : out;
   }
 
   /**
@@ -1866,13 +2174,28 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
         signer === null ? null : { contact: signer.agentId, ruleEligible: signer.eligible },
     });
     // SEC-INVITE-CAPS: no automatic receipt to a contact that waits for the owner's Keep.
-    if (auto === 'allow' && !(await this.#waitingOwner(contactId))) {
+    // SEC-RESTORE-GUARD: none for a proof envelope sent before a restore of this ID.
+    if (
+      auto === 'allow' &&
+      !(await this.#waitingOwner(contactId)) &&
+      !(await this.#restoredReplay(envelopeId))
+    ) {
       if ((await this.#signReceipt(stored, 'DELIVERED')).status === 'ok') signed += 1;
     }
     if (checked.kind === RECORD_KIND.OFFER || checked.kind === RECORD_KIND.ACCEPT) {
       signed += await this.#deferred(stored, checked);
     }
     return signed;
+  }
+
+  /** SEC-RESTORE-GUARD: the stored inbound envelope was created before a restore (or unknown). */
+  async #restoredReplay(envelopeId: string): Promise<boolean> {
+    const state = await readRestoreState(this.#ctx);
+    if (state.status === 'none') return false;
+    const createdAt = await this.#ctx.store.transaction(
+      (tx) => tx.get('envelopes', { envelope_id: envelopeId })?.created_at,
+    );
+    return createdAt === undefined || restoredReplay(state, createdAt);
   }
 
   /**
@@ -2479,7 +2802,8 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     const fee = row.status === 'received' ? undefined : this.#feeOf(row);
     return Object.freeze({
       direction: row.status === 'received' ? 'received' : 'sent',
-      status: row.status,
+      // Reserved and not signed yet (SEC-RECORD-ATOMIC): pending, as a Record not landed yet.
+      status: row.status === RECORD_SIGNING ? 'pending' : row.status,
       recordId: row.record_id,
       chainId: row.chain_id,
       chain: chain?.config.key ?? String(row.chain_id),

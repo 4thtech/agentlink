@@ -24,7 +24,7 @@ const CONTACT = '0x' + 'c1'.repeat(20);
 
 describe('schema version 18 (SEC-INVITE-CAPS)', () => {
   it('appends invites.created_by, contacts.waiting_owner and ai_accepted_at, pairings.created_by', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(18);
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(18);
     const v18 = MIGRATIONS[17]?.statements ?? [];
     expect(MIGRATIONS[16]?.version).toBe(17);
     expect(MIGRATIONS[17]?.version).toBe(18);

@@ -33,6 +33,7 @@ import { UNOPENED_TYPE, type InboundReport } from './envelopes.js';
 import { CoreError } from './errors.js';
 import { MemoryStore } from './store/memory-store.js';
 import { rowKeyOf } from './store/store.js';
+import type { RestoreMark } from './restore-guard.js';
 import { StoreSyncPersistence, mergeProofReports } from './sync.js';
 import {
   FakeClock,
@@ -65,6 +66,7 @@ let clock: FakeClock;
 // --- An in-memory relay network (NIP-01 as far as RelayPool and SyncEngine use it) -------------
 
 interface Filter {
+  ids?: string[];
   kinds?: number[];
   '#p'?: string[];
   since?: number;
@@ -81,6 +83,10 @@ class RelayNetwork implements RelayConnector {
   published = 0;
   /** M1-5g: a relay's cap on the events it returns per filter (newest first), by relay. */
   readonly caps = new Map<string, number>();
+  /** SEC-RELAY-READBACK: relays that answer a read by id with nothing (EOSE only). */
+  readonly idReadsEmpty = new Set<string>();
+  /** SEC-RELAY-READBACK: relays that refuse every EVENT. */
+  readonly refuse = new Set<string>();
 
   inject(relay: string, event: NostrEvent): void {
     const list = this.stored.get(relay) ?? [];
@@ -99,7 +105,10 @@ class RelayNetwork implements RelayConnector {
     return {
       send: (text: string) => {
         const frame = JSON.parse(text) as unknown[];
-        if (frame[0] === 'EVENT') {
+        if (frame[0] === 'EVENT' && this.refuse.has(target.url)) {
+          const event = frame[1] as NostrEvent;
+          push(['OK', event.id, false, 'blocked: test']);
+        } else if (frame[0] === 'EVENT') {
           const event = frame[1] as NostrEvent;
           this.published += 1;
           this.inject(target.url, event);
@@ -108,6 +117,10 @@ class RelayNetwork implements RelayConnector {
           const subId = frame[1] as string;
           const filter = frame[2] as Filter;
           this.reqs.push({ relay: target.url, filter });
+          if (filter.ids !== undefined && this.idReadsEmpty.has(target.url)) {
+            push(['EOSE', subId]);
+            return;
+          }
           let events = (this.stored.get(target.url) ?? []).filter((e) => matches(filter, e));
           events = events
             .sort((x, y) => y.created_at - x.created_at)
@@ -127,6 +140,7 @@ class RelayNetwork implements RelayConnector {
 }
 
 function matches(filter: Filter, event: NostrEvent): boolean {
+  if (filter.ids !== undefined && !filter.ids.includes(event.id)) return false;
   if (filter.kinds !== undefined && !filter.kinds.includes(event.kind)) return false;
   const wanted = filter['#p'];
   if (
@@ -164,6 +178,8 @@ interface OpenOptions {
   readonly keyStore?: KeyStore;
   readonly deliveryAcks?: boolean;
   readonly init?: false;
+  /** SEC-RESTORE-GUARD: the agent's restore mark (absent: a runtime without one). */
+  readonly restoreMark?: RestoreMark;
   /**
    * An owner-signed `policy.set` with this `contacts.rateLimitPerContactPerHour` (a stricter limit than
    * the default). The rate-limit tests need twice the limit in signed, wrapped and verified envelopes;
@@ -203,6 +219,7 @@ async function openAgent(
     transport: nostrTransport({ connector: net, addressCheck: 'platform' }),
     logger: createLogger({ name: 'core', level: 'debug', sink: (_l, line) => lines.push(line) }),
     ...(options.deliveryAcks === undefined ? {} : { deliveryAcks: options.deliveryAcks }),
+    ...(options.restoreMark === undefined ? {} : { restoreMark: options.restoreMark }),
   });
   if (options.init !== false) {
     await client.identity.init({
@@ -372,9 +389,14 @@ describe('syncInbox (07 §2, §4.2): fetch, verify once, store, process', () => 
     expect(first.requests).toBe(0);
     expect(first.stored).toBe(1);
     // Only the agent's own relays were read, with #p = its own keys (07 §4.2, §4.3).
-    const reqRelays = new Set(net.reqs.map((r) => r.relay));
+    // (SEC-RELAY-READBACK: the sender's availability checks ask by id only; they are not reads.)
+    const reads = net.reqs.filter((r) => r.filter.ids === undefined);
+    for (const r of net.reqs.filter((q) => q.filter.ids !== undefined)) {
+      expect(Object.keys(r.filter).sort()).toEqual(['ids', 'limit']);
+    }
+    const reqRelays = new Set(reads.map((r) => r.relay));
     expect(reqRelays).toEqual(new Set(RELAYS_B));
-    for (const r of net.reqs) {
+    for (const r of reads) {
       expect(r.filter.kinds).toEqual([1059]);
       expect(r.filter['#p']).toEqual([b.nostr]);
     }
@@ -713,6 +735,63 @@ describe('catchUp (M1-7h addendum, D-73; 06 §2.0): fetch-only', () => {
 });
 
 // --- Delivery acknowledgements --------------------------------------------------------------------
+
+describe('SEC-RESTORE-GUARD: inbound sent before a restore triggers no ack', () => {
+  it('a message created before the restore is shown but not acknowledged; a newer one is', async () => {
+    const net = new RelayNetwork();
+    const restoredAt = { value: 0 };
+    const restoreMark: RestoreMark = { read: () => Promise.resolve(restoredAt.value) };
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { restoreMark });
+    await pair(a, b);
+    await a.client.sendMessage({ to: b.id, text: 'before the restore' });
+    clock.t += 3_600;
+    restoredAt.value = clock.t;
+    const first = await b.client.syncInbox();
+    expect(first.items).toHaveLength(1);
+    expect(first.acksSent).toBe(0);
+    clock.t += 3_600;
+    await a.client.sendMessage({ to: b.id, text: 'after the restore' });
+    const second = await b.client.syncInbox();
+    expect(second.items).toHaveLength(1);
+    expect(second.acksSent).toBe(1);
+  });
+
+  it('an unreadable restore mark acknowledges nothing (fail closed)', async () => {
+    const net = new RelayNetwork();
+    const restoreMark: RestoreMark = { read: () => Promise.reject(new Error('unreadable')) };
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { restoreMark });
+    await pair(a, b);
+    await a.client.sendMessage({ to: b.id, text: 'hi' });
+    const result = await b.client.syncInbox();
+    expect(result.items).toHaveLength(1);
+    expect(result.acksSent).toBe(0);
+  });
+});
+
+describe('SEC-RELAY-READBACK: a receipt from the contact confirms a message', () => {
+  it('turns a row still pending on its availability check into sent, confirmed', async () => {
+    const net = new RelayNetwork();
+    const b3 = [...RELAYS_B, 'wss://three.relay-beta.net'];
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', b3, net);
+    await pair(a, b);
+    for (const relay of RELAYS_B) net.idReadsEmpty.add(relay);
+    net.refuse.add('wss://three.relay-beta.net');
+    const sent = await a.client.sendMessage({ to: b.id, text: 'hi' });
+    if (sent.status !== 'ok') throw new Error('test: not sent');
+    expect(sent.delivery).toBe('queued');
+    expect((await b.client.syncInbox()).acksSent).toBe(1);
+    await publishAcks(b);
+    await a.client.syncInbox();
+    await a.client.outbox.processDue();
+    const out = await a.store.transaction((tx) =>
+      tx.get('envelopes', { envelope_id: sent.envelopeId }),
+    );
+    expect(out).toMatchObject({ delivery: 'sent', availability: 'confirmed' });
+  });
+});
 
 describe('delivery acknowledgements (02 F-23; SEC-RECEIPTS-DEFAULT: on by default)', () => {
   it('on by default: the contact acks a message once, bound to its envelopeHash', async () => {
@@ -1448,6 +1527,7 @@ async function storeInboundOk(to: Agent, from: Agent, n: number): Promise<string
         refused_at: null,
         request_accepted_at: null,
         deleted_at: null,
+        availability: null,
       });
     }
   });
@@ -1494,6 +1574,7 @@ describe('M1-7h-b (IR-M1-7h-1 F04): catch-up counts, staged acks, a failing key 
           refused_at: null,
           request_accepted_at: null,
           deleted_at: null,
+          availability: null,
         });
       });
     });

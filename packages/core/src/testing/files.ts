@@ -7,6 +7,7 @@
 //   symbolic link is an entry that refuses both.
 // - MemoryOwnStorage: an S3-like StorageAdapter in memory whose presigned URL carries a secret, and
 //   whose download can be tampered with or truncated.
+import type { RestoreMark } from '../restore-guard.js';
 import {
   encodeHex,
   randomBytes,
@@ -40,10 +41,11 @@ import { MemoryPolicyMark, newNonce, ownerHex, signWith } from './owner.js';
 export const WORK = '/home/u/Work';
 export const INBOX = '/home/u/AgentLink/Inbox';
 
-/** Records every publish and acks every relay. */
+/** Records every publish, acks every relay, and serves every wrap back (SEC-RELAY-READBACK). */
 export class PublishSpy {
   readonly published: { event: NostrEvent; relays: string[] }[] = [];
   readonly factory: TransportFactory = (deps) => ({
+    checkServed: () => Promise.resolve('served' as const),
     wrap: (envelope, recipients, keys) =>
       wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
     publish: (event, relays) => {
@@ -307,6 +309,8 @@ export interface FileAgentOptions {
   readonly beforeInbox?: () => Promise<void>;
   /** FILES-AI-1 (D-152): the Send folder writer of `contentFile` sends. */
   readonly writeSendFolderFile?: FilesPlatform['writeSendFolderFile'];
+  /** SEC-RESTORE-GUARD: the agent's restore mark (absent: a runtime without one). */
+  readonly restoreMark?: RestoreMark;
 }
 
 /** An agent with a files platform whose allowed folder is WORK and whose inbox is INBOX. */
@@ -373,6 +377,7 @@ export async function openFileAgent(
     files: platform,
     ...(options.proofs === undefined ? {} : { proofs: options.proofs }),
     ...(options.autoSavePause === undefined ? {} : { autoSavePause: options.autoSavePause }),
+    ...(options.restoreMark === undefined ? {} : { restoreMark: options.restoreMark }),
     logger: createLogger({
       name: 'core',
       level: 'debug',

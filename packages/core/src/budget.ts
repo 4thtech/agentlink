@@ -67,8 +67,10 @@ function markBroken(tx: StoreTx, now: number): void {
 /**
  * Check and reserve (06 §3, 07 §3.5), inside the caller's transaction: read the ledger, evaluate,
  * and write a `reserved` row for the action's `maxFeeUsd` when the result is `allow`, or when it is
- * `approval` and the owner already approved this action (an action approved over the limit is
- * reserved too). A `deny` is never reserved. A broken ledger is recorded as `broken`.
+ * `approval` and the owner already approved this action (an action approved over the soft limit is
+ * reserved too). A `deny` is never reserved. A broken ledger is recorded as `broken` and reserves
+ * nothing. `now` must be read inside the caller's transaction (ledgerNow), so a parallel call that
+ * committed first can never make it look earlier than the ledger's newest entry.
  */
 export function checkAndReserveProof(
   tx: StoreTx,
@@ -79,6 +81,10 @@ export function checkAndReserveProof(
     readonly reservation: ProofReservation;
     /** The core consumed a valid owner approval for this exact action (M1-7e). */
     readonly ownerApproved: boolean;
+    /** SEC-RESTORE-GUARD: the restore window is open (restore-guard.ts); the proof asks the owner. */
+    readonly restoreWindow?: boolean;
+    /** Why the window is open (copy only). */
+    readonly restoreReason?: 'update';
   },
 ): ProofCheck {
   const { effective, action, now, reservation } = input;
@@ -88,10 +94,19 @@ export function checkAndReserveProof(
   } catch {
     view = BROKEN; // a read error is never an empty sum
   }
-  const result = evaluateProof(effective, action, { now, ledger: view });
-  if (result.triggers.includes('ledger_broken')) markBroken(tx, now);
+  const result = evaluateProof(effective, action, {
+    now,
+    ledger: view,
+    ...(input.restoreWindow === true ? { restoreWindow: true } : {}),
+    ...(input.restoreReason === 'update' ? { restoreReason: 'update' as const } : {}),
+  });
+  const broken = result.triggers.includes('ledger_broken');
+  if (broken) markBroken(tx, now);
+  // D-156: nothing is reserved on a ledger that cannot be summed, even with the owner's approval:
+  // the hard daily ceiling could not be checked. A fresh policy.set starts a summable epoch.
   const reserve =
-    result.decision === 'allow' || (result.decision === 'approval' && input.ownerApproved);
+    !broken &&
+    (result.decision === 'allow' || (result.decision === 'approval' && input.ownerApproved));
   if (!reserve) return { ...result, reserved: false };
 
   const state = tx.get('budget_state', { slot: SINGLETON_SLOT });

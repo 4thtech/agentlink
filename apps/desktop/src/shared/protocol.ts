@@ -181,7 +181,7 @@ export function isStartFailure(reason: StopReason): reason is StartFailureReason
 
 /** The pages the shell may ask the core to open; the core maps each to a fixed path. */
 // N7: `inbox` (a new message or file: Home, where the people are) and `updates` (Settings › Updates).
-export const SHOW_ROUTES = ['home', 'approvals', 'join', 'inbox', 'updates'] as const;
+export const SHOW_ROUTES = ['home', 'approvals', 'join', 'inbox', 'files', 'updates'] as const;
 export type ShowRoute = (typeof SHOW_ROUTES)[number];
 
 /** N7: the kinds a native notification can be about (the notification store's kinds that alert). */
@@ -307,6 +307,8 @@ export interface ShowMessage {
   readonly route: ShowRoute;
   /** NOTIFY-DEEPLINK: the one request or person to open (isNotifyTarget). */
   readonly target?: string;
+  /** OWNER-FB-0512: the window moves in place; the core mints no session link (only with a target). */
+  readonly inPlace?: true;
 }
 export interface ShutdownMessage {
   readonly v: 1;
@@ -326,7 +328,7 @@ const PORT = '([1-9][0-9]{0,4})';
 const PATH =
   '(?:/|/first-run|/settings/home|/settings/join|/settings/updates|/approve/apr_[A-Za-z0-9_-]{22})';
 const SESSION_URL = new RegExp(
-  `^http://localhost:${PORT}${PATH}\\?t=${TOKEN}(?:#person=0x[0-9a-f]{40})?$`,
+  `^http://localhost:${PORT}${PATH}\\?t=${TOKEN}(?:#person=0x[0-9a-f]{40}(?:&files)?)?$`,
 );
 
 /** NOTIFY-DEEPLINK: the opaque targets (a request's or a person's local ID). Mirrors the core. */
@@ -511,15 +513,27 @@ export function parseShellMessage(line: string): ShellMessage | undefined {
     }
     case 'show': {
       const withTarget = Object.hasOwn(value, 'target');
-      if (!hasExactKeys(value, ['v', 'type', 'route', ...(withTarget ? ['target'] : [])])) {
+      const withInPlace = Object.hasOwn(value, 'inPlace');
+      if (
+        !hasExactKeys(value, [
+          'v',
+          'type',
+          'route',
+          ...(withTarget ? ['target'] : []),
+          ...(withInPlace ? ['inPlace'] : []),
+        ])
+      ) {
         return undefined;
       }
       const route = value['route'];
       if (!isOneOf(SHOW_ROUTES, route)) return undefined;
+      if (withInPlace && (!withTarget || value['inPlace'] !== true)) return undefined;
       if (withTarget) {
         const target = value['target'];
         if (!isNotifyTarget(route, target)) return undefined;
-        return { v: 1, type: 'show', route, target };
+        return withInPlace
+          ? { v: 1, type: 'show', route, target, inPlace: true }
+          : { v: 1, type: 'show', route, target };
       }
       return { v: 1, type: 'show', route };
     }
@@ -570,6 +584,7 @@ export function encodeShellMessage(message: ShellMessage): string {
         type: 'show',
         route: message.route,
         ...(message.target === undefined ? {} : { target: message.target }),
+        ...(message.inPlace === true ? { inPlace: true } : {}),
       });
       break;
     case 'shutdown':

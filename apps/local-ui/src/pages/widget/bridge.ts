@@ -10,6 +10,7 @@ export const WIDGET_PAGE_PATH = '/settings/widget';
 const PATHS: Readonly<Record<WidgetRoute, string>> = {
   home: '/',
   inbox: '/',
+  files: '/',
   approvals: '/',
   updates: '/settings/updates',
 };

@@ -14,7 +14,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 const CHANNEL = 'agentlink:widget';
-const ROUTES = ['home', 'inbox', 'approvals', 'updates'];
+const ROUTES = ['home', 'inbox', 'files', 'approvals', 'updates'];
 const MAX_TARGET_CHARS = 64;
 let busy = false;
 

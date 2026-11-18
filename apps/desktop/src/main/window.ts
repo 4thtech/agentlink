@@ -52,6 +52,12 @@ export class MainWindow {
   #loaded = false;
   #page: WindowPage = 'none';
   #status: StatusKind | null = null;
+  /**
+   * OWNER-FB-0512: true only while the last full load of a session page succeeded (an HTTP answer
+   * below 400, no failed load). `#loaded` is set when a load starts, so it cannot tell a good page
+   * from the 401 "expired" page or a failed load.
+   */
+  #ok = false;
   /** TRAY-SHELL: counts session-link loads, so only the latest one reports it finished. */
   #sessionLoad = 0;
 
@@ -77,6 +83,12 @@ export class MainWindow {
       if (this.#page !== 'status' || !isStatusPageUrl(window.webContents.getURL())) return;
       this.#deps.onStatusAction?.(action);
     });
+    window.webContents.on('did-navigate', (_event, _url, httpResponseCode) => {
+      this.#ok = this.#page === 'session' && httpResponseCode > 0 && httpResponseCode < 400;
+    });
+    window.webContents.on('did-fail-load', (_event, _code, _text, _url, isMainFrame) => {
+      if (isMainFrame) this.#ok = false;
+    });
     window.on('page-title-updated', (event) => event.preventDefault());
     window.on('close', (event) => {
       if (this.#deps.quitting()) return;
@@ -95,6 +107,7 @@ export class MainWindow {
     window.once('ready-to-show', () => window.show());
     this.#window = window;
     this.#loaded = false;
+    this.#ok = false;
     this.#page = 'none';
     this.#status = null;
     return window;
@@ -111,6 +124,7 @@ export class MainWindow {
       this.#page = 'status';
       this.#status = kind;
       this.#loaded = false;
+      this.#ok = false;
       void window.loadURL(statusPageUrl(kind)).catch(() => undefined);
     }
     this.show();
@@ -138,10 +152,24 @@ export class MainWindow {
   loadSessionUrl(url: string, onLoaded?: () => void): boolean {
     if (!this.#deps.lock.acceptSessionUrl(url)) return false;
     const window = this.#ensure();
+    // OWNER-FB-0512: a deep link (`#person=…`) to the page Home already shows moves in place (only the
+    // fragment changes: no reload, no blank page, the app keeps its state), as opening from inside
+    // the app does. Anything else loads the new link as before.
+    const inPlace = this.#sameHome(window, url);
     this.#loaded = true;
     this.#page = 'session';
     this.#status = null;
     const load = ++this.#sessionLoad;
+    if (inPlace === null) this.#ok = false; // a full load: good again once it commits
+    if (inPlace !== null) {
+      void window.loadURL(inPlace).catch(() => undefined);
+      try {
+        onLoaded?.();
+      } catch {
+        // Never throws into Electron.
+      }
+      return true;
+    }
     // TRAY-SHELL: `onLoaded` once the page finished loading (its session cookie is set by then), and
     // only if this is still the window's latest session load.
     void window.loadURL(url).then(
@@ -163,6 +191,41 @@ export class MainWindow {
       () => undefined,
     );
     return true;
+  }
+
+  /**
+   * OWNER-FB-0512: the window's committed address with the new link's `#person=…` fragment, when the
+   * window already shows Home (`/`) of the same origin and the link is Home's person link; else null.
+   */
+  #sameHome(window: BrowserWindow, url: string): string | null {
+    if (!this.#loaded || !this.#ok || this.#page !== 'session') return null;
+    try {
+      const next = new URL(url);
+      if (next.pathname !== '/' || !/^#person=0x[0-9a-f]{40}(?:&files)?$/.test(next.hash)) {
+        return null;
+      }
+      const current = new URL(window.webContents.getURL());
+      if (current.origin !== next.origin || current.pathname !== '/') return null;
+      current.hash = next.hash;
+      return current.toString();
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * OWNER-FB-0512: true when a person link can move the window in place: Home is showing from a
+   * load that succeeded. Otherwise the core must mint a link for a full load.
+   */
+  get canOpenInPlace(): boolean {
+    const window = this.#window;
+    if (window === null || window.isDestroyed() || !this.#loaded || !this.#ok) return false;
+    if (this.#page !== 'session') return false;
+    try {
+      return new URL(window.webContents.getURL()).pathname === '/';
+    } catch {
+      return false;
+    }
   }
 
   /** True once a session link was loaded into the current window. */
@@ -221,6 +284,7 @@ export class MainWindow {
   resetForNewCore(): void {
     this.#deps.lock.reset();
     this.#loaded = false;
+    this.#ok = false;
     this.#sessionLoad += 1;
   }
 

@@ -1,6 +1,6 @@
 // NOTIFY-DEEPLINK (S1): Home opens the one person a notification click named, and nothing else.
 import { describe, expect, it } from 'vitest';
-import { personFromHash } from './person-link.js';
+import { filesFromHash, personFromHash } from './person-link.js';
 
 const ID = `0x${'ab'.repeat(20)}`;
 
@@ -22,5 +22,15 @@ describe('personFromHash', () => {
     ]) {
       expect(personFromHash(hash)).toBeUndefined();
     }
+  });
+});
+
+describe('filesFromHash (OWNER-FB-0512)', () => {
+  it('is true only for the person link with the files marker', () => {
+    expect(personFromHash(`#person=${ID}&files`)).toBe(ID);
+    expect(filesFromHash(`#person=${ID}&files`)).toBe(true);
+    expect(filesFromHash(`#person=${ID}`)).toBe(false);
+    expect(filesFromHash(`#person=${ID}&files=1`)).toBe(false);
+    expect(filesFromHash('#files')).toBe(false);
   });
 });

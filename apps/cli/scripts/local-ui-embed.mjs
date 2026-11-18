@@ -6,29 +6,56 @@
 //
 // Entries are `[name, base64url]`, sorted by name, so the bundle is deterministic. Base64url keeps the
 // app's code opaque inside the CLI bundle (the bundle checks scan our own code, not the app's).
-import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
+import {
+  closeSync,
+  constants,
+  existsSync,
+  fstatSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+} from 'node:fs';
 import { join } from 'node:path';
 
 /** The file types the approval server serves (packages/node approval-server.ts ASSET_TYPES). */
 const EXTENSIONS = new Set(['js', 'css', 'woff2', 'woff', 'svg', 'png', 'webp', 'ico']);
 const ASSET_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
+/**
+ * Reads a regular file without following a symbolic link: one open (O_NOFOLLOW), then the type check
+ * and the read on the same descriptor, so the file cannot change between the check and the read.
+ * Null when it is missing, a link, or not a regular file.
+ */
+function readRegularFile(path) {
+  let fd;
+  try {
+    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  } catch {
+    return null;
+  }
+  try {
+    return fstatSync(fd).isFile() ? readFileSync(fd) : null;
+  } finally {
+    closeSync(fd);
+  }
+}
+
 /** `[name, base64url]` for each file to embed from `dir` (apps/local-ui/dist), or [] without it. */
 export function localUiAssetEntries(dir) {
   if (!existsSync(dir)) return [];
   const entries = [];
   const index = join(dir, 'index.html');
-  if (existsSync(index) && lstatSync(index).isFile()) {
-    entries.push(['index.html', readFileSync(index).toString('base64url')]);
-  }
+  const indexBytes = readRegularFile(index);
+  if (indexBytes !== null) entries.push(['index.html', indexBytes.toString('base64url')]);
   const assets = join(dir, 'assets');
   if (existsSync(assets)) {
     for (const name of readdirSync(assets)) {
       const path = join(assets, name);
       const ext = name.slice(name.lastIndexOf('.') + 1);
       if (!ASSET_NAME.test(name) || !name.includes('.') || !EXTENSIONS.has(ext)) continue;
-      if (!lstatSync(path).isFile()) continue; // no symbolic link, no directory
-      entries.push([`assets/${name}`, readFileSync(path).toString('base64url')]);
+      const bytes = readRegularFile(path); // no symbolic link, no directory
+      if (bytes === null) continue;
+      entries.push([`assets/${name}`, bytes.toString('base64url')]);
     }
   }
   return entries.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));

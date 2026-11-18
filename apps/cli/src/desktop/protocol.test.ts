@@ -275,7 +275,7 @@ describe('N7: notify (core -> shell), fixed codes only', () => {
     expect(parseHostMessage(l(value))).toBeUndefined();
   });
   it('show may also open inbox and updates; session links may land on /settings/updates', () => {
-    expect(SHOW_ROUTES).toEqual(['home', 'approvals', 'join', 'inbox', 'updates']);
+    expect(SHOW_ROUTES).toEqual(['home', 'approvals', 'join', 'inbox', 'files', 'updates']);
     expect(isSessionUrl(`http://localhost:4567/settings/updates?t=${TOKEN}`)).toBe(true);
   });
 });

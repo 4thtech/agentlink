@@ -11,7 +11,12 @@ import {
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { createLogger } from '@4thtech-io/log';
 import { defaultPolicy } from '@4thtech-io/types';
-import { unwrapGiftWrap, wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
+import {
+  unwrapGiftWrap,
+  wrapEnvelope,
+  type PublishOutcome,
+  type ReadbackOutcome,
+} from '@4thtech-io/transport-nostr';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { CoreError } from './errors.js';
@@ -48,7 +53,14 @@ class RelaySpy {
   /** REL051-CF2: how many relays a reachability check finds connected. */
   reach = Number.POSITIVE_INFINITY;
   readonly checked: string[][] = [];
+  /** SEC-RELAY-READBACK: what a read-back answers; `none` leaves the transport without one. */
+  serve: ReadbackOutcome | 'none' = 'served';
+  readonly readbacks: { relay: string; id: string }[] = [];
   readonly factory: TransportFactory = (deps) => ({
+    checkServed: (relay: string, id: string) => {
+      this.readbacks.push({ relay, id });
+      return Promise.resolve(this.serve === 'none' ? 'unchecked' : this.serve);
+    },
     relayStatus: (relays) => {
       this.checked.push([...relays]);
       const total = new Set(relays).size;
@@ -1056,5 +1068,69 @@ describe("REL051-CF2: relayReachability (the app's network status)", () => {
     expect(a.spy.checked).toEqual([]);
     const c = await openAgent(3, ownerA, 'carol', RELAYS_C, { transport: false });
     expect(await c.client.relayReachability()).toBeUndefined();
+  });
+});
+
+describe('SEC-RELAY-READBACK: "sent" needs a relay that serves the message back (D-156)', () => {
+  const contactRows = async (a: Agent, envelopeId: string) =>
+    (await rows(a.store)).outbox.filter(
+      (r) => r.envelope_id === envelopeId && r.role === 'contact',
+    );
+
+  it('is sent, availability confirmed, when a relay serves the wrap back', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    const result = await a.client.sendMessage({ to: b.id, text: 'checked' });
+    expect(result).toMatchObject({ status: 'ok', delivery: 'sent' });
+    if (result.status !== 'ok') return;
+    expect(result.availability).toBeUndefined();
+    const stored = await rows(a.store);
+    expect(stored.out[0]).toMatchObject({ delivery: 'sent', availability: 'confirmed' });
+    for (const r of await contactRows(a, result.envelopeId)) {
+      expect(r).toMatchObject({ state: 'sent', availability: 'confirmed' });
+    }
+    // Only relays of the row were asked, by the wrap's own id.
+    for (const { relay, id } of a.spy.readbacks) {
+      expect(a.spy.ids).toContain(id);
+      expect([...RELAYS_A, ...RELAYS_B]).toContain(relay);
+    }
+  });
+
+  it('reports "sent, availability unknown" when no relay can be checked', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    a.spy.serve = 'unchecked';
+    const result = await a.client.sendMessage({ to: b.id, text: 'unknown' });
+    expect(result).toMatchObject({ status: 'ok', delivery: 'sent', availability: 'unknown' });
+    if (result.status !== 'ok') return;
+    const stored = await rows(a.store);
+    expect(stored.out[0]).toMatchObject({ delivery: 'sent', availability: 'unknown' });
+    const page = await a.client.messages.list(b.id, 'out');
+    expect(page.items[0]).toMatchObject({ status: 'sent', availability: 'unknown' });
+  });
+
+  it('treats a transport without a read-back as unknown, never as confirmed', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    a.spy.serve = 'none';
+    const result = await a.client.sendMessage({ to: b.id, text: 'no check' });
+    expect(result).toMatchObject({ status: 'ok', delivery: 'sent', availability: 'unknown' });
+  });
+
+  it('never confirms, and never fails, on relays that accept it but answer empty', async () => {
+    const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
+    const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
+    await pair(a, b);
+    a.spy.serve = 'missing';
+    const result = await a.client.sendMessage({ to: b.id, text: 'missing' });
+    // Every relay of the list accepted it, so there is no other relay to try.
+    expect(result).toMatchObject({ status: 'ok', delivery: 'sent', availability: 'unknown' });
+    if (result.status !== 'ok') return;
+    for (const r of await contactRows(a, result.envelopeId)) {
+      expect(r).toMatchObject({ state: 'sent', availability: 'unknown' });
+    }
   });
 });

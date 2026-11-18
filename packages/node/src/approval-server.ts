@@ -1185,7 +1185,7 @@ export interface ApprovalServer {
    * opaque local ID, after `#`, so it never reaches the server). A malformed ID rejects. Home checks
    * the ID against its own people before it opens anything.
    */
-  openPerson(contactId: string): Promise<boolean>;
+  openPerson(contactId: string, focus?: 'files', inPlace?: boolean): Promise<boolean>;
   /**
    * N7 (desktop app): the open ID's notification items (brought up to date first; kind, ref, count
    * and times only) and the Settings › Notifications switches in force. Undefined while no ID with a
@@ -8731,9 +8731,14 @@ export async function startApprovalServerWith(
     openUpdates: async () =>
       opener(`${origin}/settings/updates?t=${mintLink()}`).catch(() => false),
     openJoin: () => openJoinPage(false),
-    openPerson: async (contactId: string) => {
+    openPerson: async (contactId: string, focus?: 'files', inPlace?: boolean) => {
       if (typeof contactId !== 'string' || !PERSON_ID.test(contactId)) throw invalidId();
-      return opener(`${origin}/?t=${mintLink()}#person=${contactId}`).catch(() => false);
+      // OWNER-FB-0512: the window moves in place (only the fragment is used), so no one-shot link is
+      // registered for it: an unredeemed one would only crowd out a real pending link (MAX_LINKS).
+      const token = inPlace === true ? encodeBase64url(randomBytes(32)) : mintLink();
+      return opener(
+        `${origin}/?t=${token}#person=${contactId}${focus === 'files' ? '&files' : ''}`,
+      ).catch(() => false);
     },
     desktopAlerts: async () => {
       const desk = notificationsPart(source).notifications;

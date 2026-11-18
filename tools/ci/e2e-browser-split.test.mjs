@@ -152,7 +152,7 @@ describe('ci.yml: the e2e-browser job', () => {
       "if: needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.docs_only != 'true' && needs.detect.outputs.has_test == 'true' && needs.detect.outputs.run_e2e_browser == 'true'",
     );
     expect(job('detect')).toContain(
-      "run_e2e_browser: ${{ steps.affected.outputs.run_e2e_browser || 'true' }}",
+      "run_e2e_browser: ${{ steps.e2e_scope.outputs.release_pr == 'true' && 'true' || steps.affected.outputs.run_e2e_browser || 'true' }}",
     );
   });
 
