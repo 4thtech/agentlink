@@ -11,6 +11,11 @@ on:
     # 05:41 UTC, a quiet hour.
     - cron: "41 5 * * *"
   workflow_dispatch:
+  # Vet a changed list before it ships. Read-only: no secrets, `contents: read`, so a fork PR is safe.
+  pull_request:
+    paths:
+      - "packages/transport-nostr/src/default-relays.ts"
+      - "tools/relays/**"
 
 permissions: {}
 

@@ -24,7 +24,12 @@ describe('default relay set: single source', () => {
   const hosts = [...src.matchAll(/'wss:\/\/([^']+)'/g)].map((m) => m[1]);
 
   it('the source file lists the D-75 relays', () => {
-    expect(hosts).toEqual(['offchain.pub', 'relay.primal.net', 'relay.snort.social', 'nostr.bitcoiner.social']);
+    expect(hosts).toEqual([
+      'offchain.pub',
+      'relay.primal.net',
+      'relay.snort.social',
+      'nostr.bitcoiner.social',
+    ]);
   });
 
   it('no other source file in packages, apps or tools names a default relay', () => {

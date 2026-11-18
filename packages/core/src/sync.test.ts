@@ -366,7 +366,10 @@ describe('RELAY-DEFAULTS-SWAP (0.5.13): legacy relays are read, never published 
     const a = await openAgent(1, 'alice', RELAYS_A, net);
     const b = await openAgent(2, 'bob', RELAYS_B, net);
     await pair(a, b);
-    const built = await a.client.envelopes.build({ to: { contact: b.id }, payload: textPayload('old relay') });
+    const built = await a.client.envelopes.build({
+      to: { contact: b.id },
+      payload: textPayload('old relay'),
+    });
     await deliverRaw(net, a, b, built.envelope, [OLD_SET[0] as string]);
     const result = await b.client.syncInbox();
     expect(result.items.map((i) => i.payload.body)).toEqual(['old relay']);
@@ -397,7 +400,9 @@ describe('RELAY-DEFAULTS-SWAP (0.5.13): legacy relays are read, never published 
   it('a new invite lists only the new set', async () => {
     const net = new RelayNetwork();
     const a = await openAgent(1, 'alice', DEFAULT_RELAYS, net);
-    const invite = await decodeInviteLink((await a.client.pairing.createInvite({ long: true })).inviteUrl);
+    const invite = await decodeInviteLink(
+      (await a.client.pairing.createInvite({ long: true })).inviteUrl,
+    );
     expect([...invite.relays]).toEqual([...DEFAULT_RELAYS]);
     for (const relay of LEGACY_READ_RELAYS) expect(invite.relays).not.toContain(relay);
   });
