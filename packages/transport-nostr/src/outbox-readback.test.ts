@@ -242,6 +242,42 @@ describe('read-back before "sent"', () => {
     }
   });
 
+  it('DELIVERY-DETAILS: a second relay that answers within the grace is counted', async () => {
+    const { net, rows, worker } = setup();
+    const relays = relayUrls('both', 2);
+    for (const url of relays) net.configure(url);
+    const row = makeRow(relays);
+    rows.add(row);
+    await pass(worker);
+    expect(rows.get(row.wrapId)).toMatchObject({
+      availability: 'confirmed',
+      counts: { accepted: 2, available: 2 },
+    });
+  });
+
+  it('DELIVERY-DETAILS load: 100 concurrent sends x 2 rows, one silent relay: every row is confirmed', async () => {
+    const { net, pool } = setup();
+    const [honest, silent] = relayUrls('load', 2) as [string, string];
+    net.configure(honest);
+    net.configure(silent, { silentIdsReq: true });
+    const sends = Array.from({ length: 100 }, () => {
+      const rows = new Rows();
+      const own = [makeRow([honest, silent]), makeRow([honest, silent])];
+      for (const row of own) rows.add(row);
+      const worker = new OutboxWorker({ persistence: rows, pool, random: () => 0 });
+      return { rows, own, done: worker.processDue() };
+    });
+    let finished = 0;
+    for (const s of sends) void s.done.then(() => (finished += 1));
+    for (let i = 0; i < 400 && finished < sends.length; i += 1) {
+      await vi.advanceTimersByTimeAsync(500);
+    }
+    await Promise.all(sends.map((s) => s.done));
+    const all = sends.flatMap((s) => s.own.map((r) => s.rows.get(r.wrapId)));
+    expect(all).toHaveLength(200);
+    expect(all.filter((r) => r.availability === 'confirmed')).toHaveLength(200);
+  }, 60_000);
+
   it('a dead relay in the list does not keep the row pending: sent, unknown within minutes', async () => {
     const { net, rows, worker } = setup();
     const [e1, e2, dead] = relayUrls('dead', 3) as [string, string, string];
