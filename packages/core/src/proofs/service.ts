@@ -640,8 +640,13 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
   readonly #receiptTries = new Map<string, number>();
   /** The receipt signing in progress, by receipt item ID (M1-33d-b: one signature, I-6). */
   readonly #signing = new Map<string, Promise<AcknowledgeResult>>();
-  /** Record IDs whose signature is being made in this process (SEC-RECORD-ATOMIC). */
-  readonly #unsignedNow = new Set<string>();
+  /**
+   * SEC-RECORD-ATOMIC: the Records whose signing and submission one call in this process owns,
+   * from before their reservation until their submission returned, with that call's outcome
+   * (undefined: it stored or submitted nothing). Another call for the same Record waits for it and
+   * never signs or submits it again.
+   */
+  readonly #owners = new Map<string, Promise<CommitmentRecordResult | undefined>>();
   #receiptPass = 0;
 
   constructor(ctx: CoreContext, deps: ProofServiceDeps, platform: ProofsPlatform | undefined) {
@@ -814,20 +819,21 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       maxFee: selection.quote.total,
       deadline,
     });
-    const stored = await this.#reserveAndSign({
-      built,
-      envelopeId: input.envelopeId,
-      fee,
-      effective,
-      action,
-      approvalId: claim === undefined ? null : (input.approvalId ?? null),
-      claim,
-      replaces: undefined,
-      receiptRequest: input.requestReceipt === true,
-    });
-    if (stored === EXISTS) return this.#continueExisting(input.envelopeId);
-    if (stored === undefined) return rejected('POLICY_CHANGED');
-    return this.#submit(stored);
+    const out = await this.#ownedNew(built.recordId, () =>
+      this.#reserveAndSign({
+        built,
+        envelopeId: input.envelopeId,
+        fee,
+        effective,
+        action,
+        approvalId: claim === undefined ? null : (input.approvalId ?? null),
+        claim,
+        replaces: undefined,
+        receiptRequest: input.requestReceipt === true,
+      }),
+    );
+    if (out === EXISTS) return this.#continueExisting(input.envelopeId);
+    return out ?? rejected('POLICY_CHANGED');
   }
 
   // --- terms Records under a commitment scope (M1-9d-3; 04 §3.4.2; 06 §2.2a) ---------------------
@@ -936,20 +942,21 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       maxFee: quote.total,
       deadline,
     });
-    const stored = await this.#reserveAndSign({
-      built,
-      envelopeId: input.envelopeId,
-      fee,
-      effective,
-      action,
-      approvalId: input.approvalId,
-      ownerApproved: input.ownerApproved,
-      claim: (tx, next) => input.claimTx(tx, next.record_id, next.record_json),
-      replaces: undefined,
-    });
-    if (stored === EXISTS) return this.#continueExisting(input.envelopeId);
-    if (stored === undefined) return rejected('POLICY_CHANGED');
-    return this.#submit(stored);
+    const out = await this.#ownedNew(built.recordId, () =>
+      this.#reserveAndSign({
+        built,
+        envelopeId: input.envelopeId,
+        fee,
+        effective,
+        action,
+        approvalId: input.approvalId,
+        ownerApproved: input.ownerApproved,
+        claim: (tx, next) => input.claimTx(tx, next.record_id, next.record_json),
+        replaces: undefined,
+      }),
+    );
+    if (out === EXISTS) return this.#continueExisting(input.envelopeId);
+    return out ?? rejected('POLICY_CHANGED');
   }
 
   /**
@@ -1148,18 +1155,68 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
 
   /** Signs under a ticket (record-signing.ts), marking the Record as being signed in this process. */
   async #signHeld(ticket: RecordTicket, built: BuiltRecord): Promise<string | undefined> {
-    this.#unsignedNow.add(built.recordId);
+    return signUnderReservation({
+      store: this.#ctx.store,
+      ticket,
+      built,
+      sign: (b) => this.#kit.signRecord(this.#ctx.keyStore, b),
+      encode: (signature) => canonicalize({ record: built.record, signature } as never),
+    });
+  }
+
+  /**
+   * Runs `work` as the one owner of this Record's signing and submission in this process
+   * (#owners). The Record ID is registered before anything awaits, so a parallel call can never
+   * see the stored row without its owner.
+   */
+  async #owned<R extends CommitmentRecordResult | typeof EXISTS | undefined>(
+    recordId: string,
+    work: () => Promise<R>,
+  ): Promise<R> {
+    let settle: (r: CommitmentRecordResult | undefined) => void = () => undefined;
+    this.#owners.set(
+      recordId,
+      new Promise((resolve) => {
+        settle = resolve;
+      }),
+    );
+    let result: CommitmentRecordResult | undefined;
     try {
-      return await signUnderReservation({
-        store: this.#ctx.store,
-        ticket,
-        built,
-        sign: (b) => this.#kit.signRecord(this.#ctx.keyStore, b),
-        encode: (signature) => canonicalize({ record: built.record, signature } as never),
-      });
+      const r = await work();
+      if (r !== EXISTS) result = r;
+      return r;
     } finally {
-      this.#unsignedNow.delete(built.recordId);
+      this.#owners.delete(recordId);
+      settle(result);
     }
+  }
+
+  /** A new Record (fresh ID): reserve, sign and submit it as its owner. */
+  #ownedNew(
+    recordId: string,
+    reserve: () => Promise<Row<'proofs'> | typeof EXISTS | undefined>,
+  ): Promise<CommitmentRecordResult | typeof EXISTS | undefined> {
+    return this.#owned(recordId, async () => {
+      const stored = await reserve();
+      if (stored === EXISTS || stored === undefined) return stored;
+      return this.#submit(stored);
+    });
+  }
+
+  /**
+   * A Record another call in this process owns: its outcome, never a second signature or
+   * submission. Without one (it failed), the row as it stands now.
+   */
+  async #awaitOwner(
+    row: Row<'proofs'>,
+    owner: Promise<CommitmentRecordResult | undefined>,
+  ): Promise<CommitmentRecordResult> {
+    const r = await owner;
+    if (r !== undefined) return r;
+    const now =
+      (await this.#ctx.store.transaction((tx) => tx.get('proofs', { record_id: row.record_id }))) ??
+      row;
+    return this.#resultOf(now, ON_CHAIN.includes(now.status));
   }
 
   /**
@@ -1211,11 +1268,15 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
   async #continue(row: Row<'proofs'>): Promise<CommitmentRecordResult> {
     // Reserved and not signed yet (a call in progress, or one that failed before storing its
     // signature): never signed a second time; the fee stays reserved until it can never land.
+    // Owned by a parallel call in this process: that call signs and submits it, once.
+    const owner = this.#owners.get(row.record_id);
+    if (owner !== undefined) return this.#awaitOwner(row, owner);
     if (row.status === RECORD_SIGNING) {
-      // Being signed by a parallel call in this process: that call submits it.
-      if (this.#unsignedNow.has(row.record_id)) return this.#resultOf(row, false);
-      const signed = await this.#resign(row);
-      return signed === undefined ? rejected('POLICY_CHANGED') : this.#submit(signed);
+      const out = await this.#owned(row.record_id, async () => {
+        const signed = await this.#resign(row);
+        return signed === undefined ? undefined : this.#submit(signed);
+      });
+      return out ?? rejected('POLICY_CHANGED');
     }
     if (ON_CHAIN.includes(row.status)) {
       if (row.status === 'recorded') await this.#announce(row);
@@ -1446,6 +1507,8 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       }
     }
     for (const row of rows) {
+      // A Record a call in this process owns is signed and submitted by that call alone.
+      if (this.#owners.has(row.record_id)) continue;
       if (row.status === 'recorded') {
         await this.#announce(row);
         continue;
@@ -1506,7 +1569,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     row: Row<'proofs'>,
   ): Promise<{ resent: boolean; replaced: boolean; recorded: boolean }> {
     const none = { resent: false, replaced: false, recorded: false };
-    if (this.#unsignedNow.has(row.record_id)) return none;
+    if (this.#owners.has(row.record_id)) return none;
     const chain = this.#chain(row.chain_id);
     if (chain === undefined) return none;
     const item = parseJson(row.record_json) as unknown as SignedItem;
@@ -1522,15 +1585,20 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     if (landed) {
       // Signing it again cannot charge twice (its nonce is spent); it gives the proof envelope
       // and the pack their signature. Without it the row is still recorded and charged.
-      const current = (await this.#resign(row).catch(() => undefined)) ?? row;
-      await this.#settle(current, 'recorded');
-      await this.#announce({ ...current, status: 'recorded' });
+      await this.#owned(row.record_id, async () => {
+        const current = (await this.#resign(row).catch(() => undefined)) ?? row;
+        await this.#settle(current, 'recorded');
+        await this.#announce({ ...current, status: 'recorded' });
+        return undefined;
+      });
       return { ...none, recorded: true };
     }
     if (now <= deadline) {
-      const signed = await this.#resign(row);
-      if (signed === undefined) return none;
-      const r = await this.#submit(signed);
+      const r = await this.#owned(row.record_id, async () => {
+        const signed = await this.#resign(row);
+        return signed === undefined ? undefined : this.#submit(signed);
+      });
+      if (r === undefined) return none;
       return { ...none, resent: true, recorded: r.status === 'ok' };
     }
     let allowed: boolean;
@@ -1600,48 +1668,50 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     });
     const counterparty =
       envelope.contact_id === null ? null : await this.#counterparty(envelope.contact_id);
-    const stored = await this.#reserveAndSign({
-      built,
-      envelopeId: row.envelope_id,
-      fee,
-      effective: await this.#deps.ownerActions.loadPolicy(),
-      action: {
-        kind: 'proof',
-        feeUsd: fee.usd,
-        maxFeeUsd: fee.usd,
-        counterparty:
-          counterparty === null
-            ? null
-            : { contact: counterparty.agentId, ruleEligible: counterparty.eligible },
-      },
-      approvalId: entry.approval_id,
-      ownerApproved,
-      // A commitment's Record part follows its stored item (04 §3.4.2 "A signed item that did not
-      // land"): same part, still `claimed`, the replacement in the old item's place.
-      claim: (tx, next) => {
-        const part = tx.select('commitment_parts', {
-          part: 'record',
-          item_ref: row.record_id,
-          state: 'claimed',
-        })[0];
-        if (part !== undefined) {
-          tx.update(
-            'commitment_parts',
-            { approval_id: part.approval_id, part: 'record', item_ref: row.record_id },
-            {
-              item_ref: next.record_id,
-              item_json: next.record_json,
-              replacements: part.replacements + 1,
-              updated_at: now,
-            },
-          );
-        }
-        return true;
-      },
-      replaces: { recordId: row.record_id },
-    });
-    if (stored === undefined || stored === EXISTS) return undefined;
-    return this.#submit(stored);
+    const effective = await this.#deps.ownerActions.loadPolicy();
+    const out = await this.#ownedNew(built.recordId, () =>
+      this.#reserveAndSign({
+        built,
+        envelopeId: row.envelope_id,
+        fee,
+        effective,
+        action: {
+          kind: 'proof',
+          feeUsd: fee.usd,
+          maxFeeUsd: fee.usd,
+          counterparty:
+            counterparty === null
+              ? null
+              : { contact: counterparty.agentId, ruleEligible: counterparty.eligible },
+        },
+        approvalId: entry.approval_id,
+        ownerApproved,
+        // A commitment's Record part follows its stored item (04 §3.4.2 "A signed item that did not
+        // land"): same part, still `claimed`, the replacement in the old item's place.
+        claim: (tx, next) => {
+          const part = tx.select('commitment_parts', {
+            part: 'record',
+            item_ref: row.record_id,
+            state: 'claimed',
+          })[0];
+          if (part !== undefined) {
+            tx.update(
+              'commitment_parts',
+              { approval_id: part.approval_id, part: 'record', item_ref: row.record_id },
+              {
+                item_ref: next.record_id,
+                item_json: next.record_json,
+                replacements: part.replacements + 1,
+                updated_at: now,
+              },
+            );
+          }
+          return true;
+        },
+        replaces: { recordId: row.record_id },
+      }),
+    );
+    return out === EXISTS ? undefined : out;
   }
 
   /**
