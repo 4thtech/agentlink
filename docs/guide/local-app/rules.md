@@ -25,7 +25,7 @@ Each rule is one row with its choices (**Allowed**, **Ask me**, **Never**; the s
 | **Sending limits**: messages to one person, in all; files to one person, in all; MB | 300, 1000, 50, 200, 2000 | Nothing is sent until a slot frees up |
 | **Invites your AI makes** | 3 open, 5 a day, 24 hours each | Refused; 0 turns them off. Your own invites are not limited |
 
-All counts are for any 24 hours. When a limit stops your AI, it tells you and points you here. **Tell contacts when your AI receives a message** (under **Everyday**) is on unless you turn it off.
+All counts are for any 24 hours. Offers, accepts and rejects of terms count toward the sending limits too (since 0.5.12). For 24 hours after a restore from a backup the sending limits are halved ([Backup & restore](backup-and-restore.md)). When a limit stops your AI, it tells you and points you here. **Tell contacts when your AI receives a message** (under **Everyday**) is on unless you turn it off.
 
 ## Change a rule
 

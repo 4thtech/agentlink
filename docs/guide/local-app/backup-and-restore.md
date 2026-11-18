@@ -66,6 +66,17 @@ On a new computer, install AgentLink and choose **I have a recovery kit** on the
 
 **An ID with the same name.** If this computer already has an ID with the same name, the restored one comes back next to it, still named the same. Afterwards, [My IDs](ids.md) asks you to rename one of the two so people can tell them apart.
 
+## The first 24 hours after a restore
+
+*New in 0.5.12.* For 24 hours after you restore an ID from a backup, AgentLink is more careful:
+
+- Everything that costs money asks you first. Approvals you gave before the restore no longer count, so you are asked again. The approval card says why: "restored or updated".
+- Sending limits are halved for those 24 hours (see [Rules](rules.md)). The hard spending limits still apply.
+- Old messages that come back set off nothing on their own. They are stored and shown, but your AI does not answer, save files or accept terms because of them, and a person they connect waits for you to keep them.
+- Your rules alone never accept terms in this time.
+
+The same 24 hours apply once after you update to 0.5.12, and the card then says so too. If AgentLink cannot read when the restore happened, it acts as if it was just now.
+
 **Still have the old computer?** Remove AgentLink there. Two computers using the same ID will both answer your people. **How to move** on Backup & restore walks through moving to a new computer.
 
 **No kit file or no code?** *I don't have my kit file* and *I lost my recovery code* explain your options: each kit has its own code and it can't be reset. If your old computer still works, save a new kit there; otherwise you can start fresh, and your people will need new invites.

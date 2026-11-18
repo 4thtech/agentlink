@@ -57,6 +57,8 @@ These are the defaults of a new policy (`POLICY_DEFAULTS`). A new ID's first rul
 
 ## Hard limits (since 0.5.11, D-156)
 
+*0.5.12: terms messages (offer, accept, reject) count toward the sending limits. For 24 hours after a restore from a backup, and once after updating to 0.5.12, the sending limits are halved, every paid action asks the owner and the rules alone never accept terms.*
+
 | Keys | Rule | When reached |
 |---|---|---|
 | `proofs.hardMaxPerActionUSD`, `proofs.hardDailyUSD` | A Record's `maxFee` above the per-proof ceiling, or the rolling 24-hour spend plus `maxFee` above the daily one. Set together; `perActionMaxUSD`, `dailyBudgetUSD` and a contact rule's `perActionMaxUSD` must be at most them. A contact rule never lifts them | `rejected` `SPEND_CEILING` with `ceiling` and `limitUsd`; no approval is offered and none passes it |

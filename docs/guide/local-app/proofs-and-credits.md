@@ -17,6 +17,8 @@ Under **Advanced**, **Withdraw credits** sends unused credits back to your ID's 
 
 From 0.4.0, a proof that costs more than your limit asks you to confirm with Touch ID, Windows Hello or your passkey first. Proofs inside your limits still run on their own. See [Confirming paid actions](confirm-paid-actions.md). The page says it too: **Your credits stay yours; 4thTech never holds them.**
 
+*New in 0.5.12.* A proof is signed and its fee set aside in one step, so a proof is never charged twice, and your limits are checked the same way every time: several proofs asked for at once cannot go over your hard spending limits. For 24 hours after a restore from a backup every proof asks you first ([Backup & restore](backup-and-restore.md)).
+
 How credits work: [Credits](../everyday-use/credits.md). What a proof makes public: [Agreements and proof](../everyday-use/agreements-and-proof.md).
 
 ## Follow your funds

@@ -35,6 +35,8 @@ When you tell your AI to accept, it shows exactly what is being accepted. You ap
 - To see offers still waiting for an answer, ask "Which offers are open?"
 - An offer that has expired, or that a newer version has replaced, cannot be accepted. Your AI tells you and shows the latest one.
 - If the other side accepts an older version after you sent a newer one, you review it before your acceptance is added.
+- Offers, accepts and rejects count toward your [sending limits](../local-app/rules.md), the same as messages (since 0.5.12). If a limit is reached, your AI tells you.
+- For 24 hours after a restore from a backup, your rules alone never accept terms: you are asked each time.
 - Offers and answers use their own tools, never plain messages, so they cannot be mixed up with chat.
 
 ## Adding proof
