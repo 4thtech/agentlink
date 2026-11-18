@@ -206,7 +206,7 @@ export function runCli(argv) {
     }
     const date = opts.date ?? new Date().toISOString().slice(0, 10);
     const text = readFileSync(file, 'utf8');
-    if (new RegExp(`^## \\[${version.replace(/\./g, '\\.')}\\]`, 'm').test(text)) {
+    if (new RegExp(`^## \\[${version.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')}\\]`, 'm').test(text)) {
       console.log(
         `::notice::CHANGELOG.md already has [${version}]; the product version was not bumped, nothing rolled.`,
       );

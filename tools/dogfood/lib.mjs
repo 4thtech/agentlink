@@ -1584,7 +1584,7 @@ export function renderResultsMd(meta, results) {
     meta.role === undefined
       ? ''
       : ` (Mac ${meta.role.toUpperCase()}, ${meta.sameOwner ? 'same owner' : 'two owners'})`;
-  const esc = (s) => plain(s).replace(/\|/g, '\\|');
+  const esc = (s) => plain(s).replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
   const rows = results.map(
     (r) =>
       `| ${r.id} | ${esc(r.title)} | ${r.harness === 'cc' ? 'Claude Code' : 'OpenCode'}${r.local === false ? ' (other Mac)' : ''} | ${r.outcome} | ${String(r.seconds)} s | ${esc(r.notes.join('; '))} |`,

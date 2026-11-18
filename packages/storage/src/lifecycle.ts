@@ -111,18 +111,25 @@ function decodeXml(text: string): string {
 function parseRule(rule: string): RuleNode | null {
   const root: RuleNode = { name: '#root', children: [], text: '' };
   const stack: RuleNode[] = [root];
-  const token = /<(\/?)([A-Za-z][A-Za-z0-9]*)[^<>]*?(\/?)>|([^<]+)/g;
+  // Linear scan: a tag is `<` up to the next `>` (no nested `<`), its name read by an anchored match.
+  const token = /<([^<>]*)>|([^<]+)/g;
+  const tagHead = /^(\/?)([A-Za-z][A-Za-z0-9]*)/;
   for (let m = token.exec(rule); m !== null; m = token.exec(rule)) {
     const top = stack[stack.length - 1] as RuleNode;
-    if (m[4] !== undefined) {
-      top.text += m[4];
-    } else if (m[1] === '/') {
-      if (stack.length < 2 || top.name !== m[2]) return null;
+    if (m[2] !== undefined) {
+      top.text += m[2];
+      continue;
+    }
+    const body = m[1] as string;
+    const head = tagHead.exec(body);
+    if (head === null) continue; // not an element tag (declaration, comment): skipped
+    if (head[1] === '/') {
+      if (stack.length < 2 || top.name !== head[2]) return null;
       stack.pop();
     } else {
-      const node: RuleNode = { name: m[2] as string, children: [], text: '' };
+      const node: RuleNode = { name: head[2] as string, children: [], text: '' };
       top.children.push(node);
-      if (m[3] !== '/') stack.push(node);
+      if (!body.endsWith('/')) stack.push(node);
     }
   }
   return stack.length === 1 && root.children.length === 1 ? (root.children[0] as RuleNode) : null;
