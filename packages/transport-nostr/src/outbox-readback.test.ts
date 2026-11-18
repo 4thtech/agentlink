@@ -133,24 +133,14 @@ describe('read-back before "sent"', () => {
     expect(rows.get(row.wrapId)).toMatchObject({ state: 'sent', availability: 'confirmed' });
   });
 
-  it('is not sent when the relays answer OK but none serves the wrap: it retries, then gives up', async () => {
+  it('never confirms on OKs whose relays answer empty: with no other relay to try, sent and unknown', async () => {
     const { net, rows, worker } = setup();
     const relays = relayUrls('liar', 2);
     for (const url of relays) net.configure(url, { neverServes: true });
     const row = makeRow(relays);
     rows.add(row);
-    const start = nowSeconds();
-    const first = await pass(worker);
-    expect(first).toMatchObject({ sent: 0, retrying: 1 });
-    const stored = rows.get(row.wrapId);
-    expect(stored.state).toBe('pending');
-    // An OK that the relay cannot back is not kept: the next pass publishes to it again.
-    expect(stored.acks).toEqual({});
-    expect(stored.nextAttemptAt).toBe(start + 30);
-
-    vi.setSystemTime(Date.now() + OUTBOX_GIVE_UP_SECONDS * 1000);
-    await pass(worker);
-    expect(rows.get(row.wrapId).state).toBe('not_delivered');
+    expect(await pass(worker)).toMatchObject({ sent: 1, notDelivered: 0 });
+    expect(rows.get(row.wrapId)).toMatchObject({ state: 'sent', availability: 'unknown' });
   });
 
   it('does not count a relay that serves the wrap only on the connection that published it', async () => {
@@ -159,8 +149,68 @@ describe('read-back before "sent"', () => {
     for (const url of relays) net.configure(url, { sameSocketOnly: true });
     const row = makeRow(relays);
     rows.add(row);
-    expect(await pass(worker)).toMatchObject({ sent: 0, retrying: 1 });
+    expect(await pass(worker)).toMatchObject({ sent: 1 });
+    expect(rows.get(row.wrapId)).toMatchObject({ state: 'sent', availability: 'unknown' });
+  });
+
+  it("after an empty read, keeps the OKs and republishes only to the row's other relays", async () => {
+    const { net, rows, worker } = setup();
+    const [e1, e2, later] = relayUrls('more', 3) as [string, string, string];
+    net.configure(e1, { neverServes: true });
+    net.configure(e2, { neverServes: true });
+    net.configure(later, { reject: true });
+    const row = makeRow([e1, e2, later]);
+    rows.add(row);
+    const start = nowSeconds();
+    expect(await pass(worker)).toMatchObject({ sent: 0, retrying: 1, notDelivered: 0 });
+    const stored = rows.get(row.wrapId);
+    expect(stored.state).toBe('pending');
+    // The OKs stay (the relays accepted it); they just do not confirm it.
+    expect(Object.keys(stored.acks).sort()).toEqual([e1, e2].sort());
+    expect(stored.nextAttemptAt).toBe(start + 30);
+
+    net.configure(later); // the third relay works now and serves it
+    const events = (): string[] =>
+      net.received.filter((r) => r.frame.startsWith('["EVENT"')).map((r) => r.relay);
+    const before = events().length;
+    vi.setSystemTime((start + 31) * 1000);
+    expect(await pass(worker)).toMatchObject({ sent: 1 });
+    expect(events().slice(before)).toEqual([later]);
+    expect(rows.get(row.wrapId)).toMatchObject({ state: 'sent', availability: 'confirmed' });
+  });
+
+  it('an empty read never makes a message not delivered: at the give-up time it is sent, unknown', async () => {
+    const { net, rows, worker } = setup();
+    const [e1, e2, down] = relayUrls('bound', 3) as [string, string, string];
+    net.configure(e1, { neverServes: true });
+    net.configure(e2, { neverServes: true });
+    net.configure(down, { reject: true });
+    const row = makeRow([e1, e2, down]);
+    rows.add(row);
+    await pass(worker);
     expect(rows.get(row.wrapId).state).toBe('pending');
+    vi.setSystemTime(Date.now() + OUTBOX_GIVE_UP_SECONDS * 1000);
+    expect(await pass(worker)).toMatchObject({ sent: 1, notDelivered: 0 });
+    expect(rows.get(row.wrapId)).toMatchObject({ state: 'sent', availability: 'unknown' });
+  });
+
+  it('at the give-up time one OK is enough for sent, unknown; none at all stays not delivered', async () => {
+    const { net, rows, worker } = setup();
+    const [one, down] = relayUrls('single', 2) as [string, string];
+    net.configure(one, { neverServes: true });
+    net.configure(down, { reject: true });
+    const row = makeRow([one, down]);
+    rows.add(row);
+    expect(await pass(worker)).toMatchObject({ retrying: 1 });
+    const [d1, d2] = relayUrls('none', 2) as [string, string];
+    net.configure(d1, { reject: true });
+    net.configure(d2, { reject: true });
+    const dead = makeRow([d1, d2]);
+    rows.add(dead);
+    vi.setSystemTime(Date.now() + OUTBOX_GIVE_UP_SECONDS * 1000);
+    expect(await pass(worker)).toMatchObject({ sent: 1, notDelivered: 1 });
+    expect(rows.get(row.wrapId)).toMatchObject({ state: 'sent', availability: 'unknown' });
+    expect(rows.get(dead.wrapId).state).toBe('not_delivered');
   });
 
   it('re-checks once after a short wait, for a relay that stores the wrap a moment after its OK', async () => {
@@ -203,15 +253,16 @@ describe('read-back before "sent"', () => {
     expect(rows.get(row.wrapId)).toMatchObject({ state: 'sent', availability: 'unknown' });
   });
 
-  it('checks stored acks too (a crash after the publish): an OK nobody can back is not sent', async () => {
+  it('checks stored acks too (a crash after the publish): an OK nobody can back never confirms', async () => {
     const { net, rows, worker } = setup();
     const relays = relayUrls('crash', 2);
     for (const url of relays) net.configure(url, { neverServes: true });
     const at = nowSeconds();
     const row = makeRow(relays, Object.fromEntries(relays.map((r) => [r, at])));
     rows.add(row);
-    expect(await pass(worker)).toMatchObject({ sent: 0, retrying: 1 });
-    expect(rows.get(row.wrapId).state).toBe('pending');
+    expect(await pass(worker)).toMatchObject({ sent: 1 });
+    expect(rows.get(row.wrapId)).toMatchObject({ state: 'sent', availability: 'unknown' });
+    expect(net.received.filter((r) => r.frame.startsWith('["EVENT"'))).toHaveLength(0);
   });
 
   it('marks availability unknown when the pool cannot check at all', async () => {

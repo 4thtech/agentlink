@@ -1120,24 +1120,17 @@ describe('SEC-RELAY-READBACK: "sent" needs a relay that serves the message back 
     expect(result).toMatchObject({ status: 'ok', delivery: 'sent', availability: 'unknown' });
   });
 
-  it('is not sent while the relays that answered OK do not serve it', async () => {
+  it('never confirms, and never fails, on relays that accept it but answer empty', async () => {
     const a = await openAgent(1, ownerA, 'alice', RELAYS_A);
     const b = await openAgent(2, ownerB, 'bob', RELAYS_B);
     await pair(a, b);
     a.spy.serve = 'missing';
     const result = await a.client.sendMessage({ to: b.id, text: 'missing' });
-    expect(result).toMatchObject({ status: 'ok', delivery: 'queued' });
+    // Every relay of the list accepted it, so there is no other relay to try.
+    expect(result).toMatchObject({ status: 'ok', delivery: 'sent', availability: 'unknown' });
     if (result.status !== 'ok') return;
-    for (const r of await contactRows(a, result.envelopeId)) expect(r.state).toBe('pending');
-
-    // Once a relay serves it, the next pass marks it sent and confirmed.
-    a.spy.serve = 'served';
-    clock.t += 40;
-    await a.client.outbox.processDue();
-    const stored = await rows(a.store);
-    expect(stored.out.find((r) => r.envelope_id === result.envelopeId)).toMatchObject({
-      delivery: 'sent',
-      availability: 'confirmed',
-    });
+    for (const r of await contactRows(a, result.envelopeId)) {
+      expect(r).toMatchObject({ state: 'sent', availability: 'unknown' });
+    }
   });
 });
