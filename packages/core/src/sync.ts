@@ -64,6 +64,7 @@ import type { InboxCounts, InboxItem, InboxService } from './inbox.js';
 import type { OutboxService } from './outbox.js';
 import type { OwnerActions } from './owner-actions.js';
 import { policyLimits } from './policy-engine.js';
+import { readRestoreState, type RestoreState } from './restore-guard.js';
 import type { StoreTx } from './store/store.js';
 
 /** 06 §6: `agentlink_inbox` and `agentlink_status` catch up within 3 s. */
@@ -453,14 +454,18 @@ export class SyncService {
     };
 
     const inflight = new Set<Promise<SyncDisposition>>();
+    let restoreOnce: Promise<RestoreState> | undefined;
     const onEnvelope = (item: SyncItem): Promise<SyncDisposition> => {
       // After close nothing touches the store: the wrap is left for the next pass (not marked seen).
       if (closed) return Promise.resolve('retry');
       const run = (async (): Promise<SyncDisposition> => {
         const limitValue = await limitNow();
+        // RESTORE-TRACES: read once for the subscription, not per envelope.
+        restoreOnce ??= readRestoreState(this.#ctx);
+        const restore = await restoreOnce;
         // Closed while the limit was read: leave the wrap for the next pass, store nothing.
         if (closed) return 'retry';
-        const outcome = await this.#handle(item, limitValue);
+        const outcome = await this.#handle(item, limitValue, restore);
         if (outcome.stored) {
           stored += 1;
           kick();
@@ -533,11 +538,13 @@ export class SyncService {
       return { partial: true, incomplete: 0, stored: 0, rateLimited: [] };
     }
     const limit = policyLimits(await ownerActions.loadPolicy()).rateLimitPerContactPerHour;
+    // RESTORE-TRACES: the restore mark is read once for the whole batch (never throws).
+    const restore = await readRestoreState(this.#ctx);
 
     let stored = 0;
     const dropped = new Map<string, number>();
     const onEnvelope = async (item: SyncItem): Promise<SyncDisposition> => {
-      const outcome = await this.#handle(item, limit);
+      const outcome = await this.#handle(item, limit, restore);
       if (outcome.stored) stored += 1;
       if (outcome.rateLimited !== undefined) {
         dropped.set(outcome.rateLimited, (dropped.get(outcome.rateLimited) ?? 0) + 1);
@@ -577,6 +584,7 @@ export class SyncService {
   async #handle(
     item: SyncItem,
     limit: number,
+    restore: RestoreState,
   ): Promise<{
     readonly disposition: SyncDisposition;
     readonly stored: boolean;
@@ -611,6 +619,7 @@ export class SyncService {
     const received = await this.#deps.envelopes.receive({
       envelope: item.envelope,
       giftWrapId: wrapId,
+      restore,
     });
     if (received.status !== 'verified' || received.report.envelopeId === undefined) {
       return { disposition: received.status, stored: false };

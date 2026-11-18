@@ -109,7 +109,7 @@ function itemView(box: MessageBox, item: unknown): JsonObject | undefined {
     ...(seq === undefined ? {} : { seq }),
   };
   if (box === 'in') {
-    // RESTORE-TRACES (D-156): received again after a restore; only `true`, only on the Inbox.
+    // RESTORE-TRACES (D-156): sent before a restore, arrived after it; only `true`, only on the Inbox.
     const { receivedAgain } = item as Record<string, unknown>;
     if (receivedAgain !== undefined && receivedAgain !== true) return undefined;
     return receivedAgain === true ? { ...base, receivedAgain } : base;

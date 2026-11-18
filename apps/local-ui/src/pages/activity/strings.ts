@@ -199,8 +199,10 @@ export const ACTIVITY_COPY = {
   // RESTORE-TRACES (D-156; 11 §5): the restore entry of the spending history. No amount.
   restoreGuardRestore: 'This ID was restored from a backup',
   restoreGuardUpdate: 'AgentLink was updated on this computer',
-  restoreGuardLine:
-    'For 24 hours, AgentLink asked you before anything that cost money. Nothing was charged.',
+  restoreGuardOpen:
+    'For 24 hours, AgentLink asks you before anything that costs money (until {time}). This entry is not a charge.',
+  restoreGuardClosed:
+    'For 24 hours, AgentLink asked you before anything that cost money. This entry is not a charge.',
   // Links in an opened row
   linkPeople: 'See in People',
   linkProofs: 'View proofs',

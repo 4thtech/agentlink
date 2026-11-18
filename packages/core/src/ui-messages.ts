@@ -102,7 +102,8 @@ export interface InboxMessage {
   readonly seq?: number;
   /**
    * RESTORE-TRACES (D-156): present (true) only on an Inbox message first stored after a restore
-   * but created before it (restore-traces.ts): "Received again after restore". Absent otherwise.
+   * but created before it, after a restore from a backup (restore-traces.ts): "From before the
+   * restore". Absent otherwise.
    */
   readonly receivedAgain?: true;
 }

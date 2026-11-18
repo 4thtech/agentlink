@@ -8,7 +8,8 @@
 //   restore replaces the store with the backup's, so the entry is written after it, from the mark.
 // - `restore_replays`: inbound first stored after a restore whose signed createdAt is before it (the
 //   guard's skew rule), written with the envelope (envelopes.ts receive). Only for a known restore
-//   time: an unreadable mark still stops every automatic action (fail closed), but labels nothing.
+//   from a backup: an update that started the guard, or an unreadable mark, still stops every
+//   automatic action (fail closed) but labels nothing.
 //
 // Nothing behind an MCP tool writes or deletes either table (I-4).
 import type { CoreContext } from './context.js';
@@ -48,7 +49,9 @@ export function noteReplayTx(
   envelopeId: string,
   createdAt: number,
 ): void {
-  if (state.status !== 'restored' || !restoredReplay(state, createdAt)) return;
+  // An update that started the guard restored nothing: nothing arrives "from before" it.
+  if (state.status !== 'restored' || state.reason !== 'restore') return;
+  if (!restoredReplay(state, createdAt)) return;
   if (tx.get('restore_replays', { envelope_id: envelopeId }) !== undefined) return;
   tx.insert('restore_replays', { envelope_id: envelopeId, restored_at: state.restoredAt });
 }

@@ -130,8 +130,8 @@ export const HOME_STRINGS = {
   sentNoReceipt: 'Sent. No receipt yet.',
   // SEC-RELAY-READBACK (D-156 (7)): the relays took it, but none could be asked to hand it back.
   sentAvailabilityUnknown: 'Sent, availability unknown',
-  // RESTORE-TRACES (D-156): a message from them that arrived again after a restore.
-  receivedAgain: 'Received again after restore',
+  // RESTORE-TRACES (D-156): a message from them, sent before a restore, that arrived after it.
+  receivedAgain: 'From before the restore',
   receiptPending: 'Pending',
   receiptTheirs: 'Sent by them',
   proof: 'Proof',

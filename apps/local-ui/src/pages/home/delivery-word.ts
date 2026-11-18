@@ -35,8 +35,8 @@ export function receiptWord(item: Item, name: string): string {
 }
 
 /**
- * RESTORE-TRACES (D-156; 11 §5): the quiet label under a message from the other side that arrived
- * again after a restore (it was sent before the restore). Undefined otherwise.
+ * RESTORE-TRACES (D-156; 11 §5): the quiet label "From before the restore" under a message from the
+ * other side that was sent before a restore and arrived after it. Undefined otherwise.
  */
 export function receivedAgainWord(
   item: Partial<Pick<MessageItem, 'receivedAgain'>>,
