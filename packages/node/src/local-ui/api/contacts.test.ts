@@ -91,6 +91,7 @@ function fakeContacts(over: Partial<Contacts> = {}): Contacts {
     prepareRemove: (id) => Promise.resolve(prepared('contact.remove', { contact: id })),
     prepareBlock: (id) => Promise.resolve(prepared('contact.block', { contact: id })),
     prepareUnblock: (id) => Promise.resolve(prepared('contact.unblock', { contact: id })),
+    prepareKeep: (id) => Promise.resolve(prepared('contact.keep', { contact: id })),
     ...over,
   };
 }
@@ -225,6 +226,8 @@ describe('routes (M1-11c-a2, I-4)', () => {
       // WP-12 (F-2): Block and Unblock are owner routes too (I-4: no MCP tool reaches them).
       ['POST', '/api/ui/contacts/:ref/block', true],
       ['POST', '/api/ui/contacts/:ref/unblock', true],
+      // SEC-INVITE-CAPS: Keep a contact the AI connected (I-4: no MCP tool reaches it).
+      ['POST', '/api/ui/contacts/:ref/keep', true],
     ]);
     expect(Object.isFrozen(contactsRoutes)).toBe(true);
   });
@@ -233,7 +236,7 @@ describe('routes (M1-11c-a2, I-4)', () => {
     const registry = createLocalUiRoutes();
     const list = registry.match('GET', '/api/ui/contacts');
     expect(list !== undefined && list !== 'method' && list.route.presence).toBe(false);
-    for (const op of ['check', 'rename', 'remove', 'block', 'unblock']) {
+    for (const op of ['check', 'rename', 'remove', 'block', 'unblock', 'keep']) {
       const hit = registry.match('POST', `/api/ui/contacts/${MARKO}/${op}`);
       expect(hit !== undefined && hit !== 'method' && hit.route.presence).toBe(true);
       expect(registry.match('GET', `/api/ui/contacts/${MARKO}/${op}`)).toBe('method');
@@ -267,6 +270,7 @@ describe('the read-only client view (context.ts, IR-M1-11s-b-1 H-1)', () => {
         prepareContactRemove: (id: string) => (seen.push(`remove:${id}`), Promise.resolve({})),
         prepareContactBlock: (id: string) => (seen.push(`block:${id}`), Promise.resolve({})),
         prepareContactUnblock: (id: string) => (seen.push(`unblock:${id}`), Promise.resolve({})),
+        prepareContactKeep: (id: string) => (seen.push(`keep:${id}`), Promise.resolve({})),
         apply: () => (seen.push('apply'), Promise.resolve({})),
       },
     };
@@ -275,6 +279,7 @@ describe('the read-only client view (context.ts, IR-M1-11s-b-1 H-1)', () => {
       'list',
       'prepareBlock',
       'prepareCheck',
+      'prepareKeep',
       'prepareRemove',
       'prepareRename',
       'prepareUnblock',
@@ -289,6 +294,7 @@ describe('the read-only client view (context.ts, IR-M1-11s-b-1 H-1)', () => {
     await view.contacts.prepareRemove(MARKO);
     await view.contacts.prepareBlock(MARKO);
     await view.contacts.prepareUnblock(MARKO);
+    await view.contacts.prepareKeep(MARKO);
     expect(seen).toEqual([
       'list',
       `code:${MARKO}`,
@@ -297,6 +303,7 @@ describe('the read-only client view (context.ts, IR-M1-11s-b-1 H-1)', () => {
       `remove:${MARKO}`,
       `block:${MARKO}`,
       `unblock:${MARKO}`,
+      `keep:${MARKO}`,
     ]);
     // No direct write of the contact book is reachable (block, remove, apply).
     expect('block' in view.contacts).toBe(false);
@@ -388,6 +395,24 @@ describe('GET /api/ui/contacts: the list', () => {
     });
     const r = await list.handler(ctx(fakeClient(contacts)), req());
     expect(r).toBe(UI_UNAVAILABLE);
+  });
+});
+
+describe('GET /api/ui/contacts: a contact your AI connected (SEC-INVITE-CAPS)', () => {
+  const list = readRoute('/api/ui/contacts');
+
+  it('marks a contact waiting for the owner with waitingForOwner: true, and only that one', async () => {
+    const contacts = fakeContacts({
+      list: () =>
+        Promise.resolve([
+          view({ id: MARKO, waitingForOwner: true } as Partial<ContactView> & { id: string }),
+          view({ id: ANA }),
+        ]),
+    });
+    const r = await list.handler(ctx(fakeClient(contacts)), req());
+    const rows = (r.body as { contacts: JsonObject[] }).contacts;
+    expect(rows[0]?.['waitingForOwner']).toBe(true);
+    expect('waitingForOwner' in (rows[1] ?? {})).toBe(false);
   });
 });
 
@@ -676,6 +701,13 @@ for (const [what, op, prepareKey, lines] of [
     'contact.unblock',
     'prepareUnblock',
     ['Unblock this contact. Their messages arrive again.'],
+  ],
+  // SEC-INVITE-CAPS (04 §2.5.1 `contact.keep`): Keep a contact your AI connected, with presence.
+  [
+    'keep',
+    'contact.keep',
+    'prepareKeep',
+    ['Keep this contact your AI connected. Your AI can send to them from now on.'],
   ],
 ] as const) {
   describe(`POST /api/ui/contacts/:ref/${what}`, () => {

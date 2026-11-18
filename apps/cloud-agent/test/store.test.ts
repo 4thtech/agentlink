@@ -94,8 +94,14 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
       sql.exec(`DROP TABLE "${t}"`);
     }
     const columns: Record<string, string[]> = {
-      invites: ['drop_lookup_id', 'drop_key_epoch', 'cancelled_at', 'invite_link'],
-      contacts: ['former_name', 'name_changed_at', 'name_change_seen', 'declared_name'],
+      invites: ['drop_lookup_id', 'drop_key_epoch', 'cancelled_at', 'invite_link', 'created_by'],
+      contacts: [
+        'former_name',
+        'name_changed_at',
+        'name_change_seen',
+        'declared_name',
+        'waiting_owner',
+      ],
       files: ['auto_save', 'auto_reason', 'auto_tries', 'auto_next_at'],
       envelopes: ['deleted_at'],
     };
@@ -114,6 +120,28 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
       expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
       expect(await again.transaction((tx) => tx.select('seen'))).toEqual([seen('keep')]);
       expect(await again.transaction((tx) => tx.select('content_file_budget'))).toEqual([]);
+    });
+  });
+
+  // SEC-INVITE-CAPS (cloud agent parity): a version 16 store gets `invites.created_by` and
+  // `contacts.waiting_owner`, null on every existing row (invites read as the owner's, contacts kept).
+  it('migrates a version 16 store (SEC-INVITE-CAPS columns) keeping rows, the new columns null', async () => {
+    await inObject(async (store, state) => {
+      await store.transaction((tx) => tx.insert('seen', seen('keep')));
+      state.storage.sql.exec('ALTER TABLE "invites" DROP COLUMN "created_by"');
+      state.storage.sql.exec('ALTER TABLE "contacts" DROP COLUMN "waiting_owner"');
+      state.storage.sql.exec('UPDATE deploy_state SET schema_version = 16');
+      const again = DurableObjectStore.open(state.storage);
+      expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
+      expect(STORE_SCHEMA_VERSION).toBe(17);
+      const columns = (table: string) =>
+        state.storage.sql
+          .exec(`PRAGMA table_info("${table}")`)
+          .toArray()
+          .map((c) => c['name']);
+      expect(columns('invites')).toContain('created_by');
+      expect(columns('contacts')).toContain('waiting_owner');
+      expect(await again.transaction((tx) => tx.select('seen'))).toEqual([seen('keep')]);
     });
   });
 
