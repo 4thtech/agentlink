@@ -105,6 +105,7 @@ import {
   isQuarantineSink,
 } from './restore-quarantine.js';
 import { encodeKeyEpoch } from './key-epoch.js';
+import { RESTORE_MARK_ITEM, encodeRestoreMark } from './restore-mark.js';
 
 const { O_WRONLY, O_CREAT, O_EXCL, O_NOFOLLOW } = constants;
 const KIT_MODE = 0o600;
@@ -639,6 +640,12 @@ export function createKeyImportControl(options: KeyImportControlOptions): KeyImp
       }
       const mark = encodeStorageMark(null);
       entries.push({ name: STORAGE_MARK_ITEM, value: mark });
+      // SEC-RESTORE-GUARD (D-156): the time of this restore, written with the keys in one step, so
+      // every restore path starts the 24-hour guard (restore-mark.ts). A kit never carries it.
+      entries.push({
+        name: RESTORE_MARK_ITEM,
+        value: encodeRestoreMark(Math.floor(Date.now() / 1000)),
+      });
       // W4-RENAME-REACHES-CONTACTS (D-141; 04 §2.3.3): a kit made before `key-epoch` was carried has
       // none; the epoch then comes from the verified snapshot's identity row (equal to its card's),
       // so a renamed agent still opens its KeyStore at the epoch its store holds.
@@ -798,7 +805,7 @@ export async function discardImportedAgent(
   timeoutMs: number = KEYCHAIN_CALL_TIMEOUT_MS,
 ): Promise<void> {
   assertAgentId(agentId);
-  for (const name of KIT_ITEMS) {
+  for (const name of [...KIT_ITEMS, RESTORE_MARK_ITEM] as const) {
     await guarded(() => keychain.delete(keychainAccount(agentId, name)), timeoutMs).catch(
       () => false,
     );

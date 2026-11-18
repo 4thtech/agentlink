@@ -28,6 +28,7 @@ import { nowOf, type CoreContext } from '../context.js';
 import { CoreError } from '../errors.js';
 import { policyLimits, type EffectivePolicy, type PolicyDocument } from '../policy-engine.js';
 import { SINGLETON_SLOT, type Row } from '../store/schema.js';
+import { readRestoreState, restoredReplay } from '../restore-guard.js';
 import type { StoreTx } from '../store/store.js';
 import type { FetchFileResult, FileFetcher } from './incoming.js';
 
@@ -224,6 +225,8 @@ export class AutoSaver {
     }
 
     const lastPause = await this.#pause?.lastPause?.();
+    // SEC-RESTORE-GUARD: a file sent before a restore of this ID waits for Save.
+    const restore = await readRestoreState(ctx);
     const candidates: Candidate[] = [];
     let waiting = 0;
     for (const file of due) {
@@ -250,6 +253,13 @@ export class AutoSaver {
         ) {
           // It was sent while the agent was paused (a paused agent receives nothing, so it is stored
           // by the catch-up after the resume): it waits for Save (04 §4.1, D-143).
+          waitTx(tx, current, null);
+          return 'skip' as const;
+        }
+        if (
+          restore.status !== 'none' &&
+          (createdAt === undefined || restoredReplay(restore, createdAt))
+        ) {
           waitTx(tx, current, null);
           return 'skip' as const;
         }

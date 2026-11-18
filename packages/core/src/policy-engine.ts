@@ -152,6 +152,11 @@ export interface PolicyContext {
   /** The budget ledger. Required for a proof under a verified policy. */
   readonly ledger?: BudgetLedgerView;
   /**
+   * SEC-RESTORE-GUARD (D-156): the ID was restored less than 24 h ago, or its restore mark cannot be
+   * read (restore-guard.ts). A proof then asks the owner (the hard ceilings still refuse).
+   */
+  readonly restoreWindow?: boolean;
+  /**
    * The policy's `files.allowedFolders`, each resolved with realpath by the core (04 §4). Required
    * for `file.send` when the policy allows a folder; ignored when it allows none or fails closed.
    */
@@ -280,7 +285,7 @@ export const BUDGET_WINDOW_SECONDS = 86_400;
 
 /** Why a proof needs the owner, for the approval card and "Remember for this contact" (06 §3). */
 export type ProofTrigger =
-  'policy_invalid' | 'notarize' | 'per_action' | 'budget' | 'ledger_broken';
+  'policy_invalid' | 'notarize' | 'per_action' | 'budget' | 'ledger_broken' | 'restored';
 
 /** Which hard ceiling refused a proof (D-156): one Record, or the rolling 24 h window. */
 export type ProofCeiling = 'per_action' | 'daily';
@@ -425,6 +430,8 @@ export function evaluateProof(
   } else if (spent + maxFee > minMicros(parseUsd(proofs.dailyBudgetUSD), hardDaily)) {
     triggers.push('budget');
   }
+  // SEC-RESTORE-GUARD: the spending before a restore is not known here; the owner decides.
+  if (context?.restoreWindow === true) triggers.push('restored');
   return { decision: triggers.length === 0 ? 'allow' : 'approval', triggers };
 }
 
@@ -465,6 +472,23 @@ export function outgoingCaps(effective: EffectivePolicy): OutgoingPolicy {
   return effective.mode === 'fail_closed' ? FAIL_CLOSED_OUTGOING : outgoingOf(effective.policy);
 }
 
+/**
+ * SEC-RESTORE-GUARD (D-156): in the 24 h after a restore the sending before it is not known here, so
+ * every outgoing cap is halved (at least 1).
+ */
+export function restoreCaps(caps: OutgoingPolicy, windowOpen: boolean): OutgoingPolicy {
+  if (!windowOpen) return caps;
+  const half = (n: number): number => Math.max(1, Math.floor(n / 2));
+  return {
+    ...caps,
+    messagesPerContactPerDay: half(caps.messagesPerContactPerDay),
+    messagesPerDay: half(caps.messagesPerDay),
+    filesPerContactPerDay: half(caps.filesPerContactPerDay),
+    filesPerDay: half(caps.filesPerDay),
+    fileMBPerDay: half(caps.fileMBPerDay),
+  };
+}
+
 const isCount = (n: unknown): n is number =>
   typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
 
@@ -477,13 +501,14 @@ export function evaluateOutgoing(
   effective: EffectivePolicy,
   action: OutgoingAction,
   usage: OutgoingUsage,
+  options: { readonly restoreWindow?: boolean } = {},
 ): OutgoingEvaluation {
   if (!isCount(action.files) || !isCount(action.bytes)) throw contextInvalid();
   for (const n of [usage.contactMessages, usage.messages, usage.contactFiles, usage.files]) {
     if (!isCount(n)) throw contextInvalid();
   }
   if (!isCount(usage.bytes)) throw contextInvalid();
-  const caps = outgoingCaps(effective);
+  const caps = restoreCaps(outgoingCaps(effective), options.restoreWindow === true);
   const deny = (limit: OutgoingLimit, max: number): OutgoingEvaluation => ({
     decision: 'deny',
     limit,

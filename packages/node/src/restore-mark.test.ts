@@ -45,7 +45,12 @@ afterEach(async () => {
 });
 
 function markOver(keychain: KeychainBackend, now = (): number => NOW) {
-  return keychainRestoreMark(keychain, AGENT, (fn) => withInterProcessLock(join(dir, 'agent.sqlite.lock'), () => fn()), { now });
+  return keychainRestoreMark(
+    keychain,
+    AGENT,
+    (fn) => withInterProcessLock(join(dir, 'agent.sqlite.lock'), () => fn()),
+    { now },
+  );
 }
 
 describe('restore mark item', () => {

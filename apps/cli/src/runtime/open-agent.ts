@@ -283,6 +283,8 @@ async function openLocked(
       logger,
       policyMark: agentStore.policyMark,
       receiptsKept: agentStore.receiptsKept,
+      // SEC-RESTORE-GUARD (D-156): the restore mark; every runtime that opens an agent passes it.
+      restoreMark: agentStore.restoreMark,
       transport: deps.transport(),
       dropOrigins: DROP_ORIGINS,
       files: nodeFilesPlatform({ home }),

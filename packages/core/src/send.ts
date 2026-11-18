@@ -86,6 +86,7 @@ import {
   type OutgoingLimit,
   type PolicyDecision,
 } from './policy-engine.js';
+import { restoreWindowNow } from './restore-guard.js';
 
 /** The MCP tool whose idempotency rows these are (06 §2.0). */
 export const SEND_TOOL = 'agentlink_send';
@@ -381,11 +382,17 @@ export class SendService {
   ): Promise<SendLimitRefusal | undefined> {
     const policy = await this.#deps.ownerActions.loadPolicy();
     const now = nowOf(this.#ctx);
+    // SEC-RESTORE-GUARD: tighter caps in the 24 h after a restore.
+    const restoreWindow = await restoreWindowNow(this.#ctx);
     const usage =
       tx === undefined
         ? await this.#ctx.store.transaction((t) => outgoingUsage(t, to, now))
         : outgoingUsage(tx, to, now);
-    return limitRefusal(evaluateOutgoing(policy, { contact: to, files, bytes }, usage), usage, now);
+    return limitRefusal(
+      evaluateOutgoing(policy, { contact: to, files, bytes }, usage, { restoreWindow }),
+      usage,
+      now,
+    );
   }
 
   async #run(
@@ -583,6 +590,7 @@ export class SendService {
     // D-156: the caps are checked again in the transaction that stores the envelope, so two sends
     // never both pass on one count. The policy is loaded before it (no await inside, 07 §3.1).
     const policy = await this.#deps.ownerActions.loadPolicy();
+    const restoreWindow = await restoreWindowNow(ctx);
     const fileBytes = fileRows.reduce((n, f) => n + f.size, 0);
     const limited = await ctx.store.transaction((tx) => {
       const now = nowOf(ctx);
@@ -592,6 +600,7 @@ export class SendService {
           policy,
           { contact: request.to, files: fileRows.length, bytes: fileBytes },
           usage,
+          { restoreWindow },
         ),
         usage,
         now,

@@ -78,6 +78,9 @@ import {
 } from './keychain.js';
 import { CLI_COMMAND } from './cli-command.js';
 
+/** SEC-RESTORE-GUARD: the restore mark of an ID created here, `0` (restore-mark.ts). */
+const NEVER_RESTORED = Uint8Array.of(0x30);
+
 const keychainFailed = (detail?: 'timeout' | 'refused'): NodeKeyStoreError =>
   new NodeKeyStoreError(
     'keychain_failed',
@@ -508,7 +511,11 @@ async function storeNewKeychainAgent(
   const storeKey = randomBytes(32);
   try {
     const agentId = deriveAgentId(seed);
-    const accounts = [keychainAccount(agentId, 'seed'), keychainAccount(agentId, 'store-key')];
+    const accounts = [
+      keychainAccount(agentId, 'seed'),
+      keychainAccount(agentId, 'store-key'),
+      keychainAccount(agentId, 'restore-mark'),
+    ];
     for (const account of accounts) {
       const existing = await guarded(() => keychain.get(account), timeoutMs);
       if (existing !== null) {
@@ -522,6 +529,8 @@ async function storeNewKeychainAgent(
     try {
       await guarded(() => keychain.set(accounts[0] as string, seed), timeoutMs);
       await guarded(() => keychain.set(accounts[1] as string, storeKey), timeoutMs);
+      // SEC-RESTORE-GUARD: an ID created here was never restored (restore-mark.ts).
+      await guarded(() => keychain.set(accounts[2] as string, NEVER_RESTORED.slice()), timeoutMs);
       await (await KeychainKeyStore.open(keychain, agentId, { timeoutMs })).close();
     } catch (error) {
       for (const account of accounts) {

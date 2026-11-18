@@ -41,6 +41,7 @@ import { INBOX_TYPES } from './inbox.js';
 import type { OutboxService } from './outbox.js';
 import type { OwnerActions } from './owner-actions.js';
 import { evaluate } from './policy-engine.js';
+import { readRestoreState, restoredReplay } from './restore-guard.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 
@@ -288,10 +289,14 @@ export class DeliveryAcks {
     const rows = await this.#ctx.store
       .transaction((tx) => ids.map((id) => tx.get('envelopes', { envelope_id: id })))
       .catch(() => []);
+    // SEC-RESTORE-GUARD: a message sent before a restore of this ID gets no ack (an earlier copy of
+    // this ID may have acknowledged it already); an unreadable mark acknowledges nothing.
+    const restore = await readRestoreState(this.#ctx);
     const eligible: Row<'envelopes'>[] = [];
     for (const row of rows) {
       if (
         row !== undefined &&
+        !restoredReplay(restore, row.created_at) &&
         row.direction === 'in' &&
         row.state === 'ok' &&
         row.contact_id !== null &&

@@ -8,6 +8,7 @@ import {
   type OwnStorageKeys,
   type PolicyVersionMark,
   type ReceiptsKeptMark,
+  type RestoreMark,
   type Store,
   type StoreTx,
 } from '@4thtech-io/core';
@@ -21,6 +22,7 @@ import {
 import { osKeychain, type KeyStoreBackendKind, type KeychainBackend } from './keychain.js';
 import { keychainPolicyMark } from './policy-mark.js';
 import { keychainReceiptsKept } from './receipts-kept.js';
+import { keychainRestoreMark } from './restore-mark.js';
 import { SqliteStore } from './sqlite-store.js';
 import { createAgentStoreCipher, type AgentStoreCipher } from './store-cipher.js';
 
@@ -45,6 +47,12 @@ export interface AgentStore {
    * this store's inter-process lock. Pass it as AgentLinkClient.create's `receiptsKept`.
    */
   readonly receiptsKept: ReceiptsKeptMark;
+  /**
+   * SEC-RESTORE-GUARD: the restore mark of the agent's recorded backend (restore-mark.ts), replaced
+   * under this store's inter-process lock when missing or damaged. Pass it as
+   * AgentLinkClient.create's `restoreMark`.
+   */
+  readonly restoreMark: RestoreMark;
   /**
    * The own-storage KeyStore items of the agent's recorded backend (M1-9i-c; 04 §2.2): the
    * `storage-mark`, written under this store's inter-process lock and read back, and the
@@ -129,6 +137,15 @@ export async function openAgentStoreWith(
     read: (): Promise<number | null> => (closed ? storeClosed() : kept.read()),
     write: (version: number): Promise<void> => (closed ? storeClosed() : kept.write(version)),
   });
+  const restore = keychainRestoreMark(
+    items,
+    agentId,
+    (fn) => store.withInterProcessLock(fn),
+    keyOptions,
+  );
+  const restoreMark: RestoreMark = Object.freeze({
+    read: (): Promise<number> => (closed ? storeClosed() : restore.read()),
+  });
   const own = ownStorageKeysOver(
     items,
     agentId,
@@ -147,6 +164,7 @@ export async function openAgentStoreWith(
     cipher,
     policyMark,
     receiptsKept,
+    restoreMark,
     ownStorageKeys,
     close: async (): Promise<void> => {
       closed = true;
