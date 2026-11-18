@@ -35,12 +35,18 @@
 // leaves the row as it was. Nothing about an object (locator, URL, object ID) reaches a log line,
 // an error or a result (I-7): logs carry fixed codes only.
 import { HISTORY_PRE_D148, historySchema, type HistoryPolicy } from '@4thtech-io/types';
-import { nowOf, type CoreContext } from '../context.js';
+import { nowOf, open, seal, type CoreContext } from '../context.js';
 import { CoreError } from '../errors.js';
 import type { HistoryDeleteInclude, HistoryService } from '../history/delete.js';
 import type { EffectivePolicy } from '../policy-engine.js';
 import type { Row } from '../store/schema.js';
 import type { FilesPlatform } from './platform.js';
+import {
+  CLEANUP_KEY_END,
+  CLEANUP_KEY_PREFIX,
+  MAX_EXPIRY_DAYS,
+  type CleanupLocator,
+} from './outgoing.js';
 import { deleteFileObject } from './records.js';
 
 /** At most this many expired files are handled in one expiry pass. */
@@ -150,27 +156,44 @@ export async function deleteFilesOnReceipt(
  * at most MAX_EXPIRY_RETENTION_PER_PASS. A row of a received envelope is deleted on its own; a row of
  * a sent envelope (or one whose envelope row is gone) after its stored object is deleted (nothing to
  * delete for an inline file, or when the receipt pass already did). A failed delete keeps the row
- * for the next pass; busy or unavailable storage ends the pass. Never throws.
+ * for the next pass; busy or unavailable storage ends the pass. Queued cleanup rows
+ * (SEC-REFUSED-UPLOAD-CLEANUP) are not among these: deleteQueuedCleanup takes them after. Never throws.
  */
 export async function deleteExpiredFiles(
   ctx: CoreContext,
   platform: FilesPlatform | undefined,
 ): Promise<ReceiptRetentionResult> {
   const now = nowOf(ctx);
+  const order = {
+    orderBy: [
+      ['expires_at', 'asc'],
+      ['envelope_id', 'asc'],
+      ['idx', 'asc'],
+    ],
+    limit: MAX_EXPIRY_RETENTION_PER_PASS,
+  } as const;
+  // Queued cleanup rows (SEC-REFUSED-UPLOAD-CLEANUP) are left out here and handled after, in their
+  // own bounded batch, so they never take the place of an expiring file or end its pass.
   const due = await ctx.store.transaction((tx) =>
-    tx
-      .select(
+    [
+      ...tx.select(
         'files',
-        { expires_at: { lte: now } },
-        {
-          orderBy: [
-            ['expires_at', 'asc'],
-            ['envelope_id', 'asc'],
-            ['idx', 'asc'],
-          ],
-          limit: MAX_EXPIRY_RETENTION_PER_PASS,
-        },
+        { expires_at: { lte: now }, envelope_id: { lt: CLEANUP_KEY_PREFIX } },
+        order,
+      ),
+      ...tx.select(
+        'files',
+        { expires_at: { lte: now }, envelope_id: { gte: CLEANUP_KEY_END } },
+        order,
+      ),
+    ]
+      .sort(
+        (x, y) =>
+          x.expires_at - y.expires_at ||
+          (x.envelope_id < y.envelope_id ? -1 : x.envelope_id > y.envelope_id ? 1 : 0) ||
+          x.idx - y.idx,
       )
+      .slice(0, MAX_EXPIRY_RETENTION_PER_PASS)
       .map((row) => ({
         row,
         received: tx.get('envelopes', { envelope_id: row.envelope_id })?.direction === 'in',
@@ -195,6 +218,120 @@ export async function deleteExpiredFiles(
       tx.delete('files', { envelope_id: row.envelope_id, idx: row.idx });
     });
     deleted += 1;
+  }
+  const cleanup = await deleteQueuedCleanup(ctx, platform, now);
+  return { deleted: deleted + cleanup.deleted, failed: failed + cleanup.failed };
+}
+
+/** At most this many queued cleanup rows are tried in one expiry pass. */
+export const MAX_CLEANUP_PER_PASS = 20;
+/** The wait after a queued cleanup row's first failed pass, doubling with each one up to a day. */
+const CLEANUP_RETRY_SECONDS = 600;
+/** One day, in seconds. */
+const ONE_DAY = 86_400;
+/** A queued drop object is given up this long after it was queued: the drop has expired it by then. */
+const DROP_CLEANUP_GIVE_UP_SECONDS = (MAX_EXPIRY_DAYS + 1) * ONE_DAY;
+
+/** The sealed locator of a queued cleanup row, or undefined when it does not parse. */
+async function cleanupLocator(
+  ctx: CoreContext,
+  row: Row<'files'>,
+): Promise<CleanupLocator | undefined> {
+  try {
+    const parsed: unknown = JSON.parse(
+      await open(ctx, 'files', 'locator', [row.envelope_id, row.idx], row.locator),
+    );
+    if (parsed === null || typeof parsed !== 'object') return undefined;
+    const { kind, queuedAt, tries } = parsed as Record<string, unknown>;
+    if (kind !== 'drop' && kind !== 's3') return undefined;
+    if (!Number.isSafeInteger(queuedAt) || !Number.isSafeInteger(tries)) return undefined;
+    return parsed as CleanupLocator;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * SEC-REFUSED-UPLOAD-CLEANUP: the queued cleanup rows that are due, at most MAX_CLEANUP_PER_PASS. Each
+ * deleted object takes its row with it. A failed delete moves the row's next try out (10 minutes,
+ * doubling, at most a day) and warns once per row, on its first failed pass. A drop object is given
+ * up a day after the drop's own expiry; an own-storage object is tried until it is deleted. A row
+ * whose locator does not open names nothing that can be deleted and is removed. Never throws.
+ */
+async function deleteQueuedCleanup(
+  ctx: CoreContext,
+  platform: FilesPlatform | undefined,
+  now: number,
+): Promise<ReceiptRetentionResult> {
+  let deleted = 0;
+  let failed = 0;
+  let due: Row<'files'>[];
+  try {
+    due = await ctx.store.transaction((tx) =>
+      tx.select(
+        'files',
+        {
+          expires_at: { lte: now },
+          envelope_id: { gte: CLEANUP_KEY_PREFIX, lt: CLEANUP_KEY_END },
+        },
+        {
+          orderBy: [
+            ['expires_at', 'asc'],
+            ['envelope_id', 'asc'],
+            ['idx', 'asc'],
+          ],
+          limit: MAX_CLEANUP_PER_PASS,
+        },
+      ),
+    );
+  } catch {
+    return { deleted, failed };
+  }
+  const remove = (row: Row<'files'>) =>
+    ctx.store.transaction((tx) => {
+      tx.delete('files', { envelope_id: row.envelope_id, idx: row.idx });
+    });
+  for (const row of due) {
+    try {
+      const meta = await cleanupLocator(ctx, row);
+      if (
+        meta === undefined ||
+        (meta.kind === 'drop' && now >= meta.queuedAt + DROP_CLEANUP_GIVE_UP_SECONDS)
+      ) {
+        await remove(row);
+        continue;
+      }
+      try {
+        if (platform === undefined) throw new CoreError('storage_failed', 'not deleted');
+        await deleteFileObject(ctx, platform, row);
+      } catch (error) {
+        failed += 1;
+        if (meta.tries === 0) {
+          const code = error instanceof CoreError ? error.code : 'storage_failed';
+          ctx.log.warn('queued cleanup not done; tried again later', { code });
+        }
+        const wait = Math.min(CLEANUP_RETRY_SECONDS * 2 ** Math.min(meta.tries, 16), ONE_DAY);
+        const locator = await seal(
+          ctx,
+          'files',
+          'locator',
+          [row.envelope_id, row.idx],
+          JSON.stringify({ ...meta, tries: meta.tries + 1 }),
+        );
+        await ctx.store.transaction((tx) => {
+          tx.update(
+            'files',
+            { envelope_id: row.envelope_id, idx: row.idx },
+            { expires_at: now + wait, locator },
+          );
+        });
+        continue;
+      }
+      await remove(row);
+      deleted += 1;
+    } catch {
+      // A store failure: the row stays as it was for a later pass.
+    }
   }
   return { deleted, failed };
 }
