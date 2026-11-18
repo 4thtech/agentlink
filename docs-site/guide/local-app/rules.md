@@ -1,6 +1,6 @@
 # Rules page
 
-<!-- ai-knowledge: full
+<!-- ai-knowledge: summary
 summary: The Rules page: choose per rule whether your AI may act without asking (Allowed, Ask me or Never) for proofs, new connections and accepting terms, plus other everyday rules. -->
 
 *Open it from **Settings** › **Rules** (in the **Your AI** group) or from **Rules** on an ID's card in [My IDs](ids.md). The one-row-per-rule layout, the **Changed** tag and the **Rules for** picker are new in 0.5.0.*

@@ -179,7 +179,7 @@ Messages and files are encrypted on your computer. Message servers and 4thTech s
 ## Status
 
 <!-- status:start -->
-> **Version:** v0.5.10 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-17
+> **Version:** v0.5.11 (M1b, files, proof, credits (pre-alpha, test networks)) · **Milestone:** M1b Files, proof, credits · **Last updated:** 2026-11-17
 >
 > - **Components:** 78 merged, 14 in progress, 7 planned
 > - **Next:** Proofs end to end, then the cloud agent and business agents as 0.6.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.

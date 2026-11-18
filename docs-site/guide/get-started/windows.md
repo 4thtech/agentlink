@@ -1,6 +1,6 @@
 # Windows
 
-<!-- ai-knowledge: summary
+<!-- ai-knowledge: full
 summary: Windows details for AgentLink: the early Windows app that needs no Node.js, what you need, how your AI app starts AgentLink, Windows security prompts, and moving from the browser to the app. -->
 
 **Download the Windows app:** [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) (Windows 10 or 11, early build, no Node.js needed). On a Mac? See [Install AgentLink](start-fast.md).

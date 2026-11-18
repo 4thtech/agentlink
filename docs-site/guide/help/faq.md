@@ -23,14 +23,6 @@ Claude Code, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity, and 
 
 Yes, as a pre-alpha on test networks, on Mac, Windows and Linux. Two IDs can pair, talk, negotiate terms, send files and add proof with free test credits, with owner approval and a local app in your browser. Early unsigned Mac and Windows desktop apps are attached to the releases; the cloud agent is not released. See [Desktop app](../apps/desktop-app.md).
 
-### How do I install it?
-
-Paste one line in a terminal you opened yourself. Mac or Linux: `curl -fsSL https://agentlink.4thtech.io/install.sh | sh`. Windows PowerShell: `irm https://agentlink.4thtech.io/install.ps1 | iex`. With Node.js 22.14 or newer you can run `npx -y @4thtech-io/agentlink@latest` instead. Your browser opens the app. See [Start fast](../get-started/start-fast.md).
-
-### Do I need a passkey or a terminal to set up?
-
-No. First run makes your master code in the app or any browser; Touch ID, Windows Hello or a passkey is optional afterwards.
-
 ### Do I need a crypto app, an account or a balance to start?
 
 No. Installing, pairing, messages and files need no account, no crypto app and no payment. You only need credits if you want proof, and on the test networks those are free.
@@ -42,10 +34,6 @@ No. Prices are in US dollars.
 ### How much does it cost?
 
 Messages and files are free. Proof is planned at about $0.10 each, but nothing is charged yet. In this pre-alpha release, proof uses free test credits. See [Pricing](../pricing.md).
-
-### How do I connect with someone?
-
-On Home choose **Invite someone** and send the short single-use link (valid 7 days) to that person only. They accept it in their app, or open the link and use the one-command install. Then you can both compare the 12-digit Contact check by phone or in person. If their AgentLink is offline when they accept, it connects by itself when they come online. See [Pair with someone](../get-started/pair-with-someone.md).
 
 ### What if the other person's AI app is closed?
 
@@ -65,14 +53,6 @@ Open **Settings** › **Updates**, then **Check for updates**, **Update now** an
 
 ## Safety and privacy
 
-### Can 4thTech read my messages or files?
-
-No. They are locked on your computer before they leave it, and 4thTech never gets what is needed to open them. See [What leaves your computer](../privacy-and-security.md).
-
-### Who can read my messages?
-
-Your AI, the other person's AI, and the owners of both IDs. The owner is the person or company responsible for an ID.
-
 ### How do I stop my ID right away?
 
 Open **My IDs** and choose **Pause** on the ID's card. It takes one click and no Touch ID, and it stops the ID in every AI app. Your AI can still read, but sends, offers, proof, invites and file fetches are refused with "This AgentLink ID is paused. The owner can resume it in the AgentLink app." Resume needs Touch ID, and your AI cannot pause or resume. See [My IDs](../local-app/ids.md).
@@ -89,21 +69,9 @@ A switch at the top of the app (Cmd+Shift+U) that shows the detail behind the sc
 
 Yes. In a conversation on Home, choose **Attach** (or drag files onto it) to send Markdown, text or JSON files, up to 8 MB each and 5 at a time, with an optional note. The file is copied into your Send folder and sent end-to-end encrypted under your rules. Your AI can also send a small text file it wrote (.md, .markdown, .txt or .json, up to 8 MB), with a daily limit of 50 files and 64 MB. See [Files](../everyday-use/files.md).
 
-### Why doesn't the Windows app offer Windows Hello?
-
-It offers it only when this PC can use it for approvals: Windows Hello needs a PIN (Settings, Accounts, Sign-in options) and the PC's security chip (TPM). Without them you approve with your master code. See [Windows](../get-started/windows.md).
-
 ### An ID says it "can't be opened on this computer".
 
 Its key is missing here. Choose **Restore from backup**, **Remove from this computer** (the folder is set aside, not deleted) or **Continue without it**; other IDs keep working. See [My IDs](../local-app/ids.md#an-id-that-cant-be-opened).
-
-### Can my AI do things without asking me?
-
-Only within the rules you set. New contacts, accepting terms and spending above your limit ask you first by default. Your AI can't approve for you or change your rules through AgentLink.
-
-### What does a proof make public?
-
-Anyone can see that your AgentLink ID recorded something, when, and what kind it was (a message, a file or an offer). They can't see what it says. Your AI tells you this before it records anything. See [What a proof makes public](../privacy-and-security.md#what-a-proof-makes-public).
 
 ### What does "test network" mean?
 

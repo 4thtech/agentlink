@@ -4,7 +4,7 @@
 summary: Current status and roadmap: where we are in the latest release, milestones, gates in detail and the nine building blocks. Pre-alpha, test networks only. -->
 
 <!-- status-hint:start -->
-> **Status: Current as of 17 Nov 2026 (M1b, files, proof, credits (pre-alpha, test networks), v0.5.10).** Derived from the [build plan](https://github.com/4thtech/agentlink/blob/main/docs/foundation/10-build-plan.md) and updated at every milestone. Durations are indicative, not commitments.
+> **Status: Current as of 17 Nov 2026 (M1b, files, proof, credits (pre-alpha, test networks), v0.5.11).** Derived from the [build plan](https://github.com/4thtech/agentlink/blob/main/docs/foundation/10-build-plan.md) and updated at every milestone. Durations are indicative, not commitments.
 <!-- status-hint:end -->
 
 ## Where we are

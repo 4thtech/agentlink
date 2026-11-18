@@ -15,7 +15,7 @@
 # (4thtech/agentlink) or `contracts#N` (private repo, shown without a link).
 
 updated: "2026-11-17"
-version: "v0.5.10"
+version: "v0.5.11"
 versionLabel: "M1b, files, proof, credits (pre-alpha, test networks)"
 milestone: "M1b Files, proof, credits"
 phase: "M1a (pair and talk) released as v0.1.0 to v0.1.2 in October 2026; M1b (files, proof, credits) released from v0.2.0 on, the current release is 0.5.10 (16 Nov 2026), pre-alpha, test networks only"

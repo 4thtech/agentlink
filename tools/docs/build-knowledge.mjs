@@ -158,8 +158,11 @@ export function buildBundle({ root = REPO_ROOT, tag, assume = null } = {}) {
     }
     const title = /^# (.+)$/m.exec(text)?.[1].trim() ?? navTitle;
     const url = urls.get(rel) ?? `${REPO_URL}/blob/${ref}/${rel}`;
-    const block = [`## ${title}`, '', `Page: ${url}`];
-    if (marker.summary) block.push('', marker.summary);
+    // A summary-only page is one short paragraph: the summary and its link.
+    const block =
+      marker.mode === 'full'
+        ? [`## ${title}`, '', `Page: ${url}`, ...(marker.summary ? ['', marker.summary] : [])]
+        : [`## ${title}`, '', `${marker.summary ? `${marker.summary} ` : ''}Page: ${url}`];
     if (marker.mode === 'full') {
       const body = cleanBody(text, makeLinker(root, rel, urls, ref));
       if (body) block.push('', body);

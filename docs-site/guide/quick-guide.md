@@ -1,6 +1,6 @@
 # Quick start: from install to first chat
 
-<!-- ai-knowledge: summary
+<!-- ai-knowledge: full
 summary: Seven-step quick start from install to first chat on Mac, Windows or Linux, about ten minutes: install, connect your AI app, invite someone, they accept, name the contact, and talk through your AI. No account or payment. -->
 
 *Mac, Windows and Linux. No account, no payment.*
