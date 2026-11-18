@@ -7,11 +7,7 @@
 // - After the migration the read answers `current`: the notice disappears.
 import { describe, expect, it } from 'vitest';
 import type { LocalUiContext, LocalUiReadClient } from '../context.js';
-import type {
-  LocalUiOwnerOperation,
-  LocalUiOwnerRoute,
-  LocalUiReadRoute,
-} from '../route-types.js';
+import type { LocalUiOwnerOperation, LocalUiOwnerRoute, LocalUiReadRoute } from '../route-types.js';
 import { createLocalUiRoutes } from '../routes.js';
 import type { OwnerReview } from '../../owner-operation.js';
 import { contactDetailsRoutes, CONTACT_DETAILS_PATH } from './contact-details.js';
@@ -106,7 +102,8 @@ describe('POST /api/ui/contact-details (owner presence)', () => {
       sign: () => Promise.reject(new Error('never sign here')),
     };
     const result = await update.handler(w.context, { ...q, input: {} as never }, owner);
-    expect(result.status).toBe(409);
+    // 501 `not_available`, as for a rename without its gate operation (the page says to reopen).
+    expect(result.status).toBe(501);
   });
 
   it('precheck refuses before the gesture when nothing is needed or a change is unfinished', async () => {

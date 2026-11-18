@@ -21,6 +21,7 @@ import { isOwnIdName } from '@4thtech-io/core';
 import type { OwnerSetupOptions } from '@4thtech-io/node';
 import { isAgentLabel, isAgentName } from '../../runtime/agent-name.js';
 import { badArguments, openOne, ownerStep } from './common.js';
+import { updateContactDetailsOne } from './contact-details.js';
 import type { OwnerCommandDeps } from './deps.js';
 import { OWNER_TEXT } from './strings.js';
 
@@ -303,6 +304,10 @@ export function ownerHandler(deps: OwnerCommandDeps) {
       }
       if (positionals.length === 1 && positionals[0] === 'change-code') {
         return changeCodeOne(deps, context);
+      }
+      // RELAY-CARD-MIGRATION: "Update your contact details" (contact-details.ts).
+      if (positionals.length === 1 && positionals[0] === 'update-contact-details') {
+        return updateContactDetailsOne(deps, context);
       }
       return Promise.resolve(badArguments(context.output));
     });

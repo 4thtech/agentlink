@@ -405,6 +405,7 @@ export {
   CATCH_UP_SECONDS,
   type CardUpdateSendResult,
 } from './card-update.js';
+export { migratedRelays, needsRelayMigration, type RelayMigration } from './relay-migration.js';
 export {
   INBOX_PAGE_MAX_LIMIT,
   INBOX_TYPES,

@@ -20,6 +20,10 @@
 //   its recipients, was created after the last card-update sent to that contact, and that card-update
 //   is at least CATCH_UP_SECONDS old, the pass sends it the current card again (at most once per
 //   contact per 24 h), under the same D-106 rule. Derived from the stored envelopes; no new state.
+// - Legacy relays (RELAY-CARD-MIGRATION, 0.5.13 transition). The contact's wrap of a card-update is
+//   ALSO published to the legacy relays (relay-migration.ts cardUpdateLegacyRelays), so a contact
+//   still listening there learns the new card (a moved relay list most of all). Only card-updates;
+//   every other message keeps to the own and the contact's lists. Bounded by MAX_RELAYS_PER_WRAP.
 // - Who may call it. The core only (sync, and the owner flow after a rotation). No MCP tool creates
 //   or passes a `card-update` (04 §3.4.1, I-4): the payload is built here from the own stored card.
 //
@@ -32,7 +36,9 @@ import type { EnvelopeService } from './envelopes.js';
 import { CoreError } from './errors.js';
 import { openOwnCard, readIdentity, type IdentityService } from './identity.js';
 import { nowOf } from './context.js';
-import type { OutboxService } from './outbox.js';
+import type { OutboxRoute, OutboxService } from './outbox.js';
+import { MAX_RELAYS_PER_WRAP } from '@4thtech-io/transport-nostr';
+import { cardUpdateLegacyRelays } from './relay-migration.js';
 import type { OwnerActions } from './owner-actions.js';
 import { evaluate, type EffectivePolicy } from './policy-engine.js';
 import type { Row } from './store/schema.js';
@@ -160,6 +166,22 @@ function catchUpDue(tx: StoreTx, row: Row<'contacts'>, catchUp: CatchUp): boolea
 const due = (tx: StoreTx, row: Row<'contacts'>, fromKey: string, catchUp: CatchUp): boolean =>
   waiting(tx, row, fromKey) || catchUpDue(tx, row, catchUp);
 
+/**
+ * RELAY-CARD-MIGRATION: the contact routes of a card-update also name the legacy relays during the
+ * transition, as many as fit in one wrap's relay limit. Owner routes are unchanged.
+ */
+export function withLegacyRelays(routes: readonly OutboxRoute[]): OutboxRoute[] {
+  return routes.map((route) => {
+    if (route.role !== 'contact') return route;
+    const relays = [...route.relays];
+    for (const relay of cardUpdateLegacyRelays()) {
+      if (relays.length >= MAX_RELAYS_PER_WRAP) break;
+      if (!relays.includes(relay)) relays.push(relay);
+    }
+    return { ...route, relays };
+  });
+}
+
 export class CardUpdateSender {
   readonly #ctx: CoreContext;
   readonly #deps: CardUpdateSenderDeps;
@@ -253,7 +275,7 @@ export class CardUpdateSender {
     if (row.from_key !== fromKey) {
       throw new CoreError('key_epoch_mismatch', 'The identity changed while sending. Try again.');
     }
-    const routes = await outbox.routes(await outbox.contactPeer(contactId));
+    const routes = withLegacyRelays(await outbox.routes(await outbox.contactPeer(contactId)));
     const keys = routes.map((r) => r.recipient);
     if (
       keys.length !== built.recipientNostrKeys.length ||
