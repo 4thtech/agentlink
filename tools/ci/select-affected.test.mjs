@@ -12,6 +12,7 @@ import {
   INSTALL_FILES,
   PACKAGE_JOBS,
   heavyLane,
+  isReleasePr,
   jobOutputs,
   fastLane,
   docsOnly,
@@ -557,7 +558,13 @@ describe('ci.yml wires the job selection', () => {
     'detect defaults %s to true when the selector did not run (heavy lane, crash)',
     (name) => {
       const key = `run_${name.replaceAll('-', '_')}`;
-      expect(job('detect')).toContain(`${key}: \${{ steps.affected.outputs.${key} || 'true' }}`);
+      // CI-HEAVY-ON-RELEASE: the two e2e lanes are also forced on a release pull request.
+      const release = ['e2e_browser', 'e2e_deterministic'].includes(key.slice(4))
+        ? "steps.e2e_scope.outputs.release_pr == 'true' && 'true' || "
+        : '';
+      expect(job('detect')).toContain(
+        `${key}: \${{ ${release}steps.affected.outputs.${key} || 'true' }}`,
+      );
     },
   );
 
@@ -839,5 +846,59 @@ describe('docsOnly: odd diff lists and events', () => {
     expect(re.test(':000000 120000 abc def A\tdocs/link.md')).toBe(true);
     expect(re.test(':000000 160000 abc def A\tdocs/sub')).toBe(true);
     expect(re.test(':100644 100644 abc def M\tdocs/a.md')).toBe(false);
+  });
+});
+
+describe('CI-HEAVY-ON-RELEASE: isReleasePr and the workflow wiring', () => {
+  it('recognises the release PR title', () => {
+    expect(isReleasePr('RELEASE 0.5.12: ci heavy lanes')).toBe(true);
+    expect(isReleasePr('  RELEASE 0.5.12')).toBe(true);
+  });
+
+  it.each([
+    'CHORE: Version packages',
+    'release 0.5.12: x',
+    'FIX RELEASE 0.5.12',
+    'RELEASE notes',
+    '',
+    undefined,
+  ])('a normal PR title (%j) is not a release PR', (t) => expect(isReleasePr(t)).toBe(false));
+
+  it('a release head branch counts, stricter only', () => {
+    expect(isReleasePr('anything', 'rel0512/integration')).toBe(true);
+    expect(isReleasePr('anything', 'rel0512/release')).toBe(true);
+    expect(isReleasePr('anything', 'rel0512/other')).toBe(false);
+    expect(isReleasePr('anything', 'xrel0512/integration')).toBe(false);
+  });
+
+  it('pull_request.types does not include edited (a skipped job passes a required check)', () => {
+    const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
+    const types = ci.match(/^ {4}types: \[([^\]]*)\]/m);
+    expect(types?.[1]).toBeTruthy();
+    expect(types[1]).not.toMatch(/edited/);
+  });
+
+  it('e2e-browser builds and tests the full set on a release PR', () => {
+    const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
+    const start = ci.indexOf('\n  e2e-browser:\n');
+    const job = ci.slice(start, ci.indexOf('\n  docs-checks:\n'));
+    expect(
+      job.match(/\[ "\$TEST_SCOPE" = filtered \] && \[ "\$RELEASE_PR" != true \]/g),
+    ).toHaveLength(2);
+    expect(job.match(/RELEASE_PR: \$\{\{ needs\.detect\.outputs\.release_pr \}\}/g)).toHaveLength(
+      2,
+    );
+  });
+
+  it('ci.yml forces both heavy lanes on a release PR and ci-gate requires them', () => {
+    const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
+    expect(ci).toMatch(
+      /run_e2e_browser: \$\{\{ steps\.e2e_scope\.outputs\.release_pr == 'true' && 'true'/,
+    );
+    expect(ci).toMatch(
+      /run_e2e_deterministic: \$\{\{ steps\.e2e_scope\.outputs\.release_pr == 'true' && 'true'/,
+    );
+    expect(ci).toMatch(/RELEASE_PR: \$\{\{ needs\.detect\.outputs\.release_pr \}\}/);
+    expect(ci).toMatch(/for job in e2e-browser e2e-deterministic; do/);
   });
 });
