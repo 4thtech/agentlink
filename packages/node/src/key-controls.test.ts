@@ -5,6 +5,7 @@
 // The same control conformance suite runs against the keychain backend (an in-memory keychain
 // double) and the file backend (a temporary `ALKS` directory), so both behave the same. Every Argon2id
 // runs at the 04 §2.8 floor (19 MiB, t = 2) to keep the suite fast.
+import { decodeRestoreMark } from './restore-mark.js';
 import { mkdir, mkdtemp, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -616,6 +617,24 @@ for (const backend of [keychainImportBackend(), fileImportBackend()]) {
       expect(equalBytes(items.get('storage-mark') as Uint8Array, encodeStorageMark(null))).toBe(
         true,
       );
+      handle.wipe();
+    });
+
+    it('SEC-RESTORE-GUARD: writes the restore mark at the time of the restore', async () => {
+      const owner = await makeOwner();
+      const agent = await makeKeychainAgent(owner);
+      const { kit, code } = await exportKit(owner, agent);
+      const target = backend.control({ ownerKeychain: new MemoryKeychain() });
+      const handle = await openKit(target.control, kit, code);
+      const before = Math.floor(Date.now() / 1000);
+      const { unlockCode } = await target.control.importAgent(handle, agent.agentId);
+      const after = Math.floor(Date.now() / 1000);
+      const items = await target.items(agent.agentId, unlockCode);
+      const value = items.get('restore-mark');
+      expect(value).toBeDefined();
+      const at = decodeRestoreMark(value as Uint8Array);
+      expect(at).toBeGreaterThanOrEqual(before);
+      expect(at).toBeLessThanOrEqual(after);
       handle.wipe();
     });
 

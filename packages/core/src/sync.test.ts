@@ -33,6 +33,7 @@ import { UNOPENED_TYPE, type InboundReport } from './envelopes.js';
 import { CoreError } from './errors.js';
 import { MemoryStore } from './store/memory-store.js';
 import { rowKeyOf } from './store/store.js';
+import type { RestoreMark } from './restore-guard.js';
 import { StoreSyncPersistence, mergeProofReports } from './sync.js';
 import {
   FakeClock,
@@ -164,6 +165,8 @@ interface OpenOptions {
   readonly keyStore?: KeyStore;
   readonly deliveryAcks?: boolean;
   readonly init?: false;
+  /** SEC-RESTORE-GUARD: the agent's restore mark (absent: a runtime without one). */
+  readonly restoreMark?: RestoreMark;
   /**
    * An owner-signed `policy.set` with this `contacts.rateLimitPerContactPerHour` (a stricter limit than
    * the default). The rate-limit tests need twice the limit in signed, wrapped and verified envelopes;
@@ -203,6 +206,7 @@ async function openAgent(
     transport: nostrTransport({ connector: net, addressCheck: 'platform' }),
     logger: createLogger({ name: 'core', level: 'debug', sink: (_l, line) => lines.push(line) }),
     ...(options.deliveryAcks === undefined ? {} : { deliveryAcks: options.deliveryAcks }),
+    ...(options.restoreMark === undefined ? {} : { restoreMark: options.restoreMark }),
   });
   if (options.init !== false) {
     await client.identity.init({
@@ -713,6 +717,40 @@ describe('catchUp (M1-7h addendum, D-73; 06 §2.0): fetch-only', () => {
 });
 
 // --- Delivery acknowledgements --------------------------------------------------------------------
+
+describe('SEC-RESTORE-GUARD: inbound sent before a restore triggers no ack', () => {
+  it('a message created before the restore is shown but not acknowledged; a newer one is', async () => {
+    const net = new RelayNetwork();
+    const restoredAt = { value: 0 };
+    const restoreMark: RestoreMark = { read: () => Promise.resolve(restoredAt.value) };
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { restoreMark });
+    await pair(a, b);
+    await a.client.sendMessage({ to: b.id, text: 'before the restore' });
+    clock.t += 3_600;
+    restoredAt.value = clock.t;
+    const first = await b.client.syncInbox();
+    expect(first.items).toHaveLength(1);
+    expect(first.acksSent).toBe(0);
+    clock.t += 3_600;
+    await a.client.sendMessage({ to: b.id, text: 'after the restore' });
+    const second = await b.client.syncInbox();
+    expect(second.items).toHaveLength(1);
+    expect(second.acksSent).toBe(1);
+  });
+
+  it('an unreadable restore mark acknowledges nothing (fail closed)', async () => {
+    const net = new RelayNetwork();
+    const restoreMark: RestoreMark = { read: () => Promise.reject(new Error('unreadable')) };
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { restoreMark });
+    await pair(a, b);
+    await a.client.sendMessage({ to: b.id, text: 'hi' });
+    const result = await b.client.syncInbox();
+    expect(result.items).toHaveLength(1);
+    expect(result.acksSent).toBe(0);
+  });
+});
 
 describe('delivery acknowledgements (02 F-23; SEC-RECEIPTS-DEFAULT: on by default)', () => {
   it('on by default: the contact acks a message once, bound to its envelopeHash', async () => {
