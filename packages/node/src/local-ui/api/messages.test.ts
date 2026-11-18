@@ -448,3 +448,34 @@ describe('SEC-RECEIPTS-DEFAULT: an older app receipt', () => {
     expect(bodyOf(out)['items']).toEqual([]);
   });
 });
+
+describe('RESTORE-TRACES: received again after a restore', () => {
+  it('passes receivedAgain through for an Inbox item, only `true`, never on a Sent item', async () => {
+    const again = { ...(INBOX[1] as MessageItem), receivedAgain: true } as MessageItem;
+    const res = await callBox(contextWith({ list: () => Promise.resolve({ items: [again] }) }), BOB);
+    const items = bodyOf(res)['items'] as Record<string, unknown>[];
+    expect(items[0]).toMatchObject({ receivedAgain: true });
+    const plain = await callBox(
+      contextWith({ list: () => Promise.resolve({ items: [INBOX[1] as MessageItem] }) }),
+      BOB,
+    );
+    expect((bodyOf(plain)['items'] as Record<string, unknown>[])[0]).not.toHaveProperty(
+      'receivedAgain',
+    );
+    const bad = { ...(INBOX[1] as MessageItem), receivedAgain: 'yes' } as unknown as MessageItem;
+    const dropped = await callBox(
+      contextWith({ list: () => Promise.resolve({ items: [bad] }) }),
+      BOB,
+    );
+    expect(bodyOf(dropped)['items']).toEqual([]);
+    const sent = { ...(SENT[1] as MessageItem), receivedAgain: true } as MessageItem;
+    const out = await callBox(
+      contextWith({ list: () => Promise.resolve({ items: [sent] }) }),
+      BOB,
+      'box=out',
+    );
+    expect((bodyOf(out)['items'] as Record<string, unknown>[])[0]).not.toHaveProperty(
+      'receivedAgain',
+    );
+  });
+});
