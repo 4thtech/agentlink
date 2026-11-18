@@ -25,6 +25,7 @@ import {
   type LocalUiResult,
   type LocalUiRoute,
 } from '../route-types.js';
+import { CONTACT_DETAILS_REVIEW } from '../../owner-relay-migration.js';
 
 export const CONTACT_DETAILS_PATH = '/api/ui/contact-details';
 
@@ -35,13 +36,8 @@ const ROTATION_PENDING = fixed(409, 'rotation_pending');
 const NOT_APPLIED = fixed(409, 'not_applied');
 const INVALID = fixed(400, 'invalid');
 
-/** The owner statement (11 §5: plain words, no "relay"). */
-const REVIEW = Object.freeze({
-  lines: [
-    'Update your contact details',
-    'AgentLink moved to more reliable servers. Your contacts get your new details once.',
-  ],
-});
+/** The owner statement: one source, shared with the terminal (owner-relay-migration.ts). */
+const REVIEW = CONTACT_DETAILS_REVIEW;
 
 const isEmptyObject = (input: JsonValue | undefined): boolean =>
   input === undefined ||

@@ -23,7 +23,11 @@
 // - Legacy relays (RELAY-CARD-MIGRATION, 0.5.13 transition). The contact's wrap of a card-update is
 //   ALSO published to the legacy relays (relay-migration.ts cardUpdateLegacyRelays), so a contact
 //   still listening there learns the new card (a moved relay list most of all). Only card-updates;
-//   every other message keeps to the own and the contact's lists. Bounded by MAX_RELAYS_PER_WRAP.
+//   every other message keeps to the own and the contact's lists. Bounded by MAX_RELAYS_PER_WRAP,
+//   and only until LEGACY_CARD_UPDATE_UNTIL (dated in transport-nostr legacy-relays.ts). A legacy
+//   relay's OK never makes a card-update count as `sent`: only an OK from a relay of the contact's
+//   own list does; one accepted only by legacy relays (or by none yet) counts as `failed` for this
+//   pass, while the outbox keeps retrying its rows (07 §3.2).
 // - Who may call it. The core only (sync, and the owner flow after a rotation). No MCP tool creates
 //   or passes a `card-update` (04 §3.4.1, I-4): the payload is built here from the own stored card.
 //
@@ -35,9 +39,9 @@ import type { CoreContext } from './context.js';
 import type { EnvelopeService } from './envelopes.js';
 import { CoreError } from './errors.js';
 import { openOwnCard, readIdentity, type IdentityService } from './identity.js';
-import { nowOf } from './context.js';
+import { nowOf, open } from './context.js';
 import type { OutboxRoute, OutboxService } from './outbox.js';
-import { MAX_RELAYS_PER_WRAP } from '@4thtech-io/transport-nostr';
+import { LEGACY_READ_RELAYS, MAX_RELAYS_PER_WRAP } from '@4thtech-io/transport-nostr';
 import { cardUpdateLegacyRelays } from './relay-migration.js';
 import type { OwnerActions } from './owner-actions.js';
 import { evaluate, type EffectivePolicy } from './policy-engine.js';
@@ -51,9 +55,12 @@ export const MAX_CARD_UPDATES_PER_PASS = 200;
 export const CATCH_UP_SECONDS = 86_400;
 
 export interface CardUpdateSendResult {
-  /** Contacts that got a card-update stored for sending in this pass. */
+  /** Contacts whose card-update a relay of their current list (not a legacy relay) accepted. */
   readonly sent: number;
-  /** Contacts whose card-update could not be built or stored; the next pass tries again. */
+  /**
+   * Contacts whose card-update could not be built or stored (the next pass tries again), or was
+   * stored but not yet accepted by a non-legacy relay (the outbox keeps retrying its rows).
+   */
   readonly failed: number;
 }
 
@@ -170,11 +177,13 @@ const due = (tx: StoreTx, row: Row<'contacts'>, fromKey: string, catchUp: CatchU
  * RELAY-CARD-MIGRATION: the contact routes of a card-update also name the legacy relays during the
  * transition, as many as fit in one wrap's relay limit. Owner routes are unchanged.
  */
-export function withLegacyRelays(routes: readonly OutboxRoute[]): OutboxRoute[] {
+export function withLegacyRelays(routes: readonly OutboxRoute[], now: number): OutboxRoute[] {
+  const legacy = cardUpdateLegacyRelays(now);
+  if (legacy.length === 0) return [...routes];
   return routes.map((route) => {
     if (route.role !== 'contact') return route;
     const relays = [...route.relays];
-    for (const relay of cardUpdateLegacyRelays()) {
+    for (const relay of legacy) {
       if (relays.length >= MAX_RELAYS_PER_WRAP) break;
       if (!relays.includes(relay)) relays.push(relay);
     }
@@ -235,7 +244,9 @@ export class CardUpdateSender {
       .filter((id) => allowed(id, 0))
       .slice(0, MAX_CARD_UPDATES_PER_PASS)) {
       try {
-        if (await this.#send(contactId, payload, fromKey, allowed, catchUp)) sent += 1;
+        const outcome = await this.#send(contactId, payload, fromKey, allowed, catchUp);
+        if (outcome === 'sent') sent += 1;
+        else if (outcome === 'unconfirmed') failed += 1;
       } catch {
         failed += 1;
       }
@@ -266,7 +277,7 @@ export class CardUpdateSender {
     fromKey: string,
     allowed: (contact: string, sizeBytes: number) => boolean,
     catchUp: CatchUp,
-  ): Promise<boolean> {
+  ): Promise<'sent' | 'unconfirmed' | false> {
     const { envelopes, outbox } = this.#deps;
     const { built, row } = await envelopes.prepare({ to: { contact: contactId }, payload });
     // The size cap of the same evaluation, on the built envelope (as for every other message).
@@ -275,7 +286,10 @@ export class CardUpdateSender {
     if (row.from_key !== fromKey) {
       throw new CoreError('key_epoch_mismatch', 'The identity changed while sending. Try again.');
     }
-    const routes = withLegacyRelays(await outbox.routes(await outbox.contactPeer(contactId)));
+    const routes = withLegacyRelays(
+      await outbox.routes(await outbox.contactPeer(contactId)),
+      nowOf(this.#ctx),
+    );
     const keys = routes.map((r) => r.recipient);
     if (
       keys.length !== built.recipientNostrKeys.length ||
@@ -298,6 +312,25 @@ export class CardUpdateSender {
     } catch {
       // The rows stay pending; the outbox retries (07 §3.2).
     }
-    return true;
+    return (await this.#acceptedOffLegacy(built.envelope.id)) ? 'sent' : 'unconfirmed';
+  }
+
+  /** Whether a relay that is not a legacy relay acknowledged a contact wrap of this envelope. */
+  async #acceptedOffLegacy(envelopeId: string): Promise<boolean> {
+    const rows = await this.#ctx.store.transaction((tx) =>
+      tx.select('outbox', { envelope_id: envelopeId, role: 'contact' }),
+    );
+    for (const row of rows) {
+      try {
+        const acks = JSON.parse(
+          await open(this.#ctx, 'outbox', 'acks', [row.wrap_id], row.acks),
+        ) as unknown;
+        if (typeof acks !== 'object' || acks === null || Array.isArray(acks)) continue;
+        if (Object.keys(acks).some((relay) => !LEGACY_READ_RELAYS.includes(relay))) return true;
+      } catch {
+        // An unreadable row proves nothing.
+      }
+    }
+    return false;
   }
 }

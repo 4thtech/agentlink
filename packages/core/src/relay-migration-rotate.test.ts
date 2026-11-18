@@ -5,6 +5,7 @@ import { type KeyStore } from '@4thtech-io/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import {
   DEFAULT_RELAYS,
+  LEGACY_CARD_UPDATE_UNTIL,
   LEGACY_READ_RELAYS,
   wrapEnvelope,
   type PublishOutcome,
@@ -25,6 +26,9 @@ import { MemoryPolicyMark } from './testing/owner.js';
 import type { TransportFactory } from './transport.js';
 
 const clock = new FakeClock();
+const START = clock.t;
+/** Which relays accept a publish; undefined: all of them. */
+let acceptOnly: ((relay: string) => boolean) | undefined;
 /** An install from before 0.5.13: its card lists the two legacy relays and one kept relay. */
 const OLD_RELAYS = Object.freeze(['wss://nos.lol', 'wss://nostr.mom', 'wss://relay.example.org']);
 
@@ -42,10 +46,15 @@ async function agent(n: number, owner: MemoryOwnerKeyStore, relays: readonly str
       wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
     publish: (event, to) => {
       published.push({ kind: event.kind, relays: [...to] });
+      const ok = to.filter((relay) => acceptOnly === undefined || acceptOnly(relay));
       return Promise.resolve({
-        results: to.map((relay) => ({ relay, ok: true, reason: 'ok' as const })),
-        acked: [...to],
-        sent: true,
+        results: to.map((relay) => ({
+          relay,
+          ok: ok.includes(relay),
+          reason: ok.includes(relay) ? ('ok' as const) : ('connect_failed' as const),
+        })),
+        acked: ok,
+        sent: ok.length > 0,
       } as PublishOutcome);
     },
     sync: () =>
@@ -111,6 +120,8 @@ let a: Agent;
 let b: Agent;
 
 beforeEach(async () => {
+  clock.t = START;
+  acceptOnly = undefined;
   a = await agent(71, ownerA, OLD_RELAYS);
   b = await agent(72, ownerB, [...DEFAULT_RELAYS]);
   await pairWith(clock, a, b);
@@ -166,5 +177,32 @@ describe('card-update after the migration', () => {
     for (const legacy of LEGACY_READ_RELAYS) expect(lists[0]).toContain(legacy);
     // The contact's own list is kept as well.
     for (const r of DEFAULT_RELAYS) expect(lists[0]).toContain(r);
+  });
+
+  it('counts as sent only when a non-legacy relay accepted it', async () => {
+    const got = await a.client.identity.relayMigration();
+    if (got.status !== 'needed') throw new Error('test: expected needed');
+    await migrate(a, got.relays);
+    acceptOnly = (relay) => LEGACY_READ_RELAYS.includes(relay);
+    expect(await a.client.sendCardUpdates()).toEqual({ sent: 0, failed: 1 });
+  });
+
+  it('after LEGACY_CARD_UPDATE_UNTIL the card-update goes to the legacy relays no longer', async () => {
+    expect(LEGACY_CARD_UPDATE_UNTIL).toBeGreaterThan(START);
+    const got = await a.client.identity.relayMigration();
+    if (got.status !== 'needed') throw new Error('test: expected needed');
+    clock.t = LEGACY_CARD_UPDATE_UNTIL;
+    await migrate(a, got.relays);
+    expect(await a.client.sendCardUpdates()).toEqual({ sent: 1, failed: 0 });
+    const lists = await cardUpdateContactRelays(a);
+    expect(lists).toHaveLength(1);
+    for (const legacy of LEGACY_READ_RELAYS) expect(lists[0]).not.toContain(legacy);
+  });
+});
+
+describe('LEGACY_CARD_UPDATE_UNTIL', () => {
+  it('ends the fan-out at least 30 days after this release (2026-11-18)', () => {
+    const release = Date.UTC(2026, 10, 18) / 1000;
+    expect(LEGACY_CARD_UPDATE_UNTIL - release).toBeGreaterThanOrEqual(30 * 86_400);
   });
 });

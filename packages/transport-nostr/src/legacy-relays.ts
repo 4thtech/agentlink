@@ -12,3 +12,15 @@ export const LEGACY_READ_RELAYS: readonly string[] = Object.freeze([
   'wss://nos.lol',
   'wss://nostr.mom',
 ]);
+
+/**
+ * RELAY-CARD-MIGRATION, the one exception to "never published to": until this time (unix seconds,
+ * 2027-01-31T00:00:00Z, more than 30 days after the 0.5.13 release) a card-update to a contact is
+ * ALSO published to the legacy relays, so contacts still listening there learn a moved relay list.
+ * From then on it never is.
+ *
+ * Removal rule: the legacy READS must outlive the last migration by at least 30 days, so
+ * LEGACY_READ_RELAYS is not removed before LEGACY_CARD_UPDATE_UNTIL + 30 days (2027-03-02). Moving
+ * this date moves that removal with it.
+ */
+export const LEGACY_CARD_UPDATE_UNTIL = 1_801_353_600;

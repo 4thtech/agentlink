@@ -42,7 +42,7 @@ describe('no MCP path to the relay migration (I-4)', () => {
     for (const file of files) {
       const text = readFileSync(file, 'utf8');
       expect(text, file).not.toMatch(
-        /relayMigration|signRelayMigration|updateContactDetails|identity\.rotate\(/,
+        /relayMigration|signRelayMigration|updateContactDetails|identity\.rotate|sendCardUpdates/,
       );
     }
   });

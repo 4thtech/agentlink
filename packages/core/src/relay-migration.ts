@@ -12,7 +12,11 @@
 //   gesture nothing breaks: legacy relays are still read.
 //
 // Pure functions; nothing here signs, stores or logs.
-import { DEFAULT_RELAYS, LEGACY_READ_RELAYS } from '@4thtech-io/transport-nostr';
+import {
+  DEFAULT_RELAYS,
+  LEGACY_CARD_UPDATE_UNTIL,
+  LEGACY_READ_RELAYS,
+} from '@4thtech-io/transport-nostr';
 import { MAX_RELAYS, MIN_RELAYS } from '@4thtech-io/types';
 
 /** Whether a relay list still names a relay the default set dropped. */
@@ -51,8 +55,9 @@ export type RelayMigration =
 
 /**
  * The extra relays a card-update to a contact is also published to during the transition: the
- * legacy relays, so contacts still listening there learn the new card. Only card-updates use it.
+ * legacy relays, so contacts still listening there learn the new card. Only card-updates use it,
+ * and only before LEGACY_CARD_UPDATE_UNTIL (dated in legacy-relays.ts); none from then on.
  */
-export function cardUpdateLegacyRelays(): readonly string[] {
-  return LEGACY_READ_RELAYS;
+export function cardUpdateLegacyRelays(now: number): readonly string[] {
+  return now < LEGACY_CARD_UPDATE_UNTIL ? LEGACY_READ_RELAYS : [];
 }

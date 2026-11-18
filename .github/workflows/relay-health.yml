@@ -20,7 +20,8 @@ on:
 permissions: {}
 
 concurrency:
-  group: relay-health
+  # A pull_request run gets its own group per ref, so it never queues behind (or holds) the daily run.
+  group: relay-health-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
