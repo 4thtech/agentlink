@@ -85,3 +85,8 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 - Docs folder rename merged (#846): docs/ (user guide, technical), specs/ (was docs/foundation), project/ (process, runbooks, lessons, design). Old links have pointer pages.
 - RELEASE 0.5.12 PR #847: delivery confirmation ("Sent, availability unknown" when it can't be checked), restore guard, atomic proof records, send limits for terms, refused-upload cleanup, delete history no longer blocked by receipts, widget deep links and status strip, release PRs run the long e2e lanes. Reviews passed; one more limits fix is being added before merge. npm and desktop update need the owner's clicks.
 - 0.5.13 in progress on rel0513/*: delivery details under the hood, restore entries in Activity, notice when the same ID runs on two computers, public e2e/hostile suite, daily relay health check, new default relays with a one-click contact-details update.
+
+## 2026-11-18 — 0.5.12 released
+- 0.5.12 live: npm latest, GitHub release v0.5.12, signed desktop update (Mac arm64/x64, Windows). Release PR #847, version PR #848, docs #849.
+- Contents: delivery confirmation ("Sent, availability unknown" when no server can confirm), restore guard (24 h owner approval for paid actions, old approvals void), proof signing and fee reservation in one step, consistent spending limits, negotiation messages count toward send limits, refused-upload cleanup, delete history not blocked by receipts, widget file links and clearing, Under the hood strip wraps, release PRs run the long e2e lanes.
+- Next: RELEASE 0.5.13 PR; 0.5.14 before mainnet (on-chain allowance, signed Mac helper, KeyStore record gate).
