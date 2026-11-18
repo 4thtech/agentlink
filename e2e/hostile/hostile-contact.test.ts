@@ -162,10 +162,10 @@ describe('a contact’s acknowledgement counts only for what it matches (07 §3.
     const m2 = await id('keep this one');
     await deliver(s.ana, s.mallory);
     const forMessage1 = await ackFromContact(s, m1, WRONG_HASH);
-    const forMessage2 = await ackFromContact(s, m2, WRONG_HASH);
 
     const plan = await s.ana.client.history.plan({ envelopeIds: [m1], include: 'messages' });
     expect([...plan.envelopeIds].sort()).toEqual([m1, forMessage1].sort());
+    const forMessage2 = await ackFromContact(s, m2, WRONG_HASH);
     // An acknowledgement of a message that stays, arriving after the owner saw the list, changes
     // nothing about what is deleted and nothing about what stays.
     const result = await s.ana.client.history.apply(plan);

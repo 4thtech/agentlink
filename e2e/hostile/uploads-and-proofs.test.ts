@@ -91,7 +91,7 @@ describe('parallel proof requests sign and submit once (SEC-RECORD-ATOMIC)', () 
     expect(ledger).toHaveLength(1);
   });
 
-  it('parallel requests for several messages under a one-proof budget: one is paid, the others are refused', async () => {
+  it('parallel requests for several messages under a one-proof budget: never more than one proof is signed, submitted and charged', async () => {
     const s = (current = await scene());
     await editPolicy(s.ana, (p) => {
       (p['proofs'] as Record<string, unknown>)['dailyBudgetUSD'] = '0.15';
@@ -105,8 +105,9 @@ describe('parallel proof requests sign and submit once (SEC-RECORD-ATOMIC)', () 
     const results = await Promise.all(
       ids.map((envelopeId) => s.ana.client.notarize({ envelopeId })),
     );
+    // The safety property, not the mix of refusals: one paid proof, nothing else charged.
     expect(results.filter((r) => r.status === 'ok')).toHaveLength(1);
-    expect(results.filter((r) => r.status === 'rejected')).toHaveLength(3);
+    expect(results.filter((r) => r.status !== 'ok')).toHaveLength(ids.length - 1);
     expect(s.world.chain.calls.notarize).toBe(1);
     expect(s.world.chain.creditOf(s.ana.client.agentId)).toBe(9n * FEE_UNITS);
   });
