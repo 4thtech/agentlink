@@ -10,8 +10,8 @@
 //     checkServed). One that serves it: `sent`, availability `confirmed`. None can be asked (a login
 //     wanted, no answer in time): `sent`, availability `unknown`. A relay that answers without it
 //     (after one re-check a moment later) keeps its OK but never confirms: the row is republished
-//     to its other relays (backoff); with none left, or at give_up_at with at least one OK, it is
-//     `sent`, availability `unknown`. Only a row no relay accepted ends `not_delivered` (timeout);
+//     to its other relays (backoff); with none left, READBACK_GRACE_SECONDS after it reached 2 OKs,
+//     or at give_up_at with at least one OK, it is `sent`, availability `unknown`. Only a row no relay accepted ends `not_delivered` (timeout);
 //   - `not_delivered` (timeout) if that has not happened by give_up_at, the earlier of created_at +
 //     24 h and the wrap's own created_at + 48 h + S (G-49, D-71 (5)): a wrap is never published
 //     where a receiver's sync (`lastSync - 48 h - S`) could no longer find it;
@@ -25,6 +25,7 @@ import {
   MIN_ACKS,
   MAX_RELAYS_PER_WRAP,
   type ReadbackOutcome,
+  type ReadbackSignal,
   type RelayPool,
 } from './relay-pool.js';
 import { verifyNostrEvent, parseJson, type NostrEvent } from '@4thtech-io/crypto';
@@ -44,6 +45,35 @@ const ROW_CONCURRENCY = 8;
  * after its OK).
  */
 export const READBACK_RECHECK_MS = 1_000;
+/**
+ * SEC-RELAY-READBACK: a row whose OKs reached MIN_ACKS but no relay served it back keeps trying its
+ * other relays for at most this long after that; then it is `sent`, availability `unknown`, so a
+ * dead or refusing relay in the list never keeps it pending until give_up_at.
+ */
+export const READBACK_GRACE_SECONDS = 120;
+
+/** A cancel signal for the sibling checks of one row (no DOM or Node types in this package). */
+class Cancel implements ReadbackSignal {
+  aborted = false;
+  private readonly listeners = new Set<() => void>();
+  addEventListener(_type: 'abort', listener: () => void): void {
+    this.listeners.add(listener);
+  }
+  removeEventListener(_type: 'abort', listener: () => void): void {
+    this.listeners.delete(listener);
+  }
+  abort(): void {
+    if (this.aborted) return;
+    this.aborted = true;
+    for (const listener of [...this.listeners]) listener();
+  }
+}
+
+/** When the row reached MIN_ACKS: the MIN_ACKS-th earliest OK time, or undefined. */
+function reachedMinAcksAt(acks: Readonly<Record<string, number>>): number | undefined {
+  const times = Object.values(acks).sort((a, b) => a - b);
+  return times.length >= MIN_ACKS ? times[MIN_ACKS - 1] : undefined;
+}
 
 /**
  * SEC-RELAY-READBACK (D-156 (7)): how far a `sent` row's availability was confirmed. `confirmed`: a
@@ -325,11 +355,18 @@ export class OutboxWorker {
         ? { kind: 'not_delivered' }
         : { kind: 'skipped' };
     }
-    if (check?.kind === 'missing' && nothingLeft) {
-      // Every relay of the row accepted it and none served it back: no other relay to try.
-      return this.finishSent(row.wrapId, merged, 'unknown');
+    const reachedAt = reachedMinAcksAt(merged);
+    if (check?.kind === 'missing') {
+      // Every relay of the row accepted it and none served it back (no other relay to try), or the
+      // other relays did not take it within the grace: sent, availability unknown.
+      const graceOver = reachedAt !== undefined && nowSeconds - reachedAt >= READBACK_GRACE_SECONDS;
+      if (nothingLeft || graceOver) return this.finishSent(row.wrapId, merged, 'unknown');
     }
-    return this.retry(row, relays, merged, nowSeconds, giveUpAt, { unusable, tooLarge });
+    const cap =
+      check?.kind === 'missing' && reachedAt !== undefined
+        ? Math.max(reachedAt + READBACK_GRACE_SECONDS, nowSeconds + 1)
+        : undefined;
+    return this.retry(row, relays, merged, nowSeconds, giveUpAt, { unusable, tooLarge }, cap);
   }
 
   private async finishSent(
@@ -365,12 +402,21 @@ export class OutboxWorker {
     return { kind: 'missing', relays: stillMissing };
   }
 
-  /** Asks every relay at once; resolves at the first `served`, else once all have answered. */
+  /**
+   * Asks every relay at once; resolves at the first `served` (cancelling the others), else once all
+   * have answered.
+   */
   private askAll(
-    check: (relay: string, eventId: string) => Promise<ReadbackOutcome>,
+    check: (
+      relay: string,
+      eventId: string,
+      options: { readonly signal?: ReadbackSignal },
+    ) => Promise<ReadbackOutcome>,
     eventId: string,
     relays: readonly string[],
   ): Promise<{ served: boolean; missing: string[]; answered: string[] }> {
+    // The first relay that serves it ends the others at once, so they free their slots.
+    const cancel = new Cancel();
     return new Promise((resolve) => {
       const missing: string[] = [];
       const answered: string[] = [];
@@ -381,6 +427,7 @@ export class OutboxWorker {
         pending -= 1;
         if (outcome === 'served') {
           done = true;
+          cancel.abort();
           resolve({ served: true, missing, answered });
           return;
         }
@@ -396,7 +443,7 @@ export class OutboxWorker {
       for (const relay of relays) {
         let asked: Promise<ReadbackOutcome>;
         try {
-          asked = check(relay, eventId);
+          asked = check(relay, eventId, { signal: cancel });
         } catch {
           asked = Promise.resolve('unchecked');
         }
@@ -416,6 +463,7 @@ export class OutboxWorker {
     nowSeconds: number,
     giveUpAt: number,
     seen: { readonly unusable: number; readonly tooLarge: boolean },
+    cap?: number,
   ): Promise<RowResult> {
     const { unusable, tooLarge } = seen;
     const attempts = row.attempts + 1;
@@ -423,7 +471,7 @@ export class OutboxWorker {
     // Jitter of up to 25 % on top, so many rows queued together do not retry in step; never past give_up_at.
     const r = this.random();
     const jitter = Math.floor(base * 0.25 * (Number.isFinite(r) ? Math.min(Math.max(r, 0), 1) : 0));
-    const nextAttemptAt = Math.min(nowSeconds + base + jitter, giveUpAt);
+    const nextAttemptAt = Math.min(nowSeconds + base + jitter, giveUpAt, cap ?? giveUpAt);
     const recorded = await this.persistence.recordAttempt(row.wrapId, {
       acks: merged,
       attempts,

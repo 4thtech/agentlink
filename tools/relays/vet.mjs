@@ -305,10 +305,19 @@ const HEX64 = /^[0-9a-f]{64}$/;
 
 /**
  * Pure: what one id read said (SEC-RELAY-READBACK). `seen` holds the frames of one exchange for
- * subscription `sub`; `note` is the exchange's end ('ok', 'timeout', 'closed', ...).
+ * subscription `sub`; `note` is the exchange's end ('ok', 'timeout', 'closed', ...). `verify`
+ * checks a served event's id and signature (nostr-tools verifyEvent); without it nothing is served.
  */
-export function classifyIdRead(seen, sub, id, note) {
-  if (seen.some((f) => f[0] === 'EVENT' && f[1] === sub && f[2]?.id === id)) return 'served';
+export function classifyIdRead(seen, sub, id, note, verify = () => false) {
+  const isServed = (f) => {
+    if (f[0] !== 'EVENT' || f[1] !== sub || f[2]?.id !== id) return false;
+    try {
+      return verify(f[2]) === true; // a copy whose id or signature does not verify is not served
+    } catch {
+      return false;
+    }
+  };
+  if (seen.some(isServed)) return 'served';
   const closed = seen.find((f) => f[0] === 'CLOSED' && f[1] === sub);
   if (closed !== undefined) {
     const text = String(closed[2] ?? '');
@@ -327,6 +336,7 @@ const endsSub = (sub) => (f) => (f[0] === 'EOSE' || f[0] === 'CLOSED') && f[1] =
  * step that does not succeed. `ex` is `exchange` (injected for tests); `newSub` makes sub ids.
  */
 export async function idReadbackCheck(target, ex, newSub = () => randomBytes(4).toString('hex')) {
+  const { verifyEvent } = await loadSigner();
   let ids = [];
   let sample = 'empty';
   for (let attempt = 0; attempt < 2 && ids.length === 0; attempt += 1) {
@@ -346,7 +356,7 @@ export async function idReadbackCheck(target, ex, newSub = () => randomBytes(4).
     attempts += 1;
     const sub = `i${newSub()}`;
     const res = await ex(target, [['REQ', sub, { ids: [id], limit: 1 }]], endsSub(sub));
-    idRead = classifyIdRead(res.seen, sub, id, res.note);
+    idRead = classifyIdRead(res.seen, sub, id, res.note, verifyEvent);
   }
   return { sample, sampled: ids.length, idRead, attempts };
 }

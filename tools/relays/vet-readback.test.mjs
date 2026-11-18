@@ -131,7 +131,19 @@ describe('classifyIdRead: the signature', () => {
 describe('classifyIdRead', () => {
   const id = 'a'.repeat(64);
   it('reads each outcome from the frames', () => {
-    expect(classifyIdRead([['EVENT', 's', { id }]], 's', id, 'ok')).toBe('served');
+    expect(classifyIdRead([['EVENT', 's', { id }]], 's', id, 'ok', () => true)).toBe('served');
+    // No verifier: never served.
+    expect(
+      classifyIdRead(
+        [
+          ['EVENT', 's', { id }],
+          ['EOSE', 's'],
+        ],
+        's',
+        id,
+        'ok',
+      ),
+    ).toBe('empty');
     expect(classifyIdRead([['EOSE', 's']], 's', id, 'ok')).toBe('empty');
     expect(classifyIdRead([['CLOSED', 's', 'auth-required: x']], 's', id, 'ok')).toBe(
       'auth-required',

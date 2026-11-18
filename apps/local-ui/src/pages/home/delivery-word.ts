@@ -15,9 +15,10 @@ type Item = Pick<MessageItem, 'status' | 'receipt' | 'receivedOlder' | 'proof'> 
 
 /** The delivery word under a sent message. */
 export function sentWord(item: Item, name: string): string {
+  // A signed receipt proves the contact's AI has it, whatever the relays said (SEC-RELAY-READBACK).
+  if (item.receipt) return fmt(item.proof ? S.proofDelivered : S.receivedBy, { name });
   if (item.status === 'queued') return S.waitingToSend;
   if (item.status === 'not_delivered') return S.notDelivered;
-  if (item.receipt) return fmt(item.proof ? S.proofDelivered : S.receivedBy, { name });
   if (item.availability === 'unknown') return S.sentAvailabilityUnknown;
   if (item.proof) return S.sentNoReceipt;
   if (item.receivedOlder === true) return S.receivedOlder;

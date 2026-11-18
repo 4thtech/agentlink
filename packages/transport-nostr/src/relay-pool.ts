@@ -56,8 +56,10 @@ export const NIP11_MAX_BYTES = 65_536;
 export const NIP11_TIMEOUT_MS = 3_000;
 /** SEC-RELAY-READBACK (D-156 (7)): one availability check, connect to answer, ends after this. */
 export const READBACK_TIMEOUT_MS = 5_000;
-/** SEC-RELAY-READBACK: availability checks open at once; one over this is unchecked at once. */
+/** SEC-RELAY-READBACK: availability checks open at once; one over this waits for a free slot. */
 export const MAX_READBACKS = 16;
+/** SEC-RELAY-READBACK: how long a check waits for a free slot before it is `unchecked`. */
+export const READBACK_QUEUE_WAIT_MS = 10_000;
 const NIP11_TTL_MS = 60 * 60 * 1000;
 const NIP11_FAILURE_TTL_MS = 5 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 512;
@@ -107,6 +109,19 @@ export interface PublishOutcome {
  *   not be reached, or the address rule refused it). Never evidence either way.
  */
 export type ReadbackOutcome = 'served' | 'missing' | 'unchecked';
+
+/** Cancels an availability check (an AbortSignal fits). A cancelled check is `unchecked`. */
+export interface ReadbackSignal {
+  readonly aborted: boolean;
+  addEventListener(type: 'abort', listener: () => void): void;
+  removeEventListener(type: 'abort', listener: () => void): void;
+}
+
+/** Options of one availability check. */
+export interface ReadbackOptions {
+  /** Ends the check at once (closing its connection and freeing its slot), e.g. once a sibling served. */
+  readonly signal?: ReadbackSignal;
+}
 
 /** Per-relay health, for the activity feed and `doctor`. No event content. */
 export interface RelayHealth {
@@ -271,6 +286,8 @@ export class RelayPool {
   private closed = false;
   private readbacks = 0;
   private readbackSeq = 0;
+  /** Checks waiting for a slot, first in first out: `grant` hands one over, `fail` ends the wait. */
+  private readonly readbackQueue: { grant: () => boolean; fail: () => void }[] = [];
   private readonly readbackSockets = new Set<RelaySocket>();
 
   constructor(options: RelayPoolOptions) {
@@ -430,6 +447,7 @@ export class RelayPool {
       }
     }
     this.readbackSockets.clear();
+    for (const waiter of this.readbackQueue.splice(0)) waiter.fail();
   }
 
   // --- availability check (SEC-RELAY-READBACK) -------------------------------------------------
@@ -440,23 +458,74 @@ export class RelayPool {
    * connection that published; no login is ever sent on it (a relay that wants one is `unchecked`);
    * the filter holds the id only. The relay URL rule and the address check apply as for any
    * connection (04 §4). Bounded: READBACK_TIMEOUT_MS from start to answer, at most MAX_READBACKS at
-   * once. Never rejects; relay text never leaves this method, and nothing is logged.
+   * once; a check over that waits for a free slot, first in first out, for at most
+   * READBACK_QUEUE_WAIT_MS. `signal` cancels it (waiting or running) and frees its slot at once.
+   * Never rejects; relay text never leaves this method, and nothing is logged.
    */
-  async checkServed(relay: string, eventId: string): Promise<ReadbackOutcome> {
+  async checkServed(
+    relay: string,
+    eventId: string,
+    options: ReadbackOptions = {},
+  ): Promise<ReadbackOutcome> {
     if (this.closed || typeof eventId !== 'string' || !HEX_32.test(eventId)) return 'unchecked';
     if (!isAllowedRelayUrl(relay) || relayParts(relay) === undefined) return 'unchecked';
-    if (this.readbacks >= MAX_READBACKS) return 'unchecked';
-    this.readbacks += 1;
+    const signal = options.signal;
+    if (signal?.aborted === true) return 'unchecked';
+    if (this.readbacks < MAX_READBACKS) this.readbacks += 1;
+    else if (!(await this.waitForSlot(signal))) return 'unchecked';
     try {
-      return await this.readback(relay, eventId);
+      return await this.readback(relay, eventId, signal);
     } catch {
       return 'unchecked';
     } finally {
-      this.readbacks -= 1;
+      this.releaseSlot();
     }
   }
 
-  private readback(relay: string, eventId: string): Promise<ReadbackOutcome> {
+  /** Waits for a slot that a finishing check hands over; false on timeout, cancel or close. */
+  private waitForSlot(signal: ReadbackSignal | undefined): Promise<boolean> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const cleanup = (): void => {
+        this.timers.clearTimeout(timer);
+        signal?.removeEventListener('abort', fail);
+        const at = this.readbackQueue.indexOf(entry);
+        if (at !== -1) this.readbackQueue.splice(at, 1);
+      };
+      const grant = (): boolean => {
+        if (settled || this.closed) return false;
+        settled = true;
+        cleanup();
+        resolve(true);
+        return true;
+      };
+      const fail = (): void => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(false);
+      };
+      const entry = { grant, fail };
+      const timer = this.timers.setTimeout(fail, READBACK_QUEUE_WAIT_MS);
+      signal?.addEventListener('abort', fail);
+      this.readbackQueue.push(entry);
+    });
+  }
+
+  /** Hands the slot to the next waiting check, or frees it. */
+  private releaseSlot(): void {
+    while (this.readbackQueue.length > 0) {
+      const next = this.readbackQueue.shift();
+      if (next?.grant() === true) return; // the slot passes on: the count stays
+    }
+    this.readbacks -= 1;
+  }
+
+  private readback(
+    relay: string,
+    eventId: string,
+    signal: ReadbackSignal | undefined,
+  ): Promise<ReadbackOutcome> {
     this.readbackSeq = (this.readbackSeq + 1) % Number.MAX_SAFE_INTEGER;
     const subId = `r${this.readbackSeq}`;
     const req = JSON.stringify(['REQ', subId, { ids: [eventId], limit: 1 }]);
@@ -465,10 +534,12 @@ export class RelayPool {
       let open = false;
       let sent = false;
       let done = false;
+      const onAbort = (): void => finish('unchecked');
       const finish = (outcome: ReadbackOutcome): void => {
         if (done) return;
         done = true;
         this.timers.clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
         if (socket !== undefined) {
           this.readbackSockets.delete(socket);
           try {
@@ -489,6 +560,11 @@ export class RelayPool {
         }
       };
       const timer = this.timers.setTimeout(() => finish('unchecked'), READBACK_TIMEOUT_MS);
+      if (signal?.aborted === true || this.closed) {
+        finish('unchecked');
+        return;
+      }
+      signal?.addEventListener('abort', onAbort);
       const onMessage = (data: unknown): void => {
         if (done || typeof data !== 'string') return;
         if (utf8Length(data, MAX_FRAME_BYTES) > MAX_FRAME_BYTES) return;

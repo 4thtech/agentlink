@@ -25,6 +25,7 @@ import {
   type AddressCheck,
   type Nip11Fetcher,
   type PublishOutcome,
+  type ReadbackOptions,
   type ReadbackOutcome,
   type RelayConnector,
   SyncEngine,
@@ -91,7 +92,7 @@ export interface Transport {
    * connection, without a login, by id only (RelayPool.checkServed). Optional: without it every
    * sent message is availability `unknown`, never `confirmed`.
    */
-  checkServed?(relay: string, eventId: string): Promise<ReadbackOutcome>;
+  checkServed?(relay: string, eventId: string, options?: ReadbackOptions): Promise<ReadbackOutcome>;
   /**
    * One catch-up pass (M1-7h): unwraps each new gift wrap for an own key and hands the parsed,
    * not yet verified envelope to `onEnvelope`. Optional: without it the client cannot sync
@@ -176,7 +177,7 @@ export function nostrTransport(options: NostrTransportOptions): TransportFactory
       wrap: (envelope, recipients, keys) =>
         wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
       publish: (event, relays) => pool.publish(event, relays),
-      checkServed: (relay, eventId) => pool.checkServed(relay, eventId),
+      checkServed: (relay, eventId, readOptions) => pool.checkServed(relay, eventId, readOptions),
       close: () => pool.close(),
       relayStatus: async (relays) => {
         const unique = [...new Set(relays)].slice(0, MAX_STATUS_RELAYS);

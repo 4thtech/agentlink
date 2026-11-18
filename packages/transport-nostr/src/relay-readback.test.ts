@@ -38,6 +38,23 @@ function setup(options: Partial<RelayPoolOptions> = {}) {
   return { net, pool, lines };
 }
 
+/** A cancel switch in the shape of an AbortController (this package has no DOM types). */
+function controller() {
+  const listeners = new Set<() => void>();
+  const signal = {
+    aborted: false,
+    addEventListener: (_t: 'abort', l: () => void) => listeners.add(l),
+    removeEventListener: (_t: 'abort', l: () => void) => listeners.delete(l),
+  };
+  return {
+    signal,
+    abort: () => {
+      signal.aborted = true;
+      for (const l of [...listeners]) l();
+    },
+  };
+}
+
 const frames = (net: MockNetwork, relay: string, kind: string): unknown[][] =>
   net.received
     .filter((r) => r.relay === relay)
@@ -198,11 +215,11 @@ describe('checkServed', () => {
     net.configure(last);
     const event = makeWrapEvent();
     net.inject(last, event);
-    const controllers = relays.slice(0, MAX_READBACKS).map(() => new AbortController());
+    const controllers = relays.slice(0, MAX_READBACKS).map(() => controller());
     const results: string[] = [];
     relays.slice(0, MAX_READBACKS).forEach((url, i) => {
       void pool
-        .checkServed(url, event.id, { signal: controllers[i]?.signal })
+        .checkServed(url, event.id, { signal: (controllers[i] ?? controller()).signal })
         .then((r) => results.push(r));
     });
     let lastResult: string | undefined;
