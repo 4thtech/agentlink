@@ -214,7 +214,8 @@ describe('card-update after the migration', () => {
     expect(await cardUpdateContactStates(a)).toEqual(['pending']);
     // A relay of the contact's own list accepts it: now it is sent.
     acceptOnly = undefined;
-    clock.t += 61;
+    // Past the longest jittered backoff of the second retry (base 30 s doubling, plus up to 25 %).
+    clock.t += Math.floor(30 * 2 * 1.25) + 1;
     await a.client.outbox.processDue();
     expect(await cardUpdateContactStates(a)).toEqual(['sent']);
     // Nothing new is sent in the next pass: the contact holds the card now.
