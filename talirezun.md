@@ -1,20 +1,25 @@
 # @talirezun — sync
-**Headline:** 16 Nov: AgentLink 0.5.9 is live (npm latest, signed desktop update for Mac and Windows): menu bar widget with an animated brand icon, live status, approvals waiting, connected AI apps, contacts, new messages and a Today timeline; Settings switches to hide the icon or previews; stuck Checking… bar fixed. Docs: download links for Mac and Windows on every entry page, wiki synced to v0.5.9, research section with the first article (CC BY 4.0).
-_Updated 2026-11-16 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
+**Headline:** 18 Nov: AgentLink 0.5.11 is live (npm latest, signed desktop update for Mac and Windows). 0.5.10 and 0.5.11 shipped the first security hardening after a public community review: received receipts on by default, agent key signing allowlist, hard spending limits, send caps, full-text approval cards, invite limits. The 4thTech org landing page and wiki were refreshed; the research section launched.
+_Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 
 ## Now
-- 0.5.9 LIVE on npm latest and as a signed desktop update for Mac and Windows. Included:
-  - Menu bar widget with an animated brand icon: live status, approvals waiting, connected AI apps, contacts, new messages and a Today timeline (D-155).
-  - Settings switches to hide the icon or show previews.
-  - Stuck "Checking…" status bar fixed.
-  - Docs: download links for Mac and Windows on every entry page; wiki synced to v0.5.9.
-  - Research section with the first article (CC BY 4.0).
-- Merged PRs: #836, #837, #838 (release), #840 (version), wiki #31, #32, #33.
+- 0.5.11 LIVE on npm latest and as a signed desktop update for Mac and Windows. Included:
+  - Hard spending limits and send caps.
+  - Full-text approval cards.
+  - Invite limits with Keep/Remove.
+  - Widget fixes; compact docs with a generated Lumina file.
+- 0.5.10 (same day). Included:
+  - Received receipts on by default.
+  - Agent key signing allowlist.
+  - Desktop fixes.
+- 4thTech org landing page and wiki refreshed; research section launched.
+- Merged PRs: #838, #841–#845; wiki #33–#36; 4thtech/.github#1.
 
 ## Next
-1. Owner production test of 0.5.9 (Mac + Surface).
-2. Follow-up cards to backlog: AI app name per contact in the widget, widget screenshot, knowledge size, Windows CI timeout flake.
-3. Dependabot alert 19; PR #809.
+1. Docs folder rename PR.
+2. Triage of the open code-scanning alerts.
+3. 0.5.12 (relay read-back, restore guard, terms caps).
+4. Owner production test of 0.5.11.
 
 ## Owner steps
 - Visual QA of the refreshed local app on his Mac (checklist ready).
