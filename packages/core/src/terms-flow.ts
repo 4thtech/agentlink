@@ -95,7 +95,12 @@ import type { CommitmentRecordResult, ProofRejected } from './proofs/service.js'
 import { computeActionDigest, verifyStoredOwnerAction } from './owner-action.js';
 import type { OwnerActions } from './owner-actions.js';
 import { evaluate, type EffectivePolicy } from './policy-engine.js';
-import { guardCommitment, restoreWindowNow } from './restore-guard.js';
+import {
+  guardCommitment,
+  readRestoreState,
+  requestedBeforeRestore,
+  restoreWindowNow,
+} from './restore-guard.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 import {
@@ -1470,6 +1475,11 @@ export class TermsService {
     const { row } = stored;
     const now = nowOf(this.#ctx);
     if (row.signed_cancel !== null) return 'APPROVAL_VOID';
+    // SEC-RESTORE-GUARD (D-156): a scope requested before a restore of this ID (an owner decision or
+    // a policy grant) authorises nothing after it; an unreadable restore mark, none at all.
+    if (requestedBeforeRestore(await readRestoreState(this.#ctx), row.created_at)) {
+      return 'APPROVAL_VOID';
+    }
     if (row.status === 'void' || row.status === 'cancelled' || row.status === 'denied') {
       return 'APPROVAL_VOID';
     }

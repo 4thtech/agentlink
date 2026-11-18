@@ -2,7 +2,8 @@
 // RestoreMark, as an item next to the agent's other KeyStore items: the keychain account
 // `<agentId>:restore-mark` and, on a file-KeyStore machine, the `ALKS` entry of the same name. Its
 // value is the time of the last restore in unix seconds as canonical ASCII decimal, `0` for an ID
-// created on this computer.
+// created on this computer. A time the guard started for an update (no mark yet, or a damaged one)
+// carries the prefix `u`; that reason only chooses the card's wording, never a decision.
 //
 // - Written `0` when an ID is created (createKeychainAgent, createFileAgent) and the time of the
 //   restore when a restore writes the ID's keys (key-controls.ts importAgent, every restore path:
@@ -13,7 +14,7 @@
 //   read or written rejects, and the core then treats the guard as in force.
 //
 // Residual (G-1, D-67): a same-user process can edit KeyStore items directly (04 §2.5).
-import type { RestoreMark } from '@4thtech-io/core';
+import type { RestoreMark, RestoreReason } from '@4thtech-io/core';
 import { NodeKeyStoreError } from './errors.js';
 import { KEYCHAIN_CALL_TIMEOUT_MS, guarded } from './keychain-keystore.js';
 import { keychainAccount, type KeychainBackend } from './keychain.js';
@@ -22,8 +23,11 @@ import type { PolicyMarkItem, WithInterProcessLock } from './policy-mark.js';
 /** The item name: the keychain account suffix and the `ALKS` entry name (04 §2.2, §2.8). */
 export const RESTORE_MARK_ITEM = 'restore-mark';
 
-/** `0`, or a non-zero digit and at most 15 more: no sign, space, leading zero or fraction. */
-const CANONICAL = /^(?:0|[1-9][0-9]{0,15})$/;
+/**
+ * `0`, or a non-zero digit and at most 15 more (no sign, space, leading zero or fraction); a
+ * non-zero time may carry the update prefix `u`.
+ */
+const CANONICAL = /^(?:0|u?[1-9][0-9]{0,15})$/;
 
 const markInvalid = (): NodeKeyStoreError =>
   new NodeKeyStoreError('restore_mark_invalid', "This agent's restore record is damaged.");
@@ -34,23 +38,38 @@ const notWritten = (): NodeKeyStoreError =>
     "This agent's restore record could not be written. Paid actions ask you until it can be.",
   );
 
-/** The item value of `at` (unix seconds; 0 = never restored): canonical ASCII decimal. */
-export function encodeRestoreMark(at: number): Uint8Array {
+/**
+ * The item value of `at` (unix seconds; 0 = never restored): canonical ASCII decimal, with the
+ * prefix `u` when an update started the guard.
+ */
+export function encodeRestoreMark(at: number, reason: RestoreReason = 'restore'): Uint8Array {
   if (typeof at !== 'number' || !Number.isSafeInteger(at) || at < 0) throw markInvalid();
-  return Uint8Array.from(String(at), (c) => c.charCodeAt(0));
+  const text = reason === 'update' && at > 0 ? `u${String(at)}` : String(at);
+  return Uint8Array.from(text, (c) => c.charCodeAt(0));
 }
 
-/** The time an item holds. Anything but the canonical form throws `restore_mark_invalid`. */
-export function decodeRestoreMark(value: Uint8Array): number {
-  if (!(value instanceof Uint8Array) || value.length === 0 || value.length > 16) {
+function markText(value: Uint8Array): string {
+  if (!(value instanceof Uint8Array) || value.length === 0 || value.length > 17) {
     throw markInvalid();
   }
   let text = '';
   for (const byte of value) text += String.fromCharCode(byte);
   if (!CANONICAL.test(text)) throw markInvalid();
-  const at = Number(text);
+  return text;
+}
+
+/** The time an item holds. Anything but the canonical form throws `restore_mark_invalid`. */
+export function decodeRestoreMark(value: Uint8Array): number {
+  const text = markText(value);
+  const at = Number(text.startsWith('u') ? text.slice(1) : text);
   if (!Number.isSafeInteger(at)) throw markInvalid();
   return at;
+}
+
+/** Why the guard of an item started (copy only). Throws like decodeRestoreMark. */
+export function decodeRestoreReason(value: Uint8Array): RestoreReason {
+  decodeRestoreMark(value);
+  return markText(value).startsWith('u') ? 'update' : 'restore';
 }
 
 /** The mark's value, or undefined when the item is missing or damaged. Read errors propagate. */
@@ -64,7 +83,17 @@ async function readValue(item: PolicyMarkItem): Promise<number | undefined> {
   }
 }
 
-/** The mark over one backend's item. A frozen object with exactly `read`. */
+/** The reason of the mark (copy only); `update` when it cannot be read. Never throws. */
+async function readReason(item: PolicyMarkItem): Promise<RestoreReason> {
+  try {
+    const value = await item.read();
+    return value === null ? 'update' : decodeRestoreReason(value);
+  } catch {
+    return 'update';
+  }
+}
+
+/** The mark over one backend's item. A frozen object with exactly `read` and `reason`. */
 export function createRestoreMark(
   item: PolicyMarkItem,
   withLock: WithInterProcessLock,
@@ -79,7 +108,7 @@ export function createRestoreMark(
         const again = await readValue(item);
         if (again !== undefined) return again;
         const at = Math.floor(now());
-        await item.write(encodeRestoreMark(at));
+        await item.write(encodeRestoreMark(at, 'update'));
         let stored: number | undefined;
         try {
           stored = await readValue(item);
@@ -90,6 +119,7 @@ export function createRestoreMark(
         return at;
       });
     },
+    reason: (): Promise<RestoreReason> => readReason(item),
   });
 }
 

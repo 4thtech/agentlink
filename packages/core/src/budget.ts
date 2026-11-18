@@ -81,6 +81,8 @@ export function checkAndReserveProof(
     readonly ownerApproved: boolean;
     /** SEC-RESTORE-GUARD: the restore window is open (restore-guard.ts); the proof asks the owner. */
     readonly restoreWindow?: boolean;
+    /** Why the window is open (copy only). */
+    readonly restoreReason?: 'update';
   },
 ): ProofCheck {
   const { effective, action, now, reservation } = input;
@@ -94,6 +96,7 @@ export function checkAndReserveProof(
     now,
     ledger: view,
     ...(input.restoreWindow === true ? { restoreWindow: true } : {}),
+    ...(input.restoreReason === 'update' ? { restoreReason: 'update' as const } : {}),
   });
   if (result.triggers.includes('ledger_broken')) markBroken(tx, now);
   const reserve =

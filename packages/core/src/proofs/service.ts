@@ -106,7 +106,7 @@ import {
   type ProofEvaluation,
   type ProofTrigger,
 } from '../policy-engine.js';
-import { readRestoreState, restoreWindowOpen, restoredReplay } from '../restore-guard.js';
+import { readRestoreState, restoreProofContext, restoredReplay } from '../restore-guard.js';
 import type { Row } from '../store/schema.js';
 import type { StoreTx } from '../store/store.js';
 import type {
@@ -589,16 +589,24 @@ function parentOf(value: unknown): string | undefined | null {
 const iso = (seconds: bigint | number): string =>
   new Date(Number(seconds) * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z');
 
-function proofTriggers(triggers: readonly ProofTrigger[]): string[] {
+/**
+ * The approval-card triggers of a proof evaluation. SEC-RESTORE-GUARD: the restore window has its
+ * own reasons (`proofs.restored`, `proofs.updated`), never the daily budget; "remember for this
+ * contact" is never offered for them (rememberContactRules).
+ */
+export function approvalProofTriggers(triggers: readonly ProofTrigger[]): string[] {
   const out = new Set<string>();
   for (const t of triggers) {
     if (t === 'notarize' || t === 'policy_invalid') out.add('proofs.notarize');
     else if (t === 'per_action') out.add('proofs.perActionMaxUSD');
-    // `budget`, `ledger_broken` and `restored` (SEC-RESTORE-GUARD): the spending is what is asked.
+    else if (t === 'restored') out.add('proofs.restored');
+    else if (t === 'updated') out.add('proofs.updated');
     else out.add('proofs.dailyBudgetUSD');
   }
   return [...out].sort();
 }
+
+const proofTriggers = approvalProofTriggers;
 
 /** A terms Record's outcome (M1-9d-3): as `notarize`, never a separate approval. */
 export type CommitmentRecordResult = Exclude<NotarizeResult, PendingApproval>;
@@ -716,9 +724,9 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
           ? null
           : { contact: counterparty.agentId, ruleEligible: counterparty.eligible },
     };
-    const restoreWindow = restoreWindowOpen(await readRestoreState(this.#ctx), now);
+    const restore = restoreProofContext(await readRestoreState(this.#ctx), now);
     const pre = await this.#ctx.store.transaction((tx) =>
-      evaluateProof(effective, action, { now, ledger: readBudgetLedger(tx), restoreWindow }),
+      evaluateProof(effective, action, { now, ledger: readBudgetLedger(tx), ...restore }),
     );
     if (pre.decision === 'deny') return denied(pre);
     const files = payload.files.map((f) => ({
@@ -831,9 +839,9 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       maxFeeUsd: priced.fee.usd,
       counterparty: { contact: counterparty.agentId, ruleEligible: counterparty.eligible },
     };
-    const restoreWindow = restoreWindowOpen(await readRestoreState(this.#ctx), now);
+    const restore = restoreProofContext(await readRestoreState(this.#ctx), now);
     const pre = await this.#ctx.store.transaction((tx) =>
-      evaluateProof(effective, action, { now, ledger: readBudgetLedger(tx), restoreWindow }),
+      evaluateProof(effective, action, { now, ledger: readBudgetLedger(tx), ...restore }),
     );
     if (pre.decision === 'deny') return denied(pre);
     return Object.freeze({
@@ -1039,7 +1047,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
         ? await seal(this.#ctx, 'proofs', 'salt', [requestKey], '')
         : undefined;
     // SEC-RESTORE-GUARD: read before the transaction (a KeyStore item), checked inside it.
-    const restoreWindow = restoreWindowOpen(await readRestoreState(this.#ctx), now);
+    const restore = restoreProofContext(await readRestoreState(this.#ctx), now);
     try {
       await this.#ctx.store.transaction((tx) => {
         if (input.claim !== undefined && !input.claim(tx, row)) throw new Abort();
@@ -1070,7 +1078,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
             deadline: built.record.deadline,
           },
           ownerApproved: input.ownerApproved ?? input.approvalId !== null,
-          restoreWindow,
+          ...restore,
         });
         // Policy or budget moved between the check and this transaction: nothing is kept.
         if (!check.reserved) throw new Abort();

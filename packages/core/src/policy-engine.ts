@@ -156,6 +156,8 @@ export interface PolicyContext {
    * read (restore-guard.ts). A proof then asks the owner (the hard ceilings still refuse).
    */
   readonly restoreWindow?: boolean;
+  /** Why the window is open, for the card copy only: `update` gives the trigger `updated`. */
+  readonly restoreReason?: 'update';
   /**
    * The policy's `files.allowedFolders`, each resolved with realpath by the core (04 §4). Required
    * for `file.send` when the policy allows a folder; ignored when it allows none or fails closed.
@@ -285,7 +287,14 @@ export const BUDGET_WINDOW_SECONDS = 86_400;
 
 /** Why a proof needs the owner, for the approval card and "Remember for this contact" (06 §3). */
 export type ProofTrigger =
-  'policy_invalid' | 'notarize' | 'per_action' | 'budget' | 'ledger_broken' | 'restored';
+  | 'policy_invalid'
+  | 'notarize'
+  | 'per_action'
+  | 'budget'
+  | 'ledger_broken'
+  /** SEC-RESTORE-GUARD: the restore window is open (`updated`: started by an update; copy only). */
+  | 'restored'
+  | 'updated';
 
 /** Which hard ceiling refused a proof (D-156): one Record, or the rolling 24 h window. */
 export type ProofCeiling = 'per_action' | 'daily';
@@ -431,7 +440,9 @@ export function evaluateProof(
     triggers.push('budget');
   }
   // SEC-RESTORE-GUARD: the spending before a restore is not known here; the owner decides.
-  if (context?.restoreWindow === true) triggers.push('restored');
+  if (context?.restoreWindow === true) {
+    triggers.push(context.restoreReason === 'update' ? 'updated' : 'restored');
+  }
   return { decision: triggers.length === 0 ? 'allow' : 'approval', triggers };
 }
 

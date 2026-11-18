@@ -9,6 +9,7 @@ import {
   type PolicyVersionMark,
   type ReceiptsKeptMark,
   type RestoreMark,
+  type RestoreReason,
   type Store,
   type StoreTx,
 } from '@4thtech-io/core';
@@ -145,6 +146,10 @@ export async function openAgentStoreWith(
   );
   const restoreMark: RestoreMark = Object.freeze({
     read: (): Promise<number> => (closed ? storeClosed() : restore.read()),
+    reason: (): Promise<RestoreReason> =>
+      closed
+        ? Promise.resolve('update' as const)
+        : (restore.reason?.() ?? Promise.resolve('update')),
   });
   const own = ownStorageKeysOver(
     items,

@@ -42,6 +42,7 @@ import type { IdentityService } from './identity.js';
 import { computeActionDigest, parseOwnerActionText } from './owner-action.js';
 import type { ApprovalCheck, OwnerActionOutcome, OwnerActions } from './owner-actions.js';
 import type { PolicyDecision } from './policy-engine.js';
+import { readRestoreState, requestedBeforeRestore } from './restore-guard.js';
 import type { StoreTx } from './store/store.js';
 
 /** 04 §2.4.1: `apr_` + 16 random bytes, base64url. */
@@ -447,6 +448,18 @@ export class ApprovalService {
     if (row === undefined) return { status: 'refused', reason: 'approval_unknown' };
     // Commitments proceed per part of their scope (04 §3.4.2; M1-32), never as one use.
     if (row.scope_json !== null) return { status: 'refused', reason: 'commitment_scope' };
+    // SEC-RESTORE-GUARD (D-156): an approval requested before a restore of this ID authorises
+    // nothing after it (an unreadable restore mark: none at all); the owner is asked again.
+    if (requestedBeforeRestore(await readRestoreState(this.#ctx), row.created_at)) {
+      await this.#ctx.store.transaction((tx) =>
+        tx.update(
+          'approvals',
+          { approval_id: approvalId, status: { in: ['pending', 'approved'] } },
+          { status: 'void' },
+        ),
+      );
+      return { status: 'void' };
+    }
     const refusal = refusalOf(await this.#owner.checkApproval(approvalId, action));
     if (refusal !== undefined) return refusal;
     if (decision === 'deny') return { status: 'refused', reason: 'policy_deny' };

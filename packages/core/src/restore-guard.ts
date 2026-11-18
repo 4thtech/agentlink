@@ -29,6 +29,12 @@ export const RESTORE_GUARD_SECONDS = 86_400;
 /** Inbound created up to this long after the restore still counts as sent before it (clock skew). */
 export const RESTORE_CLOCK_SKEW_SECONDS = 300;
 
+/**
+ * Why the guard started: a restore from a backup, or an update that found no mark (or a damaged one)
+ * and started it. For the card copy only, never for a decision.
+ */
+export type RestoreReason = 'restore' | 'update';
+
 /** The restore mark, a KeyStore item supplied by the runtime. */
 export interface RestoreMark {
   /**
@@ -36,11 +42,17 @@ export interface RestoreMark {
    * the item cannot be read or kept.
    */
   read(): Promise<number>;
+  /** Why the guard started (copy only). Absent or failing: `update`, the plainer wording. */
+  reason?(): Promise<RestoreReason>;
 }
 
 export type RestoreState =
   | { readonly status: 'none' }
-  | { readonly status: 'restored'; readonly restoredAt: number }
+  | {
+      readonly status: 'restored';
+      readonly restoredAt: number;
+      readonly reason: RestoreReason;
+    }
   /** The mark could not be read: every check treats it as a restore in force. */
   | { readonly status: 'unknown' };
 
@@ -58,7 +70,37 @@ export async function readRestoreState(ctx: CoreContext): Promise<RestoreState> 
     return UNKNOWN;
   }
   if (typeof at !== 'number' || !Number.isSafeInteger(at) || at < 0) return UNKNOWN;
-  return at === 0 ? NONE : Object.freeze({ status: 'restored', restoredAt: at });
+  if (at === 0) return NONE;
+  let reason: RestoreReason = mark.reason === undefined ? 'restore' : 'update';
+  if (mark.reason !== undefined) {
+    try {
+      reason = (await mark.reason()) === 'restore' ? 'restore' : 'update';
+    } catch {
+      reason = 'update';
+    }
+  }
+  return Object.freeze({ status: 'restored', restoredAt: at, reason });
+}
+
+/**
+ * True for an owner approval or commitment scope requested before the restore: it authorises
+ * nothing after it, so the owner is asked again. Unknown voids every one (fail closed).
+ */
+export function requestedBeforeRestore(state: RestoreState, requestedAt: number): boolean {
+  if (state.status === 'none') return false;
+  if (state.status === 'unknown') return true;
+  return requestedAt < state.restoredAt;
+}
+
+/** The proof context of the guard at `now`: the window flag and, for the copy, an update. */
+export function restoreProofContext(
+  state: RestoreState,
+  now: number,
+): { readonly restoreWindow?: true; readonly restoreReason?: 'update' } {
+  if (!restoreWindowOpen(state, now)) return {};
+  return state.status === 'restored' && state.reason === 'update'
+    ? { restoreWindow: true, restoreReason: 'update' }
+    : { restoreWindow: true };
 }
 
 /** True while the restore window is open at `now` (a clock earlier than the restore keeps it open). */

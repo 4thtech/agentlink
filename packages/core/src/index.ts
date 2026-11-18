@@ -160,9 +160,11 @@ export {
   RESTORE_CLOCK_SKEW_SECONDS,
   RESTORE_GUARD_SECONDS,
   readRestoreState,
+  requestedBeforeRestore,
   restoreWindowOpen,
   restoredReplay,
   type RestoreMark,
+  type RestoreReason,
   type RestoreState,
 } from './restore-guard.js';
 // M1-11r-b (D-118; 04 §2.5.1; 06 §3): unsigned owner-action bodies for the local UI server to sign

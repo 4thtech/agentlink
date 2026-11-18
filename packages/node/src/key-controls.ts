@@ -640,9 +640,11 @@ export function createKeyImportControl(options: KeyImportControlOptions): KeyImp
       }
       const mark = encodeStorageMark(null);
       entries.push({ name: STORAGE_MARK_ITEM, value: mark });
-      // SEC-RESTORE-GUARD (D-156): the time of this restore, written with the keys in one step, so
-      // every restore path starts the 24-hour guard (restore-mark.ts). A kit never carries it.
-      entries.push({
+      // SEC-RESTORE-GUARD (D-156): the time of this restore, written first (before the seed) with
+      // the keys in one step, so every restore path starts the 24-hour guard and no restored key is
+      // ever without it; a failed write removes it with the rest (restore-mark.ts). A kit never
+      // carries it.
+      entries.unshift({
         name: RESTORE_MARK_ITEM,
         value: encodeRestoreMark(Math.floor(Date.now() / 1000)),
       });

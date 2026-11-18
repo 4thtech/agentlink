@@ -61,6 +61,11 @@ const RULES: Readonly<Record<string, string>> = Object.freeze({
   'contacts.acceptInvites': 'Your rules ask you to approve every new contact.',
   'commitments.accept': 'Your rules ask you to approve terms before your AI agrees to them.',
   'proofs.allowKeyDisclosure': 'Your rules ask you to approve sharing a document key.',
+  // SEC-RESTORE-GUARD (D-156): its own reason, never the daily limit.
+  'proofs.restored':
+    'This ID was restored from a backup in the last 24 hours. Until then, AgentLink asks you before anything that costs money.',
+  'proofs.updated':
+    'AgentLink was updated on this computer in the last 24 hours. Until then, it asks you before anything that costs money.',
 });
 const OUTSIDE_RULES = 'This is outside your rules.';
 
@@ -81,7 +86,11 @@ function cut(text: string, max: number): string {
 }
 
 function ruleOf(action: JsonObject): string {
-  const triggers = asObject(action['context'])?.['triggers'];
+  return ruleText(asObject(action['context'])?.['triggers']);
+}
+
+/** The card's reason for a list of approval triggers, in plain words (06 §3, 11 §5). */
+export function ruleText(triggers: unknown): string {
   if (!Array.isArray(triggers)) return OUTSIDE_RULES;
   const lines = triggers
     .map((t) => (typeof t === 'string' ? RULES[t] : undefined))
