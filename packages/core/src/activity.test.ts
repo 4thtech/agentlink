@@ -107,6 +107,8 @@ async function insertEnvelope(
       request_accepted_at: null,
       deleted_at: null,
       availability: null,
+      relays_accepted: null,
+      relays_available: null,
     }),
   );
   return id;
@@ -189,6 +191,7 @@ async function insertLedger(
       deadline: 2_000_000_000,
       replaces: null,
       settled_at: row.state === 'reserved' ? null : 2,
+      install_id: null,
     }),
   );
 }

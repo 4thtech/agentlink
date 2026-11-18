@@ -13,6 +13,7 @@ import {
   type OwnerPresence,
 } from '@4thtech-io/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { LEGACY_READ_RELAYS } from '@4thtech-io/transport-nostr';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AUTONOMOUS_ACTIONS, type SyncRunSummary } from '../src/agent-do.js';
 import { CLOUD_STORE_KEY_INFO } from '../src/worker-keystore.js';
@@ -79,7 +80,9 @@ describe('AgentDO alarm sync (08 §3.1, spike S-5)', () => {
     expect(hashes.map((r) => r['id'])).toContain(envelopeHash);
     expect(logs.some((l) => l.includes('"code":"sync_ok"') && l.includes('"stored":1'))).toBe(true);
     const cursors = await rowsOf(stub, 'SELECT relay_url FROM sync_cursors');
-    expect(cursors.map((r) => r['relay_url']).sort()).toEqual([...RELAY_URLS].sort());
+    expect(cursors.map((r) => r['relay_url']).sort()).toEqual(
+      [...RELAY_URLS, ...LEGACY_READ_RELAYS].sort(),
+    );
     expect(relay.reqs).toBeGreaterThan(0);
     // No relay socket outlives the run; the next alarm is armed.
     expect(relay.openSockets).toBe(0);

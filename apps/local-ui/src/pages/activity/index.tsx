@@ -195,7 +195,13 @@ function Row({
   id: string;
 }): ReactElement {
   const date = new Date(item.at * 1000);
-  const r: Rendered = render(item, nameOf, `${DAY.format(date)}, ${FULL_TIME.format(date)}`);
+  const r: Rendered = render(item, nameOf, `${DAY.format(date)}, ${FULL_TIME.format(date)}`, {
+    now: Math.floor(Date.now() / 1000),
+    timeText: (at) => {
+      const d = new Date(at * 1000);
+      return `${DAY.format(d)}, ${FULL_TIME.format(d)}`;
+    },
+  });
   const presence = useRowPresence<HTMLLIElement>(true, { isNew });
   return (
     <li

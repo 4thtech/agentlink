@@ -27,6 +27,11 @@ export const NOTIFY_STRINGS = {
   updateLine: 'Settings › Updates',
   network: "Can't reach the message network",
   networkLine: "Messages wait and send when it's back.",
+  // DEVICES-INTERIM: the same ID on another computer (core devices.ts).
+  devices: 'This ID is also in use on another computer',
+  devicesLine: 'Spending limits apply per computer for now',
+  // DEVICES-INTERIM-2: when the other computer was last seen (the item's time, a date).
+  devicesSeen: (date: string): string => `Last seen ${date}`,
   justNow: 'just now',
   minutes: (n: number): string => `${String(n)} min ago`,
   hours: (n: number): string => `${String(n)} h ago`,

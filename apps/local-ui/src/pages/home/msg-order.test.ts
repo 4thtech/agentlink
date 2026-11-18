@@ -33,6 +33,22 @@ describe('MSG-ORDER-1: the conversation order', () => {
     expect(thread.map((t) => t.out)).toEqual([true, false, true, true, false, false]);
   });
 
+  it('DELIVERY-DETAILS: reads relay counts of a sent message, only two whole numbers', () => {
+    const base = { at: AT, text: '', files: [], proof: false, receipt: false, size: 1 };
+    const page = parsePage({
+      items: [
+        { ...base, id: 'a', status: 'sent', relays: { accepted: 3, available: 2, url: 'x' } },
+        { ...base, id: 'b', status: 'sent', relays: { accepted: -1, available: 2 } },
+        { ...base, id: 'c', status: 'queued', relays: { accepted: 1, available: 1 } },
+      ],
+    });
+    expect(page?.items.map((i) => [i.id, i.relays])).toEqual([
+      ['a', { accepted: 3, available: 2 }],
+      ['b', undefined],
+      ['c', undefined],
+    ]);
+  });
+
   it('still orders by time first', () => {
     const thread = mergeThread([item('in_late', 1, AT + 1)], [item('out_early', 9, AT)]);
     expect(thread.map((t) => t.item.id)).toEqual(['out_early', 'in_late']);

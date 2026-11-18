@@ -25,6 +25,8 @@ const outbox = (over: Partial<Row<'outbox'>> = {}): Row<'outbox'> => ({
   state: 'pending',
   reason: null,
   availability: null,
+  relays_accepted: null,
+  relays_available: null,
   ...over,
 });
 
@@ -72,6 +74,9 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         'content_file_budget',
         // SEC-OUTBOUND-CAPS (D-156; 06 §3 `outgoing`, schema 17): counts and times only.
         'outgoing_log',
+        // RESTORE-TRACES (D-156; 07 §3.5, schema 21): restore entries (no amount) and replays.
+        'budget_restores',
+        'restore_replays',
         // W4-PAUSE (D-143 (5); 07 §3.2, schema 12): the owner's pause of the agent.
         'agent_pause',
         'idempotency',
@@ -82,6 +87,8 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         'local_owner_actions',
         'budget_ledger',
         'budget_state',
+        // DEVICES-INTERIM: this computer's install, schema version 20.
+        'install_state',
         'commitment_parts',
       ].sort(),
     );
@@ -165,12 +172,31 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
   });
 
   it('SEC-RELAY-READBACK (schema 19): envelopes.availability and outbox.availability, nullable, appended last', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(19);
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(19);
     const availability = { kind: 'enum', nullable: true, values: ['confirmed', 'unknown'] };
-    expect(Object.keys(TABLES.envelopes.columns).at(-1)).toBe('availability');
     expect(TABLES.envelopes.columns.availability).toEqual(availability);
-    expect(Object.keys(TABLES.outbox.columns).at(-1)).toBe('availability');
     expect(TABLES.outbox.columns.availability).toEqual(availability);
+  });
+
+  it('DELIVERY-DETAILS (schema 20): relays_accepted and relays_available, nullable ints, appended last', () => {
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(20);
+    const int = { kind: 'int', nullable: true };
+    for (const table of ['envelopes', 'outbox'] as const) {
+      expect(Object.keys(TABLES[table].columns).slice(-2)).toEqual([
+        'relays_accepted',
+        'relays_available',
+      ]);
+      expect(TABLES[table].columns.relays_accepted).toEqual(int);
+      expect(TABLES[table].columns.relays_available).toEqual(int);
+    }
+  });
+
+  it('DEVICES-INTERIM (schema 22): budget_ledger.install_id, nullable, appended last; install_state one row', () => {
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(22);
+    expect(Object.keys(TABLES.budget_ledger.columns).at(-1)).toBe('install_id');
+    expect(TABLES.budget_ledger.columns.install_id).toEqual({ kind: 'id', nullable: true });
+    expect(TABLES.install_state.maxRows).toBe(1);
+    expect(TABLES.install_state.primaryKey).toEqual(['slot']);
   });
 
   it('files.saved_name (MSG-FILES-IO-b, schema 6): a nullable sealed column, appended last', () => {
@@ -283,6 +309,7 @@ describe('MemoryStore: constraints are enforced by the store (07 §3.7)', () => 
       deadline: 5,
       replaces: null,
       settled_at: null,
+      install_id: null,
     });
     await expect(
       store.transaction((tx) => tx.insert('budget_ledger', ledger('1.50'))),

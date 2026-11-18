@@ -25,6 +25,7 @@ import {
   type RelaySocketHandlers,
   type RelayTarget,
 } from '@4thtech-io/transport-nostr';
+import { DEFAULT_RELAYS, LEGACY_READ_RELAYS } from '@4thtech-io/transport-nostr';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ACK_KIND_RECEIVED } from './acks.js';
 import { AgentLinkClient } from './client.js';
@@ -56,6 +57,7 @@ import {
 import type { TestAgent, TestOwner } from './testing/envelopes.js';
 import { MemoryPolicyMark, newNonce, ownerHex, signWith } from './testing/owner.js';
 import { nostrTransport } from './transport.js';
+import { decodeInviteLink } from './invite-link.js';
 
 const RELAYS_A = Object.freeze(['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net']);
 const RELAYS_B = Object.freeze(['wss://one.relay-beta.net', 'wss://two.relay-beta.net']);
@@ -356,6 +358,56 @@ beforeEach(() => {
 
 // --- syncInbox ----------------------------------------------------------------------------------
 
+describe('RELAY-DEFAULTS-SWAP (0.5.13): legacy relays are read, never published to', () => {
+  const OLD_SET = ['wss://nos.lol', 'wss://nostr.mom'];
+
+  it('reads a message that is waiting on a legacy relay', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    const built = await a.client.envelopes.build({
+      to: { contact: b.id },
+      payload: textPayload('old relay'),
+    });
+    await deliverRaw(net, a, b, built.envelope, [OLD_SET[0] as string]);
+    const result = await b.client.syncInbox();
+    expect(result.items.map((i) => i.payload.body)).toEqual(['old relay']);
+  });
+
+  it('never publishes to a legacy relay: sends to a new-set contact stay on the new set', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', DEFAULT_RELAYS, net);
+    const b = await openAgent(2, 'bob', DEFAULT_RELAYS, net);
+    await pair(a, b);
+    expect((await a.client.sendMessage({ to: b.id, text: 'hi' })).status).toBe('ok');
+    expect(net.published).toBeGreaterThan(0);
+    for (const relay of LEGACY_READ_RELAYS) expect(net.stored.get(relay)).toBeUndefined();
+    expect([...net.stored.keys()].every((r) => DEFAULT_RELAYS.includes(r))).toBe(true);
+  });
+
+  it('an old-invite contact is still reachable: its own list is used to send to it', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', DEFAULT_RELAYS, net);
+    const b = await openAgent(2, 'bob', OLD_SET, net);
+    await pair(a, b);
+    expect((await a.client.sendMessage({ to: b.id, text: 'hi old' })).status).toBe('ok');
+    expect(net.stored.get(OLD_SET[0] as string)?.length).toBeGreaterThan(0);
+    const got = await b.client.syncInbox();
+    expect(got.items.map((i) => i.payload.body)).toEqual(['hi old']);
+  });
+
+  it('a new invite lists only the new set', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', DEFAULT_RELAYS, net);
+    const invite = await decodeInviteLink(
+      (await a.client.pairing.createInvite({ long: true })).inviteUrl,
+    );
+    expect([...invite.relays]).toEqual([...DEFAULT_RELAYS]);
+    for (const relay of LEGACY_READ_RELAYS) expect(invite.relays).not.toContain(relay);
+  });
+});
+
 describe('syncInbox (07 §2, §4.2): fetch, verify once, store, process', () => {
   it('returns a contact message with the wrapper metadata, and nothing new on the next pass', async () => {
     const net = new RelayNetwork();
@@ -395,13 +447,16 @@ describe('syncInbox (07 §2, §4.2): fetch, verify once, store, process', () => 
       expect(Object.keys(r.filter).sort()).toEqual(['ids', 'limit']);
     }
     const reqRelays = new Set(reads.map((r) => r.relay));
-    expect(reqRelays).toEqual(new Set(RELAYS_B));
+    // RELAY-DEFAULTS-SWAP (0.5.13): plus the legacy read-only relays, for the transition.
+    expect(reqRelays).toEqual(new Set([...RELAYS_B, ...LEGACY_READ_RELAYS]));
     for (const r of reads) {
       expect(r.filter.kinds).toEqual([1059]);
       expect(r.filter['#p']).toEqual([b.nostr]);
     }
     const state = await rowsOf(b);
-    expect(state.cursors.map((c) => c.relay_url).sort()).toEqual([...RELAYS_B].sort());
+    expect(state.cursors.map((c) => c.relay_url).sort()).toEqual(
+      [...RELAYS_B, ...LEGACY_READ_RELAYS].sort(),
+    );
 
     const second = await b.client.syncInbox();
     expect(second.items).toEqual([]);
@@ -767,6 +822,109 @@ describe('SEC-RESTORE-GUARD: inbound sent before a restore triggers no ack', () 
     const result = await b.client.syncInbox();
     expect(result.items).toHaveLength(1);
     expect(result.acksSent).toBe(0);
+  });
+});
+
+describe('RESTORE-TRACES: inbound received again after a restore, and the restore entry', () => {
+  it('a message created before the restore and received after it is labelled; a newer one is not', async () => {
+    const net = new RelayNetwork();
+    const restoredAt = { value: 0 };
+    const restoreMark: RestoreMark = { read: () => Promise.resolve(restoredAt.value) };
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { restoreMark });
+    await pair(a, b);
+    await a.client.sendMessage({ to: b.id, text: 'before the restore' });
+    clock.t += 3_600;
+    restoredAt.value = clock.t;
+    await b.client.syncInbox();
+    clock.t += 3_600;
+    await a.client.sendMessage({ to: b.id, text: 'after the restore' });
+    await b.client.syncInbox();
+    const page = await b.client.messages.list(a.id, 'in');
+    const byText = new Map(page.items.map((i) => [i.text, i]));
+    expect(byText.get('before the restore')).toMatchObject({ receivedAgain: true });
+    expect(byText.get('after the restore')).not.toHaveProperty('receivedAgain');
+    const replays = await b.store.transaction((tx) => tx.select('restore_replays'));
+    expect(replays).toEqual([
+      { envelope_id: byText.get('before the restore')?.id, restored_at: restoredAt.value },
+    ]);
+  });
+
+  it('an update that started the guard labels nothing, and stores no replay rows', async () => {
+    const net = new RelayNetwork();
+    const restoredAt = { value: 0 };
+    const restoreMark: RestoreMark = {
+      read: () => Promise.resolve(restoredAt.value),
+      reason: () => Promise.resolve('update'),
+    };
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { restoreMark });
+    await pair(a, b);
+    await a.client.sendMessage({ to: b.id, text: 'before the update' });
+    clock.t += 3_600;
+    restoredAt.value = clock.t;
+    await b.client.syncInbox();
+    const page = await b.client.messages.list(a.id, 'in');
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]).not.toHaveProperty('receivedAgain');
+    expect(await b.store.transaction((tx) => tx.select('restore_replays'))).toEqual([]);
+  });
+
+  it('a sync reads the restore mark once for its batch and passes it to every receive', async () => {
+    const net = new RelayNetwork();
+    // A restore long ago: each read gives a new state object, so one object means one read.
+    const restoreMark: RestoreMark = { read: () => Promise.resolve(1) };
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { restoreMark });
+    await pair(a, b);
+    for (const text of ['one', 'two', 'three']) await a.client.sendMessage({ to: b.id, text });
+    const inputs: unknown[] = [];
+    const receive = b.client.envelopes.receive.bind(b.client.envelopes);
+    b.client.envelopes.receive = (input) => {
+      inputs.push(input);
+      return receive(input);
+    };
+    await b.client.syncInbox();
+    expect(inputs.length).toBeGreaterThanOrEqual(3);
+    const states = inputs.map((i) => (i as { restore?: unknown }).restore);
+    for (const state of states) {
+      expect(state).toEqual({ status: 'restored', restoredAt: 1, reason: 'restore' });
+    }
+    // One object for the whole batch: read once, not per envelope.
+    expect(new Set(states).size).toBe(1);
+  });
+
+  it('an unreadable restore mark labels nothing (the label needs a known restore time)', async () => {
+    const net = new RelayNetwork();
+    const restoreMark: RestoreMark = { read: () => Promise.reject(new Error('unreadable')) };
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { restoreMark });
+    await pair(a, b);
+    await a.client.sendMessage({ to: b.id, text: 'hi' });
+    await b.client.syncInbox();
+    const page = await b.client.messages.list(a.id, 'in');
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]).not.toHaveProperty('receivedAgain');
+  });
+
+  it('opening the restored store writes the restore entry to the spending history, once', async () => {
+    const net = new RelayNetwork();
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    const at = clock.t - 120;
+    const restoreMark: RestoreMark = {
+      read: () => Promise.resolve(at),
+      reason: () => Promise.resolve('restore'),
+    };
+    for (let i = 0; i < 2; i += 1) {
+      await openAgent(2, 'bob', RELAYS_B, net, {
+        store: b.store,
+        keyStore: b.keyStore,
+        init: false,
+        restoreMark,
+      });
+    }
+    const rows = await b.store.transaction((tx) => tx.select('budget_restores'));
+    expect(rows).toEqual([{ restored_at: at, reason: 'restore', noted_at: clock.t }]);
   });
 });
 
@@ -1528,6 +1686,8 @@ async function storeInboundOk(to: Agent, from: Agent, n: number): Promise<string
         request_accepted_at: null,
         deleted_at: null,
         availability: null,
+        relays_accepted: null,
+        relays_available: null,
       });
     }
   });
@@ -1575,6 +1735,8 @@ describe('M1-7h-b (IR-M1-7h-1 F04): catch-up counts, staged acks, a failing key 
           request_accepted_at: null,
           deleted_at: null,
           availability: null,
+          relays_accepted: null,
+          relays_available: null,
         });
       });
     });

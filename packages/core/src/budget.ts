@@ -110,6 +110,9 @@ export function checkAndReserveProof(
   if (!reserve) return { ...result, reserved: false };
 
   const state = tx.get('budget_state', { slot: SINGLETON_SLOT });
+  // DEVICES-INTERIM: the install that writes the row (devices.ts ensureInstall ran before this
+  // transaction); null without one. A label only: the window sums every row of the epoch.
+  const install = tx.get('install_state', { slot: SINGLETON_SLOT });
   tx.insert('budget_ledger', {
     entry_id: reservation.entryId,
     ledger_epoch: state?.ledger_epoch ?? 0,
@@ -123,6 +126,7 @@ export function checkAndReserveProof(
     deadline: reservation.deadline,
     replaces: null,
     settled_at: null,
+    install_id: install?.install_id ?? null,
   });
   if (state !== undefined && now > state.newest_t) {
     tx.update('budget_state', { slot: SINGLETON_SLOT }, { newest_t: now });

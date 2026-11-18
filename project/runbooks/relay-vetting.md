@@ -4,7 +4,11 @@
 Check each relay of the default set (D-75) against what AgentLink needs, and record a dated result, so M1-18 can sign off the relays before external testers arrive.
 
 ## When to use
-Before the J9 dogfood and before external testers; whenever the default list changes (`packages/transport-nostr/src/default-relays.ts`); and about every quarter while the list is public relays. Not part of CI: it talks to live third-party relays.
+Before the J9 dogfood and before external testers; whenever the default list changes (`packages/transport-nostr/src/default-relays.ts`); and about every quarter while the list is public relays. The full run (it publishes one test event per relay) is manual and not part of CI: it talks to live third-party relays.
+
+**Daily read-only check (0.5.13, RELAY-DEFAULTS-HEALTH).** `.github/workflows/relay-health.yml` runs `node tools/relays/vet.mjs --live --id-readback` every day (05:41 UTC), on manual dispatch, and on a pull request that changes `packages/transport-nostr/src/default-relays.ts` or `tools/relays/**`. It sends no event and no login, uses no secret and has only `contents: read`. Per relay it samples recent kind-1059 ids and asks for one by id on a fresh connection. The results go to the job summary. It is not part of `ci-gate`, and a failure never blocks a merge: an unreachable relay is the finding, and the job fails only when the check itself breaks. Read the summary after a change to the list, and when users report that messages are slow to arrive; a relay that fails from GitHub's runners may still work elsewhere, so treat it as a signal, not a verdict.
+
+**The default set today (0.5.13, RELAY-DEFAULTS-SWAP, D-75 as amended).** `wss://offchain.pub`, `wss://relay.primal.net`, `wss://relay.snort.social` and `wss://nostr.bitcoiner.social`. `wss://nos.lol` and `wss://nostr.mom` left the default set because some networks cannot reach them. They are still read, never published to, as `LEGACY_READ_RELAYS` (`packages/transport-nostr/src/legacy-relays.ts`), at least until 2027-03-02 (card LEGACY-RELAYS-REMOVAL). That file is not part of the default set, and `tools/relays/vet.mjs` never reads it.
 
 ## Who runs it
 The orchestrator or a builder (Sonnet or above) on a machine with network access. The owner confirms the sign-off.

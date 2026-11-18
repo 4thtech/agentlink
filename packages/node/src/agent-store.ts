@@ -5,6 +5,7 @@
 // item raised under the store's inter-process lock, for AgentLinkClient.create's `policyMark`.
 import {
   StoreUsageError,
+  type InstallIdSource,
   type OwnStorageKeys,
   type PolicyVersionMark,
   type ReceiptsKeptMark,
@@ -21,6 +22,7 @@ import {
   type KeychainKeyStoreOptions,
 } from './keychain-keystore.js';
 import { osKeychain, type KeyStoreBackendKind, type KeychainBackend } from './keychain.js';
+import { keychainInstallId } from './install-id.js';
 import { keychainPolicyMark } from './policy-mark.js';
 import { keychainReceiptsKept } from './receipts-kept.js';
 import { keychainRestoreMark } from './restore-mark.js';
@@ -54,6 +56,12 @@ export interface AgentStore {
    * AgentLinkClient.create's `restoreMark`.
    */
   readonly restoreMark: RestoreMark;
+  /**
+   * DEVICES-INTERIM: this computer's install id, an item of the agent's recorded backend
+   * (install-id.ts), created under this store's inter-process lock when missing. Pass it as
+   * AgentLinkClient.create's `installId`.
+   */
+  readonly installId: InstallIdSource;
   /**
    * The own-storage KeyStore items of the agent's recorded backend (M1-9i-c; 04 §2.2): the
    * `storage-mark`, written under this store's inter-process lock and read back, and the
@@ -151,6 +159,15 @@ export async function openAgentStoreWith(
         ? Promise.resolve('update' as const)
         : (restore.reason?.() ?? Promise.resolve('update')),
   });
+  const install = keychainInstallId(
+    items,
+    agentId,
+    (fn) => store.withInterProcessLock(fn),
+    keyOptions,
+  );
+  const installId: InstallIdSource = Object.freeze({
+    read: (): Promise<string> => (closed ? storeClosed() : install.read()),
+  });
   const own = ownStorageKeysOver(
     items,
     agentId,
@@ -170,6 +187,7 @@ export async function openAgentStoreWith(
     policyMark,
     receiptsKept,
     restoreMark,
+    installId,
     ownStorageKeys,
     close: async (): Promise<void> => {
       closed = true;

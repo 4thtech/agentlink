@@ -1,6 +1,6 @@
 // M1-7k: the Transport adapter over transport-nostr (07 §4.1, §4.2). No network: the connector
 // records what it is asked to open and never connects.
-import { TransportError, type RelayConnector } from '@4thtech-io/transport-nostr';
+import { MAX_READBACKS, TransportError, type RelayConnector } from '@4thtech-io/transport-nostr';
 import { describe, expect, it } from 'vitest';
 import { nostrTransport } from './transport.js';
 import { MemoryKeyStore } from '@4thtech-io/crypto/testing';
@@ -73,6 +73,34 @@ describe('nostrTransport (07 §4.1)', () => {
     expect(typeof transport.close).toBe('function');
     expect(sockets[0]!.closed).toBe(true);
     await expect(waiting).resolves.toMatchObject({ sent: false });
+    await keys.close();
+  });
+});
+
+describe('nostrTransport read-back slots (DELIVERY-DETAILS)', () => {
+  it('forwards readbackSpare from the pool: true while idle, false once every check slot is busy', async () => {
+    const quiet: RelayConnector = {
+      open(_target, handlers) {
+        void Promise.resolve().then(() => handlers.onOpen());
+        return { send: () => {}, close: () => {} };
+      },
+    };
+    const keys = new MemoryKeyStore(seed(3));
+    const transport = nostrTransport({ connector: quiet, addressCheck: 'platform' })({
+      keys,
+      now: () => 1_800_000_000,
+      mayAuthenticate: () => false,
+    });
+    expect(typeof transport.readbackSpare).toBe('function');
+    expect(transport.readbackSpare?.()).toBe(true);
+    const id = 'ab'.repeat(32);
+    const checks = Array.from({ length: MAX_READBACKS }, (_, i) =>
+      transport.checkServed?.(`wss://r${i}.relay-alpha.net`, id),
+    );
+    await Promise.resolve();
+    expect(transport.readbackSpare?.()).toBe(false);
+    transport.close?.();
+    await Promise.all(checks);
     await keys.close();
   });
 });

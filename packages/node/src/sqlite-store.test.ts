@@ -54,6 +54,8 @@ const outbox = (over: Partial<Row<'outbox'>> = {}): Row<'outbox'> => ({
   state: 'pending',
   reason: null,
   availability: null,
+  relays_accepted: null,
+  relays_available: null,
   ...over,
 });
 
@@ -80,6 +82,7 @@ const ledger = (over: Partial<Row<'budget_ledger'>> = {}): Row<'budget_ledger'> 
   deadline: 100,
   replaces: null,
   settled_at: null,
+  install_id: null,
   ...over,
 });
 
@@ -476,9 +479,9 @@ describe(
       // add a migration with the next version instead (07 §3.7: forward migrations only).
       const digestOf = (i: number) =>
         encodeHex(sha256(encodeUtf8(MIGRATIONS[i]?.statements.join(';\n') ?? '')));
-      expect(STORE_SCHEMA_VERSION).toBe(19);
+      expect(STORE_SCHEMA_VERSION).toBe(22);
       expect(MIGRATIONS.map((m) => m.version)).toEqual([
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
       ]);
       // Version 1 (G-9) is unchanged by D-72.
       expect(digestOf(0)).toMatchInlineSnapshot(
@@ -653,6 +656,20 @@ describe(
       // Version 19 (SEC-RELAY-READBACK, D-156 (7)): two nullable columns appended
       // (sqlite-store-v19.test.ts). Versions 1 to 18 keep their statements.
       expect(MIGRATIONS[18]?.statements).toHaveLength(2);
+      // Version 20 (DELIVERY-DETAILS): four nullable integer columns appended
+      // (sqlite-store-v20.test.ts). Versions 1 to 19 keep their statements.
+      expect(MIGRATIONS[19]?.statements).toHaveLength(4);
+      // Version 21 (RESTORE-TRACES, D-156): two new tables only
+      // (sqlite-store-restore-traces.test.ts). Versions 1 to 20 keep their statements.
+      const v20 = MIGRATIONS[20]?.statements ?? [];
+      expect(v20.filter((s) => s.startsWith('CREATE TABLE')).map((s) => s.split('"')[1])).toEqual([
+        'budget_restores',
+        'restore_replays',
+      ]);
+      expect(v20.every((s) => !s.startsWith('ALTER TABLE'))).toBe(true);
+      // Version 22 (DEVICES-INTERIM): one nullable column appended, the `install_state` table and
+      // its one-row trigger (sqlite-store-v22.test.ts). Versions 1 to 21 keep their statements.
+      expect(MIGRATIONS[21]?.statements).toHaveLength(3);
     });
 
     it('migrates a version 13 file to version 14 (REL051-B2): invites kept, invite_link null', async () => {
@@ -1319,7 +1336,7 @@ describe(
         `INSERT INTO "seen" VALUES ('wrap', 'x', -1)`,
         `INSERT INTO "seen" VALUES ('wrap', 'x', 9007199254740992)`,
         `INSERT INTO "seen" VALUES ('wrap', 'x', 'soon')`,
-        `INSERT INTO "budget_ledger" VALUES ('e', 0, 1, 'r', 1, NULL, '1.50', NULL, 'reserved', 1, NULL, NULL)`,
+        `INSERT INTO "budget_ledger" VALUES ('e', 0, 1, 'r', 1, NULL, '1.50', NULL, 'reserved', 1, NULL, NULL, NULL)`,
         `INSERT INTO "budget_state" VALUES ('other', 0, 'ok', 0, 0, NULL)`,
       ];
       for (const sql of attempts) {
@@ -1334,7 +1351,7 @@ describe(
       (await SqliteStore.open(path())).close();
       const raw = new Database(path());
       const insert = raw.prepare(
-        `INSERT INTO "budget_ledger" VALUES (?, 0, 1, ?, 1, NULL, ?, NULL, 'reserved', 1, NULL, NULL)`,
+        `INSERT INTO "budget_ledger" VALUES (?, 0, 1, ?, 1, NULL, ?, NULL, 'reserved', 1, NULL, NULL, NULL)`,
       );
       const alphabet = '0123456789.';
       let seed = 7;

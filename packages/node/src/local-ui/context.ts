@@ -32,6 +32,7 @@ import type {
   Conversation,
   CreditsMoveResult,
   CreditsView,
+  RelayMigration,
   EffectivePolicy,
   ExchangeTimes,
   FlowEvents,
@@ -430,6 +431,8 @@ export interface LocalUiReadClient {
     renameAllowance?(): Promise<RenameAllowance>;
     /** D-141: whether the agent can send (an unfinished rotation is `rotation_pending`; read). */
     sendState?(): Promise<SendState>;
+    /** RELAY-CARD-MIGRATION: whether the card still lists a dropped server (core, read). */
+    relayMigration?(): Promise<RelayMigration>;
     /** W4-PAUSE (D-143 (5)): the agent's pause row (core `pause.read`; `unreadable` is paused). */
     pauseState?(): Promise<PauseReading>;
     /**
@@ -534,6 +537,8 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       cardName: () => client.identity.cardName(),
       renameAllowance: () => client.identity.renameAllowance(),
       sendState: () => client.identity.sendState(),
+      // RELAY-CARD-MIGRATION: the "Update your contact details" read.
+      relayMigration: () => client.identity.relayMigration(),
       // W4-PAUSE: the pause row and the unsigned `agent.resume` (read and prepare only).
       pauseState: () => client.pause.read(),
       prepareResume: () => client.ownerActions.prepareResume(),

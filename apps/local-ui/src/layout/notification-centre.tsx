@@ -59,12 +59,24 @@ export function ago(at: number, nowSeconds: number): string {
   return S.days(Math.floor(s / 86_400));
 }
 
+const SEEN_DATE = new Intl.DateTimeFormat(undefined, {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
+
+/** DEVICES-INTERIM-2: the date the other computer was last seen (the devices item's time). */
+export function devicesSeenDate(at: number): string {
+  return SEEN_DATE.format(new Date(at * 1000));
+}
+
 const ICON: Readonly<Record<NotificationItem['kind'], ShellIconName>> = {
   approvals: 'check',
   messages: 'stream',
   files: 'book',
   update: 'rocket',
   network: 'relays',
+  devices: 'idcard',
 };
 
 const TONE: Readonly<Record<NotificationItem['kind'], string>> = {
@@ -73,6 +85,7 @@ const TONE: Readonly<Record<NotificationItem['kind'], string>> = {
   files: 'accent',
   update: 'accent',
   network: 'neutral',
+  devices: 'warning',
 };
 
 /** Groups (PLAN-NOTIFY §4.1): approvals waiting first, then unread, then read. */
@@ -118,6 +131,8 @@ function Sentence({
       return <>{S.update}</>;
     case 'network':
       return <>{S.network}</>;
+    case 'devices':
+      return <>{S.devices}</>;
   }
 }
 
@@ -127,6 +142,7 @@ const SECOND_LINE: Readonly<Record<NotificationItem['kind'], string>> = {
   files: S.personLine,
   update: S.updateLine,
   network: S.networkLine,
+  devices: S.devicesLine,
 };
 
 function Row({
@@ -158,7 +174,8 @@ function Row({
           <Sentence item={item} names={names} />
         </span>
         <span className="al-nc-sub">
-          {SECOND_LINE[item.kind]} · {ago(item.at, now)}
+          {SECOND_LINE[item.kind]} ·{' '}
+          {item.kind === 'devices' ? S.devicesSeen(devicesSeenDate(item.at)) : ago(item.at, now)}
         </span>
       </span>
       {unread ? (

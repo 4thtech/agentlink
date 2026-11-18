@@ -18,6 +18,9 @@
 //   called {new}", the contact's latest name change from a card-update, at that time; both names
 //   under the name rule (restrictName), the old one from `former_name`, the new one the contact's own
 //   name (also under an owner alias). It stays after the note was seen;
+// - RESTORE-TRACES (D-156): `budget_restores`, the restore entries of the spending history
+//   (`restore_guard`, at the restore time, with its reason and the end of the 24-hour guard). No
+//   amount and no cost: it is never a charge;
 // - `policies`: the signed rules now in force, at `applied_at` (the store keeps only the current
 //   version, so earlier changes are not listed);
 // - UX1113 WP-A1 (design-1112 spec §7): `contacts` with a completed pairing (`contact_connected`,
@@ -96,6 +99,7 @@ import {
   type PageQuery,
 } from './paging.js';
 import { LISTED_PROOF_STATUSES } from './proofs/service.js';
+import { RESTORE_GUARD_SECONDS } from './restore-guard.js';
 import { senderCodesFor, unknownSenderCodesTx } from './sender-codes.js';
 import { SINGLETON_SLOT, type Row } from './store/schema.js';
 import type { StoreTx, Where } from './store/store.js';
@@ -297,7 +301,17 @@ export type ActivityEntry =
       readonly formerName: string;
       readonly newName: string;
     })
-  | (EntryBase & { readonly kind: 'rules_changed'; readonly version: number });
+  | (EntryBase & { readonly kind: 'rules_changed'; readonly version: number })
+  | (EntryBase & {
+      /**
+       * RESTORE-TRACES (D-156): the ID was restored from a backup (`restore`), or an update started
+       * the restore guard (`update`); paid actions asked the owner until `until`. A spending-history
+       * entry with no amount: never a charge, never counted.
+       */
+      readonly kind: 'restore_guard';
+      readonly reason: 'restore' | 'update';
+      readonly until: number;
+    });
 
 export type ApprovalDecision = 'approved' | 'approved_by_rules' | 'denied' | 'cancelled';
 
@@ -1012,6 +1026,23 @@ export class ActivityService {
             id,
             at: policy.applied_at,
             version: policy.version,
+          })),
+        );
+      }
+
+      // RESTORE-TRACES (D-156): the restore entries of the spending history, at the restore time. A
+      // time and a reason only (one row per restore mark, so few): never an amount or a cost.
+      for (const r of tx.select('budget_restores')) {
+        const id = `restore_guard:${String(r.restored_at)}`;
+        add(
+          r.restored_at,
+          id,
+          plain(() => ({
+            kind: 'restore_guard',
+            id,
+            at: r.restored_at,
+            reason: r.reason,
+            until: r.restored_at + RESTORE_GUARD_SECONDS,
           })),
         );
       }

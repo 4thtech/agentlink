@@ -17,6 +17,8 @@ import {
   epochKeysOf,
   initOwner,
   performOwnerOperation,
+  updateContactDetailsAtTerminal,
+  type RelayMigrationOutcome,
   type AddAgentOptions,
   type AddAgentResult,
   type AgentEpochKeys,
@@ -116,6 +118,15 @@ export interface OwnerCommandDeps {
    * first label. Absent: nothing is written (the app reads the signed label from the store).
    */
   writeLabel?(name: string, label: string): Promise<void>;
+  /**
+   * RELAY-CARD-MIGRATION: `owner update-contact-details` † (@4thtech-io/node
+   * updateContactDetailsAtTerminal): presence at this process's own terminal, then the ID's next
+   * card with the migrated list. Absent: the command says it didn't go through.
+   */
+  updateContactDetails?(input: {
+    readonly agent: OwnerAgent;
+    readonly owner: OwnerPublicKeys;
+  }): Promise<RelayMigrationOutcome>;
 }
 
 /** Opens an agent through the M1-9k runtime, keeping the store and cipher it opened. */
@@ -210,5 +221,19 @@ export function nodeOwnerDeps(home: string = homedir()): OwnerCommandDeps {
     now: () => Math.floor(Date.now() / 1000),
     cardRelays: () => PROVISIONAL_CARD_RELAYS,
     writeLabel: (name, label) => writeAgentLabel(home, name, label),
+    updateContactDetails: async ({ agent, owner }) => {
+      // Only an agent whose KeyStore the node package opened carries its key items.
+      if (agent.epochKeys === undefined) return { status: 'refused', reason: 'not_applied' };
+      return updateContactDetailsAtTerminal({
+        agent: agent.client.agentId,
+        client: {
+          identity: agent.client.identity,
+          sendCardUpdates: () => agent.client.sendCardUpdates(),
+          contacts: agent.client.contacts,
+        },
+        epochKeys: agent.epochKeys,
+        ownerKeys: owner,
+      });
+    },
   });
 }

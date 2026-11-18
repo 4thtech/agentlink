@@ -202,6 +202,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/join/handoff',
       // W4-RENAME-REACHES-CONTACTS: "Contacts still see" and the former-name seen mark.
       '/api/ui/agents/card-name',
+      // RELAY-CARD-MIGRATION: "Update your contact details" (api/contact-details.test.ts).
+      '/api/ui/contact-details',
       '/api/ui/contacts/:ref/name-seen',
       // W4-INVITES-LIST: the open invites (a read) and Cancel (api/invites-short.test.ts).
       '/api/ui/invites',

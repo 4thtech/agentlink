@@ -7,6 +7,7 @@ import { encodeHex, type Envelope, type KeyStore, type NostrEvent } from '@4thte
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
 import { createLogger } from '@4thtech-io/log';
 import {
+  LEGACY_READ_RELAYS,
   wrapEnvelope,
   type RelayConnector,
   type RelaySocket,
@@ -402,13 +403,14 @@ describe('subscribeInbox (M1-9s; 07 §4.1, §4.2; 06 §6)', () => {
     expect(net.openSockets).toBe(0);
   });
 
-  it('reads only the own relays, with #p = own keys (07 §4.3)', async () => {
+  it('reads the own relays and the legacy read-only relays, with #p = own keys (07 §4.3; RELAY-DEFAULTS-SWAP)', async () => {
     const net = new LiveRelayNetwork();
     const b = await openAgent(2, 'bob', RELAYS_B, net);
     const sub = await b.client.subscribeInbox();
     await until(() => liveSubsOn(net, RELAYS_B) === RELAYS_B.length);
+    await until(() => liveSubsOn(net, LEGACY_READ_RELAYS) === LEGACY_READ_RELAYS.length);
     for (const s of net.subs) {
-      expect(RELAYS_B).toContain(s.relay);
+      expect([...RELAYS_B, ...LEGACY_READ_RELAYS]).toContain(s.relay);
       expect(s.filter.kinds).toEqual([1059]);
       expect(s.filter['#p']).toEqual([b.nostr]);
     }

@@ -78,11 +78,14 @@ import {
   type PreparedCardUpdate,
 } from './contacts.js';
 import { nowOf, seal, type CoreContext } from './context.js';
+import { ensureInstall, noteSentCopyTx, sentCopyContext } from './devices.js';
 import { checkRecipientWrap, kidOf } from './envelope-wraps.js';
 import { CoreError } from './errors.js';
 import { receivedFileRows } from './files/received.js';
 import type { IdentityService } from './identity.js';
 import { REQUESTS_FULL, isBlockedTx, pruneRefusedTx, requestsFullTx } from './requests.js';
+import { readRestoreState, type RestoreState } from './restore-guard.js';
+import { noteReplayTx } from './restore-traces.js';
 import {
   isTermsType,
   termsBodyOf,
@@ -126,6 +129,11 @@ export interface ReceiveInput {
   readonly envelope: unknown;
   /** The gift-wrap event id (64 lowercase hex), recorded in `seen` (07 §3.2). */
   readonly giftWrapId?: string;
+  /**
+   * RESTORE-TRACES: the restore state the caller read once for its batch (sync). Absent: receive
+   * reads it itself.
+   */
+  readonly restore?: RestoreState;
 }
 
 /**
@@ -696,6 +704,8 @@ export class EnvelopeService {
     }
     try {
       const now = nowOf(this.#ctx);
+      // RESTORE-TRACES: the batch's state, or read here (the mark is a KeyStore item); never throws.
+      const restore = input.restore ?? (await readRestoreState(this.#ctx));
       return await this.#ctx.store.transaction((tx): ReceiveResult => {
         const markSeen = (): void => {
           if (wrapId !== undefined && tx.get('seen', { kind: 'wrap', id: wrapId }) === undefined) {
@@ -760,7 +770,11 @@ export class EnvelopeService {
           request_accepted_at: null,
           deleted_at: null,
           availability: null,
+          relays_accepted: null,
+          relays_available: null,
         });
+        // RESTORE-TRACES: first stored after a restore but created before it: received again.
+        noteReplayTx(tx, restore, envelope.id, envelope.createdAt);
         markSeen();
         return { status: 'verified', report: report(envelope.id, 'deferred') };
       });
@@ -1550,8 +1564,17 @@ export class EnvelopeService {
       request_accepted_at: null,
       deleted_at: null,
       availability: null,
+      relays_accepted: null,
+      relays_available: null,
     };
     const now = nowOf(ctx);
+    // DEVICES-INTERIM (devices.ts): a sent copy this store never wrote is another computer's. The
+    // install row and the restore mark are KeyStore reads, made before the transaction.
+    let sentCopy: RestoreState | undefined;
+    if (d.state === 'sent_copy') {
+      await ensureInstall(ctx);
+      sentCopy = await sentCopyContext(ctx);
+    }
     let revoked: RevokeActivity | undefined;
     try {
       const done = await ctx.store.transaction((tx) => {
@@ -1600,6 +1623,9 @@ export class EnvelopeService {
           tx.delete('blocked_keys', { from_key: agentNostrKey(d.cardUpdate.card) });
         }
         writeRow(tx, item, row);
+        if (sentCopy !== undefined) {
+          noteSentCopyTx(tx, { createdAt: envelope.createdAt, now, restore: sentCopy });
+        }
         for (const f of received.rows) {
           if (tx.get('files', { envelope_id: f.envelope_id, idx: f.idx }) === undefined) {
             tx.insert('files', f);
@@ -1808,6 +1834,8 @@ export class EnvelopeService {
         request_accepted_at: null,
         deleted_at: null,
         availability: null,
+        relays_accepted: null,
+        relays_available: null,
       });
       return report(item.envelopeId, 'refused', {
         reason: effective.reason,
@@ -1957,6 +1985,8 @@ export async function outboundRow(
     request_accepted_at: null,
     deleted_at: null,
     availability: null,
+    relays_accepted: null,
+    relays_available: null,
   };
 }
 

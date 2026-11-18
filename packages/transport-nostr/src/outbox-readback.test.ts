@@ -9,10 +9,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   OUTBOX_GIVE_UP_SECONDS,
   OutboxWorker,
+  READBACK_COUNT_GRACE_MS,
   READBACK_GRACE_SECONDS,
   READBACK_RECHECK_MS,
   type OutboxAttempt,
   type OutboxAvailability,
+  type OutboxRelayCounts,
   type OutboxPersistence,
   type OutboxRow,
 } from './outbox.js';
@@ -29,7 +31,11 @@ afterEach(() => {
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 
-type StoredRow = OutboxRow & { state: string; availability?: OutboxAvailability };
+type StoredRow = OutboxRow & {
+  state: string;
+  availability?: OutboxAvailability;
+  counts?: OutboxRelayCounts;
+};
 
 class Rows implements OutboxPersistence {
   readonly rows = new Map<string, StoredRow>();
@@ -55,9 +61,14 @@ class Rows implements OutboxPersistence {
     id: string,
     acks: Readonly<Record<string, number>>,
     availability: OutboxAvailability,
+    counts: OutboxRelayCounts,
   ): Promise<boolean> {
-    this.rows.set(id, { ...this.get(id), acks, state: 'sent', availability });
+    this.rows.set(id, { ...this.get(id), acks, state: 'sent', availability, counts });
     return Promise.resolve(true);
+  }
+  updateRelayCounts(id: string, counts: OutboxRelayCounts): Promise<void> {
+    this.rows.set(id, { ...this.get(id), counts });
+    return Promise.resolve();
   }
   markNotDelivered(id: string): Promise<boolean> {
     this.rows.set(id, { ...this.get(id), state: 'not_delivered' });
@@ -121,6 +132,33 @@ describe('read-back before "sent"', () => {
     const reqs = relays.flatMap((r) => net.reqs(r));
     expect(reqs.length).toBeGreaterThan(0);
     for (const req of reqs) expect(req.filter).toEqual({ ids: [row.wrapId], limit: 1 });
+  });
+
+  it('DELIVERY-DETAILS: stores how many relays accepted it and how many served it back', async () => {
+    const { net, rows, worker } = setup();
+    const [a, b] = relayUrls('count', 2) as [string, string];
+    net.configure(a);
+    net.configure(b, { neverServes: true });
+    const row = makeRow([a, b]);
+    rows.add(row);
+    await pass(worker);
+    expect(rows.get(row.wrapId)).toMatchObject({
+      state: 'sent',
+      availability: 'confirmed',
+      counts: { accepted: 2, available: 1 },
+    });
+  });
+
+  it('DELIVERY-DETAILS: nothing served means available 0, and no relay address is in the counts', async () => {
+    const { net, rows, worker } = setup();
+    const relays = relayUrls('none', 2);
+    for (const url of relays) net.configure(url, { neverServes: true });
+    const row = makeRow(relays);
+    rows.add(row);
+    await pass(worker);
+    const stored = rows.get(row.wrapId);
+    expect(stored.counts).toEqual({ accepted: 2, available: 0 });
+    expect(JSON.stringify(stored.counts)).not.toContain('wss');
   });
 
   it('is sent when only one of the acking relays serves it', async () => {
@@ -208,6 +246,101 @@ describe('read-back before "sent"', () => {
       expect(rows.get(row.wrapId)).toMatchObject({ state: 'sent', availability: 'confirmed' });
     }
   });
+
+  it('DELIVERY-DETAILS: a second relay that answers within the grace is counted', async () => {
+    const { net, rows, worker } = setup();
+    const relays = relayUrls('both', 2);
+    for (const url of relays) net.configure(url);
+    const row = makeRow(relays);
+    rows.add(row);
+    await pass(worker);
+    expect(rows.get(row.wrapId)).toMatchObject({
+      availability: 'confirmed',
+      counts: { accepted: 2, available: 2 },
+    });
+  });
+
+  it('DELIVERY-DETAILS load: 100 concurrent sends x 2 rows, one silent relay: every row is confirmed', async () => {
+    const { net, pool } = setup();
+    const [honest, silent] = relayUrls('load', 2) as [string, string];
+    net.configure(honest);
+    net.configure(silent, { silentIdsReq: true });
+    const sends = Array.from({ length: 100 }, () => {
+      const rows = new Rows();
+      const own = [makeRow([honest, silent]), makeRow([honest, silent])];
+      for (const row of own) rows.add(row);
+      const worker = new OutboxWorker({ persistence: rows, pool, random: () => 0 });
+      return { rows, own, done: worker.processDue() };
+    });
+    let finished = 0;
+    for (const s of sends) void s.done.then(() => (finished += 1));
+    for (let i = 0; i < 400 && finished < sends.length; i += 1) {
+      await vi.advanceTimersByTimeAsync(500);
+    }
+    await Promise.all(sends.map((s) => s.done));
+    const all = sends.flatMap((s) => s.own.map((r) => s.rows.get(r.wrapId)));
+    expect(all).toHaveLength(200);
+    expect(all.filter((r) => r.availability === 'confirmed')).toHaveLength(200);
+  }, 60_000);
+
+  it('DELIVERY-DETAILS: the pass never waits on counting; counts are updated within the grace', async () => {
+    const { net, rows, pool } = setup();
+    const [fast, slow, silent] = relayUrls('nb', 3) as [string, string, string];
+    net.configure(fast);
+    net.configure(slow);
+    net.configure(silent, { silentIdsReq: true });
+    const spared = Object.assign(Object.create(pool), {
+      readbackSpare: () => true,
+      checkServed: pool.checkServed.bind(pool),
+    }) as RelayPool;
+    const worker = new OutboxWorker({ persistence: rows, pool: spared, random: () => 0 });
+    const at = Math.floor(Date.now() / 1000);
+    const row = makeRow([fast, slow, silent], { [fast]: at, [slow]: at, [silent]: at });
+    rows.add(row);
+    await Promise.all([
+      vi.advanceTimersByTimeAsync(100),
+      pool.publish(JSON.parse(row.wrapJson ?? '{}'), [fast, slow, silent]),
+    ]);
+    let ended = false;
+    void worker.processDue().then(() => (ended = true));
+    await vi.advanceTimersByTimeAsync(50);
+    // sent and confirmed at the first served, with no wait on the grace
+    expect(ended).toBe(true);
+    expect(rows.get(row.wrapId)).toMatchObject({ state: 'sent', availability: 'confirmed' });
+    await vi.advanceTimersByTimeAsync(READBACK_COUNT_GRACE_MS + 100);
+    expect(rows.get(row.wrapId).counts).toEqual({ accepted: 3, available: 2 });
+  });
+
+  it.each([24, 64, 100, 300])(
+    'DELIVERY-DETAILS probe: %i rows, one silent relay, forwarded like core: the pass does not wait on counting',
+    async (n) => {
+      const { net, rows, pool } = setup();
+      const [honest, silent] = relayUrls('probe', 2) as [string, string];
+      net.configure(honest);
+      net.configure(silent, { silentIdsReq: true });
+      // The pool as core's transport hands it to the worker: three forwarded methods.
+      const forwarded = {
+        publish: pool.publish.bind(pool),
+        checkServed: pool.checkServed.bind(pool),
+        readbackSpare: () => pool.readbackSpare(),
+      };
+      const worker = new OutboxWorker({ persistence: rows, pool: forwarded, random: () => 0 });
+      const all = Array.from({ length: n }, () => makeRow([honest, silent]));
+      for (const row of all) rows.add(row);
+      let ended = false;
+      void worker.processDue().then(() => (ended = true));
+      let elapsed = 0;
+      while (!ended && elapsed < 60_000) {
+        await vi.advanceTimersByTimeAsync(50);
+        elapsed += 50;
+      }
+      // The pass is not held by the 1 s count grace: well under one grace per 8-row batch.
+      expect(elapsed).toBeLessThan(Math.ceil(n / 8) * 1000 * 0.5);
+      for (const row of all) expect(rows.get(row.wrapId).availability).toBe('confirmed');
+      await vi.advanceTimersByTimeAsync(5_000);
+    },
+    60_000,
+  );
 
   it('a dead relay in the list does not keep the row pending: sent, unknown within minutes', async () => {
     const { net, rows, worker } = setup();

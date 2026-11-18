@@ -481,6 +481,8 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   // Screens that confirm through the shared prompt (presence-prompt.tsx offers the code).
   'pages/agents/owner-gate.tsx': { offers: /<PresencePrompt\b/ },
   'pages/agents/name-update.tsx': { offers: /<OwnerButton\b/ },
+  // RELAY-CARD-MIGRATION: the contact-details notice on Home, one OwnerButton like the rename notice.
+  'pages/home/contact-details-banner.tsx': { offers: /<OwnerButton\b/ },
   'pages/agents/parts.tsx': { offers: /<OwnerButton\b/ },
   'pages/agents/sheets.tsx': { offers: /<OwnerButton\b/ },
   'pages/apps/panel.tsx': { offers: /<OwnerGate\b/ },

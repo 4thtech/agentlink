@@ -482,6 +482,14 @@ export class RelayPool {
     }
   }
 
+  /**
+   * DELIVERY-DETAILS: true while no check waits for a slot and at least one slot is free, so a
+   * sibling check may run a moment longer without holding anyone up.
+   */
+  readbackSpare(): boolean {
+    return this.readbackQueue.length === 0 && this.readbacks < MAX_READBACKS;
+  }
+
   /** Waits for a slot that a finishing check hands over; false on timeout, cancel or close. */
   private waitForSlot(signal: ReadbackSignal | undefined): Promise<boolean> {
     return new Promise((resolve) => {

@@ -32,8 +32,9 @@ import { isAgentName } from '../runtime/agent-name.js';
 import { RuntimeError } from '../runtime/errors.js';
 import { AGENT_PAUSED_TEXT, CoreError } from '@4thtech-io/core';
 import { terminalOneLine, terminalSentence } from '../terminal/sanitize.js';
-import { copy, renderCopy } from '@4thtech-io/mcp-tools/strings/index.js';
+import { copy, formatDate, renderCopy } from '@4thtech-io/mcp-tools/strings/index.js';
 import { TEXT, agentPausedNow, createDeps, fill, printAll, type CommandDeps } from './shared.js';
+import { CONTACT_DETAILS_TEXT } from './owner/contact-details.js';
 
 /**
  * D-100: the rules line (11 §5: "rules", never "policy", except in the command itself). M1-36e: the
@@ -66,6 +67,22 @@ export const DOCTOR_TEXT = Object.freeze({
 /** M1-33a (06 §3, D-109; decided by Tali in chat, 2026-10-20): the exact line, after a status word. */
 export const DOCTOR_RECEIPTS_OLDER_DEFAULT =
   'Warning  Delivery receipts are on from an older default; they will turn off unless you keep them.';
+
+/**
+ * DEVICES-INTERIM (core devices.ts): this ID is also in use on another computer. A warning, not a
+ * problem; fixed text and, DEVICES-INTERIM-2, the date it was last seen (UTC, as other terminal
+ * dates). Never an install id or anything about the other computer.
+ */
+export const DOCTOR_DEVICES_TEXT = Object.freeze({
+  otherComputer: (seenAt: number | null): string =>
+    [
+      'Warning  This ID is also in use on another computer',
+      ...(seenAt === null || !Number.isSafeInteger(seenAt) || seenAt < 0
+        ? []
+        : [`         Last seen ${formatDate(new Date(seenAt * 1000))}`]),
+      '         Spending limits apply per computer until AgentLink supports one ID on several computers.',
+    ].join('\n'),
+});
 
 /** M1-9h: how long `doctor` waits for each proof network. */
 export const DOCTOR_PROOF_BUDGET_MS = 4_000;
@@ -260,6 +277,12 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
         } catch {
           emit(TEXT.doctorNoRelays, true);
         }
+        // RELAY-CARD-MIGRATION: a notice, not a problem (the old servers are still read). A runtime
+        // that can't tell shows nothing.
+        const migration = await Promise.resolve()
+          .then(() => client.identity.relayMigration())
+          .catch(() => undefined);
+        if (migration?.status === 'needed') emit(CONTACT_DETAILS_TEXT.doctorHint);
 
         if (await agentPausedNow(client)) {
           // W4-PAUSE (06 §6): a paused agent fetches nothing, so the network is not checked.
@@ -299,6 +322,15 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
               .catch(() => false);
             if (older) emit(DOCTOR_RECEIPTS_OLDER_DEFAULT);
           }
+        }
+
+        // DEVICES-INTERIM: the same ID on another computer (a notice; a state that cannot be read
+        // shows nothing).
+        const devices = await Promise.resolve()
+          .then(() => client.devices.state())
+          .catch(() => undefined);
+        if (devices?.otherInUse === true) {
+          emit(DOCTOR_DEVICES_TEXT.otherComputer(devices.otherSeenAt));
         }
 
         // M1-9h: the proof network (06 §8 "RPC"). Counts only (I-7).

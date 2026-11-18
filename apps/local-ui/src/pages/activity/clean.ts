@@ -89,6 +89,14 @@ export type ActivityItem =
   | {
       readonly kind: 'rules_changed' | 'id_removed' | 'id_paused' | 'id_resumed' | 'backup_saved';
       readonly at: number;
+    }
+  /** RESTORE-TRACES (D-156): a restore or an update started the 24-hour guard. No amount. */
+  | {
+      readonly kind: 'restore_guard';
+      readonly at: number;
+      readonly reason: 'restore' | 'update';
+      /** When paid actions stop asking (unix seconds); 24 hours after `at` when not sent. */
+      readonly until: number;
     };
 
 const DECISIONS: ReadonlySet<string> = new Set([
@@ -242,6 +250,17 @@ export function parseItem(raw: unknown): ActivityItem | undefined {
         ? { kind, at, app }
         : { kind, at };
     }
+    case 'restore_guard': {
+      // RESTORE-TRACES: the reason only; anything else on the entry (an amount) is not taken.
+      const reason = raw['reason'];
+      if (reason !== 'restore' && reason !== 'update') return undefined;
+      const rawUntil = raw['until'];
+      const until =
+        typeof rawUntil === 'number' && Number.isSafeInteger(rawUntil) && rawUntil >= at
+          ? rawUntil
+          : at + RESTORE_WINDOW_SECONDS;
+      return { kind, at, reason, until };
+    }
     default:
       return undefined;
   }
@@ -304,7 +323,8 @@ export type IconName =
   | 'play'
   | 'minus'
   | 'plus'
-  | 'approval';
+  | 'approval'
+  | 'refresh-cw';
 
 export interface Rendered {
   readonly icon: IconName;
@@ -411,7 +431,23 @@ function actionOf(action: ActionView | undefined, who: string | undefined): Acti
 const lower = (s: string): string => s.toLowerCase();
 
 /** The plain sentence, grey line, pill and opened-row facts for one entry. */
-export function render(item: ActivityItem, nameOf: NameOf, whenText: string): Rendered {
+/** RESTORE-TRACES: how long paid actions ask after a restore (core RESTORE_GUARD_SECONDS). */
+const RESTORE_WINDOW_SECONDS = 86_400;
+
+/** The clock a row needs for copy that depends on the time now (the restore window). */
+export interface RenderClock {
+  /** Unix seconds. */
+  readonly now: number;
+  /** A time as the page shows it. */
+  readonly timeText: (at: number) => string;
+}
+
+export function render(
+  item: ActivityItem,
+  nameOf: NameOf,
+  whenText: string,
+  clock?: RenderClock,
+): Rendered {
   const when = { label: S.rowWhen, parts: [whenText] as readonly Part[] };
   const withWhen = (
     facts: readonly { label: string; parts: readonly Part[] }[],
@@ -734,6 +770,20 @@ export function render(item: ActivityItem, nameOf: NameOf, whenText: string): Re
         pill: S.pillBackup,
         link: link(S.linkBackup, '/settings/backup'),
       });
+    case 'restore_guard':
+      // RESTORE-TRACES (D-156): a spending-history entry with no amount; never a charge.
+      return build({
+        icon: 'refresh-cw',
+        tone: 'neutral',
+        sentence: [item.reason === 'update' ? S.restoreGuardUpdate : S.restoreGuardRestore],
+        // While the window is open: "asks … (until {time})"; after it (or with no clock): "asked".
+        grey:
+          clock !== undefined && clock.now < item.until
+            ? S.restoreGuardOpen.replace('{time}', clock.timeText(item.until))
+            : S.restoreGuardClosed,
+        pill: S.pillBackup,
+        link: link(S.linkBackup, '/settings/backup'),
+      });
   }
 }
 
@@ -781,6 +831,7 @@ const SAFETY_KINDS: ReadonlySet<string> = new Set([
   'contact_checked',
   'contact_kept',
   'backup_saved',
+  'restore_guard',
 ]);
 
 export function inFilter(item: ActivityItem, filter: Filter): boolean {

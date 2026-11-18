@@ -1,0 +1,6 @@
+{
+  // Type-checks the hostile suites (E2E-HOSTILE) with the e2e settings:
+  //   pnpm --filter @4thtech-io/e2e exec tsc -p hostile/tsconfig.json
+  "extends": "../tsconfig.json",
+  "include": ["**/*.ts"]
+}

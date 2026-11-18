@@ -23,6 +23,7 @@ import {
   computeActionDigest,
   nostrTransport,
   type ApprovalChannel,
+  type RestoreMark,
   type Sealed,
   type StoreCipher,
 } from '@4thtech-io/core';
@@ -173,6 +174,9 @@ export interface PiAgent {
   readonly store: MemoryStore;
   readonly cipher: TestCipher;
   readonly owner: OwnerKeyStore;
+  /** The agent keys and their owner store, for a key-epoch advance (the owner side only). */
+  readonly keys: MemoryKeyStore;
+  readonly memoryOwner: MemoryOwnerKeyStore;
   readonly home: string;
   readonly mcp: Client;
   /** How many times the allowed-folder opener actually opened a file for this agent. */
@@ -258,7 +262,16 @@ function proofTools(world: World, home: string, packOpens: { count: number; path
 
 export async function makeAgent(
   world: World,
-  options: { n: number; label: string; name: string; relays: readonly string[] },
+  options: {
+    n: number;
+    label: string;
+    name: string;
+    relays: readonly string[];
+    /** The restore mark of an ID restored from a backup (SEC-RESTORE-GUARD); absent: never restored. */
+    restoreMark?: RestoreMark;
+    /** An encrypted drop to upload files to (the in-memory drop of src/fake-drop.mjs); absent: none. */
+    drop?: NonNullable<Parameters<typeof nodeFilesPlatform>[0]>['drop'];
+  },
 ): Promise<PiAgent> {
   const home = path.join(world.root, options.label);
   await mkdir(home, { recursive: true });
@@ -266,8 +279,9 @@ export async function makeAgent(
   const cipher = new TestCipher();
   const owner = new MemoryOwnerKeyStore(seed(100 + options.n), presence());
   let mark = 0;
+  const keys = new MemoryKeyStore(seed(options.n));
   const client = await AgentLinkClient.create({
-    keyStore: new MemoryKeyStore(seed(options.n)),
+    keyStore: keys,
     store,
     cipher,
     approvals,
@@ -281,8 +295,9 @@ export async function makeAgent(
       },
     },
     logger,
-    files: nodeFilesPlatform({ home, drop: false }),
+    files: nodeFilesPlatform({ home, drop: options.drop ?? false }),
     proofs: world.chain.platform() as never,
+    ...(options.restoreMark === undefined ? {} : { restoreMark: options.restoreMark }),
   });
   const session = await owner.unlock(presence());
   await client.identity.init({
@@ -324,6 +339,8 @@ export async function makeAgent(
     store,
     cipher,
     owner,
+    keys,
+    memoryOwner: owner,
     home,
     mcp,
     opens,
@@ -347,7 +364,7 @@ export async function makeAgent(
   return agent;
 }
 
-async function signOwner(agent: PiAgent, op: string, params: JsonObject): Promise<string> {
+export async function signOwner(agent: PiAgent, op: string, params: JsonObject): Promise<string> {
   const keys = await agent.owner.getPublicKeys();
   const issuedAt = Math.floor(Date.now() / 1000);
   const body: JsonObject = {

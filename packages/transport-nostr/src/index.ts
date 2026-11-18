@@ -18,6 +18,7 @@ export {
   type WrappedEnvelope,
 } from './gift-wrap.js';
 export { DEFAULT_RELAYS } from './default-relays.js';
+export { LEGACY_CARD_UPDATE_UNTIL, LEGACY_READ_RELAYS } from './legacy-relays.js';
 export { isGloballyRoutable } from './relay-address.js';
 export type {
   AddressCheck,
@@ -61,6 +62,7 @@ export {
   READBACK_RECHECK_MS,
   type OutboxAttempt,
   type OutboxAvailability,
+  type OutboxRelayCounts,
   type OutboxGiveUpReason,
   type OutboxNotice,
   type OutboxNoticeReason,

@@ -55,6 +55,8 @@ export type NodeKeyStoreErrorCode =
   | 'restore_mark_invalid'
   /** SEC-RESTORE-GUARD: the restore mark did not read back as written; the guard stays in force. */
   | 'restore_mark_not_written'
+  /** DEVICES-INTERIM: the install id did not read back as written (install-id.ts). */
+  | 'install_id_not_written'
   /** M1-8e: a localhost passkey is already set up for this OS user (one in M1b); never replaced. */
   | 'owner_passkey_exists'
   /** DESK-D12c: native presence (Touch ID or Windows Hello in the app) is already turned on. */

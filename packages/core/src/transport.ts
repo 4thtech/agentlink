@@ -94,6 +94,12 @@ export interface Transport {
    */
   checkServed?(relay: string, eventId: string, options?: ReadbackOptions): Promise<ReadbackOutcome>;
   /**
+   * DELIVERY-DETAILS: true while no availability check waits for a slot and one is free, so the
+   * outbox may let sibling checks run a moment longer to count them. Optional: without it the
+   * siblings are cancelled at once.
+   */
+  readbackSpare?(): boolean;
+  /**
    * One catch-up pass (M1-7h): unwraps each new gift wrap for an own key and hands the parsed,
    * not yet verified envelope to `onEnvelope`. Optional: without it the client cannot sync
    * (`transport_unavailable`).
@@ -178,6 +184,7 @@ export function nostrTransport(options: NostrTransportOptions): TransportFactory
         wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
       publish: (event, relays) => pool.publish(event, relays),
       checkServed: (relay, eventId, readOptions) => pool.checkServed(relay, eventId, readOptions),
+      readbackSpare: () => pool.readbackSpare(),
       close: () => pool.close(),
       relayStatus: async (relays) => {
         const unique = [...new Set(relays)].slice(0, MAX_STATUS_RELAYS);

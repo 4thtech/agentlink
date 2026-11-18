@@ -32,7 +32,7 @@ import {
 import { AttachComposer, type AttachProps } from './attach-composer.js';
 import { MessageFiles, type FilesContext } from './file-reader.js';
 import { mergeThread } from './people-api.js';
-import { receiptWord, sentWord } from './delivery-word.js';
+import { receiptWord, receivedAgainWord, relaysWord, sentWord } from './delivery-word.js';
 import { HOME_STRINGS as S, fmt } from './people-strings.js';
 import { HISTORY_STRINGS as H } from '../history/strings.js';
 import { termsLine, termsStateWord, type TermsEvent } from './terms-trail.js';
@@ -195,6 +195,27 @@ function Delivery({
   return null;
 }
 
+/**
+ * RESTORE-TRACES (D-156): a quiet label under a message from them that arrived again after a
+ * restore, in the delivery word's style (message meta); nothing for anything else.
+ */
+function ReceivedAgain({
+  item,
+  out,
+}: {
+  readonly item: MessageItem;
+  readonly out: boolean;
+}): ReactElement | null {
+  const word = receivedAgainWord(item, out);
+  if (word === undefined) return null;
+  return (
+    <span className="hm-dl hm-f is-again">
+      <Icon name="refresh-cw" size={13} />
+      <span>{word}</span>
+    </span>
+  );
+}
+
 function CopyText({ text }: { readonly text: string }): ReactElement {
   return (
     <CopyButton
@@ -220,6 +241,7 @@ function Details({
   readonly name: string;
 }): ReactElement {
   const receipt = !out ? S.receiptTheirs : receiptWord(item, name);
+  const relays = out ? relaysWord(item) : undefined;
   return (
     <p className="hm-msg-meta hm-f al-text-code al-reveal">
       <span>
@@ -233,6 +255,7 @@ function Details({
       <span>
         {S.receipt} <span className="hm-v">{receipt}</span>
       </span>
+      {relays === undefined ? null : <span>{relays}</span>}
       <span>
         {S.proof}{' '}
         <span className={item.proof ? 'hm-v is-proof' : 'hm-v'}>
@@ -463,6 +486,7 @@ export function Conversation({
                 )}
                 <div className="hm-msg-actions hm-f">
                   {out ? <Delivery item={item} name={name} removed={removed} /> : null}
+                  <ReceivedAgain item={item} out={out} />
                   {item.text === '' ? null : <CopyText text={item.text} />}
                 </div>
                 {pro ? <Details item={item} out={out} agent={agent} name={name} /> : null}

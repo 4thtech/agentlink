@@ -328,6 +328,7 @@ import {
 } from './owner-first-card.js';
 import { signNewAgent } from './owner-add-agent.js';
 import { signRename } from './owner-rename.js';
+import { signRelayMigration } from './owner-relay-migration.js';
 import {
   CREATE_CONNECT_HOLD_MS,
   CREATE_CONNECT_NONCE_BYTES,
@@ -1969,6 +1970,8 @@ export async function startApprovalServerWith(
         scannedUntil?: number;
         update?: boolean | 0 | 1 | 2;
         networkDown?: boolean;
+        otherComputer?: boolean;
+        otherComputerSeenAt?: number;
       } = {};
       try {
         out.approvals = (await bound.list())
@@ -2017,6 +2020,19 @@ export async function startApprovalServerWith(
         }
       } catch {
         // Unknown: the network item stays as it was.
+      }
+      if (client !== undefined) {
+        try {
+          // DEVICES-INTERIM: this ID is also in use on another computer (a flag and, DEVICES-INTERIM-2,
+          // when it was last seen; nothing about the other computer).
+          const devices = await client.devices.state();
+          out.otherComputer = devices.otherInUse;
+          if (devices.otherInUse && devices.otherSeenAt !== null) {
+            out.otherComputerSeenAt = devices.otherSeenAt;
+          }
+        } catch {
+          // Unknown: the devices item stays as it was.
+        }
       }
       return out;
     };
@@ -4192,6 +4208,42 @@ export async function startApprovalServerWith(
                         review,
                         label: request.label,
                         labelBody: request.labelBody,
+                      });
+                    },
+                  }),
+              // RELAY-CARD-MIGRATION (04 §2.6; 07 §4.3): "Update your contact details", in the app
+              // host only and with the open agent's key items. One owner operation: exactly the open
+              // agent's next card with the migrated list (signRelayMigration); never `sign` as well.
+              ...(host === undefined ||
+              byNostr !== undefined ||
+              renameUi?.client === undefined ||
+              renameUi.epochKeys === undefined
+                ? {}
+                : {
+                    updateContactDetails: async (review: OwnerReview) => {
+                      if (used) {
+                        throw new NodeKeyStoreError(
+                          'owner_operation_invalid',
+                          'One owner operation signs once.',
+                        );
+                      }
+                      used = true;
+                      if (!stillCurrent(req)) throw new AgentChanged();
+                      // The page showed the fixed statement; nothing in `review` is signed.
+                      void review;
+                      const client = renameUi.client;
+                      const epochKeys = renameUi.epochKeys;
+                      if (client === undefined || epochKeys === undefined) {
+                        throw new NodeKeyStoreError('owner_operation_invalid', 'Not here.');
+                      }
+                      return signRelayMigration(session, ownerKeys, {
+                        agent: client.agentId,
+                        client: {
+                          identity: client.identity,
+                          sendCardUpdates: () => client.sendCardUpdates(),
+                          contacts: client.contacts,
+                        },
+                        epochKeys,
                       });
                     },
                   }),

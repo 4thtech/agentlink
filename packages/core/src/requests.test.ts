@@ -102,6 +102,8 @@ async function fill(a: TestAgent, n: number, state: 'request' | 'refused', fromK
         request_accepted_at: null,
         deleted_at: null,
         availability: null,
+        relays_accepted: null,
+        relays_available: null,
       });
     }
   });

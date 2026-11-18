@@ -52,7 +52,9 @@ import {
 } from '@4thtech-io/crypto';
 import { isAllowedRelayUrl, payloadSchema, type Payload } from '@4thtech-io/types';
 import {
+  LEGACY_READ_RELAYS,
   MAX_RELAYS_PER_WRAP,
+  MIN_ACKS,
   OutboxWorker,
   SYNC_LOOKBACK_SECONDS,
   SYNC_SKEW_SECONDS,
@@ -62,6 +64,7 @@ import {
   type OutboxGiveUpReason,
   type OutboxNotice,
   type OutboxPersistence,
+  type OutboxRelayCounts,
   type OutboxRow,
   type OutboxSummary,
 } from '@4thtech-io/transport-nostr';
@@ -170,7 +173,28 @@ function updateDelivery(tx: StoreTx, envelopeId: string): void {
         : scope.every((r) => r.availability === 'confirmed')
           ? 'confirmed'
           : null;
-  tx.update('envelopes', { envelope_id: envelopeId, direction: 'out' }, { delivery, availability });
+  // DELIVERY-DETAILS: the counts follow the same rows, the smallest over those in scope (the weakest
+  // recipient decides what is claimed); null when any row has none (before schema 20).
+  const counted = delivery === 'sent' ? scope : [];
+  const minOf = (pick: (r: Row<'outbox'>) => number | null): number | null => {
+    let min: number | null = null;
+    for (const r of counted) {
+      const n = pick(r);
+      if (n === null) return null;
+      min = min === null ? n : Math.min(min, n);
+    }
+    return min;
+  };
+  tx.update(
+    'envelopes',
+    { envelope_id: envelopeId, direction: 'out' },
+    {
+      delivery,
+      availability,
+      relays_accepted: minOf((r) => r.relays_accepted),
+      relays_available: minOf((r) => r.relays_available),
+    },
+  );
 }
 
 /** OutboxPersistence over the Store, with the per-row claim described above. */
@@ -251,7 +275,9 @@ class StoreOutboxPersistence implements OutboxPersistence {
     } catch {
       relays = [];
     }
+    const uncounted = await this.#uncountedOf(row, relays);
     return {
+      ...(uncounted.length === 0 ? {} : { uncounted }),
       wrapId: row.wrap_id,
       envelopeId: row.envelope_id,
       recipientKey: row.recipient_key,
@@ -264,6 +290,22 @@ class StoreOutboxPersistence implements OutboxPersistence {
       giveUpAt: row.give_up_at,
       role: row.role,
     };
+  }
+
+  /**
+   * RELAY-CARD-MIGRATION (07 §4.3 "Card-update fan-out"): a card-update's contact wrap also goes to
+   * the legacy relays, but their OKs never end its row: it stays pending and retries until relays of
+   * the contact's own list accept it. Only when the row also lists at least MIN_ACKS other relays,
+   * so a contact whose own list is mostly legacy relays is reached as before. Every other row: none.
+   */
+  async #uncountedOf(row: Row<'outbox'>, relays: readonly string[]): Promise<readonly string[]> {
+    if (row.role !== 'contact') return [];
+    const legacy = relays.filter((r) => LEGACY_READ_RELAYS.includes(r));
+    if (legacy.length === 0 || relays.length - legacy.length < MIN_ACKS) return [];
+    const envelope = await this.#ctx.store.transaction((tx) =>
+      tx.get('envelopes', { envelope_id: row.envelope_id }),
+    );
+    return envelope?.type === 'card-update' ? legacy : [];
   }
 
   /** Still pending and still claimed by this process: another process has not taken it over. */
@@ -292,11 +334,33 @@ class StoreOutboxPersistence implements OutboxPersistence {
     wrapId: string,
     acks: Readonly<Record<string, number>>,
     availability: OutboxAvailability,
+    counts: OutboxRelayCounts,
   ): Promise<boolean> {
     const sealed = await seal(this.#ctx, 'outbox', 'acks', [wrapId], canonicalize(acks));
     // SEC-RELAY-READBACK: only the two known values are stored; anything else reads as unknown.
     const stored: OutboxAvailability = availability === 'confirmed' ? 'confirmed' : 'unknown';
-    return this.#finish(wrapId, { state: 'sent', acks: sealed, availability: stored });
+    // DELIVERY-DETAILS: counts only; clamped to whole numbers, available never above accepted.
+    const accepted = Math.max(0, Math.trunc(counts.accepted));
+    const available = Math.min(accepted, Math.max(0, Math.trunc(counts.available)));
+    return this.#finish(wrapId, {
+      state: 'sent',
+      acks: sealed,
+      availability: stored,
+      relays_accepted: accepted,
+      relays_available: available,
+    });
+  }
+
+  /** DELIVERY-DETAILS: raises `available` on a `sent` row and its envelope; counts only. */
+  async updateRelayCounts(wrapId: string, counts: OutboxRelayCounts): Promise<void> {
+    await this.#ctx.store.transaction((tx) => {
+      const row = tx.get('outbox', { wrap_id: wrapId });
+      if (row === undefined || row.state !== 'sent' || row.relays_accepted === null) return;
+      const available = Math.min(row.relays_accepted, Math.max(0, Math.trunc(counts.available)));
+      if (row.relays_available !== null && available <= row.relays_available) return;
+      tx.update('outbox', { wrap_id: wrapId, state: 'sent' }, { relays_available: available });
+      updateDelivery(tx, row.envelope_id);
+    });
   }
 
   markNotDelivered(wrapId: string, reason: OutboxGiveUpReason): Promise<boolean> {
@@ -516,6 +580,8 @@ export class OutboxService {
         state: 'pending',
         reason: null,
         availability: null,
+        relays_accepted: null,
+        relays_available: null,
       });
     }
     if (rows.length !== routes.length) {

@@ -25,6 +25,7 @@ import type { LocalUiOwnerCodeStep } from './owner-code-paths.js';
 import type { LocalUiHistoryStep } from './history-paths.js';
 import type { LocalUiHistorySession } from './history-desk.js';
 import type { RenameSignOutcome } from '../owner-rename.js';
+import type { RelayMigrationOutcome } from '../owner-relay-migration.js';
 import type { OwnerReview, OwnerSignRequest, OwnerSignature } from '../owner-operation.js';
 
 /**
@@ -84,6 +85,14 @@ export interface LocalUiOwnerOperation {
    * session or the epoch control. Absent outside the app host or without the agent's key items.
    */
   renameAgent?(review: OwnerReview, request: LocalUiRenameRequest): Promise<LocalUiRenameOutcome>;
+  /**
+   * RELAY-CARD-MIGRATION (04 §2.6; 07 §4.3): the one owner operation of "Update your contact
+   * details", instead of `sign` (one or the other, once). With the presence this request carried it
+   * signs exactly the open agent's next card with the migrated list (owner-relay-migration.ts
+   * signRelayMigration), then core's card-update tells the contacts. The handler never sees the
+   * owner session or the epoch control. Absent outside the app host or without the key items.
+   */
+  updateContactDetails?(review: OwnerReview): Promise<RelayMigrationOutcome>;
   /**
    * WP-11 (F-1, D-117 A; 04 §2.3.3 "Export: who sees the seeds", §2.5.1 `backup.export`): the one
    * owner operation of saving a recovery kit, instead of `sign` (one or the other, once). Offered

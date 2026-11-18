@@ -78,6 +78,7 @@ import { STORAGE_PREFIX_BYTES } from './constants.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import { isOwnIdName } from './names.js';
+import { migratedRelays, needsRelayMigration, type RelayMigration } from './relay-migration.js';
 import { SINGLETON_SLOT, type Row, type Sealed } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 
@@ -162,6 +163,12 @@ export interface RotateIdentityInput {
    * already one ahead (a rotation interrupted after the advance), the rotation finishes without it.
    */
   readonly epochControl?: KeyEpochControl;
+  /**
+   * RELAY-CARD-MIGRATION (07 §4.3): the card's new relay list (2 to 16 relays). Absent or equal to
+   * the stored list: the list stays. A different list commits a new `relaysHash`; refused while a
+   * rotation is unfinished. Only the owner flow passes it (I-4).
+   */
+  readonly relays?: readonly string[];
 }
 
 function isRevoked(tx: StoreTx, row: Row<'identity'>): boolean {
@@ -484,6 +491,12 @@ export class IdentityService {
     // D-141: a different name is a rename. Checked before any key is previewed or anything signed.
     const name = input.name === undefined ? storedName : checkRenameName(input.name);
     const renamed = name !== storedName;
+    // RELAY-CARD-MIGRATION: a new relay list is checked before any key is previewed or signed.
+    const storedRelays = checkStoredRelays(
+      await open(ctx, 'identity', 'relays', key, current.row.relays),
+    );
+    const relays = input.relays === undefined ? storedRelays : checkRelays(input.relays);
+    const relaysChanged = !sameList(relays, storedRelays);
     if (renamed) {
       const allowance = renameAllowanceOf(oldStored, nowOf(ctx));
       if (allowance.status === 'limited') throw renameLimited();
@@ -493,7 +506,7 @@ export class IdentityService {
       throw new CoreError('identity_mismatch', 'The keys do not belong to this agent.');
     }
     // D-141 (08 §1): a rename is refused while an earlier rotation is unfinished.
-    if (renamed && bundle.keyEpoch !== old.keyEpoch) throw rotationPending();
+    if ((renamed || relaysChanged) && bundle.keyEpoch !== old.keyEpoch) throw rotationPending();
     let next: PublicIdentity;
     let control: KeyEpochControl | undefined;
     if (bundle.keyEpoch === old.keyEpoch + 1) {
@@ -517,15 +530,19 @@ export class IdentityService {
     if (!sameOwnerKeys(old.card, ownerKeyFields(input.ownerKeys))) {
       throw new CoreError('owner_keys_changed', 'The owner keys differ from the current card.');
     }
-    const relays = checkStoredRelays(
-      await open(ctx, 'identity', 'relays', key, current.row.relays),
-    );
     const now = nowOf(ctx);
     // The session signs the card first, and its signature must recover to the stored owner keys:
     // that is what binds the session handed to advanceEpoch to this agent's owner.
     const signed = await this.#issue(next, input, name, relays, now);
     // D-141: a renaming pending card carries its name, so finishing it on open stores that name.
-    const text = renamed ? pendingCardText(signed, name) : storedCardText(signed);
+    // RELAY-CARD-MIGRATION: so does a pending card with a new relay list.
+    const text =
+      renamed || relaysChanged
+        ? pendingCardText(signed, {
+            ...(renamed ? { name } : {}),
+            ...(relaysChanged ? { relays } : {}),
+          })
+        : storedCardText(signed);
     // M1-4d-f: the current card joins the history. A card stored before M1-4d-d gets its `cardPop`
     // now, while the KeyStore is still at its epoch (04 §2.9); after the advance it no longer can.
     const oldCardPop =
@@ -581,19 +598,41 @@ export class IdentityService {
 
     // 3. Commit the card and key_epoch (and a new name), and clear the pending card.
     const sealedName = renamed ? await seal(ctx, 'identity', 'name', key, name) : undefined;
+    const sealedRelays = relaysChanged
+      ? await seal(ctx, 'identity', 'relays', key, canonicalize([...relays]))
+      : undefined;
     const patch = {
       agent_card_json: sealedCard,
       pending_card_json: null,
       key_epoch: next.keyEpoch,
       updated_at: now,
       ...(sealedName === undefined ? {} : { name: sealedName }),
+      ...(sealedRelays === undefined ? {} : { relays: sealedRelays }),
     };
     await ctx.store.transaction((tx) => {
       assertNotRevoked(tx, old.agentId);
       if (tx.update('identity', where, patch) !== 1) throw concurrentRotation();
     });
-    ctx.log.info(renamed ? 'identity renamed' : 'identity rotated', { keyEpoch: next.keyEpoch });
+    ctx.log.info(
+      renamed ? 'identity renamed' : relaysChanged ? 'identity relays changed' : 'identity rotated',
+      { keyEpoch: next.keyEpoch },
+    );
     return this.#view({ ...current.row, ...patch }, false);
+  }
+
+  /**
+   * RELAY-CARD-MIGRATION (07 §4.3): whether the stored card still lists a relay the default set
+   * dropped, and the list its next card would carry (relay-migration.ts). `current` before init or
+   * for a revoked agent. Reads only; the owner flow signs the rotation.
+   */
+  async relayMigration(): Promise<RelayMigration> {
+    const got = await readIdentity(this.#ctx);
+    if (got === undefined || got.revoked) return Object.freeze({ status: 'current' });
+    const relays = checkStoredRelays(
+      await open(this.#ctx, 'identity', 'relays', [got.row.agent_id], got.row.relays),
+    );
+    if (!needsRelayMigration(relays)) return Object.freeze({ status: 'current' });
+    return Object.freeze({ status: 'needed', relays: migratedRelays(relays) });
   }
 
   /**
@@ -718,15 +757,40 @@ function rotationPending(): CoreError {
   );
 }
 
-/** A pending card with the name it commits to (D-141): the stored-card fields plus `name`. */
-function pendingCardText(signed: StoredCard, name: string): string {
+/**
+ * A pending card with the name (D-141) and/or relay list (RELAY-CARD-MIGRATION) it commits to: the
+ * stored-card fields plus `name` and/or `relays`.
+ */
+function pendingCardText(
+  signed: StoredCard,
+  extra: { readonly name?: string; readonly relays?: readonly string[] },
+): string {
   return canonicalize({
     card: signed.card as unknown as JsonValue,
     cardSig: signed.cardSig,
     cardAgentSig: signed.cardAgentSig,
     cardPop: signed.cardPop,
-    name,
+    ...(extra.name === undefined ? {} : { name: extra.name }),
+    ...(extra.relays === undefined ? {} : { relays: [...extra.relays] }),
   });
+}
+
+/** The relay list a pending card text carries (RELAY-CARD-MIGRATION), or undefined (unchanged). */
+function pendingRelaysOf(text: string): readonly string[] | undefined {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+  if (typeof value !== 'object' || value === null) return undefined;
+  const relays = (value as Record<string, unknown>)['relays'];
+  return relays === undefined ? undefined : checkRelays(relays);
+}
+
+/** Two relay lists with the same entries in the same order. */
+function sameList(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((r, i) => r === b[i]);
 }
 
 /** The name a pending card text carries (D-141), or undefined (a rotation that keeps the name). */
@@ -787,13 +851,17 @@ async function usablePendingCard(
   sealed: Sealed,
   bundle: PublicIdentity,
   now: number,
-): Promise<(StoredCard & { readonly name?: string }) | undefined> {
+): Promise<
+  (StoredCard & { readonly name?: string; readonly relays?: readonly string[] }) | undefined
+> {
   const key = [row.agent_id];
   try {
     const text = await open(ctx, 'identity', 'pending_card_json', key, sealed);
     const pending = parseStoredCard(text);
     // D-141: a renaming pending card names its new name, and its nameHash must commit to it.
     const name = pendingNameOf(text);
+    // RELAY-CARD-MIGRATION: a pending card with a new list names it, and relaysHash commits to it.
+    const relays = pendingRelaysOf(text);
     const current = parseStoredCard(
       await open(ctx, 'identity', 'agent_card_json', key, row.agent_card_json),
     ).card;
@@ -809,9 +877,15 @@ async function usablePendingCard(
       (name === undefined
         ? pending.card.nameHash === current.nameHash
         : pending.card.nameHash === encodeHex0x(agentCardNameHash(name))) &&
-      pending.card.relaysHash === current.relaysHash;
+      (relays === undefined
+        ? pending.card.relaysHash === current.relaysHash
+        : pending.card.relaysHash === encodeHex0x(agentCardRelaysHash(relays)));
     if (!usable) return undefined;
-    return name === undefined ? pending : { ...pending, name };
+    return {
+      ...pending,
+      ...(name === undefined ? {} : { name }),
+      ...(relays === undefined ? {} : { relays }),
+    };
   } catch (error) {
     if (error instanceof CoreError) return undefined;
     throw error;
@@ -875,6 +949,11 @@ async function finishIfUsable(ctx: CoreContext): Promise<void> {
     pending.name === undefined
       ? undefined
       : await seal(ctx, 'identity', 'name', [row.agent_id], pending.name);
+  // RELAY-CARD-MIGRATION: and an interrupted relay change its list.
+  const sealedRelays =
+    pending.relays === undefined
+      ? undefined
+      : await seal(ctx, 'identity', 'relays', [row.agent_id], canonicalize([...pending.relays]));
   const finished = await ctx.store.transaction((tx) => {
     if (isRevoked(tx, row)) return false;
     // Exactly the row and the pending card that were verified; otherwise another flow moved on.
@@ -891,6 +970,7 @@ async function finishIfUsable(ctx: CoreContext): Promise<void> {
       key_epoch: bundle.keyEpoch,
       updated_at: now,
       ...(sealedName === undefined ? {} : { name: sealedName }),
+      ...(sealedRelays === undefined ? {} : { relays: sealedRelays }),
     };
     return tx.update('identity', where, patch) === 1;
   });

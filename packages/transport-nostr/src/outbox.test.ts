@@ -9,6 +9,7 @@ import {
   OutboxWorker,
   type OutboxAttempt,
   type OutboxAvailability,
+  type OutboxRelayCounts,
   type OutboxGiveUpReason,
   type OutboxPersistence,
   type OutboxRow,
@@ -31,6 +32,7 @@ afterEach(() => {
 type Stored = OutboxRow & {
   state: 'pending' | 'sent' | 'not_delivered';
   availability?: OutboxAvailability;
+  counts?: OutboxRelayCounts;
   reason?: OutboxGiveUpReason;
 };
 
@@ -70,8 +72,9 @@ class MemoryOutbox implements OutboxPersistence {
     wrapId: string,
     acks: Readonly<Record<string, number>>,
     availability: OutboxAvailability,
+    counts: OutboxRelayCounts,
   ): Promise<boolean> {
-    return this.cas(wrapId, { acks, state: 'sent', availability });
+    return this.cas(wrapId, { acks, state: 'sent', availability, counts });
   }
   markNotDelivered(wrapId: string, reason: OutboxGiveUpReason): Promise<boolean> {
     return this.cas(wrapId, { state: 'not_delivered', reason });
@@ -194,6 +197,61 @@ describe('delivery', () => {
     expect(
       net.received.filter((f) => f.relay === good && f.frame.startsWith('["EVENT"')),
     ).toHaveLength(1);
+  });
+
+  it('RELAY-CARD-MIGRATION: OKs from `uncounted` relays never end a row; it retries until counted ones do', async () => {
+    const { net, outbox, worker } = setup();
+    const [l1, l2, a, b] = relayUrls('uncounted', 4) as [string, string, string, string];
+    net.configure(l1);
+    net.configure(l2);
+    net.configure(a, { reject: true });
+    net.configure(b, { reject: true });
+    const row = makeRow([a, b, l1, l2], { uncounted: [l1, l2] });
+    outbox.add(row);
+    const w = worker();
+    const first = await w.processDue();
+    expect(first).toMatchObject({ sent: 0, retrying: 1 });
+    expect(outbox.get(row.wrapId).state).toBe('pending');
+    // The legacy OKs are kept (never published there again), but the row is still pending.
+    expect(Object.keys(outbox.get(row.wrapId).acks).sort()).toEqual([l1, l2].sort());
+    vi.setSystemTime((first.nextAttemptAt as number) * 1000);
+    expect((await w.processDue()).retrying).toBe(1);
+    expect(outbox.get(row.wrapId).state).toBe('pending');
+    // The counted relays accept it: sent.
+    net.configure(a);
+    net.configure(b);
+    vi.setSystemTime(Date.now() + 61_000);
+    expect((await w.processDue()).sent).toBe(1);
+    expect(outbox.get(row.wrapId).state).toBe('sent');
+  });
+
+  it('RELAY-CARD-MIGRATION: without `uncounted` the same two OKs end the row (normal messages unchanged)', async () => {
+    const { net, outbox, worker } = setup();
+    const [l1, l2, a, b] = relayUrls('counted', 4) as [string, string, string, string];
+    net.configure(l1);
+    net.configure(l2);
+    net.configure(a, { reject: true });
+    net.configure(b, { reject: true });
+    const row = makeRow([a, b, l1, l2]);
+    outbox.add(row);
+    expect((await worker().processDue()).sent).toBe(1);
+    expect(outbox.get(row.wrapId).state).toBe('sent');
+  });
+
+  it('RELAY-CARD-MIGRATION: at give-up a row with only uncounted OKs is not_delivered', async () => {
+    const { net, outbox, worker } = setup();
+    const [l1, a] = relayUrls('uncounted-end', 2) as [string, string];
+    net.configure(l1);
+    net.configure(a, { reject: true });
+    const row = makeRow([a, l1], {
+      uncounted: [l1],
+      acks: { [l1]: nowSeconds() - 100 },
+      createdAt: nowSeconds() - OUTBOX_GIVE_UP_SECONDS,
+      giveUpAt: nowSeconds(),
+    });
+    outbox.add(row);
+    await worker().processDue();
+    expect(outbox.get(row.wrapId).state).toBe('not_delivered');
   });
 
   it('backs off 30 s, 60 s, 120 s and so on, at most 1 h, never past give-up', async () => {
@@ -404,10 +462,10 @@ describe('unreadable and ended rows', () => {
     const bad = makeRow(relays);
     outbox.add(bad);
     const original = outbox.markSent.bind(outbox);
-    outbox.markSent = (wrapId, acks, availability) =>
+    outbox.markSent = (wrapId, acks, availability, counts) =>
       wrapId === bad.wrapId
         ? Promise.reject(new Error('disk full'))
-        : original(wrapId, acks, availability);
+        : original(wrapId, acks, availability, counts);
     const good = makeRow(relays);
     outbox.add(good);
     const summary = await worker().processDue();

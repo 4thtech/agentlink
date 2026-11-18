@@ -224,6 +224,8 @@ function outRow(id: string, contact: string, type: string, at: number): Row<'env
     request_accepted_at: null,
     deleted_at: null,
     availability: null,
+    relays_accepted: null,
+    relays_available: null,
   };
 }
 

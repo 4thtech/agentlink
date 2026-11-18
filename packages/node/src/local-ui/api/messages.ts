@@ -84,6 +84,14 @@ function filesView(files: unknown): JsonObject[] | undefined {
   return out;
 }
 
+/** DELIVERY-DETAILS: `{ accepted, available }` as two whole numbers (available at most accepted). */
+function relayCounts(value: unknown): JsonObject | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const { accepted, available } = value as Record<string, unknown>;
+  if (!isTime(accepted) || !isTime(available) || available > accepted) return undefined;
+  return { accepted, available };
+}
+
 /** One message of `box` as the page sees it, or undefined to leave it out. */
 function itemView(box: MessageBox, item: unknown): JsonObject | undefined {
   if (typeof item !== 'object' || item === null) return undefined;
@@ -108,18 +116,26 @@ function itemView(box: MessageBox, item: unknown): JsonObject | undefined {
     size,
     ...(seq === undefined ? {} : { seq }),
   };
-  if (box === 'in') return base;
-  const { status, receipt, receivedOlder, availability } = item as Record<string, unknown>;
+  if (box === 'in') {
+    // RESTORE-TRACES (D-156): sent before a restore, arrived after it; only `true`, only on the Inbox.
+    const { receivedAgain } = item as Record<string, unknown>;
+    if (receivedAgain !== undefined && receivedAgain !== true) return undefined;
+    return receivedAgain === true ? { ...base, receivedAgain } : base;
+  }
+  const { status, receipt, receivedOlder, availability, relays } = item as Record<string, unknown>;
   if (typeof status !== 'string' || !SENT_STATUSES.has(status)) return undefined;
   if (typeof receipt !== 'boolean') return undefined;
   // SEC-RECEIPTS-DEFAULT: an older app's receipt (weaker than `receipt`); only `true` when present.
   if (receivedOlder !== undefined && receivedOlder !== true) return undefined;
   // SEC-RELAY-READBACK (D-156 (7)): only `unknown`, only on a sent message, when present.
   if (availability !== undefined && availability !== 'unknown') return undefined;
+  // DELIVERY-DETAILS: two whole counts, only on a sent message; anything else leaves them out.
+  const counts = relayCounts(relays);
   return {
     ...base,
     status,
     receipt,
+    ...(counts !== undefined && status === 'sent' ? { relays: counts } : {}),
     ...(receivedOlder === true ? { receivedOlder } : {}),
     ...(availability === 'unknown' && status === 'sent' ? { availability } : {}),
   };

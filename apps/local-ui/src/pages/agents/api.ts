@@ -43,6 +43,8 @@ export type OwnerKind =
   | 'rename_limited'
   | 'rotation_pending'
   | 'not_paused'
+  /** RELAY-CARD-MIGRATION: the contact details are already up to date. */
+  | 'current'
   | 'not_available'
   | 'session'
   | 'offline'
@@ -88,7 +90,14 @@ export interface AgentsApi {
   resume(proof: PresenceProof): Promise<OwnerOutcome>;
   /** D-141: "Contacts still see {cardName}" for the open agent. */
   cardName(): Promise<CardNameOutcome>;
+  /** RELAY-CARD-MIGRATION: whether the open ID's contact details need the one-time update. */
+  contactDetails?(): Promise<'needed' | 'current' | 'unavailable'>;
+  /** RELAY-CARD-MIGRATION: "Update your contact details" (presence; signs the next card). */
+  updateContactDetails?(proof: PresenceProof): Promise<OwnerOutcome>;
 }
+
+/** RELAY-CARD-MIGRATION: the contact-details route (node api/contact-details.ts). */
+export const CONTACT_DETAILS_PATH = '/api/ui/contact-details';
 
 export interface AgentsApiOptions {
   readonly fetch?: typeof fetch;
@@ -112,6 +121,7 @@ const WORDS: ReadonlySet<string> = new Set([
   'rename_limited',
   'rotation_pending',
   'not_paused',
+  'current',
 ]);
 
 const CARD_NAME_MAX = 64;
@@ -297,6 +307,13 @@ export function createAgentsApi(options: AgentsApiOptions = {}): AgentsApi {
       }
       return { kind: 'unavailable' };
     },
+    async contactDetails() {
+      const result = await client.get(CONTACT_DETAILS_PATH);
+      if (result.kind !== 'ok') return 'unavailable';
+      const status = (result.data as { status?: unknown } | null)?.status;
+      return status === 'needed' ? 'needed' : status === 'current' ? 'current' : 'unavailable';
+    },
+    updateContactDetails: (proof) => owner(CONTACT_DETAILS_PATH, {}, proof),
     rename: (input, proof) =>
       owner(`${AGENTS}/label`, { name: input.name, label: input.label }, proof),
     remove: (input, proof) =>

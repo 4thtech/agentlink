@@ -100,6 +100,12 @@ export interface InboxMessage {
    * only after `at`, and only within one store; absent when the store gives no order.
    */
   readonly seq?: number;
+  /**
+   * RESTORE-TRACES (D-156): present (true) only on an Inbox message first stored after a restore
+   * but created before it, after a restore from a backup (restore-traces.ts): "From before the
+   * restore". Absent otherwise.
+   */
+  readonly receivedAgain?: true;
 }
 
 /** A message in a contact's Sent list. */
@@ -121,6 +127,17 @@ export interface SentMessage extends InboxMessage {
    * be asked to serve back: "Sent, availability unknown". Absent once a relay served it back.
    */
   readonly availability?: 'unknown';
+  /**
+   * DELIVERY-DETAILS: on a `sent` message, how many relays accepted it and how many served it back.
+   * Counts only (never a relay address). Absent on a message sent before the counts were kept.
+   */
+  readonly relays?: RelayCounts;
+}
+
+/** DELIVERY-DETAILS: how many relays accepted a message and how many served it back. */
+export interface RelayCounts {
+  readonly accepted: number;
+  readonly available: number;
 }
 
 export type MessageItem = InboxMessage | SentMessage;
@@ -541,7 +558,17 @@ export class MessagesView {
           'envelopes',
           shown.map((r) => ({ envelope_id: r.envelope_id })),
         ) ?? [];
-      return { rows: shown, order, nextCursor: page.nextCursor, proofs };
+      // RESTORE-TRACES: which Inbox messages arrived again after a restore.
+      const again = new Set(
+        box === 'in'
+          ? shown
+              .filter(
+                (r) => tx.get('restore_replays', { envelope_id: r.envelope_id }) !== undefined,
+              )
+              .map((r) => r.envelope_id)
+          : [],
+      );
+      return { rows: shown, order, nextCursor: page.nextCursor, proofs, again };
     });
     if (read === undefined) throw noContact();
 
@@ -592,10 +619,19 @@ export class MessagesView {
             ...(row.delivery === 'sent' && row.availability === 'unknown'
               ? { availability: 'unknown' as const }
               : {}),
+            ...(row.delivery === 'sent' &&
+            row.relays_accepted !== null &&
+            row.relays_available !== null
+              ? { relays: { accepted: row.relays_accepted, available: row.relays_available } }
+              : {}),
           }),
         );
       } else {
-        items.push(Object.freeze(base));
+        items.push(
+          Object.freeze(
+            read.again.has(row.envelope_id) ? { ...base, receivedAgain: true as const } : base,
+          ),
+        );
       }
     }
     if (unreadable > 0) this.#ctx.log.warn('message rows unreadable', { rows: unreadable });

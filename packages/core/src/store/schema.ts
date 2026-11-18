@@ -218,6 +218,11 @@ export const TABLES = {
       // could be asked (`unknown`, shown as "Sent, availability unknown"). Follows its outbox rows;
       // null otherwise and on every row from before version 19.
       availability: optOneOf('confirmed', 'unknown'),
+      // DELIVERY-DETAILS (schema version 20, appended): for an outbound envelope whose `delivery` is
+      // `sent`, how many relays accepted it and how many served it back (the smallest count over its
+      // outbox rows). Counts only, never a relay address. Null otherwise and before version 20.
+      relays_accepted: opt('int'),
+      relays_available: opt('int'),
     },
     primaryKey: ['envelope_id'],
   },
@@ -355,6 +360,10 @@ export const TABLES = {
       // when a relay that returned OK served the wrap back, `unknown` when none could be asked.
       // Null while pending, when not delivered, and on every row from before version 19.
       availability: optOneOf('confirmed', 'unknown'),
+      // DELIVERY-DETAILS (schema version 20, appended): set with `sent`: how many relays returned OK
+      // and how many of those served the wrap back. Counts only. Null before version 20.
+      relays_accepted: opt('int'),
+      relays_available: opt('int'),
     },
     primaryKey: ['wrap_id'],
     unique: [
@@ -577,9 +586,28 @@ export const TABLES = {
       deadline: int,
       replaces: opt('id'),
       settled_at: opt('int'),
+      // DEVICES-INTERIM (schema version 22): the install that wrote the row (install_state), null
+      // on rows from before version 20 and on a runtime without an install id. A label only: the
+      // sum of 06 §3 reads every row of the epoch, whatever its install.
+      install_id: opt('id'),
     },
     primaryKey: ['entry_id'],
     unique: [{ columns: ['record_id'] }],
+  },
+  // DEVICES-INTERIM (schema version 22; devices.ts): exactly one row once the runtime supplied an
+  // install id. `install_id` is this computer's id (a KeyStore item, never sent anywhere), `since`
+  // when this store became this install's (created here, or opened by another install: a restored
+  // snapshot), `other_seen_at` the signed creation time of the newest own sent copy this store never
+  // wrote, made after `since`: this ID in use on another computer.
+  install_state: {
+    columns: {
+      slot: oneOf(SINGLETON_SLOT),
+      install_id: id,
+      since: int,
+      other_seen_at: opt('int'),
+    },
+    primaryKey: ['slot'],
+    maxRows: 1,
   },
   // 07 §3.5: exactly one row, created with `identity`.
   budget_state: {
@@ -627,6 +655,25 @@ export const TABLES = {
   // same step.
   outgoing_log: {
     columns: { envelope_id: id, contact_id: id, t: int, files: int, bytes: int },
+    primaryKey: ['envelope_id'],
+  },
+  // RESTORE-TRACES (D-156; 07 §3.5; the schema version after 19, named by content; proposed, owner
+  // confirms at merge): the restore entries of the spending history, one per restore mark
+  // (restore-traces.ts). restored_at is the mark's time; reason is `restore` (restored from a backup)
+  // or `update` (an update started the guard); noted_at is when the core wrote the row. A time and a
+  // reason only, never an amount, so a row can never read as a charge; the budget (budget.ts) never
+  // reads this table. Written only by the core when it opens the store; no MCP tool writes or deletes
+  // it (I-4).
+  budget_restores: {
+    columns: { restored_at: int, reason: oneOf('restore', 'update'), noted_at: int },
+    primaryKey: ['restored_at'],
+  },
+  // RESTORE-TRACES (same version): inbound first stored after a restore whose signed createdAt is
+  // before it (the guard's skew rule, restore-guard.ts restoredReplay), so the conversation shows
+  // "Received again after restore". Written in the transaction that first stores the envelope; the
+  // envelope ID and the restore time only.
+  restore_replays: {
+    columns: { envelope_id: id, restored_at: int },
     primaryKey: ['envelope_id'],
   },
 } as const satisfies Readonly<Record<string, TableSpec>>;

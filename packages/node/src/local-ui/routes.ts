@@ -52,6 +52,7 @@ import { attachRoute } from './api/attach.js';
 import { agentsRoutes } from './api/agents.js';
 import { eventsRoutes } from './api/events.js';
 import { agentsManageRoutes } from './api/agents-manage.js';
+import { contactDetailsRoutes } from './api/contact-details.js';
 import { contactNamesRoutes } from './api/contacts-renamed.js';
 import { agentsRemoveRoutes } from './api/agents-remove.js';
 // W4-PAUSE: Pause (its own kind) and Resume (presence; signs `agent.resume`).
@@ -550,6 +551,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     // stubs answering `not_available` until their cards (U3-d, U3-e, U3-f, U3-flow) fill them.
     agentsRoutes,
     agentsManageRoutes,
+    // RELAY-CARD-MIGRATION: "Update your contact details" (read, and one owner gesture).
+    contactDetailsRoutes,
     agentsRemoveRoutes,
     appsRoutes,
     flowRoutes,

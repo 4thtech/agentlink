@@ -353,6 +353,7 @@ function hostileEntries(rand: () => number): unknown[] {
     { kind: 'app_connected', id: h(), at: 1, app: maybe('claude-code'), appName: h() },
     { kind: 'app_disconnected', id: h(), at: 1, app: maybe('codex') },
     { kind: 'backup_saved', id: h(), at: 1, folder: h(), names: [h()] },
+    { kind: 'restore_guard', id: h(), at: 1, reason: maybe('restore'), until: 86_401 },
     { kind: h(), id: h(), at: 1, text: h() },
   ];
 }
@@ -397,4 +398,21 @@ const FIELDS: Readonly<Record<string, readonly string[]>> = {
   app_connected: ['kind', 'at', 'app'],
   app_disconnected: ['kind', 'at', 'app'],
   backup_saved: ['kind', 'at'],
+  restore_guard: ['kind', 'at', 'reason', 'until'],
 };
+
+describe('GET /api/ui/activity: the restore entry (RESTORE-TRACES)', () => {
+  it('sends the time, the reason and the end of the window; never an amount', async () => {
+    const items = await call([
+      { kind: 'restore_guard', id: 'restore_guard:5', at: 5, reason: 'restore', until: 86_405 },
+      { kind: 'restore_guard', id: 'restore_guard:6', at: 6, reason: 'update', until: 86_406 },
+      { kind: 'restore_guard', id: 'restore_guard:7', at: 7, reason: 'charge', until: 1 },
+      { kind: 'restore_guard', id: 'restore_guard:8', at: 8, reason: 'restore', until: 'x' },
+    ]);
+    expect(items).toEqual([
+      { kind: 'restore_guard', at: 5, reason: 'restore', until: 86_405 },
+      { kind: 'restore_guard', at: 6, reason: 'update', until: 86_406 },
+      { kind: 'restore_guard', at: 8, reason: 'restore' },
+    ]);
+  });
+});

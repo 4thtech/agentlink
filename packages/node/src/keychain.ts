@@ -21,7 +21,9 @@ export const KEYCHAIN_LINUX_STORE = 'secret-service';
  * The agent's keychain items (04 §2.8: the names are the `ALKS` entry names): the seed, the store key,
  * the policy-version mark (M1-8g, 04 §2.5.1), the receipts-kept marker (M1-33a, 06 §3), the
  * own-storage mark `storage-mark`, the storage credentials `s3:<id>` (M1-9i-c, 04 §2.2, D-115) and
- * the agent's current key epoch `key-epoch` (W4-RENAME-REACHES-CONTACTS, D-141; key-epoch.ts).
+ * the agent's current key epoch `key-epoch` (W4-RENAME-REACHES-CONTACTS, D-141; key-epoch.ts), the
+ * restore mark `restore-mark` (SEC-RESTORE-GUARD) and this computer's `install-id` (DEVICES-INTERIM;
+ * install-id.ts; never in a recovery kit).
  */
 export type KeychainItem =
   | 'seed'
@@ -31,6 +33,7 @@ export type KeychainItem =
   | 'storage-mark'
   | 'key-epoch'
   | 'restore-mark'
+  | 'install-id'
   | `s3:${string}`;
 
 /** `s3:` + the `storage.set` id: 8 CSPRNG bytes as 16 lowercase hex (04 §2.2). */
@@ -43,6 +46,7 @@ const FIXED_ITEMS: readonly string[] = [
   'storage-mark',
   'key-epoch',
   'restore-mark',
+  'install-id',
 ];
 
 /** A narrow view of the OS keychain under one service. Values are bytes; callers wipe what they get. */
@@ -89,7 +93,7 @@ const OWNER_ACCOUNT_NAMES: readonly string[] = ['owner', 'owner-passkey', 'owner
 /**
  * U3-e (04 §2.5 "Removing an agent" step 6): the exact keychain accounts of one agent's erase list,
  * built from `agentId` alone: the seed `<agentId>`, then `<agentId>:store-key`, `policy-version`,
- * `receipts-kept`, `storage-mark`, `key-epoch`, `restore-mark` and `<agentId>:s3:<id>` for each distinct id. Throws (fixed text)
+ * `receipts-kept`, `storage-mark`, `key-epoch`, `restore-mark`, `install-id` and `<agentId>:s3:<id>` for each distinct id. Throws (fixed text)
  * for an `agentId` that is not the 04 §2.9 form, an id that is not 16 lowercase hex or too many ids,
  * so an owner account (`owner`, `owner-passkey`, `owner-next`) or another name can never be in it.
  */
