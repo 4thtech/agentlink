@@ -174,6 +174,9 @@ export interface PiAgent {
   readonly store: MemoryStore;
   readonly cipher: TestCipher;
   readonly owner: OwnerKeyStore;
+  /** The agent keys and their owner store, for a key-epoch advance (the owner side only). */
+  readonly keys: MemoryKeyStore;
+  readonly memoryOwner: MemoryOwnerKeyStore;
   readonly home: string;
   readonly mcp: Client;
   /** How many times the allowed-folder opener actually opened a file for this agent. */
@@ -276,8 +279,9 @@ export async function makeAgent(
   const cipher = new TestCipher();
   const owner = new MemoryOwnerKeyStore(seed(100 + options.n), presence());
   let mark = 0;
+  const keys = new MemoryKeyStore(seed(options.n));
   const client = await AgentLinkClient.create({
-    keyStore: new MemoryKeyStore(seed(options.n)),
+    keyStore: keys,
     store,
     cipher,
     approvals,
@@ -335,6 +339,8 @@ export async function makeAgent(
     store,
     cipher,
     owner,
+    keys,
+    memoryOwner: owner,
     home,
     mcp,
     opens,
@@ -358,7 +364,7 @@ export async function makeAgent(
   return agent;
 }
 
-async function signOwner(agent: PiAgent, op: string, params: JsonObject): Promise<string> {
+export async function signOwner(agent: PiAgent, op: string, params: JsonObject): Promise<string> {
   const keys = await agent.owner.getPublicKeys();
   const issuedAt = Math.floor(Date.now() / 1000);
   const body: JsonObject = {
