@@ -6,10 +6,16 @@
 //   node tools/relays/vet.mjs --live                   run the checks against the default relays
 //   node tools/relays/vet.mjs --live wss://a wss://b   run against the given relays
 //   node tools/relays/vet.mjs --live --recheck <file>  read back the events a earlier run saved
+//   node tools/relays/vet.mjs --live --id-readback     read-only: does each relay serve kind 1059
+//                                                      by id without a login? Publishes nothing.
 //
 // Checks (docs/runbooks/relay-vetting.md): (1) kind 1059 accepted and read back, (2) NIP-11
 // max_message_length against the largest valid wrap frame, (3) retention (method: the run saves
-// the event id; a later --recheck says whether it is still there), (4) read auth (NIP-42).
+// the event id; a later --recheck says whether it is still there), (4) read auth (NIP-42), (5) the
+// availability check (SEC-RELAY-READBACK, D-156 (7)): an unauthenticated REQ {kinds:[1059],limit:3}
+// samples recent gift-wrap ids, then a NEW unauthenticated connection asks {ids:[id],limit:1}, as
+// RelayPool.checkServed does. Outcomes: served, empty (EOSE without it), auth-required, closed,
+// timeout; one retry when not served. `--id-readback` runs only this check and sends no EVENT.
 // The read-back uses the sync's own filter (kinds [1059], "#p", since) and, for comparison, by id.
 // Sends ONE tiny kind-1059 event per relay, signed by a throwaway key made for this run. The
 // event carries random bytes, never a real envelope; the key is never printed or saved.
@@ -46,7 +52,8 @@ export function planText(relays) {
   return [
     'relay vetting plan (no network unless --live):',
     ...relays.map((r) => `  - ${r}`),
-    'per relay: NIP-11 limits, kind-1059 publish and read back, NIP-42 AUTH, retention id saved',
+    'per relay: NIP-11 limits, kind-1059 publish and read back, NIP-42 AUTH, retention id saved,',
+    '  availability check (unauthenticated read by id on a fresh connection)',
   ].join('\n');
 }
 
@@ -294,6 +301,56 @@ async function readByP(target, made, withAuth) {
   };
 }
 
+const HEX64 = /^[0-9a-f]{64}$/;
+
+/**
+ * Pure: what one id read said (SEC-RELAY-READBACK). `seen` holds the frames of one exchange for
+ * subscription `sub`; `note` is the exchange's end ('ok', 'timeout', 'closed', ...).
+ */
+export function classifyIdRead(seen, sub, id, note) {
+  if (seen.some((f) => f[0] === 'EVENT' && f[1] === sub && f[2]?.id === id)) return 'served';
+  const closed = seen.find((f) => f[0] === 'CLOSED' && f[1] === sub);
+  if (closed !== undefined) {
+    const text = String(closed[2] ?? '');
+    return /^(auth-required|restricted):/.test(text) ? 'auth-required' : 'closed';
+  }
+  if (seen.some((f) => f[0] === 'EOSE' && f[1] === sub)) return 'empty';
+  if (seen.some((f) => f[0] === 'AUTH')) return 'auth-required';
+  return note === 'timeout' ? 'timeout' : 'closed';
+}
+
+const endsSub = (sub) => (f) => (f[0] === 'EOSE' || f[0] === 'CLOSED') && f[1] === sub;
+
+/**
+ * SEC-RELAY-READBACK, read-only: samples up to 3 recent kind-1059 ids without a login, then asks
+ * for one by id on a fresh connection without a login (never answers AUTH). One retry for each
+ * step that does not succeed. `ex` is `exchange` (injected for tests); `newSub` makes sub ids.
+ */
+export async function idReadbackCheck(target, ex, newSub = () => randomBytes(4).toString('hex')) {
+  let ids = [];
+  let sample = 'empty';
+  for (let attempt = 0; attempt < 2 && ids.length === 0; attempt += 1) {
+    const sub = `s${newSub()}`;
+    const res = await ex(target, [['REQ', sub, { kinds: [1059], limit: 3 }]], endsSub(sub));
+    ids = res.seen
+      .filter((f) => f[0] === 'EVENT' && f[1] === sub && f[2]?.kind === 1059)
+      .map((f) => f[2].id)
+      .filter((id) => typeof id === 'string' && HEX64.test(id));
+    sample = ids.length > 0 ? 'ok' : classifyIdRead(res.seen, sub, '', res.note);
+  }
+  if (ids.length === 0) return { sample, sampled: 0, idRead: 'no-sample', attempts: 0 };
+  const id = ids[0];
+  let idRead = 'empty';
+  let attempts = 0;
+  for (let attempt = 0; attempt < 2 && idRead !== 'served'; attempt += 1) {
+    attempts += 1;
+    const sub = `i${newSub()}`;
+    const res = await ex(target, [['REQ', sub, { ids: [id], limit: 1 }]], endsSub(sub));
+    idRead = classifyIdRead(res.seen, sub, id, res.note);
+  }
+  return { sample, sampled: ids.length, idRead, attempts };
+}
+
 async function vetRelay(relay, deps) {
   const target = await checkRelayTarget(relay, deps);
   if (!target.ok) return { relay, refused: target.reason }; // never contacted
@@ -327,6 +384,7 @@ async function vetRelay(relay, deps) {
     note: closed ? short(closed[2]) : rd.note,
   };
   out.retention = { eventId: ev.id, savedAt: new Date().toISOString() };
+  out.idReadback = await idReadbackCheck(target, exchange);
   return out;
 }
 
@@ -371,6 +429,19 @@ async function main(argv) {
     return;
   }
   const deps = await loadTrusted();
+  if (argv.includes('--id-readback')) {
+    const rows = [];
+    for (const relay of relays) {
+      const target = await checkRelayTarget(relay, deps);
+      rows.push(
+        target.ok
+          ? { relay, ...(await idReadbackCheck(target, exchange)) }
+          : { relay, refused: target.reason },
+      );
+    }
+    console.log(JSON.stringify(rows, null, 2));
+    return;
+  }
   const results = [];
   for (const relay of relays) results.push(await vetRelay(relay, deps));
   const out = `relay-vet-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
