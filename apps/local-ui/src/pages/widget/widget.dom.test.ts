@@ -12,7 +12,7 @@ import type { ApiClient, ApiResult } from '../../api/client.js';
 import type { LiveAgent, LiveSnapshot } from '../../api/live.js';
 import { resetHealthFeedForTests } from '../../layout/health-feed.js';
 import { WIDGET_ACTIVITY_DOM_EVENT, WidgetPage, type WidgetPageProps } from './index.js';
-import { appLabel, cleanPreview, parseWidget } from './data.js';
+import { cleanPreview, parseWidget } from './data.js';
 import { WIDGET_STRINGS as S } from './strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -279,7 +279,7 @@ describe('widget page', () => {
     ).toBe(false);
     expect(el?.hasAttribute('title')).toBe(false);
     expect(el?.getAttribute('dir')).toBe('auto');
-    expect(q('[data-block="messages"] [title]:not([data-app-name])')).toBeNull();
+    expect(q('[data-block="messages"] [title]')).toBeNull();
   });
 
   it('never uses innerHTML for content', () => {
@@ -496,67 +496,5 @@ describe('widget data', () => {
     const long = cleanPreview('x'.repeat(200)) ?? '';
     expect([...long].length).toBe(80);
     expect(long.endsWith('…')).toBe(true);
-  });
-});
-
-describe('widget app name (WIDGET-APP-NAME)', () => {
-  it("appLabel: the open ID's active app, the rest counted, all in the title; local names only", () => {
-    expect(appLabel([])).toBeUndefined();
-    expect(appLabel([agent({ apps: [] })])).toBeUndefined();
-    expect(appLabel([agent()])).toEqual({ text: 'Claude Code +1', title: 'Claude Code, Cursor' });
-    const lone = agent({ apps: [{ app: 'Antigravity', state: 'ready', word: 'Connected' }] });
-    expect(appLabel([lone])).toEqual({ text: 'Antigravity', title: 'Antigravity' });
-    // Not the current ID: the other ID's apps are not this widget's.
-    const other = agent({
-      current: false,
-      apps: [{ app: 'Codex', state: 'ready', word: 'Connected' }],
-    });
-    expect(appLabel([other, lone])?.text).toBe('Antigravity');
-    // No app running: the first set up one still names the item.
-    const off = agent({ apps: [{ app: 'Cursor', state: 'off', word: 'Not running' }] });
-    expect(appLabel([off])?.text).toBe('Cursor');
-    const two = agent({
-      apps: [
-        { app: 'Cursor', state: 'off', word: 'Not running' },
-        { app: 'Claude Code', state: 'working', word: 'Working' },
-        { app: 'Codex', state: 'ready', word: 'Connected' },
-      ],
-    });
-    expect(appLabel([two])?.text).toBe('Claude Code +2');
-  });
-
-  it('shows "Ana · Claude Code" on contact and message rows, full name in the title', async () => {
-    const one = agent({ apps: [{ app: 'Claude Code', state: 'working', word: 'Working' }] });
-    await mount({ agents: [one] });
-    const rows = [...host.querySelectorAll('[data-contact] [data-app-name]')];
-    expect(rows).toHaveLength(2);
-    expect(rows[0]?.textContent).toBe('· Claude Code');
-    expect(rows[0]?.getAttribute('title')).toBe('Claude Code');
-    expect(host.querySelectorAll('.wg-row [data-app-name]')).toHaveLength(2);
-    expect(q('[data-contact]')?.textContent).toContain('Ana');
-  });
-
-  it('long app names keep their full text in the title (CSS truncates)', async () => {
-    const long = 'A'.repeat(60);
-    await mount({ agents: [agent({ apps: [{ app: long, state: 'ready', word: 'Connected' }] })] });
-    expect(q('[data-contact] [data-app-name]')?.getAttribute('title')).toBe(long);
-  });
-
-  it('never takes the name from a contact message (I-5)', async () => {
-    await mount({
-      widget: ok(
-        widgetBody({
-          unread: [{ contactId: ANA, count: 1, lastAt: NOW - 60, preview: 'Claude Desktop' }],
-        }),
-      ),
-    });
-    const tags = [...host.querySelectorAll('[data-app-name]')];
-    expect(tags.length).toBeGreaterThan(0);
-    for (const el of tags) expect(el.textContent).toBe('· Claude Code +1');
-  });
-
-  it('no AI app set up: no app name is shown', async () => {
-    await mount({ agents: [agent({ apps: [] })] });
-    expect(host.querySelector('[data-app-name]')).toBeNull();
   });
 });

@@ -50,7 +50,7 @@ import { parseHealthSnapshot, type HealthSnapshot } from '../home/data.js';
 import { APP_UPDATE_PATH, parseUpdate, type UpdateView } from '../updates/data.js';
 import { APPROVAL_ID } from '../approvals/client.js';
 import { closeWidget, openMain, quitApp } from './bridge.js';
-import { WIDGET_PATH, appLabel, parseWidget, sum, type WidgetView } from './data.js';
+import { WIDGET_PATH, parseWidget, sum, type WidgetView } from './data.js';
 import {
   WIDGET_STRINGS as S,
   agoWords,
@@ -486,13 +486,6 @@ export function WidgetPage({
   const unread = widget?.unread ?? [];
   const newTotal = unread.reduce((n, u) => n + u.count, 0);
   const anyPreview = unread.slice(0, MAX_MESSAGES).some((u) => u.preview !== undefined);
-  const appTag = appLabel(live.agents);
-  const appSpan =
-    appTag === undefined ? null : (
-      <span className="wg-app al-text-caption al-muted" data-app-name title={appTag.title}>
-        · {appTag.text}
-      </span>
-    );
   const people = [...(widget?.contacts ?? [])]
     .sort((a, b) => b.lastAt - a.lastAt)
     .slice(0, MAX_CONTACTS);
@@ -647,7 +640,6 @@ export function WidgetPage({
                   <span className="wg-contact-name al-text-body-sm">
                     <bdi>{nameOrDefault(p.contactId)}</bdi>
                   </span>
-                  {appSpan}
                   <span className="wg-when al-text-caption" data-activity={p.activity}>
                     <span className={`wg-marker is-${p.activity}`} aria-hidden="true" />
                     {p.activity === 'active_now' ? S.activeNow : S.today}
@@ -696,7 +688,6 @@ export function WidgetPage({
                             <span className="wg-name al-text-body-sm">
                               <bdi>{name}</bdi>
                             </span>
-                            {appSpan}
                             <span className="wg-time al-text-caption num">
                               {shortAgo(t - u.lastAt)}
                             </span>
