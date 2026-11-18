@@ -9,8 +9,9 @@
 //     today: {start, bucketSeconds: 3600, in[], out[], proofs[], files[], partial},
 //     contacts: [{contactId, lastAt, activity}] }
 //
-// - `unread`: the open ID's unread `messages` and `files` notification items (the bell's store,
-//   read only), summed by contact, newest first, at most WIDGET_MAX_UNREAD.
+// - `unread`: the open ID's unread `messages` notification items (the bell's store, read only),
+//   summed by contact, newest first, at most WIDGET_MAX_UNREAD. `files` items are not counted here:
+//   the widget shows them under Needs you only (WIDGET-UNREAD-MESSAGES-ONLY).
 // - `preview`: only while the `widgetPreviews` UI setting is on (absent = on; unreadable or any
 //   value but true = off, fail closed). The newest received message's text, made plain here
 //   (widgetPreview). While off, no message is read at all. Never a file name, subject or size.
@@ -159,14 +160,14 @@ interface UnreadTally {
   lastAt: number;
 }
 
-/** The unread messages and files items, summed by contact, newest first, bounded. */
+/** The unread messages items (never files), summed by contact, newest first, bounded. */
 function unreadOf(items: readonly unknown[]): [string, UnreadTally][] {
   const tallies = new Map<string, UnreadTally>();
   for (const raw of items.slice(0, 1_000)) {
     if (typeof raw !== 'object' || raw === null) continue;
     const item = readNotificationItem({ ...raw });
     if (item === undefined || item.read || item.ref === undefined) continue;
-    if (item.kind !== 'messages' && item.kind !== 'files') continue;
+    if (item.kind !== 'messages') continue;
     const tally = tallies.get(item.ref);
     if (tally === undefined) {
       tallies.set(item.ref, { count: Math.min(item.count, MAX_COUNT), lastAt: item.at });

@@ -441,6 +441,26 @@ describe('widget page', () => {
     expect(bridge.close).toHaveBeenCalledTimes(1);
   });
 
+  // WIDGET-POLISH-0511: a file opened or marked as seen in the main window (its `files` item read)
+  // leaves Needs you when the popover is focused again; the widget itself still writes nothing.
+  it('reads again on focus: new files marked seen elsewhere leave Needs you', async () => {
+    const setup: Setup = { notes: notes(0, 1) };
+    await mount(setup);
+    expect(buttonNamed('1 new file')).toBeTruthy();
+    setup.notes = {
+      items: [{ id: `files-${ANA}`, kind: 'files', ref: ANA, count: 1, at: NOW, read: true }],
+      unread: 0,
+      approvals: 0,
+    };
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+      await new Promise((r) => setTimeout(r, 600));
+    });
+    expect(buttonNamed('1 new file')).toBeUndefined();
+    expect(text()).toContain(S.noneWaiting);
+    expect(postSpy).not.toHaveBeenCalled();
+  });
+
   it('reads again, debounced, on the activity event', async () => {
     await mount();
     const before = calls.filter((c) => c.startsWith('/api/ui/widget')).length;
