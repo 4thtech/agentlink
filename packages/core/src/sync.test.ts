@@ -82,6 +82,10 @@ class RelayNetwork implements RelayConnector {
   published = 0;
   /** M1-5g: a relay's cap on the events it returns per filter (newest first), by relay. */
   readonly caps = new Map<string, number>();
+  /** SEC-RELAY-READBACK: relays that answer a read by id with nothing (EOSE only). */
+  readonly idReadsEmpty = new Set<string>();
+  /** SEC-RELAY-READBACK: relays that refuse every EVENT. */
+  readonly refuse = new Set<string>();
 
   inject(relay: string, event: NostrEvent): void {
     const list = this.stored.get(relay) ?? [];
@@ -100,7 +104,10 @@ class RelayNetwork implements RelayConnector {
     return {
       send: (text: string) => {
         const frame = JSON.parse(text) as unknown[];
-        if (frame[0] === 'EVENT') {
+        if (frame[0] === 'EVENT' && this.refuse.has(target.url)) {
+          const event = frame[1] as NostrEvent;
+          push(['OK', event.id, false, 'blocked: test']);
+        } else if (frame[0] === 'EVENT') {
           const event = frame[1] as NostrEvent;
           this.published += 1;
           this.inject(target.url, event);
@@ -109,6 +116,10 @@ class RelayNetwork implements RelayConnector {
           const subId = frame[1] as string;
           const filter = frame[2] as Filter;
           this.reqs.push({ relay: target.url, filter });
+          if (filter.ids !== undefined && this.idReadsEmpty.has(target.url)) {
+            push(['EOSE', subId]);
+            return;
+          }
           let events = (this.stored.get(target.url) ?? []).filter((e) => matches(filter, e));
           events = events
             .sort((x, y) => y.created_at - x.created_at)
@@ -720,6 +731,29 @@ describe('catchUp (M1-7h addendum, D-73; 06 §2.0): fetch-only', () => {
 });
 
 // --- Delivery acknowledgements --------------------------------------------------------------------
+
+describe('SEC-RELAY-READBACK: a receipt from the contact confirms a message', () => {
+  it('turns a row still pending on its availability check into sent, confirmed', async () => {
+    const net = new RelayNetwork();
+    const b3 = [...RELAYS_B, 'wss://three.relay-beta.net'];
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', b3, net);
+    await pair(a, b);
+    for (const relay of RELAYS_B) net.idReadsEmpty.add(relay);
+    net.refuse.add('wss://three.relay-beta.net');
+    const sent = await a.client.sendMessage({ to: b.id, text: 'hi' });
+    if (sent.status !== 'ok') throw new Error('test: not sent');
+    expect(sent.delivery).toBe('queued');
+    expect((await b.client.syncInbox()).acksSent).toBe(1);
+    await publishAcks(b);
+    await a.client.syncInbox();
+    await a.client.outbox.processDue();
+    const out = await a.store.transaction((tx) =>
+      tx.get('envelopes', { envelope_id: sent.envelopeId }),
+    );
+    expect(out).toMatchObject({ delivery: 'sent', availability: 'confirmed' });
+  });
+});
 
 describe('delivery acknowledgements (02 F-23; SEC-RECEIPTS-DEFAULT: on by default)', () => {
   it('on by default: the contact acks a message once, bound to its envelopeHash', async () => {

@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   OUTBOX_GIVE_UP_SECONDS,
   OutboxWorker,
+  READBACK_GRACE_SECONDS,
   READBACK_RECHECK_MS,
   type OutboxAttempt,
   type OutboxAvailability,
@@ -192,6 +193,37 @@ describe('read-back before "sent"', () => {
     vi.setSystemTime(Date.now() + OUTBOX_GIVE_UP_SECONDS * 1000);
     expect(await pass(worker)).toMatchObject({ sent: 1, notDelivered: 0 });
     expect(rows.get(row.wrapId)).toMatchObject({ state: 'sent', availability: 'unknown' });
+  });
+
+  it('many rows, one honest relay and one silent: every row is confirmed (checks are cancelled and queued)', async () => {
+    const { net, rows, worker } = setup();
+    const [honest, silent] = relayUrls('probe', 2) as [string, string];
+    net.configure(honest);
+    net.configure(silent, { silentIdsReq: true });
+    const all = Array.from({ length: 24 }, () => makeRow([honest, silent]));
+    for (const row of all) rows.add(row);
+    const summary = await pass(worker);
+    expect(summary).toMatchObject({ sent: 24 });
+    for (const row of all) {
+      expect(rows.get(row.wrapId)).toMatchObject({ state: 'sent', availability: 'confirmed' });
+    }
+  });
+
+  it('a dead relay in the list does not keep the row pending: sent, unknown within minutes', async () => {
+    const { net, rows, worker } = setup();
+    const [e1, e2, dead] = relayUrls('dead', 3) as [string, string, string];
+    net.configure(e1, { neverServes: true });
+    net.configure(e2, { neverServes: true });
+    net.configure(dead, { reject: true });
+    const row = makeRow([e1, e2, dead]);
+    rows.add(row);
+    const start = nowSeconds();
+    for (let i = 0; i < 20 && rows.get(row.wrapId).state === 'pending'; i += 1) {
+      vi.setSystemTime(Math.max(Date.now(), rows.get(row.wrapId).nextAttemptAt * 1000));
+      await pass(worker);
+    }
+    expect(rows.get(row.wrapId)).toMatchObject({ state: 'sent', availability: 'unknown' });
+    expect(nowSeconds() - start).toBeLessThanOrEqual(READBACK_GRACE_SECONDS + 60);
   });
 
   it('at the give-up time one OK is enough for sent, unknown; none at all stays not delivered', async () => {

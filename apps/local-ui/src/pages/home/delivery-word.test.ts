@@ -42,6 +42,12 @@ describe('sentWord', () => {
     );
   });
 
+  it('SEC-RELAY-READBACK: a signed receipt reads as received even while the row still waits', () => {
+    expect(sentWord(item({ status: 'queued', receipt: true }), 'Ana')).toBe(
+      "Received by Ana's app",
+    );
+  });
+
   it('other states keep their word', () => {
     expect(sentWord(item({ status: 'queued' }), 'Ana')).toBe('Waiting to send');
     expect(sentWord(item({ status: 'not_delivered' }), 'Ana')).toBe('Not delivered');

@@ -115,6 +115,19 @@ describe('idReadbackCheck (read-only)', () => {
   });
 });
 
+describe('classifyIdRead: the signature', () => {
+  it('does not count a served copy whose signature does not verify', async () => {
+    const net = new MockNetwork();
+    const url = relayWithWraps(net);
+    const newest = net.stored.at(-1)?.event;
+    net.configure(url, { serveInstead: { ...newest, sig: '0'.repeat(128) } });
+    const ex = mockExchange(net);
+    // The sample lists the stored ids; the id read returns the forged copy of the newest one.
+    const r = await idReadbackCheck(target(url), ex, () => 'x');
+    expect(r.idRead).toBe('empty');
+  });
+});
+
 describe('classifyIdRead', () => {
   const id = 'a'.repeat(64);
   it('reads each outcome from the frames', () => {

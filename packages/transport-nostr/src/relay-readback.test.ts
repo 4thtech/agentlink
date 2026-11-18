@@ -7,6 +7,7 @@ import { encodeHex, randomBytes, type EnvelopeKeys } from '@4thtech-io/crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   MAX_READBACKS,
+  READBACK_QUEUE_WAIT_MS,
   READBACK_TIMEOUT_MS,
   RelayPool,
   type RelayPoolOptions,
@@ -150,18 +151,71 @@ describe('checkServed', () => {
     expect(net.opens).toHaveLength(0);
   });
 
-  it('bounds the checks open at once', async () => {
+  it('bounds the checks open at once: one over the bound waits for a free slot, then runs', async () => {
     const { net, pool } = setup();
     const relays = relayUrls('many', MAX_READBACKS + 1);
-    for (const url of relays) net.configure(url, { silentIdsReq: true });
-    const id = encodeHex(randomBytes(32));
+    for (const url of relays.slice(0, MAX_READBACKS)) net.configure(url, { silentIdsReq: true });
+    const last = relays[MAX_READBACKS] as string;
+    net.configure(last);
+    const event = makeWrapEvent();
+    net.inject(last, event);
     const results: string[] = [];
-    for (const url of relays) void pool.checkServed(url, id).then((r) => results.push(r));
+    let lastResult: string | undefined;
+    for (const url of relays.slice(0, MAX_READBACKS)) {
+      void pool.checkServed(url, event.id).then((r) => results.push(r));
+    }
+    void pool.checkServed(last, event.id).then((r) => {
+      lastResult = r;
+    });
     await vi.advanceTimersByTimeAsync(0);
-    expect(results).toEqual(['unchecked']); // the one over the bound, at once
+    expect(results).toEqual([]);
+    expect(lastResult).toBeUndefined(); // queued, not refused
     expect(net.opens).toHaveLength(MAX_READBACKS);
     await vi.advanceTimersByTimeAsync(READBACK_TIMEOUT_MS);
-    expect(results).toHaveLength(MAX_READBACKS + 1);
+    expect(results).toHaveLength(MAX_READBACKS);
+    expect(lastResult).toBe('served');
+  });
+
+  it('a queued check that waits too long is unchecked', async () => {
+    const { net, pool } = setup();
+    const relays = relayUrls('wait', MAX_READBACKS + 1);
+    for (const url of relays) net.configure(url, { silentIdsReq: true });
+    const id = encodeHex(randomBytes(32));
+    let lastResult: string | undefined;
+    for (const url of relays.slice(0, MAX_READBACKS)) void pool.checkServed(url, id);
+    void pool.checkServed(relays[MAX_READBACKS] as string, id).then((r) => {
+      lastResult = r;
+    });
+    await vi.advanceTimersByTimeAsync(READBACK_QUEUE_WAIT_MS + READBACK_TIMEOUT_MS);
+    expect(lastResult).toBe('unchecked');
+  });
+
+  it('a cancelled check ends at once, closes its connection and frees its slot', async () => {
+    const { net, pool } = setup();
+    const relays = relayUrls('abort', MAX_READBACKS + 1);
+    for (const url of relays.slice(0, MAX_READBACKS)) net.configure(url, { silentIdsReq: true });
+    const last = relays[MAX_READBACKS] as string;
+    net.configure(last);
+    const event = makeWrapEvent();
+    net.inject(last, event);
+    const controllers = relays.slice(0, MAX_READBACKS).map(() => new AbortController());
+    const results: string[] = [];
+    relays.slice(0, MAX_READBACKS).forEach((url, i) => {
+      void pool
+        .checkServed(url, event.id, { signal: controllers[i]?.signal })
+        .then((r) => results.push(r));
+    });
+    let lastResult: string | undefined;
+    void pool.checkServed(last, event.id).then((r) => {
+      lastResult = r;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    for (const c of controllers) c.abort();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(results).toHaveLength(MAX_READBACKS);
+    expect(results.every((r) => r === 'unchecked')).toBe(true);
+    expect(lastResult).toBe('served'); // got a slot without waiting for the 5 s bound
+    expect(net.sockets.slice(0, MAX_READBACKS).every((s) => s.closed)).toBe(true);
   });
 
   it('is unchecked after the pool is closed, and logs no relay address or event id', async () => {
