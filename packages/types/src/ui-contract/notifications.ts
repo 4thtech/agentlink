@@ -22,8 +22,18 @@ export const NOTIFICATIONS_READ_ALL_PATH = '/api/ui/notifications/read-all';
 /** IR-NOTIFY-1 L-1: brings the store up to date (the GET only reads). The mark kind. */
 export const NOTIFICATIONS_REFRESH_PATH = '/api/ui/notifications/refresh';
 
-/** What an item is about (PLAN-NOTIFY §3.2). */
-export const NOTIFICATION_KINDS = ['approvals', 'messages', 'files', 'update', 'network'] as const;
+/**
+ * What an item is about (PLAN-NOTIFY §3.2). DEVICES-INTERIM: `devices`, a state item while this ID is
+ * also in use on another computer (core devices.ts).
+ */
+export const NOTIFICATION_KINDS = [
+  'approvals',
+  'messages',
+  'files',
+  'update',
+  'network',
+  'devices',
+] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 /** Kinds that carry a contact ref (one item per person). */
@@ -61,7 +71,7 @@ export interface NotificationList {
 }
 
 const REF = /^0x[0-9a-f]{40}$/;
-const ID = /^(approvals|update|network|(messages|files)-0x[0-9a-f]{40})$/;
+const ID = /^(approvals|update|network|devices|(messages|files)-0x[0-9a-f]{40})$/;
 
 function plainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;

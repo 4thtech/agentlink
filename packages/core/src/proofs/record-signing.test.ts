@@ -33,6 +33,7 @@ async function reserved(recordId = ID, state: 'reserved' | 'released' = 'reserve
       deadline: NOW + 3600,
       replaces: null,
       settled_at: null,
+      install_id: null,
     });
     tx.insert('proofs', {
       record_id: recordId,

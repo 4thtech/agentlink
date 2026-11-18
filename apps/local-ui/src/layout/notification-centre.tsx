@@ -65,6 +65,7 @@ const ICON: Readonly<Record<NotificationItem['kind'], ShellIconName>> = {
   files: 'book',
   update: 'rocket',
   network: 'relays',
+  devices: 'idcard',
 };
 
 const TONE: Readonly<Record<NotificationItem['kind'], string>> = {
@@ -73,6 +74,7 @@ const TONE: Readonly<Record<NotificationItem['kind'], string>> = {
   files: 'accent',
   update: 'accent',
   network: 'neutral',
+  devices: 'warning',
 };
 
 /** Groups (PLAN-NOTIFY §4.1): approvals waiting first, then unread, then read. */
@@ -118,6 +120,8 @@ function Sentence({
       return <>{S.update}</>;
     case 'network':
       return <>{S.network}</>;
+    case 'devices':
+      return <>{S.devices}</>;
   }
 }
 
@@ -127,6 +131,7 @@ const SECOND_LINE: Readonly<Record<NotificationItem['kind'], string>> = {
   files: S.personLine,
   update: S.updateLine,
   network: S.networkLine,
+  devices: S.devicesLine,
 };
 
 function Row({

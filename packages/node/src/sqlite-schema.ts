@@ -117,11 +117,14 @@ const V19_OUTBOX_COLUMNS: readonly string[] = ['availability'];
 const V20_COLUMNS: readonly string[] = ['relays_accepted', 'relays_available'];
 
 /**
- * Tables added by the restore-traces version (RESTORE-TRACES, D-156; 07 §3.5), version 20 here: the
+ * Tables added by the restore-traces version (RESTORE-TRACES, D-156; 07 §3.5), version 21 here: the
  * restore entries of the spending history and inbound received again after a restore. Named by
  * content: if another lane adds a version first, this one takes the next number.
  */
 const RESTORE_TRACES_TABLES: readonly TableName[] = ['budget_restores', 'restore_replays'];
+/** Added by version 22 (DEVICES-INTERIM): the install on each budget row, and `install_state`. */
+const V22_BUDGET_LEDGER_COLUMNS: readonly string[] = ['install_id'];
+const V22_TABLES: readonly TableName[] = ['install_state'];
 
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
@@ -156,6 +159,7 @@ function v1Spec(table: TableName): TableSpec {
   }
   if (table === 'contacts') return without(spec, [...V9_CONTACTS_COLUMNS, ...V18_CONTACTS_COLUMNS]);
   if (table === 'pairings') return without(spec, V18_PAIRINGS_COLUMNS);
+  if (table === 'budget_ledger') return without(spec, V20_BUDGET_LEDGER_COLUMNS);
   return spec;
 }
 
@@ -283,6 +287,22 @@ function v20Statements(): readonly string[] {
 }
 
 /**
+ * Version 22 (DEVICES-INTERIM; 07 §3.5): `budget_ledger.install_id`, appended, nullable (every row
+ * stored before keeps null, and the budget sums it as before), and the one-row `install_state`
+ * table, empty until the runtime supplies this computer's install id.
+ */
+function v22Statements(): readonly string[] {
+  const ledger = tableSpec('budget_ledger');
+  return [
+    ...V22_BUDGET_LEDGER_COLUMNS.map(
+      (column) =>
+        `ALTER TABLE "budget_ledger" ADD COLUMN ${columnDef('budget_ledger', column, ledger.columns[column] as ColumnSpec)}`,
+    ),
+    ...createSchemaStatements(V22_TABLES),
+  ];
+}
+
+/**
  * Version 2 (D-72, M1-7e-2): `envelopes.refused_at` and `envelopes.request_accepted_at`, appended
  * (ALTER TABLE ADD COLUMN appends, which is also their place in TABLES), and the `blocked_keys`
  * table. A `refused` row stored before version 2 has a null refused_at: the core treats it as
@@ -394,7 +414,9 @@ function v11Statements(): readonly string[] {
  * `contacts.waiting_owner`, `contacts.ai_accepted_at` and `pairings.created_by` (SEC-INVITE-CAPS,
  * D-156; nullable, null on existing rows), version 19 adds `envelopes.availability` and
  * `outbox.availability` (SEC-RELAY-READBACK, D-156 (7); nullable, null on existing rows), version 20
- * adds `relays_accepted` and `relays_available` to both (DELIVERY-DETAILS; nullable counts). A later
+ * adds `relays_accepted` and `relays_available` to both (DELIVERY-DETAILS; nullable counts), version 21
+ * adds `budget_restores` and `restore_replays` (RESTORE-TRACES, D-156; new tables, empty), version 22
+ * adds `budget_ledger.install_id` and `install_state` (DEVICES-INTERIM; nullable, and a new table). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -415,7 +437,8 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
           !V15_TABLES.includes(t) &&
           !V16_TABLES.includes(t) &&
           !V17_TABLES.includes(t) &&
-          !RESTORE_TRACES_TABLES.includes(t),
+          !RESTORE_TRACES_TABLES.includes(t) &&
+          !V22_TABLES.includes(t),
       ),
       v1Spec,
     ),
@@ -439,6 +462,8 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 18, statements: Object.freeze(v18Statements()) }),
   Object.freeze({ version: 19, statements: Object.freeze(v19Statements()) }),
   Object.freeze({ version: 20, statements: Object.freeze(v20Statements()) }),
+  Object.freeze({ version: 21, statements: createSchemaStatements(RESTORE_TRACES_TABLES) }),
+  Object.freeze({ version: 22, statements: Object.freeze(v22Statements()) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

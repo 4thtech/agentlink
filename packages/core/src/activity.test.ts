@@ -191,6 +191,7 @@ async function insertLedger(
       deadline: 2_000_000_000,
       replaces: null,
       settled_at: row.state === 'reserved' ? null : 2,
+      install_id: null,
     }),
   );
 }
