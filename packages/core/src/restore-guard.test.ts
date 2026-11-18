@@ -99,9 +99,10 @@ describe('restoreWindowOpen', () => {
 
 describe('requestedBeforeRestore: owner approvals asked for before the restore', () => {
   const restored = { status: 'restored', restoredAt: NOW, reason: 'restore' } as const;
-  it('a request made before the restore is void; one made at or after it is not', () => {
+  it('a request made before the restore (with the skew allowance) is void; a later one is not', () => {
     expect(requestedBeforeRestore(restored, NOW - 1)).toBe(true);
-    expect(requestedBeforeRestore(restored, NOW)).toBe(false);
+    expect(requestedBeforeRestore(restored, NOW + RESTORE_CLOCK_SKEW_SECONDS - 1)).toBe(true);
+    expect(requestedBeforeRestore(restored, NOW + RESTORE_CLOCK_SKEW_SECONDS)).toBe(false);
     expect(requestedBeforeRestore(restored, NOW + 10 * RESTORE_GUARD_SECONDS)).toBe(false);
   });
   it('unknown voids every request; never restored none', () => {

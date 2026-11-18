@@ -28,6 +28,7 @@ import type { Fields, Logger } from '@4thtech-io/log';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CoreContext } from '../context.js';
 import { ownerActionHash } from '../owner-action.js';
+import type { RestoreMark } from '../restore-guard.js';
 import { MemoryStore } from '../store/memory-store.js';
 import { FakeClock, TestStoreCipher, passphrase, seed } from '../testing/fixtures.js';
 import {
@@ -191,6 +192,7 @@ async function harness(
     readonly config?: ChainConfig;
     readonly keyStore?: KeyStore;
     readonly real?: boolean;
+    readonly restoreMark?: RestoreMark;
   } = {},
 ): Promise<Harness> {
   const clock = options.clock ?? new FakeClock();
@@ -251,6 +253,7 @@ async function harness(
     cipher: new TestStoreCipher(),
     now: clock.now,
     log,
+    ...(options.restoreMark === undefined ? {} : { restoreMark: options.restoreMark }),
   };
   const deps: GaslessTopUpDeps = {
     ctx,
@@ -581,6 +584,33 @@ describe('runGaslessTopUp (M3-4b-t-T4-a)', () => {
       const other = await h.approve(20n * DOLLAR);
       h.verify.mockResolvedValueOnce({ ok: true, actionHash: ownerActionHash(other) });
       const result = await runGaslessTopUp(h.deps, { approval: await h.approve(50n * DOLLAR) });
+      expect(result).toEqual({ status: 'refused', reason: 'approval_invalid' });
+      expect(h.sign712).toHaveBeenCalledTimes(0);
+    });
+
+    it('SEC-RESTORE-GUARD: an approval issued before a restore cannot authorise a top-up; a later one can', async () => {
+      const restoredAt = { value: 0 };
+      const h = await harness({ restoreMark: { read: () => Promise.resolve(restoredAt.value) } });
+      const before = await h.approve(20n * DOLLAR);
+      h.clock.t += 60;
+      restoredAt.value = h.clock.t;
+      // Issued before the restore, and within the 5-minute skew allowance after it: refused.
+      for (const approval of [before, await h.approve(20n * DOLLAR)]) {
+        expect(await runGaslessTopUp(h.deps, { approval })).toEqual({
+          status: 'refused',
+          reason: 'approval_invalid',
+        });
+      }
+      expect(h.sign712).toHaveBeenCalledTimes(0);
+      expect(h.posted).toHaveLength(0);
+      h.clock.t += 600;
+      const result = await runGaslessTopUp(h.deps, { approval: await h.approve(20n * DOLLAR) });
+      expect(result.status).not.toBe('refused');
+    });
+
+    it('SEC-RESTORE-GUARD: an unreadable restore mark refuses every top-up approval', async () => {
+      const h = await harness({ restoreMark: { read: () => Promise.reject(new Error('x')) } });
+      const result = await runGaslessTopUp(h.deps, { approval: await h.approve(20n * DOLLAR) });
       expect(result).toEqual({ status: 'refused', reason: 'approval_invalid' });
       expect(h.sign712).toHaveBeenCalledTimes(0);
     });

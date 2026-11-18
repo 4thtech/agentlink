@@ -360,7 +360,7 @@ describe('SEC-RESTORE-GUARD: approvals asked for before a restore', () => {
     expect(await t.approve(before)).toMatchObject({ status: 'applied' });
     t.clock.t += 60;
     restoredAt.value = t.clock.t;
-    t.clock.t += 60;
+    t.clock.t += 600; // past the 5-minute skew allowance
     expect(
       await t.client.approvalService.use(before.approvalId, before.action, 'approval'),
     ).toEqual({ status: 'void' });
