@@ -128,6 +128,8 @@ export async function storePairingEnvelope(
       request_accepted_at: null,
       deleted_at: null,
       availability: null,
+      relays_accepted: null,
+      relays_available: null,
     }),
   );
   return id;

@@ -218,6 +218,11 @@ export const TABLES = {
       // could be asked (`unknown`, shown as "Sent, availability unknown"). Follows its outbox rows;
       // null otherwise and on every row from before version 19.
       availability: optOneOf('confirmed', 'unknown'),
+      // DELIVERY-DETAILS (schema version 20, appended): for an outbound envelope whose `delivery` is
+      // `sent`, how many relays accepted it and how many served it back (the smallest count over its
+      // outbox rows). Counts only, never a relay address. Null otherwise and before version 20.
+      relays_accepted: opt('int'),
+      relays_available: opt('int'),
     },
     primaryKey: ['envelope_id'],
   },
@@ -355,6 +360,10 @@ export const TABLES = {
       // when a relay that returned OK served the wrap back, `unknown` when none could be asked.
       // Null while pending, when not delivered, and on every row from before version 19.
       availability: optOneOf('confirmed', 'unknown'),
+      // DELIVERY-DETAILS (schema version 20, appended): set with `sent`: how many relays returned OK
+      // and how many of those served the wrap back. Counts only. Null before version 20.
+      relays_accepted: opt('int'),
+      relays_available: opt('int'),
     },
     primaryKey: ['wrap_id'],
     unique: [

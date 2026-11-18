@@ -25,6 +25,8 @@ const outbox = (over: Partial<Row<'outbox'>> = {}): Row<'outbox'> => ({
   state: 'pending',
   reason: null,
   availability: null,
+  relays_accepted: null,
+  relays_available: null,
   ...over,
 });
 
@@ -165,12 +167,23 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
   });
 
   it('SEC-RELAY-READBACK (schema 19): envelopes.availability and outbox.availability, nullable, appended last', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(19);
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(19);
     const availability = { kind: 'enum', nullable: true, values: ['confirmed', 'unknown'] };
-    expect(Object.keys(TABLES.envelopes.columns).at(-1)).toBe('availability');
     expect(TABLES.envelopes.columns.availability).toEqual(availability);
-    expect(Object.keys(TABLES.outbox.columns).at(-1)).toBe('availability');
     expect(TABLES.outbox.columns.availability).toEqual(availability);
+  });
+
+  it('DELIVERY-DETAILS (schema 20): relays_accepted and relays_available, nullable ints, appended last', () => {
+    expect(STORE_SCHEMA_VERSION).toBe(20);
+    const int = { kind: 'int', nullable: true };
+    for (const table of ['envelopes', 'outbox'] as const) {
+      expect(Object.keys(TABLES[table].columns).slice(-2)).toEqual([
+        'relays_accepted',
+        'relays_available',
+      ]);
+      expect(TABLES[table].columns.relays_accepted).toEqual(int);
+      expect(TABLES[table].columns.relays_available).toEqual(int);
+    }
   });
 
   it('files.saved_name (MSG-FILES-IO-b, schema 6): a nullable sealed column, appended last', () => {

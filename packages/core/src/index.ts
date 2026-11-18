@@ -522,6 +522,7 @@ export {
   type SavedNameReader,
   type SentFileItem,
   type SentFileState,
+  type RelayCounts,
   type SentMessage,
   type SentStatus,
 } from './ui-messages.js';

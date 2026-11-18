@@ -121,6 +121,17 @@ export interface SentMessage extends InboxMessage {
    * be asked to serve back: "Sent, availability unknown". Absent once a relay served it back.
    */
   readonly availability?: 'unknown';
+  /**
+   * DELIVERY-DETAILS: on a `sent` message, how many relays accepted it and how many served it back.
+   * Counts only (never a relay address). Absent on a message sent before the counts were kept.
+   */
+  readonly relays?: RelayCounts;
+}
+
+/** DELIVERY-DETAILS: how many relays accepted a message and how many served it back. */
+export interface RelayCounts {
+  readonly accepted: number;
+  readonly available: number;
 }
 
 export type MessageItem = InboxMessage | SentMessage;
@@ -591,6 +602,11 @@ export class MessagesView {
             ...receiptFields(acked.get(row.envelope_id)),
             ...(row.delivery === 'sent' && row.availability === 'unknown'
               ? { availability: 'unknown' as const }
+              : {}),
+            ...(row.delivery === 'sent' &&
+            row.relays_accepted !== null &&
+            row.relays_available !== null
+              ? { relays: { accepted: row.relays_accepted, available: row.relays_available } }
               : {}),
           }),
         );

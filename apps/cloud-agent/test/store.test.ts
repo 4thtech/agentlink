@@ -110,8 +110,8 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
       ],
       pairings: ['created_by'],
       files: ['auto_save', 'auto_reason', 'auto_tries', 'auto_next_at'],
-      envelopes: ['deleted_at', 'availability'],
-      outbox: ['availability'],
+      envelopes: ['deleted_at', 'availability', 'relays_accepted', 'relays_available'],
+      outbox: ['availability', 'relays_accepted', 'relays_available'],
     };
     for (const [table, names] of Object.entries(columns)) {
       for (const name of names) sql.exec(`ALTER TABLE "${table}" DROP COLUMN "${name}"`);
@@ -174,12 +174,15 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
   it('migrates a version 18 store (SEC-RELAY-READBACK columns) keeping rows, the new columns null', async () => {
     await inObject(async (store, state) => {
       await store.transaction((tx) => tx.insert('seen', seen('keep')));
-      state.storage.sql.exec('ALTER TABLE "envelopes" DROP COLUMN "availability"');
-      state.storage.sql.exec('ALTER TABLE "outbox" DROP COLUMN "availability"');
+      for (const table of ['envelopes', 'outbox']) {
+        for (const name of ['relays_accepted', 'relays_available', 'availability']) {
+          state.storage.sql.exec(`ALTER TABLE "${table}" DROP COLUMN "${name}"`);
+        }
+      }
       state.storage.sql.exec('UPDATE deploy_state SET schema_version = 18');
       const again = DurableObjectStore.open(state.storage);
       expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
-      expect(STORE_SCHEMA_VERSION).toBe(19);
+      expect(STORE_SCHEMA_VERSION).toBe(20);
       const columns = (table: string) =>
         state.storage.sql
           .exec(`PRAGMA table_info("${table}")`)
@@ -187,6 +190,13 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
           .map((c) => c['name']);
       expect(columns('envelopes')).toContain('availability');
       expect(columns('outbox')).toContain('availability');
+      // DELIVERY-DETAILS (schema 20): the relay counts, null on every existing row.
+      expect(columns('envelopes')).toEqual(
+        expect.arrayContaining(['relays_accepted', 'relays_available']),
+      );
+      expect(columns('outbox')).toEqual(
+        expect.arrayContaining(['relays_accepted', 'relays_available']),
+      );
       expect(await again.transaction((tx) => tx.select('seen'))).toEqual([seen('keep')]);
     });
   });

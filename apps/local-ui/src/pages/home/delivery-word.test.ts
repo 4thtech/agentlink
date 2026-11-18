@@ -2,7 +2,7 @@
 // receipt the contact's AI signed over this exact message; an older app's receipt is weaker; a
 // message sent with proof never reads as delivered without that receipt.
 import { describe, expect, it } from 'vitest';
-import { receiptWord, sentWord } from './delivery-word.js';
+import { receiptWord, relaysWord, sentWord } from './delivery-word.js';
 
 const item = (over: Record<string, unknown> = {}) => ({
   status: 'sent' as const,
@@ -51,6 +51,31 @@ describe('sentWord', () => {
   it('other states keep their word', () => {
     expect(sentWord(item({ status: 'queued' }), 'Ana')).toBe('Waiting to send');
     expect(sentWord(item({ status: 'not_delivered' }), 'Ana')).toBe('Not delivered');
+  });
+});
+
+describe('relaysWord (DELIVERY-DETAILS)', () => {
+  it('reads the accepted and available counts', () => {
+    expect(relaysWord(item({ relays: { accepted: 3, available: 2 } }))).toBe(
+      'Message network: accepted by 3, available from 2',
+    );
+    expect(relaysWord(item({ relays: { accepted: 1, available: 1 } }))).toBe(
+      'Message network: accepted by 1, available from 1',
+    );
+  });
+
+  it('reads "Sent, availability unknown" when nothing could be checked', () => {
+    const none = { accepted: 2, available: 0 };
+    expect(relaysWord(item({ availability: 'unknown', relays: none }))).toBe(
+      'Sent, availability unknown',
+    );
+    expect(relaysWord(item({ relays: none }))).toBe('Sent, availability unknown');
+  });
+
+  it('says nothing without counts (an older message) or when the message is not sent', () => {
+    expect(relaysWord(item())).toBeUndefined();
+    const some = { accepted: 2, available: 1 };
+    expect(relaysWord(item({ status: 'queued', relays: some }))).toBeUndefined();
   });
 });
 

@@ -61,6 +61,7 @@ export {
   READBACK_RECHECK_MS,
   type OutboxAttempt,
   type OutboxAvailability,
+  type OutboxRelayCounts,
   type OutboxGiveUpReason,
   type OutboxNotice,
   type OutboxNoticeReason,

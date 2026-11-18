@@ -1090,6 +1090,21 @@ describe('SEC-RELAY-READBACK: "sent" needs a relay that serves the message back 
     for (const r of await contactRows(a, result.envelopeId)) {
       expect(r).toMatchObject({ state: 'sent', availability: 'confirmed' });
     }
+    // DELIVERY-DETAILS: counts follow the rows, on the envelope, in the list and nowhere else.
+    const row = (await contactRows(a, result.envelopeId))[0];
+    expect(row?.relays_accepted).toBeGreaterThanOrEqual(1);
+    expect(row?.relays_available).toBeGreaterThanOrEqual(1);
+    expect(row?.relays_available).toBeLessThanOrEqual(row?.relays_accepted ?? 0);
+    expect(stored.out[0]).toMatchObject({
+      relays_accepted: row?.relays_accepted,
+      relays_available: row?.relays_available,
+    });
+    const listed = await a.client.messages.list(b.id, 'out');
+    expect(listed.items[0]).toMatchObject({
+      status: 'sent',
+      relays: { accepted: row?.relays_accepted, available: row?.relays_available },
+    });
+    expect(JSON.stringify(listed.items[0])).not.toMatch(/wss?:/);
     // Only relays of the row were asked, by the wrap's own id.
     for (const { relay, id } of a.spy.readbacks) {
       expect(a.spy.ids).toContain(id);
@@ -1109,6 +1124,9 @@ describe('SEC-RELAY-READBACK: "sent" needs a relay that serves the message back 
     expect(stored.out[0]).toMatchObject({ delivery: 'sent', availability: 'unknown' });
     const page = await a.client.messages.list(b.id, 'out');
     expect(page.items[0]).toMatchObject({ status: 'sent', availability: 'unknown' });
+    // DELIVERY-DETAILS: accepted is kept, available is 0 (none could be asked).
+    expect(page.items[0]).toMatchObject({ relays: { available: 0 } });
+    expect(stored.out[0]?.relays_accepted).toBeGreaterThanOrEqual(1);
   });
 
   it('treats a transport without a read-back as unknown, never as confirmed', async () => {
