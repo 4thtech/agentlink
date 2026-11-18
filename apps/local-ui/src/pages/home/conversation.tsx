@@ -234,11 +234,7 @@ function Details({
       <span>
         {S.receipt} <span className="hm-v">{receipt}</span>
       </span>
-      {relays === undefined ? null : (
-        <span>
-          {S.relayDetailsLabel} <span className="hm-v">{relays}</span>
-        </span>
-      )}
+      {relays === undefined ? null : <span>{relays}</span>}
       <span>
         {S.proof}{' '}
         <span className={item.proof ? 'hm-v is-proof' : 'hm-v'}>

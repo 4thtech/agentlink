@@ -131,10 +131,8 @@ export const HOME_STRINGS = {
   // SEC-RELAY-READBACK (D-156 (7)): the relays took it, but none could be asked to hand it back.
   sentAvailabilityUnknown: 'Sent, availability unknown',
   // DELIVERY-DETAILS: the details line of a sent message (counts only, never a relay address).
-  relayDetails: 'Accepted by {accepted} · available from {available}',
-  relayCount: '{n} relay',
-  relayCountMany: '{n} relays',
-  relayDetailsLabel: 'Relays',
+  // 11 §5.1: "relay" maps to "message network", also under the hood.
+  relayDetails: 'Message network: accepted by {accepted}, available from {available}',
   receiptPending: 'Pending',
   receiptTheirs: 'Sent by them',
   proof: 'Proof',

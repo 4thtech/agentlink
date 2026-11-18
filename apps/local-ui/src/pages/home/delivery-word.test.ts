@@ -57,10 +57,10 @@ describe('sentWord', () => {
 describe('relaysWord (DELIVERY-DETAILS)', () => {
   it('reads the accepted and available counts', () => {
     expect(relaysWord(item({ relays: { accepted: 3, available: 2 } }))).toBe(
-      'Accepted by 3 relays · available from 2',
+      'Message network: accepted by 3, available from 2',
     );
     expect(relaysWord(item({ relays: { accepted: 1, available: 1 } }))).toBe(
-      'Accepted by 1 relay · available from 1',
+      'Message network: accepted by 1, available from 1',
     );
   });
 

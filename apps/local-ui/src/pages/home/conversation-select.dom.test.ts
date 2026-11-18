@@ -110,9 +110,12 @@ describe('the conversation: select messages, then Delete (RET-4)', () => {
     expect(host.textContent).toContain('Sent');
     await render(true);
     expect(host.querySelector('.hm-msg.is-out .hm-msg-meta')?.textContent).toContain(
-      'Accepted by 3 relays · available from 2',
+      'Message network: accepted by 3, available from 2',
     );
-    expect(host.querySelector('.hm-msg.is-in .hm-msg-meta')?.textContent).not.toContain('relays');
+    expect(host.querySelector('.hm-msg.is-in .hm-msg-meta')?.textContent).not.toContain(
+      'Message network',
+    );
+    expect(host.textContent).not.toMatch(/relay/i);
   });
 
   it('Cancel leaves Select mode and chooses nothing', async () => {

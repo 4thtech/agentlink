@@ -35,14 +35,13 @@ export function receiptWord(item: Item, name: string): string {
 }
 
 /**
- * DELIVERY-DETAILS: the relays line of a sent message, e.g. "Accepted by 3 relays · available from
- * 2"; "Sent, availability unknown" when no relay could be asked; nothing when the counts were not
+ * DELIVERY-DETAILS: the relays line of a sent message, e.g. "Message network: accepted by 3,
+ * available from 2"; "Sent, availability unknown" when no relay could be asked; nothing when the counts were not
  * kept (a message sent before) or the message is not sent.
  */
 export function relaysWord(item: Item): string | undefined {
   if (item.status !== 'sent' || item.relays === undefined) return undefined;
   const { accepted, available } = item.relays;
   if (item.availability === 'unknown' || available === 0) return S.sentAvailabilityUnknown;
-  const count = (n: number): string => fmt(n === 1 ? S.relayCount : S.relayCountMany, { n });
-  return fmt(S.relayDetails, { accepted: count(accepted), available: String(available) });
+  return fmt(S.relayDetails, { accepted, available });
 }
