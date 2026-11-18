@@ -23,6 +23,7 @@ import {
 import { receiptDisclosure, withDisclosure } from './strings/privacy.js';
 import { fail, internalError, ok, pendingApproval, type HandlerOutput } from './result.js';
 import { NPX_COMMAND } from './cli-command.js';
+import { WAITING_OWNER_TEXT } from './invite-common.js';
 
 export const ACK_TEXT = Object.freeze({
   recorded: 'Receipt recorded: {receipt}.',
@@ -78,6 +79,9 @@ function refusal(code: string): HandlerOutput {
       return fail('rejected', ACK_TEXT.approvalInvalid, ACK_TEXT.approvalInvalidNextStep, code);
     case 'PROOFS_UNAVAILABLE':
       return fail('error', ACK_TEXT.unavailable, ACK_TEXT.unavailableNextStep, code);
+    // SEC-INVITE-CAPS (D-156): no receipt to a contact that waits for the owner's Keep.
+    case 'CONTACT_WAITING_OWNER':
+      return fail('rejected', WAITING_OWNER_TEXT.proofSummary, WAITING_OWNER_TEXT.nextStep, code);
     default:
       return internalError();
   }

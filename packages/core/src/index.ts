@@ -549,7 +549,13 @@ export {
   type TermsSnapshot,
 } from './terms-store.js';
 export { type CommitmentPartRow } from './approvals.js';
-export { CoreError, StoreConstraintError, StoreUsageError, type CoreErrorCode } from './errors.js';
+export {
+  CoreError,
+  InviteLimitError,
+  StoreConstraintError,
+  StoreUsageError,
+  type CoreErrorCode,
+} from './errors.js';
 export * from './constants.js';
 export {
   SINGLETON_SLOT,

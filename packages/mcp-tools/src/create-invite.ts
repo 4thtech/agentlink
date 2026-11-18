@@ -1,15 +1,17 @@
 // `agentlink_create_invite` (06 §2.1; M1-9o). Creates a single-use invite record on this device:
 // nothing leaves the device until the user shares the link (`openWorldHint: false`), and it needs no
-// owner approval (the invite carries only this agent's own signed card, 04 §3.6).
+// owner approval (the invite carries only this agent's own signed card, 04 §3.6). SEC-INVITE-CAPS
+// (D-156): it is an AI-made invite, under the owner's caps (at most 3 open, 5 a day, 24 h by
+// default; INVITE_LIMIT over a cap), and a contact that pairs through it waits for the owner's Keep.
 //
 // The link holds the invite secret. It goes into `inviteUrl` and `shareText` for the user's own agent
 // to hand over, and nowhere else: never a log line (I-7). The `label` is agent-written, so the core
 // stores it sealed as a suggested alias and it is shown restricted until the owner confirms it
 // (06 §2.1); it is never echoed here.
-import { CoreError } from '@4thtech-io/core';
+import { CoreError, InviteLimitError } from '@4thtech-io/core';
 import { copy, formatDate, renderCopy } from './strings/index.js';
 import type { ToolContext } from './context.js';
-import { INVITE_TEXT, inviteFailure } from './invite-common.js';
+import { INVITE_TEXT, inviteFailure, inviteLimit } from './invite-common.js';
 import { fail, notAvailable, type HandlerOutput } from './result.js';
 
 const SUMMARY =
@@ -50,6 +52,8 @@ export async function createInviteHandler(
     // The text block carries the ready-to-send text, so a client that shows only text still has it.
     return { result, text: `${summary}\n${shareText}\n${INVITE_TEXT.createdNext}` };
   } catch (error) {
+    // SEC-INVITE-CAPS (D-156): over the owner's caps on AI-made invites; nothing was stored.
+    if (error instanceof InviteLimitError) return inviteLimit(error);
     if (error instanceof CoreError && error.code === 'name_invalid') {
       return fail(
         'error',

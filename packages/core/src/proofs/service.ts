@@ -311,7 +311,12 @@ export type ProofCode =
    * RET-3 (IR-RET-3-1 Medium 2; 04 §4.2 OD-4): the owner deleted this message on this computer, so
    * its content is never disclosed (no content key); the pack without the content still exports.
    */
-  | 'CONTENT_DELETED';
+  | 'CONTENT_DELETED'
+  /**
+   * SEC-INVITE-CAPS (D-156): the envelope is from or to a contact the AI connected that waits for
+   * the owner's Keep; no proof or receipt until then. Nothing is signed or charged.
+   */
+  | 'CONTACT_WAITING_OWNER';
 
 /** What one `processInbound` pass did (M1-7g-c). */
 export interface ProofInboundResult {

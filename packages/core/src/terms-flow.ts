@@ -83,7 +83,7 @@ import {
   type CommitmentFacts,
   type CommitmentPart,
 } from './commitments.js';
-import type { ContactBook, ContactView } from './contacts.js';
+import { waitingOwnerError, type ContactBook, type ContactView } from './contacts.js';
 import { nowOf, open, seal, type CoreContext } from './context.js';
 import type { EnvelopeService } from './envelopes.js';
 import { CoreError } from './errors.js';
@@ -720,6 +720,8 @@ export class TermsService {
       if (contact?.status !== 'active' || contact.pairing !== 'complete') {
         throw new CoreError('contact_not_active', 'That contact cannot receive messages now.');
       }
+      // SEC-INVITE-CAPS: no terms with a contact that waits for the owner's Keep.
+      if (contact.waiting_owner === 1) throw waitingOwnerError();
       if (input.claimTx !== undefined && !input.claimTx(tx, envelopeId, json)) {
         return 'lost' as const;
       }

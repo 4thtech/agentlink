@@ -20,7 +20,7 @@ import {
 import { renderRef, type ContactRef } from './contacts.js';
 import type { ToolContext } from './context.js';
 import { approvalStateOf } from './get-approval.js';
-import { INVITE_TEXT } from './invite-common.js';
+import { INVITE_TEXT, waitingOwner } from './invite-common.js';
 import type { PayPageConfig } from '@4thtech-io/chain';
 import { needsCredits, notarizeOutput, proofRefusal, proofThrown } from './proofs-common.js';
 import {
@@ -354,6 +354,9 @@ export function termsCoreError(error: unknown): HandlerOutput | undefined {
       );
     case 'contact_not_active':
       return contactNotReady();
+    // SEC-INVITE-CAPS (D-156): no terms with a contact that waits for the owner's Keep.
+    case 'contact_waiting_owner':
+      return waitingOwner();
     case 'contact_not_found':
       return fail('not_found', TOOL_TEXT.contactNotFound, TOOL_TEXT.contactNotFoundNextStep);
     case 'envelope_too_large':

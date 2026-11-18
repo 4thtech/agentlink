@@ -131,7 +131,8 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
 
   it('contacts former name (W4-RENAME-REACHES-CONTACTS, schema 9): four nullable columns, appended last', () => {
     expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(9);
-    expect(Object.keys(TABLES.contacts.columns).slice(-4)).toEqual([
+    // Followed by `waiting_owner` (SEC-INVITE-CAPS, schema 17).
+    expect(Object.keys(TABLES.contacts.columns).slice(-5, -1)).toEqual([
       'former_name',
       'name_changed_at',
       'name_change_seen',
@@ -141,6 +142,18 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
     expect(TABLES.contacts.columns.former_name).toEqual({ kind: 'enc', nullable: true });
     expect(TABLES.contacts.columns.name_changed_at).toEqual({ kind: 'int', nullable: true });
     expect(TABLES.contacts.columns.name_change_seen).toEqual({ kind: 'flag', nullable: true });
+  });
+
+  it('SEC-INVITE-CAPS (schema 17): invites.created_by and contacts.waiting_owner, nullable, appended last', () => {
+    expect(STORE_SCHEMA_VERSION).toBe(17);
+    expect(Object.keys(TABLES.invites.columns).at(-1)).toBe('created_by');
+    expect(TABLES.invites.columns.created_by).toEqual({
+      kind: 'enum',
+      nullable: true,
+      values: ['owner', 'ai'],
+    });
+    expect(Object.keys(TABLES.contacts.columns).at(-1)).toBe('waiting_owner');
+    expect(TABLES.contacts.columns.waiting_owner).toEqual({ kind: 'flag', nullable: true });
   });
 
   it('files.saved_name (MSG-FILES-IO-b, schema 6): a nullable sealed column, appended last', () => {

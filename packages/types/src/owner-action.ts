@@ -414,6 +414,19 @@ export const contactUnblockActionSchema = z
   })
   .refine(expiring, EXPIRING_MSG);
 
+/**
+ * Keeps one contact the AI connected through an AI-made invite (SEC-INVITE-CAPS, D-156): it stops
+ * waiting for the owner, so the agent may send to it. Own machine only: no envelope.
+ */
+export const contactKeepActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('contact.keep'),
+    params: contactBlockParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG);
+
 /** Connects the agent's own S3-compatible storage (M1-9i-a, D-115). Own machine only: no envelope. */
 export const storageSetActionSchema = z
   .strictObject({
@@ -546,6 +559,7 @@ export const ownerActionSchema = z.discriminatedUnion('op', [
   contactRemoveActionSchema,
   contactBlockActionSchema,
   contactUnblockActionSchema,
+  contactKeepActionSchema,
   storageSetActionSchema,
   storageRemoveActionSchema,
   backupExportActionSchema,

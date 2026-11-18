@@ -43,6 +43,8 @@ export const OWNER_ACTION_OPS: readonly string[] = Object.freeze([
   // UX1112 WP-12 (F-2): the owner blocks or unblocks a contact from the local app (People).
   'contact.block',
   'contact.unblock',
+  // SEC-INVITE-CAPS (D-156): the owner keeps a contact the AI connected (People, Home).
+  'contact.keep',
   // M1-11c-a4c: the owner turns received funds into credits, or withdraws credits (local UI).
   'credits.deposit',
   'credits.withdraw',

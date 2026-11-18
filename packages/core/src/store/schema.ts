@@ -126,6 +126,10 @@ export const TABLES = {
       name_changed_at: opt('int'),
       name_change_seen: opt('flag'),
       declared_name: opt('enc'),
+      // SEC-INVITE-CAPS (D-156; 07 §3; schema version 17): 1 while a contact paired through an
+      // AI-made invite waits for the owner's Keep (`contact.keep`): its messages arrive, but the agent
+      // sends it nothing. Null (kept) on every row from before version 17 and after Keep.
+      waiting_owner: opt('flag'),
     },
     primaryKey: ['contact_id'],
     unique: [{ columns: ['agent_nostr'] }],
@@ -171,6 +175,10 @@ export const TABLES = {
       // again from Home or People while the invite is open. Cleared when it is used or cancelled;
       // null on a row from before version 14.
       invite_link: opt('enc'),
+      // SEC-INVITE-CAPS (D-156; 07 §3; schema version 17): who made the invite: `ai` through the MCP
+      // tool (capped, 06 §3 `contacts.aiInvites`), `owner` in the app or the CLI. Null on a row from
+      // before version 17, read as the owner's.
+      created_by: optOneOf('owner', 'ai'),
     },
     primaryKey: ['invite_id'],
   },

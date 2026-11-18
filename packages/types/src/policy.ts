@@ -54,6 +54,15 @@ export const POLICY_BOUNDS = freeze({
   autoSaveFilesPerDay: freeze({ min: 1, max: 1000 } as const),
   /** `files.autoSave.perContactMBPerDay` and `totalMBPerDay` (D-142). */
   autoSaveMBPerDay: freeze({ min: 1, max: 10_240 } as const),
+  /**
+   * `contacts.aiInvites` (SEC-INVITE-CAPS, D-156): the invites the AI makes. 0 open or 0 a day turns
+   * them off; the expiry is whole hours, at most 7 days (04 §3.6).
+   */
+  aiInvites: freeze({
+    maxOpen: freeze({ min: 0, max: 20 } as const),
+    perDay: freeze({ min: 0, max: 50 } as const),
+    expiryHours: freeze({ min: 1, max: 168 } as const),
+  } as const),
 } as const);
 
 // --- field schemas -------------------------------------------------------------------------------
@@ -236,6 +245,38 @@ const contactRulesSchema = z
     'contact rules must be sorted by contact, at most one per contact',
   );
 
+// --- AI-made invites (SEC-INVITE-CAPS, D-156) ------------------------------------------------------
+
+/**
+ * `contacts.aiInvites` (06 §3; proposed, owner confirms at merge): the limits on invites the AI makes
+ * (`agentlink_create_invite`). At most `maxOpen` open at once, at most `perDay` made in any rolling
+ * 24 hours, each expiring after `expiryHours`. Invites the owner makes in the app are not limited.
+ * A strict object with all three keys when present; absent in a policy signed before it existed,
+ * which reads as AI_INVITE_DEFAULTS (aiInviteLimitsOf).
+ */
+export const aiInvitesSchema = z.strictObject({
+  maxOpen: intIn(POLICY_BOUNDS.aiInvites.maxOpen),
+  perDay: intIn(POLICY_BOUNDS.aiInvites.perDay),
+  expiryHours: intIn(POLICY_BOUNDS.aiInvites.expiryHours),
+});
+
+export type AiInviteLimits = z.infer<typeof aiInvitesSchema>;
+
+/** The limits when the signed policy has no `contacts.aiInvites`: 3 open, 5 a day, 24 hours. */
+export const AI_INVITE_DEFAULTS: Readonly<AiInviteLimits> = freeze({
+  maxOpen: 3,
+  perDay: 5,
+  expiryHours: 24,
+});
+
+/** The AI invite limits of a policy: its own `contacts.aiInvites`, or the defaults when absent. */
+export function aiInviteLimitsOf(policy: {
+  readonly contacts: { readonly aiInvites?: AiInviteLimits | undefined };
+}): AiInviteLimits {
+  const own = policy.contacts.aiInvites;
+  return own === undefined ? { ...AI_INVITE_DEFAULTS } : { ...own };
+}
+
 // --- Policy --------------------------------------------------------------------------------------
 
 export const policySchema = z.strictObject({
@@ -244,6 +285,8 @@ export const policySchema = z.strictObject({
     unknownSenders: z.enum(UNKNOWN_SENDER_RULES),
     allowed: z.union([z.literal('paired'), agentIdList(POLICY_BOUNDS.allowedContacts)]),
     rateLimitPerContactPerHour: intIn(POLICY_BOUNDS.rateLimitPerContactPerHour),
+    // SEC-INVITE-CAPS (D-156): may be absent (a policy signed before it existed reads as the defaults).
+    aiInvites: aiInvitesSchema.exactOptional(),
   }),
   files: z.strictObject({
     allowedFolders: z

@@ -43,6 +43,7 @@ import {
 import { proofDisclosure, topUpDisclosure, withDisclosure } from './strings/privacy.js';
 import { noOwnerCard, noOwnerResult } from './text.js';
 import { NPX_COMMAND } from './cli-command.js';
+import { WAITING_OWNER_TEXT } from './invite-common.js';
 
 const USD = /^(0|[1-9][0-9]{0,17})(\.[0-9]{1,6})?$/;
 const ENVELOPE_ID = /^[A-Za-z0-9_-]{22}$/;
@@ -357,6 +358,9 @@ export function proofRefusal(code: string): HandlerOutput {
       return fail('rejected', PROOF_TEXT.approvalInvalid, PROOF_TEXT.approvalInvalidNextStep, code);
     case 'POLICY_CHANGED':
       return fail('rejected', PROOF_TEXT.policyChanged, PROOF_TEXT.policyChangedNextStep, code);
+    // SEC-INVITE-CAPS (D-156): no proof for a contact that waits for the owner's Keep.
+    case 'CONTACT_WAITING_OWNER':
+      return fail('rejected', WAITING_OWNER_TEXT.proofSummary, WAITING_OWNER_TEXT.nextStep, code);
     default:
       return internalError();
   }

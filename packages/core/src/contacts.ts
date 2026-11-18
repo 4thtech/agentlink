@@ -142,6 +142,12 @@ export interface ContactView {
    * received, `invitee` when it was sent. Present with `pairedAt`.
    */
   readonly pairedAs?: 'inviter' | 'invitee';
+  /**
+   * SEC-INVITE-CAPS (D-156; 06 §2.1): present while the contact, paired through an AI-made invite,
+   * waits for the owner to keep it (`contact.keep`) or remove it. Its messages arrive; the agent
+   * sends it nothing until then. Absent for every kept contact.
+   */
+  readonly waitingForOwner?: true;
 }
 
 /**
@@ -379,6 +385,13 @@ function assertRepairAllowed(
   }
 }
 
+/** SEC-INVITE-CAPS: the fixed refusal for a contact that waits for the owner's Keep (I-5, I-7). */
+export const waitingOwnerError = (): CoreError =>
+  new CoreError(
+    'contact_waiting_owner',
+    'This contact is waiting for the owner to keep it in the AgentLink app.',
+  );
+
 export class ContactBook {
   readonly #ctx: CoreContext;
 
@@ -525,6 +538,8 @@ export class ContactBook {
       status: row.status,
       pairing: row.pairing,
       safetyCodeChecked,
+      // SEC-INVITE-CAPS: present only while the contact waits for the owner's Keep.
+      ...(row.waiting_owner === 1 ? { waitingForOwner: true as const } : {}),
       ...(await this.#nameChange(row, short)),
       ...(await this.#previousName(row, short)),
       createdAt: row.created_at,
@@ -692,6 +707,18 @@ export class ContactBook {
           { name_change_seen: 1, updated_at: now },
         ) === 1,
     );
+  }
+
+  /**
+   * SEC-INVITE-CAPS (D-156): throws `contact_waiting_owner` when the contact waits for the owner's
+   * Keep, so the agent sends it nothing (a message or file, terms, a proof or a receipt). A contact
+   * that is unknown or kept passes here; the caller's own checks still apply.
+   */
+  async assertKept(contactId: string): Promise<void> {
+    const row = await this.#ctx.store.transaction((tx) =>
+      tx.get('contacts', { contact_id: contactId }),
+    );
+    if (row?.waiting_owner === 1) throw waitingOwnerError();
   }
 
   /** Contacts that are not removed, oldest first. */
@@ -1145,6 +1172,8 @@ export class ContactBook {
           name_changed_at: null,
           name_change_seen: null,
           declared_name: sealedDeclared,
+          // SEC-INVITE-CAPS: set by the pairing transaction for an AI-made invite (pairing.ts).
+          waiting_owner: null,
         };
         tx.insert('contacts', written);
       } else {

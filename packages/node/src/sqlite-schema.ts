@@ -103,6 +103,10 @@ const V15_TABLES: readonly TableName[] = ['saved_files'];
 /** Tables added by version 16 (FILES-AI-1, D-152): the send-by-content daily budget ledger. */
 const V16_TABLES: readonly TableName[] = ['content_file_budget'];
 
+/** Columns added by version 17 (SEC-INVITE-CAPS, D-156): who made an invite; a waiting contact. */
+const V17_INVITES_COLUMNS: readonly string[] = ['created_by'];
+const V17_CONTACTS_COLUMNS: readonly string[] = ['waiting_owner'];
+
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
   return {
@@ -124,8 +128,10 @@ function v1Spec(table: TableName): TableSpec {
   if (table === 'files') {
     return without(spec, [...V4_FILES_COLUMNS, ...V6_FILES_COLUMNS, ...V11_FILES_COLUMNS]);
   }
-  if (table === 'invites') return without(spec, [...V8_INVITES_COLUMNS, ...V14_INVITES_COLUMNS]);
-  if (table === 'contacts') return without(spec, V9_CONTACTS_COLUMNS);
+  if (table === 'invites') {
+    return without(spec, [...V8_INVITES_COLUMNS, ...V14_INVITES_COLUMNS, ...V17_INVITES_COLUMNS]);
+  }
+  if (table === 'contacts') return without(spec, [...V9_CONTACTS_COLUMNS, ...V17_CONTACTS_COLUMNS]);
   return spec;
 }
 
@@ -182,6 +188,27 @@ function v15Statements(): readonly string[] {
         `ALTER TABLE "envelopes" ADD COLUMN ${columnDef('envelopes', column, envelopes.columns[column] as ColumnSpec)}`,
     ),
     ...createSchemaStatements(V15_TABLES),
+  ];
+}
+
+/**
+ * Version 17 (SEC-INVITE-CAPS, D-156; 07 §3; proposed, owner confirms at merge): `invites.created_by`
+ * (`owner` | `ai`) and `contacts.waiting_owner` (flag), appended, nullable. Nothing is rewritten:
+ * every invite made before reads as the owner's (null), and every contact paired before is kept
+ * (null), so existing contacts are not affected.
+ */
+function v17Statements(): readonly string[] {
+  const invites = tableSpec('invites');
+  const contacts = tableSpec('contacts');
+  return [
+    ...V17_INVITES_COLUMNS.map(
+      (column) =>
+        `ALTER TABLE "invites" ADD COLUMN ${columnDef('invites', column, invites.columns[column] as ColumnSpec)}`,
+    ),
+    ...V17_CONTACTS_COLUMNS.map(
+      (column) =>
+        `ALTER TABLE "contacts" ADD COLUMN ${columnDef('contacts', column, contacts.columns[column] as ColumnSpec)}`,
+    ),
   ];
 }
 
@@ -292,7 +319,8 @@ function v11Statements(): readonly string[] {
  * `invites.invite_link` (REL051-B2; nullable, null on existing rows), version 15 adds
  * `envelopes.deleted_at` and `saved_files` (RET-2, D-148; nullable, null on existing rows, and a new
  * table), version 16 adds `content_file_budget` (FILES-AI-1, D-152; a new table, existing rows
- * untouched). A later
+ * untouched), version 17 adds `invites.created_by` and `contacts.waiting_owner` (SEC-INVITE-CAPS,
+ * D-156; nullable, null on existing rows). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -331,6 +359,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 14, statements: Object.freeze(v14Statements()) }),
   Object.freeze({ version: 15, statements: Object.freeze(v15Statements()) }),
   Object.freeze({ version: 16, statements: createSchemaStatements(V16_TABLES) }),
+  Object.freeze({ version: 17, statements: Object.freeze(v17Statements()) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

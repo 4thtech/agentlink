@@ -6,9 +6,10 @@
 // presence, and exports no key. Owner flows pass a session they unlocked themselves (identity.ts).
 import type { KeyStore } from '@4thtech-io/crypto';
 import { createLogger, type Logger } from '@4thtech-io/log';
+import { aiInviteLimitsOf, AI_INVITE_DEFAULTS } from '@4thtech-io/types';
 import type { ApprovalChannel } from './approval-channel.js';
 import { STORE_SCHEMA_VERSION } from './constants.js';
-import { ContactBook, type ProofPackSigner } from './contacts.js';
+import { ContactBook, waitingOwnerError, type ProofPackSigner } from './contacts.js';
 import { EnvelopeService } from './envelopes.js';
 import { nowOf, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
@@ -17,7 +18,7 @@ import { OwnStorage, type OwnStorageKeys } from './own-storage.js';
 import { OwnerActions, type PolicyVersionMark, type ReceiptsKeptMark } from './owner-actions.js';
 import { ApprovalService } from './approvals.js';
 import { IdempotencyService } from './idempotency.js';
-import { PairingService } from './pairing.js';
+import { PairingService, type AiInviteInput, type CreatedInvite } from './pairing.js';
 import { RequestsQueue } from './requests.js';
 import { OutboxService } from './outbox.js';
 import { AgentPause } from './agent-pause.js';
@@ -511,7 +512,35 @@ export class AgentLinkClient {
   async sendMessage(input: SendMessageInput): Promise<SendMessageResult> {
     // W4-PAUSE: before the idempotency claim, so no result is kept and the same call works later.
     await this.pause.assertRunning();
+    // SEC-INVITE-CAPS: nothing to a contact the AI connected until the owner keeps it (checked
+    // again where the envelope is stored, send.ts).
+    if (typeof input.to === 'string') await this.contacts.assertKept(input.to);
     return this.#send.send(input);
+  }
+
+  /**
+   * SEC-INVITE-CAPS (D-156; 06 §2.1 `agentlink_create_invite`, §3 `contacts.aiInvites`): an invite
+   * the AI makes, under the owner's caps from the signed policy (the defaults when it has none, or
+   * when the policy fails closed). Over a cap: InviteLimitError, nothing stored. A contact that pairs
+   * through it waits for the owner's Keep. Owner surfaces use `pairing.createInvite` instead.
+   */
+  async createAiInvite(input: AiInviteInput): Promise<CreatedInvite> {
+    const effective = await this.ownerActions.loadPolicy();
+    const limits =
+      effective.mode === 'fail_closed'
+        ? { ...AI_INVITE_DEFAULTS }
+        : aiInviteLimitsOf(effective.policy);
+    return this.pairing.createAiInvite(input, limits);
+  }
+
+  /** SEC-INVITE-CAPS: true when `envelopeId` is from or to a contact that waits for the owner. */
+  async #waitingOwnerOf(envelopeId: unknown): Promise<boolean> {
+    if (typeof envelopeId !== 'string') return false;
+    return this.#ctx.store.transaction((tx) => {
+      const contactId = tx.get('envelopes', { envelope_id: envelopeId })?.contact_id;
+      if (contactId == null) return false;
+      return tx.get('contacts', { contact_id: contactId })?.waiting_owner === 1;
+    });
   }
 
   /**
@@ -634,6 +663,8 @@ export class AgentLinkClient {
    */
   async proposeTerms(input: ProposeTermsInput): Promise<ProposeTermsResult> {
     await this.pause.assertRunning();
+    // SEC-INVITE-CAPS: no terms with a contact the AI connected until the owner keeps it.
+    if (typeof input.to === 'string') await this.contacts.assertKept(input.to);
     return this.terms.propose(input);
   }
 
@@ -643,6 +674,8 @@ export class AgentLinkClient {
    */
   async respondToTerms(input: RespondToTermsInput): Promise<RespondToTermsResult> {
     await this.pause.assertRunning();
+    // SEC-INVITE-CAPS: no answer (accept, counter or decline) to a contact that waits for the owner.
+    if (await this.#waitingOwnerOf(input.envelopeId)) throw waitingOwnerError();
     const result = await this.terms.respond(input);
     // An accept whose offer is already recorded: its ACCEPTED receipt is signed now, under the
     // same approval (07 §2.1 step 3; D-55). Never fails the call.
@@ -677,6 +710,10 @@ export class AgentLinkClient {
    */
   async notarize(input: NotarizeInput): Promise<NotarizeResult> {
     await this.pause.assertRunning();
+    // SEC-INVITE-CAPS: no proof for a contact that waits for the owner's Keep.
+    if (await this.#waitingOwnerOf(input.envelopeId)) {
+      return Object.freeze({ status: 'rejected', code: 'CONTACT_WAITING_OWNER' });
+    }
     return this.proofs.notarize(input);
   }
 
@@ -686,6 +723,10 @@ export class AgentLinkClient {
    */
   async acknowledge(input: AcknowledgeInput): Promise<AcknowledgeResult> {
     await this.pause.assertRunning();
+    // SEC-INVITE-CAPS: no receipt to a contact that waits for the owner's Keep.
+    if (await this.#waitingOwnerOf(input.envelopeId)) {
+      return Object.freeze({ status: 'rejected', code: 'CONTACT_WAITING_OWNER' });
+    }
     return this.proofs.acknowledge(input);
   }
 

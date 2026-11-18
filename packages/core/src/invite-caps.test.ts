@@ -12,6 +12,7 @@
 //   `CONTACT_WAITING_OWNER`). Remove works as for any contact.
 // - Contacts paired before (or through an owner invite) are kept (null in the store: kept).
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
 import { parseJson, type Envelope, type JsonObject } from '@4thtech-io/crypto';
 import { createLogger } from '@4thtech-io/log';
 import { AI_INVITE_DEFAULTS, defaultPolicy, type Policy } from '@4thtech-io/types';
@@ -29,6 +30,19 @@ import {
 } from './testing/fixtures.js';
 import { giftWrapId } from './testing/envelopes.js';
 import { MemoryPolicyMark, newNonce, ownerHex, signWith } from './testing/owner.js';
+import type { TransportFactory } from './transport.js';
+
+/** Publishing is faked: every relay acks (the wraps are real gift wraps). */
+const transport: TransportFactory = (deps) => ({
+  relayStatus: (relays) => Promise.resolve({ connected: relays.length, total: relays.length }),
+  wrap: (envelope, recipients, keys) => wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
+  publish: (_event, relays) =>
+    Promise.resolve({
+      results: relays.map((relay) => ({ relay, ok: true, reason: 'ok' as const })),
+      acked: [...relays],
+      sent: relays.length >= 2,
+    } as PublishOutcome),
+});
 
 const HOUR = 3_600;
 const DAY = 86_400;
@@ -53,6 +67,7 @@ async function agent(n: number, owner: MemoryOwnerKeyStore, name: string): Promi
     approvals: new RecordingApprovalChannel(),
     clock: clock.now,
     policyMark: new MemoryPolicyMark(),
+    transport,
     logger: createLogger({ name: 'core', level: 'error', sink: () => undefined }),
   });
   await client.identity.init({
@@ -73,7 +88,7 @@ async function ownerAction(
   const body: JsonObject = {
     v: 1,
     agent: who.id,
-    owner: await ownerHex(who.owner),
+    owner: await ownerHex(signer),
     op,
     params,
     nonce: newNonce(),
@@ -337,9 +352,9 @@ describe('a contact from an AI-made invite waits for the owner', () => {
     expect((await contactOf(a, b.id))?.waitingForOwner).toBeUndefined();
     await a.client.ownerActions.apply(await ownerAction(a, 'contact.remove', { contact: b.id }));
     clock.t += 10;
-    await pairThrough(a, b, (await a.client.createAiInvite({})).inviteUrl).catch(() => undefined);
+    await pairThrough(a, b, (await a.client.createAiInvite({})).inviteUrl);
     const row = await a.store.transaction((tx) => tx.get('contacts', { contact_id: b.id }));
-    if (row?.status === 'active') expect(row.waiting_owner).toBe(1);
+    expect([row?.status, row?.waiting_owner]).toEqual(['active', 1]);
   });
 });
 

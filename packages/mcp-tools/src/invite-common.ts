@@ -2,7 +2,7 @@
 // built from a value: an invite link, a label or a name from another party never reaches a summary,
 // `nextStep` or error except through the 06 §2.1 name rule (I-5). Moving these sentences into the
 // copy sheet is M1-9g's, after M1-9o/p/q.
-import { CoreError } from '@4thtech-io/core';
+import { CoreError, type InviteLimitError } from '@4thtech-io/core';
 import { approvalIdSchema } from '@4thtech-io/types';
 import { fail, type HandlerOutput } from './result.js';
 import { noOwnerCard } from './text.js';
@@ -48,9 +48,56 @@ export const INVITE_TEXT = Object.freeze({
   accepted: "Invite accepted. You'll be connected when they answer.",
   acceptedOffline:
     "Invite accepted, but the message network can't be reached right now. AgentLink keeps the answer ready and sends it when the network is back.",
+  // SEC-INVITE-CAPS (D-156; 06 §2.1): the owner's caps on invites the AI makes.
+  limitOpen:
+    'You have {count} open invites. Ask your owner to create more in the app, or wait for one to be used or expire.',
+  limitDaily:
+    'You made {count} invites in the last 24 hours. Ask your owner to create more in the app, or try again after {time} UTC.',
+  limitOff: "Your owner hasn't allowed you to create invites. Ask them to create one in the app.",
+  limitNextStep:
+    'Tell the user. They can create an invite under People in the AgentLink app, or change the limits under Rules.',
   acceptedNextStep:
     'Tell the user they will be connected when the other person answers; nothing else is needed now. The owner can do the Contact check with the contact under People in the AgentLink app; until then the name is self-declared.',
 });
+
+/**
+ * SEC-INVITE-CAPS (D-156; 06 §2.2): the fixed refusal for a contact the AI connected that waits for
+ * the owner. It never names the contact (I-5).
+ */
+export const WAITING_OWNER_TEXT = Object.freeze({
+  summary:
+    'This contact is waiting for your owner to keep them in the AgentLink app, so nothing was sent.',
+  proofSummary:
+    'This contact is waiting for your owner to keep them in the AgentLink app, so no proof or receipt was added.',
+  nextStep:
+    'Tell the user your AI connected this contact: they can tap Keep under People in the AgentLink app. Their messages still arrive meanwhile.',
+});
+
+export const waitingOwner = (): HandlerOutput =>
+  fail(
+    'rejected',
+    WAITING_OWNER_TEXT.summary,
+    WAITING_OWNER_TEXT.nextStep,
+    'CONTACT_WAITING_OWNER',
+  );
+
+/** SEC-INVITE-CAPS: "YYYY-MM-DD HH:MM" in UTC (a number from the core, never input). */
+const utcMinute = (unixSeconds: number): string =>
+  new Date(unixSeconds * 1000).toISOString().slice(0, 16).replace('T', ' ');
+
+/** SEC-INVITE-CAPS: the result for an AI-made invite over the owner's caps (numbers only, I-5). */
+export function inviteLimit(error: InviteLimitError): HandlerOutput {
+  const count = String(error.max);
+  let summary: string;
+  if (error.max === 0) summary = INVITE_TEXT.limitOff;
+  else if (error.limit === 'open') summary = INVITE_TEXT.limitOpen.replace('{count}', count);
+  else {
+    summary = INVITE_TEXT.limitDaily
+      .replace('{count}', count)
+      .replace('{time}', error.resetAt === undefined ? 'a while' : utcMinute(error.resetAt));
+  }
+  return fail('rejected', summary, INVITE_TEXT.limitNextStep, 'INVITE_LIMIT');
+}
 
 /** The core's `apr_` ID: the schema and the exact character pattern (04 §2.4.1). */
 const APPROVAL_ID_CHARS = /^apr_[A-Za-z0-9_-]{22}$/;

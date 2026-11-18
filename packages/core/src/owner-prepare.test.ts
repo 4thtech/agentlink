@@ -790,9 +790,15 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
           )
           .sort();
       // The defaults plus the fields they leave out: `files.autoSave` (D-142) and
-      // `receipts.sendReceived` (SEC-RECEIPTS-DEFAULT; absent reads as on).
+      // `receipts.sendReceived` (SEC-RECEIPTS-DEFAULT; absent reads as on) and
+      // `contacts.aiInvites` (SEC-INVITE-CAPS; absent reads as AI_INVITE_DEFAULTS).
       expect(leaves(POLICY_FIELD_LOOSENING)).toEqual(
-        [...leaves(POLICY_DEFAULTS), 'files.autoSave', 'receipts.sendReceived'].sort(),
+        [
+          ...leaves(POLICY_DEFAULTS),
+          'contacts.aiInvites',
+          'files.autoSave',
+          'receipts.sendReceived',
+        ].sort(),
       );
       expect(Object.keys(POLICY_FIELD_LOOSENING).sort()).toEqual(
         Object.keys(policySchema.shape).sort(),

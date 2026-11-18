@@ -60,6 +60,7 @@ import { notarizeOutput, notarizeWithFreeCredits, proofThrown } from './proofs-c
 import { copy } from './strings/index.js';
 import { TOOL_TEXT, noOwnerCard, noOwnerResult } from './text.js';
 import { NPX_COMMAND } from './cli-command.js';
+import { WAITING_OWNER_TEXT, waitingOwner } from './invite-common.js';
 
 /** Fixed text for this tool (I-5: no slot takes another party's or the agent's text). */
 export const SEND_TEXT = Object.freeze({
@@ -67,6 +68,8 @@ export const SEND_TEXT = Object.freeze({
   useTermsToolsNextStep:
     'Use agentlink_propose_terms to make an offer, or agentlink_respond_to_terms to answer one.',
   contactNotReady: "That contact isn't connected yet, so nothing was sent.",
+  // SEC-INVITE-CAPS (D-156): a contact the AI connected, waiting for the owner's Keep.
+  waitingOwner: WAITING_OWNER_TEXT.summary,
   contactNotReadyNextStep:
     'The pairing finishes when they answer. Call agentlink_list_contacts later to check.',
   keyReused: 'That clientRequestId was already used for a different message, so nothing was sent.',
@@ -123,6 +126,8 @@ function coreErrorOutput(code: CoreErrorCode): HandlerOutput | undefined {
       return fail('error', SEND_TEXT.revoked, SEND_TEXT.revokedNextStep, 'AGENT_REVOKED');
     case 'contact_not_active':
       return contactNotReady();
+    case 'contact_waiting_owner':
+      return waitingOwner();
     case 'contact_not_found':
       return fail('not_found', TOOL_TEXT.contactNotFound, TOOL_TEXT.contactNotFoundNextStep);
     case 'envelope_too_large':
@@ -208,6 +213,8 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
   const resolved = resolveContact(to, await client.contacts());
   if (!resolved.ok) return resolved.output;
   if (resolved.contact.pairing !== 'complete') return contactNotReady();
+  // SEC-INVITE-CAPS (D-156): before anything is attached; core refuses it too (send.ts).
+  if (resolved.contact.waitingForOwner === true) return waitingOwner();
   const ref = contactRef(resolved.contact);
 
   // 5. The file: checked, never opened here (06 §2.3, 04 §4).

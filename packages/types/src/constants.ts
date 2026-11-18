@@ -191,6 +191,9 @@ export const OWNER_ACTION_OPS = freeze([
   // contact from the local app (People), behind the presence gate; no envelope carries them.
   'contact.block',
   'contact.unblock',
+  // SEC-INVITE-CAPS (D-156; proposed, owner confirms at merge): the owner keeps a contact the AI
+  // connected through an AI-made invite (People, Home), behind the presence gate; no envelope.
+  'contact.keep',
   'storage.set',
   'storage.remove',
   'backup.export',
@@ -293,6 +296,8 @@ export const OWNER_ACTION_MAX_LIFETIME_SECONDS = freeze({
   // WP-12 (F-2): applied on the agent's own machine within seconds, like contact.remove.
   'contact.block': 600,
   'contact.unblock': 600,
+  // SEC-INVITE-CAPS: applied on the agent's own machine within seconds, like contact.block.
+  'contact.keep': 600,
   // M1-9i-a (D-115): signed and applied on the agent's own machine within seconds.
   'storage.set': 600,
   'storage.remove': 600,

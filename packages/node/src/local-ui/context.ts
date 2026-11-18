@@ -351,6 +351,8 @@ export interface LocalUiReadClient {
     prepareRemove(contactId: string): Promise<PreparedOwnerAction>;
     prepareBlock(contactId: string): Promise<PreparedOwnerAction>;
     prepareUnblock(contactId: string): Promise<PreparedOwnerAction>;
+    /** SEC-INVITE-CAPS (D-156): `contact.keep` for a contact the AI connected. */
+    prepareKeep(contactId: string): Promise<PreparedOwnerAction>;
   };
   /**
    * M1-11c-a4 (Proofs and credits): the proof list and the credits read, both store or chain reads
@@ -494,6 +496,7 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       prepareRemove: (contactId: string) => client.ownerActions.prepareContactRemove(contactId),
       prepareBlock: (contactId: string) => client.ownerActions.prepareContactBlock(contactId),
       prepareUnblock: (contactId: string) => client.ownerActions.prepareContactUnblock(contactId),
+      prepareKeep: (contactId: string) => client.ownerActions.prepareContactKeep(contactId),
     }),
     proofs: Object.freeze({
       list: (query: PageQuery) => client.proofs.list(query),

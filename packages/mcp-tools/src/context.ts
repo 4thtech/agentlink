@@ -799,7 +799,8 @@ const OFFLINE_CODES: ReadonlySet<string> = new Set(['transport_unavailable']);
 function coreInviteTools(client: AgentLinkClient): InviteTools {
   return Object.freeze<InviteTools>({
     resolve: (link) => client.pairing.resolveInviteLink(link),
-    create: (input) => client.pairing.createInvite(input),
+    // SEC-INVITE-CAPS (D-156): the AI's invite, under the owner's caps; never the owner's path.
+    create: (input) => client.createAiInvite(input),
     async check(link) {
       return (await client.pairing.acceptInvite({ link })).contact;
     },

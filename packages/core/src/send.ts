@@ -41,7 +41,7 @@ import {
 import { PAYLOAD_MAX_BYTES } from '@4thtech-io/storage';
 import { SEND_TOOL_PAYLOAD_TYPES, mimeForName, payloadSchema } from '@4thtech-io/types';
 import { IDEMPOTENCY_KEY_REUSED } from './constants.js';
-import type { ContactBook } from './contacts.js';
+import { waitingOwnerError, type ContactBook } from './contacts.js';
 import { nowOf, type CoreContext } from './context.js';
 import type { EnvelopeService } from './envelopes.js';
 import { CoreError } from './errors.js';
@@ -529,6 +529,8 @@ export class SendService {
       if (contact?.status !== 'active' || contact.pairing !== 'complete') {
         throw new CoreError('contact_not_active', 'That contact cannot receive messages now.');
       }
+      // SEC-INVITE-CAPS: a contact the AI connected gets nothing until the owner keeps it.
+      if (contact.waiting_owner === 1) throw waitingOwnerError();
       tx.insert('envelopes', row);
       for (const r of rows) tx.insert('outbox', r);
       for (const f of fileRows) tx.insert('files', f);

@@ -15,6 +15,7 @@
 import { canonicalize, encodeBase64url, randomBytes } from '@4thtech-io/crypto';
 import {
   AUTO_SAVE_DEFAULTS,
+  aiInviteLimitsOf,
   HISTORY_PRE_D148,
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   PROTOCOL_VERSION,
@@ -52,6 +53,7 @@ export type PreparableOp =
   | 'contact.remove'
   | 'contact.block'
   | 'contact.unblock'
+  | 'contact.keep'
   | 'agent.label'
   | 'app.connect'
   | 'app.disconnect'
@@ -67,6 +69,8 @@ const PREPARABLE: readonly string[] = [
   // UX1112 WP-12 (F-2): the owner blocks or unblocks a contact from the local app (People).
   'contact.block',
   'contact.unblock',
+  // SEC-INVITE-CAPS (D-156): the owner keeps a contact the AI connected (People, Home).
+  'contact.keep',
   // U3-d (D-138): the owner names this agent from the local app.
   'agent.label',
   // U3-f (D-138): the owner connects, moves or disconnects an AI app from the local app.
@@ -87,6 +91,7 @@ interface ParamsOf {
   readonly 'contact.remove': ContactRemoveParams;
   readonly 'contact.block': ContactBlockParams;
   readonly 'contact.unblock': ContactBlockParams;
+  readonly 'contact.keep': ContactBlockParams;
   readonly 'agent.label': AgentLabelParams;
   readonly 'app.connect': AppChangeParams;
   readonly 'app.disconnect': AppChangeParams;
@@ -177,6 +182,8 @@ export type PrepareRefusal =
   | 'already_blocked'
   /** WP-12: Unblock for a contact that is not blocked (refused before the gesture). */
   | 'not_blocked'
+  /** SEC-INVITE-CAPS: Keep for a contact that is not waiting for the owner (refused before it). */
+  | 'not_waiting'
   /** W4-FILES-SAVE: not a received item ID `<envelope ID>.<index>` (index 00 to 15). */
   | 'item_invalid'
   /** WP-11: `backup.export` params that are not a 16-byte base64url kitId and full/identity. */
@@ -520,6 +527,16 @@ export const POLICY_FIELD_LOOSENING: {
       'contacts.rateLimitPerContactPerHour',
       (p) => p.contacts.rateLimitPerContactPerHour,
     ),
+    // SEC-INVITE-CAPS (D-156): more open or daily AI invites, or a longer expiry, lets the AI connect
+    // more people. A policy signed before it existed reads as the defaults.
+    aiInvites: (b, n) => {
+      const was = aiInviteLimitsOf(b);
+      const now = aiInviteLimitsOf(n);
+      return when(
+        now.maxOpen > was.maxOpen || now.perDay > was.perDay || now.expiryHours > was.expiryHours,
+        { code: 'limits_raised', fields: ['contacts.aiInvites'] },
+      );
+    },
   },
   files: {
     allowedFolders: (b, n) =>
