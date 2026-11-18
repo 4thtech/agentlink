@@ -6,7 +6,7 @@
 //   `unavailable`, never an error's text;
 // - the exact key sets `{now, previews, unread, today, contacts}`, each item rebuilt from an
 //   allowlist (fail closed per item);
-// - `unread` from the unread `messages` and `files` notification items, by contact, newest first,
+// - `unread` from the unread `messages` notification items only (files are Needs you), by contact, newest first,
 //   at most WIDGET_MAX_UNREAD; approvals, update and network items and read items never count;
 // - `preview` only while `widgetPreviews` is on (absent = on, unreadable = off): the newest
 //   received message's text, control/format/bidi/separator characters removed, whitespace
@@ -267,7 +267,9 @@ describe('GET /api/ui/widget: the answer', () => {
     expect(Object.keys(b.contacts[0] ?? {}).sort()).toEqual(['activity', 'contactId', 'lastAt']);
   });
 
-  it('groups unread messages and files by contact, newest first, ignoring read and other kinds', async () => {
+  // WIDGET-UNREAD-MESSAGES-ONLY: files are counted under Needs you (the notifications read), never
+  // again as messages; a contact with only new files has no unread messages.
+  it('groups unread messages by contact, newest first, ignoring files, read and other kinds', async () => {
     const w = contextOf({
       settings: { widgetPreviews: false },
       items: [
@@ -290,10 +292,9 @@ describe('GET /api/ui/widget: the answer', () => {
       ],
     });
     const b = bodyOf(await call(w.context));
-    expect(b.unread).toEqual([
-      { contactId: BOB, count: 3, lastAt: NOON - 100 },
-      { contactId: DAVE, count: 3, lastAt: NOON - 200 },
-    ]);
+    expect(b.unread).toEqual([{ contactId: BOB, count: 2, lastAt: NOON - 300 }]);
+    // DAVE has only new files: no unread messages row.
+    expect(b.unread.some((u) => u.contactId === DAVE)).toBe(false);
     expect(JSON.stringify(b)).not.toContain(CANARY);
   });
 

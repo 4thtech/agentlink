@@ -26,6 +26,7 @@ export default defineConfig({
       include: [
         /messages\.css/,
         /home\.css/,
+        /people\.css/,
         /contacts\.css/,
         /approvals\.css/,
         /board\.css/,

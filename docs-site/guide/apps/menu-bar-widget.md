@@ -35,10 +35,10 @@ Hover over the icon for a short line such as "AgentLink: Running · 1 waiting". 
 A click opens the widget under the icon. It is 360 pixels wide, closes when you click anywhere else or press **Esc**, and shows these sections in this order:
 
 1. **Status.** *Running*, *Paused*, *Not running* or *Connecting…*, and **Update ready** when there is one.
-2. **Needs you.** How many approvals are waiting and how many new files, with **Review**. If nothing is waiting: "Nothing is waiting."
+2. **Needs you.** How many approvals are waiting and how many new files, with **Review**. New files leave this list once you open, save or show them in the app, or choose **Mark as seen** in that conversation. If nothing is waiting: "Nothing is waiting."
 3. **Connected now.** For each of your IDs, which of your AI apps are *Working*, *Ready* or *Idle*, or *Not running*.
 4. **Contacts.** People you have exchanged something with today, marked **Active now** or **Today**. AgentLink only knows the time of the last exchange, so it never says a contact is "online".
-5. **New messages.** For each contact: their name, how many new messages, how long ago, and the first line of the newest one (a **message preview**, up to 80 characters, plain text). Click a row to open that chat in the app.
+5. **New messages.** For each contact: their name, how many new messages (new files are counted under Needs you, not here), how long ago, and the first line of the newest one (a **message preview**, up to 80 characters, plain text). Click a row to open that chat in the app.
 6. **Today.** A small chart by the hour of messages in and out, proofs and files.
 7. **Live.** The newest things that happened.
 8. **Footer.** **Open AgentLink**, **Pause** or **Resume**, **Update ready** when there is an update, and **Quit**.
