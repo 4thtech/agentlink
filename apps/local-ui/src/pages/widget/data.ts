@@ -14,6 +14,8 @@ import {
 
 export { WIDGET_PATH } from '@4thtech-io/types/ui-contract/widget';
 
+import type { LiveAgent } from '../../api/live.js';
+
 export interface UnreadRow {
   readonly contactId: string;
   readonly count: number;
@@ -131,3 +133,26 @@ export function parseWidget(data: unknown): WidgetView | undefined {
 
 /** Sum of an array. */
 export const sum = (a: readonly number[]): number => a.reduce((x, y) => x + y, 0);
+
+const ACTIVE_STATES: ReadonlySet<string> = new Set(['working', 'ready', 'idle']);
+
+/**
+ * WIDGET-APP-NAME: which AI app the rows are for. It comes from local configuration only: the open
+ * ID's AI apps in the shared live store (names from GET /api/ui/apps, the main app's source). Never
+ * from a contact or a message. The running app first; more than one adds "+N"; the title lists all.
+ */
+export function appLabel(
+  agents: readonly LiveAgent[],
+): { readonly text: string; readonly title: string } | undefined {
+  const apps = (agents.find((a) => a.current) ?? agents[0])?.apps ?? [];
+  if (apps.length === 0) return undefined;
+  const ordered = [
+    ...apps.filter((a) => ACTIVE_STATES.has(a.state)),
+    ...apps.filter((a) => !ACTIVE_STATES.has(a.state)),
+  ];
+  const first = (ordered[0] as { app: string }).app;
+  return {
+    text: ordered.length > 1 ? `${first} +${ordered.length - 1}` : first,
+    title: apps.map((a) => a.app).join(', '),
+  };
+}

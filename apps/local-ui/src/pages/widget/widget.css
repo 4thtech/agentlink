@@ -299,6 +299,14 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.wg-app {
+  flex: 0 1 auto;
+  min-inline-size: 0;
+  max-inline-size: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .wg-when {
   flex: none;
   display: inline-flex;
