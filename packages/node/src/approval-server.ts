@@ -1971,6 +1971,7 @@ export async function startApprovalServerWith(
         update?: boolean | 0 | 1 | 2;
         networkDown?: boolean;
         otherComputer?: boolean;
+        otherComputerSeenAt?: number;
       } = {};
       try {
         out.approvals = (await bound.list())
@@ -2022,8 +2023,13 @@ export async function startApprovalServerWith(
       }
       if (client !== undefined) {
         try {
-          // DEVICES-INTERIM: this ID is also in use on another computer (a flag only, no detail).
-          out.otherComputer = (await client.devices.state()).otherInUse;
+          // DEVICES-INTERIM: this ID is also in use on another computer (a flag and, DEVICES-INTERIM-2,
+          // when it was last seen; nothing about the other computer).
+          const devices = await client.devices.state();
+          out.otherComputer = devices.otherInUse;
+          if (devices.otherInUse && devices.otherSeenAt !== null) {
+            out.otherComputerSeenAt = devices.otherSeenAt;
+          }
         } catch {
           // Unknown: the devices item stays as it was.
         }

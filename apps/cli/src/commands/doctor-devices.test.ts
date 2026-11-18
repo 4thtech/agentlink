@@ -8,6 +8,8 @@ import { DOCTOR_DEVICES_TEXT, createDoctorHandler } from './doctor.js';
 import { createDeps } from './shared.js';
 
 const TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
+/** 2027-01-15T08:00:00Z. */
+const SEEN = 1_800_000_000;
 
 function agentWith(devices: unknown): OpenedAgent {
   return {
@@ -45,22 +47,28 @@ async function doctor(devices: unknown): Promise<{ code: number; text: string }>
 }
 
 describe('doctor: this ID on another computer (DEVICES-INTERIM)', () => {
-  it('the copy is plain (11 §5) and names the per-computer limits', () => {
-    expect(DOCTOR_DEVICES_TEXT.otherComputer).toMatch(
-      /^Warning {2}This ID is also in use on another computer/,
+  it('the copy is plain (11 §5), names the per-computer limits and when it was last seen', () => {
+    const text = DOCTOR_DEVICES_TEXT.otherComputer(SEEN);
+    expect(text).toBe(
+      'Warning  This ID is also in use on another computer\n' +
+        '         Last seen 15 Jan 2027\n' +
+        '         Spending limits apply per computer until AgentLink supports one ID on several computers.',
     );
-    expect(DOCTOR_DEVICES_TEXT.otherComputer).toContain('Spending limits apply per computer');
     for (const word of ['wallet', 'gas', 'install id', 'device', 'transaction']) {
-      expect(DOCTOR_DEVICES_TEXT.otherComputer.toLowerCase()).not.toContain(word);
+      expect(text.toLowerCase()).not.toContain(word);
     }
+    // Without a time (never expected while the warning holds), the date line is left out.
+    expect(DOCTOR_DEVICES_TEXT.otherComputer(null)).not.toContain('Last seen');
+    expect(DOCTOR_DEVICES_TEXT.otherComputer(null)).toContain('Spending limits apply per computer');
   });
 
-  it('warns while another computer uses this ID, and still exits OK', async () => {
+  it('warns while another computer uses this ID, with the date it was last seen, and still exits OK', async () => {
     const seen = await doctor({
-      state: () => Promise.resolve({ otherInUse: true, otherSeenAt: 1 }),
+      state: () => Promise.resolve({ otherInUse: true, otherSeenAt: SEEN }),
     });
     expect(seen.code).toBe(EXIT_OK);
-    expect(seen.text).toContain(DOCTOR_DEVICES_TEXT.otherComputer);
+    expect(seen.text).toContain(DOCTOR_DEVICES_TEXT.otherComputer(SEEN));
+    expect(seen.text).toContain('Last seen 15 Jan 2027');
   });
 
   it('says nothing when no other computer was seen, or the state cannot be read', async () => {

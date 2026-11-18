@@ -35,4 +35,36 @@ describe('the devices notification', () => {
     await store.observe({ otherComputer: false });
     expect(await store.list()).toEqual([]);
   });
+
+  it('carries when the other computer was last seen as its time, moving with a newer sighting', async () => {
+    let t = T0;
+    const store = createNotificationStore(memoryNotificationPersistence(), { now: () => t });
+    await store.observe({ otherComputer: true, otherComputerSeenAt: T0 - 3_600 });
+    expect(await store.list()).toEqual([
+      { id: 'devices', kind: 'devices', count: 1, at: T0 - 3_600, read: false },
+    ]);
+    await store.markRead('devices');
+    t += 600;
+    // A newer sighting moves the date; the same notice is not news again.
+    await store.observe({ otherComputer: true, otherComputerSeenAt: T0 + 300 });
+    expect(await store.list()).toEqual([
+      { id: 'devices', kind: 'devices', count: 1, at: T0 + 300, read: true },
+    ]);
+    // A time that is not a whole unix second, or one in the future, is never kept.
+    await store.observe({ otherComputer: true, otherComputerSeenAt: t + 86_400 });
+    expect((await store.list())[0]?.at).toBe(T0 + 300);
+    await store.observe({ otherComputer: true, otherComputerSeenAt: 1.5 });
+    expect((await store.list())[0]?.at).toBe(T0 + 300);
+  });
+
+  it('stays listed while it holds, even when the last sighting is older than the 30-day list', async () => {
+    const t = T0 + 40 * 86_400;
+    const store = createNotificationStore(memoryNotificationPersistence(), { now: () => t });
+    await store.observe({ otherComputer: true, otherComputerSeenAt: T0 });
+    expect(await store.list()).toEqual([
+      { id: 'devices', kind: 'devices', count: 1, at: T0, read: false },
+    ]);
+    await store.observe({ otherComputer: false });
+    expect(await store.list()).toEqual([]);
+  });
 });
