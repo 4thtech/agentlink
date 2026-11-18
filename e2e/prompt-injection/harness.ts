@@ -23,6 +23,7 @@ import {
   computeActionDigest,
   nostrTransport,
   type ApprovalChannel,
+  type RestoreMark,
   type Sealed,
   type StoreCipher,
 } from '@4thtech-io/core';
@@ -258,7 +259,16 @@ function proofTools(world: World, home: string, packOpens: { count: number; path
 
 export async function makeAgent(
   world: World,
-  options: { n: number; label: string; name: string; relays: readonly string[] },
+  options: {
+    n: number;
+    label: string;
+    name: string;
+    relays: readonly string[];
+    /** The restore mark of an ID restored from a backup (SEC-RESTORE-GUARD); absent: never restored. */
+    restoreMark?: RestoreMark;
+    /** An encrypted drop to upload files to (the in-memory drop of src/fake-drop.mjs); absent: none. */
+    drop?: NonNullable<Parameters<typeof nodeFilesPlatform>[0]>['drop'];
+  },
 ): Promise<PiAgent> {
   const home = path.join(world.root, options.label);
   await mkdir(home, { recursive: true });
@@ -281,8 +291,9 @@ export async function makeAgent(
       },
     },
     logger,
-    files: nodeFilesPlatform({ home, drop: false }),
+    files: nodeFilesPlatform({ home, drop: options.drop ?? false }),
     proofs: world.chain.platform() as never,
+    ...(options.restoreMark === undefined ? {} : { restoreMark: options.restoreMark }),
   });
   const session = await owner.unlock(presence());
   await client.identity.init({

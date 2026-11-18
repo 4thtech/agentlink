@@ -159,6 +159,40 @@ jobs:
             if (failed) process.exit(1);
           '
 
+      # E2E-HOSTILE: the hostile-contact and hostile-relay suites (e2e/hostile/): a misbehaving contact
+      # and a misbehaving relay against a real core, on in-memory relays and a temp folder. Behaviour
+      # that is already specified and shipped, so a failure is a regression. No Docker, keychain or
+      # secret needed. Run even when an earlier step failed, so one report shows everything.
+      - name: Run the hostile-contact and hostile-relay suites
+        if: always()
+        run: |
+          set -euo pipefail
+          pnpm --filter @4thtech-io/e2e exec vitest run --config hostile/vitest.config.ts --reporter=default --reporter=json --outputFile.json="$AGENTLINK_E2E_ARTIFACTS/hostile-report.json" 2>&1 | tee "$AGENTLINK_E2E_ARTIFACTS/hostile-output.log"
+
+      - name: Check that the hostile suites ran in full, with no skipped test
+        if: always()
+        run: |
+          set -euo pipefail
+          node -e '
+            const r = JSON.parse(require("node:fs").readFileSync(process.env.AGENTLINK_E2E_ARTIFACTS + "/hostile-report.json", "utf8"));
+            let failed = false;
+            for (const [name, count] of [["relay-availability", 5], ["hostile-contact", 7], ["uploads-and-proofs", 3]]) {
+              const f = r.testResults.filter((x) => x.name.endsWith(`/hostile/${name}.test.ts`));
+              const t = f.length === 1 ? f[0].assertionResults : [];
+              const bad = t.filter((x) => x.status !== "passed");
+              console.log(`hostile ${name}.test.ts: ${t.length} tests, ${bad.length} not passed`);
+              if (t.length !== count || bad.length > 0) {
+                console.error(`::error::hostile ${name}.test.ts must run ${count} tests, all passed`);
+                failed = true;
+              }
+            }
+            if (r.testResults.length !== 3) {
+              console.error("::error::the hostile suites must be exactly 3 test files");
+              failed = true;
+            }
+            if (failed) process.exit(1);
+          '
+
       - name: Canary scan of every log and artifact
         id: scan
         if: always()
