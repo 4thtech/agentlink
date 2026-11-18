@@ -96,7 +96,7 @@ describe('parallel proof requests sign and submit once (SEC-RECORD-ATOMIC)', () 
     const sent = await s.ana.call('agentlink_send', { to: 'Mallory', text: 'prove this one too' });
     const envelopeId = String(sent.structured['envelopeId']);
     const results = await Promise.all([1, 2, 3].map(() => s.ana.client.notarize({ envelopeId })));
-    // The requests reuse the one Record (none is held back for approval by a clock that moved).
+    // The requests reuse the one Record, with one submission and one fee.
     for (const r of results) expect(['ok', 'submitted']).toContain(r.status);
     expect(new Set(results.map((r) => (r as { recordId?: string }).recordId)).size).toBe(1);
     expect(s.world.chain.calls.notarize).toBe(1);
