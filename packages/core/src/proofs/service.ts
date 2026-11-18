@@ -55,6 +55,7 @@ import {
   recipientCommitment,
   wipe,
   type Envelope,
+  type JsonValue,
 } from '@4thtech-io/crypto';
 import type {
   BuiltRecord,
@@ -300,6 +301,11 @@ export type ProofCode =
   | 'RECEIPT_CONFLICT'
   | 'APPROVAL_INVALID'
   | 'POLICY_CHANGED'
+  /**
+   * SEC-CARD-FULLTEXT (06 §2.5): an approved proof whose envelope's files no longer have the hash
+   * and size the owner approved. Nothing is signed or charged.
+   */
+  | 'FILE_CHANGED'
   /** `parentRecordId` is not zero and not a record the chain shows this agent signed (D-109). */
   | 'PARENT_NOT_OWN'
   /**
@@ -312,6 +318,27 @@ export type ProofCode =
    * its content is never disclosed (no content key); the pack without the content still exports.
    */
   | 'CONTENT_DELETED';
+
+/** SEC-CARD-FULLTEXT: the tools whose approval card shows the content of a stored envelope. */
+const CONTENT_TOOLS: ReadonlySet<string> = new Set([
+  'agentlink_notarize',
+  'agentlink_acknowledge',
+  'agentlink_export_proof_pack',
+]);
+
+/** SEC-CARD-FULLTEXT: what an approval card shows of the stored envelope (decoded by the app). */
+export interface ApprovalEnvelopeContent {
+  readonly envelopeHash: string;
+  /** The full body: the text, or the canonical JSON of a structured body. Never cut. */
+  readonly text: string;
+  readonly files: readonly {
+    readonly name: string;
+    readonly size: number;
+    readonly mime: string;
+    /** Lowercase hex. */
+    readonly plaintextSha256: string;
+  }[];
+}
 
 /** What one `processInbound` pass did (M1-7g-c). */
 export interface ProofInboundResult {
@@ -664,6 +691,10 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       evaluateProof(effective, action, { now, ledger: readBudgetLedger(tx) }),
     );
     if (pre.decision === 'deny') return rejected('POLICY_DENIED');
+    const files = payload.files.map((f) => ({
+      plaintextSha256: f.plaintextSha256.toLowerCase(),
+      size: f.size,
+    }));
     const approvalAction = {
       tool: 'agentlink_notarize',
       args: {
@@ -682,10 +713,18 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
             : { agentId: counterparty.agentId, ownerKey: counterparty.ownerKey },
         envelopeHash: row.envelope_hash,
         fee,
+        // SEC-CARD-FULLTEXT (06 §2.5): the files the owner is shown, bound by the action digest.
+        ...(files.length === 0 ? {} : { files }),
       },
     };
     let claim: ((tx: StoreTx) => boolean) | undefined;
     if (pre.decision === 'approval') {
+      if (
+        input.approvalId !== undefined &&
+        (await this.#filesChanged(input.approvalId, input.envelopeId, files))
+      ) {
+        return rejected('FILE_CHANGED');
+      }
       if (input.approvalId === undefined) {
         return this.#deps.approvals.request({
           action: approvalAction,
@@ -2834,6 +2873,87 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     } catch {
       return { status: 'unavailable', unavailable: [] };
     }
+  }
+
+  /**
+   * SEC-CARD-FULLTEXT (06 §2.5): whether the approval names this envelope's proof and approved other
+   * files (hash or size) than the envelope carries now. Read-only; anything that does not read is
+   * "not changed" here and is left to `authorize`, which refuses it.
+   */
+  async #filesChanged(
+    approvalId: string,
+    envelopeId: string,
+    files: readonly { readonly plaintextSha256: string; readonly size: number }[],
+  ): Promise<boolean> {
+    const stored = await this.#deps.approvals.storedAction(approvalId);
+    if (stored === undefined || stored.tool !== 'agentlink_notarize') return false;
+    if (stored.args['envelopeId'] !== envelopeId) return false;
+    const approved = (stored.context as { files?: unknown }).files;
+    if (approved === undefined) return false;
+    return canonicalize(approved as JsonValue) !== canonicalize(files as unknown as JsonValue);
+  }
+
+  /**
+   * SEC-CARD-FULLTEXT (08 §1, 11 §6.2.1): the exact content an approval request is about, decoded
+   * by the app from the stored envelope the digest-bound action names (`args.envelopeId`, checked
+   * against `context.envelopeHash`, or for a receipt against the record `context.recordId`).
+   * `undefined` for a tool whose card has no envelope content; `'missing'` when the envelope, its
+   * payload or its binding cannot be read (the card then fails closed). Read-only.
+   */
+  async approvalContent(action: unknown): Promise<ApprovalEnvelopeContent | 'missing' | undefined> {
+    if (typeof action !== 'object' || action === null) return undefined;
+    const { tool, args, context } = action as Record<string, unknown>;
+    if (typeof tool !== 'string' || !CONTENT_TOOLS.has(tool)) return undefined;
+    const a = (typeof args === 'object' && args !== null ? args : {}) as Record<string, unknown>;
+    const c = (typeof context === 'object' && context !== null ? context : {}) as Record<
+      string,
+      unknown
+    >;
+    const envelopeId = a['envelopeId'];
+    if (typeof envelopeId !== 'string' || envelopeId.length === 0) return 'missing';
+    let row: Row<'envelopes'> | undefined;
+    try {
+      row = await this.#envelope(envelopeId);
+    } catch {
+      return 'missing';
+    }
+    if (row === undefined || row.deleted_at !== null) return 'missing';
+    const hash = c['envelopeHash'];
+    if (typeof hash === 'string') {
+      if (hash.toLowerCase() !== row.envelope_hash.toLowerCase()) return 'missing';
+    } else {
+      const recordId = c['recordId'];
+      if (typeof recordId !== 'string') return 'missing';
+      const bound = await this.#ctx.store.transaction((tx) =>
+        tx.select('proofs', { envelope_id: envelopeId }),
+      );
+      if (!bound.some((r) => r.record_id.toLowerCase() === recordId.toLowerCase())) {
+        return 'missing';
+      }
+    }
+    const payload = await this.#payload(row);
+    if (payload === undefined) return 'missing';
+    const body: unknown = payload.body;
+    let text: string;
+    try {
+      text = typeof body === 'string' ? body : canonicalize(body as JsonValue);
+    } catch {
+      return 'missing';
+    }
+    return Object.freeze({
+      envelopeHash: row.envelope_hash,
+      text,
+      files: Object.freeze(
+        payload.files.map((f) =>
+          Object.freeze({
+            name: f.name,
+            size: f.size,
+            mime: f.mime,
+            plaintextSha256: f.plaintextSha256.toLowerCase(),
+          }),
+        ),
+      ),
+    });
   }
 
   async #envelope(envelopeId: string): Promise<Row<'envelopes'> | undefined> {

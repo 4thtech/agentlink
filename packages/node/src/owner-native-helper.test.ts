@@ -615,7 +615,7 @@ describe('the prompt detail (who and cost) on the OS prompt', () => {
   it('macOS: a detail with control or bidi characters, or too long, is never passed', async () => {
     const { calls, run } = fakeRunner(() => ({ code: 0, stdout: `${'11'.repeat(32)}\n` }));
     const helper = createNativeHelper({ kind: 1, run });
-    await helper.release(RECORD, 'pay', undefined, 'for ‮Ana');
+    await helper.release(RECORD, 'pay', undefined, 'for \u202EAna');
     await helper.release(RECORD, 'pay', undefined, `for ${'x'.repeat(200)}`);
     expect(calls.map((c) => c.args)).toEqual([
       ['ecdh', 'pay'],

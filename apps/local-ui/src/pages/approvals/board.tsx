@@ -309,7 +309,8 @@ function ApprovalsList({
       (p) =>
         digests.get(p.item.approvalId) === p.item.actionDigest &&
         !p.item.commitment &&
-        !p.item.paid,
+        !p.item.paid &&
+        !ownCard(p.item),
     );
     const dropped = picked.length - keep.length;
     if (dropped === 1) notice(S.droppedOne);
@@ -337,7 +338,7 @@ function ApprovalsList({
         {shown.length === 0 ? null : (
           <div className="ap-cards">
             {shown.map((item) =>
-              item.commitment || item.paid || !owner.ready ? (
+              item.commitment || item.paid || ownCard(item) || !owner.ready ? (
                 <SingleApproval
                   key={`${round}-${item.approvalId}`}
                   item={item}
@@ -415,6 +416,13 @@ function ApprovalsList({
 }
 
 /** The full approvals list (review together), as it was at `/` before Home. */
+/**
+ * SEC-CARD-FULLTEXT: a request with exact content (or content that could not be shown) is decided
+ * on its own card, where the content is shown whole before Approve; never inside a review list.
+ */
+const ownCard = (item: ApprovalItem): boolean =>
+  item.details?.content !== undefined || item.details?.contentMissing === true;
+
 export function ApprovalsBoard({
   client: given,
   payConfirm,

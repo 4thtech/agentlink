@@ -13,6 +13,11 @@
 // request and never logged. Paid approvals go through the confirmation sheet (pay-confirm), never here.
 import { browserCeremonyGesture, sendWithProof } from '../../api/presence-ceremony.js';
 import { pageCredentials } from '../../presence/webauthn-here.js';
+import {
+  CHECK_CODE_PATTERN,
+  inertText,
+  type ApprovalContent,
+} from '@4thtech-io/types/ui-contract/approval-content';
 
 /** What the card shows, built by the agent's runtime (approval-server.ts ApprovalDetails). */
 export interface ApprovalDetailsView {
@@ -24,6 +29,10 @@ export interface ApprovalDetailsView {
   readonly rule: string;
   readonly fromAi: readonly { readonly name: string; readonly value: string }[];
   readonly terms?: readonly string[];
+  /** SEC-CARD-FULLTEXT: the exact content, decoded by the app (inert full text, check codes). */
+  readonly content?: ApprovalContent;
+  /** SEC-CARD-FULLTEXT: the content could not be shown: no Approve (fail closed). */
+  readonly contentMissing?: true;
 }
 
 /** One pending request as the server lists it (approval-server.ts PendingApprovalView). */
@@ -116,7 +125,7 @@ const str = (v: unknown): v is string => typeof v === 'string';
 
 function detailsOf(v: unknown): ApprovalDetailsView | undefined {
   if (!isObject(v)) return undefined;
-  const { who, what, cost, expires, rule, fromAi, headline, terms } = v;
+  const { who, what, cost, expires, rule, fromAi, headline, terms, content, contentMissing } = v;
   if (!str(who) || !str(what) || !str(cost) || !str(expires) || !str(rule)) return undefined;
   if (!Array.isArray(fromAi)) return undefined;
   const args = fromAi.filter(
@@ -131,6 +140,51 @@ function detailsOf(v: unknown): ApprovalDetailsView | undefined {
     fromAi: args.map((f) => ({ name: f.name, value: f.value })),
     ...(str(headline) ? { headline } : {}),
     ...(Array.isArray(terms) ? { terms: terms.filter(str) } : {}),
+    ...contentFacts(content, contentMissing),
+  };
+}
+
+/**
+ * SEC-CARD-FULLTEXT: the content block as the server checked it, checked again here; anything off
+ * makes the card fail closed (`contentMissing`). The text is made inert once more (I-5).
+ */
+function contentFacts(
+  content: unknown,
+  missing: unknown,
+): { content: ApprovalContent } | { contentMissing: true } | Record<string, never> {
+  if (missing === true) return { contentMissing: true };
+  if (content === undefined) return {};
+  if (!isObject(content)) return { contentMissing: true };
+  const { label, text, length, checkCode, files } = content;
+  if (!str(label) || typeof text !== 'string' || typeof length !== 'number') {
+    return { contentMissing: true };
+  }
+  if (!Number.isSafeInteger(length) || length < 0 || !Array.isArray(files)) {
+    return { contentMissing: true };
+  }
+  const code = (c: unknown): c is string => typeof c === 'string' && CHECK_CODE_PATTERN.test(c);
+  if (checkCode !== undefined && !code(checkCode)) return { contentMissing: true };
+  const list: ApprovalContent['files'][number][] = [];
+  for (const f of files) {
+    if (!isObject(f) || !str(f['name']) || typeof f['size'] !== 'string' || !str(f['type'])) {
+      return { contentMissing: true };
+    }
+    if (!code(f['checkCode'])) return { contentMissing: true };
+    list.push({
+      name: inertText(f['name']).replace(/[\n\t]/g, ' '),
+      size: f['size'],
+      type: f['type'],
+      checkCode: f['checkCode'],
+    });
+  }
+  return {
+    content: {
+      label: inertText(label),
+      text: inertText(text),
+      length,
+      ...(checkCode === undefined ? {} : { checkCode: checkCode as string }),
+      files: list,
+    },
   };
 }
 

@@ -397,7 +397,7 @@ describe('SEC-CARD-FULLTEXT: the card is decidable from app-decoded fields alone
     const w = await world();
     const { envelopeId, envelopeHash } = await storeEnvelope(w, {
       type: 'text',
-      body: 'pay ‮evil‬\u0007 now',
+      body: 'pay \u202Eevil\u202C\u0007 now',
       replyTo: null,
       files: [],
     });
@@ -405,12 +405,16 @@ describe('SEC-CARD-FULLTEXT: the card is decidable from app-decoded fields alone
     const [view] = await w.source.list();
     const shown = view?.details?.content?.text ?? '';
     expect(shown).toContain('[U+202E]');
-    expect(shown).not.toMatch(/[‪-‮⁦-⁩\u0007]/u);
+    // eslint-disable-next-line no-control-regex -- the test looks for control characters
+    expect(shown).not.toMatch(/[\u202A-\u202E\u2066-\u2069\u0007]/u);
   });
 
   it('fails closed when the envelope the request names is missing: no content, marked missing', async () => {
     const w = await world();
-    await w.request(undefined, notarizeAction(encodeBase64url(randomBytes(32)), `0x${'11'.repeat(32)}`));
+    await w.request(
+      undefined,
+      notarizeAction(encodeBase64url(randomBytes(32)), `0x${'11'.repeat(32)}`),
+    );
     const [view] = await w.source.list();
     expect(view?.details?.contentMissing).toBe(true);
     expect(view?.details?.content).toBeUndefined();
@@ -420,7 +424,10 @@ describe('SEC-CARD-FULLTEXT: the card is decidable from app-decoded fields alone
     const w = await world();
     const text = 'x'.repeat(20_000);
     const action = sendAction({ to: 'Ana', text, notarize: true });
-    (action['context'] as JsonObject)['file'] = { plaintextSha256: 'ef'.repeat(32), size: 99 };
+    (action['context'] as Record<string, unknown>)['file'] = {
+      plaintextSha256: 'ef'.repeat(32),
+      size: 99,
+    };
     await w.request(undefined, action);
     const [view] = await w.source.list();
     // The AI's own copy (fromAi) is cut for display; the content block never is.

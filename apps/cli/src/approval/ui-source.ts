@@ -16,9 +16,27 @@
 // `inviteUrl` is left out: the link is the capability that opens the invite, and the owner decides on
 // who it connects to (the Who line, from the verified invite card), never on the link itself.
 //
+// SEC-CARD-FULLTEXT (08 §1 "What the card shows"; 11 §5, §6.2.1): the card is decidable from
+// app-decoded fields alone. `content` is the exact text the request is about, in full and inert
+// (never cut, never the AI's description of it): for a paid send from the digest-bound `args.text`,
+// for a proof, receipt or key disclosure from the stored envelope the action names (core
+// `proofs.approvalContent`, which checks the envelope hash or record). Check codes (>= 80 bits) for
+// the envelope and each file. An envelope that cannot be read marks the card `contentMissing`: the
+// server and the page then offer no Approve (fail closed).
+//
 // I-4: nothing here decides. `apply` is core's `ownerActions.apply`, which verifies the owner
 // signature and applies the decision in one store transaction.
 import { isPaidPendingAction } from '@4thtech-io/core';
+import { FILE_KIND_LABELS, fileKindOf } from '@4thtech-io/types';
+import {
+  APPROVAL_CONTENT_FILES_MAX,
+  APPROVAL_CONTENT_MAX,
+  checkCode,
+  inertText,
+  textLength,
+  type ApprovalContent,
+  type ApprovalContentFile,
+} from '@4thtech-io/types/ui-contract/approval-content';
 import { canonicalize, type JsonObject, type JsonValue } from '@4thtech-io/crypto';
 import type {
   ApprovalDetails,
@@ -101,7 +119,96 @@ function fromAi(action: JsonObject): { name: string; value: string }[] {
     }));
 }
 
-function detailsOf(request: PendingRequest, facts: CardFacts): ApprovalDetails {
+/** The fixed label of the content block, by tool (11 §5). */
+const CONTENT_LABEL: Readonly<Record<string, string>> = Object.freeze({
+  agentlink_send: 'Exactly what will be sent',
+  agentlink_notarize: 'The message this proof is for',
+  agentlink_acknowledge: 'The message your receipt answers',
+  agentlink_export_proof_pack: 'The message whose content will be shared',
+});
+
+/** "980 bytes", "12 KB", "3.4 MB": exact enough to compare, never "about". */
+function sizeText(bytes: number): string {
+  if (!Number.isSafeInteger(bytes) || bytes < 0) return '';
+  if (bytes < 1024) return `${String(bytes)} bytes`;
+  const units = ['KB', 'MB', 'GB'];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value < 10 ? value.toFixed(1) : String(Math.round(value))} ${units[unit] ?? 'GB'}`;
+}
+
+/** A file name as one inert line. */
+const nameLine = (name: string): string => inertText(name).replace(/[\n\t]/g, ' ');
+
+function fileView(name: string, size: number, sha256: string): ApprovalContentFile {
+  return {
+    name: nameLine(name),
+    size: sizeText(size),
+    // From the name alone: the sender's media type is never trusted (file-kind.ts).
+    type: FILE_KIND_LABELS[fileKindOf(name)],
+    checkCode: checkCode(sha256),
+  };
+}
+
+type ContentFacts =
+  { readonly content: ApprovalContent } | { readonly contentMissing: true } | Record<string, never>;
+
+/** The basename of a path argument, for a file not sent yet (the content holds no path). */
+const baseName = (path: unknown): string =>
+  typeof path === 'string' ? (path.split(/[\\/]/).pop() ?? '') : '';
+
+/** The card's content block (see the file header); fails closed to `contentMissing`. */
+async function contentOf(agent: OwnerAgent, action: JsonObject): Promise<ContentFacts> {
+  const tool = action['tool'];
+  if (typeof tool !== 'string') return {};
+  const label = CONTENT_LABEL[tool];
+  if (label === undefined) return {};
+  try {
+    if (tool === 'agentlink_send') {
+      const args = asObject(action['args']);
+      const text = args?.['text'];
+      const body = args?.['body'];
+      const raw =
+        typeof text === 'string' ? text : body === undefined ? '' : canonicalize(body as JsonValue);
+      const file = asObject(asObject(action['context'])?.['file']);
+      const sha = file?.['plaintextSha256'];
+      const size = file?.['size'];
+      const files =
+        typeof sha === 'string' && typeof size === 'number'
+          ? [fileView(baseName(args?.['path']) || 'File', size, sha)]
+          : [];
+      if (raw.length > APPROVAL_CONTENT_MAX) return { contentMissing: true };
+      return { content: { label, text: inertText(raw), length: textLength(raw), files } };
+    }
+    const found = await agent.client.proofs.approvalContent(action);
+    if (found === undefined) return {};
+    if (found === 'missing') return { contentMissing: true };
+    if (found.text.length > APPROVAL_CONTENT_MAX) return { contentMissing: true };
+    if (found.files.length > APPROVAL_CONTENT_FILES_MAX) return { contentMissing: true };
+    return {
+      content: {
+        label,
+        text: inertText(found.text),
+        length: textLength(found.text),
+        checkCode: checkCode(found.envelopeHash),
+        files: found.files.map((f) => fileView(f.name, f.size, f.plaintextSha256)),
+      },
+    };
+  } catch {
+    // Anything that does not decode is never shown as if it were the content.
+    return { contentMissing: true };
+  }
+}
+
+function detailsOf(
+  request: PendingRequest,
+  facts: CardFacts,
+  content: ContentFacts,
+): ApprovalDetails {
   const terms = facts.terms;
   const lines =
     terms === undefined || terms === 'problem'
@@ -121,6 +228,7 @@ function detailsOf(request: PendingRequest, facts: CardFacts): ApprovalDetails {
     rule: [ruleOf(request.action), ...disclosureOf(request.action, facts)].join(' '),
     fromAi: fromAi(request.action).slice(0, 64),
     ...(lines === undefined ? {} : { terms: lines }),
+    ...content,
   };
 }
 
@@ -131,13 +239,14 @@ async function viewOf(
 ): Promise<ApprovalForDecision | undefined> {
   const facts = await cardFacts(agent.client, request);
   if (facts.terms === 'problem') return undefined;
+  const content = await contentOf(agent, request.action);
   return {
     approvalId: request.approvalId,
     summary: facts.summary,
     actionDigest: request.actionDigest,
     expiresAt: request.expiresAt,
     commitment: request.commitment,
-    details: detailsOf(request, facts),
+    details: detailsOf(request, facts, content),
     action: request.action,
     storedDigest: request.storedDigest,
   };

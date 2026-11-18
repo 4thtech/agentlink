@@ -52,7 +52,7 @@ describe('inert full text (SEC-CARD-FULLTEXT, I-5)', () => {
   });
 
   it('shows bidi, zero-width and control characters as visible markers', () => {
-    const hostile = 'pay ‮evil‬ to​ Bob\u0007 end';
+    const hostile = 'pay \u202Eevil\u202C to\u200B Bob\u0007\u2028end';
     const shown = inertText(hostile);
     expect(shown).toBe('pay [U+202E]evil[U+202C] to[U+200B] Bob[U+0007][U+2028]end');
     expect(isInertText(shown)).toBe(true);
@@ -70,8 +70,9 @@ describe('the presence prompt detail (SEC-CARD-FULLTEXT, 04 §2.5.3)', () => {
   });
 
   it('is one line, without control or bidi characters, and capped', () => {
-    const detail = presencePromptDetail(`An‮a\n${'x'.repeat(200)}`, '$12.50');
-    expect(detail).not.toMatch(/[\u0000-\u001f‪-‮⁦-⁩]/u);
+    const detail = presencePromptDetail(`An\u202Ea\n${'x'.repeat(200)}`, '$12.50');
+    // eslint-disable-next-line no-control-regex -- the test looks for control characters
+    expect(detail).not.toMatch(/[\u0000-\u001f\u202A-\u202E\u2066-\u2069]/u);
     expect(Array.from(detail).length).toBeLessThanOrEqual(PRESENCE_DETAIL_MAX);
     expect(detail).toContain('$12.50');
     expect(detail.startsWith('for Ana x')).toBe(true);

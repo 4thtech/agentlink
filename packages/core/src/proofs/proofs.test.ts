@@ -2876,7 +2876,11 @@ describe('SEC-RECEIPTS-DEFAULT: the automatic device receipt in the sender pack 
 
 describe('SEC-CARD-FULLTEXT: the card content comes from the stored envelope (08 §1, 06 §2.5)', () => {
   /** Rewrites the stored (sealed) payload of `envelopeId`, as a same-user edit of the store would. */
-  async function rewritePayload(agent: Agent, envelopeId: string, edit: (p: JsonObject) => void) {
+  async function rewritePayload(
+    agent: Agent,
+    envelopeId: string,
+    edit: (p: Record<string, unknown>) => void,
+  ) {
     const row = await agent.store.transaction((tx) =>
       tx.get('envelopes', { envelope_id: envelopeId }),
     );
@@ -2885,7 +2889,10 @@ describe('SEC-CARD-FULLTEXT: the card content comes from the stored envelope (08
       column: 'payload_json',
       rowKey: JSON.stringify([envelopeId]),
     } as const;
-    const payload = parseJson(await agent.cipher.open(context, row!.payload_json!)) as JsonObject;
+    const payload = parseJson(await agent.cipher.open(context, row!.payload_json!)) as Record<
+      string,
+      unknown
+    >;
     edit(payload);
     const sealed = await agent.cipher.seal(context, JSON.stringify(payload));
     await agent.store.transaction((tx) =>
@@ -2913,7 +2920,7 @@ describe('SEC-CARD-FULLTEXT: the card content comes from the stored envelope (08
 
   it('decodes the full message text and files of the envelope the proof approval binds', async () => {
     const { a, b } = await twoAgents();
-    const text = `${'A long, exact message. '.repeat(400)}‮end`;
+    const text = `${'A long, exact message. '.repeat(400)}\u202Eend`;
     const envelopeId = await proofNeedsApproval(a, b, text);
     await rewritePayload(a, envelopeId, (p) => {
       p['files'] = [fileEntry('ab'.repeat(32))];
@@ -2932,7 +2939,12 @@ describe('SEC-CARD-FULLTEXT: the card content comes from the stored envelope (08
     expect(content.text).toBe(text);
     expect(content.envelopeHash).toBe(row!.envelope_hash);
     expect(content.files).toEqual([
-      { name: 'invoice.pdf', size: 1240, mime: 'application/pdf', plaintextSha256: 'ab'.repeat(32) },
+      {
+        name: 'invoice.pdf',
+        size: 1240,
+        mime: 'application/pdf',
+        plaintextSha256: 'ab'.repeat(32),
+      },
     ]);
   });
 

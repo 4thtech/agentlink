@@ -122,6 +122,10 @@ export const PROOF_TEXT = Object.freeze({
   approvalInvalid: "That approval can't be used for this request, so nothing was done.",
   approvalInvalidNextStep:
     'Call the tool again without approvalId to ask the owner again, or check it with agentlink_get_approval.',
+  // SEC-CARD-FULLTEXT (06 §2.5): the file is not the one the owner approved.
+  fileChanged: 'A file changed after the owner approved it, so nothing was recorded.',
+  fileChangedNextStep:
+    'Call the tool again without approvalId: the owner approves the file as it is now.',
   policyChanged: "The owner's rules changed while this ran, so nothing was recorded.",
   policyChangedNextStep: 'Call the tool again; it checks the current rules.',
   // M1-36i (owner decision 2026-10-22): free test credits, claimed once on the first proof that
@@ -357,6 +361,8 @@ export function proofRefusal(code: string): HandlerOutput {
       return fail('rejected', PROOF_TEXT.approvalInvalid, PROOF_TEXT.approvalInvalidNextStep, code);
     case 'POLICY_CHANGED':
       return fail('rejected', PROOF_TEXT.policyChanged, PROOF_TEXT.policyChangedNextStep, code);
+    case 'FILE_CHANGED':
+      return fail('rejected', PROOF_TEXT.fileChanged, PROOF_TEXT.fileChangedNextStep, code);
     default:
       return internalError();
   }

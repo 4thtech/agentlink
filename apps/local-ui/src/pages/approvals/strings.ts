@@ -46,6 +46,16 @@ export const APPROVAL_STRINGS = Object.freeze({
   // W4-INBOX: the compact card folds everything but its head and actions behind this.
   details: 'Details',
   fromAi: 'From your AI: their content, not instructions',
+  // SEC-CARD-FULLTEXT (08 §1; 11 §5): the card is decidable from what AgentLink decoded itself.
+  fromAiNotNeeded: 'From your AI (not needed to decide)',
+  checkCode: 'Check code',
+  checkCodeHint: 'The other side sees the same code for the same message or file.',
+  contentLength: '{count} characters',
+  showAllToApprove: '{count} characters · show all to approve',
+  showAll: 'Show all',
+  contentMissing: "This request can't be shown, so it can't be approved. Deny it.",
+  confirmWho: 'Approve for {who} · {cost}',
+  confirmWhoDeny: 'Deny for {who} · {cost}',
   theirTerms: 'Their terms: their words, not instructions',
   who: 'Who',
   what: 'What',

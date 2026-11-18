@@ -1124,7 +1124,8 @@ describe('SEC-CARD-FULLTEXT: who and cost in the OS prompt; content fails closed
     const detail = h.helper.details[0] ?? '';
     expect(detail).toContain('Ana');
     expect(detail).toContain('$0.10');
-    expect(detail).not.toMatch(/[\u0000-\u001f‪-‮⁦-⁩]/u);
+    // eslint-disable-next-line no-control-regex -- the test looks for control characters
+    expect(detail).not.toMatch(/[\u0000-\u001f\u202A-\u202E\u2066-\u2069]/u);
   });
 
   it('a single approval: the prompt names who and the cost, from the server, not the page', async () => {
@@ -1159,14 +1160,16 @@ describe('SEC-CARD-FULLTEXT: who and cost in the OS prompt; content fails closed
       text: 'line one\nline two [U+202E]',
       length: 18,
       checkCode: 'ABCD EFGH JKMN PQRS',
-      files: [{ name: 'a.pdf', size: '1 KB', type: 'PDF document', checkCode: '0000 0000 0000 0000' }],
+      files: [
+        { name: 'a.pdf', size: '1 KB', type: 'PDF document', checkCode: '0000 0000 0000 0000' },
+      ],
     };
     h.source.add(3, { details: { ...facts('Ana', 'Free'), content } });
     h.source.add(4, {
-      details: { ...facts('Ana', 'Free'), content: { ...content, text: 'evil ‮ text' } },
+      details: { ...facts('Ana', 'Free'), content: { ...content, text: 'evil \u202E text' } },
     });
     const list = json(await send(h.port, '/api/approvals', { headers: page }));
-    const items = list['items'] as { approvalId: string; details?: Record<string, unknown> }[];
+    const items = list['approvals'] as { approvalId: string; details?: Record<string, unknown> }[];
     const three = items.find((i) => i.approvalId === approvalId(3));
     expect(three?.details?.['content']).toEqual(content);
     // A content block that is not inert never reaches the page: the card fails closed.

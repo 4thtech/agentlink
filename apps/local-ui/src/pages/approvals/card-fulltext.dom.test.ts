@@ -127,14 +127,24 @@ describe('SEC-CARD-FULLTEXT: the approval card', () => {
   });
 
   it('a bidi or control-character payload renders inert', async () => {
-    await mount(item('pay ‮evil‬\u0007 now'));
+    await mount(item('pay \u202Eevil\u202C\u0007 now'));
     const shown = host.querySelector('[data-content-text]')?.textContent ?? '';
-    expect(shown).not.toMatch(/[‪-‮⁦-⁩\u0007]/u);
+    // eslint-disable-next-line no-control-regex -- the test looks for control characters
+    expect(shown).not.toMatch(/[\u202A-\u202E\u2066-\u2069\u0007]/u);
     expect(shown).toContain('[U+202E]');
   });
 
   it('a request whose content cannot be shown has no Approve; Deny stays', async () => {
-    await mount(item('x', { content: undefined, contentMissing: true }));
+    const base = item('x');
+    const rest: Record<string, unknown> = { ...base.details };
+    delete rest['content'];
+    await mount({
+      ...base,
+      details: {
+        ...(rest as unknown as NonNullable<ApprovalItem['details']>),
+        contentMissing: true,
+      },
+    });
     expect(host.textContent).toContain(S.contentMissing);
     expect(button(S.approve)).toBeUndefined();
     expect(button(S.deny)).toBeDefined();

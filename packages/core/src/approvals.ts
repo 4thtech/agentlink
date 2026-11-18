@@ -543,6 +543,33 @@ export class ApprovalService {
   }
 
   /**
+   * SEC-CARD-FULLTEXT: the stored action of one approval, opened and parsed under the strict
+   * schema; undefined when it is unknown or does not open or parse. Read-only and authorises
+   * nothing (I-4): a caller uses it only to explain a refusal precisely (06 §2.5), never to allow.
+   */
+  async storedAction(approvalId: string): Promise<
+    | {
+        readonly tool: string;
+        readonly args: Readonly<Record<string, unknown>>;
+        readonly context: unknown;
+      }
+    | undefined
+  > {
+    if (!approvalIdSchema.safeParse(approvalId).success) return undefined;
+    const row = await this.#ctx.store.transaction((tx) =>
+      tx.get('approvals', { approval_id: approvalId }),
+    );
+    if (row === undefined) return undefined;
+    try {
+      const text = await open(this.#ctx, 'approvals', 'action_json', [approvalId], row.action_json);
+      const parsed = approvalActionSchema.safeParse(parseJson(text));
+      return parsed.success ? parsed.data : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
    * What one approval is for, while the agent still has something to run (06 §2.5; M1-22): the row
    * reads `pending` or `approved` after the same re-verification as read(), and for a commitment its
    * answer is not sent yet (an `envelope` part unclaimed or claimed, or, with no `envelope` part, an
