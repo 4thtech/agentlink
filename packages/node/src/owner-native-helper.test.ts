@@ -602,3 +602,44 @@ describe('the helper environment (Fable r1 L4)', () => {
     expect(nativeHelperEnv({}, 'win32')).toEqual({});
   });
 });
+
+// SEC-CARD-FULLTEXT (04 §2.5.3 "Prompt text"): the macOS sheet names who and the cost.
+describe('the prompt detail (who and cost) on the OS prompt', () => {
+  it('macOS: ecdh <reason> <detail>; the detail is checked plain text', async () => {
+    const { calls, run } = fakeRunner(() => ({ code: 0, stdout: `${'11'.repeat(32)}\n` }));
+    const helper = createNativeHelper({ kind: 1, run });
+    await helper.release(RECORD, 'pay', undefined, 'for Ana, $0.10');
+    expect(calls.map((c) => c.args)).toEqual([['ecdh', 'pay', 'for Ana, $0.10']]);
+  });
+
+  it('macOS: a detail with control or bidi characters, or too long, is never passed', async () => {
+    const { calls, run } = fakeRunner(() => ({ code: 0, stdout: `${'11'.repeat(32)}\n` }));
+    const helper = createNativeHelper({ kind: 1, run });
+    await helper.release(RECORD, 'pay', undefined, 'for ‮Ana');
+    await helper.release(RECORD, 'pay', undefined, `for ${'x'.repeat(200)}`);
+    expect(calls.map((c) => c.args)).toEqual([
+      ['ecdh', 'pay'],
+      ['ecdh', 'pay'],
+    ]);
+  });
+
+  it('macOS: an older helper that refuses the detail (usage) is asked once more without it', async () => {
+    const { calls, run } = fakeRunner((args) => ({
+      code: args.length > 2 ? NATIVE_HELPER_EXIT.usage : 0,
+      stdout: args.length > 2 ? '' : `${'11'.repeat(32)}\n`,
+    }));
+    const helper = createNativeHelper({ kind: 1, run });
+    expect((await helper.release(RECORD, 'approve', undefined, 'for Ana, free')).length).toBe(32);
+    expect(calls.map((c) => c.args)).toEqual([
+      ['ecdh', 'approve', 'for Ana, free'],
+      ['ecdh', 'approve'],
+    ]);
+  });
+
+  it('Windows: Windows Hello takes no caller text; the argv is unchanged', async () => {
+    const { calls, run } = fakeRunner(() => ({ code: 0, stdout: `${'22'.repeat(256)}\n` }));
+    const helper = createNativeHelper({ kind: 2, run });
+    await helper.release(RECORD, 'pay', undefined, 'for Ana, $0.10');
+    expect(calls.map((c) => c.args)).toEqual([['sign', 'pay']]);
+  });
+});

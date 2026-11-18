@@ -306,3 +306,125 @@ describe('the local UI approval source (M1-11a)', () => {
     expect(await w.source.list()).toEqual([]);
   });
 });
+
+describe('SEC-CARD-FULLTEXT: the card is decidable from app-decoded fields alone', () => {
+  const CHECK = /^[0-9A-HJKMNP-TV-Z]{4}( [0-9A-HJKMNP-TV-Z]{4}){3}$/;
+
+  /** Stores an outbound envelope with this payload, as the send path would (sealed payload). */
+  async function storeEnvelope(
+    w: Awaited<ReturnType<typeof world>>,
+    payload: JsonObject,
+  ): Promise<{ envelopeId: string; envelopeHash: string }> {
+    const envelopeId = encodeBase64url(randomBytes(32));
+    const envelopeHash = `0x${encodeHex(randomBytes(32))}`;
+    const payloadJson = await w.cipher.seal(
+      { table: 'envelopes', column: 'payload_json', rowKey: rowKeyOf([envelopeId]) },
+      JSON.stringify(payload),
+    );
+    await w.store.transaction((tx) =>
+      tx.insert('envelopes', {
+        envelope_id: envelopeId,
+        envelope_hash: envelopeHash,
+        thread_id: envelopeId,
+        direction: 'out',
+        contact_id: null,
+        from_key: encodeHex(randomBytes(32)),
+        type: String(payload['type']),
+        state: 'ok',
+        refused_reason: null,
+        created_at: w.clock.t,
+        envelope_json: '{}',
+        payload_json: payloadJson,
+        read_at: null,
+        delivery: 'sent',
+        refused_at: null,
+        request_accepted_at: null,
+        deleted_at: null,
+      }),
+    );
+    return { envelopeId, envelopeHash };
+  }
+
+  function notarizeAction(envelopeId: string, envelopeHash: string): JsonObject {
+    return {
+      tool: 'agentlink_notarize',
+      args: { envelopeId },
+      context: {
+        triggers: ['proofs.notarize'],
+        counterparty: null,
+        envelopeHash,
+        fee: { token: evm(), amount: '100000', usd: '0.1' },
+      },
+    };
+  }
+
+  const file = {
+    name: 'invoice.pdf',
+    size: 1240,
+    mime: 'application/pdf',
+    plaintextSha256: 'ab'.repeat(32),
+    ciphertextSha256: 'cd'.repeat(32),
+    inline: encodeBase64url(new Uint8Array(32)),
+    url: null,
+    fileKey: encodeBase64url(new Uint8Array(32).fill(7)),
+    expiresAt: T0 + 86_400,
+  };
+
+  it('shows the full decoded message text from the stored envelope, never cut', async () => {
+    const w = await world();
+    const text = `${'Every word counts. '.repeat(1_000)}The end.`;
+    const { envelopeId, envelopeHash } = await storeEnvelope(w, {
+      type: 'text',
+      body: text,
+      replyTo: null,
+      files: [file],
+    });
+    await w.request(undefined, notarizeAction(envelopeId, envelopeHash));
+    const [view] = await w.source.list();
+    const content = view?.details?.content;
+    expect(content?.text).toBe(text);
+    expect(content?.length).toBe(Array.from(text).length);
+    expect(content?.label.length).toBeGreaterThan(0);
+    // Check codes: at least 80 bits, for the envelope and for each file.
+    expect(content?.checkCode).toMatch(CHECK);
+    expect(content?.files).toHaveLength(1);
+    expect(content?.files[0]?.name).toBe('invoice.pdf');
+    expect(content?.files[0]?.checkCode).toMatch(CHECK);
+    expect(view?.details?.contentMissing).toBeUndefined();
+  });
+
+  it('renders a bidi or control-character payload inert', async () => {
+    const w = await world();
+    const { envelopeId, envelopeHash } = await storeEnvelope(w, {
+      type: 'text',
+      body: 'pay ‮evil‬\u0007 now',
+      replyTo: null,
+      files: [],
+    });
+    await w.request(undefined, notarizeAction(envelopeId, envelopeHash));
+    const [view] = await w.source.list();
+    const shown = view?.details?.content?.text ?? '';
+    expect(shown).toContain('[U+202E]');
+    expect(shown).not.toMatch(/[‪-‮⁦-⁩\u0007]/u);
+  });
+
+  it('fails closed when the envelope the request names is missing: no content, marked missing', async () => {
+    const w = await world();
+    await w.request(undefined, notarizeAction(encodeBase64url(randomBytes(32)), `0x${'11'.repeat(32)}`));
+    const [view] = await w.source.list();
+    expect(view?.details?.contentMissing).toBe(true);
+    expect(view?.details?.content).toBeUndefined();
+  });
+
+  it('a paid send shows its own text and file check code from the digest-bound action', async () => {
+    const w = await world();
+    const text = 'x'.repeat(20_000);
+    const action = sendAction({ to: 'Ana', text, notarize: true });
+    (action['context'] as JsonObject)['file'] = { plaintextSha256: 'ef'.repeat(32), size: 99 };
+    await w.request(undefined, action);
+    const [view] = await w.source.list();
+    // The AI's own copy (fromAi) is cut for display; the content block never is.
+    expect(view?.details?.content?.text).toBe(text);
+    expect(view?.details?.content?.files[0]?.checkCode).toMatch(CHECK);
+  });
+});

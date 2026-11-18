@@ -1067,3 +1067,111 @@ describe('native presence answers a fresh ceremony per gesture (DESK051-C6)', ()
     expect(h.helper.calls.map((c) => c.split('@')[0])).toEqual(['release:code']);
   });
 });
+
+// SEC-CARD-FULLTEXT (04 §2.5.3 "Prompt text"; 08 §1): the OS presence prompt names who and the cost,
+// built by the server from the stored request, so a look-alike page cannot hide them. A request whose
+// content cannot be shown is never approved.
+describe('SEC-CARD-FULLTEXT: who and cost in the OS prompt; content fails closed', () => {
+  const PAID = (): JsonObject => ({
+    tool: 'agentlink_notarize',
+    args: { envelopeId: 'E'.repeat(22) },
+    context: {
+      triggers: ['proofs.perActionMaxUSD'],
+      counterparty: { agentId: `0x${'12'.repeat(20)}`, ownerKey: 'cd'.repeat(32) },
+      envelopeHash: `0x${'ef'.repeat(32)}`,
+      fee: { token: `0x${'ab'.repeat(20)}`, amount: '100000', usd: '0.1' },
+    },
+  });
+  const facts = (who: string, cost: string) => ({
+    who,
+    what: 'Record a proof',
+    cost,
+    expires: '12 Oct 2026 14:02 UTC',
+    rule: 'Above your per-proof limit',
+    fromAi: [],
+  });
+  const inputHeader = (value: JsonValue): string =>
+    encodeBase64url(encodeUtf8(canonicalize(value)));
+
+  it('a paid approval: the Touch ID prompt text contains the contact and the cost', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.calls.length = 0;
+    h.helper.details.length = 0;
+    const action = PAID();
+    h.source.add(6, {
+      action,
+      actionDigest: digestOf(action),
+      storedDigest: digestOf(action),
+      summary: 'Record a proof',
+      details: facts('“Ana” (self-declared)', '$0.10'),
+    });
+    const begun = await send(h.port, '/api/ui/pay-confirm/begin', {
+      method: 'POST',
+      headers: {
+        ...page,
+        'X-AgentLink-Input': inputHeader({ flow: 'proof', approvalId: approvalId(6) }),
+      },
+    });
+    const ceremony = String(json(begun)['ceremony']);
+    const res = await send(h.port, '/api/ui/pay-confirm/finish', {
+      method: 'POST',
+      headers: { ...page, ...NATIVE, 'X-AgentLink-Input': inputHeader({ ceremony }) },
+    });
+    expect(res.status).toBe(200);
+    expect(h.helper.details).toHaveLength(1);
+    const detail = h.helper.details[0] ?? '';
+    expect(detail).toContain('Ana');
+    expect(detail).toContain('$0.10');
+    expect(detail).not.toMatch(/[\u0000-\u001f‪-‮⁦-⁩]/u);
+  });
+
+  it('a single approval: the prompt names who and the cost, from the server, not the page', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.details.length = 0;
+    h.source.add(1, { details: facts('Ben', 'Free') });
+    const res = await decide(h, page, 1);
+    expect(res.status).toBe(200);
+    expect(h.helper.details).toEqual(['for Ben, free']);
+  });
+
+  it('a request whose content cannot be shown is never approved (no gesture asked)', async () => {
+    const h = await harness();
+    const page = await h.page();
+    await register(h, page);
+    h.helper.calls.length = 0;
+    h.source.add(2, { details: { ...facts('Ana', 'Free'), contentMissing: true } });
+    const res = await decide(h, page, 2);
+    expect(res.status).toBe(409);
+    expect(json(res)['status']).toBe('refused');
+    expect(h.helper.calls.some((c) => c.startsWith('release'))).toBe(false);
+    expect(h.source.applied).toHaveLength(0);
+  });
+
+  it('the page gets the content block as checked plain text; raw bidi text is refused', async () => {
+    const h = await harness();
+    const page = await h.page();
+    const content = {
+      label: 'The message this proof is for',
+      text: 'line one\nline two [U+202E]',
+      length: 18,
+      checkCode: 'ABCD EFGH JKMN PQRS',
+      files: [{ name: 'a.pdf', size: '1 KB', type: 'PDF document', checkCode: '0000 0000 0000 0000' }],
+    };
+    h.source.add(3, { details: { ...facts('Ana', 'Free'), content } });
+    h.source.add(4, {
+      details: { ...facts('Ana', 'Free'), content: { ...content, text: 'evil ‮ text' } },
+    });
+    const list = json(await send(h.port, '/api/approvals', { headers: page }));
+    const items = list['items'] as { approvalId: string; details?: Record<string, unknown> }[];
+    const three = items.find((i) => i.approvalId === approvalId(3));
+    expect(three?.details?.['content']).toEqual(content);
+    // A content block that is not inert never reaches the page: the card fails closed.
+    const four = items.find((i) => i.approvalId === approvalId(4));
+    expect(four?.details?.['content']).toBeUndefined();
+    expect(four?.details?.['contentMissing']).toBe(true);
+  });
+});
