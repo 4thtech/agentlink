@@ -307,6 +307,8 @@ export interface ShowMessage {
   readonly route: ShowRoute;
   /** NOTIFY-DEEPLINK: the one request or person to open (isNotifyTarget). */
   readonly target?: string;
+  /** OWNER-FB-0512: the window moves in place; the core mints no session link (only with a target). */
+  readonly inPlace?: true;
 }
 export interface ShutdownMessage {
   readonly v: 1;
@@ -511,15 +513,27 @@ export function parseShellMessage(line: string): ShellMessage | undefined {
     }
     case 'show': {
       const withTarget = Object.hasOwn(value, 'target');
-      if (!hasExactKeys(value, ['v', 'type', 'route', ...(withTarget ? ['target'] : [])])) {
+      const withInPlace = Object.hasOwn(value, 'inPlace');
+      if (
+        !hasExactKeys(value, [
+          'v',
+          'type',
+          'route',
+          ...(withTarget ? ['target'] : []),
+          ...(withInPlace ? ['inPlace'] : []),
+        ])
+      ) {
         return undefined;
       }
       const route = value['route'];
       if (!isOneOf(SHOW_ROUTES, route)) return undefined;
+      if (withInPlace && (!withTarget || value['inPlace'] !== true)) return undefined;
       if (withTarget) {
         const target = value['target'];
         if (!isNotifyTarget(route, target)) return undefined;
-        return { v: 1, type: 'show', route, target };
+        return withInPlace
+          ? { v: 1, type: 'show', route, target, inPlace: true }
+          : { v: 1, type: 'show', route, target };
       }
       return { v: 1, type: 'show', route };
     }
@@ -570,6 +584,7 @@ export function encodeShellMessage(message: ShellMessage): string {
         type: 'show',
         route: message.route,
         ...(message.target === undefined ? {} : { target: message.target }),
+        ...(message.inPlace === true ? { inPlace: true } : {}),
       });
       break;
     case 'shutdown':

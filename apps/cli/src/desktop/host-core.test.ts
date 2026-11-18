@@ -66,6 +66,9 @@ afterEach(async () => {
 });
 
 /** Every file's bytes under `dir`, as text. */
+/** OWNER-FB-0512: the `inPlace` argument of each openPerson call of the fake server. */
+const personInPlace: boolean[] = [];
+
 function filesUnder(dir: string): string {
   let entries: Dirent[];
   try {
@@ -175,8 +178,10 @@ async function fakeServer(
     activity: { lastAt: () => 0, openStreams: () => 1, linksUsed: () => 0 },
     open: (approvalId?: string) =>
       sink(`${origin}${approvalId === undefined ? '/' : `/approve/${approvalId}`}?t=${mint()}`),
-    openPerson: (contactId: string, focus?: 'files') =>
-      sink(`${origin}/?t=${mint()}#person=${contactId}${focus === 'files' ? '&files' : ''}`),
+    openPerson: (contactId: string, focus?: 'files', inPlace?: boolean) => (
+      personInPlace.push(inPlace === true),
+      sink(`${origin}/?t=${mint()}#person=${contactId}${focus === 'files' ? '&files' : ''}`)
+    ),
     openHome: () => sink(`${origin}/settings/home?t=${mint()}`),
     openFirstRun: () => sink(`${origin}/first-run?t=${mint()}`),
     openJoin: () => sink(`${origin}/settings/join?t=${mint()}`),
@@ -863,6 +868,20 @@ describe('N7: native notifications from the desktop host', () => {
       .slice(1)
       .map((u) => new URL(u));
     expect(urls.map((u) => u.hash)).toEqual([`#person=${person}&files`, '']);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+  });
+
+  it('OWNER-FB-0512: an in-place show reaches the server as such; a plain one does not', async () => {
+    personInPlace.length = 0;
+    const s = setup();
+    const run = runDesktopHost(s.deps);
+    await until(() => readies(s.pipe.sent).length === 1);
+    const person = `0x${'ab'.repeat(20)}`;
+    s.pipe.shell({ v: 1, type: 'show', route: 'inbox', target: person, inPlace: true });
+    s.pipe.shell({ v: 1, type: 'show', route: 'inbox', target: person });
+    await until(() => readies(s.pipe.sent).length === 3);
+    expect(personInPlace).toEqual([true, false]);
     s.pipe.shell({ v: 1, type: 'shutdown' });
     await run;
   });

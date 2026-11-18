@@ -336,7 +336,13 @@ export interface NotifyMessage {
 
 export type ShellMessage =
   | { readonly v: 1; readonly type: 'invite'; readonly link: string }
-  | { readonly v: 1; readonly type: 'show'; readonly route: ShowRoute; readonly target?: string }
+  | {
+      readonly v: 1;
+      readonly type: 'show';
+      readonly route: ShowRoute;
+      readonly target?: string;
+      readonly inPlace?: true;
+    }
   | { readonly v: 1; readonly type: 'shutdown' }
   | ({ readonly v: 1; readonly type: 'app-update' } & AppUpdateView);
 
@@ -392,11 +398,27 @@ export function parseShellMessage(line: string): ShellMessage | undefined {
     }
     case 'show': {
       const withTarget = typeof value === 'object' && value !== null && 'target' in value;
-      const m = exactObject(value, ['v', 'type', 'route', ...(withTarget ? ['target'] : [])]);
+      // OWNER-FB-0512: `inPlace: true` (only with a target): the window moves in place, so no session
+      // link is minted for this open.
+      const withInPlace = typeof value === 'object' && value !== null && 'inPlace' in value;
+      const m = exactObject(value, [
+        'v',
+        'type',
+        'route',
+        ...(withTarget ? ['target'] : []),
+        ...(withInPlace ? ['inPlace'] : []),
+      ]);
       if (m?.['v'] !== DESKTOP_PIPE_VERSION || !isOneOf(SHOW_ROUTES, m['route'])) return undefined;
+      if (withInPlace && (!withTarget || m['inPlace'] !== true)) return undefined;
       if (withTarget) {
         if (!isNotifyTarget(m['route'], m['target'])) return undefined;
-        return Object.freeze({ v: 1, type: 'show', route: m['route'], target: m['target'] });
+        return Object.freeze({
+          v: 1,
+          type: 'show',
+          route: m['route'],
+          target: m['target'],
+          ...(withInPlace ? { inPlace: true as const } : {}),
+        });
       }
       return Object.freeze({ v: 1, type: 'show', route: m['route'] });
     }

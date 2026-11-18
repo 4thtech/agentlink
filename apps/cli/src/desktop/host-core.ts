@@ -410,7 +410,7 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   // The first page: Home, first run while no owner exists (the sink sends `ready`).
   await server.open().catch(() => false);
 
-  const show = async (route: ShowRoute, target?: string): Promise<void> => {
+  const show = async (route: ShowRoute, target?: string, inPlace = false): Promise<void> => {
     if (approvalServer === undefined) return;
     // NOTIFY-DEEPLINK: the one request or person a notification named; the server checks the shape
     // again. A request that is no longer waiting opens the approve page's own "no longer waiting" state
@@ -425,7 +425,7 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
       // A new file opens that person's conversation at the file (`&files`), a message at the thread.
       if (
         await approvalServer
-          .openPerson(target, route === 'files' ? 'files' : undefined)
+          .openPerson(target, route === 'files' ? 'files' : undefined, inPlace)
           .catch(() => false)
       ) {
         return;
@@ -470,7 +470,8 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
   const handle = async (message: ShellMessage): Promise<void> => {
     if (stopping) return;
     if (message.type === 'shutdown') stop('shutdown');
-    else if (message.type === 'show') await show(message.route, message.target);
+    else if (message.type === 'show')
+      await show(message.route, message.target, message.inPlace === true);
     else if (message.type === 'app-update')
       return; // kept by its own listener above
     else {

@@ -21,10 +21,17 @@ function make(): MainWindow {
   });
 }
 
+/** The window's last full load committed with this HTTP answer. */
+function committed(code = 200): void {
+  const fake = FakeBrowserWindow.created.at(-1);
+  fake?.webContents.emit('did-navigate', {}, fake.webContents.url, code);
+}
+
 describe('main window person links', () => {
   it('changes only the fragment of the open Home page and reports it loaded at once', () => {
     const window = make();
     window.loadSessionUrl(SESSION_URL);
+    committed();
     const fake = FakeBrowserWindow.created.at(-1);
     let loaded = 0;
     expect(window.loadSessionUrl(link(`#person=${PERSON}`), () => (loaded += 1))).toBe(true);
@@ -36,6 +43,7 @@ describe('main window person links', () => {
   it('keeps the files marker in the fragment', () => {
     const window = make();
     window.loadSessionUrl(SESSION_URL);
+    committed();
     window.loadSessionUrl(link(`#person=${PERSON}&files`));
     expect(FakeBrowserWindow.created.at(-1)?.loaded.at(-1)).toBe(
       `${SESSION_URL}#person=${PERSON}&files`,
@@ -58,5 +66,39 @@ describe('main window person links', () => {
     window.loadSessionUrl(SESSION_URL);
     window.loadSessionUrl(link(''));
     expect(FakeBrowserWindow.created.at(-1)?.loaded.at(-1)).toBe(link(''));
+  });
+
+  it('loads in full while the first load has not committed, or after a 401 or a failed load', () => {
+    const fresh = make();
+    fresh.loadSessionUrl(SESSION_URL);
+    expect(fresh.canOpenInPlace).toBe(false);
+    fresh.loadSessionUrl(link(`#person=${PERSON}`));
+    expect(FakeBrowserWindow.created.at(-1)?.loaded.at(-1)).toBe(link(`#person=${PERSON}`));
+
+    const expired = make();
+    expired.loadSessionUrl(SESSION_URL);
+    committed(401);
+    expect(expired.canOpenInPlace).toBe(false);
+    expired.loadSessionUrl(link(`#person=${PERSON}`));
+    expect(FakeBrowserWindow.created.at(-1)?.loaded.at(-1)).toBe(link(`#person=${PERSON}`));
+
+    const failed = make();
+    failed.loadSessionUrl(SESSION_URL);
+    committed();
+    FakeBrowserWindow.created
+      .at(-1)
+      ?.webContents.emit('did-fail-load', {}, -105, '', SESSION_URL, true);
+    expect(failed.canOpenInPlace).toBe(false);
+    failed.loadSessionUrl(link(`#person=${PERSON}`));
+    expect(FakeBrowserWindow.created.at(-1)?.loaded.at(-1)).toBe(link(`#person=${PERSON}`));
+  });
+
+  it('says it can move in place only after a good Home load', () => {
+    const window = make();
+    window.loadSessionUrl(SESSION_URL);
+    committed();
+    expect(window.canOpenInPlace).toBe(true);
+    window.resetForNewCore();
+    expect(window.canOpenInPlace).toBe(false);
   });
 });

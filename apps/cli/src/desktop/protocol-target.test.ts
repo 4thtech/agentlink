@@ -55,6 +55,24 @@ describe('opaque targets', () => {
   });
 });
 
+describe('show inPlace (OWNER-FB-0512)', () => {
+  it('is accepted only as true and only with a target', () => {
+    expect(
+      parseShellMessage(
+        line({ v: 1, type: 'show', route: 'inbox', target: PERSON, inPlace: true }),
+      ),
+    ).toEqual({ v: 1, type: 'show', route: 'inbox', target: PERSON, inPlace: true });
+    expect(
+      parseShellMessage(
+        line({ v: 1, type: 'show', route: 'inbox', target: PERSON, inPlace: false }),
+      ),
+    ).toBe(undefined);
+    expect(parseShellMessage(line({ v: 1, type: 'show', route: 'home', inPlace: true }))).toBe(
+      undefined,
+    );
+  });
+});
+
 describe('the session link', () => {
   it('may name one request or one person, nothing else', () => {
     expect(isSessionUrl(`http://localhost:4567/approve/${APR}?t=${TOKEN}`)).toBe(true);
