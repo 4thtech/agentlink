@@ -45,6 +45,7 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BUNDLE_HASHES_FILE, bundleFilePaths, verifyBundle } from './bundle-check.js';
 import { CoreLog, logDir } from './core-log.js';
+import { inPlaceReply } from './in-place.js';
 import { checkDataFolderAcl, dataFolderFor, type AclScratch, type AclVerdict } from './data-acl.js';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { CoreSupervisor, aiAppMarkerSet, type SpawnFn, type Timers } from './core-process.js';
@@ -1045,15 +1046,24 @@ export async function runShell(
           const showOnLoad = targetedShow;
           // OWNER-FB-0512: asked to move in place, but the window cannot any more (it reloaded, or
           // its page failed): that link has no live token, so ask again for a full load.
-          const asked = inPlaceAsked;
-          inPlaceAsked = null;
-          if (
-            asked !== null &&
-            window?.canOpenInPlace !== true &&
-            new URL(message.sessionUrl).hash.startsWith('#person=')
-          ) {
-            supervisor?.send({ v: 1, type: 'show', route: asked.route, target: asked.target });
-            return;
+          // Only the answer to that very ask uses it up; an unrelated `ready` (Updates) leaves it.
+          const reply = inPlaceReply(
+            inPlaceAsked,
+            message.sessionUrl,
+            window?.canOpenInPlace === true,
+          );
+          if (reply !== 'other') {
+            const asked = inPlaceAsked;
+            inPlaceAsked = null;
+            if (reply === 'reask' && asked !== null) {
+              supervisor?.send({
+                v: 1,
+                type: 'show',
+                route: asked.route as ShowRoute,
+                target: asked.target,
+              });
+              return;
+            }
           }
           if (
             window?.loadSessionUrl(message.sessionUrl, () => {
