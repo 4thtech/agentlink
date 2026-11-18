@@ -2,7 +2,9 @@
 # Commercial brief and legacy-repo audit (contains unpatched vulnerability details).
 # They move to a private repo; until then this guard prevents accidental commits.
 docs/foundation/01-commercial-brief.md
+specs/01-commercial-brief.md
 docs/foundation/09-repositories-and-reuse.md
+specs/09-repositories-and-reuse.md
 # Contract source lives only in the private occ-v2-contracts repo
 *.sol
 

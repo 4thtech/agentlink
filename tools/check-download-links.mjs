@@ -21,9 +21,9 @@ const VERSIONED_TAG = /4thtech\/agentlink\/releases\/tag\/(?:v|\d|<|\{|\$)/;
 /** Returns the problems of one file's text (empty when it is fine). */
 export function checkText(file, text) {
   const problems = [];
-  // The process docs under docs/ describe the versioned names on purpose (the updater needs them),
+  // The internal docs under project/ describe the versioned names on purpose (the updater needs them),
   // so there only the download URL is checked.
-  const namesAllowed = file.startsWith('docs/');
+  const namesAllowed = file.startsWith('project/');
   text.split('\n').forEach((line, i) => {
     if (VERSIONED_URL.test(line)) {
       problems.push(
@@ -58,7 +58,7 @@ function walk(dir, out = []) {
 /** Returns [repo-relative path, text] for every file the check covers. */
 export function collectFiles(root) {
   const files = [join(root, 'README.md'), join(root, 'llms.txt')];
-  for (const dir of ['docs', 'knowledge', 'docs', join('apps', 'invite', 'src')]) {
+  for (const dir of ['docs', 'knowledge', 'project', join('apps', 'invite', 'src')]) {
     files.push(...walk(join(root, dir)));
   }
   return (

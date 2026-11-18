@@ -1,0 +1,52 @@
+{
+  "note": "DOCS-PHASE-B: where documentation moved. 'prefixes' map an old folder to its new one (apply the first match; docs/status.yaml did not move). 'files' are exact old paths that map elsewhere: the old internal map docs/README.md is now project/README.md (and docs-site/README.md is now docs/README.md). 'stubs' are the old paths that still carry a one-line pointer file because shipped artifacts or published articles link to them; tools/docs/moved-paths.test.mjs keeps the stub files exactly this set. Delete the stubs at 0.7.",
+  "files": {
+    "docs/README.md": "project/README.md"
+  },
+  "prefixes": [
+    {
+      "from": "docs/foundation/",
+      "to": "specs/"
+    },
+    {
+      "from": "docs/process/",
+      "to": "project/process/"
+    },
+    {
+      "from": "docs/runbooks/",
+      "to": "project/runbooks/"
+    },
+    {
+      "from": "docs/lessons/",
+      "to": "project/lessons/"
+    },
+    {
+      "from": "docs/design/",
+      "to": "project/design/"
+    },
+    {
+      "from": "docs/explainers/",
+      "to": "project/explainers/"
+    },
+    {
+      "from": "docs/releases/",
+      "to": "project/releases/"
+    },
+    {
+      "from": "docs-site/",
+      "to": "docs/"
+    }
+  ],
+  "stubs": {
+    "docs-site/README.md": "docs/README.md",
+    "docs-site/guide/README.md": "docs/guide/README.md",
+    "docs-site/guide/quick-guide.md": "docs/guide/quick-guide.md",
+    "docs-site/guide/apps/desktop-app.md": "docs/guide/apps/desktop-app.md",
+    "docs-site/guide/apps/menu-bar-widget.md": "docs/guide/apps/menu-bar-widget.md",
+    "docs-site/guide/get-started/claude-code.md": "docs/guide/get-started/claude-code.md",
+    "docs-site/guide/get-started/codex.md": "docs/guide/get-started/codex.md",
+    "docs-site/guide/get-started/gemini-cli.md": "docs/guide/get-started/gemini-cli.md",
+    "docs-site/technical/README.md": "docs/technical/README.md",
+    "docs/foundation/README.md": "specs/00-README.md"
+  }
+}

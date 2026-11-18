@@ -16,7 +16,7 @@
 //      any path that belongs to no workspace package and is not a doc.
 //   3. A file inside a workspace package selects that package and every package that depends on
 //      it, transitively (dependencies, devDependencies, peer and optional).
-//   4. Docs (`docs/`, `docs/`, `knowledge/`, `changelog.d/`, `.changeset/*.md`, root `*.md`)
+//   4. Docs (`docs/`, `specs/`, `project/`, `knowledge/`, `changelog.d/`, `.changeset/*.md`, root `*.md`)
 //      select no package by themselves.
 //   5. Any changed file also selects every package whose source names a path prefix of it (for
 //      example `project/design/d1/` in the ui token test): the doc-drift tests follow their docs
@@ -54,7 +54,7 @@ const FULL_PREFIXES = [
 
 // The same docs set as `detect`'s docs-only rule in ci.yml.
 const DOCS =
-  /^(docs\/|docs\/|knowledge\/|changelog\.d\/|\.changeset\/[^/]+\.md$|[^/]+\.md$|llms\.txt$|brand\/.+\.(?:png|jpe?g|gif|svg|webp)$)/;
+  /^(docs\/|specs\/|project\/|knowledge\/|changelog\.d\/|\.changeset\/[^/]+\.md$|[^/]+\.md$|llms\.txt$|brand\/.+\.(?:png|jpe?g|gif|svg|webp)$)/;
 
 // OPS-FAST-LANE-1: a push to one of these refs is the heavy lane (everything runs; release.yml
 // requires that run's gate). Every other push, every pull request and every merge group is the
@@ -95,8 +95,7 @@ export function fastLane({ event, ref = '', files }) {
 // by the first rule: a package publishes its README.
 const IMAGE = '(?:png|jpe?g|gif|svg|webp)';
 const DOCS_ONLY = [
-  new RegExp(`^docs/.+\\.(?:md|${IMAGE})$`),
-  new RegExp(`^docs/.+\\.(?:md|${IMAGE})$`),
+  new RegExp(`^(?:docs|specs|project)/.+\\.(?:md|${IMAGE})$`),
   /^knowledge\/.+\.md$/,
   /^changelog\.d\/.+\.md$/,
   new RegExp(`^brand/.+\\.${IMAGE}$`),
@@ -400,7 +399,7 @@ const SKIP_DIRS = new Set(['node_modules', 'dist', '.turbo', 'coverage', '.wrang
 const SOURCE = /\.(?:[cm]?[jt]s|tsx)$/;
 // A repository path as it appears in a string, a template or a comment: `docs/…`, `../../docs/…`.
 const PATH_REF =
-  /(?:^|[\s'"`(/])((?:docs|docs|knowledge|packages|apps|e2e|tools|test-vectors)\/[A-Za-z0-9_.\-/]*)/g;
+  /(?:^|[\s'"`(/])((?:docs|specs|project|knowledge|packages|apps|e2e|tools|test-vectors)\/[A-Za-z0-9_.\-/]*)/g;
 const PLAYWRIGHT = /['"](?:playwright|@playwright\/test|@vitest\/browser[^'"]*)['"]/;
 
 function workspaceDirs(root) {

@@ -1,6 +1,6 @@
 # AGENTS.md — AgentLink
 
-> Canonical instructions for every agent and harness (Claude Code: via `CLAUDE.md`). **Rules and pointers only (≤ 8 KB)**; details in `docs/`.
+> Canonical instructions for every agent and harness (Claude Code: via `CLAUDE.md`). **Rules and pointers only (≤ 8 KB)**; details in `docs/`, `specs/`, `project/`.
 
 AgentLink (working name) by 4thTech is *encrypted, provable exchange between AI agents*, on protocol OCC v2.
 - Specs (source of truth): `specs/`.

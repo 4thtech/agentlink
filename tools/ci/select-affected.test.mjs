@@ -397,9 +397,7 @@ describe('heavy lane: which heavy jobs a pull request runs (by area)', () => {
   });
 
   it('a docs-only change runs no heavy job, even a Windows guide', () => {
-    expect(
-      running(['docs/guide/get-started/windows.md', 'changelog.d/W5-WINDOWS.md']),
-    ).toEqual([]);
+    expect(running(['docs/guide/get-started/windows.md', 'changelog.d/W5-WINDOWS.md'])).toEqual([]);
   });
 
   it('a harness change runs windows-smoke', () => {
@@ -685,9 +683,7 @@ describe('docsOnly: the docs fast lane', () => {
   it('is true when every path is prose or an image in a doc tree', () => {
     expect(pr(['project/process/ci-cd.md'])).toBe(true);
     expect(pr(['specs/00-README.md', 'project/lessons/new.md'])).toBe(true);
-    expect(pr(['docs/technical/project/x.md', 'docs/guide/.gitbook/assets/a.png'])).toBe(
-      true,
-    );
+    expect(pr(['docs/technical/project/x.md', 'docs/guide/.gitbook/assets/a.png'])).toBe(true);
     expect(pr(['knowledge/agentlink-overview.md'])).toBe(true);
     expect(pr(['changelog.d/ops-docs-fastlane.md'])).toBe(true);
     expect(pr(['README.md', 'CHANGELOG.md', 'llms.txt', 'brand/logo/mark.svg'])).toBe(true);
@@ -750,7 +746,15 @@ describe('docsOnly: the docs fast lane', () => {
   });
 
   it('docs-only is always a subset of the existing docs rule (no heavy job for it)', () => {
-    for (const f of ['docs/a.md', 'knowledge/a.md', 'README.md', 'llms.txt', 'brand/a.png']) {
+    for (const f of [
+      'docs/a.md',
+      'specs/a.md',
+      'project/a.md',
+      'knowledge/a.md',
+      'README.md',
+      'llms.txt',
+      'brand/a.png',
+    ]) {
       if (docsOnly({ event: 'pull_request', files: [f] })) {
         expect(fastLane({ event: 'pull_request', files: [f] }).codeChanged, f).toBe(false);
       }

@@ -23,8 +23,8 @@ import { parseFragment } from './roll-changelog.mjs';
 const NEEDS_ENTRY = [
   /^apps\/[^/]+\/src\/.+/,
   /^packages\/[^/]+\/src\/.+/,
-  /^docs\/foundation\/.+/,
-  /^docs\/process\/(?!backlog\.md$).+/,
+  /^specs\/.+/,
+  /^project\/process\/(?!backlog\.md$).+/,
   /^AGENTS\.md$/,
 ];
 const TEST_FILE = /(\.test\.|\.spec\.|\/__tests__\/|\/test\/)/;

@@ -142,7 +142,7 @@ const oneLine = (text) =>
     .trim();
 const EDIT = 'EDIT:';
 const DOC_PATH =
-  /^(README\.md|CHANGELOG\.md|docs\/|docs\/|knowledge\/|changelog\.d\/)|(^|\/)README\.md$/;
+  /^(README\.md|CHANGELOG\.md|docs\/|specs\/|project\/|knowledge\/|changelog\.d\/)|(^|\/)README\.md$/;
 const TEST_PATH = /(\.test\.|\.spec\.|\/__tests__\/|\/test\/)/;
 const list = (paths, max = 15) =>
   paths.length <= max
@@ -313,7 +313,9 @@ export function parseArgs(argv) {
 export function plan({ cwd, opts, changed, branch, template, titleRe }) {
   const task = resolveTask({ task: opts.task, title: opts.title, branch });
   if (!task)
-    throw new Error('No task ID: pass --task <ID> (project/process/backlog.md: no task ID, no work).');
+    throw new Error(
+      'No task ID: pass --task <ID> (project/process/backlog.md: no task ID, no work).',
+    );
   const summary = oneLine(opts.summary ?? opts.title ?? '');
   const title = normalizeTitle({
     task,

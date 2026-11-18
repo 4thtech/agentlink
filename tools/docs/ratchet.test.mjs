@@ -35,10 +35,20 @@ describe('paths', () => {
   it('names one layout as current and derives the pages from it', () => {
     expect(Object.keys(LAYOUTS)).toEqual(['legacy', 'compact']);
     expect(DOCS.name).toBe(CURRENT_LAYOUT);
-    expect(pathsFor('legacy').securitySpec).toBe('specs/04-security-and-crypto.md');
+    expect(pathsFor('legacy').securitySpec).toBe('docs/foundation/04-security-and-crypto.md');
     expect(pathsFor('compact').securitySpec).toBe('specs/04-security-and-crypto.md');
     expect(pathsFor('compact').statusPage).toBe('docs/technical/project/status-and-roadmap.md');
     expect(pathsFor('compact').status).toBe('docs/status.yaml');
     expect(() => pathsFor('other')).toThrow(/unknown docs layout/);
+  });
+});
+
+describe("renamed entries", () => {
+  it("maps old-path allowlist entries to the new folders", async () => {
+    const { renamedEntry } = await import("./ratchet.mjs");
+    expect(renamedEntry("docs/foundation/07-x.md: note")).toBe("specs/07-x.md: note");
+    expect(renamedEntry("docs/process/a.md: x")).toBe("project/process/a.md: x");
+    expect(renamedEntry("docs-site/guide/a.md: x")).toBe("docs/guide/a.md: x");
+    expect(renamedEntry("docs/guide/a.md: x")).toBe("docs/guide/a.md: x");
   });
 });

@@ -24,6 +24,22 @@ export function writeAllowlist(root, rel, note, entries) {
   writeFileSync(join(root, rel), `${JSON.stringify({ note, entries: sorted }, null, 2)}\n`);
 }
 
+// DOCS-PHASE-B: entries start with a repo path. A base branch that predates the folder rename holds
+// them under the old names, so they are mapped to the new names before the growth comparison.
+const RENAMED = [
+  ['docs/foundation/', 'specs/'],
+  ['docs/README.md', 'project/README.md'],
+  ...['process', 'runbooks', 'lessons', 'design', 'explainers', 'releases'].map((d) => [
+    `docs/${d}/`,
+    `project/${d}/`,
+  ]),
+  ['docs-site/', 'docs/'],
+];
+export function renamedEntry(entry) {
+  for (const [from, to] of RENAMED) if (entry.startsWith(from)) return to + entry.slice(from.length);
+  return entry;
+}
+
 /**
  * The allowlist on the base ref (env DOCS_RATCHET_BASE, default origin/main), or null when git or
  * the ref or the file is not available there (then the growth check is skipped, with a note).
@@ -35,7 +51,7 @@ export function baseAllowlist(root, rel, ref = process.env.DOCS_RATCHET_BASE ?? 
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     });
-    return JSON.parse(text).entries ?? [];
+    return (JSON.parse(text).entries ?? []).map(renamedEntry);
   } catch {
     return null;
   }

@@ -4,11 +4,14 @@ import { describe, expect, it } from 'vitest';
 import css from './tokens.css?raw';
 import { depthTokens } from './index.js';
 
-const d1 = import.meta.glob('../../../../project/design/d1/tokens/{tokens.css,tokens.source.json}', {
-  query: '?raw',
-  import: 'default',
-  eager: true,
-});
+const d1 = import.meta.glob(
+  '../../../../project/design/d1/tokens/{tokens.css,tokens.source.json}',
+  {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+  },
+);
 const d1Css = d1['../../../../project/design/d1/tokens/tokens.css'] as string;
 const sourceRaw = d1['../../../../project/design/d1/tokens/tokens.source.json'] as string;
 

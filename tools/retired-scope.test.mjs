@@ -23,7 +23,7 @@ const isHistory = (path, line) =>
   path.endsWith('/CHANGELOG.md') ||
   // A decision file: only its heading, its Status line and the decision text (the paragraph lines),
   // never the Date, Specs or Index lines or another heading.
-  (/^docs\/foundation\/decisions\/D-\d{3}\.md$/.test(path) &&
+  (/^specs\/decisions\/D-\d{3}\.md$/.test(path) &&
     (/^# D-\d+: /.test(line) || /^- \*\*Status:\*\* /.test(line) || /^[^#\-\s]/.test(line))) ||
   (path === 'specs/decisions/README.md' && /^\| \[D-\d+\]/.test(line));
 

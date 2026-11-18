@@ -16,7 +16,17 @@ const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 /** The brand PNGs for each taskbar colour (the "connected" state), smallest first. */
 export function trayIcoSources() {
-  const dir = join(DESKTOP_DIR, '..', '..', 'docs', 'design', 'brand', 'icons', 'tray', 'windows');
+  const dir = join(
+    DESKTOP_DIR,
+    '..',
+    '..',
+    'project',
+    'design',
+    'brand',
+    'icons',
+    'tray',
+    'windows',
+  );
   const files = (taskbar) =>
     SIZES.map((size) =>
       join(dir, `agentlink-tray-windows-connected-${taskbar}-taskbar-${size}.png`),

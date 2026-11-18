@@ -137,6 +137,20 @@ describe('review-gate path classes', () => {
     expect(classify('changelog.d/X.md')).toBe(0);
   });
 
+  it('DOCS-PHASE-B: the renamed folders keep their classes', () => {
+    expect(classify('specs/04-security-and-crypto.md')).toBe(2);
+    expect(classify('specs/decisions/D-001.md')).toBe(1);
+    expect(classify('specs/06-mcp-server.md')).toBe(1);
+    expect(classify('project/process/audit-rules.md')).toBe(1);
+    expect(classify('docs/guide/x.md')).toBe(1);
+    expect(classify('docs/status.yaml')).toBe(0);
+    expect(classify('project/runbooks/x.md')).toBe(0);
+    expect(classify('project/design/d1/x.md')).toBe(0);
+    expect(classify('project/README.md')).toBe(0);
+    // A nested copy or a similarly named file is not the owner-gated spec.
+    expect(classify('specs/04-security-and-crypto.md.bak')).toBe(1);
+  });
+
   it('marks the AGENTS.md sensitive paths', () => {
     for (const p of [
       '.github/workflows/ci.yml',

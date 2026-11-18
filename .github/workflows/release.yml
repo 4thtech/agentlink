@@ -1888,7 +1888,7 @@ jobs:
           set -euo pipefail
           VERSION="$(node -p "require('./apps/cli/package.json').version")"
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Unexpected CLI version."; exit 1; }
-          if ! grep -q 'ai-knowledge:' docs/guide/README.md docs/guide/README.md 2>/dev/null; then
+          if ! grep -q 'ai-knowledge:' docs/guide/README.md 2>/dev/null; then
             echo "::notice::The public pages carry no ai-knowledge markers yet (DOCS-COMPACT-A Step 2); the knowledge bundle is not built for v$VERSION."
             exit 0
           fi

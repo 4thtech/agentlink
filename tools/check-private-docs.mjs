@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // DOCS-COMPACT-A: the private specs (01 commercial brief, 09 repositories and reuse) live in the
-// private ops repo and are never committed here, under the old path (specs/) or the new
+// private ops repo and are never committed here, under the old path (docs/foundation/) or the new
 // one (specs/) or anywhere else. Run by `pnpm lint` (tools `check`). It fails on any tracked or
 // untracked, not ignored, file with one of those names; an ignored local copy is fine.
 
