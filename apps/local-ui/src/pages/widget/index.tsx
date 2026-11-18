@@ -11,7 +11,7 @@
 // - Reads: /api/ui/widget (today, unread, contacts), health, notifications (approvals, files),
 //   /api/ui/activity (Live), /api/ui/contacts (names), /api/ui/app-update, and the shared live store
 //   (/api/ui/agents and its events). Re-read, debounced, on an agents change, the `activity` event, a
-//   return to view, and every 15 s as a fallback; nothing is read while the window is hidden.
+//   return to view or focus, and every 15 s as a fallback; nothing is read while the window is hidden.
 // - Keyboard: Escape closes, the arrow keys move between the actionable rows, Enter opens.
 import {
   Banner,
@@ -340,6 +340,9 @@ export function WidgetPage({
       if (document.visibilityState !== 'hidden') schedule();
     };
     window.addEventListener(WIDGET_ACTIVITY_DOM_EVENT, onActivity);
+    // WIDGET-POLISH-0511: the popover gaining focus (it opens again) reads again, so a file opened or
+    // marked as seen in the main window leaves Needs you without waiting for the fallback poll.
+    window.addEventListener('focus', onActivity);
     document.addEventListener('visibilitychange', onVisible);
     const poll = setInterval(() => {
       if (document.visibilityState !== 'hidden') void readAll();
@@ -361,6 +364,7 @@ export function WidgetPage({
       clearInterval(poll);
       if (timer.current !== undefined) clearTimeout(timer.current);
       window.removeEventListener(WIDGET_ACTIVITY_DOM_EVENT, onActivity);
+      window.removeEventListener('focus', onActivity);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);

@@ -87,6 +87,7 @@ import { HomeApprovals } from './home-approvals.js';
 import { RenameBanner } from './rename-banner.js';
 import { createSendFolderApi, type SendFolderApi } from './send-folder-banner.js';
 import { FilesPanel } from './files-panel.js';
+import { useFilesSeen } from './files-seen.js';
 import type { Getter } from '../files/folders-summary.js';
 import { createRevealApi, type RevealApi } from '../../api/reveal-folder.js';
 import { createAttachApi, type AttachApi } from './attach-api.js';
@@ -319,15 +320,43 @@ function PersonOpen({
         : undefined,
     [contact, person.contactId, clients.attach, clients.sendFolder, refresh],
   );
+  // WIDGET-POLISH-0511: opening, saving or showing a received file marks this person's new files
+  // seen (the bell and the widget's Needs you); "Mark as seen" below does it without a file.
+  const { unseen: filesUnseen, markSeen: markFilesSeen } = useFilesSeen(
+    clients.api,
+    person.contactId,
+    tick,
+  );
+  const received = data.received;
+  const reveal = useCallback<Reveal>(
+    async (id) => {
+      const outcome = await clients.reveal(id);
+      if (outcome === 'shown' && received.has(id)) markFilesSeen();
+      return outcome;
+    },
+    [clients.reveal, received, markFilesSeen],
+  );
+  const preview = useCallback<Preview>(
+    async (id) => {
+      const outcome = await clients.preview(id);
+      if (outcome.kind === 'ok' && received.has(id)) markFilesSeen();
+      return outcome;
+    },
+    [clients.preview, received, markFilesSeen],
+  );
+  const onSaved = useCallback((): void => {
+    markFilesSeen();
+    refresh();
+  }, [markFilesSeen, refresh]);
   const fileContext = useMemo(
     () => ({
       received: data.received,
       sent: data.sent,
       folder: data.inboxFolder,
-      reveal: clients.reveal,
-      preview: clients.preview,
+      reveal,
+      preview,
     }),
-    [data.received, data.sent, data.inboxFolder, clients.reveal, clients.preview],
+    [data.received, data.sent, data.inboxFolder, reveal, preview],
   );
   return (
     <div
@@ -409,6 +438,27 @@ function PersonOpen({
           </div>
         </dl>
       ) : null}
+      {filesUnseen ? (
+        <Banner
+          tone="info"
+          icon="file"
+          compact
+          className="hm-new-files"
+          action={
+            <Button
+              size="sm"
+              variant="ghost"
+              className="hm-mark-seen"
+              aria-label={fmt(S.markFilesSeenLabel, { name: person.name })}
+              onClick={markFilesSeen}
+            >
+              {S.markSeen}
+            </Button>
+          }
+        >
+          {fmt(S.newFilesFrom, { name: person.name })}
+        </Banner>
+      ) : null}
       <Conversation
         name={person.name}
         agent={agent}
@@ -430,8 +480,8 @@ function PersonOpen({
         sent={data.sent}
         save={clients.save}
         passkey={passkey}
-        reveal={clients.reveal}
-        onSaved={refresh}
+        reveal={reveal}
+        onSaved={onSaved}
         {...(data.inboxFolder === undefined ? {} : { folder: data.inboxFolder })}
         {...(folderNote === undefined ? {} : { folderNote })}
       />
@@ -832,6 +882,16 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
       if (details !== null) details.open = true;
       el.scrollIntoView?.({ block: 'start', behavior: 'auto' });
       el.focus({ preventScroll: true });
+      mark(el, 0);
+    };
+    // WIDGET-POLISH-0511: the mark (a thin bar by the header, never an overlay) only once the
+    // conversation has rendered, so nothing covers it while it loads; at most ~10 s of waiting.
+    const mark = (el: HTMLElement, waited: number): void => {
+      if (!el.isConnected) return;
+      if (el.querySelector('[aria-busy="true"]') !== null && waited < 100) {
+        timer = setTimeout(() => mark(el, waited + 1), 100);
+        return;
+      }
       el.classList.add('hm-target');
       timer = setTimeout(() => el.classList.remove('hm-target'), 2000);
     };
