@@ -11,6 +11,16 @@ let prefixCache: string | undefined;
 const prefix = (): string => (prefixCache ??= cliPrefix());
 
 export const OWNER_TEXT = Object.freeze({
+  /** SEC-CARD-FULLTEXT (08 §1): a request with exact content is approved on its own. */
+  contentOwn: (command: string): string =>
+    `This one shows the exact message, so it is approved on its own: ${command}`,
+  /** SEC-CARD-FULLTEXT: the content could not be shown, so the request is never approved. */
+  contentMissing: "This request can't be shown, so it can't be approved. Deny it.",
+  contentLength: (count: number): string =>
+    `${count.toLocaleString('en-US')} characters (the AgentLink app shows every one)`,
+  checkCode: (code: string): string => `Check code: ${code}`,
+  file: (name: string, size: string, type: string, code: string): string =>
+    `File: ${name} · ${size} · ${type} · Check code: ${code}`,
   /** M1-PAY-CONFIRM-a (04 §2.5.3 rule 7): a paid request is approved on its own. */
   paidOwn: (command: string): string =>
     `This one costs something, so it is approved on its own: ${command}`,

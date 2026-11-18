@@ -260,7 +260,15 @@ export async function nativePresence(
   helper: NativeHelper,
   ownerNostr: Uint8Array,
   reason: NativeReason,
-  options: OwnerNativeOptions & { readonly signal?: AbortSignal } = {},
+  options: OwnerNativeOptions & {
+    readonly signal?: AbortSignal;
+    /**
+     * SEC-CARD-FULLTEXT (04 §2.5.3): who and the cost ("for Ana, $0.10"), built by the server from
+     * the stored request; shown on the OS prompt where the platform takes caller text (macOS).
+     * Display-only, like the reason: it binds nothing.
+     */
+    readonly detail?: string;
+  } = {},
 ): Promise<NativeOwnerPresence> {
   const timeoutMs = options.timeoutMs ?? KEYCHAIN_CALL_TIMEOUT_MS;
   const blob = await readItem(keychain, timeoutMs);
@@ -281,7 +289,7 @@ export async function nativePresence(
     wipe(blob);
   }
   if (options.signal?.aborted === true) throw new NativeHelperError('cancelled');
-  const secret = await helper.release(record, reason, options.signal);
+  const secret = await helper.release(record, reason, options.signal, options.detail);
   // Fable review L1: a touch that arrives after the operation was abandoned approves nothing.
   if (isAborted(options.signal)) {
     wipe(secret);

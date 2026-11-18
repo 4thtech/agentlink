@@ -2900,3 +2900,129 @@ describe('SEC-RECEIPTS-DEFAULT: the automatic device receipt in the sender pack 
     expect(exported).not.toHaveProperty('deviceReceipt');
   });
 });
+
+describe('SEC-CARD-FULLTEXT: the card content comes from the stored envelope (08 §1, 06 §2.5)', () => {
+  /** Rewrites the stored (sealed) payload of `envelopeId`, as a same-user edit of the store would. */
+  async function rewritePayload(
+    agent: Agent,
+    envelopeId: string,
+    edit: (p: Record<string, unknown>) => void,
+  ) {
+    const row = await agent.store.transaction((tx) =>
+      tx.get('envelopes', { envelope_id: envelopeId }),
+    );
+    const context = {
+      table: 'envelopes',
+      column: 'payload_json',
+      rowKey: JSON.stringify([envelopeId]),
+    } as const;
+    const payload = parseJson(await agent.cipher.open(context, row!.payload_json!)) as Record<
+      string,
+      unknown
+    >;
+    edit(payload);
+    const sealed = await agent.cipher.seal(context, JSON.stringify(payload));
+    await agent.store.transaction((tx) =>
+      tx.update('envelopes', { envelope_id: envelopeId }, { payload_json: sealed }),
+    );
+  }
+  const fileEntry = (sha: string) => ({
+    name: 'invoice.pdf',
+    size: 1240,
+    mime: 'application/pdf',
+    plaintextSha256: sha,
+    ciphertextSha256: 'cd'.repeat(32),
+    inline: encodeBase64url(new Uint8Array(32)),
+    url: null,
+    fileKey: encodeBase64url(new Uint8Array(32).fill(7)),
+    expiresAt: clock.t + 86_400,
+  });
+
+  async function proofNeedsApproval(a: Agent, b: Agent, text: string): Promise<string> {
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    return sendText(a, b, text);
+  }
+
+  it('decodes the full message text and files of the envelope the proof approval binds', async () => {
+    const { a, b } = await twoAgents();
+    const text = `${'A long, exact message. '.repeat(400)}\u202Eend`;
+    const envelopeId = await proofNeedsApproval(a, b, text);
+    await rewritePayload(a, envelopeId, (p) => {
+      p['files'] = [fileEntry('ab'.repeat(32))];
+    });
+    const pending = await a.client.notarize({ envelopeId });
+    expect(pending.status).toBe('pending_approval');
+    const row = await a.store.transaction((tx) => tx.get('envelopes', { envelope_id: envelopeId }));
+    const action = {
+      tool: 'agentlink_notarize',
+      args: { envelopeId },
+      context: { envelopeHash: row!.envelope_hash },
+    };
+    const content = await a.client.proofs.approvalContent(action);
+    if (content === undefined || content === 'missing') throw new Error('test: no content');
+    // Every character, never cut (the card collapses it; it never truncates it).
+    expect(content.text).toBe(text);
+    expect(content.envelopeHash).toBe(row!.envelope_hash);
+    expect(content.files).toEqual([
+      {
+        name: 'invoice.pdf',
+        size: 1240,
+        mime: 'application/pdf',
+        plaintextSha256: 'ab'.repeat(32),
+      },
+    ]);
+  });
+
+  it('fails closed when the envelope is missing or its hash does not match', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const other = {
+      tool: 'agentlink_notarize',
+      args: { envelopeId },
+      context: { envelopeHash: `0x${'11'.repeat(32)}` },
+    };
+    expect(await a.client.proofs.approvalContent(other)).toBe('missing');
+    const gone = {
+      tool: 'agentlink_notarize',
+      args: { envelopeId: 'Z'.repeat(43) },
+      context: { envelopeHash: `0x${'11'.repeat(32)}` },
+    };
+    expect(await a.client.proofs.approvalContent(gone)).toBe('missing');
+    // A tool whose card carries no envelope content.
+    const invite = { tool: 'agentlink_accept_invite', args: {}, context: {} };
+    expect(await a.client.proofs.approvalContent(invite)).toBeUndefined();
+  });
+
+  it('a file changed after the approval is refused when the approved proof runs (FILE_CHANGED)', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await proofNeedsApproval(a, b, 'see the attached invoice');
+    await rewritePayload(a, envelopeId, (p) => {
+      p['files'] = [fileEntry('ab'.repeat(32))];
+    });
+    const pending = await a.client.notarize({ envelopeId });
+    expect(pending.status).toBe('pending_approval');
+    const approvalId = (pending as { approvalId: string }).approvalId;
+    await approve(a, approvalId);
+    // The file the owner approved is not the file the proof would now bind.
+    await rewritePayload(a, envelopeId, (p) => {
+      p['files'] = [fileEntry('ef'.repeat(32))];
+    });
+    const run = await a.client.notarize({ envelopeId, approvalId });
+    expect(run).toMatchObject({ status: 'rejected', code: 'FILE_CHANGED' });
+    expect(chain.calls.notarize).toBe(0);
+  });
+
+  it('the same file runs: the approval binds its hash and size', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await proofNeedsApproval(a, b, 'see the attached invoice');
+    await rewritePayload(a, envelopeId, (p) => {
+      p['files'] = [fileEntry('ab'.repeat(32))];
+    });
+    const pending = await a.client.notarize({ envelopeId });
+    const approvalId = (pending as { approvalId: string }).approvalId;
+    await approve(a, approvalId);
+    expect(await a.client.notarize({ envelopeId, approvalId })).toMatchObject({ status: 'ok' });
+  });
+});

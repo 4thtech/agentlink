@@ -16,6 +16,14 @@
 // `inviteUrl` is left out: the link is the capability that opens the invite, and the owner decides on
 // who it connects to (the Who line, from the verified invite card), never on the link itself.
 //
+// SEC-CARD-FULLTEXT (08 §1 "What the card shows"; 11 §5, §6.2.1): the card is decidable from
+// app-decoded fields alone. `content` is the exact text the request is about, in full and inert
+// (never cut, never the AI's description of it): for a paid send from the digest-bound `args.text`,
+// for a proof, receipt or key disclosure from the stored envelope the action names (core
+// `proofs.approvalContent`, which checks the envelope hash or record). Check codes (>= 80 bits) for
+// the envelope and each file. An envelope that cannot be read marks the card `contentMissing`: the
+// server and the page then offer no Approve (fail closed).
+//
 // I-4: nothing here decides. `apply` is core's `ownerActions.apply`, which verifies the owner
 // signature and applies the decision in one store transaction.
 import { isPaidPendingAction } from '@4thtech-io/core';
@@ -35,6 +43,7 @@ import {
   readRow,
   type PendingRequest,
 } from '../commands/owner/pending.js';
+import { type ContentFacts } from '../commands/owner/card-content.js';
 import { cardFacts, HIDDEN_ARGS, recipientName, type CardFacts } from '../commands/owner/render.js';
 import { cardDisclosure } from '@4thtech-io/mcp-tools/strings/privacy.js';
 
@@ -101,7 +110,11 @@ function fromAi(action: JsonObject): { name: string; value: string }[] {
     }));
 }
 
-function detailsOf(request: PendingRequest, facts: CardFacts): ApprovalDetails {
+function detailsOf(
+  request: PendingRequest,
+  facts: CardFacts,
+  content: ContentFacts,
+): ApprovalDetails {
   const terms = facts.terms;
   const lines =
     terms === undefined || terms === 'problem'
@@ -121,6 +134,7 @@ function detailsOf(request: PendingRequest, facts: CardFacts): ApprovalDetails {
     rule: [ruleOf(request.action), ...disclosureOf(request.action, facts)].join(' '),
     fromAi: fromAi(request.action).slice(0, 64),
     ...(lines === undefined ? {} : { terms: lines }),
+    ...content,
   };
 }
 
@@ -131,13 +145,14 @@ async function viewOf(
 ): Promise<ApprovalForDecision | undefined> {
   const facts = await cardFacts(agent.client, request);
   if (facts.terms === 'problem') return undefined;
+  const content: ContentFacts = facts.content ?? {};
   return {
     approvalId: request.approvalId,
     summary: facts.summary,
     actionDigest: request.actionDigest,
     expiresAt: request.expiresAt,
     commitment: request.commitment,
-    details: detailsOf(request, facts),
+    details: detailsOf(request, facts, content),
     action: request.action,
     storedDigest: request.storedDigest,
   };

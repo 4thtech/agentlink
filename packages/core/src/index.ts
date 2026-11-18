@@ -532,6 +532,7 @@ export {
   type ProofRejected,
   type ProofService,
   type ProofServiceDeps,
+  type ApprovalEnvelopeContent,
   type ProofView,
   type ResubmitSummary,
 } from './proofs/service.js';

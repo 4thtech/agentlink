@@ -61,7 +61,9 @@ test('argv: only the fixed commands, with exactly their fixed arguments', { skip
     ['ecdh'],
     ['ecdh', 'bogus'],
     ['ecdh', 'APPROVE'],
-    ['ecdh', 'approve', 'x'],
+    // SEC-CARD-FULLTEXT: an unknown reason with a detail, or a fourth argument.
+    ['ecdh', 'bogus', 'for Ana'],
+    ['ecdh', 'approve', 'for Ana', 'x'],
     ['ecdh', '--reason', 'approve'],
     ['ecdh', 'Approve this payment of $1000'],
     ['sign', 'approve'],
@@ -70,6 +72,25 @@ test('argv: only the fixed commands, with exactly their fixed arguments', { skip
     refused(args, '', EXIT.usage);
   }
 });
+
+test(
+  'SEC-CARD-FULLTEXT: a detail that is not one short plain line exits 66, not usage',
+  { skip: !onMac },
+  () => {
+    for (const detail of ['', 'for \u202EAna', 'for Ana\n$0.10', 'for\tAna', 'x'.repeat(65)]) {
+      refused(['ecdh', 'approve', detail], '', EXIT.detailRefused);
+    }
+  },
+);
+
+test(
+  'SEC-CARD-FULLTEXT: ecdh <reason> <detail> is accepted argv (it reads the record next)',
+  { skip: !onMac },
+  () => {
+    // Empty stdin: past the argv check, refused as bad input before any key or sheet.
+    refused(['ecdh', 'pay', 'for “Ana” (self-declared), $0.10'], '', EXIT.badInput);
+  },
+);
 
 test('version prints the record version as hex and nothing else', { skip: !onMac }, () => {
   const r = runHelper(['version']);

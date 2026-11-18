@@ -122,6 +122,15 @@ async function decideOne(
     }
     for (const line of cardLines(entry, facts)) output.print(line);
     output.print('');
+    // SEC-CARD-FULLTEXT (08 §1): a request whose content cannot be shown is never approved.
+    if (
+      decision === 'approve' &&
+      facts.content !== undefined &&
+      'contentMissing' in facts.content
+    ) {
+      output.printError(OWNER_TEXT.contentMissing);
+      return EXIT_FAILED;
+    }
     // A commitment is decided alone, as here (D-31, 04 §2.5.2): one request, one approval.decide.
     const { kept } = await stillPending(agent, [entry], deps.now());
     if (kept.length === 0) {
@@ -174,6 +183,15 @@ async function reviewList(deps: OwnerCommandDeps, context: CommandContext): Prom
         output.print(
           copy('cli.approve.termsOwn', { approvalId: entry.approvalId, prefix: cliPrefix() }),
         );
+        output.print('');
+        continue;
+      }
+      if (
+        facts.content !== undefined &&
+        ('content' in facts.content || 'contentMissing' in facts.content)
+      ) {
+        // SEC-CARD-FULLTEXT (08 §1 (b)): never part of a review list; decided on its own.
+        output.print(OWNER_TEXT.contentOwn(`${cliPrefix()} approve ${entry.approvalId}`));
         output.print('');
         continue;
       }
