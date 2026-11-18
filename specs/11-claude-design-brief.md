@@ -478,7 +478,8 @@ The free, private "received" receipt the recipient's app sends back (04 §3.4, 0
 | Settings › Rules switch, Everyday (on by default) | "Tell contacts when your AI receives a message" (helper: "Your contacts see that your AI app received their message. It also shows them that your AI app was open at about that time. Never what you did with it.") |
 | Per contact (contact page) | "Tell {contactName} when your AI receives a message" · "Use my default" |
 | One-time notice after the update | "AgentLink now tells your contacts when your AI app has received their message. This also shows them that your AI app was open at about that time. You can turn this off in Settings." **Got it** · **Open Settings** |
-| Sender, message status | "Sending…" · "Sent" · "Received by {contactName}'s app" · "Received (older app)" · "Not delivered" |
+| Sender, message status | "Sending…" · "Sent" · "Sent, availability unknown" · "Received by {contactName}'s app" · "Received (older app)" · "Not delivered" |
+| Sender, availability unknown (0.5.12) | "Sent, availability unknown" (the message network took it, but AgentLink could not yet confirm that it holds it; a received receipt from the contact replaces it). In `agentlink_send`: "Sent to Marko, availability unknown: AgentLink could not yet confirm that the message network holds it. End-to-end encrypted: only you, Marko and your AIs can read it." |
 | Sender, status detail | "Received by {contactName}'s app: their AI app confirmed it received this exact message." |
 | Sender, proof status | "Delivered: {contactName}'s AI confirmed it received this." · "Sent. No receipt yet." |
 | Recipient, under a received message (muted) | "Receipt sent to {contactName}" |
@@ -500,6 +501,8 @@ Rules page, More rules (SEC-HARD-CEILING, SEC-OUTBOUND-CAPS):
 | Soft above hard | ""Ask me over" and the proof budget can be at most your hard spending limits." |
 | Sending limits row | "Sending limits" · "How much your AI can send in any 24 hours. Above these, sending stops until a slot frees up or you raise them." · fields "Messages to one person", "Messages in all", "Files to one person", "Files in all", "File data in all (MB)" |
 | Confirmation sheet | "Hard limit per proof", "Hard limit for 24 hours" |
+| Approval card reason, restored (0.5.12) | "This ID was restored from a backup in the last 24 hours. Until then, AgentLink asks you before anything that costs money." |
+| Approval card reason, updated (0.5.12) | "AgentLink was updated on this computer in the last 24 hours. Until then, it asks you before anything that costs money." |
 
 What the AI relays (tool results; never an approval):
 
