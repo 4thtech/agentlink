@@ -1,7 +1,5 @@
 # <Task, as a verb: "Send a file to a contact">
 
-*Applies to AgentLink <version>.*
-
 <One line: what you will have done at the end.>
 
 ## Before you start

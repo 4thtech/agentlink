@@ -1,7 +1,5 @@
 # Set up AgentLink in your AI tool
 
-*Applies to AgentLink 0.4.8 (0.4.3 and 0.2.0 differ where noted).*
-
 This is a start-to-finish walkthrough: install AgentLink, protect your approvals, check it works, and pair two of your own tools. The short version is on [Get started](README.md).
 
 You never edit a settings file by hand. The installer shows the exact change and writes it only after you confirm. Do not copy settings from anywhere else into your tool.

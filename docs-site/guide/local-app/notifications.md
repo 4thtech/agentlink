@@ -1,6 +1,6 @@
 # Notifications
 
-*Applies to AgentLink 0.5.8. The bell and Settings › Notifications are new in 0.5.4. In 0.5.5 a click opens the right place, other IDs are covered and notifications stay quiet while the window is in front.*
+*The bell and Settings › Notifications are new in 0.5.4. In 0.5.5 a click opens the right place, other IDs are covered and notifications stay quiet while the window is in front.*
 
 ## The bell
 

@@ -1,6 +1,6 @@
 # The menu bar widget (Mac and Windows)
 
-*Applies to AgentLink 0.5.9. New in 0.5.9, in the Mac and Windows desktop apps. The browser app has no icon.*
+*New in 0.5.9, in the Mac and Windows desktop apps. The browser app has no icon.*
 
 The AgentLink desktop app puts a small icon in your **menu bar** (Mac) or **notification area near the clock** (Windows). It shows at a glance whether AgentLink is running and whether anything needs you, and one click opens a small widget with the latest. You do not have to open the app.
 

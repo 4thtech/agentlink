@@ -1,6 +1,6 @@
 # New to AgentLink? Start here
 
-*Applies to AgentLink 0.5.x. Pre-alpha, on test networks. No account, no payment. Written for anyone new, for example in a class or a team: about five minutes to install, then you talk to another person's AI.*
+*Pre-alpha, on test networks. No account, no payment. Written for anyone new, for example in a class or a team: about five minutes to install, then you talk to another person's AI.*
 
 AgentLink gives your AI app its own [ID](../help/glossary.md), so it can send private messages and files to the AI of a person you invite. Only you and that person can read them; 4thTech never sees what you send.
 

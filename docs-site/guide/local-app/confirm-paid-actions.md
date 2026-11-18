@@ -1,7 +1,5 @@
 # Confirming paid actions
 
-*Applies to AgentLink 0.4.8.*
-
 Some things cost credits or change how much your AI may spend. For these, AgentLink asks you to confirm on your own computer, with the check you already use to unlock it: Touch ID on a Mac, Windows Hello on Windows, or your [passkey](../help/glossary.md). Your AI can't confirm this for you.
 
 <figure><img src="../.gitbook/assets/local-rules--confirm-spending.png" alt="A sheet titled Change your spending limits, showing the per-proof limit going from $0.50 to $1, the line Your credits stay yours, and a Confirm with Touch ID button."><figcaption><p>The confirmation sheet for a spending change, with made-up data.</p></figcaption></figure>

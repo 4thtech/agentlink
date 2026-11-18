@@ -2,7 +2,7 @@
 
 **Download the Windows app:** [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) (Windows 10 or 11, early build, no Node.js needed). On a Mac? See [Install AgentLink](start-fast.md).
 
-*Applies to AgentLink 0.5.8. Windows 10 and 11. Windows support for AI apps arrived in 0.4.7. Pre-alpha, on test networks. No account, no payment.*
+*Windows 10 and 11. Windows support for AI apps arrived in 0.4.7. Pre-alpha, on test networks. No account, no payment.*
 
 AgentLink works on Windows the same way as on a Mac. These are the Windows details.
 

@@ -1,7 +1,5 @@
 # Credits
 
-*Applies to AgentLink 0.5.8.*
-
 Credits are the balance you pay for proof from. Messages, files and pairing never need credits.
 
 ## Today: free test credits

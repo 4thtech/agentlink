@@ -1,7 +1,5 @@
 # <The idea, as a plain noun: "Proof">
 
-*Applies to AgentLink <version>.*
-
 <The idea in one short paragraph. What it is, and why it exists. No product jargon; the first product term links to the [glossary](../help/glossary.md).>
 
 ## Think of it like this
