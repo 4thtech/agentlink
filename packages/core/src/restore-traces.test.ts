@@ -82,9 +82,7 @@ describe('recordRestoreTrace: one spending-history entry per restore mark', () =
     const store = new MemoryStore();
     await recordRestoreTrace(ctxOver(store, markAt(0)));
     await recordRestoreTrace(ctxOver(store));
-    await recordRestoreTrace(
-      ctxOver(store, { read: () => Promise.reject(new Error('keychain')) }),
-    );
+    await recordRestoreTrace(ctxOver(store, { read: () => Promise.reject(new Error('keychain')) }));
     expect(await store.transaction((tx) => tx.select('budget_restores'))).toEqual([]);
   });
 

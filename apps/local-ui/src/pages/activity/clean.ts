@@ -89,7 +89,9 @@ export type ActivityItem =
   | {
       readonly kind: 'rules_changed' | 'id_removed' | 'id_paused' | 'id_resumed' | 'backup_saved';
       readonly at: number;
-    };
+    }
+  /** RESTORE-TRACES (D-156): a restore or an update started the 24-hour guard. No amount. */
+  | { readonly kind: 'restore_guard'; readonly at: number; readonly reason: 'restore' | 'update' };
 
 const DECISIONS: ReadonlySet<string> = new Set([
   'approved',
@@ -242,6 +244,11 @@ export function parseItem(raw: unknown): ActivityItem | undefined {
         ? { kind, at, app }
         : { kind, at };
     }
+    case 'restore_guard': {
+      // RESTORE-TRACES: the reason only; anything else on the entry (an amount) is not taken.
+      const reason = raw['reason'];
+      return reason === 'restore' || reason === 'update' ? { kind, at, reason } : undefined;
+    }
     default:
       return undefined;
   }
@@ -304,7 +311,8 @@ export type IconName =
   | 'play'
   | 'minus'
   | 'plus'
-  | 'approval';
+  | 'approval'
+  | 'refresh-cw';
 
 export interface Rendered {
   readonly icon: IconName;
@@ -734,6 +742,16 @@ export function render(item: ActivityItem, nameOf: NameOf, whenText: string): Re
         pill: S.pillBackup,
         link: link(S.linkBackup, '/settings/backup'),
       });
+    case 'restore_guard':
+      // RESTORE-TRACES (D-156): a spending-history entry with no amount; never a charge.
+      return build({
+        icon: 'refresh-cw',
+        tone: 'neutral',
+        sentence: [item.reason === 'update' ? S.restoreGuardUpdate : S.restoreGuardRestore],
+        grey: S.restoreGuardLine,
+        pill: S.pillBackup,
+        link: link(S.linkBackup, '/settings/backup'),
+      });
   }
 }
 
@@ -781,6 +799,7 @@ const SAFETY_KINDS: ReadonlySet<string> = new Set([
   'contact_checked',
   'contact_kept',
   'backup_saved',
+  'restore_guard',
 ]);
 
 export function inFilter(item: ActivityItem, filter: Filter): boolean {

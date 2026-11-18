@@ -42,6 +42,8 @@ export interface MessageItem {
   readonly receivedOlder?: boolean;
   /** SEC-RELAY-READBACK: sent, but no relay could confirm it holds the message. */
   readonly availability?: 'unknown';
+  /** RESTORE-TRACES: a received message that arrived again after a restore. */
+  readonly receivedAgain?: true;
   readonly proof: boolean;
   readonly size: number;
   /** MSG-ORDER-1: the local order of one second, both boxes on one scale (core `seq`). */
@@ -88,6 +90,7 @@ function parseItem(raw: unknown): MessageItem | undefined {
   if (!isRecord(raw)) return undefined;
   const { id, at, text, files, status, receipt, receivedOlder, availability, proof, size, seq } =
     raw;
+  const { receivedAgain } = raw;
   if (typeof id !== 'string' || !ID_RE.test(id)) return undefined;
   if (!isTime(at) || !isTime(size)) return undefined;
   if (typeof text !== 'string' || text.length > MAX_TEXT) return undefined;
@@ -110,6 +113,7 @@ function parseItem(raw: unknown): MessageItem | undefined {
     ...(status === 'sent' && availability === 'unknown'
       ? { availability: 'unknown' as const }
       : {}),
+    ...(status === undefined && receivedAgain === true ? { receivedAgain: true as const } : {}),
     proof: proof === true,
     size,
     ...(seq === undefined ? {} : { seq }),

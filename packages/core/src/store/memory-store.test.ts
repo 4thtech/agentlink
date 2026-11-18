@@ -72,6 +72,9 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         'content_file_budget',
         // SEC-OUTBOUND-CAPS (D-156; 06 §3 `outgoing`, schema 17): counts and times only.
         'outgoing_log',
+        // RESTORE-TRACES (D-156; 07 §3.5, schema 20): restore entries (no amount) and replays.
+        'budget_restores',
+        'restore_replays',
         // W4-PAUSE (D-143 (5); 07 §3.2, schema 12): the owner's pause of the agent.
         'agent_pause',
         'idempotency',
@@ -165,7 +168,7 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
   });
 
   it('SEC-RELAY-READBACK (schema 19): envelopes.availability and outbox.availability, nullable, appended last', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(19);
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(19);
     const availability = { kind: 'enum', nullable: true, values: ['confirmed', 'unknown'] };
     expect(Object.keys(TABLES.envelopes.columns).at(-1)).toBe('availability');
     expect(TABLES.envelopes.columns.availability).toEqual(availability);

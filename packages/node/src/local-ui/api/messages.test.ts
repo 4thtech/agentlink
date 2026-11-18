@@ -452,7 +452,10 @@ describe('SEC-RECEIPTS-DEFAULT: an older app receipt', () => {
 describe('RESTORE-TRACES: received again after a restore', () => {
   it('passes receivedAgain through for an Inbox item, only `true`, never on a Sent item', async () => {
     const again = { ...(INBOX[1] as MessageItem), receivedAgain: true } as MessageItem;
-    const res = await callBox(contextWith({ list: () => Promise.resolve({ items: [again] }) }), BOB);
+    const res = await callBox(
+      contextWith({ list: () => Promise.resolve({ items: [again] }) }),
+      BOB,
+    );
     const items = bodyOf(res)['items'] as Record<string, unknown>[];
     expect(items[0]).toMatchObject({ receivedAgain: true });
     const plain = await callBox(

@@ -33,3 +33,14 @@ export function receiptWord(item: Item, name: string): string {
   if (item.receivedOlder === true) return S.receivedOlder;
   return S.receiptNo;
 }
+
+/**
+ * RESTORE-TRACES (D-156; 11 §5): the quiet label under a message from the other side that arrived
+ * again after a restore (it was sent before the restore). Undefined otherwise.
+ */
+export function receivedAgainWord(
+  item: Partial<Pick<MessageItem, 'receivedAgain'>>,
+  out: boolean,
+): string | undefined {
+  return !out && item.receivedAgain === true ? S.receivedAgain : undefined;
+}

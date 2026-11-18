@@ -44,6 +44,7 @@
 //   id_removed, id_paused, id_resumed, backup_saved   (nothing more)
 //   id_renamed         name?
 //   app_connected, app_disconnected   app?
+//   restore_guard      reason ('restore' | 'update')   (RESTORE-TRACES, D-156: no amount)
 import {
   CoreError,
   type ActivityEntry,
@@ -244,6 +245,13 @@ function view(entry: ActivityEntry): JsonObject | undefined {
     case 'id_created': {
       const name = idName(entry.name);
       return { kind: entry.kind, at, ...(name === undefined ? {} : { name }) };
+    }
+    case 'restore_guard': {
+      // RESTORE-TRACES (D-156): the time and the reason only; never an amount.
+      const reason: unknown = entry.reason;
+      return reason === 'restore' || reason === 'update'
+        ? { kind: entry.kind, at, reason }
+        : undefined;
     }
     case 'rules_changed':
     case 'id_removed':

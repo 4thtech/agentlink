@@ -83,6 +83,8 @@ import { CoreError } from './errors.js';
 import { receivedFileRows } from './files/received.js';
 import type { IdentityService } from './identity.js';
 import { REQUESTS_FULL, isBlockedTx, pruneRefusedTx, requestsFullTx } from './requests.js';
+import { readRestoreState } from './restore-guard.js';
+import { noteReplayTx } from './restore-traces.js';
 import {
   isTermsType,
   termsBodyOf,
@@ -696,6 +698,8 @@ export class EnvelopeService {
     }
     try {
       const now = nowOf(this.#ctx);
+      // RESTORE-TRACES: read before the transaction (the mark is a KeyStore item); never throws.
+      const restore = await readRestoreState(this.#ctx);
       return await this.#ctx.store.transaction((tx): ReceiveResult => {
         const markSeen = (): void => {
           if (wrapId !== undefined && tx.get('seen', { kind: 'wrap', id: wrapId }) === undefined) {
@@ -761,6 +765,8 @@ export class EnvelopeService {
           deleted_at: null,
           availability: null,
         });
+        // RESTORE-TRACES: first stored after a restore but created before it: received again.
+        noteReplayTx(tx, restore, envelope.id, envelope.createdAt);
         markSeen();
         return { status: 'verified', report: report(envelope.id, 'deferred') };
       });

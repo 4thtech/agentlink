@@ -114,6 +114,13 @@ const V18_PAIRINGS_COLUMNS: readonly string[] = ['created_by'];
 const V19_ENVELOPE_COLUMNS: readonly string[] = ['availability'];
 const V19_OUTBOX_COLUMNS: readonly string[] = ['availability'];
 
+/**
+ * Tables added by the restore-traces version (RESTORE-TRACES, D-156; 07 §3.5), version 20 here: the
+ * restore entries of the spending history and inbound received again after a restore. Named by
+ * content: if another lane adds a version first, this one takes the next number.
+ */
+const RESTORE_TRACES_TABLES: readonly TableName[] = ['budget_restores', 'restore_replays'];
+
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
   return {
@@ -363,7 +370,8 @@ function v11Statements(): readonly string[] {
  * before the update are not counted), version 18 adds `invites.created_by`,
  * `contacts.waiting_owner`, `contacts.ai_accepted_at` and `pairings.created_by` (SEC-INVITE-CAPS,
  * D-156; nullable, null on existing rows), version 19 adds `envelopes.availability` and
- * `outbox.availability` (SEC-RELAY-READBACK, D-156 (7); nullable, null on existing rows). A later
+ * `outbox.availability` (SEC-RELAY-READBACK, D-156 (7); nullable, null on existing rows), version 20
+ * adds `budget_restores` and `restore_replays` (RESTORE-TRACES, D-156; new tables, empty). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -383,7 +391,8 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
           !V12_TABLES.includes(t) &&
           !V15_TABLES.includes(t) &&
           !V16_TABLES.includes(t) &&
-          !V17_TABLES.includes(t),
+          !V17_TABLES.includes(t) &&
+          !RESTORE_TRACES_TABLES.includes(t),
       ),
       v1Spec,
     ),
@@ -406,6 +415,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 17, statements: createSchemaStatements(V17_TABLES) }),
   Object.freeze({ version: 18, statements: Object.freeze(v18Statements()) }),
   Object.freeze({ version: 19, statements: Object.freeze(v19Statements()) }),
+  Object.freeze({ version: 20, statements: createSchemaStatements(RESTORE_TRACES_TABLES) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {
