@@ -177,10 +177,10 @@ describe('stubs', () => {
       needsChangeset({ cwd: repoRoot, changed: changed('tools/pr/open-pr.mjs', 'README.md') }),
     ).toBe(false);
     expect(needsFragment({ changed: changed('tools/pr/open-pr.mjs', 'README.md') })).toBe(false);
-    expect(needsChangeset({ cwd: repoRoot, changed: changed('docs/process/audit-rules.md') })).toBe(
+    expect(needsChangeset({ cwd: repoRoot, changed: changed('project/process/audit-rules.md') })).toBe(
       false,
     );
-    expect(needsFragment({ changed: changed('docs/process/audit-rules.md') })).toBe(true);
+    expect(needsFragment({ changed: changed('project/process/audit-rules.md') })).toBe(true);
   });
   it('the stubs are valid', () => {
     expect(changesetStub({ task: 'X-1', summary: 'a  b' })).toBe('---\n---\n\nX-1: a b\n');
@@ -324,7 +324,7 @@ describe('plan', () => {
     ]);
     expect(at(['packages/crypto/src/a.ts'], 'security-docs: none (refactor only)')).toEqual([]);
     expect(
-      at(['packages/crypto/src/a.ts', 'docs-site/technical/concepts/security-model.md']),
+      at(['packages/crypto/src/a.ts', 'docs/technical/concepts/security-model.md']),
     ).toEqual([]);
     expect(at(['packages/ui/src/a.tsx'])).toEqual([]);
   });

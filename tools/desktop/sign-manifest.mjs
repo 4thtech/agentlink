@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // WP-D10 (plan 2026-11-12 Decision 5, Fable H3; 08 §8 "Signed updates"), format v2 (UPD-1): the
-// owner's OFFLINE tool for the desktop update key. Owner guide: docs/runbooks/desktop-update-keys.md
+// owner's OFFLINE tool for the desktop update key. Owner guide: project/runbooks/desktop-update-keys.md
 // (RB-23). Since the owner decision of 2026-11-13 there is ONE update key, its public key pinned in
 // the app (root-key.json `rootPublicKey`); no root key and no key statements. Release signing moves
 // to one approved CI job (UPD-3); this tool stays for local signing and checks.
@@ -401,7 +401,7 @@ async function withKey(path, role, io, fn) {
   }
 }
 
-const USAGE = `Usage (offline only; guide: docs/runbooks/desktop-update-keys.md):
+const USAGE = `Usage (offline only; guide: project/runbooks/desktop-update-keys.md):
   sign-manifest.mjs generate --out <key file>
   sign-manifest.mjs public-key <key file>
   sign-manifest.mjs check <key file>

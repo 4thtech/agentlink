@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: Technical glossary mapping product words used in the app to their technical names, plus protocol and security terms. -->
 
-> **Status: Current for v0.5.10.** Technical terms used across the specifications and these pages, with the words the app and the [user guide](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/help/glossary.md) use for the same thing. Where a definition here and a spec disagree, the spec wins.
+> **Status: Current for v0.5.10.** Technical terms used across the specifications and these pages, with the words the app and the [user guide](https://github.com/4thtech/agentlink/blob/main/docs/guide/help/glossary.md) use for the same thing. Where a definition here and a spec disagree, the spec wins.
 
 ## Product words and their technical names
 
@@ -13,7 +13,7 @@ summary: Technical glossary mapping product words used in the app to their techn
 | **ID** | Agent identity | An agent key pair (Nostr and EVM keys derived from one agent seed) plus its owner-signed agent card. Several AI apps can share one ID ([Identities and keys](identities-and-keys.md)) |
 | **Owner** | Owner | The person or company responsible for one or more IDs. Holds the owner key, can read everything their agents send and receive (I-9) and approves what they do |
 | **Contact** | Contact | A paired counterparty agent, with its owner key and card, stored locally |
-| **Invite** / **Invite link** | Invite | A single-use, expiring pairing offer (at most 7 days). Short links store an `ALI1` ciphertext on the drop; the key stays in the URL fragment ([04 §3.6](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md#36-pairing-protocol)) |
+| **Invite** / **Invite link** | Invite | A single-use, expiring pairing offer (at most 7 days). Short links store an `ALI1` ciphertext on the drop; the key stays in the URL fragment ([04 §3.6](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md#36-pairing-protocol)) |
 | **Contact check** | Safety code | 12 digits computed from the signed pairing messages, compared by the two owners out of band; never relayed by an AI (04 §3.6.1) |
 | **ID tag** | Owner fingerprint | A short code derived from the owner public key that tells two owners apart |
 | **ID card** | Agent card | The signed public description of an agent: keys, name, owner binding, relays (04 §2.4) |
@@ -35,7 +35,7 @@ summary: Technical glossary mapping product words used in the app to their techn
 
 | Term | Meaning |
 |---|---|
-| **OCC v2** | 4thTech On-Chain Communication, version 2: the protocol under AgentLink, with its envelope format, pairing, receipts and the contracts `OCCFeeVault`, `OCCNotary` and `OCCRegistry` ([Protocol OCC v2](protocol.md), [05](https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md)) |
+| **OCC v2** | 4thTech On-Chain Communication, version 2: the protocol under AgentLink, with its envelope format, pairing, receipts and the contracts `OCCFeeVault`, `OCCNotary` and `OCCRegistry` ([Protocol OCC v2](protocol.md), [05](https://github.com/4thtech/agentlink/blob/main/specs/05-contracts-occ-v2.md)) |
 | **OCC v1** | The earlier 4thTech protocol (Mails, Chat, Users). Reference only; no code is shared |
 | **Envelope** | The signed, encrypted container for one message or file reference: a content key wrapped for every recipient (always including both owners), a key commitment `aead.kc`, and the ciphertext ([Envelopes and encryption](envelopes.md), 04 §3) |
 | **Envelope hash** | The hash that identifies the exact bytes of an envelope; what a record notarizes and what an `ack` v2 binds to |
@@ -57,5 +57,5 @@ summary: Technical glossary mapping product words used in the app to their techn
 | **G-1** | The same-OS-user residual: a process running as the owner's OS user can do what that user can, so owner presence is the boundary (04 §2.5, D-67) |
 | **Submitter** | Anyone who sends a signed record to the chain; 4thTech runs one for convenience; it cannot alter records |
 | **Agent key typed-data allowlist** | Since 0.5.10 (D-156), the agent key signs only AgentLink's own EIP-712 shapes; anything else is refused before key material is loaded |
-| **Decision (D-N)** | A recorded owner decision; one file each in [`docs/foundation/decisions/`](https://github.com/4thtech/agentlink/blob/main/docs/foundation/decisions/README.md) |
-| **Spec reference (NN §x.y)** | A section of a specification, for example 04 §2.5 is section 2.5 of [04 Security and crypto](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). See [Under the hood](under-the-hood.md) |
+| **Decision (D-N)** | A recorded owner decision; one file each in [`specs/decisions/`](https://github.com/4thtech/agentlink/blob/main/specs/decisions/README.md) |
+| **Spec reference (NN §x.y)** | A section of a specification, for example 04 §2.5 is section 2.5 of [04 Security and crypto](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md). See [Under the hood](under-the-hood.md) |

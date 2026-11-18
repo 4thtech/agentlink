@@ -3,7 +3,7 @@
 //
 // Drives two harnesses headless against two AgentLink agents of ONE owner: Claude Code (`claude -p`,
 // the owner's subscription) as `cc-test` and OpenCode (`opencode run`, the model set in OpenCode) as
-// `oc-test`. Runs docs/runbooks/dogfood-m1a.md section 5 and 6, saves transcripts and a results
+// `oc-test`. Runs project/runbooks/dogfood-m1a.md section 5 and 6, saves transcripts and a results
 // table outside the repository, and scans the folder for secrets.
 //
 // What this script NEVER does: approve anything, read the owner code, or call an owner command

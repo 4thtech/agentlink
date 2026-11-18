@@ -50,25 +50,25 @@ function tree(pages) {
     fs.writeFileSync(path.join(root, rel), text);
   };
   w('docs/status.yaml', STATUS);
-  w('docs/foundation/04-security-and-crypto.md', '# 04\n');
+  w('specs/04-security-and-crypto.md', '# 04\n');
   w(
-    'docs-site/guide/SUMMARY.md',
+    'docs/guide/SUMMARY.md',
     '# T\n\n* [What](README.md)\n* [How](how.md)\n\n## Help\n\n* [FAQ](help/faq.md)\n',
   );
   w(
-    'docs-site/technical/SUMMARY.md',
+    'docs/technical/SUMMARY.md',
     '# T\n\n* [Overview](README.md)\n\n## Concepts\n\n* [Arch](concepts/architecture.md)\n\n## Reference\n\n* [Networks](reference/networks-and-contracts.md)\n',
   );
   const defaults = {
-    'docs-site/guide/README.md':
+    'docs/guide/README.md':
       '# What is AgentLink?\n\n<!-- ai-knowledge: full\nsummary: What AgentLink is. -->\n\n**AgentLink lets AIs talk.**\n',
-    'docs-site/guide/how.md':
-      '# How\n\n<!-- ai-knowledge: full\nsummary: How it works,\n  for newcomers. -->\n\nAlso on 4thTech Docs: [x](https://wiki.4thtech.io/x).\n\n*Applies to AgentLink 0.5.8.*\n\n## Steps\n\nSee the [FAQ](help/faq.md#q) and the [spec](../../docs/foundation/04-security-and-crypto.md).\n\n<figure><img src="../assets/a.webp" alt="A"><figcaption><p>Caption</p></figcaption></figure>\n\n![shot](../assets/b.webp)\n\n```mermaid\nflowchart LR\n  A-->B\n```\n\n```sh\n# not a heading\n```\n',
-    'docs-site/guide/help/faq.md':
+    'docs/guide/how.md':
+      '# How\n\n<!-- ai-knowledge: full\nsummary: How it works,\n  for newcomers. -->\n\nAlso on 4thTech Docs: [x](https://wiki.4thtech.io/x).\n\n*Applies to AgentLink 0.5.8.*\n\n## Steps\n\nSee the [FAQ](help/faq.md#q) and the [spec](../../specs/04-security-and-crypto.md).\n\n<figure><img src="../assets/a.webp" alt="A"><figcaption><p>Caption</p></figcaption></figure>\n\n![shot](../assets/b.webp)\n\n```mermaid\nflowchart LR\n  A-->B\n```\n\n```sh\n# not a heading\n```\n',
+    'docs/guide/help/faq.md':
       '# FAQ\n\n<!-- ai-knowledge: summary\nsummary: Short answers. -->\n\nLong body that is left out.\n',
-    'docs-site/technical/README.md': '# Overview\n\n<!-- ai-knowledge: skip -->\n\nBody\n',
-    'docs-site/technical/reference/networks-and-contracts.md': '# Networks\n<!-- ai-knowledge: skip -->\n',
-    'docs-site/technical/concepts/architecture.md':
+    'docs/technical/README.md': '# Overview\n\n<!-- ai-knowledge: skip -->\n\nBody\n',
+    'docs/technical/reference/networks-and-contracts.md': '# Networks\n<!-- ai-knowledge: skip -->\n',
+    'docs/technical/concepts/architecture.md':
       '# Architecture\n\n<!-- ai-knowledge: summary\nsummary: Components. -->\n',
   };
   for (const [rel, text] of Object.entries({ ...defaults, ...pages })) if (text !== null) w(rel, text);
@@ -122,7 +122,7 @@ describe('bundle', () => {
     expect(t).toContain('### Steps');
     expect(t).toContain('[FAQ](https://wiki.4thtech.io/products/agentlink/faq#q)');
     expect(t).toContain(
-      '[spec](https://github.com/4thtech/agentlink/blob/v0.5.11/docs/foundation/04-security-and-crypto.md)',
+      '[spec](https://github.com/4thtech/agentlink/blob/v0.5.11/specs/04-security-and-crypto.md)',
     );
     expect(t).toContain('```sh\n# not a heading\n```');
     for (const gone of ['Caption', 'b.webp', 'flowchart', 'Also on 4thTech', 'Applies to AgentLink 0.5.8', 'ai-knowledge'])
@@ -134,7 +134,7 @@ describe('bundle', () => {
   });
 
   it('fails on a page without a marker unless an estimate is asked for', () => {
-    const root = tree({ 'docs-site/guide/how.md': '# How\n\nBody\n' });
+    const root = tree({ 'docs/guide/how.md': '# How\n\nBody\n' });
     expect(buildBundle({ root }).problems[0]).toMatch(/how\.md: no ai-knowledge marker/);
     const est = buildBundle({ root, assume: 'full' });
     expect(est.problems).toEqual([]);
@@ -144,13 +144,13 @@ describe('bundle', () => {
   it('fails above the hard cap and warns above the target and per page', () => {
     const big = 'word '.repeat(MAX_TOKENS * 4 / 5 + 100);
     const r = buildBundle({
-      root: tree({ 'docs-site/guide/how.md': `# How\n<!-- ai-knowledge: full\nsummary: x -->\n\n${big}\n` }),
+      root: tree({ 'docs/guide/how.md': `# How\n<!-- ai-knowledge: full\nsummary: x -->\n\n${big}\n` }),
     });
     expect(r.problems.some((p) => /above the hard max 22000/.test(p))).toBe(true);
     expect(r.warnings.some((w) => /how\.md: \d+ tokens/.test(w))).toBe(true);
     const mid = 'word '.repeat(19_500 * 4 / 5);
     const m = buildBundle({
-      root: tree({ 'docs-site/guide/how.md': `# How\n<!-- ai-knowledge: full\nsummary: x -->\n\n${mid}\n` }),
+      root: tree({ 'docs/guide/how.md': `# How\n<!-- ai-knowledge: full\nsummary: x -->\n\n${mid}\n` }),
     });
     expect(m.problems).toEqual([]);
     expect(m.warnings.some((w) => /above the target 19000/.test(w))).toBe(true);
@@ -163,8 +163,8 @@ describe('bundle', () => {
 
   it('builds from a compact-layout tree too', () => {
     const root = tree({});
-    fs.renameSync(path.join(root, 'docs-site/guide'), path.join(root, 'docs/guide'));
-    fs.renameSync(path.join(root, 'docs-site/technical'), path.join(root, 'docs/technical'));
+    fs.renameSync(path.join(root, 'docs/guide'), path.join(root, 'docs/guide'));
+    fs.renameSync(path.join(root, 'docs/technical'), path.join(root, 'docs/technical'));
     const r = buildBundle({ root, tag: 'v0.6.0' });
     expect(r.problems).toEqual([]);
     expect(r.text).toContain('Page: https://wiki.4thtech.io/products/agentlink/how');

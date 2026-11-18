@@ -13,7 +13,7 @@ If your app lets you add a local MCP tool, the command to start AgentLink is:
 npx -y @4thtech-io/agentlink mcp
 ```
 
-Then protect your approvals as on [Protect your approvals](protect-your-approvals.md). The technical documentation has the details in its [configuration reference](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/harness-configuration.md) reference.
+Then protect your approvals as on [Protect your approvals](protect-your-approvals.md). The technical documentation has the details in its [configuration reference](https://github.com/4thtech/agentlink/blob/main/docs/technical/reference/harness-configuration.md) reference.
 
 **Web apps such as claude.ai** cannot run programs on your computer. They need the [always-on cloud agent](../apps/cloud-agent.md), which is coming later.
 

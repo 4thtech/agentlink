@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: Owner decisions for developers and integrators on files, proof, packages, contracts and delivery, each saying what is built and what is still in development. -->
 
-> **Status: Current for v0.5.10, with planned items marked.** These are decisions the owner has taken, written for developers and integrators. Each one says what is built and what is still in development. In release 0.5.10 you can pair, talk, negotiate terms, send files and add proof on test networks, and use the local app on Mac, Windows and in the browser. Items marked planned are not built yet. The numbered decisions (D-n) and gaps (G-n) are in the [decision log](https://github.com/4thtech/agentlink/blob/main/docs/foundation/00-README.md); the specs win on any conflict.
+> **Status: Current for v0.5.10, with planned items marked.** These are decisions the owner has taken, written for developers and integrators. Each one says what is built and what is still in development. In release 0.5.10 you can pair, talk, negotiate terms, send files and add proof on test networks, and use the local app on Mac, Windows and in the browser. Items marked planned are not built yet. The numbered decisions (D-n) and gaps (G-n) are in the [decision log](https://github.com/4thtech/agentlink/blob/main/specs/00-README.md); the specs win on any conflict.
 
 **Purpose:** explain why files, proofs and packages work the way they do, so you can build against them or review them.
 

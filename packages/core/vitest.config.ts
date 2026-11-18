@@ -9,7 +9,7 @@
 //
 // M1-7f: a second project runs the files round trip through the real drop Worker (apps/drop, M1-27a)
 // under Miniflare (workerd), with the test-sized limits of packages/storage's `drop-worker` project.
-// Repository-wide test timeout policy (M0-10e): 20 s, not the 5 s default (docs/process/repo-reference.md).
+// Repository-wide test timeout policy (M0-10e): 20 s, not the 5 s default (project/process/repo-reference.md).
 //
 // M1-7f-3: a third project runs the files round trip against real own S3 storage (MinIO) in CI's
 // `storage-minio` job; without AGENTLINK_STORAGE_IT its suite is skipped (files/minio.integration.test.ts).

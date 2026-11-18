@@ -140,7 +140,7 @@ ct          ciphertext || 16-byte tag
 
 #### 2.3.3 Recovery kit format `ALKK` v1 and v2 (D-115; v2 KIT-NAMES)
 
-Decided by the owner, 2026-10-21 (D-115, recommendations A to E of `docs/design/m1-9i-storage-backup.md`). I-10 needs export and restore on a clean machine to bring back identity, contacts and history. The `ALKR` blob of §2.3.2 holds only the owner seed, so the CLI kit (`agentlink backup export` †, 06 §8) is a separate sealed file that carries, per agent, the agent seed, the other KeyStore items its store needs to open, and the store itself. The console kit stays `ALKR` (§2.3 step 6), because the browser has only the owner. An `ALKK` kit never embeds an `ALKR` blob, which would be a second wrap of the same seed under the same code. `init`'s recovery-kit offer (M1-9h) runs `backup export --identity-only` right after owner setup.
+Decided by the owner, 2026-10-21 (D-115, recommendations A to E of `project/design/m1-9i-storage-backup.md`). I-10 needs export and restore on a clean machine to bring back identity, contacts and history. The `ALKR` blob of §2.3.2 holds only the owner seed, so the CLI kit (`agentlink backup export` †, 06 §8) is a separate sealed file that carries, per agent, the agent seed, the other KeyStore items its store needs to open, and the store itself. The console kit stays `ALKR` (§2.3 step 6), because the browser has only the owner. An `ALKK` kit never embeds an `ALKR` blob, which would be a second wrap of the same seed under the same code. `init`'s recovery-kit offer (M1-9h) runs `backup export --identity-only` right after owner setup.
 
 ```
 magic       "ALKK"              4 B
@@ -621,7 +621,7 @@ Outside those conditions a batch adds no new path and closes none: a modified pa
 
 #### 2.5.3 Confirming paid actions (D-132; decided by the owner, 2026-10-27: the owner confirms paid actions with the computer's own verification; which actions, the backup code and the sheet closing itself decided by Tali in chat, 2026-10-27 (brief §20, 1 (a), 2 (a), 3 (a)); the ceremony details of rules 1 to 5 and 7 are proposed, owner confirms at merge)
 
-Only two actions cost anything: a **proof** and **verified registration** (12 §2). AgentLink moves no money between agents, and 4thTech never holds credits (12 §4.1). This section says which paid actions the owner confirms and what that confirmation must be. Design: `docs/design/b11-local-app.md` §19.
+Only two actions cost anything: a **proof** and **verified registration** (12 §2). AgentLink moves no money between agents, and 4thTech never holds credits (12 §4.1). This section says which paid actions the owner confirms and what that confirmation must be. Design: `project/design/b11-local-app.md` §19.
 
 **Which actions (decided by Tali in chat, 2026-10-27, D-132; brief §20 decision 1 (a)):**
 

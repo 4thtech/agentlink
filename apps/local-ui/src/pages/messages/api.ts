@@ -1,4 +1,4 @@
-// The Messages API client: the only place that knows the routes (plan docs/process/proposals/
+// The Messages API client: the only place that knows the routes (plan project/process/proposals/
 // MSG-FILES-IO.md §4; MSG-FILES-IO-c builds the server side). Two read-only GETs under /api/ui/.
 // Wiring to the real endpoint is a change in this file only.
 //

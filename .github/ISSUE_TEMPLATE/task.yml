@@ -1,5 +1,5 @@
 name: Task
-description: A backlog task from the build plan (docs/foundation/10-build-plan.md)
+description: A backlog task from the build plan (specs/10-build-plan.md)
 title: "M?-?: "
 labels: ["task"]
 body:
@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         One task per issue, one issue per pull request. The task ID goes in the branch name and the PR title.
-        Read `AGENTS.md`, `docs/foundation/04-security-and-crypto.md` and the spec for your component before you start.
+        Read `AGENTS.md`, `specs/04-security-and-crypto.md` and the spec for your component before you start.
   - type: input
     id: task_id
     attributes:
@@ -41,7 +41,7 @@ body:
     id: spec_refs
     attributes:
       label: Spec references
-      description: Sections of docs/foundation/ that define this work (for example 04 §3.5, 07 §4.2).
+      description: Sections of specs/ that define this work (for example 04 §3.5, 07 §4.2).
       placeholder: |
         - 04 §3.5 Transport wrapping
         - 07 §4.2 Inbox sync

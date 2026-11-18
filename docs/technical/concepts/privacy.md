@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: Technical rules for what proofs keep private and what metadata is public, plus the rules for received acknowledgements and widget message previews. -->
 
-> **Status: Current for v0.5.10.** The privacy rules for proofs were decided on 20 Oct 2026 (D-109) and the rules for received acknowledgements and widget previews on 16 and 17 Nov 2026 (D-155, D-156). Per-relationship signing addresses, registry privacy and delayed receipts are roadmap items for v0.3.0 (M2). Sources: [04 §5.1](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), [05 §3, §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md), [06 §2.4, §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md), [07 §7, §8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md), [12 §4.4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/12-economics-and-fees.md).
+> **Status: Current for v0.5.10.** The privacy rules for proofs were decided on 20 Oct 2026 (D-109) and the rules for received acknowledgements and widget previews on 16 and 17 Nov 2026 (D-155, D-156). Per-relationship signing addresses, registry privacy and delayed receipts are roadmap items for v0.3.0 (M2). Sources: [04 §5.1](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md), [05 §3, §4](https://github.com/4thtech/agentlink/blob/main/specs/05-contracts-occ-v2.md), [06 §2.4, §3](https://github.com/4thtech/agentlink/blob/main/specs/06-mcp-server.md), [07 §7, §8](https://github.com/4thtech/agentlink/blob/main/specs/07-sdk-transport-storage.md), [12 §4.4](https://github.com/4thtech/agentlink/blob/main/specs/12-economics-and-fees.md).
 
 **Purpose:** say exactly what a proof makes public, what never becomes public, and how AgentLink limits the metadata a public record leaks.
 
@@ -28,7 +28,7 @@ One agent address signs every record on every chain, so today an agent's records
 
 ## The rules (D-109)
 
-- **Disclosure.** Every proof, receipt, export and top-up surface says in plain words what becomes public ([11 §5.6](https://github.com/4thtech/agentlink/blob/main/docs/foundation/11-claude-design-brief.md)).
+- **Disclosure.** Every proof, receipt, export and top-up surface says in plain words what becomes public ([11 §5.6](https://github.com/4thtech/agentlink/blob/main/specs/11-claude-design-brief.md)).
 - **Delivery receipts are opt-in.** `receipts.autoDelivered` defaults to `false`. A sender may ask for a receipt (`requestReceipt`, carried as `receiptRequest` in the `proof` body); the recipient's agent signs one only when its policy allows it for that contact or its user says yes. `OPENED` stays explicit; `ACCEPTED` and `REJECTED` stay commitments. See [Policies](../reference/policies.md).
 - **`parentRecordId`** is zero, or a record of the same signer. It never names the other agent's record, since that would publish the link between the two agents without any receipt.
 - **Services see no more than the chain.** The submitter gets only signed records and receipts. It never gets plaintext, envelopes, keys or a record's salt before its receipt, keeps no IP address next to an agent address, and runs with platform logging off, checked at every deploy (OPS-PRIV-1).
@@ -50,4 +50,4 @@ The menu bar widget shows the newest received message as plain text, at most 80 
 ## Reading further
 
 - [Records, receipts and proof packs](proof.md), [Security model](security-model.md), [Threat model](threat-model.md)
-- User guide: [What leaves your computer](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/privacy-and-security.md)
+- User guide: [What leaves your computer](https://github.com/4thtech/agentlink/blob/main/docs/guide/privacy-and-security.md)

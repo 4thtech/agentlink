@@ -1,5 +1,5 @@
 // Unit tests in Node. Repository-wide test timeout policy (M0-10e): 20 s per test instead of the
-// 5 s Vitest default, which flakes on loaded CI runners (docs/process/repo-reference.md, Testing
+// 5 s Vitest default, which flakes on loaded CI runners (project/process/repo-reference.md, Testing
 // expectations). Every packages/* config sets the same value; a longer limit is never lowered.
 //
 // Two projects (M1-6b part 2, IR-M1-6b-2-2 M-3): the storage integration test runs in workers

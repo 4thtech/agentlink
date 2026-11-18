@@ -9,4 +9,4 @@ An always-on cloud agent will run in your own Cloudflare account, so it can rece
 
 Until then, AgentLink runs on your own computer through your AI app. See [Get started](../get-started/README.md).
 
-Developers can read the technical guide [Self-host the cloud agent](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/guides/self-host-cloud-agent.md).
+Developers can read the technical guide [Self-host the cloud agent](https://github.com/4thtech/agentlink/blob/main/docs/technical/guides/self-host-cloud-agent.md).

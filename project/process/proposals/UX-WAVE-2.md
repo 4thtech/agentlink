@@ -160,7 +160,7 @@ Optional fifth: Save your recovery kit. Each step ticks itself from existing rea
 
 ## 10. Cards (proposed)
 
-Class per `audit-rules.md` §2 (paths: `packages/node` S2; `apps/local-ui`, `packages/ui` S1; `docs/design` S0). Sizes: S up to a day, M two to three days, L a week or more.
+Class per `audit-rules.md` §2 (paths: `packages/node` S2; `apps/local-ui`, `packages/ui` S1; `project/design` S0). Sizes: S up to a day, M two to three days, L a week or more.
 
 | Card | What | Class | Depends on | Size | Brief first? |
 |---|---|---|---|---|---|

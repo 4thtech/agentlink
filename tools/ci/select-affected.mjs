@@ -9,17 +9,17 @@
 // everything and never reaches it, so a wrong answer here can only delay a failure to the push to
 // `main`, whose run gates the release.
 //
-// Rules (docs/process/ci-cd.md, "What runs where"); when unsure, run everything:
+// Rules (project/process/ci-cd.md, "What runs where"); when unsure, run everything:
 //   1. No diff, or an empty one: full.
 //   2. Global triggers: full. Any root file that is not `*.md` (root config, lockfile, dotfiles),
 //      `.github/`, `tools/`, `test-vectors/`, the shared packages `types`, `crypto` and `core`, and
 //      any path that belongs to no workspace package and is not a doc.
 //   3. A file inside a workspace package selects that package and every package that depends on
 //      it, transitively (dependencies, devDependencies, peer and optional).
-//   4. Docs (`docs/`, `docs-site/`, `knowledge/`, `changelog.d/`, `.changeset/*.md`, root `*.md`)
+//   4. Docs (`docs/`, `docs/`, `knowledge/`, `changelog.d/`, `.changeset/*.md`, root `*.md`)
 //      select no package by themselves.
 //   5. Any changed file also selects every package whose source names a path prefix of it (for
-//      example `docs/design/d1/` in the ui token test): the doc-drift tests follow their docs
+//      example `project/design/d1/` in the ui token test): the doc-drift tests follow their docs
 //      without a hand-kept list. Those packages are added without their dependents.
 //   6. `@4thtech-io/tools` is always selected: docs-status, the knowledge links and size, the
 //      retired-vocabulary scan and the manifest checks are its `check` and `test`.
@@ -54,7 +54,7 @@ const FULL_PREFIXES = [
 
 // The same docs set as `detect`'s docs-only rule in ci.yml.
 const DOCS =
-  /^(docs\/|docs-site\/|knowledge\/|changelog\.d\/|\.changeset\/[^/]+\.md$|[^/]+\.md$|llms\.txt$|brand\/.+\.(?:png|jpe?g|gif|svg|webp)$)/;
+  /^(docs\/|docs\/|knowledge\/|changelog\.d\/|\.changeset\/[^/]+\.md$|[^/]+\.md$|llms\.txt$|brand\/.+\.(?:png|jpe?g|gif|svg|webp)$)/;
 
 // OPS-FAST-LANE-1: a push to one of these refs is the heavy lane (everything runs; release.yml
 // requires that run's gate). Every other push, every pull request and every merge group is the
@@ -91,12 +91,12 @@ export function fastLane({ event, ref = '', files }) {
 // manifests and lockfiles, AGENTS.md, CLAUDE.md, .claude/, docs/status.yaml (the status generator and
 // its tests, review-gate and release tooling read it), `.changeset/` (it decides versions), and any
 // path a workspace package's source names (`coupledRefs`: a package test that reads a doc, such as the
-// guide pages in apps/cli tests or docs/design/d1 in the ui tests). packages/*/README.md is excluded
+// guide pages in apps/cli tests or project/design/d1 in the ui tests). packages/*/README.md is excluded
 // by the first rule: a package publishes its README.
 const IMAGE = '(?:png|jpe?g|gif|svg|webp)';
 const DOCS_ONLY = [
   new RegExp(`^docs/.+\\.(?:md|${IMAGE})$`),
-  new RegExp(`^docs-site/.+\\.(?:md|${IMAGE})$`),
+  new RegExp(`^docs/.+\\.(?:md|${IMAGE})$`),
   /^knowledge\/.+\.md$/,
   /^changelog\.d\/.+\.md$/,
   new RegExp(`^brand/.+\\.${IMAGE}$`),
@@ -400,7 +400,7 @@ const SKIP_DIRS = new Set(['node_modules', 'dist', '.turbo', 'coverage', '.wrang
 const SOURCE = /\.(?:[cm]?[jt]s|tsx)$/;
 // A repository path as it appears in a string, a template or a comment: `docs/…`, `../../docs/…`.
 const PATH_REF =
-  /(?:^|[\s'"`(/])((?:docs|docs-site|knowledge|packages|apps|e2e|tools|test-vectors)\/[A-Za-z0-9_.\-/]*)/g;
+  /(?:^|[\s'"`(/])((?:docs|docs|knowledge|packages|apps|e2e|tools|test-vectors)\/[A-Za-z0-9_.\-/]*)/g;
 const PLAYWRIGHT = /['"](?:playwright|@playwright\/test|@vitest\/browser[^'"]*)['"]/;
 
 function workspaceDirs(root) {

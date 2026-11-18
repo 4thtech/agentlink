@@ -35,7 +35,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${GH_TOKEN:-}" ]; then
-            echo "::error::DEPLOY_FREEZE_TOKEN is not configured in environment deploy-freeze (docs/process/ci-cd.md, owner setup section 8)."
+            echo "::error::DEPLOY_FREEZE_TOKEN is not configured in environment deploy-freeze (project/process/ci-cd.md, owner setup section 8)."
             exit 1
           fi
           gh variable set DEPLOY_FREEZE --body true --repo "$REPOSITORY"

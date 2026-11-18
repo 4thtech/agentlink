@@ -316,7 +316,7 @@ describe('constants (04, 05, 06)', () => {
   });
 
   it('references the policy defaults and their protocol caps (06 §3; values land in M1-2b)', () => {
-    expect(POLICY_DEFAULTS_SPEC).toBe('docs/foundation/06-mcp-server.md §3');
+    expect(POLICY_DEFAULTS_SPEC).toBe('specs/06-mcp-server.md §3');
     expect(POLICY_PROTOCOL_LIMITS).toEqual({
       'envelopes.maxEnvelopeKB': 24,
       'files.defaultExpiryDays': 7,

@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: Reference list of the 16 tools AgentLink gives your AI app, with design rules, file tools, received files and naming a contact. For developers and integrators. -->
 
-> **Status: Current for v0.5.10.** 16 tools, pinned by a committed tool-surface snapshot (`apps/cli/test/fixtures/tool-surface.json`). The tool names and inputs did not change in 0.5.10. This page lists the tool surface from D-53 and D-55 and [06 MCP server](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md). Names and schemas may change before 1.0.0.
+> **Status: Current for v0.5.10.** 16 tools, pinned by a committed tool-surface snapshot (`apps/cli/test/fixtures/tool-surface.json`). The tool names and inputs did not change in 0.5.10. This page lists the tool surface from D-53 and D-55 and [06 MCP server](https://github.com/4thtech/agentlink/blob/main/specs/06-mcp-server.md). Names and schemas may change before 1.0.0.
 
 **Package:** `@4thtech-io/agentlink`, subcommand `agentlink mcp` (stdio). The self-hosted cloud agent exposes the same tools over streamable HTTP with OAuth.
 
@@ -118,4 +118,4 @@ The AgentLink app sends a signed "received" acknowledgement by itself, for each 
 ## Reading further
 
 - [Policies](policies.md), [Files](../concepts/files.md), [Records, receipts and proof packs](../concepts/proof.md)
-- Source of truth: [06 MCP server](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md)
+- Source of truth: [06 MCP server](https://github.com/4thtech/agentlink/blob/main/specs/06-mcp-server.md)

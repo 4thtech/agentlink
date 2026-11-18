@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: Technical details of encrypted files: chunked encryption format, where ciphertext goes, sending by content, automatic saving and file types for the receiving AI. -->
 
-> **Status: Available since v0.2.0** (sending and fetching files through the MCP tools, M1-9d-1); **automatic saving, Save to Inbox in the app and the Inbox folder rules since v0.4.6** (31 Oct 2026). The encrypted drop serves ciphertext for testers on the test networks; consumer storage connectors are planned for the desktop apps (M2). Sources: [04 §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), [07 §5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md).
+> **Status: Available since v0.2.0** (sending and fetching files through the MCP tools, M1-9d-1); **automatic saving, Save to Inbox in the app and the Inbox folder rules since v0.4.6** (31 Oct 2026). The encrypted drop serves ciphertext for testers on the test networks; consumer storage connectors are planned for the desktop apps (M2). Sources: [04 §4](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md), [07 §5](https://github.com/4thtech/agentlink/blob/main/specs/07-sdk-transport-storage.md).
 
 ## Encryption
 
@@ -50,7 +50,7 @@ Not yet built (M1-7f-2): the refresh-link request and answer, and retention (del
 
 ## Send by content (since 0.5.5, D-152)
 
-Source: [06 §2.3 "Send by content"](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md), [04 §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) (FILES-AI-1, FILES-AI-2). An AI that made a text file in its own workspace often can't put it on your computer. `agentlink_send` takes `file: {name, content}` instead of a `path`: AgentLink saves the content into the ID's own Send folder and sends it as an ordinary file, under the same rules as `path`.
+Source: [06 §2.3 "Send by content"](https://github.com/4thtech/agentlink/blob/main/specs/06-mcp-server.md), [04 §4](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md) (FILES-AI-1, FILES-AI-2). An AI that made a text file in its own workspace often can't put it on your computer. `agentlink_send` takes `file: {name, content}` instead of a `path`: AgentLink saves the content into the ID's own Send folder and sends it as an ordinary file, under the same rules as `path`.
 
 - **Input.** `name` and `content` only (`additionalProperties: false`); exactly one of `path` and `file`, and not `file` with `body` (`INVALID_ARGUMENT`). `.md`, `.markdown`, `.txt` and `.json` only (`FILE_TYPE`); a separator in the name is `FILE_NAME`; `content` must be UTF-8 text without NUL, up to 8 MiB (`FILE_NOT_TEXT`, `FILE_TOO_LARGE`).
 - **Where it is written.** Only into the root of the ID's pinned Send folder, held by device and inode, with `O_CREAT | O_EXCL | O_NOFOLLOW` and mode 0600; never an overwrite (`notes (2).md`; `FILE_NAME_TAKEN` after many clashes), never a link, never another folder. No allowed folder: `needs_setup` `NO_ALLOWED_FOLDER`; the Send folder missing, a link or not allowed: `SEND_FOLDER_UNAVAILABLE`, nothing written.
@@ -64,7 +64,7 @@ The Files step in Get started, the Files panel on Home and **Show in Finder** (*
 
 ## Automatic saving (since 0.4.6)
 
-Source: [04 §4.1](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) (D-142, W4-AUTO-SAVE). Before 0.4.6 a received file was downloaded only when you or your AI asked. Now a contact you keep can cause a file to land on your disk without a click, so the rules are strict.
+Source: [04 §4.1](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md) (D-142, W4-AUTO-SAVE). Before 0.4.6 a received file was downloaded only when you or your AI asked. Now a contact you keep can cause a file to land on your disk without a click, so the rules are strict.
 
 - **Who saves.** Only the process that holds the agent's publisher lease, in its background loop, after the message is verified and stored. With no AgentLink process running, files are saved when one runs next, until they expire.
 - **Which files.** Only from a contact that is paired, allowed and not blocked or removed (checked when the message is stored and again right before the download); never from an unknown sender, never for a file named in a request, never while the agent is paused, and only for files whose message the agent stored after it ran with this feature. A file that arrives while the agent is paused is not saved on resume; it waits for Save, so resuming never starts a burst of downloads.
@@ -78,7 +78,7 @@ Source: [04 §4.1](https://github.com/4thtech/agentlink/blob/main/docs/foundatio
 
 ## File types and text for the receiving AI (since 0.5.1)
 
-Source: [06 §2.3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md) (REL051-A12). Built for the common case of one AI sending a Markdown plan or a code file to a classmate's coding agent.
+Source: [06 §2.3](https://github.com/4thtech/agentlink/blob/main/specs/06-mcp-server.md) (REL051-A12). Built for the common case of one AI sending a Markdown plan or a code file to a classmate's coding agent.
 
 - **Type on send.** The sender labels each file from its extension with a fixed table: `.md` is `text/markdown`, `.json` is `application/json`, `.patch` and `.diff` are `text/x-diff`, code and text files are `text/plain`, `.png`, `.jpg`, `.webp` and `.gif` are `image/*`, anything else `application/octet-stream`.
 - **The receiver decides the type itself.** The type a sender states is never trusted. The receiving agent derives the kind (Markdown, Text, Code, JSON, Patch, Image or File) from the file's sanitised name alone. `agentlink_inbox` shows it as `kind` and in the file line inside the untrusted block, for example `File 0: plan.md (Markdown, 97 bytes)`, and shows `savedTo` once the file is saved, however it was saved.

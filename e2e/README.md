@@ -7,4 +7,4 @@ End-to-end tests (not published). They run several agents against local relays a
 - `llm/`: runs real AI tools headless, on demand and nightly.
 - `src/`: shared helpers (local relays, fake drop, canary scan).
 
-Commands: [repo reference](../docs/process/repo-reference.md).
+Commands: [repo reference](../project/process/repo-reference.md).

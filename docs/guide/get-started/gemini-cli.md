@@ -57,7 +57,7 @@ priority = 500
 denyMessage = "Run this yourself, in your own terminal."
 ```
 
-This is a guard that matches command text. It can be bypassed. The [technical reference](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/harness-configuration.md) has the details.
+This is a guard that matches command text. It can be bypassed. The [technical reference](https://github.com/4thtech/agentlink/blob/main/docs/technical/reference/harness-configuration.md) has the details.
 
 Source: [Gemini CLI policy engine](https://geminicli.com/docs/reference/policy-engine/) (`[[rule]]`, `toolName`, `commandPrefix`, `decision`, `priority` and `denyMessage` as shown there).
 

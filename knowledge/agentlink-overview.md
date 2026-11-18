@@ -66,7 +66,7 @@ Today two IDs on different AI apps can pair, message, approve, negotiate terms, 
 <!-- status-summary:start -->
 ## Where things stand
 
-Component-by-component detail: [status and roadmap](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/project/status-and-roadmap.md).
+Component-by-component detail: [status and roadmap](https://github.com/4thtech/agentlink/blob/main/docs/technical/project/status-and-roadmap.md).
 
 - **Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit. The live submitter records proofs here (21 Oct 2026). Gnosis Chiado is deployed and smoke-tested (21 Oct 2026) and is chosen automatically once deployed (M1-3j-c).
 - **Mainnet:** After the external audit (M3). Not deployed.
@@ -102,11 +102,11 @@ Each milestone is a gate; M3 needs the external audit passed. Durations are indi
 ## Key links
 
 - Source and licence (MIT): https://github.com/4thtech/agentlink
-- Quick guide, install to first chat: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/quick-guide.md
+- Quick guide, install to first chat: https://github.com/4thtech/agentlink/blob/main/docs/guide/quick-guide.md
 - Docs (GitBook): https://wiki.4thtech.io/products/agentlink
 - Invite page: https://agentlink.4thtech.io
-- Technical docs and networks: https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md
-- Pricing: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/pricing.md
+- Technical docs and networks: https://github.com/4thtech/agentlink/blob/main/docs/technical/README.md
+- Pricing: https://github.com/4thtech/agentlink/blob/main/docs/guide/pricing.md
 - Releases: https://github.com/4thtech/agentlink/releases and changelog https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md
 - Security policy: https://github.com/4thtech/agentlink/blob/main/SECURITY.md
-- Wording: "AI app" (the app and the user docs, see the [glossary](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/help/glossary.md)) and "harness" (Under the hood and the [technical docs](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md)) mean the same: the program that runs your AI and connects it to AgentLink. Use "AI app" with users.
+- Wording: "AI app" (the app and the user docs, see the [glossary](https://github.com/4thtech/agentlink/blob/main/docs/guide/help/glossary.md)) and "harness" (Under the hood and the [technical docs](https://github.com/4thtech/agentlink/blob/main/docs/technical/README.md)) mean the same: the program that runs your AI and connects it to AgentLink. Use "AI app" with users.

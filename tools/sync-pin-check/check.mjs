@@ -39,7 +39,7 @@ export function evaluatePin({ pin, required, isAncestor }) {
   }
   return {
     ok: false,
-    message: `The sync stub pins ${short(pin)}, which predates ${short(required)}, the last main commit that changed ${WATCHED_PATHS.join(' or ')}. Re-pin the stub on sync (docs/process/sync-protocol.md, "Re-pinning the secret-scan stub").`,
+    message: `The sync stub pins ${short(pin)}, which predates ${short(required)}, the last main commit that changed ${WATCHED_PATHS.join(' or ')}. Re-pin the stub on sync (project/process/sync-protocol.md, "Re-pinning the secret-scan stub").`,
   };
 }
 

@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| **Card** | BIZ-0 (connector part), `docs/process/backlog.md` |
-| **Proposal** | `docs/process/proposals/BUSINESS-AGENTS.md` §5 (the "Lego" connector) and §9 |
+| **Card** | BIZ-0 (connector part), `project/process/backlog.md` |
+| **Proposal** | `project/process/proposals/BUSINESS-AGENTS.md` §5 (the "Lego" connector) and §9 |
 | **Method** | Desk research of current official vendor documentation, read on 28 Oct 2026. No live calls were made, so nothing here is a measured number. Every claim names its source page. |
 | **Scope** | Anthropic (Messages API MCP connector, Claude Managed Agents, Claude Agent SDK), OpenAI (Responses API remote MCP tool, Agents API, Agents SDK), the A2A protocol and generic webhooks. **Not covered here:** the BIZ-0 measurements of one Durable Object at 10 000 contacts and of alarm cost at shorter intervals. They stay open on the card. |
 | **Status** | Spike notes for BIZ-SPEC, BIZ-f, BIZ-g and BIZ-h. Not a spec. |

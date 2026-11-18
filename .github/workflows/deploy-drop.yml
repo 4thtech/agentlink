@@ -1,6 +1,6 @@
 # Deploy the 4thTech encrypted drop Worker (apps/drop, D-48, M1-27b): staging on every merge to main,
 # production automatically once the staging smoke test is green (D-25, D-52).
-# Contract: docs/process/release-and-deployment.md §4.5 (Workers pipeline), §6 (secrets), §8
+# Contract: project/process/release-and-deployment.md §4.5 (Workers pipeline), §6 (secrets), §8
 # (rollback). Configuration: apps/drop/wrangler.toml. Tests of this file:
 # tools/release/deploy-drop.test.mjs (structure, read-back checks on fixtures) and
 # apps/drop/test/smoke-config.test.ts (wrangler.toml).

@@ -75,7 +75,7 @@ If the sender uses an account with its own rules (for example one shared by a te
 
 ## Not available yet
 
-- Proof on a main network. Proofs are recorded on public test networks only (see the [list of networks](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/networks-and-contracts.md)).
+- Proof on a main network. Proofs are recorded on public test networks only (see the [list of networks](https://github.com/4thtech/agentlink/blob/main/docs/technical/reference/networks-and-contracts.md)).
 - A web page for checking a proof.
 - Recording a rejection with proof.
 - Turning delivery confirmations on automatically for a contact.

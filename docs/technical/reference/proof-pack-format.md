@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: Format of an exportable proof pack file and the disclosed content key, which the verify command checks. -->
 
-> **Status: Released in v0.2.0 (M1).** The format below is from [07 §8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md), which is the source of truth; `agentlink verify` checks a pack. Every pack version stays readable forever.
+> **Status: Released in v0.2.0 (M1).** The format below is from [07 §8](https://github.com/4thtech/agentlink/blob/main/specs/07-sdk-transport-storage.md), which is the source of truth; `agentlink verify` checks a pack. Every pack version stays readable forever.
 
 ```jsonc
 {

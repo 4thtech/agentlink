@@ -18,7 +18,7 @@ The owner (Tali) and Denis, each with their own agents. The agents may do the in
 - A system keychain that works (macOS Keychain, Windows Credential Manager, or Linux Secret Service). Without one `init` stops and says so.
 - The harnesses you want: Claude Code, Antigravity, OpenCode. Codex and Gemini CLI also work (`init` knows them).
 - The build to test (a tarball from the CI artifact, or the release once it exists). Where this runbook says `npx -y @4thtech-io/agentlink`, use the installed `agentlink` command instead if you installed the tarball.
-- Read [Protect your approvals](../../docs-site/guide/get-started/protect-your-approvals.md) once. It explains the master code and the same-user risk.
+- Read [Protect your approvals](../../docs/guide/get-started/protect-your-approvals.md) once. It explains the master code and the same-user risk.
 - Your own sync file open (step 8), to record results.
 
 ## Steps
@@ -33,9 +33,9 @@ The owner (Tali) and Denis, each with their own agents. The agents may do the in
 
 Do this once per harness, on the computer where that harness lives. After each install, restart the harness.
 
-**Claude Code.** Follow [Claude Code](../../docs-site/guide/get-started/claude-code.md): paste its install prompt into Claude Code, read the diff it shows, apply it only if it is the one `agentlink` entry in `~/.claude.json`. Add the permission settings from the same page.
+**Claude Code.** Follow [Claude Code](../../docs/guide/get-started/claude-code.md): paste its install prompt into Claude Code, read the diff it shows, apply it only if it is the one `agentlink` entry in `~/.claude.json`. Add the permission settings from the same page.
 
-**Codex and Gemini CLI.** Follow [Codex](../../docs-site/guide/get-started/codex.md) and [Gemini CLI](../../docs-site/guide/get-started/gemini-cli.md) in the same way.
+**Codex and Gemini CLI.** Follow [Codex](../../docs/guide/get-started/codex.md) and [Gemini CLI](../../docs/guide/get-started/gemini-cli.md) in the same way.
 
 **OpenCode and Antigravity** are set up by `init` too (M1-9t): in a terminal you opened, run `npx -y @4thtech-io/agentlink init --harness opencode` or `--harness antigravity`, read the diff and answer `y`. If Antigravity reads another file than the default (see below), add `--config <that path>`. Answering `n` writes no config but keeps the agent. The hand edits below stay as the fallback and show what `init` writes.
 
@@ -418,7 +418,7 @@ OPS-CI-7: every night (03:17 UTC) and on manual dispatch, `.github/workflows/nig
 - **Red:** read the failed step's notes first. A step marked `skipped` only means an earlier step it depends on failed; fix the first failure. A "never arrived" note on one side with a failure on the other points to the other side. A missing invite points at agent A's first step.
 - **Flake or bug?** Re-run with the `force` input from `main`. The public relays and the model are not deterministic: one red night with a green re-run is a flake to note; the same step red twice is a card (symptom, step ID, harness version, which side). A hostile-line step (I-5), the `~/.agentlink` read (F1) or an owner step failing is never a flake: stop and tell Tali.
 - **Never** approve anything for the test: the approvals are made by the CI test owner inside the harness, not by an agent, and not by you.
-- **Cost:** about $0.10 to $0.30 per night; both sides are capped (see `docs/process/ci-cd.md`). A spending limit on the key is the owner's.
+- **Cost:** about $0.10 to $0.30 per night; both sides are capped (see `project/process/ci-cd.md`). A spending limit on the key is the owner's.
 
 ## Verify
 
@@ -436,4 +436,4 @@ OPS-CI-7: every night (03:17 UTC) and on manual dispatch, `.github/workflows/nig
 
 ## Related
 
-[M1-23 card](../process/backlog.md), [sync protocol](../process/sync-protocol.md), [Pair with someone](../../docs-site/guide/get-started/pair-with-someone.md), [Protect your approvals](../../docs-site/guide/get-started/protect-your-approvals.md), 06 §6.1 and §7.1, decisions D-33, D-53, D-67.
+[M1-23 card](../process/backlog.md), [sync protocol](../process/sync-protocol.md), [Pair with someone](../../docs/guide/get-started/pair-with-someone.md), [Protect your approvals](../../docs/guide/get-started/protect-your-approvals.md), 06 §6.1 and §7.1, decisions D-33, D-53, D-67.

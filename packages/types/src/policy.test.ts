@@ -56,7 +56,7 @@ const USD_PATHS: Path[] = [
 
 describe('policy defaults (06 §3)', () => {
   it('deep-equal the 06 §3 listing in the policy JSON form (snapshot citing the spec)', () => {
-    // policyDefaultsFromSpec is transcribed from docs/foundation/06-mcp-server.md §3 (YAML listing
+    // policyDefaultsFromSpec is transcribed from specs/06-mcp-server.md §3 (YAML listing
     // and "The defaults" bullet). A change to either side fails here.
     expect(POLICY_DEFAULTS).toStrictEqual(policyDefaultsFromSpec());
     expect(POLICY_DEFAULTS).toMatchInlineSnapshot(`

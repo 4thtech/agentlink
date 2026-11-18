@@ -14,4 +14,4 @@ Libraries that the apps are built from. They are private to this repository and 
 - [`mcp-tools`](mcp-tools): the tools your AI app calls.
 - [`ui`](ui): the shared design system.
 
-How it fits together: [architecture](../docs-site/technical/concepts/architecture.md).
+How it fits together: [architecture](../docs/technical/concepts/architecture.md).

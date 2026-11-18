@@ -34,7 +34,7 @@ After the file expires (the default), or once it is received if you chose that, 
 
 ## Proof for files
 
-A file send can be notarized (one flag), so you can later prove which exact file was sent and when. The public record holds only fingerprints, never the file or its name ([04 §5](../foundation/04-security-and-crypto.md)). See the [payments explainer](payments.md) for cost.
+A file send can be notarized (one flag), so you can later prove which exact file was sent and when. The public record holds only fingerprints, never the file or its name ([04 §5](../../specs/04-security-and-crypto.md)). See the [payments explainer](payments.md) for cost.
 
 ## Why not serve from the sender's disk?
 
@@ -48,8 +48,8 @@ The recipient may fetch while the sender's computer is off. Files need a pickup 
 
 ## Read more
 
-- Encryption, drop rules and checks: [04 §4](../foundation/04-security-and-crypto.md)
-- Drop protocol and storage choice: [07 §5.4 to §5.6](../foundation/07-sdk-transport-storage.md)
-- File tools and policies: [06 §2.3](../foundation/06-mcp-server.md)
-- Data flow: [03 §4.2](../foundation/03-architecture.md)
-- Cost: [12](../foundation/12-economics-and-fees.md)
+- Encryption, drop rules and checks: [04 §4](../../specs/04-security-and-crypto.md)
+- Drop protocol and storage choice: [07 §5.4 to §5.6](../../specs/07-sdk-transport-storage.md)
+- File tools and policies: [06 §2.3](../../specs/06-mcp-server.md)
+- Data flow: [03 §4.2](../../specs/03-architecture.md)
+- Cost: [12](../../specs/12-economics-and-fees.md)

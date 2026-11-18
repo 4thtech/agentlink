@@ -19,12 +19,12 @@ const script = `${block}\n${download}`.replace(/^ {10}/gm, '');
 
 function run({ size, releaseNote }) {
   const dir = mkdtempSync(join(tmpdir(), 'body-'));
-  mkdirSync(join(dir, 'docs/releases'), { recursive: true });
+  mkdirSync(join(dir, 'project/releases'), { recursive: true });
   writeFileSync(
     join(dir, 'CHANGELOG.md'),
     '# C\n\n## [Unreleased]\n\n## [0.2.0] - 2026-11-01\n\n- x\n',
   );
-  if (releaseNote) writeFileSync(join(dir, 'docs/releases/v0.2.0.md'), 'note');
+  if (releaseNote) writeFileSync(join(dir, 'project/releases/v0.2.0.md'), 'note');
   const notes = join(dir, 'notes.md');
   writeFileSync(notes, 'x'.repeat(size));
   execFileSync('bash', ['-euo', 'pipefail', '-c', script], {
@@ -57,9 +57,9 @@ describe('release body size fallback (inline in release.yml)', () => {
       'https://github.com/4thtech/agentlink/blob/v0.2.0/CHANGELOG.md#020---2026-11-01',
     );
   });
-  it('prefers docs/releases/v<version>.md', () => {
+  it('prefers project/releases/v<version>.md', () => {
     expect(run({ size: 123001, releaseNote: true })).toContain(
-      '/blob/v0.2.0/docs/releases/v0.2.0.md',
+      '/blob/v0.2.0/project/releases/v0.2.0.md',
     );
   });
 });

@@ -1,6 +1,6 @@
 # Design intake and status
 
-The owner (Tali) designs the brand and the app in **Claude Design**, following the brief in `docs/foundation/11-claude-design-brief.md`. The single file to paste or upload into Claude Design is **[`claude-design-handoff.md`](claude-design-handoff.md)**, derived from the brief. The design arrives in three drops (D-30; schedule in `docs/foundation/10-build-plan.md` → *Design deliveries*). **Agents check this file before any UI work.**
+The owner (Tali) designs the brand and the app in **Claude Design**, following the brief in `specs/11-claude-design-brief.md`. The single file to paste or upload into Claude Design is **[`claude-design-handoff.md`](claude-design-handoff.md)**, derived from the brief. The design arrives in three drops (D-30; schedule in `specs/10-build-plan.md` → *Design deliveries*). **Agents check this file before any UI work.**
 
 ## Status
 
@@ -40,7 +40,7 @@ The owner exported the brand (`agentlink-brand`) and the application design (`ag
 
 ### Re-export of 15 Oct 2026 (DESIGN-D2 intake check)
 
-The owner exported the brand and the application design again. Compared byte for byte with `docs/design/`, the application design (`agentlink-app-design`) is **identical** to the 14 Oct intake, so **no surface gained a design**: the Status table and the tables above stand and DESIGN-D2 stays partial. *Superseded by D-116 (21 Oct 2026):* surfaces with a delivered or partial screen are built styled from it, after DESIGN-ADJ-1; only surfaces with no screen stay functional and unstyled. The only new files are the logo and social JPG renderings, now in `brand/logo/jpg/` and `brand/social/` (see `brand/MANIFEST.md`). The production-domain and trademark check (M1-24) is still pending, so the brand is not final.
+The owner exported the brand and the application design again. Compared byte for byte with `project/design/`, the application design (`agentlink-app-design`) is **identical** to the 14 Oct intake, so **no surface gained a design**: the Status table and the tables above stand and DESIGN-D2 stays partial. *Superseded by D-116 (21 Oct 2026):* surfaces with a delivered or partial screen are built styled from it, after DESIGN-ADJ-1; only surfaces with no screen stay functional and unstyled. The only new files are the logo and social JPG renderings, now in `brand/logo/jpg/` and `brand/social/` (see `brand/MANIFEST.md`). The production-domain and trademark check (M1-24) is still pending, so the brand is not final.
 
 **Drift from 11.** The drop was designed from an older handoff text than `claude-design-handoff.md` here (pairing safety-code timing, scope of "Remember for this contact", per-contact proof rules, invite answered twice). **11 wins**; the differences are listed in `d1/MANIFEST.md`. The D2 vocabulary check (hits such as "owner key" in the console) is in `d2/MANIFEST.md`.
 
@@ -50,7 +50,7 @@ The owner exported the brand and the application design again. Compared byte for
 
 **Owner, in chat, 2026-10-21:** "Please write in the build plan because this was built from the beginning And for some reason we did not know that it existed", and "The design must be adjusted. It was built before we fine-tuned everything."
 
-D1 and the D2 first pass are the visual basis. They were designed on 14 Oct 2026, before later decisions, so each surface is adjusted before or while it is built. Card **DESIGN-ADJ-1** (Opus, S0) writes `docs/design/adjustments.md`: per screen, what is outdated, missing or to remove, each item marked **(a) agents fix in code** (copy, small flow changes) or **(b) owner redesigns in Claude Design** (layout, new screens), with a paste-ready brief per (b) item: **[`adjustments.md`](adjustments.md)** (in review). Decisions that may affect screens and copy: D-56 onward, especially D-96…D-115:
+D1 and the D2 first pass are the visual basis. They were designed on 14 Oct 2026, before later decisions, so each surface is adjusted before or while it is built. Card **DESIGN-ADJ-1** (Opus, S0) writes `project/design/adjustments.md`: per screen, what is outdated, missing or to remove, each item marked **(a) agents fix in code** (copy, small flow changes) or **(b) owner redesigns in Claude Design** (layout, new screens), with a paste-ready brief per (b) item: **[`adjustments.md`](adjustments.md)** (in review). Decisions that may affect screens and copy: D-56 onward, especially D-96…D-115:
 
 - D-109: delivery receipts off by default, a receipt request and confirm UI, and the 11 §5.6 proof privacy disclosure lines;
 - D-111…D-114: top-up direction (crypto first, card last), messages and files free, the top-up link format, who pays for receipts;
@@ -118,19 +118,19 @@ Every wave-4 screen takes motion and loading from the kit in `@4thtech-io/ui` (`
    - light, dark and increased-contrast themes;
    - no external CDNs.
 4. **Fidelity.** Implement the design as delivered. Any deviation, whether technical, accessibility or security (e.g. the CSP forbids something), is written up in the PR and needs the owner's OK.
-5. **Intake.** The orchestrator routes design-to-code work to Sonnet, and anything touching keys, passkeys, approvals or the deposit page to Opus (S1/S2 per `docs/process/audit-rules.md`).
+5. **Intake.** The orchestrator routes design-to-code work to Sonnet, and anything touching keys, passkeys, approvals or the deposit page to Opus (S1/S2 per `project/process/audit-rules.md`).
 6. **Keep the handoff in sync.** A PR that changes 11 updates `claude-design-handoff.md` in the same PR, or says in the PR why it doesn't need to. On conflict, 11 wins.
 
 ## How the owner delivers
 
 Use either or both:
 - **Claude Design links:** paste the links into the drop's `MANIFEST.md`. They are for people; whether agents can read Claude Design links is unverified (check before D1), so agents build only from exported files.
-- **Exported files:** committed under `docs/design/` as below. This repo is public; anything that must stay private goes to `agentlink-ops`.
+- **Exported files:** committed under `project/design/` as below. This repo is public; anything that must stay private goes to `agentlink-ops`.
 
 ### Folder layout
 
 ```
-docs/design/
+project/design/
   README.md                   # this file
   claude-design-handoff.md    # the file given to Claude Design
   brand/                      # current approved brand; any drop may update it

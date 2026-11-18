@@ -1,5 +1,5 @@
 // CLI entry: `node docs-status/index.mjs [--check] [root]`. Without --check it regenerates the
-// status blocks in README.md, the docs-site status page and (when present) the knowledge base from
+// status blocks in README.md, the docs status page and (when present) the knowledge base from
 // docs/status.yaml. With --check (wired into the tools `check` script, so `pnpm lint` and
 // therefore `ci-gate` run it) it changes nothing and exits 1 when any generated block has drifted.
 // `--counts` prints the backlog card counts on demand (they are not committed anywhere).
@@ -19,7 +19,7 @@ function main() {
   if (counts) {
     const text = backlogCountsText(root);
     if (text === null) {
-      console.error('docs-status: docs/process/backlog.md is missing');
+      console.error('docs-status: project/process/backlog.md is missing');
       process.exit(1);
     }
     console.log(text);
@@ -33,7 +33,7 @@ function main() {
     process.exit(1);
   }
   if (check) {
-    console.log('docs-status: README, docs-site and knowledge status match docs/status.yaml.');
+    console.log('docs-status: README, docs and knowledge status match docs/status.yaml.');
   } else {
     console.log(
       changed.length > 0

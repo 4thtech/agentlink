@@ -187,6 +187,6 @@ A green run is not always a deploy. If that commit's CI was cancelled because a 
 - A key leaked or is suspected: put a new one (Part B) and move the remaining funds from the old address; follow `audit-rules.md` §10.3.
 
 ## Related
-- `docs/process/release-and-deployment.md` §1 (D-88), §1.1 (hostnames), §4.5 (Workers pipeline), §5 (deploy record), §6 (secrets inventory), §8 (rollback).
-- `docs/foundation/07-sdk-transport-storage.md` §7 (submitter), `05-contracts-occ-v2.md` §9 (faucet), `audit-rules.md` SUB-7.
+- `project/process/release-and-deployment.md` §1 (D-88), §1.1 (hostnames), §4.5 (Workers pipeline), §5 (deploy record), §6 (secrets inventory), §8 (rollback).
+- `specs/07-sdk-transport-storage.md` §7 (submitter), `05-contracts-occ-v2.md` §9 (faucet), `audit-rules.md` SUB-7.
 - [RB-10](deploy-and-verify.md) deploying and verifying, [RB-11](rollback-and-freeze.md) rollback and `DEPLOY_FREEZE`.

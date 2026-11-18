@@ -2,13 +2,13 @@
 
 Where everything lives in the AgentLink repository, what to read first for your role, and how to get productive in a set time. AgentLink is pre-alpha (M0 Foundations nearly complete; v0.1.0 of M1a released on 16 Oct 2026): the documents describe the design and the way we build; the M1a code (crypto, transport, core, node, the CLI and the MCP server) is released as the `@4thtech-io/agentlink` package. For the current state, see the Status box in the [root README](../README.md).
 
-Published docs: [AgentLink on 4thTech Docs](https://wiki.4thtech.io/products/agentlink) (guide and technical docs from `docs-site/`; home at [wiki.4thtech.io](https://wiki.4thtech.io/)).
+Published docs: [AgentLink on 4thTech Docs](https://wiki.4thtech.io/products/agentlink) (guide and technical docs from `docs/`; home at [wiki.4thtech.io](https://wiki.4thtech.io/)).
 
 Four kinds of document, four jobs:
 
 | Kind | Where | Answers | When two disagree |
 |---|---|---|---|
-| **Specs** | [`foundation/`](foundation/00-README.md) | *What* we build and the invariants it keeps | The spec wins over everything below |
+| **Specs** | [`foundation/`](../specs/00-README.md) | *What* we build and the invariants it keeps | The spec wins over everything below |
 | **Process** | [`process/`](process/development-process.md) | The *rules*: who may do what, gates, classes | The process document wins over a runbook |
 | **Runbooks** | [`runbooks/`](runbooks/README.md) | *How*: numbered steps and exact commands for one repeatable procedure | Fix the runbook in the same PR |
 | **Lessons** | [`lessons/`](lessons/README.md) | *Why* a rule exists: what went wrong before | A lesson never overrides a rule |
@@ -20,8 +20,8 @@ Read the documents in order. Each list is the minimum; open the rest by section 
 ### New human developer
 
 1. [`../README.md`](../README.md) and [`../CONTRIBUTING.md`](../CONTRIBUTING.md): what this is, how work is organised.
-2. [`foundation/00-README.md`](foundation/00-README.md): principles and glossary; then skim the [decision index](foundation/decisions/README.md). The public map from each spec to its explanation page is [Under the hood](../docs-site/technical/concepts/under-the-hood.md).
-3. [`foundation/04-security-and-crypto.md`](foundation/04-security-and-crypto.md) §1: the invariants I-1 to I-10.
+2. [`foundation/00-README.md`](../specs/00-README.md): principles and glossary; then skim the [decision index](../specs/decisions/README.md). The public map from each spec to its explanation page is [Under the hood](../docs/technical/concepts/under-the-hood.md).
+3. [`foundation/04-security-and-crypto.md`](../specs/04-security-and-crypto.md) §1: the invariants I-1 to I-10.
 4. [`process/delivery-process.md`](process/delivery-process.md): the 14-step lifecycle and the definition of done.
 5. [`runbooks/README.md`](runbooks/README.md), then [RB-01 session start and end](runbooks/session-start-end.md) and [RB-02 claiming a task](runbooks/claim-task.md).
 6. [`lessons/README.md`](lessons/README.md): ten minutes that save you a day.
@@ -54,7 +54,7 @@ Read the documents in order. Each list is the minimum; open the rest by section 
 ### Reviewer (independent auditor worker or human reviewer)
 
 1. [`process/audit-rules.md`](process/audit-rules.md) §4 (inputs, procedure, output format) and the §5 checklists for the areas touched.
-2. [`foundation/04-security-and-crypto.md`](foundation/04-security-and-crypto.md) in full for S2, §1 for S1.
+2. [`foundation/04-security-and-crypto.md`](../specs/04-security-and-crypto.md) in full for S2, §1 for S1.
 3. [RB-04 independent review](runbooks/independent-review.md).
 4. The spec sections the change cites. Nothing else: no PR body, no builder report (audit-rules §4.1).
 
@@ -66,7 +66,7 @@ Read the documents in order. Each list is the minimum; open the rest by section 
 4. [RB-11 rollback and `DEPLOY_FREEZE`](runbooks/rollback-and-freeze.md) and [RB-14 permission denied](runbooks/permission-denied.md): where agents stop and hand the decision to you.
 5. The private runbooks in `4thtech/agentlink-ops` (`runbooks/`) for incidents, secrets, Safe operations and mainnet.
 
-Designers start with [`foundation/11-claude-design-brief.md`](foundation/11-claude-design-brief.md) and [`design/README.md`](design/README.md); product and partners with [`../README.md`](../README.md), [`foundation/02-product-spec.md`](foundation/02-product-spec.md) and [`foundation/10-build-plan.md`](foundation/10-build-plan.md).
+Designers start with [`foundation/11-claude-design-brief.md`](../specs/11-claude-design-brief.md) and [`design/README.md`](design/README.md); product and partners with [`../README.md`](../README.md), [`foundation/02-product-spec.md`](../specs/02-product-spec.md) and [`foundation/10-build-plan.md`](../specs/10-build-plan.md).
 
 ## 2. Onboarding track for a new developer
 
@@ -97,24 +97,24 @@ A time-boxed path. Each stage ends with something you can show.
 
 ### `foundation/`: the specifications (source of truth)
 
-When code, process or any other document disagrees with a spec, the spec wins. Start with [`00-README.md`](foundation/00-README.md).
+When code, process or any other document disagrees with a spec, the spec wins. Start with [`00-README.md`](../specs/00-README.md).
 
 | Doc | Purpose |
 |---|---|
-| [`00-README.md`](foundation/00-README.md) | Index, core principles, invariants pointer, glossary and the revision history |
-| [`decisions/`](foundation/decisions/README.md) | The **decision log**: one file per decision (`D-001.md` … `D-156.md`) and an index table (ID, title, status, date, specs) |
+| [`00-README.md`](../specs/00-README.md) | Index, core principles, invariants pointer, glossary and the revision history |
+| [`decisions/`](../specs/decisions/README.md) | The **decision log**: one file per decision (`D-001.md` … `D-156.md`) and an index table (ID, title, status, date, specs) |
 | 01 Commercial brief | *Private.* Positioning, market and business model; kept outside this repository |
-| [`02-product-spec.md`](foundation/02-product-spec.md) | Features, user journeys, free vs paid, non-goals |
-| [`03-architecture.md`](foundation/03-architecture.md) | Components, data flows, packagings and trust boundaries |
-| [`04-security-and-crypto.md`](foundation/04-security-and-crypto.md) | Key management, encryption scheme, threat model and the non-negotiable invariants I-1 to I-10 |
-| [`05-contracts-occ-v2.md`](foundation/05-contracts-occ-v2.md) | Specification of the OCC v2 smart contracts (the Solidity source lives in a separate private repository during beta) |
-| [`06-mcp-server.md`](foundation/06-mcp-server.md) | MCP tools, transports, approval flow and harness setup |
-| [`07-sdk-transport-storage.md`](foundation/07-sdk-transport-storage.md) | Core TypeScript packages, the Nostr transport and the storage adapter |
-| [`08-clients-console-cloud.md`](foundation/08-clients-console-cloud.md) | Local approval UI, owner console, cloud agent, public pages and desktop apps |
+| [`02-product-spec.md`](../specs/02-product-spec.md) | Features, user journeys, free vs paid, non-goals |
+| [`03-architecture.md`](../specs/03-architecture.md) | Components, data flows, packagings and trust boundaries |
+| [`04-security-and-crypto.md`](../specs/04-security-and-crypto.md) | Key management, encryption scheme, threat model and the non-negotiable invariants I-1 to I-10 |
+| [`05-contracts-occ-v2.md`](../specs/05-contracts-occ-v2.md) | Specification of the OCC v2 smart contracts (the Solidity source lives in a separate private repository during beta) |
+| [`06-mcp-server.md`](../specs/06-mcp-server.md) | MCP tools, transports, approval flow and harness setup |
+| [`07-sdk-transport-storage.md`](../specs/07-sdk-transport-storage.md) | Core TypeScript packages, the Nostr transport and the storage adapter |
+| [`08-clients-console-cloud.md`](../specs/08-clients-console-cloud.md) | Local approval UI, owner console, cloud agent, public pages and desktop apps |
 | 09 Repositories and reuse | *Private.* Audit of existing repositories and what to reuse; kept outside this repository |
-| [`10-build-plan.md`](foundation/10-build-plan.md) | Milestones, tasks and acceptance criteria |
-| [`11-claude-design-brief.md`](foundation/11-claude-design-brief.md) | UX principles, screens, flows and the copy vocabulary |
-| [`12-economics-and-fees.md`](foundation/12-economics-and-fees.md) | Public fee schedule in USD, fee tokens, caps and price-change policy, treasury and transparency |
+| [`10-build-plan.md`](../specs/10-build-plan.md) | Milestones, tasks and acceptance criteria |
+| [`11-claude-design-brief.md`](../specs/11-claude-design-brief.md) | UX principles, screens, flows and the copy vocabulary |
+| [`12-economics-and-fees.md`](../specs/12-economics-and-fees.md) | Public fee schedule in USD, fee tokens, caps and price-change policy, treasury and transparency |
 
 ### `process/`: how we build
 
@@ -131,7 +131,7 @@ When code, process or any other document disagrees with a spec, the spec wins. S
 | [`onboarding.md`](process/onboarding.md) | Onboarding for collaborators and the agents working for them |
 | [`backlog.md`](process/backlog.md) | Task cards (the IDs you see in branches and PR titles) |
 | [`repo-reference.md`](process/repo-reference.md) | Stack, repository layout, commands and testing |
-| [`docs-architecture.md`](process/docs-architecture.md) | What goes where in the public docs: README, guide, technical docs, knowledge base, llms.txt; single sources; the screenshot pipeline (`pnpm docs:screens`); how `docs-site/` reaches GitBook |
+| [`docs-architecture.md`](process/docs-architecture.md) | What goes where in the public docs: README, guide, technical docs, knowledge base, llms.txt; single sources; the screenshot pipeline (`pnpm docs:screens`); how `docs/` reaches GitBook |
 | [`docs-model.md`](process/docs-model.md) | How every public docs page is written: readers and layers, page types, components, screenshots, the UI ↔ tech bridge, the single GitBook space and its release-time sync, definition of done |
 | [`test-reports/`](process/test-reports/README.md) | Reports of end-to-end and acceptance test runs (setup, how to rerun, measured results) |
 
@@ -155,17 +155,17 @@ One short file per lesson (problem, symptom, cause, rule). Index: [`lessons/READ
 
 ### Elsewhere
 
-- [`../docs-site/`](../docs-site/README.md): source of the **public documentation** on [GitBook](https://wiki.4thtech.io) (user guide and technical docs), kept separate from these internal documents; upkeep rules in [`MAINTAINING.md`](../docs-site/MAINTAINING.md); how every page is written (page types, components, screenshots, the UI ↔ tech bridge) in the [docs model](process/docs-model.md).
+- [`../docs/`](../docs/README.md): source of the **public documentation** on [GitBook](https://wiki.4thtech.io) (user guide and technical docs), kept separate from these internal documents; upkeep rules in [`MAINTAINING.md`](../docs/MAINTAINING.md); how every page is written (page types, components, screenshots, the UI ↔ tech bridge) in the [docs model](process/docs-model.md).
 - [`../research/`](../research/README.md): **research section**: signed, dated articles and papers about agent-to-agent communication and AgentLink, with their own [contributing guide](../research/CONTRIBUTING.md).
 - [`design/`](design/README.md): design intake and status (the three design drops, and the rules for building UI before a design lands).
-- **Decision log:** [`foundation/decisions/`](foundation/decisions/README.md), one file per decision with an index. Every decision has an ID (D-xx); changes to it go through a PR.
+- **Decision log:** [`foundation/decisions/`](../specs/decisions/README.md), one file per decision with an index. Every decision has an ID (D-xx); changes to it go through a PR.
 - **Release history:** [`../CHANGELOG.md`](../CHANGELOG.md).
 - **Root files:** [`../README.md`](../README.md) (status and roadmap), [`../CONTRIBUTING.md`](../CONTRIBUTING.md), [`../CODE_OF_CONDUCT.md`](../CODE_OF_CONDUCT.md), [`../SECURITY.md`](../SECURITY.md), [`../AGENTS.md`](../AGENTS.md) (with the harness pointers [`../CLAUDE.md`](../CLAUDE.md) and [`../GEMINI.md`](../GEMINI.md)).
 
 ## 5. How the docs change
 
 - **Specs, process documents and the decision log change only through a pull request.** A spec change that alters an interface lands in the same PR as the code, or before it. Implementation never runs ahead of the spec.
-- **Decisions are recorded.** A change to a principle, an invariant, a policy default or the build plan adds a decision-log entry (D-xx) in [`foundation/decisions/`](foundation/decisions/README.md) (a file plus its index row), and a revision-history line when the spec pack changes.
+- **Decisions are recorded.** A change to a principle, an invariant, a policy default or the build plan adds a decision-log entry (D-xx) in [`foundation/decisions/`](../specs/decisions/README.md) (a file plus its index row), and a revision-history line when the spec pack changes.
 - **Every user-visible, spec or process change adds a line under `[Unreleased]` in [`CHANGELOG.md`](../CHANGELOG.md).** See [`process/versioning.md`](process/versioning.md).
 - **Review depends on the security class.** Changes to `04-security-and-crypto.md` are S2; other specs and process documents are S1; see [`process/audit-rules.md`](process/audit-rules.md) and the spec-change table in [`process/development-process.md`](process/development-process.md).
 - **Keep the README honest.** Update its Status and Roadmap whenever a milestone, release or user-visible capability changes, and never describe unbuilt features as available.

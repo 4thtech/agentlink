@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const pagePath = join(root, 'docs-site/technical/reference/networks-and-contracts.md');
+const pagePath = join(root, 'docs/technical/reference/networks-and-contracts.md');
 const generated = readFileSync(
   join(root, 'packages/occ-v2-abi/src/addresses.generated.ts'),
   'utf8',

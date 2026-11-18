@@ -2,7 +2,7 @@
 
 **Problem.** Around twenty open pull requests shared one runner pool and one merge queue. PRs stayed red or queued for hours.
 
-**Symptom.** Reruns piled up. Several PRs were ejected from the merge queue after a long wait with a conflict (`docs/process/backlog.md`, the generated status files) or a stale lockfile. Draft and work-in-progress PRs ran the same full suite as ready ones.
+**Symptom.** Reruns piled up. Several PRs were ejected from the merge queue after a long wait with a conflict (`project/process/backlog.md`, the generated status files) or a stale lockfile. Draft and work-in-progress PRs ran the same full suite as ready ones.
 
 **Cause.**
 - Every push to a PR ran the full suite, drafts included, on a small runner pool, so queued jobs starved each other.

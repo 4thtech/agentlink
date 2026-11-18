@@ -1,5 +1,5 @@
 // MSG-FILES-IO-d: the Files page's Received and Sent API (08 §1; plan
-// docs/process/proposals/MSG-FILES-IO.md §3, §4; 04 §2.5, §4; I-4, I-5, I-7).
+// project/process/proposals/MSG-FILES-IO.md §3, §4; 04 §2.5, §4; I-4, I-5, I-7).
 //
 // - `GET /api/ui/files/received` and `GET /api/ui/files/sent` are read routes (`presence: false`):
 //   they read core's `client.filesIo` through the read-only client view and change nothing.

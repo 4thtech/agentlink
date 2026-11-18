@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /// <reference types="vite/client" />
 // MSG-FILES-IO-f: the Files page's three tabs, Received · Sent · Send folders (08 §1; 11 §5.7;
-// design b11 §15, §17.3; plan docs/process/proposals/MSG-FILES-IO.md §4, §5).
+// design b11 §15, §17.3; plan project/process/proposals/MSG-FILES-IO.md §4, §5).
 //
 // - Received is the default tab; Send folders keeps today's page. Read-only: only GETs.
 // - Other people's file names are untrusted (I-5): inert plain text, no control or bidi characters,

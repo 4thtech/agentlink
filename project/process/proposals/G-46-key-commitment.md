@@ -3,12 +3,12 @@
 | | |
 |---|---|
 | **Status** | **Decided: D-66** (Tali, 14 Oct 2026): A + D, as recommended by the independent review IR-G-46-1 (sound with changes). The normative text is in 04 §3.1, §3.1.1 and §3.3 and in 07 §8; where it differs from this note, the spec wins. In particular, the spec fixes `skE_j = ikm_j` as the raw X25519 secret, not `DeriveKeyPair` (IR-G-46-1 F-2). The new gap for T6 is G-48. This note is kept as the rationale. |
-| **Gap** | G-46 (H), `docs/process/backlog.md` §8 |
+| **Gap** | G-46 (H), `project/process/backlog.md` §8 |
 | **Requirement** | D-61 (5), stated in 04 §3.3: every recipient entry, every owner (I-9) and a proof-pack verifier obtain the same plaintext for a given `envelopeHash`, or fail to decrypt |
 | **Timing** | D-62: fixed before M1-7b becomes `ready` and before the `aead-envelope` and `envelope-sig` vectors freeze |
 | **Security class** | S2 (envelope cryptography, I-2, I-8, I-9) |
 | **Date** | 14 Oct 2026 |
-| **Where this file lives** | The repository had no convention for proposals (no `docs/foundation/proposals/`, no proposal files anywhere under `docs/`). This note therefore sits under `docs/process/proposals/` and is the first file there. The specs stay the source of truth (`docs/README.md`). |
+| **Where this file lives** | The repository had no convention for proposals (no `specs/proposals/`, no proposal files anywhere under `docs/`). This note therefore sits under `project/process/proposals/` and is the first file there. The specs stay the source of truth (`project/README.md`). |
 
 ## 0. Summary
 
@@ -119,7 +119,7 @@ Opening: `unwrapCek` gives the CEK. `kc'` is derived and compared with `aead.kc`
 - **Merged code:** `envelope.ts` (exact `aead` keys `alg`, `iv`, `kc`, `ct`; `AEAD_ALG`; a `kc` length constant); `aead.ts` (derive and check); `packages/types/src/envelope.ts` (`aeadSchema` and fixtures); test fixtures in `packages/transport-nostr/src/gift-wrap.test.ts`, `aead.test.ts` and `envelope.test.ts`. No interface of `KeyStore` or `EnvelopeKeys` changes.
 - **Vectors:** regenerate `aead-envelope` (every envelope, the AAD, hash, sign and decrypt cases, and the size cases: 24 509 becomes 24 563) and `safety-code-recompute` (its signed handshakes embed `aead`), with `generate_aead_envelope.py`, `generate_safety_code.py` and `generate_safety_code_recompute.py`. Add reject cases: missing `kc`, wrong `kc` (one flipped bit), 31- or 33-byte `kc`, old `alg`, and a T1 envelope that opens under GCM with both keys but fails `kc` for one of them. `hpke` is unchanged. `envelope-sig` is not committed yet, so it is written on the new form.
 
-**Migration:** small. Nothing is released (`packages/*` are `private`, version 0.0.0), and no envelope exists outside tests, so `v` stays 1 with no compatibility path. Cards: M1-1c follow-up (S2), M1-2a follow-up (types), M1-1h (vectors), M1-5a (test fixtures), M1-7b (tests only), M1-4d and M1-7g (pack rules), DOCS-M1a (docs-site), plus the spec PR.
+**Migration:** small. Nothing is released (`packages/*` are `private`, version 0.0.0), and no envelope exists outside tests, so `v` stays 1 with no compatibility path. Cards: M1-1c follow-up (S2), M1-2a follow-up (types), M1-1h (vectors), M1-5a (test fixtures), M1-7b (tests only), M1-4d and M1-7g (pack rules), DOCS-M1a (docs), plus the spec PR.
 
 **References:** RFC 5869 (HKDF); Krawczyk, "Cryptographic Extraction and Key Derivation: The HKDF Scheme" (CRYPTO 2010); Bellare and Hoang, "Efficient Schemes for Committing Authenticated Encryption" (EUROCRYPT 2022: CMT-1/CMT-4, UtC); the AWS Encryption SDK message format version 2 (committing algorithm suites, key commitment in the header); the age v1 format (C2SP), whose header MAC under a file-key-derived key plays the same binding role.
 
@@ -240,7 +240,7 @@ To be made in one S2 spec PR after the owner decides. Nothing below is applied b
   - M1-2a follow-up: `aeadSchema` and fixtures;
   - M1-1h: regenerate `aead-envelope` and `safety-code-recompute`, add `hpke` derived-ephemeral cases and the `kc` reject cases, then freeze;
   - M1-5a: test fixtures.
-- Scope lines: M1-7b (steps 5 and 8, T2/T3 refusal tests), M1-4d and M1-7g (pack rules), DOCS-M1a (`docs-site/technical/concepts/envelopes.md`, `docs-site/technical/reference/proof-pack-format.md`).
+- Scope lines: M1-7b (steps 5 and 8, T2/T3 refusal tests), M1-4d and M1-7g (pack rules), DOCS-M1a (`docs/technical/concepts/envelopes.md`, `docs/technical/reference/proof-pack-format.md`).
 - Drop "gap G-46 resolved" from Depends on in M1-1h, M1-7b and M1-7g.
 
 **CHANGELOG.md:** a spec line under `[Unreleased]`.

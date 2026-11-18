@@ -1,6 +1,6 @@
 # test-vectors
 
-Canonical test vectors for AgentLink's crypto and EIP-712 code, and the harness that checks them in every runtime the shared packages support (04 §8.2, task M0-9). The vectors are public. The private contracts repo pins a commit of this directory and checks parity (`docs/process/development-process.md` §9.1).
+Canonical test vectors for AgentLink's crypto and EIP-712 code, and the harness that checks them in every runtime the shared packages support (04 §8.2, task M0-9). The vectors are public. The private contracts repo pins a commit of this directory and checks parity (`project/process/development-process.md` §9.1).
 
 ```
 pnpm vectors:check
@@ -41,7 +41,7 @@ Vectors can land before the code they test (M1-1h, tests first). Such a suite is
 - A pending suite that also has a module fails. So the card that adds the module removes the entry, and from then on every case must pass. Each implementing card's acceptance says so (backlog).
 - A runtime without the pending marker still needs a passing result for every case, and a suite with both a marker and case results fails (`tools/vectors/rules.mjs`).
 - A pending entry without a committed vector file fails.
-- **The list only shrinks.** CI runs `node tools/vectors/check-pending.mjs --base origin/main`. A suite may arrive pending only together with its new vectors. A suite that has vectors on `main` and is not pending there can never become pending again, so deleting a module to hide a regression fails. An existing entry's card and phase cannot change, and each entry's phase must equal its card's `Phase` in `docs/process/backlog.md`.
+- **The list only shrinks.** CI runs `node tools/vectors/check-pending.mjs --base origin/main`. A suite may arrive pending only together with its new vectors. A suite that has vectors on `main` and is not pending there can never become pending again, so deleting a module to hide a regression fails. An existing entry's card and phase cannot change, and each entry's phase must equal its card's `Phase` in `project/process/backlog.md`.
 - **Pending cases.** An implemented suite may leave single cases to a later card: `cases` in `pending-suites.json` names the suite, the card, its phase and the case ids. Each listed case records a passing `pending-case` marker instead of a result, and the same rules apply: a failed marker leaves the case missing, a case with both a marker and a result fails, the list only shrinks against `main` (a case may be pending only if it did not run there), its card's phase comes from the backlog, and the release gate fails while a case of a gated phase is pending. None is pending now: the `owner-action` `contact.check` verify cases, the first ones, run since M1-7d routed `contact.check` to the core's verifier.
 - **Release gate.** `release.yml` runs `check-pending.mjs --gate M1a`, so no release ships while an M1a suite is pending. The gate takes each card's phase from the backlog, never from the pending entry. That is the M1a gate (M1-23). The next phase's gate is added there when it applies (RB-06).
 
@@ -86,4 +86,4 @@ Vectors can land before the code they test (M1-1h, tests first). Such a suite is
 1. Write the generator under `tools/vectors/`, with `--write` and `--check [FILE]`. It must not import repository TypeScript. Where published values exist, cross-check against them.
 2. Run it once to write `<suite>/vectors.json`. Add `<suite>/case.schema.json`.
 3. Add the suite module under `harness/suites/` and register it.
-4. If the code under test does not exist yet, list the suite in `pending-suites.json` with its card and phase instead of adding a module. Otherwise commit the failing tests first (S2), then the implementation. Record the negative control: mutate one vector, and every runtime fails. Step-by-step: runbook RB-06 (`docs/runbooks/test-vectors.md`).
+4. If the code under test does not exist yet, list the suite in `pending-suites.json` with its card and phase instead of adding a module. Otherwise commit the failing tests first (S2), then the implementation. Record the negative control: mutate one vector, and every runtime fails. Step-by-step: runbook RB-06 (`project/runbooks/test-vectors.md`).

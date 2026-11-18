@@ -1,5 +1,5 @@
 /* @4thtech-io/ui components (M1-35b). Built on tokens.css (the --al-* variables); no colour, size or
-   font is declared here. Derived from the D1 reference stylesheet (docs/design/d1/components/
+   font is declared here. Derived from the D1 reference stylesheet (project/design/d1/components/
    reference/bundle.css) with the DESIGN-ADJ-1 fixes. Classes only: no component sets a style
    attribute (08 §4 CSP); the credits bar width is a class (al-pct-N). */
 /* AgentLink components. Every value comes from tokens.css (--al-*); type comes from the .al-text-* classes. */

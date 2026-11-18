@@ -1,8 +1,8 @@
 // Icon geometry for <Icon> (M1-35b). Generated once from the D1 reference bundle
-// (docs/design/d1/components/reference/bundle.js) and kept as data, so icons render as React
+// (project/design/d1/components/reference/bundle.js) and kept as data, so icons render as React
 // elements and never through innerHTML (Trusted Types, 08 §4).
 //
-// Sources: the 21 icons in CUSTOM_ICONS are AgentLink's own (docs/design/brand/icons/ui/);
+// Sources: the 21 icons in CUSTOM_ICONS are AgentLink's own (project/design/brand/icons/ui/);
 // the others are Lucide (ISC), see THIRD-PARTY-NOTICES.md.
 
 export type IconShape = readonly [

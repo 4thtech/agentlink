@@ -1,4 +1,4 @@
-// Shared prop types of the components (M1-35b; docs/design/d1/components/*.md with the
+// Shared prop types of the components (M1-35b; project/design/d1/components/*.md with the
 // DESIGN-ADJ-1 fixes C-1…C-10).
 
 /** Name rule input (11 §5.2): the alias the owner typed, or the name the contact declared. */

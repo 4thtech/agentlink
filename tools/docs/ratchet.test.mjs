@@ -35,7 +35,7 @@ describe('paths', () => {
   it('names one layout as current and derives the pages from it', () => {
     expect(Object.keys(LAYOUTS)).toEqual(['legacy', 'compact']);
     expect(DOCS.name).toBe(CURRENT_LAYOUT);
-    expect(pathsFor('legacy').securitySpec).toBe('docs/foundation/04-security-and-crypto.md');
+    expect(pathsFor('legacy').securitySpec).toBe('specs/04-security-and-crypto.md');
     expect(pathsFor('compact').securitySpec).toBe('specs/04-security-and-crypto.md');
     expect(pathsFor('compact').statusPage).toBe('docs/technical/project/status-and-roadmap.md');
     expect(pathsFor('compact').status).toBe('docs/status.yaml');

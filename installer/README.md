@@ -8,7 +8,7 @@ Install AgentLink by pasting one line into a terminal you opened yourself (owner
 | Windows (PowerShell) | `irm https://agentlink.4thtech.io/install.ps1 \| iex` |
 | Windows (Command Prompt) | `powershell -ExecutionPolicy Bypass -c "irm https://agentlink.4thtech.io/install.ps1 \| iex"` |
 
-A desktop app preview for Mac and Windows is coming soon (not released; unsigned builds). Its install steps are on the [desktop app page](../docs-site/guide/apps/desktop-app.md); this installer stays the way to get AgentLink until then.
+A desktop app preview for Mac and Windows is coming soon (not released; unsigned builds). Its install steps are on the [desktop app page](../docs/guide/apps/desktop-app.md); this installer stays the way to get AgentLink until then.
 
 Already have Node.js 22.14 or newer? `npx -y @4thtech-io/agentlink@latest` works without the installer.
 

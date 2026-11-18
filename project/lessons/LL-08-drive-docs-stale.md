@@ -6,6 +6,6 @@
 
 **Cause.** The Drive copies are snapshots from before the specs moved into the repository; nobody updates them.
 
-**Rule.** The repository is canonical (`docs/foundation/`, `docs/process/`). Use other copies only to find history, never as the source. The Curator foundations mirror is refreshed from the repository after merges, and the repository wins when they differ (`development-process.md` §2.1).
+**Rule.** The repository is canonical (`specs/`, `project/process/`). Use other copies only to find history, never as the source. The Curator foundations mirror is refreshed from the repository after merges, and the repository wins when they differ (`development-process.md` §2.1).
 
 **Source.** Owner's note, October 2026.

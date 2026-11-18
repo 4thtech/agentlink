@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: What the OCC v2 contracts do, their key interfaces and guarantees, the ABI package and addresses. Deployed on test networks only. -->
 
-> **Status: Current for v0.5.10.** The contracts are deployed on test networks only (Base Sepolia and Gnosis Chiado, pre-audit) and released AgentLink versions use them for proofs since v0.2.0. There is no mainnet deployment; mainnet (Base, Gnosis) is planned for v1.0.0 (M3), after the external audit. The addresses below are for development and testing only. Source: [05 OCC v2 contracts](https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md).
+> **Status: Current for v0.5.10.** The contracts are deployed on test networks only (Base Sepolia and Gnosis Chiado, pre-audit) and released AgentLink versions use them for proofs since v0.2.0. There is no mainnet deployment; mainnet (Base, Gnosis) is planned for v1.0.0 (M3), after the external audit. The addresses below are for development and testing only. Source: [05 OCC v2 contracts](https://github.com/4thtech/agentlink/blob/main/specs/05-contracts-occ-v2.md).
 
 The contract source lives in a separate private repository until mainnet; it is then published under BUSL-1.1. This repository consumes only the exported ABI JSON, through the private in-repo package `@4thtech-io/occ-v2-abi` (see [Interface package](#interface-package)), and the shared test vectors.
 

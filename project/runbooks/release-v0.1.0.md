@@ -53,7 +53,7 @@ The owner (Tali). Parts B and C work on the web or GitHub mobile; Part A needs a
 
 ### Part B: GitHub (repository `4thtech/agentlink`)
 
-6. Environments (Settings → Environments). Check each exists with these settings (full table: `docs/process/ci-cd.md` §4):
+6. Environments (Settings → Environments). Check each exists with these settings (full table: `project/process/ci-cd.md` §4):
    - `npm-publish`: Required reviewers = `talirezun`; **Prevent self-review OFF**; deployment branches and tags: `main` and tag pattern `*@*`. No secrets.
    - `npm-next`: no reviewer; branches `main` only; no secrets.
    - `deploy-freeze`: no reviewer; "Selected branches" → `main`.
@@ -89,14 +89,14 @@ The owner (Tali). Parts B and C work on the web or GitHub mobile; Part A needs a
     ```
     The npmjs.com package page shows the provenance badge ("Built and signed on GitHub Actions") linking to the `release.yml` run. The GitHub Release `v0.1.0` exists.
 15. After the release (agents do the docs once you say it is out):
-    - (done 2026-10-16, post-release docs pass) flip `docs/status.yaml` to released (version `v0.1.0`, M1a done), run `node tools/docs-status/index.mjs`, and update README Status, `knowledge/`, `llms.txt`, docs-site get-started; remove the "not released yet" notes;
-    - remove the draft banner from `docs/releases/v0.1.0.md`;
+    - (done 2026-10-16, post-release docs pass) flip `docs/status.yaml` to released (version `v0.1.0`, M1a done), run `node tools/docs-status/index.mjs`, and update README Status, `knowledge/`, `llms.txt`, docs get-started; remove the "not released yet" notes;
+    - remove the draft banner from `project/releases/v0.1.0.md`;
     - announce (your call): README, the release note, social. State the known limits from the release note and claim nothing beyond it;
     - run the two-person dogfood ([RB-17](dogfood-m1a.md)) against the published package.
 
 ### Post-release record (2026-10-16)
 - Released: `@4thtech-io/agentlink@0.1.0` is on npm `latest` with provenance; the `release.yml` run for #193 passed `publish-latest`, `smoke-latest` and `record`. Tags `v0.1.0` and `@4thtech-io/agentlink@0.1.0` exist.
-- **The GitHub Release `v0.1.0` was not created.** Its step failed with HTTP 422 "body is too long (maximum is 125000 characters)": the `## [0.1.0]` CHANGELOG section is about 130 KB. By design the step only warns (`continue-on-error`). Owner action: create the release by hand from the short note, for example `gh release create v0.1.0 --verify-tag --title "v0.1.0" --notes-file docs/releases/v0.1.0.md`. Follow-up (OPS-REL-3): make the workflow fall back to the release note or a link to the CHANGELOG when the section is too long.
+- **The GitHub Release `v0.1.0` was not created.** Its step failed with HTTP 422 "body is too long (maximum is 125000 characters)": the `## [0.1.0]` CHANGELOG section is about 130 KB. By design the step only warns (`continue-on-error`). Owner action: create the release by hand from the short note, for example `gh release create v0.1.0 --verify-tag --title "v0.1.0" --notes-file project/releases/v0.1.0.md`. Follow-up (OPS-REL-3): make the workflow fall back to the release note or a link to the CHANGELOG when the section is too long.
 - Docs pass done in `DOCS: post-release docs pass for v0.1.0`. Still to do: the two-person dogfood (RB-17) against the published package, and the announcement (owner's call).
 
 ## Verify
@@ -109,4 +109,4 @@ The owner (Tali). Parts B and C work on the web or GitHub mobile; Part A needs a
 - **Frozen:** only you clear `DEPLOY_FREEZE`.
 
 ## Related
-[RB-09](merge-and-release.md), [RB-11](rollback-and-freeze.md), [RB-17](dogfood-m1a.md); `docs/process/ci-cd.md` §4, §5, §8; `docs/process/release-and-deployment.md` §4.1, §5, §8; `docs/process/versioning.md` §5, §6, §9; draft release note [`docs/releases/v0.1.0.md`](../releases/v0.1.0.md).
+[RB-09](merge-and-release.md), [RB-11](rollback-and-freeze.md), [RB-17](dogfood-m1a.md); `project/process/ci-cd.md` §4, §5, §8; `project/process/release-and-deployment.md` §4.1, §5, §8; `project/process/versioning.md` §5, §6, §9; draft release note [`project/releases/v0.1.0.md`](../releases/v0.1.0.md).

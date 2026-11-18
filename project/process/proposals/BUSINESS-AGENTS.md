@@ -5,7 +5,7 @@
 | **Status** | Proposal; **owner decisions 1–10 and 12 of §10 accepted by Tali in chat, 28 Oct 2026** (every recommended option); decision 11 (pilot company) is to be named by the owner. The spec text is not yet written. Specs win on conflict until the owner decides; the spec text is written by BIZ-SPEC after the decisions in §10. |
 | **Owner intent** | Decision 20 (Tali, in chat, 28 Oct 2026): companies run their own agents in the cloud with access to their own data (Claude-based, GPT-based or another vendor's). People connect their personal agents to them through links published on the company website. Agreement through propose/respond terms, owner approval, optional public proof. Part of 0.5.0 with the cloud agent (D-131, D-135). Companies plug in agents they already have through a no-code setup ("Legos putting together Legos"). Companies are charged; users stay free. No payments between agents and no booking payments: payment stays with the company's own checkout. |
 | **Specs that win on conflict** | 00 (D-34, D-37, D-39, D-40, D-47, D-53, D-55, D-114, D-130, D-131, D-135), 04 (I-1…I-10, §2.5 owner presence, §2.7 domain verification, §3.6 pairing, §4 SSRF), 06 §2.1, §2.2a, §3, §4, 07 §3.2, 08 §3 and §4, 11 §5, 12 |
-| **Related** | `docs/process/proposals/UX-WAVE-2.md` (PR #631: the Add contact sheet, item 1); backlog M2-3* (0.5.0 cloud slice), M2-12 (domain verification), M2-13 (browser counterparty) |
+| **Related** | `project/process/proposals/UX-WAVE-2.md` (PR #631: the Add contact sheet, item 1); backlog M2-3* (0.5.0 cloud slice), M2-12 (domain verification), M2-13 (browser counterparty) |
 | **Date** | 28 Oct 2026 |
 
 ## 1. Summary
@@ -212,7 +212,7 @@ Illustrative tiers for the owner to set (placeholders, not proposed prices): **P
 
 ## 9. Cards (proposed)
 
-Classes per `audit-rules.md` §2 (path defaults: `packages/core`, `apps/cloud-agent`, `docs/foundation/04` are S2). Sizes S/M/L. "Fable" marks a Fable audit (keys, owner presence, money).
+Classes per `audit-rules.md` §2 (path defaults: `packages/core`, `apps/cloud-agent`, `specs/04` are S2). Sizes S/M/L. "Fable" marks a Fable audit (keys, owner presence, money).
 
 | Card | What | Class | Depends on | Size |
 |---|---|---|---|---|

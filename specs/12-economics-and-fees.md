@@ -114,7 +114,7 @@ Every top-up is public and links the paying account to the agent: `Deposited` na
 
 ### 4.5 Funding paths (D-111; direction, owner decides details)
 
-How a user adds credits on the pay page (08 §2.3). Design brief: `docs/design/topup-ux.md`.
+How a user adds credits on the pay page (08 §2.3). Design brief: `project/design/topup-ux.md`.
 
 | Path | How the funds arrive | Fees the user sees | Status |
 |---|---|---|---|

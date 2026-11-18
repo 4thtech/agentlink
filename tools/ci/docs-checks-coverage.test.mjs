@@ -11,7 +11,7 @@ const tools = join(root, 'tools');
 
 // A path built from a doc tree, or the root README.md / llms.txt, in a join/resolve/URL call.
 const READS_DOCS =
-  /(?:join|resolve|URL)\([^)\n]*['"`/](?:docs|docs-site|knowledge|changelog\.d)[/'"`]|['"`](?:llms\.txt|README\.md)['"`]\)|['"`]llms\.txt['"`]/;
+  /(?:join|resolve|URL)\([^)\n]*['"`/](?:docs|docs|knowledge|changelog\.d)[/'"`]|['"`](?:llms\.txt|README\.md)['"`]\)|['"`]llms\.txt['"`]/;
 
 // Files that match but do not read the repository's real docs (each needs a reason).
 const NOT_NEEDED = {
@@ -23,7 +23,7 @@ const NOT_NEEDED = {
   'release/roll-changelog.test.mjs': 'scratch directories',
   'release/check-changelog-fragment.test.mjs': 'scratch directories',
   'dogfood/dogfood.test.mjs': 'passes the docs directory as a path argument only',
-  'vectors/check-pending.mjs': 'runs in the `vectors` job (reads docs/process/backlog.md)',
+  'vectors/check-pending.mjs': 'runs in the `vectors` job (reads project/process/backlog.md)',
   'vectors/check-generators.mjs': 'runs in the `vectors` job (reads test-vectors/README.md)',
 };
 

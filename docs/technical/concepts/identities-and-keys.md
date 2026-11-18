@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: How identities and keys work: principals and master seeds, where seeds live, the signed cards that tie an ID to its owner, owner operations and browser support for approval passkeys. For developers and security readers. -->
 
-> **Status: Current for v0.5.10.** Keys and agent cards shipped in v0.1.0; owner presence in the desktop app and the agent-key signing allowlist are described as of 0.5.10. Source: [04 §2](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). The exact derivation inputs are in the spec, and test vectors in [`test-vectors/`](https://github.com/4thtech/agentlink/tree/main/test-vectors).
+> **Status: Current for v0.5.10.** Keys and agent cards shipped in v0.1.0; owner presence in the desktop app and the agent-key signing allowlist are described as of 0.5.10. Source: [04 §2](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md). The exact derivation inputs are in the spec, and test vectors in [`test-vectors/`](https://github.com/4thtech/agentlink/tree/main/test-vectors).
 
 ## Principals
 
@@ -84,7 +84,7 @@ Sources: MDN, WebAuthn extensions (modified 17 Sep 2026); Mozilla bug 1863819 an
 
 ## First run, one host, start over and a missing key (0.5.5)
 
-Sources: [04 §2.5, §2.5.4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), [08 §1](https://github.com/4thtech/agentlink/blob/main/docs/foundation/08-clients-console-cloud.md).
+Sources: [04 §2.5, §2.5.4](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md), [08 §1](https://github.com/4thtech/agentlink/blob/main/specs/08-clients-console-cloud.md).
 
 - **First run on any platform** (FIRSTRUN-ANY-PLATFORM). The owner is made with the master code in the app host, wherever it runs; "Use your master code instead" makes no WebAuthn request, so there is no passkey dead end and no security-key prompt on Windows. A platform sensor (Touch ID, Windows Hello, a platform passkey with PRF) is offered after the master code, and in a browser only where the browser reports a user-verifying platform authenticator. "Skip to Home" is hidden until an owner exists.
 - **One AgentLink, browser or app** (APP-CONTINUITY). The browser host (`agentlink ui`) and the desktop app run the same app host on the same `~/.agentlink` and the same keychain service, so the owner, IDs, contacts and folders are the same either way. Before the app's host starts it reads `~/.agentlink/app-host.json`: a record of a dead process is removed, and a running terminal host is asked to close with `POST /api/ui/host/yield` (record token only, no cookie; it prints "AgentLink moved to the AgentLink app"). With the app open, `agentlink ui` sends `POST /api/ui/host/show` and starts nothing. In the app, presence uses the app's own helper (Touch ID, Windows Hello) once turned on, otherwise the master code; the window has WebAuthn switched off, so no browser passkey is asked for. On a Mac, items the browser host saved in the keychain trigger one allow-access prompt per item on first use (the notice says to enter the Mac login password, never the master code, and choose Always Allow).

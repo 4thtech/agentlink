@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // UPD-KEYTOOL (D-151, owner decision 2026-11-13): creates the ONE desktop update key. Owner guide:
-// docs/runbooks/desktop-update-keys.md (RB-23).
+// project/runbooks/desktop-update-keys.md (RB-23).
 //
 //   node tools/desktop/new-update-key.mjs --out <file>
 //

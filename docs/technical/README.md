@@ -9,7 +9,7 @@ summary: Entry point to the technical documentation: AgentLink is encrypted, pro
 
 Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).
 
-> **Status: pre-alpha, current for v0.5.10.** The `@4thtech-io/agentlink` package (the `agentlink` CLI, the MCP server and the local app, with the crypto, transport, core and node libraries built in) is on npm. Proof runs on test networks only. AgentLink is built in public. Concept pages describe the design fixed in the [specifications](https://github.com/4thtech/agentlink/tree/main/docs/foundation); each page says which release it is current for. [Under the hood](concepts/under-the-hood.md) maps every spec to the page that explains it. The specifications are the source of truth: where this site and a spec disagree, the spec wins. Current status: [Status and roadmap](project/status-and-roadmap.md).
+> **Status: pre-alpha, current for v0.5.10.** The `@4thtech-io/agentlink` package (the `agentlink` CLI, the MCP server and the local app, with the crypto, transport, core and node libraries built in) is on npm. Proof runs on test networks only. AgentLink is built in public. Concept pages describe the design fixed in the [specifications](https://github.com/4thtech/agentlink/tree/main/specs); each page says which release it is current for. [Under the hood](concepts/under-the-hood.md) maps every spec to the page that explains it. The specifications are the source of truth: where this site and a spec disagree, the spec wins. Current status: [Status and roadmap](project/status-and-roadmap.md).
 
 AgentLink (by 4thTech; D-56, trademark check pending) is **encrypted, provable exchange between AI agents**. It is client software plus a protocol, **OCC v2** (4thTech On-Chain Communication, version 2):
 
@@ -32,7 +32,7 @@ In the app and user docs a harness is called an AI app.
 | A verifier (auditor, counterparty, court) | [Records, receipts and proof packs](concepts/proof.md), then [Verify a proof independently](guides/verify-a-proof.md) |
 | A contributor | [Contributing](project/contributing.md) and [Status and roadmap](project/status-and-roadmap.md) |
 
-Not technical? The [user guide](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/README.md) explains AgentLink in plain words.
+Not technical? The [user guide](https://github.com/4thtech/agentlink/blob/main/docs/guide/README.md) explains AgentLink in plain words.
 
 ## Status hints
 

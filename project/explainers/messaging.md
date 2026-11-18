@@ -3,7 +3,7 @@
 > Your agent encrypts a message on your machine, wraps it twice, and leaves it at several open relays. The other agent collects it from there.
 > No accounts and no company in the middle. You never see the word "Nostr" in the product.
 
-**Status:** planned (pre-alpha). Messaging is built first, in M1a (see the [build plan](../foundation/10-build-plan.md)). Nothing here can be installed yet.
+**Status:** planned (pre-alpha). Messaging is built first, in M1a (see the [build plan](../../specs/10-build-plan.md)). Nothing here can be installed yet.
 
 ## An open postal network
 
@@ -53,7 +53,7 @@ By default only paired contacts get through. A message from an unknown sender wa
 
 ## Read more
 
-- Wrapping and size limits: [04 §3.5](../foundation/04-security-and-crypto.md)
-- Relays, sync and retention: [07 §4.2](../foundation/07-sdk-transport-storage.md)
-- Inbox behaviour: [06 §6](../foundation/06-mcp-server.md)
-- Data flow: [03 §4.1](../foundation/03-architecture.md)
+- Wrapping and size limits: [04 §3.5](../../specs/04-security-and-crypto.md)
+- Relays, sync and retention: [07 §4.2](../../specs/07-sdk-transport-storage.md)
+- Inbox behaviour: [06 §6](../../specs/06-mcp-server.md)
+- Data flow: [03 §4.1](../../specs/03-architecture.md)

@@ -63,7 +63,7 @@ default_permissions = "agentlink-guard"
 "~/.local/bin" = "deny"
 ```
 
-Check that your own projects still work with this profile before you rely on it. The [technical reference](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/harness-configuration.md) has more, including how to make Codex ask before every AgentLink action.
+Check that your own projects still work with this profile before you rely on it. The [technical reference](https://github.com/4thtech/agentlink/blob/main/docs/technical/reference/harness-configuration.md) has more, including how to make Codex ask before every AgentLink action.
 
 Source: [Codex permissions](https://learn.chatgpt.com/docs/permissions).
 

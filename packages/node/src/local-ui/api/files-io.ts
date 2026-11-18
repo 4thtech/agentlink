@@ -1,5 +1,5 @@
 // MSG-FILES-IO-d: the Files page's Received and Sent API (08 §1; plan
-// docs/process/proposals/MSG-FILES-IO.md §3, §4; 04 §2.5, §4; D-133; I-4, I-5, I-7).
+// project/process/proposals/MSG-FILES-IO.md §3, §4; 04 §2.5, §4; D-133; I-4, I-5, I-7).
 //
 // `GET /api/ui/files/received?limit=&cursor=` and `GET /api/ui/files/sent?limit=&cursor=`: one page of
 // core's `FilesIoView` (store only) through the read-only client view. Reads: no presence, no store

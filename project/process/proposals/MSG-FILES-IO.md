@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Plan. The feature is **decided** by the owner (Tali, 27 Oct 2026, in chat): B-11 §18 decisions 1 (a), 4 (a), 5 (a) and 6 (a). The cards are in `backlog.md` (Local approval UI, MSG-FILES-IO-a to -h). Specs win on conflict; MSG-FILES-IO-g writes the spec text. |
-| **Design** | `docs/design/b11-local-app.md` §17 (merged in #567) |
+| **Design** | `project/design/b11-local-app.md` §17 (merged in #567) |
 | **Replaces** | The 0.3.1 plan items M1-UX3-FILES-EXPLAIN (Files explainer line and Received tab) and the Sent list of M1-UX3-FILES-SEND. Neither was carded; both are now covered by MSG-FILES-IO-d and -f. The folder picker of M1-UX3-FILES-SEND stays a separate later card. |
 | **Date** | 27 Oct 2026 |
 

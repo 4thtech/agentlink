@@ -45,7 +45,7 @@ const fake = [
     name: '@4thtech-io/ui',
     dir: 'packages/ui',
     deps: [],
-    refs: ['docs/design/d1/'],
+    refs: ['project/design/d1/'],
     playwright: false,
   },
   {
@@ -59,7 +59,7 @@ const fake = [
     name: '@4thtech-io/agentlink',
     dir: 'apps/cli',
     deps: ['@4thtech-io/chain', '@4thtech-io/node'],
-    refs: ['docs/foundation/06-mcp-server.md', 'docs-site/guide/', 'packages/log/src/redact'],
+    refs: ['specs/06-mcp-server.md', 'docs/guide/', 'packages/log/src/redact'],
     playwright: false,
   },
   { name: '@4thtech-io/tools', dir: 'tools', deps: [], refs: [], playwright: false },
@@ -135,7 +135,7 @@ describe('selectAffected: package changes select the package and its dependents'
 
 describe('selectAffected: docs-only changes run only the docs checks', () => {
   it('a process doc selects tools only (docs-status, links, vocabulary)', () => {
-    expect(sel(['docs/process/ci-cd.md', 'changelog.d/X.md', 'README.md'])).toMatchObject({
+    expect(sel(['project/process/ci-cd.md', 'changelog.d/X.md', 'README.md'])).toMatchObject({
       scope: 'filtered',
       packages: ['@4thtech-io/tools'],
       playwright: false,
@@ -143,22 +143,22 @@ describe('selectAffected: docs-only changes run only the docs checks', () => {
   });
 
   it('a doc that a package test reads selects that package as well', () => {
-    expect(sel(['docs/design/d1/tokens/color.json']).packages).toEqual([
+    expect(sel(['project/design/d1/tokens/color.json']).packages).toEqual([
       '@4thtech-io/tools',
       '@4thtech-io/ui',
     ]);
-    expect(sel(['docs/foundation/06-mcp-server.md']).packages).toEqual([
+    expect(sel(['specs/06-mcp-server.md']).packages).toEqual([
       '@4thtech-io/agentlink',
       '@4thtech-io/tools',
     ]);
-    expect(sel(['docs-site/guide/get-started/codex.md']).packages).toEqual([
+    expect(sel(['docs/guide/get-started/codex.md']).packages).toEqual([
       '@4thtech-io/agentlink',
       '@4thtech-io/tools',
     ]);
   });
 
   it('a doc consumer does not pull in its dependents', () => {
-    expect(sel(['docs/design/d1/x.md']).packages).not.toContain('@4thtech-io/agentlink');
+    expect(sel(['project/design/d1/x.md']).packages).not.toContain('@4thtech-io/agentlink');
   });
 
   it('changeset notes and knowledge files are docs', () => {
@@ -227,8 +227,8 @@ describe('the real workspace', () => {
   });
 
   it('the design tokens and the MCP spec select their doc-drift tests', () => {
-    expect(real(['docs/design/d1/tokens/colors.json']).packages).toContain('@4thtech-io/ui');
-    expect(real(['docs/foundation/06-mcp-server.md']).packages).toContain('@4thtech-io/agentlink');
+    expect(real(['project/design/d1/tokens/colors.json']).packages).toContain('@4thtech-io/ui');
+    expect(real(['specs/06-mcp-server.md']).packages).toContain('@4thtech-io/agentlink');
   });
 
   it('the node package needs the Playwright browsers', () => {
@@ -289,7 +289,7 @@ describe('package jobs: which ones a pull request runs', () => {
   });
 
   it('a docs-only change runs no package job', () => {
-    expect(running(['docs/process/ci-cd.md', 'changelog.d/x.md', 'README.md'])).toEqual([]);
+    expect(running(['project/process/ci-cd.md', 'changelog.d/x.md', 'README.md'])).toEqual([]);
   });
 
   it('a CLI-only change runs keychain, bundle-check and the browser suites (e2e is above the CLI)', () => {
@@ -391,14 +391,14 @@ describe('heavy lane: which heavy jobs a pull request runs (by area)', () => {
         'packages/ui/src/components/surface.tsx',
         'e2e/test/local-ui-sheet-close.test.ts',
         'changelog.d/X.md',
-        'docs/process/backlog.md',
+        'project/process/backlog.md',
       ]),
     ).toEqual([]);
   });
 
   it('a docs-only change runs no heavy job, even a Windows guide', () => {
     expect(
-      running(['docs-site/guide/get-started/windows.md', 'changelog.d/W5-WINDOWS.md']),
+      running(['docs/guide/get-started/windows.md', 'changelog.d/W5-WINDOWS.md']),
     ).toEqual([]);
   });
 
@@ -519,7 +519,7 @@ describe('macOS legs (OPS-MACOS-QUEUE)', () => {
     'packages/ui/src/button.ts',
     'packages/crypto/src/hash.ts',
     'pnpm-lock.yaml',
-    'docs/process/macos-notes.md',
+    'project/process/macos-notes.md',
   ])('an ordinary change (%s) skips the macOS legs', (f) => {
     expect(macosAffected([f])).toBe(false);
     expect(jobOutputs(selectAffected({ files: [f], workspace: fake }))).toContain(
@@ -613,7 +613,7 @@ describe('ci.yml wires the job selection', () => {
 // CHORE-CI-DOCS-FASTLANE and OPS-FAST-LANE-1: which events take the fast lane. Anything unknown fails
 // towards running everything.
 describe('fastLane: the fast lane and the heavy lane', () => {
-  const DOC = ['docs/process/ci-cd.md', 'changelog.d/X.md', 'README.md', '.changeset/a-b.md'];
+  const DOC = ['project/process/ci-cd.md', 'changelog.d/X.md', 'README.md', '.changeset/a-b.md'];
   const CODE = ['apps/cli/src/index.ts'];
   const FULL = { codeChanged: true, selector: false };
   const FEATURE = 'refs/heads/feat/x';
@@ -683,9 +683,9 @@ describe('docsOnly: the docs fast lane', () => {
   const pr = (files, coupledRefs = []) => docsOnly({ event: 'pull_request', files, coupledRefs });
 
   it('is true when every path is prose or an image in a doc tree', () => {
-    expect(pr(['docs/process/ci-cd.md'])).toBe(true);
-    expect(pr(['docs/foundation/00-README.md', 'docs/lessons/new.md'])).toBe(true);
-    expect(pr(['docs-site/technical/project/x.md', 'docs-site/guide/.gitbook/assets/a.png'])).toBe(
+    expect(pr(['project/process/ci-cd.md'])).toBe(true);
+    expect(pr(['specs/00-README.md', 'project/lessons/new.md'])).toBe(true);
+    expect(pr(['docs/technical/project/x.md', 'docs/guide/.gitbook/assets/a.png'])).toBe(
       true,
     );
     expect(pr(['knowledge/agentlink-overview.md'])).toBe(true);
@@ -718,8 +718,8 @@ describe('docsOnly: the docs fast lane', () => {
     expect(pr(['.github/CODEOWNERS'])).toBe(false);
     expect(pr(['packages/core/README.md'])).toBe(false); // a package publishes its README
     expect(pr(['apps/cli/README.md'])).toBe(false);
-    expect(pr(['docs/design/d1/tokens/tokens.css'])).toBe(false);
-    expect(pr(['docs/design/d1/components/reference/bundle.js'])).toBe(false);
+    expect(pr(['project/design/d1/tokens/tokens.css'])).toBe(false);
+    expect(pr(['project/design/d1/components/reference/bundle.js'])).toBe(false);
     expect(pr(['docs/x/../../packages/core/src/a.md'])).toBe(false);
     expect(pr(['docs/runbook.sh'])).toBe(false);
     expect(pr(['docs/a.sol'])).toBe(false);
@@ -728,15 +728,15 @@ describe('docsOnly: the docs fast lane', () => {
   });
 
   it('one non-doc file makes the whole diff not docs-only', () => {
-    expect(pr(['docs/process/ci-cd.md', 'packages/core/src/a.ts'])).toBe(false);
-    expect(pr(['docs/process/ci-cd.md', 'docs/status.yaml'])).toBe(false);
+    expect(pr(['project/process/ci-cd.md', 'packages/core/src/a.ts'])).toBe(false);
+    expect(pr(['project/process/ci-cd.md', 'docs/status.yaml'])).toBe(false);
   });
 
   it('a doc that a package source names is not docs-only', () => {
-    const refs = ['docs-site/guide/get-started/codex.md', 'docs/design/d1/'];
-    expect(pr(['docs-site/guide/get-started/codex.md'], refs)).toBe(false);
-    expect(pr(['docs/design/d1/copy/notes.md'], refs)).toBe(false);
-    expect(pr(['docs/process/ci-cd.md'], refs)).toBe(true);
+    const refs = ['docs/guide/get-started/codex.md', 'project/design/d1/'];
+    expect(pr(['docs/guide/get-started/codex.md'], refs)).toBe(false);
+    expect(pr(['project/design/d1/copy/notes.md'], refs)).toBe(false);
+    expect(pr(['project/process/ci-cd.md'], refs)).toBe(true);
   });
 
   it('is false when the diff is unknown or empty, and in the heavy lane', () => {

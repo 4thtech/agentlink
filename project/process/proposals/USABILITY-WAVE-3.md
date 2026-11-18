@@ -157,13 +157,13 @@ Pairing, invites, the policy engine, approvals, passkey enrolment, the publisher
 
 ## 9. Cards (proposed)
 
-Classes per `audit-rules.md` §2 (`packages/node`, `packages/crypto`, `packages/core`, `docs/foundation/04` S2; `apps/local-ui`, `apps/cli`, other `docs/foundation`, `docs/process` S1; `docs/design` S0). **Fable** = Fable 5.1 audit.
+Classes per `audit-rules.md` §2 (`packages/node`, `packages/crypto`, `packages/core`, `specs/04` S2; `apps/local-ui`, `apps/cli`, other `specs`, `project/process` S1; `project/design` S0). **Fable** = Fable 5.1 audit.
 
 | Card | What | Class | Depends on | Files | Acceptance | Fable |
 |---|---|---|---|---|---|---|
-| **U3-spec** | Spec text of §7.5 except 04 | S1 | decisions | `docs/foundation/06, 07, 08, 11` | Matches decisions; marked proposed | — |
-| **U3-spec-04** | 04 amendments | S2 | decisions | `docs/foundation/04-security-and-crypto.md` | Ops, lifetimes, residuals | Yes |
-| **U3-brief** | b11 §27 amended, §28 to §32 | S0 | decisions | `docs/design/b11-local-app.md` | Owner approves | — |
+| **U3-spec** | Spec text of §7.5 except 04 | S1 | decisions | `specs/06, 07, 08, 11` | Matches decisions; marked proposed | — |
+| **U3-spec-04** | 04 amendments | S2 | decisions | `specs/04-security-and-crypto.md` | Ops, lifetimes, residuals | Yes |
+| **U3-brief** | b11 §27 amended, §28 to §32 | S0 | decisions | `project/design/b11-local-app.md` | Owner approves | — |
 | **U3-a** | Open on Home: `openHome()` replaces `openActivity()`; `ui.ts` calls it; first run finishes on Home | S2 | — | `packages/node/src/approval-server.ts` (open function only), `apps/cli/src/commands/ui.ts` (one call), `apps/local-ui/src/pages/first-run/` (redirect) | `ui` and first run land on Home; tests | — |
 | **U3-c** | App host: `AgentDirectory` seam, current agent, generation, switch, agents list, `app.json`; **registers every U3 route in `routes.ts` as a stub** (`not_available`) so later cards only add handlers | S2 | U3-a, U3-spec | `approval-server.ts`, `local-ui/routes.ts`, `local-ui/api/agents.ts` (new), `apps/cli/src/runtime/agent-dir.ts` (seam) | Stale generation refused on every mutating route; switch closes and opens; stubs refused; RED first | Yes |
 | **U3-b** | CLI: no picker, bare command opens the app, `ui` with no agent opens Welcome | S1 | U3-c | `apps/cli/src/commands/{ui,init,agent-choice}.ts`, `apps/cli/src/dispatch.ts` | No prompt with 0, 1 or 4 agents; AI-run output unchanged | — |
@@ -177,7 +177,7 @@ Classes per `audit-rules.md` §2 (`packages/node`, `packages/crypto`, `packages/
 | **U3-j** | Start here v2, incl. the second-agent path | S1 | U3-brief, U3-c | `apps/local-ui/src/pages/home/` | Ticks from reads only | — |
 | **U3-map** | Live map on Agents, on the shared pulse module (builds UX2-pulse-shared if not yet built) | S1 | U3-brief §32, U3-flow, U3-h | `pages/agents/map/` (new), `pages/pulse/` | Click opens Messages; no content drawn; budget; reduced motion; screenshots | — |
 | **U3-map-2** | Home mini map, Contacts Map, row stream marks, compact strip | S1 | U3-map, decision 8 | `pages/home/`, `contacts/`, `messages/`, `files/`, `compact/` | Same rules, one source | — |
-| **U3-k** | End-to-end on a clean macOS user (two agents, two AI apps, a reply), README quick start, docs-site Getting started | S1 | all | `docs/runbooks/`, `README.md`, `docs-site/`, `changelog.d/` | Owner follows it without a terminal after step 0 | — |
+| **U3-k** | End-to-end on a clean macOS user (two agents, two AI apps, a reply), README quick start, docs Getting started | S1 | all | `project/runbooks/`, `README.md`, `docs/`, `changelog.d/` | Owner follows it without a terminal after step 0 | — |
 
 ## 10. Ordering (4 to 6 builders, disjoint files)
 

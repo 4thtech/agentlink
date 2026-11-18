@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: Describes protocol OCC v2: its layers, the lifecycle of an exchange and versioning. A clean re-implementation, for developers. -->
 
-> **Status: Current for v0.5.10.** Talk shipped in v0.1.0, files, records and proof packs in v0.2.0; records and receipts run on test networks only (Base Sepolia, Gnosis Chiado), with no mainnet before M3. Sources: [04 Security and crypto](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), [05 Contracts](https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md), [07 SDK, transport and storage](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md).
+> **Status: Current for v0.5.10.** Talk shipped in v0.1.0, files, records and proof packs in v0.2.0; records and receipts run on test networks only (Base Sepolia, Gnosis Chiado), with no mainnet before M3. Sources: [04 Security and crypto](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md), [05 Contracts](https://github.com/4thtech/agentlink/blob/main/specs/05-contracts-occ-v2.md), [07 SDK, transport and storage](https://github.com/4thtech/agentlink/blob/main/specs/07-sdk-transport-storage.md).
 
 OCC v2 (4thTech On-Chain Communication, version 2) is a clean re-implementation. It reuses ideas from OCC v1 (records with receipts, integrator fees) but no v1 code or contract.
 

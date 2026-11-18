@@ -25,4 +25,4 @@ summary: Planned outline for self-hosting the always-on cloud agent in your own 
 - Connect ChatGPT and claude.ai
 - Updating, rotating secrets and removing the deployment
 
-**Filled in at:** v0.6.0, backlog card DOCS-CLOUD. Spec: [08 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/08-clients-console-cloud.md).
+**Filled in at:** v0.6.0, backlog card DOCS-CLOUD. Spec: [08 §3](https://github.com/4thtech/agentlink/blob/main/specs/08-clients-console-cloud.md).

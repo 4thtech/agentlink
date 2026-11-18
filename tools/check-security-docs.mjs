@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// DOCS-UNDER-THE-HOOD: keeps the security explanation layer (docs-site/technical, knowledge) in step
+// DOCS-UNDER-THE-HOOD: keeps the security explanation layer (docs/technical, knowledge) in step
 // with the normative spec 04 and the decision log. Checks, all against the real repository:
 //   1. threat mirror: every threat named in 04 §7 appears in threat-model.md (or tools/security-docs.json
 //      `threats`, with a reason);
-//   2. decision coverage: every decided entry in docs/foundation/decisions/ that cites 04 is referenced
+//   2. decision coverage: every decided entry in specs/decisions/ that cites 04 is referenced
 //      (D-N) on a security page, or listed in tools/security-docs.json `decisions` with a reason; the
-//      index docs/foundation/decisions/README.md has exactly one row per decision file;
+//      index specs/decisions/README.md has exactly one row per decision file;
 //   3. stale wording: "Status: Design" and "next release" are refused on pages whose subject has shipped
-//      (every docs-site/technical page, plus `shippedPages`), and a "Current for vX.Y" stamp older than the current minor version
-//      (apps/cli/package.json) is refused on every docs-site and knowledge page;
-//   4. section references: every "NN §x.y" on docs-site and knowledge pages names a numbered heading
+//      (every docs/technical page, plus `shippedPages`), and a "Current for vX.Y" stamp older than the current minor version
+//      (apps/cli/package.json) is refused on every docs and knowledge page;
+//   4. section references: every "NN §x.y" on docs and knowledge pages names a numbered heading
 //      that exists in spec NN.
 // Exit 1 on any finding. `--pr <base>` additionally prints the PR-hygiene warning (never fails): a diff
 // touching a security-sensitive path should touch a security page or carry "security-docs: none" in
@@ -21,9 +21,9 @@ import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const SPEC_DIR = 'docs/foundation';
-const DECISIONS_DIR = 'docs/foundation/decisions';
-const THREAT_PAGE = 'docs-site/technical/concepts/threat-model.md';
+const SPEC_DIR = 'specs';
+const DECISIONS_DIR = 'specs/decisions';
+const THREAT_PAGE = 'docs/technical/concepts/threat-model.md';
 
 /** Lower case, no Markdown emphasis or code marks, typographic quotes folded, whitespace collapsed. */
 export function normalise(text) {
@@ -181,7 +181,7 @@ export function securityDocsWarning(paths, body = '', config = loadConfig()) {
   const sensitive = config.sensitivePaths.map((s) => new RegExp(s));
   const hits = paths.filter((p) => sensitive.some((re) => re.test(p)));
   if (hits.length === 0) return null;
-  const pages = new Set([...config.securityPages, 'docs-site/technical/reference/policies.md']);
+  const pages = new Set([...config.securityPages, 'docs/technical/reference/policies.md']);
   if (paths.some((p) => pages.has(p))) return null;
   if (/^\s*security-docs:\s*none\b/im.test(body)) return null;
   return (
@@ -239,10 +239,10 @@ export function runChecks(base = root) {
   const version = JSON.parse(read('apps/cli/package.json')).version;
   const shipped = new Set(config.shippedPages);
   // Every technical page counts as shipped: an unbuilt subject says "Planned for vX" instead.
-  const isShipped = (p) => shipped.has(p) || p.startsWith('docs-site/technical/');
-  const pages = [...walk(join(base, 'docs-site')), ...walk(join(base, 'knowledge'))]
+  const isShipped = (p) => shipped.has(p) || p.startsWith('docs/technical/');
+  const pages = [...walk(join(base, 'docs')), ...walk(join(base, 'knowledge'))]
     .map((f) => relative(base, f).split('\\').join('/'))
-    .filter((p) => !p.startsWith('docs-site/_templates/') && p !== 'docs-site/MAINTAINING.md');
+    .filter((p) => !p.startsWith('docs/_templates/') && p !== 'docs/MAINTAINING.md');
   let refs = 0;
   for (const p of pages) {
     const text = read(p);

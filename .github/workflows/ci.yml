@@ -5,11 +5,11 @@
 # repository and every Node job skips cleanly when there is nothing to run, so
 # this workflow is green on a docs-only repo and activates by itself once the
 # skeleton lands. To turn "skip" into "fail" for missing root scripts, commit an
-# empty file `.github/ci-strict` (see docs/process/ci-cd.md).
+# empty file `.github/ci-strict` (see project/process/ci-cd.md).
 #
 # `ci-gate` is the single required status check for this workflow.
 #
-# Security posture (docs/foundation/04 §7): no secrets, read-only token, every
+# Security posture (specs/04 §7): no secrets, read-only token, every
 # action pinned to a full commit SHA, no lifecycle scripts on install,
 # no event data interpolated into shell scripts.
 name: CI
@@ -256,7 +256,7 @@ jobs:
 
       # CHORE-CI-SPEED-2: a pull request lints, typechecks, builds and tests only the packages it
       # touches, their dependents, and the packages whose tests read a changed doc
-      # (tools/ci/select-affected.mjs, rules in docs/process/ci-cd.md "What runs where").
+      # (tools/ci/select-affected.mjs, rules in project/process/ci-cd.md "What runs where").
       # CHORE-CI-SPEED-3 and OPS-FAST-LANE-1: the same step decides which package jobs (by package)
       # and heavy-lane jobs (by area) run (run_<job>). It runs in the fast lane only (`use_selector`
       # of the step above); a push to `main` or `wave-4` runs everything and never reaches it. A
@@ -290,7 +290,7 @@ jobs:
     name: checks
     needs: detect
     # CHORE-CI-MATRIX-QUEUE-ONLY: runs on every change that is not docs-only: it holds the doc-drift
-    # tests (spec, README, docs-site, knowledge). OPS-DOCS-FASTLANE: a diff of only documentation that
+    # tests (spec, README, docs, knowledge). OPS-DOCS-FASTLANE: a diff of only documentation that
     # no package reads (`docs_only`) runs `docs-checks` instead, which runs those doc checks directly.
     if: needs.detect.outputs.has_skeleton == 'true' && needs.detect.outputs.docs_only != 'true'
     runs-on: ubuntu-24.04
@@ -536,7 +536,7 @@ jobs:
           # REL-LINKS-3: the Mac download links never name a version.
           node tools/check-download-links.mjs
           node tools/docs-status/index.mjs --check
-          # DOCS-UNIFY: docs-site still generates a clean 4thTech Docs (wiki) copy: every page in its
+          # DOCS-UNIFY: docs still generates a clean 4thTech Docs (wiki) copy: every page in its
           # SUMMARY.md, every link and image resolves after the GitBook rewrite.
           node tools/docs/wiki-sync.mjs --preflight
           # DOCS-UNDER-THE-HOOD: the security pages mirror 04 §7 and the decided 04 decisions, no stale
@@ -591,7 +591,7 @@ jobs:
       - name: Set up Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
-      # Requires playwright (or @playwright/test) as a root devDependency (docs/process/ci-cd.md).
+      # Requires playwright (or @playwright/test) as a root devDependency (project/process/ci-cd.md).
       # The vectors run in all three Playwright engines (M0-9).
       - name: Install Playwright browsers
         if: needs.detect.outputs.needs_playwright == 'true'
@@ -653,7 +653,7 @@ jobs:
         run: pnpm vectors:check
 
       # Vectors come from an independent generator and are committed; tests only read them
-      # (docs/process/development-process.md §10). Independent of the runner's own check.
+      # (project/process/development-process.md §10). Independent of the runner's own check.
       - name: Fail if the run created or changed anything under test-vectors/
         shell: bash
         run: |
@@ -1352,8 +1352,8 @@ jobs:
             echo "Fix, locally on the PR branch:"
             echo "  git fetch origin && git merge origin/${BASE_REF}"
             echo "  (never rebase or force-push; resolve the files above, then commit and push)"
-            echo "Generated status files (README.md, docs-site/technical/project/status-and-roadmap.md, knowledge/agentlink-overview.md) are never merged by hand: take the base copy and regenerate:"
-            echo "  git checkout origin/${BASE_REF} -- README.md docs-site/technical/project/status-and-roadmap.md knowledge/agentlink-overview.md && node tools/docs-status/index.mjs"
+            echo "Generated status files (README.md, docs/technical/project/status-and-roadmap.md, knowledge/agentlink-overview.md) are never merged by hand: take the base copy and regenerate:"
+            echo "  git checkout origin/${BASE_REF} -- README.md docs/technical/project/status-and-roadmap.md knowledge/agentlink-overview.md && node tools/docs-status/index.mjs"
             echo "  (docs/status.yaml itself is the source: merge it by hand if it conflicts, then run the command above.)"
             echo "pnpm-lock.yaml: git checkout origin/${BASE_REF} -- pnpm-lock.yaml && pnpm install --ignore-scripts --ignore-pnpmfile"
           } >&2
@@ -1370,7 +1370,7 @@ jobs:
           set -euo pipefail
           if ! node tools/docs-status/index.mjs --check; then
             echo "::error::The generated status files are out of date against the merged tree (docs/status.yaml)."
-            echo "Fix: merge origin/main, then run: node tools/docs-status/index.mjs  and commit README.md, docs-site and knowledge." >&2
+            echo "Fix: merge origin/main, then run: node tools/docs-status/index.mjs  and commit README.md, docs and knowledge." >&2
             exit 1
           fi
 

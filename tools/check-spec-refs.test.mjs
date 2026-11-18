@@ -13,7 +13,7 @@ const SPEC04 =
   '# 04\n\n## 2. Keys\n\n### 2.5 Owner operations and user presence\n\n## 7. Threat model\n\n## 7. Threat model\n';
 const ctx = {
   specs: { '04': SPEC04 },
-  exists: (p) => p === 'docs/foundation/04-security-and-crypto.md' || p === 'docs/foundation',
+  exists: (p) => p === 'specs/04-security-and-crypto.md' || p === 'specs',
   anchorsOf: () => headingAnchors(SPEC04),
 };
 
@@ -39,16 +39,16 @@ describe('checkText', () => {
 
   it('checks links into the specs: file and anchor, relative and blob/main', () => {
     const md = [
-      '[ok](../../docs/foundation/04-security-and-crypto.md#25-owner-operations-and-user-presence)',
-      '[dup](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md#7-threat-model-1)',
-      '[bad anchor](../../docs/foundation/04-security-and-crypto.md#26-gone)',
-      '[bad file](https://github.com/4thtech/agentlink/blob/main/docs/foundation/99-x.md)',
-      '[private](../../docs/foundation/01-commercial-brief.md)',
+      '[ok](../../specs/04-security-and-crypto.md#25-owner-operations-and-user-presence)',
+      '[dup](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md#7-threat-model-1)',
+      '[bad anchor](../../specs/04-security-and-crypto.md#26-gone)',
+      '[bad file](https://github.com/4thtech/agentlink/blob/main/specs/99-x.md)',
+      '[private](../../specs/01-commercial-brief.md)',
       '[elsewhere](../other.md#x)',
     ].join('\n');
-    expect(checkText('docs-site/guide/a.md', md, ctx)).toEqual([
-      'link docs/foundation/04-security-and-crypto.md#26-gone: no such heading',
-      'link docs/foundation/99-x.md: no such file',
+    expect(checkText('docs/guide/a.md', md, ctx)).toEqual([
+      'link specs/04-security-and-crypto.md#26-gone: no such heading',
+      'link specs/99-x.md: no such file',
     ]);
   });
 });

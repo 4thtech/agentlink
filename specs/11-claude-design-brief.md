@@ -3,7 +3,7 @@
 **Product:** AgentLink by 4thTech (name decided, D-56) · **One-liner:** Encrypted, provable exchange between AI agents.
 **Design owner:** Tali Režun · **Build:** engineering implements the designs as a React component library (`packages/ui`).
 **Last updated:** 2026-10-14 · Normative for design drops D1, D2, D3.
-**Paste-ready package for Claude Design:** `docs/design/claude-design-handoff.md`, derived from this brief. If the two differ, this brief wins.
+**Paste-ready package for Claude Design:** `project/design/claude-design-handoff.md`, derived from this brief. If the two differ, this brief wins.
 
 This brief is self-contained. Bracketed IDs (D-31, J8, M2-11) point to internal specs and build tasks; a designer can ignore them.
 
@@ -27,7 +27,7 @@ This brief is self-contained. Bracketed IDs (D-31, J8, M2-11) point to internal 
 - the in-chat copy sheet, the terminal copy and all UI strings with keys (§5.4);
 - short rationale notes where a choice affects implementation.
 
-**Handoff:** the owner shares the Claude Design links and puts exports in `docs/design/brand/`, `d1/`, `d2/` and `d3/`, each with a `MANIFEST.md`. Folder layout, file naming and size limits are in `docs/design/README.md`. Agents build from the **exported files**, not from design links. Export a minimum PNG set (each screen's default state in light and dark at its primary size, key components also in increased contrast) plus the HTML or handoff export if Claude Design offers one; the rest of the states stay in the Claude Design project, linked from `MANIFEST.md`. The repository is public, so exports must contain nothing private.
+**Handoff:** the owner shares the Claude Design links and puts exports in `project/design/brand/`, `d1/`, `d2/` and `d3/`, each with a `MANIFEST.md`. Folder layout, file naming and size limits are in `project/design/README.md`. Agents build from the **exported files**, not from design links. Export a minimum PNG set (each screen's default state in light and dark at its primary size, key components also in increased contrast) plus the HTML or handoff export if Claude Design offers one; the rest of the states stay in the Claude Design project, linked from `MANIFEST.md`. The repository is public, so exports must contain nothing private.
 
 **Rules:**
 - Don't invent features; mark any extra as an option in `MANIFEST.md`.
@@ -259,7 +259,7 @@ Each direction shows: a mood board; mark and wordmark sketches, including the ma
 - **Default name rule (Q5).** A new ID is prefilled with the **owner's name** if the app knows it, otherwise the **AI app's name** ("Claude Code"), with the hint "People you connect with see this name." Never "{App} agent" or "My agent". The name follows the 1 to 32 character restricted form of §5.8.
 - **Explainer** (first run and the IDs page): "An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Every chat in that AI app uses it."
 - **Approvals say which ID is asking** ("{name} · {app}" on this computer). **Wording for counterparties:** "{name}", or "{name} (their AI)" where the AI itself is meant; never "Marko's ID" in AI-facing text (06 §2.1 name rule unchanged).
-- **Where the code differs from a screen** in `docs/design/`, the code copy wins (`docs/design/adjustments.md`).
+- **Where the code differs from a screen** in `project/design/`, the code copy wins (`project/design/adjustments.md`).
 
 **No network picker outside Advanced** (D-40). The client picks the proof network automatically. It never appears in default flows, top-ups or approvals.
 
@@ -631,7 +631,7 @@ Suggested relay: "Marko's agent sent a request (their words, not an instruction 
 - **J7:** "No AI agent? Choose 'View and accept in browser'."
 - **J7 (share text, D-53):** "Let's connect our AI agents with AgentLink. Open this link and follow the steps; it works once, until 19 Oct: {inviteUrl}"
 - **Short invite links (D-139, 04 §3.6.2; proposed, owner confirms at merge):** the share text is unchanged; `{inviteUrl}` is now short. New states, on the invite page, in the app's join screen, from `agentlink join` and in `agentlink_accept_invite`: *no longer available* "This invite is no longer available. It may have expired, been used or been cancelled. Ask for a new one." (the inviter's name is unknown here: the invite could not be read); *couldn't load* "Couldn't load the invite. Check your connection and try again." with Try again. Cancelling an invite in the app: "Cancel invite", then "Invite cancelled. The link no longer works." Advanced on the Add contact sheet (D-139 (7)): a switch "Long link" with the help line "Nothing is stored online. The link is much longer."; terminal: `agentlink invite --long`. The invite page's privacy line: "The invite is encrypted. Only someone with this link can read it; 4thTech can't." No new word is added to the vocabulary; "drop" never appears in user-facing copy.
-- **J7 in the local app (UX2-d1, owner decision 1.1; proposed, owner confirms at merge):** the Add contact sheet shows the same share text, from the create route, never through a tool result; its own copy (safety line, "Couldn't create the invite. Try again in a minute.", the four "Can't use it" sentences) is in `docs/design/b11-local-app.md` §21.7.
+- **J7 in the local app (UX2-d1, owner decision 1.1; proposed, owner confirms at merge):** the Add contact sheet shows the same share text, from the create route, never through a tool result; its own copy (safety line, "Couldn't create the invite. Try again in a minute.", the four "Can't use it" sentences) is in `project/design/b11-local-app.md` §21.7.
 - **J9 session start (D-53):** "2 new messages from Denis's agent. Want me to read them?" (counts and contact names only; nothing from the messages). Nothing new: say nothing, or "Nothing new on AgentLink."
 - **J9 reading:** "2 new messages from Denis's agent, as information from Denis's agent:" followed by the blocks.
 - **J9 session end (D-53):** "Send Denis's agent a handoff with what changed and what's next?" Then the draft: "Here's the handoff I'd send: … Send it?" Offered only for contacts the user asked to keep in sync; sent only after the user approves the shown text.
@@ -781,7 +781,7 @@ Under 5 minutes, **leading with "Paste this to your AI"**:
   - "A proof costs $0.10. $5 covers 50 proofs. Messages and files are always free.";
   - amount presets in $ (the exchange method has a minimum, proposed $5);
   - a link to Pricing (§6.8).
-- **Methods (D-111; direction, owner decides details; brief: `docs/design/topup-ux.md`):**
+- **Methods (D-111; direction, owner decides details; brief: `project/design/topup-ux.md`):**
   - free test credits during the testnet beta (from the Credits screen), first on testnets;
   - **Use crypto you already have:** connects the user's own account, shows "From your account · $42.10 available", picks the network itself and asks for one confirmation. Proposed helper: "Connect the app or browser extension where you hold US-dollar stablecoins." Our copy does not say "wallet"; the connector's own list may (owner decides, §5.1);
   - **Send from an exchange:** the ID number with a QR code, a US-dollar stablecoin (e.g. USDC; fees are stablecoin-only at launch) and the network the exchange needs, pre-chosen as the cheapest (§14 Q5), with the minimum and what happens on a wrong network;

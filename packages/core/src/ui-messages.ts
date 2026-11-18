@@ -1,5 +1,5 @@
 // The local app's Messages and Files In/Out reads (MSG-FILES-IO-a; plan
-// docs/process/proposals/MSG-FILES-IO.md §3, §4; 06 §2.2, §4; 07 §3, §3.1; 04 §4). What the owner
+// project/process/proposals/MSG-FILES-IO.md §3, §4; 06 §2.2, §4; 07 §3, §3.1; 04 §4). What the owner
 // sees in the app of what their AI sent and received, decrypted only on this computer.
 //
 // Read-only (I-4). These views never write to the store: in particular they never set `read_at`,

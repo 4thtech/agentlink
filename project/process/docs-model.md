@@ -1,13 +1,13 @@
 # Docs model: one way to write every AgentLink page
 
-How every public page is built, so the guide, the technical docs, GitBook and the wiki read as one system (owner request, 2026-10-26). Upkeep and publishing: [`docs-site/MAINTAINING.md`](../../docs-site/MAINTAINING.md). Templates: [`docs-site/_templates/`](../../docs-site/_templates/README.md). Worked example: [Files page](../../docs-site/guide/local-app/files.md).
+How every public page is built, so the guide, the technical docs, GitBook and the wiki read as one system (owner request, 2026-10-26). Upkeep and publishing: [`docs/MAINTAINING.md`](../../docs/MAINTAINING.md). Templates: [`docs/_templates/`](../../docs/_templates/README.md). Worked example: [Files page](../../docs/guide/local-app/files.md).
 
 ## 1. Readers and layers
 
 | Space | Reader | Words |
 |---|---|---|
-| `docs-site/guide` | Anyone using AgentLink through their AI app | [11 §5](../foundation/11-claude-design-brief.md#5-vocabulary-and-microcopy) only |
-| `docs-site/technical` | Builders, reviewers, verifiers, contributors | Technical terms, defined on first use; specs win |
+| `docs/guide` | Anyone using AgentLink through their AI app | [11 §5](../../specs/11-claude-design-brief.md#5-vocabulary-and-microcopy) only |
+| `docs/technical` | Builders, reviewers, verifiers, contributors | Technical terms, defined on first use; specs win |
 
 Every page has two layers:
 1. **Simple first.** The top answers "what is this, and what do I do?" in plain words. A reader who stops there is not misled.
@@ -41,7 +41,7 @@ The status line follows MAINTAINING §3: one short line, no release history.
 - **Collapsible deeper part.** `<details><summary>For the technically curious</summary>` + a blank line + markdown + `</details>`. Both GitBook and GitHub render it.
 - **What you see table.** Columns: *What you see* (the exact UI words, in bold) · *What it means* · *What happens behind* (one plain sentence).
 - **Steps.** A numbered list, one action per step, UI words in **bold** exactly as on screen, the result in the same step.
-- **Diagrams.** Mermaid, `flowchart LR` for flows, `sequenceDiagram` for exchanges, at most 9 boxes. Labels in the page's vocabulary (guide: "Your AI", "AgentLink on your computer", "4thTech", "Public record"). Groups say whose they are ("On your computer (only you)"). No custom colours by default, so light and dark themes both work. For emphasis, one class with stroke `#FF6A1A` (signal orange, [`docs/design`](../design/README.md)); never the 4thTech green. A dashed `-.-x` arrow means "cannot".
+- **Diagrams.** Mermaid, `flowchart LR` for flows, `sequenceDiagram` for exchanges, at most 9 boxes. Labels in the page's vocabulary (guide: "Your AI", "AgentLink on your computer", "4thTech", "Public record"). Groups say whose they are ("On your computer (only you)"). No custom colours by default, so light and dark themes both work. For emphasis, one class with stroke `#FF6A1A` (signal orange, [`project/design`](../design/README.md)); never the 4thTech green. A dashed `-.-x` arrow means "cannot".
 - **Screenshots.** See §5.
 
 ## 4. The UI ↔ tech bridge
@@ -55,23 +55,23 @@ Every screen guide ends with a table inside **For the technically curious**: *On
 - **Real app, generated.** `pnpm docs:screens` renders the real app on the journey harness (temp homes, keychain stand-in, in-memory relay, virtual passkey): never a real home, keychain, key, code or person. The two people are **Tali** and **Natasa**.
 - **Fixed frame.** 1280 × 800 at device scale 2, light theme, WebP, about 40 to 70 KB each.
 - **Names.** `<page-or-moment>.webp`, lowercase with hyphens, for example `accept-invite.webp`. Add a shot by adding one `shot(page, '<name>')` step to the generator.
-- **Stored** in `docs-site/assets/screens/`, shared by the README, the guide and the technical docs; embedded as `<figure><img src="../assets/screens/NAME.webp" alt="<what it shows and why>"><figcaption><p><caption></p></figcaption></figure>` (one more `../` per folder level).
+- **Stored** in `docs/assets/screens/`, shared by the README, the guide and the technical docs; embedded as `<figure><img src="../../docs/assets/screens/NAME.webp" alt="<what it shows and why>"><figcaption><p><caption></p></figcaption></figure>` (one more `../` per folder level).
 - **Alt text** says what the reader should notice, not "screenshot".
 - **Placeholder** until captured: `<!-- screenshot: <name> | shows: <state> -->`.
-- **Refresh** with `pnpm docs:screens` when any string on a shot changes. The older dark, fixture-based shots in `docs-site/guide/.gitbook/assets/` stay only until the generator covers their pages (files, proofs, rules).
+- **Refresh** with `pnpm docs:screens` when any string on a shot changes. The older dark, fixture-based shots in `docs/guide/.gitbook/assets/` stay only until the generator covers their pages (files, proofs, rules).
 
 ## 6. Wording
 
-- Guide words follow [11 §5](../foundation/11-claude-design-brief.md#5-vocabulary-and-microcopy); the vocabulary check (`tools/vocabulary.test.mjs`) enforces it.
+- Guide words follow [11 §5](../../specs/11-claude-design-brief.md#5-vocabulary-and-microcopy); the vocabulary check (`tools/vocabulary.test.mjs`) enforces it.
 - Short sentences. One idea per paragraph. Outcome first, then the next step.
 - Say what changes and what does not ("Nothing was changed").
-- The first use of a product term on a page links to the [glossary](../../docs-site/guide/help/glossary.md).
+- The first use of a product term on a page links to the [glossary](../../docs/guide/help/glossary.md).
 - UI words exactly as the app shows them. The source is the page's `strings.ts`, not memory.
 - Never claim what is not released, and never overstate privacy or legal weight.
 
 ## 7. Links: repo, GitBook, wiki
 
-- **One source:** `docs-site/` on `main`. Never edit in GitBook; GitBook only shows what the wiki repo holds (§8).
+- **One source:** `docs/` on `main`. Never edit in GitBook; GitBook only shows what the wiki repo holds (§8).
 - Inside the docs: relative links. To specs or code: absolute `https://github.com/4thtech/agentlink/blob/main/...` URLs. Between the guide and the technical docs, relative links keep working because both folders are copied together (§8).
 - **GitHub wiki of this repo:** a short map of a few pages (Home, Guide, Technical docs, Releases and roadmap) that links into GitBook ([wiki.4thtech.io](https://wiki.4thtech.io)) and the repo. Never a copy of a page.
 
@@ -80,16 +80,16 @@ Every screen guide ends with a table inside **For the technically curious**: *On
 **Decided by Tali, 2026-10-26.**
 
 - **One space.** GitBook has a single space, the 4thTech Docs site, Git-synced from the private repo `4thtech/wiki.4thtech.io` (domain `wiki.4thtech.io`). There is no AgentLink-specific space and no Git Sync from this repo.
-- **Single source.** AgentLink's docs stay in this repo's `docs-site/`. They are copied into the wiki repo, never written there.
+- **Single source.** AgentLink's docs stay in this repo's `docs/`. They are copied into the wiki repo, never written there.
 - **Sync model.**
-  1. A script in the wiki repo will copy `docs-site/guide` and `docs-site/technical` from the **release tag** of AgentLink (tags only, never `main`) into the AgentLink section of the wiki repo.
+  1. A script in the wiki repo will copy `docs/guide` and `docs/technical` from the **release tag** of AgentLink (tags only, never `main`) into the AgentLink section of the wiki repo.
   2. **Planned: the script is not built yet.** Today the AgentLink section of 4thTech Docs is a short summary. When it exists, it opens a pull request in the wiki repo; it needs no secrets (public repo read).
   3. A merge there publishes through that repo's Git Sync.
   4. After two releases done by hand with the script, it moves to a GitHub Action in the wiki repo.
 - **Brand.** 4thTech is the master brand and AgentLink a sub-brand: "AgentLink by 4thTech". The site header uses the 4thTech logo from 4thTech's original file (never redrawn). AgentLink landing pages show its horizontal lockup; the footer uses the endorsed lockup ([brand rules](../../brand/README.md)). The two marks are never merged; the AgentLink mark is never put inside a hexagon.
 - **Cross-links.** The AgentLink landing page says in one line that it builds on earlier 4thTech work and links it; earlier pages carry one line pointing to AgentLink as the current product.
 - **Intro GIF** (on the repo README, today a relative path): pinning its URL to the release tag is planned for the 4thTech Docs copy, so a copied page never shows a newer or missing file.
-- **Screenshots:** light theme, one set, from `docs-site/assets/screens/` (§5); the wiki sync copies that folder too.
+- **Screenshots:** light theme, one set, from `docs/assets/screens/` (§5); the wiki sync copies that folder too.
 - **OCC v1** (EUPL-1.2 with a non-commercial rider): reference only; link, never copy code.
 
 ## 9. Definition of done (every page)

@@ -7,7 +7,7 @@
 // Two sources are read:
 //  - TypeScript copy files: only string literals (and template text) are linted, so comments and
 //    identifiers never trigger it;
-//  - user docs: README.md, llms.txt, knowledge/ and docs-site/guide, with code, link targets and
+//  - user docs: README.md, llms.txt, knowledge/ and docs/guide, with code, link targets and
 //    comments removed first.
 // Exceptions are listed in ALLOWED: a file, the exact phrase and the reason. An entry that no longer
 // matches fails, so the list cannot outlive the text it excuses.
@@ -24,13 +24,13 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 /** Reviewed exceptions: file (repo-relative) + the lower-case phrase the rule matches. */
 const ALLOWED = [
   {
-    file: 'docs-site/guide/local-app/contacts.md',
+    file: 'docs/guide/local-app/contacts.md',
     phrase: "ana's agent",
     reason:
       'alt text of a screenshot taken before the rename that still shows the old word; remove when the screenshot is retaken',
   },
   {
-    file: 'docs-site/guide/local-app/messages.md',
+    file: 'docs/guide/local-app/messages.md',
     phrase: "marko's agent",
     reason:
       'alt text of a screenshot taken before the rename that still shows the old word; remove when the screenshot is retaken',
@@ -98,7 +98,7 @@ function docFiles() {
     }
   };
   walk('knowledge');
-  walk('docs-site/guide');
+  walk('docs/guide');
   return out;
 }
 

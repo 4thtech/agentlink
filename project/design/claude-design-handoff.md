@@ -1,7 +1,7 @@
 # AgentLink: design handoff for Claude Design
 
 > Paste or upload this one file into Claude Design. It is self-contained.
-> Derived from `docs/foundation/11-claude-design-brief.md` on 2026-10-14. If the two ever differ, the brief wins; tell the owner.
+> Derived from `specs/11-claude-design-brief.md` on 2026-10-14. If the two ever differ, the brief wins; tell the owner.
 > Design owner: Tali Režun. Everything here is public; nothing private belongs in the designs or exports.
 
 ---
@@ -554,7 +554,7 @@ The owner exports from Claude Design and commits to the public repository `4thte
 ### 13.1 Where files go
 
 ```
-docs/design/
+project/design/
   brand/                      # current approved brand; updated by any drop
     MANIFEST.md
     logo/                     # SVG + PNG

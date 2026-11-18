@@ -1,5 +1,5 @@
 // MSG-FILES-IO-c: the Messages page's API (08 §1; 04 §2.5; D-133, D-134; plan
-// docs/process/proposals/MSG-FILES-IO.md §4; I-4, I-5, I-7).
+// project/process/proposals/MSG-FILES-IO.md §4; I-4, I-5, I-7).
 //
 // What these tests hold the routes to:
 // - two read routes (`GET`, `presence: false`) in the default registry; no other method on their

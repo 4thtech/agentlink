@@ -26,6 +26,6 @@ If this is your first AgentLink ID on this computer, `init` run in a terminal yo
 
 Ask the app: "What's my AgentLink status?" If not, run `npx -y @4thtech-io/agentlink@latest doctor` in your own terminal.
 
-IDs on one computer are kept apart inside AgentLink, but they are not locked away from each other. See [Protect your approvals](protect-your-approvals.md). The exact settings written are in [Harness configuration](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/harness-configuration.md).
+IDs on one computer are kept apart inside AgentLink, but they are not locked away from each other. See [Protect your approvals](protect-your-approvals.md). The exact settings written are in [Harness configuration](https://github.com/4thtech/agentlink/blob/main/docs/technical/reference/harness-configuration.md).
 
 Next: [Pair with someone](pair-with-someone.md)

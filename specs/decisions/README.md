@@ -2,7 +2,7 @@
 
 Every product, protocol, security and process decision for AgentLink, one file per decision. This index replaces the table that used to sit in [`00-README.md`](../00-README.md). The specs (02 to 12) are normative; a decision records why they say what they say, and a spec change that needs a decision adds one here.
 
-**Adding a decision:** create `D-NNN.md` (three digits, the next free number) with the same outline as the others (heading `# D-N: title`, then Status, Date, Specs and the Decision text) and add its row to the table below. [`tools/check-security-docs.mjs`](../../../tools/check-security-docs.mjs) checks that every file has a row here and that every decided entry citing 04 is explained on a security page or allowlisted.
+**Adding a decision:** create `D-NNN.md` (three digits, the next free number) with the same outline as the others (heading `# D-N: title`, then Status, Date, Specs and the Decision text) and add its row to the table below. [`tools/check-security-docs.mjs`](../../tools/check-security-docs.mjs) checks that every file has a row here and that every decided entry citing 04 is explained on a security page or allowlisted.
 
 Status: **Decided** (an owner decision; details may still say "owner confirms at merge"), **Decided in part** (some points decided, others proposed), **Proposed** or **Open**. Each file holds the full status text, including amendments and supersessions.
 

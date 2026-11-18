@@ -1,4 +1,4 @@
-// Generated from docs/design/d1/tokens/tokens.source.json (D1 drop, 2026-10-14). Do not edit by
+// Generated from project/design/d1/tokens/tokens.source.json (D1 drop, 2026-10-14). Do not edit by
 // hand: tokens.test.ts diffs every value against the D1 source, so a drift fails CI.
 
 export const themes = ['dark', 'light', 'dark-contrast', 'light-contrast'] as const;

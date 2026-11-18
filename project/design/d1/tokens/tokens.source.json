@@ -2,7 +2,7 @@
  "name": "AgentLink",
  "version": 1,
  "meta": {
-  "source": "AgentLink design handoff (docs/foundation/11-claude-design-brief.md, 2026-10-14)"
+  "source": "AgentLink design handoff (specs/11-claude-design-brief.md, 2026-10-14)"
  },
  "color": {
   "themes": [

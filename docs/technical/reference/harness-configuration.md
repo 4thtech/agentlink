@@ -9,17 +9,17 @@ summary: What agentlink init writes into each supported AI app's configuration, 
 
 ## How `agentlink init` configures a harness
 
-`npx -y @4thtech-io/agentlink init` detects Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode, Antigravity, Cursor and Windsurf, prints the exact diff of each config file, and writes it only after confirmation. `init --harness <id>` (`claude-code`, `claude-desktop`, `codex`, `gemini-cli`, `opencode`, `antigravity`, `cursor`, `windsurf`) proposes that one app only (`claude-desktop` and the stricter Gemini CLI detection are available since v0.1.1), and `init --harness none` creates the agent identity only. Answering no to every proposed change writes no config but keeps the agent identity. In an interactive terminal it asks `y/N` for each file. Run by an agent (no terminal, or a harness marker set), it prints the diff and a one-time confirmation code, writes nothing, and `init --confirm <code>` then writes exactly those changes. The code is a hash of the shown changes, so it stops matching if they change. This is transparency, not a security boundary: an agent with a shell can edit its own harness config anyway ([06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation)).
+`npx -y @4thtech-io/agentlink init` detects Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode, Antigravity, Cursor and Windsurf, prints the exact diff of each config file, and writes it only after confirmation. `init --harness <id>` (`claude-code`, `claude-desktop`, `codex`, `gemini-cli`, `opencode`, `antigravity`, `cursor`, `windsurf`) proposes that one app only (`claude-desktop` and the stricter Gemini CLI detection are available since v0.1.1), and `init --harness none` creates the agent identity only. Answering no to every proposed change writes no config but keeps the agent identity. In an interactive terminal it asks `y/N` for each file. Run by an agent (no terminal, or a harness marker set), it prints the diff and a one-time confirmation code, writes nothing, and `init --confirm <code>` then writes exactly those changes. The code is a hash of the shown changes, so it stops matching if they change. This is transparency, not a security boundary: an agent with a shell can edit its own harness config anyway ([06 §7](https://github.com/4thtech/agentlink/blob/main/specs/06-mcp-server.md#7-harness-installation)).
 
 An existing `agentlink` entry that differs is left alone. Existing config is backed up before it is changed. `init` never writes an owner secret.
 
-`--config <path>` names the config file for OpenCode, Antigravity or Windsurf when it is not in the default place. The folder must exist and is resolved with `realpath`; the file must be a `.json` file and not a link, never under `~/.agentlink`, `~/.ssh` or the keychain folders. It is written like every other config: as a diff you confirm, through a temporary file renamed over the old one, with a backup. These checks stop accidents and misdirected paths; they can't stop a program running as you from swapping a folder in between ([06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation)).
+`--config <path>` names the config file for OpenCode, Antigravity or Windsurf when it is not in the default place. The folder must exist and is resolved with `realpath`; the file must be a `.json` file and not a link, never under `~/.agentlink`, `~/.ssh` or the keychain folders. It is written like every other config: as a diff you confirm, through a temporary file renamed over the old one, with a backup. These checks stop accidents and misdirected paths; they can't stop a program running as you from swapping a folder in between ([06 §7](https://github.com/4thtech/agentlink/blob/main/specs/06-mcp-server.md#7-harness-installation)).
 
 ### Several agents on one computer
 
 From 0.4.4 the local app can do the same job: since 0.4.6, **Connect** and **Disconnect** on the IDs screen (and the AI app step of Get started and New ID) connect an AI app to an ID, move it to another ID or disconnect it, with one Touch ID; the first Touch ID of Get started also creates the ID and connects the app ("{label} is ready in {app}. Restart {app} to finish."). Quit the AI app first (Claude Desktop is never written while it runs) and restart it afterwards. It shows the exact `agentlink` entry it adds, changes or removes, saves a backup of the file first, touches nothing else in it, and does not change Claude Desktop's settings while that app is open. The result is the same single entry; `init` stays the way for an AI to set itself up.
 
-Each app's config holds one `agentlink` entry, so each app runs one agent. Give each app its own agent with `init --agent <name> --harness <id>`; its entry then ends in `--agent <name>`. The owner key is set up once per computer user (`owner init`); every further agent gets its card from it with `agentlink owner add-agent --agent <name>`, run in your own terminal, one master code entry for exactly that agent ([04 §2.8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), D-78). An approval for one agent is refused by every other. The agents still run as the same user, so this is logical isolation, not a security boundary.
+Each app's config holds one `agentlink` entry, so each app runs one agent. Give each app its own agent with `init --agent <name> --harness <id>`; its entry then ends in `--agent <name>`. The owner key is set up once per computer user (`owner init`); every further agent gets its card from it with `agentlink owner add-agent --agent <name>`, run in your own terminal, one master code entry for exactly that agent ([04 §2.8](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md), D-78). An approval for one agent is refused by every other. The agents still run as the same user, so this is logical isolation, not a security boundary.
 
 ## Configuration by harness
 
@@ -68,7 +68,7 @@ The Claude desktop app (chat) has its own file, separate from Claude Code's `~/.
 
 After `init`, quit and reopen the Claude app; AgentLink appears under Connectors. A one-click extension bundle is planned for v0.2.0.
 
-Sources: [06 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#7-harness-installation) (Claude Desktop row). Not yet tried in the app.
+Sources: [06 §7](https://github.com/4thtech/agentlink/blob/main/specs/06-mcp-server.md#7-harness-installation) (Claude Desktop row). Not yet tried in the app.
 
 ### Codex (CLI, IDE extension, Codex in the ChatGPT desktop app)
 
@@ -214,7 +214,7 @@ Messages travel over public Nostr relays that see only ciphertext (I-3). The def
 
 ## Tools and approval prompts
 
-MCP tool names are `agentlink_*`. Harnesses show them under the server name, for example `mcp__agentlink__agentlink_status` in Claude Code. The annotations are advisory; policies and approvals are enforced in the core whatever the harness allows ([06 §2.0](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#20-tool-surface-d-53-d-55-frozen-at-010)).
+MCP tool names are `agentlink_*`. Harnesses show them under the server name, for example `mcp__agentlink__agentlink_status` in Claude Code. The annotations are advisory; policies and approvals are enforced in the core whatever the harness allows ([06 §2.0](https://github.com/4thtech/agentlink/blob/main/specs/06-mcp-server.md#20-tool-surface-d-53-d-55-frozen-at-010)).
 
 | Tool | Read-only | Recommended harness setting |
 |---|---|---|
@@ -228,7 +228,7 @@ Never auto-allow, by tool rule or by running them through a shell rule, any of t
 
 ## Permission settings that keep an agent away from AgentLink's private files
 
-These are guards, not a security boundary. A harness rule matches command text or file paths. A script can open a file or call the keychain API without naming it, so a rule can be bypassed by an agent that runs as your OS user ([04 §2.5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md#25-owner-operations-and-user-presence), G-1, D-67).
+These are guards, not a security boundary. A harness rule matches command text or file paths. A script can open a file or call the keychain API without naming it, so a rule can be bypassed by an agent that runs as your OS user ([04 §2.5](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md#25-owner-operations-and-user-presence), G-1, D-67).
 
 What to cover:
 
@@ -286,7 +286,7 @@ Adjust it to your system:
 - Add `Edit(<npm global prefix>/bin/**)` as an absolute path (`npm prefix -g`).
 - On Windows, the npx cache is `Edit(~/AppData/Local/npm-cache/_npx/**)` and the PowerShell profile is `Edit(~/Documents/PowerShell/**)`.
 - A `Bash(...)` rule matches the command text only. Those commands refuse to run from a terminal an AI app controls anyway; the rules add a second guard, not a boundary.
-- The last five rules stop an agent from running owner commands in its own shell. Owner commands also refuse when no terminal is attached or a harness marker is set. Both are guards ([06 §8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md#8-cli-commands)).
+- The last five rules stop an agent from running owner commands in its own shell. Owner commands also refuse when no terminal is attached or a harness marker is set. Both are guards ([06 §8](https://github.com/4thtech/agentlink/blob/main/specs/06-mcp-server.md#8-cli-commands)).
 
 On macOS, Linux and WSL2, also turn on the sandbox, which the operating system enforces for every shell command, including scripts. The Read and Edit rules above cover only Claude Code's file tools. `sandbox.filesystem.denyRead` and `denyWrite` are enforced for Bash subprocesses ([sandboxing](https://code.claude.com/docs/en/sandboxing)); the sandbox does not run on native Windows.
 

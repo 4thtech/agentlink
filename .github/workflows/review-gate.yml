@@ -1,4 +1,4 @@
-# Review gate: security class and review evidence (docs/process/audit-rules.md §2-§3, decision D-25).
+# Review gate: security class and review evidence (project/process/audit-rules.md §2-§3, decision D-25).
 #
 # Required status check: `review-gate`.
 #
@@ -184,7 +184,7 @@ jobs:
               // Public docs, published on merge (D-57). Owner decision 2026-10-25 (CHORE-CI-DOCS-FASTLANE):
               // the one generated page is exempt; its source docs/status.yaml is S0 and tools/docs-status
               // fails CI on any drift between the two.
-              [1, /^docs-site\/(?!technical\/project\/status-and-roadmap\.md$)/],
+              [1, /^docs\/(?!technical\/project\/status-and-roadmap\.md$)/],
             ];
             const classify = (path) =>
               RULES.reduce((highest, [cls, re]) => (re.test(path) ? Math.max(highest, cls) : highest), 0);

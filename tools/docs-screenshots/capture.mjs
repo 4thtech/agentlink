@@ -9,7 +9,7 @@
 // How: the built app (apps/local-ui/dist) is served from a throwaway localhost server, and every
 // /api/** call is answered in the browser by Playwright (page.route) from fixtures.mjs. There is no
 // agent, no key store, no owner code and no network: only made-up data can appear on a page.
-// Output: docs-site/guide/.gitbook/assets/<name>.png (1280 x 800, scale 2, UTC, en-US; dark unless a
+// Output: docs/guide/.gitbook/assets/<name>.png (1280 x 800, scale 2, UTC, en-US; dark unless a
 // shot says light, or phone width, which is 360 x 800).
 import { createServer } from 'node:http';
 import { mkdirSync, readFileSync, statSync } from 'node:fs';
@@ -20,7 +20,7 @@ import { chromium } from 'playwright';
 import { CONTACTS_DUPLICATE, ROUTES } from './fixtures.mjs';
 
 const DIST = fileURLToPath(new URL('../../apps/local-ui/dist/', import.meta.url));
-const OUT = fileURLToPath(new URL('../../docs-site/guide/.gitbook/assets/', import.meta.url));
+const OUT = fileURLToPath(new URL('../../docs/guide/.gitbook/assets/', import.meta.url));
 const QA_DIR = process.argv.includes('--qa')
   ? process.argv[process.argv.indexOf('--qa') + 1]
   : undefined;

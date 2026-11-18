@@ -1,4 +1,4 @@
-/* Activity (M1-11c-a1, UI-REFRESH-h): the layout of d1 Local-activity (docs/design/d2/source/screens/
+/* Activity (M1-11c-a1, UI-REFRESH-h): the layout of d1 Local-activity (project/design/d2/source/screens/
    Local-activity.dc.html) as classes, because the CSP allows no inline styles (08 §4). Tokens only.
    Day headers stick under the top bar on the solid chrome colour: no blur on a repeated element (B-11 §7). */
 .al-activity-head {

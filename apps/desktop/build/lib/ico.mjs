@@ -1,6 +1,6 @@
 // WIN-DESK-2 (R-WIN §6 item 6): the Windows tray icons. A .ico file can hold PNG images directly
 // (Windows Vista and later); this writes one from the brand PNGs in
-// docs/design/brand/icons/tray/windows, one file per taskbar colour, 16, 20, 24 and 32 px. The app
+// project/design/brand/icons/tray/windows, one file per taskbar colour, 16, 20, 24 and 32 px. The app
 // picks one at start (src/main/main.ts resourcePaths). Pure Node, so it runs on any build host.
 import { join } from 'node:path';
 import { DESKTOP_DIR } from './stage.mjs';

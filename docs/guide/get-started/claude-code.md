@@ -46,7 +46,7 @@ Install AgentLink and finish setup first. Then add the settings.
 
 ### The settings
 
-Add to `~/.claude/settings.json` (create it if it doesn't exist). This is the macOS and Linux version; use the line for your system's keychain tool and ignore the other. The [technical reference](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/harness-configuration.md) has the Windows paths, the complete list and the global install paths.
+Add to `~/.claude/settings.json` (create it if it doesn't exist). This is the macOS and Linux version; use the line for your system's keychain tool and ignore the other. The [technical reference](https://github.com/4thtech/agentlink/blob/main/docs/technical/reference/harness-configuration.md) has the Windows paths, the complete list and the global install paths.
 
 ```json
 {

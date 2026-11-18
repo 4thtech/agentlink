@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: The security model as shipped: the invariants, core design, owner presence, and desktop and local app security features. -->
 
-> **Status: Current for v0.5.10.** This page describes the security model as shipped in release 0.5.10. Source: [04 Security and crypto](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), which is normative; any change to it needs a recorded decision.
+> **Status: Current for v0.5.10.** This page describes the security model as shipped in release 0.5.10. Source: [04 Security and crypto](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md), which is normative; any change to it needs a recorded decision.
 
 ## Invariants
 
@@ -12,7 +12,7 @@ summary: The security model as shipped: the invariants, core design, owner prese
 | I-1 | Private keys are generated on the user's side and never transmitted in plaintext to any 4thTech system, relay, storage provider or chain |
 | I-2 | Plaintext content (messages, files, file keys, contact lists, policies) never leaves the user's side unencrypted |
 | I-3 | 4thTech-operated services must function correctly if fully compromised, without exposing I-1 or I-2 data; they may only deny or delay service |
-| I-4 | Policies, approvals, key export and storage credentials are owner-controlled: they take effect only with an owner signature, and the owner key unlocks only with the owner's presence: Touch ID, Windows Hello or the master code in the desktop app, a passkey or the master code in a browser, the owner passphrase on the command line. No MCP tool and no agent process can produce one. Scope: on a machine where an agent runs as the owner's OS user, the last sentence holds only under the conditions in [04 §2.5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md#25-owner-operations-and-user-presence) (G-1, D-67) |
+| I-4 | Policies, approvals, key export and storage credentials are owner-controlled: they take effect only with an owner signature, and the owner key unlocks only with the owner's presence: Touch ID, Windows Hello or the master code in the desktop app, a passkey or the master code in a browser, the owner passphrase on the command line. No MCP tool and no agent process can produce one. Scope: on a machine where an agent runs as the owner's OS user, the last sentence holds only under the conditions in [04 §2.5](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md#25-owner-operations-and-user-presence) (G-1, D-67) |
 | I-5 | All inbound content from other agents is untrusted data: never executed, never interpreted as tool instructions by our code, and clearly labelled as untrusted in tool results |
 | I-6 | Every on-chain record and receipt is EIP-712 signed with domain separation and replay protection |
 | I-7 | No logging of plaintext, keys, presigned URLs, salts or decrypted metadata anywhere, including local logs and debug mode |
@@ -164,7 +164,7 @@ Later items of D-156, in order:
 
 ## Decisions behind the mechanisms
 
-The decisions below shape the security mechanisms on this page and in 04; each file in the [decision log](https://github.com/4thtech/agentlink/blob/main/docs/foundation/decisions/README.md) has the full text. Decisions named elsewhere on this page are not repeated.
+The decisions below shape the security mechanisms on this page and in 04; each file in the [decision log](https://github.com/4thtech/agentlink/blob/main/specs/decisions/README.md) has the full text. Decisions named elsewhere on this page are not repeated.
 
 | Decision | What it settles |
 |---|---|

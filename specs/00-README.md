@@ -31,7 +31,7 @@ Documents dated **12 October 2026**. Status: **Foundation v0.1 (pre-build)**.
 | 11 | `11-claude-design-brief.md` | Design (Claude Design) | UX principles, screens, flows, copy rules |
 | 12 | `12-economics-and-fees.md` | Everyone | Public fee schedule, USD pricing, fee tokens, caps and change policy, treasury and transparency |
 | — | `CLAUDE.md` | Claude Code | Drop-in agent instructions for the new monorepo |
-| — | `docs/process/*` | Engineers, agents | Development process, audit rules, release & deployment, CI/CD, task backlog |
+| — | `project/process/*` | Engineers, agents | Development process, audit rules, release & deployment, CI/CD, task backlog |
 
 **For Claude Code:** read 00 → 03 → 04 → the spec for the component you are building → 10. Treat `04-security-and-crypto.md` § "Invariants" as non-negotiable.
 
@@ -55,13 +55,13 @@ AI agents from different people and companies (Claude, ChatGPT/Codex, Gemini/Ant
 
 ## Invariants
 
-The ten security invariants I-1 to I-10 (zero access to keys and plaintext, a compromised 4thTech service can only deny or delay, owner-only control of policies and approvals, untrusted inbound content, signed and replay-protected on-chain records, no logging of secrets, audited crypto only, the owner can read everything, export and leave) are defined in [04 §1](04-security-and-crypto.md#1-invariants-non-negotiable) and are non-negotiable. The engineer-facing explanation is the [security model](../../docs-site/technical/concepts/security-model.md); the public map from each spec to its explanation page is [Under the hood](../../docs-site/technical/concepts/under-the-hood.md).
+The ten security invariants I-1 to I-10 (zero access to keys and plaintext, a compromised 4thTech service can only deny or delay, owner-only control of policies and approvals, untrusted inbound content, signed and replay-protected on-chain records, no logging of secrets, audited crypto only, the owner can read everything, export and leave) are defined in [04 §1](04-security-and-crypto.md#1-invariants-non-negotiable) and are non-negotiable. The engineer-facing explanation is the [security model](../docs/technical/concepts/security-model.md); the public map from each spec to its explanation page is [Under the hood](../docs/technical/concepts/under-the-hood.md).
 
 ---
 
 ## Glossary
 
-The technical glossary for readers outside this folder (with the user-facing terms) is [docs-site/technical/concepts/glossary.md](../../docs-site/technical/concepts/glossary.md).
+The technical glossary for readers outside this folder (with the user-facing terms) is [docs/technical/concepts/glossary.md](../docs/technical/concepts/glossary.md).
 
 | Term | Meaning |
 |---|---|
@@ -108,13 +108,13 @@ The decision log (D-1 to D-156) lives in [`decisions/`](decisions/README.md): on
 | 0.13 | 14 Oct 2026 | D-67 (owner decision, option A): G-1 accepted as a documented M1 residual (testnets only), still open, tracked to G-42 and re-decided at M2-GATE. 04 §2.5 states presence, not intent, and the accepted residual attacks; the M1-8 same-user test is scoped to an unmodified installation without memory reads (10 M1-8); the owner seed on keychain machines is the keychain item `agentlink`/`owner` holding `ALKO` v1 under a generated owner code by default (04 §2.2), and the owner code is added to 11 §5.5; the quickstart deny rules are carded in M1-12b |
 | 0.12 | 14 Oct 2026 | D-66 (owner decisions): the G-46 construction, with an HKDF-derived payload key, the key commitment `aead.kc` and wraps derived from the CEK (04 §3.1, §3.1.1, §3.3; proof-pack verifier order in 07 §8; new gap G-48); the G-47 option, document now and add the contract fallback (M1-3l) before mainnet; the 12-code-point minimum for a chosen owner passphrase (04 §2.8); the `notarizeBatch` per-item gas ceiling raised to 125k (05 §3.4); and the CreateX AGPL-3.0 test fixture accepted with a notice and provenance entry, reviewed with D-11 (M3-6). D-65 recorded as accepted at the merge of 4thtech/agentlink#51 |
 | 0.11 | 14 Oct 2026 | D-65 (accepted, Tali, 2026-10-14, at merge of 4thtech/agentlink#51): two amendments of D-58 for owner-copy relays (G-24): the owner-channel `card-update` and `relays` in `handshake-ack`; the relay routing rule and values are in 07 §4.3. |
-| 0.10 | 14 Oct 2026 | D-64: (1) the testnet campaign's deployer key is also the mainnet deployment key (owner decision, taken against the documented default after the risk was explained), with a mandatory, fail-closed go-or-switch reassessment before mainnet and proposed mitigations; (2) one shared campaign label, so identical addresses on testnet and mainnet (owner decision; consequences proposed). In 03 §7, 05 §5.1 (testnet holders), §9 and §9.1, `release-and-deployment.md` §1, §3, §3.2, §4.2, §4.3, §6, §7.1 and §9, `onboarding.md`, `development-process.md` §12.1, the docs-site contract reference and architecture page, and the M1-3g, M1-9h, M2-5a, M3-2b and M3-2c cards; amends D-63 (3); review IR-D-64-1 |
+| 0.10 | 14 Oct 2026 | D-64: (1) the testnet campaign's deployer key is also the mainnet deployment key (owner decision, taken against the documented default after the risk was explained), with a mandatory, fail-closed go-or-switch reassessment before mainnet and proposed mitigations; (2) one shared campaign label, so identical addresses on testnet and mainnet (owner decision; consequences proposed). In 03 §7, 05 §5.1 (testnet holders), §9 and §9.1, `release-and-deployment.md` §1, §3, §3.2, §4.2, §4.3, §6, §7.1 and §9, `onboarding.md`, `development-process.md` §12.1, the docs contract reference and architecture page, and the M1-3g, M1-9h, M2-5a, M3-2b and M3-2c cards; amends D-63 (3); review IR-D-64-1 |
 | 0.9 | 14 Oct 2026 | D-63: testnet deployment order (Base Sepolia first, Gnosis Chiado later at the same addresses; build-plan deviation announced by the owner) and the CREATE3 salt scheme and deployer-key lifecycle (G-8, proposed), in 05 §9.1, `release-and-deployment.md` §4.2, §4.3 and §6, and 10 M1-3 |
 | 0.8 | 14 Oct 2026 | D-61 (owner's contract and envelope decisions; amends D-59 pause scope) and D-62 (accepted, Tali, 2026-10-14, at merge of 4thtech/agentlink#34, except the held-envelope cap of 100 per contact owner, which stays proposed) envelope signatures, keys and limits (G-2): the `KeyStore`/`OwnerSession` interfaces move to `@4thtech-io/crypto` and `EnvelopeKeys` replaces `hpkeOpen` with `unwrapCek` (interface change) |
 | 0.7 | 14 Oct 2026 | D-58 (owner-operation bodies, G-29) and D-59 (contract roles and delays, G-3) recorded as decided after the owner's merge of PRs #10 and #11 |
-| 0.6 | 14 Oct 2026 | D-57 (proposed) public docs published continuously from `docs-site/` through GitBook Git Sync, with status hints; amends D-29 |
+| 0.6 | 14 Oct 2026 | D-57 (proposed) public docs published continuously from `docs/` through GitBook Git Sync, with status hints; amends D-29 |
 | 0.5 | 14 Oct 2026 | D-52 automated delivery pipeline (one pipeline for every task; owner go-ahead model; services deploy to production automatically after staging smoke; npm `latest` keeps the owner's approval click; verify by content); amends D-25 |
 | 0.4 | 13 Oct 2026 | D-48 encrypted drop as the default file path (resolves D-13; amends D-05 and principle 5); D-49 one-click consumer storage connectors (M2); D-50 phased revenue operations (monthly report, internal dashboard, opt-in billing profiles); D-51 (simplified) agents under the owner's account, owner "merge" gate for S2 and sensitive paths, Denis optional; Tali approves S2 and code-owned paths on GitHub, Denis optional; review fixes IR-D48-1 (drop key, one encryption pass, drop logging, retention per `files.deleteAfter`, connector link expiry) |
 | 0.3 | 12 Oct 2026 | Product decisions D-31…D-44: commitments, J8/J9, M1a/M1b, identity, desktop apps, UX-first, zero-config chains, brand, versioning, public build |
-| 0.2 | 12 Oct 2026 | Setup session: decisions D-19…D-47; process docs added under `docs/process/` |
+| 0.2 | 12 Oct 2026 | Setup session: decisions D-19…D-47; process docs added under `project/process/` |
 | 0.1 | 12 Oct 2026 | Initial foundation pack, revised after an independent consistency and security review (owner-presence model, registration signatures, Nostr size and sync limits, SSRF rules, contract governance fixes) |

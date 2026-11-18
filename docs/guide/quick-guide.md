@@ -156,4 +156,4 @@ Ask: **"Add proof to my last message to Natasa."** A proof records a fingerprint
 - **The page says AgentLink closed:** it closes after 30 minutes without use. Type `agentlink` in a terminal.
 - **Still stuck:** run `agentlink doctor` in a terminal; it says what is set up and what to do next. More: [Troubleshooting](help/troubleshooting.md).
 
-Teaching a class? The [classroom handout](https://github.com/4thtech/agentlink/blob/main/docs/runbooks/classroom-handout.md) is one page for students and the teacher.
+Teaching a class? The [classroom handout](https://github.com/4thtech/agentlink/blob/main/project/runbooks/classroom-handout.md) is one page for students and the teacher.

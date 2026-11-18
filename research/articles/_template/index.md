@@ -24,7 +24,7 @@ What problem, why now, and what the reader will take away.
 
 ## Main sections
 
-Your argument, findings or experience. When you mention an AgentLink concept, link to the page that explains it, for example [agreements and proof](../../../docs-site/guide/everyday-use/agreements-and-proof.md) or the [architecture](../../../docs-site/technical/concepts/architecture.md).
+Your argument, findings or experience. When you mention an AgentLink concept, link to the page that explains it, for example [agreements and proof](../../../docs/guide/everyday-use/agreements-and-proof.md) or the [architecture](../../../docs/technical/concepts/architecture.md).
 
 <!-- An image: put the file in images/ and reference it with an image link to images/figure-1.png, with alt text that describes the image -->
 
@@ -37,11 +37,11 @@ What this piece does not show, and what is still open.
 
 ## Go deeper
 
-**Try it:** [quick guide](../../../docs-site/guide/quick-guide.md) · [latest release](https://github.com/4thtech/agentlink/releases/latest)
+**Try it:** [quick guide](../../../docs/guide/quick-guide.md) · [latest release](https://github.com/4thtech/agentlink/releases/latest)
 
-**Understand it:** [how AgentLink works](../../../docs-site/guide/how-agentlink-works.md) · [privacy and security](../../../docs-site/guide/privacy-and-security.md)
+**Understand it:** [how AgentLink works](../../../docs/guide/how-agentlink-works.md) · [privacy and security](../../../docs/guide/privacy-and-security.md)
 
-**Build on it:** [technical docs](../../../docs-site/technical/README.md) · [specifications](../../../docs/foundation/00-README.md)
+**Build on it:** [technical docs](../../../docs/technical/README.md) · [specifications](../../../specs/00-README.md)
 
 ## Sources & further reading
 

@@ -6,7 +6,7 @@
 | **Applies to** | Every change to `4thtech/agentlink` (public) and `4thtech/occ-v2-contracts` (private), every release, and every reviewer, human or AI. |
 | **Status** | Normative · v0.3 · 13 Oct 2026 (merge rules D-51, simplified; `apps/drop/**` S2, D-48; continuous delivery, D-25) |
 | **Companions** | `development-process.md` · `release-and-deployment.md` · `backlog.md` · `sync-protocol.md` |
-| **Source of truth** | Invariants I-1…I-10 and the threat model are in `docs/foundation/04-security-and-crypto.md`. This document never relaxes them. |
+| **Source of truth** | Invariants I-1…I-10 and the threat model are in `specs/04-security-and-crypto.md`. This document never relaxes them. |
 
 The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119 / RFC 8174.
 
@@ -30,7 +30,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 
 | Class | Name | Definition |
 |---|---|---|
-| **S0** | None | No security-relevant behaviour: docs outside `docs/foundation/`, `docs/process/` and `docs-site/`, internal tooling with no secrets, UI styling with no data flow change. |
+| **S0** | None | No security-relevant behaviour: docs outside `specs/`, `project/process/` and `docs/`, internal tooling with no secrets, UI styling with no data flow change. |
 | **S1** | Sensitive | Handles inbound content; files, paths or URLs; storage credentials; the policy or approval UI; CI or release configuration; the chain client. |
 | **S2** | Critical | Crypto; key derivation and storage; owner presence; the envelope or pairing protocol; the policy engine; contracts; anything that signs; the submitter; deploy scripts with roles. |
 
@@ -63,9 +63,9 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are used as in RFC 2119
 | `package.json` (root), `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc` (any depth), `.pnpmfile.*` (any depth), `turbo.json`, `.changeset/config.json`, `.gitleaks.toml`, `.gitleaksignore` | S1 | Supply chain, release and secret-scan configuration. `.npmrc`, `.pnpmfile.*`, `pnpm-workspace.yaml` and the root `package.json` can run code or redirect installs and publishing in CI (`--ignore-scripts` does not stop a pnpmfile), including in jobs holding the npm OIDC token |
 | `tools/release/**` | S1 | Release tooling: `release.yml` runs these scripts in jobs holding the npm OIDC token (code-owned; a sensitive path, §3) |
 | `tools/ci/**` | S1 | CI gate tooling, including the test quarantine (`tools/ci/quarantine.json`): a change can relax a gate (code-owned; a sensitive path, §3; OPS-UNSTICK-A) |
-| `docs/foundation/04-security-and-crypto.md` | S2 | Invariants |
-| other `docs/foundation/**`, `docs/process/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, `SECURITY.md` | S1 | Specs, agent instructions and harness settings |
-| `docs-site/**` | S1 | Public docs, published on merge (D-57); they restate security and privacy commitments. Mirrored in `review-gate.yml` (CHORE-CI-DOCS-FASTLANE, owner decision 2026-10-25). The one generated page `docs-site/technical/project/status-and-roadmap.md` is S0: its source `docs/status.yaml` is S0 and `tools/docs-status` fails CI on drift |
+| `specs/04-security-and-crypto.md` | S2 | Invariants |
+| other `specs/**`, `project/process/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, `SECURITY.md` | S1 | Specs, agent instructions and harness settings |
+| `docs/**` | S1 | Public docs, published on merge (D-57); they restate security and privacy commitments. Mirrored in `review-gate.yml` (CHORE-CI-DOCS-FASTLANE, owner decision 2026-10-25). The one generated page `docs/technical/project/status-and-roadmap.md` is S0: its source `docs/status.yaml` is S0 and `tools/docs-status` fails CI on drift |
 | anything else | S0 | — |
 
 This table is mirrored in two places that MUST change with it in the same PR:
@@ -499,7 +499,7 @@ An agent that finds a secret MUST NOT copy, print, move or use it; it reports th
 | PRs, approvals, relayed reviews, CI results | GitHub (public repo / private repo) |
 | Independent review, milestone and external audit reports | Private store (§4.5); published after closure |
 | Findings | Advisories and private issues (§9.2) |
-| Decisions, risk acceptances, gate passes | Decision log in `docs/foundation/decisions/` |
+| Decisions, risk acceptances, gate passes | Decision log in `specs/decisions/` |
 | Deploy records, incidents | Per `release-and-deployment.md` |
 | Feedback dispositions | Owner's sync file (`development-process.md` §14) |
 
@@ -517,4 +517,4 @@ CI logs expire, so evidence used for acceptance or audits MUST be copied (key ou
 
 ## Change control
 
-Changing this document requires the owner's approval and a decision log entry (D-xx) in `docs/foundation/decisions/`. Changes that relax any requirement are S2. Agents may propose changes but MUST NOT enable auto-merge on them: the owner merges, or enables auto-merge, himself.
+Changing this document requires the owner's approval and a decision log entry (D-xx) in `specs/decisions/`. Changes that relax any requirement are S2. Agents may propose changes but MUST NOT enable auto-merge on them: the owner merges, or enables auto-merge, himself.

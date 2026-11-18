@@ -144,7 +144,7 @@ IR-<ID>-<n>: PASS (mechanical) at <full sha> (Haiku 5.5, D-126 verifier; <summar
 The full template is `development-process.md` §4.1; this is the short form every brief includes.
 
 ```text
-Task ID / card:     <ID>, card in docs/process/backlog.md
+Task ID / card:     <ID>, card in project/process/backlog.md
 Model / class:      <Haiku|Sonnet|Opus 5.5|Fable 5.1> / <S0|S1|S2>
 Spec sections:      <e.g. 04 §3.5, 07 §4.2> (read fully)
 Invariants:         <I-x and how each applies>

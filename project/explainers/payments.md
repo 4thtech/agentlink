@@ -47,8 +47,8 @@ Quotes, charges, deposits, withdrawals and changes are public on-chain, and addr
 
 ## Read more
 
-- Fees, credits and governance: [12](../foundation/12-economics-and-fees.md)
-- Contract mechanics: [05 §2](../foundation/05-contracts-occ-v2.md)
-- Paid proof tools: [06 §2.4](../foundation/06-mcp-server.md)
-- Credits top-up flow: [03 §4.4](../foundation/03-architecture.md)
-- Signed maximum fee: [05 §3.1](../foundation/05-contracts-occ-v2.md)
+- Fees, credits and governance: [12](../../specs/12-economics-and-fees.md)
+- Contract mechanics: [05 §2](../../specs/05-contracts-occ-v2.md)
+- Paid proof tools: [06 §2.4](../../specs/06-mcp-server.md)
+- Credits top-up flow: [03 §4.4](../../specs/03-architecture.md)
+- Signed maximum fee: [05 §3.1](../../specs/05-contracts-occ-v2.md)

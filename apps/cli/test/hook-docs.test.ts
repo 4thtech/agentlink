@@ -4,11 +4,11 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const PAGES = [
-  '../../../docs-site/guide/get-started/claude-code.md',
-  '../../../docs-site/guide/get-started/codex.md',
-  '../../../docs-site/guide/get-started/gemini-cli.md',
-  '../../../docs-site/technical/reference/harness-configuration.md',
-  '../../../docs-site/technical/reference/cli.md',
+  '../../../docs/guide/get-started/claude-code.md',
+  '../../../docs/guide/get-started/codex.md',
+  '../../../docs/guide/get-started/gemini-cli.md',
+  '../../../docs/technical/reference/harness-configuration.md',
+  '../../../docs/technical/reference/cli.md',
 ];
 
 const read = (path: string): string => readFileSync(new URL(path, import.meta.url), 'utf8');

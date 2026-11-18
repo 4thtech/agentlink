@@ -45,7 +45,7 @@ No passkey, or it won't work? Choose **Use your master code instead** (a small l
 
 | On the page | What happens | Where it is built |
 |---|---|---|
-| The sheet | Shows only the statement your computer's AgentLink built from stored data. Nothing comes from the link or from your AI | `POST /api/ui/pay-confirm/begin` and `/finish` · [04 §2.5.3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md) · D-132 |
+| The sheet | Shows only the statement your computer's AgentLink built from stored data. Nothing comes from the link or from your AI | `POST /api/ui/pay-confirm/begin` and `/finish` · [04 §2.5.3](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md) · D-132 |
 | Confirm with Touch ID | A passkey check that requires you to be present, tied to this exact statement and used once | [`pay-confirm.ts`](https://github.com/4thtech/agentlink/blob/main/packages/node/src/pay-confirm.ts) |
 | Page text | Every word on the sheet | [`pay-confirm.tsx`](https://github.com/4thtech/agentlink/blob/main/packages/ui/src/components/pay-confirm.tsx) |
 

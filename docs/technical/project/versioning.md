@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: How AgentLink versions releases, formats and these docs, with a link to the changelog. -->
 
-> **Status: Current.** Source: [versioning.md](https://github.com/4thtech/agentlink/blob/main/docs/process/versioning.md). Release history: [CHANGELOG.md](https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md) (Keep a Changelog) and GitHub Releases.
+> **Status: Current.** Source: [versioning.md](https://github.com/4thtech/agentlink/blob/main/project/process/versioning.md). Release history: [CHANGELOG.md](https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md) (Keep a Changelog) and GitHub Releases.
 
 ## Product version
 
@@ -43,4 +43,4 @@ Unknown versions are refused visibly, never guessed at. Proof packs and receipts
 
 ## This documentation
 
-The docs on this site describe the latest release and mark anything not yet released as planned or in development (v0.1.0 was released on 16 Oct 2026, v0.1.1 on 18 Oct 2026, and v0.2.0 on 24 Oct 2026, v0.3.0 on 26 Oct 2026, v0.4.0 on 27 Oct 2026, v0.4.1, v0.4.2 and v0.4.3 on 28 Oct 2026, v0.4.4 and v0.4.5 on 29 Oct 2026, v0.4.6 on 31 Oct 2026). Versioned copies per release are planned from 1.0.0; see [MAINTAINING.md](https://github.com/4thtech/agentlink/blob/main/docs-site/MAINTAINING.md).
+The docs on this site describe the latest release and mark anything not yet released as planned or in development (v0.1.0 was released on 16 Oct 2026, v0.1.1 on 18 Oct 2026, and v0.2.0 on 24 Oct 2026, v0.3.0 on 26 Oct 2026, v0.4.0 on 27 Oct 2026, v0.4.1, v0.4.2 and v0.4.3 on 28 Oct 2026, v0.4.4 and v0.4.5 on 29 Oct 2026, v0.4.6 on 31 Oct 2026). Versioned copies per release are planned from 1.0.0; see [MAINTAINING.md](https://github.com/4thtech/agentlink/blob/main/docs/MAINTAINING.md).

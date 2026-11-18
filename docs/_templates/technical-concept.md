@@ -1,10 +1,10 @@
 # <Component or mechanism: "Allowed folders">
 
-> **Status: <Design | Planned for vX.Y.Z (Mx) | Available since vX.Y.Z>.** Sources: [<spec §>](https://github.com/4thtech/agentlink/blob/main/docs/foundation/<spec>.md), <D-xx>.
+> **Status: <Design | Planned for vX.Y.Z (Mx) | Available since vX.Y.Z>.** Sources: [<spec §>](https://github.com/4thtech/agentlink/blob/main/specs/<spec>.md), <D-xx>.
 
 ## In short
 
-<Two or three sentences a non-developer understands: what it does and what it guarantees. For users: [<guide page>](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/<page>.md).>
+<Two or three sentences a non-developer understands: what it does and what it guarantees. For users: [<guide page>](https://github.com/4thtech/agentlink/blob/main/docs/guide/<page>.md).>
 
 ## Why it is built this way
 
@@ -35,7 +35,7 @@ flowchart LR
 
 | Part | Code | Spec |
 |---|---|---|
-| <part> | [`<path>`](https://github.com/4thtech/agentlink/blob/main/<path>) | [<spec §>](https://github.com/4thtech/agentlink/blob/main/docs/foundation/<spec>.md) |
+| <part> | [`<path>`](https://github.com/4thtech/agentlink/blob/main/<path>) | [<spec §>](https://github.com/4thtech/agentlink/blob/main/specs/<spec>.md) |
 
 ## For users
 

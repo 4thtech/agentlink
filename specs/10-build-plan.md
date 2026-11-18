@@ -55,14 +55,14 @@ What and when only. Cost estimates are tracked internally.
 |---|---|---|
 | M0-1 Legacy security actions L-1, L-5, L-8 (details in private 09 §4) | Remediation per item (tracked privately); gitleaks report | Written confirmation per item |
 | M0-2 Create repos (09 §5), branch protection, CI (lint, typecheck, test), Renovate, npm org with 2FA | Empty monorepo + contracts repo | CI green on skeleton |
-| M0-3 Copy this pack to `docs/foundation/`, add `CLAUDE.md` | Docs in repo | — |
+| M0-3 Copy this pack to `specs/`, add `CLAUDE.md` | Docs in repo | — |
 | M0-4 Decide D-11, D-12, D-14 (license, name) | Decision log updated | — |
 
 ## Design deliveries (owner, via Claude Design — D-30)
 
-Design is delivered by the owner in three drops so it never blocks the build. The brief for designers is `11-claude-design-brief.md`. Intake and live status are in `docs/design/README.md`. Until a surface's design has landed, agents build it **functional and unstyled** (semantic HTML, placeholder tokens) and never invent a visual design for it.
+Design is delivered by the owner in three drops so it never blocks the build. The brief for designers is `11-claude-design-brief.md`. Intake and live status are in `project/design/README.md`. Until a surface's design has landed, agents build it **functional and unstyled** (semantic HTML, placeholder tokens) and never invent a visual design for it.
 
-*Build-plan deviation (D-116, announced by the owner on 21 Oct 2026):* D1 and a first pass of D2 have been in `docs/design/` since 14 Oct 2026. The surfaces they cover are built **styled** from them now and no longer wait for D2. The design predates later decisions, so it is adjusted first: DESIGN-ADJ-1 lists, per screen, what agents fix in code and what the owner redesigns in Claude Design. `packages/ui` tokens and fonts start in parallel (M1-35a). D3 is not delivered.
+*Build-plan deviation (D-116, announced by the owner on 21 Oct 2026):* D1 and a first pass of D2 have been in `project/design/` since 14 Oct 2026. The surfaces they cover are built **styled** from them now and no longer wait for D2. The design predates later decisions, so it is adjusted first: DESIGN-ADJ-1 lists, per screen, what agents fix in code and what the owner redesigns in Claude Design. `packages/ui` tokens and fonts start in parallel (M1-35a). D3 is not delivered.
 
 | Drop | Contents (11 §) | Needed by | Blocks |
 |---|---|---|---|
@@ -138,7 +138,7 @@ Design is delivered by the owner in three drops so it never blocks the build. Th
 | M2-13 Browser counterparty view-and-accept (D-35, P1) | web client | A counterparty without an agent opens the invite link, views the offer and accepts in the browser; keys generated in the browser, same identity model as the console; design in D2 |
 | M2-15 Consumer storage connectors (D-49, P1) | packages/storage, apps/desktop | Google Drive, Dropbox and OneDrive adapters behind the same `StorageAdapter` interface; Settings → Storage → Connect in the desktop apps with OAuth (PKCE, loopback redirect), minimal scopes and tokens only in the OS keychain; only ciphertext with random names in an app folder; time-limited share links, or the owner's decision per provider (07 §5.5); round trips against each provider |
 | M2-17 Privacy of on-chain proofs, M2 part (D-109) | contracts, chain, core, console | Per-relationship signing addresses with proof of possession and no per-address funding (M2-17a); a Registry whose events and calldata carry no guessable identifier (M2-17b, before M2-4a); optional delayed or batched receipts (M2-17c). Contract changes land before the M3 audit |
-| M2-18 Adding credits on the pay page (D-111) | apps/pay, docs | With the pay page (M2-2f): use crypto you already have (connect the user's own account, network detected, one confirmation) and send from an exchange (address, QR, minimum, wrong-network help) on testnets, plus free test credits; payment progress and records. Crypto first: nothing waits for a card path (D-111). Design brief `docs/design/topup-ux.md` |
+| M2-18 Adding credits on the pay page (D-111) | apps/pay, docs | With the pay page (M2-2f): use crypto you already have (connect the user's own account, network detected, one confirmation) and send from an exchange (address, QR, minimum, wrong-network help) on testnets, plus free test credits; payment progress and records. Crypto first: nothing waits for a card path (D-111). Design brief `project/design/topup-ux.md` |
 
 **Gate M2:** 20–50 early adopters (external) on testnets; UX metric "install → first message < 5 min" met by the D-125 rule (median < 5 min, at least 80% of testers < 5 min, no tester > 15 min for a cause on our side); no wallet, browser extension, gas or chain choice in any J1–J9 default flow, including the desktop apps and the browser counterparty (D-39); G-1 (same-user agent vs owner presence) re-decided by the owner (D-67) before external testers start.
 

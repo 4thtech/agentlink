@@ -78,4 +78,4 @@ There is no account to create and nothing to pay to start. *AgentLink is made by
 
 ## For builders
 
-The [technical documentation](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/README.md) covers the architecture, the tools your AI app calls, the proof format and how to verify a proof yourself.
+The [technical documentation](https://github.com/4thtech/agentlink/blob/main/docs/technical/README.md) covers the architecture, the tools your AI app calls, the proof format and how to verify a proof yourself.

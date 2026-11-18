@@ -61,10 +61,10 @@ sequenceDiagram
 
 | On the page | What happens | Where it is built |
 |---|---|---|
-| <UI element> | <Plain sentence> | `<METHOD /api/ui/…>` · [`<file>`](https://github.com/4thtech/agentlink/blob/main/<path>) · [<spec §>](https://github.com/4thtech/agentlink/blob/main/docs/foundation/<spec>.md) |
+| <UI element> | <Plain sentence> | `<METHOD /api/ui/…>` · [`<file>`](https://github.com/4thtech/agentlink/blob/main/<path>) · [<spec §>](https://github.com/4thtech/agentlink/blob/main/specs/<spec>.md) |
 | Page text | Every string on this page | [`strings.ts`](https://github.com/4thtech/agentlink/blob/main/apps/local-ui/src/pages/<page>/strings.ts) |
 
-More: [<Technical page>](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/concepts/<page>.md).
+More: [<Technical page>](https://github.com/4thtech/agentlink/blob/main/docs/technical/concepts/<page>.md).
 
 </details>
 

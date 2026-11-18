@@ -471,7 +471,7 @@ export const MAX_JSON_NODES = 4096;
  * The policy defaults are defined in 06 §3; `POLICY_DEFAULTS` and `policySchema` (policy.ts) carry
  * them. These are the policy values that are also protocol caps, so the two cannot drift.
  */
-export const POLICY_DEFAULTS_SPEC = 'docs/foundation/06-mcp-server.md §3';
+export const POLICY_DEFAULTS_SPEC = 'specs/06-mcp-server.md §3';
 export const POLICY_PROTOCOL_LIMITS = freeze({
   'envelopes.maxEnvelopeKB': 24,
   'files.defaultExpiryDays': 7,

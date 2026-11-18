@@ -1,9 +1,9 @@
 # Deploy the 4thTech submitter Worker and its testnet credits faucet (apps/submitter, 07 §7, 05 §9;
 # M1-10c, D-28, D-88): staging on every merge to main, production automatically once the staging
 # smoke test is green (D-25, D-52). Mirrors deploy-drop.yml (M1-27b), the first proven Worker
-# pipeline. Contract: docs/process/release-and-deployment.md §4.5 (Workers pipeline), §6 (secrets),
+# pipeline. Contract: project/process/release-and-deployment.md §4.5 (Workers pipeline), §6 (secrets),
 # §8 (rollback). Configuration: apps/submitter/wrangler.toml. Owner steps:
-# docs/runbooks/submitter-deploy.md. Tests of this file: tools/release/deploy-submitter.test.mjs
+# project/runbooks/submitter-deploy.md. Tests of this file: tools/release/deploy-submitter.test.mjs
 # (structure, the marked bash blocks on fakes) and apps/submitter/test/smoke-config.test.ts
 # (wrangler.toml).
 #
@@ -304,7 +304,7 @@ jobs:
             exit 1
           fi
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
-            echo "::notice::Environment $DEPLOY_ENV has no CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID yet (owner steps, docs/runbooks/submitter-deploy.md). Not deployed."
+            echo "::notice::Environment $DEPLOY_ENV has no CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID yet (owner steps, project/runbooks/submitter-deploy.md). Not deployed."
             echo "ready=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -346,7 +346,7 @@ jobs:
             fi
           done
           if [ -n "$missing" ]; then
-            echo "::notice::Worker secrets not set on $WORKER yet: $missing (owner: wrangler secret put, docs/runbooks/submitter-deploy.md). Not deployed."
+            echo "::notice::Worker secrets not set on $WORKER yet: $missing (owner: wrangler secret put, project/runbooks/submitter-deploy.md). Not deployed."
             echo "ready=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -561,7 +561,7 @@ jobs:
             exit 1
           fi
           if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
-            echo "::notice::Environment $DEPLOY_ENV has no CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID yet (owner steps, docs/runbooks/submitter-deploy.md). Not deployed."
+            echo "::notice::Environment $DEPLOY_ENV has no CLOUDFLARE_API_TOKEN or CLOUDFLARE_ACCOUNT_ID yet (owner steps, project/runbooks/submitter-deploy.md). Not deployed."
             echo "ready=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -603,7 +603,7 @@ jobs:
             fi
           done
           if [ -n "$missing" ]; then
-            echo "::notice::Worker secrets not set on $WORKER yet: $missing (owner: wrangler secret put, docs/runbooks/submitter-deploy.md). Not deployed."
+            echo "::notice::Worker secrets not set on $WORKER yet: $missing (owner: wrangler secret put, project/runbooks/submitter-deploy.md). Not deployed."
             echo "ready=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi

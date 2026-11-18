@@ -73,7 +73,7 @@ If a rebase conflicts on `board.md`, keep **both** sides' rows. Never drop anoth
 - A task is claimed when it has a board row with an assignee and a branch name. The branch is pushed so others can see it (`git ls-remote --heads origin <branch>`); there is no draft PR.
 - Before claiming, check the board and the open branches and PRs for the task ID. If someone else holds the task, don't start; write an ask instead.
 - If a claim has had no update for 5 days, raise it under Asks. Only the claimant or the owner releases a claim.
-- Task statuses follow the backlog: `ready · in-progress · in-review · audit · done`. When the PR merges, the task's card in `docs/process/backlog.md` is set to `done` *in that PR*, and the row leaves the board.
+- Task statuses follow the backlog: `ready · in-progress · in-review · audit · done`. When the PR merges, the task's card in `project/process/backlog.md` is set to `done` *in that PR*, and the row leaves the board.
 
 ## 7. Feedback loop (Denis → owner → build)
 
@@ -86,14 +86,14 @@ If a rebase conflicts on `board.md`, keep **both** sides' rows. Never drop anoth
 
 When Denis, or anyone else, takes over a specific part, **the owner decides**. Then:
 - The "Area ownership" row on the board is updated.
-- If the change is significant (for example, a whole repo or package), the decision log in `docs/foundation/decisions/` gets a new entry via a PR.
+- If the change is significant (for example, a whole repo or package), the decision log in `specs/decisions/` gets a new entry via a PR.
 
 ## 9. How the layers fit
 
 | Layer | Holds | Read by | Written by |
 |---|---|---|---|
 | `AGENTS.md` / `CLAUDE.md` (main) | Rules for every agent | Everyone | Through PRs |
-| `docs/foundation/`, `docs/process/` (main) | Specs, process, backlog definitions | Everyone | Through PRs |
+| `specs/`, `project/process/` (main) | Specs, process, backlog definitions | Everyone | Through PRs |
 | **`sync` branch** | Live assignments, per-person state, asks, heads-ups, feedback dispositions | Everyone | Each person's agents (own file) |
 | GitHub PRs | Code review and CI results (opened after the independent review; claims are on the board) | Everyone | Agents and reviewers |
 | Curator (`my-curator`) | The owner's detailed handoffs, private docs as foundations | The owner's agents | The owner's orchestrator |

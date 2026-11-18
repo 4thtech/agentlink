@@ -1,5 +1,5 @@
 // N1 notice lint: pages raise notices only through the shared Banner, PageNotice, InlineError and
-// notify() (@4thtech-io/ui; docs/design/notices.md). Page code may not add its own live regions
+// notify() (@4thtech-io/ui; project/design/notices.md). Page code may not add its own live regions
 // (role alert or status, aria-live) or its own note, error or hint classes. The counts in
 // notice-lint-baseline.json are the notices still to migrate: they may go down, never up, and a new
 // file starts at zero. Lowering a count: edit the baseline in the same change.

@@ -7,7 +7,7 @@
 //   node tools/relays/vet.mjs --live wss://a wss://b   run against the given relays
 //   node tools/relays/vet.mjs --live --recheck <file>  read back the events a earlier run saved
 //
-// Checks (docs/runbooks/relay-vetting.md): (1) kind 1059 accepted and read back, (2) NIP-11
+// Checks (project/runbooks/relay-vetting.md): (1) kind 1059 accepted and read back, (2) NIP-11
 // max_message_length against the largest valid wrap frame, (3) retention (method: the run saves
 // the event id; a later --recheck says whether it is still there), (4) read auth (NIP-42).
 // The read-back uses the sync's own filter (kinds [1059], "#p", since) and, for comparison, by id.

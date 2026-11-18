@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: How envelopes travel over relays behind a transport interface: wrapping, relays and delivery, sync, size limits and inbox behaviour by packaging. -->
 
-> **Status: Current for v0.5.10.** Nostr transport shipped in v0.1.0. Sources: [04 §3.5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), [07 §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md).
+> **Status: Current for v0.5.10.** Nostr transport shipped in v0.1.0. Sources: [04 §3.5](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md), [07 §4](https://github.com/4thtech/agentlink/blob/main/specs/07-sdk-transport-storage.md).
 
 Envelopes travel over **Nostr relays** behind a transport-agnostic `Transport` interface, so another network (for example XMTP) can be added later without changing envelopes.
 

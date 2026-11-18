@@ -8,11 +8,11 @@ import rawCss from './tokens.css?raw';
 import { motionTokens, scalarTokens } from './index.js';
 
 const d1 = import.meta.glob(
-  ['../../../../docs/design/d1/tokens/tokens.css', '../../../../docs/design/d1/tokens/*.json'],
+  ['../../../../project/design/d1/tokens/tokens.css', '../../../../project/design/d1/tokens/*.json'],
   { query: '?raw', import: 'default', eager: true },
 );
-const d1Css = d1['../../../../docs/design/d1/tokens/tokens.css'] ?? '';
-const source = JSON.parse(d1['../../../../docs/design/d1/tokens/tokens.source.json'] ?? '{}') as {
+const d1Css = d1['../../../../project/design/d1/tokens/tokens.css'] ?? '';
+const source = JSON.parse(d1['../../../../project/design/d1/tokens/tokens.source.json'] ?? '{}') as {
   duration: { tokens: { name: string; value: string }[] };
   easing: { tokens: { name: string; value: string }[] };
 };

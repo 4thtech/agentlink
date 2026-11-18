@@ -24,7 +24,7 @@ const alias = [
 
 export default defineConfig({
   test: {
-    // Repository-wide test timeout policy (M0-10e): 20 s, not the 5 s default (docs/process/repo-reference.md).
+    // Repository-wide test timeout policy (M0-10e): 20 s, not the 5 s default (project/process/repo-reference.md).
     testTimeout: 20_000,
     projects: [
       {

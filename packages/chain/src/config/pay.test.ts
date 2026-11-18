@@ -1,4 +1,4 @@
-// The shipped pay page config (M1-26-e; docs/design/topup-ux.md §5, D-113).
+// The shipped pay page config (M1-26-e; project/design/topup-ux.md §5, D-113).
 import { describe, expect, it } from 'vitest';
 import { PAY_PAGE } from './pay.js';
 

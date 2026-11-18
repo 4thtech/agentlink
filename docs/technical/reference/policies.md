@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: Reference for the owner's policy, the rule book for one ID: defaults, received acknowledgements, per-contact overrides and how a change is signed. -->
 
-> **Status: Current for v0.5.10.** Source: [06 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md) and the schema in `packages/types/src/policy.ts`.
+> **Status: Current for v0.5.10.** Source: [06 §3](https://github.com/4thtech/agentlink/blob/main/specs/06-mcp-server.md) and the schema in `packages/types/src/policy.ts`.
 
 **Purpose:** the reference for every policy key, its default and what it allows.
 
@@ -90,4 +90,4 @@ Up to 256 rules, one per contact, sorted by ID. A rule applies only while the co
 
 ## How a change is signed
 
-The app builds the whole new policy with version plus one, asks for presence, and signs it. The core applies it only if the version is the next one. Changes to spending (proofs, limits, rules) get the strongest confirmation. See [06 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md) for the exact JSON form, bounds and the fail-closed rules.
+The app builds the whole new policy with version plus one, asks for presence, and signs it. The core applies it only if the version is the next one. Changes to spending (proofs, limits, rules) get the strongest confirmation. See [06 §3](https://github.com/4thtech/agentlink/blob/main/specs/06-mcp-server.md) for the exact JSON form, bounds and the fail-closed rules.

@@ -3,7 +3,7 @@
 **Purpose.** This explains how the AgentLink project is organised and how a collaborator, and the AI agents working for them, take part. Part A is for **Denis** (@denisjazbec). Part B is for **Denis's agents**, in any harness.
 
 > **Bootstrap prompt for your agent** (paste it into a new session):
-> *"You are working on AgentLink for @denisjazbec. Read `AGENTS.md`, then `docs/process/onboarding.md` Part B, and follow Part B's session protocol exactly. Report back before doing anything else."*
+> *"You are working on AgentLink for @denisjazbec. Read `AGENTS.md`, then `project/process/onboarding.md` Part B, and follow Part B's session protocol exactly. Report back before doing anything else."*
 
 ---
 
@@ -13,8 +13,8 @@
 
 | Thing | Where | What it is |
 |---|---|---|
-| Specs (source of truth) | `docs/foundation/` in `4thtech/agentlink` (public) | Product, architecture, security invariants I-1…I-10, contracts, MCP, SDK, clients, build plan, decision log (`decisions/`) |
-| Process rules | `docs/process/` | `development-process.md`, `audit-rules.md`, `release-and-deployment.md`, `ci-cd.md`, `sync-protocol.md`, `backlog.md`, this file |
+| Specs (source of truth) | `specs/` in `4thtech/agentlink` (public) | Product, architecture, security invariants I-1…I-10, contracts, MCP, SDK, clients, build plan, decision log (`decisions/`) |
+| Process rules | `project/process/` | `development-process.md`, `audit-rules.md`, `release-and-deployment.md`, `ci-cd.md`, `sync-protocol.md`, `backlog.md`, this file |
 | Agent rules | `AGENTS.md` (canonical) · `CLAUDE.md` (imports it) | What every agent in any harness must and must not do |
 | **Shared live state** | the **`sync` branch** of `4thtech/agentlink` | `board.md` (who owns what and which tasks are active), `talirezun.md` (Tali's side), `denisjazbec.md` (your side) |
 | Contracts (OCC v2) | `4thtech/occ-v2-contracts` (**private**, to be created) | A fresh Foundry repo, re-implemented from spec 05. OCC v1 is reference only (D-20) |
@@ -37,7 +37,7 @@
 1. `board.md` on the sync branch: active tasks, who has them, decisions waiting, blockers.
 2. `talirezun.md`: Tali's current state, what's in flight, *Asks for @denisjazbec*, *Heads-up* (interface changes etc.) and the *Feedback log*.
 3. Open PRs: `gh pr list --repo 4thtech/agentlink`. Task claims are on `board.md`; a PR appears only after the independent review. Reviews requested from you: `gh pr list --repo 4thtech/agentlink --search "review-requested:@me"`.
-4. Task definitions: `docs/process/backlog.md`.
+4. Task definitions: `project/process/backlog.md`.
 
 ### A4. Reviewing an S2 PR (optional for you)
 

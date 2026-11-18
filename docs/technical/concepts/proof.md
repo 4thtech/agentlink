@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: Technical explanation of records, receipts, proof of agreement, proof packs and fees; proof runs on test networks only. -->
 
-> **Status: Released on test networks in v0.2.0 (design below); paid on mainnet from v1.0.0 (M3). Sources: [05 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md), [04 §5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), [07 §8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md).
+> **Status: Released on test networks in v0.2.0 (design below); paid on mainnet from v1.0.0 (M3). Sources: [05 §3](https://github.com/4thtech/agentlink/blob/main/specs/05-contracts-occ-v2.md), [04 §5](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md), [07 §8](https://github.com/4thtech/agentlink/blob/main/specs/07-sdk-transport-storage.md).
 
 ## Records
 
@@ -35,4 +35,4 @@ Verification needs only a public RPC: the contract's `getRecord` returns everyth
 
 ## Fees
 
-Notarization charges a `NOTARIZE` fee through `OCCFeeVault`, from prepaid credits or paid directly, never above the signed `maxFee`. Beta price: $0.10 per record including receipts, on-chain cap $0.50, stablecoins only. See the [fee schedule](https://github.com/4thtech/agentlink/blob/main/docs/foundation/12-economics-and-fees.md).
+Notarization charges a `NOTARIZE` fee through `OCCFeeVault`, from prepaid credits or paid directly, never above the signed `maxFee`. Beta price: $0.10 per record including receipts, on-chain cap $0.50, stablecoins only. See the [fee schedule](https://github.com/4thtech/agentlink/blob/main/specs/12-economics-and-fees.md).

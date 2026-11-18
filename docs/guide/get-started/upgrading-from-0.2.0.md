@@ -65,7 +65,7 @@ Run `npx -y @4thtech-io/agentlink@latest doctor` in your terminal. It shows what
 | `init` reuses your ID | An existing ID is always reused; a new one is created only on a computer with none | [`apps/cli/src/commands/init.ts`](https://github.com/4thtech/agentlink/blob/main/apps/cli/src/commands/init.ts) `defaultAgentName` |
 | The first-run page does not open for an existing owner | Owner setup is offered only while no owner exists anywhere (no card, no owner keychain item, no other ID folder) | [`apps/cli/src/mcp/local-ui-wiring.ts`](https://github.com/4thtech/agentlink/blob/main/apps/cli/src/mcp/local-ui-wiring.ts), [`apps/cli/src/commands/first-run.ts`](https://github.com/4thtech/agentlink/blob/main/apps/cli/src/commands/first-run.ts) |
 | Your data is read as it is | The store schema version is unchanged since 0.2.0 | `STORE_SCHEMA_VERSION` in `@4thtech-io/core`, [`packages/node/src/sqlite-schema.ts`](https://github.com/4thtech/agentlink/blob/main/packages/node/src/sqlite-schema.ts) |
-| Touch ID for 0.2.0 owners | Backlog card M1-UX-FIRSTRUN-V2-c, not built | [`docs/process/backlog.md`](https://github.com/4thtech/agentlink/blob/main/docs/process/backlog.md) |
+| Touch ID for 0.2.0 owners | Backlog card M1-UX-FIRSTRUN-V2-c, not built | [`project/process/backlog.md`](https://github.com/4thtech/agentlink/blob/main/project/process/backlog.md) |
 | `policy allow-send-folder` | Adds only `~/AgentLink/Send` to the rules, through an owner operation | [`packages/node/src/owner-send-folder.ts`](https://github.com/4thtech/agentlink/blob/main/packages/node/src/owner-send-folder.ts) |
 
 </details>

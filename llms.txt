@@ -108,8 +108,8 @@ Everything in one file, for AI assistants: [AgentLink knowledge bundle](https://
 ## Optional
 
 - [Project README](https://github.com/4thtech/agentlink/blob/main/README.md): the public face of the project, with the current status
-- [Specifications](https://github.com/4thtech/agentlink/blob/main/docs/foundation/00-README.md): the source of truth, including the security invariants
-- [Decision log](https://github.com/4thtech/agentlink/blob/main/docs/foundation/decisions/README.md): every decision, one file each
+- [Specifications](https://github.com/4thtech/agentlink/blob/main/specs/00-README.md): the source of truth, including the security invariants
+- [Decision log](https://github.com/4thtech/agentlink/blob/main/specs/decisions/README.md): every decision, one file each
 - [Research](https://github.com/4thtech/agentlink/blob/main/research/README.md): articles about agent-to-agent communication and AgentLink
 - [Changelog](https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md): what changed in each release
 - [Security policy](https://github.com/4thtech/agentlink/blob/main/SECURITY.md): how to report a vulnerability privately

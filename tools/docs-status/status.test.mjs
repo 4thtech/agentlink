@@ -36,7 +36,7 @@ describe('the real status file', () => {
     expect(validateStatus(real())).toEqual([]);
   });
 
-  it('is in sync with README.md and the docs-site page in this repository', () => {
+  it('is in sync with README.md and the docs page in this repository', () => {
     const { problems, skipped } = run({ root: repo, check: true });
     expect(problems).toEqual([]);
     expect(skipped).toEqual([]); // every target carries its markers, so nothing is skipped
@@ -139,7 +139,7 @@ describe('run', () => {
 
   const read = (file) => readFileSync(join(root, file), 'utf8');
   const write = (file, text) => writeFileSync(join(root, file), text);
-  const SITE = 'docs-site/technical/project/status-and-roadmap.md';
+  const SITE = 'docs/technical/project/status-and-roadmap.md';
 
   it('passes the check when nothing has drifted, and skips an absent knowledge base', () => {
     const result = run({ root, check: true });
@@ -236,7 +236,7 @@ describe('run', () => {
 });
 
 describe('the backlog card counts', () => {
-  const BACKLOG = 'docs/process/backlog.md';
+  const BACKLOG = 'project/process/backlog.md';
   const card = (id, status, phase) =>
     `#### ${id} · title\n- **Status:** ${status} · **Size:** S · **Phase:** ${phase}\n- **Scope:** x\n`;
   const sample = [

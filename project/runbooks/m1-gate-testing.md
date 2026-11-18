@@ -18,7 +18,7 @@ When the M1b cards that these journeys need have merged and a build is installab
 
 - Node.js (current LTS) and a working system keychain on each tester's computer (macOS Keychain, Windows Credential Manager, Linux Secret Service).
 - Test networks only. No tester uses real money, a wallet, a browser extension or a chain choice anywhere in these steps. If one is asked for, that is a finding (D-39, D-40).
-- Read [Protect your approvals](../../docs-site/guide/get-started/protect-your-approvals.md) once. Owner steps are typed by the tester in a terminal they opened themselves.
+- Read [Protect your approvals](../../docs/guide/get-started/protect-your-approvals.md) once. Owner steps are typed by the tester in a terminal they opened themselves.
 - A stopwatch (a phone is fine) for step 4.
 - The build under test and its version (`agentlink --version`), with the commit or release it came from.
 
@@ -54,7 +54,7 @@ A combination is the harness the tester installs into, plus the harness of their
 | C3 | Claude Desktop, Cursor or another MCP chat app | Claude Code | two |
 | C4 (optional) | Codex or Gemini CLI | Claude Code | two |
 
-Assign testers so each combination has at least 3 testers and each tester is paired with someone in a different combination. Setup follows the get-started page of the tester's harness: [Claude Code](../../docs-site/guide/get-started/claude-code.md), [Claude Desktop](../../docs-site/guide/get-started/claude-desktop.md), [Codex](../../docs-site/guide/get-started/codex.md), [Gemini CLI](../../docs-site/guide/get-started/gemini-cli.md), [OpenCode and Antigravity](../../docs-site/guide/get-started/opencode-and-antigravity.md), [Cursor](../../docs-site/guide/get-started/cursor.md), [other apps](../../docs-site/guide/get-started/other-ai-apps.md).
+Assign testers so each combination has at least 3 testers and each tester is paired with someone in a different combination. Setup follows the get-started page of the tester's harness: [Claude Code](../../docs/guide/get-started/claude-code.md), [Claude Desktop](../../docs/guide/get-started/claude-desktop.md), [Codex](../../docs/guide/get-started/codex.md), [Gemini CLI](../../docs/guide/get-started/gemini-cli.md), [OpenCode and Antigravity](../../docs/guide/get-started/opencode-and-antigravity.md), [Cursor](../../docs/guide/get-started/cursor.md), [other apps](../../docs/guide/get-started/other-ai-apps.md).
 
 Coverage the gate needs: every tester completes A to G once, as sender or recipient as the script says; J3 for every tester who has faucet credits; J8 with proof of agreement for at least one pair per combination.
 

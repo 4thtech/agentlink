@@ -10,14 +10,14 @@ Before any write work on a card. Not for read-only surveys or reviews, which cla
 The orchestrator (Opus), or a human builder for their own task. Workers never write the `sync` branch, and push or open a PR only as `development-process.md` §4.2 allows; the orchestrator claims on their behalf and hands them the worktree path in the brief.
 
 ## Preconditions
-- The card exists in `docs/process/backlog.md` and meets the Definition of Ready (`development-process.md` §6.2). No task ID, no work.
+- The card exists in `project/process/backlog.md` and meets the Definition of Ready (`development-process.md` §6.2). No task ID, no work.
 - [RB-01](session-start-end.md) start steps done: nobody else holds the task on `board.md` or on a pushed branch. If someone does, stop and write an ask instead.
 - You know the card's security class (`audit-rules.md` §2: path defaults plus content rules, the highest wins).
 
 ## Steps
 1. Find the card and read it:
    ```bash
-   grep -n '^#### <TASK-ID> ' docs/process/backlog.md
+   grep -n '^#### <TASK-ID> ' project/process/backlog.md
    ```
 2. Create the branch and its worktree from current `main` (one task = one worktree = one PR):
    ```bash

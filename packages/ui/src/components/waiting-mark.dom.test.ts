@@ -37,9 +37,9 @@ const files = import.meta.glob(
     './*.css',
     './*.ts',
     './*.tsx',
-    '../../../../docs/design/b11-local-app.md',
-    '../../../../docs/design/brand/brand-guidelines.md',
-    '../../../../docs/design/d1/components/Mark.md',
+    '../../../../project/design/b11-local-app.md',
+    '../../../../project/design/brand/brand-guidelines.md',
+    '../../../../project/design/d1/components/Mark.md',
     '../../../../apps/*/src/**/*.{ts,tsx,css}',
     '../../../*/src/**/*.{ts,tsx,css}',
   ],
@@ -226,11 +226,11 @@ describe('the waiting mark is used in no other loading state', () => {
 });
 
 describe('brand guidelines carry the exception once, word for word', () => {
-  const spec = read('docs/design/b11-local-app.md');
+  const spec = read('project/design/b11-local-app.md');
   const quote = /### 23\.4[\s\S]*?\n> (\*\*Exception: the waiting mark\*\*[^\n]*)\n/.exec(
     spec,
   )?.[1];
-  const guidelines = read('docs/design/brand/brand-guidelines.md');
+  const guidelines = read('project/design/brand/brand-guidelines.md');
   it('finds the spec text', () => {
     expect(quote).toBeDefined();
   });
@@ -240,7 +240,7 @@ describe('brand guidelines carry the exception once, word for word', () => {
     expect(guidelines.split(quote as string)).toHaveLength(2);
   });
   it('adds the pointer to the Mark component spec', () => {
-    expect(read('docs/design/d1/components/Mark.md')).toContain(
+    expect(read('project/design/d1/components/Mark.md')).toContain(
       'except the waiting mark (see the brand guidelines)',
     );
   });

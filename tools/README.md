@@ -17,4 +17,4 @@ Scripts that keep the repository healthy. They are for maintainers and CI, not f
 - [`orchestrator`](orchestrator): helpers for the people and agents running the project.
 - [`pr`](pr): `node tools/pr/open-pr.mjs --task <ID> --summary "…"` opens a pull request with the paperwork filled in: the security class computed from the paths (the rules of `review-gate.yml`, read by `classes.mjs`), every template section, a missing changeset or changelog stub, the title prefix. `--dry-run` shows it first.
 
-The `check-*.mjs` files at this level are repository checks that CI runs. See [repo reference](../docs/process/repo-reference.md).
+The `check-*.mjs` files at this level are repository checks that CI runs. See [repo reference](../project/process/repo-reference.md).

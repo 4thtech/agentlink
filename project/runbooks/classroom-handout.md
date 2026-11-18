@@ -2,7 +2,7 @@
 
 For students and the teacher. Mac and Windows. About 10 minutes.
 
-> Linked from the quick guide: `docs-site/guide/quick-guide.md`.
+> Linked from the quick guide: `docs/guide/quick-guide.md`.
 
 ## Students
 

@@ -727,7 +727,7 @@ describe('WP-D9: desktop app links (flag-on build)', () => {
       'Open in the AgentLink app',
     );
     await expect(page.locator('#get-app').getAttribute('href')).resolves.toBe(
-      'https://github.com/4thtech/agentlink/blob/main/docs-site/guide/apps/desktop-app.md',
+      'https://github.com/4thtech/agentlink/blob/main/docs/guide/apps/desktop-app.md',
     );
     await expect(page.locator('#get-app').getAttribute('rel')).resolves.toBe('noopener noreferrer');
     await expect(page.locator('#get-app').textContent()).resolves.toBe('Get the app (coming soon)');

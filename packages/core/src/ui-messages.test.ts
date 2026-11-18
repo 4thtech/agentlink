@@ -1,5 +1,5 @@
 // MSG-FILES-IO-a: the read-only Messages and Files In/Out views of the local app (plan
-// docs/process/proposals/MSG-FILES-IO.md §3, §4; 06 §2.2, §4; 07 §3, §3.1; 04 §4).
+// project/process/proposals/MSG-FILES-IO.md §3, §4; 06 §2.2, §4; 07 §3, §3.1; 04 §4).
 //
 // What these tests hold the views to:
 // - they never write: `read_at` and every other row of every table are unchanged after each call

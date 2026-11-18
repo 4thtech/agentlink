@@ -126,7 +126,7 @@ describe('MCP server (stdio binding, 06 §1)', () => {
 
   it('the instructions are 06 §5 verbatim', () => {
     const spec = readFileSync(
-      new URL('../../../../docs/foundation/06-mcp-server.md', import.meta.url),
+      new URL('../../../../specs/06-mcp-server.md', import.meta.url),
       'utf8',
     );
     const section = spec.slice(spec.indexOf('## 5. Server instructions'));
