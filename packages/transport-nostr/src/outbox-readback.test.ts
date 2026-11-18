@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   OUTBOX_GIVE_UP_SECONDS,
   OutboxWorker,
+  READBACK_COUNT_GRACE_MS,
   READBACK_GRACE_SECONDS,
   READBACK_RECHECK_MS,
   type OutboxAttempt,
@@ -64,6 +65,10 @@ class Rows implements OutboxPersistence {
   ): Promise<boolean> {
     this.rows.set(id, { ...this.get(id), acks, state: 'sent', availability, counts });
     return Promise.resolve(true);
+  }
+  updateRelayCounts(id: string, counts: OutboxRelayCounts): Promise<void> {
+    this.rows.set(id, { ...this.get(id), counts });
+    return Promise.resolve();
   }
   markNotDelivered(id: string): Promise<boolean> {
     this.rows.set(id, { ...this.get(id), state: 'not_delivered' });
@@ -277,6 +282,30 @@ describe('read-back before "sent"', () => {
     expect(all).toHaveLength(200);
     expect(all.filter((r) => r.availability === 'confirmed')).toHaveLength(200);
   }, 60_000);
+
+  it('DELIVERY-DETAILS: the pass never waits on counting; counts are updated within the grace', async () => {
+    const { net, rows, pool } = setup();
+    const [fast, slow, silent] = relayUrls('nb', 3) as [string, string, string];
+    net.configure(fast);
+    net.configure(slow);
+    net.configure(silent, { silentIdsReq: true });
+    const spared = Object.assign(Object.create(pool), {
+      readbackSpare: () => true,
+      checkServed: pool.checkServed.bind(pool),
+    }) as RelayPool;
+    const worker = new OutboxWorker({ persistence: rows, pool: spared, random: () => 0 });
+    const at = Math.floor(Date.now() / 1000);
+    const row = makeRow([fast, slow, silent], { [fast]: at, [slow]: at, [silent]: at });
+    rows.add(row);
+    let ended = false;
+    void worker.processDue().then(() => (ended = true));
+    await vi.advanceTimersByTimeAsync(0);
+    // sent and confirmed at the first served, with no wait on the grace
+    expect(ended).toBe(true);
+    expect(rows.get(row.wrapId)).toMatchObject({ state: 'sent', availability: 'confirmed' });
+    await vi.advanceTimersByTimeAsync(READBACK_COUNT_GRACE_MS + 100);
+    expect(rows.get(row.wrapId).counts).toEqual({ accepted: 3, available: 2 });
+  });
 
   it('a dead relay in the list does not keep the row pending: sent, unknown within minutes', async () => {
     const { net, rows, worker } = setup();
