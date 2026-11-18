@@ -1,5 +1,11 @@
 # @4thtech-io/drop
 
+## 0.0.32
+
+### Patch Changes
+
+- @4thtech-io/crypto@0.5.11
+
 ## 0.0.31
 
 ### Patch Changes

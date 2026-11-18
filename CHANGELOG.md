@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.11] - 2026-11-18
+
+### Changed
+
+- Documentation for 0.5.11 (DOCS-0511, S1): the guide explains the hard spending limits, the sending limits and the limits on invites your AI makes (Rules), approval cards that show the exact message with check codes, keeping or removing a new contact via your AI, and when new files leave the menu bar widget. The security model, policies and MCP tools pages describe the new limits, the `SPEND_CEILING`, `SEND_LIMIT`, `INVITE_LIMIT` and `CONTACT_WAITING_OWNER` results and `waitingForOwner`. Spec 08 §1 now states the terminal cut of an approval's content as 40 lines or 2000 code points, as the CLI does.
+- Documentation tooling for the compact docs model (DOCS-COMPACT-A, S1): one module names the docs roots, the 4thTech Docs sync reads both the current and the planned folder layout (released versions sync unchanged), a builder makes the single-file AgentLink knowledge bundle with a size cap, the version banner, threat-model table and llms.txt can be generated, and new checks keep the guide's button names and the spec references accurate and the private specs out of the repository.
+
+### Fixed
+
+- The Rules page switch "Tell contacts when your AI receives a message" now saves (SEC-RECEIPTS-DEFAULT, D-156 (1), 06 §3): the server refused the edit, so turning it off had no effect. It still asks for your presence.
+- New files leave the menu bar widget's Needs you once you open, save or show them in Finder, or choose Mark as seen in the conversation; the widget reads again when it opens (WIDGET-POLISH-0511, S1).
+- A conversation opened from the widget or a notification no longer shows a large coloured box over it while it loads; a thin bar by its header marks it once it has loaded (WIDGET-POLISH-0511, S1).
+- The menu bar widget no longer counts new files twice: they appear only under Needs you, and New messages counts messages only (WIDGET-UNREAD-MESSAGES-ONLY, S2, 08 §1).
+
+### Security
+
+- Approval cards show exactly what you approve (SEC-CARD-FULLTEXT, S2, 08 §1, 04 §2.3.4): the full message text and its files as AgentLink decoded them, with check codes you can compare with the other side. Long texts are shown in full before you can approve, hidden direction or control characters are made visible, a request that can't be shown can't be approved, and the Touch ID prompt on Mac names who and the cost. A proof whose file changed after you approved it is refused.
+- Hard spending limits for proofs (SEC-HARD-CEILING, S2, D-156 (4), 06 §3): your AI can never spend more than $0.50 on one proof or $10 in any 24 hours unless you raise these limits on the Rules page; above them a proof is refused, never sent to you for approval. The "ask me over" amount is now $0.20 by default.
+- Sending limits (SEC-OUTBOUND-CAPS, S2, D-156 (6), 06 §3): your AI can send at most 300 messages to one person, 1 000 in all, 50 files to one person, 200 files and 2 000 MB in any 24 hours; you can change these on the Rules page.
+- Limits on invites your AI makes (SEC-INVITE-CAPS, S2, D-156): your AI can have at most 3 invites open and make at most 5 a day, and each one works for 24 hours. Change these in Settings › Rules › More rules ("Invites your AI makes"; 0 turns them off). Invites you make yourself are not limited: in the app you confirm Create invite with Touch ID, Windows Hello, your passkey or your master code, and `agentlink invite` in the terminal asks for your master code the same way. Someone who connects through an invite your AI made shows as "New contact via your AI" on People, Home and in the menu bar widget: their messages arrive, but your AI can't send them anything (no messages, files, terms or proofs) until you tap Keep. Contacts you already have are not affected.
+
 ## [0.5.10] - 2026-11-17
 
 ### Added
@@ -1377,7 +1398,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.10...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.11...HEAD
+[0.5.11]: https://github.com/4thtech/agentlink/compare/v0.5.10...v0.5.11
 [0.5.10]: https://github.com/4thtech/agentlink/compare/v0.5.9...v0.5.10
 [0.5.9]: https://github.com/4thtech/agentlink/compare/v0.5.8...v0.5.9
 [0.5.8]: https://github.com/4thtech/agentlink/compare/v0.5.7...v0.5.8

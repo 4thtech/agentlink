@@ -1,5 +1,21 @@
 # @4thtech-io/mcp-tools
 
+## 0.5.11
+
+### Patch Changes
+
+- bfbdbf3: SEC-CARD-FULLTEXT: approval cards show exactly what the request is about, decoded by AgentLink from the stored request: the full message text (inert, never cut; a long text is shown once before Approve), its files and 80-bit check codes. A card whose content cannot be shown offers no Approve. The Touch ID prompt on Mac and the master code step name who and the cost. An approved proof whose files changed since the approval is refused (`FILE_CHANGED`).
+- bfbdbf3: SEC-HARD-CEILING and SEC-OUTBOUND-CAPS (D-156): hard spending limits for proofs, $0.50 per proof and $10 in any 24 hours by default, above which a proof is refused (`SPEND_CEILING`) and never offered for approval; the "ask me" limit per proof is now $0.20 by default and is always at most the hard limit. Sending limits for what the AI sends with `agentlink_send`: 300 messages to one contact and 1 000 in all, 50 files to one contact, 200 files and 2 000 MB in any 24 hours (`SEND_LIMIT`, with when to try again). Both are on the Rules page and change only with the owner's presence; raising a hard limit goes through the spending confirmation. Rules signed before this version read as these defaults.
+- bfbdbf3: SEC-INVITE-CAPS (D-156): invites the AI makes with `agentlink_create_invite` are capped by the owner's policy `contacts.aiInvites` (default at most 3 open, 5 per rolling 24 hours, each for 24 hours; 0 turns them off; absent reads as the defaults), refused with `INVITE_LIMIT` in plain words; owner invites are neither limited nor counted. A contact paired through an AI-made invite waits for the owner (`waitingForOwner`): its messages arrive, but core refuses every outbound message, file, terms message, proof and receipt to it (`contact_waiting_owner`, `CONTACT_WAITING_OWNER`) until the owner keeps it with the new owner action `contact.keep` (local app, presence, `POST /api/ui/contacts/:ref/keep`) or removes it. Store schema version 18 adds `invites.created_by` and `contacts.waiting_owner` (nullable; existing contacts stay kept). People, Home and the widget show "New contact via your AI"; Rules › More rules edits the caps.
+- Updated dependencies [bfbdbf3]
+- Updated dependencies [bfbdbf3]
+- Updated dependencies [bfbdbf3]
+  - @4thtech-io/types@0.5.11
+  - @4thtech-io/core@0.5.11
+  - @4thtech-io/chain@0.5.11
+  - @4thtech-io/crypto@0.5.11
+  - @4thtech-io/log@0.5.11
+
 ## 0.5.10
 
 ### Patch Changes
