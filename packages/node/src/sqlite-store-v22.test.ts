@@ -74,4 +74,37 @@ describe('schema version 22 (DEVICES-INTERIM)', () => {
     ).rejects.toThrow();
     await store.close();
   });
+  it('migrates a populated version 19 file through 20, 21 and 22 in order', async () => {
+    const raw = new Database(path());
+    for (const m of MIGRATIONS.slice(0, 19)) {
+      for (const statement of m.statements) raw.prepare(statement).run();
+    }
+    raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
+    raw.pragma('user_version = 19');
+    raw
+      .prepare(
+        'INSERT INTO "outbox" ("wrap_id", "envelope_id", "recipient_key", "relays", "acks", ' +
+          '"attempt", "role", "attempts", "next_attempt_at", "created_at", "give_up_at", "state", ' +
+          "\"availability\") VALUES (?, ?, ?, 'r', 'a', 1, 'contact', 1, 1, 1, 2, 'sent', 'confirmed')",
+      )
+      .run('ab'.repeat(32), 'AAAAAAAAAAAAAAAAAAAAAA', 'cd'.repeat(32));
+    raw
+      .prepare(
+        'INSERT INTO "budget_ledger" ("entry_id", "ledger_epoch", "t", "record_id", "chain_id", ' +
+          '"reserved_usd", "state", "deadline") VALUES (?, 1, 1, ?, 8453, ?, ?, 2)',
+      )
+      .run('e1', `0x${'1'.padStart(64, '0')}`, '0.1', 'reserved');
+    raw.close();
+    expect(MIGRATIONS.slice(19).map((m) => m.version)).toEqual([20, 21, 22]);
+    const store = await SqliteStore.open(path());
+    expect(store.schemaVersion).toBe(22);
+    const [out] = await store.transaction((tx) => tx.select('outbox'));
+    expect(out).toMatchObject({ availability: 'confirmed', relays_accepted: null });
+    const [led] = await store.transaction((tx) => tx.select('budget_ledger'));
+    expect(led).toMatchObject({ entry_id: 'e1', install_id: null });
+    expect(await store.transaction((tx) => tx.select('budget_restores'))).toEqual([]);
+    expect(await store.transaction((tx) => tx.select('restore_replays'))).toEqual([]);
+    expect(await store.transaction((tx) => tx.select('install_state'))).toEqual([]);
+    await store.close();
+  });
 });

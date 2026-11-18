@@ -299,7 +299,7 @@ await step('S6', 'app: ui in a terminal serves its first page', async () => {
       '#!/bin/sh',
       'arg="$1"',
       'if [ -f "$arg" ]; then',
-      "  arg=$(grep -o 'url=http[^\"]*' \"$arg\" | head -n 1 | cut -c5-)",
+      '  arg=$(grep -o \'url=http[^"]*\' "$arg" | head -n 1 | cut -c5-)',
       'fi',
       `printf '%s' "$arg" > '${sink}'`,
       '',
@@ -325,7 +325,10 @@ await step('S6', 'app: ui in a terminal serves its first page', async () => {
       ...profileEnv(benHome),
       XDG_CONFIG_HOME: join(benHome, '.config'),
       XDG_DATA_HOME: join(benHome, '.local', 'share'),
-      XDG_CURRENT_DESKTOP: '', DESKTOP_SESSION: '', BROWSER: '' },
+      XDG_CURRENT_DESKTOP: '',
+      DESKTOP_SESSION: '',
+      BROWSER: '',
+    },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   let out = '';

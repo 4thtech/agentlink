@@ -159,7 +159,7 @@ function v1Spec(table: TableName): TableSpec {
   }
   if (table === 'contacts') return without(spec, [...V9_CONTACTS_COLUMNS, ...V18_CONTACTS_COLUMNS]);
   if (table === 'pairings') return without(spec, V18_PAIRINGS_COLUMNS);
-  if (table === 'budget_ledger') return without(spec, V20_BUDGET_LEDGER_COLUMNS);
+  if (table === 'budget_ledger') return without(spec, V22_BUDGET_LEDGER_COLUMNS);
   return spec;
 }
 

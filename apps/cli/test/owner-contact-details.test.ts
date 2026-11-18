@@ -77,7 +77,9 @@ async function setUp(relays: readonly string[]): Promise<void> {
       }),
     backendOf: () => Promise.resolve('keychain'),
     // Stands in for @4thtech-io/node's owner flow: presence, then the rotation with the new list.
-    updateContactDetails: async ({ agent }) => {
+    updateContactDetails: async ({
+      agent,
+    }: Parameters<NonNullable<OwnerCommandDeps['updateContactDetails']>>[0]) => {
       gestures += 1;
       if (refusePresence) throw Object.assign(new Error('presence'), { code: 'presence_rejected' });
       const migration = await agent.client.identity.relayMigration();

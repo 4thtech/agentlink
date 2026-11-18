@@ -407,10 +407,10 @@ describe('unreadable and ended rows', () => {
     const bad = makeRow(relays);
     outbox.add(bad);
     const original = outbox.markSent.bind(outbox);
-    outbox.markSent = (wrapId, acks, availability) =>
+    outbox.markSent = (wrapId, acks, availability, counts) =>
       wrapId === bad.wrapId
         ? Promise.reject(new Error('disk full'))
-        : original(wrapId, acks, availability);
+        : original(wrapId, acks, availability, counts);
     const good = makeRow(relays);
     outbox.add(good);
     const summary = await worker().processDue();
