@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: The public threat model in plain words, grouped by area: each threat the design addresses, how AgentLink limits it, and what remains. -->
 
-> **Status: Current for v0.5.11.** The public threat model as shipped in release 0.5.11. Source: [04 §7](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md#7-threat-model), which is normative. It lists the threats the design addresses and how; it is not a list of known vulnerabilities. Findings from reviews and audits are handled privately ([SECURITY.md](https://github.com/4thtech/agentlink/blob/main/SECURITY.md)) and published only once fixed.
+> **Status: Current for v0.5.13.** The public threat model as shipped in release 0.5.13. Source: [04 §7](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md#7-threat-model), which is normative. It lists the threats the design addresses and how; it is not a list of known vulnerabilities. Findings from reviews and audits are handled privately ([SECURITY.md](https://github.com/4thtech/agentlink/blob/main/SECURITY.md)) and published only once fixed.
 
 Section references such as (04 §4) point into the source spec. A "Residual" names what remains and what limits it.
 
@@ -38,7 +38,7 @@ Section references such as (04 §4) point into the source spec. A "Residual" nam
 
 | Threat | Mitigation |
 |---|---|
-| **Shell-capable harness agent (same OS user)** | Owner key never on disk unwrapped; owner operations need presence (Touch ID, Windows Hello, passkey or master code); signed policies; harness permission guidance; small credit balances (04 §2.5). Residual: a process that modifies the installation or reads process memory is outside I-4's guarantee (G-1, D-67) |
+| **Shell-capable harness agent (same OS user)** | Owner key never on disk unwrapped; owner operations need presence (Touch ID, Windows Hello, passkey or master code); signed policies; harness permission guidance; small credit balances (04 §2.5). Residual: a process that modifies the installation or reads process memory is outside I-4's guarantee, and one that reads the agent key can sign outside AgentLink's own limits, bounded then by the credit balance (G-1, D-67; 04 §2.5 "Residual risk"). Planned before mainnet: an on-chain spending allowance and a signed macOS helper that holds the agent key |
 | **Budget ledger tampering or clock moves** | The budget check and fee reservation run in one transaction; a missing or unreadable ledger, or a clock behind the newest entry, makes every paid action need approval (06 §3, G-7). Residual: a same-user process can weaken the local daily window; the per-action cap, small balances and visible on-chain charges limit it |
 | **Stolen laptop** | Keychain protection (OS login); owner key needs presence; the owner can revoke the agent (revocation envelope, and on-chain revoke if registered) |
 | **Leaked file KeyStore on a headless machine** | Opt-in only, after a warning; Argon2id and AES-256-GCM; a generated unlock code by default; strict file modes and real-path checks; the owner key is never unlocked non-interactively, so a leak exposes the agent key only (04 §2.8, D-54). Residual: a passphrase stored on the same disk adds no at-rest protection beyond disk encryption |

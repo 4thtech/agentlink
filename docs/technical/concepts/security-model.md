@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: The security model as shipped: the invariants, core design, owner presence, and desktop and local app security features. -->
 
-> **Status: Current for v0.5.10.** This page describes the security model as shipped in release 0.5.10. Source: [04 Security and crypto](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md), which is normative; any change to it needs a recorded decision.
+> **Status: Current for v0.5.13.** This page describes the security model as shipped in release 0.5.13. Source: [04 Security and crypto](https://github.com/4thtech/agentlink/blob/main/specs/04-security-and-crypto.md), which is normative; any change to it needs a recorded decision.
 
 ## Invariants
 
@@ -52,8 +52,9 @@ Agents often run with shell access as the owner's OS user. AgentLink is built so
 
 - **What the OS sheet protects.** Touch ID and Windows Hello prompts are drawn by the operating system. A same-user process cannot answer them, and cannot see or type a gesture for the owner.
 - **What a same-user process could still do.** While builds are unsigned, a process running as the same OS user that can modify the installed app, read process memory or imitate a prompt could misuse a genuine gesture or a typed master code. This is the same class as a modified package on the command line.
+- **The agent key is within its reach.** The agent key sits in the keychain or the file KeyStore as the same user. A process that reads it can sign outside AgentLink's code, so the spending limits, sending caps, restore guard and other counts kept on this computer bind AgentLink's own code paths (an AI that reaches AgentLink only through its tools, and our own bugs), not that process. Today the credit balance bounds what it can spend (04 §2.5 "Residual risk").
 - **What limits it.** Small credit balances, spending budgets, harness permission settings that deny access to AgentLink's files and the keychain, and owner revocation. A same-user script that does not modify the installation and does not read process memory cannot approve or change a policy.
-- **What closes it.** A signed build whose owner key opens only in a fixed-identity owner process (D-145 (3)). See the Roadmap below.
+- **What closes it.** For the owner key, a signed build whose owner key opens only in a fixed-identity owner process (D-145 (3)). For money, an on-chain spending allowance per ID; on a Mac, a signed helper that holds the agent key. See the Roadmap below.
 
 ## Desktop and local app features
 
@@ -150,17 +151,20 @@ The ceilings apply in every mode and, when the policy can't be read, as defaults
 
 - **No forward secrecy for stored messages** (04 §6). Owners must be able to read history (I-9), so a stolen encryption key opens past envelopes addressed to it. Mitigated by keychain storage, key rotation, short file expiry and crypto-shredding.
 - **Same-user processes** (G-1, D-67). A process running as the owner's OS user that modifies the installation, reads process memory or imitates a prompt can act beyond what I-4 promises. Limited by small balances, budgets, harness permissions, revocation and, in the desktop app, OS-drawn prompts.
+- **Signing gate in the core.** A proof is signed only under a single-use ticket tied to its budget reservation, but the core checks the ticket, not the KeyStore; code that calls the KeyStore directly is bounded by the typed-data rules only. Moving the gate into the KeyStore is planned before mainnet.
+- **Several computers on one ID.** Until multi-device support and the on-chain allowance, spending limits and sending caps apply per computer. The app and `agentlink doctor` say when the same ID sends from another computer; a computer that only receives is not seen.
+- **Old default relays.** During the 0.5.13 transition contacts that still list a dropped relay are reached there, and card updates also go there until 31 January 2027. Content stays end-to-end encrypted.
 - **Compromised hosts serving code.** Whoever can serve code for the console, the setup guide page or a user's own cloud agent controls what those pages do. Limited by open source, reproducible builds, published hashes, SRI and CSP, and by self-hosting or the desktop app.
 - **Unsigned desktop builds.** While builds are unsigned, a same-user process could change a staged update between its last check and the install. Today this adds nothing, because that process could change the installed app directly. Signed builds close it.
 - **Metadata.** Relays, the encrypted drop and storage providers see IP addresses, sizes and timing. The chain shows pseudonymous agent addresses and, after an on-chain receipt, the link between a record and its recipient.
 
 ## Roadmap
 
-Later items of D-156, in order:
+D-156 shipped in 0.5.10 to 0.5.13: received receipts on by default, the typed-data allowlist for the agent key, owner spending ceilings, sending and invite limits, full-text approval cards, the relay availability check, the restore guard and its traces, proof signing tied to the budget, and the notice when an ID is used on another computer. Still to come, before mainnet (M3):
 
-- Planned: a message counts as sent once a relay serves it back, 0.5.12.
-- Planned: a restore guard for spending and processed actions, 0.5.12.
-- Planned: an on-chain spending allowance and a protected signing helper on macOS, before mainnet (M3).
+- Planned: an on-chain spending allowance per ID and network, set only by the owner.
+- Planned: a small signed helper on macOS that holds the agent key.
+- Planned: the proof-signing gate inside the KeyStore itself.
 
 ## Decisions behind the mechanisms
 
