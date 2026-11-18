@@ -25,7 +25,7 @@ const ENVELOPE = 'AAAAAAAAAAAAAAAAAAAAAA';
 
 describe('schema version 20 (DELIVERY-DETAILS)', () => {
   it('appends the two count columns to envelopes and outbox', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(20);
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(20);
     const v20 = MIGRATIONS[19]?.statements ?? [];
     expect(MIGRATIONS[18]?.version).toBe(19);
     expect(MIGRATIONS[19]?.version).toBe(20);

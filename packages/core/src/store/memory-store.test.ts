@@ -74,7 +74,7 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         'content_file_budget',
         // SEC-OUTBOUND-CAPS (D-156; 06 §3 `outgoing`, schema 17): counts and times only.
         'outgoing_log',
-        // RESTORE-TRACES (D-156; 07 §3.5, schema 20): restore entries (no amount) and replays.
+        // RESTORE-TRACES (D-156; 07 §3.5, schema 21): restore entries (no amount) and replays.
         'budget_restores',
         'restore_replays',
         // W4-PAUSE (D-143 (5); 07 §3.2, schema 12): the owner's pause of the agent.
@@ -177,7 +177,7 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
   });
 
   it('DELIVERY-DETAILS (schema 20): relays_accepted and relays_available, nullable ints, appended last', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(20);
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(20);
     const int = { kind: 'int', nullable: true };
     for (const table of ['envelopes', 'outbox'] as const) {
       expect(Object.keys(TABLES[table].columns).slice(-2)).toEqual([
