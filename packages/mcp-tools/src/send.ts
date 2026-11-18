@@ -74,6 +74,18 @@ export const SEND_TEXT = Object.freeze({
     'Use a new clientRequestId for a new message, or the same request to repeat it.',
   inProgress: 'This message is already being sent by another call, so nothing more was done.',
   inProgressNextStep: 'Wait a few seconds, then call again with the same clientRequestId.',
+  // D-156 (SEC-OUTBOUND-CAPS): an outgoing cap of the owner's rules; never an approval.
+  sendLimitContactMessages:
+    'Sending limit reached for {name} ({max} messages a day), so nothing was sent.',
+  sendLimitMessages: 'Sending limit reached ({max} messages a day in all), so nothing was sent.',
+  sendLimitContactFiles:
+    'Sending limit reached for {name} ({max} files a day), so nothing was sent.',
+  sendLimitFiles: 'Sending limit reached ({max} files a day in all), so nothing was sent.',
+  sendLimitMB: 'Sending limit reached ({max} MB of files a day), so nothing was sent.',
+  sendLimitNextStep:
+    'Try again after {time}. Or tell the user: This is over the limit your owner set. Only the owner can change it in Settings › Rules.',
+  proofCeiling:
+    "The proof wasn't added: it is over the limit the owner set, so nothing was recorded.",
   policyDenied: "The owner's rules don't allow this message, so nothing was sent.",
   policyDeniedNextStep:
     'Tell the user their AgentLink rules blocked this message. Only they can change the rules.',
@@ -366,6 +378,9 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
             FILE_TEXT.payloadTooLargeNextStep,
             'PAYLOAD_TOO_LARGE',
           );
+        case 'SEND_LIMIT':
+          logger.info('send refused', { code: 'SEND_LIMIT' });
+          return sendLimit(result as unknown as Readonly<Record<string, unknown>>, renderRef(ref));
         default: {
           // FILES-AI-1: the `file` refusals (06 §2.3), fixed text by code.
           const content = byContent ? contentFileRefusal(result.code) : undefined;
@@ -472,11 +487,15 @@ async function withProofOf(
       typeof proofOut.result.code === 'string' && proofOut.result.code !== 'INTERNAL'
         ? proofOut.result.code
         : 'PROOF_FAILED';
+    // D-156: over a hard ceiling the proof is refused in plain words (no retry, no approval).
+    const ceiling = code === 'SPEND_CEILING';
     proofOut = {
       result: {
         status: 'error',
-        summary: SEND_TEXT.proofFailed,
-        nextStep: SEND_TEXT.proofFailedNextStep.replace('{envelopeId}', envelopeId),
+        summary: ceiling ? SEND_TEXT.proofCeiling : SEND_TEXT.proofFailed,
+        nextStep: ceiling
+          ? String(proofOut.result.nextStep)
+          : SEND_TEXT.proofFailedNextStep.replace('{envelopeId}', envelopeId),
         code,
       },
     };
@@ -509,4 +528,43 @@ async function withProofOf(
       proof,
     },
   };
+}
+
+/**
+ * D-156: the SEND_LIMIT refusal in plain words: which cap, its number, the contact for a
+ * per-contact cap, and when a slot frees. The numbers and the time come from the core's typed
+ * result and are checked here; nothing else is read from it.
+ */
+function sendLimit(result: Readonly<Record<string, unknown>>, name: string): HandlerOutput {
+  const limit = result['limit'];
+  const max = result['max'];
+  const retryAt = result['retryAt'];
+  const templates: Readonly<Record<string, string>> = {
+    messages_contact: SEND_TEXT.sendLimitContactMessages,
+    messages_day: SEND_TEXT.sendLimitMessages,
+    files_contact: SEND_TEXT.sendLimitContactFiles,
+    files_day: SEND_TEXT.sendLimitFiles,
+    file_mb_day: SEND_TEXT.sendLimitMB,
+  };
+  const template = typeof limit === 'string' ? templates[limit] : undefined;
+  const time =
+    typeof retryAt === 'string' &&
+    /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/.test(retryAt)
+      ? retryAt
+      : undefined;
+  if (
+    template === undefined ||
+    typeof max !== 'number' ||
+    !Number.isSafeInteger(max) ||
+    time === undefined
+  ) {
+    return internalError();
+  }
+  return fail(
+    'rejected',
+    template.replace('{name}', name).replace('{max}', String(max)),
+    SEND_TEXT.sendLimitNextStep.replace('{time}', time),
+    'SEND_LIMIT',
+    { limit, max, retryAt: time },
+  );
 }

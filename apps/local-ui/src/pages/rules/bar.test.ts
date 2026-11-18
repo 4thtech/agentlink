@@ -33,7 +33,7 @@ const RULES = {
     proofs: {
       notarize: 'approval',
       dailyBudgetUSD: '5',
-      perActionMaxUSD: '1',
+      perActionMaxUSD: '0.2',
       allowKeyDisclosure: 'approval',
     },
     contacts: { acceptInvites: 'approval', unknownSenders: 'queue', allowed: 'paired', listed: 0 },

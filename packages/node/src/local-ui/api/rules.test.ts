@@ -290,8 +290,17 @@ describe('GET /api/ui/rules', () => {
         proofs: {
           notarize: 'allow',
           dailyBudgetUSD: '5',
-          perActionMaxUSD: '1',
+          perActionMaxUSD: '0.2',
           allowKeyDisclosure: 'approval',
+          hardMaxPerActionUSD: '0.5',
+          hardDailyUSD: '10',
+        },
+        outgoing: {
+          messagesPerContactPerDay: 300,
+          messagesPerDay: 1000,
+          filesPerContactPerDay: 50,
+          filesPerDay: 200,
+          fileMBPerDay: 2000,
         },
         contacts: {
           acceptInvites: 'approval',
@@ -443,7 +452,13 @@ describe('GET /api/ui/rules/review: prepare an edit (core preparePolicyEdit)', (
       base: 0,
       patch: {
         contacts: { acceptInvites: 'auto' },
-        proofs: { dailyBudgetUSD: '20', perActionMaxUSD: '2' },
+        // D-156: a soft limit above its hard ceiling is refused, so both are raised.
+        proofs: {
+          dailyBudgetUSD: '20',
+          perActionMaxUSD: '2',
+          hardDailyUSD: '20',
+          hardMaxPerActionUSD: '2',
+        },
         files: { maxSendSizeMB: 500 },
         commitments: { accept: 'allow' },
       },
@@ -544,9 +559,9 @@ describe('hard proof ceilings and outgoing caps on the Rules page (D-156; I-4)',
     expect(
       await review(context, { base: 0, patch: { proofs: { perActionMaxUSD: '0.9' } } }),
     ).toEqual({ status: 400, body: { error: 'invalid_edit' } });
-    expect(
-      await review(context, { base: 0, patch: { proofs: { dailyBudgetUSD: '11' } } }),
-    ).toEqual({ status: 400, body: { error: 'invalid_edit' } });
+    expect(await review(context, { base: 0, patch: { proofs: { dailyBudgetUSD: '11' } } })).toEqual(
+      { status: 400, body: { error: 'invalid_edit' } },
+    );
   });
 });
 
@@ -554,7 +569,11 @@ describe('hard proof ceilings and outgoing caps on the Rules page (D-156; I-4)',
 
 const LOOSER = {
   base: 0,
-  patch: { proofs: { dailyBudgetUSD: '20' }, commitments: { accept: 'allow' } },
+  // D-156: the daily budget is at most the hard daily ceiling, so both are raised.
+  patch: {
+    proofs: { dailyBudgetUSD: '20', hardDailyUSD: '20' },
+    commitments: { accept: 'allow' },
+  },
 };
 
 describe('POST /api/ui/rules: sign only an acknowledged prepared body (D-119; I-4)', () => {

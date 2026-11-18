@@ -106,7 +106,24 @@ export interface RulesPageProps {
 }
 
 /** The spending fields of the proofs section (04 §2.5.3 "Which actions"). */
-const SPENDING_FIELDS = ['notarize', 'dailyBudgetUSD', 'perActionMaxUSD'] as const;
+const SPENDING_FIELDS = [
+  'notarize',
+  'dailyBudgetUSD',
+  'perActionMaxUSD',
+  // D-156: the hard limits are spending fields too.
+  'hardMaxPerActionUSD',
+  'hardDailyUSD',
+] as const;
+
+/** D-156: the sending limits, in the order the page shows them. */
+const SENDING_FIELDS = [
+  ['messagesPerContactPerDay', S.sendMessagesContact],
+  ['messagesPerDay', S.sendMessagesDay],
+  ['filesPerContactPerDay', S.sendFilesContact],
+  ['filesPerDay', S.sendFilesDay],
+  ['fileMBPerDay', S.sendMBDay],
+] as const;
+const SENDING_KEYS = SENDING_FIELDS.map(([key]) => key);
 
 function Row({
   title,
@@ -461,6 +478,8 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
     checked.invalid.has(key) ? { error: S.invalidAmount } : {};
   const sizeError = (key: keyof Draft): { error?: string } =>
     checked.invalid.has(key) ? { error: S.invalidSize } : {};
+  const countError = (key: keyof Draft): { error?: string } =>
+    checked.invalid.has(key) ? { error: S.invalidCount } : {};
   const turningSellOn = draft.sellOn && !viewSellOn(view);
   const base = draftOf(view);
   const differs = (...keys: (keyof Draft)[]): boolean => keys.some((k) => draft[k] !== base[k]);
@@ -472,6 +491,8 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
     differs('maxSendSizeMB', 'maxReceiveSizeMB'),
     differs('allowKeyDisclosure'),
     differs('buyOn', 'buyMaxUSD', 'sellOn', 'sellMinUSD'),
+    differs('hardMaxPerActionUSD', 'hardDailyUSD'),
+    differs(...SENDING_KEYS),
   ].filter(Boolean).length;
   const widens =
     rank3(draft.notarize) > rank3(base.notarize) ||
@@ -482,7 +503,10 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
     (draft.unknownSenders === 'queue' && base.unknownSenders === 'drop') ||
     (draft.allowKeyDisclosure === 'approval' && base.allowKeyDisclosure === 'deny') ||
     (draft.buyOn && !base.buyOn) ||
-    (draft.sellOn && !base.sellOn);
+    (draft.sellOn && !base.sellOn) ||
+    toNum(draft.hardMaxPerActionUSD) > toNum(base.hardMaxPerActionUSD) ||
+    toNum(draft.hardDailyUSD) > toNum(base.hardDailyUSD) ||
+    SENDING_KEYS.some((k) => toNum(draft[k]) > toNum(base[k]));
   const dirty = checked.changes > 0 || checked.invalid.size > 0;
 
   return (
@@ -572,7 +596,10 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
                   invalid={checked.invalid.has('perActionMaxUSD')}
                   onChange={(v) => edit({ perActionMaxUSD: v })}
                 />
-                {checked.invalid.has('dailyBudgetUSD') || checked.invalid.has('perActionMaxUSD') ? (
+                {checked.aboveHard.size > 0 ? (
+                  <InlineError>{S.softAboveHard}</InlineError>
+                ) : checked.invalid.has('dailyBudgetUSD') ||
+                  checked.invalid.has('perActionMaxUSD') ? (
                   <InlineError>{S.invalidAmount}</InlineError>
                 ) : null}
               </div>
@@ -650,7 +677,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
                 <span className="al-text-caption al-muted">{S.moreHelp}</span>
               </span>
               <span className="al-text-body-sm al-muted rl-more-state">
-                {S.moreState(5, moreChanged)}
+                {S.moreState(7, moreChanged)}
               </span>
               <Icon name={moreOpen ? 'chevron-down' : 'chevron-right'} size={16} />
             </button>
@@ -658,6 +685,49 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
         </Surface>
         {moreOpen ? (
           <Surface id="rules-more" className="rl-card">
+            {/* D-156 (SEC-HARD-CEILING): refused above, never asked; changed only here. */}
+            <Row
+              title={S.hardTitle}
+              changed={differs('hardMaxPerActionUSD', 'hardDailyUSD')}
+              help={S.hardHelp}
+            >
+              <div className="rl-fields">
+                <TextField
+                  label={S.hardPerProof}
+                  prefix="$"
+                  mono
+                  inputMode="decimal"
+                  value={draft.hardMaxPerActionUSD}
+                  {...amountError('hardMaxPerActionUSD')}
+                  onChange={(e) => edit({ hardMaxPerActionUSD: e.currentTarget.value })}
+                />
+                <TextField
+                  label={S.hardDaily}
+                  prefix="$"
+                  mono
+                  inputMode="decimal"
+                  value={draft.hardDailyUSD}
+                  {...amountError('hardDailyUSD')}
+                  onChange={(e) => edit({ hardDailyUSD: e.currentTarget.value })}
+                />
+              </div>
+            </Row>
+            {/* D-156 (SEC-OUTBOUND-CAPS): what the AI may send in any 24 hours. */}
+            <Row title={S.sendingTitle} changed={differs(...SENDING_KEYS)} help={S.sendingHelp}>
+              <div className="rl-fields">
+                {SENDING_FIELDS.map(([key, label]) => (
+                  <TextField
+                    key={key}
+                    label={label}
+                    mono
+                    inputMode="numeric"
+                    value={draft[key]}
+                    {...countError(key)}
+                    onChange={(e) => edit({ [key]: e.currentTarget.value } as Partial<Draft>)}
+                  />
+                ))}
+              </div>
+            </Row>
             <Row
               title={S.unknownTitle}
               changed={differs('unknownSenders')}

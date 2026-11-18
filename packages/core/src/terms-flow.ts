@@ -501,7 +501,10 @@ function quoteRefusal(
       : { status: 'needs_credits', topUp: quote.topUp };
   }
   switch (quote.code) {
+    // D-156: a hard ceiling (SPEND_CEILING) refuses the terms Record; the terms tools report the
+    // rules' refusal.
     case 'POLICY_DENIED':
+    case 'SPEND_CEILING':
       return rejected('POLICY_DENIED');
     case 'CARD_EXPIRED':
       return rejected('CARD_EXPIRED');

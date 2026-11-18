@@ -83,6 +83,12 @@ defaults carry `history: {messagesKeepDays: 0, filesKeepDays: 0}` (keep forever)
 `policy.set` vector built from them has this seventh top-level key. A first edit of rules never
 signed signs these defaults; only a new ID's first rules or Settings › Storage set other values.
 
+Hard proof ceilings and outgoing caps (D-156, SEC-HARD-CEILING, SEC-OUTBOUND-CAPS; 06 §3), version
+10: the 06 §3 defaults carry `proofs.perActionMaxUSD: "0.2"`, `proofs.hardMaxPerActionUSD: "0.5"`,
+`proofs.hardDailyUSD: "10"` and `outgoing: {messagesPerContactPerDay: 300, messagesPerDay: 1000,
+filesPerContactPerDay: 50, filesPerDay: 200, fileMBPerDay: 2000}`, so every `policy.set` vector built
+from them carries these. A policy signed before version 10 has none of them and reads as these values.
+
 Usage: python3 -I tools/vectors/generate_owner_action.py --check [FILE] | --write
 """
 
@@ -100,7 +106,7 @@ import generate_safety_code as safety  # noqa: E402
 import vectorlib as v  # noqa: E402
 
 SUITE = "owner-action"
-VERSION = 9
+VERSION = 10
 TAG = "agentlink/owner-action/v1"
 ENVELOPE_TAG = "agentlink/envelope/v1"
 SPEC = "04 §2.5.1"
@@ -280,12 +286,15 @@ def build():
             "ownerArchive": False,
         },
         "envelopes": {"maxEnvelopeKB": 24},
-        "proofs": {"notarize": "allow", "dailyBudgetUSD": "5", "perActionMaxUSD": "1", "allowKeyDisclosure": "approval", "exportFolder": "~/AgentLink/Proofs", "defaultChain": "base"},
+        # D-156 (owner-action version 10): ask above $0.20 a proof; refuse above $0.50 or $10 a day.
+        "proofs": {"notarize": "allow", "dailyBudgetUSD": "5", "perActionMaxUSD": "0.2", "allowKeyDisclosure": "approval", "exportFolder": "~/AgentLink/Proofs", "defaultChain": "base", "hardMaxPerActionUSD": "0.5", "hardDailyUSD": "10"},
         # D-109 (M1-33a, owner-action version 6): delivery receipts are off by default.
         "receipts": {"autoDelivered": False, "autoOpened": False},
         "commitments": {"accept": "approval", "autoAcceptContacts": [], "autoAcceptMaxUSD": "0", "autoAcceptDirection": "buy", "autoAcceptMinUSD": None},
         # D-148 (RET-6/7, owner-action version 9): local history is kept forever by default.
         "history": {"messagesKeepDays": 0, "filesKeepDays": 0},
+        # D-156 (owner-action version 10): the rolling 24 h caps on outgoing messages and files.
+        "outgoing": {"messagesPerContactPerDay": 300, "messagesPerDay": 1000, "filesPerContactPerDay": 50, "filesPerDay": 200, "fileMBPerDay": 2000},
         "contactRules": [],
     }
 

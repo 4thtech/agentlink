@@ -31,7 +31,17 @@ const CONTACT = `0x${'12'.repeat(20)}`;
 const OTHER = `0x${'34'.repeat(20)}`;
 const FEE_TOKEN = `0x${'ab'.repeat(20)}`;
 
-const policy = (): Policy => JSON.parse(JSON.stringify(POLICY_DEFAULTS)) as Policy;
+/**
+ * The defaults with the $1 per-proof soft limit these flows were written for, and the D-156 hard
+ * ceilings out of their way (the ceilings' own spending changes are in policy-limits.test.ts).
+ */
+const policy = (): Policy => {
+  const p = JSON.parse(JSON.stringify(POLICY_DEFAULTS)) as Policy;
+  p.proofs.perActionMaxUSD = '1';
+  p.proofs.hardMaxPerActionUSD = '1000';
+  p.proofs.hardDailyUSD = '1000';
+  return p;
+};
 
 const notarize = (
   usd = '0.1',

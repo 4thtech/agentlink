@@ -11352,12 +11352,14 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Goal:** caps on invites the AI makes, and contacts it adds wait until the owner keeps them.
 
 #### SEC-HARD-CEILING · Spending ceiling (0.5.11)
-- **Status:** later (0.5.11) · **Security:** S2 · **Spec:** D-156 (4)
+- **Status:** built on `rel0511/limits` (review pending) · **Security:** S2 · **Spec:** D-156 (4); 06 §3; 04 §2.5.3; 11 §5.11; 12
 - **Goal:** owner-set per-proof and per-day ceilings above which nothing is signed.
+- **Done:** `proofs.hardMaxPerActionUSD` "0.5" and `hardDailyUSD` "10" (absent = these), soft per-proof default "0.2"; `evaluateProof` denies above a ceiling with `ceiling` (every mode, broken ledger included; an approval never passes it); `SPEND_CEILING` with plain words for the AI; soft ≤ hard in the schema; older policies read and migrated by min(); raising is a spending change on the Rules page; owner-action vectors version 10.
 
 #### SEC-OUTBOUND-CAPS · Sending limits (0.5.11)
-- **Status:** later (0.5.11) · **Security:** S2 · **Spec:** D-156 (6)
+- **Status:** built on `rel0511/limits` (review pending) · **Security:** S2 · **Spec:** D-156 (6); 06 §3; 11 §5.11
 - **Goal:** per-contact and per-day limits for outgoing messages and files.
+- **Done:** policy `outgoing` (300 / 1000 messages, 50 / 200 files, 2000 MB per rolling 24 h; absent = these); counted in the send transaction from the stored envelopes and files (no schema change); `SEND_LIMIT` with the cap, its number and `retryAt`, never kept under a clientRequestId; acks, receipts, pairing and terms not counted; Rules page "Sending limits". Residual: a process with the agent key bypasses it; terms envelopes are not capped.
 
 #### SEC-RELAY-READBACK · Relay availability check (0.5.12)
 - **Status:** later (0.5.12) · **Security:** S2 · **Spec:** D-156 (7)

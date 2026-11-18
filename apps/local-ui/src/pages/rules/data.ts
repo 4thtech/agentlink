@@ -11,7 +11,12 @@ export interface RulesView {
     readonly dailyBudgetUSD: string;
     readonly perActionMaxUSD: string;
     readonly allowKeyDisclosure: 'approval' | 'deny';
+    /** D-156: the hard limits; above them a proof is refused, never asked. */
+    readonly hardMaxPerActionUSD: string;
+    readonly hardDailyUSD: string;
   };
+  /** D-156: what the AI may send in any 24 hours (06 §3 `outgoing`). */
+  readonly outgoing: Outgoing;
   readonly contacts: {
     readonly acceptInvites: 'approval' | 'auto';
     readonly unknownSenders: 'queue' | 'drop';
@@ -31,6 +36,49 @@ export interface RulesView {
     readonly autoAcceptMinUSD: string | null;
     readonly autoAcceptContacts: number;
   };
+}
+
+export interface Outgoing {
+  readonly messagesPerContactPerDay: number;
+  readonly messagesPerDay: number;
+  readonly filesPerContactPerDay: number;
+  readonly filesPerDay: number;
+  readonly fileMBPerDay: number;
+}
+
+/** D-156: each outgoing cap's upper bound (06 §3; core's POLICY_BOUNDS). */
+export const OUTGOING_MAX: Readonly<Record<keyof Outgoing, number>> = Object.freeze({
+  messagesPerContactPerDay: 10_000,
+  messagesPerDay: 100_000,
+  filesPerContactPerDay: 1_000,
+  filesPerDay: 10_000,
+  fileMBPerDay: 102_400,
+});
+
+/** D-156: what a server that does not send them yet means (the 06 §3 defaults). */
+const OUTGOING_DEFAULTS: Outgoing = Object.freeze({
+  messagesPerContactPerDay: 300,
+  messagesPerDay: 1000,
+  filesPerContactPerDay: 50,
+  filesPerDay: 200,
+  fileMBPerDay: 2000,
+});
+const HARD_DEFAULTS = Object.freeze({ hardMaxPerActionUSD: '0.5', hardDailyUSD: '10' });
+
+const OUTGOING_KEYS = Object.keys(OUTGOING_MAX) as (keyof Outgoing)[];
+
+function parseOutgoing(v: unknown): Outgoing | undefined {
+  if (v === undefined) return OUTGOING_DEFAULTS;
+  if (!isObject(v)) return undefined;
+  const out: Record<string, number> = {};
+  for (const key of OUTGOING_KEYS) {
+    const n = v[key];
+    if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 1 || n > OUTGOING_MAX[key]) {
+      return undefined;
+    }
+    out[key] = n;
+  }
+  return out as unknown as Outgoing;
 }
 
 export type RulesAnswer =
@@ -75,6 +123,11 @@ function parseView(v: unknown): RulesView | undefined {
   const { proofs: p, contacts: c, files: f, receipts: r, commitments: m } = v;
   if (!isObject(p) || !isObject(c) || !isObject(f) || !isObject(r) || !isObject(m))
     return undefined;
+  const outgoing = parseOutgoing(v.outgoing);
+  // An older server leaves the hard limits out: they read as the defaults (D-156).
+  const hardMaxPerActionUSD = p.hardMaxPerActionUSD ?? HARD_DEFAULTS.hardMaxPerActionUSD;
+  const hardDailyUSD = p.hardDailyUSD ?? HARD_DEFAULTS.hardDailyUSD;
+  if (outgoing === undefined || !usd(hardMaxPerActionUSD) || !usd(hardDailyUSD)) return undefined;
   if (
     !oneOf(p.notarize, RULE3) ||
     !usd(p.dailyBudgetUSD) ||
@@ -103,7 +156,10 @@ function parseView(v: unknown): RulesView | undefined {
       dailyBudgetUSD: p.dailyBudgetUSD,
       perActionMaxUSD: p.perActionMaxUSD,
       allowKeyDisclosure: p.allowKeyDisclosure,
+      hardMaxPerActionUSD,
+      hardDailyUSD,
     },
+    outgoing,
     contacts: {
       acceptInvites: c.acceptInvites,
       unknownSenders: c.unknownSenders,
@@ -165,6 +221,14 @@ export interface Draft {
   readonly sellOn: boolean;
   readonly sellMinUSD: string;
   readonly sendReceived: boolean;
+  /** D-156: the hard limits and the sending limits, as typed. */
+  readonly hardMaxPerActionUSD: string;
+  readonly hardDailyUSD: string;
+  readonly messagesPerContactPerDay: string;
+  readonly messagesPerDay: string;
+  readonly filesPerContactPerDay: string;
+  readonly filesPerDay: string;
+  readonly fileMBPerDay: string;
 }
 
 /** Buy auto-accept as core reads it: live, with listed contacts and a maximum above 0. */
@@ -196,6 +260,13 @@ export function draftOf(v: RulesView): Draft {
     sellOn: sellOn(v),
     sellMinUSD: v.commitments.autoAcceptMinUSD ?? '',
     sendReceived: v.receipts.sendReceived,
+    hardMaxPerActionUSD: v.proofs.hardMaxPerActionUSD,
+    hardDailyUSD: v.proofs.hardDailyUSD,
+    messagesPerContactPerDay: String(v.outgoing.messagesPerContactPerDay),
+    messagesPerDay: String(v.outgoing.messagesPerDay),
+    filesPerContactPerDay: String(v.outgoing.filesPerContactPerDay),
+    filesPerDay: String(v.outgoing.filesPerDay),
+    fileMBPerDay: String(v.outgoing.fileMBPerDay),
   };
 }
 
@@ -223,12 +294,21 @@ export function toSize(text: string): number | undefined {
   return n >= 1 && n <= MB_MAX ? n : undefined;
 }
 
+/** D-156: the owner's whole-number entry from 1 to `max`, or undefined. */
+export function toCount(text: string, max: number): number | undefined {
+  if (!/^\s*[0-9]{1,6}\s*$/.test(text)) return undefined;
+  const n = Number(text.trim());
+  return n >= 1 && n <= max ? n : undefined;
+}
+
 export interface DraftCheck {
   readonly patch: Record<string, Record<string, unknown>>;
   /** How many settings the owner changed (the unsaved-changes bar). */
   readonly changes: number;
   /** Fields whose entry is not valid, by draft key. */
   readonly invalid: ReadonlySet<keyof Draft>;
+  /** D-156: soft limits above their hard limit (also in `invalid`: saving waits). */
+  readonly aboveHard: ReadonlySet<'perActionMaxUSD' | 'dailyBudgetUSD'>;
 }
 
 /** The patch for `draft` over `view`: only what changed, in core's form. */
@@ -246,7 +326,9 @@ export function checkDraft(view: RulesView, draft: Draft): DraftCheck {
   };
 
   pick(draft.notarize !== view.proofs.notarize, 'proofs', 'notarize', draft.notarize);
-  const amount = (key: 'dailyBudgetUSD' | 'perActionMaxUSD'): void => {
+  const amount = (
+    key: 'dailyBudgetUSD' | 'perActionMaxUSD' | 'hardMaxPerActionUSD' | 'hardDailyUSD',
+  ): void => {
     const value = toUsd(draft[key]);
     if (value === undefined) {
       invalid.add(key);
@@ -256,6 +338,26 @@ export function checkDraft(view: RulesView, draft: Draft): DraftCheck {
   };
   amount('dailyBudgetUSD');
   amount('perActionMaxUSD');
+  amount('hardMaxPerActionUSD');
+  amount('hardDailyUSD');
+  // D-156: a soft limit is at most its hard limit (core refuses the edit otherwise).
+  const aboveHard = new Set<'perActionMaxUSD' | 'dailyBudgetUSD'>();
+  for (const [soft, hard] of [
+    ['perActionMaxUSD', 'hardMaxPerActionUSD'],
+    ['dailyBudgetUSD', 'hardDailyUSD'],
+  ] as const) {
+    const s = toUsd(draft[soft]);
+    const h = toUsd(draft[hard]);
+    if (s !== undefined && h !== undefined && Number(s) > Number(h)) {
+      aboveHard.add(soft);
+      invalid.add(soft);
+    }
+  }
+  for (const key of OUTGOING_KEYS) {
+    const value = toCount(draft[key], OUTGOING_MAX[key]);
+    if (value === undefined) invalid.add(key);
+    else pick(value !== view.outgoing[key], 'outgoing', key, value);
+  }
   pick(
     draft.allowKeyDisclosure !== view.proofs.allowKeyDisclosure,
     'proofs',
@@ -322,7 +424,7 @@ export function checkDraft(view: RulesView, draft: Draft): DraftCheck {
     set('commitments', 'autoAcceptMinUSD', min);
     if (draft.sellOn === wasSell) changes += 1;
   }
-  return { patch, changes, invalid };
+  return { patch, changes, invalid, aboveHard };
 }
 
 const toBase64url = (bytes: Uint8Array): string => {

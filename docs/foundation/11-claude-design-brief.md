@@ -489,6 +489,24 @@ The free, private "received" receipt the recipient's app sends back (04 §3.4, 0
 - An automatic device receipt is always named as such, apart from public receipts (§5.6).
 - Never "wallet", "gas", "seed phrase" or "transaction" (§5.1).
 
+### 5.11 Hard limits and sending limits (D-156)
+
+Rules page, More rules (SEC-HARD-CEILING, SEC-OUTBOUND-CAPS):
+
+| Key | Copy |
+|---|---|
+| Hard limits row | "Hard spending limits" · "Your AI can never spend more than this on proofs, not even with your approval. Only you can change these, here." · fields "Never more than, per proof" and "Never more than, in any 24 hours" |
+| Soft above hard | ""Ask me over" and the proof budget can be at most your hard spending limits." |
+| Sending limits row | "Sending limits" · "How much your AI can send in any 24 hours. Above these, sending stops until a slot frees up or you raise them." · fields "Messages to one person", "Messages in all", "Files to one person", "Files in all", "File data in all (MB)" |
+| Confirmation sheet | "Hard limit per proof", "Hard limit for 24 hours" |
+
+What the AI relays (tool results; never an approval):
+
+| Code | Summary · next step |
+|---|---|
+| `SPEND_CEILING` | "This proof would cost more than the limit the owner set ($0.50 per proof), so nothing was recorded." or "…go over the limit the owner set ($10 a day)…" · "Tell the user: This is over the limit your owner set. Only the owner can change it in Settings › Rules. Don't ask for an approval: an approval can't go over this limit." |
+| `SEND_LIMIT` | "Sending limit reached for Ana (300 messages a day), so nothing was sent." (per kind: messages in all, files to one person, files in all, MB of files) · "Try again after {time}. Or tell the user: This is over the limit your owner set. Only the owner can change it in Settings › Rules." |
+
 ## 6. Surfaces and information architecture
 
 ### 6.0 Surface map

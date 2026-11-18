@@ -32,7 +32,7 @@ const rules = (notarize: string, unknownSenders: string): unknown => ({
     proofs: {
       notarize,
       dailyBudgetUSD: '5',
-      perActionMaxUSD: '1',
+      perActionMaxUSD: '0.2',
       allowKeyDisclosure: 'approval',
     },
     contacts: { acceptInvites: 'approval', unknownSenders, allowed: 'paired', listed: 0 },

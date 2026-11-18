@@ -124,7 +124,9 @@ describe('outgoing message caps in the send pipeline (D-156)', () => {
       max: 2,
     });
     if (refused.status === 'rejected' && 'retryAt' in refused) {
-      expect(refused.retryAt).toBe(new Date((clock.t + DAY) * 1000).toISOString().replace('.000Z', 'Z'));
+      expect(refused.retryAt).toBe(
+        new Date((clock.t + DAY) * 1000).toISOString().replace('.000Z', 'Z'),
+      );
     }
     expect(published).toBe(before);
     expect(await sentRows(a)).toHaveLength(2);
@@ -168,7 +170,7 @@ describe('outgoing message caps in the send pipeline (D-156)', () => {
     await applyCaps(a, { messagesPerContactPerDay: 1, messagesPerDay: 1 });
     await a.store.transaction((tx) => {
       for (const [i, type] of ['ack', 'proof', 'card-update', 'handshake'].entries()) {
-        tx.insert('envelopes', outRow(`x${i}`, b.id, type, clock.t));
+        tx.insert('envelopes', outRow(id22(`x${i}`, 'X'), b.id, type, clock.t));
       }
     });
     expect((await a.client.sendMessage({ to: b.id, text: 'one' })).status).toBe('ok');
@@ -192,11 +194,14 @@ describe('outgoing message caps in the send pipeline (D-156)', () => {
   });
 });
 
+/** A 22-character base64url ID (16 bytes), as envelope and thread IDs are. */
+const id22 = (id: string, pad: string): string => id.slice(0, 21).padEnd(21, pad) + 'A';
+
 function outRow(id: string, contact: string, type: string, at: number): Row<'envelopes'> {
   return {
     envelope_id: id,
     envelope_hash: `h${id}`,
-    thread_id: `t${id}`,
+    thread_id: id22(id, 'T'),
     direction: 'out',
     contact_id: contact,
     from_key: 'self',

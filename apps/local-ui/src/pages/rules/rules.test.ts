@@ -84,7 +84,7 @@ const DEFAULTS = {
   proofs: {
     notarize: 'allow',
     dailyBudgetUSD: '5',
-    perActionMaxUSD: '1',
+    perActionMaxUSD: '0.2',
     allowKeyDisclosure: 'approval',
   },
   contacts: { acceptInvites: 'approval', unknownSenders: 'queue', allowed: 'paired', listed: 0 },
@@ -207,7 +207,7 @@ describe('Rules: two groups, current values (UX audit 6a; RU-2…RU-6)', () => {
     expect(host.querySelector('#rules-more')).toBeNull();
     expect(radio(S.proofTitle, S.allowed)?.getAttribute('aria-checked')).toBe('true');
     expect(inputLabelled(S.budget)?.value).toBe('5');
-    expect(inputLabelled(S.askOver)?.value).toBe('1');
+    expect(inputLabelled(S.askOver)?.value).toBe('0.2');
     expect(radio(S.termsTitle, S.askEveryTime)?.getAttribute('aria-checked')).toBe('true');
   });
 
@@ -322,12 +322,13 @@ describe('saving: review every warning, then one owner operation (D-119; I-4)', 
       'GET /api/owner/passkey': NO_PASSKEY,
     });
     await click(radio(S.proofTitle, S.askMe));
-    await type(inputLabelled(S.budget), '10.50');
+    // At most the $10 hard limit (D-156).
+    await type(inputLabelled(S.budget), '9.50');
     await click(buttonByText(S.reviewSave));
     const reviewCall = srv.calls.find((c) => c.url.startsWith('/api/ui/rules/review?'));
     expect(editOf(reviewCall)).toEqual({
       base: 3,
-      patch: { proofs: { notarize: 'approval', dailyBudgetUSD: '10.5' } },
+      patch: { proofs: { notarize: 'approval', dailyBudgetUSD: '9.5' } },
     });
   });
 

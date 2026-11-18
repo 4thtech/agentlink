@@ -497,7 +497,9 @@ describe('DurableObjectStore: outgoing caps (D-156)', () => {
         const rowKey = rowKeyOf([envelopeId, idx]);
         for (const column of encColumns('files')) {
           row[column] =
-            row[column] === null ? null : await cipher.seal({ table: 'files', column, rowKey }, 'x');
+            row[column] === null
+              ? null
+              : await cipher.seal({ table: 'files', column, rowKey }, 'x');
         }
         return row;
       };

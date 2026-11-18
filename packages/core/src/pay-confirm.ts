@@ -15,7 +15,8 @@
 //   nothing but that contact's proof rule (06 §3).
 // - A limits change: the body is the complete unsigned `policy.set`; the statement lists each
 //   spending field's old and new value (`proofs.notarize`, `proofs.dailyBudgetUSD`,
-//   `proofs.perActionMaxUSD`, `contactRules[].proofs`). A `policy.set` that changes no spending field
+//   `proofs.perActionMaxUSD`, the hard ceilings `proofs.hardDailyUSD` and
+//   `proofs.hardMaxPerActionUSD` (D-156), `contactRules[].proofs`). A `policy.set` that changes no spending field
 //   is not a paid flow: it keeps the ordinary owner prompt.
 //
 // Every value in a statement comes from stored, verified data: the pending action, the policy in
@@ -34,8 +35,11 @@ import {
 } from '@4thtech-io/crypto';
 import {
   approvalFeeSchema,
+  compareUsd,
   isUsdAmount,
+  outgoingOf,
   policySchema,
+  proofCeilingsOf,
   roundUpUsdToCents,
   type ContactRule,
   type Policy,
@@ -58,6 +62,9 @@ export type SpendingField =
   | 'proofs.notarize'
   | 'proofs.dailyBudgetUSD'
   | 'proofs.perActionMaxUSD'
+  /** D-156: the hard ceilings, compared as read (absent: the defaults). */
+  | 'proofs.hardDailyUSD'
+  | 'proofs.hardMaxPerActionUSD'
   | 'contactRules.proofs.notarize'
   | 'contactRules.proofs.perActionMaxUSD';
 
@@ -177,6 +184,12 @@ export function spendingChanges(before: Policy, after: Policy): readonly Spendin
     const now = after.proofs[key];
     if (old !== now) out.push({ field: `proofs.${key}`, old, new: now });
   }
+  // D-156: the hard ceilings as the engine reads them, so filling in the defaults is no change.
+  const b0 = proofCeilingsOf(before);
+  const a0 = proofCeilingsOf(after);
+  for (const key of ['hardDailyUSD', 'hardMaxPerActionUSD'] as const) {
+    if (b0[key] !== a0[key]) out.push({ field: `proofs.${key}`, old: b0[key], new: a0[key] });
+  }
   const a = proofRulesByContact(before);
   const b = proofRulesByContact(after);
   const contacts = [...new Set([...a.keys(), ...b.keys()])].sort((x, y) =>
@@ -195,11 +208,21 @@ export function spendingChanges(before: Policy, after: Policy): readonly Spendin
 /** The policy without its spending fields: equal for two policies that differ only in spending. */
 function nonSpending(policy: Policy): JsonValue {
   const proofs: Record<string, unknown> = { ...policy.proofs };
-  for (const key of ['notarize', 'dailyBudgetUSD', 'perActionMaxUSD']) delete proofs[key];
+  for (const key of [
+    'notarize',
+    'dailyBudgetUSD',
+    'perActionMaxUSD',
+    'hardDailyUSD',
+    'hardMaxPerActionUSD',
+  ]) {
+    delete proofs[key];
+  }
   const contactRules = policy.contactRules
     .filter((r) => r.receipts !== undefined)
     .map((r) => ({ contact: r.contact, receipts: r.receipts }));
-  return { ...policy, proofs, contactRules } as unknown as JsonValue;
+  // D-156: absent outgoing caps read as the defaults (a policy signed before D-156), as the merge
+  // that builds the next policy.set fills them in.
+  return { ...policy, outgoing: outgoingOf(policy), proofs, contactRules } as unknown as JsonValue;
 }
 
 const sameJson = (a: JsonValue, b: JsonValue): boolean => {
@@ -412,8 +435,10 @@ export function buildPayConfirmFlow(input: PayConfirmInput): PayConfirmFlow {
   if (
     !sameJson(nonSpending(before), nonSpending(after)) ||
     before.proofs.notarize !== after.proofs.notarize ||
-    before.proofs.dailyBudgetUSD !== after.proofs.dailyBudgetUSD ||
-    before.proofs.perActionMaxUSD !== after.proofs.perActionMaxUSD ||
+    effectiveSoft(before, 'dailyBudgetUSD') !== effectiveSoft(after, 'dailyBudgetUSD') ||
+    effectiveSoft(before, 'perActionMaxUSD') !== effectiveSoft(after, 'perActionMaxUSD') ||
+    proofCeilingsOf(before).hardDailyUSD !== proofCeilingsOf(after).hardDailyUSD ||
+    proofCeilingsOf(before).hardMaxPerActionUSD !== proofCeilingsOf(after).hardMaxPerActionUSD ||
     !sameJson(expected as unknown as JsonValue, after.contactRules as unknown as JsonValue)
   ) {
     throw refuse('remember_mismatch');
@@ -429,6 +454,17 @@ export function buildPayConfirmFlow(input: PayConfirmInput): PayConfirmFlow {
     changes,
   };
   return freezeFlow(statement, copyJson([input.pendingAction, input.policySet] as JsonValue));
+}
+
+/**
+ * D-156: a soft limit as the engine reads it, at most its hard ceiling (a policy signed before
+ * D-156 may hold a higher one; the next policy.set lowers it to the ceiling).
+ */
+function effectiveSoft(policy: Policy, key: 'dailyBudgetUSD' | 'perActionMaxUSD'): string {
+  const ceilings = proofCeilingsOf(policy);
+  const hard = key === 'dailyBudgetUSD' ? ceilings.hardDailyUSD : ceilings.hardMaxPerActionUSD;
+  const soft = policy.proofs[key];
+  return compareUsd(soft, hard) > 0 ? hard : soft;
 }
 
 function freezeFlow(statement: PayConfirmStatement, body: JsonValue): PayConfirmFlow {

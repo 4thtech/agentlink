@@ -8,7 +8,8 @@ export const RULES_STRINGS = {
   pickerLabel: 'Rules for',
   masterCode: 'your master code',
   changedTag: 'Changed',
-  moreHelp: 'File sizes, who can message this ID, limits for accepting terms, exports',
+  moreHelp:
+    'Hard spending limits, sending limits, file sizes, who can message this ID, limits for accepting terms, exports',
   moreState: (n: number, changed: number): string =>
     changed === 0
       ? `${String(n)} rules · all at their defaults`
@@ -43,6 +44,23 @@ export const RULES_STRINGS = {
   proofAskBudget: 'Budget in any 24 hours when proofs are allowed:',
   budget: 'Proof budget in any 24 hours',
   askOver: 'Ask me over',
+  // D-156 (SEC-HARD-CEILING): above the hard limits a proof is refused, never asked.
+  softAboveHard: '"Ask me over" and the proof budget can be at most your hard spending limits.',
+  hardTitle: 'Hard spending limits',
+  hardHelp:
+    'Your AI can never spend more than this on proofs, not even with your approval. Only you can change these, here.',
+  hardPerProof: 'Never more than, per proof',
+  hardDaily: 'Never more than, in any 24 hours',
+  // D-156 (SEC-OUTBOUND-CAPS): what your AI may send in any 24 hours.
+  sendingTitle: 'Sending limits',
+  sendingHelp:
+    'How much your AI can send in any 24 hours. Above these, sending stops until a slot frees up or you raise them.',
+  sendMessagesContact: 'Messages to one person',
+  sendMessagesDay: 'Messages in all',
+  sendFilesContact: 'Files to one person',
+  sendFilesDay: 'Files in all',
+  sendMBDay: 'File data in all (MB)',
+  invalidCount: 'Enter a whole number.',
   invitesTitle: 'Connect with someone new',
   summaryInvites: 'New people',
   // REL051-SF5: `contacts.acceptInvites` gates accepting only (04 §3.6, 06 §2.1); making an invite
