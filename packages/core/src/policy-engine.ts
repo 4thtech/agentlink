@@ -355,6 +355,16 @@ export function budgetSpentMicros(view: BudgetLedgerView, now: number): bigint |
   return spent;
 }
 
+/**
+ * The rolling spend of a ledger that cannot be summed at `now` only because `now` is earlier than
+ * its newest entry: summed at that newest time instead, so the hard daily ceiling still holds. A
+ * ledger broken in any other way gives 'broken'.
+ */
+function spentAtNewest(view: BudgetLedgerView | undefined): bigint | 'broken' {
+  if (view === undefined || view.status !== 'ok' || !isTime(view.newestT)) return 'broken';
+  return budgetSpentMicros(view, view.newestT);
+}
+
 function proofFees(action: ProofAction): { fee: bigint; maxFee: bigint } {
   if (!isUsdAmount(action.feeUsd) || !isUsdAmount(action.maxFeeUsd)) throw contextInvalid();
   const fee = parseUsd(action.feeUsd);
@@ -394,7 +404,8 @@ export function evaluateProof(
     const view = context?.ledger;
     const now = context?.now;
     if (view !== undefined && isTime(now)) {
-      const spent = budgetSpentMicros(view, now);
+      let spent = budgetSpentMicros(view, now);
+      if (spent === 'broken') spent = spentAtNewest(view);
       if (spent !== 'broken' && spent + maxFee > hardDaily) {
         return {
           decision: 'deny',
@@ -433,8 +444,15 @@ export function evaluateProof(
   // is refused (D-156); above the soft budget (read as at most the ceiling) it asks the owner. A
   // broken ledger cannot be summed: it asks (the per-Record ceiling above still refuses).
   const spent = budgetSpentMicros(view, now);
-  if (spent === 'broken') triggers.push('ledger_broken');
-  else if (spent + maxFee > hardDaily) {
+  if (spent === 'broken') {
+    // D-156: a ledger that cannot be summed asks the owner, but never past the hard daily ceiling
+    // where its entries can still be summed.
+    const known = spentAtNewest(view);
+    if (known !== 'broken' && known + maxFee > hardDaily) {
+      return { decision: 'deny', triggers: [], ceiling: 'daily', limitUsd: ceilings.hardDailyUSD };
+    }
+    triggers.push('ledger_broken');
+  } else if (spent + maxFee > hardDaily) {
     return { decision: 'deny', triggers: [], ceiling: 'daily', limitUsd: ceilings.hardDailyUSD };
   } else if (spent + maxFee > minMicros(parseUsd(proofs.dailyBudgetUSD), hardDaily)) {
     triggers.push('budget');
