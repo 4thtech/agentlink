@@ -45,7 +45,8 @@ A proof never shows content, but it does show publicly which ID recorded it, whe
 
 - Your AI app sees what it handles, under your AI provider's terms.
 - The other side can keep a copy of anything you send them.
-- An AI app that can run any command as you shares your computer's permissions. The Mac and Windows apps confirm approvals with Touch ID, Windows Hello or your master code, and the key signs only AgentLink's own kinds of data. Keep credits small and give your AI app only the permissions it needs.
+- An AI app that can run any command as you shares your computer's permissions. The Mac and Windows apps confirm approvals with Touch ID, Windows Hello or your master code, and the key signs only AgentLink's own kinds of data. Such an app could also read your ID's key, and then AgentLink's spending and sending limits no longer bind it: only your credit balance does. Keep credits small and give your AI app only the permissions it needs. Before mainnet, an on-chain spending limit and a protected key helper on Mac are planned.
+- If the same ID runs on two computers, each has its own spending and sending limits. The app tells you when it notices this.
 - Malware that controls your computer cannot be stopped by any software.
 - Stored history has no forward secrecy; files expire within 7 days, which limits this.
 - A proof shows that a document existed and was exchanged at that time. It does not prove the content is true and has no legal effect by itself.
