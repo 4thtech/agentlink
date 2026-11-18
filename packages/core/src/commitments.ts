@@ -89,7 +89,9 @@ export type AutoAcceptMiss =
   /** Sell: `autoAcceptMinUSD` is null (the default), so sell never auto-accepts. */
   | 'sell_off'
   /** Sell: below `autoAcceptMinUSD`. */
-  | 'under_minimum';
+  | 'under_minimum'
+  /** SEC-RESTORE-GUARD: the ID was restored from a backup less than 24 hours ago. */
+  | 'restored';
 
 /** The basis of an allowed commitment: the policy grant the core records (04 §3.4.2). */
 export interface CommitmentGrant {

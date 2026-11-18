@@ -174,7 +174,10 @@ describe('createKeychainAgent', () => {
     const storeKey = keychain.items.get(keychainAccount(agentId, 'store-key'));
     expect(storeKey?.length).toBe(32);
     expect(storeKey).not.toEqual(seed);
-    expect(keychain.items.size).toBe(2);
+    // SEC-RESTORE-GUARD: an ID created here starts with the restore mark "never restored".
+    const mark = keychain.items.get(keychainAccount(agentId, 'restore-mark'));
+    expect(mark).toEqual(Uint8Array.of(0x30));
+    expect(keychain.items.size).toBe(3);
   });
 
   it('keeps several agents side by side, each under its own account', async () => {

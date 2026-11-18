@@ -79,6 +79,10 @@ export function checkAndReserveProof(
     readonly reservation: ProofReservation;
     /** The core consumed a valid owner approval for this exact action (M1-7e). */
     readonly ownerApproved: boolean;
+    /** SEC-RESTORE-GUARD: the restore window is open (restore-guard.ts); the proof asks the owner. */
+    readonly restoreWindow?: boolean;
+    /** Why the window is open (copy only). */
+    readonly restoreReason?: 'update';
   },
 ): ProofCheck {
   const { effective, action, now, reservation } = input;
@@ -88,7 +92,12 @@ export function checkAndReserveProof(
   } catch {
     view = BROKEN; // a read error is never an empty sum
   }
-  const result = evaluateProof(effective, action, { now, ledger: view });
+  const result = evaluateProof(effective, action, {
+    now,
+    ledger: view,
+    ...(input.restoreWindow === true ? { restoreWindow: true } : {}),
+    ...(input.restoreReason === 'update' ? { restoreReason: 'update' as const } : {}),
+  });
   if (result.triggers.includes('ledger_broken')) markBroken(tx, now);
   const reserve =
     result.decision === 'allow' || (result.decision === 'approval' && input.ownerApproved);

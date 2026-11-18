@@ -101,6 +101,12 @@ import type { CommitmentRecordResult, ProofRejected } from './proofs/service.js'
 import { computeActionDigest, verifyStoredOwnerAction } from './owner-action.js';
 import type { OwnerActions } from './owner-actions.js';
 import { evaluate, type EffectivePolicy } from './policy-engine.js';
+import {
+  guardCommitment,
+  readRestoreState,
+  requestedBeforeRestore,
+  restoreWindowNow,
+} from './restore-guard.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 import {
@@ -1372,7 +1378,11 @@ export class TermsService {
       supersededByOwnNewer: plan.superseded,
     };
     const policy = await this.#policy();
-    const evaluation = evaluateCommitment(policy, facts);
+    // SEC-RESTORE-GUARD: in the 24 h after a restore the rules alone never commit; the owner does.
+    const evaluation = guardCommitment(
+      evaluateCommitment(policy, facts),
+      await restoreWindowNow(this.#ctx),
+    );
     if (evaluation.decision === 'void') return rejected('APPROVAL_VOID');
     // A denial creates nothing: no request, no grant, no envelope (06 §3).
     if (evaluation.decision === 'deny') return rejected('POLICY_DENIED');
@@ -1504,6 +1514,11 @@ export class TermsService {
     const { row } = stored;
     const now = nowOf(this.#ctx);
     if (row.signed_cancel !== null) return 'APPROVAL_VOID';
+    // SEC-RESTORE-GUARD (D-156): a scope requested before a restore of this ID (an owner decision or
+    // a policy grant) authorises nothing after it; an unreadable restore mark, none at all.
+    if (requestedBeforeRestore(await readRestoreState(this.#ctx), row.created_at)) {
+      return 'APPROVAL_VOID';
+    }
     if (row.status === 'void' || row.status === 'cancelled' || row.status === 'denied') {
       return 'APPROVAL_VOID';
     }
@@ -1524,6 +1539,8 @@ export class TermsService {
       const e = evaluateCommitment(policy, facts);
       const basis = e.decision === 'allow' ? e.grant.basis : 'rule';
       const r = recheckCommitmentGrant(policy, facts, { basis, policyHash: hash });
+      // SEC-RESTORE-GUARD: a policy grant does not run in the 24 h after a restore.
+      if (r.status === 'allow' && (await restoreWindowNow(this.#ctx))) return 'ask_owner';
       if (r.status === 'allow') return 'ok';
       if (r.status === 'ask_owner') return 'ask_owner';
       return 'APPROVAL_VOID';
@@ -2293,7 +2310,11 @@ export class TermsService {
       terms,
       supersededByOwnNewer: false,
     };
-    const evaluation = evaluateCommitment(await this.#policy(), facts);
+    // SEC-RESTORE-GUARD: in the 24 h after a restore the rules alone never commit; the owner does.
+    const evaluation = guardCommitment(
+      evaluateCommitment(await this.#policy(), facts),
+      await restoreWindowNow(this.#ctx),
+    );
     if (evaluation.decision === 'void') return rejected('APPROVAL_VOID');
     if (evaluation.decision === 'deny') return rejected('POLICY_DENIED');
     const commitmentAsked = evaluation.decision === 'approval';

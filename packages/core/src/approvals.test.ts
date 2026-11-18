@@ -18,6 +18,7 @@ import { feeContextFromQuote } from './approvals.js';
 import { AgentLinkClient } from './client.js';
 import { CoreError } from './errors.js';
 import { computeActionDigest } from './owner-action.js';
+import type { RestoreMark } from './restore-guard.js';
 import { MemoryStore } from './store/memory-store.js';
 import { rowKeyOf } from './store/store.js';
 import {
@@ -48,7 +49,7 @@ const exportAction = (note = 'x'): JsonObject => ({
   },
 });
 
-async function setup() {
+async function setup(restoreMark?: RestoreMark) {
   const keyStore = new MemoryKeyStore(seed(1));
   const owner = new MemoryOwnerKeyStore(seed(101), passphrase());
   const store = new MemoryStore();
@@ -63,6 +64,7 @@ async function setup() {
     approvals: channel,
     clock: clock.now,
     policyMark: new MemoryPolicyMark(),
+    ...(restoreMark === undefined ? {} : { restoreMark }),
     logger: createLogger({ name: 'core', level: 'debug', sink: (_l, line) => lines.push(line) }),
   });
   const session = await owner.unlock(passphrase());
@@ -347,6 +349,35 @@ describe('creating a request (04 §3.4.1, 06 §2.5)', () => {
       .request({ action: exportAction(), summary: 'Export' })
       .catch((e: unknown) => e);
     expect((error as CoreError).code).toBe('identity_missing');
+  });
+});
+
+describe('SEC-RESTORE-GUARD: approvals asked for before a restore', () => {
+  it('an approval requested before the restore authorises nothing after it; a new one does', async () => {
+    const restoredAt = { value: 0 };
+    const t = await setup({ read: () => Promise.resolve(restoredAt.value) });
+    const before = await t.request();
+    expect(await t.approve(before)).toMatchObject({ status: 'applied' });
+    t.clock.t += 60;
+    restoredAt.value = t.clock.t;
+    t.clock.t += 600; // past the 5-minute skew allowance
+    expect(
+      await t.client.approvalService.use(before.approvalId, before.action, 'approval'),
+    ).toEqual({ status: 'void' });
+    const after = await t.request(exportAction('after'));
+    expect(await t.approve(after)).toMatchObject({ status: 'applied' });
+    expect(await t.client.approvalService.use(after.approvalId, after.action, 'approval')).toEqual({
+      status: 'used',
+    });
+  });
+
+  it('fails closed: with an unreadable restore mark no approval authorises anything', async () => {
+    const t = await setup({ read: () => Promise.reject(new Error('unreadable')) });
+    const r = await t.request();
+    expect(await t.approve(r)).toMatchObject({ status: 'applied' });
+    expect(await t.client.approvalService.use(r.approvalId, r.action, 'approval')).toEqual({
+      status: 'void',
+    });
   });
 });
 

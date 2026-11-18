@@ -43,6 +43,7 @@ import type { OutboxService } from '../outbox.js';
 import type { OwnerActions } from '../owner-actions.js';
 import { evaluate, type EffectivePolicy } from '../policy-engine.js';
 import { waitingOwnerError } from '../contacts.js';
+import { readRestoreState, restoredReplay, type RestoreState } from '../restore-guard.js';
 import type { Row } from '../store/schema.js';
 import type { FilesPlatform } from './platform.js';
 import { openFileObject } from './records.js';
@@ -191,6 +192,7 @@ export class FileLinks {
     let refreshed = 0;
     let skipped = 0;
     let policy: EffectivePolicy | undefined;
+    let restore: RestoreState | undefined;
     const answeredFiles = new Set<string>();
     for (const row of rows) {
       if (
@@ -210,6 +212,12 @@ export class FileLinks {
         if (payload.type === 'request') {
           const key = `${body.envelopeId}/${body.fileIndex}`;
           if (answered >= MAX_LINK_ANSWERS_PER_PASS || answeredFiles.has(key)) {
+            skipped += 1;
+            continue;
+          }
+          // SEC-RESTORE-GUARD: a request sent before a restore of this ID is not answered.
+          restore ??= await readRestoreState(this.#ctx);
+          if (restoredReplay(restore, row.created_at)) {
             skipped += 1;
             continue;
           }

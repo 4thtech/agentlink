@@ -619,6 +619,28 @@ for (const backend of [keychainImportBackend(), fileImportBackend()]) {
       handle.wipe();
     });
 
+    it('SEC-RESTORE-GUARD: writes the restore mark at the time of the restore', async () => {
+      const owner = await makeOwner();
+      const agent = await makeKeychainAgent(owner);
+      const { kit, code } = await exportKit(owner, agent);
+      const target = backend.control({ ownerKeychain: new MemoryKeychain() });
+      const handle = await openKit(target.control, kit, code);
+      const before = Math.floor(Date.now() / 1000);
+      const { unlockCode } = await target.control.importAgent(handle, agent.agentId);
+      const after = Math.floor(Date.now() / 1000);
+      const items = await target.items(agent.agentId, unlockCode);
+      const value = items.get('restore-mark');
+      expect(value).toBeDefined();
+      // L5: loaded when the test runs, so a missing module fails this test only.
+      const { decodeRestoreMark } = await import('./restore-mark.js');
+      const at = decodeRestoreMark(value as Uint8Array);
+      expect(at).toBeGreaterThanOrEqual(before);
+      expect(at).toBeLessThanOrEqual(after);
+      // Written before the seed, so a restore never leaves keys without the mark.
+      expect([...items.keys()][0]).toBe('restore-mark');
+      handle.wipe();
+    });
+
     it('U3-e: refuses an agent in the revoked list (verifying, other owner or damaged) and writes nothing', async () => {
       const owner = await makeOwner();
       const agent = await makeKeychainAgent(owner);

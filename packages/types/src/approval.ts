@@ -117,6 +117,10 @@ export const PROOF_TRIGGERS = freeze([
   'proofs.dailyBudgetUSD',
   'proofs.notarize',
   'proofs.perActionMaxUSD',
+  // SEC-RESTORE-GUARD (D-156): the 24 h after a restore (`restored`) or after an update that started
+  // the same guard (`updated`). Not policy keys: the reason a paid action asks, for the card copy.
+  'proofs.restored',
+  'proofs.updated',
 ] as const);
 
 /**

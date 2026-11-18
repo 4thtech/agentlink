@@ -233,7 +233,14 @@ describe('approval-request action: one strict context per tool (04 §3.4.1, M1-2
       'proofs.dailyBudgetUSD',
       'proofs.notarize',
       'proofs.perActionMaxUSD',
+      'proofs.restored',
+      'proofs.updated',
     ]);
+    // SEC-RESTORE-GUARD: the restore reasons are proof triggers of send and notarize.
+    for (const action of [a.agentlink_send, a.agentlink_notarize]) {
+      expectAccept(approvalActionSchema, withTriggers(action, ['proofs.restored']));
+      expectAccept(approvalActionSchema, withTriggers(action, ['proofs.updated']));
+    }
   });
 
   it.each([

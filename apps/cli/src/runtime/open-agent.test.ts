@@ -90,6 +90,7 @@ function processDeps(
         }),
         cipher: { indexDigest: () => Promise.resolve('') } as unknown as StoreCipher,
         policyMark: { read: () => Promise.resolve(0), raise: (v: number) => Promise.resolve(v) },
+        restoreMark: { read: () => Promise.resolve(0) },
         close: () => {
           rec.closed.push('store');
           return Promise.resolve();
@@ -155,6 +156,8 @@ describe('openAgent (M1-9k)', () => {
     const options = rec.clients[0]!;
     expect(options.approvals).toBe(result.agent.approvals);
     expect(options.policyMark).toBeDefined();
+    // SEC-RESTORE-GUARD: the agent's restore mark reaches the client.
+    expect(options.restoreMark).toBeDefined();
     expect(options.transport).toBeDefined();
     // The 4thTech drop's origin (M1-9d-1): its file links show as `drop`, any other as `own`.
     expect(options.dropOrigins).toEqual(['https://drop.agentlink.4thtech.io']);
