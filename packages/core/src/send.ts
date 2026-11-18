@@ -33,6 +33,11 @@
 // in the transaction that stores the envelope. Over a cap: SEND_LIMIT with the cap, its number and
 // when a slot frees, nothing stored or published; the refusal is not kept under a clientRequestId.
 //
+// SEC-REFUSED-UPLOAD-CLEANUP: a send with stored files checks the contact (active, paired, kept)
+// before anything is uploaded. A refusal after the upload (a cap, the policy, the contact in the store
+// transaction) deletes the uploaded objects through deleteUploaded, which queues any it cannot delete
+// for the retention pass (files/outgoing.ts); the refusal stands either way.
+//
 // Errors are CoreErrors with fixed sentences; nothing of the message, the contact or a key goes
 // into an error or a log line (I-5, I-7). Logs carry counts only.
 import {
@@ -518,6 +523,9 @@ export class SendService {
     if (platform === undefined) {
       throw new CoreError('files_unavailable', 'This agent cannot send files here.');
     }
+    // SEC-REFUSED-UPLOAD-CLEANUP: the contact checks of the store transaction, once before anything
+    // is uploaded, so the common refusal uploads nothing. The transaction checks them again.
+    await this.#assertContactReady(request.to);
     const outcome = await prepareOutgoing(
       { ctx, platform, policy: await ownerActions.loadPolicy() },
       request.payload,
@@ -546,6 +554,19 @@ export class SendService {
       return done;
     }
     return { ...done, result: { ...done.result, files: outcome.sent } };
+  }
+
+  /** A known contact can receive now: active, paired and kept (the store transaction's errors). */
+  async #assertContactReady(to: string): Promise<void> {
+    const contact = await this.#ctx.store.transaction((tx) =>
+      tx.get('contacts', { contact_id: to }),
+    );
+    // An unknown contact is left to the envelope build, which refuses it with its own error.
+    if (contact === undefined) return;
+    if (contact.status !== 'active' || contact.pairing !== 'complete') {
+      throw new CoreError('contact_not_active', 'That contact cannot receive messages now.');
+    }
+    if (contact.waiting_owner === 1) throw waitingOwnerError();
   }
 
   /** Builds, signs and stores the envelope with its outbox rows and its files rows. */
