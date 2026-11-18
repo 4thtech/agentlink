@@ -114,7 +114,20 @@ async function cardUpdateContactRelays(x: Agent): Promise<string[][]> {
   return out;
 }
 
-const ownerA = new MemoryOwnerKeyStore(seed(171), passphrase());
+/** The states of the contact-role outbox rows of `x`'s card-updates. */
+async function cardUpdateContactStates(x: Agent): Promise<string[]> {
+  return x.store.transaction((tx) => {
+    const ids = tx
+      .select('envelopes', { direction: 'out', type: 'card-update' })
+      .map((r) => r.envelope_id);
+    return tx
+      .select('outbox')
+      .filter((r) => ids.includes(r.envelope_id) && r.role === 'contact')
+      .map((r) => r.state);
+  });
+}
+
+const ownerA =new MemoryOwnerKeyStore(seed(171), passphrase());
 const ownerB = new MemoryOwnerKeyStore(seed(172), passphrase());
 let a: Agent;
 let b: Agent;
@@ -185,6 +198,37 @@ describe('card-update after the migration', () => {
     await migrate(a, got.relays);
     acceptOnly = (relay) => LEGACY_READ_RELAYS.includes(relay);
     expect(await a.client.sendCardUpdates()).toEqual({ sent: 0, failed: 1 });
+  });
+
+  it('legacy OKs alone never end its row: it stays pending and retries until a current relay accepts', async () => {
+    const got = await a.client.identity.relayMigration();
+    if (got.status !== 'needed') throw new Error('test: expected needed');
+    await migrate(a, got.relays);
+    // Both legacy relays answer OK (that alone is MIN_ACKS); no relay of the contact's list does.
+    acceptOnly = (relay) => LEGACY_READ_RELAYS.includes(relay);
+    await a.client.sendCardUpdates();
+    expect(await cardUpdateContactStates(a)).toEqual(['pending']);
+    // The next attempt (within the usual backoff) still has only the legacy OKs: still pending.
+    clock.t += 31;
+    await a.client.outbox.processDue();
+    expect(await cardUpdateContactStates(a)).toEqual(['pending']);
+    // A relay of the contact's own list accepts it: now it is sent.
+    acceptOnly = undefined;
+    clock.t += 61;
+    await a.client.outbox.processDue();
+    expect(await cardUpdateContactStates(a)).toEqual(['sent']);
+    // Nothing new is sent in the next pass: the contact holds the card now.
+    expect(await a.client.sendCardUpdates()).toEqual({ sent: 0, failed: 0 });
+  });
+
+  it('an ordinary message to a contact that lists a legacy relay is unchanged: its OKs count', async () => {
+    // b's contact `a` still lists the legacy relays in its card: two legacy OKs end the row.
+    acceptOnly = (relay) => LEGACY_READ_RELAYS.includes(relay);
+    await b.client.sendMessage({ to: a.id, text: 'hi' });
+    const states = await b.store.transaction((tx) =>
+      tx.select('outbox', { role: 'contact' }).map((r) => r.state),
+    );
+    expect(states).toEqual(['sent']);
   });
 
   it('after LEGACY_CARD_UPDATE_UNTIL the card-update goes to the legacy relays no longer', async () => {
