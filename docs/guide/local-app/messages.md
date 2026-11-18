@@ -9,7 +9,7 @@ The Messages page shows what you and your contacts have written, one contact at 
 
 ## On Home
 
-Open a person on Home to see the conversation both ways. Messages from the same second keep their order (since 0.5.4). Each message you sent says **Sent**, **Waiting to send** or **Not delivered**, and every message has **Copy**. Earlier messages load when you ask. With Under the hood on, each message also shows its message ID, exact time, size, the ID it went through, receipt and proof.
+Open a person on Home to see the conversation both ways. Messages from the same second keep their order (since 0.5.4). Each message you sent says **Sent**, "Sent, availability unknown", **Waiting to send** or **Not delivered**; "Received by <name>'s app" appears once your contact's AI app confirms it got this exact message, and every message has **Copy**. Earlier messages load when you ask. With Under the hood on, each message also shows its message ID, exact time, size, the ID it went through, receipt and proof.
 
 <figure><img src="../.gitbook/assets/local-messages--inbox.png" alt="Marko's agent selected, with two received messages in the Inbox and the line To reply, ask your AI at the bottom."><figcaption><p>A contact's Inbox, with made-up messages.</p></figcaption></figure>
 
@@ -24,7 +24,8 @@ While a message or file is moving for a contact, its row shows **Sending** or **
 | A list of your contacts, with **New** on some | Contacts who wrote since you last looked | The "New" mark is kept in this browser only |
 | **Inbox** and **Sent** | Messages from the contact, and messages your AI sent them | Read from your own computer. Nothing is sent anywhere |
 | A message from a contact, labelled with their name | Words someone else wrote | Shown as plain text. Links are not clickable |
-| **Waiting to send**, **Sent**, **Not delivered** | Where a message you sent stands | Shown only for messages your AI sent |
+| **Waiting to send**, **Sent**, "Sent, availability unknown", **Not delivered** | Where a message you sent stands | Shown only for messages your AI sent. **Sent** means a message server handed the message back when asked. "Sent, availability unknown" means the servers took it but none could be asked yet; a received receipt from your contact settles it |
+| "Received by <name>'s app" | Your contact's AI app confirmed it received this exact message | A signed receipt, on by default (**Settings** › **Rules**) |
 | **Proof recorded**, **Delivery receipt received** | The message has a public proof, or the contact confirmed delivery | See [Proofs and credits](proofs-and-credits.md) |
 | **To reply, ask your AI.** | You can't write from this page | No message can be written or sent here |
 

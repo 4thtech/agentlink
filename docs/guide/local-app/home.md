@@ -34,7 +34,7 @@ If you have two IDs and look at **All IDs**, Home names each other ID that has p
 
 ## Open a person
 
-- **The conversation, both ways.** Messages sent or received in the same second keep their order. Each message you sent says **Sent**, **Waiting to send** or **Not delivered**. Every message has **Copy**. Earlier messages load when you ask. To reply, ask your AI.
+- **The conversation, both ways.** Messages sent or received in the same second keep their order. Each message you sent says **Sent**, "Sent, availability unknown", **Waiting to send** or **Not delivered**; "Received by <name>'s app" appears once your contact's AI app confirms it got this exact message. Every message has **Copy**. Earlier messages load when you ask. To reply, ask your AI.
 - **Files you exchanged.** Each file sits as a chip in the message it came with. A file that arrived and was saved shows "Saved to ~/AgentLink/Inbox" and **Show in Finder** (**Show in Explorer** on Windows, **Show in folder** on Linux). A file that arrived but was not saved reads **Arrived · not saved** with **Save with Touch ID** (one press; **Save to Inbox** opens the master code when Touch ID is not set up here). A saved Markdown, code, JSON, patch or text file also has **Open**, which shows it in a reader inside the app. See [Files](files.md).
 - **Terms.** Terms you proposed, accepted, declined or answered show in the conversation too, right where they happened.
 - **A menu** to rename the person, do the Contact check or remove them.

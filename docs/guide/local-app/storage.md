@@ -38,7 +38,7 @@ You can also say "free up some space" to your AI. It can only **suggest** a clea
 
 ## From a conversation
 
-- In the person's **⋯** menu: **Delete history…** (messages and files, messages only or files only, any age or older than a time) and **Archive**.
+- In the person's **⋯** menu (a receipt that arrives late no longer stops a delete, since 0.5.12; a new message or saved file still does): **Delete history…** (messages and files, messages only or files only, any age or older than a time) and **Archive**.
 - In the conversation: **Select**, tick the messages, then **Delete 2 messages**.
 
 Both use the same steps: what it removes first, one Touch ID, then 10 seconds with Undo.

@@ -140,6 +140,26 @@ The ceilings apply in every mode and, when the policy can't be read, as defaults
 - The "Tell contacts when your AI receives a message" switch now saves; it still needs presence.
 - The menu bar widget counts new files only under Needs you; they clear when opened, saved or shown in Finder or Explorer, or with "Mark as seen". The widget stays read-only.
 
+## New in 0.5.12 (D-156)
+
+### A send counts as sent once a relay serves it back (07 §4)
+
+- **Read-back.** A message is marked sent only after a relay that accepted it hands the wrap back when asked by its ID, on a separate connection, without signing in and within 5 seconds; the signature is checked. At most 16 such checks run at once, and the relay address rule (04 §4) applies.
+- **Availability unknown.** If no relay can be asked, or a relay accepts but serves nothing, the message is sent with availability unknown ("Sent, availability unknown", `availability: "unknown"` from `agentlink_send`). A signed received receipt from the contact settles it.
+
+### Restore guard (04 §2.5, 06 §3)
+
+- **A restore mark** kept with the ID's keys starts a 24-hour guard after a restore from a backup, and once on the first start after updating to 0.5.12. A missing or damaged mark starts the guard; an unreadable one keeps it in force.
+- **In the guard:** every paid action asks the owner (the hard limits still refuse), approvals and terms approvals given before the restore no longer count, sending limits are halved, and the rules alone never accept terms.
+- **Replayed inbound.** Messages created before the restore that arrive again are stored and shown, but trigger no received receipt, no automatic file save or on-chain receipt, no file link answer, and a contact they connect waits for the owner.
+
+### Proofs, limits and cleanup
+
+- **One step per proof.** A Record is signed only under its held fee reservation: the reservation and the Record's row are stored in one transaction, which issues a single-use ticket, so a proof is never charged twice and parallel requests cannot pass the budget or the hard limits. An unsigned Record is signed again, replaced after its deadline, or recorded when the chain already shows it.
+- **Terms count.** Offers, accepts and rejects count toward the sending limits like messages.
+- **Refused uploads.** When a send with files is refused after the files were uploaded, the uploads are removed.
+- **Delete history.** Receipts arriving after the delete sheet listed its items no longer make it fail; a new message or saved file still does.
+
 ## Updates and sending
 
 - **Updater trust (D-145, D-151).** The desktop app installs an update only if it is signed by the one update key whose public half is pinned in the app. CI signs the manifest (SHA-256 of each file, channel, short validity, no downgrades) only after the owner's approval click in a protected environment. The app re-checks every signature and hash before it replaces itself. Updating never touches IDs, keys or messages.
@@ -158,9 +178,9 @@ The ceilings apply in every mode and, when the policy can't be read, as defaults
 
 Later items of D-156, in order:
 
-- Planned: a message counts as sent once a relay serves it back, 0.5.12.
-- Planned: a restore guard for spending and processed actions, 0.5.12.
-- Planned: an on-chain spending allowance and a protected signing helper on macOS, before mainnet (M3).
+- Released in 0.5.12: a message counts as sent once a relay serves it back, and a restore guard for spending and processed actions.
+- Planned for 0.5.13: more delivery detail, a restore entry list, a same-ID notice, new default message-network servers and public hostile tests.
+- Planned for 0.5.14, before mainnet (M3): an on-chain spending allowance, a signed Mac helper and a KeyStore record gate.
 
 ## Decisions behind the mechanisms
 

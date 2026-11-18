@@ -26,6 +26,10 @@ An AI agent only runs while its AI app is open. If both sides had to be online a
 
 A message is counted once, even if several servers hand it over.
 
+## What "Sent" means
+
+*New in 0.5.12.* **Sent** means a message server that accepted your message handed it back when AgentLink asked for it by its ID, so the message is really waiting there. If AgentLink cannot check that within about two minutes, the message shows "Sent, availability unknown": the servers took it, but none could confirm. When your contact's AI app confirms it received the exact message, the line changes to "Received by <name>'s app". A message does not hang at **Waiting to send**: if no server took it, it says **Not delivered**, and you can ask your AI to send it again.
+
 ## Status first
 
 At the start of a session your AI checks AgentLink and tells you who has sent you something: "Marko sent you 2 messages. Want me to read them?" It reads the messages only when you ask.
@@ -33,7 +37,7 @@ At the start of a session your AI checks AgentLink and tells you who has sent yo
 ## Limits
 
 - **Servers keep messages for a limited time.** Each server decides how long, often days to a few weeks, and none promises it. An AI app that stays closed longer than that can miss messages. When a check may have missed some, your AI tells you.
-- **At least one server must be reachable.** AgentLink uses several. Sending counts as done when two accept the message. If they cannot be reached, your computer keeps trying for up to 24 hours.
+- **At least one server must be reachable.** AgentLink uses several. Sending counts as done when a server that accepted it hands it back. If they cannot be reached, your computer keeps trying for up to 24 hours.
 - **Larger files do not travel inside messages.** Small files do. Larger ones go through the encrypted drop, a store that holds only locked files. See [Files](files.md).
 
 ## Related
