@@ -25,6 +25,7 @@ import {
   type RelaySocketHandlers,
   type RelayTarget,
 } from '@4thtech-io/transport-nostr';
+import { DEFAULT_RELAYS, LEGACY_READ_RELAYS } from '@4thtech-io/transport-nostr';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ACK_KIND_RECEIVED } from './acks.js';
 import { AgentLinkClient } from './client.js';
@@ -56,6 +57,7 @@ import {
 import type { TestAgent, TestOwner } from './testing/envelopes.js';
 import { MemoryPolicyMark, newNonce, ownerHex, signWith } from './testing/owner.js';
 import { nostrTransport } from './transport.js';
+import { decodeInviteLink } from './invite-link.js';
 
 const RELAYS_A = Object.freeze(['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net']);
 const RELAYS_B = Object.freeze(['wss://one.relay-beta.net', 'wss://two.relay-beta.net']);
@@ -356,6 +358,51 @@ beforeEach(() => {
 
 // --- syncInbox ----------------------------------------------------------------------------------
 
+describe('RELAY-DEFAULTS-SWAP (0.5.13): legacy relays are read, never published to', () => {
+  const OLD_SET = ['wss://nos.lol', 'wss://nostr.mom'];
+
+  it('reads a message that is waiting on a legacy relay', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    await pair(a, b);
+    const built = await a.client.envelopes.build({ to: { contact: b.id }, payload: textPayload('old relay') });
+    await deliverRaw(net, a, b, built.envelope, [OLD_SET[0] as string]);
+    const result = await b.client.syncInbox();
+    expect(result.items.map((i) => i.payload.body)).toEqual(['old relay']);
+  });
+
+  it('never publishes to a legacy relay: sends to a new-set contact stay on the new set', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', DEFAULT_RELAYS, net);
+    const b = await openAgent(2, 'bob', DEFAULT_RELAYS, net);
+    await pair(a, b);
+    expect((await a.client.sendMessage({ to: b.id, text: 'hi' })).status).toBe('ok');
+    expect(net.published).toBeGreaterThan(0);
+    for (const relay of LEGACY_READ_RELAYS) expect(net.stored.get(relay)).toBeUndefined();
+    expect([...net.stored.keys()].every((r) => DEFAULT_RELAYS.includes(r))).toBe(true);
+  });
+
+  it('an old-invite contact is still reachable: its own list is used to send to it', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', DEFAULT_RELAYS, net);
+    const b = await openAgent(2, 'bob', OLD_SET, net);
+    await pair(a, b);
+    expect((await a.client.sendMessage({ to: b.id, text: 'hi old' })).status).toBe('ok');
+    expect(net.stored.get(OLD_SET[0] as string)?.length).toBeGreaterThan(0);
+    const got = await b.client.syncInbox();
+    expect(got.items.map((i) => i.payload.body)).toEqual(['hi old']);
+  });
+
+  it('a new invite lists only the new set', async () => {
+    const net = new RelayNetwork();
+    const a = await openAgent(1, 'alice', DEFAULT_RELAYS, net);
+    const invite = await decodeInviteLink((await a.client.pairing.createInvite({ long: true })).inviteUrl);
+    expect([...invite.relays]).toEqual([...DEFAULT_RELAYS]);
+    for (const relay of LEGACY_READ_RELAYS) expect(invite.relays).not.toContain(relay);
+  });
+});
+
 describe('syncInbox (07 §2, §4.2): fetch, verify once, store, process', () => {
   it('returns a contact message with the wrapper metadata, and nothing new on the next pass', async () => {
     const net = new RelayNetwork();
@@ -395,13 +442,16 @@ describe('syncInbox (07 §2, §4.2): fetch, verify once, store, process', () => 
       expect(Object.keys(r.filter).sort()).toEqual(['ids', 'limit']);
     }
     const reqRelays = new Set(reads.map((r) => r.relay));
-    expect(reqRelays).toEqual(new Set(RELAYS_B));
+    // RELAY-DEFAULTS-SWAP (0.5.13): plus the legacy read-only relays, for the transition.
+    expect(reqRelays).toEqual(new Set([...RELAYS_B, ...LEGACY_READ_RELAYS]));
     for (const r of reads) {
       expect(r.filter.kinds).toEqual([1059]);
       expect(r.filter['#p']).toEqual([b.nostr]);
     }
     const state = await rowsOf(b);
-    expect(state.cursors.map((c) => c.relay_url).sort()).toEqual([...RELAYS_B].sort());
+    expect(state.cursors.map((c) => c.relay_url).sort()).toEqual(
+      [...RELAYS_B, ...LEGACY_READ_RELAYS].sort(),
+    );
 
     const second = await b.client.syncInbox();
     expect(second.items).toEqual([]);
