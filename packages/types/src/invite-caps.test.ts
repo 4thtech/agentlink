@@ -9,6 +9,7 @@ import {
   POLICY_BOUNDS,
   aiInviteLimitsOf,
   contactKeepActionSchema,
+  inviteCreateActionSchema,
   defaultPolicy,
   ownerActionSchema,
   policyPatchSchema,
@@ -49,6 +50,22 @@ describe('contact.keep (SEC-INVITE-CAPS)', () => {
       expectReject(ownerActionSchema, bad);
     }
     expectReject(signedApprovalOpSchema, signed(body()));
+  });
+});
+
+describe('invite.create (SEC-INVITE-CAPS, owner decision 18 Nov 2026)', () => {
+  const create = (params: Record<string, unknown> = {}) => ({
+    ...body(),
+    op: 'invite.create',
+    params,
+  });
+  it('is an owner-action op with L(op) = 600 s and exactly empty params', () => {
+    expect(OWNER_ACTION_OPS).toContain('invite.create');
+    expect(OWNER_ACTION_MAX_LIFETIME_SECONDS['invite.create']).toBe(600);
+    expectRoundTrip(inviteCreateActionSchema, create());
+    expectRoundTrip(signedOwnerActionSchema, signed(create()));
+    expectReject(ownerActionSchema, create({ long: true }));
+    expectReject(signedApprovalOpSchema, signed(create()));
   });
 });
 

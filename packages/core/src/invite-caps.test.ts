@@ -446,3 +446,34 @@ describe('review follow-ups', () => {
     });
   });
 });
+
+// Owner decision (18 Nov 2026): an invite is the owner's only with owner presence. The owner's
+// terminal command signs one `invite.create` (04 §2.5.1) and core makes the invite only after it
+// verified that signature and recorded its nonce.
+describe('createOwnerInvite: an owner invite needs the owner signature', () => {
+  it('signed by this owner: an owner invite, not capped, its contact kept', async () => {
+    for (let i = 0; i < 3; i += 1) await a.client.createAiInvite({});
+    const made = await a.client.createOwnerInvite(await ownerAction(a, 'invite.create', {}), {});
+    expect(made.expiresAt).toBe(clock.t + 7 * DAY);
+    const row = await a.store.transaction((tx) => tx.get('invites', { invite_id: made.inviteId }));
+    expect(row?.created_by).toBe('owner');
+    await pairThrough(a, b, made.inviteUrl);
+    expect((await contactOf(a, b.id))?.waitingForOwner).toBeUndefined();
+  });
+
+  it('refused, nothing stored, when not signed by this owner, replayed or another op', async () => {
+    const before = await a.store.transaction((tx) => tx.select('invites').length);
+    await expect(
+      a.client.createOwnerInvite(await ownerAction(a, 'invite.create', {}, stranger), {}),
+    ).rejects.toMatchObject({ code: 'invite_not_confirmed' });
+    await expect(
+      a.client.createOwnerInvite(await ownerAction(a, 'contact.keep', { contact: b.id }), {}),
+    ).rejects.toMatchObject({ code: 'invite_not_confirmed' });
+    const once = await ownerAction(a, 'invite.create', {});
+    await a.client.createOwnerInvite(once, {});
+    await expect(a.client.createOwnerInvite(once, {})).rejects.toMatchObject({
+      code: 'invite_not_confirmed',
+    });
+    expect(await a.store.transaction((tx) => tx.select('invites').length)).toBe(before + 1);
+  });
+});
