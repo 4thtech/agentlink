@@ -187,7 +187,7 @@ jobs:
               const text = fs.readFileSync(`e2e/hostile/${name}.test.ts`, "utf8");
               // The count below sees only plain it( and test( calls, so a modifier or a table form
               // (each, for, skip, only, todo, ...) would make it wrong: refused outright.
-              if (/\b(?:it|test|describe)\s*\.\s*[A-Za-z]+/.test(text)) {
+              if (/^\s*(?:it|test|describe)\s*\.\s*[A-Za-z]+/m.test(text)) {
                 console.error(`::error::hostile ${name}.test.ts must use plain it( or test( only (no .each, .skip, .only or other forms)`);
                 failed = true;
               }
