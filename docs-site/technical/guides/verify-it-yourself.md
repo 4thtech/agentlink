@@ -137,6 +137,6 @@ The client and the contracts must hash `Record` and `Receipt` identically. The p
 
 ## What you cannot check yet
 
-- **The implementation source.** Private until mainnet, then planned as verified source under BUSL-1.1 (proposed; 05 §10).
+- **The implementation source.** Private until mainnet, then planned as verified source under BUSL-1.1 (05 §10).
 - **Audit reports.** The contracts are pre-audit. Internal pre-audit reports stay private; the external audit before mainnet (M3) is published after fixes.
 - **Mainnet.** Not deployed.

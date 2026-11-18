@@ -13,10 +13,8 @@ import {
   BANNER_BLOCK,
   BANNER_FILES,
   LLMS_NOTICE,
-  THREAT_BLOCK,
   renderBanner,
   renderLlms,
-  renderThreatModel,
   strayStamps,
 } from './generated.mjs';
 
@@ -378,15 +376,6 @@ export const TARGETS = [
     optional: true,
     blocks: { [BANNER_BLOCK]: renderBanner },
   })),
-  // DOCS-COMPACT-A: the threat-model table, copied from 04 §7.
-  {
-    file: DOCS.threatModelPage,
-    optional: true,
-    blocks: {
-      [THREAT_BLOCK]: (_data, _text, ctx) =>
-        renderThreatModel(readFileSync(join(ctx.root, DOCS.securitySpec), 'utf8')),
-    },
-  },
 ];
 
 /** Public docs files scanned for stray version stamps once the banner exists. */

@@ -4,8 +4,6 @@
 //   `<!-- version-banner:start/end -->` in the public docs index, the guide and the technical
 //   README only, from docs/status.yaml. Once a banner exists, a version stamp anywhere else in the
 //   public docs is an error (one place to update per release instead of 68).
-// - The threat-model table on the technical "Threat model" page, between
-//   `<!-- threat-model-table:start/end -->`, copied from 04 §7 (the normative source).
 // - llms.txt, whole file, from the public docs index, the guide and technical SUMMARY files (titles,
 //   ai-knowledge summaries, 4thTech Docs URLs) and the knowledge bundle link.
 // Each generator is enforced only once its target carries its markers (or, for llms.txt, the
@@ -46,34 +44,6 @@ export function strayStamps(files) {
       });
   }
   return out;
-}
-
-// ---------- threat model ----------
-
-export const THREAT_BLOCK = 'threat-model-table';
-
-/** The `| Threat | Mitigation |` table under `## 7. Threat model` in the security spec. */
-export function extractThreatTable(specText) {
-  const lines = specText.split('\n');
-  const start = lines.findIndex((l) => /^## 7\.? Threat model\b/.test(l));
-  if (start === -1) throw new Error('the security spec has no "## 7. Threat model" section');
-  const table = [];
-  for (let i = start + 1; i < lines.length && !/^## /.test(lines[i]); i += 1) {
-    if (lines[i].startsWith('|')) table.push(lines[i]);
-    else if (table.length) break;
-  }
-  if (table.length < 3) throw new Error('04 §7 has no threat table');
-  return table;
-}
-
-/**
- * The table for the public page: bare section refs (§3.5) are made explicit (04 §3.5); a ref after
- * another spec number (07 §4.2) or a file name (`release-and-deployment.md` §4.8) is left alone.
- */
-export function renderThreatModel(specText) {
-  return extractThreatTable(specText)
-    .map((l) => l.replace(/(?<!\b\d\d |\.md`? )§(?=\d)/g, '04 §'))
-    .join('\n');
 }
 
 // ---------- llms.txt ----------

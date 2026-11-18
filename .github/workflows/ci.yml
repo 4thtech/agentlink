@@ -551,6 +551,8 @@ jobs:
           node tools/check-spec-refs.mjs
           node tools/check-ui-labels.mjs
           node tools/check-private-docs.mjs
+          # No internal annotations (proposed markers, open decisions, review IDs, CI names) on public pages.
+          node tools/check-public-wording.mjs
           # DOCS-COMPACT-A: every public page carries an ai-knowledge marker and the knowledge bundle
           # stays under its cap (22k tokens; warning above 19k).
           node tools/docs/build-knowledge.mjs --check
@@ -563,6 +565,7 @@ jobs:
           check-download-links.test.mjs release/deploy-drop.test.mjs docs/wiki-sync.test.mjs
           check-security-docs.test.mjs docs/build-knowledge.test.mjs docs/ratchet.test.mjs
           check-spec-refs.test.mjs check-ui-labels.test.mjs check-private-docs.test.mjs
+          check-public-wording.test.mjs
 
       - name: Prettier
         run: pnpm exec prettier --check .

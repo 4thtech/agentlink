@@ -1,16 +1,10 @@
-// DOCS-COMPACT-A: tests for the version banner, threat-model table and llms.txt generators.
+// DOCS-COMPACT-A: tests for the version banner and llms.txt generators.
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import {
-  LLMS_NOTICE,
-  extractThreatTable,
-  renderBanner,
-  renderThreatModel,
-  strayStamps,
-} from './generated.mjs';
+import { LLMS_NOTICE, renderBanner, strayStamps } from './generated.mjs';
 import { run } from './status.mjs';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -70,41 +64,6 @@ describe('version banner', () => {
     expect(readFileSync(join(root, readme), 'utf8')).toMatch(
       /<!-- version-banner:start -->\n\*Applies to AgentLink \d+\.\d+\.\d+ \(pre-alpha, test networks\)\.\*\n<!-- version-banner:end -->/,
     );
-  });
-});
-
-describe('threat model', () => {
-  it('copies the 04 §7 table and makes bare section refs explicit', () => {
-    const spec =
-      '## 6. X\n\n## 7. Threat model\n\n| Threat | Mitigation |\n|---|---|\n| **A** | B (§3.5, 07 §4.2, `x.md` §4.8) |\n\n---\n\n## 8. Rules\n| not | this |\n';
-    expect(extractThreatTable(spec)).toHaveLength(3);
-    expect(renderThreatModel(spec)).toBe(
-      '| Threat | Mitigation |\n|---|---|\n| **A** | B (04 §3.5, 07 §4.2, `x.md` §4.8) |',
-    );
-    expect(() => extractThreatTable('## 6. X\n')).toThrow(/no "## 7. Threat model"/);
-  });
-
-  it('renders every row of the real spec into a marked page', () => {
-    const root = copyRepo();
-    const page = 'docs-site/technical/concepts/threat-model.md';
-    edit(root, page, (t) =>
-      t.replace(
-        /(<!-- threat-model-table:start -->)[\s\S]*(<!-- threat-model-table:end -->)/,
-        '$1\n$2',
-      ),
-    );
-    expect(run({ root, check: true }).problems.join('\n')).toMatch(
-      /threat-model\.md is out of date/,
-    );
-    run({ root });
-    const spec = readFileSync(join(root, 'docs/foundation/04-security-and-crypto.md'), 'utf8');
-    const rows = extractThreatTable(spec).length;
-    const block = readFileSync(join(root, page), 'utf8')
-      .split('<!-- threat-model-table:start -->')[1]
-      .split('<!-- threat-model-table:end -->')[0];
-    expect(block.trim().split('\n')).toHaveLength(rows);
-    expect(block).not.toMatch(/\(§\d/);
-    expect(run({ root, check: true }).problems).toEqual([]);
   });
 });
 

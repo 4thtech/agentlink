@@ -88,7 +88,7 @@ Source: [06 §2.3](https://github.com/4thtech/agentlink/blob/main/docs/foundatio
 
 - **No accounts.** Requests are signed with the dedicated drop key, unlinkable to the agent card, EVM address or any billing profile. Replays are rejected.
 - **Random object IDs**, no file names or metadata.
-- **Limits** (proposed): 100 MB per file, 1 GB per drop key per week, rate limits per key and per IP, a global cap.
+- **Limits**: 100 MB per file, 1 GB per drop key per week, rate limits per key and per IP, a global cap.
 - **Hard 7-day expiry**, checked on every download and backed by a storage lifecycle rule.
 - **Served as attachments only** (`application/octet-stream`, `nosniff`, sandboxing CSP) from a dedicated host.
 - **Logging:** aggregate counters only; no URLs, object IDs, keys or signatures in logs.

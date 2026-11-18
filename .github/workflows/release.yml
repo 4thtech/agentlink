@@ -1288,11 +1288,6 @@ jobs:
             printf '**Mac, first time:** 1) Open the .dmg and drag AgentLink to Applications. 2) Open AgentLink from Applications; macOS blocks it the first time, press **Done**. 3) **System Settings** > **Privacy & Security**, scroll down, press **Open Anyway** next to the AgentLink message, confirm, then **Open**. 4) You only do this once. AgentLink isn\047t signed with an Apple Developer ID yet. [Full steps](%s/apps/desktop-app.md#open-it-the-first-time).\n\n' "$docs"
             printf '**Windows, first time:** Windows may say "Windows protected your PC". Choose **More info**, then **Run anyway**. If Smart App Control blocks it, use the [one command](%s/get-started/windows.md).\n\n' "$docs"
             printf 'The other files (`.mcpb`, `SHA256SUMS`) are for AI-app extensions and checks. You don\047t need them.\n\n'
-            # DOCS-COMPACT-A: the knowledge bundle link, once the pages carry ai-knowledge markers
-            # (the knowledge-bundle job attaches the file under this name).
-            if grep -q 'ai-knowledge:' docs-site/guide/README.md docs/guide/README.md 2>/dev/null; then
-              printf 'For AI assistants: everything about AgentLink in one file, [agentlink-knowledge.md](%s/agentlink-knowledge.md).\n\n' "$dl"
-            fi
             printf '## What\047s new\n\n'
             cat "$notes"
           } > "$notes.download"
@@ -1905,6 +1900,15 @@ jobs:
           node tools/docs/build-knowledge.mjs --tag "v$VERSION" --out "$RUNNER_TEMP/agentlink-knowledge.md"
           gh release upload "v$VERSION" --repo "$REPOSITORY" --clobber -- "$RUNNER_TEMP/agentlink-knowledge.md"
           echo "Attached agentlink-knowledge.md to v$VERSION."
+          # The notes link the bundle only once it is attached: added here, before "What's new", once.
+          notes="$RUNNER_TEMP/release-notes.md"
+          gh release view "v$VERSION" --repo "$REPOSITORY" --json body --jq .body > "$notes"
+          if ! grep -q 'agentlink-knowledge.md' "$notes"; then
+            line="For AI assistants: everything about AgentLink in one file, [agentlink-knowledge.md](https://github.com/$REPOSITORY/releases/download/v$VERSION/agentlink-knowledge.md)."
+            awk -v line="$line" '!done && /^## What.s new/ { print line; print ""; done = 1 } { print } END { if (!done) { print ""; print line } }' "$notes" > "$notes.new"
+            gh release edit "v$VERSION" --repo "$REPOSITORY" --notes-file "$notes.new"
+            echo "Linked agentlink-knowledge.md in the v$VERSION notes."
+          fi
 
   # ---------------------------------------------------------------------------
   # WP-D11 (DESK051-C4): the AgentLink desktop app for the npm version just published. desktop.yml

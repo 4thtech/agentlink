@@ -13,7 +13,6 @@ The pages on this site are the **explanation layer**: shorter, current for the r
 
 - A reference such as **04 §2.5** means section 2.5 of spec 04. Every numbered heading is a GitHub anchor: `04-security-and-crypto.md#25-owner-operations-and-user-presence`.
 - The large specs (04, 06, 07, 08, 11) are written to be searched, not read end to end. List the sections first: `grep -n '^#' docs/foundation/04-security-and-crypto.md`, then open the range you need.
-- "Proposed, owner confirms at merge" marks details that were written by an engineer and confirmed when the change merged; the decision file says which.
 - Words: see the [glossary](glossary.md). The app calls a harness an "AI app" and an agent identity an "ID".
 
 ## Why 01 and 09 are missing
