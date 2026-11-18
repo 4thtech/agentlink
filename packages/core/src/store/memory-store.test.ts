@@ -24,6 +24,7 @@ const outbox = (over: Partial<Row<'outbox'>> = {}): Row<'outbox'> => ({
   give_up_at: 86_400,
   state: 'pending',
   reason: null,
+  availability: null,
   ...over,
 });
 
@@ -147,7 +148,7 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
   });
 
   it('SEC-INVITE-CAPS (schema 18): invites.created_by and contacts.waiting_owner, nullable, appended last', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(18);
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(18);
     expect(Object.keys(TABLES.invites.columns).at(-1)).toBe('created_by');
     expect(TABLES.invites.columns.created_by).toEqual({
       kind: 'enum',
@@ -161,6 +162,15 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
     expect(TABLES.contacts.columns.ai_accepted_at).toEqual({ kind: 'int', nullable: true });
     expect(Object.keys(TABLES.pairings.columns).at(-1)).toBe('created_by');
     expect(TABLES.contacts.columns.waiting_owner).toEqual({ kind: 'flag', nullable: true });
+  });
+
+  it('SEC-RELAY-READBACK (schema 19): envelopes.availability and outbox.availability, nullable, appended last', () => {
+    expect(STORE_SCHEMA_VERSION).toBe(19);
+    const availability = { kind: 'enum', nullable: true, values: ['confirmed', 'unknown'] };
+    expect(Object.keys(TABLES.envelopes.columns).at(-1)).toBe('availability');
+    expect(TABLES.envelopes.columns.availability).toEqual(availability);
+    expect(Object.keys(TABLES.outbox.columns).at(-1)).toBe('availability');
+    expect(TABLES.outbox.columns.availability).toEqual(availability);
   });
 
   it('files.saved_name (MSG-FILES-IO-b, schema 6): a nullable sealed column, appended last', () => {

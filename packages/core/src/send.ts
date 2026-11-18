@@ -145,6 +145,12 @@ export type SendMessageResult =
        */
       readonly delivery?: SendDelivery;
       /**
+       * SEC-RELAY-READBACK (D-156 (7)): present (`unknown`) only with `delivery` `sent` when no relay
+       * that accepted the message could be asked to serve it back: "Sent, availability unknown".
+       * Absent once a relay served it back. Read like `delivery`, never stored.
+       */
+      readonly availability?: 'unknown';
+      /**
        * FILES-AI-1: the file written by content: the saved name (`notes (2).md` after a clash), the
        * size and SHA-256 of the in-memory bytes, and the Send folder in its fixed `~` form.
        */
@@ -699,7 +705,8 @@ export class SendService {
       if (delivery !== 'queued' && delivery !== 'sent' && delivery !== 'not_delivered') {
         return result;
       }
-      return { ...result, delivery };
+      const unknown = delivery === 'sent' && row?.availability === 'unknown';
+      return { ...result, delivery, ...(unknown ? { availability: 'unknown' as const } : {}) };
     } catch {
       return result;
     }

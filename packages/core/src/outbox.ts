@@ -58,12 +58,14 @@ import {
   SYNC_SKEW_SECONDS,
   type GiftWrap,
   type OutboxAttempt,
+  type OutboxAvailability,
   type OutboxGiveUpReason,
   type OutboxNotice,
   type OutboxPersistence,
   type OutboxRow,
   type OutboxSummary,
 } from '@4thtech-io/transport-nostr';
+import { acksFor, type AckTarget } from './acks.js';
 import { agentNostrKey } from './card.js';
 import {
   ACK_DELAY_MAX_SECONDS,
@@ -138,6 +140,9 @@ const giveUpAt = (now: number, wrap: GiftWrap): number =>
 
 type Delivery = NonNullable<Row<'envelopes'>['delivery']>;
 
+/** SEC-RELAY-READBACK: pending contact rows looked at per pass for a confirming receipt. */
+const RECEIPT_SWEEP_ROWS = 200;
+
 /** Sets envelopes.delivery from its outbox rows (07 §3.2 "States"), inside the caller's transaction. */
 function updateDelivery(tx: StoreTx, envelopeId: string): void {
   const latest = new Map<string, Row<'outbox'>>();
@@ -154,7 +159,18 @@ function updateDelivery(tx: StoreTx, envelopeId: string): void {
     : scope.every((r) => r.state === 'sent')
       ? 'sent'
       : 'queued';
-  tx.update('envelopes', { envelope_id: envelopeId, direction: 'out' }, { delivery });
+  // SEC-RELAY-READBACK (D-156 (7)): a sent envelope is `confirmed` only when every row in scope was
+  // served back by a relay; one that no relay could be asked for makes it `unknown`. A row from
+  // before schema 19 (null) reads as before: no availability is claimed or shown for it.
+  const availability: Row<'envelopes'>['availability'] =
+    delivery !== 'sent'
+      ? null
+      : scope.some((r) => r.availability === 'unknown')
+        ? 'unknown'
+        : scope.every((r) => r.availability === 'confirmed')
+          ? 'confirmed'
+          : null;
+  tx.update('envelopes', { envelope_id: envelopeId, direction: 'out' }, { delivery, availability });
 }
 
 /** OutboxPersistence over the Store, with the per-row claim described above. */
@@ -272,9 +288,15 @@ class StoreOutboxPersistence implements OutboxPersistence {
     return n === 1;
   }
 
-  async markSent(wrapId: string, acks: Readonly<Record<string, number>>): Promise<boolean> {
+  async markSent(
+    wrapId: string,
+    acks: Readonly<Record<string, number>>,
+    availability: OutboxAvailability,
+  ): Promise<boolean> {
     const sealed = await seal(this.#ctx, 'outbox', 'acks', [wrapId], canonicalize(acks));
-    return this.#finish(wrapId, { state: 'sent', acks: sealed });
+    // SEC-RELAY-READBACK: only the two known values are stored; anything else reads as unknown.
+    const stored: OutboxAvailability = availability === 'confirmed' ? 'confirmed' : 'unknown';
+    return this.#finish(wrapId, { state: 'sent', acks: sealed, availability: stored });
   }
 
   markNotDelivered(wrapId: string, reason: OutboxGiveUpReason): Promise<boolean> {
@@ -493,6 +515,7 @@ export class OutboxService {
         give_up_at: giveUpAt(now, wrap),
         state: 'pending',
         reason: null,
+        availability: null,
       });
     }
     if (rows.length !== routes.length) {
@@ -564,6 +587,7 @@ export class OutboxService {
 
   async #run(envelopeId: string | undefined): Promise<OutboxSummary> {
     const transport = this.requireTransport();
+    await this.#confirmByReceipts(envelopeId);
     // W4-PAUSE (06 §6 "Paused agents"): while the owner has paused the agent (or its pause row cannot
     // be read: fail closed) no row is published; queued rows keep their state and deadlines and go
     // out at the first pass after a verified `agent.resume`.
@@ -588,6 +612,54 @@ export class OutboxService {
       return await this.#passWith(persistence, transport);
     } finally {
       this.#passes.delete(persistence);
+    }
+  }
+
+  /**
+   * SEC-RELAY-READBACK (D-156 (7)): a receipt the contact's AI signed over this exact message (a
+   * verified v2 ack, acks.ts) proves it reached them, so its `contact` rows still pending (on their
+   * availability check, or on a relay that never answers) end as `sent`, availability `confirmed`.
+   * Compare-and-set on `pending`; nothing is published. Bounded per pass; a failure claims nothing.
+   */
+  async #confirmByReceipts(envelopeId: string | undefined): Promise<void> {
+    try {
+      const targets = await this.#ctx.store.transaction((tx) => {
+        const pending = tx.select(
+          'outbox',
+          {
+            state: 'pending',
+            role: 'contact',
+            ...(envelopeId === undefined ? {} : { envelope_id: envelopeId }),
+          },
+          { limit: RECEIPT_SWEEP_ROWS },
+        );
+        const out: AckTarget[] = [];
+        for (const id of new Set(pending.map((r) => r.envelope_id))) {
+          const env = tx.get('envelopes', { envelope_id: id });
+          if (env === undefined || env.direction !== 'out' || env.contact_id === null) continue;
+          if (env.deleted_at !== null) continue;
+          out.push({ envelopeId: id, envelopeHash: env.envelope_hash, contactId: env.contact_id });
+        }
+        return out;
+      });
+      if (targets.length === 0) return;
+      const found = await acksFor(this.#ctx, targets);
+      const confirmed = targets
+        .filter((t) => found.get(t.envelopeId)?.strength === 'verified')
+        .map((t) => t.envelopeId);
+      if (confirmed.length === 0) return;
+      await this.#ctx.store.transaction((tx) => {
+        for (const id of confirmed) {
+          const n = tx.update(
+            'outbox',
+            { envelope_id: id, role: 'contact', state: 'pending' },
+            { state: 'sent', availability: 'confirmed', wrap_json: null },
+          );
+          if (n > 0) updateDelivery(tx, id);
+        }
+      });
+    } catch {
+      // A store or ack read fault: the rows stay as they are; the next pass tries again.
     }
   }
 

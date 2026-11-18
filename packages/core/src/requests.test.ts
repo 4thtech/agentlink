@@ -101,6 +101,7 @@ async function fill(a: TestAgent, n: number, state: 'request' | 'refused', fromK
         refused_at: state === 'refused' ? clock.t : null,
         request_accepted_at: null,
         deleted_at: null,
+        availability: null,
       });
     }
   });

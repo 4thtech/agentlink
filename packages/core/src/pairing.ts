@@ -1408,6 +1408,7 @@ export class PairingService implements PairingHandler {
       refused_at: null,
       request_accepted_at: null,
       deleted_at: null,
+      availability: null,
     };
     const ackRow = ack === undefined ? undefined : await outboundRow(ctx, ack, id);
     // SEC-RESTORE-GUARD: a handshake sent before a restore of this ID pairs a contact that waits

@@ -5,16 +5,21 @@
 // - `receivedOlder`: only an older app's receipt (it names the message, not its content): shown as
 //   weaker, and never enough for a message sent with proof.
 // - A message sent with proof never reads as delivered without the signed receipt.
+// - `availability: unknown` (SEC-RELAY-READBACK, D-156 (7)): the relays took it but none could be
+//   asked to hand it back: "Sent, availability unknown" until a signed receipt arrives.
 import type { MessageItem } from '../messages/api.js';
 import { HOME_STRINGS as S, fmt } from './people-strings.js';
 
-type Item = Pick<MessageItem, 'status' | 'receipt' | 'receivedOlder' | 'proof'>;
+type Item = Pick<MessageItem, 'status' | 'receipt' | 'receivedOlder' | 'proof'> &
+  Partial<Pick<MessageItem, 'availability'>>;
 
 /** The delivery word under a sent message. */
 export function sentWord(item: Item, name: string): string {
+  // A signed receipt proves the contact's AI has it, whatever the relays said (SEC-RELAY-READBACK).
+  if (item.receipt) return fmt(item.proof ? S.proofDelivered : S.receivedBy, { name });
   if (item.status === 'queued') return S.waitingToSend;
   if (item.status === 'not_delivered') return S.notDelivered;
-  if (item.receipt) return fmt(item.proof ? S.proofDelivered : S.receivedBy, { name });
+  if (item.availability === 'unknown') return S.sentAvailabilityUnknown;
   if (item.proof) return S.sentNoReceipt;
   if (item.receivedOlder === true) return S.receivedOlder;
   return S.sent;

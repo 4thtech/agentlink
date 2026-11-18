@@ -804,6 +804,12 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "pattern": "^apr_[A-Za-z0-9_-]{22}$",
           "type": "string",
         },
+        "availability": {
+          "enum": [
+            "unknown",
+          ],
+          "type": "string",
+        },
         "candidates": {
           "items": {
             "additionalProperties": false,

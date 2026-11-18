@@ -8,6 +8,7 @@ import {
   OUTBOX_GIVE_UP_SECONDS,
   OutboxWorker,
   type OutboxAttempt,
+  type OutboxAvailability,
   type OutboxGiveUpReason,
   type OutboxPersistence,
   type OutboxRow,
@@ -29,6 +30,7 @@ afterEach(() => {
 
 type Stored = OutboxRow & {
   state: 'pending' | 'sent' | 'not_delivered';
+  availability?: OutboxAvailability;
   reason?: OutboxGiveUpReason;
 };
 
@@ -64,8 +66,12 @@ class MemoryOutbox implements OutboxPersistence {
   recordAttempt(wrapId: string, attempt: OutboxAttempt): Promise<boolean> {
     return this.cas(wrapId, attempt);
   }
-  markSent(wrapId: string, acks: Readonly<Record<string, number>>): Promise<boolean> {
-    return this.cas(wrapId, { acks, state: 'sent' });
+  markSent(
+    wrapId: string,
+    acks: Readonly<Record<string, number>>,
+    availability: OutboxAvailability,
+  ): Promise<boolean> {
+    return this.cas(wrapId, { acks, state: 'sent', availability });
   }
   markNotDelivered(wrapId: string, reason: OutboxGiveUpReason): Promise<boolean> {
     return this.cas(wrapId, { state: 'not_delivered', reason });
@@ -242,8 +248,11 @@ describe('delivery', () => {
     const [a, b] = relayUrls('crash', 2) as [string, string];
     const row = makeRow([a, b], { acks: { [a]: nowSeconds(), [b]: nowSeconds() } });
     outbox.add(row);
+    // The relays hold it from the publish before the crash.
+    for (const relay of [a, b]) net.inject(relay, JSON.parse(row.wrapJson));
     expect((await worker().processDue()).sent).toBe(1);
-    expect(net.opens).toHaveLength(0);
+    // SEC-RELAY-READBACK: only the availability check reads it back; nothing is published again.
+    expect(net.received.filter((r) => r.frame.startsWith('["EVENT"'))).toHaveLength(0);
   });
 
   it('gives up after 24 h: not_delivered (timeout), and nothing is published after that', async () => {
@@ -286,6 +295,7 @@ describe('delivery', () => {
     net.configure(b);
     const row = makeRow([a, b], { acks: { [a]: 1, [b]: 1 }, giveUpAt: nowSeconds() - 1 });
     outbox.add(row);
+    for (const relay of [a, b]) net.inject(relay, JSON.parse(row.wrapJson));
     expect((await worker().processDue()).sent).toBe(1);
   });
 
@@ -394,8 +404,10 @@ describe('unreadable and ended rows', () => {
     const bad = makeRow(relays);
     outbox.add(bad);
     const original = outbox.markSent.bind(outbox);
-    outbox.markSent = (wrapId, acks) =>
-      wrapId === bad.wrapId ? Promise.reject(new Error('disk full')) : original(wrapId, acks);
+    outbox.markSent = (wrapId, acks, availability) =>
+      wrapId === bad.wrapId
+        ? Promise.reject(new Error('disk full'))
+        : original(wrapId, acks, availability);
     const good = makeRow(relays);
     outbox.add(good);
     const summary = await worker().processDue();
@@ -638,8 +650,10 @@ describe('sync look-back window (G-49)', () => {
     const wrapCreated = nowSeconds() - WINDOW - 60;
     const row = makeRow([a, b], { acks: { [a]: 1, [b]: 1 } }, 'AAAA', wrapCreated);
     outbox.add(row);
+    for (const relay of [a, b]) net.inject(relay, JSON.parse(row.wrapJson));
     expect(await worker().processDue()).toMatchObject({ sent: 1, notDelivered: 0 });
     expect(outbox.get(row.wrapId).state).toBe('sent');
-    expect(net.opens).toHaveLength(0);
+    // SEC-RELAY-READBACK: read back only, never published again.
+    expect(net.received.filter((r) => r.frame.startsWith('["EVENT"'))).toHaveLength(0);
   });
 });

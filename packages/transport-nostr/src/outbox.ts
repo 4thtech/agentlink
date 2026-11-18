@@ -4,7 +4,14 @@
 // processDue(). A row holds the signed kind 1059 event and the relay list that the core chose for
 // its recipient key. This worker republishes that stored event, never a re-wrapped one, to exactly
 // that list (a wrap is never published to a relay outside its row's list), and marks the row:
-//   - `sent` once 2 relays of the list have returned OK (for `owner` rows as for `contact` rows);
+//   - `sent` once 2 relays of the list have returned OK (for `owner` rows as for `contact` rows) and
+//     the availability check has run (SEC-RELAY-READBACK, D-156 (7)): the relays that returned OK
+//     are asked for the wrap by its id, each on a new connection without a login (RelayPool
+//     checkServed). One that serves it: `sent`, availability `confirmed`. None can be asked (a login
+//     wanted, no answer in time): `sent`, availability `unknown`. A relay that answers without it
+//     (after one re-check a moment later) keeps its OK but never confirms: the row is republished
+//     to its other relays (backoff); with none left, READBACK_GRACE_SECONDS after it reached 2 OKs,
+//     or at give_up_at with at least one OK, it is `sent`, availability `unknown`. Only a row no relay accepted ends `not_delivered` (timeout);
 //   - `not_delivered` (timeout) if that has not happened by give_up_at, the earlier of created_at +
 //     24 h and the wrap's own created_at + 48 h + S (G-49, D-71 (5)): a wrap is never published
 //     where a receiver's sync (`lastSync - 48 h - S`) could no longer find it;
@@ -14,7 +21,13 @@
 // Persistence is injected (implemented by core/node over the `outbox` table, 07 §3.2), so a restart
 // loses nothing: the next processDue() reads the pending rows again. Times are Unix seconds, the
 // store's clock (07 §3.1). Logs carry counts only: never wrap_json, relay URLs or keys (I-7).
-import { MIN_ACKS, MAX_RELAYS_PER_WRAP, type RelayPool } from './relay-pool.js';
+import {
+  MIN_ACKS,
+  MAX_RELAYS_PER_WRAP,
+  type ReadbackOutcome,
+  type ReadbackSignal,
+  type RelayPool,
+} from './relay-pool.js';
 import { verifyNostrEvent, parseJson, type NostrEvent } from '@4thtech-io/crypto';
 import type { Logger } from '@4thtech-io/log';
 import { isAllowedRelayUrl } from '@4thtech-io/types';
@@ -26,6 +39,47 @@ const BACKOFF_BASE_SECONDS = 30;
 const BACKOFF_MAX_SECONDS = 3_600;
 /** Rows published at the same time by one processDue() pass. */
 const ROW_CONCURRENCY = 8;
+/**
+ * SEC-RELAY-READBACK: when no relay served the wrap and at least one answered without it, the
+ * relays that answered without it are asked once more after this wait (a relay may store a moment
+ * after its OK).
+ */
+export const READBACK_RECHECK_MS = 1_000;
+/**
+ * SEC-RELAY-READBACK: a row whose OKs reached MIN_ACKS but no relay served it back keeps trying its
+ * other relays for at most this long after that; then it is `sent`, availability `unknown`, so a
+ * dead or refusing relay in the list never keeps it pending until give_up_at.
+ */
+export const READBACK_GRACE_SECONDS = 120;
+
+/** A cancel signal for the sibling checks of one row (no DOM or Node types in this package). */
+class Cancel implements ReadbackSignal {
+  aborted = false;
+  private readonly listeners = new Set<() => void>();
+  addEventListener(_type: 'abort', listener: () => void): void {
+    this.listeners.add(listener);
+  }
+  removeEventListener(_type: 'abort', listener: () => void): void {
+    this.listeners.delete(listener);
+  }
+  abort(): void {
+    if (this.aborted) return;
+    this.aborted = true;
+    for (const listener of [...this.listeners]) listener();
+  }
+}
+
+/** When the row reached MIN_ACKS: the MIN_ACKS-th earliest OK time, or undefined. */
+function reachedMinAcksAt(acks: Readonly<Record<string, number>>): number | undefined {
+  const times = Object.values(acks).sort((a, b) => a - b);
+  return times.length >= MIN_ACKS ? times[MIN_ACKS - 1] : undefined;
+}
+
+/**
+ * SEC-RELAY-READBACK (D-156 (7)): how far a `sent` row's availability was confirmed. `confirmed`: a
+ * relay that returned OK served the wrap back. `unknown`: none of them could be asked.
+ */
+export type OutboxAvailability = 'confirmed' | 'unknown';
 
 /** Failures that make a relay unusable for this wrap (not a transient fault): 07 §4.3. */
 const UNUSABLE: ReadonlySet<string> = new Set(['too_large', 'blocked_address', 'invalid_url']);
@@ -76,19 +130,41 @@ export interface OutboxPersistence {
    * overwrites a state it did not read as pending.
    */
   recordAttempt(wrapId: string, attempt: OutboxAttempt): Promise<boolean>;
-  markSent(wrapId: string, acks: Readonly<Record<string, number>>): Promise<boolean>;
+  markSent(
+    wrapId: string,
+    acks: Readonly<Record<string, number>>,
+    availability: OutboxAvailability,
+  ): Promise<boolean>;
   markNotDelivered(wrapId: string, reason: OutboxGiveUpReason): Promise<boolean>;
 }
 
+/** What the worker uses of the pool. Without `checkServed` every `sent` row is availability `unknown`. */
+export type OutboxPool = Pick<RelayPool, 'publish'> & Partial<Pick<RelayPool, 'checkServed'>>;
+
 export interface OutboxWorkerOptions {
   readonly persistence: OutboxPersistence;
-  readonly pool: Pick<RelayPool, 'publish'>;
+  readonly pool: OutboxPool;
   readonly logger?: Logger;
   /** Clock in Unix milliseconds (default: the wall clock). */
   readonly now?: () => number;
   /** Random source in [0, 1) for the backoff jitter (default: Math.random; not a security use). */
   readonly random?: () => number;
+  /** Waits `ms` (default: the global setTimeout, read at call time so fake timers apply). */
+  readonly sleep?: (ms: number) => Promise<void>;
 }
+
+type Readback =
+  | { readonly kind: 'confirmed' }
+  | { readonly kind: 'unknown' }
+  | { readonly kind: 'missing'; readonly relays: readonly string[] };
+
+const defaultSleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    (globalThis as unknown as { setTimeout(cb: () => void, ms: number): unknown }).setTimeout(
+      resolve,
+      ms,
+    );
+  });
 
 /** Why a row is stuck with fewer than 2 usable relays. Fixed strings, no relay name or address. */
 export type OutboxNoticeReason = 'no_relay_large_enough' | 'too_few_usable_relays';
@@ -147,10 +223,11 @@ function readRelays(row: OutboxRow): readonly string[] | undefined {
 
 export class OutboxWorker {
   private readonly persistence: OutboxPersistence;
-  private readonly pool: Pick<RelayPool, 'publish'>;
+  private readonly pool: OutboxPool;
   private readonly logger: Logger | undefined;
   private readonly now: () => number;
   private readonly random: () => number;
+  private readonly sleep: (ms: number) => Promise<void>;
   private readonly inFlight = new Set<string>();
 
   constructor(options: OutboxWorkerOptions) {
@@ -159,6 +236,7 @@ export class OutboxWorker {
     this.logger = options.logger;
     this.now = options.now ?? (() => Date.now());
     this.random = options.random ?? (() => Math.random());
+    this.sleep = options.sleep ?? defaultSleep;
   }
 
   /** Delivers every pending row that is due. Call after the core's store transaction and on a timer. */
@@ -228,26 +306,26 @@ export class OutboxWorker {
       created + OUTBOX_GIVE_UP_SECONDS,
       event.created_at + SYNC_LOOKBACK_SECONDS + SYNC_SKEW_SECONDS,
     );
-    const acks = this.listedAcks(row, relays);
-    if (Object.keys(acks).length >= MIN_ACKS) {
-      // a crash after the publish, before the mark
-      return (await this.persistence.markSent(row.wrapId, acks))
-        ? { kind: 'sent' }
-        : { kind: 'skipped' };
+    // SEC-RELAY-READBACK (D-156 (7)): an OK is kept once a relay gave it. Only a relay that serves
+    // the wrap back confirms it; an empty read never confirms, and never by itself ends the row as
+    // `not_delivered`: the row goes on to its other relays, and when none is left to try, or at
+    // give_up_at with at least one OK, it is `sent` with availability `unknown`. `not_delivered`
+    // (timeout) stays for a row that no relay accepted.
+    const merged: Record<string, number> = this.listedAcks(row, relays);
+    const pastDeadline = nowSeconds >= giveUpAt;
+    let check: Readback | undefined;
+    if (Object.keys(merged).length >= MIN_ACKS) {
+      // a crash after the publish, before the mark: the stored OKs are checked like fresh ones
+      check = await this.readback(event.id, Object.keys(merged));
+      if (check.kind !== 'missing') return this.finishSent(row.wrapId, merged, check.kind);
     }
-    if (nowSeconds >= giveUpAt) {
-      return (await this.persistence.markNotDelivered(row.wrapId, 'timeout'))
-        ? { kind: 'not_delivered' }
-        : { kind: 'skipped' };
-    }
-    if (!(await this.persistence.isPending(row.wrapId))) return { kind: 'skipped' };
-
     // The stored event goes only to the relays of its row that have not acknowledged it yet.
-    const remaining = relays.filter((relay) => acks[relay] === undefined);
-    const merged: Record<string, number> = { ...acks };
+    const remaining = relays.filter((relay) => merged[relay] === undefined);
     let unusable = 0;
     let tooLarge = false;
-    if (remaining.length > 0) {
+    if (!pastDeadline && remaining.length > 0) {
+      if (!(await this.persistence.isPending(row.wrapId))) return { kind: 'skipped' };
+      const before = Object.keys(merged).length;
       const outcome = await this.pool.publish(event, remaining);
       for (const r of outcome.results) {
         if (r.reason === 'too_large') tooLarge = true;
@@ -256,18 +334,144 @@ export class OutboxWorker {
       for (const relay of outcome.acked) {
         if (relays.includes(relay) && merged[relay] === undefined) merged[relay] = nowSeconds;
       }
+      if (Object.keys(merged).length >= MIN_ACKS && Object.keys(merged).length > before) {
+        check = await this.readback(event.id, Object.keys(merged));
+        if (check.kind !== 'missing') return this.finishSent(row.wrapId, merged, check.kind);
+      }
     }
-    if (Object.keys(merged).length >= MIN_ACKS) {
-      return (await this.persistence.markSent(row.wrapId, merged))
-        ? { kind: 'sent' }
+    const okCount = Object.keys(merged).length;
+    const nothingLeft = relays.every((relay) => merged[relay] !== undefined);
+    if (pastDeadline && okCount >= 1) {
+      // At the bound: one OK (or more) and nothing served is sent with availability unknown.
+      check ??= await this.readback(event.id, Object.keys(merged));
+      return this.finishSent(
+        row.wrapId,
+        merged,
+        check.kind === 'confirmed' ? 'confirmed' : 'unknown',
+      );
+    }
+    if (pastDeadline) {
+      return (await this.persistence.markNotDelivered(row.wrapId, 'timeout'))
+        ? { kind: 'not_delivered' }
         : { kind: 'skipped' };
     }
+    const reachedAt = reachedMinAcksAt(merged);
+    if (check?.kind === 'missing') {
+      // Every relay of the row accepted it and none served it back (no other relay to try), or the
+      // other relays did not take it within the grace: sent, availability unknown.
+      const graceOver = reachedAt !== undefined && nowSeconds - reachedAt >= READBACK_GRACE_SECONDS;
+      if (nothingLeft || graceOver) return this.finishSent(row.wrapId, merged, 'unknown');
+    }
+    const cap =
+      check?.kind === 'missing' && reachedAt !== undefined
+        ? Math.max(reachedAt + READBACK_GRACE_SECONDS, nowSeconds + 1)
+        : undefined;
+    return this.retry(row, relays, merged, nowSeconds, giveUpAt, { unusable, tooLarge }, cap);
+  }
+
+  private async finishSent(
+    wrapId: string,
+    acks: Readonly<Record<string, number>>,
+    availability: OutboxAvailability,
+  ): Promise<RowResult> {
+    return (await this.persistence.markSent(wrapId, acks, availability))
+      ? { kind: 'sent' }
+      : { kind: 'skipped' };
+  }
+
+  /**
+   * SEC-RELAY-READBACK (D-156 (7)): asks the relays that returned OK for the wrap by its id. The
+   * first that serves it confirms; when none can be asked the answer is `unknown`; when some answered
+   * without it and none served it, those are asked once more after READBACK_RECHECK_MS, and the ones
+   * still without it are returned. Bounded by the pool's own per-check limit.
+   */
+  private async readback(eventId: string, acked: readonly string[]): Promise<Readback> {
+    const check = this.pool.checkServed?.bind(this.pool);
+    if (check === undefined || acked.length === 0) return { kind: 'unknown' };
+    const first = await this.askAll(check, eventId, acked);
+    if (first.served) return { kind: 'confirmed' };
+    if (first.missing.length === 0) return { kind: 'unknown' };
+    await this.sleep(READBACK_RECHECK_MS);
+    const second = await this.askAll(check, eventId, first.missing);
+    if (second.served) return { kind: 'confirmed' };
+    // A relay that answered without the wrap and then could not be asked again still counts as
+    // missing: it never served it.
+    const stillMissing = first.missing.filter(
+      (relay) => second.missing.includes(relay) || !second.answered.includes(relay),
+    );
+    return { kind: 'missing', relays: stillMissing };
+  }
+
+  /**
+   * Asks every relay at once; resolves at the first `served` (cancelling the others), else once all
+   * have answered.
+   */
+  private askAll(
+    check: (
+      relay: string,
+      eventId: string,
+      options: { readonly signal?: ReadbackSignal },
+    ) => Promise<ReadbackOutcome>,
+    eventId: string,
+    relays: readonly string[],
+  ): Promise<{ served: boolean; missing: string[]; answered: string[] }> {
+    // The first relay that serves it ends the others at once, so they free their slots.
+    const cancel = new Cancel();
+    return new Promise((resolve) => {
+      const missing: string[] = [];
+      const answered: string[] = [];
+      let pending = relays.length;
+      let done = false;
+      const settle = (relay: string, outcome: ReadbackOutcome): void => {
+        if (done) return;
+        pending -= 1;
+        if (outcome === 'served') {
+          done = true;
+          cancel.abort();
+          resolve({ served: true, missing, answered });
+          return;
+        }
+        if (outcome === 'missing') {
+          missing.push(relay);
+          answered.push(relay);
+        }
+        if (pending === 0) {
+          done = true;
+          resolve({ served: false, missing, answered });
+        }
+      };
+      for (const relay of relays) {
+        let asked: Promise<ReadbackOutcome>;
+        try {
+          asked = check(relay, eventId, { signal: cancel });
+        } catch {
+          asked = Promise.resolve('unchecked');
+        }
+        asked.then(
+          (outcome) => settle(relay, outcome),
+          () => settle(relay, 'unchecked'),
+        );
+      }
+    });
+  }
+
+  /** Records one attempt that did not end the row, with the next backoff step. */
+  private async retry(
+    row: OutboxRow,
+    relays: readonly string[],
+    merged: Readonly<Record<string, number>>,
+    nowSeconds: number,
+    giveUpAt: number,
+    seen: { readonly unusable: number; readonly tooLarge: boolean },
+    cap?: number,
+  ): Promise<RowResult> {
+    const { unusable, tooLarge } = seen;
     const attempts = row.attempts + 1;
     const base = Math.min(BACKOFF_BASE_SECONDS * 2 ** (attempts - 1), BACKOFF_MAX_SECONDS);
     // Jitter of up to 25 % on top, so many rows queued together do not retry in step; never past give_up_at.
     const r = this.random();
     const jitter = Math.floor(base * 0.25 * (Number.isFinite(r) ? Math.min(Math.max(r, 0), 1) : 0));
-    const nextAttemptAt = Math.min(nowSeconds + base + jitter, giveUpAt);
+    const nextAttemptAt = Math.min(nowSeconds + base + jitter, giveUpAt, cap ?? giveUpAt);
     const recorded = await this.persistence.recordAttempt(row.wrapId, {
       acks: merged,
       attempts,

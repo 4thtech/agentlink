@@ -110,7 +110,8 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
       ],
       pairings: ['created_by'],
       files: ['auto_save', 'auto_reason', 'auto_tries', 'auto_next_at'],
-      envelopes: ['deleted_at'],
+      envelopes: ['deleted_at', 'availability'],
+      outbox: ['availability'],
     };
     for (const [table, names] of Object.entries(columns)) {
       for (const name of names) sql.exec(`ALTER TABLE "${table}" DROP COLUMN "${name}"`);
@@ -154,7 +155,7 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
       state.storage.sql.exec('UPDATE deploy_state SET schema_version = 17');
       const again = DurableObjectStore.open(state.storage);
       expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
-      expect(STORE_SCHEMA_VERSION).toBe(18);
+      expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(18);
       const columns = (table: string) =>
         state.storage.sql
           .exec(`PRAGMA table_info("${table}")`)
@@ -164,6 +165,28 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
       expect(columns('contacts')).toContain('waiting_owner');
       expect(columns('contacts')).toContain('ai_accepted_at');
       expect(columns('pairings')).toContain('created_by');
+      expect(await again.transaction((tx) => tx.select('seen'))).toEqual([seen('keep')]);
+    });
+  });
+
+  // SEC-RELAY-READBACK (cloud agent parity): a version 18 store gets `envelopes.availability` and
+  // `outbox.availability`, null on every existing row.
+  it('migrates a version 18 store (SEC-RELAY-READBACK columns) keeping rows, the new columns null', async () => {
+    await inObject(async (store, state) => {
+      await store.transaction((tx) => tx.insert('seen', seen('keep')));
+      state.storage.sql.exec('ALTER TABLE "envelopes" DROP COLUMN "availability"');
+      state.storage.sql.exec('ALTER TABLE "outbox" DROP COLUMN "availability"');
+      state.storage.sql.exec('UPDATE deploy_state SET schema_version = 18');
+      const again = DurableObjectStore.open(state.storage);
+      expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
+      expect(STORE_SCHEMA_VERSION).toBe(19);
+      const columns = (table: string) =>
+        state.storage.sql
+          .exec(`PRAGMA table_info("${table}")`)
+          .toArray()
+          .map((c) => c['name']);
+      expect(columns('envelopes')).toContain('availability');
+      expect(columns('outbox')).toContain('availability');
       expect(await again.transaction((tx) => tx.select('seen'))).toEqual([seen('keep')]);
     });
   });

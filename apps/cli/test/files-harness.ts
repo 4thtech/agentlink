@@ -70,6 +70,7 @@ export class TestCipher implements StoreCipher {
 }
 
 interface Filter {
+  ids?: string[];
   kinds?: number[];
   '#p'?: string[];
   since?: number;
@@ -78,6 +79,7 @@ interface Filter {
 }
 
 function matches(filter: Filter, event: NostrEvent): boolean {
+  if (filter.ids !== undefined && !filter.ids.includes(event.id)) return false;
   if (filter.kinds !== undefined && !filter.kinds.includes(event.kind)) return false;
   const wanted = filter['#p'];
   if (

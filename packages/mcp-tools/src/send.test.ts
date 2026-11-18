@@ -176,6 +176,35 @@ describe('REL051-CF2: agentlink_send says sent or queued (06 §2.2)', () => {
     expect(String((result.structured as { summary: string }).summary)).toMatch(/^Sent to /);
   });
 
+  it('SEC-RELAY-READBACK: says "sent, availability unknown" when no relay could be checked', async () => {
+    const client = fake({
+      send: () =>
+        Promise.resolve({
+          status: 'ok',
+          envelopeId: ENVELOPE,
+          thread: THREAD,
+          sentAt: '2026-10-15T10:00:00Z',
+          delivery: 'sent',
+          availability: 'unknown',
+        } as SendMessageResult),
+    });
+    const result = await send({ to: 'marko', text: 'hi' }, client);
+    expect(result.structured).toMatchObject({
+      status: 'ok',
+      delivery: 'sent',
+      availability: 'unknown',
+    });
+    const summary = String((result.structured as { summary: string }).summary);
+    expect(summary).toMatch(/^Sent to /);
+    expect(summary).toContain('availability unknown');
+    expect(summary).not.toMatch(/relay|wallet|gas|transaction/i);
+  });
+
+  it('adds no availability field once a relay served the message back', async () => {
+    const result = await send({ to: 'marko', text: 'hi' }, withDelivery('sent'));
+    expect(result.structured).not.toHaveProperty('availability');
+  });
+
   it('never says sent for a message that could not be delivered', async () => {
     const result = await send({ to: 'marko', text: 'hi' }, withDelivery('not_delivered'));
     expect(result.structured).toMatchObject({ delivery: 'not_delivered' });
