@@ -42,6 +42,8 @@ export default defineConfig({
         /agents\.css/,
         /shell\.css/,
         /invite\.css/,
+        /file-reader\.css/,
+        /attach-composer\.css/,
         // The real-browser layout test reads the shared UI stylesheets as text (HOTFIX-045-PASTE-FIELD).
         /ui\/src\/(components|tokens)\/.*\.css/,
       ],

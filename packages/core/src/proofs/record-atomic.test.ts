@@ -64,15 +64,16 @@ async function openAgent(n: number, owner: TestOwner, name: string): Promise<Age
   const keyStore = new MemoryKeyStore(seed(n), { nowSeconds: () => clock.now() });
   const base = chain.platform();
   const cipher = new TestStoreCipher();
-  const agent = {
+  type Mutable = { -readonly [K in keyof Agent]: Agent[K] };
+  // `client`, `id` and `policyVersion` are filled in below, once the client exists.
+  const agent: Pick<Mutable, 'store' | 'cipher' | 'keyStore' | 'owner' | 'signed' | 'hook'> &
+    Partial<Mutable> = {
     store,
     cipher,
     keyStore,
     owner,
-    signed: [] as BuiltRecord[],
+    signed: [],
     hook: undefined,
-  } as {
-    -readonly [K in keyof Agent]: Agent[K];
   };
   const platform: ProofsPlatform = {
     ...base,

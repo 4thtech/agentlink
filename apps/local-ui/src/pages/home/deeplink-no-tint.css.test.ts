@@ -3,15 +3,10 @@
 // `--al-color-accent-subtle` over the whole opened conversation (inset: 0) while it loaded. No
 // conversation, file or skeleton rule of the Home screen may paint such a full-area tint again.
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-
-const read = (name: string): string =>
-  readFileSync(fileURLToPath(new URL(name, import.meta.url)), 'utf8');
-const peopleCss = read('./people.css');
-const homeCss = read('./home.css');
-const fileReaderCss = read('./file-reader.css');
-const attachCss = read('./attach-composer.css');
+import peopleCss from './people.css?raw';
+import homeCss from './home.css?raw';
+import fileReaderCss from './file-reader.css?raw';
+import attachCss from './attach-composer.css?raw';
 
 const strip = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ');
 

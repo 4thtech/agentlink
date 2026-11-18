@@ -3,6 +3,7 @@
 import type { BuiltRecord } from '@4thtech-io/chain';
 import { describe, expect, it, vi } from 'vitest';
 import { MemoryStore } from '../store/memory-store.js';
+import type { Sealed } from '../store/schema.js';
 import type { Store } from '../store/store.js';
 import {
   RECORD_SIGNING,
@@ -42,7 +43,7 @@ async function reserved(recordId = ID, state: 'reserved' | 'released' = 'reserve
       status: RECORD_SIGNING,
       fee_token: null,
       fee_amount: null,
-      salt: 'sealed',
+      salt: 'sealed' as Sealed,
       created_at: NOW,
     });
   });
