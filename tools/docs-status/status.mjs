@@ -5,14 +5,25 @@
 // the source renders (so drift between the source and README, the docs site or the knowledge base
 // fails CI, instead of relying on someone remembering).
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseYaml } from './yaml.mjs';
+import { DOCS } from '../docs/paths.mjs';
+import {
+  BANNER_BLOCK,
+  BANNER_FILES,
+  LLMS_NOTICE,
+  THREAT_BLOCK,
+  renderBanner,
+  renderLlms,
+  renderThreatModel,
+  strayStamps,
+} from './generated.mjs';
 
 export const STATUS_FILE = 'docs/status.yaml';
 const STATES = ['done', 'in-progress', 'planned'];
 const REPO = 'https://github.com/4thtech/agentlink';
-const SITE_STATUS_PAGE = 'docs-site/technical/project/status-and-roadmap.md';
+const SITE_STATUS_PAGE = DOCS.statusPage;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // --- Validation -----------------------------------------------------------------------------------
@@ -158,7 +169,7 @@ export function renderSiteRoadmapDetail(data) {
 
 /** Docs site and knowledge base: the "Status: Current as of" line. */
 export function renderSiteHint(data) {
-  return `> **Status: Current as of ${longDate(data.updated)} (${data.versionLabel}, ${data.version}).** Derived from the [build plan](${REPO}/blob/main/docs/foundation/10-build-plan.md) and updated at every milestone. Durations are indicative, not commitments.`;
+  return `> **Status: Current as of ${longDate(data.updated)} (${data.versionLabel}, ${data.version}).** Derived from the [build plan](${REPO}/blob/main/${DOCS.specs}/10-build-plan.md) and updated at every milestone. Durations are indicative, not commitments.`;
 }
 
 /** Release history, newest first, one line each (optional `releases` list in docs/status.yaml). */
@@ -235,7 +246,7 @@ export function renderKnowledgeSummary(data) {
   const out = [
     '## Where things stand',
     '',
-    `Component-by-component detail: [status and roadmap](${REPO}/blob/main/docs-site/technical/project/status-and-roadmap.md).`,
+    `Component-by-component detail: [status and roadmap](${REPO}/blob/main/${DOCS.statusPage}).`,
     '',
   ];
   out.push(
@@ -344,7 +355,7 @@ export const TARGETS = [
     blocks: { status: renderReadmeStatus, roadmap: renderReadmeRoadmap },
   },
   {
-    file: 'docs-site/technical/project/status-and-roadmap.md',
+    file: DOCS.statusPage,
     blocks: {
       'status-hint': renderSiteHint,
       'status-summary': renderSiteSummary,
@@ -353,7 +364,7 @@ export const TARGETS = [
     },
   },
   {
-    file: 'knowledge/agentlink-overview.md',
+    file: `${DOCS.knowledge}/agentlink-overview.md`,
     optional: true,
     blocks: {
       'status-intro': renderKnowledgeIntro,
@@ -361,7 +372,39 @@ export const TARGETS = [
       'status-milestones': renderKnowledgeMilestones,
     },
   },
+  // DOCS-COMPACT-A: the one version banner (enforced once a file carries its markers).
+  ...BANNER_FILES.map((file) => ({
+    file,
+    optional: true,
+    blocks: { [BANNER_BLOCK]: renderBanner },
+  })),
+  // DOCS-COMPACT-A: the threat-model table, copied from 04 §7.
+  {
+    file: DOCS.threatModelPage,
+    optional: true,
+    blocks: {
+      [THREAT_BLOCK]: (_data, _text, ctx) =>
+        renderThreatModel(readFileSync(join(ctx.root, DOCS.securitySpec), 'utf8')),
+    },
+  },
 ];
+
+/** Public docs files scanned for stray version stamps once the banner exists. */
+function publicDocFiles(root) {
+  const out = [];
+  for (const dir of [DOCS.guide, DOCS.technical, DOCS.templates]) {
+    let names = [];
+    try {
+      names = readdirSync(join(root, dir), { recursive: true });
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    for (const name of names.map(String).sort())
+      if (name.endsWith('.md')) out.push(`${dir}/${name.split('\\').join('/')}`);
+  }
+  out.push(DOCS.publicReadme, 'README.md');
+  return out;
+}
 
 const startMarker = (name) => `<!-- ${name}:start -->`;
 const endMarker = (name) => `<!-- ${name}:end -->`;
@@ -442,7 +485,14 @@ export function run({ root, check = false }) {
     let text = original;
     let applied = 0;
     for (const [name, render] of Object.entries(target.blocks)) {
-      const result = replaceBlock(text, name, render(data, original));
+      let rendered;
+      try {
+        rendered = render(data, original, { root });
+      } catch (error) {
+        problems.push(`${target.file}: ${error.message}`);
+        continue;
+      }
+      const result = replaceBlock(text, name, rendered);
       if (result.missing) {
         if (target.optional) skipped.push(`${target.file} has no ${name} markers; skipped`);
         else
@@ -472,6 +522,38 @@ export function run({ root, check = false }) {
         writeFileSync(path, text);
       }
     }
+  }
+
+  // DOCS-COMPACT-A: once a version banner exists, no other version stamp may remain.
+  const files = publicDocFiles(root)
+    .map((file) => [file, readIfPresent(join(root, file))])
+    .filter(([, text]) => text !== null);
+  if (files.some(([, text]) => text.includes(`<!-- ${BANNER_BLOCK}:start -->`))) {
+    for (const stray of strayStamps(files))
+      problems.push(
+        `${stray}: a version stamp outside the generated banner; remove it (the banner says the version)`,
+      );
+  }
+
+  // DOCS-COMPACT-A: llms.txt, generated whole once it carries the generated notice.
+  const llms = readIfPresent(join(root, DOCS.llms));
+  if (llms !== null && llms.includes(LLMS_NOTICE)) {
+    let rendered = null;
+    try {
+      rendered = renderLlms(root, data);
+    } catch (error) {
+      problems.push(`${DOCS.llms}: ${error.message}`);
+    }
+    if (rendered !== null && rendered !== llms) {
+      changed.push(DOCS.llms);
+      if (check)
+        problems.push(
+          `${DOCS.llms} is out of date with the docs; run: node tools/docs-status/index.mjs`,
+        );
+      else writeFileSync(join(root, DOCS.llms), rendered);
+    }
+  } else if (llms !== null) {
+    skipped.push(`${DOCS.llms} has no generated notice; skipped`);
   }
   return { problems, changed, skipped };
 }

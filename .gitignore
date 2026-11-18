@@ -38,3 +38,6 @@ test-results/
 # OPS-UNSTICK-A: per-package vitest JSON reports written in CI (tools/ci/quarantine.mjs)
 .vitest-report.json
 .vitest-run.json
+
+# DOCS-COMPACT-A: the knowledge bundle is a release asset only (tools/docs/build-knowledge.mjs), never committed
+/agentlink-knowledge.md

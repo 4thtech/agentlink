@@ -14,6 +14,11 @@
 // Release tags only, never `main`, and the tag must be on main: the wiki shows what is released.
 // Only .md pages and images are copied; symbolic links are refused; redirects stay inside agentlink/. docs-site/guide -> agentlink/,
 // docs-site/technical -> agentlink/technical/, docs-site/assets -> agentlink/.gitbook/assets/.
+// DOCS-COMPACT-A: the source paths come from tools/docs/paths.mjs and are picked per source tree
+// (detectLayout): a tag in the legacy layout (docs-site/, up to v0.5.11) syncs byte for byte as before;
+// a tag in the compact layout (docs/guide, docs/technical, docs/assets) syncs to the same wiki paths,
+// with the header naming `docs@<tag>`. The `ai-knowledge` page markers are stripped, and the generated
+// version banner is set to the synced tag (both absent in legacy tags, so their output is unchanged).
 // Ported from the wiki's scripts/sync-agentlink.mjs (same output byte for byte, same state file), so
 // the wiki's own `--check` keeps working. Runbook: docs-site/MAINTAINING.md §2.
 
@@ -23,16 +28,14 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { CURRENT_LAYOUT, LAYOUTS, REPO_ROOT, REPO_URL, detectLayout } from './paths.mjs';
 
-export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-export const REPO_URL = 'https://github.com/4thtech/agentlink';
+export { REPO_ROOT, REPO_URL, LAYOUTS, detectLayout };
 export const TAG_RE = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/;
 export const STATE_FILE = 'data/agentlink-sync.yaml';
-const GUIDE_SRC = 'docs-site/guide';
-const TECH_SRC = 'docs-site/technical';
+const DEFAULT_LAYOUT = LAYOUTS[CURRENT_LAYOUT];
 const GUIDE_DEST = 'agentlink';
 const TECH_DEST = 'agentlink/technical';
-const ASSETS_SRC = 'docs-site/assets';
 const ASSETS_DEST = 'agentlink/.gitbook/assets';
 const IMAGE_RE = /\.(png|jpe?g|gif|svg|webp)$/i;
 const SKIP_NAMES = new Set(['.gitbook.yaml', 'SUMMARY.md']);
@@ -45,12 +48,14 @@ const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
 
 // ---------- file mapping ----------
 
-export function destFor(srcRel) {
-  if (srcRel.startsWith(`${GUIDE_SRC}/`))
-    return `${GUIDE_DEST}/${srcRel.slice(GUIDE_SRC.length + 1)}`;
-  if (srcRel.startsWith(`${TECH_SRC}/`)) return `${TECH_DEST}/${srcRel.slice(TECH_SRC.length + 1)}`;
-  if (srcRel.startsWith(`${ASSETS_SRC}/`))
-    return `${ASSETS_DEST}/${srcRel.slice(ASSETS_SRC.length + 1)}`;
+export function destFor(srcRel, layout = DEFAULT_LAYOUT) {
+  for (const [src, dest] of [
+    [layout.guide, GUIDE_DEST],
+    [layout.technical, TECH_DEST],
+    [layout.assets, ASSETS_DEST],
+  ]) {
+    if (srcRel.startsWith(`${src}/`)) return `${dest}/${srcRel.slice(src.length + 1)}`;
+  }
   return null;
 }
 
@@ -92,9 +97,9 @@ export function isPublishable(rel) {
 }
 
 /** Source files (repo-relative, posix) that are copied. */
-export function collectSources(srcRoot) {
+export function collectSources(srcRoot, layout = detectLayout(srcRoot)) {
   const out = [];
-  for (const base of [GUIDE_SRC, TECH_SRC]) {
+  for (const base of [layout.guide, layout.technical]) {
     const dir = path.join(srcRoot, base);
     if (!fs.existsSync(dir))
       throw new Error(
@@ -106,7 +111,7 @@ export function collectSources(srcRoot) {
       out.push(rel);
     }
   }
-  const assets = path.join(srcRoot, ASSETS_SRC);
+  const assets = path.join(srcRoot, layout.assets);
   if (fs.existsSync(assets)) {
     for (const f of walk(assets)) {
       const rel = relOf(srcRoot, f);
@@ -156,8 +161,9 @@ export function rewriteHref(href, ctx) {
     const [, type, repoPath0, rest = ''] = m;
     const repoPath = repoPath0.replace(/\/$/, '');
     if (ctx.map.has(repoPath)) return toWiki(ctx.map.get(repoPath), rest);
-    if (repoPath === GUIDE_SRC) return toWiki(`${GUIDE_DEST}/README.md`, rest);
-    if (repoPath === TECH_SRC) return toWiki(`${TECH_DEST}/README.md`, rest);
+    const layout = ctx.layout ?? DEFAULT_LAYOUT;
+    if (repoPath === layout.guide) return toWiki(`${GUIDE_DEST}/README.md`, rest);
+    if (repoPath === layout.technical) return toWiki(`${TECH_DEST}/README.md`, rest);
     return pin(type, repoPath, rest);
   }
   if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('/') || href.startsWith('//'))
@@ -201,12 +207,33 @@ export function linkTargets(text) {
   return out;
 }
 
-/** Adds the "synced" marker after any front matter. */
-export function addHeader(text, tag) {
-  const header = `<!-- Synced from 4thtech/agentlink docs-site@${tag}. Edit there, not here. -->`;
+/** Adds the "synced" marker after any front matter. `label` is the layout's source name. */
+export function addHeader(text, tag, label = 'docs-site') {
+  const header = `<!-- Synced from 4thtech/agentlink ${label}@${tag}. Edit there, not here. -->`;
   const fm = /^---\n[\s\S]*?\n---\n/.exec(text);
   if (fm) return `${fm[0]}${header}\n${text.slice(fm[0].length)}`;
   return `${header}\n${text}`;
+}
+
+// The Lumina marker under a page's H1 (DOCS-COMPACT-A): an HTML comment the wiki does not need.
+export const AI_KNOWLEDGE_RE = /^<!-- ai-knowledge:[\s\S]*?-->[ \t]*\n(?:[ \t]*\n)?/m;
+
+/** Removes the `ai-knowledge` marker (and one blank line after it); other text is untouched. */
+export function stripKnowledgeMarker(text) {
+  return text.replace(AI_KNOWLEDGE_RE, '');
+}
+
+/**
+ * Inside `<!-- version-banner:start -->`…`<!-- version-banner:end -->`, the version is set to the
+ * synced tag: the wiki shows the release it was generated from, even when main is ahead.
+ */
+export function setBannerVersion(text, tag) {
+  const version = tag.replace(/^v/, '').split('-')[0];
+  return text.replace(
+    /(<!-- version-banner:start -->)([\s\S]*?)(<!-- version-banner:end -->)/g,
+    (_, a, body, b) =>
+      a + body.replace(/Applies to AgentLink \d+\.\d+\.\d+/g, `Applies to AgentLink ${version}`) + b,
+  );
 }
 
 // ---------- SUMMARY ----------
@@ -524,8 +551,9 @@ export function latestTag(cwd = REPO_ROOT) {
 export function sync({ tag, srcRoot, commit, root }) {
   for (const rel of ['SUMMARY.md', '.gitbook.yaml', 'data', STATE_FILE, GUIDE_DEST])
     assertNoLink(path.join(root, rel));
-  const sources = collectSources(srcRoot);
-  const map = new Map(sources.map((s) => [s, destFor(s)]));
+  const layout = detectLayout(srcRoot);
+  const sources = collectSources(srcRoot, layout);
+  const map = new Map(sources.map((s) => [s, destFor(s, layout)]));
   const kind = (rel) => {
     const p = path.join(srcRoot, rel);
     if (!fs.existsSync(p)) return null;
@@ -534,10 +562,10 @@ export function sync({ tag, srcRoot, commit, root }) {
 
   // Navigation first (it also tells us which pages exist).
   const guideEntries = parseSummary(
-    fs.readFileSync(path.join(srcRoot, GUIDE_SRC, 'SUMMARY.md'), 'utf8'),
+    fs.readFileSync(path.join(srcRoot, layout.guide, 'SUMMARY.md'), 'utf8'),
   );
   const techEntries = parseSummary(
-    fs.readFileSync(path.join(srcRoot, TECH_SRC, 'SUMMARY.md'), 'utf8'),
+    fs.readFileSync(path.join(srcRoot, layout.technical, 'SUMMARY.md'), 'utf8'),
   );
   const nav = planNavigation(guideEntries, techEntries);
   const listedDest = new Set([
@@ -573,8 +601,9 @@ export function sync({ tag, srcRoot, commit, root }) {
     const buf = fs.readFileSync(path.join(srcRoot, srcRel));
     let data = buf;
     if (srcRel.endsWith('.md')) {
-      const ctx = { tag, srcRel, destRel, map, kind, navMap };
-      data = Buffer.from(addHeader(rewriteLinks(buf.toString('utf8'), ctx), tag));
+      const ctx = { tag, srcRel, destRel, map, kind, navMap, layout };
+      const page = setBannerVersion(stripKnowledgeMarker(buf.toString('utf8')), tag);
+      data = Buffer.from(addHeader(rewriteLinks(page, ctx), tag, layout.label));
     }
     fs.writeFileSync(out, data);
     written.set(destRel, sha256(data));
@@ -585,8 +614,8 @@ export function sync({ tag, srcRoot, commit, root }) {
   // Redirects from the source sections, with the section prefix.
   const redirects = [];
   for (const [base, destBase] of [
-    [GUIDE_SRC, GUIDE_DEST],
-    [TECH_SRC, TECH_DEST],
+    [layout.guide, GUIDE_DEST],
+    [layout.technical, TECH_DEST],
   ]) {
     const y = path.join(srcRoot, base, '.gitbook.yaml');
     if (!fs.existsSync(y)) continue;
@@ -701,7 +730,7 @@ function main() {
       );
       process.exit(1);
     }
-    console.log('wiki-sync --preflight: docs-site generates a clean 4thTech Docs copy.');
+    console.log('wiki-sync --preflight: the public docs generate a clean 4thTech Docs copy.');
     return;
   }
   if (args['latest-tag']) {
