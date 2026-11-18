@@ -4,7 +4,7 @@
 // Parallel calls never sign or reserve beyond the budget, and never sign one envelope twice.
 import { parseJson, type KeyStore } from '@4thtech-io/crypto';
 import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
-import type { BuiltRecord } from '@4thtech-io/chain';
+import type { BuiltRecord, ProofSubmitter } from '@4thtech-io/chain';
 import { createLogger } from '@4thtech-io/log';
 import { defaultPolicy, type Policy } from '@4thtech-io/types';
 import { wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
@@ -70,7 +70,10 @@ async function openAgent(n: number, owner: TestOwner, name: string): Promise<Age
   const cipher = new TestStoreCipher();
   type Mutable = { -readonly [K in keyof Agent]: Agent[K] };
   // `client`, `id` and `policyVersion` are filled in below, once the client exists.
-  const agent: Pick<Mutable, 'store' | 'cipher' | 'keyStore' | 'owner' | 'signed' | 'hook'> &
+  const agent: Pick<
+    Mutable,
+    'store' | 'cipher' | 'keyStore' | 'owner' | 'signed' | 'hook' | 'submitHook' | 'submits'
+  > &
     Partial<Mutable> = {
     store,
     cipher,
@@ -89,10 +92,10 @@ async function openAgent(n: number, owner: TestOwner, name: string): Promise<Age
         ...baseChain!,
         submitter: {
           ...baseChain!.submitter,
-          notarize: async (item, call) => {
+          notarize: async (item: Parameters<ProofSubmitter['notarize']>[0]) => {
             agent.submits += 1;
             await agent.submitHook?.();
-            return baseChain!.submitter.notarize(item, call);
+            return baseChain!.submitter.notarize(item);
           },
         },
       },
