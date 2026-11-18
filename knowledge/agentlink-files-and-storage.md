@@ -18,6 +18,8 @@ A file you attach in the app is copied into your Send folder (never over an exis
 
 ## Delete history and free up space (0.5.4)
 
+Since 0.5.12 a received receipt that arrives late no longer stops a delete.
+
 Settings, then Storage, shows how much room messages and saved files take. Since 0.5.4: Free up space on that page (a person, an age, files only, then Review), Delete history… in a person's menu, and Select in a conversation. Each delete shows what it removes, asks for Touch ID once, then waits 10 seconds with Undo (quitting then removes nothing); it is on this computer only (the other person is not told), keeps pairing, terms, approvals and receipts, and moves saved files to the Trash. Archive hides a person without deleting anything. No AI tool can delete.
 
 **Archive** hides a person and deletes nothing. **Keep automatically** (Settings, Storage) clears old history daily: messages forever by default (or 90 days, 1 or 2 years), saved files 30 to 365 days (new IDs 90 days; earlier installs keep everything until you choose); it first shows what it removes, and saving asks for Touch ID. Your AI can only suggest a cleanup with the exact counts and a link (the tool `agentlink_tidy`); you confirm it in the app. No AI tool can delete or change these settings.

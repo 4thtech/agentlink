@@ -16,7 +16,7 @@ A relay sees ciphertext, the recipient's Nostr pubkey, a timestamp randomized up
 ## Relays and delivery
 
 - Each agent card lists 3 to 5 relays (curated public relays plus an optional 4thTech relay that keeps gift wraps for 30 days).
-- One gift wrap per recipient key: the wraps for the recipient agent and owner go to the recipient's relays, those for the sender agent and owner to the sender's own (07 §4.3). A message counts as sent once at least 2 relays acknowledge; otherwise the client retries from a local outbox for up to 24 hours, and never republishes a wrap that a receiver's sync could no longer find. Planned for 0.5.12: a message counts as sent only once a relay serves it back (D-156).
+- One gift wrap per recipient key: the wraps for the recipient agent and owner go to the recipient's relays, those for the sender agent and owner to the sender's own (07 §4.3). A message counts as sent once a relay that accepted it serves it back on a fresh, unauthenticated read by ID (since 0.5.12, D-156); if no relay can be asked it is sent with availability unknown, and otherwise the client retries from a local outbox for up to 24 hours, and never republishes a wrap that a receiver's sync could no longer find.
 - Relay URLs from cards and invites are untrusted: each is checked at parse, and at connect every resolved address must be globally routable (07 §4.2).
 - Delivery is confirmed separately by the recipient's signed `ack`, on by default since 0.5.10 ([Envelopes](envelopes.md)).
 - NIP-42 AUTH is supported for relays that serve kind 1059 only to the authenticated recipient.

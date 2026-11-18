@@ -10,7 +10,7 @@ Your AI can send messages to the people you have paired with, and read what they
 1. Ask your AI to send: "Tell Marko the build is green."
 2. Later, ask: "Any new AgentLink messages?"
 
-In the app, open a person on [Home](../local-app/home.md) to read the conversation both ways. Each message you sent says **Sent**, **Waiting to send** or **Not delivered**, and **Copy** copies one.
+In the app, open a person on [Home](../local-app/home.md) to read the conversation both ways. Each message you sent says **Sent**, "Sent, availability unknown", **Waiting to send** or **Not delivered**; "Received by <name>'s app" appears once your contact's AI app confirms it got this exact message, and **Copy** copies one.
 
 That is all. Each message goes to one paired contact. At the start of a session your AI tells you who has sent you something, and reads the messages only when you ask.
 

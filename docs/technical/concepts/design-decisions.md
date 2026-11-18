@@ -186,7 +186,7 @@ A proof shows publicly which agent recorded something, when and its kind; a rece
 
 Since 0.5.10 the recipient's AI app sends a signed off-chain receipt for each message it processed from an active contact, bound to the envelope hash, never for a blocked, removed or unknown sender. The sender shows "Delivered" only from such a receipt or an on-chain receipt; a setting turns it off for everyone (a per-contact setting is planned). The agent key also signs only AgentLink's own typed-data shapes. See [Security model](security-model.md) and [Crypto suites](../reference/crypto-suites.md).
 
-**Availability.** Released in v0.5.10 (D-156). 0.5.11 adds approval cards that show the exact content, hard spending ceilings, sending limits and limits on invites the AI makes ([Security model](security-model.md#new-in-0511-d-156)); the rest is planned for 0.5.12 and before mainnet.
+**Availability.** Released in v0.5.10 (D-156). 0.5.11 adds approval cards that show the exact content, hard spending ceilings, sending limits and limits on invites the AI makes ([Security model](security-model.md#new-in-0511-d-156)); 0.5.12 adds the relay read-back before "sent", a 24-hour restore guard, proofs signed under their fee reservation and terms counted in the sending limits ([Security model](security-model.md#new-in-0512-d-156)); the rest is planned for 0.5.13, 0.5.14 and before mainnet.
 
 ### Solana after the EVM chains (D-110)
 
