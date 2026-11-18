@@ -21,6 +21,7 @@ import { InviteScreen } from '../invite/invite-screen.js';
 import { HomeScreen, type HomeScreenProps } from './home-screen.js';
 import { CONTACTS_STRINGS as C } from '../contacts/strings.js';
 import { HOME_STRINGS as S, fmt } from './people-strings.js';
+import { INBOX_STRINGS as I } from '../inbox/strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -1357,6 +1358,7 @@ describe('Files in the conversation and the reader (REL051-A34)', () => {
 // `files-<ref>` item. Opening, Show in Finder or "Mark as seen" in the conversation marks it read
 // through the existing mark route (the widget itself never writes).
 describe('New files are marked seen (WIDGET-POLISH-0511)', () => {
+  const SAVE = '/api/ui/files/save';
   const NOTES = '/api/ui/notifications';
   const READ = `/api/ui/notifications/files-${DENIS.contactId}/read`;
   const notes = (read: boolean): Answer =>
@@ -1404,6 +1406,76 @@ describe('New files are marked seen (WIDGET-POLISH-0511)', () => {
     await click(row('Denis'));
     expect(marks(s)).toHaveLength(0);
     await click(byText('button', S.showInFinder));
+    expect(marks(s)).toHaveLength(1);
+  });
+
+  it('Open on a received text file marks the new files seen', async () => {
+    const PLAN_ID = `${ENV_FILE}.00`;
+    const PREVIEW = `/api/ui/files/received/preview?id=${encodeURIComponent(PLAN_ID)}`;
+    const s = await render(
+      base({
+        [NOTES]: [notes(false), notes(true)],
+        [READ]: ok({ status: 'done' }),
+        [RECEIVED]: ok({
+          items: [
+            {
+              id: PLAN_ID,
+              from: 'Denis',
+              at: AT + 40,
+              name: 'plan.md',
+              size: 12,
+              state: 'saved',
+              savedName: 'plan.md',
+              proof: false,
+            },
+          ],
+        }),
+        [box(DENIS, 'in')]: ok({
+          items: [msg(ENV_FILE, 'The plan', AT + 40, { files: [{ name: 'plan.md', size: 12 }] })],
+        }),
+        [PREVIEW]: ok({ kind: 'markdown', size: 12, text: '# Plan\n' }),
+      }),
+    );
+    await click(row('Denis'));
+    expect(marks(s)).toHaveLength(0);
+    await click(byText('.hm-chip button', S.openFile));
+    expect(document.querySelector('[role="dialog"]')).toBeTruthy();
+    expect(marks(s)).toHaveLength(1);
+  });
+
+  it('Save to Inbox on a received file marks the new files seen', async () => {
+    const s = await render(
+      base({
+        [NOTES]: [notes(false), notes(true)],
+        [READ]: ok({ status: 'done' }),
+        [RECEIVED]: ok({
+          items: [
+            {
+              id: `${ENV_FILE}.00`,
+              from: 'Denis',
+              at: AT + 40,
+              name: 'logo-sketch-v1.png',
+              size: 1_200_000,
+              state: 'not_saved',
+              proof: false,
+            },
+          ],
+        }),
+        [SAVE]: ok({ status: 'saved' }),
+      }),
+    );
+    await click(row('Denis'));
+    expect(marks(s)).toHaveLength(0);
+    await click(byText('button', I.saveToInbox));
+    const input = q<HTMLInputElement>('.ib-save input');
+    expect(input).toBeTruthy();
+    await act(async () => {
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      set?.call(input, 'ABCD-EFGH-IJKL-MNOP');
+      input?.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await click(byText('button', I.confirmSave));
+    expect(s.calls.some((c) => c.url === SAVE && c.method === 'POST')).toBe(true);
     expect(marks(s)).toHaveLength(1);
   });
 
