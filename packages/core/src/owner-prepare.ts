@@ -57,6 +57,7 @@ export type PreparableOp =
   | 'contact.block'
   | 'contact.unblock'
   | 'contact.keep'
+  | 'invite.create'
   | 'agent.label'
   | 'app.connect'
   | 'app.disconnect'
@@ -74,6 +75,8 @@ const PREPARABLE: readonly string[] = [
   'contact.unblock',
   // SEC-INVITE-CAPS (D-156): the owner keeps a contact the AI connected (People, Home).
   'contact.keep',
+  // SEC-INVITE-CAPS (owner decision 18 Nov 2026): the owner's own invite (People, Get started).
+  'invite.create',
   // U3-d (D-138): the owner names this agent from the local app.
   'agent.label',
   // U3-f (D-138): the owner connects, moves or disconnects an AI app from the local app.
@@ -95,6 +98,7 @@ interface ParamsOf {
   readonly 'contact.block': ContactBlockParams;
   readonly 'contact.unblock': ContactBlockParams;
   readonly 'contact.keep': ContactBlockParams;
+  readonly 'invite.create': Record<string, never>;
   readonly 'agent.label': AgentLabelParams;
   readonly 'app.connect': AppChangeParams;
   readonly 'app.disconnect': AppChangeParams;

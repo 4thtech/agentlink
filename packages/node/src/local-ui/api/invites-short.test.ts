@@ -72,16 +72,6 @@ function desk(over: Partial<LocalUiInviteDesk> = {}) {
   const cancelled: string[] = [];
   const linked: string[] = [];
   const d: LocalUiInviteDesk = {
-    create: (input) => {
-      created.push(input);
-      return Promise.resolve<CreatedInvite>({
-        inviteId: INVITES_WORLD.inviteId,
-        inviteUrl: input.long === true ? LONG : SHORT,
-        format: input.long === true ? 'long' : 'short',
-        ownerFingerprint: { short: '7F3A·19C2', long: '7F3A19C2'.repeat(8) },
-        expiresAt: EXPIRES,
-      });
-    },
     check: (link) => {
       checked.push(link);
       return Promise.resolve<LocalUiCheckedInvite>({ contact: CONTACT, expiresAt: EXPIRES });
@@ -115,24 +105,62 @@ function desk(over: Partial<LocalUiInviteDesk> = {}) {
 const request = (): LocalUiRequest =>
   ({ method: 'GET', path: INVITES_PATH, query: new URLSearchParams(), input: undefined }) as never;
 
+// SEC-INVITE-CAPS: create is an owner route; the owner's presence signs one `invite.create`.
+function createWith() {
+  const created: unknown[] = [];
+  const port = {
+    prepareCreate: () =>
+      Promise.resolve({
+        status: 'prepared',
+        op: 'invite.create',
+        body: { op: 'invite.create', params: {} },
+        jcs: '{}',
+      }),
+    createOwner: (_signed: unknown, input: { label?: string; long?: true }) => {
+      created.push(input);
+      return Promise.resolve<CreatedInvite>({
+        inviteId: INVITES_WORLD.inviteId,
+        inviteUrl: input.long === true ? LONG : SHORT,
+        format: input.long === true ? 'long' : 'short',
+        ownerFingerprint: { short: '7F3A·19C2', long: '7F3A19C2'.repeat(8) },
+        expiresAt: EXPIRES,
+      });
+    },
+  };
+  const owner = {
+    sign: (_r: unknown, requests: readonly { kind: string; action?: unknown }[]) =>
+      Promise.resolve(
+        requests.map((r) => ({ kind: 'owner-action', signed: { body: r.action, sig: 'ab' } })),
+      ),
+  };
+  const create = (input?: unknown) =>
+    inviteCreateRoute.handler(
+      context({ invites: port as never }),
+      {
+        params: {},
+        query: new URLSearchParams(),
+        ...(input === undefined ? {} : { input }),
+      } as never,
+      owner as never,
+    );
+  return { created, create };
+}
+
 describe('create (D-139 (7))', () => {
   it('answers the short link and its format; `long: true` asks for the long link', async () => {
-    const d = desk();
-    const short = await inviteCreateRoute.handler(context(), {}, d.desk);
+    const d = createWith();
+    const short = await d.create();
     expect(short.status).toBe(200);
-    expect(short.body).toMatchObject({ status: 'ok', inviteUrl: SHORT, format: 'short' });
-    const long = await inviteCreateRoute.handler(context(), { long: true, label: 'Bo' }, d.desk);
+    expect(short.body).toMatchObject({ status: 'done', inviteUrl: SHORT, format: 'short' });
+    const long = await d.create({ long: true, label: 'Bo' });
     expect(long.body).toMatchObject({ inviteUrl: LONG, format: 'long' });
     expect(d.created).toEqual([{}, { label: 'Bo', long: true }]);
   });
 
   it('refuses `long` other than true', async () => {
-    const d = desk();
-    for (const body of [{ long: false }, { long: 'yes' }, { long: 1 }] as unknown as JsonObject[]) {
-      expect(await inviteCreateRoute.handler(context(), body, d.desk)).toEqual({
-        status: 400,
-        body: { error: 'invalid' },
-      });
+    const d = createWith();
+    for (const body of [{ long: false }, { long: 'yes' }, { long: 1 }]) {
+      expect(await d.create(body)).toEqual({ status: 400, body: { error: 'invalid' } });
     }
     expect(d.created).toHaveLength(0);
   });
@@ -297,6 +325,8 @@ describe('check and accept a short link (04 §3.6.2)', () => {
     const resolved: string[] = [];
     const seen: string[] = [];
     const port: LocalUiInviteAcceptPort = {
+      prepareCreate: () => Promise.reject(new Error('unused')),
+      createOwner: () => Promise.reject(new Error('unused')),
       resolve: (link) => {
         resolved.push(link);
         return Promise.resolve(LONG);

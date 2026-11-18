@@ -853,6 +853,18 @@
           "maxLength": 2048,
           "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/"
         },
+        "limit": {
+          "type": "string",
+          "enum": ["messages_contact", "messages_day", "files_contact", "files_day", "file_mb_day"]
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "retryAt": {
+          "type": "string",
+          "maxLength": 64
+        },
         "candidates": {
           "type": "array",
           "items": {
@@ -1177,6 +1189,14 @@
           "type": "string",
           "maxLength": 2048,
           "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/"
+        },
+        "ceiling": {
+          "type": "string",
+          "enum": ["per_action", "daily"]
+        },
+        "limitUsd": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,6})?$"
         },
         "candidates": {
           "type": "array",
@@ -1504,6 +1524,14 @@
           "type": "string",
           "maxLength": 2048,
           "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/"
+        },
+        "ceiling": {
+          "type": "string",
+          "enum": ["per_action", "daily"]
+        },
+        "limitUsd": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,6})?$"
         }
       },
       "required": ["status", "summary"],
@@ -2209,6 +2237,14 @@
           "type": "string",
           "maxLength": 2048,
           "pattern": "^https://pay\\.agentlink\\.4thtech\\.io/"
+        },
+        "ceiling": {
+          "type": "string",
+          "enum": ["per_action", "daily"]
+        },
+        "limitUsd": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,6})?$"
         }
       },
       "required": ["status", "summary"],

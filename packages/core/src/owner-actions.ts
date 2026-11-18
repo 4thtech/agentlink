@@ -1788,6 +1788,18 @@ export class OwnerActions {
     return this.#build(signer, op, { contact: contactId });
   }
 
+  /**
+   * SEC-INVITE-CAPS (owner decision 18 Nov 2026): the unsigned `invite.create` `{}` for the local
+   * app's Create invite (the owner's presence signs it; client.createOwnerInvite verifies it).
+   */
+  async prepareInviteCreate(): Promise<PreparedOwnerAction> {
+    const signer = await this.#signer();
+    if ('refusal' in signer) {
+      return { status: 'refused', op: 'invite.create', reason: signer.refusal } as const;
+    }
+    return this.#build(signer, 'invite.create', {});
+  }
+
   async #prepareContactBlock(
     op: 'contact.block' | 'contact.unblock',
     contactId: string,

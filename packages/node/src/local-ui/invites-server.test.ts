@@ -193,6 +193,35 @@ async function harness(): Promise<Harness> {
     },
     ownerActions: {
       loadPolicy: () => Promise.resolve({ mode: 'fail_closed', problem: 'missing' }),
+      // SEC-INVITE-CAPS: the unsigned `invite.create` the owner's presence signs.
+      prepareInviteCreate: () => {
+        const issuedAt = Math.floor(Date.now() / 1000);
+        const body = {
+          v: 1,
+          agent: world.agentId,
+          owner: encodeHex(world.owner.ownerNostr),
+          op: 'invite.create',
+          params: {},
+          nonce: 'BBBBBBBBBBBBBBBBBBBBBB',
+          issuedAt,
+          expiresAt: issuedAt + 600,
+        };
+        return Promise.resolve({ status: 'prepared', op: 'invite.create', body, jcs: '' });
+      },
+    },
+    // SEC-INVITE-CAPS: core verifies the owner's `invite.create` before it makes the invite.
+    createOwnerInvite: (signed: { body: JsonObject; sig: string }, input: unknown) => {
+      if (!ownerSigValid(world.owner, signed.body, signed.sig)) {
+        return Promise.reject(new Error('not confirmed'));
+      }
+      core.created.push(input);
+      return Promise.resolve({
+        inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
+        inviteUrl: LINK,
+        format: 'long',
+        ownerFingerprint: { short: 'EF56·7890', long: 'EF567890'.repeat(8) },
+        expiresAt: 1_793_786_400,
+      });
     },
     approvalService: {
       findOpen: () => Promise.resolve(undefined),
@@ -312,70 +341,45 @@ const GATE_VARIANTS: [Record<string, string>, readonly string[], number][] = [
   [{ 'Content-Type': 'application/json' }, [], 415],
 ];
 
-describe('create an invite: no owner presence, its own gate (UX2-d1, decision 1.1)', () => {
-  it('creates with no owner presence and no owner store, answering the link only to the page', async () => {
+// SEC-INVITE-CAPS (owner decision 18 Nov 2026): Create invite is an owner route: the owner's
+// presence signs one `invite.create`, which core verifies before it makes the invite.
+describe('create an invite: owner presence required (SEC-INVITE-CAPS)', () => {
+  it('refuses without owner presence, or with a wrong code, before anything is made', async () => {
     const h = await harness();
-    const res = await h.post(INVITE_CREATE_PATH, json({ label: 'Marko' }));
+    const none = await h.post(INVITE_CREATE_PATH, undefined, {
+      'X-AgentLink-Input': input({ label: 'Marko' }),
+    });
+    expect(none.status).toBe(403);
+    expect(JSON.parse(none.body)).toEqual({ status: 'presence_required' });
+    const wrong = await h.post(INVITE_CREATE_PATH, encodeUtf8('AAAA BBBB CCCC DDDD EEEE FFFF'), {
+      'X-AgentLink-Input': input({ label: 'Marko' }),
+    });
+    expect(wrong.status).toBe(403);
+    expect(h.core.created).toHaveLength(0);
+  });
+
+  it('with the master code: one invite.create by the owner key, then the invite, to the page only', async () => {
+    const h = await harness();
+    const res = await h.post(INVITE_CREATE_PATH, encodeUtf8(world.code), {
+      'X-AgentLink-Input': input({ label: 'Marko' }),
+    });
     expect(res.status).toBe(200);
     expect(JSON.parse(res.body)).toMatchObject({
-      status: 'ok',
+      status: 'done',
       inviteUrl: LINK,
       ownerFingerprint: 'EF56·7890',
       expiresAt: '2026-11-04T10:00:00Z',
     });
-    expect(String(res.headers['cache-control'])).toContain('no-store');
     expect(h.core.created).toEqual([{ label: 'Marko' }]);
-    expect(h.core.ownerStores).toBe(0);
   });
 
-  it('needs the session, CSRF, Origin, same-origin metadata and an octet-stream body', async () => {
+  it('needs the session, CSRF, Origin and same-origin metadata too', async () => {
     const h = await harness();
     for (const [extra, omit, status] of GATE_VARIANTS) {
-      const res = await h.post(INVITE_CREATE_PATH, json({}), extra, omit);
+      const res = await h.post(INVITE_CREATE_PATH, encodeUtf8(world.code), extra, omit);
       expect(res.status, JSON.stringify({ extra, omit })).toBe(status);
     }
-    const get = await send(h.port, INVITE_CREATE_PATH);
-    expect([401, 405]).toContain(get.status);
     expect(h.core.created).toHaveLength(0);
-  });
-
-  it('refuses a query, an operation input or a presence header before anything runs', async () => {
-    const h = await harness();
-    for (const [extra, path] of [
-      [{ 'X-AgentLink-Input': input({ label: 'x' }) }, INVITE_CREATE_PATH],
-      [{ 'X-AgentLink-Presence': 'passkey' }, INVITE_CREATE_PATH],
-      [{}, `${INVITE_CREATE_PATH}?label=Marko`],
-    ] as const) {
-      const res = await h.post(path, json({}), extra);
-      expect(res.status, path).toBe(400);
-      expect(JSON.parse(res.body)).toEqual({ error: 'invalid' });
-    }
-    expect(h.core.created).toHaveLength(0);
-  });
-
-  it('refuses a body that is not strict JSON, or an oversized one', async () => {
-    const h = await harness();
-    for (const raw of ['', 'not json', '{"label":"a","label":"b"}', '[]', 'null']) {
-      const res = await h.post(INVITE_CREATE_PATH, encodeUtf8(raw));
-      expect(res.status, raw).toBe(400);
-    }
-    const big = await h.post(INVITE_CREATE_PATH, json({ label: 'x'.repeat(4096) }));
-    expect(big.status).toBe(413);
-    expect(h.core.created).toHaveLength(0);
-  });
-
-  it('is rate-limited: at most 10 invites in 10 minutes, then 429 with Retry-After', async () => {
-    const h = await harness();
-    for (let i = 0; i < 10; i += 1) {
-      expect((await h.post(INVITE_CREATE_PATH, json({}))).status, String(i)).toBe(200);
-    }
-    const held = await h.post(INVITE_CREATE_PATH, json({}));
-    expect(held.status).toBe(429);
-    expect(JSON.parse(held.body)).toMatchObject({ error: 'wait' });
-    expect(Number(held.headers['retry-after'])).toBeGreaterThan(0);
-    expect(h.core.created).toHaveLength(10);
-    h.setNow(1_790_000_000_000 + 10 * 60_000 + 1);
-    expect((await h.post(INVITE_CREATE_PATH, json({}))).status).toBe(200);
   });
 });
 
@@ -595,7 +599,13 @@ describe('the invite link is never logged (UX2-d1, I-7)', () => {
     }
     const h = await harness();
     const answers: string[] = [];
-    answers.push((await h.post(INVITE_CREATE_PATH, json({ label: 'Marko' }))).body);
+    answers.push(
+      (
+        await h.post(INVITE_CREATE_PATH, encodeUtf8(world.code), {
+          'X-AgentLink-Input': input({ label: 'Marko' }),
+        })
+      ).body,
+    );
     answers.push((await h.post(INVITE_CHECK_PATH, json({ invite: LINK }))).body);
     answers.push((await h.post(INVITE_CHECK_PATH, json({ invite: `${LINK}x!` }))).body);
     answers.push((await h.post(INVITE_CHECK_PATH, json({ invite: SSRF_LINK }))).body);

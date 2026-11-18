@@ -46,6 +46,7 @@ interface Call {
   url: string;
   method: string;
   body: string;
+  input: string | null;
 }
 let host: HTMLElement;
 let root: Root;
@@ -59,6 +60,7 @@ const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit) => {
   calls.push({
     url,
     method,
+    input: new Headers(init?.headers).get('X-AgentLink-Input'),
     body:
       raw === undefined || raw === null
         ? ''
@@ -72,7 +74,8 @@ const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit) => {
 
 const LINK = `https://agentlink.4thtech.io/i#2.${'A'.repeat(43)}`;
 const MADE = {
-  status: 'ok',
+  // SEC-INVITE-CAPS: Create invite is an owner route; it answers `done`.
+  status: 'done',
   inviteUrl: LINK,
   shareText: `Hi: ${LINK}`,
   ownerFingerprint: 'ABCD·EF01',
@@ -120,8 +123,50 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function settle(): Promise<void> {
+async function settleOnly(): Promise<void> {
   for (let i = 0; i < 8; i += 1) {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  }
+}
+
+async function settle(): Promise<void> {
+  await settleOnly();
+  await confirmCreate();
+  await settleOnly();
+}
+
+/**
+ * SEC-INVITE-CAPS (owner decision 18 Nov 2026): the invite panel makes a link only when the owner
+ * confirms Create invite; here with the master code (the fake invite API ignores the proof).
+ */
+async function confirmCreate(): Promise<void> {
+  const buttons = (): HTMLButtonElement[] => [...document.body.querySelectorAll('button')];
+  const start = buttons().find(
+    (b) => (b.textContent ?? '').trim() === 'Create invite with your master code',
+  );
+  if (start === undefined) return;
+  await act(async () => start.click());
+  for (let i = 0; i < 3; i += 1) {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  }
+  const input = document.body.querySelector<HTMLInputElement>('input[name="owner-code"]');
+  if (input === null) return;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+      input,
+      'ABCD-EFGH',
+    );
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const confirm = buttons().find(
+    (b) => (b.textContent ?? '').trim() === 'Confirm with your master code',
+  );
+  await act(async () => confirm?.click());
+  for (let i = 0; i < 6; i += 1) {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
     });
@@ -295,32 +340,29 @@ describe('WP-1 R-2: an invite while the names differ asks for the update first',
     );
   }
 
+  // SEC-INVITE-CAPS: the panel reads the card name before Create, so nothing is made first.
   it('Update name, one gesture, then the invite is made', async () => {
-    answers['POST /api/ui/invites'] = {
-      status: 409,
-      body: { error: 'name_update_needed', cardName: 'cc-test', label: 'macbook-agent-1' },
-    };
+    answers['POST /api/ui/invites'] = { status: 200, body: MADE };
     await mountPanel();
     expect(plain(host)).toContain('Your invites still show cc-test');
     expect(plain(host)).not.toContain(LINK);
-    answers['POST /api/ui/invites'] = { status: 200, body: MADE };
+    expect(posts('/api/ui/invites')).toHaveLength(0);
     await click(button(host, 'Update name with your master code'));
     await confirmWithCode();
+    await settle();
     expect(posts('/api/ui/agents/label')).toHaveLength(1);
-    expect(posts('/api/ui/invites').length).toBe(2);
+    expect(posts('/api/ui/invites').length).toBe(1);
     expect(plain(host)).toContain(LINK);
   });
 
   it('"Invite as {cardName}" makes it under the old name (oldName: true)', async () => {
-    answers['POST /api/ui/invites'] = {
-      status: 409,
-      body: { error: 'name_update_needed', cardName: 'cc-test', label: 'macbook-agent-1' },
-    };
-    await mountPanel();
     answers['POST /api/ui/invites'] = { status: 200, body: MADE };
+    await mountPanel();
     await click(button(host, 'Invite as cc-test'));
     const last = posts('/api/ui/invites').at(-1);
-    expect(JSON.parse(last?.body ?? '{}')).toEqual({ oldName: true });
+    const sent = last?.input ?? '';
+    const decoded = atob(sent.replace(/-/g, '+').replace(/_/g, '/'));
+    expect(JSON.parse(decoded)).toEqual({ oldName: true });
     expect(posts('/api/ui/agents/label')).toHaveLength(0);
     expect(plain(host)).toContain(LINK);
   });

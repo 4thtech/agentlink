@@ -125,15 +125,14 @@
 //   object of allowlisted booleans (`underTheHood`, `menuExpanded`), at most 128 bytes. No owner
 //   presence, no owner store, nothing signed, no generation (it is the app's, not an agent's); the
 //   app host writes only `~/.agentlink/ui-settings.json`. Its read answers with no agent open too.
-// - UX2-d1 (owner decision 1.1; proposed in 08 §1, owner confirms at merge), creating an invite and
-//   checking a pasted one: the two `presence: 'invite'` routes are run by `inviteGate`, never by
-//   `ownerGate`. After the same session, CSRF, Origin, fetch-metadata and octet-stream checks, no
-//   query, operation input or presence header; the body is one strict JSON object (1 KiB for create,
-//   22 KiB for check). Create is limited to INVITE_CREATE_LIMIT per INVITE_CREATE_WINDOW_MS
-//   (429 `wait`). The handler gets only that object and the invite desk (local-ui/context.ts): no
-//   owner presence, no owner store, nothing signed. The body (a pasted link holds the invite
-//   secret) is wiped after the handler, and nothing here logs it. Accepting an invite is an ordinary
-//   owner route behind `ownerGate`.
+// - UX2-d1 (owner decision 1.1; proposed in 08 §1, owner confirms at merge), checking a pasted invite
+//   (and Cancel, Copy link, Not now): the `presence: 'invite'` routes are run by `inviteGate`, never
+//   by `ownerGate`. After the same session, CSRF, Origin, fetch-metadata and octet-stream checks, no
+//   query, operation input or presence header; the body is one strict JSON object (22 KiB for
+//   check). The handler gets only that object and the invite desk (local-ui/context.ts): no owner
+//   presence, no owner store, nothing signed. The body (a pasted link holds the invite secret) is
+//   wiped after the handler, and nothing here logs it. Creating an invite (SEC-INVITE-CAPS, owner
+//   decision 18 Nov 2026) and accepting one are ordinary owner routes behind `ownerGate`.
 // - M1-11s-c, owner setup on the first-run page (D-120 (1); proposed, owner confirms at merge): the
 //   two `presence: 'setup'` routes (begin, finish) are run by `setupGate`, never by `ownerGate`
 //   (which is unchanged). After the same session, CSRF, Origin, fetch-metadata and octet-stream
@@ -637,9 +636,6 @@ const REVEAL_ITEM_ID = /^[A-Za-z0-9_-]{1,64}\.[0-9]{2}$/;
 const MAX_INVITE_CHECK_BODY_BYTES = 22_528;
 /** UX2-d1: the largest create body: `{"label":"<name>"}`, a name of at most 128 characters. */
 const MAX_INVITE_CREATE_BODY_BYTES = 1_024;
-/** UX2-d1: at most this many invites created per window, per server (a store and spam bound). */
-const INVITE_CREATE_LIMIT = 10;
-const INVITE_CREATE_WINDOW_MS = 10 * 60_000;
 /** ATT-APP-ATTACH: at most this many attached messages per window, per server (then 429 `wait`). */
 const ATTACH_LIMIT = 20;
 const ATTACH_WINDOW_MS = 60_000;
@@ -1874,8 +1870,6 @@ export async function startApprovalServerWith(
   });
   /** UX2-d1: the invite desk of the invite-kind routes (never reachable from another route). */
   let invitesDesk = agentUi?.client === undefined ? undefined : inviteDesk(agentUi.client);
-  /** UX2-d1: when each recent invite was created (ms), oldest first, for the create limit. */
-  const invitesCreated: number[] = [];
   /** ATT-APP-ATTACH: the attach desk of the attach route (never reachable from another route). */
   const attachDeskOf = (ui: typeof agentUi) =>
     ui?.client === undefined
@@ -7095,23 +7089,6 @@ export async function startApprovalServerWith(
       sendJson(res, 400, { error: 'invalid' });
       return;
     }
-    if (route.step === 'create') {
-      const at = now();
-      while (
-        invitesCreated.length > 0 &&
-        (invitesCreated[0] as number) <= at - INVITE_CREATE_WINDOW_MS
-      ) {
-        invitesCreated.shift();
-      }
-      if (invitesCreated.length >= INVITE_CREATE_LIMIT) {
-        const oldest = invitesCreated[0] as number;
-        const retryAfter = Math.max(1, Math.ceil((oldest + INVITE_CREATE_WINDOW_MS - at) / 1000));
-        req.resume();
-        res.setHeader('Retry-After', String(retryAfter));
-        sendJson(res, 429, { error: 'wait', retryAfter });
-        return;
-      }
-    }
     const body = await boundedBody(
       req,
       res,
@@ -7135,7 +7112,6 @@ export async function startApprovalServerWith(
         agentChanged(res);
         return;
       }
-      if (route.step === 'create') invitesCreated.push(now());
       let result: LocalUiResult;
       try {
         result = await route.handler(uiContext, parsed as JsonObject, invitesDesk);

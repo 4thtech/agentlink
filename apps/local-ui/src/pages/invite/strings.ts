@@ -14,6 +14,12 @@ export const INVITE_STRINGS = {
   nameInvalid: 'Use letters, numbers and spaces, up to 32.',
   linkLabel: 'Invite link',
   making: 'Making your link…',
+  // SEC-INVITE-CAPS (owner decision 18 Nov 2026; 11 §5.12): the owner confirms each invite.
+  createStatement:
+    'Create an invite from you. Whoever uses it first is connected with this ID as your contact.',
+  createWith: (sensor: string): string => `Create invite with ${sensor}`,
+  createWithCode: 'Create invite with your master code',
+  createLong: 'Make it a long link (nothing stored on the AgentLink service)',
   copy: 'Copy',
   copied: 'Copied',
   copiedAnnounce: 'Invite link copied',

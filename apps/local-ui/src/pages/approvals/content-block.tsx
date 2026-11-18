@@ -9,6 +9,7 @@
 //   approve"); the owner shows it once before Approve is enabled (the card asks `needsExpand`).
 // - Each file: name, size, type. Check codes (>= 80 bits) are labelled "Check code"; the other side
 //   can compare them.
+import { InlineError } from '@4thtech-io/ui';
 import type { ReactElement } from 'react';
 import { inertText, type ApprovalContent } from '@4thtech-io/types/ui-contract/approval-content';
 import { APPROVAL_STRINGS as S, fmt } from './strings.js';
@@ -100,8 +101,9 @@ export function ContentBlock({
 /** The card's notice when the content could not be shown: it is never approved (fail closed). */
 export function ContentMissing(): ReactElement {
   return (
-    <p className="al-content-missing" role="alert">
-      {S.contentMissing}
-    </p>
+    // N1: the shared notice component (no page-made live region).
+    <div className="al-content-missing">
+      <InlineError>{S.contentMissing}</InlineError>
+    </div>
   );
 }
