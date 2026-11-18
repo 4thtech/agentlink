@@ -140,7 +140,8 @@ export async function acceptInviteHandler(
       }
     }
 
-    await invites.start(inviteUrl);
+    // SEC-INVITE-CAPS: without an owner approval (policy `auto`), the AI's own accept.
+    await invites.start(inviteUrl, decision === 'allow');
     const sent = await invites.publish();
     return ok(sent ? INVITE_TEXT.accepted : INVITE_TEXT.acceptedOffline, {
       nextStep: INVITE_TEXT.acceptedNextStep,

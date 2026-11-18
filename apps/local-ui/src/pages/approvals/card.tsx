@@ -27,6 +27,12 @@
 // The card holds "Denied." and every fact (faded, as before), then collapses out (reduced motion:
 // removed at once) and the page keeps "Denied: <summary>". A refused, expired or failed attempt and
 // an open sheet keep the card. The line is built from the core's summary only, as React text (I-5).
+//
+// SEC-CARD-FULLTEXT (08 §1; 11 §5, §6.2.1): the card is decidable from what the app decoded itself.
+// The exact content (content-block.tsx) follows the facts: full inert text, files and check codes;
+// a long text must be shown once before Approve is enabled. A request whose content could not be
+// shown has no Approve (the server refuses it too). "From your AI" is folded and captioned as not
+// needed to decide. The master code step names who and the cost.
 import {
   Button,
   RingMeter,
@@ -55,6 +61,7 @@ import { ForgotCodeLink } from '../start-over/forgot-link.js';
 import { normaliseBackupCode, UseCodeInstead } from '../first-run/backup-code.js';
 import { APPROVAL_STRINGS as S, fmt } from './strings.js';
 import { isPlumbing, TermsDetails, TermsSummary } from './terms-view.js';
+import { ContentBlock, ContentMissing, needsExpand } from './content-block.js';
 
 /** The owner as the page knows it: set up or not, and the decision passkey when registered. */
 export interface OwnerState {
@@ -199,10 +206,25 @@ export function Statuses({ lines }: { lines: readonly string[] }): ReactElement 
   );
 }
 
-/** The card's content: headline, facts, terms, then what the AI chose (marked as theirs). */
-export function ApprovalFacts({ item }: { item: ApprovalItem }): ReactElement {
+/**
+ * The card's content: headline, facts, terms, the exact content (SEC-CARD-FULLTEXT), then what the
+ * AI chose (marked as theirs, folded: not needed to decide). `expanded` / `onExpand` let the card
+ * know a long content was shown; without them the block keeps its own state.
+ */
+export function ApprovalFacts({
+  item,
+  expanded,
+  onExpand,
+}: {
+  item: ApprovalItem;
+  expanded?: boolean;
+  onExpand?: () => void;
+}): ReactElement {
   const d = item.details;
   const hood = useHood();
+  const [ownExpanded, setOwnExpanded] = useState(false);
+  const shown = expanded ?? ownExpanded;
+  const expand = onExpand ?? (() => setOwnExpanded(true));
   const fromAi =
     d === undefined
       ? []
@@ -241,21 +263,28 @@ export function ApprovalFacts({ item }: { item: ApprovalItem }): ReactElement {
           {d.terms !== undefined && d.terms.length > 0 ? (
             <TermsDetails lines={d.terms} showAdvanced={hood} />
           ) : null}
+          {d.content === undefined ? null : (
+            <ContentBlock content={d.content} expanded={shown} onExpand={expand} />
+          )}
+          {d.contentMissing === true ? <ContentMissing /> : null}
           {/* Ids, hashes and flags are plumbing: Under the hood only (11 §5). */}
           {fromAi.length > 0 ? (
-            <figure className="al-untrusted" role="group" aria-label={S.fromAi}>
-              <figcaption className="al-untrusted-label">{S.fromAi}</figcaption>
-              <dl className="al-untrusted-body">
-                {fromAi.map((f, i) => (
-                  <div key={i}>
-                    <dt>{f.name}</dt>
-                    <dd>
-                      <pre>{f.value}</pre>
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </figure>
+            <details className="al-from-ai">
+              <summary>{S.fromAiNotNeeded}</summary>
+              <figure className="al-untrusted" role="group" aria-label={S.fromAi}>
+                <figcaption className="al-untrusted-label">{S.fromAi}</figcaption>
+                <dl className="al-untrusted-body">
+                  {fromAi.map((f, i) => (
+                    <div key={i}>
+                      <dt>{f.name}</dt>
+                      <dd>
+                        <pre>{f.value}</pre>
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </figure>
+            </details>
           ) : null}
         </>
       )}
@@ -578,6 +607,11 @@ export function SingleApproval({
   const [paying, setPaying] = useState(false);
   const [outcome, setOutcome] = useState<'approved' | 'denied' | undefined>(undefined);
   const [reviewing, setReviewing] = useState(false);
+  // SEC-CARD-FULLTEXT: a long content is shown once before Approve; content that could not be
+  // shown is never approved (no Approve at all).
+  const [contentShown, setContentShown] = useState(false);
+  const mustExpand = needsExpand(item.details?.content) && !contentShown;
+  const noContent = item.details?.contentMissing === true;
   const reviewId = useId();
   const say = (text: string): void => setLines((l) => [...l, text]);
 
@@ -648,9 +682,11 @@ export function SingleApproval({
   // IR-N3-1 #1: terms commit the owner, so on the compact card Approve is offered only once Review
   // shows every line of them; Deny needs no Review.
   const termsHidden = compact && item.commitment && !reviewing;
+  // SEC-CARD-FULLTEXT: the same for exact content: Approve only once Review shows it.
+  const contentHidden = compact && item.details?.content !== undefined && !reviewing;
   const open = (decision: Decision): void => {
     if (flight.current) return;
-    if (decision === 'approve' && termsHidden) return;
+    if (decision === 'approve' && (termsHidden || contentHidden || mustExpand || noContent)) return;
     // M1-PAY-CONFIRM-b: approving a request that costs credits is the confirmation sheet's.
     if (item.paid && decision === 'approve') {
       setPaying(true);
@@ -666,7 +702,7 @@ export function SingleApproval({
 
   const full = (
     <>
-      <ApprovalFacts item={item} />
+      <ApprovalFacts item={item} expanded={contentShown} onExpand={() => setContentShown(true)} />
       {item.commitment ? <p className="al-note">{S.termsAlone}</p> : null}
       {item.paid ? <p className="al-note">{S.paidAlone}</p> : null}
     </>
@@ -692,11 +728,11 @@ export function SingleApproval({
                 {proof === undefined ? S.deny : fmt(S.denyWith, { sensor })}
               </Button>
               {/* F30/F31: while the code step is open, its button is the one orange button. */}
-              {termsHidden ? null : (
+              {termsHidden || contentHidden || noContent ? null : (
                 <Button
                   {...(step === undefined ? { variant: 'primary' as const } : {})}
                   size="lg"
-                  disabled={reading}
+                  disabled={reading || mustExpand}
                   {...(proof?.kind === 'native' && !item.paid ? { 'data-native-confirm': '' } : {})}
                   onClick={() => open('approve')}
                 >
@@ -730,7 +766,17 @@ export function SingleApproval({
                 setStep(undefined);
                 setActions(true);
               }}
-            />
+            >
+              {/* SEC-CARD-FULLTEXT: the code step names who and the cost it confirms. */}
+              {item.details === undefined ? null : (
+                <p className="al-text-body-sm">
+                  {fmt(step === 'approve' ? S.confirmWho : S.confirmWhoDeny, {
+                    who: item.details.who,
+                    cost: item.details.cost,
+                  })}
+                </p>
+              )}
+            </CodeStep>
           )}
         </div>
         {compact ? (

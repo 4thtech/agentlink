@@ -111,7 +111,7 @@ export const CONTACT_B = '0x' + '4e'.repeat(20);
 /**
  * The 06 §3 defaults in the policy JSON form, transcribed by hand from the YAML listing of
  * docs/foundation/06-mcp-server.md §3 and its "The defaults" bullet: `contacts.allowed: "paired"`,
- * empty arrays, the USD values "5", "1" and "0", `autoAcceptMinUSD: null`, `contactRules: []`.
+ * empty arrays, the USD values "5", "0.2", "0.5", "10" and "0", `autoAcceptMinUSD: null`, `contactRules: []`.
  */
 export const policyDefaultsFromSpec = () => ({
   contacts: {
@@ -136,10 +136,13 @@ export const policyDefaultsFromSpec = () => ({
   proofs: {
     notarize: 'allow',
     dailyBudgetUSD: '5',
-    perActionMaxUSD: '1',
+    perActionMaxUSD: '0.2',
     allowKeyDisclosure: 'approval',
     exportFolder: '~/AgentLink/Proofs',
     defaultChain: 'base',
+    // SEC-HARD-CEILING (D-156): the owner's hard ceilings, refused above, never asked.
+    hardMaxPerActionUSD: '0.5',
+    hardDailyUSD: '10',
   },
   receipts: {
     autoDelivered: false,
@@ -156,6 +159,14 @@ export const policyDefaultsFromSpec = () => ({
   history: {
     messagesKeepDays: 0,
     filesKeepDays: 0,
+  },
+  // SEC-OUTBOUND-CAPS (D-156): rolling 24 h caps on outgoing messages and files.
+  outgoing: {
+    messagesPerContactPerDay: 300,
+    messagesPerDay: 1000,
+    filesPerContactPerDay: 50,
+    filesPerDay: 200,
+    fileMBPerDay: 2000,
   },
   contactRules: [],
 });

@@ -63,6 +63,8 @@ export type ActivityItem =
   | { readonly kind: 'contact_blocked'; readonly at: number; readonly contactId?: string }
   | { readonly kind: 'contact_unblocked'; readonly at: number; readonly contactId?: string }
   | { readonly kind: 'contact_checked'; readonly at: number; readonly contactId?: string }
+  // SEC-INVITE-CAPS: the owner kept a contact the AI connected.
+  | { readonly kind: 'contact_kept'; readonly at: number; readonly contactId?: string }
   | { readonly kind: 'contact_removed'; readonly at: number; readonly contactId?: string }
   | { readonly kind: 'contact_revoked'; readonly at: number; readonly contactId?: string }
   // R1-SEC-03 (04 §3.6): someone else also answered the invite this contact used.
@@ -206,6 +208,7 @@ export function parseItem(raw: unknown): ActivityItem | undefined {
     case 'contact_blocked':
     case 'contact_unblocked':
     case 'contact_checked':
+    case 'contact_kept':
     case 'contact_removed':
     case 'contact_revoked':
     case 'invite_answered_twice':
@@ -571,6 +574,16 @@ export function render(item: ActivityItem, nameOf: NameOf, whenText: string): Re
         pill: S.pillBlocked,
         link: link(S.linkPeople, '/contacts'),
       });
+    case 'contact_kept':
+      return build({
+        icon: 'user-plus',
+        tone: 'neutral',
+        sentence: names(S.contactKept, item.contactId),
+        grey: S.contactKeptLine,
+        pill: S.pillKept,
+        link: link(S.linkPeople, '/contacts'),
+        words: 'kept',
+      });
     case 'contact_unblocked':
       return build({
         icon: 'ban',
@@ -766,6 +779,7 @@ const SAFETY_KINDS: ReadonlySet<string> = new Set([
   'contact_blocked',
   'contact_unblocked',
   'contact_checked',
+  'contact_kept',
   'backup_saved',
 ]);
 

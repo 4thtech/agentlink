@@ -200,12 +200,17 @@ export {
   BUDGET_WINDOW_SECONDS,
   FAIL_CLOSED_CONTACTS,
   FAIL_CLOSED_LIMITS,
+  FAIL_CLOSED_OUTGOING,
+  FAIL_CLOSED_PROOF_CEILINGS,
   POLICY_DEFAULTS_EFFECTIVE,
   budgetSpentMicros,
   evaluate,
   evaluateFileSend,
+  evaluateOutgoing,
   evaluateProof,
+  outgoingCaps,
   policyLimits,
+  proofCeilings,
   type BudgetEntryView,
   type BudgetLedgerView,
   type EffectivePolicy,
@@ -219,10 +224,22 @@ export {
   type PolicyDocument,
   type PolicyLimits,
   type PolicyProblem,
+  type OutgoingAction,
+  type OutgoingEvaluation,
+  type OutgoingLimit,
+  type OutgoingUsage,
   type ProofAction,
+  type ProofCeiling,
   type ProofEvaluation,
   type ProofTrigger,
 } from './policy-engine.js';
+// SEC-OUTBOUND-CAPS (D-156): the outgoing usage over the rolling 24 h window, read in a transaction.
+export {
+  OUTGOING_WINDOW_SECONDS,
+  outgoingUsage,
+  recordOutgoing,
+  type OutgoingUsageDetail,
+} from './outgoing-limits.js';
 export {
   checkAndReserveProof,
   readBudgetLedger,
@@ -277,8 +294,10 @@ export {
   FILE_TOO_LARGE,
   PAYLOAD_TOO_LARGE,
   POLICY_DENIED,
+  SEND_LIMIT,
   SEND_TOOL,
   USE_TERMS_TOOLS,
+  type SendLimitRefusal,
   type SendMessageInput,
   type SendDelivery,
   type SendMessageResult,
@@ -532,6 +551,7 @@ export {
   type ProofRejected,
   type ProofService,
   type ProofServiceDeps,
+  type ApprovalEnvelopeContent,
   type ProofView,
   type ResubmitSummary,
 } from './proofs/service.js';
@@ -549,7 +569,13 @@ export {
   type TermsSnapshot,
 } from './terms-store.js';
 export { type CommitmentPartRow } from './approvals.js';
-export { CoreError, StoreConstraintError, StoreUsageError, type CoreErrorCode } from './errors.js';
+export {
+  CoreError,
+  InviteLimitError,
+  StoreConstraintError,
+  StoreUsageError,
+  type CoreErrorCode,
+} from './errors.js';
 export * from './constants.js';
 export {
   SINGLETON_SLOT,

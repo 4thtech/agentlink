@@ -381,7 +381,12 @@ export class DeliveryAcks {
     const { identity, envelopes, outbox } = this.#deps;
     const isActive = (tx: StoreTx): boolean => {
       const contact = tx.get('contacts', { contact_id: contactId });
-      return contact?.status === 'active' && contact.pairing === 'complete';
+      // SEC-INVITE-CAPS: no ack to a contact that waits for the owner's Keep.
+      return (
+        contact?.status === 'active' &&
+        contact.pairing === 'complete' &&
+        contact.waiting_owner !== 1
+      );
     };
     // Checked before anything is signed, and again in the writing transaction.
     if (!(await this.#ctx.store.transaction(isActive))) return false;

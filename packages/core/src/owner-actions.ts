@@ -254,6 +254,19 @@ function contactBlockState(
   return row.status === 'blocked' ? 'blocked' : 'active';
 }
 
+/**
+ * SEC-INVITE-CAPS: one contact's state for Keep. `unknown` for a missing or removed row; `revoked` as
+ * for Block; `waiting` while it waits for the owner (`waiting_owner` 1); `kept` otherwise.
+ */
+function contactKeepState(
+  tx: StoreTx,
+  contactId: string,
+): 'unknown' | 'revoked' | 'waiting' | 'kept' {
+  const state = contactBlockState(tx, contactId);
+  if (state === 'unknown' || state === 'revoked') return state;
+  return tx.get('contacts', { contact_id: contactId })?.waiting_owner === 1 ? 'waiting' : 'kept';
+}
+
 const nonceRow = (signed: SignedOwnerAction, actionHash: string, now: number) => ({
   nonce: signed.body.nonce,
   op: signed.body.op,
@@ -365,6 +378,15 @@ export class OwnerActions {
       case 'contact.block':
       case 'contact.unblock':
         return this.#applyContactBlock(value, base);
+      case 'contact.keep':
+        return this.#applyContactKeep(value, base);
+      case 'invite.create': {
+        // SEC-INVITE-CAPS: used only through `consumeInviteCreate` (client.createOwnerInvite), which
+        // makes the invite; applied alone it would record a presence that made nothing.
+        const verdict = verifyOwnerAction(value, base);
+        if (!verdict.ok && verdict.stage === 'object') return this.#report(fromVerdict(verdict));
+        return this.#report(refused(op, 'unsupported_op'));
+      }
       case 'storage.set':
       case 'storage.remove':
         return this.#applyStorage(text, value, base);
@@ -564,6 +586,84 @@ export class OwnerActions {
       return { status: 'applied', op };
     });
     return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  /**
+   * `contact.keep` (SEC-INVITE-CAPS, D-156; 04 §2.5.1; proposed, owner confirms at merge): the owner
+   * keeps a contact the AI connected through an AI-made invite. The object checks and the nonce first
+   * (L(op) = 600 s). Then, in one store transaction, the nonce is checked again and the op's rule:
+   * the contact must be stored and not removed (`contact_unknown`), not revoked (`contact_revoked`),
+   * and waiting for the owner (`not_waiting`). Only then are the nonce row (the audit record) and
+   * `waiting_owner` null written; a refusal writes nothing. From then on the agent may send to it as
+   * to any contact. Nothing is sent to the contact. No MCP tool or CLI command signs it (I-4).
+   */
+  async #applyContactKeep(
+    value: unknown,
+    base: OwnerActionCheckContext,
+  ): Promise<OwnerActionOutcome> {
+    const shaped = signedOwnerActionSchema.parse(value);
+    const usedBefore = await this.#nonceUsed(shaped.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) return this.#report(fromVerdict(verdict));
+    const { signed, actionHash } = verdict;
+    const { body } = signed;
+    if (body.op !== 'contact.keep') return this.#report(refused(body.op, 'malformed'));
+    const contactId = body.params.contact;
+    const now = base.now;
+    const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      if (tx.get('owner_action_nonces', { nonce: body.nonce }) !== undefined) {
+        return refused('contact.keep', 'nonce_used');
+      }
+      const state = contactKeepState(tx, contactId);
+      if (state === 'unknown') return refused('contact.keep', 'contact_unknown');
+      if (state === 'revoked') return refused('contact.keep', 'contact_revoked');
+      if (state !== 'waiting') return refused('contact.keep', 'not_waiting');
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, now));
+      if (
+        tx.update(
+          'contacts',
+          { contact_id: contactId, waiting_owner: 1 },
+          { waiting_owner: null, updated_at: now },
+        ) !== 1
+      ) {
+        throw new Error('contact changed inside the transaction');
+      }
+      return { status: 'applied', op: 'contact.keep' };
+    });
+    return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  /**
+   * SEC-INVITE-CAPS (owner decision 18 Nov 2026; 04 §2.5.1 `invite.create`): verifies an owner-signed
+   * `invite.create` (encoding, this agent, this owner's key, freshness, L(op) = 600 s) and records
+   * its nonce (the audit row) in one transaction. True only then; anything else writes nothing. The
+   * caller (client.createOwnerInvite) makes the owner invite only after true.
+   */
+  async consumeInviteCreate(input: unknown): Promise<boolean> {
+    let value: unknown;
+    try {
+      value = typeof input === 'string' ? parseOwnerActionText(input) : input;
+    } catch {
+      return false;
+    }
+    const self = await this.#self();
+    if ('refusal' in self) return false;
+    const base: OwnerActionCheckContext = { ...self, now: nowOf(this.#ctx) };
+    const shaped = signedOwnerActionSchema.safeParse(value);
+    if (!shaped.success || shaped.data.body.op !== 'invite.create') return false;
+    const usedBefore = await this.#nonceUsed(shaped.data.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) {
+      this.#report(fromVerdict(verdict));
+      return false;
+    }
+    const { signed, actionHash } = verdict;
+    if (signed.body.op !== 'invite.create') return false;
+    return this.#ctx.store.transaction((tx) => {
+      if (tx.get('owner_action_nonces', { nonce: signed.body.nonce }) !== undefined) return false;
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, base.now));
+      return true;
+    });
   }
 
   /**
@@ -1669,6 +1769,35 @@ export class OwnerActions {
    */
   async prepareContactUnblock(contactId: string): Promise<PreparedOwnerAction> {
     return this.#prepareContactBlock('contact.unblock', contactId);
+  }
+
+  /**
+   * The unsigned `contact.keep` (SEC-INVITE-CAPS, D-156): refused before any gesture for an unknown,
+   * removed or revoked contact and one that is not waiting for the owner.
+   */
+  async prepareContactKeep(contactId: string): Promise<PreparedOwnerAction> {
+    const op = 'contact.keep' as const;
+    const refuse = (reason: PrepareRefusal) => ({ status: 'refused', op, reason }) as const;
+    const signer = await this.#signer();
+    if ('refusal' in signer) return refuse(signer.refusal);
+    if (!evmAddress.safeParse(contactId).success) return refuse('contact_unknown');
+    const state = await this.#ctx.store.transaction((tx) => contactKeepState(tx, contactId));
+    if (state === 'unknown') return refuse('contact_unknown');
+    if (state === 'revoked') return refuse('contact_revoked');
+    if (state !== 'waiting') return refuse('not_waiting');
+    return this.#build(signer, op, { contact: contactId });
+  }
+
+  /**
+   * SEC-INVITE-CAPS (owner decision 18 Nov 2026): the unsigned `invite.create` `{}` for the local
+   * app's Create invite (the owner's presence signs it; client.createOwnerInvite verifies it).
+   */
+  async prepareInviteCreate(): Promise<PreparedOwnerAction> {
+    const signer = await this.#signer();
+    if ('refusal' in signer) {
+      return { status: 'refused', op: 'invite.create', reason: signer.refusal } as const;
+    }
+    return this.#build(signer, 'invite.create', {});
   }
 
   async #prepareContactBlock(

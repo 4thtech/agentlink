@@ -47,7 +47,9 @@ const REPAIRS: Readonly<Record<string, (p: Json) => void>> = {
   'reject-policy-set-pre-g32-form': (p) => {
     // The whole pre-G-32 form on purpose: JSON-number USD and no contactRules.
     at(p, 'proofs').dailyBudgetUSD = '5';
-    at(p, 'proofs').perActionMaxUSD = '1';
+    // The repair restores the defaults' value (D-156: "0.2", at most the "0.5" hard ceiling the
+    // vector's policy carries); the vector keeps the version 1 number.
+    at(p, 'proofs').perActionMaxUSD = '0.2';
     at(p, 'commitments').autoAcceptMaxUSD = '0';
     p.contactRules = [];
   },
@@ -55,7 +57,8 @@ const REPAIRS: Readonly<Record<string, (p: Json) => void>> = {
     at(p, 'proofs').dailyBudgetUSD = String(at(p, 'proofs').dailyBudgetUSD);
   },
   'reject-policy-set-usd-seven-decimals': (p) => {
-    at(p, 'proofs').perActionMaxUSD = '5';
+    // The defaults' value: at most the "0.5" hard ceiling (D-156).
+    at(p, 'proofs').perActionMaxUSD = '0.2';
   },
   'reject-policy-set-usd-trailing-zeros': (p) => {
     at(p, 'proofs').dailyBudgetUSD = '5';

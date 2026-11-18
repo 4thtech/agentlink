@@ -49,6 +49,7 @@ import {
 import {
   CLOCK_SKEW_SECONDS,
   INVITE_DEFAULT_EXPIRY_DAYS,
+  type AiInviteLimits,
   type ContactDisplayName,
   type Invite,
   type Payload,
@@ -72,7 +73,7 @@ import {
   type PairingHandler,
   type PairingOutcome,
 } from './envelopes.js';
-import { CoreError, type CoreErrorCode } from './errors.js';
+import { CoreError, InviteLimitError, type CoreErrorCode } from './errors.js';
 import type { IdentityService } from './identity.js';
 import type { DropConfig } from './files/platform.js';
 import {
@@ -88,10 +89,12 @@ import {
 import { restrictName } from './names.js';
 import { verifyPairingTranscript, type PairingTranscript } from './safety-code.js';
 import type { Row } from './store/schema.js';
+import type { StoreTx } from './store/store.js';
 import { openStoredPairingMessage, recomputeStoredPairing } from './stored-envelope.js';
 
 /** Seconds per day, for invite expiry. */
 const DAY_SECONDS = 86_400;
+const HOUR_SECONDS = 3_600;
 /** The longest an invite lives (04 §3.6: 1 to 7 days). */
 const INVITE_MAX_SECONDS = INVITE_DEFAULT_EXPIRY_DAYS * DAY_SECONDS;
 const INVITE_ID_BYTES = 16;
@@ -112,6 +115,58 @@ export interface CreateInviteInput {
    * owner's surfaces set it (Advanced in the app, `agentlink invite --long`); no MCP argument does.
    */
   readonly long?: boolean;
+}
+
+/**
+ * SEC-INVITE-CAPS (D-156; 06 §2.1): what an AI-made invite takes (`agentlink_create_invite`). Never
+ * `long`: only the owner's surfaces ask for a format 1 link.
+ */
+export interface AiInviteInput {
+  readonly label?: string;
+  /** Whole days, 1 to 7; it only shortens the owner's `expiryHours` (default 24 hours). */
+  readonly expiresInDays?: number;
+}
+
+/**
+ * SEC-INVITE-CAPS: the cap an AI-made invite would break now, or undefined. Open: not used, not
+ * cancelled, not expired. Daily: made in the last 24 hours, whatever happened to them since. Only
+ * rows marked `ai` count; owner-made invites (and rows from before version 17) never do.
+ */
+function aiInviteLimitTx(
+  tx: StoreTx,
+  now: number,
+  limits: AiInviteLimits,
+  kind: 'invite' | 'accept' = 'invite',
+): InviteLimitError | undefined {
+  const ai = tx.select('invites', { created_by: 'ai' });
+  if (kind === 'invite') {
+    const open = ai.filter(
+      (r) => r.used_at == null && r.cancelled_at == null && r.expires_at > now,
+    ).length;
+    if (open >= limits.maxOpen) return new InviteLimitError('open', limits.maxOpen);
+  }
+  // The daily cap counts every pairing the AI started on its own: its invites, its accepts still
+  // staged and its accepts that completed (`contacts.ai_accepted_at`).
+  const recent = [
+    ...ai.map((r) => r.created_at),
+    ...tx.select('pairings', { created_by: 'ai' }).map((r) => r.created_at),
+    ...tx
+      .select('contacts')
+      .map((r) => r.ai_accepted_at)
+      .filter((at): at is number => typeof at === 'number'),
+  ]
+    .filter((at) => at > now - DAY_SECONDS)
+    .sort((x, y) => x - y);
+  if (recent.length >= limits.perDay) {
+    // The window frees a slot when enough of the oldest ones leave it.
+    const oldest = recent[recent.length - limits.perDay];
+    return new InviteLimitError(
+      'daily',
+      limits.perDay,
+      oldest === undefined ? undefined : oldest + DAY_SECONDS,
+    );
+  }
+  return undefined;
 }
 
 export interface CreatedInvite {
@@ -150,6 +205,13 @@ export interface AcceptInviteInput {
    * (I-4). Default false: the result is `pending_approval` and nothing changes.
    */
   readonly allowed?: boolean;
+  /**
+   * SEC-INVITE-CAPS (D-156): present when the AI accepts on its own (`contacts.acceptInvites: auto`,
+   * no owner approval). The accept counts toward the daily cap (refused with InviteLimitError over
+   * it) and the contact waits for the owner's Keep. Set only by the core's AI path
+   * (`client.acceptInviteByAi`), never by an MCP argument.
+   */
+  readonly aiLimits?: AiInviteLimits;
 }
 
 export type AcceptInviteResult =
@@ -488,8 +550,32 @@ export class PairingService implements PairingHandler {
 
   // --- A: create an invite -----------------------------------------------------------------------
 
-  /** Creates a single-use invite (04 §3.6). Returns the link; stores proofKey, never the secret. */
+  /**
+   * Creates a single-use invite (04 §3.6). Returns the link; stores proofKey, never the secret. The
+   * owner's own invite (the app, the CLI): not limited and not counted (SEC-INVITE-CAPS).
+   */
   async createInvite(input: CreateInviteInput = {}): Promise<CreatedInvite> {
+    return this.#create(input, undefined);
+  }
+
+  /**
+   * SEC-INVITE-CAPS (D-156; 06 §2.1, §3 `contacts.aiInvites`): an invite the AI makes through the
+   * MCP tool. Refused with InviteLimitError when `limits.maxOpen` AI-made invites are open or
+   * `limits.perDay` were made in the last 24 hours (checked before anything is derived or uploaded,
+   * and again in the transaction that stores it). It expires after `limits.expiryHours` (a shorter
+   * `expiresInDays` wins). A contact that pairs through it waits for the owner (`waiting_owner`).
+   */
+  async createAiInvite(input: AiInviteInput, limits: AiInviteLimits): Promise<CreatedInvite> {
+    return this.#create(
+      {
+        ...(input.label === undefined ? {} : { label: input.label }),
+        ...(input.expiresInDays === undefined ? {} : { expiresInDays: input.expiresInDays }),
+      },
+      limits,
+    );
+  }
+
+  async #create(input: CreateInviteInput, ai: AiInviteLimits | undefined): Promise<CreatedInvite> {
     // W4-PAUSE: no invite (and no drop upload) while the agent is paused.
     await this.#pause?.assertRunning();
     const ctx = this.#ctx;
@@ -499,9 +585,23 @@ export class PairingService implements PairingHandler {
       throw new CoreError('invite_options_invalid', 'The invite expiry must be 1 to 7 days.');
     }
     const label = input.label === undefined ? undefined : checkName(input.label);
-    const own = await this.#identity.signedCard();
     const now = nowOf(ctx);
-    const expiresAt = now + days * DAY_SECONDS;
+    if (ai !== undefined) {
+      const refused = await ctx.store.transaction((tx) => aiInviteLimitTx(tx, now, ai));
+      if (refused !== undefined) {
+        ctx.log.info('ai invite refused', { code: 'invite_limit' });
+        throw refused;
+      }
+    }
+    const own = await this.#identity.signedCard();
+    const lifetime =
+      ai === undefined
+        ? days * DAY_SECONDS
+        : Math.min(
+            ai.expiryHours * HOUR_SECONDS,
+            input.expiresInDays === undefined ? Infinity : days * DAY_SECONDS,
+          );
+    const expiresAt = now + lifetime;
     const inviteId = randomBytes(INVITE_ID_BYTES);
     const secret = randomBytes(SECRET_BYTES);
     const nonceA = randomBytes(NONCE_BYTES);
@@ -559,8 +659,14 @@ export class PairingService implements PairingHandler {
         cancelled_at: null,
         // REL051-B2: set below, once it is known which link is handed out.
         invite_link: null,
+        created_by: ai === undefined ? 'owner' : 'ai',
       };
       await ctx.store.transaction((tx) => {
+        // SEC-INVITE-CAPS: checked again where it is stored, so two calls at once cannot pass both.
+        if (ai !== undefined) {
+          const refused = aiInviteLimitTx(tx, now, ai);
+          if (refused !== undefined) throw refused;
+        }
         tx.insert('invites', row);
       });
       let inviteUrl = longUrl;
@@ -811,8 +917,19 @@ export class PairingService implements PairingHandler {
     }
     await this.#identity.assertCanSend();
     if (input.allowed !== true) return { status: 'pending_approval', contact };
+    const aiLimits = input.aiLimits;
+    if (aiLimits !== undefined) {
+      const refused = await ctx.store.transaction((tx) =>
+        aiInviteLimitTx(tx, now, aiLimits, 'accept'),
+      );
+      if (refused !== undefined) {
+        ctx.log.info('ai accept refused', { code: 'invite_limit' });
+        throw refused;
+      }
+    }
 
-    const prepared = await this.#contacts.prepareStage({
+    const prepared0 = await this.#contacts.prepareStage({
+      ...(aiLimits === undefined ? {} : { createdBy: 'ai' as const }),
       card: invite.card,
       cardSig: invite.cardSig,
       cardAgentSig: invite.cardAgentSig,
@@ -822,6 +939,19 @@ export class PairingService implements PairingHandler {
       // R1-SEC-11 (04 §2.9): a staged accept lapses at the invite's expiry, never past 7 days.
       expiresAt: Math.min(invite.expiresAt, now + INVITE_MAX_SECONDS),
     });
+    // SEC-INVITE-CAPS: the daily cap is checked again in the transaction that stages the AI's accept,
+    // so two accepts at once cannot both pass it.
+    const prepared =
+      aiLimits === undefined
+        ? prepared0
+        : {
+            ...prepared0,
+            apply: (tx: StoreTx): void => {
+              const refused = aiInviteLimitTx(tx, now, aiLimits, 'accept');
+              if (refused !== undefined) throw refused;
+              prepared0.apply(tx);
+            },
+          };
     // M1-9ze: the counterparty staged (and sealed to, below) must be the contact this invite names,
     // the one step 1 verified and the approval showed. M1-9zf: that binds the owner too (step 2
     // shows the owner fingerprint) and the whole card, by its sha256(JCS) hash, so a card with the
@@ -1283,6 +1413,18 @@ export class PairingService implements PairingHandler {
     try {
       result = await ctx.store.transaction((tx) => {
         if (!inbound.claim(tx)) return 'claimed_elsewhere';
+        // SEC-INVITE-CAPS: whether this pairing came through an AI-made invite, and the contact as
+        // it was before (a kept active contact stays kept).
+        let viaAi = false;
+        const before = tx.get('contacts', { contact_id: id });
+        // An accept the AI started on its own (auto): its staged row says so (deleted below).
+        const acceptedByAi =
+          staged.role === 'invitee' &&
+          tx.get('pairings', { pairing_id: staged.pairingId })?.created_by === 'ai';
+        const acceptedAt = acceptedByAi
+          ? tx.get('pairings', { pairing_id: staged.pairingId })?.created_at
+          : undefined;
+        if (acceptedByAi) viaAi = true;
         if (context.invite !== undefined) {
           const current = tx.get('invites', { invite_id: context.invite });
           // O-L2: re-checked at commit, so a Cancel after the checks above still refuses it.
@@ -1294,6 +1436,7 @@ export class PairingService implements PairingHandler {
             throw new CoreError('pairing_expired', 'The pairing has expired.');
           }
           if (current.used_at !== null) return { usedAt: current.used_at };
+          viaAi = current.created_by === 'ai';
           tx.update(
             'invites',
             { invite_id: context.invite, used_at: null },
@@ -1305,6 +1448,24 @@ export class PairingService implements PairingHandler {
         if (ackRow !== undefined) tx.insert('envelopes', ackRow);
         context.stage?.(tx);
         completion.apply(tx);
+        // SEC-INVITE-CAPS (D-156): a contact the AI connected waits for the owner's Keep, unless it
+        // was an active contact the owner already kept. Any other pairing keeps the active contact's
+        // state and starts a re-added (removed) one kept.
+        const keptBefore = before?.status === 'active' && before.waiting_owner !== 1;
+        const waiting: 1 | null = viaAi
+          ? keptBefore
+            ? null
+            : 1
+          : before !== undefined && before.status !== 'removed' && before.waiting_owner === 1
+            ? 1
+            : null;
+        const after = tx.get('contacts', { contact_id: id });
+        if (after !== undefined && after.waiting_owner !== waiting) {
+          tx.update('contacts', { contact_id: id }, { waiting_owner: waiting });
+        }
+        if (after !== undefined && acceptedAt !== undefined) {
+          tx.update('contacts', { contact_id: id }, { ai_accepted_at: acceptedAt });
+        }
         return 'done';
       });
     } catch (error) {

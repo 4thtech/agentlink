@@ -20,6 +20,7 @@ import {
   evaluate,
   type AcceptInviteAction,
   type ConnectingContact,
+  type CreatedInvite,
   type OpenInvite,
   type PendingContact,
   type PolicyDecision,
@@ -351,6 +352,8 @@ export interface LocalUiReadClient {
     prepareRemove(contactId: string): Promise<PreparedOwnerAction>;
     prepareBlock(contactId: string): Promise<PreparedOwnerAction>;
     prepareUnblock(contactId: string): Promise<PreparedOwnerAction>;
+    /** SEC-INVITE-CAPS (D-156): `contact.keep` for a contact the AI connected. */
+    prepareKeep(contactId: string): Promise<PreparedOwnerAction>;
   };
   /**
    * M1-11c-a4 (Proofs and credits): the proof list and the credits read, both store or chain reads
@@ -494,6 +497,7 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       prepareRemove: (contactId: string) => client.ownerActions.prepareContactRemove(contactId),
       prepareBlock: (contactId: string) => client.ownerActions.prepareContactBlock(contactId),
       prepareUnblock: (contactId: string) => client.ownerActions.prepareContactUnblock(contactId),
+      prepareKeep: (contactId: string) => client.ownerActions.prepareContactKeep(contactId),
     }),
     proofs: Object.freeze({
       list: (query: PageQuery) => client.proofs.list(query),
@@ -617,7 +621,6 @@ export function pauseDesk(client: AgentLinkClient): LocalUiPauseDesk {
  */
 export function inviteDesk(client: AgentLinkClient): LocalUiInviteDesk {
   return Object.freeze<LocalUiInviteDesk>({
-    create: (input) => client.pairing.createInvite(input),
     async check(link) {
       // W4-SHORT-INVITE: a short link is resolved once (core keeps it in memory for the accept).
       const resolved = await client.pairing.resolveInviteLink(link);
@@ -667,6 +670,19 @@ export interface LocalUiInviteAcceptPort {
    */
   connecting?(): Promise<readonly ConnectingContact[]>;
   check(link: string): Promise<PendingContact>;
+  /**
+   * SEC-INVITE-CAPS (owner decision 18 Nov 2026): the unsigned `invite.create` for Create invite.
+   * Writes nothing; only the owner's presence on the owner route signs it.
+   */
+  prepareCreate(): Promise<PreparedOwnerAction>;
+  /**
+   * SEC-INVITE-CAPS: core `createOwnerInvite`: the owner's invite, made only after core verified the
+   * signed `invite.create`. W4-SHORT-INVITE: `long` (Advanced, D-139 (7)) asks for the format 1 link.
+   */
+  createOwner(
+    signed: unknown,
+    input: { readonly label?: string; readonly long?: true },
+  ): Promise<CreatedInvite>;
   decision(): Promise<PolicyDecision>;
   action(link: string): Promise<AcceptInviteAction>;
   openRequest(
@@ -691,6 +707,9 @@ export function inviteAcceptPort(client: AgentLinkClient): LocalUiInviteAcceptPo
     resolve: (link) => client.pairing.resolveInviteLink(link),
     list: () => client.pairing.openInvites(),
     connecting: () => client.contacts.connecting(),
+    // SEC-INVITE-CAPS (owner decision 18 Nov 2026): Create invite needs the owner's presence.
+    prepareCreate: () => client.ownerActions.prepareInviteCreate(),
+    createOwner: (signed, input) => client.createOwnerInvite(signed, input),
     async check(link) {
       return (await client.pairing.acceptInvite({ link })).contact;
     },

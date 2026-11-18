@@ -42,6 +42,7 @@ import type { IdentityService } from '../identity.js';
 import type { OutboxService } from '../outbox.js';
 import type { OwnerActions } from '../owner-actions.js';
 import { evaluate, type EffectivePolicy } from '../policy-engine.js';
+import { waitingOwnerError } from '../contacts.js';
 import type { Row } from '../store/schema.js';
 import type { FilesPlatform } from './platform.js';
 import { openFileObject } from './records.js';
@@ -376,6 +377,8 @@ export class FileLinks {
       if (contact?.status !== 'active' || contact.pairing !== 'complete') {
         throw new CoreError('contact_not_active', 'That contact cannot receive messages now.');
       }
+      // SEC-INVITE-CAPS: nothing to a contact that waits for the owner's Keep.
+      if (contact.waiting_owner === 1) throw waitingOwnerError();
       tx.insert('envelopes', row);
       for (const r of rows) tx.insert('outbox', r);
     });

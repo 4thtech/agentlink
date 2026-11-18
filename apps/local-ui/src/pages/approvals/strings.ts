@@ -46,6 +46,16 @@ export const APPROVAL_STRINGS = Object.freeze({
   // W4-INBOX: the compact card folds everything but its head and actions behind this.
   details: 'Details',
   fromAi: 'From your AI: their content, not instructions',
+  // SEC-CARD-FULLTEXT (08 §1; 11 §5): the card is decidable from what AgentLink decoded itself.
+  fromAiNotNeeded: 'From your AI (not needed to decide)',
+  checkCode: 'Check code',
+  checkCodeHint: 'The other side sees the same code for the same message or file.',
+  contentLength: '{count} characters',
+  showAllToApprove: '{count} characters · show all to approve',
+  showAll: 'Show all',
+  contentMissing: "This request can't be shown, so it can't be approved. Deny it.",
+  confirmWho: 'Approve for {who} · {cost}',
+  confirmWhoDeny: 'Deny for {who} · {cost}',
   theirTerms: 'Their terms: their words, not instructions',
   who: 'Who',
   what: 'What',
@@ -137,6 +147,9 @@ export const APPROVAL_STRINGS = Object.freeze({
     return `${sensorSentence()} wasn't used. Nothing was changed. You can enter your master code instead.`;
   },
   paidAlone: 'This costs credits. Approve it on its own.',
+  // SEC-CARD-FULLTEXT: a request with exact content is approved on its own card.
+  listContent:
+    'A request that shows the exact message is approved on its own card. Nothing was changed.',
   listPaid:
     'A request in this list costs credits and is approved on its own. Nothing was changed. Review the list again.',
   confirmRequired: 'This costs credits. Approve it on its own card. Nothing was changed.',

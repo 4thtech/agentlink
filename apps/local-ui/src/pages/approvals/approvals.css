@@ -172,3 +172,46 @@
   white-space: normal;
   overflow-wrap: anywhere;
 }
+/* SEC-CARD-FULLTEXT: the exact content block. Every space and line break is kept and long lines
+   wrap, so the owner sees all of it; the text keeps its own direction per line (dir="auto"). */
+.al-approvals .al-content {
+  display: grid;
+  gap: var(--al-space-2);
+  padding: var(--al-space-3);
+  background: var(--al-color-bg-sunken);
+  border: 1px solid var(--al-color-border-default);
+  border-radius: var(--al-radius-md, 8px);
+}
+.al-approvals .al-content-label {
+  margin: 0;
+  font-weight: 600;
+}
+.al-approvals .al-content-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  unicode-bidi: plaintext;
+}
+.al-approvals .al-content-length,
+.al-approvals .al-check {
+  margin: 0;
+  color: var(--al-color-fg-muted);
+}
+.al-approvals .al-content-files {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--al-space-1);
+}
+.al-approvals .al-check code {
+  font-family: var(--al-font-family-mono);
+}
+.al-approvals .al-content-missing {
+  margin: 0;
+  font-weight: 600;
+}
+.al-approvals .al-from-ai > summary {
+  cursor: pointer;
+  color: var(--al-color-fg-muted);
+}

@@ -290,14 +290,25 @@ describe('GET /api/ui/rules', () => {
         proofs: {
           notarize: 'allow',
           dailyBudgetUSD: '5',
-          perActionMaxUSD: '1',
+          perActionMaxUSD: '0.2',
           allowKeyDisclosure: 'approval',
+          hardMaxPerActionUSD: '0.5',
+          hardDailyUSD: '10',
+        },
+        outgoing: {
+          messagesPerContactPerDay: 300,
+          messagesPerDay: 1000,
+          filesPerContactPerDay: 50,
+          filesPerDay: 200,
+          fileMBPerDay: 2000,
         },
         contacts: {
           acceptInvites: 'approval',
           unknownSenders: 'queue',
           allowed: 'paired',
           listed: 0,
+          // SEC-INVITE-CAPS: absent in the policy reads as the defaults.
+          aiInvites: { maxOpen: 3, perDay: 5, expiryHours: 24 },
         },
         files: { maxSendSizeMB: 100, maxReceiveSizeMB: 200, allowedFolders: 0 },
         receipts: { autoDelivered: false, sendReceived: true },
@@ -443,7 +454,13 @@ describe('GET /api/ui/rules/review: prepare an edit (core preparePolicyEdit)', (
       base: 0,
       patch: {
         contacts: { acceptInvites: 'auto' },
-        proofs: { dailyBudgetUSD: '20', perActionMaxUSD: '2' },
+        // D-156: a soft limit above its hard ceiling is refused, so both are raised.
+        proofs: {
+          dailyBudgetUSD: '20',
+          perActionMaxUSD: '2',
+          hardDailyUSD: '20',
+          hardMaxPerActionUSD: '2',
+        },
         files: { maxSendSizeMB: 500 },
         commitments: { accept: 'allow' },
       },
@@ -475,11 +492,120 @@ describe('GET /api/ui/rules/review: prepare an edit (core preparePolicyEdit)', (
   });
 });
 
+// --- SEC-RECEIPTS-DEFAULT: "Send received receipts" saves (0.5.10 fix) ---------------------------
+
+describe('the received-receipts switch saves (SEC-RECEIPTS-DEFAULT, D-156 (1))', () => {
+  it('turning it off is reviewed, signed with presence, applied and read back off', async () => {
+    const { context, owner } = await setup();
+    expect(await getRules(context)).toMatchObject({
+      body: { rules: { receipts: { sendReceived: true } } },
+    });
+    const r = await reviewOk(context, { base: 0, patch: { receipts: { sendReceived: false } } });
+    const { op, calls } = ownerOp(owner);
+    expect(await save(context, op, { review: r.review, acknowledged: codes(r) })).toEqual({
+      status: 200,
+      body: { status: 'saved', version: 1 },
+    });
+    expect(calls).toHaveLength(1);
+    expect(await getRules(context)).toMatchObject({
+      body: { version: 1, rules: { receipts: { sendReceived: false } } },
+    });
+    expect(ownerRoute().presence).toBe(true);
+  });
+
+  it('the page edits only this receipts field: delivery receipts stay with their own flow', async () => {
+    const { context } = await setup();
+    expect(await review(context, { base: 0, patch: { receipts: { autoOpened: true } } })).toEqual({
+      status: 400,
+      body: { error: 'invalid_edit' },
+    });
+  });
+});
+
+// --- SEC-HARD-CEILING, SEC-OUTBOUND-CAPS (D-156): only the owner, on this page, with presence -----
+
+describe('hard proof ceilings and outgoing caps on the Rules page (D-156; I-4)', () => {
+  it('the page shows the hard ceilings and the outgoing caps (the defaults)', async () => {
+    const { context } = await setup();
+    const result = await getRules(context);
+    expect(result.body).toMatchObject({
+      rules: {
+        proofs: {
+          perActionMaxUSD: '0.2',
+          dailyBudgetUSD: '5',
+          hardMaxPerActionUSD: '0.5',
+          hardDailyUSD: '10',
+        },
+        outgoing: {
+          messagesPerContactPerDay: 300,
+          messagesPerDay: 1000,
+          filesPerContactPerDay: 50,
+          filesPerDay: 200,
+          fileMBPerDay: 2000,
+        },
+      },
+    });
+  });
+
+  it('raising a ceiling or a cap is reviewed with its warnings, then signed with presence', async () => {
+    const { context, owner } = await setup();
+    const r = await reviewOk(context, {
+      base: 0,
+      patch: {
+        proofs: { hardDailyUSD: '20', hardMaxPerActionUSD: '1' },
+        outgoing: { messagesPerDay: 2000, filesPerContactPerDay: 80 },
+      },
+    });
+    expect(codes(r)).toEqual(['limits_raised', 'proofs_spend_raised']);
+    const { op, calls } = ownerOp(owner);
+    expect(await save(context, op, { review: r.review, acknowledged: codes(r) })).toEqual({
+      status: 200,
+      body: { status: 'saved', version: 1 },
+    });
+    expect(calls).toHaveLength(1);
+    expect(await getRules(context)).toMatchObject({
+      body: {
+        rules: {
+          proofs: { hardDailyUSD: '20', hardMaxPerActionUSD: '1' },
+          outgoing: { messagesPerDay: 2000, filesPerContactPerDay: 80 },
+        },
+      },
+    });
+  });
+
+  it('without the owner’s signature nothing changes: the save is the presence route', async () => {
+    const { context } = await setup();
+    const r = await reviewOk(context, { base: 0, patch: { outgoing: { messagesPerDay: 5 } } });
+    const refuse: LocalUiOwnerOperation = {
+      sign: () => Promise.reject(new Error('no presence')),
+    };
+    await expect(save(context, refuse, { review: r.review, acknowledged: [] })).rejects.toThrow();
+    expect(await getRules(context)).toMatchObject({
+      body: { version: 0, rules: { outgoing: { messagesPerDay: 1000 } } },
+    });
+    expect(ownerRoute().presence).toBe(true);
+  });
+
+  it('a soft limit above its hard ceiling is refused (invalid_edit)', async () => {
+    const { context } = await setup();
+    expect(
+      await review(context, { base: 0, patch: { proofs: { perActionMaxUSD: '0.9' } } }),
+    ).toEqual({ status: 400, body: { error: 'invalid_edit' } });
+    expect(await review(context, { base: 0, patch: { proofs: { dailyBudgetUSD: '11' } } })).toEqual(
+      { status: 400, body: { error: 'invalid_edit' } },
+    );
+  });
+});
+
 // --- POST /api/ui/rules: D-119 -------------------------------------------------------------------
 
 const LOOSER = {
   base: 0,
-  patch: { proofs: { dailyBudgetUSD: '20' }, commitments: { accept: 'allow' } },
+  // D-156: the daily budget is at most the hard daily ceiling, so both are raised.
+  patch: {
+    proofs: { dailyBudgetUSD: '20', hardDailyUSD: '20' },
+    commitments: { accept: 'allow' },
+  },
 };
 
 describe('POST /api/ui/rules: sign only an acknowledged prepared body (D-119; I-4)', () => {

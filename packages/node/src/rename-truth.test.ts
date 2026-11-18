@@ -188,10 +188,23 @@ async function cardNameRead(w: World): Promise<unknown> {
 }
 
 async function createInviteInApp(w: World, body: JsonObject): Promise<unknown> {
-  const desk = {
-    create: (input: { label?: string; long?: true }) => w.client.pairing.createInvite(input),
+  // SEC-INVITE-CAPS: create is an owner route; the name check runs before anything is signed.
+  const port = {
+    prepareCreate: () => w.client.ownerActions.prepareInviteCreate(),
+    createOwner: (_signed: unknown, input: { label?: string; long?: true }) =>
+      w.client.pairing.createInvite(input),
   };
-  const out = await inviteCreateRoute.handler(contextOf(w), body, desk as never);
+  const owner = {
+    sign: (_r: unknown, requests: readonly { kind: string; action?: unknown }[]) =>
+      Promise.resolve(
+        requests.map((r) => ({ kind: 'owner-action', signed: { body: r.action, sig: 'ab' } })),
+      ),
+  };
+  const out = await inviteCreateRoute.handler(
+    { ...contextOf(w), invites: port as never },
+    { params: {}, query: new URLSearchParams(), input: body } as never,
+    owner as never,
+  );
   // Only the fields compared: a made link never reaches a test report.
   const { error, cardName, label, status } = out.body as Record<string, unknown>;
   return { error, cardName, label, status };
@@ -222,7 +235,7 @@ describe('WP-1: a terminal-made ID renamed in the app before D-141 (the owner ca
       status: undefined,
     });
     // The owner may still choose to invite under the old name (nothing is signed either way).
-    expect(await createInviteInApp(w, { oldName: true })).toMatchObject({ status: 'ok' });
+    expect(await createInviteInApp(w, { oldName: true })).toMatchObject({ status: 'done' });
   });
 
   it('one repair gesture puts the label in the card: a new invite shows the new name', async () => {
@@ -232,6 +245,6 @@ describe('WP-1: a terminal-made ID renamed in the app before D-141 (the owner ca
     expect(await w.client.identity.cardName()).toBe('macbook-agent-1');
     expect(await inviteName(w)).toBe('macbook-agent-1');
     expect(await cardNameRead(w)).toEqual({ status: 'same' });
-    expect(await createInviteInApp(w, {})).toMatchObject({ status: 'ok' });
+    expect(await createInviteInApp(w, {})).toMatchObject({ status: 'done' });
   });
 });

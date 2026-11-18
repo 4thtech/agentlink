@@ -80,6 +80,15 @@ export type CoreErrorCode =
   | 'invite_unavailable'
   | 'invite_fetch_failed'
   | 'invite_options_invalid'
+  // SEC-INVITE-CAPS (D-156; 06 §3 `contacts.aiInvites`): an AI-made invite over the owner's caps
+  // (InviteLimitError); nothing was stored.
+  | 'invite_limit'
+  // SEC-INVITE-CAPS: the contact came through an AI-made invite and waits for the owner's Keep; the
+  // agent sends it nothing (no message, file, terms, proof or receipt) until then.
+  | 'contact_waiting_owner'
+  // SEC-INVITE-CAPS (owner decision 18 Nov 2026): an owner invite without a valid `invite.create`
+  // signed by this agent's owner (wrong key, replayed, expired, another op); nothing was stored.
+  | 'invite_not_confirmed'
   | 'safety_code_unavailable'
   // Files (04 §4, 06 §2.3, 07 §5; M1-7f)
   | 'files_unavailable'
@@ -108,6 +117,31 @@ export class CoreError extends Error {
     super(message);
     this.name = 'CoreError';
     this.code = code;
+  }
+}
+
+/**
+ * SEC-INVITE-CAPS (D-156; 06 §2.1, §3): an AI-made invite refused by the owner's caps. `limit`: which
+ * cap (`open`: at most `max` open at once; `daily`: at most `max` made in any rolling 24 hours);
+ * `resetAt`: for `daily`, the unix second the oldest counted invite leaves the window. Numbers only,
+ * never input (I-5, I-7).
+ */
+export class InviteLimitError extends CoreError {
+  readonly limit: 'open' | 'daily';
+  readonly max: number;
+  readonly resetAt: number | undefined;
+
+  constructor(limit: 'open' | 'daily', max: number, resetAt?: number) {
+    super(
+      'invite_limit',
+      limit === 'open'
+        ? 'The AI already has as many open invites as the owner allows.'
+        : 'The AI made as many invites in the last 24 hours as the owner allows.',
+    );
+    this.name = 'InviteLimitError';
+    this.limit = limit;
+    this.max = max;
+    this.resetAt = resetAt;
   }
 }
 

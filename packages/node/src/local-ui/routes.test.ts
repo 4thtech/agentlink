@@ -225,6 +225,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       // UX1112 WP-12 (F-2): Block and Unblock a contact (local-ui/api/contacts.test.ts).
       '/api/ui/contacts/:ref/block',
       '/api/ui/contacts/:ref/unblock',
+      // SEC-INVITE-CAPS: Keep a contact the AI connected (local-ui/api/contacts.test.ts).
+      '/api/ui/contacts/:ref/keep',
       // WP-11: the Backup page's read and the recovery-kit export (backup-export-server.test.ts).
       '/api/ui/backup',
       '/api/ui/backup/export',
@@ -403,20 +405,19 @@ describe('the invite route kind (UX2-d1, decision 1.1, I-4)', () => {
   const route = (over: Record<string, unknown>) =>
     ({
       method: 'POST',
-      path: INVITE_CREATE_PATH,
+      path: INVITE_CHECK_PATH,
       presence: 'invite',
-      step: 'create',
+      step: 'check',
       handler: answer,
       ...over,
     }) as unknown as LocalUiRoute;
 
-  it('the default registry has create and check as the invite kind, and accept behind presence', () => {
+  it('the default registry has check as the invite kind; create and accept are behind presence', () => {
     const routes = createLocalUiRoutes().routes();
     expect(
       routes.filter((r) => r.presence === 'invite').map((r) => `${r.method} ${r.path}`),
       // U3-invite: "Not now" on the join screen is the invite kind too (no presence, signs nothing).
     ).toEqual([
-      `POST ${INVITE_CREATE_PATH}`,
       `POST ${INVITE_CHECK_PATH}`,
       // W4-INVITES-LIST: Cancel an open invite (no presence, signs nothing).
       'POST /api/ui/invites/cancel',
@@ -428,6 +429,10 @@ describe('the invite route kind (UX2-d1, decision 1.1, I-4)', () => {
     ]);
     expect(routes.find((r) => r.path === INVITE_ACCEPT_PATH)).toMatchObject({
       method: 'POST',
+      presence: true,
+    });
+    // SEC-INVITE-CAPS (owner decision 18 Nov 2026): Create invite asks for the owner's presence.
+    expect(routes.find((r) => r.path === INVITE_CREATE_PATH && r.method === 'POST')).toMatchObject({
       presence: true,
     });
     expect([INVITE_CREATE_PATH, INVITE_CHECK_PATH, INVITE_ACCEPT_PATH]).toEqual([
@@ -444,6 +449,8 @@ describe('the invite route kind (UX2-d1, decision 1.1, I-4)', () => {
       '/api/ui/contacts/invite',
       '/api/ui/rules/set',
       `${INVITE_CREATE_PATH}/x`,
+      // SEC-INVITE-CAPS: create is no longer the invite kind.
+      INVITE_CREATE_PATH,
     ]) {
       const registry = new LocalUiRouteRegistry();
       expect(() => registry.register(route({ path })), path).toThrow(/invite/);
@@ -454,17 +461,19 @@ describe('the invite route kind (UX2-d1, decision 1.1, I-4)', () => {
       expect(() => registry.register(route({ method })), method).toThrow(/invite/);
     }
     const mismatched = new LocalUiRouteRegistry();
-    expect(() => mismatched.register(route({ step: 'check' }))).toThrow(/invite/);
+    expect(() => mismatched.register(route({ step: 'create' }))).toThrow(/invite/);
     expect(() => mismatched.register(route({ step: 'accept' }))).toThrow(/invite/);
-    expect(() => mismatched.register(route({ path: INVITE_CHECK_PATH, step: 'create' }))).toThrow(
+    expect(() => mismatched.register(route({ path: INVITE_CREATE_PATH, step: 'create' }))).toThrow(
       /invite/,
     );
     expect(() => mismatched.register(route({ handler: undefined }))).toThrow(/handler/);
     const registry = new LocalUiRouteRegistry();
     registry.register(route({}));
-    registry.register(route({ path: INVITE_CHECK_PATH, step: 'check' }));
+    registry.register(route({ path: '/api/ui/invites/cancel', step: 'cancel' }));
     expect(() => registry.register(route({}))).toThrow();
-    expect(() => registry.register(route({ path: INVITE_CHECK_PATH, step: 'check' }))).toThrow();
+    expect(() =>
+      registry.register(route({ path: '/api/ui/invites/cancel', step: 'cancel' })),
+    ).toThrow();
     expect(registry.routes()).toHaveLength(2);
   });
 

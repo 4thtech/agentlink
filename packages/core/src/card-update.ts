@@ -98,9 +98,11 @@ function holdsCard(tx: StoreTx, contact: Row<'contacts'>, fromKey: string): bool
 const isRevoked = (tx: StoreTx, row: Row<'contacts'>): boolean =>
   row.status === 'revoked' || tx.get('revoked_agents', { agent_evm: row.contact_id }) !== undefined;
 
+// SEC-INVITE-CAPS: nothing to a contact that waits for the owner's Keep (sent once kept).
 const waiting = (tx: StoreTx, row: Row<'contacts'>, fromKey: string): boolean =>
   row.status === 'active' &&
   row.pairing === 'complete' &&
+  row.waiting_owner !== 1 &&
   !isRevoked(tx, row) &&
   !holdsCard(tx, row, fromKey);
 
@@ -134,6 +136,7 @@ function recipientKids(json: string | null): readonly string[] {
 function catchUpDue(tx: StoreTx, row: Row<'contacts'>, catchUp: CatchUp): boolean {
   if (catchUp.kids.size === 0) return false;
   if (row.status !== 'active' || row.pairing !== 'complete' || isRevoked(tx, row)) return false;
+  if (row.waiting_owner === 1) return false;
   const [latest] = tx.select(
     'envelopes',
     { direction: 'in', state: 'ok', contact_id: row.contact_id },

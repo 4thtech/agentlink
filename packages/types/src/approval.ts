@@ -14,6 +14,7 @@ import { z } from 'zod';
 import {
   BYTE_LENGTHS,
   COMMITMENT_SCOPE_MAX_LIFETIME_SECONDS,
+  MAX_FILES_PER_PAYLOAD,
   PROTOCOL_VERSION,
   type ApprovalToolName,
 } from './constants.js';
@@ -163,13 +164,22 @@ const sendContext = z.strictObject({
   fee: approvalFeeSchema,
 });
 
-/** `agentlink_notarize` (policy `proofs.*`): the envelope recorded, its other agent and the fee. */
+/**
+ * `agentlink_notarize` (policy `proofs.*`): the envelope recorded, its other agent and the fee.
+ * SEC-CARD-FULLTEXT: `files`, present only when the envelope carries files, are the hash and size
+ * of each file the owner was shown; the approved proof runs only while they are unchanged (06 §2.5).
+ */
 const notarizeContext = z.strictObject({
   triggers: triggersOf(PROOF_TRIGGERS),
   /** The other agent of the envelope; null for a note to self (no counterparty, no contact rule). */
   counterparty: counterpartySchema.nullable(),
   envelopeHash: bytes32Hex,
   fee: approvalFeeSchema,
+  files: z
+    .array(z.strictObject({ plaintextSha256: sha256Hex, size: uint53 }))
+    .min(1)
+    .max(MAX_FILES_PER_PAYLOAD)
+    .optional(),
 });
 
 /** `agentlink_acknowledge` `accepted` / `rejected` on a record without terms (`commitments.accept`). */

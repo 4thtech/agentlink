@@ -128,6 +128,9 @@ constexpr int EXIT_ATTESTATION_RETRY = 17;
 constexpr int EXIT_WEAK_KEY = 18;
 constexpr int EXIT_USAGE = 64;
 constexpr int EXIT_BAD_INPUT = 65;
+// SEC-CARD-FULLTEXT: the macOS prompt detail was refused. Never used here (Windows Hello takes no
+// caller text and the core passes none); kept so both helpers share one exit code table.
+constexpr int EXIT_DETAIL_REFUSED = 66;
 constexpr int EXIT_UNAVAILABLE = 69;
 constexpr int EXIT_INTERNAL_ERROR = 70;
 

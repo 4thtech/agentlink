@@ -1,9 +1,11 @@
 // DESK-D12c (S2; D-145 phase 2; 04 §2.3.4, §2.5 "Desktop app owner presence"; I-7): how core runs the
 // first-party presence helper of the desktop app (DESK-D12b, apps/desktop/native/*/agentlink-presence.*,
 // whose header is the contract). Fixed argv only:
-//   available · create · check (macOS) · ecdh <reason> (macOS) · sign <reason> (Windows) · delete (Windows)
+//   available · create · check (macOS) · ecdh <reason> [<detail>] (macOS) · sign <reason> (Windows) · delete (Windows)
 // with <reason> one of the fixed ids setup | approve | pay | code | reset (display-only: the helper shows its own
-// fixed text and releases the same secret for every reason). The record goes on stdin as lowercase
+// fixed text and releases the same secret for every reason). SEC-CARD-FULLTEXT (04 §2.5.3): on macOS
+// an optional <detail>, one plain line the server built from the stored request naming who and the
+// cost, follows the fixed text on the sheet (display-only too). Windows Hello takes no caller text. The record goes on stdin as lowercase
 // hex and one newline; stdout is lowercase hex and one newline on success, nothing else is accepted;
 // stderr carries at most one fixed diagnostic line of the macOS helper (DESK-NATIVE-DEBUG,
 // "<stage> <domain> <code>", parsed strictly by readHelperDiagnostic; anything else is dropped). Every exit code maps to one fixed UI state (nativeUiState); no output or message
@@ -37,6 +39,7 @@ import {
   encodeHex,
   type NativePresenceKind,
 } from '@4thtech-io/crypto';
+import { refusedCategory15 } from '@4thtech-io/types';
 
 /**
  * The fixed reason ids (display-only). `code` (D15-04): Replace master code, the one operation that
@@ -45,6 +48,24 @@ import {
  */
 export const NATIVE_REASONS = Object.freeze(['setup', 'approve', 'pay', 'code', 'reset'] as const);
 export type NativeReason = (typeof NATIVE_REASONS)[number];
+
+/** SEC-CARD-FULLTEXT: the longest prompt detail passed to the helper, in code points. */
+export const NATIVE_DETAIL_MAX = 64;
+
+/**
+ * Whether `detail` may go on the helper's argv: a non-empty single line of at most NATIVE_DETAIL_MAX
+ * code points with no control, format (bidi, zero-width), separator other than the space,
+ * private-use or unassigned character (the helper checks the same again).
+ */
+export function isPromptDetail(detail: unknown): detail is string {
+  if (typeof detail !== 'string' || detail.length === 0) return false;
+  const points = Array.from(detail);
+  if (points.length > NATIVE_DETAIL_MAX) return false;
+  return points.every(
+    (ch) =>
+      ch === ' ' || (!/\s/u.test(ch) && refusedCategory15(ch.codePointAt(0) as number) === null),
+  );
+}
 
 /** The helpers' fixed exit codes (identical on macOS and Windows; apps/desktop/build/native.mjs). */
 export const NATIVE_HELPER_EXIT = Object.freeze({
@@ -60,6 +81,8 @@ export const NATIVE_HELPER_EXIT = Object.freeze({
   weakKey: 18,
   usage: 64,
   badInput: 65,
+  /** SEC-CARD-FULLTEXT (macOS): the prompt detail was refused; nothing is approved. */
+  detailRefused: 66,
   unavailable: 69,
   internalError: 70,
 } as const);
@@ -288,7 +311,18 @@ export interface NativeHelper {
    * `ecdh <reason>` / `sign <reason>`: one OS prompt, the released secret (the caller wipes it).
    * `signal` aborts it (the helper is killed and the prompt goes away): `cancelled`, no bytes.
    */
-  release(record: Uint8Array, reason: NativeReason, signal?: AbortSignal): Promise<Uint8Array>;
+  release(
+    record: Uint8Array,
+    reason: NativeReason,
+    signal?: AbortSignal,
+    /**
+     * SEC-CARD-FULLTEXT (04 §2.5.3): one plain line naming who and the cost, added to the macOS
+     * sheet after the fixed reason text (`ecdh <reason> <detail>`). Windows Hello takes no caller
+     * text, so it is not passed there. A detail that is not plain (control, bidi, too long) is
+     * dropped; an older helper that refuses the extra argument (usage) is asked again without it.
+     */
+    detail?: string,
+  ): Promise<Uint8Array>;
   /** Windows `delete` (best effort, no prompt); nothing on macOS (the key lives in its record). */
   remove(record: Uint8Array): Promise<void>;
 }
@@ -383,12 +417,25 @@ export function createNativeHelper(options: {
       if (isAborted(signal)) throw new NativeHelperError('cancelled', 'aborted');
       if (result.code !== 0) throw refusal(result);
     },
-    async release(record, reason, signal) {
+    async release(record, reason, signal, detail) {
       if (!(NATIVE_REASONS as readonly string[]).includes(reason)) {
         throw new NativeHelperError('error');
       }
       if (signal?.aborted === true) throw new NativeHelperError('cancelled');
-      const result = await run([mac ? 'ecdh' : 'sign', reason], stdinOf(record), signal);
+      const command = mac ? 'ecdh' : 'sign';
+      // SEC-CARD-FULLTEXT: a detail that is given but not plain fails closed (never dropped).
+      if (mac && detail !== undefined && detail !== '' && !isPromptDetail(detail)) {
+        throw new NativeHelperError('error', 'exit_detailRefused');
+      }
+      const extra = mac && isPromptDetail(detail) ? [detail] : [];
+      let result = await run([command, reason, ...extra], stdinOf(record), signal);
+      // An older helper knows only `ecdh <reason>` and exits with usage before any sheet; that is
+      // the only case retried without the detail. A helper that knows the detail and refused it
+      // (detailRefused) fails closed: nothing is approved without the who and cost on the sheet.
+      if (extra.length > 0 && result.code === NATIVE_HELPER_EXIT.usage && !isAborted(signal)) {
+        result.stdout.fill(0);
+        result = await run([command, reason], stdinOf(record), signal);
+      }
       if (isAborted(signal)) {
         // Fable review L1: abandoned; whatever the helper printed is dropped.
         result.stdout.fill(0);

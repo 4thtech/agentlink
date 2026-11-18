@@ -10,6 +10,10 @@ import {
   StoreUsageError,
   TABLE_NAMES,
   createSqlSchemaStatements,
+  POLICY_DEFAULTS_EFFECTIVE,
+  evaluateOutgoing,
+  outgoingUsage,
+  recordOutgoing,
   rowKeyOf,
   type Row,
   type Sealed,
@@ -90,12 +94,21 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
       'agent_pause',
       'saved_files',
       'content_file_budget',
+      'outgoing_log',
     ]) {
       sql.exec(`DROP TABLE "${t}"`);
     }
     const columns: Record<string, string[]> = {
-      invites: ['drop_lookup_id', 'drop_key_epoch', 'cancelled_at', 'invite_link'],
-      contacts: ['former_name', 'name_changed_at', 'name_change_seen', 'declared_name'],
+      invites: ['drop_lookup_id', 'drop_key_epoch', 'cancelled_at', 'invite_link', 'created_by'],
+      contacts: [
+        'former_name',
+        'name_changed_at',
+        'name_change_seen',
+        'declared_name',
+        'waiting_owner',
+        'ai_accepted_at',
+      ],
+      pairings: ['created_by'],
       files: ['auto_save', 'auto_reason', 'auto_tries', 'auto_next_at'],
       envelopes: ['deleted_at'],
     };
@@ -114,6 +127,44 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
       expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
       expect(await again.transaction((tx) => tx.select('seen'))).toEqual([seen('keep')]);
       expect(await again.transaction((tx) => tx.select('content_file_budget'))).toEqual([]);
+    });
+  });
+
+  it('migrates a version 16 store (no outgoing_log, D-156) to the current schema, keeping its rows', async () => {
+    await inObject(async (store, state) => {
+      await store.transaction((tx) => tx.insert('seen', seen('keep')));
+      state.storage.sql.exec('DROP TABLE "outgoing_log"');
+      state.storage.sql.exec('UPDATE deploy_state SET schema_version = 16');
+      const again = DurableObjectStore.open(state.storage);
+      expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
+      expect(await again.transaction((tx) => tx.select('seen'))).toEqual([seen('keep')]);
+      expect(await again.transaction((tx) => tx.select('outgoing_log'))).toEqual([]);
+    });
+  });
+
+  // SEC-INVITE-CAPS (cloud agent parity): a version 17 store gets `invites.created_by` and
+  // `contacts.waiting_owner`, null on every existing row (invites read as the owner's, contacts kept).
+  it('migrates a version 17 store (SEC-INVITE-CAPS columns) keeping rows, the new columns null', async () => {
+    await inObject(async (store, state) => {
+      await store.transaction((tx) => tx.insert('seen', seen('keep')));
+      state.storage.sql.exec('ALTER TABLE "invites" DROP COLUMN "created_by"');
+      state.storage.sql.exec('ALTER TABLE "contacts" DROP COLUMN "waiting_owner"');
+      state.storage.sql.exec('ALTER TABLE "contacts" DROP COLUMN "ai_accepted_at"');
+      state.storage.sql.exec('ALTER TABLE "pairings" DROP COLUMN "created_by"');
+      state.storage.sql.exec('UPDATE deploy_state SET schema_version = 17');
+      const again = DurableObjectStore.open(state.storage);
+      expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
+      expect(STORE_SCHEMA_VERSION).toBe(18);
+      const columns = (table: string) =>
+        state.storage.sql
+          .exec(`PRAGMA table_info("${table}")`)
+          .toArray()
+          .map((c) => c['name']);
+      expect(columns('invites')).toContain('created_by');
+      expect(columns('contacts')).toContain('waiting_owner');
+      expect(columns('contacts')).toContain('ai_accepted_at');
+      expect(columns('pairings')).toContain('created_by');
+      expect(await again.transaction((tx) => tx.select('seen'))).toEqual([seen('keep')]);
     });
   });
 
@@ -462,6 +513,49 @@ describe('DurableObjectStore: sealed-column conformance (07 §3, §3.1)', () => 
         '37e3fae71850b52bc6451f527824bb9f9788d12132f0fed83cc934223ec93c7e',
       );
       cipher.close();
+    });
+  });
+});
+
+// SEC-OUTBOUND-CAPS (D-156): the cloud agent runs core's send pipeline over this store, so the
+// outgoing caps hold here too: the count queries core makes in the send transaction answer the same
+// over Durable Object SQLite, and the shared engine refuses at the cap.
+describe('DurableObjectStore: outgoing caps (D-156)', () => {
+  it('counts the outgoing log in the rolling 24 h window; the engine refuses at the cap', async () => {
+    await inObject(async (store) => {
+      const NOW = 1_800_000_000;
+      const ana = '0x' + '3d'.repeat(20);
+      const ben = '0x' + '4e'.repeat(20);
+      await store.transaction((tx) => {
+        tx.insert('outgoing_log', {
+          envelope_id: 'old',
+          contact_id: ana,
+          t: NOW - 86_400,
+          files: 1,
+          bytes: 400,
+        });
+        recordOutgoing(tx, { envelopeId: 'm1', contact: ana, now: NOW - 10, files: 1, bytes: 100 });
+        recordOutgoing(tx, { envelopeId: 'm2', contact: ana, now: NOW - 5, files: 1, bytes: 200 });
+        recordOutgoing(tx, { envelopeId: 'm3', contact: ben, now: NOW - 1, files: 0, bytes: 0 });
+      });
+      const usage = await store.transaction((tx) => outgoingUsage(tx, ana, NOW));
+      expect(usage).toMatchObject({
+        contactMessages: 2,
+        messages: 3,
+        contactFiles: 2,
+        files: 2,
+        bytes: 300,
+      });
+      if (POLICY_DEFAULTS_EFFECTIVE.mode !== 'defaults') throw new Error('unreachable');
+      const base = POLICY_DEFAULTS_EFFECTIVE.policy;
+      const policy = { ...base, outgoing: { ...base.outgoing!, messagesPerContactPerDay: 2 } };
+      expect(
+        evaluateOutgoing(
+          { mode: 'signed', policy, version: 1 },
+          { contact: ana, files: 0, bytes: 0 },
+          usage,
+        ),
+      ).toEqual({ decision: 'deny', limit: 'messages_contact', max: 2 });
     });
   });
 });

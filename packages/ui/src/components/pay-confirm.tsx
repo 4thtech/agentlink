@@ -39,6 +39,9 @@ export const PAY_CONFIRM_STRINGS = Object.freeze({
   changeProofs: 'Proofs',
   changeBudget: '24-hour budget',
   changePerProof: 'Per-proof limit',
+  // D-156: the hard limits, above which proofs are refused, never asked.
+  changeHardBudget: 'Hard limit for 24 hours',
+  changeHardPerProof: 'Hard limit per proof',
   changeContactProofs: 'Proofs for {name}',
   changeContactPerProof: 'Per-proof limit for {name}',
   aContact: 'a contact',
@@ -92,6 +95,8 @@ export type PayField =
   | 'proofs.notarize'
   | 'proofs.dailyBudgetUSD'
   | 'proofs.perActionMaxUSD'
+  | 'proofs.hardDailyUSD'
+  | 'proofs.hardMaxPerActionUSD'
   | 'contactRules.proofs.notarize'
   | 'contactRules.proofs.perActionMaxUSD';
 
@@ -117,6 +122,8 @@ const FIELD_KIND: Readonly<Record<PayField, 'rule' | 'usd'>> = {
   'proofs.notarize': 'rule',
   'proofs.dailyBudgetUSD': 'usd',
   'proofs.perActionMaxUSD': 'usd',
+  'proofs.hardDailyUSD': 'usd',
+  'proofs.hardMaxPerActionUSD': 'usd',
   'contactRules.proofs.notarize': 'rule',
   'contactRules.proofs.perActionMaxUSD': 'usd',
 };
@@ -228,6 +235,10 @@ function changeLabel(field: PayField, name: string | null): string {
       return P.changeBudget;
     case 'proofs.perActionMaxUSD':
       return P.changePerProof;
+    case 'proofs.hardDailyUSD':
+      return P.changeHardBudget;
+    case 'proofs.hardMaxPerActionUSD':
+      return P.changeHardPerProof;
     case 'contactRules.proofs.notarize':
       return fill(P.changeContactProofs, { name: who });
     default:

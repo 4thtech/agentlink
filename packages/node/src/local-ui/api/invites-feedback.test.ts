@@ -71,7 +71,6 @@ function context(over: Partial<LocalUiContext> = {}, contacts: ContactView[] = [
 }
 
 const desk: LocalUiInviteDesk = {
-  create: () => Promise.reject(new Error('unused')),
   check: () => Promise.resolve<LocalUiCheckedInvite>({ contact: PENDING, expiresAt: EXPIRES }),
   cancel: () => Promise.resolve('not_found'),
   cancelConnecting: () => Promise.resolve('not_found'),

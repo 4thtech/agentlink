@@ -251,6 +251,35 @@ function filesText(n: number): string {
 }
 
 /** "2 min ago", "Yesterday", or the date. */
+/**
+ * SEC-INVITE-CAPS (D-156; 08 §1): how many contacts the AI connected wait for Keep or Remove; the
+ * gesture itself is on People (presence). A count only: no name from another party here.
+ */
+export function ViaAiBanner({
+  contacts,
+}: {
+  readonly contacts: ReadonlyMap<string, ContactRow> | undefined;
+}): ReactElement | null {
+  const waiting = [...(contacts?.values() ?? [])].filter(
+    (c) => c.waitingForOwner === true && c.status === 'active',
+  ).length;
+  if (waiting === 0) return null;
+  return (
+    <Banner
+      tone="warning"
+      icon="user-plus"
+      title={S.viaAiTitle}
+      action={
+        <a className="al-btn al-btn-secondary al-btn-sm" href={PEOPLE_PATH} data-via-ai-open>
+          {S.viaAiOpen}
+        </a>
+      }
+    >
+      {waiting === 1 ? S.viaAiOne : fmt(S.viaAiMany, { count: String(waiting) })}
+    </Banner>
+  );
+}
+
 function ago(at: number, now: number): string {
   const s = Math.max(0, Math.floor(now / 1000) - at);
   if (s < 60) return S.agoNow;
@@ -1230,6 +1259,8 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
             {unfinished.map((row) => (
               <UnfinishedRemoval key={row.name} row={row} onFinish={setFinishing} />
             ))}
+            {/* SEC-INVITE-CAPS (D-156): contacts the AI connected wait for the owner's Keep. */}
+            <ViaAiBanner contacts={data?.contacts} />
             {/* WP-1: an ID whose card still carries an older name: repaired here, one gesture. */}
             <RenameBanner
               api={clients.agents}

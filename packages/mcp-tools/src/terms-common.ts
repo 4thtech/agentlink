@@ -20,7 +20,7 @@ import {
 import { renderRef, type ContactRef } from './contacts.js';
 import type { ToolContext } from './context.js';
 import { approvalStateOf } from './get-approval.js';
-import { INVITE_TEXT } from './invite-common.js';
+import { INVITE_TEXT, waitingOwner } from './invite-common.js';
 import type { PayPageConfig } from '@4thtech-io/chain';
 import { needsCredits, notarizeOutput, proofRefusal, proofThrown } from './proofs-common.js';
 import {
@@ -163,6 +163,9 @@ export function termsRefusal(
     case 'IDEMPOTENCY_KEY_REUSED':
       // The same wording and code as agentlink_send (06 §1 rule 6).
       return fail('rejected', SEND_TEXT.keyReused, SEND_TEXT.keyReusedNextStep, code);
+    case 'SPEND_CEILING':
+      // D-156: over a hard ceiling the owner set; never an approval.
+      return proofRefusal(code, fields);
     case 'CHAIN_UNAVAILABLE':
     case 'CARD_EXPIRED':
       // The proof could not be priced or would not verify (M1-9d-3): nothing was sent or asked.
@@ -354,6 +357,9 @@ export function termsCoreError(error: unknown): HandlerOutput | undefined {
       );
     case 'contact_not_active':
       return contactNotReady();
+    // SEC-INVITE-CAPS (D-156): no terms with a contact that waits for the owner's Keep.
+    case 'contact_waiting_owner':
+      return waitingOwner();
     case 'contact_not_found':
       return fail('not_found', TOOL_TEXT.contactNotFound, TOOL_TEXT.contactNotFoundNextStep);
     case 'envelope_too_large':
@@ -394,4 +400,17 @@ export function addressLabel(
   const ref = contacts.get(address);
   if (ref === undefined) return undefined;
   return oneLineName(ref.name) === '' ? A_CONTACT : nameOf(ref);
+}
+
+/** D-156: the SPEND_CEILING fields of a terms refusal (the ceiling and its amount), or none. */
+export function ceilingOf(result: {
+  readonly code: string;
+  readonly ceiling?: string;
+  readonly limitUsd?: string;
+}): Readonly<Record<string, unknown>> {
+  if (result.code !== 'SPEND_CEILING') return {};
+  return {
+    ...(result.ceiling === undefined ? {} : { ceiling: result.ceiling }),
+    ...(result.limitUsd === undefined ? {} : { limitUsd: result.limitUsd }),
+  };
 }
