@@ -102,6 +102,7 @@ describe('check and reserve (06 §3, 07 §3.5)', () => {
         deadline: res.deadline,
         replaces: null,
         settled_at: null,
+        install_id: null,
       },
     ]);
     expect((await state(store))?.newest_t).toBe(NOW);
@@ -256,6 +257,7 @@ describe('fail closed on the ledger (06 §3, 07 §3.5)', () => {
         deadline: NOW + 100,
         replaces: null,
         settled_at: null,
+        install_id: null,
       }),
     );
     const out = await reserve(store, proof('0.01'));

@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 // DEVICES-INTERIM: the bell's row "This ID is also in use on another computer", styled as every
 // other state row of the centre (N5); its second line names the per-computer spending limits.
 import { lintVocabulary } from '@4thtech-io/ui';

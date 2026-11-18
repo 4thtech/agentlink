@@ -18,11 +18,11 @@
  * (SEC-OUTBOUND-CAPS, D-156) adds `outgoing_log` (06 §3 `outgoing`). Version 18
  * (SEC-INVITE-CAPS, D-156) adds `invites.created_by`, `contacts.waiting_owner`, `contacts.ai_accepted_at`
  * and `pairings.created_by` (07 §3). Version 19 (SEC-RELAY-READBACK, D-156 (7)) adds
- * `outbox.availability` and `envelopes.availability` (07 §3.2). An
- * older build refuses a newer store (`store_schema_newer`) when it opens it, so an upgrade cannot be
+ * `outbox.availability` and `envelopes.availability` (07 §3.2). Version 20 (DEVICES-INTERIM)
+ * adds `budget_ledger.install_id` and `install_state` (07 §3.5). An older build refuses a newer store (`store_schema_newer`) when it opens it, so an upgrade cannot be
  * rolled back.
  */
-export const STORE_SCHEMA_VERSION = 19;
+export const STORE_SCHEMA_VERSION = 20;
 
 /** 04 §2.9: `storagePrefix` is 16 random bytes, base64url, generated at init. */
 export const STORAGE_PREFIX_BYTES = 16;

@@ -103,7 +103,9 @@ describe('DEVICES-INTERIM: this ID in use on another computer', () => {
       otherInUse: false,
       otherSeenAt: null,
     });
-    const row = await a.store.transaction((tx) => tx.get('install_state', { slot: SINGLETON_SLOT }));
+    const row = await a.store.transaction((tx) =>
+      tx.get('install_state', { slot: SINGLETON_SLOT }),
+    );
     expect(row).toMatchObject({ install_id: INSTALL_A, since: clock.t, other_seen_at: null });
   });
 
@@ -134,7 +136,12 @@ describe('DEVICES-INTERIM: this ID in use on another computer', () => {
       to: { owner: true },
       payload: await cardUpdatePayload(a),
     });
-    await deliver(a, built.envelope);
+    const received = await a.client.envelopes.receive({
+      envelope: built.envelope,
+      giftWrapId: giftWrapId(),
+    });
+    expect(received).toMatchObject({ status: 'processed', report: { outcome: 'duplicate' } });
+    await a.client.envelopes.processReceived();
     expect((await a.client.devices.state()).otherInUse).toBe(false);
   });
 
@@ -216,7 +223,9 @@ describe('DEVICES-INTERIM: this ID in use on another computer', () => {
       otherInUse: false,
       otherSeenAt: null,
     });
-    const row = await a.store.transaction((tx) => tx.get('install_state', { slot: SINGLETON_SLOT }));
+    const row = await a.store.transaction((tx) =>
+      tx.get('install_state', { slot: SINGLETON_SLOT }),
+    );
     expect(row).toMatchObject({ install_id: INSTALL_B, since: clock.t });
   });
 
@@ -236,7 +245,9 @@ describe('DEVICES-INTERIM: this ID in use on another computer', () => {
     const clock = new FakeClock();
     const a = await agentWith(clock, { installId: installSource('not-an-id') });
     expect((await a.client.devices.state()).installId).toBeNull();
-    const row = await a.store.transaction((tx) => tx.get('install_state', { slot: SINGLETON_SLOT }));
+    const row = await a.store.transaction((tx) =>
+      tx.get('install_state', { slot: SINGLETON_SLOT }),
+    );
     expect(row).toBeUndefined();
   });
 

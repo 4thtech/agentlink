@@ -64,6 +64,8 @@ export interface NotificationSignals {
   readonly update?: boolean | 0 | 1 | 2;
   /** The network has been down for more than 10 minutes. */
   readonly networkDown?: boolean;
+  /** DEVICES-INTERIM: this ID is also in use on another computer (core devices.ts). */
+  readonly otherComputer?: boolean;
   /** When the inbound read ended (unix seconds); the cursor moves there. */
   readonly scannedUntil?: number;
 }
@@ -208,7 +210,10 @@ export function createNotificationStore(
         const record = await load();
         const t = now();
         const byId = new Map(record.items.map((i) => [i.id, i]));
-        const state = (kind: 'approvals' | 'update' | 'network', count: number | undefined) => {
+        const state = (
+          kind: 'approvals' | 'update' | 'network' | 'devices',
+          count: number | undefined,
+        ) => {
           if (count === undefined) return;
           const before = byId.get(kind);
           if (count <= 0) {
@@ -226,6 +231,10 @@ export function createNotificationStore(
         state(
           'network',
           signals.networkDown === undefined ? undefined : signals.networkDown ? 1 : 0,
+        );
+        state(
+          'devices',
+          signals.otherComputer === undefined ? undefined : signals.otherComputer ? 1 : 0,
         );
         const starting = fresh.has(record);
         const windowStart = record.cursor - NOTIFICATION_INBOUND_OVERLAP_SECONDS;

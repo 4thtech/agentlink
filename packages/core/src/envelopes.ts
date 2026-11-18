@@ -78,11 +78,13 @@ import {
   type PreparedCardUpdate,
 } from './contacts.js';
 import { nowOf, seal, type CoreContext } from './context.js';
+import { ensureInstall, noteSentCopyTx, sentCopyContext } from './devices.js';
 import { checkRecipientWrap, kidOf } from './envelope-wraps.js';
 import { CoreError } from './errors.js';
 import { receivedFileRows } from './files/received.js';
 import type { IdentityService } from './identity.js';
 import { REQUESTS_FULL, isBlockedTx, pruneRefusedTx, requestsFullTx } from './requests.js';
+import type { RestoreState } from './restore-guard.js';
 import {
   isTermsType,
   termsBodyOf,
@@ -1552,6 +1554,13 @@ export class EnvelopeService {
       availability: null,
     };
     const now = nowOf(ctx);
+    // DEVICES-INTERIM (devices.ts): a sent copy this store never wrote is another computer's. The
+    // install row and the restore mark are KeyStore reads, made before the transaction.
+    let sentCopy: RestoreState | undefined;
+    if (d.state === 'sent_copy') {
+      await ensureInstall(ctx);
+      sentCopy = await sentCopyContext(ctx);
+    }
     let revoked: RevokeActivity | undefined;
     try {
       const done = await ctx.store.transaction((tx) => {
@@ -1600,6 +1609,9 @@ export class EnvelopeService {
           tx.delete('blocked_keys', { from_key: agentNostrKey(d.cardUpdate.card) });
         }
         writeRow(tx, item, row);
+        if (sentCopy !== undefined) {
+          noteSentCopyTx(tx, { createdAt: envelope.createdAt, now, restore: sentCopy });
+        }
         for (const f of received.rows) {
           if (tx.get('files', { envelope_id: f.envelope_id, idx: f.idx }) === undefined) {
             tx.insert('files', f);

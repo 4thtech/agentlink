@@ -1,7 +1,10 @@
 // DEVICES-INTERIM: the notification centre's `devices` item, "This ID is also in use on another
 // computer". A state item like `update` and `network`: one item, no ref, no content, gone once the
 // other computer has not been seen for a week (core devices.ts).
-import { isNotificationId, readNotificationItem } from '@4thtech-io/types/ui-contract/notifications';
+import {
+  isNotificationId,
+  readNotificationItem,
+} from '@4thtech-io/types/ui-contract/notifications';
 import { describe, expect, it } from 'vitest';
 import { createNotificationStore, memoryNotificationPersistence } from './notifications.js';
 

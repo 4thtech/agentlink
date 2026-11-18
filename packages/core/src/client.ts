@@ -12,6 +12,7 @@ import { STORE_SCHEMA_VERSION } from './constants.js';
 import { ContactBook, waitingOwnerError, type ProofPackSigner } from './contacts.js';
 import { EnvelopeService } from './envelopes.js';
 import { nowOf, type CoreContext } from './context.js';
+import { devicesView, type DevicesView, type InstallIdSource } from './devices.js';
 import { CoreError } from './errors.js';
 import { IdentityService, finishPendingRotation } from './identity.js';
 import { OwnStorage, type OwnStorageKeys } from './own-storage.js';
@@ -125,6 +126,12 @@ export interface AgentLinkClientOptions {
    * automatically; an unreadable mark counts as a restore in force. Without it there is no guard.
    */
   readonly restoreMark?: RestoreMark;
+  /**
+   * DEVICES-INTERIM: this computer's install id, a KeyStore item never sent anywhere (devices.ts).
+   * It labels the budget ledger rows and lets the core notice this ID in use on another computer.
+   * Without it there is no install row and no notice.
+   */
+  readonly installId?: InstallIdSource;
   /**
    * The own-storage KeyStore items, `storage-mark` and the `credentialDigest` of `s3:<id>` (04 §2.2,
    * §2.5.1; M1-9i-a, D-115). Without them no `storage.set` or `storage.remove` applies, and
@@ -249,6 +256,11 @@ export class AgentLinkClient {
    * only under a verified signed policy, never while paused. No MCP tool reaches it (I-4).
    */
   readonly historyRetention: HistoryRetention;
+  /**
+   * DEVICES-INTERIM: whether this ID is also in use on another computer (devices.ts), for the local
+   * app's notice and `doctor`. Read only; no MCP tool reaches it.
+   */
+  readonly devices: DevicesView;
   readonly #send: SendService;
   readonly #sync: SyncService;
   readonly #files: FileFetcher;
@@ -345,6 +357,7 @@ export class AgentLinkClient {
       files,
     );
     this.activity = new ActivityService(ctx, this.contacts);
+    this.devices = devicesView(ctx);
     this.history = new HistoryService(ctx, { files: this.#files });
     this.historyRetention = new HistoryRetention(ctx, {
       loadPolicy: () => this.ownerActions.loadPolicy(),
@@ -845,6 +858,7 @@ export class AgentLinkClient {
       now: options.clock ?? systemClock,
       log: options.logger ?? createLogger({ name: 'core' }),
       ...(options.restoreMark === undefined ? {} : { restoreMark: options.restoreMark }),
+      ...(options.installId === undefined ? {} : { installId: options.installId }),
     };
     if (row !== undefined) await finishPendingRotation(ctx);
     return new AgentLinkClient(

@@ -67,6 +67,15 @@ export const DOCTOR_TEXT = Object.freeze({
 export const DOCTOR_RECEIPTS_OLDER_DEFAULT =
   'Warning  Delivery receipts are on from an older default; they will turn off unless you keep them.';
 
+/**
+ * DEVICES-INTERIM (core devices.ts): this ID is also in use on another computer. A warning, not a
+ * problem; fixed text only (never an install id, a time or anything about the other computer).
+ */
+export const DOCTOR_DEVICES_TEXT = Object.freeze({
+  otherComputer:
+    'Warning  This ID is also in use on another computer\n         Spending limits apply per computer until AgentLink supports one ID on several computers.',
+});
+
 /** M1-9h: how long `doctor` waits for each proof network. */
 export const DOCTOR_PROOF_BUDGET_MS = 4_000;
 
@@ -300,6 +309,13 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
             if (older) emit(DOCTOR_RECEIPTS_OLDER_DEFAULT);
           }
         }
+
+        // DEVICES-INTERIM: the same ID on another computer (a notice; a state that cannot be read
+        // shows nothing).
+        const devices = await Promise.resolve()
+          .then(() => client.devices.state())
+          .catch(() => undefined);
+        if (devices?.otherInUse === true) emit(DOCTOR_DEVICES_TEXT.otherComputer);
 
         // M1-9h: the proof network (06 §8 "RPC"). Counts only (I-7).
         if (deps.proofNetwork !== undefined && withProofNetwork) {

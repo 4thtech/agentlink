@@ -1969,6 +1969,7 @@ export async function startApprovalServerWith(
         scannedUntil?: number;
         update?: boolean | 0 | 1 | 2;
         networkDown?: boolean;
+        otherComputer?: boolean;
       } = {};
       try {
         out.approvals = (await bound.list())
@@ -2017,6 +2018,14 @@ export async function startApprovalServerWith(
         }
       } catch {
         // Unknown: the network item stays as it was.
+      }
+      if (client !== undefined) {
+        try {
+          // DEVICES-INTERIM: this ID is also in use on another computer (a flag only, no detail).
+          out.otherComputer = (await client.devices.state()).otherInUse;
+        } catch {
+          // Unknown: the devices item stays as it was.
+        }
       }
       return out;
     };

@@ -92,6 +92,7 @@ import {
 } from '../budget.js';
 import { evaluateCommitment } from '../commitments.js';
 import type { ContactBook } from '../contacts.js';
+import { ensureInstall } from '../devices.js';
 import { CoreError } from '../errors.js';
 import { acksFor } from '../acks.js';
 import { nowOf, open, seal, type CoreContext } from '../context.js';
@@ -1085,6 +1086,8 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     let ticket: ReturnType<typeof issueRecordTicket>;
     // SEC-RESTORE-GUARD: read before the transaction (a KeyStore item), checked inside it.
     const restore = restoreProofContext(await readRestoreState(this.#ctx), now);
+    // DEVICES-INTERIM: the install row the ledger row names (a KeyStore read, before the transaction).
+    await ensureInstall(this.#ctx);
     try {
       ticket = await this.#ctx.store.transaction((tx) => {
         if (input.claim !== undefined && !input.claim(tx, row)) throw new Abort();

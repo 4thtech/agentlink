@@ -167,6 +167,14 @@ export {
   type RestoreReason,
   type RestoreState,
 } from './restore-guard.js';
+// DEVICES-INTERIM: this ID in use on another computer (the local app's notice, `doctor`).
+export {
+  OTHER_INSTALL_NOTICE_SECONDS,
+  OTHER_INSTALL_SKEW_SECONDS,
+  type DevicesState,
+  type DevicesView,
+  type InstallIdSource,
+} from './devices.js';
 // M1-11r-b (D-118; 04 §2.5.1; 06 §3): unsigned owner-action bodies for the local UI server to sign
 // after presence. Owner surfaces only: no MCP tool uses them (I-4).
 export {

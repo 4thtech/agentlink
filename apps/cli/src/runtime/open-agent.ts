@@ -285,6 +285,8 @@ async function openLocked(
       receiptsKept: agentStore.receiptsKept,
       // SEC-RESTORE-GUARD (D-156): the restore mark; every runtime that opens an agent passes it.
       restoreMark: agentStore.restoreMark,
+      // DEVICES-INTERIM: this computer's install id (a KeyStore item, never sent anywhere).
+      installId: agentStore.installId,
       transport: deps.transport(),
       dropOrigins: DROP_ORIGINS,
       files: nodeFilesPlatform({ home }),

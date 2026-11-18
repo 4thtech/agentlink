@@ -113,6 +113,9 @@ const V18_PAIRINGS_COLUMNS: readonly string[] = ['created_by'];
 /** Columns added by version 19 (SEC-RELAY-READBACK, D-156 (7)): the availability check's result. */
 const V19_ENVELOPE_COLUMNS: readonly string[] = ['availability'];
 const V19_OUTBOX_COLUMNS: readonly string[] = ['availability'];
+/** Added by version 20 (DEVICES-INTERIM): the install on each budget row, and `install_state`. */
+const V20_BUDGET_LEDGER_COLUMNS: readonly string[] = ['install_id'];
+const V20_TABLES: readonly TableName[] = ['install_state'];
 
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
@@ -146,6 +149,7 @@ function v1Spec(table: TableName): TableSpec {
   }
   if (table === 'contacts') return without(spec, [...V9_CONTACTS_COLUMNS, ...V18_CONTACTS_COLUMNS]);
   if (table === 'pairings') return without(spec, V18_PAIRINGS_COLUMNS);
+  if (table === 'budget_ledger') return without(spec, V20_BUDGET_LEDGER_COLUMNS);
   return spec;
 }
 
@@ -249,6 +253,22 @@ function v19Statements(): readonly string[] {
       (column) =>
         `ALTER TABLE "outbox" ADD COLUMN ${columnDef('outbox', column, outbox.columns[column] as ColumnSpec)}`,
     ),
+  ];
+}
+
+/**
+ * Version 20 (DEVICES-INTERIM; 07 §3.5): `budget_ledger.install_id`, appended, nullable (every row
+ * stored before keeps null, and the budget sums it as before), and the one-row `install_state`
+ * table, empty until the runtime supplies this computer's install id.
+ */
+function v20Statements(): readonly string[] {
+  const ledger = tableSpec('budget_ledger');
+  return [
+    ...V20_BUDGET_LEDGER_COLUMNS.map(
+      (column) =>
+        `ALTER TABLE "budget_ledger" ADD COLUMN ${columnDef('budget_ledger', column, ledger.columns[column] as ColumnSpec)}`,
+    ),
+    ...createSchemaStatements(V20_TABLES),
   ];
 }
 
@@ -363,7 +383,9 @@ function v11Statements(): readonly string[] {
  * before the update are not counted), version 18 adds `invites.created_by`,
  * `contacts.waiting_owner`, `contacts.ai_accepted_at` and `pairings.created_by` (SEC-INVITE-CAPS,
  * D-156; nullable, null on existing rows), version 19 adds `envelopes.availability` and
- * `outbox.availability` (SEC-RELAY-READBACK, D-156 (7); nullable, null on existing rows). A later
+ * `outbox.availability` (SEC-RELAY-READBACK, D-156 (7); nullable, null on existing rows), version
+ * 20 adds `budget_ledger.install_id` and `install_state` (DEVICES-INTERIM; nullable, null on
+ * existing rows, and a new table). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -383,7 +405,8 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
           !V12_TABLES.includes(t) &&
           !V15_TABLES.includes(t) &&
           !V16_TABLES.includes(t) &&
-          !V17_TABLES.includes(t),
+          !V17_TABLES.includes(t) &&
+          !V20_TABLES.includes(t),
       ),
       v1Spec,
     ),
@@ -406,6 +429,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 17, statements: createSchemaStatements(V17_TABLES) }),
   Object.freeze({ version: 18, statements: Object.freeze(v18Statements()) }),
   Object.freeze({ version: 19, statements: Object.freeze(v19Statements()) }),
+  Object.freeze({ version: 20, statements: Object.freeze(v20Statements()) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {
