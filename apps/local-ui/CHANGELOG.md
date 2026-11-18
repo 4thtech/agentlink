@@ -1,5 +1,11 @@
 # @4thtech-io/local-ui
 
+## 0.0.32
+
+### Patch Changes
+
+- @4thtech-io/ui@0.5.13
+
 ## 0.0.31
 
 ### Patch Changes

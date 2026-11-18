@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.13] - 2026-11-18
+
+### Added
+
+- Sent messages show how many message-network servers accepted them and how many served them back, e.g. "Message network: accepted by 3, available from 2" (DELIVERY-DETAILS, S1, 07 §3.2). Counts only; no relay address is stored or shown. The local UI API carries them per message.
+- AgentLink tells you when an ID is also in use on another computer (DEVICES-INTERIM, S2): the app's notifications and `agentlink doctor` say so, and that spending limits apply per computer until one ID can be used on several computers. Nothing new is sent to relays or contacts to find this out.
+- Hostile-peer and hostile-relay tests (E2E-HOSTILE, S1, 04 §3.4, 06 §3, 07 §3.8, §4.2): a misbehaving contact and a misbehaving relay run against a real core in CI. They check that a relay that does not serve a message back never earns a plain "Sent", that text that reads like instructions stays untrusted, that acknowledgements never delete or keep more than their own message, that offers meet the sending caps, that messages from before a restore start nothing automatically, that refused sends clean up their uploads and that parallel proof requests sign and charge once.
+The nine scenarios:
+- A message from a relay that serves nothing back stays "not yet confirmed", never "Sent".
+- Instruction-like text in a message stays untrusted and starts nothing.
+- An acknowledgement with another hash, for another message or from another key epoch is not a receipt.
+- An acknowledgement delivered again, or reused for another message, counts once, for its own message only.
+- Acknowledgements never delete or keep more than their own message.
+- Offers beyond the sending caps are refused.
+- Messages from before a restore start nothing automatically.
+- A refused send cleans up its uploads.
+- Parallel proof requests sign and charge once.
+- "Update your contact details": an ID made before the new default servers can move to them with one owner approval, on Home or with `agentlink owner update-contact-details` (RELAY-CARD-MIGRATION, S2, 04 §2.6, 07 §4.3). Contacts get the new details automatically, also on the old servers during the transition. Only the owner can do it; no AI tool can. Skipping it breaks nothing for now, and `agentlink doctor` mentions it.
+- A daily, read-only check of the default relays runs on GitHub's runners (RELAY-DEFAULTS-HEALTH, S1): it asks each relay for recent gift-wrap ids without a login, publishes nothing, and writes the result to the job summary.
+
+### Changed
+
+- The notice that an ID is also in use on another computer says when that computer was last seen, in the app and in `agentlink doctor`, and stays on until AgentLink can tell the other computer stopped (DEVICES-INTERIM-2, S2).
+- The user guide, README, status page, security model and knowledge base describe AgentLink 0.5.12: what "Sent" means, the 24 hours after a restore, proofs, sending limits for terms, Delete history, the menu bar widget (DOCS-REL-0512, S0).
+- Specs, backlog, process and knowledge describe the 0.5.13 changes: message network counts, restore traces, the notice for an ID in use on another computer, the e2e hostile suites, the new default relays with read-only legacy relays, "Update your contact details", and the broken-ledger and clock rules of the spending limits (DOCS-REL0513, S0; D-75, D-156).
+- New default relays: offchain.pub and nostr.bitcoiner.social replace nos.lol and nostr.mom, after a live read-back check (RELAY-DEFAULTS-SWAP, S1, D-75, 07 §4). New invites list only the new set. For now AgentLink still reads from the two old relays so nothing waiting there is lost, never sends to them by itself, and still reaches contacts whose invite lists them.
+
+### Fixed
+
+- A contact-details update accepted only by the old servers now keeps retrying until one of the contact's current servers accepts it, as documented (07 §4.3). Other messages are unchanged.
+
+### Security
+
+- Restores are visible in your history (RESTORE-TRACES, S2, D-156): the Activity page shows when an ID was restored from a backup, or when an update started the 24-hour check, and that paid actions ask you first for 24 hours; the entry itself is not a charge. Messages sent before a restore from a backup that arrive after it are marked "From before the restore" in the conversation.
+- SPEC04-RESIDUAL-REWRITE: the security spec and pages now state plainly what is defended after 0.5.10 to 0.5.13, what stays residual (a process running as the same OS user, one ID on several computers, the proof-signing gate in the core, the old default relays during the move) and what is planned before mainnet.
+
 ## [0.5.12] - 2026-11-18
 
 ### Changed
@@ -1421,7 +1457,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.12...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.13...HEAD
+[0.5.13]: https://github.com/4thtech/agentlink/compare/v0.5.12...v0.5.13
 [0.5.12]: https://github.com/4thtech/agentlink/compare/v0.5.11...v0.5.12
 [0.5.11]: https://github.com/4thtech/agentlink/compare/v0.5.10...v0.5.11
 [0.5.10]: https://github.com/4thtech/agentlink/compare/v0.5.9...v0.5.10
