@@ -75,6 +75,17 @@ class Cancel implements ReadbackSignal {
   }
 }
 
+/** The OKs that count for a row: all of them, less those of its `uncounted` relays. */
+function countedAcks(
+  row: OutboxRow,
+  acks: Readonly<Record<string, number>>,
+): Record<string, number> {
+  const skip = row.uncounted ?? [];
+  const out: Record<string, number> = {};
+  for (const [relay, at] of Object.entries(acks)) if (!skip.includes(relay)) out[relay] = at;
+  return out;
+}
+
 /** When the row reached MIN_ACKS: the MIN_ACKS-th earliest OK time, or undefined. */
 function reachedMinAcksAt(acks: Readonly<Record<string, number>>): number | undefined {
   const times = Object.values(acks).sort((a, b) => a - b);
@@ -117,6 +128,14 @@ export interface OutboxRow {
   readonly createdAt: number;
   readonly giveUpAt: number;
   readonly role: 'contact' | 'owner';
+  /**
+   * RELAY-CARD-MIGRATION: relays of the list whose OK is kept (the wrap is not published there
+   * again) but never counts: not toward MIN_ACKS, not for the read-back, not at give_up_at. A row
+   * with only such OKs stays pending and retries within the usual backoff until counted relays accept
+   * it, and is `not_delivered` at give_up_at. The core sets it only for a card-update's fan-out to the
+   * legacy relays; absent for every other row, which is unchanged.
+   */
+  readonly uncounted?: readonly string[];
 }
 
 /** What changes after one publish pass that did not reach 2 OKs. */
@@ -352,9 +371,9 @@ export class OutboxWorker {
     const merged: Record<string, number> = this.listedAcks(row, relays);
     const pastDeadline = nowSeconds >= giveUpAt;
     let check: Readback | undefined;
-    if (Object.keys(merged).length >= MIN_ACKS) {
+    if (Object.keys(countedAcks(row, merged)).length >= MIN_ACKS) {
       // a crash after the publish, before the mark: the stored OKs are checked like fresh ones
-      check = await this.readback(event.id, Object.keys(merged));
+      check = await this.readback(event.id, Object.keys(countedAcks(row, merged)));
       if (check.kind !== 'missing') return this.finishSent(row.wrapId, merged, check);
     }
     // The stored event goes only to the relays of its row that have not acknowledged it yet.
@@ -363,7 +382,7 @@ export class OutboxWorker {
     let tooLarge = false;
     if (!pastDeadline && remaining.length > 0) {
       if (!(await this.persistence.isPending(row.wrapId))) return { kind: 'skipped' };
-      const before = Object.keys(merged).length;
+      const before = Object.keys(countedAcks(row, merged)).length;
       const outcome = await this.pool.publish(event, remaining);
       for (const r of outcome.results) {
         if (r.reason === 'too_large') tooLarge = true;
@@ -372,16 +391,17 @@ export class OutboxWorker {
       for (const relay of outcome.acked) {
         if (relays.includes(relay) && merged[relay] === undefined) merged[relay] = nowSeconds;
       }
-      if (Object.keys(merged).length >= MIN_ACKS && Object.keys(merged).length > before) {
-        check = await this.readback(event.id, Object.keys(merged));
+      const counted = Object.keys(countedAcks(row, merged));
+      if (counted.length >= MIN_ACKS && counted.length > before) {
+        check = await this.readback(event.id, counted);
         if (check.kind !== 'missing') return this.finishSent(row.wrapId, merged, check);
       }
     }
-    const okCount = Object.keys(merged).length;
+    const okCount = Object.keys(countedAcks(row, merged)).length;
     const nothingLeft = relays.every((relay) => merged[relay] !== undefined);
     if (pastDeadline && okCount >= 1) {
       // At the bound: one OK (or more) and nothing served is sent with availability unknown.
-      check ??= await this.readback(event.id, Object.keys(merged));
+      check ??= await this.readback(event.id, Object.keys(countedAcks(row, merged)));
       return this.finishSent(row.wrapId, merged, check);
     }
     if (pastDeadline) {
@@ -389,7 +409,7 @@ export class OutboxWorker {
         ? { kind: 'not_delivered' }
         : { kind: 'skipped' };
     }
-    const reachedAt = reachedMinAcksAt(merged);
+    const reachedAt = reachedMinAcksAt(countedAcks(row, merged));
     if (check?.kind === 'missing') {
       // Every relay of the row accepted it and none served it back (no other relay to try), or the
       // other relays did not take it within the grace: sent, availability unknown.

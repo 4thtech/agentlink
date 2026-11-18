@@ -27,7 +27,10 @@
 //   and only until LEGACY_CARD_UPDATE_UNTIL (dated in transport-nostr legacy-relays.ts). A legacy
 //   relay's OK never makes a card-update count as `sent`: only an OK from a relay of the contact's
 //   own list does; one accepted only by legacy relays (or by none yet) counts as `failed` for this
-//   pass, while the outbox keeps retrying its rows (07 §3.2).
+//   pass. Its contact row does not end either: the outbox marks the legacy relays `uncounted`
+//   (outbox.ts #uncountedOf), so their OKs never count toward MIN_ACKS, and the row stays pending and
+//   retries within the usual backoff until relays of the contact's own list accept it (or is
+//   `not_delivered` at give_up_at, and then sent again by the next pass) (07 §3.2, §4.3).
 // - Who may call it. The core only (sync, and the owner flow after a rotation). No MCP tool creates
 //   or passes a `card-update` (04 §3.4.1, I-4): the payload is built here from the own stored card.
 //

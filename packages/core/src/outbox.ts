@@ -52,7 +52,9 @@ import {
 } from '@4thtech-io/crypto';
 import { isAllowedRelayUrl, payloadSchema, type Payload } from '@4thtech-io/types';
 import {
+  LEGACY_READ_RELAYS,
   MAX_RELAYS_PER_WRAP,
+  MIN_ACKS,
   OutboxWorker,
   SYNC_LOOKBACK_SECONDS,
   SYNC_SKEW_SECONDS,
@@ -273,7 +275,9 @@ class StoreOutboxPersistence implements OutboxPersistence {
     } catch {
       relays = [];
     }
+    const uncounted = await this.#uncountedOf(row, relays);
     return {
+      ...(uncounted.length === 0 ? {} : { uncounted }),
       wrapId: row.wrap_id,
       envelopeId: row.envelope_id,
       recipientKey: row.recipient_key,
@@ -286,6 +290,22 @@ class StoreOutboxPersistence implements OutboxPersistence {
       giveUpAt: row.give_up_at,
       role: row.role,
     };
+  }
+
+  /**
+   * RELAY-CARD-MIGRATION (07 §4.3 "Card-update fan-out"): a card-update's contact wrap also goes to
+   * the legacy relays, but their OKs never end its row: it stays pending and retries until relays of
+   * the contact's own list accept it. Only when the row also lists at least MIN_ACKS other relays,
+   * so a contact whose own list is mostly legacy relays is reached as before. Every other row: none.
+   */
+  async #uncountedOf(row: Row<'outbox'>, relays: readonly string[]): Promise<readonly string[]> {
+    if (row.role !== 'contact') return [];
+    const legacy = relays.filter((r) => LEGACY_READ_RELAYS.includes(r));
+    if (legacy.length === 0 || relays.length - legacy.length < MIN_ACKS) return [];
+    const envelope = await this.#ctx.store.transaction((tx) =>
+      tx.get('envelopes', { envelope_id: row.envelope_id }),
+    );
+    return envelope?.type === 'card-update' ? legacy : [];
   }
 
   /** Still pending and still claimed by this process: another process has not taken it over. */
