@@ -95,6 +95,8 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
       'saved_files',
       'content_file_budget',
       'outgoing_log',
+      'budget_restores',
+      'restore_replays',
     ]) {
       sql.exec(`DROP TABLE "${t}"`);
     }
@@ -198,6 +200,21 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
         expect.arrayContaining(['relays_accepted', 'relays_available']),
       );
       expect(await again.transaction((tx) => tx.select('seen'))).toEqual([seen('keep')]);
+    });
+  });
+
+  // RESTORE-TRACES (cloud agent parity): a version 19 store gets the two new tables, empty.
+  it('migrates a version 19 store (no restore-traces tables) keeping rows, the new tables empty', async () => {
+    await inObject(async (store, state) => {
+      await store.transaction((tx) => tx.insert('seen', seen('keep')));
+      state.storage.sql.exec('DROP TABLE "budget_restores"');
+      state.storage.sql.exec('DROP TABLE "restore_replays"');
+      state.storage.sql.exec('UPDATE deploy_state SET schema_version = 19');
+      const again = DurableObjectStore.open(state.storage);
+      expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
+      expect(await again.transaction((tx) => tx.select('seen'))).toEqual([seen('keep')]);
+      expect(await again.transaction((tx) => tx.select('budget_restores'))).toEqual([]);
+      expect(await again.transaction((tx) => tx.select('restore_replays'))).toEqual([]);
     });
   });
 

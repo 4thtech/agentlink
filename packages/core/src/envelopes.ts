@@ -83,6 +83,8 @@ import { CoreError } from './errors.js';
 import { receivedFileRows } from './files/received.js';
 import type { IdentityService } from './identity.js';
 import { REQUESTS_FULL, isBlockedTx, pruneRefusedTx, requestsFullTx } from './requests.js';
+import { readRestoreState, type RestoreState } from './restore-guard.js';
+import { noteReplayTx } from './restore-traces.js';
 import {
   isTermsType,
   termsBodyOf,
@@ -126,6 +128,11 @@ export interface ReceiveInput {
   readonly envelope: unknown;
   /** The gift-wrap event id (64 lowercase hex), recorded in `seen` (07 §3.2). */
   readonly giftWrapId?: string;
+  /**
+   * RESTORE-TRACES: the restore state the caller read once for its batch (sync). Absent: receive
+   * reads it itself.
+   */
+  readonly restore?: RestoreState;
 }
 
 /**
@@ -696,6 +703,8 @@ export class EnvelopeService {
     }
     try {
       const now = nowOf(this.#ctx);
+      // RESTORE-TRACES: the batch's state, or read here (the mark is a KeyStore item); never throws.
+      const restore = input.restore ?? (await readRestoreState(this.#ctx));
       return await this.#ctx.store.transaction((tx): ReceiveResult => {
         const markSeen = (): void => {
           if (wrapId !== undefined && tx.get('seen', { kind: 'wrap', id: wrapId }) === undefined) {
@@ -763,6 +772,8 @@ export class EnvelopeService {
           relays_accepted: null,
           relays_available: null,
         });
+        // RESTORE-TRACES: first stored after a restore but created before it: received again.
+        noteReplayTx(tx, restore, envelope.id, envelope.createdAt);
         markSeen();
         return { status: 'verified', report: report(envelope.id, 'deferred') };
       });

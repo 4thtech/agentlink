@@ -17,6 +17,7 @@ import { IdentityService, finishPendingRotation } from './identity.js';
 import { OwnStorage, type OwnStorageKeys } from './own-storage.js';
 import { OwnerActions, type PolicyVersionMark, type ReceiptsKeptMark } from './owner-actions.js';
 import type { RestoreMark } from './restore-guard.js';
+import { recordRestoreTrace } from './restore-traces.js';
 import { ApprovalService } from './approvals.js';
 import { IdempotencyService } from './idempotency.js';
 import {
@@ -847,6 +848,9 @@ export class AgentLinkClient {
       ...(options.restoreMark === undefined ? {} : { restoreMark: options.restoreMark }),
     };
     if (row !== undefined) await finishPendingRotation(ctx);
+    // RESTORE-TRACES: the spending-history entry of a restore (or an update that started the guard),
+    // written once per restore mark; never blocks opening.
+    if (row !== undefined) await recordRestoreTrace(ctx);
     return new AgentLinkClient(
       bundle.agentId,
       ctx,

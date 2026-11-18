@@ -116,6 +116,13 @@ const V19_OUTBOX_COLUMNS: readonly string[] = ['availability'];
 /** Columns added by version 20 (DELIVERY-DETAILS): how many relays accepted and served a message. */
 const V20_COLUMNS: readonly string[] = ['relays_accepted', 'relays_available'];
 
+/**
+ * Tables added by the restore-traces version (RESTORE-TRACES, D-156; 07 §3.5), version 20 here: the
+ * restore entries of the spending history and inbound received again after a restore. Named by
+ * content: if another lane adds a version first, this one takes the next number.
+ */
+const RESTORE_TRACES_TABLES: readonly TableName[] = ['budget_restores', 'restore_replays'];
+
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
   return {
@@ -407,7 +414,8 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
           !V12_TABLES.includes(t) &&
           !V15_TABLES.includes(t) &&
           !V16_TABLES.includes(t) &&
-          !V17_TABLES.includes(t),
+          !V17_TABLES.includes(t) &&
+          !RESTORE_TRACES_TABLES.includes(t),
       ),
       v1Spec,
     ),

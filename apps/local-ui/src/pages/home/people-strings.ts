@@ -133,6 +133,8 @@ export const HOME_STRINGS = {
   // DELIVERY-DETAILS: the details line of a sent message (counts only, never a relay address).
   // 11 §5.1: "relay" maps to "message network", also under the hood.
   relayDetails: 'Message network: accepted by {accepted}, available from {available}',
+  // RESTORE-TRACES (D-156): a message from them, sent before a restore, that arrived after it.
+  receivedAgain: 'From before the restore',
   receiptPending: 'Pending',
   receiptTheirs: 'Sent by them',
   proof: 'Proof',

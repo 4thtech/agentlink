@@ -638,6 +638,25 @@ export const TABLES = {
     columns: { envelope_id: id, contact_id: id, t: int, files: int, bytes: int },
     primaryKey: ['envelope_id'],
   },
+  // RESTORE-TRACES (D-156; 07 §3.5; the schema version after 19, named by content; proposed, owner
+  // confirms at merge): the restore entries of the spending history, one per restore mark
+  // (restore-traces.ts). restored_at is the mark's time; reason is `restore` (restored from a backup)
+  // or `update` (an update started the guard); noted_at is when the core wrote the row. A time and a
+  // reason only, never an amount, so a row can never read as a charge; the budget (budget.ts) never
+  // reads this table. Written only by the core when it opens the store; no MCP tool writes or deletes
+  // it (I-4).
+  budget_restores: {
+    columns: { restored_at: int, reason: oneOf('restore', 'update'), noted_at: int },
+    primaryKey: ['restored_at'],
+  },
+  // RESTORE-TRACES (same version): inbound first stored after a restore whose signed createdAt is
+  // before it (the guard's skew rule, restore-guard.ts restoredReplay), so the conversation shows
+  // "Received again after restore". Written in the transaction that first stores the envelope; the
+  // envelope ID and the restore time only.
+  restore_replays: {
+    columns: { envelope_id: id, restored_at: int },
+    primaryKey: ['envelope_id'],
+  },
 } as const satisfies Readonly<Record<string, TableSpec>>;
 
 export type Tables = typeof TABLES;

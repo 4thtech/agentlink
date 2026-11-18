@@ -770,6 +770,109 @@ describe('SEC-RESTORE-GUARD: inbound sent before a restore triggers no ack', () 
   });
 });
 
+describe('RESTORE-TRACES: inbound received again after a restore, and the restore entry', () => {
+  it('a message created before the restore and received after it is labelled; a newer one is not', async () => {
+    const net = new RelayNetwork();
+    const restoredAt = { value: 0 };
+    const restoreMark: RestoreMark = { read: () => Promise.resolve(restoredAt.value) };
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { restoreMark });
+    await pair(a, b);
+    await a.client.sendMessage({ to: b.id, text: 'before the restore' });
+    clock.t += 3_600;
+    restoredAt.value = clock.t;
+    await b.client.syncInbox();
+    clock.t += 3_600;
+    await a.client.sendMessage({ to: b.id, text: 'after the restore' });
+    await b.client.syncInbox();
+    const page = await b.client.messages.list(a.id, 'in');
+    const byText = new Map(page.items.map((i) => [i.text, i]));
+    expect(byText.get('before the restore')).toMatchObject({ receivedAgain: true });
+    expect(byText.get('after the restore')).not.toHaveProperty('receivedAgain');
+    const replays = await b.store.transaction((tx) => tx.select('restore_replays'));
+    expect(replays).toEqual([
+      { envelope_id: byText.get('before the restore')?.id, restored_at: restoredAt.value },
+    ]);
+  });
+
+  it('an update that started the guard labels nothing, and stores no replay rows', async () => {
+    const net = new RelayNetwork();
+    const restoredAt = { value: 0 };
+    const restoreMark: RestoreMark = {
+      read: () => Promise.resolve(restoredAt.value),
+      reason: () => Promise.resolve('update'),
+    };
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { restoreMark });
+    await pair(a, b);
+    await a.client.sendMessage({ to: b.id, text: 'before the update' });
+    clock.t += 3_600;
+    restoredAt.value = clock.t;
+    await b.client.syncInbox();
+    const page = await b.client.messages.list(a.id, 'in');
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]).not.toHaveProperty('receivedAgain');
+    expect(await b.store.transaction((tx) => tx.select('restore_replays'))).toEqual([]);
+  });
+
+  it('a sync reads the restore mark once for its batch and passes it to every receive', async () => {
+    const net = new RelayNetwork();
+    // A restore long ago: each read gives a new state object, so one object means one read.
+    const restoreMark: RestoreMark = { read: () => Promise.resolve(1) };
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { restoreMark });
+    await pair(a, b);
+    for (const text of ['one', 'two', 'three']) await a.client.sendMessage({ to: b.id, text });
+    const inputs: unknown[] = [];
+    const receive = b.client.envelopes.receive.bind(b.client.envelopes);
+    b.client.envelopes.receive = (input) => {
+      inputs.push(input);
+      return receive(input);
+    };
+    await b.client.syncInbox();
+    expect(inputs.length).toBeGreaterThanOrEqual(3);
+    const states = inputs.map((i) => (i as { restore?: unknown }).restore);
+    for (const state of states) {
+      expect(state).toEqual({ status: 'restored', restoredAt: 1, reason: 'restore' });
+    }
+    // One object for the whole batch: read once, not per envelope.
+    expect(new Set(states).size).toBe(1);
+  });
+
+  it('an unreadable restore mark labels nothing (the label needs a known restore time)', async () => {
+    const net = new RelayNetwork();
+    const restoreMark: RestoreMark = { read: () => Promise.reject(new Error('unreadable')) };
+    const a = await openAgent(1, 'alice', RELAYS_A, net);
+    const b = await openAgent(2, 'bob', RELAYS_B, net, { restoreMark });
+    await pair(a, b);
+    await a.client.sendMessage({ to: b.id, text: 'hi' });
+    await b.client.syncInbox();
+    const page = await b.client.messages.list(a.id, 'in');
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]).not.toHaveProperty('receivedAgain');
+  });
+
+  it('opening the restored store writes the restore entry to the spending history, once', async () => {
+    const net = new RelayNetwork();
+    const b = await openAgent(2, 'bob', RELAYS_B, net);
+    const at = clock.t - 120;
+    const restoreMark: RestoreMark = {
+      read: () => Promise.resolve(at),
+      reason: () => Promise.resolve('restore'),
+    };
+    for (let i = 0; i < 2; i += 1) {
+      await openAgent(2, 'bob', RELAYS_B, net, {
+        store: b.store,
+        keyStore: b.keyStore,
+        init: false,
+        restoreMark,
+      });
+    }
+    const rows = await b.store.transaction((tx) => tx.select('budget_restores'));
+    expect(rows).toEqual([{ restored_at: at, reason: 'restore', noted_at: clock.t }]);
+  });
+});
+
 describe('SEC-RELAY-READBACK: a receipt from the contact confirms a message', () => {
   it('turns a row still pending on its availability check into sent, confirmed', async () => {
     const net = new RelayNetwork();

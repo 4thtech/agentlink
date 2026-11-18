@@ -658,6 +658,14 @@ describe(
       // Version 20 (DELIVERY-DETAILS): four nullable integer columns appended
       // (sqlite-store-v20.test.ts). Versions 1 to 19 keep their statements.
       expect(MIGRATIONS[19]?.statements).toHaveLength(4);
+      // Version 21 (RESTORE-TRACES, D-156): two new tables only
+      // (sqlite-store-restore-traces.test.ts). Versions 1 to 20 keep their statements.
+      const v20 = MIGRATIONS[20]?.statements ?? [];
+      expect(v20.filter((s) => s.startsWith('CREATE TABLE')).map((s) => s.split('"')[1])).toEqual([
+        'budget_restores',
+        'restore_replays',
+      ]);
+      expect(v20.every((s) => !s.startsWith('ALTER TABLE'))).toBe(true);
     });
 
     it('migrates a version 13 file to version 14 (REL051-B2): invites kept, invite_link null', async () => {

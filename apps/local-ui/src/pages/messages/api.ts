@@ -44,6 +44,8 @@ export interface MessageItem {
   readonly availability?: 'unknown';
   /** DELIVERY-DETAILS: relays that accepted the message, and relays that served it back. */
   readonly relays?: { readonly accepted: number; readonly available: number };
+  /** RESTORE-TRACES: a received message that arrived again after a restore. */
+  readonly receivedAgain?: true;
   readonly proof: boolean;
   readonly size: number;
   /** MSG-ORDER-1: the local order of one second, both boxes on one scale (core `seq`). */
@@ -98,6 +100,7 @@ function parseItem(raw: unknown): MessageItem | undefined {
     receivedOlder,
     availability,
     relays,
+    receivedAgain,
     proof,
     size,
     seq,
@@ -127,6 +130,7 @@ function parseItem(raw: unknown): MessageItem | undefined {
     ...(status === 'sent' && isRecord(relays) && isTime(relays.accepted) && isTime(relays.available)
       ? { relays: { accepted: relays.accepted, available: relays.available } }
       : {}),
+    ...(status === undefined && receivedAgain === true ? { receivedAgain: true as const } : {}),
     proof: proof === true,
     size,
     ...(seq === undefined ? {} : { seq }),

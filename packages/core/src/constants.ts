@@ -19,11 +19,12 @@
  * (SEC-INVITE-CAPS, D-156) adds `invites.created_by`, `contacts.waiting_owner`, `contacts.ai_accepted_at`
  * and `pairings.created_by` (07 §3). Version 19 (SEC-RELAY-READBACK, D-156 (7)) adds
  * `outbox.availability` and `envelopes.availability` (07 §3.2). Version 20 (DELIVERY-DETAILS) adds
- * `relays_accepted` and `relays_available` to both (counts only). An
+ * `relays_accepted` and `relays_available` to both (counts only). Version 21 (RESTORE-TRACES, D-156)
+ * adds `budget_restores` and `restore_replays` (07 §3.5). An
  * older build refuses a newer store (`store_schema_newer`) when it opens it, so an upgrade cannot be
  * rolled back.
  */
-export const STORE_SCHEMA_VERSION = 20;
+export const STORE_SCHEMA_VERSION = 21;
 
 /** 04 §2.9: `storagePrefix` is 16 random bytes, base64url, generated at init. */
 export const STORAGE_PREFIX_BYTES = 16;

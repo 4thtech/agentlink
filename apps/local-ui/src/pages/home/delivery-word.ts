@@ -45,3 +45,14 @@ export function relaysWord(item: Item): string | undefined {
   if (item.availability === 'unknown' || available === 0) return S.sentAvailabilityUnknown;
   return fmt(S.relayDetails, { accepted, available });
 }
+
+/**
+ * RESTORE-TRACES (D-156; 11 §5): the quiet label "From before the restore" under a message from the
+ * other side that was sent before a restore and arrived after it. Undefined otherwise.
+ */
+export function receivedAgainWord(
+  item: Partial<Pick<MessageItem, 'receivedAgain'>>,
+  out: boolean,
+): string | undefined {
+  return !out && item.receivedAgain === true ? S.receivedAgain : undefined;
+}

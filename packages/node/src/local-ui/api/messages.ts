@@ -116,7 +116,12 @@ function itemView(box: MessageBox, item: unknown): JsonObject | undefined {
     size,
     ...(seq === undefined ? {} : { seq }),
   };
-  if (box === 'in') return base;
+  if (box === 'in') {
+    // RESTORE-TRACES (D-156): sent before a restore, arrived after it; only `true`, only on the Inbox.
+    const { receivedAgain } = item as Record<string, unknown>;
+    if (receivedAgain !== undefined && receivedAgain !== true) return undefined;
+    return receivedAgain === true ? { ...base, receivedAgain } : base;
+  }
   const { status, receipt, receivedOlder, availability, relays } = item as Record<string, unknown>;
   if (typeof status !== 'string' || !SENT_STATUSES.has(status)) return undefined;
   if (typeof receipt !== 'boolean') return undefined;
