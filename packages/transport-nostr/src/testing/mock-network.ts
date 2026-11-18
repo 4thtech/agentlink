@@ -67,6 +67,14 @@ export interface MockRelayConfig {
   silentIdsReq?: boolean;
   /** M2-19: raw frames sent before the stored events of every REQ with an `ids` filter (hostile input). */
   idsExtraFrames?: (subId: string) => string[];
+  /** SEC-RELAY-READBACK: answers EVENT with OK true but keeps nothing (an OK it cannot back). */
+  neverServes?: boolean;
+  /** SEC-RELAY-READBACK: serves a stored event only on the connection that published it. */
+  sameSocketOnly?: boolean;
+  /** SEC-RELAY-READBACK: takes EVENT without a login, but closes every REQ until one (NIP-42). */
+  reqNeedsAuth?: boolean;
+  /** SEC-RELAY-READBACK: answers a REQ with an `ids` filter with this event instead of the stored one. */
+  serveInstead?: NostrEvent;
 }
 
 const microtask = (fn: () => void): void => {
@@ -187,9 +195,13 @@ export class MockSocket implements RelaySocket {
       this.push(JSON.stringify(['OK', event.id, false, config.okMessage ?? 'blocked: no']));
       return;
     }
-    this.network.stored.push({ relay: this.target.url, event });
-    this.network.fanOut(this.target.url, event);
     const ok = JSON.stringify(['OK', event.id, true, config.okMessage ?? '']);
+    if (config.neverServes === true) {
+      this.push(ok);
+      return;
+    }
+    this.network.stored.push({ relay: this.target.url, event, socket: this });
+    this.network.fanOut(this.target.url, event);
     if (config.okDelayMs === undefined) this.push(ok);
     else {
       // read at call time, so fake timers apply
@@ -218,7 +230,10 @@ export class MockSocket implements RelaySocket {
   }
 
   private handleReq(subId: string, filter: MockFilter, config: MockRelayConfig): void {
-    if (config.requireAuth === true && !this.authed) {
+    if ((config.requireAuth === true || config.reqNeedsAuth === true) && !this.authed) {
+      if (config.reqNeedsAuth === true && config.requireAuth !== true) {
+        this.push(JSON.stringify(['AUTH', this.challenge]));
+      }
       this.push(JSON.stringify(['CLOSED', subId, 'auth-required: log in first']));
       return;
     }
@@ -240,8 +255,18 @@ export class MockSocket implements RelaySocket {
     const withoutUntil: MockFilter = { ...filter };
     delete withoutUntil.until;
     const matchFilter: MockFilter = ignore ? withoutUntil : filter;
+    if (config.serveInstead !== undefined && filter.ids !== undefined) {
+      this.push(JSON.stringify(['EVENT', subId, config.serveInstead]));
+      this.push(JSON.stringify(['EOSE', subId]));
+      return;
+    }
     let stored = this.network.stored
-      .filter((s) => s.relay === this.target.url && this.matches(matchFilter, s.event))
+      .filter(
+        (s) =>
+          s.relay === this.target.url &&
+          (config.sameSocketOnly !== true || s.socket === this) &&
+          this.matches(matchFilter, s.event),
+      )
       .map((s) => s.event);
     if (config.newestFirst === true) stored.reverse();
     const limit = ignore ? undefined : filter.limit;
@@ -288,7 +313,7 @@ export class MockNetwork implements RelayConnector, HostResolver, Nip11Fetcher {
   readonly nip11Options: (Nip11FetchOptions | undefined)[] = [];
   readonly sockets: MockSocket[] = [];
   readonly received: { relay: string; frame: string }[] = [];
-  readonly stored: { relay: string; event: NostrEvent }[] = [];
+  readonly stored: { relay: string; event: NostrEvent; socket?: MockSocket }[] = [];
   closedCount = 0;
 
   configure(url: string, config: MockRelayConfig = {}): string {

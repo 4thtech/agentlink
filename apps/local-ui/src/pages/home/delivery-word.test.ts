@@ -31,6 +31,17 @@ describe('sentWord', () => {
     );
   });
 
+  it('SEC-RELAY-READBACK: sent but not confirmed by any relay reads "Sent, availability unknown"', () => {
+    expect(sentWord(item({ availability: 'unknown' }), 'Ana')).toBe('Sent, availability unknown');
+    // A signed receipt is stronger: the contact's AI has it.
+    expect(sentWord(item({ availability: 'unknown', receipt: true }), 'Ana')).toBe(
+      "Received by Ana's app",
+    );
+    expect(sentWord(item({ availability: 'unknown', proof: true }), 'Ana')).toBe(
+      'Sent, availability unknown',
+    );
+  });
+
   it('other states keep their word', () => {
     expect(sentWord(item({ status: 'queued' }), 'Ana')).toBe('Waiting to send');
     expect(sentWord(item({ status: 'not_delivered' }), 'Ana')).toBe('Not delivered');
