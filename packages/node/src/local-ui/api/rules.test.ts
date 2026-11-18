@@ -475,6 +475,81 @@ describe('GET /api/ui/rules/review: prepare an edit (core preparePolicyEdit)', (
   });
 });
 
+// --- SEC-HARD-CEILING, SEC-OUTBOUND-CAPS (D-156): only the owner, on this page, with presence -----
+
+describe('hard proof ceilings and outgoing caps on the Rules page (D-156; I-4)', () => {
+  it('the page shows the hard ceilings and the outgoing caps (the defaults)', async () => {
+    const { context } = await setup();
+    const result = await getRules(context);
+    expect(result.body).toMatchObject({
+      rules: {
+        proofs: {
+          perActionMaxUSD: '0.2',
+          dailyBudgetUSD: '5',
+          hardMaxPerActionUSD: '0.5',
+          hardDailyUSD: '10',
+        },
+        outgoing: {
+          messagesPerContactPerDay: 300,
+          messagesPerDay: 1000,
+          filesPerContactPerDay: 50,
+          filesPerDay: 200,
+          fileMBPerDay: 2000,
+        },
+      },
+    });
+  });
+
+  it('raising a ceiling or a cap is reviewed with its warnings, then signed with presence', async () => {
+    const { context, owner } = await setup();
+    const r = await reviewOk(context, {
+      base: 0,
+      patch: {
+        proofs: { hardDailyUSD: '20', hardMaxPerActionUSD: '1' },
+        outgoing: { messagesPerDay: 2000, filesPerContactPerDay: 80 },
+      },
+    });
+    expect(codes(r)).toEqual(['limits_raised', 'proofs_spend_raised']);
+    const { op, calls } = ownerOp(owner);
+    expect(await save(context, op, { review: r.review, acknowledged: codes(r) })).toEqual({
+      status: 200,
+      body: { status: 'saved', version: 1 },
+    });
+    expect(calls).toHaveLength(1);
+    expect(await getRules(context)).toMatchObject({
+      body: {
+        rules: {
+          proofs: { hardDailyUSD: '20', hardMaxPerActionUSD: '1' },
+          outgoing: { messagesPerDay: 2000, filesPerContactPerDay: 80 },
+        },
+      },
+    });
+  });
+
+  it('without the owner’s signature nothing changes: the save is the presence route', async () => {
+    const { context } = await setup();
+    const r = await reviewOk(context, { base: 0, patch: { outgoing: { messagesPerDay: 5 } } });
+    const refuse: LocalUiOwnerOperation = {
+      sign: () => Promise.reject(new Error('no presence')),
+    };
+    await expect(save(context, refuse, { review: r.review, acknowledged: [] })).rejects.toThrow();
+    expect(await getRules(context)).toMatchObject({
+      body: { version: 0, rules: { outgoing: { messagesPerDay: 1000 } } },
+    });
+    expect(ownerRoute().presence).toBe(true);
+  });
+
+  it('a soft limit above its hard ceiling is refused (invalid_edit)', async () => {
+    const { context } = await setup();
+    expect(
+      await review(context, { base: 0, patch: { proofs: { perActionMaxUSD: '0.9' } } }),
+    ).toEqual({ status: 400, body: { error: 'invalid_edit' } });
+    expect(
+      await review(context, { base: 0, patch: { proofs: { dailyBudgetUSD: '11' } } }),
+    ).toEqual({ status: 400, body: { error: 'invalid_edit' } });
+  });
+});
+
 // --- POST /api/ui/rules: D-119 -------------------------------------------------------------------
 
 const LOOSER = {

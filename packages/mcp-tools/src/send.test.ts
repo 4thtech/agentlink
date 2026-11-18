@@ -328,6 +328,59 @@ describe('agentlink_send: idempotency and policy results (06 §1 rule 6, 07 §3.
   });
 });
 
+describe('agentlink_send: an outgoing cap is a typed refusal in plain words (D-156)', () => {
+  it('SEND_LIMIT → rejected with the cap, the time and who can change it; no approval offered', async () => {
+    const client = fake({
+      send: () =>
+        Promise.resolve({
+          status: 'rejected',
+          code: 'SEND_LIMIT',
+          limit: 'messages_contact',
+          max: 300,
+          retryAt: '2026-10-16T10:00:00Z',
+        } as SendMessageResult),
+    });
+    const result = await send({ to: C, text: CANARY }, client);
+    expect(result.structured).toMatchObject({
+      status: 'rejected',
+      code: 'SEND_LIMIT',
+      limit: 'messages_contact',
+      max: 300,
+      retryAt: '2026-10-16T10:00:00Z',
+    });
+    expect(result.structured.approvalId).toBeUndefined();
+    expect(String(result.structured.summary)).toContain('300 messages a day');
+    expect(String(result.structured.summary)).toContain('Ana');
+    expect(String(result.structured.nextStep)).toContain('Only the owner can change it');
+    expect(String(result.structured.nextStep)).toContain('Settings › Rules');
+    expectNoCanary(result);
+  });
+
+  it('each cap has its own words', async () => {
+    const cases: [string, number, string][] = [
+      ['messages_day', 1000, '1000 messages a day'],
+      ['files_contact', 50, '50 files a day'],
+      ['files_day', 200, '200 files a day'],
+      ['file_mb_day', 2000, '2000 MB of files a day'],
+    ];
+    for (const [limit, max, words] of cases) {
+      const client = fake({
+        send: () =>
+          Promise.resolve({
+            status: 'rejected',
+            code: 'SEND_LIMIT',
+            limit,
+            max,
+            retryAt: '2026-10-16T10:00:00Z',
+          } as SendMessageResult),
+      });
+      const result = await send({ to: B, text: 'hi' }, client);
+      expect(result.structured, limit).toMatchObject({ status: 'rejected', code: 'SEND_LIMIT' });
+      expect(String(result.structured.summary), limit).toContain(words);
+    }
+  });
+});
+
 describe('agentlink_send: core errors become fixed text (I-5, I-7)', () => {
   const cases: [string, string, string | undefined][] = [
     ['transport_unavailable', 'error', 'NETWORK'],

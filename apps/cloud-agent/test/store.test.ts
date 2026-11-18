@@ -10,6 +10,9 @@ import {
   StoreUsageError,
   TABLE_NAMES,
   createSqlSchemaStatements,
+  POLICY_DEFAULTS_EFFECTIVE,
+  evaluateOutgoing,
+  outgoingUsage,
   rowKeyOf,
   type Row,
   type Sealed,
@@ -461,6 +464,73 @@ describe('DurableObjectStore: sealed-column conformance (07 §3, §3.1)', () => 
       expect(await cipher.indexDigest(encodeUtf8('{"a":1}'))).toBe(
         '37e3fae71850b52bc6451f527824bb9f9788d12132f0fed83cc934223ec93c7e',
       );
+      cipher.close();
+    });
+  });
+});
+
+// SEC-OUTBOUND-CAPS (D-156): the cloud agent runs core's send pipeline over this store, so the
+// outgoing caps hold here too: the count queries core makes in the send transaction answer the same
+// over Durable Object SQLite, and the shared engine refuses at the cap.
+describe('DurableObjectStore: outgoing caps (D-156)', () => {
+  it('counts sent messages and files in the rolling 24 h window; the engine refuses at the cap', async () => {
+    await inObject(async (store) => {
+      const cipher = await createStoreColumnCipher(new Uint8Array(32).map((_, i) => i));
+      const NOW = 1_800_000_000;
+      const ana = '0x' + '3d'.repeat(20);
+      const envelope = async (id: string, type: string, at: number, direction = 'out') => ({
+        ...(await sampleRow('envelopes', 0, cipher)),
+        envelope_id: id,
+        direction,
+        contact_id: ana,
+        type,
+        created_at: at,
+        payload_json: null,
+      });
+      const file = async (envelopeId: string, idx: number, size: number) => {
+        const row: Record<string, unknown> = {
+          ...(await sampleRow('files', 0, cipher)),
+          envelope_id: envelopeId,
+          idx,
+          size,
+        };
+        const rowKey = rowKeyOf([envelopeId, idx]);
+        for (const column of encColumns('files')) {
+          row[column] =
+            row[column] === null ? null : await cipher.seal({ table: 'files', column, rowKey }, 'x');
+        }
+        return row;
+      };
+      const envelopes = [
+        await envelope('m1', 'text', NOW - 10),
+        await envelope('m2', 'note', NOW - 20),
+        await envelope('old', 'text', NOW - 86_400),
+        await envelope('ack1', 'ack', NOW - 5),
+        await envelope('in1', 'text', NOW - 5, 'in'),
+      ];
+      const files = [await file('m1', 0, 100), await file('m2', 0, 200), await file('old', 0, 400)];
+      await store.transaction((tx) => {
+        for (const e of envelopes) tx.insert('envelopes', e as never);
+        for (const f of files) tx.insert('files', f as never);
+      });
+      const usage = await store.transaction((tx) => outgoingUsage(tx, ana, NOW));
+      expect(usage).toMatchObject({
+        contactMessages: 2,
+        messages: 2,
+        contactFiles: 2,
+        files: 2,
+        bytes: 300,
+      });
+      if (POLICY_DEFAULTS_EFFECTIVE.mode !== 'defaults') throw new Error('unreachable');
+      const base = POLICY_DEFAULTS_EFFECTIVE.policy;
+      const policy = { ...base, outgoing: { ...base.outgoing!, messagesPerContactPerDay: 2 } };
+      expect(
+        evaluateOutgoing(
+          { mode: 'signed', policy, version: 1 },
+          { contact: ana, files: 0, bytes: 0 },
+          usage,
+        ),
+      ).toEqual({ decision: 'deny', limit: 'messages_contact', max: 2 });
       cipher.close();
     });
   });

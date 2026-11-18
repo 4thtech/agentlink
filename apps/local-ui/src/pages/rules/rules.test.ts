@@ -629,6 +629,71 @@ describe('spending limits: confirmed on the sheet (D-132)', () => {
   });
 });
 
+describe('hard limits and sending limits (SEC-HARD-CEILING, SEC-OUTBOUND-CAPS; D-156)', () => {
+  const WITH_LIMITS = {
+    ...DEFAULTS,
+    proofs: {
+      ...DEFAULTS.proofs,
+      perActionMaxUSD: '0.2',
+      hardMaxPerActionUSD: '0.5',
+      hardDailyUSD: '10',
+    },
+    outgoing: {
+      messagesPerContactPerDay: 300,
+      messagesPerDay: 1000,
+      filesPerContactPerDay: 50,
+      filesPerDay: 200,
+      fileMBPerDay: 2000,
+    },
+  };
+
+  it('shows the hard limits and the sending limits with their current values', async () => {
+    await mount({ 'GET /api/ui/rules': RULES(WITH_LIMITS) });
+    await expandMore();
+    expect(text()).toContain(S.hardTitle);
+    expect(text()).toContain(S.sendingTitle);
+    expect(inputLabelled(S.hardPerProof)?.value).toBe('0.5');
+    expect(inputLabelled(S.hardDaily)?.value).toBe('10');
+    expect(inputLabelled(S.sendMessagesContact)?.value).toBe('300');
+    expect(inputLabelled(S.sendMessagesDay)?.value).toBe('1000');
+    expect(inputLabelled(S.sendFilesContact)?.value).toBe('50');
+    expect(inputLabelled(S.sendFilesDay)?.value).toBe('200');
+    expect(inputLabelled(S.sendMBDay)?.value).toBe('2000');
+    expect(text()).not.toMatch(NEVER_SAY);
+  });
+
+  it('a raised hard limit goes to the review as a proofs field; a sending limit as outgoing', async () => {
+    const srv = await mount({
+      'GET /api/ui/rules': RULES(WITH_LIMITS, 2),
+      'GET /api/ui/rules/review': REVIEW_OK,
+      'GET /api/owner/passkey': NO_PASSKEY,
+    });
+    await expandMore();
+    await type(inputLabelled(S.hardDaily), '20');
+    await type(inputLabelled(S.sendMessagesDay), '2000');
+    await click(buttonByText(S.reviewSave));
+    const reviewCall = srv.calls.find((c) => c.url.startsWith('/api/ui/rules/review?'));
+    expect(editOf(reviewCall)).toEqual({
+      base: 2,
+      patch: { proofs: { hardDailyUSD: '20' }, outgoing: { messagesPerDay: 2000 } },
+    });
+  });
+
+  it('an "ask me above" amount over the hard limit blocks saving and says why', async () => {
+    await mount({ 'GET /api/ui/rules': RULES(WITH_LIMITS) });
+    await type(inputLabelled(S.askOver), '0.9');
+    expect(text()).toContain(S.softAboveHard);
+    expect(buttonByText(S.reviewSave)?.disabled).toBe(true);
+  });
+
+  it('a sending limit that is not a whole number in range blocks saving', async () => {
+    await mount({ 'GET /api/ui/rules': RULES(WITH_LIMITS) });
+    await expandMore();
+    await type(inputLabelled(S.sendMessagesDay), '0');
+    expect(buttonByText(S.reviewSave)?.disabled).toBe(true);
+  });
+});
+
 describe('R1-UI-15: leaving with unsaved changes', () => {
   afterEach(() => setLeaveGuard(undefined));
 

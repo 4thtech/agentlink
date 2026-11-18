@@ -581,6 +581,70 @@ describe('credits and policy (06 §3, 07 §6.3)', () => {
   });
 });
 
+describe('hard ceilings refuse, never ask (SEC-HARD-CEILING, D-156; 06 §3)', () => {
+  const approvalRows = (agent: Agent) => agent.store.transaction((tx) => tx.select('approvals'));
+
+  it('a fee over the per-proof ceiling: SPEND_CEILING, no approval card, nothing signed', async () => {
+    const { a, b } = await twoAgents();
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+      p.proofs.perActionMaxUSD = '0.05';
+      p.proofs.hardMaxPerActionUSD = '0.05';
+    });
+    const envelopeId = await sendText(a, b);
+    expect(await a.client.notarize({ envelopeId })).toMatchObject({
+      status: 'rejected',
+      code: 'SPEND_CEILING',
+      ceiling: 'per_action',
+      limitUsd: '0.05',
+    });
+    expect(await approvalRows(a)).toEqual([]);
+    expect(await proofRows(a)).toEqual([]);
+    expect(await ledger(a)).toEqual([]);
+    expect(chain.calls.notarize).toBe(0);
+  });
+
+  it('a valid approval id does not pass the ceiling', async () => {
+    const { a, b } = await twoAgents();
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    const envelopeId = await sendText(a, b);
+    const pending = await a.client.notarize({ envelopeId });
+    const approvalId = (pending as { approvalId: string }).approvalId;
+    await approve(a, approvalId);
+    // The owner lowers the ceiling after approving: the approved call is refused, not recorded.
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+      p.proofs.perActionMaxUSD = '0.05';
+      p.proofs.hardMaxPerActionUSD = '0.05';
+    });
+    expect(await a.client.notarize({ envelopeId, approvalId })).toMatchObject({
+      status: 'rejected',
+      code: 'SPEND_CEILING',
+    });
+    expect(chain.calls.notarize).toBe(0);
+  });
+
+  it('the daily ceiling counts every Record in the rolling 24 h window', async () => {
+    const { a, b } = await twoAgents();
+    await setPolicy(a, (p) => {
+      p.proofs.dailyBudgetUSD = '0.15';
+      p.proofs.hardDailyUSD = '0.15';
+    });
+    const first = await sendText(a, b, 'one');
+    expect(await a.client.notarize({ envelopeId: first })).toMatchObject({ status: 'ok' });
+    const second = await sendText(a, b, 'two');
+    expect(await a.client.notarize({ envelopeId: second })).toMatchObject({
+      status: 'rejected',
+      code: 'SPEND_CEILING',
+      ceiling: 'daily',
+      limitUsd: '0.15',
+    });
+    expect(chain.calls.notarize).toBe(1);
+  });
+});
+
 describe('ACCEPTED / REJECTED without terms are commitments (D-31, 06 §2.4)', () => {
   it('no ACCEPTED under the default policy without an owner-signed approval; then exclusive', async () => {
     // The defaults in full (D-109: no automatic DELIVERED either); ACCEPTED is unchanged.
