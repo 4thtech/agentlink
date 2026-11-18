@@ -795,6 +795,7 @@ export function FirstRunPage({
   // most 1.5 s), then Home opens.
   const stepInvites = useMemo(() => trackCancels(createInviteApi()), []);
   const [inviteGone, setInviteGone] = useState(false);
+  const [inviteShown, setInviteShown] = useState(false);
   const discardInvite = useRef(false);
   const leaveInvite = (keep: boolean): void => {
     discardInvite.current = !keep;
@@ -1509,12 +1510,17 @@ export function FirstRunPage({
         inviteHref={INVITE_PATH}
         onHome={invitePanel === undefined ? () => leaveInvite(true) : goHome}
         onSkip={invitePanel === undefined ? () => leaveInvite(false) : goHome}
+        linkMade={invitePanel !== undefined || inviteShown}
         panel={
           invitePanel ??
           (inviteGone ? (
             <></>
           ) : (
-            <INVITE_PANEL.Part invites={stepInvites.api} discard={discardInvite} />
+            <INVITE_PANEL.Part
+              invites={stepInvites.api}
+              discard={discardInvite}
+              onLink={setInviteShown}
+            />
           ))
         }
       />,

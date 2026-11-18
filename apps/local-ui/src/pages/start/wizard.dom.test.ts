@@ -16,7 +16,7 @@ import { FirstRunPage, type FirstRunPageProps } from '../first-run/index.js';
 import { encodeRegistration } from '../first-run/passkey.js';
 import type { FinishResult, SetupApi, StatusResult } from '../first-run/setup-api.js';
 import { mayLeave } from '../../leave-guard.js';
-import { appTiles, defaultChoice } from './wizard.js';
+import { appTiles, defaultChoice, InviteStep } from './wizard.js';
 import { rememberWizard, resetAutoShown, resetWizard, wasAutoShown } from './store.js';
 import { RECOVERY_KIT_LATER_KEY } from '../../states/index.js';
 import {
@@ -639,9 +639,27 @@ describe('W4-WIZARD step 3 opened from the real state, and step 4 (A2, A3)', () 
     expect(went.at(-1)).toBe('/start/files');
     await click(FILES_STEP.skip);
     expect(went.at(-1)).toBe('/start/invite');
+    // SEC-INVITE-CAPS UX (owner decision 18 Nov 2026; 11 §5.12): before a link is on screen, Create
+    // invite is the one primary action and only "Skip for now" leaves; no "Done, go to Home" yet.
+    expect(() => button(INVITE_STEP.done)).toThrow();
     await click(INVITE_STEP.skip);
+    expect(home).toHaveBeenCalledTimes(1);
+  });
+
+  it('SEC-INVITE-CAPS UX: "Done, go to Home" comes as the primary action once a link is made', async () => {
+    const onHome = vi.fn();
+    const panel = h('div', { id: 'u4-panel' }, 'panel');
+    await act(async () => {
+      root.render(h(InviteStep, { panel, inviteHref: '/contacts?invite', onHome }));
+    });
+    expect(() => button(INVITE_STEP.done)).toThrow();
+    expect(button(INVITE_STEP.skip)).toBeDefined();
+    await act(async () => {
+      root.render(h(InviteStep, { panel, inviteHref: '/contacts?invite', onHome, linkMade: true }));
+    });
+    expect(button(INVITE_STEP.done).className).toContain('al-btn-primary');
     await click(INVITE_STEP.done);
-    expect(home).toHaveBeenCalledTimes(2);
+    expect(onHome).toHaveBeenCalledTimes(1);
   });
 
   it("step 4 shows U4's invite panel when one is given", async () => {

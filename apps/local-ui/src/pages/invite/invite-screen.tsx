@@ -104,6 +104,8 @@ export function InviteScreen({
   const [invites] = useState<InviteApi>(() => givenInvites ?? createInviteApi());
   const [theirs, setTheirs] = useState(false);
   const theirsId = useId();
+  // SEC-INVITE-CAPS UX: Create invite is the one primary action until a link is on screen.
+  const [linkShown, setLinkShown] = useState(false);
   return (
     <div className="inv-screen al-reveal">
       <a className="inv-back" href={backHref}>
@@ -127,7 +129,14 @@ export function InviteScreen({
         <h1 className="inv-title">{S.title}</h1>
         <p className="inv-intro al-muted">{S.intro}</p>
       </div>
-      <InvitePanel {...panel} invites={invites} />
+      <InvitePanel
+        {...panel}
+        invites={invites}
+        onLink={(shown) => {
+          setLinkShown(shown);
+          panel.onLink?.(shown);
+        }}
+      />
       <PasteInvite invites={invites} {...paste} />
       <div className="inv-foot">
         <button
@@ -139,7 +148,12 @@ export function InviteScreen({
         >
           {theirs ? S.hideTheirs : S.seeTheirs}
         </button>
-        <Button size="lg" className="al-press" onClick={onDone}>
+        <Button
+          size="lg"
+          variant={linkShown ? 'primary' : 'secondary'}
+          className="al-press"
+          onClick={onDone}
+        >
           {S.done}
         </Button>
       </div>

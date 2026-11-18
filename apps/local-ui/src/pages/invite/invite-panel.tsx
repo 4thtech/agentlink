@@ -51,6 +51,11 @@ export interface InvitePanelProps {
   /** Whether a link is on screen that has not gone anywhere yet. */
   readonly onUnsent?: (unsent: boolean) => void;
   /**
+   * SEC-INVITE-CAPS UX: whether a link is on screen (made with the owner's presence, or this tab's
+   * kept one). Until then the page offers only its way out, not "Done".
+   */
+  readonly onLink?: (shown: boolean) => void;
+  /**
    * REL051-B2: set to true just before the panel goes when the owner chose not to invite ("Skip for
    * now" in Get started): a link that never left the screen is then cancelled. Otherwise it stays.
    */
@@ -97,6 +102,7 @@ export function InvitePanel({
   invites: givenInvites,
   onCreated,
   onUnsent,
+  onLink,
   discard,
   now = () => Date.now(),
   agents: givenAgents,
@@ -333,6 +339,10 @@ export function InvitePanel({
     return () => clearTimeout(t);
   }, [copiedMessage]);
 
+  useEffect(() => {
+    onLink?.(made !== undefined);
+  }, [made]);
+
   const markShared = (): void => {
     sharedRef.current = true;
     setShared(true);
@@ -563,6 +573,9 @@ export function InvitePanel({
             onProof={(proof) => void make(wanted, wantLong, useOldName, proof)}
             owner={owner}
           />
+          <p className="al-text-body-sm al-muted inv-create-note" aria-hidden="true">
+            {S.createStatement}
+          </p>
         </section>
       ) : null}
       {(nameGate !== undefined && made === undefined) || phase === 'confirm' ? null : (
