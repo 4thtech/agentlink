@@ -586,7 +586,7 @@ export const TABLES = {
       deadline: int,
       replaces: opt('id'),
       settled_at: opt('int'),
-      // DEVICES-INTERIM (schema version 20): the install that wrote the row (install_state), null
+      // DEVICES-INTERIM (schema version 22): the install that wrote the row (install_state), null
       // on rows from before version 20 and on a runtime without an install id. A label only: the
       // sum of 06 §3 reads every row of the epoch, whatever its install.
       install_id: opt('id'),
@@ -594,7 +594,7 @@ export const TABLES = {
     primaryKey: ['entry_id'],
     unique: [{ columns: ['record_id'] }],
   },
-  // DEVICES-INTERIM (schema version 20; devices.ts): exactly one row once the runtime supplied an
+  // DEVICES-INTERIM (schema version 22; devices.ts): exactly one row once the runtime supplied an
   // install id. `install_id` is this computer's id (a KeyStore item, never sent anywhere), `since`
   // when this store became this install's (created here, or opened by another install: a restored
   // snapshot), `other_seen_at` the signed creation time of the newest own sent copy this store never

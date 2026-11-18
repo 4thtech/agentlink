@@ -127,7 +127,7 @@ async function cardUpdateContactStates(x: Agent): Promise<string[]> {
   });
 }
 
-const ownerA =new MemoryOwnerKeyStore(seed(171), passphrase());
+const ownerA = new MemoryOwnerKeyStore(seed(171), passphrase());
 const ownerB = new MemoryOwnerKeyStore(seed(172), passphrase());
 let a: Agent;
 let b: Agent;

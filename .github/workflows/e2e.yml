@@ -184,7 +184,14 @@ jobs:
               }
             }
             for (const name of ["relay-availability", "hostile-contact", "uploads-and-proofs"]) {
-              const count = (fs.readFileSync(`e2e/hostile/${name}.test.ts`, "utf8").match(/^\s*(?:it|test)\(/gm) || []).length;
+              const text = fs.readFileSync(`e2e/hostile/${name}.test.ts`, "utf8");
+              // The count below sees only plain it( and test( calls, so a modifier or a table form
+              // (each, for, skip, only, todo, ...) would make it wrong: refused outright.
+              if (/\b(?:it|test|describe)\s*\.\s*[A-Za-z]+/.test(text)) {
+                console.error(`::error::hostile ${name}.test.ts must use plain it( or test( only (no .each, .skip, .only or other forms)`);
+                failed = true;
+              }
+              const count = (text.match(/^\s*(?:it|test)\(/gm) || []).length;
               const f = r.testResults.filter((x) => x.name.endsWith(`/hostile/${name}.test.ts`));
               const t = f.length === 1 ? f[0].assertionResults : [];
               const passed = t.filter((x) => x.status === "passed");
