@@ -591,7 +591,15 @@ const PARENT_MISMATCH: RecordCheck = Object.freeze({
 });
 const UNAVAILABLE: RecordCheck = Object.freeze({ status: 'unavailable' });
 
-class Abort extends Error {}
+class Abort extends Error {
+  constructor(
+    message?: string,
+    /** The in-transaction policy refusal, reported as such (SPEND_CEILING, POLICY_DENIED). */
+    readonly denial?: ProofRejected,
+  ) {
+    super(message);
+  }
+}
 /** #reserveAndSign: another live Record of the envelope is already stored. */
 const EXISTS = 'exists' as const;
 /** An own Record row that still stands for its envelope (not replaced, released or received). */
@@ -755,8 +763,13 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
           : { contact: counterparty.agentId, ruleEligible: counterparty.eligible },
     };
     const restore = restoreProofContext(await readRestoreState(this.#ctx), now);
+    // The clock is read inside the transaction, consistent with the ledger it sums.
     const pre = await this.#ctx.store.transaction((tx) =>
-      evaluateProof(effective, action, { now, ledger: readBudgetLedger(tx), ...restore }),
+      evaluateProof(effective, action, {
+        now: nowOf(this.#ctx),
+        ledger: readBudgetLedger(tx),
+        ...restore,
+      }),
     );
     if (pre.decision === 'deny') return denied(pre);
     const files = payload.files.map((f) => ({
@@ -871,7 +884,11 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     };
     const restore = restoreProofContext(await readRestoreState(this.#ctx), now);
     const pre = await this.#ctx.store.transaction((tx) =>
-      evaluateProof(effective, action, { now, ledger: readBudgetLedger(tx), ...restore }),
+      evaluateProof(effective, action, {
+        now: nowOf(this.#ctx),
+        ledger: readBudgetLedger(tx),
+        ...restore,
+      }),
     );
     if (pre.decision === 'deny') return denied(pre);
     return Object.freeze({
@@ -1058,7 +1075,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     readonly replaces: { readonly recordId: string } | undefined;
     /** Keep the sender's receipt-request marker with this Record (M1-33d). */
     readonly receiptRequest?: boolean;
-  }): Promise<Row<'proofs'> | typeof EXISTS | undefined> {
+  }): Promise<Row<'proofs'> | typeof EXISTS | ProofRejected | undefined> {
     const { built } = input;
     const now = nowOf(this.#ctx);
     const recordId = built.recordId;
@@ -1087,6 +1104,8 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     const restore = restoreProofContext(await readRestoreState(this.#ctx), now);
     try {
       ticket = await this.#ctx.store.transaction((tx) => {
+        // The clock is read inside the transaction, consistent with the ledger it checks.
+        const at = nowOf(this.#ctx);
         if (input.claim !== undefined && !input.claim(tx, row)) throw new Abort();
         let replacedEntry: string | undefined;
         if (input.replaces !== undefined) {
@@ -1094,7 +1113,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
           if (
             releaseProofReservation(tx, {
               recordId: input.replaces.recordId,
-              now,
+              now: at,
               chainHasRecord: false,
             }) !== 'released'
           ) {
@@ -1110,7 +1129,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
         const check = checkAndReserveProof(tx, {
           effective: input.effective,
           action: input.action,
-          now,
+          now: at,
           reservation: {
             entryId,
             recordId,
@@ -1122,7 +1141,9 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
           ...restore,
         });
         // Policy or budget moved between the check and this transaction: nothing is kept.
-        if (!check.reserved) throw new Abort();
+        if (!check.reserved) {
+          throw new Abort('', check.decision === 'deny' ? denied(check) : undefined);
+        }
         if (replacedEntry !== undefined) {
           tx.update('budget_ledger', { entry_id: entryId }, { replaces: replacedEntry });
         }
@@ -1150,7 +1171,10 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
         return issued;
       });
     } catch (error) {
-      if (error instanceof Abort) return error.message === EXISTS ? EXISTS : undefined;
+      if (error instanceof Abort) {
+        if (error.denial !== undefined) return error.denial;
+        return error.message === EXISTS ? EXISTS : undefined;
+      }
       throw error;
     }
     const json = await this.#signHeld(ticket, built);
@@ -1199,11 +1223,13 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
   /** A new Record (fresh ID): reserve, sign and submit it as its owner. */
   #ownedNew(
     recordId: string,
-    reserve: () => Promise<Row<'proofs'> | typeof EXISTS | undefined>,
+    reserve: () => Promise<Row<'proofs'> | typeof EXISTS | ProofRejected | undefined>,
   ): Promise<CommitmentRecordResult | typeof EXISTS | undefined> {
     return this.#owned(recordId, async () => {
       const stored = await reserve();
       if (stored === EXISTS || stored === undefined) return stored;
+      // Refused by the policy check in the reserving transaction: reported as that refusal.
+      if (!('record_id' in stored)) return stored;
       return this.#submit(stored);
     });
   }
@@ -1723,7 +1749,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
         replaces: { recordId: row.record_id },
       }),
     );
-    return out === EXISTS ? undefined : out;
+    return out === EXISTS || out?.status === 'rejected' ? undefined : out;
   }
 
   /**
