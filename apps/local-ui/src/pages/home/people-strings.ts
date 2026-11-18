@@ -130,6 +130,11 @@ export const HOME_STRINGS = {
   sentNoReceipt: 'Sent. No receipt yet.',
   // SEC-RELAY-READBACK (D-156 (7)): the relays took it, but none could be asked to hand it back.
   sentAvailabilityUnknown: 'Sent, availability unknown',
+  // DELIVERY-DETAILS: the details line of a sent message (counts only, never a relay address).
+  relayDetails: 'Accepted by {accepted} · available from {available}',
+  relayCount: '{n} relay',
+  relayCountMany: '{n} relays',
+  relayDetailsLabel: 'Relays',
   receiptPending: 'Pending',
   receiptTheirs: 'Sent by them',
   proof: 'Proof',

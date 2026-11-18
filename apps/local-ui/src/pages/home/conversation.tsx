@@ -32,7 +32,7 @@ import {
 import { AttachComposer, type AttachProps } from './attach-composer.js';
 import { MessageFiles, type FilesContext } from './file-reader.js';
 import { mergeThread } from './people-api.js';
-import { receiptWord, sentWord } from './delivery-word.js';
+import { receiptWord, relaysWord, sentWord } from './delivery-word.js';
 import { HOME_STRINGS as S, fmt } from './people-strings.js';
 import { HISTORY_STRINGS as H } from '../history/strings.js';
 import { termsLine, termsStateWord, type TermsEvent } from './terms-trail.js';
@@ -166,8 +166,9 @@ function Delivery({
 }): ReactElement | null {
   const status = item.status;
   if (status === 'sent') {
+    // DELIVERY-DETAILS: the relay counts as a tooltip for everyone (Under the hood: a line).
     return (
-      <span className="hm-dl hm-f is-sent al-pop">
+      <span className="hm-dl hm-f is-sent al-pop" title={relaysWord(item)}>
         <Icon name="check" size={13} />
         <span>{sentWord(item, name)}</span>
       </span>
@@ -220,6 +221,7 @@ function Details({
   readonly name: string;
 }): ReactElement {
   const receipt = !out ? S.receiptTheirs : receiptWord(item, name);
+  const relays = out ? relaysWord(item) : undefined;
   return (
     <p className="hm-msg-meta hm-f al-text-code al-reveal">
       <span>
@@ -233,6 +235,11 @@ function Details({
       <span>
         {S.receipt} <span className="hm-v">{receipt}</span>
       </span>
+      {relays === undefined ? null : (
+        <span>
+          {S.relayDetailsLabel} <span className="hm-v">{relays}</span>
+        </span>
+      )}
       <span>
         {S.proof}{' '}
         <span className={item.proof ? 'hm-v is-proof' : 'hm-v'}>

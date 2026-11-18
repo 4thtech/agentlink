@@ -46,6 +46,12 @@ const ROW_CONCURRENCY = 8;
  */
 export const READBACK_RECHECK_MS = 1_000;
 /**
+ * DELIVERY-DETAILS: once one relay has served the wrap, the relays still being asked get this long
+ * to answer too (so "available from N" counts those that are quick); then they are cancelled, so a
+ * silent relay never holds the check slots.
+ */
+export const READBACK_COUNT_GRACE_MS = 1_000;
+/**
  * SEC-RELAY-READBACK: a row whose OKs reached MIN_ACKS but no relay served it back keeps trying its
  * other relays for at most this long after that; then it is `sent`, availability `unknown`, so a
  * dead or refusing relay in the list never keeps it pending until give_up_at.
@@ -80,6 +86,15 @@ function reachedMinAcksAt(acks: Readonly<Record<string, number>>): number | unde
  * relay that returned OK served the wrap back. `unknown`: none of them could be asked.
  */
 export type OutboxAvailability = 'confirmed' | 'unknown';
+
+/**
+ * DELIVERY-DETAILS: how many relays returned OK and how many of those served the wrap back. Counts
+ * only: no relay address is passed on, stored or logged.
+ */
+export interface OutboxRelayCounts {
+  readonly accepted: number;
+  readonly available: number;
+}
 
 /** Failures that make a relay unusable for this wrap (not a transient fault): 07 §4.3. */
 const UNUSABLE: ReadonlySet<string> = new Set(['too_large', 'blocked_address', 'invalid_url']);
@@ -134,6 +149,7 @@ export interface OutboxPersistence {
     wrapId: string,
     acks: Readonly<Record<string, number>>,
     availability: OutboxAvailability,
+    counts: OutboxRelayCounts,
   ): Promise<boolean>;
   markNotDelivered(wrapId: string, reason: OutboxGiveUpReason): Promise<boolean>;
 }
@@ -154,7 +170,7 @@ export interface OutboxWorkerOptions {
 }
 
 type Readback =
-  | { readonly kind: 'confirmed' }
+  | { readonly kind: 'confirmed'; readonly served: number }
   | { readonly kind: 'unknown' }
   | { readonly kind: 'missing'; readonly relays: readonly string[] };
 
@@ -317,7 +333,7 @@ export class OutboxWorker {
     if (Object.keys(merged).length >= MIN_ACKS) {
       // a crash after the publish, before the mark: the stored OKs are checked like fresh ones
       check = await this.readback(event.id, Object.keys(merged));
-      if (check.kind !== 'missing') return this.finishSent(row.wrapId, merged, check.kind);
+      if (check.kind !== 'missing') return this.finishSent(row.wrapId, merged, check);
     }
     // The stored event goes only to the relays of its row that have not acknowledged it yet.
     const remaining = relays.filter((relay) => merged[relay] === undefined);
@@ -336,7 +352,7 @@ export class OutboxWorker {
       }
       if (Object.keys(merged).length >= MIN_ACKS && Object.keys(merged).length > before) {
         check = await this.readback(event.id, Object.keys(merged));
-        if (check.kind !== 'missing') return this.finishSent(row.wrapId, merged, check.kind);
+        if (check.kind !== 'missing') return this.finishSent(row.wrapId, merged, check);
       }
     }
     const okCount = Object.keys(merged).length;
@@ -344,11 +360,7 @@ export class OutboxWorker {
     if (pastDeadline && okCount >= 1) {
       // At the bound: one OK (or more) and nothing served is sent with availability unknown.
       check ??= await this.readback(event.id, Object.keys(merged));
-      return this.finishSent(
-        row.wrapId,
-        merged,
-        check.kind === 'confirmed' ? 'confirmed' : 'unknown',
-      );
+      return this.finishSent(row.wrapId, merged, check);
     }
     if (pastDeadline) {
       return (await this.persistence.markNotDelivered(row.wrapId, 'timeout'))
@@ -360,7 +372,7 @@ export class OutboxWorker {
       // Every relay of the row accepted it and none served it back (no other relay to try), or the
       // other relays did not take it within the grace: sent, availability unknown.
       const graceOver = reachedAt !== undefined && nowSeconds - reachedAt >= READBACK_GRACE_SECONDS;
-      if (nothingLeft || graceOver) return this.finishSent(row.wrapId, merged, 'unknown');
+      if (nothingLeft || graceOver) return this.finishSent(row.wrapId, merged, check);
     }
     const cap =
       check?.kind === 'missing' && reachedAt !== undefined
@@ -372,9 +384,21 @@ export class OutboxWorker {
   private async finishSent(
     wrapId: string,
     acks: Readonly<Record<string, number>>,
-    availability: OutboxAvailability,
+    check: Readback,
   ): Promise<RowResult> {
-    return (await this.persistence.markSent(wrapId, acks, availability))
+    // DELIVERY-DETAILS: counts only. `available` is how many relays served the wrap back (0 when
+    // none could be asked or none had it); `accepted` is how many returned OK.
+    const confirmed = check.kind === 'confirmed';
+    const counts: OutboxRelayCounts = {
+      accepted: Object.keys(acks).length,
+      available: confirmed ? check.served : 0,
+    };
+    return (await this.persistence.markSent(
+      wrapId,
+      acks,
+      confirmed ? 'confirmed' : 'unknown',
+      counts,
+    ))
       ? { kind: 'sent' }
       : { kind: 'skipped' };
   }
@@ -389,11 +413,11 @@ export class OutboxWorker {
     const check = this.pool.checkServed?.bind(this.pool);
     if (check === undefined || acked.length === 0) return { kind: 'unknown' };
     const first = await this.askAll(check, eventId, acked);
-    if (first.served) return { kind: 'confirmed' };
+    if (first.served > 0) return { kind: 'confirmed', served: first.served };
     if (first.missing.length === 0) return { kind: 'unknown' };
     await this.sleep(READBACK_RECHECK_MS);
     const second = await this.askAll(check, eventId, first.missing);
-    if (second.served) return { kind: 'confirmed' };
+    if (second.served > 0) return { kind: 'confirmed', served: second.served };
     // A relay that answered without the wrap and then could not be asked again still counts as
     // missing: it never served it.
     const stillMissing = first.missing.filter(
@@ -403,8 +427,7 @@ export class OutboxWorker {
   }
 
   /**
-   * Asks every relay at once; resolves at the first `served` (cancelling the others), else once all
-   * have answered.
+   * Asks every relay at once; resolves once all have answered or were cancelled, with how many served the wrap.
    */
   private askAll(
     check: (
@@ -414,31 +437,26 @@ export class OutboxWorker {
     ) => Promise<ReadbackOutcome>,
     eventId: string,
     relays: readonly string[],
-  ): Promise<{ served: boolean; missing: string[]; answered: string[] }> {
-    // The first relay that serves it ends the others at once, so they free their slots.
+  ): Promise<{ served: number; missing: string[]; answered: string[] }> {
+    // DELIVERY-DETAILS: the first relay that serves it starts a short grace for the others (they
+    // are counted if they answer within it); then the rest are cancelled and free their slots.
     const cancel = new Cancel();
     return new Promise((resolve) => {
       const missing: string[] = [];
       const answered: string[] = [];
       let pending = relays.length;
-      let done = false;
+      let served = 0;
       const settle = (relay: string, outcome: ReadbackOutcome): void => {
-        if (done) return;
         pending -= 1;
         if (outcome === 'served') {
-          done = true;
-          cancel.abort();
-          resolve({ served: true, missing, answered });
-          return;
+          served += 1;
+          if (served === 1) void this.sleep(READBACK_COUNT_GRACE_MS).then(() => cancel.abort());
         }
         if (outcome === 'missing') {
           missing.push(relay);
           answered.push(relay);
         }
-        if (pending === 0) {
-          done = true;
-          resolve({ served: false, missing, answered });
-        }
+        if (pending === 0) resolve({ served, missing, answered });
       };
       for (const relay of relays) {
         let asked: Promise<ReadbackOutcome>;

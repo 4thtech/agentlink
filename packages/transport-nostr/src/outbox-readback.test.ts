@@ -13,6 +13,7 @@ import {
   READBACK_RECHECK_MS,
   type OutboxAttempt,
   type OutboxAvailability,
+  type OutboxRelayCounts,
   type OutboxPersistence,
   type OutboxRow,
 } from './outbox.js';
@@ -29,7 +30,11 @@ afterEach(() => {
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 
-type StoredRow = OutboxRow & { state: string; availability?: OutboxAvailability };
+type StoredRow = OutboxRow & {
+  state: string;
+  availability?: OutboxAvailability;
+  counts?: OutboxRelayCounts;
+};
 
 class Rows implements OutboxPersistence {
   readonly rows = new Map<string, StoredRow>();
@@ -55,8 +60,9 @@ class Rows implements OutboxPersistence {
     id: string,
     acks: Readonly<Record<string, number>>,
     availability: OutboxAvailability,
+    counts: OutboxRelayCounts,
   ): Promise<boolean> {
-    this.rows.set(id, { ...this.get(id), acks, state: 'sent', availability });
+    this.rows.set(id, { ...this.get(id), acks, state: 'sent', availability, counts });
     return Promise.resolve(true);
   }
   markNotDelivered(id: string): Promise<boolean> {
@@ -121,6 +127,33 @@ describe('read-back before "sent"', () => {
     const reqs = relays.flatMap((r) => net.reqs(r));
     expect(reqs.length).toBeGreaterThan(0);
     for (const req of reqs) expect(req.filter).toEqual({ ids: [row.wrapId], limit: 1 });
+  });
+
+  it('DELIVERY-DETAILS: stores how many relays accepted it and how many served it back', async () => {
+    const { net, rows, worker } = setup();
+    const [a, b] = relayUrls('count', 2) as [string, string];
+    net.configure(a);
+    net.configure(b, { neverServes: true });
+    const row = makeRow([a, b]);
+    rows.add(row);
+    await pass(worker);
+    expect(rows.get(row.wrapId)).toMatchObject({
+      state: 'sent',
+      availability: 'confirmed',
+      counts: { accepted: 2, available: 1 },
+    });
+  });
+
+  it('DELIVERY-DETAILS: nothing served means available 0, and no relay address is in the counts', async () => {
+    const { net, rows, worker } = setup();
+    const relays = relayUrls('none', 2);
+    for (const url of relays) net.configure(url, { neverServes: true });
+    const row = makeRow(relays);
+    rows.add(row);
+    await pass(worker);
+    const stored = rows.get(row.wrapId);
+    expect(stored.counts).toEqual({ accepted: 2, available: 0 });
+    expect(JSON.stringify(stored.counts)).not.toContain('wss');
   });
 
   it('is sent when only one of the acking relays serves it', async () => {

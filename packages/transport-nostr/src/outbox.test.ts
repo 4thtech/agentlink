@@ -9,6 +9,7 @@ import {
   OutboxWorker,
   type OutboxAttempt,
   type OutboxAvailability,
+  type OutboxRelayCounts,
   type OutboxGiveUpReason,
   type OutboxPersistence,
   type OutboxRow,
@@ -31,6 +32,7 @@ afterEach(() => {
 type Stored = OutboxRow & {
   state: 'pending' | 'sent' | 'not_delivered';
   availability?: OutboxAvailability;
+  counts?: OutboxRelayCounts;
   reason?: OutboxGiveUpReason;
 };
 
@@ -70,8 +72,9 @@ class MemoryOutbox implements OutboxPersistence {
     wrapId: string,
     acks: Readonly<Record<string, number>>,
     availability: OutboxAvailability,
+    counts: OutboxRelayCounts,
   ): Promise<boolean> {
-    return this.cas(wrapId, { acks, state: 'sent', availability });
+    return this.cas(wrapId, { acks, state: 'sent', availability, counts });
   }
   markNotDelivered(wrapId: string, reason: OutboxGiveUpReason): Promise<boolean> {
     return this.cas(wrapId, { state: 'not_delivered', reason });

@@ -143,6 +143,8 @@ async function put(p: Put): Promise<string> {
       request_accepted_at: p.acceptedAt ?? null,
       deleted_at: null,
       availability: null,
+      relays_accepted: null,
+      relays_available: null,
     }),
   );
   return id;

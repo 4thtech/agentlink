@@ -429,6 +429,46 @@ describe('the read-only messages view (context.ts, MSG-FILES-IO-c; I-4)', () => 
   });
 });
 
+describe('DELIVERY-DETAILS: relay counts on a Sent item', () => {
+  const sentWith = (relays: unknown, status = 'sent'): MessageItem =>
+    ({ ...(SENT[1] as MessageItem), status, relays }) as unknown as MessageItem;
+  const run = async (item: MessageItem) =>
+    bodyOf(
+      await callBox(
+        contextWith({ list: () => Promise.resolve({ items: [item] }) }),
+        BOB,
+        'box=out',
+      ),
+    )['items'] as Record<string, unknown>[];
+
+  it('passes two whole counts through for a sent message', async () => {
+    const items = await run(sentWith({ accepted: 3, available: 2 }));
+    expect(items[0]).toMatchObject({ status: 'sent', relays: { accepted: 3, available: 2 } });
+  });
+
+  it('keeps only the two numbers: no extra field, no relay address', async () => {
+    const items = await run(sentWith({ accepted: 2, available: 1, urls: ['wss://r.example'] }));
+    expect(items[0]?.['relays']).toEqual({ accepted: 2, available: 1 });
+    expect(JSON.stringify(items)).not.toContain('wss');
+  });
+
+  it('leaves the counts out when malformed, more available than accepted, or not sent', async () => {
+    for (const bad of [
+      { accepted: -1, available: 0 },
+      { accepted: 1.5, available: 1 },
+      { accepted: '2', available: 1 },
+      { accepted: 1, available: 2 },
+      'many',
+    ]) {
+      const items = await run(sentWith(bad));
+      expect(items[0]).toBeDefined();
+      expect(items[0]).not.toHaveProperty('relays');
+    }
+    const queued = await run(sentWith({ accepted: 1, available: 1 }, 'queued'));
+    expect(queued[0]).not.toHaveProperty('relays');
+  });
+});
+
 describe('SEC-RECEIPTS-DEFAULT: an older app receipt', () => {
   it('passes receivedOlder through for a Sent item, and only `true`', async () => {
     const older = { ...(SENT[1] as MessageItem), receipt: false, receivedOlder: true };

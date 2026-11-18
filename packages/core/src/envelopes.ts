@@ -760,6 +760,8 @@ export class EnvelopeService {
           request_accepted_at: null,
           deleted_at: null,
           availability: null,
+          relays_accepted: null,
+          relays_available: null,
         });
         markSeen();
         return { status: 'verified', report: report(envelope.id, 'deferred') };
@@ -1550,6 +1552,8 @@ export class EnvelopeService {
       request_accepted_at: null,
       deleted_at: null,
       availability: null,
+      relays_accepted: null,
+      relays_available: null,
     };
     const now = nowOf(ctx);
     let revoked: RevokeActivity | undefined;
@@ -1808,6 +1812,8 @@ export class EnvelopeService {
         request_accepted_at: null,
         deleted_at: null,
         availability: null,
+        relays_accepted: null,
+        relays_available: null,
       });
       return report(item.envelopeId, 'refused', {
         reason: effective.reason,
@@ -1957,6 +1963,8 @@ export async function outboundRow(
     request_accepted_at: null,
     deleted_at: null,
     availability: null,
+    relays_accepted: null,
+    relays_available: null,
   };
 }
 

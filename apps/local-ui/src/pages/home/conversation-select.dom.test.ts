@@ -77,6 +77,45 @@ describe('the conversation: select messages, then Delete (RET-4)', () => {
     expect(onDelete).toHaveBeenCalledWith(['out-1']);
   });
 
+  it('DELIVERY-DETAILS: a sent message shows its relay counts (tooltip, and a line under the hood)', async () => {
+    const counted: Thread = {
+      ...THREAD,
+      sent: {
+        items: [
+          {
+            ...msg('out-1', 1_800_000_020, 'Hi Ana'),
+            status: 'sent',
+            relays: { accepted: 3, available: 2 },
+          },
+        ],
+        paged: false,
+      },
+    };
+    const render = async (pro: boolean): Promise<void> => {
+      await act(async () => {
+        root.render(
+          createElement(Conversation, {
+            name: 'Ana',
+            agent: 'Personal',
+            pro,
+            thread: counted,
+            loadEarlier: () => Promise.resolve(),
+          }),
+        );
+      });
+    };
+    await render(false);
+    expect(host.querySelector('.hm-dl.is-sent')?.getAttribute('title')).toBe(
+      'Accepted by 3 relays · available from 2',
+    );
+    expect(host.textContent).not.toContain('Accepted by');
+    await render(true);
+    expect(host.querySelector('.hm-msg.is-out .hm-msg-meta')?.textContent).toContain(
+      'Accepted by 3 relays · available from 2',
+    );
+    expect(host.querySelector('.hm-msg.is-in .hm-msg-meta')?.textContent).not.toContain('relays');
+  });
+
   it('Cancel leaves Select mode and chooses nothing', async () => {
     const onDelete = vi.fn();
     await show(onDelete);
