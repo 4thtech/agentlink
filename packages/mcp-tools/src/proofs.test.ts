@@ -556,6 +556,35 @@ describe('agentlink_notarize (06 §2.4)', () => {
     }
   });
 
+  it('SPEND_CEILING: a typed refusal in plain words, never an approval (D-156)', async () => {
+    for (const [ceiling, words] of [
+      ['per_action', '$0.50 per proof'],
+      ['daily', '$10 a day'],
+    ] as const) {
+      const { client } = fake({
+        notarize: () =>
+          ({
+            status: 'rejected',
+            code: 'SPEND_CEILING',
+            ceiling,
+            limitUsd: ceiling === 'daily' ? '10' : '0.5',
+          }) as never,
+      });
+      const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+      expect(r.structured, ceiling).toMatchObject({
+        status: 'rejected',
+        code: 'SPEND_CEILING',
+        ceiling,
+      });
+      expect(r.structured.approvalId).toBeUndefined();
+      expect(String(r.structured.summary)).toContain(words);
+      expect(String(r.structured.nextStep)).toContain(
+        'This is over your limit. You can change it in Settings › Rules in the AgentLink app.',
+      );
+      expect(r.structured.summary).not.toMatch(/chain|contract|on-chain|network|wallet|gas/i);
+    }
+  });
+
   it('the chain override is Advanced only: a known key maps to its ID, an unknown one is refused', async () => {
     const { client, calls } = fake();
     const advanced = { surface: 'advanced' } as const;

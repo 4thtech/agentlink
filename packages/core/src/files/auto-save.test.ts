@@ -35,6 +35,7 @@ import {
   openFileAgent,
   outgoing,
   pairForFiles,
+  roomyOutgoing,
   type FileAgent,
   type FileAgentOptions,
 } from '../testing/files.js';
@@ -216,7 +217,7 @@ describe('W4-AUTO-SAVE: limits (04 §4.1, Decision 51)', () => {
   });
 
   it('the 51st file from one contact in 24 h waits with limit_contact; after 24 h it is room again', async () => {
-    const w = await world();
+    const w = await world({}, roomyOutgoing);
     for (let i = 0; i < 9; i += 1) await send(w.a, w.b, `f${String(i)}.bin`, 20_000, 6);
     await w.b.client.autoSave.run();
     await w.b.client.autoSave.run();

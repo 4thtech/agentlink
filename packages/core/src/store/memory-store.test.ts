@@ -69,6 +69,8 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         'saved_files',
         // FILES-AI-1 (D-152; 06 §2.3 "Daily budget", schema 16): times and byte counts only.
         'content_file_budget',
+        // SEC-OUTBOUND-CAPS (D-156; 06 §3 `outgoing`, schema 17): counts and times only.
+        'outgoing_log',
         // W4-PAUSE (D-143 (5); 07 §3.2, schema 12): the owner's pause of the agent.
         'agent_pause',
         'idempotency',
@@ -131,7 +133,7 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
 
   it('contacts former name (W4-RENAME-REACHES-CONTACTS, schema 9): four nullable columns, appended last', () => {
     expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(9);
-    // Followed by `waiting_owner` (SEC-INVITE-CAPS, schema 17).
+    // Followed by `waiting_owner` (SEC-INVITE-CAPS, schema 18).
     expect(Object.keys(TABLES.contacts.columns).slice(-6, -2)).toEqual([
       'former_name',
       'name_changed_at',
@@ -144,8 +146,8 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
     expect(TABLES.contacts.columns.name_change_seen).toEqual({ kind: 'flag', nullable: true });
   });
 
-  it('SEC-INVITE-CAPS (schema 17): invites.created_by and contacts.waiting_owner, nullable, appended last', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(17);
+  it('SEC-INVITE-CAPS (schema 18): invites.created_by and contacts.waiting_owner, nullable, appended last', () => {
+    expect(STORE_SCHEMA_VERSION).toBe(18);
     expect(Object.keys(TABLES.invites.columns).at(-1)).toBe('created_by');
     expect(TABLES.invites.columns.created_by).toEqual({
       kind: 'enum',

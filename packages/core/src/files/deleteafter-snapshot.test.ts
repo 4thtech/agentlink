@@ -17,6 +17,7 @@ import {
   openFileAgent,
   outgoing,
   pairForFiles,
+  roomyOutgoing,
   type FileAgent,
 } from '../testing/files.js';
 import { newNonce, ownerHex, signWith } from '../testing/owner.js';
@@ -195,7 +196,10 @@ describe('files.deleteAfter is snapshotted per file at send time (M1-1g-i)', () 
 
 describe('the rotating window is keyed on the last envelope ID (IR-M1-1g-h-2)', () => {
   it('more than 50 notarized candidates: every one is visited across passes, even as some are deleted', async () => {
-    await agents((p) => both(p, 'receipt'));
+    await agents((p) => {
+      both(p, 'receipt');
+      roomyOutgoing(p);
+    });
     const total = MAX_RECEIPT_RETENTION_PER_PASS + 10;
     const ids: string[] = [];
     for (let i = 0; i < total; i += 1) {

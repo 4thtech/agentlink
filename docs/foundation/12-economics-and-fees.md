@@ -198,6 +198,7 @@ All figures are **estimates** and move with network prices.
 - **Who carries it.** The submitter sponsors that cost and recovers it from protocol fees, together with running the submitter, the faucet, audits and the bug bounty.
 - **Files.** The encrypted drop's storage cost (R2, about $0.015 per GB-month, free egress, at most 7 days per object) is borne by 4thTech; files are free within the quotas (§2, D-48).
 - **What you buy.** A proof is not a bare timestamp. It can be a **proof of agreement**: the sender's signature over the exact content hash, plus the recipient's signed receipts for delivery, opening and acceptance, so an accepted record shows that both sides assented to the same terms. Anyone can check it without trusting 4thTech. (It does not by itself establish legal enforceability, 02 F-43.)
+- **Default limits (D-156 (4)).** The rules ask above $0.20 per proof or $5 in any 24 hours and refuse above $0.50 per proof (the contract's per-Record cap) or $10 in any 24 hours (06 §3 `hardMaxPerActionUSD`, `hardDailyUSD`). At the $0.10 fee that is 50 proofs a day without a question and 100 at most.
 - **Why a fixed price.** One flat USD price is easy to budget (policies use `dailyBudgetUSD`, 06 §3) and does not change with short-term network congestion.
 
 ---

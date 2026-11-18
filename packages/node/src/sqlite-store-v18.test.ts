@@ -1,4 +1,4 @@
-// SEC-INVITE-CAPS (D-156; 07 §3): schema version 17.
+// SEC-INVITE-CAPS (D-156; 07 §3): schema version 18 (after version 17, SEC-OUTBOUND-CAPS `outgoing_log`).
 // - `invites.created_by` (`owner` | `ai`, nullable) and `contacts.waiting_owner` (flag, nullable),
 //   appended. Nothing is rewritten: every invite made before reads as the owner's (null) and every
 //   contact paired before is kept (null), so existing contacts are not affected.
@@ -14,7 +14,7 @@ import { SqliteStore } from './sqlite-store.js';
 
 let dir: string;
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'agentlink-v17-'));
+  dir = await mkdtemp(join(tmpdir(), 'agentlink-v18-'));
 });
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
@@ -22,21 +22,22 @@ afterEach(async () => {
 const path = (): string => join(dir, 'store.sqlite');
 const CONTACT = '0x' + 'c1'.repeat(20);
 
-describe('schema version 17 (SEC-INVITE-CAPS)', () => {
+describe('schema version 18 (SEC-INVITE-CAPS)', () => {
   it('appends invites.created_by, contacts.waiting_owner and ai_accepted_at, pairings.created_by', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(17);
-    const v17 = MIGRATIONS[16]?.statements ?? [];
+    expect(STORE_SCHEMA_VERSION).toBe(18);
+    const v18 = MIGRATIONS[17]?.statements ?? [];
     expect(MIGRATIONS[16]?.version).toBe(17);
-    expect(v17).toHaveLength(4);
-    expect(v17[0]).toMatch(/^ALTER TABLE "invites" ADD COLUMN "created_by" TEXT /);
-    expect(v17[0]).toContain(`"created_by" IS NULL OR`);
-    expect(v17[1]).toMatch(/^ALTER TABLE "contacts" ADD COLUMN "waiting_owner" INTEGER /);
-    expect(v17[1]).toContain(`"waiting_owner" IS NULL OR`);
-    expect(v17[2]).toMatch(/^ALTER TABLE "contacts" ADD COLUMN "ai_accepted_at" INTEGER /);
-    expect(v17[3]).toMatch(/^ALTER TABLE "pairings" ADD COLUMN "created_by" TEXT /);
+    expect(MIGRATIONS[17]?.version).toBe(18);
+    expect(v18).toHaveLength(4);
+    expect(v18[0]).toMatch(/^ALTER TABLE "invites" ADD COLUMN "created_by" TEXT /);
+    expect(v18[0]).toContain(`"created_by" IS NULL OR`);
+    expect(v18[1]).toMatch(/^ALTER TABLE "contacts" ADD COLUMN "waiting_owner" INTEGER /);
+    expect(v18[1]).toContain(`"waiting_owner" IS NULL OR`);
+    expect(v18[2]).toMatch(/^ALTER TABLE "contacts" ADD COLUMN "ai_accepted_at" INTEGER /);
+    expect(v18[3]).toMatch(/^ALTER TABLE "pairings" ADD COLUMN "created_by" TEXT /);
   });
 
-  it('migrates a version 16 file: invites read as the owner’s, contacts stay kept', async () => {
+  it('migrates a version 16 file through 17 (outgoing_log) to 18: invites read as the owner’s, contacts stay kept', async () => {
     const raw = new Database(path());
     for (const m of MIGRATIONS.slice(0, 16)) {
       for (const statement of m.statements) raw.prepare(statement).run();
@@ -60,6 +61,8 @@ describe('schema version 17 (SEC-INVITE-CAPS)', () => {
     raw.close();
     const store = await SqliteStore.open(path());
     expect(store.schemaVersion).toBe(STORE_SCHEMA_VERSION);
+    // Version 17 (SEC-OUTBOUND-CAPS) ran first: its table is there, empty.
+    expect(await store.transaction((tx) => tx.select('outgoing_log'))).toEqual([]);
     const [invite] = await store.transaction((tx) => tx.select('invites'));
     expect(invite?.created_by).toBeNull();
     const [contact] = await store.transaction((tx) => tx.select('contacts'));

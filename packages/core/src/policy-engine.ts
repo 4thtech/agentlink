@@ -17,10 +17,16 @@
 // the built-in hard caps of FAIL_CLOSED_LIMITS.
 import {
   MAX_INLINE_FILE_BYTES,
+  OUTGOING_DEFAULTS,
   POLICY_DEFAULTS,
+  PROOF_CEILING_DEFAULTS,
   isUsdAmount,
+  outgoingOf,
   parseUsd,
+  proofCeilingsOf,
+  type OutgoingPolicy,
   type Policy,
+  type ProofCeilings,
 } from '@4thtech-io/types';
 import { evaluateCommitment, type CommitmentFacts } from './commitments.js';
 import { isInsideFolder } from './path-guard.js';
@@ -276,10 +282,37 @@ export const BUDGET_WINDOW_SECONDS = 86_400;
 export type ProofTrigger =
   'policy_invalid' | 'notarize' | 'per_action' | 'budget' | 'ledger_broken';
 
+/** Which hard ceiling refused a proof (D-156): one Record, or the rolling 24 h window. */
+export type ProofCeiling = 'per_action' | 'daily';
+
 export interface ProofEvaluation {
   readonly decision: PolicyDecision;
   readonly triggers: readonly ProofTrigger[];
+  /**
+   * D-156: set only on a `deny` from a hard ceiling. Such a deny is never an approval: no card is
+   * offered and an owner approval does not pass it; only an owner-signed `policy.set` raises it.
+   */
+  readonly ceiling?: ProofCeiling;
+  /** The ceiling's amount (a USD amount), with `ceiling`. */
+  readonly limitUsd?: string;
 }
+
+/**
+ * The hard ceilings under G-6 fail closed (D-156): the built-in defaults, so an unreadable policy
+ * never lifts them.
+ */
+export const FAIL_CLOSED_PROOF_CEILINGS: ProofCeilings = Object.freeze({
+  ...PROOF_CEILING_DEFAULTS,
+});
+
+/** The hard ceilings in force: the policy's own (absent: the defaults), or the fail-closed ones. */
+export function proofCeilings(effective: EffectivePolicy): ProofCeilings {
+  return effective.mode === 'fail_closed'
+    ? FAIL_CLOSED_PROOF_CEILINGS
+    : proofCeilingsOf(effective.policy);
+}
+
+const minMicros = (a: bigint, b: bigint): bigint => (a < b ? a : b);
 
 const LEDGER_STATES: readonly string[] = ['reserved', 'charged', 'released'];
 const isTime = (n: unknown): n is number =>
@@ -328,7 +361,35 @@ export function evaluateProof(
   context?: PolicyContext,
 ): ProofEvaluation {
   const { fee, maxFee } = proofFees(action);
+  // D-156: the hard per-Record ceiling first, in every mode: it refuses, it never asks. The Record's
+  // maxFee is what can be charged, so it is what is compared.
+  const ceilings = proofCeilings(effective);
+  const hardPerAction = parseUsd(ceilings.hardMaxPerActionUSD);
+  if (maxFee > hardPerAction) {
+    return {
+      decision: 'deny',
+      triggers: [],
+      ceiling: 'per_action',
+      limitUsd: ceilings.hardMaxPerActionUSD,
+    };
+  }
+  const hardDaily = parseUsd(ceilings.hardDailyUSD);
   if (effective.mode === 'fail_closed') {
+    // D-156: the built-in daily ceiling holds too, over a ledger that can be summed. A broken
+    // ledger cannot be: every paid action then asks the owner (06 §3 "Fail closed").
+    const view = context?.ledger;
+    const now = context?.now;
+    if (view !== undefined && isTime(now)) {
+      const spent = budgetSpentMicros(view, now);
+      if (spent !== 'broken' && spent + maxFee > hardDaily) {
+        return {
+          decision: 'deny',
+          triggers: [],
+          ceiling: 'daily',
+          limitUsd: ceilings.hardDailyUSD,
+        };
+      }
+    }
     return { decision: 'approval', triggers: ['policy_invalid'] };
   }
   const proofs = effective.policy.proofs;
@@ -347,14 +408,101 @@ export function evaluateProof(
   if (!isTime(now) || view === undefined) throw contextInvalid();
   const triggers: ProofTrigger[] = [];
   if (notarize === 'approval') triggers.push('notarize');
-  // Step 3: the rule's per-action maximum replaces the global one; the fee is compared.
-  const perActionMax = parseUsd(rule?.proofs?.perActionMaxUSD ?? proofs.perActionMaxUSD);
+  // Step 3: the rule's per-action maximum replaces the global one; the fee is compared. Either is
+  // read as at most the hard ceiling (D-156: a rule or an older policy never lifts it).
+  const perActionMax = minMicros(
+    parseUsd(rule?.proofs?.perActionMaxUSD ?? proofs.perActionMaxUSD),
+    hardPerAction,
+  );
   if (fee > perActionMax) triggers.push('per_action');
-  // Step 4: always the global budget; spent + the reserved maximum fee above it asks the owner.
+  // Step 4: always the global budget over the rolling window. Above the hard daily ceiling the proof
+  // is refused (D-156); above the soft budget (read as at most the ceiling) it asks the owner. A
+  // broken ledger cannot be summed: it asks (the per-Record ceiling above still refuses).
   const spent = budgetSpentMicros(view, now);
   if (spent === 'broken') triggers.push('ledger_broken');
-  else if (spent + maxFee > parseUsd(proofs.dailyBudgetUSD)) triggers.push('budget');
+  else if (spent + maxFee > hardDaily) {
+    return { decision: 'deny', triggers: [], ceiling: 'daily', limitUsd: ceilings.hardDailyUSD };
+  } else if (spent + maxFee > minMicros(parseUsd(proofs.dailyBudgetUSD), hardDaily)) {
+    triggers.push('budget');
+  }
   return { decision: triggers.length === 0 ? 'allow' : 'approval', triggers };
+}
+
+// --- outgoing caps (06 §3 `outgoing`, 07 §3.2; D-156) ----------------------------------------------
+
+/** Which outgoing cap refused a send (D-156). */
+export type OutgoingLimit =
+  'messages_contact' | 'messages_day' | 'files_contact' | 'files_day' | 'file_mb_day';
+
+/** One `agentlink_send`: the contact, how many files it attaches and their bytes. */
+export interface OutgoingAction {
+  readonly contact: string;
+  readonly files: number;
+  readonly bytes: number;
+}
+
+/**
+ * What this agent sent with `agentlink_send` in the rolling 24 h window, not counting this send
+ * (outgoing-limits.ts reads it from the store, in the transaction that stores the envelope).
+ */
+export interface OutgoingUsage {
+  readonly contactMessages: number;
+  readonly messages: number;
+  readonly contactFiles: number;
+  readonly files: number;
+  readonly bytes: number;
+}
+
+export type OutgoingEvaluation =
+  | { readonly decision: 'allow' }
+  | { readonly decision: 'deny'; readonly limit: OutgoingLimit; readonly max: number };
+
+/** The caps under G-6 fail closed: the built-in defaults (an unreadable policy never lifts them). */
+export const FAIL_CLOSED_OUTGOING: OutgoingPolicy = Object.freeze({ ...OUTGOING_DEFAULTS });
+
+/** The outgoing caps in force: the policy's own (absent: the defaults), or the fail-closed ones. */
+export function outgoingCaps(effective: EffectivePolicy): OutgoingPolicy {
+  return effective.mode === 'fail_closed' ? FAIL_CLOSED_OUTGOING : outgoingOf(effective.policy);
+}
+
+const isCount = (n: unknown): n is number =>
+  typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
+
+/**
+ * The outgoing caps for one send (D-156): the Nth message or file of the window passes, the N + 1th
+ * is refused; a message with files counts as one message and each file once. Pure. Over a cap the
+ * answer is `deny`, never an approval: only an owner-signed `policy.set` raises a cap.
+ */
+export function evaluateOutgoing(
+  effective: EffectivePolicy,
+  action: OutgoingAction,
+  usage: OutgoingUsage,
+): OutgoingEvaluation {
+  if (!isCount(action.files) || !isCount(action.bytes)) throw contextInvalid();
+  for (const n of [usage.contactMessages, usage.messages, usage.contactFiles, usage.files]) {
+    if (!isCount(n)) throw contextInvalid();
+  }
+  if (!isCount(usage.bytes)) throw contextInvalid();
+  const caps = outgoingCaps(effective);
+  const deny = (limit: OutgoingLimit, max: number): OutgoingEvaluation => ({
+    decision: 'deny',
+    limit,
+    max,
+  });
+  if (usage.contactMessages + 1 > caps.messagesPerContactPerDay) {
+    return deny('messages_contact', caps.messagesPerContactPerDay);
+  }
+  if (usage.messages + 1 > caps.messagesPerDay) return deny('messages_day', caps.messagesPerDay);
+  if (action.files > 0) {
+    if (usage.contactFiles + action.files > caps.filesPerContactPerDay) {
+      return deny('files_contact', caps.filesPerContactPerDay);
+    }
+    if (usage.files + action.files > caps.filesPerDay) return deny('files_day', caps.filesPerDay);
+    if (usage.bytes + action.bytes > caps.fileMBPerDay * MB) {
+      return deny('file_mb_day', caps.fileMBPerDay);
+    }
+  }
+  return { decision: 'allow' };
 }
 
 // --- files (06 §2.3, §3 `files`, D-48) ------------------------------------------------------------

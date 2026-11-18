@@ -28,6 +28,11 @@
 // are the ones in memory. Anything but `ok` removes the file this call wrote; the content refusals
 // are never kept under the clientRequestId.
 //
+// SEC-OUTBOUND-CAPS (D-156; 06 §3 `outgoing`): after the contact rule, the rolling 24 h caps on
+// messages and files (outgoing-limits.ts) are checked before anything is read or uploaded, and again
+// in the transaction that stores the envelope. Over a cap: SEND_LIMIT with the cap, its number and
+// when a slot frees, nothing stored or published; the refusal is not kept under a clientRequestId.
+//
 // Errors are CoreErrors with fixed sentences; nothing of the message, the contact or a key goes
 // into an error or a log line (I-5, I-7). Logs carry counts only.
 import {
@@ -69,7 +74,18 @@ import type { IdempotencyRun, IdempotencyService } from './idempotency.js';
 import type { IdentityService } from './identity.js';
 import type { OutboxService } from './outbox.js';
 import type { OwnerActions } from './owner-actions.js';
-import { evaluate, type PolicyDecision } from './policy-engine.js';
+import {
+  OUTGOING_WINDOW_SECONDS,
+  outgoingUsage,
+  recordOutgoing,
+  type OutgoingUsageDetail,
+} from './outgoing-limits.js';
+import {
+  evaluate,
+  evaluateOutgoing,
+  type OutgoingLimit,
+  type PolicyDecision,
+} from './policy-engine.js';
 
 /** The MCP tool whose idempotency rows these are (06 §2.0). */
 export const SEND_TOOL = 'agentlink_send';
@@ -105,6 +121,17 @@ export const POLICY_DENIED = 'POLICY_DENIED' as const;
 export const PAYLOAD_TOO_LARGE = 'PAYLOAD_TOO_LARGE' as const;
 /** A file above `files.maxSendSizeMB`. Nothing was read or sent. */
 export const FILE_TOO_LARGE = 'FILE_TOO_LARGE' as const;
+/** D-156: an outgoing cap of the owner's rules is reached. Nothing was stored or sent. */
+export const SEND_LIMIT = 'SEND_LIMIT' as const;
+
+/** D-156: the SEND_LIMIT refusal: which cap, its number, and when a slot frees (RFC 3339 UTC). */
+export interface SendLimitRefusal {
+  readonly status: 'rejected';
+  readonly code: typeof SEND_LIMIT;
+  readonly limit: OutgoingLimit;
+  readonly max: number;
+  readonly retryAt: string;
+}
 
 /** REL051-CF2: an outbound message's delivery state (07 §3.2). */
 export type SendDelivery = 'queued' | 'sent' | 'not_delivered';
@@ -146,6 +173,7 @@ export type SendMessageResult =
         | typeof FILE_TOO_LARGE
         | ContentFileCode;
     }
+  | SendLimitRefusal
   /** A file send that needs the owner first (06 §2.3): an allowed folder or own storage. */
   | { readonly status: 'needs_setup'; readonly reason: FilesNeedsSetup }
   /** Another execution holds this clientRequestId: run nothing, try again shortly (07 §3.3). */
@@ -316,6 +344,8 @@ export class SendService {
         }
         if (
           done.result.status === 'needs_setup' ||
+          // D-156: a cap frees as the window rolls; the same clientRequestId runs again then.
+          (done.result.status === 'rejected' && done.result.code === SEND_LIMIT) ||
           (request.contentFile !== undefined &&
             done.result.status === 'rejected' &&
             CONTENT_FILE_UNKEPT.has(done.result.code))
@@ -338,6 +368,26 @@ export class SendService {
     return evaluate(policy, { kind: 'envelope.send', contact: to, sizeBytes });
   }
 
+  /**
+   * D-156: the outgoing caps for a send of `files` files and `bytes` bytes to `to`, as a refusal, or
+   * undefined when within them. Inside a transaction (`tx`) it is the authoritative check; without
+   * one it is the early check before anything is read or uploaded.
+   */
+  async #limits(
+    to: string,
+    files: number,
+    bytes: number,
+    tx?: Parameters<typeof outgoingUsage>[0],
+  ): Promise<SendLimitRefusal | undefined> {
+    const policy = await this.#deps.ownerActions.loadPolicy();
+    const now = nowOf(this.#ctx);
+    const usage =
+      tx === undefined
+        ? await this.#ctx.store.transaction((t) => outgoingUsage(t, to, now))
+        : outgoingUsage(tx, to, now);
+    return limitRefusal(evaluateOutgoing(policy, { contact: to, files, bytes }, usage), usage, now);
+  }
+
   async #run(
     request: Request,
     run: IdempotencyRun | undefined,
@@ -350,6 +400,12 @@ export class SendService {
     if ((await this.#decide(request.to, 0)) !== 'allow') {
       return { result: { status: 'rejected', code: POLICY_DENIED } };
     }
+    const declared = request.files.reduce(
+      (n, f) => n + (typeof f?.size === 'number' && f.size > 0 ? f.size : 0),
+      0,
+    );
+    const early = await this.#limits(request.to, request.files.length, declared);
+    if (early !== undefined) return { result: early };
     return this.#runFiles(request, request.files, run);
   }
 
@@ -369,6 +425,9 @@ export class SendService {
     if ((await this.#decide(request.to, 0)) !== 'allow') {
       return { result: { status: 'rejected', code: POLICY_DENIED } };
     }
+    // D-156: the outgoing caps before the file is written.
+    const early = await this.#limits(request.to, 1, bytes.length);
+    if (early !== undefined) return { result: early };
     const policy = await this.#deps.ownerActions.loadPolicy();
     const folders = policy.mode === 'fail_closed' ? [] : policy.policy.files.allowedFolders;
     if (!Array.isArray(folders) || folders.length === 0) {
@@ -521,7 +580,23 @@ export class SendService {
     const fileRows = await sealFileRows(ctx, envelopeId, records);
     const prepared =
       run === undefined ? undefined : await idempotency.prepareEffect(run, [envelopeId]);
-    await ctx.store.transaction((tx) => {
+    // D-156: the caps are checked again in the transaction that stores the envelope, so two sends
+    // never both pass on one count. The policy is loaded before it (no await inside, 07 §3.1).
+    const policy = await this.#deps.ownerActions.loadPolicy();
+    const fileBytes = fileRows.reduce((n, f) => n + f.size, 0);
+    const limited = await ctx.store.transaction((tx) => {
+      const now = nowOf(ctx);
+      const usage = outgoingUsage(tx, request.to, now);
+      const over = limitRefusal(
+        evaluateOutgoing(
+          policy,
+          { contact: request.to, files: fileRows.length, bytes: fileBytes },
+          usage,
+        ),
+        usage,
+        now,
+      );
+      if (over !== undefined) return over;
       if (run !== undefined && prepared !== undefined && !idempotency.effectTx(tx, run, prepared)) {
         throw new CoreError('idempotency_lost', 'This request is already being handled.');
       }
@@ -534,7 +609,17 @@ export class SendService {
       tx.insert('envelopes', row);
       for (const r of rows) tx.insert('outbox', r);
       for (const f of fileRows) tx.insert('files', f);
+      // D-156: the durable count of the outgoing caps (a later file delete never frees it).
+      recordOutgoing(tx, {
+        envelopeId,
+        contact: request.to,
+        now,
+        files: fileRows.length,
+        bytes: fileBytes,
+      });
+      return undefined;
     });
+    if (limited !== undefined) return { result: limited };
     if (run !== undefined && prepared !== undefined) idempotency.committed(run, prepared);
     ctx.log.info(
       'message stored for sending',
@@ -603,4 +688,31 @@ export class SendService {
       return result;
     }
   }
+}
+
+/**
+ * D-156: the SEND_LIMIT refusal for an outgoing evaluation, or undefined when it allows. `retryAt` is
+ * when the oldest counted entry of that cap's scope leaves the rolling window (a slot frees then).
+ */
+function limitRefusal(
+  evaluation: ReturnType<typeof evaluateOutgoing>,
+  usage: OutgoingUsageDetail,
+  now: number,
+): SendLimitRefusal | undefined {
+  if (evaluation.decision === 'allow') return undefined;
+  const oldest: Record<OutgoingLimit, number | null> = {
+    messages_contact: usage.contactOldestAt,
+    messages_day: usage.oldestAt,
+    files_contact: usage.contactFileOldestAt,
+    files_day: usage.fileOldestAt,
+    file_mb_day: usage.fileOldestAt,
+  };
+  const at = (oldest[evaluation.limit] ?? now) + OUTGOING_WINDOW_SECONDS;
+  return {
+    status: 'rejected',
+    code: SEND_LIMIT,
+    limit: evaluation.limit,
+    max: evaluation.max,
+    retryAt: iso(at),
+  };
 }

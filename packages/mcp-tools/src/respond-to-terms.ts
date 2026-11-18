@@ -44,6 +44,7 @@ import {
   termsApprovalState,
   termsCoreError,
   termsInProgress,
+  ceilingOf,
   termsRefusal,
   termsWithProof,
 } from './terms-common.js';
@@ -133,7 +134,7 @@ export async function respondToTermsHandler(
         decision === 'accept',
         result.code === 'APPROVAL_USED' && result.envelopeId !== undefined
           ? { envelopeId: result.envelopeId }
-          : {},
+          : ceilingOf(result),
       );
     case 'ok': {
       const sender = await tools.senderOf(envelopeId);

@@ -348,6 +348,17 @@ export const POLICY_REVIEW_ROWS: readonly PolicyReviewRow[] = Object.freeze([
   { path: 'proofs.notarize', label: 'Adding proof', read: rule },
   { path: 'proofs.dailyBudgetUSD', label: 'Spent on proofs in 24 hours, at most', read: usd },
   { path: 'proofs.perActionMaxUSD', label: 'Each proof, at most', read: usd },
+  // D-156: the hard limits; absent in a policy signed before D-156, which reads as the defaults.
+  {
+    path: 'proofs.hardDailyUSD',
+    label: 'Never spent on proofs in 24 hours, above',
+    read: (v) => (v === undefined ? 'the default ($10)' : usd(v)),
+  },
+  {
+    path: 'proofs.hardMaxPerActionUSD',
+    label: 'Never spent on one proof, above',
+    read: (v) => (v === undefined ? 'the default ($0.50)' : usd(v)),
+  },
   {
     path: 'proofs.allowKeyDisclosure',
     label: "Including a message's content in a proof file",
@@ -370,6 +381,32 @@ export const POLICY_REVIEW_ROWS: readonly PolicyReviewRow[] = Object.freeze([
     read: (v) => (v === 'sell' ? 'selling' : 'buying'),
   },
   { path: 'commitments.autoAcceptMinUSD', label: 'Selling accepted automatically from', read: usd },
+  // D-156: absent in a policy signed before D-156, which reads as the defaults.
+  {
+    path: 'outgoing.messagesPerContactPerDay',
+    label: 'Messages your AI sends one contact in 24 hours, at most',
+    read: (v) => (v === undefined ? 'the default (300)' : String(v)),
+  },
+  {
+    path: 'outgoing.messagesPerDay',
+    label: 'Messages your AI sends in 24 hours, at most',
+    read: (v) => (v === undefined ? 'the default (1000)' : String(v)),
+  },
+  {
+    path: 'outgoing.filesPerContactPerDay',
+    label: 'Files your AI sends one contact in 24 hours, at most',
+    read: (v) => (v === undefined ? 'the default (50)' : String(v)),
+  },
+  {
+    path: 'outgoing.filesPerDay',
+    label: 'Files your AI sends in 24 hours, at most',
+    read: (v) => (v === undefined ? 'the default (200)' : String(v)),
+  },
+  {
+    path: 'outgoing.fileMBPerDay',
+    label: 'File data your AI sends in 24 hours, at most',
+    read: (v) => (v === undefined ? 'the default (2000 MB)' : `${String(v)} MB`),
+  },
   // D-148 (RET-6): absent in a policy signed before D-148, which keeps everything.
   { path: 'history.messagesKeepDays', label: 'Messages are kept', read: keptFor },
   { path: 'history.filesKeepDays', label: 'Saved files are kept', read: keptFor },

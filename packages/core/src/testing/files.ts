@@ -416,6 +416,20 @@ export async function openFileAgent(
 }
 
 /** Pairs both ways, then gives the sender a signed policy that allows WORK. */
+/**
+ * D-156: raises the sender's outgoing caps far above a test's sends, for tests about the receiving
+ * side that send more than the default per-contact file cap (the caps have their own tests).
+ */
+export function roomyOutgoing(p: Policy): void {
+  p.outgoing = {
+    messagesPerContactPerDay: 10_000,
+    messagesPerDay: 100_000,
+    filesPerContactPerDay: 1_000,
+    filesPerDay: 10_000,
+    fileMBPerDay: 102_400,
+  };
+}
+
 export async function pairForFiles(
   clock: FakeClock,
   a: FileAgent,

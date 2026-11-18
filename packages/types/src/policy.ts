@@ -15,7 +15,7 @@ import {
   isWellFormedString,
   utf8ByteLength,
 } from './encoding.js';
-import { usdAmountSchema } from './usd.js';
+import { compareUsd, isUsdAmount, usdAmountSchema } from './usd.js';
 
 const freeze = <T>(value: T): Readonly<T> => Object.freeze(value);
 
@@ -63,6 +63,16 @@ export const POLICY_BOUNDS = freeze({
     perDay: freeze({ min: 0, max: 50 } as const),
     expiryHours: freeze({ min: 1, max: 168 } as const),
   } as const),
+  /** `outgoing.messagesPerContactPerDay` (D-156). */
+  outgoingMessagesPerContact: freeze({ min: 1, max: 10_000 } as const),
+  /** `outgoing.messagesPerDay` (D-156). */
+  outgoingMessages: freeze({ min: 1, max: 100_000 } as const),
+  /** `outgoing.filesPerContactPerDay` (D-156). */
+  outgoingFilesPerContact: freeze({ min: 1, max: 1_000 } as const),
+  /** `outgoing.filesPerDay` (D-156). */
+  outgoingFiles: freeze({ min: 1, max: 10_000 } as const),
+  /** `outgoing.fileMBPerDay` (D-156). */
+  outgoingFileMB: freeze({ min: 1, max: 102_400 } as const),
 } as const);
 
 // --- field schemas -------------------------------------------------------------------------------
@@ -189,6 +199,78 @@ export function historyOf(policy: { readonly history?: HistoryPolicy | undefined
   return { messagesKeepDays: h.messagesKeepDays, filesKeepDays: h.filesKeepDays };
 }
 
+// --- outgoing caps (D-156, SEC-OUTBOUND-CAPS) ----------------------------------------------------
+
+/**
+ * `outgoing` (D-156; 06 §3, 07 §3.2): rolling 24-hour caps on what this agent sends with
+ * `agentlink_send`: messages and attached files, per contact and in all. Over a cap the send is
+ * refused (never an approval). Acks, receipts, pairing and owner-channel envelopes are not counted.
+ * Changed only by an owner-signed `policy.set` from the app (I-4). It may be absent only in a policy
+ * signed before D-156, which reads as OUTGOING_DEFAULTS. When present it is a strict object with all
+ * five keys.
+ */
+export const outgoingSchema = z.strictObject({
+  messagesPerContactPerDay: intIn(POLICY_BOUNDS.outgoingMessagesPerContact),
+  messagesPerDay: intIn(POLICY_BOUNDS.outgoingMessages),
+  filesPerContactPerDay: intIn(POLICY_BOUNDS.outgoingFilesPerContact),
+  filesPerDay: intIn(POLICY_BOUNDS.outgoingFiles),
+  fileMBPerDay: intIn(POLICY_BOUNDS.outgoingFileMB),
+});
+
+export type OutgoingPolicy = z.infer<typeof outgoingSchema>;
+
+/** The 06 §3 `outgoing` defaults (D-156, D6 option 1): 300 / 1000 messages, 50 / 200 files, 2000 MB. */
+export const OUTGOING_DEFAULTS: Readonly<OutgoingPolicy> = freeze({
+  messagesPerContactPerDay: 300,
+  messagesPerDay: 1000,
+  filesPerContactPerDay: 50,
+  filesPerDay: 200,
+  fileMBPerDay: 2000,
+});
+
+/** The `outgoing` caps of a policy: its own, or OUTGOING_DEFAULTS for one signed before D-156. */
+export function outgoingOf(policy: {
+  readonly outgoing?: OutgoingPolicy | undefined;
+}): OutgoingPolicy {
+  return { ...(policy.outgoing ?? OUTGOING_DEFAULTS) };
+}
+
+// --- hard proof ceilings (D-156, SEC-HARD-CEILING) ------------------------------------------------
+
+/**
+ * The hard proof ceilings (D-156, D5 option 1; 06 §3): above `hardMaxPerActionUSD` for one Record,
+ * or above `hardDailyUSD` over the rolling 24 h window, a proof is refused, never asked. The soft
+ * limits (`perActionMaxUSD`, `dailyBudgetUSD`, a contact rule's `perActionMaxUSD`) are read as at
+ * most these. A policy signed before D-156 has neither and reads as these defaults.
+ */
+export const PROOF_CEILING_DEFAULTS = freeze({
+  hardMaxPerActionUSD: '0.5',
+  hardDailyUSD: '10',
+} as const);
+
+export interface ProofCeilings {
+  readonly hardMaxPerActionUSD: string;
+  readonly hardDailyUSD: string;
+}
+
+/** The hard proof ceilings of a policy: its own, or PROOF_CEILING_DEFAULTS before D-156. */
+export function proofCeilingsOf(policy: {
+  readonly proofs: {
+    readonly hardMaxPerActionUSD?: string | undefined;
+    readonly hardDailyUSD?: string | undefined;
+  };
+}): ProofCeilings {
+  return {
+    hardMaxPerActionUSD:
+      policy.proofs.hardMaxPerActionUSD ?? PROOF_CEILING_DEFAULTS.hardMaxPerActionUSD,
+    hardDailyUSD: policy.proofs.hardDailyUSD ?? PROOF_CEILING_DEFAULTS.hardDailyUSD,
+  };
+}
+
+/** Defensive: true when `a` and `b` are USD amounts and `a` is above `b`. */
+const usdAbove = (a: unknown, b: unknown): boolean =>
+  isUsdAmount(a) && isUsdAmount(b) && compareUsd(a, b) > 0;
+
 /** The 06 §3 `files.autoSave` defaults (D-142, Decision 51): on, 50/500 per contact, 200/2048. */
 export const AUTO_SAVE_DEFAULTS: Readonly<AutoSavePolicy> = freeze({
   on: true,
@@ -307,14 +389,31 @@ export const policySchema = z.strictObject({
   envelopes: z.strictObject({
     maxEnvelopeKB: intIn(POLICY_BOUNDS.maxEnvelopeKB),
   }),
-  proofs: z.strictObject({
-    notarize: z.enum(POLICY_RULES),
-    dailyBudgetUSD: usdAmountSchema,
-    perActionMaxUSD: usdAmountSchema,
-    allowKeyDisclosure: z.enum(KEY_DISCLOSURE_RULES),
-    exportFolder: policyPathSchema,
-    defaultChain: chainKeySchema,
-  }),
+  proofs: z
+    .strictObject({
+      notarize: z.enum(POLICY_RULES),
+      dailyBudgetUSD: usdAmountSchema,
+      perActionMaxUSD: usdAmountSchema,
+      allowKeyDisclosure: z.enum(KEY_DISCLOSURE_RULES),
+      exportFolder: policyPathSchema,
+      defaultChain: chainKeySchema,
+      // D-156: the hard ceilings, both or neither. Absent only in a policy signed before D-156
+      // (read as PROOF_CEILING_DEFAULTS); when present, each soft limit is at most its ceiling.
+      hardMaxPerActionUSD: usdAmountSchema.exactOptional(),
+      hardDailyUSD: usdAmountSchema.exactOptional(),
+    })
+    .refine(
+      (p) => (p.hardMaxPerActionUSD === undefined) === (p.hardDailyUSD === undefined),
+      'hardMaxPerActionUSD and hardDailyUSD are set together',
+    )
+    .refine(
+      (p) => !usdAbove(p.perActionMaxUSD, p.hardMaxPerActionUSD),
+      'perActionMaxUSD must be at most hardMaxPerActionUSD',
+    )
+    .refine(
+      (p) => !usdAbove(p.dailyBudgetUSD, p.hardDailyUSD),
+      'dailyBudgetUSD must be at most hardDailyUSD',
+    ),
   receipts: z.strictObject({
     autoDelivered: z.boolean(),
     autoOpened: z.boolean(),
@@ -331,6 +430,8 @@ export const policySchema = z.strictObject({
   }),
   // D-148: may be absent only in a policy signed before D-148 (read as HISTORY_PRE_D148).
   history: historySchema.exactOptional(),
+  // D-156: may be absent only in a policy signed before D-156 (read as OUTGOING_DEFAULTS).
+  outgoing: outgoingSchema.exactOptional(),
   contactRules: contactRulesSchema,
 });
 
@@ -382,13 +483,16 @@ function buildDefaults(): Policy {
       ownerArchive: false,
     },
     envelopes: { maxEnvelopeKB: 24 },
+    // D-156 (D5 option 1): ask above $0.20 a proof or $5 a day; refuse above $0.50 or $10.
     proofs: {
       notarize: 'allow',
       dailyBudgetUSD: '5',
-      perActionMaxUSD: '1',
+      perActionMaxUSD: '0.2',
       allowKeyDisclosure: 'approval',
       exportFolder: '~/AgentLink/Proofs',
       defaultChain: 'base',
+      hardMaxPerActionUSD: PROOF_CEILING_DEFAULTS.hardMaxPerActionUSD,
+      hardDailyUSD: PROOF_CEILING_DEFAULTS.hardDailyUSD,
     },
     // D-109: a delivery receipt is public, so it is off unless the owner turns it on.
     receipts: { autoDelivered: false, autoOpened: false },
@@ -401,6 +505,8 @@ function buildDefaults(): Policy {
     },
     // D-148: keep forever; a new ID's first rules carry HISTORY_NEW_ID (OD-2).
     history: { ...HISTORY_DEFAULTS },
+    // D-156 (D6 option 1): the outgoing caps.
+    outgoing: { ...OUTGOING_DEFAULTS },
     contactRules: [],
   };
 }
@@ -447,6 +553,7 @@ export const policyPatchSchema = z.strictObject({
   receipts: exactPartial(sections.receipts.shape).exactOptional(),
   commitments: exactPartial(sections.commitments.shape).exactOptional(),
   history: exactPartial(historySchema.shape).exactOptional(),
+  outgoing: exactPartial(outgoingSchema.shape).exactOptional(),
   contactRules: sections.contactRules.exactOptional(),
 });
 

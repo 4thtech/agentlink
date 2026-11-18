@@ -716,7 +716,8 @@ describe('preparePolicyEdit (M1-11r-b; 04 §2.5.1 policy.set; 06 §3)', () => {
         [{ code: 'contact_rule_removed_loosens', contacts: [C1] }],
         (p) =>
           void (p.contactRules = [
-            { contact: C1, proofs: { perActionMaxUSD: '0.5' } },
+            // Lower than the global soft limit ($0.20 since D-156).
+            { contact: C1, proofs: { perActionMaxUSD: '0.1' } },
             { contact: C2, proofs: { notarize: 'allow' } },
           ]),
       ],

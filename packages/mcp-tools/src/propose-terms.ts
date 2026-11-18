@@ -37,6 +37,7 @@ import {
   termsCoreError,
   termsInProgress,
   termsNeedsCredits,
+  ceilingOf,
   termsRefusal,
   termsWithProof,
 } from './terms-common.js';
@@ -186,7 +187,7 @@ export async function proposeTermsHandler(
       return termsNeedsCreditsAfterClaim(result, context, self.agentId, 'agentlink_propose_terms');
     case 'rejected':
       logger.info('propose terms refused', { kind: 'terms' });
-      return termsRefusal(result.code, false);
+      return termsRefusal(result.code, false, ceilingOf(result));
     case 'pending_approval':
       // A firm offer (M1-9d-3): one approval for the offer and its proof.
       logger.info('terms approval requested', { requests: 1 });

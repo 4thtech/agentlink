@@ -15,11 +15,13 @@
  * `mcp_sessions.version` (07 §3.2). Version 14 (REL051-B2) adds `invites.invite_link` (07 §3).
  * Version 15 (RET-2, D-148) adds `envelopes.deleted_at` and `saved_files` (07 §3.8). Version 16
  * (FILES-AI-1, D-152) adds `content_file_budget` (06 §2.3 "Daily budget"). Version 17
- * (SEC-INVITE-CAPS, D-156) adds `invites.created_by` and `contacts.waiting_owner` (07 §3). An
+ * (SEC-OUTBOUND-CAPS, D-156) adds `outgoing_log` (06 §3 `outgoing`). Version 18
+ * (SEC-INVITE-CAPS, D-156) adds `invites.created_by`, `contacts.waiting_owner`, `contacts.ai_accepted_at`
+ * and `pairings.created_by` (07 §3). An
  * older build refuses a newer store (`store_schema_newer`) when it opens it, so an upgrade cannot be
  * rolled back.
  */
-export const STORE_SCHEMA_VERSION = 17;
+export const STORE_SCHEMA_VERSION = 18;
 
 /** 04 §2.9: `storagePrefix` is 16 random bytes, base64url, generated at init. */
 export const STORAGE_PREFIX_BYTES = 16;

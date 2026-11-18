@@ -16,6 +16,7 @@ import {
   openFileAgent,
   outgoing,
   pairForFiles,
+  roomyOutgoing,
   type FileAgent,
 } from '../testing/files.js';
 
@@ -81,6 +82,8 @@ describe('files.deleteAfter: receipt, the DELIVERED receipt deletes the stored o
     await agents((p) => {
       p.files.deleteAfter = 'receipt';
       p.receipts.autoDelivered = true;
+      // The window test sends 60 files to one contact: above the default outgoing cap (D-156).
+      roomyOutgoing(p);
     });
   });
 

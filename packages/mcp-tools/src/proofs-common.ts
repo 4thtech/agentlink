@@ -127,6 +127,13 @@ export const PROOF_TEXT = Object.freeze({
   fileChanged: 'A file changed after the owner approved it, so nothing was recorded.',
   fileChangedNextStep:
     'Call the tool again without approvalId: the owner approves the file as it is now.',
+  // D-156 (SEC-HARD-CEILING): a hard ceiling refuses; no approval can lift it.
+  spendCeilingPerAction:
+    'This proof would cost more than your limit ({limit} per proof), so nothing was recorded.',
+  spendCeilingDaily:
+    'This proof would go over your limit ({limit} a day), so nothing was recorded.',
+  spendCeilingNextStep:
+    "Tell the user: This is over your limit. You can change it in Settings › Rules in the AgentLink app. Don't ask for an approval: an approval can't go over this limit.",
   policyChanged: "The owner's rules changed while this ran, so nothing was recorded.",
   policyChangedNextStep: 'Call the tool again; it checks the current rules.',
   // M1-36i (owner decision 2026-10-22): free test credits, claimed once on the first proof that
@@ -339,9 +346,36 @@ export function proofFields(view: {
   };
 }
 
+/**
+ * D-156: the SPEND_CEILING refusal: which ceiling and its amount, in plain words; never an approval.
+ * Only a well-formed ceiling and amount from the core are carried (fixed text otherwise).
+ */
+function spendCeiling(details: Readonly<Record<string, unknown>>): HandlerOutput {
+  const ceiling = details['ceiling'] === 'daily' ? 'daily' : 'per_action';
+  const raw = details['limitUsd'];
+  // "$0.50", "$10": the amount as the Rules page shows it.
+  const shown = dollars(raw)?.replace(/\.00$/, '');
+  const limitUsd = shown === undefined ? undefined : (raw as string);
+  const template =
+    ceiling === 'daily' ? PROOF_TEXT.spendCeilingDaily : PROOF_TEXT.spendCeilingPerAction;
+  const summary =
+    shown === undefined
+      ? template.replace(' ({limit} per proof)', '').replace(' ({limit} a day)', '')
+      : fill(template, { limit: shown });
+  return fail('rejected', summary, PROOF_TEXT.spendCeilingNextStep, 'SPEND_CEILING', {
+    ceiling,
+    ...(limitUsd === undefined ? {} : { limitUsd }),
+  });
+}
+
 /** Core proof refusal codes (06 §1 rule 3): status and fixed text, by code. */
-export function proofRefusal(code: string): HandlerOutput {
+export function proofRefusal(
+  code: string,
+  details: Readonly<Record<string, unknown>> = {},
+): HandlerOutput {
   switch (code) {
+    case 'SPEND_CEILING':
+      return spendCeiling(details);
     case 'PROOFS_UNAVAILABLE':
       return fail('error', PROOF_TEXT.unavailable, PROOF_TEXT.unavailableNextStep, code);
     case 'ENVELOPE_NOT_FOUND':
@@ -527,7 +561,7 @@ export function notarizeOutput(
       };
     }
     case 'rejected':
-      return proofRefusal(result.code);
+      return proofRefusal(result.code, result as unknown as Readonly<Record<string, unknown>>);
     default:
       return internalError();
   }

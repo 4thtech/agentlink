@@ -1,5 +1,5 @@
 // `agentlink invite [--long]` † (M1-9l; SEC-INVITE-CAPS, D-156, owner decision 18 Nov 2026; 04
-// §2.5.1 `invite.create`, §3.6; 06 §8; 11 §5.11): the owner's own invite from the terminal.
+// §2.5.1 `invite.create`, §3.6; 06 §8; 11 §5.12): the owner's own invite from the terminal.
 //
 // - An owner operation: the dispatcher's owner guard runs first (interactive terminal, no AI harness
 //   marker; a UX guard, D-67). Then @4thtech-io/node shows the fixed summary, asks for the owner's
@@ -19,7 +19,7 @@ import { badArguments, chooseAgent, ownerContext, ownerStep } from './common.js'
 import type { OwnerCommandDeps } from './deps.js';
 import { OWNER_TEXT } from './strings.js';
 
-/** Fixed text (11 §5.11). */
+/** Fixed text (11 §5.12). */
 export const INVITE_OWNER_TEXT = Object.freeze({
   summary:
     'Create an invite from you. Whoever uses it first is connected with this ID as your contact.',

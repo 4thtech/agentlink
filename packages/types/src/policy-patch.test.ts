@@ -38,6 +38,8 @@ describe('policyPatchSchema (M1-11r-b)', () => {
         Object.keys(policySection.shape)
           .filter((k) => !(section === 'files' && k === 'autoSave'))
           .filter((k) => !(section === 'receipts' && k === 'sendReceived'))
+          // SEC-INVITE-CAPS: `contacts.aiInvites` (absent reads as AI_INVITE_DEFAULTS).
+          .filter((k) => !(section === 'contacts' && k === 'aiInvites'))
           .sort(),
       ).toEqual(Object.keys(value as object).sort());
     }

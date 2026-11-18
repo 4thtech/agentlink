@@ -134,7 +134,7 @@ export const ACTIVITY_COPY = {
   contactUnblocked: ['You unblocked {who}', 'You unblocked a contact'] as Pair,
   contactUnblockedLine: 'Their messages reach you again',
   pillUnblocked: 'Unblocked',
-  // SEC-INVITE-CAPS (D-156; 11 §5.11).
+  // SEC-INVITE-CAPS (D-156; 11 §5.12).
   contactKept: [
     'You kept {who}, connected by your AI',
     'You kept a contact your AI connected',

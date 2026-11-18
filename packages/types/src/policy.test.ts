@@ -92,13 +92,22 @@ describe('policy defaults (06 §3)', () => {
           "filesKeepDays": 0,
           "messagesKeepDays": 0,
         },
+        "outgoing": {
+          "fileMBPerDay": 2000,
+          "filesPerContactPerDay": 50,
+          "filesPerDay": 200,
+          "messagesPerContactPerDay": 300,
+          "messagesPerDay": 1000,
+        },
         "proofs": {
           "allowKeyDisclosure": "approval",
           "dailyBudgetUSD": "5",
           "defaultChain": "base",
           "exportFolder": "~/AgentLink/Proofs",
+          "hardDailyUSD": "10",
+          "hardMaxPerActionUSD": "0.5",
           "notarize": "allow",
-          "perActionMaxUSD": "1",
+          "perActionMaxUSD": "0.2",
         },
         "receipts": {
           "autoDelivered": false,
@@ -148,6 +157,8 @@ describe('policy round trips', () => {
 
   it('the bounds themselves are accepted', () => {
     const p = policyDefaultsFromSpec();
+    // D-156: the daily soft limit is at most the hard ceiling, so the ceiling takes its bound too.
+    p.proofs.hardDailyUSD = '999999999.999999';
     const ids = (n: number) =>
       Array.from({ length: n }, (_, i) => `0x${i.toString(16).padStart(40, '0')}`);
     for (const [path, value] of [
@@ -168,6 +179,13 @@ describe('policy round trips', () => {
       [['proofs', 'defaultChain'], 'a'.repeat(32)],
       [['proofs', 'dailyBudgetUSD'], '999999999.999999'],
       [['proofs', 'perActionMaxUSD'], '0'],
+      [['proofs', 'hardMaxPerActionUSD'], '999999999.999999'],
+      [['proofs', 'hardMaxPerActionUSD'], '0.2'],
+      [['outgoing', 'messagesPerContactPerDay'], 1],
+      [['outgoing', 'messagesPerDay'], 100_000],
+      [['outgoing', 'filesPerContactPerDay'], 1_000],
+      [['outgoing', 'filesPerDay'], 10_000],
+      [['outgoing', 'fileMBPerDay'], 102_400],
       [['commitments', 'autoAcceptMinUSD'], '0.000001'],
       [['commitments', 'accept'], 'allow'],
       [['commitments', 'accept'], 'deny'],
@@ -200,10 +218,13 @@ describe('policy rejects (M1-2b acceptance)', () => {
   // RET-6 (D-148): the whole `history` section may be absent (a policy signed before D-148;
   // policy-history.test.ts); each of its keys may not.
   const isHistorySection = (p: Path) => p.length === 1 && p[0] === 'history';
+  // D-156: the whole `outgoing` section may be absent (a policy signed before D-156;
+  // policy-limits.test.ts); each of its keys may not.
+  const isOutgoingSection = (p: Path) => p.length === 1 && p[0] === 'outgoing';
 
   it.each(
     keyPaths(policyWithRules())
-      .filter((p) => !isRuleProofKey(p) && !isHistorySection(p))
+      .filter((p) => !isRuleProofKey(p) && !isHistorySection(p) && !isOutgoingSection(p))
       .map((p) => [p.join('.'), p] as const),
   )('a missing key: %s', (_label, path) => {
     expectReject(policySchema, edit(policyWithRules(), path, DELETE));

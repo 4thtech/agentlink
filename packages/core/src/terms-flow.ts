@@ -133,6 +133,11 @@ export type TermsCode =
   | 'APPROVAL_VOID'
   | 'POLICY_DENIED'
   /**
+   * D-156: the terms Record is over a hard ceiling the owner set. Nothing is sent or requested; no
+   * approval can pass it. Carries `ceiling` and `limitUsd`.
+   */
+  | 'SPEND_CEILING'
+  /**
    * `notarize` where no Record can be made: no proof platform on this machine, or a `reject`
    * with `notarize` (not specified; M1-9d-3, M1-9d-5). Nothing is sent.
    */
@@ -249,6 +254,9 @@ export interface TermsRejected {
   /** With APPROVAL_USED: the state of the original response (04 §3.4.2). */
   readonly envelopeId?: string;
   readonly receipt?: ReceiptState;
+  /** With SPEND_CEILING (D-156): which hard ceiling, and its amount (a USD amount). */
+  readonly ceiling?: 'per_action' | 'daily';
+  readonly limitUsd?: string;
 }
 
 /** A change from the newest version this side held before (computed locally; 04 §3.4.2). */
@@ -503,6 +511,12 @@ function quoteRefusal(
   switch (quote.code) {
     case 'POLICY_DENIED':
       return rejected('POLICY_DENIED');
+    // D-156: a hard ceiling refuses the terms Record, with its ceiling and amount.
+    case 'SPEND_CEILING':
+      return rejected('SPEND_CEILING', {
+        ...(quote.ceiling === undefined ? {} : { ceiling: quote.ceiling }),
+        ...(quote.limitUsd === undefined ? {} : { limitUsd: quote.limitUsd }),
+      });
     case 'CARD_EXPIRED':
       return rejected('CARD_EXPIRED');
     case 'PROOFS_UNAVAILABLE':

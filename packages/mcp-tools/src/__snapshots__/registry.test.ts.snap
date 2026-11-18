@@ -910,6 +910,20 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           ],
           "type": "object",
         },
+        "limit": {
+          "enum": [
+            "messages_contact",
+            "messages_day",
+            "files_contact",
+            "files_day",
+            "file_mb_day",
+          ],
+          "type": "string",
+        },
+        "max": {
+          "minimum": 1,
+          "type": "integer",
+        },
         "nextStep": {
           "maxLength": 500,
           "minLength": 1,
@@ -1018,6 +1032,10 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
             "receipts",
           ],
           "type": "object",
+        },
+        "retryAt": {
+          "maxLength": 64,
+          "type": "string",
         },
         "sentAt": {
           "maxLength": 64,
@@ -1276,12 +1294,23 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           },
           "type": "array",
         },
+        "ceiling": {
+          "enum": [
+            "per_action",
+            "daily",
+          ],
+          "type": "string",
+        },
         "code": {
           "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
           "type": "string",
         },
         "envelopeId": {
           "pattern": "^[A-Za-z0-9_-]{22}$",
+          "type": "string",
+        },
+        "limitUsd": {
+          "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,6})?$",
           "type": "string",
         },
         "nextStep": {
@@ -1612,6 +1641,13 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "pattern": "^apr_[A-Za-z0-9_-]{22}$",
           "type": "string",
         },
+        "ceiling": {
+          "enum": [
+            "per_action",
+            "daily",
+          ],
+          "type": "string",
+        },
         "code": {
           "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
           "type": "string",
@@ -1626,6 +1662,10 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
         },
         "envelopeId": {
           "pattern": "^[A-Za-z0-9_-]{22}$",
+          "type": "string",
+        },
+        "limitUsd": {
+          "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,6})?$",
           "type": "string",
         },
         "nextStep": {
@@ -2518,6 +2558,13 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
           "pattern": "^apr_[A-Za-z0-9_-]{22}$",
           "type": "string",
         },
+        "ceiling": {
+          "enum": [
+            "per_action",
+            "daily",
+          ],
+          "type": "string",
+        },
         "code": {
           "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
           "type": "string",
@@ -2552,6 +2599,10 @@ exports[`tool surface (06 §2.0, D-53) > matches the committed snapshot 1`] = `
             "usd",
           ],
           "type": "object",
+        },
+        "limitUsd": {
+          "pattern": "^(0|[1-9][0-9]{0,17})(\\.[0-9]{1,6})?$",
+          "type": "string",
         },
         "nextStep": {
           "maxLength": 500,

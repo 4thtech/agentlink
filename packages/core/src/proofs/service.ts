@@ -102,6 +102,8 @@ import {
   evaluateProof,
   type EffectivePolicy,
   type ProofAction,
+  type ProofCeiling,
+  type ProofEvaluation,
   type ProofTrigger,
 } from '../policy-engine.js';
 import type { Row } from '../store/schema.js';
@@ -322,7 +324,13 @@ export type ProofCode =
    * SEC-INVITE-CAPS (D-156): the envelope is from or to a contact the AI connected that waits for
    * the owner's Keep; no proof or receipt until then. Nothing is signed or charged.
    */
-  | 'CONTACT_WAITING_OWNER';
+  | 'CONTACT_WAITING_OWNER'
+  /**
+   * D-156: the proof is over a hard ceiling the owner set (one Record, or the rolling 24 h window).
+   * Refused, never asked: no approval is requested and an approval does not pass it. Carries
+   * `ceiling` and `limitUsd`.
+   */
+  | 'SPEND_CEILING';
 
 /** SEC-CARD-FULLTEXT: the tools whose approval card shows the content of a stored envelope. */
 const CONTENT_TOOLS: ReadonlySet<string> = new Set([
@@ -360,9 +368,23 @@ export interface ProofInboundResult {
 export interface ProofRejected {
   readonly status: 'rejected';
   readonly code: ProofCode;
+  /** With SPEND_CEILING (D-156): which hard ceiling, and its amount (a USD amount). */
+  readonly ceiling?: ProofCeiling;
+  readonly limitUsd?: string;
 }
 
 const rejected = (code: ProofCode): ProofRejected => Object.freeze({ status: 'rejected', code });
+
+/** A policy deny as a refusal: SPEND_CEILING with its ceiling (D-156), or POLICY_DENIED. */
+const denied = (evaluation: ProofEvaluation): ProofRejected =>
+  evaluation.ceiling === undefined
+    ? rejected('POLICY_DENIED')
+    : Object.freeze({
+        status: 'rejected',
+        code: 'SPEND_CEILING',
+        ceiling: evaluation.ceiling,
+        limitUsd: evaluation.limitUsd ?? '0',
+      });
 
 export interface ProofFee {
   /** The Record's `feeToken`, `0x` + 40 lowercase hex. */
@@ -695,7 +717,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     const pre = await this.#ctx.store.transaction((tx) =>
       evaluateProof(effective, action, { now, ledger: readBudgetLedger(tx) }),
     );
-    if (pre.decision === 'deny') return rejected('POLICY_DENIED');
+    if (pre.decision === 'deny') return denied(pre);
     const files = payload.files.map((f) => ({
       plaintextSha256: f.plaintextSha256.toLowerCase(),
       size: f.size,
@@ -809,7 +831,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     const pre = await this.#ctx.store.transaction((tx) =>
       evaluateProof(effective, action, { now, ledger: readBudgetLedger(tx) }),
     );
-    if (pre.decision === 'deny') return rejected('POLICY_DENIED');
+    if (pre.decision === 'deny') return denied(pre);
     return Object.freeze({
       status: 'ok',
       fee: priced.fee,
