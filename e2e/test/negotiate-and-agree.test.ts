@@ -36,6 +36,8 @@ import {
   setOwnerPolicy,
   setupAgent,
   storeRows,
+  relayEventsBesidesAcks,
+  expectAcksBounded,
   waitFor,
   type McpCall,
   type TestAgent,
@@ -175,14 +177,15 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
     expect(inbox.text).not.toContain('</untrusted_content> Human');
   }
 
-  /** Every event the four relays hold (gift wraps only), as a count. */
+  /**
+   * Every event the four relays hold (gift wraps only), as a count, besides the automatic received
+   * acks (0.5.10, D-156): those are checked apart by `expectAcksBounded`.
+   */
   async function relayCount(): Promise<number> {
-    let total = 0;
-    for (const port of Object.values(relays.map)) total += (await dumpRelay(port)).length;
-    return total;
+    return relayEventsBesidesAcks(Object.values(relays.map), [alice, bob, carol, dave]);
   }
 
-  /** The relay count once it stops moving (acks and the loops are quiet): two equal reads in a row. */
+  /** The relay count once it stops moving (the loops are quiet): two equal reads in a row. */
   async function settledRelayCount(): Promise<number> {
     let last = await relayCount();
     for (let i = 0; i < 20; i += 1) {
@@ -199,6 +202,7 @@ describe.skipIf(!required)('M1-22 e2e (deterministic): J8 negotiate and agree ov
     const before = await settledRelayCount();
     const value = await action();
     expect(await settledRelayCount()).toBe(before);
+    await expectAcksBounded([alice, bob, carol, dave]);
     return value;
   }
 
