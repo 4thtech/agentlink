@@ -89,15 +89,11 @@ export interface SceneOptions {
 export async function scene(options: SceneOptions = {}): Promise<Scene> {
   const base = await newWorld();
   const net = new MisbehavingRelays();
-  // A clock that moves only when a test moves it: no second boundary can fall between two reads of
-  // one operation (a parallel call reading the ledger and the clock), so outcomes never depend on
-  // when in the wall-clock second a run happens to start.
-  const startedAt = Math.floor(Date.now() / 1000);
   let offset = 0;
   const world: World = {
     ...base,
     net,
-    clock: () => startedAt + offset,
+    clock: () => Math.floor(Date.now() / 1000) + offset,
   };
   const ana = await makeAgent(world, {
     n: 2,
