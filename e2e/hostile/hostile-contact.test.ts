@@ -117,7 +117,7 @@ describe('a contact’s acknowledgement counts only for what it matches (07 §3.
     s: Scene,
     naming: string,
     hash: string,
-    options: { expectVerified?: boolean } = {},
+    options: { expectDeferred?: boolean } = {},
   ): Promise<string> {
     const { row } = await s.mallory.client.envelopes.prepare({
       to: { contact: s.ana.client.agentId },
@@ -129,7 +129,8 @@ describe('a contact’s acknowledgement counts only for what it matches (07 §3.
     const received = await s.ana.client.envelopes.receive({
       envelope: parseJson(row.envelope_json ?? ''),
     });
-    if (options.expectVerified !== false) expect(received.status).toBe('verified');
+    expect(received.status).toBe('verified');
+    if (options.expectDeferred) expect(received.report).toMatchObject({ outcome: 'deferred' });
     await s.ana.client.envelopes.processReceived();
     return row.envelope_id;
   }
@@ -186,7 +187,7 @@ describe('a contact’s acknowledgement counts only for what it matches (07 §3.
       epochControl: s.mallory.memoryOwner.epochControl(s.mallory.keys),
     });
     await session.close();
-    await ackFromContact(s, m2, await hashOf(m2), { expectVerified: false });
+    await ackFromContact(s, m2, await hashOf(m2), { expectDeferred: true });
     expect(await s.ana.client.acks.status(m2)).toMatchObject({
       received: false,
       verified: false,

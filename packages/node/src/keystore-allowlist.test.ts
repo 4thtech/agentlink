@@ -107,29 +107,31 @@ describe('the KeyStore signs only what its allowlist names, on both backends (04
     }
   });
 
-  it('the file KeyStore refuses typed data, a transaction and a drop request outside the list', async () => {
-    // The file KeyStore needs POSIX file modes (04 §2.8).
-    if (process.platform === 'win32') return;
-    const root = await mkdtemp(join(tmpdir(), 'agentlink-hostile-keystore-'));
-    const dir = join(root, '.agentlink', 'keystore');
-    const kek = await newKeystoreKek(
-      'ALKS',
-      { secret: encodeUtf8(PASSPHRASE), secretKind: 2, source: 'prompt' },
-      FAST,
-    );
-    await writeAgentFile(dir, SEED, kek);
-    const unlocked = await unlockFileAgent(AGENT_ID, {
-      dir,
-      env: {},
-      prompt: () => Promise.resolve(encodeUtf8(PASSPHRASE)),
-    });
-    const store = await KeychainKeyStore.open(fileKeychain(unlocked), AGENT_ID, { keyEpoch: 0 });
-    try {
-      await keepsToItsAllowlist(store);
-    } finally {
-      await store.close();
-      unlocked.close();
-      await rm(root, { recursive: true, force: true });
-    }
-  });
+  // The file KeyStore needs POSIX file modes (04 §2.8), so this is skipped on Windows.
+  it.skipIf(process.platform === 'win32')(
+    'the file KeyStore refuses typed data, a transaction and a drop request outside the list (skipped on Windows: needs POSIX file modes)',
+    async () => {
+      const root = await mkdtemp(join(tmpdir(), 'agentlink-hostile-keystore-'));
+      const dir = join(root, '.agentlink', 'keystore');
+      const kek = await newKeystoreKek(
+        'ALKS',
+        { secret: encodeUtf8(PASSPHRASE), secretKind: 2, source: 'prompt' },
+        FAST,
+      );
+      await writeAgentFile(dir, SEED, kek);
+      const unlocked = await unlockFileAgent(AGENT_ID, {
+        dir,
+        env: {},
+        prompt: () => Promise.resolve(encodeUtf8(PASSPHRASE)),
+      });
+      const store = await KeychainKeyStore.open(fileKeychain(unlocked), AGENT_ID, { keyEpoch: 0 });
+      try {
+        await keepsToItsAllowlist(store);
+      } finally {
+        await store.close();
+        unlocked.close();
+        await rm(root, { recursive: true, force: true });
+      }
+    },
+  );
 });
