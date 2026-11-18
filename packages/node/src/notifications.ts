@@ -9,6 +9,9 @@
 //   update is available and whether the network has been down for more than 10 minutes.
 // - Kept for 30 days or 200 items, whichever is fewer; a state item (approvals, update, network) is
 //   removed once it is no longer true.
+// - DEVICES-INTERIM-2: the `devices` item's time is when the other computer was last seen (core
+//   devices.ts `otherSeenAt`), shown as "Last seen {date}"; a newer sighting moves it without making
+//   it news again. It is listed for as long as it holds, however old that time is.
 // - The record is `{v: 1, cursor, items, seen}`. `cursor` is when the last inbound read ended; the
 //   next read starts NOTIFICATION_INBOUND_OVERLAP_SECONDS before it (IR-NOTIFY-1 M-2, as flow.ts
 //   IR-U3-flow-1), so a message stored late with an older time is still counted. `seen` holds the
@@ -66,6 +69,11 @@ export interface NotificationSignals {
   readonly networkDown?: boolean;
   /** DEVICES-INTERIM: this ID is also in use on another computer (core devices.ts). */
   readonly otherComputer?: boolean;
+  /**
+   * DEVICES-INTERIM-2: when the other computer was last seen (unix seconds, core `otherSeenAt`); the
+   * devices item's time. A value that is not a whole second or is in the future is ignored.
+   */
+  readonly otherComputerSeenAt?: number;
   /** When the inbound read ended (unix seconds); the cursor moves there. */
   readonly scannedUntil?: number;
 }
@@ -135,11 +143,14 @@ export function memoryNotificationPersistence(): NotificationPersistence {
   };
 }
 
-/** Newest first, then by ID; at most 200, none older than 30 days. */
+/**
+ * Newest first, then by ID; at most 200, none older than 30 days except the `devices` state item,
+ * whose time is the last sighting and which is removed only once it no longer holds.
+ */
 function kept(items: readonly NotificationItem[], now: number): NotificationItem[] {
   const oldest = now - NOTIFICATION_KEEP_SECONDS;
   return items
-    .filter((i) => i.at >= oldest)
+    .filter((i) => i.kind === 'devices' || i.at >= oldest)
     .sort((a, b) => b.at - a.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
     .slice(0, NOTIFICATION_MAX_ITEMS);
 }
@@ -236,6 +247,12 @@ export function createNotificationStore(
           'devices',
           signals.otherComputer === undefined ? undefined : signals.otherComputer ? 1 : 0,
         );
+        // DEVICES-INTERIM-2: the devices item's time is the last sighting, when one is given.
+        const lastSeen = signals.otherComputerSeenAt;
+        const devices = byId.get('devices');
+        if (devices !== undefined && whole(lastSeen) && lastSeen <= t && lastSeen !== devices.at) {
+          byId.set('devices', item('devices', devices.count, lastSeen, devices.read));
+        }
         const starting = fresh.has(record);
         const windowStart = record.cursor - NOTIFICATION_INBOUND_OVERLAP_SECONDS;
         const seen = new Set(record.seen);

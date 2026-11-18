@@ -15,9 +15,11 @@
 //   whose signed creation time is at or after `since` (set when this install first opens the store),
 //   and after the last restore plus the clock-skew allowance, counts: an older copy still on the relays, or one the restored backup did
 //   not hold, is this ID's own past, not another computer.
-// - The notice holds for OTHER_INSTALL_NOTICE_SECONDS after the newest such copy.
+// - The notice holds for OTHER_INSTALL_NOTICE_SECONDS after the newest such copy, and after that
+//   until a contact shows this computer's keys are still current (DEVICES-INTERIM-2, devicesView).
 // - Informational, never a gate: an id or a restore mark that cannot be read marks nothing; nothing
 //   here changes a decision. Residual: a computer that only receives (never sends) is not seen.
+import { encodeBase64url } from '@4thtech-io/crypto';
 import type { CoreContext } from './context.js';
 import { nowOf } from './context.js';
 import { readRestoreState, type RestoreState } from './restore-guard.js';
@@ -131,7 +133,50 @@ export function noteSentCopyTx(
   return true;
 }
 
-/** The devices view over the context. */
+/** At most this many inbound envelopes are read for the currency check (newest first). */
+export const CURRENT_KEYS_CHECK_ROWS = 50;
+
+/**
+ * DEVICES-INTERIM-2: whether a contact's verified envelope, signed after `from`, lists `kid` (this
+ * computer's current agent `enc` kid) among its recipients. Any row that cannot be read counts as no
+ * evidence, so the caller fails closed.
+ */
+function currentKeysConfirmedTx(tx: StoreTx, kid: string, from: number): boolean {
+  const rows = tx.select(
+    'envelopes',
+    { direction: 'in', state: 'ok', created_at: { gte: from } },
+    { orderBy: [['created_at', 'desc']], limit: CURRENT_KEYS_CHECK_ROWS },
+  );
+  for (const row of rows) {
+    if (row.contact_id === null || row.envelope_json === null) continue;
+    try {
+      const parsed: unknown = JSON.parse(row.envelope_json);
+      const recipients = (parsed as { recipients?: unknown }).recipients;
+      if (!Array.isArray(recipients)) continue;
+      if (recipients.some((r) => (r as { kid?: unknown } | null)?.kid === kid)) return true;
+    } catch {
+      // Not readable: no evidence.
+    }
+  }
+  return false;
+}
+
+/**
+ * The devices view over the context.
+ *
+ * DEVICES-INTERIM-2 (fail closed). Within OTHER_INSTALL_NOTICE_SECONDS of the newest sighting the
+ * notice holds. After that it ends only when there is evidence that the other computer stopped rather
+ * than moved out of sight: a contact's verified envelope, signed at or after the end of the week, that
+ * is addressed to this computer's current agent key. Why: when the other computer moves this ID to a
+ * newer key epoch (a rotation, such as the owner's contact-details update), its sent copies are wrapped
+ * to the newer epoch's keys, which this computer neither subscribes to nor can derive (the KeyStore
+ * refuses an epoch above its own; only an owner flow previews the next one), so it would see nothing
+ * more and the notice would lapse while both computers can still spend. Contacts that applied the
+ * newer card write to the newer keys only, so a contact still writing to this computer's keys after the
+ * week shows the card did not move on. Nothing here widens what is accepted as a message: the check
+ * reads only envelopes already stored as verified contact messages. A store or KeyStore read that fails
+ * keeps the notice on. Residual: a contact that has not yet received the newer card can end it.
+ */
 export function devicesView(ctx: CoreContext): DevicesView {
   return Object.freeze({
     state: async (): Promise<DevicesState> => {
@@ -142,10 +187,17 @@ export function devicesView(ctx: CoreContext): DevicesView {
       );
       if (row === undefined) return { otherInUse: false, otherSeenAt: null };
       const seen = row.other_seen_at;
-      return {
-        otherInUse: seen !== null && now < seen + OTHER_INSTALL_NOTICE_SECONDS,
-        otherSeenAt: seen,
-      };
+      if (seen === null) return { otherInUse: false, otherSeenAt: null };
+      const lapse = seen + OTHER_INSTALL_NOTICE_SECONDS;
+      if (now < lapse) return { otherInUse: true, otherSeenAt: seen };
+      let confirmed: boolean;
+      try {
+        const kid = encodeBase64url((await ctx.keyStore.getPublicBundle()).kid);
+        confirmed = await ctx.store.transaction((tx) => currentKeysConfirmedTx(tx, kid, lapse));
+      } catch {
+        confirmed = false;
+      }
+      return { otherInUse: !confirmed, otherSeenAt: seen };
     },
   });
 }

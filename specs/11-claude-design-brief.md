@@ -545,8 +545,8 @@ Proposed, owner confirms at merge. RESTORE-TRACES, DEVICES-INTERIM and RELAY-CAR
 | Activity, restore entry, second line, after the 24 hours | "For 24 hours, AgentLink asked you before anything that cost money. This entry is not a charge." |
 | Activity, restore entry, pill and link | "Backup" · "Open backup" |
 | Conversation, a message from them that was sent before a restore from a backup and arrived after it | "From before the restore" (quiet; never after an update) |
-| Notifications, this ID is also in use on another computer | "This ID is also in use on another computer" · "Spending limits apply per computer for now" |
-| `agentlink doctor`, other computer | "Warning  This ID is also in use on another computer" · "Spending limits apply per computer until AgentLink supports one ID on several computers." |
+| Notifications, this ID is also in use on another computer | "This ID is also in use on another computer" · "Spending limits apply per computer for now · Last seen {date}" (a short local date, e.g. "15 Jan 2027") |
+| `agentlink doctor`, other computer | "Warning  This ID is also in use on another computer" · "Last seen {date}" (UTC, "15 Jan 2027") · "Spending limits apply per computer until AgentLink supports one ID on several computers." |
 | Home notice, contact details | "Update your contact details" · "AgentLink moved to more reliable servers. Your contacts need your new details once." · **Update with {sensor}** / **Update with your master code** |
 | After the update | "Contact details updated. Your contacts get your new details." |
 | Update refused or failed | "An earlier change of this ID is still finishing. Try again in a minute." · "That didn't go through. Your contact details didn't change. Try again." |

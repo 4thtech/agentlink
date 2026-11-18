@@ -32,7 +32,7 @@ import { isAgentName } from '../runtime/agent-name.js';
 import { RuntimeError } from '../runtime/errors.js';
 import { AGENT_PAUSED_TEXT, CoreError } from '@4thtech-io/core';
 import { terminalOneLine, terminalSentence } from '../terminal/sanitize.js';
-import { copy, renderCopy } from '@4thtech-io/mcp-tools/strings/index.js';
+import { copy, formatDate, renderCopy } from '@4thtech-io/mcp-tools/strings/index.js';
 import { TEXT, agentPausedNow, createDeps, fill, printAll, type CommandDeps } from './shared.js';
 import { CONTACT_DETAILS_TEXT } from './owner/contact-details.js';
 
@@ -70,11 +70,18 @@ export const DOCTOR_RECEIPTS_OLDER_DEFAULT =
 
 /**
  * DEVICES-INTERIM (core devices.ts): this ID is also in use on another computer. A warning, not a
- * problem; fixed text only (never an install id, a time or anything about the other computer).
+ * problem; fixed text and, DEVICES-INTERIM-2, the date it was last seen (UTC, as other terminal
+ * dates). Never an install id or anything about the other computer.
  */
 export const DOCTOR_DEVICES_TEXT = Object.freeze({
-  otherComputer:
-    'Warning  This ID is also in use on another computer\n         Spending limits apply per computer until AgentLink supports one ID on several computers.',
+  otherComputer: (seenAt: number | null): string =>
+    [
+      'Warning  This ID is also in use on another computer',
+      ...(seenAt === null || !Number.isSafeInteger(seenAt) || seenAt < 0
+        ? []
+        : [`         Last seen ${formatDate(new Date(seenAt * 1000))}`]),
+      '         Spending limits apply per computer until AgentLink supports one ID on several computers.',
+    ].join('\n'),
 });
 
 /** M1-9h: how long `doctor` waits for each proof network. */
@@ -322,7 +329,9 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
         const devices = await Promise.resolve()
           .then(() => client.devices.state())
           .catch(() => undefined);
-        if (devices?.otherInUse === true) emit(DOCTOR_DEVICES_TEXT.otherComputer);
+        if (devices?.otherInUse === true) {
+          emit(DOCTOR_DEVICES_TEXT.otherComputer(devices.otherSeenAt));
+        }
 
         // M1-9h: the proof network (06 §8 "RPC"). Counts only (I-7).
         if (deps.proofNetwork !== undefined && withProofNetwork) {

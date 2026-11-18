@@ -59,6 +59,17 @@ export function ago(at: number, nowSeconds: number): string {
   return S.days(Math.floor(s / 86_400));
 }
 
+const SEEN_DATE = new Intl.DateTimeFormat(undefined, {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+});
+
+/** DEVICES-INTERIM-2: the date the other computer was last seen (the devices item's time). */
+export function devicesSeenDate(at: number): string {
+  return SEEN_DATE.format(new Date(at * 1000));
+}
+
 const ICON: Readonly<Record<NotificationItem['kind'], ShellIconName>> = {
   approvals: 'check',
   messages: 'stream',
@@ -163,7 +174,8 @@ function Row({
           <Sentence item={item} names={names} />
         </span>
         <span className="al-nc-sub">
-          {SECOND_LINE[item.kind]} · {ago(item.at, now)}
+          {SECOND_LINE[item.kind]} ·{' '}
+          {item.kind === 'devices' ? S.devicesSeen(devicesSeenDate(item.at)) : ago(item.at, now)}
         </span>
       </span>
       {unread ? (
