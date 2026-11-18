@@ -297,15 +297,50 @@ describe('read-back before "sent"', () => {
     const at = Math.floor(Date.now() / 1000);
     const row = makeRow([fast, slow, silent], { [fast]: at, [slow]: at, [silent]: at });
     rows.add(row);
+    await Promise.all([
+      vi.advanceTimersByTimeAsync(100),
+      pool.publish(JSON.parse(row.wrapJson ?? '{}'), [fast, slow, silent]),
+    ]);
     let ended = false;
     void worker.processDue().then(() => (ended = true));
-    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(50);
     // sent and confirmed at the first served, with no wait on the grace
     expect(ended).toBe(true);
     expect(rows.get(row.wrapId)).toMatchObject({ state: 'sent', availability: 'confirmed' });
     await vi.advanceTimersByTimeAsync(READBACK_COUNT_GRACE_MS + 100);
     expect(rows.get(row.wrapId).counts).toEqual({ accepted: 3, available: 2 });
   });
+
+  it.each([24, 64, 100, 300])(
+    'DELIVERY-DETAILS probe: %i rows, one silent relay, forwarded like core: the pass does not wait on counting',
+    async (n) => {
+      const { net, rows, pool } = setup();
+      const [honest, silent] = relayUrls('probe', 2) as [string, string];
+      net.configure(honest);
+      net.configure(silent, { silentIdsReq: true });
+      // The pool as core's transport hands it to the worker: three forwarded methods.
+      const forwarded = {
+        publish: pool.publish.bind(pool),
+        checkServed: pool.checkServed.bind(pool),
+        readbackSpare: () => pool.readbackSpare(),
+      };
+      const worker = new OutboxWorker({ persistence: rows, pool: forwarded, random: () => 0 });
+      const all = Array.from({ length: n }, () => makeRow([honest, silent]));
+      for (const row of all) rows.add(row);
+      let ended = false;
+      void worker.processDue().then(() => (ended = true));
+      let elapsed = 0;
+      while (!ended && elapsed < 60_000) {
+        await vi.advanceTimersByTimeAsync(50);
+        elapsed += 50;
+      }
+      // The pass is not held by the 1 s count grace: well under one grace per 8-row batch.
+      expect(elapsed).toBeLessThan(Math.ceil(n / 8) * 1000 * 0.5);
+      for (const row of all) expect(rows.get(row.wrapId).availability).toBe('confirmed');
+      await vi.advanceTimersByTimeAsync(5_000);
+    },
+    60_000,
+  );
 
   it('a dead relay in the list does not keep the row pending: sent, unknown within minutes', async () => {
     const { net, rows, worker } = setup();

@@ -331,6 +331,18 @@ class StoreOutboxPersistence implements OutboxPersistence {
     });
   }
 
+  /** DELIVERY-DETAILS: raises `available` on a `sent` row and its envelope; counts only. */
+  async updateRelayCounts(wrapId: string, counts: OutboxRelayCounts): Promise<void> {
+    await this.#ctx.store.transaction((tx) => {
+      const row = tx.get('outbox', { wrap_id: wrapId });
+      if (row === undefined || row.state !== 'sent' || row.relays_accepted === null) return;
+      const available = Math.min(row.relays_accepted, Math.max(0, Math.trunc(counts.available)));
+      if (row.relays_available !== null && available <= row.relays_available) return;
+      tx.update('outbox', { wrap_id: wrapId, state: 'sent' }, { relays_available: available });
+      updateDelivery(tx, row.envelope_id);
+    });
+  }
+
   markNotDelivered(wrapId: string, reason: OutboxGiveUpReason): Promise<boolean> {
     return this.#finish(wrapId, { state: 'not_delivered', reason });
   }

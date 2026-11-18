@@ -152,6 +152,12 @@ export interface OutboxPersistence {
     counts: OutboxRelayCounts,
   ): Promise<boolean>;
   markNotDelivered(wrapId: string, reason: OutboxGiveUpReason): Promise<boolean>;
+  /**
+   * DELIVERY-DETAILS: after `markSent`, raises `available` on a row that is already `sent` when
+   * more relays served the wrap within the count grace. Counts only. Optional; may reject (the
+   * worker ignores it: the row is already sent).
+   */
+  updateRelayCounts?(wrapId: string, counts: OutboxRelayCounts): Promise<void>;
 }
 
 /** What the worker uses of the pool. Without `checkServed` every `sent` row is availability `unknown`. */
@@ -171,7 +177,12 @@ export interface OutboxWorkerOptions {
 }
 
 type Readback =
-  | { readonly kind: 'confirmed'; readonly served: number }
+  | {
+      readonly kind: 'confirmed';
+      readonly served: number;
+      /** The final number of relays that served it, once the count grace is over. */
+      readonly final: Promise<number>;
+    }
   | { readonly kind: 'unknown' }
   | { readonly kind: 'missing'; readonly relays: readonly string[] };
 
@@ -404,14 +415,24 @@ export class OutboxWorker {
       accepted: Object.keys(acks).length,
       available: confirmed ? check.served : 0,
     };
-    return (await this.persistence.markSent(
+    const marked = await this.persistence.markSent(
       wrapId,
       acks,
       confirmed ? 'confirmed' : 'unknown',
       counts,
-    ))
-      ? { kind: 'sent' }
-      : { kind: 'skipped' };
+    );
+    if (!marked) return { kind: 'skipped' };
+    // The pass never waits on counting: the row is sent now, and the stored count is raised later
+    // if more relays answered within the grace.
+    const update = this.persistence.updateRelayCounts?.bind(this.persistence);
+    if (confirmed && update !== undefined) {
+      void check.final
+        .then((available) =>
+          available > check.served ? update(wrapId, { ...counts, available }) : undefined,
+        )
+        .catch(() => undefined);
+    }
+    return { kind: 'sent' };
   }
 
   /**
@@ -425,11 +446,13 @@ export class OutboxWorker {
     if (check === undefined || acked.length === 0) return { kind: 'unknown' };
     const spare = (): boolean => this.pool.readbackSpare?.() === true;
     const first = await this.askAll(check, spare, eventId, acked);
-    if (first.served > 0) return { kind: 'confirmed', served: first.served };
+    if (first.served > 0) return { kind: 'confirmed', served: first.served, final: first.final };
     if (first.missing.length === 0) return { kind: 'unknown' };
     await this.sleep(READBACK_RECHECK_MS);
     const second = await this.askAll(check, spare, eventId, first.missing);
-    if (second.served > 0) return { kind: 'confirmed', served: second.served };
+    if (second.served > 0) {
+      return { kind: 'confirmed', served: second.served, final: second.final };
+    }
     // A relay that answered without the wrap and then could not be asked again still counts as
     // missing: it never served it.
     const stillMissing = first.missing.filter(
@@ -450,11 +473,15 @@ export class OutboxWorker {
     spare: () => boolean,
     eventId: string,
     relays: readonly string[],
-  ): Promise<{ served: number; missing: string[]; answered: string[] }> {
+  ): Promise<{ served: number; missing: string[]; answered: string[]; final: Promise<number> }> {
     // DELIVERY-DETAILS: the first relay that serves it starts a short grace for the others (they
     // are counted if they answer within it); then the rest are cancelled and free their slots.
     const cancel = new Cancel();
     return new Promise((resolve) => {
+      let finish: (n: number) => void = () => {};
+      const final = new Promise<number>((done) => {
+        finish = done;
+      });
       const missing: string[] = [];
       const answered: string[] = [];
       let pending = relays.length;
@@ -470,6 +497,8 @@ export class OutboxWorker {
             if (pending > 0 && spare()) {
               grace = setTimer(() => cancel.abort(), READBACK_COUNT_GRACE_MS);
             } else cancel.abort();
+            // Confirmed at the first served: the caller goes on; `final` carries the count later.
+            resolve({ served, missing, answered, final });
           }
         }
         if (outcome === 'missing') {
@@ -478,7 +507,8 @@ export class OutboxWorker {
         }
         if (pending === 0) {
           if (grace !== undefined) clearTimer(grace);
-          resolve({ served, missing, answered });
+          finish(served);
+          resolve({ served, missing, answered, final });
         }
       };
       for (const relay of relays) {
