@@ -545,6 +545,13 @@ jobs:
           # Hard rule: no Solidity source in this public repo. The script scans every tracked file,
           # Markdown included (it ran in the lint step of `checks`).
           node tools/check-no-solidity.mjs
+          # DOCS-COMPACT-A: spec references resolve, guide labels exist in the UI (shrink-only
+          # allowlists, compared with origin/main), and the private specs are never committed.
+          git fetch --quiet --depth=1 origin main:refs/remotes/origin/main || echo "::notice::origin/main not fetched; the allowlist growth check is skipped."
+          node tools/check-spec-refs.mjs
+          node tools/check-ui-labels.mjs
+          node tools/check-private-docs.mjs
+          # Step 2 (after the markers land): node tools/docs/build-knowledge.mjs --check
 
       - name: Doc tests (vocabulary, retired scope, networks page, skill file, status, knowledge)
         working-directory: tools
@@ -552,7 +559,8 @@ jobs:
           pnpm exec vitest run vocabulary.test.mjs id-vocabulary.test.mjs retired-scope.test.mjs networks-page.test.mjs
           skill-file.test.mjs check-knowledge-links.test.mjs check-knowledge-size.test.mjs docs-status
           check-download-links.test.mjs release/deploy-drop.test.mjs docs/wiki-sync.test.mjs
-          check-security-docs.test.mjs
+          check-security-docs.test.mjs docs/build-knowledge.test.mjs docs/ratchet.test.mjs
+          check-spec-refs.test.mjs check-ui-labels.test.mjs check-private-docs.test.mjs
 
       - name: Prettier
         run: pnpm exec prettier --check .
