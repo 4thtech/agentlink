@@ -74,7 +74,16 @@ async function openAgent(n: number, owner: TestOwner, name: string): Promise<Age
     name,
     relays: RELAYS,
   });
-  return { client, store, cipher, keyStore, owner, id: client.agentId, published, policyVersion: 0 };
+  return {
+    client,
+    store,
+    cipher,
+    keyStore,
+    owner,
+    id: client.agentId,
+    published,
+    policyVersion: 0,
+  };
 }
 
 async function pair(a: Agent, b: Agent): Promise<void> {

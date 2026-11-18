@@ -46,6 +46,7 @@ import {
   termsInProgress,
   ceilingOf,
   termsRefusal,
+  termsSendLimit,
   termsWithProof,
 } from './terms-common.js';
 import { termsNeedsCreditsAfterClaim } from './propose-terms.js';
@@ -129,6 +130,12 @@ export async function respondToTermsHandler(
       );
     case 'rejected':
       logger.info('respond to terms refused', { kind: 'terms' });
+      if (result.code === 'SEND_LIMIT') {
+        // SEC-TERMS-CAPS: an outgoing cap, in the agentlink_send words.
+        const sender = await tools.senderOf(envelopeId);
+        const name = sender === undefined ? UNNAMED : nameOf(displayRef(sender.id, sender.display));
+        return termsSendLimit(result, name);
+      }
       return termsRefusal(
         result.code,
         decision === 'accept',

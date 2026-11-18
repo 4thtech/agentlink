@@ -539,9 +539,14 @@ async function withProofOf(
 /**
  * D-156: the SEND_LIMIT refusal in plain words: which cap, its number, the contact for a
  * per-contact cap, and when a slot frees. The numbers and the time come from the core's typed
- * result and are checked here; nothing else is read from it.
+ * result and are checked here; nothing else is read from it. `withFields` false leaves the typed
+ * `limit`, `max` and `retryAt` out (the terms tools: the same words, their own output schema).
  */
-function sendLimit(result: Readonly<Record<string, unknown>>, name: string): HandlerOutput {
+export function sendLimit(
+  result: Readonly<Record<string, unknown>>,
+  name: string,
+  withFields = true,
+): HandlerOutput {
   const limit = result['limit'];
   const max = result['max'];
   const retryAt = result['retryAt'];
@@ -571,6 +576,6 @@ function sendLimit(result: Readonly<Record<string, unknown>>, name: string): Han
     template.replace('{name}', name).replace('{max}', String(max)),
     SEND_TEXT.sendLimitNextStep.replace('{time}', time),
     'SEND_LIMIT',
-    { limit, max, retryAt: time },
+    withFields ? { limit, max, retryAt: time } : {},
   );
 }
