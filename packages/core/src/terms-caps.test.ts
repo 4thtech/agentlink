@@ -9,6 +9,7 @@ import { wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentLinkClient } from './client.js';
 import { computeActionDigest } from './owner-action.js';
+import type { RestoreMark } from './restore-guard.js';
 import { MemoryStore } from './store/memory-store.js';
 import {
   FakeClock,
@@ -42,7 +43,12 @@ const ownerA = new MemoryOwnerKeyStore(seed(231), passphrase());
 const ownerB = new MemoryOwnerKeyStore(seed(232), passphrase());
 const ownerC = new MemoryOwnerKeyStore(seed(233), passphrase());
 
-async function openAgent(n: number, owner: TestOwner, name: string): Promise<Agent> {
+async function openAgent(
+  n: number,
+  owner: TestOwner,
+  name: string,
+  restoreMark?: RestoreMark,
+): Promise<Agent> {
   const store = new MemoryStore();
   const cipher = new TestStoreCipher();
   const keyStore = new MemoryKeyStore(seed(n));
@@ -67,6 +73,7 @@ async function openAgent(n: number, owner: TestOwner, name: string): Promise<Age
     clock: clock.now,
     transport: factory,
     policyMark: new MemoryPolicyMark(),
+    ...(restoreMark === undefined ? {} : { restoreMark }),
   });
   await client.identity.init({
     owner: await owner.unlock(passphrase()),
@@ -171,6 +178,29 @@ const isoAt = (t: number) => new Date(t * 1000).toISOString().replace('.000Z', '
 
 beforeEach(() => {
   clock = new FakeClock();
+});
+
+describe('SEC-RESTORE-GUARD x SEC-TERMS-CAPS: terms caps are halved in the restore window', () => {
+  it('an offer over half the per-contact cap is SEND_LIMIT while the window is open', async () => {
+    const restoredAt = { value: 0 };
+    const a = await openAgent(41, ownerA, 'alice', {
+      read: () => Promise.resolve(restoredAt.value),
+    });
+    const b = await openAgent(42, ownerB, 'bob');
+    await pair(a, b);
+    await applyCaps(a, { messagesPerContactPerDay: 4 });
+    restoredAt.value = clock.t;
+    expect((await a.client.proposeTerms({ to: b.id, terms: terms('one') })).status).toBe('ok');
+    expect((await a.client.proposeTerms({ to: b.id, terms: terms('two') })).status).toBe('ok');
+    const refused = await a.client.proposeTerms({ to: b.id, terms: terms('three') });
+    expect(refused).toMatchObject({
+      status: 'rejected',
+      code: 'SEND_LIMIT',
+      limit: 'messages_contact',
+      max: 2,
+    });
+    expect(await termsOut(a, 'offer')).toHaveLength(2);
+  });
 });
 
 describe('terms count toward the outgoing caps (SEC-TERMS-CAPS, D-156)', () => {

@@ -10,6 +10,7 @@ import { defaultPolicy, type Policy } from '@4thtech-io/types';
 import { wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AgentLinkClient } from '../client.js';
+import type { RestoreMark } from '../restore-guard.js';
 import { MemoryStore } from '../store/memory-store.js';
 import { FakeNotary, FEE_UNITS } from '../testing/chain.js';
 import {
@@ -63,7 +64,12 @@ const RELAYS = Object.freeze(['wss://one.relay-alpha.net', 'wss://two.relay-alph
 const ownerA = new MemoryOwnerKeyStore(seed(241), passphrase());
 const ownerB = new MemoryOwnerKeyStore(seed(242), passphrase());
 
-async function openAgent(n: number, owner: TestOwner, name: string): Promise<Agent> {
+async function openAgent(
+  n: number,
+  owner: TestOwner,
+  name: string,
+  restoreMark?: RestoreMark,
+): Promise<Agent> {
   const store = new MemoryStore();
   const keyStore = new MemoryKeyStore(seed(n), { nowSeconds: () => clock.now() });
   const base = chain.platform();
@@ -119,6 +125,7 @@ async function openAgent(n: number, owner: TestOwner, name: string): Promise<Age
     policyMark: new MemoryPolicyMark(),
     logger: createLogger({ name: 'core', level: 'debug', sink: () => undefined }),
     proofs: platform,
+    ...(restoreMark === undefined ? {} : { restoreMark }),
   });
   await client.identity.init({
     owner: await owner.unlock(passphrase()),
@@ -150,8 +157,8 @@ async function setPolicy(agent: Agent, edit: (p: Policy) => void): Promise<void>
   expect(r).toMatchObject({ status: 'applied' });
 }
 
-async function twoAgents() {
-  const a = await openAgent(51, ownerA, 'alice');
+async function twoAgents(restoreMark?: RestoreMark) {
+  const a = await openAgent(51, ownerA, 'alice', restoreMark);
   const b = await openAgent(52, ownerB, 'bob');
   await pairWith(clock, a, b);
   await pairWith(clock, b, a);
@@ -210,6 +217,75 @@ describe('a Record is signed only under a stored reservation (SEC-RECORD-ATOMIC)
     chain.censor = false;
     expect(await a.client.proofs.resubmitPending()).toMatchObject({ replaced: 1 });
     expect(seen).toEqual(['reserved']);
+  });
+});
+
+describe('SEC-RESTORE-GUARD: no replacement Record on an approval from before a restore', () => {
+  async function approvedAndCensored(mark: { value: number; broken: boolean }) {
+    const { a, b } = await twoAgents({
+      read: () =>
+        mark.broken ? Promise.reject(new Error('unreadable')) : Promise.resolve(mark.value),
+    });
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    const envelopeId = await sendText(a, b, 'one');
+    chain.censor = true;
+    const pending = await a.client.notarize({ envelopeId });
+    if (pending.status !== 'pending_approval') throw new Error('test: not pending');
+    const signed = await signWith(a.owner, {
+      v: 1,
+      agent: a.id,
+      owner: await ownerHex(a.owner),
+      op: 'approval.decide',
+      params: {
+        approvalId: pending.approvalId,
+        actionDigest: pending.actionDigest,
+        decision: 'approve',
+      },
+      nonce: newNonce(),
+      issuedAt: clock.t,
+      expiresAt: clock.t + 600,
+    });
+    expect(await a.client.ownerActions.apply(JSON.stringify(signed))).toMatchObject({
+      status: 'applied',
+    });
+    expect(await a.client.notarize({ envelopeId, approvalId: pending.approvalId })).toMatchObject({
+      status: 'submitted',
+    });
+    expect(a.signed).toHaveLength(1);
+    return a;
+  }
+
+  it('control: without a restore the approved Record is replaced after its deadline', async () => {
+    const a = await approvedAndCensored({ value: 0, broken: false });
+    clock.t += 3601 + 60;
+    chain.censor = false;
+    expect(await a.client.proofs.resubmitPending()).toMatchObject({ replaced: 1 });
+    expect(a.signed).toHaveLength(2);
+  });
+
+  it('after a restore the approval does not cover a replacement: nothing signed or charged', async () => {
+    const mark = { value: 0, broken: false };
+    const a = await approvedAndCensored(mark);
+    clock.t += 60;
+    mark.value = clock.t;
+    clock.t += 3601 + 60;
+    chain.censor = false;
+    expect(await a.client.proofs.resubmitPending()).toMatchObject({ replaced: 0 });
+    expect(a.signed).toHaveLength(1);
+    expect(chain.calls.notarize).toBe(0);
+    expect((await ledger(a)).filter((r) => r.state !== 'released')).toHaveLength(0);
+  });
+
+  it('an unreadable restore mark: no replacement on the approval either', async () => {
+    const mark = { value: 0, broken: false };
+    const a = await approvedAndCensored(mark);
+    mark.broken = true;
+    clock.t += 3601 + 60;
+    chain.censor = false;
+    expect(await a.client.proofs.resubmitPending()).toMatchObject({ replaced: 0 });
+    expect(a.signed).toHaveLength(1);
   });
 });
 
