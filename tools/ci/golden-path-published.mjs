@@ -321,7 +321,11 @@ await step('S6', 'app: ui in a terminal serves its first page', async () => {
   );
   const child = spawn('script', ['-qec', `"${launcher}" ui`, '/dev/null'], {
     // No desktop session: xdg-settings then reads this profile's mimeapps.list, never the image's.
-    env: { ...profileEnv(benHome), XDG_CURRENT_DESKTOP: '', DESKTOP_SESSION: '', BROWSER: '' },
+    env: {
+      ...profileEnv(benHome),
+      XDG_CONFIG_HOME: join(benHome, '.config'),
+      XDG_DATA_HOME: join(benHome, '.local', 'share'),
+      XDG_CURRENT_DESKTOP: '', DESKTOP_SESSION: '', BROWSER: '' },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   let out = '';
