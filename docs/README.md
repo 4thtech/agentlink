@@ -4,7 +4,7 @@
 *Applies to AgentLink 0.5.11 (pre-alpha, test networks).*
 <!-- version-banner:end -->
 
-This folder is the only source of AgentLink's public documentation. At each release tag, [`tools/docs/wiki-sync.mjs`](../tools/docs/wiki-sync.mjs) generates the AgentLink section of [4thTech Docs](https://wiki.4thtech.io) from it; never edit that copy. It is separate from [`docs/`](../project/README.md), which holds the internal specifications, process and runbooks.
+This folder is the only source of AgentLink's public documentation. At each release tag, [`tools/docs/wiki-sync.mjs`](../tools/docs/wiki-sync.mjs) generates the AgentLink section of [4thTech Docs](https://wiki.4thtech.io) from it; never edit that copy. It is separate from [`project/`](../project/README.md), which holds the internal specifications, process and runbooks.
 
 | Folder | Published as |
 |---|---|

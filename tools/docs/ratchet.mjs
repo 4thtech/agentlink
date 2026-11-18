@@ -35,6 +35,19 @@ const RENAMED = [
   ]),
   ['docs-site/', 'docs/'],
 ];
+/** True when the ref still has the legacy docs layout (docs-site/guide/SUMMARY.md). */
+export function baseIsLegacy(root, ref) {
+  try {
+    execFileSync('git', ['cat-file', '-e', `${ref}:docs-site/guide/SUMMARY.md`], {
+      cwd: root,
+      stdio: 'ignore',
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function renamedEntry(entry) {
   for (const [from, to] of RENAMED) if (entry.startsWith(from)) return to + entry.slice(from.length);
   return entry;
@@ -51,7 +64,8 @@ export function baseAllowlist(root, rel, ref = process.env.DOCS_RATCHET_BASE ?? 
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     });
-    return (JSON.parse(text).entries ?? []).map(renamedEntry);
+    const entries = JSON.parse(text).entries ?? [];
+    return baseIsLegacy(root, ref) ? entries.map(renamedEntry) : entries;
   } catch {
     return null;
   }

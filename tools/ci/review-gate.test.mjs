@@ -144,6 +144,7 @@ describe('review-gate path classes', () => {
     expect(classify('project/process/audit-rules.md')).toBe(1);
     expect(classify('docs/guide/x.md')).toBe(1);
     expect(classify('docs/status.yaml')).toBe(0);
+    expect(classify('docs-site/guide/x.md')).toBe(1);
     expect(classify('project/runbooks/x.md')).toBe(0);
     expect(classify('project/design/d1/x.md')).toBe(0);
     expect(classify('project/README.md')).toBe(0);

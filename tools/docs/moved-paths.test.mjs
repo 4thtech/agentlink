@@ -33,6 +33,17 @@ describe('moved-paths.json', () => {
     expect(walk(path.join(REPO_ROOT, 'docs/foundation'))).toEqual(['docs/foundation/README.md']);
   });
 
+  it('lists the old paths that published releases link to', () => {
+    for (const n of ['start-fast', 'windows'])
+      expect(moved.stubs).toHaveProperty([`docs-site/guide/get-started/${n}.md`]);
+    expect(moved.stubs).toHaveProperty(['docs-site/guide/apps/desktop-app.md']);
+    const text = fs.readFileSync(
+      path.join(REPO_ROOT, 'docs-site/guide/apps/desktop-app.md'),
+      'utf8',
+    );
+    expect(text).toContain('## Open it the first time');
+  });
+
   it('the prefixes send an old path to a path that exists', () => {
     const resolve = (p) => {
       if (moved.files[p]) return moved.files[p];
