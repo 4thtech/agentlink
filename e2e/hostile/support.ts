@@ -81,6 +81,8 @@ export interface Scene {
 }
 
 export interface SceneOptions {
+  /** Every read of the clock is one second later than the one before. */
+  readonly tickingClock?: boolean;
   readonly anaRestoreMark?: Parameters<typeof makeAgent>[1]['restoreMark'];
   readonly drop?: Parameters<typeof makeAgent>[1]['drop'];
 }
@@ -90,10 +92,14 @@ export async function scene(options: SceneOptions = {}): Promise<Scene> {
   const base = await newWorld();
   const net = new MisbehavingRelays();
   let offset = 0;
+  let ticks = 0;
   const world: World = {
     ...base,
     net,
-    clock: () => Math.floor(Date.now() / 1000) + offset,
+    // `tickingClock`: the clock also advances one second on every read, so a second boundary falls
+    // between any two reads of one operation (what the real clock does now and then).
+    clock: () =>
+      Math.floor(Date.now() / 1000) + offset + (options.tickingClock === true ? ticks++ : 0),
   };
   const ana = await makeAgent(world, {
     n: 2,

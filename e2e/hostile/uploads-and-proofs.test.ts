@@ -91,6 +91,24 @@ describe('parallel proof requests sign and submit once (SEC-RECORD-ATOMIC)', () 
     expect(ledger).toHaveLength(1);
   });
 
+  it('a clock that ticks between reads: three parallel requests for one message still share one Record, one fee', async () => {
+    const s = (current = await scene({ tickingClock: true }));
+    const sent = await s.ana.call('agentlink_send', { to: 'Mallory', text: 'prove this one too' });
+    const envelopeId = String(sent.structured['envelopeId']);
+    const results = await Promise.all([1, 2, 3].map(() => s.ana.client.notarize({ envelopeId })));
+    // The requests reuse the one Record (none is held back for approval by a clock that moved).
+    for (const r of results) expect(['ok', 'submitted']).toContain(r.status);
+    expect(new Set(results.map((r) => (r as { recordId?: string }).recordId)).size).toBe(1);
+    expect(s.world.chain.calls.notarize).toBe(1);
+    expect(s.world.chain.creditOf(s.ana.client.agentId)).toBe(9n * FEE_UNITS);
+    const [proofs, ledger] = await s.ana.store.transaction((tx) => [
+      tx.select('proofs', {}),
+      tx.select('budget_ledger', {}),
+    ]);
+    expect(proofs).toHaveLength(1);
+    expect(ledger).toHaveLength(1);
+  });
+
   it('parallel requests for several messages under a one-proof budget: never more than one proof is signed, submitted and charged', async () => {
     const s = (current = await scene());
     await editPolicy(s.ana, (p) => {
