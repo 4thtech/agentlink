@@ -8,9 +8,10 @@
 //     the availability check has run (SEC-RELAY-READBACK, D-156 (7)): the relays that returned OK
 //     are asked for the wrap by its id, each on a new connection without a login (RelayPool
 //     checkServed). One that serves it: `sent`, availability `confirmed`. None can be asked (a login
-//     wanted, no answer in time): `sent`, availability `unknown`. Otherwise, after one re-check
-//     a moment later, the OKs of the relays that answered without it are dropped and the row goes
-//     on as one with fewer than 2 OKs (backoff, republish, and `not_delivered` at give_up_at);
+//     wanted, no answer in time): `sent`, availability `unknown`. A relay that answers without it
+//     (after one re-check a moment later) keeps its OK but never confirms: the row is republished
+//     to its other relays (backoff); with none left, or at give_up_at with at least one OK, it is
+//     `sent`, availability `unknown`. Only a row no relay accepted ends `not_delivered` (timeout);
 //   - `not_delivered` (timeout) if that has not happened by give_up_at, the earlier of created_at +
 //     24 h and the wrap's own created_at + 48 h + S (G-49, D-71 (5)): a wrap is never published
 //     where a receiver's sync (`lastSync - 48 h - S`) could no longer find it;
@@ -190,16 +191,6 @@ function readRelays(row: OutboxRow): readonly string[] | undefined {
   return [...new Set(relays as string[])];
 }
 
-/** `acks` without the given relays. */
-function withoutRelays(
-  acks: Readonly<Record<string, number>>,
-  drop: readonly string[],
-): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const [relay, at] of Object.entries(acks)) if (!drop.includes(relay)) out[relay] = at;
-  return out;
-}
-
 export class OutboxWorker {
   private readonly persistence: OutboxPersistence;
   private readonly pool: OutboxPool;
@@ -285,29 +276,26 @@ export class OutboxWorker {
       created + OUTBOX_GIVE_UP_SECONDS,
       event.created_at + SYNC_LOOKBACK_SECONDS + SYNC_SKEW_SECONDS,
     );
-    const acks = this.listedAcks(row, relays);
-    if (Object.keys(acks).length >= MIN_ACKS) {
+    // SEC-RELAY-READBACK (D-156 (7)): an OK is kept once a relay gave it. Only a relay that serves
+    // the wrap back confirms it; an empty read never confirms, and never by itself ends the row as
+    // `not_delivered`: the row goes on to its other relays, and when none is left to try, or at
+    // give_up_at with at least one OK, it is `sent` with availability `unknown`. `not_delivered`
+    // (timeout) stays for a row that no relay accepted.
+    const merged: Record<string, number> = this.listedAcks(row, relays);
+    const pastDeadline = nowSeconds >= giveUpAt;
+    let check: Readback | undefined;
+    if (Object.keys(merged).length >= MIN_ACKS) {
       // a crash after the publish, before the mark: the stored OKs are checked like fresh ones
-      const check = await this.readback(event.id, Object.keys(acks));
-      if (check.kind !== 'missing') return this.finishSent(row.wrapId, acks, check.kind);
-      return this.retry(row, relays, withoutRelays(acks, check.relays), nowSeconds, giveUpAt, {
-        unusable: 0,
-        tooLarge: false,
-      });
+      check = await this.readback(event.id, Object.keys(merged));
+      if (check.kind !== 'missing') return this.finishSent(row.wrapId, merged, check.kind);
     }
-    if (nowSeconds >= giveUpAt) {
-      return (await this.persistence.markNotDelivered(row.wrapId, 'timeout'))
-        ? { kind: 'not_delivered' }
-        : { kind: 'skipped' };
-    }
-    if (!(await this.persistence.isPending(row.wrapId))) return { kind: 'skipped' };
-
     // The stored event goes only to the relays of its row that have not acknowledged it yet.
-    const remaining = relays.filter((relay) => acks[relay] === undefined);
-    const merged: Record<string, number> = { ...acks };
+    const remaining = relays.filter((relay) => merged[relay] === undefined);
     let unusable = 0;
     let tooLarge = false;
-    if (remaining.length > 0) {
+    if (!pastDeadline && remaining.length > 0) {
+      if (!(await this.persistence.isPending(row.wrapId))) return { kind: 'skipped' };
+      const before = Object.keys(merged).length;
       const outcome = await this.pool.publish(event, remaining);
       for (const r of outcome.results) {
         if (r.reason === 'too_large') tooLarge = true;
@@ -316,14 +304,32 @@ export class OutboxWorker {
       for (const relay of outcome.acked) {
         if (relays.includes(relay) && merged[relay] === undefined) merged[relay] = nowSeconds;
       }
+      if (Object.keys(merged).length >= MIN_ACKS && Object.keys(merged).length > before) {
+        check = await this.readback(event.id, Object.keys(merged));
+        if (check.kind !== 'missing') return this.finishSent(row.wrapId, merged, check.kind);
+      }
     }
-    let kept: Record<string, number> = merged;
-    if (Object.keys(merged).length >= MIN_ACKS) {
-      const check = await this.readback(event.id, Object.keys(merged));
-      if (check.kind !== 'missing') return this.finishSent(row.wrapId, merged, check.kind);
-      kept = withoutRelays(merged, check.relays);
+    const okCount = Object.keys(merged).length;
+    const nothingLeft = relays.every((relay) => merged[relay] !== undefined);
+    if (pastDeadline && okCount >= 1) {
+      // At the bound: one OK (or more) and nothing served is sent with availability unknown.
+      check ??= await this.readback(event.id, Object.keys(merged));
+      return this.finishSent(
+        row.wrapId,
+        merged,
+        check.kind === 'confirmed' ? 'confirmed' : 'unknown',
+      );
     }
-    return this.retry(row, relays, kept, nowSeconds, giveUpAt, { unusable, tooLarge });
+    if (pastDeadline) {
+      return (await this.persistence.markNotDelivered(row.wrapId, 'timeout'))
+        ? { kind: 'not_delivered' }
+        : { kind: 'skipped' };
+    }
+    if (check?.kind === 'missing' && nothingLeft) {
+      // Every relay of the row accepted it and none served it back: no other relay to try.
+      return this.finishSent(row.wrapId, merged, 'unknown');
+    }
+    return this.retry(row, relays, merged, nowSeconds, giveUpAt, { unusable, tooLarge });
   }
 
   private async finishSent(
