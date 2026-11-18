@@ -3,7 +3,7 @@
 Nothing here imports repository TypeScript or any code under test. Primitives come from pinned,
 well-known Python libraries (tools/vectors/requirements.txt, installed with --require-hashes):
 `cryptography` (OpenSSL), `coincurve` (libsecp256k1), `pycryptodome` (Keccak-256), `pyhpke` and
-`rfc8785`. This module only composes them the way docs/foundation/04 specifies; every composition
+`rfc8785`. This module only composes them the way specs/04 specifies; every composition
 is cross-checked against published values in the generator that uses it.
 
 Each generator script imports this module from its own directory. Scripts run with `python3 -I`

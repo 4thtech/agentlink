@@ -1,7 +1,7 @@
 # Release: Changesets "Version packages" pull request, npm prereleases to `next` (automatic,
 # staging) and stable releases to `latest` (production, after the owner's approval click).
 # npm trusted publishing (OIDC) with provenance; no long-lived npm token anywhere.
-# Decision D-25; docs/process/release-and-deployment.md §4.1.
+# Decision D-25; project/process/release-and-deployment.md §4.1.
 #
 # ---------------------------------------------------------------------------
 # CI-GREEN (OPS-CI-2)
@@ -76,7 +76,7 @@
 #                   15 minutes for npm's CDN; version on `latest`, provenance, registry signatures); on failure it moves `latest` back to the
 #                   previous version in the same job (no second click). When all of that passed it
 #                   creates the product GitHub Release `v<version>` from the root CHANGELOG.md
-#                   section (D-43, docs/process/versioning.md §6). The section is checked BEFORE
+#                   section (D-43, project/process/versioning.md §6). The section is checked BEFORE
 #                   publishing, so a missing one blocks the release while nothing is published.
 #   re-run          (CHORE-RELEASE-HEALTH-TARBALL-WAIT) a re-run publishes nothing new. When this commit's
 #                   stable versions are already on npm, not deprecated and newer than `latest` (a check
@@ -143,7 +143,7 @@
 #   Version packages PR or `next` releases of later merges. Each writing job has its own group and
 #   never cancels in flight. If several promotions wait, approve the newest and reject the rest.
 #
-# MANUAL SETTINGS REQUIRED (docs/process/ci-cd.md, "Owner setup checklist", sections 4, 5 and 8)
+# MANUAL SETTINGS REQUIRED (project/process/ci-cd.md, "Owner setup checklist", sections 4, 5 and 8)
 #   1. GitHub Environments:
 #        npm-next       no required reviewer (the `next` snapshot of every merge to main needs no
 #                       click; OPS-FAST-LANE-3); deployment branches: main (and wave-4 while that
@@ -480,7 +480,7 @@ jobs:
 
       # Title and commit message use the CHORE prefix so they satisfy pr-hygiene's title rule.
       # The root script `version-packages` runs `changeset version` and then rolls the root CHANGELOG.md
-      # (tools/release/roll-changelog.mjs, OPS-REL-3, docs/process/versioning.md §5): for a stable version
+      # (tools/release/roll-changelog.mjs, OPS-REL-3, project/process/versioning.md §5): for a stable version
       # [Unreleased] becomes "## [<version>] - <date>" and an empty [Unreleased] is added; an empty
       # [Unreleased] fails this job; prereleases leave the file alone. With the release App token the PR
       # and its commits are authored by the App, so its checks start normally and review-gate recognises it.
@@ -533,7 +533,7 @@ jobs:
 
       # Release gate (M1-1h, IR-M1-1h-1 F2): no release while an M1a vector suite is still pending,
       # i.e. while protocol code it checks has not proven itself against the canonical vectors.
-      # Add the next phase here at its gate (docs/runbooks/test-vectors.md).
+      # Add the next phase here at its gate (project/runbooks/test-vectors.md).
       - name: Check that no M1a vector suite is pending
         run: node tools/vectors/check-pending.mjs --gate M1a
 
@@ -1247,7 +1247,7 @@ jobs:
             found { print }
           ' CHANGELOG.md > "$notes"
           if ! grep -q '[^[:space:]]' "$notes"; then
-            echo "::error file=CHANGELOG.md::CHANGELOG.md has no non-empty \"## [$version]\" section; the release PR must roll [Unreleased] into it (docs/process/versioning.md §5)."
+            echo "::error file=CHANGELOG.md::CHANGELOG.md has no non-empty \"## [$version]\" section; the release PR must roll [Unreleased] into it (project/process/versioning.md §5)."
             exit 1
           fi
           # GitHub rejects a Release body over 125,000 characters (HTTP 422): swap in a short note with a link.
@@ -1259,9 +1259,9 @@ jobs:
           chars="$(LC_ALL=C.UTF-8 wc -m < "$notes" | tr -d '[:space:]')"
           if [ "$chars" -gt 123000 ]; then
             base="https://github.com/$GITHUB_REPOSITORY/blob/v$version"
-            if [ -f "docs/releases/v$version.md" ]; then
+            if [ -f "project/releases/v$version.md" ]; then
               what="the release note"
-              link="$base/docs/releases/v$version.md"
+              link="$base/project/releases/v$version.md"
             else
               heading_date="$(grep -m1 -oE "^## \\[${version//./\\.}\\] - [0-9]{4}-[0-9]{2}-[0-9]{2}" CHANGELOG.md | sed 's/.* - //')"
               what="the changelog section"
@@ -1276,7 +1276,7 @@ jobs:
           # (WIN-DESK-1d) are attached later by desktop-app-release under exactly these names.
           # DOWNLOAD-BEGIN
           dl="https://github.com/$GITHUB_REPOSITORY/releases/download/v$version"
-          docs="https://github.com/$GITHUB_REPOSITORY/blob/main/docs-site/guide"
+          docs="https://github.com/$GITHUB_REPOSITORY/blob/main/docs/guide"
           {
             printf '## Download\n\n'
             printf '| Your computer | Download this |\n|---|---|\n'
@@ -1580,7 +1580,7 @@ jobs:
           # REL-LINKS-1: not Latest yet. desktop-app-release marks it Latest as its last step, once both
           # stable-named DMGs are attached and verified, so `releases/latest/download/...` never 404s.
           if ! gh release create "v$VERSION" --repo "$REPOSITORY" --target "$COMMIT" --title "v$VERSION" --latest=false --notes-file "$RUNNER_TEMP/release-notes.md"; then
-            echo "::warning::GitHub Release v$VERSION could not be created. Owner: create it by hand from the CHANGELOG section (docs/process/versioning.md §6)."
+            echo "::warning::GitHub Release v$VERSION could not be created. Owner: create it by hand from the CHANGELOG section (project/process/versioning.md §6)."
             exit 1
           fi
 
@@ -1838,7 +1838,7 @@ jobs:
           set -euo pipefail
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Unexpected CLI version."; exit 1; }
           if ! gh release view "v$VERSION" --repo "$REPOSITORY" > /dev/null 2>&1; then
-            echo "::warning::GitHub Release v$VERSION does not exist, so the desktop extension bundles were not attached. Owner: create the release (docs/process/versioning.md §6), then re-run this job."
+            echo "::warning::GitHub Release v$VERSION does not exist, so the desktop extension bundles were not attached. Owner: create the release (project/process/versioning.md §6), then re-run this job."
             exit 0
           fi
           gh release upload "v$VERSION" --repo "$REPOSITORY" --clobber -- *.mcpb SHA256SUMS
@@ -1888,7 +1888,7 @@ jobs:
           set -euo pipefail
           VERSION="$(node -p "require('./apps/cli/package.json').version")"
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Unexpected CLI version."; exit 1; }
-          if ! grep -q 'ai-knowledge:' docs-site/guide/README.md docs/guide/README.md 2>/dev/null; then
+          if ! grep -q 'ai-knowledge:' docs/guide/README.md 2>/dev/null; then
             echo "::notice::The public pages carry no ai-knowledge markers yet (DOCS-COMPACT-A Step 2); the knowledge bundle is not built for v$VERSION."
             exit 0
           fi
@@ -2056,7 +2056,7 @@ jobs:
         run: |
           set -euo pipefail
           gh release view "v$VERSION" --repo "$REPOSITORY" > /dev/null 2>&1 ||
-            { echo "::error::GitHub Release v$VERSION does not exist, so the desktop app was not attached. Owner: create the release (docs/process/versioning.md §6), then re-run this job."; exit 1; }
+            { echo "::error::GitHub Release v$VERSION does not exist, so the desktop app was not attached. Owner: create the release (project/process/versioning.md §6), then re-run this job."; exit 1; }
           shopt -s nullglob
           # The two DMGs and the Windows setup (WIN-DESK-1d), each under its versioned and its stable
           # name, and the two zips (UPD-3, versioned name only: the signed update manifest links them).

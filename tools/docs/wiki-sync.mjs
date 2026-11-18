@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// DOCS-UNIFY: generates the AgentLink part of 4thTech Docs (wiki.4thtech.io) from docs-site/.
-// One source: docs-site/ in this repo. The wiki repo 4thtech/wiki.4thtech.io holds a generated copy in
+// DOCS-UNIFY: generates the AgentLink part of 4thTech Docs (wiki.4thtech.io) from docs/ (docs-site/ in tags up to v0.5.11).
+// One source: docs/ in this repo. The wiki repo 4thtech/wiki.4thtech.io holds a generated copy in
 // `agentlink/`, its navigation entries in the root SUMMARY.md, AgentLink redirects in .gitbook.yaml and
 // the record data/agentlink-sync.yaml. Everything else in the wiki (Welcome, news, deployments, the
 // other 4thTech products) is written there by hand. Plain Node 22, no dependencies, no secrets.
@@ -12,15 +12,15 @@
 //   node tools/docs/wiki-sync.mjs --latest-tag                        # prints the newest release tag
 //
 // Release tags only, never `main`, and the tag must be on main: the wiki shows what is released.
-// Only .md pages and images are copied; symbolic links are refused; redirects stay inside agentlink/. docs-site/guide -> agentlink/,
-// docs-site/technical -> agentlink/technical/, docs-site/assets -> agentlink/.gitbook/assets/.
+// Only .md pages and images are copied; symbolic links are refused; redirects stay inside agentlink/. docs/guide -> agentlink/,
+// docs/technical -> agentlink/technical/, docs/assets -> agentlink/.gitbook/assets/.
 // DOCS-COMPACT-A: the source paths come from tools/docs/paths.mjs and are picked per source tree
 // (detectLayout): a tag in the legacy layout (docs-site/, up to v0.5.11) syncs byte for byte as before;
 // a tag in the compact layout (docs/guide, docs/technical, docs/assets) syncs to the same wiki paths,
 // with the header naming `docs@<tag>`. The `ai-knowledge` page markers are stripped, and the generated
 // version banner is set to the synced tag (both absent in legacy tags, so their output is unchanged).
 // Ported from the wiki's scripts/sync-agentlink.mjs (same output byte for byte, same state file), so
-// the wiki's own `--check` keeps working. Runbook: docs-site/MAINTAINING.md §2.
+// the wiki's own `--check` keeps working. Runbook: docs/MAINTAINING.md §2.
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -490,7 +490,7 @@ export function checkState(root) {
     if (!fs.existsSync(p)) problems.push(`${f.path}: synced file is missing`);
     else if (sha256(fs.readFileSync(p)) !== f.sha256)
       problems.push(
-        `${f.path}: edited by hand (synced from ${st.tag}); edit docs-site in 4thtech/agentlink and sync again`,
+        `${f.path}: edited by hand (synced from ${st.tag}); edit docs in 4thtech/agentlink and sync again`,
       );
   }
   const dir = path.join(root, GUIDE_DEST);
@@ -499,7 +499,7 @@ export function checkState(root) {
       const rel = relOf(root, f);
       if (!listed.has(rel))
         problems.push(
-          `${rel}: not part of the sync; agentlink/ is generated, add it to 4thtech/agentlink docs-site instead`,
+          `${rel}: not part of the sync; agentlink/ is generated, add it to 4thtech/agentlink docs instead`,
         );
     }
   }

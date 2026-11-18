@@ -22,7 +22,7 @@ export interface SuiteModule {
   /**
    * Per-case test timeout in ms, for a suite whose cases are memory-hard and run longer than the
    * Vitest default on a loaded CI runner. Measured, never a guess: the suite's comment cites the
-   * local and CI timings (test timeout policy, `docs/process/repo-reference.md`, M0-10e). Applied
+   * local and CI timings (test timeout policy, `project/process/repo-reference.md`, M0-10e). Applied
    * by harness/vectors.test.ts to each case in every runtime the suite runs in. Omitted means the
    * project default.
    */

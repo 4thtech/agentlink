@@ -306,7 +306,7 @@ export function checkPendingShrinks(head, base) {
 }
 
 /**
- * Card -> phase, read from docs/process/backlog.md: each `#### <card> · …` heading followed by a
+ * Card -> phase, read from project/process/backlog.md: each `#### <card> · …` heading followed by a
  * `**Phase:** <phase>` field before the next heading.
  *
  * @param {string} backlog
@@ -377,7 +377,7 @@ export function checkPendingGate(head, phases, cards = new Map()) {
 
 /**
  * Compares two snapshots (relative path -> content hash) of test-vectors/. Tests read the vectors;
- * they never write or regenerate them (docs/process/development-process.md §10).
+ * they never write or regenerate them (project/process/development-process.md §10).
  *
  * @param {ReadonlyMap<string, string>} before
  * @param {ReadonlyMap<string, string>} after

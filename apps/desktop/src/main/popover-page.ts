@@ -20,7 +20,7 @@ export const POPOVER_ACTION_URL = 'http://agentlink.invalid/open-agentlink';
 export const POPOVER_FALLBACK_CSP =
   "default-src 'none'; style-src 'unsafe-inline'; img-src 'none'; form-action 'none'; base-uri 'none'";
 
-// Colours from docs/design (D-116 tokens), as status-page.ts.
+// Colours from project/design (D-116 tokens), as status-page.ts.
 const STYLE = `
 :root{color-scheme:dark light;--canvas:#0b0c0e;--fg:#f5f6f7;--muted:#a1a9b4;--border:#2a2f36;--accent:#ff6a1a;--on-accent:#0b0c0e}
 @media (prefers-color-scheme: light){:root{--canvas:#ffffff;--fg:#0b0c0e;--muted:#4f5761;--border:#d3d7dc}}

@@ -1,5 +1,5 @@
 // The docs screenshot generator (`pnpm docs:screens`), kept out of every test run: it writes images
-// into docs-site/assets/screens/ and is started only on purpose. Same crypto test seam alias as the
+// into docs/assets/screens/ and is started only on purpose. Same crypto test seam alias as the
 // e2e suites (vitest.config.ts next door).
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';

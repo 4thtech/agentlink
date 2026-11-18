@@ -69,7 +69,7 @@ const FILLED = {
   'Security class': '- [x] **S1**: sensitive\n- [ ] **S2**: critical',
   'Tests added': 'A test.',
   'Docs / spec updated': 'README.',
-  'Docs impact': 'README Status and docs-site status page (regenerated from docs/status.yaml).',
+  'Docs impact': 'README Status and docs status page (regenerated from docs/status.yaml).',
   'Dependencies added': 'None',
   'Review requirements': '- [x] reviewed',
   'Independent review': 'pending',

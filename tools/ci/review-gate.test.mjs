@@ -1,6 +1,6 @@
 // review-gate (.github/workflows/review-gate.yml): the path classes and the whole gate script.
 //
-// CHORE-CI-DOCS-FASTLANE (owner decision D2, 2026-10-25): `docs-site/**` is S1 (audit-rules.md §2.2,
+// CHORE-CI-DOCS-FASTLANE (owner decision D2, 2026-10-25): `docs/**` is S1 (audit-rules.md §2.2,
 // D-57), except the one generated status page, whose source docs/status.yaml is S0.
 // OPS-FAST-LANE-2 (owner Decision 54): the class is computed from the paths; a missing or lower
 // declaration only warns; the independent review line is required for S2 and sensitive paths only;
@@ -112,29 +112,44 @@ function body({ cls = null, review = '', threat = '', redSha = '' } = {}) {
 
 describe('review-gate path classes', () => {
   it('lifts the rules out of the workflow', () => {
-    expect(classify('docs/foundation/04-security-and-crypto.md')).toBe(2);
+    expect(classify('specs/04-security-and-crypto.md')).toBe(2);
   });
 
-  it('a docs-site file is S1', () => {
-    expect(classify('docs-site/guide/getting-started.md')).toBe(1);
-    expect(classify('docs-site/technical/project/other.md')).toBe(1);
+  it('a docs file is S1', () => {
+    expect(classify('docs/guide/getting-started.md')).toBe(1);
+    expect(classify('docs/technical/project/other.md')).toBe(1);
   });
 
   it('the generated status page is S0', () => {
-    expect(classify('docs-site/technical/project/status-and-roadmap.md')).toBe(0);
+    expect(classify('docs/technical/project/status-and-roadmap.md')).toBe(0);
   });
 
   it('only that exact page is exempt', () => {
-    expect(classify('docs-site/technical/project/status-and-roadmap.md.bak')).toBe(1);
-    expect(classify('docs-site/x/technical/project/status-and-roadmap.md')).toBe(1);
+    expect(classify('docs/technical/project/status-and-roadmap.md.bak')).toBe(1);
+    expect(classify('docs/x/technical/project/status-and-roadmap.md')).toBe(1);
   });
 
   it('other docs stay as before', () => {
-    expect(classify('docs/process/ci-cd.md')).toBe(1);
-    expect(classify('docs/lessons/x.md')).toBe(0);
+    expect(classify('project/process/ci-cd.md')).toBe(1);
+    expect(classify('project/lessons/x.md')).toBe(0);
     expect(classify('knowledge/a.md')).toBe(0);
     expect(classify('README.md')).toBe(0);
     expect(classify('changelog.d/X.md')).toBe(0);
+  });
+
+  it('DOCS-PHASE-B: the renamed folders keep their classes', () => {
+    expect(classify('specs/04-security-and-crypto.md')).toBe(2);
+    expect(classify('specs/decisions/D-001.md')).toBe(1);
+    expect(classify('specs/06-mcp-server.md')).toBe(1);
+    expect(classify('project/process/audit-rules.md')).toBe(1);
+    expect(classify('docs/guide/x.md')).toBe(1);
+    expect(classify('docs/status.yaml')).toBe(0);
+    expect(classify('docs-site/guide/x.md')).toBe(1);
+    expect(classify('project/runbooks/x.md')).toBe(0);
+    expect(classify('project/design/d1/x.md')).toBe(0);
+    expect(classify('project/README.md')).toBe(0);
+    // A nested copy or a similarly named file is not the owner-gated spec.
+    expect(classify('specs/04-security-and-crypto.md.bak')).toBe(1);
   });
 
   it('marks the AGENTS.md sensitive paths', () => {
@@ -161,7 +176,7 @@ describe('review-gate path classes', () => {
     }
     for (const p of [
       'packages/cli/package.json',
-      'docs/process/x.md',
+      'project/process/x.md',
       'SECURITY.md',
       'tools/x.mjs',
       'tools/desktop-extension/build.mjs',
@@ -198,7 +213,7 @@ describe('review-gate path classes', () => {
         new RegExp(`^${path.replaceAll('/', '\\/')}\\s+@talirezun @denisjazbec$`, 'm'),
       );
     }
-    const rules = readFileSync(join(root, 'docs/process/audit-rules.md'), 'utf8');
+    const rules = readFileSync(join(root, 'project/process/audit-rules.md'), 'utf8');
     expect(rules).toMatch(/^\| `installer\/\*\*` \| S2 \|/m);
   });
 
@@ -229,7 +244,7 @@ describe('review-gate path classes', () => {
         new RegExp(`^${path.replaceAll('/', '\\/')}\\s+@talirezun @denisjazbec$`, 'm'),
       );
     }
-    const rules = readFileSync(join(root, 'docs/process/audit-rules.md'), 'utf8');
+    const rules = readFileSync(join(root, 'project/process/audit-rules.md'), 'utf8');
     expect(rules).toMatch(/^\| `apps\/desktop\/\*\*`, `apps\/cli\/src\/desktop\/\*\*` \| S2 \|/m);
     expect(rules).toMatch(/^\| `tools\/desktop\/\*\*` \| S2 \|/m);
   });

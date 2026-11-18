@@ -1,5 +1,5 @@
 // REL-LINKS-3: the Mac download links never name a version. This test checks the rules and the real
-// public docs (README, docs-site, knowledge, llms.txt, apps/invite/src).
+// public docs (README, docs, knowledge, llms.txt, apps/invite/src).
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -37,25 +37,25 @@ describe('check-download-links', () => {
     expect(checkText('a.md', 'AgentLink-0.5.8-win-x64-setup.exe')).toHaveLength(1);
     expect(checkText('a.md', `${STABLE_BASE}/AgentLink-win-x64-setup.exe`)).toEqual([]);
     expect(checkText('a.md', '4thtech/agentlink/releases/latest')).toEqual([]);
-    expect(checkText('docs/runbooks/x.md', '4thtech/agentlink/releases/tag/v0.5.8')).toEqual([]);
+    expect(checkText('project/runbooks/x.md', '4thtech/agentlink/releases/tag/v0.5.8')).toEqual([]);
   });
 
   it('ignores another project, and allows versioned names in the process docs', () => {
     expect(
       checkText('a.md', 'https://github.com/electron/electron/releases/download/v1.0.0/x'),
     ).toEqual([]);
-    expect(checkText('docs/process/versioning.md', 'AgentLink-<version>-mac-arm64.dmg')).toEqual(
+    expect(checkText('project/process/versioning.md', 'AgentLink-<version>-mac-arm64.dmg')).toEqual(
       [],
     );
     expect(
-      checkText('docs/runbooks/x.md', '4thtech/agentlink/releases/download/v1/x.dmg'),
+      checkText('project/runbooks/x.md', '4thtech/agentlink/releases/download/v1/x.dmg'),
     ).toHaveLength(1);
   });
 
-  it('covers docs/ but not docs/foundation, and more file types', () => {
+  it('covers docs/ but not specs, and more file types', () => {
     const files = collectFiles(root).map(([f]) => f);
-    expect(files.some((f) => f.startsWith('docs/runbooks/'))).toBe(true);
-    expect(files.some((f) => f.startsWith('docs/foundation/'))).toBe(false);
+    expect(files.some((f) => f.startsWith('project/runbooks/'))).toBe(true);
+    expect(files.some((f) => f.startsWith('specs/'))).toBe(false);
     expect(files.some((f) => f.endsWith('.json') || f.endsWith('.mjs') || f.endsWith('.js'))).toBe(
       true,
     );

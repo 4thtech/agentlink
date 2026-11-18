@@ -1,4 +1,4 @@
-// N2: what the app says about the network, in one place (docs/design/notices.md).
+// N2: what the app says about the network, in one place (project/design/notices.md).
 //
 // - `useHealth()`: the one health word. The state, its words and whether the network has been down
 //   long enough to say so.

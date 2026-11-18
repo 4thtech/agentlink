@@ -1,5 +1,5 @@
 // M1-35a: the design tokens module, the CSS and the shipped notices (S1). The sources of truth are
-// the D1 files under docs/design/d1/ (read with Vite `?raw`: the ui zone allows no Node built-ins).
+// the D1 files under project/design/d1/ (read with Vite `?raw`: the ui zone allows no Node built-ins).
 import { describe, expect, it } from 'vitest';
 import css from './tokens.css?raw';
 import {
@@ -18,13 +18,13 @@ import {
 // The D1 files, read through Vite: a relative import would leave the package (boundaries rule).
 const d1 = import.meta.glob(
   [
-    '../../../../docs/design/d1/tokens/*.{json,css}',
-    '../../../../docs/design/d1/design-system/contrast.md',
+    '../../../../project/design/d1/tokens/*.{json,css}',
+    '../../../../project/design/d1/design-system/contrast.md',
   ],
   { query: '?raw', import: 'default', eager: true },
 );
 function d1File(name: string): string {
-  const text = d1[`../../../../docs/design/d1/${name}`];
+  const text = d1[`../../../../project/design/d1/${name}`];
   if (text === undefined || text === '') throw new Error(`D1 file missing or empty: ${name}`);
   return text;
 }

@@ -5,7 +5,7 @@
 # temporary profiles on macOS, Windows and Linux. It never reaches 4thTech services: the installers
 # fetch Node.js from nodejs.org and the package from npm. Step S7 (invite, accept, messages both
 # ways) is reported as a gap: the published package has no relay override, and relays must be public
-# wss:// hosts (docs/foundation/04 §4), so that leg can only use the production default relays.
+# wss:// hosts (specs/04 §4), so that leg can only use the production default relays.
 #
 # Manual (workflow_dispatch, input: version, default latest) and on pull requests that change this
 # workflow or its script. Not part of ci-gate. No secrets, read-only token, no checkout credentials.

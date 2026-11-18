@@ -238,7 +238,7 @@ export function renderKnowledgeIntro(data) {
 
 /**
  * Knowledge base: where things stand, kept lean for the support chat. The per-component detail
- * lives on the docs-site status page, which is generated from the same source.
+ * lives on the docs status page, which is generated from the same source.
  */
 export function renderKnowledgeSummary(data) {
   const out = [
@@ -293,7 +293,7 @@ export function renderKnowledgeMilestones(data) {
 // cards whose Phase starts with "later" (not in a milestone). M1 cards split into M1a and M1b by
 // the first word of their `**Phase:**` field.
 
-const BACKLOG_FILE = 'docs/process/backlog.md';
+const BACKLOG_FILE = 'project/process/backlog.md';
 
 /** Counts cards per section: { M0, M1a, M1b, M1, M2, M3 } (M1 is M1a + M1b + M1 cards with no phase). */
 export function countBacklogCards(text) {

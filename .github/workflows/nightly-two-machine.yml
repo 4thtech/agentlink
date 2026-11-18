@@ -26,7 +26,7 @@
 # scan, and appears in no uploaded result. Transcripts stay on the runner; only sanitized results
 # (step names, pass or fail, tool names, cost) are uploaded, after a clean canary scan.
 #
-# Security posture (docs/foundation/04 §7): `permissions: {}` at the top and least privilege per job
+# Security posture (specs/04 §7): `permissions: {}` at the top and least privilege per job
 # (`actions: read` only where an artifact of this run is read), every action pinned to a full commit
 # SHA, no lifecycle scripts on install, no event data in shell scripts, the harness CLI downloaded as
 # an exact version and checked against a pinned sha512 integrity (no npm install). The API key is an

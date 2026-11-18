@@ -30,12 +30,14 @@ import {
   updateRedirects,
   updateSummary,
   detectLayout,
+  LAYOUTS,
 } from './wiki-sync.mjs';
 
 const ctx = (srcRel, extra = {}) => ({
   tag: 'v9.9.9',
   srcRel,
-  destRel: destFor(srcRel),
+  destRel: destFor(srcRel, LAYOUTS.legacy),
+  layout: LAYOUTS.legacy,
   map: new Map([
     ['docs-site/guide/README.md', 'agentlink/README.md'],
     ['docs-site/guide/pricing.md', 'agentlink/pricing.md'],

@@ -6,30 +6,30 @@ Thank you for your interest. AgentLink is built in public, and this page explain
 
 AgentLink is **pre-alpha** and works today on test networks: the CLI, MCP server and local app ship on npm as [`@4thtech-io/agentlink`](https://www.npmjs.com/package/@4thtech-io/agentlink), and an early Mac app is attached to each [release](https://github.com/4thtech/agentlink/releases). That shapes how you can help:
 
-- **Issues** for bugs, feedback, questions, ideas and reports of unclear or inconsistent spec text. Reading and challenging the [specs](docs/foundation/00-README.md) is genuinely useful.
+- **Issues** for bugs, feedback, questions, ideas and reports of unclear or inconsistent spec text. Reading and challenging the [specs](specs/00-README.md) is genuinely useful.
 - **Code contributions** are welcome. Please open an issue before investing time in a larger pull request, so we can tell you whether it fits the plan.
 
 See the Status and Roadmap in the [README](README.md) for where things stand.
 
 ## How work is organised
 
-- **Task IDs.** Every piece of work has a task card in [`docs/process/backlog.md`](docs/process/backlog.md), for example `M1-5`. No task ID, no work.
+- **Task IDs.** Every piece of work has a task card in [`project/process/backlog.md`](project/process/backlog.md), for example `M1-5`. No task ID, no work.
 - **One task = one branch = one PR.** Put the task ID in the branch name and the PR title (`M1-5 transport-nostr sync`). Other allowed prefixes are `OPS-<n>`, `DOCS`, `CHORE` and `DEPS`.
-- **Specs come first.** The documents in [`docs/foundation/`](docs/foundation/00-README.md) are the source of truth, and the invariants in [`04-security-and-crypto.md`](docs/foundation/04-security-and-crypto.md) are non-negotiable. An interface change updates the spec in the same PR (or earlier). The [documentation map](docs/README.md) shows where everything is.
+- **Specs come first.** The documents in [`specs/`](specs/00-README.md) are the source of truth, and the invariants in [`04-security-and-crypto.md`](specs/04-security-and-crypto.md) are non-negotiable. An interface change updates the spec in the same PR (or earlier). The [documentation map](project/README.md) shows where everything is.
 - **The PR template is enforced.** Fill in every section of [`.github/pull_request_template.md`](.github/pull_request_template.md). The `pr-hygiene` and `review-gate` checks fail the PR if sections are empty or the declared security class is lower than the one derived from the changed files.
-- **Security classes** decide how much review a change needs ([`audit-rules.md`](docs/process/audit-rules.md) has the full rules and path defaults):
+- **Security classes** decide how much review a change needs ([`audit-rules.md`](project/process/audit-rules.md) has the full rules and path defaults):
 
   | Class | What it covers | Review needed, on top of the CI gates |
   |---|---|---|
-  | **S0** | No security-relevant behaviour (docs outside `docs/foundation/`, `docs/process/` and `docs-site/`, tooling without secrets) | None beyond CI |
+  | **S0** | No security-relevant behaviour (docs outside `specs/`, `project/process/` and `docs/`, tooling without secrets) | None beyond CI |
   | **S1** | Sensitive: inbound content, files and URLs, storage credentials, approval UI, CI configuration, specs | Independent review session; a regression test for every fix |
   | **S2** | Critical: crypto, keys, owner presence, envelope and pairing protocol, policy engine, anything that signs | Everything in S1, plus tests written first, a full threat note, and the owner's (@talirezun) explicit go-ahead before merge (D-51) |
 
 - **Merging.** S0/S1 changes merge through GitHub auto-merge once every required check is green. Changes to S2 paths and sensitive paths (`.github/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**`, supply-chain files) also need the owner's explicit go-ahead (D-51). Nobody pushes to `main`, and there is no admin bypass.
-- **Tests and checks.** Tests are expected with every change; crypto, the policy engine and anything that signs are tests-first. The commands are in [`docs/process/repo-reference.md`](docs/process/repo-reference.md); `pnpm verify` runs locally what CI's `checks` runs for the packages you changed. Open a PR with `node tools/pr/open-pr.mjs` (it fills the template and the security class).
+- **Tests and checks.** Tests are expected with every change; crypto, the policy engine and anything that signs are tests-first. The commands are in [`project/process/repo-reference.md`](project/process/repo-reference.md); `pnpm verify` runs locally what CI's `checks` runs for the packages you changed. Open a PR with `node tools/pr/open-pr.mjs` (it fills the template and the security class).
 - **AI agents working in this repository follow [`AGENTS.md`](AGENTS.md).** Much of the project is built by orchestrated AI agents under human review, and the rules for agents and people are the same. Do not add AI-attribution lines (co-author trailers, "generated with" footers) to commits or PRs.
 
-The full process is in [`docs/process/development-process.md`](docs/process/development-process.md).
+The full process is in [`project/process/development-process.md`](project/process/development-process.md).
 
 ## Writing for the research section
 
@@ -42,7 +42,7 @@ AgentLink uses SemVer, with one shared product version during beta. You do not b
 - A PR that changes a published package adds a **changeset**.
 - A user-visible, spec or process change adds a fragment file in [`changelog.d/`](changelog.d/README.md); do not edit [`CHANGELOG.md`](CHANGELOG.md), it is rolled from the fragments at release.
 
-Details are in [`docs/process/versioning.md`](docs/process/versioning.md).
+Details are in [`project/process/versioning.md`](project/process/versioning.md).
 
 ## Reporting security issues
 

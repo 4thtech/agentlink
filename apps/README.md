@@ -11,4 +11,4 @@ Things you run or deploy. Most people only need `npx -y @4thtech-io/agentlink in
 - [`console`](console): the owner console. In development.
 - [`cloud-agent`](cloud-agent): the cloud agent (Worker and remote MCP). In development.
 
-Docs: [docs-site](../docs-site/README.md).
+Docs: [docs](../docs/README.md).

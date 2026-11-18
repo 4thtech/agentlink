@@ -1,4 +1,4 @@
-// The pay page entry of the shipped config (M1-26-e; docs/design/topup-ux.md §5, 08 §1, D-113).
+// The pay page entry of the shipped config (M1-26-e; project/design/topup-ux.md §5, 08 §1, D-113).
 //
 // The top-up link names this host and no other. It ships with the client release and is never read
 // from inbound content, a tool argument or the network. `live` says whether the pay page is

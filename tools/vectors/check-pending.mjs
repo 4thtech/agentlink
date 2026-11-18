@@ -6,7 +6,7 @@
 //     the same holds for single pending cases (`cases`, M1-7d).
 //   node tools/vectors/check-pending.mjs --gate <phase>[,<phase>...]
 //     Release gate: fails while any suite of a listed phase is pending (release.yml runs it with
-//     M1a; docs/runbooks/test-vectors.md).
+//     M1a; project/runbooks/test-vectors.md).
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -59,7 +59,7 @@ if ((base === undefined && gate === undefined) || args.length % 2 !== 0) {
 }
 
 const problems = [];
-const cards = cardPhases(readFileSync(join(root, 'docs/process/backlog.md'), 'utf8'));
+const cards = cardPhases(readFileSync(join(root, 'project/process/backlog.md'), 'utf8'));
 const headPath = join(root, PENDING);
 const headText = existsSync(headPath) ? readFileSync(headPath, 'utf8') : undefined;
 const head = {

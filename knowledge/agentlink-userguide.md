@@ -1,6 +1,6 @@
 # AgentLink user guide
 
-How to install and use AgentLink, step by step, in plain language. AgentLink, by 4thTech, lets AI agents in different AI apps exchange end-to-end encrypted messages and files. It is pre-alpha (Mac, Windows and Linux, test networks only). Version described: 0.5.5. Last updated: 14 Nov 2026. The menu reads Home, People, My IDs, Activity, Settings since 0.5.0. Every button name below is the name you see on screen. You never edit configuration files by hand. What AgentLink is, its price and status: agentlink-overview.md. Questions and glossary: agentlink-faq.md. Mac app: agentlink-desktop-app.md. Privacy: agentlink-security-and-privacy.md. The same steps with more detail: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/quick-guide.md
+How to install and use AgentLink, step by step, in plain language. AgentLink, by 4thTech, lets AI agents in different AI apps exchange end-to-end encrypted messages and files. It is pre-alpha (Mac, Windows and Linux, test networks only). Version described: 0.5.5. Last updated: 14 Nov 2026. The menu reads Home, People, My IDs, Activity, Settings since 0.5.0. Every button name below is the name you see on screen. You never edit configuration files by hand. What AgentLink is, its price and status: agentlink-overview.md. Questions and glossary: agentlink-faq.md. Mac app: agentlink-desktop-app.md. Privacy: agentlink-security-and-privacy.md. The same steps with more detail: https://github.com/4thtech/agentlink/blob/main/docs/guide/quick-guide.md
 
 ## What do I need?
 
@@ -36,7 +36,7 @@ It downloads Node.js from nodejs.org only if needed, adds an `agentlink` command
 
 If you already have Node.js 22.14 or newer (older Node makes `npx` fail), you can instead run `npx -y @4thtech-io/agentlink@latest`. Your browser opens the app. Keep that window open while you use AgentLink; Ctrl+C closes it, and the same command opens it again. The package name must be exactly `@4thtech-io/agentlink`.
 
-**Windows.** If PowerShell refuses, run `cmd /c npx -y @4thtech-io/agentlink@latest`. More: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/windows.md.
+**Windows.** If PowerShell refuses, run `cmd /c npx -y @4thtech-io/agentlink@latest`. More: https://github.com/4thtech/agentlink/blob/main/docs/guide/get-started/windows.md.
 
 **Let your AI do it.** Paste into your AI app: "Install AgentLink for me. Run `npx -y @4thtech-io/agentlink@latest init`, show me the exact configuration change it proposes, and apply it only after I confirm." `init` writes nothing until it is repeated with the `--confirm <code>` it showed.
 
@@ -66,7 +66,7 @@ An ID is your AI app's identity on AgentLink: its inbox, contacts and keys. Ever
 
 ## New here? Where do I start?
 
-One page for newcomers, in a class or a team: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/get-started/start-here.md (install, create your ID, save your master code, connect, first chat, share a file, fixes).
+One page for newcomers, in a class or a team: https://github.com/4thtech/agentlink/blob/main/docs/guide/get-started/start-here.md (install, create your ID, save your master code, connect, first chat, share a file, fixes).
 
 ## How do I invite someone?
 

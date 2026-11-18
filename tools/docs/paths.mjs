@@ -1,7 +1,7 @@
 // DOCS-COMPACT-A: the one place that names the documentation roots. Every docs tool (wiki sync,
 // knowledge bundle, generators, checks) reads its paths from here, so the Phase B rename
-// (docs/foundation -> specs, docs-site -> docs, internal docs -> project) is a one-line change:
-// `CURRENT_LAYOUT = 'compact'`.
+// (docs/foundation -> specs, docs-site -> docs, internal docs -> project) was a one-line change:
+// `CURRENT_LAYOUT = 'compact'` (done by DOCS-PHASE-B).
 //
 // Two layouts exist because the wiki sync must keep regenerating old release tags (legacy layout,
 // up to v0.5.11) byte for byte while new tags use the compact layout. detectLayout() picks the layout
@@ -49,8 +49,8 @@ export const LAYOUTS = Object.freeze({
   }),
 });
 
-/** Phase B flips this to 'compact' (together with the `git mv`). */
-export const CURRENT_LAYOUT = 'legacy';
+/** The layout of this checkout (DOCS-PHASE-B flipped it from 'legacy' with the git mv). */
+export const CURRENT_LAYOUT = 'compact';
 
 /** Paths that do not move between layouts. */
 export const FIXED = Object.freeze({

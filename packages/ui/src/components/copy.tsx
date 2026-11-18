@@ -1,4 +1,4 @@
-// The one copy button (N1; docs/design/notices.md). Copies text to the clipboard, says "Copied" for
+// The one copy button (N1; project/design/notices.md). Copies text to the clipboard, says "Copied" for
 // COPIED_MS (inline, as 21.5 asks), announces it politely once, and says plainly when it could not
 // copy. Text only: the text it copies is never put in an attribute, a log or an error.
 import { useCallback, useEffect, useState, type ReactElement } from 'react';

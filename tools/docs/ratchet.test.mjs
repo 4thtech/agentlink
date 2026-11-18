@@ -42,3 +42,39 @@ describe('paths', () => {
     expect(() => pathsFor('other')).toThrow(/unknown docs layout/);
   });
 });
+
+describe("renamed entries", () => {
+  it("maps old-path allowlist entries to the new folders", async () => {
+    const { renamedEntry } = await import("./ratchet.mjs");
+    expect(renamedEntry("docs/foundation/07-x.md: note")).toBe("specs/07-x.md: note");
+    expect(renamedEntry("docs/process/a.md: x")).toBe("project/process/a.md: x");
+    expect(renamedEntry("docs-site/guide/a.md: x")).toBe("docs/guide/a.md: x");
+    expect(renamedEntry("docs/guide/a.md: x")).toBe("docs/guide/a.md: x");
+  });
+});
+
+describe('baseIsLegacy', () => {
+  it('is true only for a ref that still has docs-site/guide/SUMMARY.md', async () => {
+    const { baseIsLegacy } = await import('./ratchet.mjs');
+    const { execFileSync } = await import('node:child_process');
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const dir = mkdtempSync(join(tmpdir(), 'ratchet-'));
+    const git = (...a) =>
+      execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...a], { cwd: dir });
+    git('init', '-q');
+    mkdirSync(join(dir, 'docs-site/guide'), { recursive: true });
+    writeFileSync(join(dir, 'docs-site/guide/SUMMARY.md'), 'x');
+    git('add', '.');
+    git('commit', '-qm', 'legacy');
+    git('tag', 'legacy');
+    git('rm', '-qr', 'docs-site');
+    mkdirSync(join(dir, 'docs/guide'), { recursive: true });
+    writeFileSync(join(dir, 'docs/guide/SUMMARY.md'), 'x');
+    git('add', '.');
+    git('commit', '-qm', 'compact');
+    git('tag', 'compact');
+    expect(baseIsLegacy(dir, 'legacy')).toBe(true);
+    expect(baseIsLegacy(dir, 'compact')).toBe(false);
+  });
+});

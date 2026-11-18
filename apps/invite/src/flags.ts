@@ -13,4 +13,4 @@ export const DESKTOP_APP_LINKS: boolean =
 
 /** "Get the app": the desktop app page of the public docs (used only when the flag is on). */
 export const GET_APP_URL =
-  'https://github.com/4thtech/agentlink/blob/main/docs-site/guide/apps/desktop-app.md';
+  'https://github.com/4thtech/agentlink/blob/main/docs/guide/apps/desktop-app.md';

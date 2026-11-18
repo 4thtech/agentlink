@@ -14,7 +14,7 @@ minimumReleaseAge: 4320
 # onlyBuiltDependencies, which pnpm ignores). No dependency is approved (no `true` entry), and
 # strictDepBuilds makes an unapproved build fail the install instead of being skipped with a
 # warning. better-sqlite3 (packages/node, M1-8b) needs no entry: from 13.0 it ships prebuilt binaries
-# in its package and has no install script (docs/process/ci-cd.md).
+# in its package and has no install script (project/process/ci-cd.md).
 # Explicitly denied (`false`: the script never runs and the install does not fail), for the Workers
 # test-vector pool (M0-9): esbuild and workerd ship prebuilt binaries as optional platform packages
 # and their postinstall scripts only verify or relink them. CI installs with --ignore-scripts, so

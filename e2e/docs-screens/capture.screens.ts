@@ -11,7 +11,7 @@
 //     owner's own terminal (a TTY, no AI app marker), as in the journey tests.
 // The friend's invite page is the built apps/invite site with a made-up invite (e2e invite fixtures).
 //
-// Output: docs-site/assets/screens/<name>.webp, light theme, 1280 x 800 CSS pixels at device scale 2,
+// Output: docs/assets/screens/<name>.webp, light theme, 1280 x 800 CSS pixels at device scale 2,
 // encoded as WebP by the same Chromium (no extra dependency). Names and contents are fixed (Tali,
 // Natasa, the same messages); keys, links and the Contact check digits are new on every run, so the
 // pixels are not byte-identical between runs. Nothing is printed; a failed step names itself.
@@ -45,7 +45,7 @@ import {
   startUiRun,
 } from '../test/journey/world.js';
 
-const OUT = fileURLToPath(new URL('../../docs-site/assets/screens/', import.meta.url));
+const OUT = fileURLToPath(new URL('../../docs/assets/screens/', import.meta.url));
 const INVITE_ROOT = fileURLToPath(new URL('../../apps/invite', import.meta.url));
 const INVITE_OUT = fileURLToPath(new URL('../../apps/invite/dist/site/', import.meta.url));
 const VIEWPORT = { width: 1280, height: 800 };

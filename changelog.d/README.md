@@ -1,6 +1,6 @@
 # Changelog fragments
 
-Every PR that changes user-visible behaviour, a spec or the process adds **one file here** instead of editing `CHANGELOG.md`. Parallel PRs then never touch the same line, so the merge queue stops conflicting after each merge (OPS-REL-4, [`versioning.md`](../docs/process/versioning.md) §5).
+Every PR that changes user-visible behaviour, a spec or the process adds **one file here** instead of editing `CHANGELOG.md`. Parallel PRs then never touch the same line, so the merge queue stops conflicting after each merge (OPS-REL-4, [`versioning.md`](../project/process/versioning.md) §5).
 
 ## File name
 

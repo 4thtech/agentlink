@@ -1,6 +1,6 @@
 // WIN-ACL-NOTICE: the Windows desktop app could not check who can open the data folder. Its shell
 // tells the core (a fixed flag), the health read carries `dataAccess: 'unchecked'`, and this shows a
-// non-blocking page notice (docs/design/notices.md; PageNotice, tone warning), closable and
+// non-blocking page notice (project/design/notices.md; PageNotice, tone warning), closable and
 // remembered in this browser. The app keeps working. Fixed words only (11 §5): no path, no account
 // name, nothing from the answer except the one word.
 import { PageNotice } from '@4thtech-io/ui';

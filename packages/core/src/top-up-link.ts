@@ -1,5 +1,5 @@
 // The top-up link (M1-26-e; D-111, D-113, 08 §1, 06 §2.1 `topUpUrl`, §2.4 `needs_credits`,
-// docs/design/topup-ux.md §5): the one builder for the link to the pay page.
+// project/design/topup-ux.md §5): the one builder for the link to the pay page.
 //
 //   https://{payHost}/#v=1&a=<agent address, 0x + 40 lowercase hex>&usd=<suggested amount, optional>
 //
@@ -13,7 +13,7 @@
 // - The builder is strict and returns undefined instead of a link when anything is malformed.
 //   The address is the agent's own public address; no key or secret is ever an input.
 
-/** The pay page's amount presets in US dollars (docs/design/topup-ux.md §2). */
+/** The pay page's amount presets in US dollars (project/design/topup-ux.md §2). */
 export const TOP_UP_PRESETS_USD: readonly number[] = Object.freeze([5, 10, 25]);
 /** The smallest suggested amount: the gasless top-up minimum (12 §4.1, proposed $5). */
 export const TOP_UP_MIN_USD = 5;

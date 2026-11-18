@@ -1,6 +1,8 @@
 # Not formatted by Prettier: prose, lockfile, CI configuration (owner-reviewed as written), build output.
 *.md
 docs/
+project/
+specs/
 .github/
 .claude/
 .changeset/

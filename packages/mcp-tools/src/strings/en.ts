@@ -1,6 +1,6 @@
-// The M1a copy sheet, English (M1-9g). Source: docs/design/d1/copy/ (strings.en.json,
+// The M1a copy sheet, English (M1-9g). Source: project/design/d1/copy/ (strings.en.json,
 // in-chat.md, terminal.md) reconciled with 11 §5, §6.1, §6.2.1, §6.10 and §9, and D-72. Where the
-// D1 drop and 11 differ, 11 wins (docs/design/README.md, "Drift from 11").
+// D1 drop and 11 differ, 11 wins (project/design/README.md, "Drift from 11").
 //
 // Rules for this file:
 // - Keys are `<surface>.<screen>.<element>[.<state>]` (11 §5.4); placeholders are ICU

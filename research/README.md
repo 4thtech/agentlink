@@ -2,7 +2,7 @@
 
 Articles, essays and research papers about **agent-to-agent communication**: encrypted exchange between AI agents, provable agreements, owner approval for agents that act in our name, and AgentLink itself — what it is, why it was built and what we learn while building it in public.
 
-The product documentation lives in [`docs-site/`](../docs-site/README.md) (also on [4thTech Docs](https://wiki.4thtech.io/products/agentlink)) and the specifications in [`docs/foundation/`](../docs/foundation/00-README.md). This section is different: it holds signed, dated pieces with an argument and a point of view. Each one links back to the docs and specs, so it also works as a gateway for readers who want to go deeper.
+The product documentation lives in [`docs/`](../docs/README.md) (also on [4thTech Docs](https://wiki.4thtech.io/products/agentlink)) and the specifications in [`specs/`](../specs/00-README.md). This section is different: it holds signed, dated pieces with an argument and a point of view. Each one links back to the docs and specs, so it also works as a gateway for readers who want to go deeper.
 
 ## Published
 
@@ -52,6 +52,6 @@ Text and images in `research/` are licensed under [CC BY 4.0](LICENSE) unless an
 ## Related
 
 - [Project README](../README.md): status and roadmap
-- [User guide](../docs-site/guide/README.md) and [technical docs](../docs-site/technical/README.md)
+- [User guide](../docs/guide/README.md) and [technical docs](../docs/technical/README.md)
 - [Knowledge files for AI assistants](../knowledge/README.md)
 - [Contributing to AgentLink](../CONTRIBUTING.md) (code and docs)

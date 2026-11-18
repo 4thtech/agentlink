@@ -1,4 +1,4 @@
-// The one notice system (UX 2026-11-12, docs/design/notices.md). Three kinds, one look:
+// The one notice system (UX 2026-11-12, project/design/notices.md). Three kinds, one look:
 //
 // - Toast (feedback.tsx `Toast`, stacked here by `ToastStack`): a transient outcome. Bottom right
 //   (centred on narrow screens), closes itself after a few seconds, and always has a close button.

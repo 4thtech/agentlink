@@ -1,6 +1,6 @@
 // WP-D10 (Decision 5, Fable H3): a release build must carry the owner's real offline root public key.
 // The repository holds a placeholder in src/main/updater/root-key.json until the key ceremony
-// (docs/runbooks/desktop-update-keys.md). Packaging refuses the placeholder, both in the source file
+// (project/runbooks/desktop-update-keys.md). Packaging refuses the placeholder, both in the source file
 // and anywhere in the built app.asar. The only exception is an owner build on his own machine
 // (AGENTLINK_DESKTOP_OWNER_LOCAL_BUILD=1), which is refused whenever CI or GITHUB_ACTIONS is set.
 //

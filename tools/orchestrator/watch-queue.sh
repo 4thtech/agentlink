@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PROC-ORCH-PLAYBOOK (docs/process/orchestrator-playbook.md §5.6): background merge-queue watcher.
+# PROC-ORCH-PLAYBOOK (project/process/orchestrator-playbook.md §5.6): background merge-queue watcher.
 # Exits (and so wakes the orchestrator) when one of the key PRs merges or any merge-queue entry
 # is UNMERGEABLE. Run it once with the harness's background mode instead of polling by hand.
 #

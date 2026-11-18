@@ -816,7 +816,7 @@ describe('production health check (M1-27b-c)', () => {
     const line = script.match(/^\s*connect_exits="([^"]*)"/m);
     expect(line, 'connect_exits in HEALTH-CHECK').not.toBeNull();
     const docs = readFileSync(
-      new URL('../../docs/process/release-and-deployment.md', import.meta.url),
+      new URL('../../project/process/release-and-deployment.md', import.meta.url),
       'utf8',
     );
     const row = docs.split('\n').find((l) => l.startsWith('| Production checks |')) ?? '';
@@ -991,7 +991,7 @@ describe('cancellation and timeouts of the production deploy (M1-27b-b)', () => 
     expect(new Set(values).size).toBe(1);
     expect(values[0]).toBeLessThan(30_000);
     const contract = readFileSync(
-      resolve(import.meta.dirname, '../../docs/process/release-and-deployment.md'),
+      resolve(import.meta.dirname, '../../project/process/release-and-deployment.md'),
       'utf8',
     );
     expect(contract).toContain(`\`limits.cpu_ms = ${values[0]}\` in every environment`);

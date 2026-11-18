@@ -119,7 +119,7 @@ const escapeHtml = (text: string): string =>
 /** Inline code in the fixed copy (`agentlink doctor`) → <code>. */
 const withCode = (escaped: string): string => escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
 
-// Colours from docs/design (D-116 tokens: canvas, surface, border, fg, muted, brand seal).
+// Colours from project/design (D-116 tokens: canvas, surface, border, fg, muted, brand seal).
 const STYLE = `
 :root{color-scheme:dark light;--canvas:#0b0c0e;--surface:#111316;--border:#2a2f36;--fg:#f5f6f7;--muted:#a1a9b4;--accent:#ff6a1a;--on-accent:#0b0c0e}
 @media (prefers-color-scheme: light){:root{--canvas:#f5f6f7;--surface:#ffffff;--border:#d3d7dc;--fg:#0b0c0e;--muted:#4f5761}}

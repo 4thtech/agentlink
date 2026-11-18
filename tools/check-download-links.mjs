@@ -1,7 +1,7 @@
 // REL-LINKS-3: the public Mac download links must never name a version, so no release makes them stale.
 // They point at https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-mac-<arch>.dmg.
-// Fails on `4thtech/agentlink/releases/download/v...` (also in docs/, except docs/foundation) or a versioned .dmg name (AgentLink-0.5.2-mac-arm64.dmg, or
-// AgentLink-<version>-mac-x64.dmg) in README.md, llms.txt, docs-site, knowledge and apps/invite/src.
+// Fails on `4thtech/agentlink/releases/download/v...` (also in docs/, except specs) or a versioned .dmg name (AgentLink-0.5.2-mac-arm64.dmg, or
+// AgentLink-<version>-mac-x64.dmg) in README.md, llms.txt, docs, knowledge and apps/invite/src.
 // Test files are skipped: they may spell out the bad shapes on purpose.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -21,9 +21,9 @@ const VERSIONED_TAG = /4thtech\/agentlink\/releases\/tag\/(?:v|\d|<|\{|\$)/;
 /** Returns the problems of one file's text (empty when it is fine). */
 export function checkText(file, text) {
   const problems = [];
-  // The process docs under docs/ describe the versioned names on purpose (the updater needs them),
+  // The internal docs under project/ describe the versioned names on purpose (the updater needs them),
   // so there only the download URL is checked.
-  const namesAllowed = file.startsWith('docs/');
+  const namesAllowed = file.startsWith('project/');
   text.split('\n').forEach((line, i) => {
     if (VERSIONED_URL.test(line)) {
       problems.push(
@@ -58,7 +58,7 @@ function walk(dir, out = []) {
 /** Returns [repo-relative path, text] for every file the check covers. */
 export function collectFiles(root) {
   const files = [join(root, 'README.md'), join(root, 'llms.txt')];
-  for (const dir of ['docs-site', 'knowledge', 'docs', join('apps', 'invite', 'src')]) {
+  for (const dir of ['docs', 'knowledge', 'project', join('apps', 'invite', 'src')]) {
     files.push(...walk(join(root, dir)));
   }
   return (
@@ -67,8 +67,8 @@ export function collectFiles(root) {
         (f) =>
           /\.(md|txt|ts|tsx|mts|js|mjs|json|vue|html)$/.test(f) && !/\.test\.[cm]?[jt]sx?$/.test(f),
       )
-      // docs/foundation is decision history.
-      .filter((f) => !relative(root, f).split('\\').join('/').startsWith('docs/foundation/'))
+      // specs is decision history.
+      .filter((f) => !relative(root, f).split('\\').join('/').startsWith('specs/'))
       .filter((f) => existsSync(f))
       .map((f) => [relative(root, f).split('\\').join('/'), readFileSync(f, 'utf8')])
   );

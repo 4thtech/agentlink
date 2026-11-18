@@ -1,6 +1,6 @@
 // CLI: `node tools/sync-pin-check/index.mjs` from a full-history checkout. Fetches origin/sync
 // (a missing branch passes with a notice), then runs the pin check against origin/main.
-// Wired into .github/workflows/security.yml (job `sync-pin`); see docs/process/ci-cd.md.
+// Wired into .github/workflows/security.yml (job `sync-pin`); see project/process/ci-cd.md.
 
 import { execFileSync } from 'node:child_process';
 import { readStubFromRef, runCheck } from './check.mjs';

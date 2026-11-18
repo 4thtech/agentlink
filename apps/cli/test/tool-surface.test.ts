@@ -22,7 +22,7 @@ import { toMcpTool } from '../src/mcp/server.js';
 import { ADVANCED_TOOLS, TOOLS } from '@4thtech-io/mcp-tools/registry.js';
 
 const SNAPSHOT = new URL('./fixtures/tool-surface.json', import.meta.url);
-const SPEC = new URL('../../../docs/foundation/06-mcp-server.md', import.meta.url);
+const SPEC = new URL('../../../specs/06-mcp-server.md', import.meta.url);
 
 interface SurfaceTool {
   name: string;

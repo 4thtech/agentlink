@@ -32,7 +32,7 @@
 # build accepts only when the ASAR has the updates-off mark and no root-key placeholder. "on" needs
 # the real pinned root key (build/lib/root-key-check.mjs). No owner-local flag is ever set here.
 #
-# Security posture (docs/foundation/04 section 7, docs/process/ci-cd.md): `permissions: {}` at the top,
+# Security posture (specs/04 section 7, project/process/ci-cd.md): `permissions: {}` at the top,
 # `contents: read` for the build, the attestation permissions only in `attest`; every action pinned to
 # a full commit SHA; no secret is referenced anywhere; no pnpm store cache (the job produces
 # artifacts); `--ignore-scripts` installs; event data reaches shell only through `env:`; the build

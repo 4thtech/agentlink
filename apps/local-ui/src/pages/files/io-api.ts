@@ -1,4 +1,4 @@
-// The Files lists' calls (MSG-FILES-IO-f; plan docs/process/proposals/MSG-FILES-IO.md §4). Built
+// The Files lists' calls (MSG-FILES-IO-f; plan project/process/proposals/MSG-FILES-IO.md §4). Built
 // against the node API of card d with a mocked server in tests; this is the one small module that
 // knows the routes, so a change to the contract touches only this file.
 //

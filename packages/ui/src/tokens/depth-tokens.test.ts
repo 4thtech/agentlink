@@ -4,13 +4,16 @@ import { describe, expect, it } from 'vitest';
 import css from './tokens.css?raw';
 import { depthTokens } from './index.js';
 
-const d1 = import.meta.glob('../../../../docs/design/d1/tokens/{tokens.css,tokens.source.json}', {
-  query: '?raw',
-  import: 'default',
-  eager: true,
-});
-const d1Css = d1['../../../../docs/design/d1/tokens/tokens.css'] as string;
-const sourceRaw = d1['../../../../docs/design/d1/tokens/tokens.source.json'] as string;
+const d1 = import.meta.glob(
+  '../../../../project/design/d1/tokens/{tokens.css,tokens.source.json}',
+  {
+    query: '?raw',
+    import: 'default',
+    eager: true,
+  },
+);
+const d1Css = d1['../../../../project/design/d1/tokens/tokens.css'] as string;
+const sourceRaw = d1['../../../../project/design/d1/tokens/tokens.source.json'] as string;
 
 const compact = (text: string): string => text.replace(/\s+/g, '').replaceAll("'", '"');
 const decl = (name: string, value: string): string => compact(`--${name}:${value};`);
@@ -91,7 +94,7 @@ const CASES: { name: string; opener: string; row: Row }[] = [
 describe('elevation highlight and chrome material tokens', () => {
   for (const [label, text] of [
     ['packages/ui copy', css],
-    ['docs/design/d1 copy', d1Css],
+    ['project/design/d1 copy', d1Css],
   ] as const) {
     const css0 = compact(text);
     for (const c of CASES) {
@@ -161,7 +164,7 @@ describe('motion tokens (B-11 §14) are pinned', () => {
   };
   for (const [label, text] of [
     ['packages/ui copy', css],
-    ['docs/design/d1 copy', d1Css],
+    ['project/design/d1 copy', d1Css],
   ] as const) {
     it(`${label}: every duration and easing has the brief's value`, () => {
       const css0 = compact(text);

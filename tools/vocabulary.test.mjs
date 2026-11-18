@@ -1,8 +1,8 @@
-// M1-36e (11 §5.1, finding F14): the user guide (docs-site/guide, the default pages a user reads)
+// M1-36e (11 §5.1, finding F14): the user guide (docs/guide, the default pages a user reads)
 // and the approval server's fixed pages (packages/node/src/approval-pages.ts: the expired link and
 // the page without the app; M1-11b-2c removed the server-rendered approval page) stay inside the
 // default vocabulary. They are linted here because packages/node cannot import the list; the
-// approvals' own words live in the app (apps/local-ui strings.test.ts lints them). The technical docs (docs-site/technical) are the "Advanced"
+// approvals' own words live in the app (apps/local-ui strings.test.ts lints them). The technical docs (docs/technical) are the "Advanced"
 // side and are not linted. The banned terms are the CLI's list (apps/cli/src/vocabulary.ts), so the
 // terminal and the guide use one source.
 //
@@ -19,10 +19,10 @@ import { EXPIRED_HTML, NO_APP_HTML, PAGE_STRINGS } from '../packages/node/src/ap
 import { APPROVAL_STRINGS } from '../apps/local-ui/src/pages/approvals/strings.ts';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const GUIDE = join(root, 'docs-site/guide');
+const GUIDE = join(root, 'docs/guide');
 
 /**
- * Reviewed exceptions: a guide page (relative to docs-site/guide) → the terms it may use, and why.
+ * Reviewed exceptions: a guide page (relative to docs/guide) → the terms it may use, and why.
  * Keep each entry to the page and the term that need it.
  */
 const ALLOWED = [
@@ -109,7 +109,7 @@ const ALLOWED = [
   },
 ];
 
-/** Every Markdown page of the guide, relative to docs-site/guide. */
+/** Every Markdown page of the guide, relative to docs/guide. */
 function pages(dir = GUIDE) {
   return readdirSync(dir).flatMap((entry) => {
     const path = join(dir, entry);

@@ -4,7 +4,7 @@
 # SHAs it contains) lives in exactly one place. The repository must already be
 # checked out (actions/checkout) before this action runs.
 #
-# Supply-chain rules enforced here (docs/foundation/04 §7, AGENTS.md):
+# Supply-chain rules enforced here (specs/04 §7, AGENTS.md):
 #   - pnpm version comes from the "packageManager" field in package.json (no unpinned installs)
 #   - `pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile`: lockfile is law, no
 #     lifecycle scripts, and no pnpm hooks. `--ignore-scripts` does NOT stop pnpm from executing

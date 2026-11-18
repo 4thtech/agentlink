@@ -8,7 +8,7 @@ hashlib and refuses to write anything unless hashlib agrees with the published v
 file is only produced when two independent sources agree.
 
 Vectors are generated once and committed. Tests never regenerate them; CI fails if a test run
-changes anything under test-vectors/ (docs/process/development-process.md §10, test-vectors/README.md).
+changes anything under test-vectors/ (project/process/development-process.md §10, test-vectors/README.md).
 
 Usage (from the repository root):
   python3 tools/vectors/generate_sha256.py --check [FILE]  # compare FILE (default: the committed

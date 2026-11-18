@@ -7,7 +7,7 @@
 // The folder is deliberately lean: exactly the files in KNOWLEDGE_FILES, one topic per file (an index,
 // the overview, the user guide, the desktop app, the FAQ, security and privacy, the technical
 // overview). Lumina reads every file whole, so each must stand alone. Another file fails the check;
-// engineering depth lives in docs-site/technical.
+// engineering depth lives in docs/technical.
 //
 // Budgets (KNOWLEDGE-1, 2026-11-13): the folder grew from 2 to 7 files, so the total target moves from
 // 15,000 to 19,000 tokens (about 76 KB with llms.txt); the hard max stays 30,000. Each file also has a

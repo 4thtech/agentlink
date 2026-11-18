@@ -40,4 +40,4 @@ SHA256SUMS-desktop-app.txt. If you have the GitHub command line tool, you
 can also run: gh attestation verify <the .dmg file> --repo 4thtech/agentlink
 
 Download AgentLink only from https://github.com/4thtech/agentlink/releases
-More help: https://github.com/4thtech/agentlink/blob/main/docs-site/guide/apps/desktop-app.md
+More help: https://github.com/4thtech/agentlink/blob/main/docs/guide/apps/desktop-app.md
