@@ -32,8 +32,10 @@ import {
   giftWrapId,
   makeAgent,
   ownerEnc,
+  agentSigner,
   ownerSigner,
   pairWith,
+  rotate,
   textPayload,
   type TestAgent,
 } from './testing/envelopes.js';
@@ -99,6 +101,18 @@ async function deliver(agent: TestAgent, envelope: unknown): Promise<void> {
   const received = await agent.client.envelopes.receive({ envelope, giftWrapId: giftWrapId() });
   expect(received.status).toBe('verified');
   await agent.client.envelopes.processReceived();
+}
+
+/** A contact's text message to `self`, built with the contact's view of `self`'s current card. */
+async function fromContact(self: TestAgent, contact: TestAgent): Promise<void> {
+  const built = await contact.client.envelopes.build({
+    to: { contact: self.id },
+    payload: textPayload(),
+  });
+  await self.client.envelopes.receive({ envelope: built.envelope, giftWrapId: giftWrapId() });
+  expect(await self.client.envelopes.processReceived()).toEqual([
+    expect.objectContaining({ outcome: 'ok', contactId: contact.id }),
+  ]);
 }
 
 describe('DEVICES-INTERIM: this ID in use on another computer', () => {
@@ -242,21 +256,91 @@ describe('DEVICES-INTERIM: this ID in use on another computer', () => {
     expect((await a.client.devices.state()).otherInUse).toBe(false);
   });
 
-  it('the notice ends a week after the last copy from the other computer', async () => {
+  it('the notice ends a week after the last copy once a contact still writes to this computer’s current keys', async () => {
     const clock = new FakeClock();
     const a = await agentWith(clock, { installId: installSource(INSTALL_A) });
+    const b = await makeAgent(clock, new MemoryKeyStore(seed(63)), ownerB, 'bob');
+    await pairWith(clock, a, b);
+    await pairWith(clock, b, a);
     await a.client.devices.state();
     clock.t += 3_600;
-    const copy = await otherComputersCopy(a);
-    await deliver(a, copy.envelope);
+    await deliver(a, (await otherComputersCopy(a)).envelope);
     const seenAt = clock.t;
+    // A contact's message from inside the week shows nothing about later: the notice holds.
+    clock.t = seenAt + OTHER_INSTALL_NOTICE_SECONDS - 60;
+    await fromContact(a, b);
     clock.t = seenAt + OTHER_INSTALL_NOTICE_SECONDS - 1;
     expect((await a.client.devices.state()).otherInUse).toBe(true);
     clock.t = seenAt + OTHER_INSTALL_NOTICE_SECONDS;
+    expect((await a.client.devices.state()).otherInUse).toBe(true);
+    // A contact still writes to this computer's current keys after the week: the ID's card did not
+    // move on elsewhere, so the quiet week means the other computer stopped. The notice ends.
+    clock.t += 60;
+    await fromContact(a, b);
     expect(await a.client.devices.state()).toEqual({
       otherInUse: false,
       otherSeenAt: seenAt,
     });
+  });
+
+  it('after a week with nothing that shows this computer’s keys are current, the notice holds (fail closed)', async () => {
+    const clock = new FakeClock();
+    const a = await agentWith(clock, { installId: installSource(INSTALL_A) });
+    await a.client.devices.state();
+    clock.t += 3_600;
+    await deliver(a, (await otherComputersCopy(a)).envelope);
+    const seenAt = clock.t;
+    clock.t = seenAt + 30 * 86_400;
+    expect(await a.client.devices.state()).toEqual({ otherInUse: true, otherSeenAt: seenAt });
+  });
+
+  it('the other computer moved this ID to a newer key epoch: its copies never open here, and the notice holds', async () => {
+    const clock = new FakeClock();
+    const a = await agentWith(clock, { installId: installSource(INSTALL_A) });
+    await a.client.devices.state();
+    // The same ID on another computer (same keys, its own store).
+    const other = await agentWith(clock, { installId: installSource(INSTALL_B) });
+    expect(other.id).toBe(a.id);
+    clock.t += 3_600;
+    await deliver(a, (await otherComputersCopy(other)).envelope);
+    const seenAt = clock.t;
+    expect((await a.client.devices.state()).otherInUse).toBe(true);
+    // The other computer rotates (as the owner's contact-details update does) and keeps sending.
+    await rotate(other);
+    clock.t += 86_400;
+    const newer = await otherComputersCopy(other);
+    await a.client.envelopes.receive({ envelope: newer.envelope, giftWrapId: giftWrapId() });
+    const reports = await a.client.envelopes.processReceived();
+    // Never accepted here as a message or as a sent copy: what is accepted does not widen.
+    expect(reports.map((r) => r.outcome)).not.toContain('sent_copy');
+    expect(
+      await a.store.transaction((tx) => tx.get('envelopes', { envelope_id: newer.id })),
+    ).toBeUndefined();
+    clock.t = seenAt + 8 * 86_400;
+    expect(await a.client.devices.state()).toEqual({ otherInUse: true, otherSeenAt: seenAt });
+  });
+
+  it('a contact writing to a newer key of this ID never ends the notice here', async () => {
+    const clock = new FakeClock();
+    const a = await agentWith(clock, { installId: installSource(INSTALL_A) });
+    const b = await makeAgent(clock, new MemoryKeyStore(seed(63)), ownerB, 'bob');
+    await pairWith(clock, a, b);
+    await a.client.devices.state();
+    clock.t += 3_600;
+    await deliver(a, (await otherComputersCopy(a)).envelope);
+    const seenAt = clock.t;
+    clock.t = seenAt + OTHER_INSTALL_NOTICE_SECONDS + 60;
+    // Addressed to another enc key of this ID's (the other computer's newer card): not for this
+    // agent, so it is never stored and shows nothing.
+    const elsewhere = await craft({
+      signer: await agentSigner(b.keyStore),
+      entries: [{ pk: await agentEnc(b) }, { pk: await ownerEnc(a.owner) }],
+      payload: textPayload(),
+      createdAt: clock.t,
+    });
+    await a.client.envelopes.receive({ envelope: elsewhere, giftWrapId: giftWrapId() });
+    await a.client.envelopes.processReceived();
+    expect((await a.client.devices.state()).otherInUse).toBe(true);
   });
 
   it('a store that came from another install (a restored snapshot) starts afresh here', async () => {
