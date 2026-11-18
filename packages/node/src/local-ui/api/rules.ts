@@ -76,6 +76,8 @@ const EDITABLE: Readonly<Record<string, ReadonlySet<string>>> = Object.freeze({
     'fileMBPerDay',
   ]),
   contacts: new Set(['acceptInvites', 'unknownSenders']),
+  // SEC-RECEIPTS-DEFAULT (D-156 (1)): "Send received receipts". Delivery receipts keep their own flow.
+  receipts: new Set(['sendReceived']),
   files: new Set(['maxSendSizeMB', 'maxReceiveSizeMB']),
   commitments: new Set(['accept', 'autoAcceptDirection', 'autoAcceptMaxUSD', 'autoAcceptMinUSD']),
 });

@@ -490,6 +490,36 @@ describe('GET /api/ui/rules/review: prepare an edit (core preparePolicyEdit)', (
   });
 });
 
+// --- SEC-RECEIPTS-DEFAULT: "Send received receipts" saves (0.5.10 fix) ---------------------------
+
+describe('the received-receipts switch saves (SEC-RECEIPTS-DEFAULT, D-156 (1))', () => {
+  it('turning it off is reviewed, signed with presence, applied and read back off', async () => {
+    const { context, owner } = await setup();
+    expect(await getRules(context)).toMatchObject({
+      body: { rules: { receipts: { sendReceived: true } } },
+    });
+    const r = await reviewOk(context, { base: 0, patch: { receipts: { sendReceived: false } } });
+    const { op, calls } = ownerOp(owner);
+    expect(await save(context, op, { review: r.review, acknowledged: codes(r) })).toEqual({
+      status: 200,
+      body: { status: 'saved', version: 1 },
+    });
+    expect(calls).toHaveLength(1);
+    expect(await getRules(context)).toMatchObject({
+      body: { version: 1, rules: { receipts: { sendReceived: false } } },
+    });
+    expect(ownerRoute().presence).toBe(true);
+  });
+
+  it('the page edits only this receipts field: delivery receipts stay with their own flow', async () => {
+    const { context } = await setup();
+    expect(await review(context, { base: 0, patch: { receipts: { autoOpened: true } } })).toEqual({
+      status: 400,
+      body: { error: 'invalid_edit' },
+    });
+  });
+});
+
 // --- SEC-HARD-CEILING, SEC-OUTBOUND-CAPS (D-156): only the owner, on this page, with presence -----
 
 describe('hard proof ceilings and outgoing caps on the Rules page (D-156; I-4)', () => {
