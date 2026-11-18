@@ -1,5 +1,17 @@
 # @4thtech-io/transport-nostr
 
+## 0.5.13
+
+### Patch Changes
+
+- a083919: A contact-details update that only the old servers accepted is no longer treated as delivered: it keeps retrying until one of the contact's current servers accepts it. Other messages are unchanged.
+- a083919: Each sent message now keeps how many relays accepted it and how many served it back (store version 20, counts only, no relay addresses). The conversation shows it as "Message network: accepted by 3, available from 2" (a line under the hood only), or "Sent, availability unknown" when nothing could be checked.
+- a083919: RELAY-DEFAULTS-SWAP (D-75): the default relays are now offchain.pub, relay.primal.net, relay.snort.social and nostr.bitcoiner.social (nos.lol and nostr.mom are replaced). New agents and new invites list only the new set. For a transition period AgentLink still reads from nos.lol and nostr.mom (`LEGACY_READ_RELAYS`, catch-up and live subscription) so waiting messages and acks arrive; it never publishes to them on its own, and a contact that still lists them in its invite or card is reached on that list.
+- Updated dependencies [a083919]
+  - @4thtech-io/types@0.5.13
+  - @4thtech-io/crypto@0.5.13
+  - @4thtech-io/log@0.5.13
+
 ## 0.5.12
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # @4thtech-io/agentlink
 
+## 0.5.13
+
+### Patch Changes
+
+- a083919: Each sent message now keeps how many relays accepted it and how many served it back (store version 20, counts only, no relay addresses). The conversation shows it as "Message network: accepted by 3, available from 2" (a line under the hood only), or "Sent, availability unknown" when nothing could be checked.
+- a083919: DEVICES-INTERIM-2: the notice that an ID is also in use on another computer now says when that computer was last seen, in the app's notifications and in `agentlink doctor`, and it no longer ends on its own while AgentLink cannot tell whether the other computer stopped.
+- a083919: DEVICES-INTERIM: AgentLink notices when the same ID is also in use on another computer and says so in the app's notifications and in `agentlink doctor`: spending limits apply per computer until one ID can be used on several computers. The signal is the ID's own sent copy of a message this computer never wrote, so nothing new is sent to relays or contacts. Each computer gets a random install id, kept with the ID's keys on that computer only (never in a recovery kit, never sent anywhere), and every budget entry records it. Store schema version 20 adds the install id on budget entries and the one-row install state.
+- a083919: RELAY-CARD-MIGRATION: an ID whose card still lists a server the default set dropped can move to the current set with one owner approval ("Update your contact details" on Home, or `agentlink owner update-contact-details`). It issues the next card with the updated list; contacts get it through the usual card update, which during the transition is also sent to the old servers. No AI tool can start or approve it. If the owner never does it, nothing breaks: the old servers are still read. `agentlink doctor` mentions it when it applies.
+- a083919: RELAY-DEFAULTS-SWAP (D-75): the default relays are now offchain.pub, relay.primal.net, relay.snort.social and nostr.bitcoiner.social (nos.lol and nostr.mom are replaced). New agents and new invites list only the new set. For a transition period AgentLink still reads from nos.lol and nostr.mom (`LEGACY_READ_RELAYS`, catch-up and live subscription) so waiting messages and acks arrive; it never publishes to them on its own, and a contact that still lists them in its invite or card is reached on that list.
+- a083919: RESTORE-TRACES (D-156): a restore now leaves a visible trace. The app's activity history lists an entry when an ID was restored from a backup, or when an update started the 24-hour guard, saying that paid actions ask the owner for 24 hours (with the end time while that lasts); the entry itself is not a charge, carries no amount and never counts toward the budget. Messages from the other side that were sent before a restore from a backup and arrive after it carry a quiet "From before the restore" label in the conversation (an update never labels messages). The sync reads the restore time once per batch. Store schema version 20 adds two tables, `budget_restores` and `restore_replays` (new and empty; existing rows unchanged). Only the core writes them; no MCP tool reads, writes or deletes them.
+
 ## 0.5.12
 
 ### Patch Changes

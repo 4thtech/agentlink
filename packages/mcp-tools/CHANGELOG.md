@@ -1,5 +1,22 @@
 # @4thtech-io/mcp-tools
 
+## 0.5.13
+
+### Patch Changes
+
+- Updated dependencies [a083919]
+- Updated dependencies [a083919]
+- Updated dependencies [a083919]
+- Updated dependencies [a083919]
+- Updated dependencies [a083919]
+- Updated dependencies [a083919]
+- Updated dependencies [a083919]
+  - @4thtech-io/core@0.5.13
+  - @4thtech-io/types@0.5.13
+  - @4thtech-io/chain@0.5.13
+  - @4thtech-io/crypto@0.5.13
+  - @4thtech-io/log@0.5.13
+
 ## 0.5.12
 
 ### Patch Changes
