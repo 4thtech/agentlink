@@ -83,13 +83,14 @@ export async function readRestoreState(ctx: CoreContext): Promise<RestoreState> 
 }
 
 /**
- * True for an owner approval or commitment scope requested before the restore: it authorises
- * nothing after it, so the owner is asked again. Unknown voids every one (fail closed).
+ * True for an owner approval or commitment scope requested before the restore (with the clock-skew
+ * allowance): it authorises nothing after it, so the owner is asked again. Unknown voids every one
+ * (fail closed).
  */
 export function requestedBeforeRestore(state: RestoreState, requestedAt: number): boolean {
   if (state.status === 'none') return false;
   if (state.status === 'unknown') return true;
-  return requestedAt < state.restoredAt;
+  return !(requestedAt >= state.restoredAt + RESTORE_CLOCK_SKEW_SECONDS);
 }
 
 /** The proof context of the guard at `now`: the window flag and, for the copy, an update. */
