@@ -15,6 +15,7 @@
 //
 // Fixed answers only, never an error's text or an input value (I-5, I-7).
 import type { EffectivePolicy, PreparedPolicyEdit } from '@4thtech-io/core';
+import { aiInviteLimitsOf } from '@4thtech-io/types';
 import {
   canonicalize,
   decodeBase64url,
@@ -58,7 +59,8 @@ const NOT_SIGNED = answer(409, 'refused');
 /** The fields this page edits, per policy section (06 §3). Anything else is invalid_edit. */
 const EDITABLE: Readonly<Record<string, ReadonlySet<string>>> = Object.freeze({
   proofs: new Set(['notarize', 'dailyBudgetUSD', 'perActionMaxUSD', 'allowKeyDisclosure']),
-  contacts: new Set(['acceptInvites', 'unknownSenders']),
+  // SEC-INVITE-CAPS (D-156): the caps on invites the AI makes (a whole `aiInvites` object).
+  contacts: new Set(['acceptInvites', 'unknownSenders', 'aiInvites']),
   files: new Set(['maxSendSizeMB', 'maxReceiveSizeMB']),
   commitments: new Set(['accept', 'autoAcceptDirection', 'autoAcceptMaxUSD', 'autoAcceptMinUSD']),
 });
@@ -167,6 +169,8 @@ function view(policy: Doc): JsonObject {
       unknownSenders: p.contacts.unknownSenders as string,
       allowed: allowed === 'paired' ? 'paired' : 'listed',
       listed: count(allowed),
+      // SEC-INVITE-CAPS (D-156): absent in the signed policy reads as the defaults (3, 5, 24 h).
+      aiInvites: { ...aiInviteLimitsOf(policy) },
     },
     files: {
       maxSendSizeMB: p.files.maxSendSizeMB as number,

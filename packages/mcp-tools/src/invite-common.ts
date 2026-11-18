@@ -48,16 +48,21 @@ export const INVITE_TEXT = Object.freeze({
   accepted: "Invite accepted. You'll be connected when they answer.",
   acceptedOffline:
     "Invite accepted, but the message network can't be reached right now. AgentLink keeps the answer ready and sends it when the network is back.",
-  // SEC-INVITE-CAPS (D-156; 06 §2.1): the owner's caps on invites the AI makes.
-  limitOpen:
-    'You have {count} open invites. Ask your owner to create more in the app, or wait for one to be used or expire.',
-  limitDaily:
-    'You made {count} invites in the last 24 hours. Ask your owner to create more in the app, or try again after {time} UTC.',
-  limitOff: "Your owner hasn't allowed you to create invites. Ask them to create one in the app.",
-  limitNextStep:
-    'Tell the user. They can create an invite under People in the AgentLink app, or change the limits under Rules.',
   acceptedNextStep:
     'Tell the user they will be connected when the other person answers; nothing else is needed now. The owner can do the Contact check with the contact under People in the AgentLink app; until then the name is self-declared.',
+});
+
+/**
+ * SEC-INVITE-CAPS (D-156; 06 §2.1): the owner's caps on invites the AI makes. `{count}` and `{time}`
+ * are numbers from the core (never input, I-5).
+ */
+export const INVITE_LIMIT_TEXT = Object.freeze({
+  open: 'You have {count} open invites. Ask your owner to create more in the app, or wait for one to be used or expire.',
+  daily:
+    'You made {count} invites in the last 24 hours. Ask your owner to create more in the app, or try again after {time} UTC.',
+  off: "Your owner hasn't allowed you to create invites. Ask them to create one in the app.",
+  nextStep:
+    'Tell the user. They can create an invite under People in the AgentLink app, or change the limits under Rules.',
 });
 
 /**
@@ -89,14 +94,14 @@ const utcMinute = (unixSeconds: number): string =>
 export function inviteLimit(error: InviteLimitError): HandlerOutput {
   const count = String(error.max);
   let summary: string;
-  if (error.max === 0) summary = INVITE_TEXT.limitOff;
-  else if (error.limit === 'open') summary = INVITE_TEXT.limitOpen.replace('{count}', count);
+  if (error.max === 0) summary = INVITE_LIMIT_TEXT.off;
+  else if (error.limit === 'open') summary = INVITE_LIMIT_TEXT.open.replace('{count}', count);
   else {
-    summary = INVITE_TEXT.limitDaily
+    summary = INVITE_LIMIT_TEXT.daily
       .replace('{count}', count)
       .replace('{time}', error.resetAt === undefined ? 'a while' : utcMinute(error.resetAt));
   }
-  return fail('rejected', summary, INVITE_TEXT.limitNextStep, 'INVITE_LIMIT');
+  return fail('rejected', summary, INVITE_LIMIT_TEXT.nextStep, 'INVITE_LIMIT');
 }
 
 /** The core's `apr_` ID: the schema and the exact character pattern (04 §2.4.1). */

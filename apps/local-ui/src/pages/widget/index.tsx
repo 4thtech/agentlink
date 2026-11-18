@@ -59,6 +59,7 @@ import {
   moreMessages,
   newCount,
   newFiles,
+  newViaAi,
   rowLabel,
   shortAgo,
   todayLabel,
@@ -439,7 +440,12 @@ export function WidgetPage({
     .map((i) => i.ref as string)
     .filter((r) => /^0x[0-9a-f]{40}$/.test(r));
   const filesTarget = new Set(fileRefs).size === 1 ? fileRefs[0] : undefined;
-  const needs = approvals + files > 0;
+  // SEC-INVITE-CAPS (D-156): contacts the AI connected, waiting for Keep or Remove (Home shows
+  // them and links to People, where the gesture is).
+  const viaAi = model.contacts.filter(
+    (c) => c.waitingForOwner === true && c.status === 'active',
+  ).length;
+  const needs = approvals + files + viaAi > 0;
   const paused = link === 'paused';
   const offline = link === 'offline';
 
@@ -526,6 +532,26 @@ export function WidgetPage({
                       <Icon name="approval" size={16} />
                     </span>
                     <span className="wg-main al-text-body-sm">{waitingForYou(approvals)}</span>
+                    <span className="wg-chev">
+                      <Icon name="chevron-right" size={14} />
+                    </span>
+                  </button>
+                </li>
+              ) : null}
+              {viaAi > 0 ? (
+                <li>
+                  <button
+                    type="button"
+                    className="wg-row"
+                    data-wg-nav
+                    data-wg-via-ai
+                    onClick={go('home')}
+                    disabled={offline}
+                  >
+                    <span className="wg-ico">
+                      <Icon name="user-plus" size={16} />
+                    </span>
+                    <span className="wg-main al-text-body-sm">{newViaAi(viaAi)}</span>
                     <span className="wg-chev">
                       <Icon name="chevron-right" size={14} />
                     </span>

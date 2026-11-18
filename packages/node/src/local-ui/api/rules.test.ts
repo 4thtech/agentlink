@@ -298,6 +298,8 @@ describe('GET /api/ui/rules', () => {
           unknownSenders: 'queue',
           allowed: 'paired',
           listed: 0,
+          // SEC-INVITE-CAPS: absent in the policy reads as the defaults.
+          aiInvites: { maxOpen: 3, perDay: 5, expiryHours: 24 },
         },
         files: { maxSendSizeMB: 100, maxReceiveSizeMB: 200, allowedFolders: 0 },
         receipts: { autoDelivered: false, sendReceived: true },

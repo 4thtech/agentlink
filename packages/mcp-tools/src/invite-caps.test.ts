@@ -10,7 +10,7 @@ import { createLogger } from '@4thtech-io/log';
 import { describe, expect, it } from 'vitest';
 import type { ToolContext } from './context.js';
 import { createInviteHandler } from './create-invite.js';
-import { INVITE_TEXT } from './invite-common.js';
+import { INVITE_LIMIT_TEXT } from './invite-common.js';
 import { listContactsHandler } from './list-contacts.js';
 import { ADVANCED_TOOLS, TOOLS } from './registry.js';
 import { SEND_TEXT, sendHandler } from './send.js';
@@ -51,7 +51,7 @@ describe('agentlink_create_invite over a cap', () => {
     expect(out.result.summary).toBe(
       'You have 3 open invites. Ask your owner to create more in the app, or wait for one to be used or expire.',
     );
-    expect(out.result.nextStep).toBe(INVITE_TEXT.limitNextStep);
+    expect(out.result.nextStep).toBe(INVITE_LIMIT_TEXT.nextStep);
   });
 
   it('daily cap: rejected, INVITE_LIMIT, says how many and that it frees up', async () => {

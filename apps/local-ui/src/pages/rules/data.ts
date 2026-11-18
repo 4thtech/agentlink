@@ -17,6 +17,8 @@ export interface RulesView {
     readonly unknownSenders: 'queue' | 'drop';
     readonly allowed: 'paired' | 'listed';
     readonly listed: number;
+    /** SEC-INVITE-CAPS (D-156): the caps on invites the AI makes; an older server: the defaults. */
+    readonly aiInvites: AiInvites;
   };
   readonly files: {
     readonly maxSendSizeMB: number;
@@ -31,6 +33,44 @@ export interface RulesView {
     readonly autoAcceptMinUSD: string | null;
     readonly autoAcceptContacts: number;
   };
+}
+
+/** SEC-INVITE-CAPS: `contacts.aiInvites` (06 §3), as the page shows and edits it. */
+export interface AiInvites {
+  readonly maxOpen: number;
+  readonly perDay: number;
+  readonly expiryHours: number;
+}
+
+/** The core defaults (packages/types AI_INVITE_DEFAULTS), for an older server that leaves it out. */
+export const AI_INVITES_DEFAULT: AiInvites = Object.freeze({
+  maxOpen: 3,
+  perDay: 5,
+  expiryHours: 24,
+});
+
+/** The bounds of each cap (packages/types POLICY_BOUNDS.aiInvites). */
+export const AI_INVITES_BOUNDS = Object.freeze({
+  maxOpen: { min: 0, max: 20 },
+  perDay: { min: 0, max: 50 },
+  expiryHours: { min: 1, max: 168 },
+} as const);
+
+const inRange = (v: unknown, b: { readonly min: number; readonly max: number }): v is number =>
+  typeof v === 'number' && Number.isSafeInteger(v) && v >= b.min && v <= b.max;
+
+function parseAiInvites(v: unknown): AiInvites | undefined {
+  if (v === undefined) return AI_INVITES_DEFAULT;
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return undefined;
+  const { maxOpen, perDay, expiryHours } = v as Record<string, unknown>;
+  if (
+    !inRange(maxOpen, AI_INVITES_BOUNDS.maxOpen) ||
+    !inRange(perDay, AI_INVITES_BOUNDS.perDay) ||
+    !inRange(expiryHours, AI_INVITES_BOUNDS.expiryHours)
+  ) {
+    return undefined;
+  }
+  return { maxOpen, perDay, expiryHours };
 }
 
 export type RulesAnswer =
@@ -97,6 +137,8 @@ function parseView(v: unknown): RulesView | undefined {
   ) {
     return undefined;
   }
+  const aiInvites = parseAiInvites(c.aiInvites);
+  if (aiInvites === undefined) return undefined;
   return {
     proofs: {
       notarize: p.notarize,
@@ -109,6 +151,7 @@ function parseView(v: unknown): RulesView | undefined {
       unknownSenders: c.unknownSenders,
       allowed: c.allowed,
       listed: c.listed,
+      aiInvites,
     },
     files: { maxSendSizeMB: f.maxSendSizeMB, maxReceiveSizeMB: f.maxReceiveSizeMB },
     receipts: { autoDelivered: r.autoDelivered, sendReceived: r.sendReceived !== false },
@@ -165,6 +208,10 @@ export interface Draft {
   readonly sellOn: boolean;
   readonly sellMinUSD: string;
   readonly sendReceived: boolean;
+  /** SEC-INVITE-CAPS: the three caps on AI-made invites, as typed. */
+  readonly aiMaxOpen: string;
+  readonly aiPerDay: string;
+  readonly aiExpiryHours: string;
 }
 
 /** Buy auto-accept as core reads it: live, with listed contacts and a maximum above 0. */
@@ -196,7 +243,20 @@ export function draftOf(v: RulesView): Draft {
     sellOn: sellOn(v),
     sellMinUSD: v.commitments.autoAcceptMinUSD ?? '',
     sendReceived: v.receipts.sendReceived,
+    aiMaxOpen: String(v.contacts.aiInvites.maxOpen),
+    aiPerDay: String(v.contacts.aiInvites.perDay),
+    aiExpiryHours: String(v.contacts.aiInvites.expiryHours),
   };
+}
+
+/** SEC-INVITE-CAPS: a whole number typed for one cap, within its bounds, or undefined. */
+export function toCap(
+  text: string,
+  bounds: { readonly min: number; readonly max: number },
+): number | undefined {
+  if (!/^\s*[0-9]{1,3}\s*$/.test(text)) return undefined;
+  const n = Number(text.trim());
+  return n >= bounds.min && n <= bounds.max ? n : undefined;
 }
 
 /** The owner's dollar entry ("5", "0.50", "$10.5") as core's amount, or undefined. */
@@ -278,6 +338,26 @@ export function checkDraft(view: RulesView, draft: Draft): DraftCheck {
     const value = toSize(draft[key]);
     if (value === undefined) invalid.add(key);
     else pick(value !== view.files[key], 'files', key, value);
+  }
+  // SEC-INVITE-CAPS: the caps travel as one whole object (06 §3 `contacts.aiInvites`).
+  const caps = {
+    maxOpen: toCap(draft.aiMaxOpen, AI_INVITES_BOUNDS.maxOpen),
+    perDay: toCap(draft.aiPerDay, AI_INVITES_BOUNDS.perDay),
+    expiryHours: toCap(draft.aiExpiryHours, AI_INVITES_BOUNDS.expiryHours),
+  };
+  if (caps.maxOpen === undefined) invalid.add('aiMaxOpen');
+  if (caps.perDay === undefined) invalid.add('aiPerDay');
+  if (caps.expiryHours === undefined) invalid.add('aiExpiryHours');
+  if (caps.maxOpen !== undefined && caps.perDay !== undefined && caps.expiryHours !== undefined) {
+    const was = view.contacts.aiInvites;
+    pick(
+      caps.maxOpen !== was.maxOpen ||
+        caps.perDay !== was.perDay ||
+        caps.expiryHours !== was.expiryHours,
+      'contacts',
+      'aiInvites',
+      { maxOpen: caps.maxOpen, perDay: caps.perDay, expiryHours: caps.expiryHours },
+    );
   }
   pick(draft.accept !== view.commitments.accept, 'commitments', 'accept', draft.accept);
   pick(

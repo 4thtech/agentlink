@@ -399,9 +399,9 @@ describe('agentlink_create_invite', () => {
     expect(r['shareText']).toContain(r['inviteUrl']);
     expect(r['shareText']).toContain('works once, until');
     expect(r['ownerFingerprint']).toMatch(/^[0-9A-F]{4}\u00b7[0-9A-F]{4}$/);
-    expect(r['expiresAt']).toBe(
-      new Date((NOW + 3 * 86_400) * 1000).toISOString().replace('.000', ''),
-    );
+    // SEC-INVITE-CAPS (D-156): an AI-made invite lives at most the owner's 24 hours by default; a
+    // longer `expiresInDays` does not extend it.
+    expect(r['expiresAt']).toBe(new Date((NOW + 86_400) * 1000).toISOString().replace('.000', ''));
     // The ready-to-send text is in the text block too; nothing was published.
     expect(made.text).toContain(String(r['inviteUrl']));
     expect(w.net.eventCount()).toBe(0);

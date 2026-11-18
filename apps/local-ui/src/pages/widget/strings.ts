@@ -53,6 +53,10 @@ export function waitingForYou(n: number): string {
 export function newFiles(n: number): string {
   return n === 1 ? '1 new file' : `${String(n)} new files`;
 }
+/** SEC-INVITE-CAPS (D-156): contacts the AI connected that wait for Keep or Remove. */
+export function newViaAi(n: number): string {
+  return n === 1 ? 'New contact via your AI' : `${String(n)} new contacts via your AI`;
+}
 export function newCount(n: number): string {
   return `${String(n)} new`;
 }

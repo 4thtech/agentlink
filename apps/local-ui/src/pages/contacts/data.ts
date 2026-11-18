@@ -34,6 +34,11 @@ export interface ContactRow {
   readonly formerName?: string;
   /** Under the owner's own name for them: what they now call themselves; plain text only. */
   readonly newName?: string;
+  /**
+   * SEC-INVITE-CAPS (D-156; 08 §1): your AI connected them through its invite; they wait for you to
+   * Keep or Remove them. Your AI sends them nothing until you keep them.
+   */
+  readonly waitingForOwner?: true;
 }
 
 export type ListAnswer =
@@ -103,6 +108,7 @@ function row(v: unknown): ContactRow | undefined {
       ? { formerName: former }
       : {}),
     ...(typeof own === 'string' && own !== '' && own.length <= MAX_NAME ? { newName: own } : {}),
+    ...(v['waitingForOwner'] === true ? { waitingForOwner: true as const } : {}),
   };
 }
 

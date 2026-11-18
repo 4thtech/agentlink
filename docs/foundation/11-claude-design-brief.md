@@ -489,6 +489,25 @@ The free, private "received" receipt the recipient's app sends back (04 §3.4, 0
 - An automatic device receipt is always named as such, apart from public receipts (§5.6).
 - Never "wallet", "gas", "seed phrase" or "transaction" (§5.1).
 
+### 5.11 Contacts your AI connected (D-156)
+
+A contact paired through an invite the AI made waits for the owner (06 §2.1, 08 §1). Proposed, owner confirms at merge.
+
+| Where | String |
+|---|---|
+| People, the row (chip) | "New via your AI" |
+| People, the person (banner) | "New contact via your AI" · "Your AI connected this person with an invite it made. Their messages arrive, but your AI can't send them anything until you keep them." **Keep with {sensor}** · **Remove** |
+| After Keep | "Kept. Your AI can send to them now." |
+| Home (banner) | "New contact via your AI" · "Your AI connected 1 new contact. Keep or remove them in People." / "Your AI connected {count} new contacts. Keep or remove them in People." **Open People** |
+| Widget, Needs you | "New contact via your AI" / "{count} new contacts via your AI" |
+| Settings › Rules › More rules | "Invites your AI makes" · "At most {open} open, {day} a day, each for {hours} hours." / "Your AI can't create invites." · helper "Limits for invites your AI creates. People who connect through them wait for you to keep them. Invites you create in People are not limited." · fields "Open at once", "Per day", "Expire after (hours)" |
+| In chat, over a cap | "You have {count} open invites. Ask your owner to create more in the app, or wait for one to be used or expire." / "You made {count} invites in the last 24 hours. Ask your owner to create more in the app, or try again after {time} UTC." / "Your owner hasn't allowed you to create invites. Ask them to create one in the app." |
+| In chat, a waiting contact | "This contact is waiting for your owner to keep them in the AgentLink app, so nothing was sent." |
+
+**Rules.**
+- Never the contact's name in Home's banner or the widget line (a count only); on the person it is shown as text only (I-5).
+- Never "wallet", "gas", "seed phrase" or "transaction" (§5.1).
+
 ## 6. Surfaces and information architecture
 
 ### 6.0 Surface map

@@ -111,6 +111,7 @@ function fakeClient(topUp: () => Promise<TopUpView>): LocalUiReadClient {
       prepareRemove: () => Promise.reject(new Error('not used')),
       prepareBlock: () => Promise.reject(new Error('not used')),
       prepareUnblock: () => Promise.reject(new Error('not used')),
+      prepareKeep: () => Promise.reject(new Error('not used')),
     },
   };
 }

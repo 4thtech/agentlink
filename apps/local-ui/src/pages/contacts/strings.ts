@@ -27,6 +27,14 @@ export const CONTACTS_STRINGS = {
   listUnavailable: "Your people can't be loaded right now. Try again in a minute.",
   blocked: 'Blocked',
   blockedDetail: 'Blocked. Messages from this person are dropped.',
+  // SEC-INVITE-CAPS (D-156; 11 §5): a contact your AI connected through its own invite.
+  viaAiChip: 'New via your AI',
+  viaAiTitle: 'New contact via your AI',
+  viaAiDetail:
+    'Your AI connected this person with an invite it made. Their messages arrive, but your AI can’t send them anything until you keep them.',
+  keepWith: (sensor: string): string => `Keep with ${sensor}`,
+  keepWithCode: 'Keep with your master code',
+  keptNow: 'Kept. Your AI can send to them now.',
   revoked: 'No longer active',
   revokedDetail: 'This person turned this ID off. Messages from it are dropped.',
   // UX 2026-11-12 (notices): the full explanation lives here, not on Home.
@@ -246,4 +254,5 @@ export const SUMMARY = {
   remove: (name: string): string => `Remove ${name}.`,
   block: (name: string): string => `Block ${name}.`,
   unblock: (name: string): string => `Unblock ${name}.`,
+  keep: (name: string): string => `Keep ${name}, the contact your AI connected.`,
 } as const;

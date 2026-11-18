@@ -272,7 +272,7 @@ describe('a contact from an AI-made invite waits for the owner', () => {
       a.client.proposeTerms({ to: b.id, terms: { subject: 'Logo' } }),
     ).rejects.toMatchObject({ code: 'contact_waiting_owner' });
     await expect(
-      a.client.respondToTerms({ envelopeId: inbound[0]!.envelope_id, decision: 'decline' }),
+      a.client.respondToTerms({ envelopeId: inbound[0]!.envelope_id, decision: 'reject' }),
     ).rejects.toMatchObject({ code: 'contact_waiting_owner' });
     expect(
       await a.client.acknowledge({ envelopeId: inbound[0]!.envelope_id, type: 'opened' }),

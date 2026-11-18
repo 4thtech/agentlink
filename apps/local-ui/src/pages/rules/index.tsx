@@ -470,6 +470,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
   const moreChanged = [
     differs('unknownSenders'),
     differs('maxSendSizeMB', 'maxReceiveSizeMB'),
+    differs('aiMaxOpen', 'aiPerDay', 'aiExpiryHours'),
     differs('allowKeyDisclosure'),
     differs('buyOn', 'buyMaxUSD', 'sellOn', 'sellMinUSD'),
   ].filter(Boolean).length;
@@ -482,6 +483,10 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
     (draft.unknownSenders === 'queue' && base.unknownSenders === 'drop') ||
     (draft.allowKeyDisclosure === 'approval' && base.allowKeyDisclosure === 'deny') ||
     (draft.buyOn && !base.buyOn) ||
+    // SEC-INVITE-CAPS: more invites, or longer ones, let your AI connect more people.
+    Number(draft.aiMaxOpen) > Number(base.aiMaxOpen) ||
+    Number(draft.aiPerDay) > Number(base.aiPerDay) ||
+    Number(draft.aiExpiryHours) > Number(base.aiExpiryHours) ||
     (draft.sellOn && !base.sellOn);
   const dirty = checked.changes > 0 || checked.invalid.size > 0;
 
@@ -650,7 +655,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
                 <span className="al-text-caption al-muted">{S.moreHelp}</span>
               </span>
               <span className="al-text-body-sm al-muted rl-more-state">
-                {S.moreState(5, moreChanged)}
+                {S.moreState(6, moreChanged)}
               </span>
               <Icon name={moreOpen ? 'chevron-down' : 'chevron-right'} size={16} />
             </button>
@@ -700,6 +705,43 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
                   value={draft.maxReceiveSizeMB}
                   {...sizeError('maxReceiveSizeMB')}
                   onChange={(e) => edit({ maxReceiveSizeMB: e.currentTarget.value })}
+                />
+              </div>
+            </Row>
+            {/* SEC-INVITE-CAPS (D-156): the caps on invites the AI makes (06 §3). */}
+            <Row
+              title={S.aiInvitesTitle}
+              changed={differs('aiMaxOpen', 'aiPerDay', 'aiExpiryHours')}
+              help={`${S.aiInvitesSummary(
+                view.contacts.aiInvites.maxOpen,
+                view.contacts.aiInvites.perDay,
+                view.contacts.aiInvites.expiryHours,
+              )} ${S.aiInvitesHelp}`}
+            >
+              <div className="rl-fields">
+                <TextField
+                  label={S.aiOpenLabel}
+                  mono
+                  inputMode="numeric"
+                  value={draft.aiMaxOpen}
+                  {...(checked.invalid.has('aiMaxOpen') ? { error: S.invalidAiOpen } : {})}
+                  onChange={(e) => edit({ aiMaxOpen: e.currentTarget.value })}
+                />
+                <TextField
+                  label={S.aiDayLabel}
+                  mono
+                  inputMode="numeric"
+                  value={draft.aiPerDay}
+                  {...(checked.invalid.has('aiPerDay') ? { error: S.invalidAiDay } : {})}
+                  onChange={(e) => edit({ aiPerDay: e.currentTarget.value })}
+                />
+                <TextField
+                  label={S.aiHoursLabel}
+                  mono
+                  inputMode="numeric"
+                  value={draft.aiExpiryHours}
+                  {...(checked.invalid.has('aiExpiryHours') ? { error: S.invalidAiHours } : {})}
+                  onChange={(e) => edit({ aiExpiryHours: e.currentTarget.value })}
                 />
               </div>
             </Row>

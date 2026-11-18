@@ -225,6 +225,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       // UX1112 WP-12 (F-2): Block and Unblock a contact (local-ui/api/contacts.test.ts).
       '/api/ui/contacts/:ref/block',
       '/api/ui/contacts/:ref/unblock',
+      // SEC-INVITE-CAPS: Keep a contact the AI connected (local-ui/api/contacts.test.ts).
+      '/api/ui/contacts/:ref/keep',
       // WP-11: the Backup page's read and the recovery-kit export (backup-export-server.test.ts).
       '/api/ui/backup',
       '/api/ui/backup/export',

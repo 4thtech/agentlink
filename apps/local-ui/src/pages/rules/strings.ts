@@ -61,6 +61,20 @@ export const RULES_STRINGS = {
   whoPaired: 'Paired contacts',
   whoListed: (n: number): string =>
     n === 1 ? 'Only the 1 contact you listed' : `Only the ${String(n)} contacts you listed`,
+  // SEC-INVITE-CAPS (D-156; 11 §5): invites your AI makes. Yours in People are not limited.
+  aiInvitesTitle: 'Invites your AI makes',
+  aiInvitesHelp:
+    'Limits for invites your AI creates. People who connect through them wait for you to keep them. Invites you create in People are not limited.',
+  aiInvitesSummary: (open: number, day: number, hours: number): string =>
+    open === 0 || day === 0
+      ? 'Your AI can’t create invites.'
+      : `At most ${open} open, ${day} a day, each for ${hours} ${hours === 1 ? 'hour' : 'hours'}.`,
+  aiOpenLabel: 'Open at once',
+  aiDayLabel: 'Per day',
+  aiHoursLabel: 'Expire after (hours)',
+  invalidAiOpen: 'Enter 0 to 20 (0: your AI can’t create invites).',
+  invalidAiDay: 'Enter 0 to 50 (0: your AI can’t create invites).',
+  invalidAiHours: 'Enter 1 to 168 hours.',
   filesTitle: 'Files',
   filesSummary: (send: number, receive: number): string =>
     `Only from allowed folders · send up to ${String(send)} MB · receive up to ${String(receive)} MB`,
