@@ -96,7 +96,7 @@ jobs:
       run_bundle_check: ${{ steps.affected.outputs.run_bundle_check || 'true' }}
       # CI-E2E-BROWSER: the Playwright suites' own job, and the turbo filters of the two test steps
       # on a filtered run (empty on a full run: the jobs then use their full-run filters).
-      run_e2e_browser: ${{ steps.affected.outputs.run_e2e_browser || 'true' }}
+      run_e2e_browser: ${{ steps.e2e_scope.outputs.release_pr == 'true' && 'true' || steps.affected.outputs.run_e2e_browser || 'true' }}
       checks_test_filters: ${{ steps.affected.outputs.checks_test_filters }}
       e2e_browser_filters: ${{ steps.affected.outputs.e2e_browser_filters }}
       run_windows_smoke: ${{ steps.affected.outputs.run_windows_smoke || 'true' }}
@@ -106,7 +106,10 @@ jobs:
       # OPS-MACOS-QUEUE: the macOS legs start on a pull request only when this is true (macOS-specific
       # paths, MACOS_PATHS in the selector); a push to `main` or `wave-4` always runs them.
       run_macos: ${{ steps.affected.outputs.run_macos || 'true' }}
-      run_e2e_deterministic: ${{ steps.affected.outputs.run_e2e_deterministic || 'true' }}
+      run_e2e_deterministic: ${{ steps.e2e_scope.outputs.release_pr == 'true' && 'true' || steps.affected.outputs.run_e2e_deterministic || 'true' }}
+      # CI-HEAVY-ON-RELEASE: a pull request titled `RELEASE <version>` runs, and ci-gate requires,
+      # e2e-browser and e2e-deterministic whatever its diff.
+      release_pr: ${{ steps.e2e_scope.outputs.release_pr || 'false' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -206,12 +209,20 @@ jobs:
           REF: ${{ github.ref }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           MQ_BASE_SHA: ${{ github.event.merge_group.base_sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           set -euo pipefail
           relevant=true
           use_selector=false
           docs_only=false
-          if [ "$EVENT_NAME" = pull_request ]; then use_selector=true; fi
+          release_pr=false
+          if [ "$EVENT_NAME" = pull_request ]; then
+            use_selector=true
+            # CI-HEAVY-ON-RELEASE: the title is data; the selector script only pattern-matches it.
+            if [ "$(node tools/ci/select-affected.mjs --is-release "$PR_TITLE" 2> /dev/null || true)" = true ]; then
+              release_pr=true
+            fi
+          fi
           base=""
           case "$EVENT_NAME" in
             pull_request) base="$PR_BASE_SHA" ;;
@@ -248,6 +259,13 @@ jobs:
             docs_only=false
             echo "Not docs-only: a symlink or submodule changed, or the diff could not be read"
           fi
+          # CI-HEAVY-ON-RELEASE: a release pull request is never docs-only and always runs the heavy e2e.
+          if [ "$release_pr" = true ]; then
+            relevant=true
+            docs_only=false
+            echo "Release pull request: e2e-deterministic and e2e-browser are required"
+          fi
+          echo "release_pr=$release_pr" >> "$GITHUB_OUTPUT"
           echo "e2e_relevant=$relevant" >> "$GITHUB_OUTPUT"
           echo "use_selector=$use_selector" >> "$GITHUB_OUTPUT"
           echo "docs_only=$docs_only" >> "$GITHUB_OUTPUT"
@@ -1421,6 +1439,7 @@ jobs:
           DOCS_ONLY: ${{ needs.detect.outputs.docs_only }}
           HAS_TEST: ${{ needs.detect.outputs.has_test }}
           RUN_E2E_BROWSER: ${{ needs.detect.outputs.run_e2e_browser }}
+          RELEASE_PR: ${{ needs.detect.outputs.release_pr }}
           NEEDS: ${{ toJSON(needs) }}
           # OPS-FAST-LANE-1: in the heavy lane (a push to `main` or `wave-4`) these must have run and
           # passed (a skip fails), so the release cannot ship with a heavy job silently skipped.
@@ -1459,6 +1478,17 @@ jobs:
           if [ "$checks_result" != skipped ] && [ "$HAS_TEST" = true ] && [ "$RUN_E2E_BROWSER" = true ] && [ "$browser_result" != success ]; then
             echo "::error::The browser suites were selected: e2e-browser must succeed; it ended as '$browser_result'."
             exit 1
+          fi
+          # CI-HEAVY-ON-RELEASE: a release pull request (title `RELEASE <version>`) must have run and
+          # passed both heavy e2e lanes; a skip fails. A draft leaves detect skipped, so it is exempt.
+          if [ "$RELEASE_PR" = true ]; then
+            for job in e2e-browser e2e-deterministic; do
+              result="$(jq -r --arg j "$job" '.[$j].result // "missing"' <<< "$NEEDS")"
+              if [ "$result" != success ]; then
+                echo "::error::Release pull request: '$job' must succeed; it ended as '$result'."
+                exit 1
+              fi
+            done
           fi
           # CHORE-CI-SPEED-1: on a draft pull request every upstream job is skipped, which passes here;
           # the suite runs when the draft is marked ready for review.
