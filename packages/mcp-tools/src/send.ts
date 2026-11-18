@@ -83,9 +83,8 @@ export const SEND_TEXT = Object.freeze({
   sendLimitFiles: 'Sending limit reached ({max} files a day in all), so nothing was sent.',
   sendLimitMB: 'Sending limit reached ({max} MB of files a day), so nothing was sent.',
   sendLimitNextStep:
-    'Try again after {time}. Or tell the user: This is over the limit your owner set. Only the owner can change it in Settings › Rules.',
-  proofCeiling:
-    "The proof wasn't added: it is over the limit the owner set, so nothing was recorded.",
+    'Try again after {time}. Or tell the user: This is over your limit. You can change it in Settings › Rules in the AgentLink app.',
+  proofCeiling: "The proof wasn't added: it is over your limit, so nothing was recorded.",
   policyDenied: "The owner's rules don't allow this message, so nothing was sent.",
   policyDeniedNextStep:
     'Tell the user their AgentLink rules blocked this message. Only they can change the rules.',

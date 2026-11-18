@@ -69,6 +69,8 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         'saved_files',
         // FILES-AI-1 (D-152; 06 §2.3 "Daily budget", schema 16): times and byte counts only.
         'content_file_budget',
+        // SEC-OUTBOUND-CAPS (D-156; 06 §3 `outgoing`, schema 17): counts and times only.
+        'outgoing_log',
         // W4-PAUSE (D-143 (5); 07 §3.2, schema 12): the owner's pause of the agent.
         'agent_pause',
         'idempotency',

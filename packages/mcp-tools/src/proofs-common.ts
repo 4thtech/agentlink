@@ -124,11 +124,11 @@ export const PROOF_TEXT = Object.freeze({
     'Call the tool again without approvalId to ask the owner again, or check it with agentlink_get_approval.',
   // D-156 (SEC-HARD-CEILING): a hard ceiling refuses; no approval can lift it.
   spendCeilingPerAction:
-    'This proof would cost more than the limit the owner set ({limit} per proof), so nothing was recorded.',
+    'This proof would cost more than your limit ({limit} per proof), so nothing was recorded.',
   spendCeilingDaily:
-    'This proof would go over the limit the owner set ({limit} a day), so nothing was recorded.',
+    'This proof would go over your limit ({limit} a day), so nothing was recorded.',
   spendCeilingNextStep:
-    "Tell the user: This is over the limit your owner set. Only the owner can change it in Settings › Rules. Don't ask for an approval: an approval can't go over this limit.",
+    "Tell the user: This is over your limit. You can change it in Settings › Rules in the AgentLink app. Don't ask for an approval: an approval can't go over this limit.",
   policyChanged: "The owner's rules changed while this ran, so nothing was recorded.",
   policyChangedNextStep: 'Call the tool again; it checks the current rules.',
   // M1-36i (owner decision 2026-10-22): free test credits, claimed once on the first proof that

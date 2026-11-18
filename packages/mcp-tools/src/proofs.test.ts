@@ -579,7 +579,7 @@ describe('agentlink_notarize (06 §2.4)', () => {
       expect(r.structured.approvalId).toBeUndefined();
       expect(String(r.structured.summary)).toContain(words);
       expect(String(r.structured.nextStep)).toContain(
-        'This is over the limit your owner set. Only the owner can change it in Settings › Rules.',
+        'This is over your limit. You can change it in Settings › Rules in the AgentLink app.',
       );
       expect(r.structured.summary).not.toMatch(/chain|contract|on-chain|network|wallet|gas/i);
     }

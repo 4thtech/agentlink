@@ -237,6 +237,7 @@ export {
 export {
   OUTGOING_WINDOW_SECONDS,
   outgoingUsage,
+  recordOutgoing,
   type OutgoingUsageDetail,
 } from './outgoing-limits.js';
 export {

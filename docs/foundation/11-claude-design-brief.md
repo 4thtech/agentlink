@@ -504,8 +504,8 @@ What the AI relays (tool results; never an approval):
 
 | Code | Summary · next step |
 |---|---|
-| `SPEND_CEILING` | "This proof would cost more than the limit the owner set ($0.50 per proof), so nothing was recorded." or "…go over the limit the owner set ($10 a day)…" · "Tell the user: This is over the limit your owner set. Only the owner can change it in Settings › Rules. Don't ask for an approval: an approval can't go over this limit." |
-| `SEND_LIMIT` | "Sending limit reached for Ana (300 messages a day), so nothing was sent." (per kind: messages in all, files to one person, files in all, MB of files) · "Try again after {time}. Or tell the user: This is over the limit your owner set. Only the owner can change it in Settings › Rules." |
+| `SPEND_CEILING` | "This proof would cost more than your limit ($0.50 per proof), so nothing was recorded." or "…go over your limit ($10 a day)…" · "Tell the user: This is over your limit. You can change it in Settings › Rules in the AgentLink app. Don't ask for an approval: an approval can't go over this limit." The terms tools use the same words. |
+| `SEND_LIMIT` | "Sending limit reached for Ana (300 messages a day), so nothing was sent." (per kind: messages in all, files to one person, files in all, MB of files) · "Try again after {time}. Or tell the user: This is over your limit. You can change it in Settings › Rules in the AgentLink app." |
 
 ## 6. Surfaces and information architecture
 

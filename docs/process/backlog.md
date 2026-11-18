@@ -11359,7 +11359,11 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 #### SEC-OUTBOUND-CAPS · Sending limits (0.5.11)
 - **Status:** built on `rel0511/limits` (review pending) · **Security:** S2 · **Spec:** D-156 (6); 06 §3; 11 §5.11
 - **Goal:** per-contact and per-day limits for outgoing messages and files.
-- **Done:** policy `outgoing` (300 / 1000 messages, 50 / 200 files, 2000 MB per rolling 24 h; absent = these); counted in the send transaction from the stored envelopes and files (no schema change); `SEND_LIMIT` with the cap, its number and `retryAt`, never kept under a clientRequestId; acks, receipts, pairing and terms not counted; Rules page "Sending limits". Residual: a process with the agent key bypasses it; terms envelopes are not capped.
+- **Done:** policy `outgoing` (300 / 1000 messages, 50 / 200 files, 2000 MB per rolling 24 h, per ID; absent = these); counted from the durable `outgoing_log` (store schema 17) written in the send transaction, so a deleted file or message never frees a cap; `SEND_LIMIT` with the cap, its number and `retryAt`, never kept under a clientRequestId; acks, receipts, pairing and terms not counted; Rules page "Sending limits". Residual: a process with the agent key bypasses it; terms envelopes are not capped (SEC-TERMS-CAPS).
+
+#### SEC-TERMS-CAPS · Terms count toward the sending limits (0.5.12)
+- **Status:** later (0.5.12) · **Security:** S2 · **Spec:** D-156 (6); 06 §3 `outgoing`
+- **Goal:** `offer`, `accept` and `reject` sent through the terms tools count toward the outgoing caps per contact and per day, as `agentlink_send` messages do (the terms send path, `terms-flow.ts`), with the same `SEND_LIMIT` refusal and the same durable count.
 
 #### SEC-RELAY-READBACK · Relay availability check (0.5.12)
 - **Status:** later (0.5.12) · **Security:** S2 · **Spec:** D-156 (7)

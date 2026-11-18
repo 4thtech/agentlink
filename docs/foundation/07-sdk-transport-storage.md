@@ -89,7 +89,7 @@ Every mutating call runs: **policy check → (approval) → action → store →
 | `approvals` | approval_id, action_json (`enc`: `args` can hold message text), scope_json (commitments, D-55; immutable after creation, carried in `action.context.scope`, 04 §3.4.2), answers_envelope_id, scope_key (at most one live scope per value, §3.5), source (owner \| policy grant, with the policy hash `enc`), signed_decision (the owner's `SignedOwnerAction`: an `approval.decide`, or the `approval.decideBatch` that covers this row, copied per row and re-verified for this row's `approvalId`, 04 §2.5.2, D-68; re-verified on every use, `status` is only a cache, 04 §2.5.1), signed_cancel (the owner's `approval.cancel`, if any; re-verified on use), parts in `commitment_parts` (§3.5; this replaces the earlier parts_used_json), summary (`enc`: it names the contact), status (pending \| approved \| denied \| expired \| cancelled \| void; an approval other than a commitment becomes `void` in the transaction of its one use, and a status only ever takes authority away, never grants it: proposed, owner confirms at merge, M1-7e), expires_at, created_at, decided_at |
 | `policies` | The current signed policy, one row (§3.4); this replaces the earlier key, value_json, updated_at |
 | `sync_cursors` | relay_url, last_seen |
-| `outbox`, `outbox_staged`, `seen`, `held_envelopes`, `blocked_keys`, `rate_counters`, `publisher_lease` | Delivery (§3.2) |
+| `outbox`, `outbox_staged`, `seen`, `held_envelopes`, `blocked_keys`, `rate_counters`, `outgoing_log`, `publisher_lease` | Delivery (§3.2) |
 | `saved_files` | Inbox files the app saved, kept after the day-7 `files` shred (D-148, §3.8) |
 | `idempotency` | Tool results by `clientRequestId` (§3.3) |
 | `owner_action_nonces`, `revoked_agents`, `own_storage` | Owner authority (§3.4) |
@@ -241,6 +241,8 @@ Every mutating call runs: **policy check → (approval) → action → store →
 - **On failure.** If the set cannot be read, the processing pass stops and processes nothing, so a blocked key's envelope is never stored as a request; a later pass runs it again.
 
 **`rate_counters`**: inbound envelopes per contact, for `contacts.rateLimitPerContactPerHour` (06 §3; M1-7h).
+
+**`outgoing_log`** (SEC-OUTBOUND-CAPS, D-156; schema version 17): one row per message sent with `agentlink_send`, `{envelope_id, contact_id, t, files, bytes}`, written in the transaction that stores the envelope and pruned there once older than 24 h. The durable count of the `outgoing` caps (06 §3): no name, hash, key or locator, and deleting a file or a message never removes its row.
 
 | Column | Type and meaning |
 |---|---|

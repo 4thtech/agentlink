@@ -241,6 +241,31 @@ describe('changing the ceilings and caps is an owner change (04 §2.5.3, 06 §3)
     expect(fields).not.toContain('proofs.hardMaxPerActionUSD');
   });
 
+  it('an older $1 soft limit lowered to the $0.50 ceiling is no spending change (read as $0.50)', () => {
+    const base = preD156();
+    const next = mergePolicyPatch(base, { receipts: { autoDelivered: false } });
+    expect(next.proofs.perActionMaxUSD).toBe('0.5');
+    expect(spendingChanges(base, next)).toEqual([]);
+    const raised = mergePolicyPatch(base, { proofs: { perActionMaxUSD: '0.4' } });
+    expect(spendingChanges(base, raised)).toEqual([
+      { field: 'proofs.perActionMaxUSD', old: '0.5', new: '0.4' },
+    ]);
+  });
+
+  it('under fail closed the built-in daily ceiling refuses over a readable ledger', () => {
+    expect(evaluateProof(failClosed, proof('0.1'), ctx(entry('9.95', NOW - 60)))).toMatchObject({
+      decision: 'deny',
+      ceiling: 'daily',
+    });
+    expect(evaluateProof(failClosed, proof('0.1'), ctx(entry('5', NOW - 60))).decision).toBe(
+      'approval',
+    );
+    // A broken ledger cannot be summed: it asks the owner (06 §3 "Fail closed").
+    expect(
+      evaluateProof(failClosed, proof('0.1'), { now: NOW, ledger: { status: 'broken' } }).decision,
+    ).toBe('approval');
+  });
+
   it('raising an outgoing cap warns as a raised limit', () => {
     const base = defaultPolicy();
     const next = mergePolicyPatch(base, { outgoing: { messagesPerDay: 5000 } });
@@ -256,18 +281,18 @@ describe('outgoing caps (D-156): per contact and per day, messages and files', (
   const msg = { contact: CONTACT, files: 0, bytes: 0 };
 
   it('allows up to the cap and refuses the next message to the same contact', () => {
-    expect(evaluateOutgoing(defaults, msg, { ...zero, contactMessages: 299, messages: 299 })).toEqual(
-      { decision: 'allow' },
-    );
-    expect(evaluateOutgoing(defaults, msg, { ...zero, contactMessages: 300, messages: 300 })).toEqual(
-      { decision: 'deny', limit: 'messages_contact', max: 300 },
-    );
+    expect(
+      evaluateOutgoing(defaults, msg, { ...zero, contactMessages: 299, messages: 299 }),
+    ).toEqual({ decision: 'allow' });
+    expect(
+      evaluateOutgoing(defaults, msg, { ...zero, contactMessages: 300, messages: 300 }),
+    ).toEqual({ decision: 'deny', limit: 'messages_contact', max: 300 });
   });
 
   it('refuses the next message of the day across contacts', () => {
-    expect(evaluateOutgoing(defaults, msg, { ...zero, contactMessages: 2, messages: 1000 })).toEqual(
-      { decision: 'deny', limit: 'messages_day', max: 1000 },
-    );
+    expect(
+      evaluateOutgoing(defaults, msg, { ...zero, contactMessages: 2, messages: 1000 }),
+    ).toEqual({ decision: 'deny', limit: 'messages_day', max: 1000 });
   });
 
   it('files per contact, files per day and MB per day', () => {
@@ -302,9 +327,9 @@ describe('outgoing caps (D-156): per contact and per day, messages and files', (
     expect(evaluateOutgoing(defaults, three, { ...zero, contactFiles: 47, files: 47 })).toEqual({
       decision: 'allow',
     });
-    expect(evaluateOutgoing(defaults, three, { ...zero, contactFiles: 48, files: 48 })).toMatchObject(
-      { decision: 'deny', limit: 'files_contact' },
-    );
+    expect(
+      evaluateOutgoing(defaults, three, { ...zero, contactFiles: 48, files: 48 }),
+    ).toMatchObject({ decision: 'deny', limit: 'files_contact' });
   });
 
   it('reads the owner’s own caps, and the defaults for a pre-D-156 policy or fail closed', () => {

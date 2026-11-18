@@ -373,7 +373,23 @@ export function evaluateProof(
       limitUsd: ceilings.hardMaxPerActionUSD,
     };
   }
+  const hardDaily = parseUsd(ceilings.hardDailyUSD);
   if (effective.mode === 'fail_closed') {
+    // D-156: the built-in daily ceiling holds too, over a ledger that can be summed. A broken
+    // ledger cannot be: every paid action then asks the owner (06 §3 "Fail closed").
+    const view = context?.ledger;
+    const now = context?.now;
+    if (view !== undefined && isTime(now)) {
+      const spent = budgetSpentMicros(view, now);
+      if (spent !== 'broken' && spent + maxFee > hardDaily) {
+        return {
+          decision: 'deny',
+          triggers: [],
+          ceiling: 'daily',
+          limitUsd: ceilings.hardDailyUSD,
+        };
+      }
+    }
     return { decision: 'approval', triggers: ['policy_invalid'] };
   }
   const proofs = effective.policy.proofs;
@@ -403,7 +419,6 @@ export function evaluateProof(
   // is refused (D-156); above the soft budget (read as at most the ceiling) it asks the owner. A
   // broken ledger cannot be summed: it asks (the per-Record ceiling above still refuses).
   const spent = budgetSpentMicros(view, now);
-  const hardDaily = parseUsd(ceilings.hardDailyUSD);
   if (spent === 'broken') triggers.push('ledger_broken');
   else if (spent + maxFee > hardDaily) {
     return { decision: 'deny', triggers: [], ceiling: 'daily', limitUsd: ceilings.hardDailyUSD };

@@ -13,6 +13,7 @@ import {
   POLICY_DEFAULTS_EFFECTIVE,
   evaluateOutgoing,
   outgoingUsage,
+  recordOutgoing,
   rowKeyOf,
   type Row,
   type Sealed,
@@ -93,6 +94,7 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
       'agent_pause',
       'saved_files',
       'content_file_budget',
+      'outgoing_log',
     ]) {
       sql.exec(`DROP TABLE "${t}"`);
     }
@@ -117,6 +119,18 @@ describe('DurableObjectStore: schema (07 §3, §3.7)', () => {
       expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
       expect(await again.transaction((tx) => tx.select('seen'))).toEqual([seen('keep')]);
       expect(await again.transaction((tx) => tx.select('content_file_budget'))).toEqual([]);
+    });
+  });
+
+  it('migrates a version 16 store (no outgoing_log, D-156) to the current schema, keeping its rows', async () => {
+    await inObject(async (store, state) => {
+      await store.transaction((tx) => tx.insert('seen', seen('keep')));
+      state.storage.sql.exec('DROP TABLE "outgoing_log"');
+      state.storage.sql.exec('UPDATE deploy_state SET schema_version = 16');
+      const again = DurableObjectStore.open(state.storage);
+      expect(again.schemaVersion).toBe(STORE_SCHEMA_VERSION);
+      expect(await again.transaction((tx) => tx.select('seen'))).toEqual([seen('keep')]);
+      expect(await again.transaction((tx) => tx.select('outgoing_log'))).toEqual([]);
     });
   });
 
@@ -473,52 +487,27 @@ describe('DurableObjectStore: sealed-column conformance (07 §3, §3.1)', () => 
 // outgoing caps hold here too: the count queries core makes in the send transaction answer the same
 // over Durable Object SQLite, and the shared engine refuses at the cap.
 describe('DurableObjectStore: outgoing caps (D-156)', () => {
-  it('counts sent messages and files in the rolling 24 h window; the engine refuses at the cap', async () => {
+  it('counts the outgoing log in the rolling 24 h window; the engine refuses at the cap', async () => {
     await inObject(async (store) => {
-      const cipher = await createStoreColumnCipher(new Uint8Array(32).map((_, i) => i));
       const NOW = 1_800_000_000;
       const ana = '0x' + '3d'.repeat(20);
-      const envelope = async (id: string, type: string, at: number, direction = 'out') => ({
-        ...(await sampleRow('envelopes', 0, cipher)),
-        envelope_id: id,
-        direction,
-        contact_id: ana,
-        type,
-        created_at: at,
-        payload_json: null,
-      });
-      const file = async (envelopeId: string, idx: number, size: number) => {
-        const row: Record<string, unknown> = {
-          ...(await sampleRow('files', 0, cipher)),
-          envelope_id: envelopeId,
-          idx,
-          size,
-        };
-        const rowKey = rowKeyOf([envelopeId, idx]);
-        for (const column of encColumns('files')) {
-          row[column] =
-            row[column] === null
-              ? null
-              : await cipher.seal({ table: 'files', column, rowKey }, 'x');
-        }
-        return row;
-      };
-      const envelopes = [
-        await envelope('m1', 'text', NOW - 10),
-        await envelope('m2', 'note', NOW - 20),
-        await envelope('old', 'text', NOW - 86_400),
-        await envelope('ack1', 'ack', NOW - 5),
-        await envelope('in1', 'text', NOW - 5, 'in'),
-      ];
-      const files = [await file('m1', 0, 100), await file('m2', 0, 200), await file('old', 0, 400)];
+      const ben = '0x' + '4e'.repeat(20);
       await store.transaction((tx) => {
-        for (const e of envelopes) tx.insert('envelopes', e as never);
-        for (const f of files) tx.insert('files', f as never);
+        tx.insert('outgoing_log', {
+          envelope_id: 'old',
+          contact_id: ana,
+          t: NOW - 86_400,
+          files: 1,
+          bytes: 400,
+        });
+        recordOutgoing(tx, { envelopeId: 'm1', contact: ana, now: NOW - 10, files: 1, bytes: 100 });
+        recordOutgoing(tx, { envelopeId: 'm2', contact: ana, now: NOW - 5, files: 1, bytes: 200 });
+        recordOutgoing(tx, { envelopeId: 'm3', contact: ben, now: NOW - 1, files: 0, bytes: 0 });
       });
       const usage = await store.transaction((tx) => outgoingUsage(tx, ana, NOW));
       expect(usage).toMatchObject({
         contactMessages: 2,
-        messages: 2,
+        messages: 3,
         contactFiles: 2,
         files: 2,
         bytes: 300,
@@ -533,7 +522,6 @@ describe('DurableObjectStore: outgoing caps (D-156)', () => {
           usage,
         ),
       ).toEqual({ decision: 'deny', limit: 'messages_contact', max: 2 });
-      cipher.close();
     });
   });
 });

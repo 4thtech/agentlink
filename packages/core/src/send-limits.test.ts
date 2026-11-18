@@ -8,9 +8,9 @@ import { defaultPolicy, type Policy } from '@4thtech-io/types';
 import { wrapEnvelope, type PublishOutcome } from '@4thtech-io/transport-nostr';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { AgentLinkClient } from './client.js';
-import { outgoingUsage } from './outgoing-limits.js';
+import { outgoingUsage, recordOutgoing } from './outgoing-limits.js';
 import { MemoryStore } from './store/memory-store.js';
-import type { Row, Sealed } from './store/schema.js';
+import type { Row } from './store/schema.js';
 import {
   FakeClock,
   RecordingApprovalChannel,
@@ -19,6 +19,13 @@ import {
   seed,
 } from './testing/fixtures.js';
 import { pairWith, type TestAgent } from './testing/envelopes.js';
+import {
+  MemoryOwnStorage,
+  fileBytes,
+  openFileAgent,
+  outgoing,
+  pairForFiles,
+} from './testing/files.js';
 import { MemoryPolicyMark, newNonce, ownerHex, signWith } from './testing/owner.js';
 import type { TransportFactory } from './transport.js';
 
@@ -219,47 +226,26 @@ function outRow(id: string, contact: string, type: string, at: number): Row<'env
   };
 }
 
-function fileRow(envelopeId: string, idx: number, size: number): Row<'files'> {
-  const s = 'v1.sealed' as Sealed;
-  return {
-    envelope_id: envelopeId,
-    idx,
-    name: s,
-    size,
-    sha256: 'ab'.repeat(32),
-    locator: s,
-    url: null,
-    file_key: s,
-    expires_at: NOW + 7 * DAY,
-    deleted_at: null,
-    delete_after: 'expiry',
-    saved_name: null,
-    auto_save: null,
-    auto_reason: null,
-    auto_tries: null,
-    auto_next_at: null,
-  };
-}
-
 const NOW = 1_800_000_000;
 const ANA = '0x' + '3d'.repeat(20);
 const BEN = '0x' + '4e'.repeat(20);
 
+const logRow = (id: string, contact: string, t: number, files = 0, bytes = 0) => ({
+  envelope_id: id,
+  contact_id: contact,
+  t,
+  files,
+  bytes,
+});
+
 describe('outgoingUsage: what the store counts (D-156)', () => {
-  it('counts sent messages and their files per contact and in all, inside the window only', async () => {
+  it('counts logged messages and their files per contact and in all, inside the window only', async () => {
     const store = new MemoryStore();
     await store.transaction((tx) => {
-      tx.insert('envelopes', outRow('m1', ANA, 'text', NOW - 10));
-      tx.insert('envelopes', outRow('m2', ANA, 'note', NOW - 20));
-      tx.insert('envelopes', outRow('m3', BEN, 'request', NOW - 30));
-      tx.insert('envelopes', outRow('old', ANA, 'text', NOW - DAY));
-      tx.insert('envelopes', outRow('ack', ANA, 'ack', NOW - 5));
-      tx.insert('envelopes', { ...outRow('in1', ANA, 'text', NOW - 5), direction: 'in' });
-      tx.insert('files', fileRow('m1', 0, 100));
-      tx.insert('files', fileRow('m1', 1, 200));
-      tx.insert('files', fileRow('m3', 0, 400));
-      tx.insert('files', fileRow('old', 0, 800));
-      tx.insert('files', fileRow('in1', 0, 1600));
+      tx.insert('outgoing_log', logRow('m1', ANA, NOW - 10, 2, 300));
+      tx.insert('outgoing_log', logRow('m2', ANA, NOW - 20));
+      tx.insert('outgoing_log', logRow('m3', BEN, NOW - 30, 1, 400));
+      tx.insert('outgoing_log', logRow('old', ANA, NOW - DAY, 1, 800));
     });
     const usage = await store.transaction((tx) => outgoingUsage(tx, ANA, NOW));
     expect(usage).toMatchObject({
@@ -268,6 +254,71 @@ describe('outgoingUsage: what the store counts (D-156)', () => {
       contactFiles: 2,
       files: 3,
       bytes: 700,
+      contactOldestAt: NOW - 20,
+      fileOldestAt: NOW - 30,
     });
+  });
+
+  it('recording drops the rows that left the window', async () => {
+    const store = new MemoryStore();
+    await store.transaction((tx) => {
+      tx.insert('outgoing_log', logRow('old', ANA, NOW - DAY));
+      recordOutgoing(tx, { envelopeId: 'new', contact: ANA, now: NOW, files: 1, bytes: 5 });
+    });
+    const rows = await store.transaction((tx) => tx.select('outgoing_log'));
+    expect(rows.map((r) => r.envelope_id)).toEqual(['new']);
+  });
+});
+
+describe('a deleted file never frees a cap (IR M1; D-156)', () => {
+  it('send a file, delete its row as retention does: the next file is still over the cap', async () => {
+    const own = new MemoryOwnStorage();
+    const a = await openFileAgent(clock, new MemoryKeyStore(seed(61)), ownerA, 'alice', {
+      relays: ['wss://one.relay-alpha.net', 'wss://two.relay-alpha.net'],
+      own,
+    });
+    const b = await openFileAgent(clock, new MemoryKeyStore(seed(62)), ownerB, 'bob', {
+      relays: ['wss://one.relay-beta.net', 'wss://two.relay-beta.net'],
+      own,
+    });
+    await pairForFiles(clock, a, b, (p) => {
+      p.outgoing = { ...p.outgoing!, filesPerContactPerDay: 1 };
+    });
+    const first = await a.client.sendMessage({
+      to: b.id,
+      text: 'file',
+      files: [outgoing('one.bin', fileBytes(64))],
+    });
+    expect(first.status).toBe('ok');
+    if (first.status !== 'ok') return;
+    const before = await a.store.transaction((tx) => outgoingUsage(tx, b.id, clock.t));
+    // What delete on receipt and expiry do (files/retention.ts): the row goes, with its key.
+    await a.store.transaction((tx) => tx.delete('files', { envelope_id: first.envelopeId }));
+    const after = await a.store.transaction((tx) => outgoingUsage(tx, b.id, clock.t));
+    expect(after).toEqual(before);
+    expect(after.contactFiles).toBe(1);
+    expect(
+      await a.client.sendMessage({
+        to: b.id,
+        text: 'file',
+        files: [outgoing('two.bin', fileBytes(64))],
+      }),
+    ).toMatchObject({ status: 'rejected', code: 'SEND_LIMIT', limit: 'files_contact' });
+  });
+});
+
+describe('two concurrent sends at the cap (L5; D-156)', () => {
+  it('exactly one passes: the count and the stored envelope are one transaction', async () => {
+    const mark = new MemoryPolicyMark();
+    const a = await openAgent(32, ownerA, 'alice', mark);
+    const b = await openAgent(33, ownerB, 'bob');
+    await pair(a, b);
+    await applyCaps(a, { messagesPerContactPerDay: 1 });
+    const results = await Promise.all([
+      a.client.sendMessage({ to: b.id, text: 'one' }),
+      a.client.sendMessage({ to: b.id, text: 'two' }),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual(['ok', 'rejected']);
+    expect(await sentRows(a)).toHaveLength(1);
   });
 });

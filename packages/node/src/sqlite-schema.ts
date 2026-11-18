@@ -103,6 +103,9 @@ const V15_TABLES: readonly TableName[] = ['saved_files'];
 /** Tables added by version 16 (FILES-AI-1, D-152): the send-by-content daily budget ledger. */
 const V16_TABLES: readonly TableName[] = ['content_file_budget'];
 
+/** Tables added by version 17 (SEC-OUTBOUND-CAPS, D-156): the outgoing caps' count. */
+const V17_TABLES: readonly TableName[] = ['outgoing_log'];
+
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
   return {
@@ -292,7 +295,8 @@ function v11Statements(): readonly string[] {
  * `invites.invite_link` (REL051-B2; nullable, null on existing rows), version 15 adds
  * `envelopes.deleted_at` and `saved_files` (RET-2, D-148; nullable, null on existing rows, and a new
  * table), version 16 adds `content_file_budget` (FILES-AI-1, D-152; a new table, existing rows
- * untouched). A later
+ * untouched), version 17 adds `outgoing_log` (SEC-OUTBOUND-CAPS, D-156; a new table, empty: sends
+ * before the update are not counted). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -311,7 +315,8 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
           !V11_TABLES.includes(t) &&
           !V12_TABLES.includes(t) &&
           !V15_TABLES.includes(t) &&
-          !V16_TABLES.includes(t),
+          !V16_TABLES.includes(t) &&
+          !V17_TABLES.includes(t),
       ),
       v1Spec,
     ),
@@ -331,6 +336,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 14, statements: Object.freeze(v14Statements()) }),
   Object.freeze({ version: 15, statements: Object.freeze(v15Statements()) }),
   Object.freeze({ version: 16, statements: createSchemaStatements(V16_TABLES) }),
+  Object.freeze({ version: 17, statements: createSchemaStatements(V17_TABLES) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

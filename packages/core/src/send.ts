@@ -77,6 +77,7 @@ import type { OwnerActions } from './owner-actions.js';
 import {
   OUTGOING_WINDOW_SECONDS,
   outgoingUsage,
+  recordOutgoing,
   type OutgoingUsageDetail,
 } from './outgoing-limits.js';
 import {
@@ -606,6 +607,14 @@ export class SendService {
       tx.insert('envelopes', row);
       for (const r of rows) tx.insert('outbox', r);
       for (const f of fileRows) tx.insert('files', f);
+      // D-156: the durable count of the outgoing caps (a later file delete never frees it).
+      recordOutgoing(tx, {
+        envelopeId,
+        contact: request.to,
+        now,
+        files: fileRows.length,
+        bytes: fileBytes,
+      });
       return undefined;
     });
     if (limited !== undefined) return { result: limited };

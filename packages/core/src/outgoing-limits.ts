@@ -1,16 +1,18 @@
 // SEC-OUTBOUND-CAPS (D-156; 06 §3 `outgoing`, 07 §3.2): what this agent sent with `agentlink_send`
-// in the rolling 24 h window, read from the store inside the caller's transaction, so the count and
-// the stored envelope are one step (two concurrent sends never both pass on the same count).
+// in the rolling 24 h window, per ID. The count is the `outgoing_log` table: one row per sent message,
+// written in the transaction that stores the envelope (recordOutgoing), so the count and the stored
+// envelope are one step and two concurrent sends never both pass on the same count. Deleting a file
+// (retention, delete on receipt) or a message never frees a cap: the log keeps only counts, and rows
+// leave it only when they leave the window.
 //
-// Counted: outbound envelopes of the `agentlink_send` types (text, note, request, delivery) and the
-// file rows they carry. Not counted: acks, receipts, proofs, pairing, card updates, owner-channel and
-// terms envelopes. A message the owner deleted still counts until it leaves the window (its row
-// stays as a tombstone). Counts and bytes only: nothing here reads a name, a path or a body.
+// Counted: messages of the `agentlink_send` types and the files they carry. Not counted: acks,
+// receipts, proofs, pairing, card updates, owner-channel and terms envelopes (SEC-TERMS-CAPS, later).
+// Counts and bytes only: nothing here reads a name, a path or a body.
 //
 // Scope: this protects against a runaway or steered AI using the tools. A process holding the agent
 // key can bypass it; the recipient's inbound limit (`contacts.rateLimitPerContactPerHour`) is the
-// backstop. The counts are local to one store: a restored backup counts from what it holds.
-import { SEND_TOOL_PAYLOAD_TYPES } from '@4thtech-io/types';
+// backstop. The counts are local to one store: a restored backup counts from what it holds, and an
+// update to schema version 17 starts with an empty log.
 import { BUDGET_WINDOW_SECONDS, type OutgoingUsage } from './policy-engine.js';
 import type { StoreTx } from './store/store.js';
 
@@ -32,56 +34,34 @@ export interface OutgoingUsageDetail extends OutgoingUsage {
 const minOf = (a: number | null, b: number): number => (a === null || b < a ? b : a);
 
 /**
- * IDs per `in` query: a SQL store binds one parameter per ID, and the Durable Object SQL API allows
- * only a small number of bound parameters per statement, so the file rows are read in chunks.
- */
-const IN_CHUNK = 50;
-
-/**
- * The outgoing usage over the window ending at `now` (an entry counts while `created_at > now −
- * 86 400`, as the budget window), for `contact` and in all. Synchronous, inside the caller's
- * transaction (07 §3.1).
+ * The outgoing usage over the window ending at `now` (an entry counts while `t > now − 86 400`, as
+ * the budget window), for `contact` and in all. Synchronous, inside the caller's transaction (07
+ * §3.1).
  */
 export function outgoingUsage(tx: StoreTx, contact: string, now: number): OutgoingUsageDetail {
-  const rows = tx.select('envelopes', {
-    direction: 'out',
-    type: { in: [...SEND_TOOL_PAYLOAD_TYPES] },
-    created_at: { gt: now - OUTGOING_WINDOW_SECONDS },
-  });
+  const rows = tx.select('outgoing_log', { t: { gt: now - OUTGOING_WINDOW_SECONDS } });
   let contactMessages = 0;
-  let contactOldestAt: number | null = null;
-  let oldestAt: number | null = null;
-  const contactOf = new Map<string, boolean>();
-  const createdOf = new Map<string, number>();
-  for (const r of rows) {
-    const mine = r.contact_id === contact;
-    if (mine) {
-      contactMessages += 1;
-      contactOldestAt = minOf(contactOldestAt, r.created_at);
-    }
-    oldestAt = minOf(oldestAt, r.created_at);
-    contactOf.set(r.envelope_id, mine);
-    createdOf.set(r.envelope_id, r.created_at);
-  }
   let files = 0;
   let contactFiles = 0;
   let bytes = 0;
+  let contactOldestAt: number | null = null;
+  let oldestAt: number | null = null;
   let contactFileOldestAt: number | null = null;
   let fileOldestAt: number | null = null;
-  if (contactOf.size > 0) {
-    const ids = [...contactOf.keys()];
-    const fileRows = [];
-    for (let i = 0; i < ids.length; i += IN_CHUNK) {
-      fileRows.push(...tx.select('files', { envelope_id: { in: ids.slice(i, i + IN_CHUNK) } }));
+  for (const r of rows) {
+    const mine = r.contact_id === contact;
+    oldestAt = minOf(oldestAt, r.t);
+    if (mine) {
+      contactMessages += 1;
+      contactOldestAt = minOf(contactOldestAt, r.t);
     }
-    for (const f of fileRows) {
-      const at = createdOf.get(f.envelope_id) ?? now;
-      files += 1;
-      bytes += f.size;
-      fileOldestAt = minOf(fileOldestAt, at);
-      if (contactOf.get(f.envelope_id) === true) {
-        contactFiles += 1;
-        contactFileOldestAt = minOf(contactFileOldestAt, at);
+    if (r.files > 0) {
+      files += r.files;
+      bytes += r.bytes;
+      fileOldestAt = minOf(fileOldestAt, r.t);
+      if (mine) {
+        contactFiles += r.files;
+        contactFileOldestAt = minOf(contactFileOldestAt, r.t);
       }
     }
   }
@@ -96,4 +76,28 @@ export function outgoingUsage(tx: StoreTx, contact: string, now: number): Outgoi
     contactFileOldestAt,
     fileOldestAt,
   };
+}
+
+/**
+ * Records one sent message in the log, in the transaction that stores its envelope, and drops the
+ * rows that left the window. Synchronous (07 §3.1).
+ */
+export function recordOutgoing(
+  tx: StoreTx,
+  entry: {
+    readonly envelopeId: string;
+    readonly contact: string;
+    readonly now: number;
+    readonly files: number;
+    readonly bytes: number;
+  },
+): void {
+  tx.delete('outgoing_log', { t: { lte: entry.now - OUTGOING_WINDOW_SECONDS } });
+  tx.insert('outgoing_log', {
+    envelope_id: entry.envelopeId,
+    contact_id: entry.contact,
+    t: entry.now,
+    files: entry.files,
+    bytes: entry.bytes,
+  });
 }

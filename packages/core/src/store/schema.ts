@@ -595,6 +595,16 @@ export const TABLES = {
     columns: { entry_id: id, t: int, bytes: int },
     primaryKey: ['entry_id'],
   },
+  // SEC-OUTBOUND-CAPS (D-156 (6); 06 §3 `outgoing`; schema version 17): one row per message sent
+  // with `agentlink_send`, written in the transaction that stores the envelope: the envelope ID, the
+  // contact, the time, how many files it carried and their bytes. Counts only: no name, hash, key or
+  // locator. It is the outgoing caps' durable count, so deleting a file (retention, delete on
+  // receipt) or a message never frees a cap; rows older than the rolling 24 h are dropped by the
+  // same step.
+  outgoing_log: {
+    columns: { envelope_id: id, contact_id: id, t: int, files: int, bytes: int },
+    primaryKey: ['envelope_id'],
+  },
 } as const satisfies Readonly<Record<string, TableSpec>>;
 
 export type Tables = typeof TABLES;

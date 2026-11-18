@@ -180,8 +180,10 @@ export function spendingChanges(before: Policy, after: Policy): readonly Spendin
   const out: SpendingChange[] = [];
   const globals = ['notarize', 'dailyBudgetUSD', 'perActionMaxUSD'] as const;
   for (const key of globals) {
-    const old = before.proofs[key];
-    const now = after.proofs[key];
+    // D-156: the soft limits as the engine reads them (at most their hard ceiling), so an older
+    // "1" lowered to the "0.5" ceiling by the next policy.set is no change.
+    const old = key === 'notarize' ? before.proofs[key] : effectiveSoft(before, key);
+    const now = key === 'notarize' ? after.proofs[key] : effectiveSoft(after, key);
     if (old !== now) out.push({ field: `proofs.${key}`, old, new: now });
   }
   // D-156: the hard ceilings as the engine reads them, so filling in the defaults is no change.

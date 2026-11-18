@@ -351,7 +351,7 @@ describe('agentlink_send: an outgoing cap is a typed refusal in plain words (D-1
     expect(result.structured.approvalId).toBeUndefined();
     expect(String(result.structured.summary)).toContain('300 messages a day');
     expect(String(result.structured.summary)).toContain('Ana');
-    expect(String(result.structured.nextStep)).toContain('Only the owner can change it');
+    expect(String(result.structured.nextStep)).toContain('This is over your limit.');
     expect(String(result.structured.nextStep)).toContain('Settings › Rules');
     expectNoCanary(result);
   });
