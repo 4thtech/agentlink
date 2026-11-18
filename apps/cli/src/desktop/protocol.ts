@@ -81,6 +81,7 @@ export const SHOW_ROUTES = Object.freeze([
   'approvals',
   'join',
   'inbox',
+  'files',
   'updates',
 ] as const);
 export type ShowRoute = (typeof SHOW_ROUTES)[number];
@@ -268,7 +269,7 @@ export function isNotifyTarget(kind: NotifyKind | ShowRoute, value: unknown): va
 // `/approve/<id>` and a `#person=<id>` fragment (NOTIFY-DEEPLINK): the fragment never leaves the
 // window (a browser does not send it to the server); Home reads it and opens that person.
 const SESSION_URL =
-  /^http:\/\/localhost:([1-9][0-9]{0,4})(?:\/|\/first-run|\/settings\/home|\/settings\/join|\/settings\/updates|\/approve\/apr_[A-Za-z0-9_-]{22})\?t=[A-Za-z0-9_-]{43}(?:#person=0x[0-9a-f]{40})?$/;
+  /^http:\/\/localhost:([1-9][0-9]{0,4})(?:\/|\/first-run|\/settings\/home|\/settings\/join|\/settings\/updates|\/approve\/apr_[A-Za-z0-9_-]{22})\?t=[A-Za-z0-9_-]{43}(?:#person=0x[0-9a-f]{40}(?:&files)?)?$/;
 
 /** 08 §4: the canonical invite (join.ts CANONICAL; a test keeps them equal). */
 const INVITE_CANONICAL = /^https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_-]{1,21846}$/;
@@ -335,7 +336,13 @@ export interface NotifyMessage {
 
 export type ShellMessage =
   | { readonly v: 1; readonly type: 'invite'; readonly link: string }
-  | { readonly v: 1; readonly type: 'show'; readonly route: ShowRoute; readonly target?: string }
+  | {
+      readonly v: 1;
+      readonly type: 'show';
+      readonly route: ShowRoute;
+      readonly target?: string;
+      readonly inPlace?: true;
+    }
   | { readonly v: 1; readonly type: 'shutdown' }
   | ({ readonly v: 1; readonly type: 'app-update' } & AppUpdateView);
 
@@ -391,11 +398,27 @@ export function parseShellMessage(line: string): ShellMessage | undefined {
     }
     case 'show': {
       const withTarget = typeof value === 'object' && value !== null && 'target' in value;
-      const m = exactObject(value, ['v', 'type', 'route', ...(withTarget ? ['target'] : [])]);
+      // OWNER-FB-0512: `inPlace: true` (only with a target): the window moves in place, so no session
+      // link is minted for this open.
+      const withInPlace = typeof value === 'object' && value !== null && 'inPlace' in value;
+      const m = exactObject(value, [
+        'v',
+        'type',
+        'route',
+        ...(withTarget ? ['target'] : []),
+        ...(withInPlace ? ['inPlace'] : []),
+      ]);
       if (m?.['v'] !== DESKTOP_PIPE_VERSION || !isOneOf(SHOW_ROUTES, m['route'])) return undefined;
+      if (withInPlace && (!withTarget || m['inPlace'] !== true)) return undefined;
       if (withTarget) {
         if (!isNotifyTarget(m['route'], m['target'])) return undefined;
-        return Object.freeze({ v: 1, type: 'show', route: m['route'], target: m['target'] });
+        return Object.freeze({
+          v: 1,
+          type: 'show',
+          route: m['route'],
+          target: m['target'],
+          ...(withInPlace ? { inPlace: true as const } : {}),
+        });
       }
       return Object.freeze({ v: 1, type: 'show', route: m['route'] });
     }

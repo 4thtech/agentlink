@@ -14,7 +14,7 @@ export function inDesktopApp(
  * activation and answers only true or false; it can open a page in the main window, close the
  * popover or quit, nothing more.
  */
-export type WidgetRoute = 'home' | 'inbox' | 'approvals' | 'updates';
+export type WidgetRoute = 'home' | 'inbox' | 'files' | 'approvals' | 'updates';
 export interface AgentlinkWidgetBridge {
   open(request: { route: WidgetRoute; target?: string }): Promise<boolean>;
   quit(): Promise<boolean>;

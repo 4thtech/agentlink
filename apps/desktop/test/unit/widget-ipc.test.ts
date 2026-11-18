@@ -65,6 +65,15 @@ describe('parseWidgetRequest', () => {
       route: 'inbox',
       target: PERSON,
     });
+    // OWNER-FB-0512: a new file opens at the file, with the same person target as a message.
+    expect(parseWidgetRequest({ action: 'open', route: 'files', target: PERSON })).toEqual({
+      action: 'open',
+      route: 'files',
+      target: PERSON,
+    });
+    expect(
+      parseWidgetRequest({ action: 'open', route: 'files', target: APPROVAL }),
+    ).toBeUndefined();
     expect(parseWidgetRequest({ action: 'open', route: 'approvals', target: APPROVAL })).toEqual({
       action: 'open',
       route: 'approvals',
@@ -73,7 +82,7 @@ describe('parseWidgetRequest', () => {
   });
 
   it('the route list is fixed', () => {
-    expect([...WIDGET_ROUTES]).toEqual(['home', 'inbox', 'approvals', 'updates']);
+    expect([...WIDGET_ROUTES]).toEqual(['home', 'inbox', 'files', 'approvals', 'updates']);
   });
 
   it.each([

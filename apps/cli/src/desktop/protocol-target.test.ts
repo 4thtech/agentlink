@@ -40,10 +40,34 @@ describe('opaque targets', () => {
     expect(parseShellMessage(line({ v: 1, type: 'show', route: 'inbox', target: PERSON }))).toEqual(
       { v: 1, type: 'show', route: 'inbox', target: PERSON },
     );
+    expect(parseShellMessage(line({ v: 1, type: 'show', route: 'files', target: PERSON }))).toEqual(
+      { v: 1, type: 'show', route: 'files', target: PERSON },
+    );
+    expect(parseShellMessage(line({ v: 1, type: 'show', route: 'files', target: APR }))).toBe(
+      undefined,
+    );
     expect(parseShellMessage(line({ v: 1, type: 'show', route: 'home', target: PERSON }))).toBe(
       undefined,
     );
     expect(parseShellMessage(line({ v: 1, type: 'show', route: 'inbox', target: 'x' }))).toBe(
+      undefined,
+    );
+  });
+});
+
+describe('show inPlace (OWNER-FB-0512)', () => {
+  it('is accepted only as true and only with a target', () => {
+    expect(
+      parseShellMessage(
+        line({ v: 1, type: 'show', route: 'inbox', target: PERSON, inPlace: true }),
+      ),
+    ).toEqual({ v: 1, type: 'show', route: 'inbox', target: PERSON, inPlace: true });
+    expect(
+      parseShellMessage(
+        line({ v: 1, type: 'show', route: 'inbox', target: PERSON, inPlace: false }),
+      ),
+    ).toBe(undefined);
+    expect(parseShellMessage(line({ v: 1, type: 'show', route: 'home', inPlace: true }))).toBe(
       undefined,
     );
   });

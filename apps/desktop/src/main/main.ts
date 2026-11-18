@@ -45,6 +45,7 @@ import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BUNDLE_HASHES_FILE, bundleFilePaths, verifyBundle } from './bundle-check.js';
 import { CoreLog, logDir } from './core-log.js';
+import { inPlaceReply } from './in-place.js';
 import { checkDataFolderAcl, dataFolderFor, type AclScratch, type AclVerdict } from './data-acl.js';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { CoreSupervisor, aiAppMarkerSet, type SpawnFn, type Timers } from './core-process.js';
@@ -113,6 +114,7 @@ import {
   createTrayFeed,
   type HostState,
   type InviteOutcome,
+  type ShowRoute,
   type TrayPulseKind,
   type TrayStateView,
 } from '../shared/protocol.js';
@@ -550,6 +552,26 @@ export async function runShell(
         inviteDialogOpen = false;
       });
   };
+  /**
+   * OWNER-FB-0512: a targeted open (a person's message or file). When the window can move in place
+   * (Home loaded fine, live session) the core is told so and mints no session link; if the window
+   * cannot by the time the answer comes, the open is asked again as a full load (see `ready`).
+   */
+  let inPlaceAsked: { route: ShowRoute; target: string } | null = null;
+  const sendShow = (route: ShowRoute, target?: string): void => {
+    const inPlace =
+      target !== undefined &&
+      (route === 'inbox' || route === 'files') &&
+      window?.canOpenInPlace === true;
+    inPlaceAsked = inPlace ? { route, target } : null;
+    supervisor?.send({
+      v: 1,
+      type: 'show',
+      route,
+      ...(target === undefined ? {} : { target }),
+      ...(inPlace ? { inPlace: true as const } : {}),
+    });
+  };
   const showWindow = (): void => {
     if (quitting) return;
     popover?.hide();
@@ -827,12 +849,7 @@ export async function runShell(
             if (!quitting) window?.show();
           }, TARGETED_SHOW_BACKSTOP_MS);
         }
-        supervisor?.send({
-          v: 1,
-          type: 'show',
-          route,
-          ...(target === undefined ? {} : { target }),
-        });
+        sendShow(route, target);
       },
       quit: () => app.quit(),
       close: () => widget.hide(),
@@ -978,7 +995,7 @@ export async function runShell(
     windowFocused: () => window?.focused === true,
     onClick: (route, target) => {
       window?.show();
-      supervisor?.send({ v: 1, type: 'show', route, ...(target === undefined ? {} : { target }) });
+      sendShow(route, target);
     },
   });
   // WIN-ACL-NOTICE: the last data folder check could not run; the core shows a notice in the app.
@@ -1027,6 +1044,27 @@ export async function runShell(
           // TRAY-SHELL: once the main window has this core's session, the popover loads the widget.
           // DESK-WIDGET-TARGET: after a targeted open, the window comes up once the page loaded.
           const showOnLoad = targetedShow;
+          // OWNER-FB-0512: asked to move in place, but the window cannot any more (it reloaded, or
+          // its page failed): that link has no live token, so ask again for a full load.
+          // Only the answer to that very ask uses it up; an unrelated `ready` (Updates) leaves it.
+          const reply = inPlaceReply(
+            inPlaceAsked,
+            message.sessionUrl,
+            window?.canOpenInPlace === true,
+          );
+          if (reply !== 'other') {
+            const asked = inPlaceAsked;
+            inPlaceAsked = null;
+            if (reply === 'reask' && asked !== null) {
+              supervisor?.send({
+                v: 1,
+                type: 'show',
+                route: asked.route as ShowRoute,
+                target: asked.target,
+              });
+              return;
+            }
+          }
           if (
             window?.loadSessionUrl(message.sessionUrl, () => {
               popover?.setSessionReady(true);

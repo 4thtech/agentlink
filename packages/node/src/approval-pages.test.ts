@@ -67,6 +67,7 @@ async function start(assets: LocalUiAssets | null = TEST_APP): Promise<{
   source: FakeSource;
   cookie: () => Promise<string>;
   session: () => Promise<{ cookie: string; csrf: string }>;
+  opened: string[];
 }> {
   const source = fakeSource(world);
   const opened: string[] = [];
@@ -93,6 +94,7 @@ async function start(assets: LocalUiAssets | null = TEST_APP): Promise<{
   return {
     server,
     source,
+    opened,
     cookie,
     async session() {
       const c = await cookie();
@@ -102,6 +104,22 @@ async function start(assets: LocalUiAssets | null = TEST_APP): Promise<{
     },
   };
 }
+
+describe('a person link that moves the window in place (OWNER-FB-0512)', () => {
+  const PERSON = `0x${'ab'.repeat(20)}`;
+  it('mints no one-shot link for it; a normal open still gets a working one', async () => {
+    const { server, opened } = await start();
+    await server.openPerson(PERSON, undefined, true);
+    const ghost = new URL(opened[0] ?? '');
+    expect(ghost.hash).toBe(`#person=${PERSON}`);
+    const refused = await send(server.port, `${ghost.pathname}${ghost.search}`);
+    expect(refused.status).not.toBe(303);
+    expect(refused.headers['set-cookie']).toBeUndefined();
+    await server.openPerson(PERSON);
+    const real = new URL(opened[1] ?? '');
+    expect((await send(server.port, `${real.pathname}${real.search}`)).status).toBe(303);
+  });
+});
 
 /** Fixed HTML that can never run or load anything. */
 function expectInert(html: string): void {

@@ -143,7 +143,7 @@ describe('the pipe: notify is fixed codes only (strict)', () => {
 
 describe('deep links: only allowlisted routes', () => {
   it('show routes are a fixed enum: home, approvals, join, inbox, updates', () => {
-    expect([...SHOW_ROUTES]).toEqual(['home', 'approvals', 'join', 'inbox', 'updates']);
+    expect([...SHOW_ROUTES]).toEqual(['home', 'approvals', 'join', 'inbox', 'files', 'updates']);
     for (const route of ['inbox', 'updates'] as const) {
       expect(parseShellMessage(encodeShellMessage({ v: 1, type: 'show', route }).trim())).toEqual({
         v: 1,
@@ -160,7 +160,7 @@ describe('deep links: only allowlisted routes', () => {
     expect(NOTIFY_ROUTES).toEqual({
       approvals: 'approvals',
       messages: 'inbox',
-      files: 'inbox',
+      files: 'files',
       update: 'updates',
     });
   });
@@ -300,7 +300,7 @@ describe('NativeNotifier: throttle, coalesce and click', () => {
     const { notifier, msg, clicks } = make();
     for (const kind of NOTIFY_KINDS) notifier.handle(msg(kind, 1));
     for (const shown of FakeNotification.shown) shown.click();
-    expect(clicks).toEqual(['approvals', 'inbox', 'inbox', 'updates']);
+    expect(clicks).toEqual(['approvals', 'inbox', 'files', 'updates']);
   });
 
   it('shows nothing where the OS has no notifications', () => {

@@ -152,7 +152,7 @@ export function StatusStrip({
     <div className={`al-strip ${VT_CLASS.strip}`} role="region" aria-label={S.liveStatus}>
       <ul className="al-strip-list al-text-code">
         {items.map((item) => (
-          <li key={item.label} className="al-strip-item">
+          <li key={item.label} className="al-strip-item" title={`${item.label} ${item.value}`}>
             {item.state === undefined ? null : <LiveDot state={item.state} />}
             <span className="al-strip-label">{item.label}</span>
             <span className="al-strip-value">{item.value}</span>
@@ -160,8 +160,14 @@ export function StatusStrip({
         ))}
         {items.length === 0
           ? null
-          : facts.map((item) => (
-              <li key={item.label} className="al-strip-item" data-server-fact>
+          : facts.map((item, index) => (
+              <li
+                key={item.label}
+                className="al-strip-item"
+                title={`${item.label} ${item.value}`}
+                data-server-fact
+                {...(index === 0 ? { 'data-fact-first': '' } : {})}
+              >
                 <span className="al-strip-label">{item.label}</span>
                 <span className="al-strip-value">{item.value}</span>
               </li>

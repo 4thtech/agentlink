@@ -568,7 +568,7 @@ export function WidgetPage({
                     type="button"
                     className="wg-row"
                     data-wg-nav
-                    onClick={go('inbox', filesTarget)}
+                    onClick={go('files', filesTarget)}
                     disabled={offline}
                   >
                     <span className="wg-ico">

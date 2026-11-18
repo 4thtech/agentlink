@@ -631,8 +631,8 @@ describe('DESK-QUIT-ORDER and DESK-WIDGET-OPEN (main)', () => {
     expect(sent(s)).toContainEqual({ v: 1, type: 'show', route: 'inbox', target: PERSON });
     expect(mainWindow().visible).toBe(false);
     s.children[0]?.stream.push(readyLine(`${ORIGIN}/?t=${TOKEN}#person=${PERSON}`));
-    expect(mainWindow().visible).toBe(false);
     await flush();
+    // OWNER-FB-0512: Home was already open, so only its fragment changed (no reload): shown at once.
     expect(mainWindow().visible).toBe(true);
     expect(mainWindow().loaded.at(-1)).toBe(`${ORIGIN}/?t=${TOKEN}#person=${PERSON}`);
   });

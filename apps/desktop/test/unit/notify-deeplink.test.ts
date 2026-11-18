@@ -142,8 +142,15 @@ describe('a click carries the notification target', () => {
     expect(clicks).toEqual([
       { route: 'approvals', target: APR },
       { route: 'inbox', target: PERSON },
-      { route: 'inbox' },
+      { route: 'files' },
     ]);
+  });
+
+  it('OWNER-FB-0512: a file notification from one person opens at that file', () => {
+    const { notifier, clicks, msg } = make();
+    notifier.handle(msg('files', 1, PERSON));
+    for (const shown of FakeNotification.shown) shown.click();
+    expect(clicks).toEqual([{ route: 'files', target: PERSON }]);
   });
 
   it('coalesced from two people: no target (the list), from one: that person', () => {
