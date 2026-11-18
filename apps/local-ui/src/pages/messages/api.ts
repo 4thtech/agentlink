@@ -107,7 +107,9 @@ function parseItem(raw: unknown): MessageItem | undefined {
     files: parsedFiles,
     receipt: receipt === true,
     ...(receipt !== true && receivedOlder === true ? { receivedOlder: true } : {}),
-    ...(status === 'sent' && availability === 'unknown' ? { availability: 'unknown' as const } : {}),
+    ...(status === 'sent' && availability === 'unknown'
+      ? { availability: 'unknown' as const }
+      : {}),
     proof: proof === true,
     size,
     ...(seq === undefined ? {} : { seq }),
