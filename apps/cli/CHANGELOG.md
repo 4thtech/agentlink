@@ -1,5 +1,14 @@
 # @4thtech-io/agentlink
 
+## 0.5.12
+
+### Patch Changes
+
+- 8cb862f: Fix: deleting history no longer fails at random with "What would be deleted changed" when a contact's received receipt (or your own) lands after the delete sheet listed the items or during the 10-second Undo. Receipts are not part of the confirmed list: they still go with the message they name, and a new message or saved file still stops the delete.
+- 8cb862f: OWNER-FB-0512: opening a message or a new file from the menu bar widget or a notification while the app is open moves the app to that conversation in place (no reload, no blank coloured panel). A new file opens at the file itself (scrolled to and focused), and what you opened leaves the widget and the bell as seen. The Under the hood status strip wraps onto a second line instead of scrolling sideways.
+- 8cb862f: SEC-RELAY-READBACK (D-156 (7)): a message counts as sent only once a relay that accepted it hands it back when asked by its id, on a separate connection and without signing in (`RelayPool.checkServed`, bounded to 5 s, at most 16 at once, the relay address rule applies). If no relay can be asked, the message is sent with availability unknown: the outbox row and the envelope record `availability`, `agentlink_send` returns `availability: "unknown"` with `delivery: "sent"`, and the app shows "Sent, availability unknown". A relay that accepts a message but answers an id read empty never confirms it; the outbox keeps the OK and tries the row's other relays, and with none left, or at the give-up time with at least one OK, the message is sent with availability unknown (not delivered only when no relay accepted it). Store schema version 19 adds `outbox.availability` and `envelopes.availability` (nullable; existing rows unchanged).
+- 8cb862f: SEC-RESTORE-GUARD (D-156): after an ID is restored from a backup, every paid action asks the owner for 24 hours (the hard spending limits still refuse), the sending limits are halved for those 24 hours, and the rules alone never accept terms. Messages that were sent before the restore and arrive again are stored and shown but trigger nothing automatically: no received receipt, no automatic file save or on-chain receipt, no file link answered, and a contact they connect waits for the owner. The restore time is kept with the ID's keys; if it cannot be read, AgentLink acts as if the ID was just restored. Approvals and terms approvals asked for before the restore no longer count, so the owner is asked again, and the approval card says why in its own words (restored from a backup, or AgentLink updated).
+
 ## 0.5.11
 
 ### Patch Changes
