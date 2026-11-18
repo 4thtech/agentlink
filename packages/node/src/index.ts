@@ -103,6 +103,11 @@ export {
   type OwnerSignature,
 } from './owner-operation.js';
 export {
+  updateContactDetailsAtTerminal,
+  type ContactDetailsAtTerminalInput,
+  type RelayMigrationOutcome,
+} from './owner-relay-migration.js';
+export {
   LOCAL_APPROVAL_LIFETIME_S,
   MAX_APPROVAL_BATCH_ITEMS,
   decideReviewedApprovals,

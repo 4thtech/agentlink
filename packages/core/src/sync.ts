@@ -44,6 +44,7 @@
 // I-5, I-7: nothing from an inbound envelope reaches a log line, an error or a report beyond its
 // validated envelope ID and fixed codes. Logs carry counts only; relay URLs are never logged here.
 import { encodeHex, encodeHex0x, envelopeHash } from '@4thtech-io/crypto';
+import { LEGACY_READ_RELAYS } from '@4thtech-io/transport-nostr';
 import {
   MAX_SYNC_IDENTITIES,
   seenPruneBefore,
@@ -398,7 +399,7 @@ export class SyncService {
     const subscribe = transport.subscribe.bind(transport);
     // The own list (07 §4.3), as for a fetch; routes() marks it as the only list for AUTH.
     const routes = await outbox.routes(undefined);
-    const relays = [...new Set(routes.flatMap((r) => r.relays))];
+    const relays = [...new Set([...routes.flatMap((r) => r.relays), ...LEGACY_READ_RELAYS])];
     const identities = await this.#identities();
     const keyEpoch = identities[0]?.epoch ?? 0;
     const ctx = this.#ctx;
@@ -531,7 +532,8 @@ export class SyncService {
     let identities: SyncIdentity[];
     try {
       const routes = await outbox.routes(undefined);
-      relays = [...new Set(routes.flatMap((r) => r.relays))];
+      // RELAY-DEFAULTS-SWAP: the legacy relays are read for a transition period, never published to.
+      relays = [...new Set([...routes.flatMap((r) => r.relays), ...LEGACY_READ_RELAYS])];
       identities = await this.#identities();
     } catch {
       this.#ctx.log.warn('inbox fetch failed', {});

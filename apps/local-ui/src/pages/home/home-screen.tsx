@@ -85,6 +85,7 @@ import { useTerms } from './terms-trail.js';
 import type { Preview } from './file-reader.js';
 import { HomeApprovals } from './home-approvals.js';
 import { RenameBanner } from './rename-banner.js';
+import { ContactDetailsBanner } from './contact-details-banner.js';
 import { createSendFolderApi, type SendFolderApi } from './send-folder-banner.js';
 import { FilesPanel } from './files-panel.js';
 import { useFilesSeen } from './files-seen.js';
@@ -1294,6 +1295,12 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
               api={clients.agents}
               owner={clients.owner}
               row={liveIds.rows.find((r) => r.current && !r.removing)}
+            />
+            {/* RELAY-CARD-MIGRATION: "Update your contact details", one owner gesture. */}
+            <ContactDetailsBanner
+              api={clients.agents}
+              owner={clients.owner}
+              agentKey={liveIds.rows.find((r) => r.current && !r.removing)?.name}
             />
             <HomeApprovals
               items={approvals}

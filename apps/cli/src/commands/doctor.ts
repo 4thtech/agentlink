@@ -34,6 +34,7 @@ import { AGENT_PAUSED_TEXT, CoreError } from '@4thtech-io/core';
 import { terminalOneLine, terminalSentence } from '../terminal/sanitize.js';
 import { copy, renderCopy } from '@4thtech-io/mcp-tools/strings/index.js';
 import { TEXT, agentPausedNow, createDeps, fill, printAll, type CommandDeps } from './shared.js';
+import { CONTACT_DETAILS_TEXT } from './owner/contact-details.js';
 
 /**
  * D-100: the rules line (11 §5: "rules", never "policy", except in the command itself). M1-36e: the
@@ -269,6 +270,12 @@ export function createDoctorHandler(deps: DoctorDeps = createDeps()): CommandHan
         } catch {
           emit(TEXT.doctorNoRelays, true);
         }
+        // RELAY-CARD-MIGRATION: a notice, not a problem (the old servers are still read). A runtime
+        // that can't tell shows nothing.
+        const migration = await Promise.resolve()
+          .then(() => client.identity.relayMigration())
+          .catch(() => undefined);
+        if (migration?.status === 'needed') emit(CONTACT_DETAILS_TEXT.doctorHint);
 
         if (await agentPausedNow(client)) {
           // W4-PAUSE (06 §6): a paused agent fetches nothing, so the network is not checked.

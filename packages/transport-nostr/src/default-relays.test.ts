@@ -4,17 +4,18 @@
 import { MAX_RELAYS, MIN_RELAYS, isAllowedRelayUrl, relayListSchema } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RELAYS } from './default-relays.js';
-import { DEFAULT_RELAYS as FROM_INDEX } from './index.js';
+import { DEFAULT_RELAYS as FROM_INDEX, LEGACY_READ_RELAYS as LEGACY_FROM_INDEX } from './index.js';
+import { LEGACY_READ_RELAYS } from './legacy-relays.js';
 import { isGloballyRoutable } from './relay-address.js';
 
 describe('DEFAULT_RELAYS (D-75)', () => {
   it('is the exported list and holds the four public relays of D-75', () => {
     expect(FROM_INDEX).toBe(DEFAULT_RELAYS);
     expect([...DEFAULT_RELAYS]).toEqual([
-      'wss://nos.lol',
+      'wss://offchain.pub',
       'wss://relay.primal.net',
       'wss://relay.snort.social',
-      'wss://nostr.mom',
+      'wss://nostr.bitcoiner.social',
     ]);
   });
 
@@ -34,5 +35,17 @@ describe('DEFAULT_RELAYS (D-75)', () => {
 
   it('is frozen, so a caller cannot change the shared list', () => {
     expect(Object.isFrozen(DEFAULT_RELAYS)).toBe(true);
+  });
+});
+
+describe('LEGACY_READ_RELAYS (0.5.13 transition)', () => {
+  it('is the two replaced relays, read only, outside the defaults', () => {
+    expect(LEGACY_FROM_INDEX).toBe(LEGACY_READ_RELAYS);
+    expect([...LEGACY_READ_RELAYS]).toEqual(['wss://nos.lol', 'wss://nostr.mom']);
+    for (const url of LEGACY_READ_RELAYS) {
+      expect(DEFAULT_RELAYS).not.toContain(url);
+      expect(isAllowedRelayUrl(url)).toBe(true);
+    }
+    expect(Object.isFrozen(LEGACY_READ_RELAYS)).toBe(true);
   });
 });

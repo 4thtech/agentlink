@@ -81,6 +81,7 @@ describe('--help (06 §8)', () => {
       'agentlink owner init',
       'agentlink owner add-agent --id <name>',
       'agentlink owner change-code',
+      'agentlink owner update-contact-details',
       'agentlink init [--harness <id|none>] [--config <path>]',
       'agentlink status [--brief]',
       'agentlink invite',
@@ -129,7 +130,8 @@ describe('--help (06 §8)', () => {
     // U3-invite: `agentlink join '<invite link>'`.
     expect(help).toContain("agentlink join '<invite link>'");
     // UX1113-R1: `backup restore` and `restore`.
-    expect(commandLines).toHaveLength(29);
+    // RELAY-CARD-MIGRATION: `owner update-contact-details`.
+    expect(commandLines).toHaveLength(30);
   });
 
   it('prints help for --help, -h and help', async () => {

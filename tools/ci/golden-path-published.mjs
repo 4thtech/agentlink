@@ -283,16 +283,49 @@ await step('S6', 'app: ui in a terminal serves its first page', async () => {
         : 'macOS opens the session link with /usr/bin/open (absolute path): it cannot be captured',
     };
   }
-  // The session link goes only to /usr/bin/xdg-open (never printed). The runner has no browser, so a
-  // capturing stand-in takes its place on this fresh VM.
+  // The launcher starts the DEFAULT WEB BROWSER with a private launch page (it holds the session
+  // link) when it can find one (xdg-settings), and only otherwise hands the link to /usr/bin/xdg-open
+  // (packages/node default-browser.ts, approval-os.ts). Which of the two happens depended on what the
+  // runner image has installed (GOLDEN-PATH-S6-FLAKE: a real browser on the image was started
+  // without a display and failed, "couldn't open your browser"). Make both paths land in the same
+  // capturing stand-in: a stand-in default browser in this profile, and an xdg-open stand-in.
+  // The stand-in takes either the link itself or the launch page and writes the link to the sink;
+  // nothing is printed.
   const sink = join(root, 'opened-url.txt');
   const shim = join(root, 'xdg-open');
-  writeFileSync(shim, `#!/bin/sh\nprintf '%s' "$1" > '${sink}'\n`);
+  writeFileSync(
+    shim,
+    [
+      '#!/bin/sh',
+      'arg="$1"',
+      'if [ -f "$arg" ]; then',
+      "  arg=$(grep -o 'url=http[^\"]*' \"$arg\" | head -n 1 | cut -c5-)",
+      'fi',
+      `printf '%s' "$arg" > '${sink}'`,
+      '',
+    ].join('\n'),
+  );
   chmodSync(shim, 0o755);
   const inst = spawnSync('sudo', ['install', '-m', '755', shim, '/usr/bin/xdg-open']);
   need(inst.status === 0, 'could not install the xdg-open stand-in');
+  const benHome = homes.ben;
+  mkdirSync(join(benHome, '.local', 'share', 'applications'), { recursive: true });
+  mkdirSync(join(benHome, '.config'), { recursive: true });
+  writeFileSync(
+    join(benHome, '.local', 'share', 'applications', 'agentlink-ci-browser.desktop'),
+    `[Desktop Entry]\nType=Application\nName=CI browser\nExec=/usr/bin/xdg-open %u\nMimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;\n`,
+  );
+  writeFileSync(
+    join(benHome, '.config', 'mimeapps.list'),
+    '[Default Applications]\nx-scheme-handler/http=agentlink-ci-browser.desktop\nx-scheme-handler/https=agentlink-ci-browser.desktop\ntext/html=agentlink-ci-browser.desktop\n',
+  );
   const child = spawn('script', ['-qec', `"${launcher}" ui`, '/dev/null'], {
-    env: profileEnv(homes.ben),
+    // No desktop session: xdg-settings then reads this profile's mimeapps.list, never the image's.
+    env: {
+      ...profileEnv(benHome),
+      XDG_CONFIG_HOME: join(benHome, '.config'),
+      XDG_DATA_HOME: join(benHome, '.local', 'share'),
+      XDG_CURRENT_DESKTOP: '', DESKTOP_SESSION: '', BROWSER: '' },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   let out = '';
