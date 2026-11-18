@@ -9,6 +9,7 @@ import { agentEraseAccounts, keychainAccount, type KeychainBackend } from './key
 import {
   RESTORE_MARK_ITEM,
   decodeRestoreMark,
+  decodeRestoreReason,
   encodeRestoreMark,
   keychainRestoreMark,
 } from './restore-mark.js';
@@ -80,9 +81,12 @@ describe('restore mark item', () => {
 
   it('a missing item starts a guard window now and writes it (fail closed)', async () => {
     const keychain = new MemKeychain();
-    expect(await markOver(keychain).read()).toBe(NOW);
+    const mark = markOver(keychain);
+    expect(await mark.read()).toBe(NOW);
     const stored = keychain.items.get(keychainAccount(AGENT, RESTORE_MARK_ITEM));
-    expect(stored).toEqual(encodeRestoreMark(NOW));
+    // Written on an update (no mark yet): the reason is for the card copy only.
+    expect(stored).toEqual(encodeRestoreMark(NOW, 'update'));
+    expect(await mark.reason()).toBe('update');
   });
 
   it('a damaged item starts a guard window now and is replaced (fail closed)', async () => {
@@ -90,7 +94,20 @@ describe('restore mark item', () => {
     const account = keychainAccount(AGENT, RESTORE_MARK_ITEM);
     keychain.items.set(account, ascii('garbage'));
     expect(await markOver(keychain).read()).toBe(NOW);
-    expect(keychain.items.get(account)).toEqual(encodeRestoreMark(NOW));
+    expect(keychain.items.get(account)).toEqual(encodeRestoreMark(NOW, 'update'));
+  });
+
+  it('a restore records the reason restore; an update records update; both read as the time', async () => {
+    expect(encodeRestoreMark(NOW, 'update')).toEqual(ascii(`u${String(NOW)}`));
+    expect(decodeRestoreMark(encodeRestoreMark(NOW, 'update'))).toBe(NOW);
+    expect(decodeRestoreReason(encodeRestoreMark(NOW))).toBe('restore');
+    expect(decodeRestoreReason(encodeRestoreMark(NOW, 'update'))).toBe('update');
+    for (const bad of ['u', 'u01', 'U5', 'u-1', 'x5']) {
+      expect(() => decodeRestoreMark(ascii(bad))).toThrow();
+    }
+    const keychain = new MemKeychain();
+    keychain.items.set(keychainAccount(AGENT, RESTORE_MARK_ITEM), encodeRestoreMark(NOW - 5));
+    expect(await markOver(keychain).reason()).toBe('restore');
   });
 
   it('a mark in the future is kept (never lowered to now)', async () => {
@@ -110,7 +127,7 @@ describe('restore mark item', () => {
 
   it('the mark offers no way to lower or clear it', () => {
     const mark = markOver(new MemKeychain());
-    expect(Object.keys(mark).sort()).toEqual(['read']);
+    expect(Object.keys(mark).sort()).toEqual(['read', 'reason']);
     expect(Object.isFrozen(mark)).toBe(true);
   });
 });

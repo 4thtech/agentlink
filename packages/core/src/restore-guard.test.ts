@@ -11,11 +11,13 @@ import {
   type EffectivePolicy,
   type ProofAction,
 } from './policy-engine.js';
+import { approvalProofTriggers } from './proofs/service.js';
 import {
   RESTORE_CLOCK_SKEW_SECONDS,
   RESTORE_GUARD_SECONDS,
   guardCommitment,
   readRestoreState,
+  requestedBeforeRestore,
   restoreWindowOpen,
   restoredReplay,
   type RestoreMark,
@@ -48,7 +50,25 @@ describe('readRestoreState', () => {
     expect(await readRestoreState(ctxWith(mark(NOW)))).toEqual({
       status: 'restored',
       restoredAt: NOW,
+      reason: 'restore',
     });
+  });
+
+  it('the reason (restore or update) comes from the mark, for the card copy only', async () => {
+    const updated: RestoreMark = {
+      read: () => Promise.resolve(NOW),
+      reason: () => Promise.resolve('update'),
+    };
+    expect(await readRestoreState(ctxWith(updated))).toEqual({
+      status: 'restored',
+      restoredAt: NOW,
+      reason: 'update',
+    });
+    const unreadable: RestoreMark = {
+      read: () => Promise.resolve(NOW),
+      reason: () => Promise.reject(new Error('x')),
+    };
+    expect(await readRestoreState(ctxWith(unreadable))).toMatchObject({ reason: 'update' });
   });
 
   it('a mark that throws or holds anything but a time is unknown (fail closed)', async () => {
@@ -61,7 +81,7 @@ describe('readRestoreState', () => {
 });
 
 describe('restoreWindowOpen', () => {
-  const restored = { status: 'restored', restoredAt: NOW } as const;
+  const restored = { status: 'restored', restoredAt: NOW, reason: 'restore' } as const;
   it('is open for 24 h after the restore, then closes', () => {
     expect(RESTORE_GUARD_SECONDS).toBe(86_400);
     expect(restoreWindowOpen(restored, NOW)).toBe(true);
@@ -77,8 +97,21 @@ describe('restoreWindowOpen', () => {
   });
 });
 
+describe('requestedBeforeRestore: owner approvals asked for before the restore', () => {
+  const restored = { status: 'restored', restoredAt: NOW, reason: 'restore' } as const;
+  it('a request made before the restore is void; one made at or after it is not', () => {
+    expect(requestedBeforeRestore(restored, NOW - 1)).toBe(true);
+    expect(requestedBeforeRestore(restored, NOW)).toBe(false);
+    expect(requestedBeforeRestore(restored, NOW + 10 * RESTORE_GUARD_SECONDS)).toBe(false);
+  });
+  it('unknown voids every request; never restored none', () => {
+    expect(requestedBeforeRestore({ status: 'unknown' }, NOW + 10 ** 6)).toBe(true);
+    expect(requestedBeforeRestore({ status: 'none' }, 0)).toBe(false);
+  });
+});
+
 describe('restoredReplay: inbound sent before the restore', () => {
-  const restored = { status: 'restored', restoredAt: NOW } as const;
+  const restored = { status: 'restored', restoredAt: NOW, reason: 'restore' } as const;
   it('an envelope created before the restore (with the skew allowance) is a replay', () => {
     expect(restoredReplay(restored, NOW - 86_400)).toBe(true);
     expect(restoredReplay(restored, NOW + RESTORE_CLOCK_SKEW_SECONDS - 1)).toBe(true);
@@ -102,6 +135,27 @@ describe('paid actions in the restore window', () => {
     });
     expect(out.decision).toBe('approval');
     expect(out.triggers).toContain('restored');
+  });
+
+  it('after an update the trigger says so (copy only: the decision is the same)', () => {
+    const out = evaluateProof(defaults, proof('0.01'), {
+      now: NOW,
+      ledger: empty,
+      restoreWindow: true,
+      restoreReason: 'update',
+    });
+    expect(out.decision).toBe('approval');
+    expect(out.triggers).toContain('updated');
+    expect(out.triggers).not.toContain('restored');
+  });
+
+  it('the card names the restore, never the daily budget, and offers no "remember"', () => {
+    expect(approvalProofTriggers(['restored'])).toEqual(['proofs.restored']);
+    expect(approvalProofTriggers(['updated'])).toEqual(['proofs.updated']);
+    expect(approvalProofTriggers(['restored', 'per_action'])).toEqual([
+      'proofs.perActionMaxUSD',
+      'proofs.restored',
+    ]);
   });
 
   it('the hard ceilings still refuse inside the window (never an approval)', () => {

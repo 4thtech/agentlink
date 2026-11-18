@@ -5,7 +5,6 @@
 // The same control conformance suite runs against the keychain backend (an in-memory keychain
 // double) and the file backend (a temporary `ALKS` directory), so both behave the same. Every Argon2id
 // runs at the 04 §2.8 floor (19 MiB, t = 2) to keep the suite fast.
-import { decodeRestoreMark } from './restore-mark.js';
 import { mkdir, mkdtemp, open, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -632,9 +631,13 @@ for (const backend of [keychainImportBackend(), fileImportBackend()]) {
       const items = await target.items(agent.agentId, unlockCode);
       const value = items.get('restore-mark');
       expect(value).toBeDefined();
+      // L5: loaded when the test runs, so a missing module fails this test only.
+      const { decodeRestoreMark } = await import('./restore-mark.js');
       const at = decodeRestoreMark(value as Uint8Array);
       expect(at).toBeGreaterThanOrEqual(before);
       expect(at).toBeLessThanOrEqual(after);
+      // Written before the seed, so a restore never leaves keys without the mark.
+      expect([...items.keys()][0]).toBe('restore-mark');
       handle.wipe();
     });
 
