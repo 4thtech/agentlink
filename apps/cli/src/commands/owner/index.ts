@@ -10,6 +10,8 @@ import { policyHandler } from './policy.js';
 
 export { nodeOwnerDeps, type OwnerAgent, type OwnerCommandDeps } from './deps.js';
 export { contactsManageHandler } from './contacts-manage.js';
+export { inviteOwnerHandler, INVITE_OWNER_TEXT } from './invite.js';
+import { inviteOwnerHandler } from './invite.js';
 export { policyHandler, type PolicyCommandOptions } from './policy.js';
 export { PROVISIONAL_CARD_RELAYS } from './card-relays.js';
 
@@ -24,5 +26,7 @@ export function ownerCommandHandlers(
     cancel: cancelHandler(deps),
     // M1-9m: the owner's rules (allowed folders for sending files).
     policy: policyHandler(deps),
+    // SEC-INVITE-CAPS (owner decision 18 Nov 2026): the owner's own invite needs presence.
+    invite: inviteOwnerHandler(deps),
   };
 }

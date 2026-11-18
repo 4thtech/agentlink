@@ -86,6 +86,9 @@ export type CoreErrorCode =
   // SEC-INVITE-CAPS: the contact came through an AI-made invite and waits for the owner's Keep; the
   // agent sends it nothing (no message, file, terms, proof or receipt) until then.
   | 'contact_waiting_owner'
+  // SEC-INVITE-CAPS (owner decision 18 Nov 2026): an owner invite without a valid `invite.create`
+  // signed by this agent's owner (wrong key, replayed, expired, another op); nothing was stored.
+  | 'invite_not_confirmed'
   | 'safety_code_unavailable'
   // Files (04 §4, 06 §2.3, 07 §5; M1-7f)
   | 'files_unavailable'

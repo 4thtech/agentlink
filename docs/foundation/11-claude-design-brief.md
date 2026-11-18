@@ -502,6 +502,7 @@ A contact paired through an invite the AI made waits for the owner (06 §2.1, 08
 | Widget, Needs you | "New contact via your AI" / "{count} new contacts via your AI" |
 | Settings › Rules › More rules | "Invites your AI makes" · "At most {open} open, {day} a day, each for {hours} hours." / "Your AI can't create invites." · helper "Limits for invites your AI creates. People who connect through them wait for you to keep them. Invites you create in People are not limited." · fields "Open at once", "Per day", "Expire after (hours)" |
 | In chat, over a cap | "You have {count} open invites. Ask your owner to create more in the app, or wait for one to be used or expire." / "You made {count} invites in the last 24 hours. Ask your owner to create more in the app, or try again after {time} UTC." / "Your owner hasn't allowed you to create invites. Ask them to create one in the app." |
+| Terminal, `agentlink invite` † (before the owner's presence) | "Create an invite from you. Whoever uses it first is connected with this ID as your contact." · on failure "Problem  That didn't go through. No invite was made." |
 | In chat, a waiting contact | "This contact is waiting for your owner to keep them in the AgentLink app, so nothing was sent." |
 
 **Rules.**

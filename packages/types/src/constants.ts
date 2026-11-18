@@ -194,6 +194,9 @@ export const OWNER_ACTION_OPS = freeze([
   // SEC-INVITE-CAPS (D-156; proposed, owner confirms at merge): the owner keeps a contact the AI
   // connected through an AI-made invite (People, Home), behind the presence gate; no envelope.
   'contact.keep',
+  // SEC-INVITE-CAPS (owner decision 18 Nov 2026): the owner's own invite from `agentlink invite`
+  // (owner presence). Core makes an owner invite only after verifying it; no envelope carries it.
+  'invite.create',
   'storage.set',
   'storage.remove',
   'backup.export',
@@ -298,6 +301,7 @@ export const OWNER_ACTION_MAX_LIFETIME_SECONDS = freeze({
   'contact.unblock': 600,
   // SEC-INVITE-CAPS: applied on the agent's own machine within seconds, like contact.block.
   'contact.keep': 600,
+  'invite.create': 600,
   // M1-9i-a (D-115): signed and applied on the agent's own machine within seconds.
   'storage.set': 600,
   'storage.remove': 600,

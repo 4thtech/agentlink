@@ -427,6 +427,20 @@ export const contactKeepActionSchema = z
   })
   .refine(expiring, EXPIRING_MSG);
 
+/**
+ * The owner's own invite (SEC-INVITE-CAPS, owner decision 18 Nov 2026): signed with owner presence by
+ * `agentlink invite`; core makes an owner invite (not capped, its contact kept) only after it verified
+ * this and recorded its nonce. Params exactly `{}`. Own machine only: no envelope.
+ */
+export const inviteCreateActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('invite.create'),
+    params: z.strictObject({}),
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG);
+
 /** Connects the agent's own S3-compatible storage (M1-9i-a, D-115). Own machine only: no envelope. */
 export const storageSetActionSchema = z
   .strictObject({
@@ -560,6 +574,7 @@ export const ownerActionSchema = z.discriminatedUnion('op', [
   contactBlockActionSchema,
   contactUnblockActionSchema,
   contactKeepActionSchema,
+  inviteCreateActionSchema,
   storageSetActionSchema,
   storageRemoveActionSchema,
   backupExportActionSchema,

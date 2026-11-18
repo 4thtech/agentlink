@@ -380,6 +380,13 @@ export class OwnerActions {
         return this.#applyContactBlock(value, base);
       case 'contact.keep':
         return this.#applyContactKeep(value, base);
+      case 'invite.create': {
+        // SEC-INVITE-CAPS: used only through `consumeInviteCreate` (client.createOwnerInvite), which
+        // makes the invite; applied alone it would record a presence that made nothing.
+        const verdict = verifyOwnerAction(value, base);
+        if (!verdict.ok && verdict.stage === 'object') return this.#report(fromVerdict(verdict));
+        return this.#report(refused(op, 'unsupported_op'));
+      }
       case 'storage.set':
       case 'storage.remove':
         return this.#applyStorage(text, value, base);
@@ -624,6 +631,39 @@ export class OwnerActions {
       return { status: 'applied', op: 'contact.keep' };
     });
     return outcome.status === 'refused' ? this.#report(outcome) : outcome;
+  }
+
+  /**
+   * SEC-INVITE-CAPS (owner decision 18 Nov 2026; 04 §2.5.1 `invite.create`): verifies an owner-signed
+   * `invite.create` (encoding, this agent, this owner's key, freshness, L(op) = 600 s) and records
+   * its nonce (the audit row) in one transaction. True only then; anything else writes nothing. The
+   * caller (client.createOwnerInvite) makes the owner invite only after true.
+   */
+  async consumeInviteCreate(input: unknown): Promise<boolean> {
+    let value: unknown;
+    try {
+      value = typeof input === 'string' ? parseOwnerActionText(input) : input;
+    } catch {
+      return false;
+    }
+    const self = await this.#self();
+    if ('refusal' in self) return false;
+    const base: OwnerActionCheckContext = { ...self, now: nowOf(this.#ctx) };
+    const shaped = signedOwnerActionSchema.safeParse(value);
+    if (!shaped.success || shaped.data.body.op !== 'invite.create') return false;
+    const usedBefore = await this.#nonceUsed(shaped.data.body.nonce);
+    const verdict = verifyOwnerAction(value, { ...base, nonceUsed: () => usedBefore });
+    if (!verdict.ok) {
+      this.#report(fromVerdict(verdict));
+      return false;
+    }
+    const { signed, actionHash } = verdict;
+    if (signed.body.op !== 'invite.create') return false;
+    return this.#ctx.store.transaction((tx) => {
+      if (tx.get('owner_action_nonces', { nonce: signed.body.nonce }) !== undefined) return false;
+      tx.insert('owner_action_nonces', nonceRow(signed, actionHash, base.now));
+      return true;
+    });
   }
 
   /**

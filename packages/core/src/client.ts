@@ -22,6 +22,7 @@ import {
   PairingService,
   type AcceptInviteResult,
   type AiInviteInput,
+  type CreateInviteInput,
   type CreatedInvite,
 } from './pairing.js';
 import { RequestsQueue } from './requests.js';
@@ -550,6 +551,22 @@ export class AgentLinkClient {
         ? { ...AI_INVITE_DEFAULTS }
         : aiInviteLimitsOf(effective.policy);
     return this.pairing.acceptInvite({ link, allowed: true, aiLimits });
+  }
+
+  /**
+   * SEC-INVITE-CAPS (owner decision 18 Nov 2026): the owner's own invite (`agentlink invite`, with
+   * owner presence). `signed` must be an `invite.create` this agent's owner signed; core verifies it
+   * and records its nonce first, then makes the invite: not capped, not counted, its contact kept.
+   * Anything else: `invite_not_confirmed`, nothing stored. The AI's path is `createAiInvite`.
+   */
+  async createOwnerInvite(signed: unknown, input: CreateInviteInput = {}): Promise<CreatedInvite> {
+    if (!(await this.ownerActions.consumeInviteCreate(signed))) {
+      throw new CoreError(
+        'invite_not_confirmed',
+        'The invite was not confirmed by the owner, so nothing was made.',
+      );
+    }
+    return this.pairing.createInvite(input);
   }
 
   /** SEC-INVITE-CAPS: true when `envelopeId` is from or to a contact that waits for the owner. */

@@ -320,6 +320,7 @@ export function verifyOwnerAction(
     case 'contact.block':
     case 'contact.unblock':
     case 'contact.keep':
+    case 'invite.create':
     case 'storage.set':
     case 'storage.remove':
     case 'backup.export':

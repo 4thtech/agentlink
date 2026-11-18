@@ -39,7 +39,7 @@ import { defaultPolicy } from '@4thtech-io/types';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createAcceptHandler } from '../src/commands/accept.js';
 import { createContactsHandler } from '../src/commands/contacts.js';
-import { createInviteHandler } from '../src/commands/invite.js';
+import { inviteOwnerHandler, type OwnerCommandDeps } from '../src/commands/owner/index.js';
 import { createStatusHandler } from '../src/commands/status.js';
 import { createDeps, type CommandDeps, type Prompter } from '../src/commands/shared.js';
 import { EXIT_FAILED, EXIT_OK, createDispatcher } from '../src/dispatch.js';
@@ -290,8 +290,44 @@ async function world(options: { aliceName?: string; bobName?: string } = {}): Pr
     clock: () => NOW,
     prompter,
   });
+  // SEC-INVITE-CAPS: `invite` † signs one `invite.create` with the owner's presence (the crypto test
+  // seam stands in for @4thtech-io/node's prompt).
+  const ownerDeps = {
+    listAgents: () => Promise.resolve([...agents.keys()]),
+    open: (name: string | undefined) => {
+      const found = agents.get(name ?? '');
+      if (found === undefined) throw new Error('unknown test agent');
+      return Promise.resolve({
+        status: 'ok' as const,
+        agent: {
+          name: found.name,
+          client: found.client,
+          store: found.store,
+          cipher: found.cipher,
+          close: () => Promise.resolve(),
+        },
+      });
+    },
+    signOwnerAction: async (
+      _owner: unknown,
+      item: { kind: string; action: JsonObject },
+    ): Promise<{ kind: 'owner-action'; signed: unknown }> => {
+      const found = [...agents.values()].find((a) => a.client.agentId === item.action['agent']);
+      if (found === undefined) throw new Error('unknown test agent');
+      const session = await found.owner.unlock(presence());
+      try {
+        return {
+          kind: 'owner-action',
+          signed: { body: item.action, sig: await session.signOwnerAction(item.action) },
+        };
+      } finally {
+        await session.close();
+      }
+    },
+    now: () => NOW,
+  } as unknown as OwnerCommandDeps;
   const dispatch = createDispatcher({
-    invite: createInviteHandler(deps),
+    invite: inviteOwnerHandler(ownerDeps),
     accept: createAcceptHandler(deps),
     contacts: createContactsHandler(deps),
     status: createStatusHandler(deps),

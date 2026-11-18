@@ -123,8 +123,10 @@ export const COMMANDS: readonly CommandSpec[] = Object.freeze([
   },
   {
     name: 'invite',
-    usage: ['agentlink invite [--long]'],
-    guard: 'none',
+    usage: ['agentlink invite [--long] [--id <name>]   †'],
+    // SEC-INVITE-CAPS (owner decision 18 Nov 2026): the owner's own invite needs owner presence;
+    // the AI's is `agentlink_create_invite` (capped, its contacts wait for the owner).
+    guard: 'owner',
     // W4-SHORT-INVITE (D-139 (7)): the long link, with nothing uploaded to the drop.
     options: { ...AGENT, long: { type: 'boolean' } },
   },

@@ -48,8 +48,6 @@ import { defaultPolicy } from '@4thtech-io/types';
 
 import { createAcceptHandler } from '../src/commands/accept.js';
 
-import { createInviteHandler } from '../src/commands/invite.js';
-
 import { createDeps, type CommandDeps, type Prompter } from '../src/commands/shared.js';
 
 import { EXIT_FAILED, EXIT_OK, createDispatcher } from '../src/dispatch.js';
@@ -311,7 +309,6 @@ async function world(options: { aliceName?: string; bobName?: string } = {}): Pr
     prompter,
   });
   const dispatch = createDispatcher({
-    invite: createInviteHandler(deps),
     accept: createAcceptHandler(deps),
   });
   return {
