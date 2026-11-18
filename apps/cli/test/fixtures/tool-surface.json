@@ -573,6 +573,9 @@
               "safetyCodeChecked": {
                 "type": "boolean"
               },
+              "waitingForOwner": {
+                "type": "boolean"
+              },
               "connectedAt": {
                 "type": "string",
                 "maxLength": 64

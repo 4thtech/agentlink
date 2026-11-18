@@ -104,7 +104,13 @@ export function createAcceptHandler(deps: CommandDeps = createDeps()): CommandHa
         }
       }
 
-      const started = await client.pairing.acceptInvite({ link, allowed: true });
+      // SEC-INVITE-CAPS (D-156): without an owner approval (`contacts.acceptInvites: auto`) the accept
+      // is the AI's own, as on the MCP path: capped, and its contact waits for the owner's Keep. An
+      // accept the owner approved (the approval just used) is the owner's.
+      const started =
+        decision === 'allow'
+          ? await client.acceptInviteByAi(link)
+          : await client.pairing.acceptInvite({ link, allowed: true });
       if (started.status !== 'pending') {
         // `allowed` was set, so this does not happen; fail closed with fixed text if it ever does.
         context.output.printError(DISPATCH_TEXT.failed);

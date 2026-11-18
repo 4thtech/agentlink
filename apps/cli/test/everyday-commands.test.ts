@@ -408,6 +408,23 @@ describe('invite and accept: a pairing round trip over a relay double (M1-9l; 04
     expect(atBob.text).not.toMatch(/\b\d{4}\b.*\b\d{4}\b.*\b\d{4}\b/);
   });
 
+  // SEC-INVITE-CAPS (D-156): under `contacts.acceptInvites: auto` no owner approved this accept, so
+  // it is the AI's own (as on the MCP path): it counts toward the daily cap and the contact waits for
+  // the owner's Keep. Alice's invite was the owner's: on her side Bob is kept.
+  it('an accept under auto is the AI accept: the contact waits for the owner on the accepting side', async () => {
+    await allowAutoAccept(w.bob);
+    const url = inviteUrlOf(await w.run(w.alice, ['invite']));
+    const accepted = await w.run(w.bob, ['accept', url], NO_TTY);
+    expect(accepted.code).toBe(EXIT_OK);
+    expect((await rows(w.bob)).pairings.map((p) => p.created_by)).toEqual(['ai']);
+    await settle(w.alice, w.bob);
+    const atBob = (await rows(w.bob)).contacts[0];
+    expect(atBob?.waiting_owner).toBe(1);
+    expect(atBob?.ai_accepted_at).not.toBeNull();
+    const atAlice = (await rows(w.alice)).contacts[0];
+    expect(atAlice?.waiting_owner).toBeNull();
+  });
+
   it('under the default policy it returns the approve command and pairs nothing, without a terminal', async () => {
     const invite = await w.run(w.alice, ['invite']);
     const url = inviteUrlOf(invite);
@@ -458,6 +475,8 @@ describe('invite and accept: a pairing round trip over a relay double (M1-9l; 04
     expect(ok.code).toBe(EXIT_OK);
     expect(ok.text).toContain('Invite accepted');
     expect((await rows(w.bob)).pairings).toHaveLength(1);
+    // SEC-INVITE-CAPS: an accept the owner approved is the owner's (not counted, kept).
+    expect((await rows(w.bob)).pairings[0]?.created_by).toBeNull();
 
     const again = await w.run(w.bob, ['accept', url, '--approval', approvalId], NO_TTY);
     expect(again.code).toBe(EXIT_FAILED);

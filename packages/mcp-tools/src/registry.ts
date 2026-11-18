@@ -482,6 +482,9 @@ const DEFINITIONS: readonly ToolDefinition[] = [
             shortId: str({ maxLength: 16 }),
             pairing,
             safetyCodeChecked: bool(),
+            // SEC-INVITE-CAPS (D-156): present (true) while the AI connected it and the owner has not
+            // kept it yet; nothing can be sent to it until then.
+            waitingForOwner: bool(),
             connectedAt: timestamp,
             lastActivity: timestamp,
             unread: int(),

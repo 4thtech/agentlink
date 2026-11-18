@@ -928,7 +928,7 @@ export class PairingService implements PairingHandler {
       }
     }
 
-    const prepared = await this.#contacts.prepareStage({
+    const prepared0 = await this.#contacts.prepareStage({
       ...(aiLimits === undefined ? {} : { createdBy: 'ai' as const }),
       card: invite.card,
       cardSig: invite.cardSig,
@@ -939,6 +939,19 @@ export class PairingService implements PairingHandler {
       // R1-SEC-11 (04 §2.9): a staged accept lapses at the invite's expiry, never past 7 days.
       expiresAt: Math.min(invite.expiresAt, now + INVITE_MAX_SECONDS),
     });
+    // SEC-INVITE-CAPS: the daily cap is checked again in the transaction that stages the AI's accept,
+    // so two accepts at once cannot both pass it.
+    const prepared =
+      aiLimits === undefined
+        ? prepared0
+        : {
+            ...prepared0,
+            apply: (tx: StoreTx): void => {
+              const refused = aiInviteLimitTx(tx, now, aiLimits, 'accept');
+              if (refused !== undefined) throw refused;
+              prepared0.apply(tx);
+            },
+          };
     // M1-9ze: the counterparty staged (and sealed to, below) must be the contact this invite names,
     // the one step 1 verified and the approval showed. M1-9zf: that binds the owner too (step 2
     // shows the owner fingerprint) and the whole card, by its sha256(JCS) hash, so a card with the
