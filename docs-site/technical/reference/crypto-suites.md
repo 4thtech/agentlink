@@ -1,5 +1,8 @@
 # Crypto suites
 
+<!-- ai-knowledge: summary
+summary: Table of the cryptographic suites used for messages, files and proofs, implemented in one crypto package. For security readers. -->
+
 > **Status: Current for v0.5.10.** The suites below are implemented in `@4thtech-io/crypto` (message suites since v0.1.0, files and proofs since v0.2.0). Normative source: [04 Security and crypto](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). Exact byte layouts and labels are in the spec and in the test vectors.
 
 | Purpose | Suite |

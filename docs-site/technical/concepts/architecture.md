@@ -1,5 +1,8 @@
 # Architecture
 
+<!-- ai-knowledge: summary
+summary: Technical overview of components, the local app, the desktop app, packagings and trust boundaries: sensitive operations happen on the user's side and 4thTech runs only relays and a ciphertext drop. -->
+
 > **Status: Current for v0.5.10.** The released `@4thtech-io/agentlink` holds the crypto, transport, core, CLI, MCP server and local app; the desktop app for Mac and Windows has shipped; proof runs on test networks only (no mainnet before M3). The owner console, the self-hosted cloud agent and the Linux desktop app are planned. Source: [03 Architecture](https://github.com/4thtech/agentlink/blob/main/docs/foundation/03-architecture.md).
 
 AgentLink is client software plus a protocol. All sensitive operations (key generation, signing, encryption, decryption) happen on the user's side: their computer, their browser or their own cloud account. 4thTech operates only optional, zero-knowledge conveniences.
@@ -87,7 +90,7 @@ Events are `snapshot` (the whole state, first on every stream), `agents` (only a
 
 **Windows (W5-WINDOWS).** The entry `init` and the app write for an AI app starts with `cmd /c npx -y @4thtech-io/agentlink mcp`, because those apps cannot spawn `npx` directly on Windows; entries written earlier are recognised and rewritten on the next connect. The Claude Desktop extension (`.mcpb`) is built per platform (`darwin-arm64`, `darwin-x64`, `win32-x64`). CI installs the packed CLI on Windows, runs it, connects an AI app into a temporary profile and starts the MCP server on every change to the CLI, and the Windows `.mcpb` is opened on a Windows machine before each release.
 
-**The invite page and its deploy.** `apps/invite` is a static site served as Workers static assets at `https://agentlink.4thtech.io` (Custom Domain), with exactly five files (`_headers`, `index.html`, `i/index.html`, `invite.css`, `invite.js`). `deploy-invite.yml` builds once, then staging (`workers.dev`), then a smoke test that compares the served files with the build byte for byte and checks the security headers, then production after the environment approval, with a health check, an automatic rollback and the deploy freeze (`DEPLOY_FREEZE`).
+**The invite page and its deploy.** `apps/invite` is a static site served as Workers static assets at `https://agentlink.4thtech.io` (Custom Domain), with exactly five files (`_headers`, `index.html`, `i/index.html`, `invite.css`, `invite.js`). `deploy-invite.yml` builds once, then staging (`workers.dev`), then a smoke test that compares the served files with the build byte for byte and checks the security headers, then production after the environment approval, with a health check, an automatic rollback and the deploy freeze switch.
 
 **CI and release fast lane (owner Decision 54, 2026-11-01).** Pull requests run the checks of the packages a change affects, plus the heavy-lane jobs (macOS and Windows keychain, path guard, node on each OS, Windows smoke, deterministic end-to-end) only when the change is in their area. A push to `main` runs everything and publishes `ci-gate (push)`, which fails if any heavy job was skipped; deploys and `latest` releases require it. There is no merge queue. The class (S0, S1, S2) is computed from the paths; the independent review is required for S2 and sensitive paths only, and `node tools/pr/open-pr.mjs` fills the pull request. Every merge is testable as `@next` within minutes.
 

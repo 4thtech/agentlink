@@ -103,6 +103,14 @@ const V15_TABLES: readonly TableName[] = ['saved_files'];
 /** Tables added by version 16 (FILES-AI-1, D-152): the send-by-content daily budget ledger. */
 const V16_TABLES: readonly TableName[] = ['content_file_budget'];
 
+/** Tables added by version 17 (SEC-OUTBOUND-CAPS, D-156): the outgoing caps' count. */
+const V17_TABLES: readonly TableName[] = ['outgoing_log'];
+
+/** Columns added by version 18 (SEC-INVITE-CAPS, D-156): who made an invite; a waiting contact. */
+const V18_INVITES_COLUMNS: readonly string[] = ['created_by'];
+const V18_CONTACTS_COLUMNS: readonly string[] = ['waiting_owner', 'ai_accepted_at'];
+const V18_PAIRINGS_COLUMNS: readonly string[] = ['created_by'];
+
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
   return {
@@ -124,8 +132,11 @@ function v1Spec(table: TableName): TableSpec {
   if (table === 'files') {
     return without(spec, [...V4_FILES_COLUMNS, ...V6_FILES_COLUMNS, ...V11_FILES_COLUMNS]);
   }
-  if (table === 'invites') return without(spec, [...V8_INVITES_COLUMNS, ...V14_INVITES_COLUMNS]);
-  if (table === 'contacts') return without(spec, V9_CONTACTS_COLUMNS);
+  if (table === 'invites') {
+    return without(spec, [...V8_INVITES_COLUMNS, ...V14_INVITES_COLUMNS, ...V18_INVITES_COLUMNS]);
+  }
+  if (table === 'contacts') return without(spec, [...V9_CONTACTS_COLUMNS, ...V18_CONTACTS_COLUMNS]);
+  if (table === 'pairings') return without(spec, V18_PAIRINGS_COLUMNS);
   return spec;
 }
 
@@ -182,6 +193,33 @@ function v15Statements(): readonly string[] {
         `ALTER TABLE "envelopes" ADD COLUMN ${columnDef('envelopes', column, envelopes.columns[column] as ColumnSpec)}`,
     ),
     ...createSchemaStatements(V15_TABLES),
+  ];
+}
+
+/**
+ * Version 18 (SEC-INVITE-CAPS, D-156; 07 §3; proposed, owner confirms at merge): `invites.created_by`
+ * (`owner` | `ai`), `contacts.waiting_owner` (flag), `contacts.ai_accepted_at` and
+ * `pairings.created_by`, appended, nullable. Nothing is rewritten:
+ * every invite made before reads as the owner's (null), and every contact paired before is kept
+ * (null), so existing contacts are not affected.
+ */
+function v18Statements(): readonly string[] {
+  const invites = tableSpec('invites');
+  const contacts = tableSpec('contacts');
+  const pairings = tableSpec('pairings');
+  return [
+    ...V18_INVITES_COLUMNS.map(
+      (column) =>
+        `ALTER TABLE "invites" ADD COLUMN ${columnDef('invites', column, invites.columns[column] as ColumnSpec)}`,
+    ),
+    ...V18_CONTACTS_COLUMNS.map(
+      (column) =>
+        `ALTER TABLE "contacts" ADD COLUMN ${columnDef('contacts', column, contacts.columns[column] as ColumnSpec)}`,
+    ),
+    ...V18_PAIRINGS_COLUMNS.map(
+      (column) =>
+        `ALTER TABLE "pairings" ADD COLUMN ${columnDef('pairings', column, pairings.columns[column] as ColumnSpec)}`,
+    ),
   ];
 }
 
@@ -292,7 +330,10 @@ function v11Statements(): readonly string[] {
  * `invites.invite_link` (REL051-B2; nullable, null on existing rows), version 15 adds
  * `envelopes.deleted_at` and `saved_files` (RET-2, D-148; nullable, null on existing rows, and a new
  * table), version 16 adds `content_file_budget` (FILES-AI-1, D-152; a new table, existing rows
- * untouched). A later
+ * untouched), version 17 adds `outgoing_log` (SEC-OUTBOUND-CAPS, D-156; a new table, empty: sends
+ * before the update are not counted), version 18 adds `invites.created_by`,
+ * `contacts.waiting_owner`, `contacts.ai_accepted_at` and `pairings.created_by` (SEC-INVITE-CAPS,
+ * D-156; nullable, null on existing rows). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -311,7 +352,8 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
           !V11_TABLES.includes(t) &&
           !V12_TABLES.includes(t) &&
           !V15_TABLES.includes(t) &&
-          !V16_TABLES.includes(t),
+          !V16_TABLES.includes(t) &&
+          !V17_TABLES.includes(t),
       ),
       v1Spec,
     ),
@@ -331,6 +373,8 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 14, statements: Object.freeze(v14Statements()) }),
   Object.freeze({ version: 15, statements: Object.freeze(v15Statements()) }),
   Object.freeze({ version: 16, statements: createSchemaStatements(V16_TABLES) }),
+  Object.freeze({ version: 17, statements: createSchemaStatements(V17_TABLES) }),
+  Object.freeze({ version: 18, statements: Object.freeze(v18Statements()) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

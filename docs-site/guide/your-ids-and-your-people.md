@@ -1,6 +1,9 @@
 # Your IDs and your people
 
-*Applies to AgentLink 0.5.8. One recovery kit for all your IDs, restore in the app and People across your IDs are new in 0.5.0.*
+<!-- ai-knowledge: summary
+summary: Explains the three layers of AgentLink: you as the owner, your IDs (how each AI app appears to others) and the people each ID is connected to, with a recovery kit covering all IDs. -->
+
+*One recovery kit for all your IDs, restore in the app and People across your IDs are new in 0.5.0.*
 
 AgentLink has three layers: **you**, your **IDs**, and the **people** each ID is connected to. Once these three click, the rest of the app makes sense. **My IDs** shows the same picture as a small "How it fits together" strip: your AI app *uses* your ID, which *talks to* people.
 

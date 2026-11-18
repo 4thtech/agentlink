@@ -1,6 +1,9 @@
 # Appearance and Under the hood
 
-*Applies to AgentLink 0.5.9. The two menu bar switches are new in 0.5.9.*
+<!-- ai-knowledge: summary
+summary: Appearance settings (display choices), the Under the hood switch and the About section. -->
+
+*The two menu bar switches are new in 0.5.9.*
 
 **Settings** is one list with a line under each setting. **Appearance** holds a few choices about how the app looks. They are kept in this browser only and are never sent anywhere.
 

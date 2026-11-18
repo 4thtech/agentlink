@@ -8,8 +8,10 @@
 // - apps/local-ui (src/pages/contacts/*.test.ts) asserts its client builds exactly each request and
 //   reads each answer as the outcome word next to it.
 //
-// Every POST route is the invite kind (no presence): an octet-stream body holding one JSON object,
-// the page's CSRF token, no query, no X-AgentLink-Input. The list never carries a link, a secret or
+// SEC-INVITE-CAPS (owner decision 18 Nov 2026): create is an owner route (presence): its JSON object
+// travels in X-AgentLink-Input, the body is the presence proof, and it answers `status: 'done'`.
+// Every other POST route is the invite kind (no presence): an octet-stream body holding one JSON
+// object, the page's CSRF token, no query, no X-AgentLink-Input. The list never carries a link, a secret or
 // a lookup ID. REL051-B2 (owner test, 13 Nov; 04 §3.6, 08 §1): `POST /api/ui/invites/link` answers
 // one open invite's kept link again, only on the owner's click (Copy link, Show link); an invite
 // stored before links were kept answers `no_link`. The world's values are filler.
@@ -21,7 +23,7 @@ export interface InviteCreateBody {
 }
 
 export interface InviteCreatedBody {
-  readonly status: 'ok';
+  readonly status: 'done';
   /** `https://agentlink.4thtech.io/i#2.<43>` (short) or `…/i#<payload>` (long). */
   readonly inviteUrl: string;
   readonly shareText: string;
@@ -94,7 +96,7 @@ export const INVITE_CREATE = {
     answer: {
       status: 200,
       body: {
-        status: 'ok',
+        status: 'done',
         inviteUrl: INVITES_WORLD.shortLink,
         shareText: `Add my AI agent on AgentLink: ${INVITES_WORLD.shortLink}`,
         ownerFingerprint: INVITES_WORLD.ownerFingerprint,

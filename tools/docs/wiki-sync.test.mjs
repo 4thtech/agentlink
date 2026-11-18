@@ -24,9 +24,12 @@ import {
   renderState,
   rewriteHref,
   rewriteLinks,
+  setBannerVersion,
+  stripKnowledgeMarker,
   sync,
   updateRedirects,
   updateSummary,
+  detectLayout,
 } from './wiki-sync.mjs';
 
 const ctx = (srcRel, extra = {}) => ({
@@ -341,5 +344,101 @@ describe('hardening (DOCS-UNIFY review)', () => {
     expect(() => assertOnMain(repo, offMain)).toThrow(/not on origin\/main/);
     g('update-ref', '-d', 'refs/remotes/origin/main');
     expect(() => assertOnMain(repo, onMain)).toThrow(/has no origin\/main/);
+  });
+});
+
+// DOCS-COMPACT-A: one script syncs old tags (legacy layout, docs-site/) and new tags (compact layout,
+// docs/guide, docs/technical, docs/assets) to the same wiki paths.
+function toCompact(src) {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'sync-compact-'));
+  fs.cpSync(src, out, { recursive: true });
+  for (const [from, to] of [
+    ['docs-site/guide', 'docs/guide'],
+    ['docs-site/technical', 'docs/technical'],
+    ['docs-site/assets', 'docs/assets'],
+  ]) {
+    if (fs.existsSync(path.join(out, from))) fs.renameSync(path.join(out, from), path.join(out, to));
+  }
+  fs.rmSync(path.join(out, 'docs-site'), { recursive: true, force: true });
+  return out;
+}
+
+const filesOf = (root) =>
+  fs
+    .readdirSync(root, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile())
+    .map((e) => path.relative(root, path.join(e.parentPath ?? e.path, e.name)))
+    .sort();
+
+describe('dual layout (DOCS-COMPACT-A)', () => {
+  it('detects the layout of a source tree, and fails clearly on neither', () => {
+    const { src } = fixture();
+    expect(detectLayout(src).name).toBe('legacy');
+    expect(detectLayout(toCompact(src)).name).toBe('compact');
+    expect(() => detectLayout(fs.mkdtempSync(path.join(os.tmpdir(), 'empty-')))).toThrow(
+      /unknown docs layout/,
+    );
+  });
+
+  it('maps both layouts to the same wiki paths', () => {
+    const legacy = { guide: 'docs-site/guide', technical: 'docs-site/technical', assets: 'docs-site/assets' };
+    const compact = { guide: 'docs/guide', technical: 'docs/technical', assets: 'docs/assets' };
+    expect(destFor('docs-site/guide/a/b.md', legacy)).toBe('agentlink/a/b.md');
+    expect(destFor('docs/guide/a/b.md', compact)).toBe('agentlink/a/b.md');
+    expect(destFor('docs/technical/x.md', compact)).toBe('agentlink/technical/x.md');
+    expect(destFor('docs/assets/s/x.webp', compact)).toBe('agentlink/.gitbook/assets/s/x.webp');
+    expect(destFor('docs/foundation/04.md', compact)).toBe(null);
+  });
+
+  it('a compact tree generates the same wiki copy as the legacy tree, except the header label', () => {
+    const { src, wiki } = fixture();
+    fs.mkdirSync(path.join(src, 'docs-site/assets/screens'), { recursive: true });
+    fs.writeFileSync(path.join(src, 'docs-site/assets/screens/home.webp'), 'RIFF');
+    fs.appendFileSync(
+      path.join(src, 'docs-site/guide/how.md'),
+      '\n<img src="../assets/screens/home.webp" alt="Home">\n[cli](https://github.com/4thtech/agentlink/blob/main/docs-site/technical/reference/cli.md)\n',
+    );
+    const wiki2 = fs.mkdtempSync(path.join(os.tmpdir(), 'sync-wiki2-'));
+    fs.cpSync(wiki, wiki2, { recursive: true });
+    const compact = toCompact(src);
+    // The compact tree links the technical page by its new repo path.
+    const how = path.join(compact, 'docs/guide/how.md');
+    fs.writeFileSync(how, fs.readFileSync(how, 'utf8').replace('blob/main/docs-site/', 'blob/main/docs/'));
+    const a = sync({ tag: 'v9.9.9', srcRoot: src, commit: 'abc', root: wiki });
+    const b = sync({ tag: 'v9.9.9', srcRoot: compact, commit: 'abc', root: wiki2 });
+    expect(b.pages).toBe(a.pages);
+    expect(filesOf(wiki2)).toEqual(filesOf(wiki));
+    for (const rel of filesOf(wiki)) {
+      if (rel === 'data/agentlink-sync.yaml') continue;
+      const x = fs.readFileSync(path.join(wiki, rel), 'utf8');
+      const y = fs.readFileSync(path.join(wiki2, rel), 'utf8');
+      expect(y, rel).toBe(x.replace('agentlink docs-site@v9.9.9', 'agentlink docs@v9.9.9'));
+    }
+    expect(fs.readFileSync(path.join(wiki2, 'agentlink/how.md'), 'utf8')).toContain(
+      '[cli](technical/reference/cli.md)',
+    );
+  });
+
+  it('strips the ai-knowledge marker and sets the banner to the synced tag', () => {
+    const page =
+      '# Title\n\n<!-- ai-knowledge: full\nsummary: What this page answers. -->\n\nBody\n';
+    expect(stripKnowledgeMarker(page)).toBe('# Title\n\nBody\n');
+    expect(stripKnowledgeMarker('# T\n\nno marker\n')).toBe('# T\n\nno marker\n');
+    const banner =
+      '<!-- version-banner:start -->\n*Applies to AgentLink 0.6.1 (pre-alpha, test networks).*\n<!-- version-banner:end -->\nApplies to AgentLink 0.1.0 outside\n';
+    expect(setBannerVersion(banner, 'v0.6.0')).toBe(
+      banner.replace('0.6.1', '0.6.0'),
+    );
+    const { src, wiki } = fixture();
+    const compact = toCompact(src);
+    fs.writeFileSync(
+      path.join(compact, 'docs/guide/how.md'),
+      `# How\n\n<!-- ai-knowledge: summary\nsummary: x -->\n\n${banner}`,
+    );
+    sync({ tag: 'v0.6.0', srcRoot: compact, commit: 'abc', root: wiki });
+    const out = fs.readFileSync(path.join(wiki, 'agentlink/how.md'), 'utf8');
+    expect(out).not.toContain('ai-knowledge');
+    expect(out).toContain('Applies to AgentLink 0.6.0 (pre-alpha');
+    expect(out).toContain('Synced from 4thtech/agentlink docs@v0.6.0');
   });
 });

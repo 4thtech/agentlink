@@ -1,6 +1,9 @@
 # Install AgentLink
 
-*Applies to AgentLink 0.5.8. Mac, Windows 10 or 11, and Linux.*
+<!-- ai-knowledge: full
+summary: How to install AgentLink in about two minutes on a Mac, Windows 10 or 11, or Linux, with no account and no admin rights; also covers the one-command install and joining from an invite link. -->
+
+*Mac, Windows 10 or 11, and Linux.*
 
 **Goal:** AgentLink installed and open, in about two minutes. You need no account and no admin rights.
 

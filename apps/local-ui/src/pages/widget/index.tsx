@@ -11,7 +11,7 @@
 // - Reads: /api/ui/widget (today, unread, contacts), health, notifications (approvals, files),
 //   /api/ui/activity (Live), /api/ui/contacts (names), /api/ui/app-update, and the shared live store
 //   (/api/ui/agents and its events). Re-read, debounced, on an agents change, the `activity` event, a
-//   return to view, and every 15 s as a fallback; nothing is read while the window is hidden.
+//   return to view or focus, and every 15 s as a fallback; nothing is read while the window is hidden.
 // - Keyboard: Escape closes, the arrow keys move between the actionable rows, Enter opens.
 import {
   Banner,
@@ -59,6 +59,7 @@ import {
   moreMessages,
   newCount,
   newFiles,
+  newViaAi,
   rowLabel,
   shortAgo,
   todayLabel,
@@ -340,6 +341,9 @@ export function WidgetPage({
       if (document.visibilityState !== 'hidden') schedule();
     };
     window.addEventListener(WIDGET_ACTIVITY_DOM_EVENT, onActivity);
+    // WIDGET-POLISH-0511: the popover gaining focus (it opens again) reads again, so a file opened or
+    // marked as seen in the main window leaves Needs you without waiting for the fallback poll.
+    window.addEventListener('focus', onActivity);
     document.addEventListener('visibilitychange', onVisible);
     const poll = setInterval(() => {
       if (document.visibilityState !== 'hidden') void readAll();
@@ -361,6 +365,7 @@ export function WidgetPage({
       clearInterval(poll);
       if (timer.current !== undefined) clearTimeout(timer.current);
       window.removeEventListener(WIDGET_ACTIVITY_DOM_EVENT, onActivity);
+      window.removeEventListener('focus', onActivity);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, []);
@@ -439,7 +444,12 @@ export function WidgetPage({
     .map((i) => i.ref as string)
     .filter((r) => /^0x[0-9a-f]{40}$/.test(r));
   const filesTarget = new Set(fileRefs).size === 1 ? fileRefs[0] : undefined;
-  const needs = approvals + files > 0;
+  // SEC-INVITE-CAPS (D-156): contacts the AI connected, waiting for Keep or Remove (Home shows
+  // them and links to People, where the gesture is).
+  const viaAi = model.contacts.filter(
+    (c) => c.waitingForOwner === true && c.status === 'active',
+  ).length;
+  const needs = approvals + files + viaAi > 0;
   const paused = link === 'paused';
   const offline = link === 'offline';
 
@@ -526,6 +536,26 @@ export function WidgetPage({
                       <Icon name="approval" size={16} />
                     </span>
                     <span className="wg-main al-text-body-sm">{waitingForYou(approvals)}</span>
+                    <span className="wg-chev">
+                      <Icon name="chevron-right" size={14} />
+                    </span>
+                  </button>
+                </li>
+              ) : null}
+              {viaAi > 0 ? (
+                <li>
+                  <button
+                    type="button"
+                    className="wg-row"
+                    data-wg-nav
+                    data-wg-via-ai
+                    onClick={go('home')}
+                    disabled={offline}
+                  >
+                    <span className="wg-ico">
+                      <Icon name="user-plus" size={16} />
+                    </span>
+                    <span className="wg-main al-text-body-sm">{newViaAi(viaAi)}</span>
                     <span className="wg-chev">
                       <Icon name="chevron-right" size={14} />
                     </span>

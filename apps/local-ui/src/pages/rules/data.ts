@@ -11,12 +11,19 @@ export interface RulesView {
     readonly dailyBudgetUSD: string;
     readonly perActionMaxUSD: string;
     readonly allowKeyDisclosure: 'approval' | 'deny';
+    /** D-156: the hard limits; above them a proof is refused, never asked. */
+    readonly hardMaxPerActionUSD: string;
+    readonly hardDailyUSD: string;
   };
+  /** D-156: what the AI may send in any 24 hours (06 §3 `outgoing`). */
+  readonly outgoing: Outgoing;
   readonly contacts: {
     readonly acceptInvites: 'approval' | 'auto';
     readonly unknownSenders: 'queue' | 'drop';
     readonly allowed: 'paired' | 'listed';
     readonly listed: number;
+    /** SEC-INVITE-CAPS (D-156): the caps on invites the AI makes; an older server: the defaults. */
+    readonly aiInvites: AiInvites;
   };
   readonly files: {
     readonly maxSendSizeMB: number;
@@ -31,6 +38,87 @@ export interface RulesView {
     readonly autoAcceptMinUSD: string | null;
     readonly autoAcceptContacts: number;
   };
+}
+
+/** SEC-INVITE-CAPS: `contacts.aiInvites` (06 §3), as the page shows and edits it. */
+export interface AiInvites {
+  readonly maxOpen: number;
+  readonly perDay: number;
+  readonly expiryHours: number;
+}
+
+/** The core defaults (packages/types AI_INVITE_DEFAULTS), for an older server that leaves it out. */
+export const AI_INVITES_DEFAULT: AiInvites = Object.freeze({
+  maxOpen: 3,
+  perDay: 5,
+  expiryHours: 24,
+});
+
+/** The bounds of each cap (packages/types POLICY_BOUNDS.aiInvites). */
+export const AI_INVITES_BOUNDS = Object.freeze({
+  maxOpen: { min: 0, max: 20 },
+  perDay: { min: 0, max: 50 },
+  expiryHours: { min: 1, max: 168 },
+} as const);
+
+const inRange = (v: unknown, b: { readonly min: number; readonly max: number }): v is number =>
+  typeof v === 'number' && Number.isSafeInteger(v) && v >= b.min && v <= b.max;
+
+function parseAiInvites(v: unknown): AiInvites | undefined {
+  if (v === undefined) return AI_INVITES_DEFAULT;
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return undefined;
+  const { maxOpen, perDay, expiryHours } = v as Record<string, unknown>;
+  if (
+    !inRange(maxOpen, AI_INVITES_BOUNDS.maxOpen) ||
+    !inRange(perDay, AI_INVITES_BOUNDS.perDay) ||
+    !inRange(expiryHours, AI_INVITES_BOUNDS.expiryHours)
+  ) {
+    return undefined;
+  }
+  return { maxOpen, perDay, expiryHours };
+}
+
+export interface Outgoing {
+  readonly messagesPerContactPerDay: number;
+  readonly messagesPerDay: number;
+  readonly filesPerContactPerDay: number;
+  readonly filesPerDay: number;
+  readonly fileMBPerDay: number;
+}
+
+/** D-156: each outgoing cap's upper bound (06 §3; core's POLICY_BOUNDS). */
+export const OUTGOING_MAX: Readonly<Record<keyof Outgoing, number>> = Object.freeze({
+  messagesPerContactPerDay: 10_000,
+  messagesPerDay: 100_000,
+  filesPerContactPerDay: 1_000,
+  filesPerDay: 10_000,
+  fileMBPerDay: 102_400,
+});
+
+/** D-156: what a server that does not send them yet means (the 06 §3 defaults). */
+const OUTGOING_DEFAULTS: Outgoing = Object.freeze({
+  messagesPerContactPerDay: 300,
+  messagesPerDay: 1000,
+  filesPerContactPerDay: 50,
+  filesPerDay: 200,
+  fileMBPerDay: 2000,
+});
+const HARD_DEFAULTS = Object.freeze({ hardMaxPerActionUSD: '0.5', hardDailyUSD: '10' });
+
+const OUTGOING_KEYS = Object.keys(OUTGOING_MAX) as (keyof Outgoing)[];
+
+function parseOutgoing(v: unknown): Outgoing | undefined {
+  if (v === undefined) return OUTGOING_DEFAULTS;
+  if (!isObject(v)) return undefined;
+  const out: Record<string, number> = {};
+  for (const key of OUTGOING_KEYS) {
+    const n = v[key];
+    if (typeof n !== 'number' || !Number.isSafeInteger(n) || n < 1 || n > OUTGOING_MAX[key]) {
+      return undefined;
+    }
+    out[key] = n;
+  }
+  return out as unknown as Outgoing;
 }
 
 export type RulesAnswer =
@@ -75,6 +163,11 @@ function parseView(v: unknown): RulesView | undefined {
   const { proofs: p, contacts: c, files: f, receipts: r, commitments: m } = v;
   if (!isObject(p) || !isObject(c) || !isObject(f) || !isObject(r) || !isObject(m))
     return undefined;
+  const outgoing = parseOutgoing(v.outgoing);
+  // An older server leaves the hard limits out: they read as the defaults (D-156).
+  const hardMaxPerActionUSD = p.hardMaxPerActionUSD ?? HARD_DEFAULTS.hardMaxPerActionUSD;
+  const hardDailyUSD = p.hardDailyUSD ?? HARD_DEFAULTS.hardDailyUSD;
+  if (outgoing === undefined || !usd(hardMaxPerActionUSD) || !usd(hardDailyUSD)) return undefined;
   if (
     !oneOf(p.notarize, RULE3) ||
     !usd(p.dailyBudgetUSD) ||
@@ -97,18 +190,24 @@ function parseView(v: unknown): RulesView | undefined {
   ) {
     return undefined;
   }
+  const aiInvites = parseAiInvites(c.aiInvites);
+  if (aiInvites === undefined) return undefined;
   return {
     proofs: {
       notarize: p.notarize,
       dailyBudgetUSD: p.dailyBudgetUSD,
       perActionMaxUSD: p.perActionMaxUSD,
       allowKeyDisclosure: p.allowKeyDisclosure,
+      hardMaxPerActionUSD,
+      hardDailyUSD,
     },
+    outgoing,
     contacts: {
       acceptInvites: c.acceptInvites,
       unknownSenders: c.unknownSenders,
       allowed: c.allowed,
       listed: c.listed,
+      aiInvites,
     },
     files: { maxSendSizeMB: f.maxSendSizeMB, maxReceiveSizeMB: f.maxReceiveSizeMB },
     receipts: { autoDelivered: r.autoDelivered, sendReceived: r.sendReceived !== false },
@@ -165,6 +264,18 @@ export interface Draft {
   readonly sellOn: boolean;
   readonly sellMinUSD: string;
   readonly sendReceived: boolean;
+  /** SEC-INVITE-CAPS: the three caps on AI-made invites, as typed. */
+  readonly aiMaxOpen: string;
+  readonly aiPerDay: string;
+  readonly aiExpiryHours: string;
+  /** D-156: the hard limits and the sending limits, as typed. */
+  readonly hardMaxPerActionUSD: string;
+  readonly hardDailyUSD: string;
+  readonly messagesPerContactPerDay: string;
+  readonly messagesPerDay: string;
+  readonly filesPerContactPerDay: string;
+  readonly filesPerDay: string;
+  readonly fileMBPerDay: string;
 }
 
 /** Buy auto-accept as core reads it: live, with listed contacts and a maximum above 0. */
@@ -196,7 +307,27 @@ export function draftOf(v: RulesView): Draft {
     sellOn: sellOn(v),
     sellMinUSD: v.commitments.autoAcceptMinUSD ?? '',
     sendReceived: v.receipts.sendReceived,
+    aiMaxOpen: String(v.contacts.aiInvites.maxOpen),
+    aiPerDay: String(v.contacts.aiInvites.perDay),
+    aiExpiryHours: String(v.contacts.aiInvites.expiryHours),
+    hardMaxPerActionUSD: v.proofs.hardMaxPerActionUSD,
+    hardDailyUSD: v.proofs.hardDailyUSD,
+    messagesPerContactPerDay: String(v.outgoing.messagesPerContactPerDay),
+    messagesPerDay: String(v.outgoing.messagesPerDay),
+    filesPerContactPerDay: String(v.outgoing.filesPerContactPerDay),
+    filesPerDay: String(v.outgoing.filesPerDay),
+    fileMBPerDay: String(v.outgoing.fileMBPerDay),
   };
+}
+
+/** SEC-INVITE-CAPS: a whole number typed for one cap, within its bounds, or undefined. */
+export function toCap(
+  text: string,
+  bounds: { readonly min: number; readonly max: number },
+): number | undefined {
+  if (!/^\s*[0-9]{1,3}\s*$/.test(text)) return undefined;
+  const n = Number(text.trim());
+  return n >= bounds.min && n <= bounds.max ? n : undefined;
 }
 
 /** The owner's dollar entry ("5", "0.50", "$10.5") as core's amount, or undefined. */
@@ -223,12 +354,21 @@ export function toSize(text: string): number | undefined {
   return n >= 1 && n <= MB_MAX ? n : undefined;
 }
 
+/** D-156: the owner's whole-number entry from 1 to `max`, or undefined. */
+export function toCount(text: string, max: number): number | undefined {
+  if (!/^\s*[0-9]{1,6}\s*$/.test(text)) return undefined;
+  const n = Number(text.trim());
+  return n >= 1 && n <= max ? n : undefined;
+}
+
 export interface DraftCheck {
   readonly patch: Record<string, Record<string, unknown>>;
   /** How many settings the owner changed (the unsaved-changes bar). */
   readonly changes: number;
   /** Fields whose entry is not valid, by draft key. */
   readonly invalid: ReadonlySet<keyof Draft>;
+  /** D-156: soft limits above their hard limit (also in `invalid`: saving waits). */
+  readonly aboveHard: ReadonlySet<'perActionMaxUSD' | 'dailyBudgetUSD'>;
 }
 
 /** The patch for `draft` over `view`: only what changed, in core's form. */
@@ -246,7 +386,9 @@ export function checkDraft(view: RulesView, draft: Draft): DraftCheck {
   };
 
   pick(draft.notarize !== view.proofs.notarize, 'proofs', 'notarize', draft.notarize);
-  const amount = (key: 'dailyBudgetUSD' | 'perActionMaxUSD'): void => {
+  const amount = (
+    key: 'dailyBudgetUSD' | 'perActionMaxUSD' | 'hardMaxPerActionUSD' | 'hardDailyUSD',
+  ): void => {
     const value = toUsd(draft[key]);
     if (value === undefined) {
       invalid.add(key);
@@ -256,6 +398,26 @@ export function checkDraft(view: RulesView, draft: Draft): DraftCheck {
   };
   amount('dailyBudgetUSD');
   amount('perActionMaxUSD');
+  amount('hardMaxPerActionUSD');
+  amount('hardDailyUSD');
+  // D-156: a soft limit is at most its hard limit (core refuses the edit otherwise).
+  const aboveHard = new Set<'perActionMaxUSD' | 'dailyBudgetUSD'>();
+  for (const [soft, hard] of [
+    ['perActionMaxUSD', 'hardMaxPerActionUSD'],
+    ['dailyBudgetUSD', 'hardDailyUSD'],
+  ] as const) {
+    const s = toUsd(draft[soft]);
+    const h = toUsd(draft[hard]);
+    if (s !== undefined && h !== undefined && Number(s) > Number(h)) {
+      aboveHard.add(soft);
+      invalid.add(soft);
+    }
+  }
+  for (const key of OUTGOING_KEYS) {
+    const value = toCount(draft[key], OUTGOING_MAX[key]);
+    if (value === undefined) invalid.add(key);
+    else pick(value !== view.outgoing[key], 'outgoing', key, value);
+  }
   pick(
     draft.allowKeyDisclosure !== view.proofs.allowKeyDisclosure,
     'proofs',
@@ -278,6 +440,26 @@ export function checkDraft(view: RulesView, draft: Draft): DraftCheck {
     const value = toSize(draft[key]);
     if (value === undefined) invalid.add(key);
     else pick(value !== view.files[key], 'files', key, value);
+  }
+  // SEC-INVITE-CAPS: the caps travel as one whole object (06 §3 `contacts.aiInvites`).
+  const caps = {
+    maxOpen: toCap(draft.aiMaxOpen, AI_INVITES_BOUNDS.maxOpen),
+    perDay: toCap(draft.aiPerDay, AI_INVITES_BOUNDS.perDay),
+    expiryHours: toCap(draft.aiExpiryHours, AI_INVITES_BOUNDS.expiryHours),
+  };
+  if (caps.maxOpen === undefined) invalid.add('aiMaxOpen');
+  if (caps.perDay === undefined) invalid.add('aiPerDay');
+  if (caps.expiryHours === undefined) invalid.add('aiExpiryHours');
+  if (caps.maxOpen !== undefined && caps.perDay !== undefined && caps.expiryHours !== undefined) {
+    const was = view.contacts.aiInvites;
+    pick(
+      caps.maxOpen !== was.maxOpen ||
+        caps.perDay !== was.perDay ||
+        caps.expiryHours !== was.expiryHours,
+      'contacts',
+      'aiInvites',
+      { maxOpen: caps.maxOpen, perDay: caps.perDay, expiryHours: caps.expiryHours },
+    );
   }
   pick(draft.accept !== view.commitments.accept, 'commitments', 'accept', draft.accept);
   pick(
@@ -322,7 +504,7 @@ export function checkDraft(view: RulesView, draft: Draft): DraftCheck {
     set('commitments', 'autoAcceptMinUSD', min);
     if (draft.sellOn === wasSell) changes += 1;
   }
-  return { patch, changes, invalid };
+  return { patch, changes, invalid, aboveHard };
 }
 
 const toBase64url = (bytes: Uint8Array): string => {

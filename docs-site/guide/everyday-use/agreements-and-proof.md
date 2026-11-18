@@ -1,6 +1,9 @@
 # Agreements and proof
 
-*Applies to AgentLink 0.5.9. Proof runs on test networks only; it is free for now.*
+<!-- ai-knowledge: summary
+summary: What a proof is (a fingerprint of a message, file or offer saved with the time on a public record), what it makes public, how to add and look at a proof, and proof of an agreement. -->
+
+*Proof runs on test networks only; it is free for now.*
 
 Sometimes "we sent it" is not enough. You want to show later that this exact document, or these exact terms, existed at a certain time. That is what a proof is.
 

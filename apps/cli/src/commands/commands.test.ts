@@ -13,7 +13,6 @@ import { NO_AGENT_MESSAGE } from '../runtime/open-agent.js';
 import { createAcceptHandler } from './accept.js';
 import { createContactsHandler } from './contacts.js';
 import { createDoctorHandler } from './doctor.js';
-import { createInviteHandler } from './invite.js';
 import { createRequestsHandler } from './requests.js';
 import { TEXT, createDeps, type CommandDeps, type Prompter } from './shared.js';
 import { createStatusHandler } from './status.js';
@@ -142,7 +141,6 @@ function harness(
     ...over,
   });
   const dispatch = createDispatcher({
-    invite: createInviteHandler(deps),
     accept: createAcceptHandler(deps),
     contacts: createContactsHandler(deps),
     status: createStatusHandler(deps),
@@ -842,45 +840,14 @@ describe('accept and invite argument checks', () => {
     expect(h.asked).toEqual([]);
   });
 
-  it('invite takes no arguments and needs no terminal', async () => {
-    const f = fakeAgent({
-      pairing: {
-        createInvite: () =>
-          Promise.resolve({
-            inviteUrl: 'agentlink://invite/AAAA',
-            ownerFingerprint: {},
-            expiresAt: 1_800_600_000,
-          }),
-      },
-    });
+  // SEC-INVITE-CAPS (owner decision 18 Nov 2026): `invite` is an owner command now; its arguments,
+  // terminal and presence are tested in test/invite-presence.test.ts.
+  it('invite is refused without an interactive terminal, before anything is opened', async () => {
+    const f = fakeAgent({});
     const h = harness(f);
-    expect((await h.run(['invite', 'extra'], PIPED)).code).toBe(EXIT_USAGE);
-    const ok = await h.run(['invite'], PIPED);
-    expect(ok.code).toBe(EXIT_OK);
-    expect(ok.out).toContain('agentlink://invite/AAAA');
-    expect(ok.out.join('\n')).toMatch(/until \d{1,2} \w{3} 2027/);
-    expect(h.asked).toEqual([]);
-  });
-
-  it('invite --long asks core for the long link (D-139 (7)); plain invite never does', async () => {
-    const inputs: unknown[] = [];
-    const f = fakeAgent({
-      pairing: {
-        createInvite: (input: unknown) => {
-          inputs.push(input);
-          return Promise.resolve({
-            inviteUrl: 'https://agentlink.4thtech.io/i#AAAA',
-            format: 'long',
-            ownerFingerprint: {},
-            expiresAt: 1_800_600_000,
-          });
-        },
-      },
-    });
-    const h = harness(f);
-    expect((await h.run(['invite', '--long'], PIPED)).code).toBe(EXIT_OK);
-    expect((await h.run(['invite'], PIPED)).code).toBe(EXIT_OK);
-    expect(inputs).toEqual([{ long: true }, {}]);
+    const piped = await h.run(['invite'], PIPED);
+    expect(piped.code).not.toBe(EXIT_OK);
+    expect(f.calls).not.toContain('close');
   });
 
   it('W4-PAUSE (IR-W4-PAUSE-1): invite and accept refuse while paused with the fixed paused text', async () => {
@@ -896,29 +863,8 @@ describe('accept and invite argument checks', () => {
       },
     });
     const h = harness(f);
-    const invite = await h.run(['invite'], PIPED);
-    expect(invite.code).toBe(EXIT_FAILED);
-    expect(invite.err).toEqual([PAUSED]);
     const accept = await h.run(['accept', 'https://agentlink.4thtech.io/i#AAAA']);
     expect(accept.code).toBe(EXIT_FAILED);
     expect(accept.err).toEqual([PAUSED]);
-  });
-
-  it('prints core fixed text for an expected core refusal and a generic line for anything else', async () => {
-    const refusing = fakeAgent({
-      pairing: {
-        createInvite: () =>
-          Promise.reject(new CoreError('identity_revoked', 'This agent has been revoked.')),
-      },
-    });
-    const a = await harness(refusing).run(['invite']);
-    expect(a.code).toBe(EXIT_FAILED);
-    expect(a.err).toEqual(['This agent has been revoked.']);
-    const odd = fakeAgent({
-      pairing: { createInvite: () => Promise.reject(new Error('leaks /tmp/x')) },
-    });
-    const b = await harness(odd).run(['invite']);
-    expect(b.err).toEqual([DISPATCH_TEXT.failed]);
-    expect(odd.calls).toContain('close');
   });
 });

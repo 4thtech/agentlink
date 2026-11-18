@@ -1844,6 +1844,72 @@ jobs:
           gh release upload "v$VERSION" --repo "$REPOSITORY" --clobber -- *.mcpb SHA256SUMS
           echo "Attached $(ls -- *.mcpb | wc -l) desktop extension bundles and SHA256SUMS to v$VERSION."
 
+  # DOCS-COMPACT-A: the Lumina knowledge bundle, a release asset only (no committed copy). Stable link:
+  # https://github.com/4thtech/agentlink/releases/latest/download/agentlink-knowledge.md
+  # Enabled after Step 2: until the public pages carry ai-knowledge markers, the build step skips
+  # with a notice; once they do, the cap check is strict (the bundle fails above 22k tokens).
+  knowledge-bundle:
+    name: knowledge-bundle
+    needs: [publish-latest, smoke-latest]
+    if: needs.smoke-latest.result == 'success' && needs.publish-latest.outputs.published == 'true' && vars.DEPLOY_FREEZE != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # attach the bundle to the GitHub Release v<version>
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Stop if DEPLOY_FREEZE is set
+        shell: bash
+        env:
+          DEPLOY_FREEZE: ${{ vars.DEPLOY_FREEZE }}
+        run: |
+          set -euo pipefail
+          if [ "${DEPLOY_FREEZE:-}" = "true" ]; then
+            echo "::error::DEPLOY_FREEZE is set; nothing is published until the owner clears it."
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          cache: "false"
+          install: "false"
+
+      - name: Build and attach agentlink-knowledge.md
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./apps/cli/package.json').version")"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Unexpected CLI version."; exit 1; }
+          if ! grep -q 'ai-knowledge:' docs-site/guide/README.md docs/guide/README.md 2>/dev/null; then
+            echo "::notice::The public pages carry no ai-knowledge markers yet (DOCS-COMPACT-A Step 2); the knowledge bundle is not built for v$VERSION."
+            exit 0
+          fi
+          if ! gh release view "v$VERSION" --repo "$REPOSITORY" > /dev/null 2>&1; then
+            echo "::warning::GitHub Release v$VERSION does not exist; the knowledge bundle was not attached."
+            exit 0
+          fi
+          node tools/docs/build-knowledge.mjs --check
+          node tools/docs/build-knowledge.mjs --tag "v$VERSION" --out "$RUNNER_TEMP/agentlink-knowledge.md"
+          gh release upload "v$VERSION" --repo "$REPOSITORY" --clobber -- "$RUNNER_TEMP/agentlink-knowledge.md"
+          echo "Attached agentlink-knowledge.md to v$VERSION."
+          # The notes link the bundle only once it is attached: added here, before "What's new", once.
+          notes="$RUNNER_TEMP/release-notes.md"
+          gh release view "v$VERSION" --repo "$REPOSITORY" --json body --jq .body > "$notes"
+          if ! grep -q 'agentlink-knowledge.md' "$notes"; then
+            line="For AI assistants: everything about AgentLink in one file, [agentlink-knowledge.md](https://github.com/$REPOSITORY/releases/download/v$VERSION/agentlink-knowledge.md)."
+            awk -v line="$line" '!done && /^## What.s new/ { print line; print ""; done = 1 } { print } END { if (!done) { print ""; print line } }' "$notes" > "$notes.new"
+            gh release edit "v$VERSION" --repo "$REPOSITORY" --notes-file "$notes.new"
+            echo "Linked agentlink-knowledge.md in the v$VERSION notes."
+          fi
+
   # ---------------------------------------------------------------------------
   # WP-D11 (DESK051-C4): the AgentLink desktop app for the npm version just published. desktop.yml
   # builds it on macOS (arm64, x64), runs the hardening checks and the smoke test on the built

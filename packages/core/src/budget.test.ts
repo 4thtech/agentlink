@@ -1,7 +1,7 @@
 // M1-7i: the budget check and the reservation of the Record's `maxFee` in one store transaction
 // (06 §3 "Daily budget window", G-7; 07 §3.5). Settle on confirmation, release only after the
 // deadline with no record, and fail closed on a missing, corrupted or clock-skewed ledger.
-import { POLICY_DEFAULTS } from '@4thtech-io/types';
+import { POLICY_DEFAULTS, defaultPolicy } from '@4thtech-io/types';
 import { describe, expect, it } from 'vitest';
 import {
   checkAndReserveProof,
@@ -16,7 +16,13 @@ import { SINGLETON_SLOT } from './store/schema.js';
 import type { Store, StoreTx } from './store/store.js';
 
 const NOW = 1_800_000_000;
-const defaults: EffectivePolicy = { mode: 'defaults', policy: POLICY_DEFAULTS };
+// The 06 §3 soft limits these rows were written for ($1 a proof, $5 a day), with the D-156 hard
+// ceilings out of their way; the ceilings have their own rows in policy-limits.test.ts.
+const softPolicy = defaultPolicy();
+softPolicy.proofs.perActionMaxUSD = '1';
+softPolicy.proofs.hardMaxPerActionUSD = '1000';
+softPolicy.proofs.hardDailyUSD = '1000';
+const defaults: EffectivePolicy = { mode: 'signed', policy: softPolicy, version: 1 };
 const failClosed: EffectivePolicy = { mode: 'fail_closed', problem: 'missing' };
 
 const proof = (feeUsd: string, maxFeeUsd = feeUsd): PolicyAction & { kind: 'proof' } => ({

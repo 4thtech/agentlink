@@ -34,9 +34,16 @@ const MB = 1024 * 1024;
 const defaults: EffectivePolicy = { mode: 'defaults', policy: POLICY_DEFAULTS };
 const signed = (edit: (p: Policy) => void = () => {}): EffectivePolicy => {
   const p = defaultPolicy();
+  // The soft-limit rows below were written for a $1 per-proof soft limit; the D-156 hard ceilings
+  // are set out of their way here and have their own rows in policy-limits.test.ts.
+  p.proofs.perActionMaxUSD = '1';
+  p.proofs.hardMaxPerActionUSD = '1000';
+  p.proofs.hardDailyUSD = '1000';
   edit(p);
   return { mode: 'signed', policy: p, version: 3 };
 };
+/** The 06 §3 soft limits ($1 a proof, $5 a day) with the hard ceilings out of the way (D-156). */
+const soft: EffectivePolicy = signed();
 const failClosed: EffectivePolicy = { mode: 'fail_closed', problem: 'tampered' };
 
 // --- proofs ---------------------------------------------------------------------------------------
@@ -97,24 +104,24 @@ const approval = (...triggers: ProofEvaluation['triggers']): ProofEvaluation => 
 const deny: ProofEvaluation = { decision: 'deny', triggers: ['notarize'] };
 
 const PROOF_ROWS: readonly ProofRow[] = [
-  // Defaults (06 §3): notarize allow, perActionMaxUSD "1", dailyBudgetUSD "5".
+  // Soft limits: notarize allow, perActionMaxUSD "1", dailyBudgetUSD "5" (hard ceilings out of the way).
   {
     name: 'defaults, $1.00 fee, empty ledger',
-    policy: defaults,
+    policy: soft,
     action: proof('1'),
     context: ctx(),
     expected: allow,
   },
   {
     name: 'defaults, $1.01 fee',
-    policy: defaults,
+    policy: soft,
     action: proof('1.01'),
     context: ctx(),
     expected: approval('per_action'),
   },
   {
     name: 'defaults, $0.000001 fee',
-    policy: defaults,
+    policy: soft,
     action: proof('0.000001'),
     context: ctx(),
     expected: allow,
@@ -122,7 +129,7 @@ const PROOF_ROWS: readonly ProofRow[] = [
   // Step 3 reads the fee (usd, the total); step 4 reads the reserved maximum fee.
   {
     name: 'fee $0.5 within the per-action max, maxFee $1.2 over it: per-action reads the fee',
-    policy: defaults,
+    policy: soft,
     action: proof('0.5', '1.2'),
     context: ctx(),
     expected: allow,
@@ -130,14 +137,14 @@ const PROOF_ROWS: readonly ProofRow[] = [
   // Threshold: spent + maxFee equal to the budget is allowed; one cent more is not.
   {
     name: 'spent $4 + max $1 = $5 budget',
-    policy: defaults,
+    policy: soft,
     action: proof('0.5', '1'),
     context: ctx(ledger([entry(NOW - 100, '4')])),
     expected: allow,
   },
   {
     name: 'spent $4.01 + max $1 = $5.01',
-    policy: defaults,
+    policy: soft,
     action: proof('0.5', '1'),
     context: ctx(ledger([entry(NOW - 100, '4.01')])),
     expected: approval('budget'),
@@ -145,14 +152,14 @@ const PROOF_ROWS: readonly ProofRow[] = [
   // Rolling window (G-7): t = now − 86 400 is outside, now − 86 399 inside.
   {
     name: 'an entry at now − 86 400 is outside the window',
-    policy: defaults,
+    policy: soft,
     action: proof('1'),
     context: ctx(ledger([entry(NOW - 86_400, '4.5')])),
     expected: allow,
   },
   {
     name: 'an entry at now − 86 399 is inside the window',
-    policy: defaults,
+    policy: soft,
     action: proof('1'),
     context: ctx(ledger([entry(NOW - 86_399, '4.5')])),
     expected: approval('budget'),
@@ -160,35 +167,35 @@ const PROOF_ROWS: readonly ProofRow[] = [
   // Entry states: reserved and charged count, released does not; charged counts the charged fee.
   {
     name: 'a reserved entry counts its reservation',
-    policy: defaults,
+    policy: soft,
     action: proof('1'),
     context: ctx(ledger([entry(NOW - 5, '4.5', 'reserved')])),
     expected: approval('budget'),
   },
   {
     name: 'a released entry does not count',
-    policy: defaults,
+    policy: soft,
     action: proof('1'),
     context: ctx(ledger([entry(NOW - 5, '4.5', 'released')])),
     expected: allow,
   },
   {
     name: 'a charged entry counts the charged fee, not the reservation',
-    policy: defaults,
+    policy: soft,
     action: proof('1'),
     context: ctx(ledger([entry(NOW - 5, '4.5', 'charged', { chargedUsd: '0.3' })])),
     expected: allow,
   },
   {
     name: 'entries of an earlier epoch do not count',
-    policy: defaults,
+    policy: soft,
     action: proof('1'),
     context: ctx(ledger([entry(NOW - 5, '4.5', 'charged', { ledgerEpoch: 1 })], { epoch: 2 })),
     expected: allow,
   },
   {
     name: 'several entries add as exact decimals (0.1 + 0.2 + 4.7 = 5)',
-    policy: defaults,
+    policy: soft,
     action: proof('0.000001'),
     context: ctx(ledger([entry(NOW - 3, '0.1'), entry(NOW - 2, '0.2'), entry(NOW - 1, '4.7')])),
     expected: approval('budget'),
@@ -196,42 +203,42 @@ const PROOF_ROWS: readonly ProofRow[] = [
   // Broken ledger (06 §3, 07 §3.5): approval for every paid action, never an empty sum.
   {
     name: 'ledger marked broken',
-    policy: defaults,
+    policy: soft,
     action: proof('0.01'),
     context: ctx({ status: 'broken' }),
     expected: approval('ledger_broken'),
   },
   {
     name: 'clock earlier than the newest entry',
-    policy: defaults,
+    policy: soft,
     action: proof('0.01'),
     context: ctx(ledger([], { newestT: NOW + 1 })),
     expected: approval('ledger_broken'),
   },
   {
     name: 'clock equal to the newest entry is fine',
-    policy: defaults,
+    policy: soft,
     action: proof('0.01'),
     context: ctx(ledger([], { newestT: NOW })),
     expected: allow,
   },
   {
     name: 'an entry from a later epoch than the state',
-    policy: defaults,
+    policy: soft,
     action: proof('0.01'),
     context: ctx(ledger([entry(NOW - 5, '0.01', 'charged', { ledgerEpoch: 2 })], { epoch: 1 })),
     expected: approval('ledger_broken'),
   },
   {
     name: 'a charged entry without a charged amount',
-    policy: defaults,
+    policy: soft,
     action: proof('0.01'),
     context: ctx(ledger([entry(NOW - 5, '0.01', 'charged', { chargedUsd: null })])),
     expected: approval('ledger_broken'),
   },
   {
     name: 'an entry with an unknown state',
-    policy: defaults,
+    policy: soft,
     action: proof('0.01'),
     context: ctx(
       ledger([
@@ -242,21 +249,21 @@ const PROOF_ROWS: readonly ProofRow[] = [
   },
   {
     name: 'an entry whose amount is not a USD amount ("1.0")',
-    policy: defaults,
+    policy: soft,
     action: proof('0.01'),
     context: ctx(ledger([entry(NOW - 5, '1.0', 'reserved')])),
     expected: approval('ledger_broken'),
   },
   {
     name: 'a broken entry outside the window still breaks the ledger',
-    policy: defaults,
+    policy: soft,
     action: proof('0.01'),
     context: ctx(ledger([entry(NOW - 90_000, '1.00', 'reserved')])),
     expected: approval('ledger_broken'),
   },
   {
     name: 'broken ledger and a fee over the per-action max: both triggers',
-    policy: defaults,
+    policy: soft,
     action: proof('2'),
     context: ctx({ status: 'broken' }),
     expected: approval('per_action', 'ledger_broken'),

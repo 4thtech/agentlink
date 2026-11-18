@@ -1,5 +1,8 @@
 # Harness configuration
 
+<!-- ai-knowledge: summary
+summary: What agentlink init writes into each supported AI app's configuration, the optional start-of-session hook, the default message network, and tools and approval prompts. -->
+
 > **Status: Available since v0.1.0 (released 16 Oct 2026, pre-alpha); current version v0.4.6, 31 Oct 2026.** The configuration below is what `agentlink init` writes. Other harnesses and remote harnesses are planned for later releases and are not covered here.
 
 **Purpose:** the exact MCP configuration for Claude Code, Claude Desktop, Codex, Gemini CLI, OpenCode and Antigravity, for people who configure it by hand instead of using `agentlink init`, and the harness permission settings that keep an agent away from AgentLink's private files.

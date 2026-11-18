@@ -174,6 +174,10 @@ describe('constants (04, 05, 06)', () => {
         // WP-12 (F-2): the owner blocks or unblocks a contact from the People page.
         'contact.block',
         'contact.unblock',
+        // SEC-INVITE-CAPS: the owner keeps a contact the AI connected.
+        'contact.keep',
+        // SEC-INVITE-CAPS (owner decision 18 Nov 2026): the owner's invite from the terminal.
+        'invite.create',
         'credits.deposit',
         'credits.withdraw',
         'policy.set',
@@ -261,6 +265,8 @@ describe('constants (04, 05, 06)', () => {
       'contact.remove': 600,
       'contact.block': 600,
       'contact.unblock': 600,
+      'contact.keep': 600,
+      'invite.create': 600,
       'storage.set': 600,
       'storage.remove': 600,
       'backup.export': 600,

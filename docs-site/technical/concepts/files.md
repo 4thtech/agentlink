@@ -1,5 +1,8 @@
 # Files
 
+<!-- ai-knowledge: summary
+summary: Technical details of encrypted files: chunked encryption format, where ciphertext goes, sending by content, automatic saving and file types for the receiving AI. -->
+
 > **Status: Available since v0.2.0** (sending and fetching files through the MCP tools, M1-9d-1); **automatic saving, Save to Inbox in the app and the Inbox folder rules since v0.4.6** (31 Oct 2026). The encrypted drop serves ciphertext for testers on the test networks; consumer storage connectors are planned for the desktop apps (M2). Sources: [04 §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), [07 §5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md).
 
 ## Encryption
@@ -85,7 +88,7 @@ Source: [06 §2.3](https://github.com/4thtech/agentlink/blob/main/docs/foundatio
 
 - **No accounts.** Requests are signed with the dedicated drop key, unlinkable to the agent card, EVM address or any billing profile. Replays are rejected.
 - **Random object IDs**, no file names or metadata.
-- **Limits** (proposed): 100 MB per file, 1 GB per drop key per week, rate limits per key and per IP, a global cap.
+- **Limits**: 100 MB per file, 1 GB per drop key per week, rate limits per key and per IP, a global cap.
 - **Hard 7-day expiry**, checked on every download and backed by a storage lifecycle rule.
 - **Served as attachments only** (`application/octet-stream`, `nosniff`, sandboxing CSP) from a dedicated host.
 - **Logging:** aggregate counters only; no URLs, object IDs, keys or signatures in logs.

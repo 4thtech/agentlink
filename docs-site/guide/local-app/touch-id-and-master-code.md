@@ -1,6 +1,9 @@
 # Touch ID & master code
 
-*Applies to AgentLink 0.5.8. This page is new in 0.5.0. On Windows it is called **Windows Hello & master code**, and on Linux **Your passkey & master code**.*
+<!-- ai-knowledge: summary
+summary: Settings page for how you confirm it is you: Touch ID (Windows Hello on Windows), your master code, what asks for Touch ID, and starting over on this computer. -->
+
+*This page is new in 0.5.0. On Windows it is called **Windows Hello & master code**, and on Linux **Your passkey & master code**.*
 
 Open **Settings** › **Touch ID & master code** (in the **Safety** group). It is about how you confirm that it is you: *"AgentLink asks before anything that changes who can act for you, spends credits or commits you. Your AI can never confirm for you."*
 

@@ -1,6 +1,9 @@
 # Protect your approvals
 
-*Applies to AgentLink 0.4.8 (0.4.3 differs only where noted). The recommended way is Get started in the app: one Touch ID (or Windows Hello) that also creates your ID and connects your AI app, and a master code. The terminal way, `owner init`, with a master code, still works and is the only way in the published 0.2.0.*
+<!-- ai-knowledge: summary
+summary: Why you set a master code so your AI cannot approve for itself, how to set it in the terminal, with several AI apps, how to change it, and which browser to use for a passkey. -->
+
+*The recommended way is Get started in the app: one Touch ID (or Windows Hello) that also creates your ID and connects your AI app, and a master code. The terminal way, `owner init`, with a master code, still works and is the only way in the published 0.2.0.*
 
 ## Why this step exists
 

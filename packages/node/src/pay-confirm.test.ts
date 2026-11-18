@@ -823,19 +823,24 @@ describe('a change to the spending limits (04 §2.5.3 table)', () => {
   it('the ordinary save refuses a spending change; the confirmation lists old and new and signs it', async () => {
     const h = await harness();
     const page = await h.page();
-    const saved = await save(h, page, await review(h, page, { proofs: { perActionMaxUSD: '7' } }));
+    // D-156: a per-proof limit above the hard ceiling raises the ceiling too; both are spending.
+    const edit = { proofs: { perActionMaxUSD: '7', hardMaxPerActionUSD: '7' } };
+    const saved = await save(h, page, await review(h, page, edit));
     expect(saved.status).toBe(409);
     expect(json(saved)['status']).toBe('confirm_required');
     expect(h.policy.version).toBe(1);
 
-    const hash = await review(h, page, { proofs: { perActionMaxUSD: '7' } });
+    const hash = await review(h, page, edit);
     const b = await begin(h, page, { flow: 'limits', review: hash, acknowledged: [] });
     expect(b.response.status).toBe(200);
     expect(b.statement).toMatchObject({
       kind: 'limits',
       amountUsd: null,
       purpose: 'limits_change',
-      changes: [{ field: 'proofs.perActionMaxUSD', old: '1', new: '7' }],
+      changes: [
+        { field: 'proofs.perActionMaxUSD', old: '0.2', new: '7' },
+        { field: 'proofs.hardMaxPerActionUSD', old: '0.5', new: '7' },
+      ],
     });
     const res = await finishPasskey(
       h,

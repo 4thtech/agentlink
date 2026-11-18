@@ -117,7 +117,19 @@ export type CreateOutcome =
    * the name update first (or `oldName` makes the invite anyway). Both names are text only (I-5).
    */
   | { readonly kind: 'name_update'; readonly cardName: string; readonly label: string }
-  | { readonly kind: 'invalid_name' | 'not_set_up' | 'session_expired' | 'offline' | 'failed' };
+  | { readonly kind: 'wait'; readonly seconds: number }
+  | {
+      readonly kind:
+        | 'invalid_name'
+        | 'not_set_up'
+        | 'session_expired'
+        | 'offline'
+        | 'failed'
+        // SEC-INVITE-CAPS: the owner's presence on Create (owner route).
+        | 'presence_rejected'
+        | 'presence_required'
+        | 'busy';
+    };
 
 export type InviteRefusal = 'expired' | 'own' | 'damaged' | 'cant_use' | 'unavailable';
 
@@ -151,9 +163,14 @@ export type AcceptOutcome =
     };
 
 export interface InviteApi {
+  /**
+   * SEC-INVITE-CAPS (owner decision 18 Nov 2026): Create invite is an owner route; `proof` is the
+   * owner's presence (Touch ID / Windows Hello / passkey / master code), once per invite.
+   */
   create(
     label: string | undefined,
-    options?: { readonly long?: boolean; readonly oldName?: boolean },
+    options: { readonly long?: boolean; readonly oldName?: boolean } | undefined,
+    proof: PresenceProof,
   ): Promise<CreateOutcome>;
   /** `keepalive`: the request outlives the page (W5-INVITE-FEEDBACK, a page that hides). */
   cancel(inviteId: string, options?: { readonly keepalive?: boolean }): Promise<CancelOutcome>;
@@ -353,16 +370,34 @@ export function createInviteApi(options: InviteApiOptions = {}): InviteApi {
   const encode = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(value));
 
   return {
-    async create(label, options) {
-      const body = encode({
-        ...(label === undefined ? {} : { label }),
-        ...(options?.long === true ? { long: true } : {}),
-        ...(options?.oldName === true ? { oldName: true } : {}),
+    async create(label, options, proof) {
+      const headers = new Headers({
+        [CSRF_HEADER]: token(),
+        'content-type': 'application/octet-stream',
+        'X-AgentLink-Input': toBase64url(
+          encode({
+            ...(label === undefined ? {} : { label }),
+            ...(options?.long === true ? { long: true } : {}),
+            ...(options?.oldName === true ? { oldName: true } : {}),
+          }),
+        ),
       });
-      const answer = await call(INVITE_CREATE_PATH, { headers: inviteHeaders(), body });
+      const answer = await call(INVITE_CREATE_PATH, { headers, body: new Uint8Array(0), proof });
       if (answer.kind === 'offline') return { kind: 'offline' };
       const { status, json } = answer;
-      if (status === 200 && json['status'] === 'ok') {
+      const gate = json['status'];
+      if (gate === 'presence_rejected' || gate === 'presence_required' || gate === 'busy') {
+        return { kind: gate };
+      }
+      if (status === 429 || gate === 'wait') {
+        const raw = json['retryAfter'];
+        const seconds =
+          typeof raw === 'number' && Number.isSafeInteger(raw) && raw > 0 && raw <= 86_400
+            ? raw
+            : 30;
+        return { kind: 'wait', seconds };
+      }
+      if (status === 200 && json['status'] === 'done') {
         const invite = created(json);
         return invite === undefined ? { kind: 'failed' } : { kind: 'ok', invite };
       }

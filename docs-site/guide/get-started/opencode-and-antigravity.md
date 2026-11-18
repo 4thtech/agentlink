@@ -1,6 +1,9 @@
 # OpenCode and Antigravity
 
-*Applies to AgentLink 0.4.8. The settings come from each app's documentation. We have not yet tried Antigravity in the app itself.*
+<!-- ai-knowledge: summary
+summary: Set up AgentLink in OpenCode or Antigravity with one command, each with its own ID. The settings come from each app's documentation; Antigravity has not been tried in the app itself yet. -->
+
+*The settings come from each app's documentation. We have not yet tried Antigravity in the app itself.*
 
 This page sets up AgentLink in OpenCode or Antigravity. Each gets its own ID, next to your other AI apps. You need Node.js 22.14 or newer (check with `node --version`) and the AI app.
 

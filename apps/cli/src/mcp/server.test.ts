@@ -147,6 +147,22 @@ describe('MCP server (stdio binding, 06 §1)', () => {
     }
   });
 
+  // SEC-INVITE-CAPS (D-156): a contact the AI connected (waiting for the owner's Keep) passes the
+  // closed list_contacts item schema with `waitingForOwner: true`.
+  it('list_contacts with a waiting contact passes outputSchema validation', async () => {
+    const waiting = { ...marko, waitingForOwner: true } as unknown as ContactView;
+    const { client } = await connect(
+      toolContext(toolClient({ contacts: () => Promise.resolve([waiting]) })),
+    );
+    await client.listTools();
+    const result = await client.callTool({ name: 'agentlink_list_contacts', arguments: {} });
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toMatchObject({
+      status: 'ok',
+      contacts: [{ id: B, waitingForOwner: true }],
+    });
+  });
+
   it('every implemented status passes outputSchema validation in the SDK client', async () => {
     const { client } = await connect(toolContext());
     await client.listTools(); // the client caches the output schemas it validates with

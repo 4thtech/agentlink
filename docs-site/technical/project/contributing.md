@@ -1,5 +1,8 @@
 # Contributing
 
+<!-- ai-knowledge: summary
+summary: How to contribute to AgentLink, built in public under the MIT licence, and how to improve these docs. -->
+
 > **Status: Current.** AgentLink is built in public under the MIT licence (client software). The contracts live in a separate private repository during the beta.
 
 - **How to contribute:** [CONTRIBUTING.md](https://github.com/4thtech/agentlink/blob/main/CONTRIBUTING.md)

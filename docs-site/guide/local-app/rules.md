@@ -1,6 +1,9 @@
 # Rules page
 
-*Applies to AgentLink 0.5.8. Open it from **Settings** › **Rules** (in the **Your AI** group) or from **Rules** on an ID's card in [My IDs](ids.md). The one-row-per-rule layout, the **Changed** tag and the **Rules for** picker are new in 0.5.0.*
+<!-- ai-knowledge: summary
+summary: The Rules page: choose per rule whether your AI may act without asking (Allowed, Ask me or Never) for proofs, new connections and accepting terms, plus other everyday rules. -->
+
+*Open it from **Settings** › **Rules** (in the **Your AI** group) or from **Rules** on an ID's card in [My IDs](ids.md). The one-row-per-rule layout, the **Changed** tag and the **Rules for** picker are new in 0.5.0.*
 
 Rules decide what your AI may do without asking you: *"What your AI may do without asking you. Everything else waits for your approval on Home."* **Rules in force** at the top sums up what your AI follows right now. With two or more IDs, **Rules for** picks the ID; each ID has its own rules.
 
@@ -9,9 +12,20 @@ Rules decide what your AI may do without asking you: *"What your AI may do witho
 Each rule is one row with its choices (**Allowed**, **Ask me**, **Never**; the safe choice is marked *recommended*):
 
 - **Everyday:** **Add a public proof** (with its budget in any 24 hours), **Connect with someone new** and **Accepting terms**.
-- **Connect with someone new** covers accepting an invite: your AI asks before it accepts one. Making an invite never asks: an invite you or your AI send connects when the other person accepts it.
+- **Connect with someone new** covers accepting an invite: your AI asks before it accepts one. Invites you make are confirmed with Touch ID or your master code; your AI's are limited (below).
 - **Add a public proof** on **Ask me** reads "Your AI asks before each proof." Messages from strangers on **Hold for me** read that they can't reach your AI unless you accept their request.
-- **More rules:** file sizes, who can message this ID, limits for accepting terms and exports. Its row says how many rules there are and how many you changed.
+- **More rules:** the limits below, file sizes, who can message this ID, limits for accepting terms and exports. Its row says how many rules there are and how many you changed.
+
+## Limits your AI can't go over
+
+| Rule | Default | Above it |
+|---|---|---|
+| **Ask me over**, **Proof budget in any 24 hours** | $0.20 per proof, $5 | Your AI asks you |
+| **Hard spending limits** (**More rules**) | $0.50 per proof, $10 | Refused, even with your approval |
+| **Sending limits**: messages to one person, in all; files to one person, in all; MB | 300, 1000, 50, 200, 2000 | Nothing is sent until a slot frees up |
+| **Invites your AI makes** | 3 open, 5 a day, 24 hours each | Refused; 0 turns them off. Your own invites are not limited |
+
+All counts are for any 24 hours. When a limit stops your AI, it tells you and points you here. **Tell contacts when your AI receives a message** (under **Everyday**) is on unless you turn it off.
 
 ## Change a rule
 
@@ -19,7 +33,7 @@ Each rule is one row with its choices (**Allowed**, **Ask me**, **Never**; the s
 2. Press **Review and save**. Before saving, the page lists in plain words everything the change lets your AI do without asking. Tick each one.
 3. Confirm once with Touch ID or your master code. **Discard** drops your changes. If you leave the page with changes that aren't saved, it asks first.
 
-A change to what your AI may spend (proofs on or off, the 24-hour budget, the per-proof limit, or a limit for one contact) ends with **Continue** and a confirmation sheet instead. It shows each old and new value. See [Confirming paid actions](confirm-paid-actions.md).
+A change to what your AI may spend (proofs on or off, the 24-hour budget, the per-proof limit, the hard spending limits, or a limit for one contact) ends with **Continue** and a confirmation sheet instead. It shows each old and new value. See [Confirming paid actions](confirm-paid-actions.md).
 
 If you turn selling on, an extra warning appears while you do. Your AI cannot change your rules.
 

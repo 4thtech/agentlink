@@ -1,5 +1,8 @@
 # Glossary
 
+<!-- ai-knowledge: summary
+summary: Technical glossary mapping product words used in the app to their technical names, plus protocol and security terms. -->
+
 > **Status: Current for v0.5.10.** Technical terms used across the specifications and these pages, with the words the app and the [user guide](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/help/glossary.md) use for the same thing. Where a definition here and a spec disagree, the spec wins.
 
 ## Product words and their technical names

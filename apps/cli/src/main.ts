@@ -10,7 +10,6 @@ import { createContactsHandler } from './commands/contacts.js';
 import { creditsHandler } from './commands/credits.js';
 import { doctorHandler } from './commands/doctor.js';
 import { uiHandler } from './commands/ui.js';
-import { inviteHandler } from './commands/invite.js';
 import { joinHandler } from './commands/join.js';
 import { requestsHandler } from './commands/requests.js';
 import { statusHandler } from './commands/status.js';
@@ -33,7 +32,6 @@ const dispatch = createDispatcher({
   backup: backupCommandHandler,
   restore: backupCommandHandler,
   init: createInitHandler(nodeInitDeps()),
-  invite: inviteHandler,
   accept: acceptHandler,
   // M1-9za: `contacts rename | remove` † go to the owner handler.
   contacts: createContactsHandler(undefined, contactsManageHandler(nodeOwnerDeps())),

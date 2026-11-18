@@ -11348,16 +11348,23 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Goal:** every approval card can be decided from fields the app decodes itself, shown in full.
 
 #### SEC-INVITE-CAPS · Invite limits (0.5.11)
-- **Status:** later (0.5.11) · **Security:** S2 · **Spec:** D-156 (5)
+- **Status:** in review (0.5.11, branch `rel0511/invites`) · **Security:** S2 · **Spec:** D-156 (5); 04 §2.5.1 `contact.keep`; 06 §2.1, §3 `contacts.aiInvites`; 07 §3 (schema 18); 08 §1; 11 §5.12
 - **Goal:** caps on invites the AI makes, and contacts it adds wait until the owner keeps them.
+- **Done when:** AI-made invites stop at 3 open / 5 per rolling 24 h (owner-set, 0 = off), expire after 24 h; owner invites unchanged and uncounted; a contact paired through an AI invite receives normally but gets no message, file, terms, proof or receipt until the owner taps Keep (presence) or Remove; existing contacts kept; no MCP tool keeps a contact or changes the caps.
 
 #### SEC-HARD-CEILING · Spending ceiling (0.5.11)
-- **Status:** later (0.5.11) · **Security:** S2 · **Spec:** D-156 (4)
+- **Status:** built on `rel0511/limits` (review pending) · **Security:** S2 · **Spec:** D-156 (4); 06 §3; 04 §2.5.3; 11 §5.12; 12
 - **Goal:** owner-set per-proof and per-day ceilings above which nothing is signed.
+- **Done:** `proofs.hardMaxPerActionUSD` "0.5" and `hardDailyUSD` "10" (absent = these), soft per-proof default "0.2"; `evaluateProof` denies above a ceiling with `ceiling` (every mode, broken ledger included; an approval never passes it); `SPEND_CEILING` with plain words for the AI; soft ≤ hard in the schema; older policies read and migrated by min(); raising is a spending change on the Rules page; owner-action vectors version 10.
 
 #### SEC-OUTBOUND-CAPS · Sending limits (0.5.11)
-- **Status:** later (0.5.11) · **Security:** S2 · **Spec:** D-156 (6)
+- **Status:** built on `rel0511/limits` (review pending) · **Security:** S2 · **Spec:** D-156 (6); 06 §3; 11 §5.12
 - **Goal:** per-contact and per-day limits for outgoing messages and files.
+- **Done:** policy `outgoing` (300 / 1000 messages, 50 / 200 files, 2000 MB per rolling 24 h, per ID; absent = these); counted from the durable `outgoing_log` (store schema 17) written in the send transaction, so a deleted file or message never frees a cap; `SEND_LIMIT` with the cap, its number and `retryAt`, never kept under a clientRequestId; acks, receipts, pairing and terms not counted; Rules page "Sending limits". Residual: a process with the agent key bypasses it; terms envelopes are not capped (SEC-TERMS-CAPS).
+
+#### SEC-TERMS-CAPS · Terms count toward the sending limits (0.5.12)
+- **Status:** later (0.5.12) · **Security:** S2 · **Spec:** D-156 (6); 06 §3 `outgoing`
+- **Goal:** `offer`, `accept` and `reject` sent through the terms tools count toward the outgoing caps per contact and per day, as `agentlink_send` messages do (the terms send path, `terms-flow.ts`), with the same `SEND_LIMIT` refusal and the same durable count.
 
 #### SEC-RELAY-READBACK · Relay availability check (0.5.12)
 - **Status:** later (0.5.12) · **Security:** S2 · **Spec:** D-156 (7)

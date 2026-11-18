@@ -26,6 +26,7 @@ import {
   fileLogger,
   openLog,
   ownerApprove,
+  ownerKeepsWaitingContact,
   setupAgent,
   waitFor,
   type McpCall,
@@ -171,6 +172,15 @@ describe.skipIf(!required)('M1-13a e2e (deterministic): two agents pair and mess
     );
     expect(aliceSeesBob).toMatchObject({ name: 'Bob', id: expect.stringMatching(/^0x/) });
     expect(bobSeesAlice).toMatchObject({ name: 'Alice', id: expect.stringMatching(/^0x/) });
+
+    // 5b. SEC-INVITE-CAPS (D-156; 11 §5.11): Alice's AI made the invite, so Bob waits for Alice (the
+    // owner): her agent can't send to him until she keeps him (one owner-signed `contact.keep`).
+    await step('A owner: keep Bob', async () => {
+      expect(aliceSeesBob).toMatchObject({ waitingForOwner: true });
+      const early = await aliceMcp.call('agentlink_send', { to: 'Bob', text: 'too early' });
+      expect(early.structured).toMatchObject({ status: 'rejected', code: 'CONTACT_WAITING_OWNER' });
+      await ownerKeepsWaitingContact(alice);
+    });
 
     // 6. Alice's agent sends a note (J9 step 2) and a hostile text.
     await step('A: agentlink_send note to B', async () => {

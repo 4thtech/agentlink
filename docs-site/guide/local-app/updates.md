@@ -1,6 +1,9 @@
 # Updates
 
-*Applies to AgentLink 0.5.6. Updates is new in 0.5.1. **Update now** works in the Mac app, the Windows app and the browser app from 0.5.6 on (the buttons in the Mac app did nothing in 0.5.4 and 0.5.5).*
+<!-- ai-knowledge: summary
+summary: The Updates page: your version, Check for updates, the daily automatic check, how updating differs for the desktop app and the browser app, and what the check sends. -->
+
+*Updates is new in 0.5.1. **Update now** works in the Mac app, the Windows app and the browser app from 0.5.6 on (the buttons in the Mac app did nothing in 0.5.4 and 0.5.5).*
 
 **If you have 0.5.4 or 0.5.5, install 0.5.6 once by hand:** on a Mac, download the DMG and replace AgentLink in Applications; on Windows, run the new setup.exe; for the browser app, run `npx -y @4thtech-io/agentlink@latest`. From 0.5.6 on, an update is one click. Your IDs, people and messages stay as they are.
 

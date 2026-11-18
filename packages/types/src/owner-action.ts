@@ -414,6 +414,33 @@ export const contactUnblockActionSchema = z
   })
   .refine(expiring, EXPIRING_MSG);
 
+/**
+ * Keeps one contact the AI connected through an AI-made invite (SEC-INVITE-CAPS, D-156): it stops
+ * waiting for the owner, so the agent may send to it. Own machine only: no envelope.
+ */
+export const contactKeepActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('contact.keep'),
+    params: contactBlockParamsSchema,
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG);
+
+/**
+ * The owner's own invite (SEC-INVITE-CAPS, owner decision 18 Nov 2026): signed with owner presence by
+ * `agentlink invite`; core makes an owner invite (not capped, its contact kept) only after it verified
+ * this and recorded its nonce. Params exactly `{}`. Own machine only: no envelope.
+ */
+export const inviteCreateActionSchema = z
+  .strictObject({
+    ...head,
+    op: z.literal('invite.create'),
+    params: z.strictObject({}),
+    ...tail,
+  })
+  .refine(expiring, EXPIRING_MSG);
+
 /** Connects the agent's own S3-compatible storage (M1-9i-a, D-115). Own machine only: no envelope. */
 export const storageSetActionSchema = z
   .strictObject({
@@ -546,6 +573,8 @@ export const ownerActionSchema = z.discriminatedUnion('op', [
   contactRemoveActionSchema,
   contactBlockActionSchema,
   contactUnblockActionSchema,
+  contactKeepActionSchema,
+  inviteCreateActionSchema,
   storageSetActionSchema,
   storageRemoveActionSchema,
   backupExportActionSchema,

@@ -1,6 +1,9 @@
 # Home
 
-*Applies to AgentLink 0.5.9. The Files panel is new in 0.5.5. Waiting invites, file chips with a reader in the conversation and the network status line are new in 0.5.1. In 0.4.4 and 0.4.5, Home was five tiles and a seven-step Start here.*
+<!-- ai-knowledge: summary
+summary: The Home screen: what needs you first, then the people your AI talks to, plus waiting invites and what happens when the message network can't be reached. -->
+
+*The Files panel is new in 0.5.5. Waiting invites, file chips with a reader in the conversation and the network status line are new in 0.5.1. In 0.4.4 and 0.4.5, Home was five tiles and a seven-step Start here.*
 
 Home is the first screen. It shows what needs you, then the people your AI talks to.
 

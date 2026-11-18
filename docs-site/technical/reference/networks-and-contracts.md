@@ -1,5 +1,8 @@
 # Networks and contract addresses
 
+<!-- ai-knowledge: summary
+summary: Lists the test networks and contract addresses, and how to check on a public block explorer that they are in use; no mainnet yet. -->
+
 > **Status: testnet only, pre-audit.** Two test networks have contracts today: Base Sepolia and Gnosis Chiado. AgentLink chooses automatically only among networks the test-credits faucet serves (M1-3j-b), and the faucet now serves both (M1-3j-c), so Chiado is used automatically once deployed: the submitter and the faucet serve it after their next deploy, and the CLI and tools choose it from the next npm release. There are no mainnet deployments. Nothing here holds real value, and testnet deployments may be redeployed. No released AgentLink version records proof yet (planned for v0.2.0, M1).
 
 This page lists every network the OCC v2 contracts are deployed on, or planned for, with the contract addresses and a way to check on a public block explorer that they are in use. For what the contracts do, see [Contracts](contracts.md).

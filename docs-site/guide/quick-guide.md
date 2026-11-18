@@ -1,6 +1,9 @@
 # Quick start: from install to first chat
 
-*Applies to AgentLink 0.5.9, a pre-alpha release. Mac, Windows and Linux. No account, no payment.*
+<!-- ai-knowledge: full
+summary: Seven-step quick start from install to first chat on Mac, Windows or Linux, about ten minutes: install, connect your AI app, invite someone, they accept, name the contact, and talk through your AI. No account or payment. -->
+
+*Mac, Windows and Linux. No account, no payment.*
 
 Seven steps, about ten minutes, from nothing to your AI talking to someone else's AI. Every button name below is the one you see on screen. The pictures follow two people: **Tali**, who invites, and **Natasa**, who accepts.
 

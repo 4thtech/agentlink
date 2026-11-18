@@ -1,7 +1,7 @@
 {
   "$schema": "../schema/vector-file.schema.json",
   "suite": "owner-action",
-  "version": 9,
+  "version": 10,
   "generator": {
     "tool": "python (hashlib, cryptography 50.0.2, coincurve 21.0.0, pycryptodome 3.23.0, pyhpke 0.6.5, rfc8785 0.1.4)",
     "version": "cpython 3.12.13",
@@ -1321,10 +1321,12 @@
               "proofs": {
                 "notarize": "allow",
                 "dailyBudgetUSD": "5",
-                "perActionMaxUSD": "1",
+                "perActionMaxUSD": "0.2",
                 "allowKeyDisclosure": "approval",
                 "exportFolder": "~/AgentLink/Proofs",
-                "defaultChain": "base"
+                "defaultChain": "base",
+                "hardMaxPerActionUSD": "0.5",
+                "hardDailyUSD": "10"
               },
               "receipts": {
                 "autoDelivered": false,
@@ -1341,6 +1343,13 @@
                 "messagesKeepDays": 0,
                 "filesKeepDays": 0
               },
+              "outgoing": {
+                "messagesPerContactPerDay": 300,
+                "messagesPerDay": 1000,
+                "filesPerContactPerDay": 50,
+                "filesPerDay": 200,
+                "fileMBPerDay": 2000
+              },
               "contactRules": []
             }
           },
@@ -1352,10 +1361,10 @@
         "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
       },
       "expected": {
-        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":\"0\",\"autoAcceptMinUSD\":null},\"contactRules\":[],\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"history\":{\"filesKeepDays\":0,\"messagesKeepDays\":0},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":\"5\",\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"notarize\":\"allow\",\"perActionMaxUSD\":\"1\"},\"receipts\":{\"autoDelivered\":false,\"autoOpened\":false}},\"version\":1},\"v\":1}",
-        "bodyHash": "d23710287e400cfb23eb1d1f23a094ac0afeba4d87f7da3ea2a8a0ccbde56a7d",
-        "signatureInput": "201b32b870c51d79ee63db5a8b271ec773c9e90107eb0daf10307cd148f08eeb",
-        "sig": "93089211942daa812e57c236771ba55d32c5f8946948b85e5bf74b7661ec8ec6b5599452d50340701db1b54d4cbfa6013167b86a6003469fc7491ad85f89347e"
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":\"0\",\"autoAcceptMinUSD\":null},\"contactRules\":[],\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"history\":{\"filesKeepDays\":0,\"messagesKeepDays\":0},\"outgoing\":{\"fileMBPerDay\":2000,\"filesPerContactPerDay\":50,\"filesPerDay\":200,\"messagesPerContactPerDay\":300,\"messagesPerDay\":1000},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":\"5\",\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"hardDailyUSD\":\"10\",\"hardMaxPerActionUSD\":\"0.5\",\"notarize\":\"allow\",\"perActionMaxUSD\":\"0.2\"},\"receipts\":{\"autoDelivered\":false,\"autoOpened\":false}},\"version\":1},\"v\":1}",
+        "bodyHash": "f36978ba4ec96968b9017066bf00d9d257eda1902754192d7710bc4c9afb38e2",
+        "signatureInput": "b4380c4bff654260169fc4428b9d68107bece19b1b1b475c07f02be427d7aae5",
+        "sig": "bf82f3d9efc10ae7b0f11b8743020c810743b8a934d978949f0d4e8d82cace1b29deac44a47341517a238ea104b83b96e2fd3fcef80e85a533ed8da3c1fb335b"
       }
     },
     {
@@ -1393,10 +1402,12 @@
               "proofs": {
                 "notarize": "allow",
                 "dailyBudgetUSD": "5",
-                "perActionMaxUSD": "1",
+                "perActionMaxUSD": "0.2",
                 "allowKeyDisclosure": "approval",
                 "exportFolder": "~/AgentLink/Proofs",
-                "defaultChain": "base"
+                "defaultChain": "base",
+                "hardMaxPerActionUSD": "0.5",
+                "hardDailyUSD": "10"
               },
               "receipts": {
                 "autoDelivered": false,
@@ -1412,6 +1423,13 @@
               "history": {
                 "messagesKeepDays": 0,
                 "filesKeepDays": 0
+              },
+              "outgoing": {
+                "messagesPerContactPerDay": 300,
+                "messagesPerDay": 1000,
+                "filesPerContactPerDay": 50,
+                "filesPerDay": 200,
+                "fileMBPerDay": 2000
               },
               "contactRules": [
                 {
@@ -1438,10 +1456,10 @@
         "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
       },
       "expected": {
-        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":\"0\",\"autoAcceptMinUSD\":null},\"contactRules\":[{\"contact\":\"0x16d4667155468cfe1b1cf411a1413bbb59470f01\",\"proofs\":{\"notarize\":\"allow\",\"perActionMaxUSD\":\"2.5\"}},{\"contact\":\"0x879e48ea18a3dd814b18b51e5e6e665f87c1e613\",\"proofs\":{\"perActionMaxUSD\":\"0.01\"}}],\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"history\":{\"filesKeepDays\":0,\"messagesKeepDays\":0},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":\"5\",\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"notarize\":\"allow\",\"perActionMaxUSD\":\"1\"},\"receipts\":{\"autoDelivered\":false,\"autoOpened\":false}},\"version\":2},\"v\":1}",
-        "bodyHash": "4ae1102b987aee91a92c0078e7bd5f9d7496be214bd5af8aae7c48bf69840413",
-        "signatureInput": "2d05ac1dba00cf0475b85ab174cf0ee6a208b39b86b6f4fedd3d040acf10de8c",
-        "sig": "fb8188b871bb2e69ab56ae66511397843b38409e1bf0d7d84cf4fcf12b9d88c35fc9bea5b5b3bdc7373bbf8ab1a72fc9dd7f0afb32b5f0c68c14e7cb69f0f904"
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":\"0\",\"autoAcceptMinUSD\":null},\"contactRules\":[{\"contact\":\"0x16d4667155468cfe1b1cf411a1413bbb59470f01\",\"proofs\":{\"notarize\":\"allow\",\"perActionMaxUSD\":\"2.5\"}},{\"contact\":\"0x879e48ea18a3dd814b18b51e5e6e665f87c1e613\",\"proofs\":{\"perActionMaxUSD\":\"0.01\"}}],\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"history\":{\"filesKeepDays\":0,\"messagesKeepDays\":0},\"outgoing\":{\"fileMBPerDay\":2000,\"filesPerContactPerDay\":50,\"filesPerDay\":200,\"messagesPerContactPerDay\":300,\"messagesPerDay\":1000},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":\"5\",\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"hardDailyUSD\":\"10\",\"hardMaxPerActionUSD\":\"0.5\",\"notarize\":\"allow\",\"perActionMaxUSD\":\"0.2\"},\"receipts\":{\"autoDelivered\":false,\"autoOpened\":false}},\"version\":2},\"v\":1}",
+        "bodyHash": "c8401fd852b39196b9cbfe06b562f7f6cbc4af90477c3c607a73dfbb0703bd98",
+        "signatureInput": "c6c7dbcb36b05b9271b6e8ffa81becc396114af23aa8808b44162a7b55eac317",
+        "sig": "4a2e2915ab9f195ea527a2fdd9da564b8a8ca19a0b4b157af51e4ea9cb777c583e1599cbf0734095e6c225c5673b0cdfcd7fd03a366b280be171d10d1001eb31"
       }
     },
     {
@@ -1479,10 +1497,12 @@
               "proofs": {
                 "notarize": "allow",
                 "dailyBudgetUSD": "5",
-                "perActionMaxUSD": "1",
+                "perActionMaxUSD": "0.2",
                 "allowKeyDisclosure": "approval",
                 "exportFolder": "~/AgentLink/Proofs",
-                "defaultChain": "base"
+                "defaultChain": "base",
+                "hardMaxPerActionUSD": "0.5",
+                "hardDailyUSD": "10"
               },
               "receipts": {
                 "autoDelivered": false,
@@ -1498,6 +1518,13 @@
               "history": {
                 "messagesKeepDays": 0,
                 "filesKeepDays": 0
+              },
+              "outgoing": {
+                "messagesPerContactPerDay": 300,
+                "messagesPerDay": 1000,
+                "filesPerContactPerDay": 50,
+                "filesPerDay": 200,
+                "fileMBPerDay": 2000
               },
               "contactRules": [
                 {
@@ -1517,10 +1544,10 @@
         "auxRand": "63e120a5d7958957eb80c40dc21ac0ac81c283f2d2e32ca5607a1e90c61eed89"
       },
       "expected": {
-        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":\"0\",\"autoAcceptMinUSD\":null},\"contactRules\":[{\"contact\":\"0x16d4667155468cfe1b1cf411a1413bbb59470f01\",\"receipts\":{\"autoDelivered\":true}}],\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"history\":{\"filesKeepDays\":0,\"messagesKeepDays\":0},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":\"5\",\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"notarize\":\"allow\",\"perActionMaxUSD\":\"1\"},\"receipts\":{\"autoDelivered\":false,\"autoOpened\":false}},\"version\":3},\"v\":1}",
-        "bodyHash": "306b81369f375aea4a0d759e62b182ad5b8623ce911acfe59551628a47a4d541",
-        "signatureInput": "c08d612b71fc11d27bc45df2cd41147e5b49cae1dee758a83670305c7035ef33",
-        "sig": "9cbc5a7129b19d6dbac578dd7683350f0383c9202396074c7c0d235d5299e8b4f4e7f333597d097d6e7df12144bb8ae9b04706d01f4d523ce7d7fd6243a13c61"
+        "jcs": "{\"agent\":\"0x7b92afb3701a34563f0ee406f285fa7731e8f415\",\"expiresAt\":1760000600,\"issuedAt\":1760000000,\"nonce\":\"-_8-DwD_EOD4_n08GwqZ7g\",\"op\":\"policy.set\",\"owner\":\"241d788931ff6ca35f3f03de0aaddf05044016ed3b4df91e626dd537a6352fc0\",\"params\":{\"policy\":{\"commitments\":{\"accept\":\"approval\",\"autoAcceptContacts\":[],\"autoAcceptDirection\":\"buy\",\"autoAcceptMaxUSD\":\"0\",\"autoAcceptMinUSD\":null},\"contactRules\":[{\"contact\":\"0x16d4667155468cfe1b1cf411a1413bbb59470f01\",\"receipts\":{\"autoDelivered\":true}}],\"contacts\":{\"acceptInvites\":\"approval\",\"allowed\":\"paired\",\"rateLimitPerContactPerHour\":120,\"unknownSenders\":\"queue\"},\"envelopes\":{\"maxEnvelopeKB\":24},\"files\":{\"allowedFolders\":[],\"defaultExpiryDays\":7,\"deleteAfter\":\"expiry\",\"inboxFolder\":\"~/AgentLink/Inbox\",\"maxReceiveSizeMB\":200,\"maxSendSizeMB\":100,\"ownerArchive\":false,\"storage\":\"auto\"},\"history\":{\"filesKeepDays\":0,\"messagesKeepDays\":0},\"outgoing\":{\"fileMBPerDay\":2000,\"filesPerContactPerDay\":50,\"filesPerDay\":200,\"messagesPerContactPerDay\":300,\"messagesPerDay\":1000},\"proofs\":{\"allowKeyDisclosure\":\"approval\",\"dailyBudgetUSD\":\"5\",\"defaultChain\":\"base\",\"exportFolder\":\"~/AgentLink/Proofs\",\"hardDailyUSD\":\"10\",\"hardMaxPerActionUSD\":\"0.5\",\"notarize\":\"allow\",\"perActionMaxUSD\":\"0.2\"},\"receipts\":{\"autoDelivered\":false,\"autoOpened\":false}},\"version\":3},\"v\":1}",
+        "bodyHash": "8a31b746a0481c09bc1061db041fb6c29a0c9b059908763275935ef1f4780e24",
+        "signatureInput": "08a211993cffd0bc2a358c89e9191d3a8bd5e188bab490d1766cf28000ca5a1b",
+        "sig": "dee92eade82996b42b386134ee6b90736f363729c8ff7fbf043a8ea8be08ee72de1e8e8603c94d707bfacc7a91f5ed0a0ebcf37c9c02c9630ba890e99850b13b"
       }
     },
     {
@@ -4687,7 +4714,9 @@
                   "perActionMaxUSD": 1,
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -4703,6 +4732,13 @@
                 "history": {
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
+                },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
                 }
               }
             },
@@ -4710,7 +4746,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "abf229891299f5f3f5b341d881f3cc47d17543890ca824e3dac15e98c1af312b71058ebe68df7a4875d1e248b897b38c66908f9911bb2ee94c6b306c67d9508f"
+          "sig": "3266bd1738948d4bf687fbad8b6bd2fd56955625c1b904f0836c02f921db0d043fef29571d72339689c9e2ce16f43a2f333cab08f1ed0f9142406fe284377fa5"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -4758,10 +4794,12 @@
                 "proofs": {
                   "notarize": "allow",
                   "dailyBudgetUSD": 5,
-                  "perActionMaxUSD": "1",
+                  "perActionMaxUSD": "0.2",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -4778,6 +4816,13 @@
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
                 },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
+                },
                 "contactRules": []
               }
             },
@@ -4785,7 +4830,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "be316950235f445ed635397e4f49d32717c2c318c0a8761e7beed65d2013d637f5cdd3c077a2a855808b395b30fa6d6f25dd464fe8c697348c4d8d0bcee2106c"
+          "sig": "be41e6a69f3f91e0cdda38c3898a5d6cbadc37c8da7a7501717d3ea128224728f9a5c47b052af9bbe1fb0d8614adda8c2b5da3191aef539dd19b67741f021212"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -4833,10 +4878,12 @@
                 "proofs": {
                   "notarize": "allow",
                   "dailyBudgetUSD": "5.00",
-                  "perActionMaxUSD": "1",
+                  "perActionMaxUSD": "0.2",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -4853,6 +4900,13 @@
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
                 },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
+                },
                 "contactRules": []
               }
             },
@@ -4860,7 +4914,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "e5c574dbd427e0c527b900360275c847c18e5b1a66d9c4223c31605adb06e48b9d0c96941e5f1e36d2e75d8b6306f1b30b77032d8709ee685c949936fb1902e3"
+          "sig": "2ad78217a880834adde29f5a29e346142caa029213a57e28a11862222d1307c00df83948e5527a1731ae78ae52ebdb013b979e09b415ed7c6716eec6d5a08a05"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -4911,7 +4965,9 @@
                   "perActionMaxUSD": "5.0000001",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -4928,6 +4984,13 @@
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
                 },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
+                },
                 "contactRules": []
               }
             },
@@ -4935,7 +4998,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "b6693c31e9b7b8267e0af8582e6ac0f9d5d1df9e0877bc167d476d9da4c42ec0cb072a273e915711294f3a3b51bdc0fcd92ff28ddbfbbb4115a411af3a7aad74"
+          "sig": "e1ff801a8ca5740fc7cbf9920cd7d25f76622ca42e69426a8e1731c13c36744ce2282007852b33df2e699f9ff42b954f74d8808f8cf2d178f7f8a5a870caea85"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -4983,10 +5046,12 @@
                 "proofs": {
                   "notarize": "allow",
                   "dailyBudgetUSD": "5",
-                  "perActionMaxUSD": "1",
+                  "perActionMaxUSD": "0.2",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -5006,6 +5071,13 @@
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
                 },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
+                },
                 "contactRules": []
               }
             },
@@ -5013,7 +5085,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "8cdd7b45e0ab1f061cdc522eed6cd4ff9a648d4b6135d8fc8c83e1c6383c9d239840ef440ed27f5bd1dd90f5bf9da581a3aef3da5400f427bd54c3376b59a9ef"
+          "sig": "c17328a8d33393044e6756cf5b8956624c9f215b720615aafb39748d5cb874fa43440843151526b508c73e1be134158e7aaf5725249a3714077bdeb92bdf5442"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5061,10 +5133,12 @@
                 "proofs": {
                   "notarize": "allow",
                   "dailyBudgetUSD": "5",
-                  "perActionMaxUSD": "1",
+                  "perActionMaxUSD": "0.2",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -5080,6 +5154,13 @@
                 "history": {
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
+                },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
                 },
                 "contactRules": [
                   {
@@ -5102,7 +5183,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "6d5ffbf800ef8707e08533f2a6adf2a0deddc57f733c01e960032ca422aa3f026fad29860d533af4f7b6e48e18a2814bb48f9c32e685462c39b6f265bc108c3c"
+          "sig": "4ca9d31627c780b88c1e0004f96626449666f372a27b450e75374b3a2b0b0f810dc6288cd5a5b2d22f700f903b2e29100d52a4f688cbc174bfa5e1f37a02339e"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5150,10 +5231,12 @@
                 "proofs": {
                   "notarize": "allow",
                   "dailyBudgetUSD": "5",
-                  "perActionMaxUSD": "1",
+                  "perActionMaxUSD": "0.2",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -5169,6 +5252,13 @@
                 "history": {
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
+                },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
                 },
                 "contactRules": [
                   {
@@ -5191,7 +5281,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "955e7ce6a0168be3293096622586501b4c48745799f7eae2558f6b5c0800738445f99faae4ecbe5291ea5c4bcd4e48e3a078ce483e2fc57995ebdc3d13c3b829"
+          "sig": "a263b00a0836b6f5043fe0c2fd2c8d5d13f3430bdaf15643baab5bc7aefff4f90b7bdb92984f8a853d82798be940f7fc45f2c07b492038686ea1e5ec2ac539ca"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5239,10 +5329,12 @@
                 "proofs": {
                   "notarize": "allow",
                   "dailyBudgetUSD": "5",
-                  "perActionMaxUSD": "1",
+                  "perActionMaxUSD": "0.2",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -5259,6 +5351,13 @@
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
                 },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
+                },
                 "contactRules": [
                   {
                     "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01",
@@ -5271,7 +5370,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "fdb8acc620bcf05cb4c8ccb8842a5f023a0736948f503d90681441d0a7fc01685306729102019053b73b33a0b653fc94706eba86b73009be91d502c8ab7294e4"
+          "sig": "bd1de2dee624548e9c5a38db65cf406e04e6ba1e0716bd295ba650349842fdbaf4f90c36e852447f9792c706bbc25e0c5b4dbd4e603e32cd4e7bda062de80ec4"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5319,10 +5418,12 @@
                 "proofs": {
                   "notarize": "allow",
                   "dailyBudgetUSD": "5",
-                  "perActionMaxUSD": "1",
+                  "perActionMaxUSD": "0.2",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -5339,6 +5440,13 @@
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
                 },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
+                },
                 "contactRules": [
                   {
                     "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01",
@@ -5354,7 +5462,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "36b5497c434dc7376d5821e82b537a3a611fcc11f2d619e70ed99298e51b03e667e1bb6a7678e6fbec0ecf5302b9fef04be1c03cf53b809c554c9b193811e93e"
+          "sig": "803eac2cd0e6c7635a0a21cde6d88af1a523406cac3e7884d36dda8992a0947c847458ab46474741fe78bdf7a408b701848a27fb117c46eff9e85b11f23725ba"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5402,10 +5510,12 @@
                 "proofs": {
                   "notarize": "allow",
                   "dailyBudgetUSD": "5",
-                  "perActionMaxUSD": "1",
+                  "perActionMaxUSD": "0.2",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -5422,6 +5532,13 @@
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
                 },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
+                },
                 "contactRules": [
                   {
                     "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01"
@@ -5433,7 +5550,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "7b550ecd755769c4a4b11d79fa8f88a75f69c78ae905faa7cea6c58c9575293727bd0b2d8a48fcd345bcd9fe575ffca8a5259fc86c037bbb803b496b54ad13da"
+          "sig": "24b94c6caf1b51d952712e43e83900072cc2c9c30e3a084de0da13fcb08d8550f4c2589c454ccacc29ec883649920a05e4c893125362794a6ea0c521276435bb"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5481,10 +5598,12 @@
                 "proofs": {
                   "notarize": "allow",
                   "dailyBudgetUSD": "5",
-                  "perActionMaxUSD": "1",
+                  "perActionMaxUSD": "0.2",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -5501,6 +5620,13 @@
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
                 },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
+                },
                 "contactRules": [
                   {
                     "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01",
@@ -5513,7 +5639,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "288b3feae3c72f9fe1ba66d003f661a8e81c1720a99dd7fa7faf0e62d9b9583c86e7464cbe34c2342fffdbde4208c0e31b9436461094beaedc179955431925f7"
+          "sig": "1b81ea8d8e89f63e905ad46af276645e505b0fc62e827151c45d3590af4754da1617482e0cc93c059a5ed2615046a2fcbe524b5c60c5820ee94f1d11674ec608"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5561,10 +5687,12 @@
                 "proofs": {
                   "notarize": "allow",
                   "dailyBudgetUSD": "5",
-                  "perActionMaxUSD": "1",
+                  "perActionMaxUSD": "0.2",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -5581,6 +5709,13 @@
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
                 },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
+                },
                 "contactRules": [
                   {
                     "contact": "0x16d4667155468cfe1b1cf411a1413bbb59470f01",
@@ -5596,7 +5731,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "188bb14c3d286178d1e81ea339a92ff74bc82fe26e86f25c49543f61d327af126d3ad971368f72d7661f171fe48b4a31647bf8477ae1c58c9734be747f3bc239"
+          "sig": "4b50532815aa36eb6fe3d0e1f510d211ddaa0f7b4e06176e2a347c778d495234e032ab3defde1c9e0b67a75467d26e3d2d02ffff86df3482d864b74dac67411b"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5643,10 +5778,12 @@
                 "proofs": {
                   "notarize": "allow",
                   "dailyBudgetUSD": "5",
-                  "perActionMaxUSD": "1",
+                  "perActionMaxUSD": "0.2",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -5663,6 +5800,13 @@
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
                 },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
+                },
                 "contactRules": []
               }
             },
@@ -5670,7 +5814,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "47084578b9d7d1972b0f7ba0c9f25a2859d26f920f9491ebe59f6807072ea493c40266e79ec83b2182b787a14a7b406d57712f82a7206254b4dd3a72ac45be1d"
+          "sig": "42819978ce1fcc056539bc05a5bee792315b4ea3bd717a5b6ba965a9b59986ea9213c7b6bd879d820d01ab021114073bdde82e9a31e1d0d81a87e7bb7ce62b58"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5718,10 +5862,12 @@
                 "proofs": {
                   "notarize": "allow",
                   "dailyBudgetUSD": "5",
-                  "perActionMaxUSD": "1",
+                  "perActionMaxUSD": "0.2",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -5738,6 +5884,13 @@
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
                 },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
+                },
                 "contactRules": []
               }
             },
@@ -5745,7 +5898,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "93089211942daa812e57c236771ba55d32c5f8946948b85e5bf74b7661ec8ec6b5599452d50340701db1b54d4cbfa6013167b86a6003469fc7491ad85f89347e"
+          "sig": "bf82f3d9efc10ae7b0f11b8743020c810743b8a934d978949f0d4e8d82cace1b29deac44a47341517a238ea104b83b96e2fd3fcef80e85a533ed8da3c1fb335b"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5793,10 +5946,12 @@
                 "proofs": {
                   "notarize": "allow",
                   "dailyBudgetUSD": "5",
-                  "perActionMaxUSD": "1",
+                  "perActionMaxUSD": "0.2",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -5812,6 +5967,13 @@
                 "history": {
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
+                },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
                 },
                 "contactRules": [
                   {
@@ -5834,7 +5996,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "fb8188b871bb2e69ab56ae66511397843b38409e1bf0d7d84cf4fcf12b9d88c35fc9bea5b5b3bdc7373bbf8ab1a72fc9dd7f0afb32b5f0c68c14e7cb69f0f904"
+          "sig": "4a2e2915ab9f195ea527a2fdd9da564b8a8ca19a0b4b157af51e4ea9cb777c583e1599cbf0734095e6c225c5673b0cdfcd7fd03a366b280be171d10d1001eb31"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5883,10 +6045,12 @@
                 "proofs": {
                   "notarize": "allow",
                   "dailyBudgetUSD": "5",
-                  "perActionMaxUSD": "1",
+                  "perActionMaxUSD": "0.2",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -5902,6 +6066,13 @@
                 "history": {
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
+                },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
                 },
                 "contactRules": [
                   {
@@ -5924,7 +6095,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "fb8188b871bb2e69ab56ae66511397843b38409e1bf0d7d84cf4fcf12b9d88c35fc9bea5b5b3bdc7373bbf8ab1a72fc9dd7f0afb32b5f0c68c14e7cb69f0f904"
+          "sig": "4a2e2915ab9f195ea527a2fdd9da564b8a8ca19a0b4b157af51e4ea9cb777c583e1599cbf0734095e6c225c5673b0cdfcd7fd03a366b280be171d10d1001eb31"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",
@@ -5973,10 +6144,12 @@
                 "proofs": {
                   "notarize": "allow",
                   "dailyBudgetUSD": "5",
-                  "perActionMaxUSD": "1",
+                  "perActionMaxUSD": "0.2",
                   "allowKeyDisclosure": "approval",
                   "exportFolder": "~/AgentLink/Proofs",
-                  "defaultChain": "base"
+                  "defaultChain": "base",
+                  "hardMaxPerActionUSD": "0.5",
+                  "hardDailyUSD": "10"
                 },
                 "receipts": {
                   "autoDelivered": false,
@@ -5993,6 +6166,13 @@
                   "messagesKeepDays": 0,
                   "filesKeepDays": 0
                 },
+                "outgoing": {
+                  "messagesPerContactPerDay": 300,
+                  "messagesPerDay": 1000,
+                  "filesPerContactPerDay": 50,
+                  "filesPerDay": 200,
+                  "fileMBPerDay": 2000
+                },
                 "contactRules": []
               }
             },
@@ -6000,7 +6180,7 @@
             "issuedAt": 1760000000,
             "expiresAt": 1760000600
           },
-          "sig": "93089211942daa812e57c236771ba55d32c5f8946948b85e5bf74b7661ec8ec6b5599452d50340701db1b54d4cbfa6013167b86a6003469fc7491ad85f89347e"
+          "sig": "bf82f3d9efc10ae7b0f11b8743020c810743b8a934d978949f0d4e8d82cace1b29deac44a47341517a238ea104b83b96e2fd3fcef80e85a533ed8da3c1fb335b"
         },
         "context": {
           "agent": "0x7b92afb3701a34563f0ee406f285fa7731e8f415",

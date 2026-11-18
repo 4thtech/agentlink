@@ -118,7 +118,7 @@ const RULES = {
     proofs: {
       notarize: 'allow',
       dailyBudgetUSD: '5',
-      perActionMaxUSD: '1',
+      perActionMaxUSD: '0.2',
       allowKeyDisclosure: 'approval',
     },
     contacts: { acceptInvites: 'approval', unknownSenders: 'queue', allowed: 'paired', listed: 0 },
@@ -493,6 +493,8 @@ const PRESENCE_FILES: Readonly<Record<string, Entry>> = {
   'pages/contacts/index.tsx': { offers: /<PresenceButton\b/ },
   'pages/contacts/presence-button.tsx': { offers: /<UseCodeInstead\b/ },
   'pages/invite/name-contact.tsx': { offers: /<PresenceButton\b/ },
+  // SEC-INVITE-CAPS (owner decision 18 Nov 2026): Create invite with the owner's presence.
+  'pages/invite/invite-panel.tsx': { offers: /<PresenceButton\b/ },
   'pages/home/person-menu.tsx': { offers: /<PresenceButton\b/ },
   // RET-4: the delete sheet's one button is the sensor, with the master code as a link.
   'pages/history/delete-sheet.tsx': { offers: /<PresenceButton\b/ },

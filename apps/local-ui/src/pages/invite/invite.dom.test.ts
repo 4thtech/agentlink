@@ -6,9 +6,10 @@
 //   address). "Invite link for {name}" follows the optional name, which is only for your list.
 // - Copy puts the link on the clipboard and shows the ✓ "Copied" moment; Email opens the mail app
 //   with the share text; Share appears only where the browser has a share sheet for text.
-// - A name typed before the link went anywhere makes a fresh link with that name (the old one is
-//   cancelled). REL051-B2 (owner test, 13 Nov): leaving keeps the link, copied or not; it waits
-//   under Home and People, where Copy link gets it again and Cancel invite ends it.
+// - SEC-INVITE-CAPS (owner decision 18 Nov 2026): the link is made when the owner confirms Create
+//   invite with their presence (here the master code); the name and a long link are chosen first and
+//   fixed once it is made. REL051-B2 (owner test, 13 Nov): leaving keeps the link, copied or not; it
+//   waits under Home and People, where Copy link gets it again and Cancel invite ends it.
 // - Under the hood: the invite's facts, a long link and the QR code. The long-link fallback (the
 //   drop is down) says so in plain words.
 import { HoodProvider } from '@4thtech-io/ui';
@@ -19,6 +20,7 @@ import type { ApiClient, ApiResult } from '../../api/client.js';
 import type { CreateOutcome, InviteApi } from '../contacts/invite-api.js';
 import { InvitePanel, InviteScreen, type InvitePanelProps } from './index.js';
 import { INVITE_STRINGS as S } from './strings.js';
+import { CONTACTS_STRINGS as CS } from '../contacts/strings.js';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -139,11 +141,36 @@ const settle = async (): Promise<void> => {
   }
 };
 
-async function show(element: ReactElement, hood = false): Promise<void> {
+async function show(element: ReactElement, hood = false, confirm = true): Promise<void> {
   root = createRoot(host);
   await act(async () => {
     root?.render(createElement(HoodProvider, { value: hood }, element));
   });
+  await settle();
+  if (confirm) await confirmCreate();
+}
+
+/** SEC-INVITE-CAPS: Create invite with the master code (the owner's presence; nothing is read). */
+async function confirmCreate(): Promise<void> {
+  const start = [...host.querySelectorAll('button')].find(
+    (b) => (b.textContent ?? '').trim() === S.createWithCode,
+  );
+  if (start === undefined) return;
+  await act(async () => start.click());
+  await settle();
+  const input = host.querySelector<HTMLInputElement>('input[name="owner-code"]');
+  if (input === null) throw new Error('no master code field');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+      input,
+      'ABCD-EFGH',
+    );
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const confirmButton = [...host.querySelectorAll('button')].find(
+    (b) => (b.textContent ?? '').trim() === CS.confirmWithCode,
+  );
+  await act(async () => confirmButton?.click());
   await settle();
 }
 
@@ -251,13 +278,12 @@ describe('the invite panel (A3/A5)', () => {
     const href = mail?.getAttribute('href') ?? '';
     expect(href).toMatch(/^mailto:\?subject=/);
     expect(decodeURIComponent(href)).toContain(SHORT_A);
-    // A click is the mail app's business: it is not shown as sent (the name field stays open), but a
-    // mail app hiding the page must not cancel the invite; it stays pending until it expires.
+    // A click is the mail app's business: it is not shown as sent, but a mail app hiding the page
+    // must not cancel the invite; it stays pending until it expires.
     await act(async () => {
       mail?.addEventListener('click', (e) => e.preventDefault());
       mail?.click();
     });
-    expect(nameField().readOnly).toBe(false);
     act(() => window.dispatchEvent(new Event('pagehide')));
     await settle();
     expect(w.cancelled).toHaveLength(0);
@@ -276,96 +302,29 @@ describe('the invite panel (A3/A5)', () => {
     expect(shared).toEqual([`Connect with me on AgentLink: ${SHORT_A}`]);
   });
 
-  it('a name typed before the link went anywhere makes a fresh link with that name', async () => {
+  it('SEC-INVITE-CAPS: nothing is made before Create; the name typed first names the link, then fixed', async () => {
     const w = world();
-    stubClipboard();
-    await show(panel(w));
+    await show(panel(w), false, false);
+    expect(w.created).toEqual([]);
+    expect(text()).toContain(S.createStatement);
     await typeName('Denis');
-    await blurName();
-    expect(w.created).toEqual([
-      { label: undefined, long: false },
-      { label: 'Denis', long: false },
-    ]);
-    expect(w.cancelled).toEqual(['invite-0000000000000001']);
-    expect(text()).toContain('agentlink.4thtech.io/i#2.BBBB');
-    // Once the link went out, the name no longer changes it.
-    await click(S.copy);
+    await confirmCreate();
+    expect(w.created).toEqual([{ label: 'Denis', long: false }]);
+    expect(text()).toContain('Invite link for Denis');
     expect(nameField().readOnly).toBe(true);
-  });
-
-  it('REL051-UF3 (R1-UI-04): type a name, click Copy at once: the named link is copied and it says Copied', async () => {
-    // The real order of a mouse click: press (the field loses focus, its name is saved and a fresh
-    // link is being made), then the click itself. The fresh link takes a moment.
-    const w = world();
-    const written = stubClipboard();
-    let release: (() => void) | undefined;
-    const slow: InviteApi = {
-      ...w.invites,
-      create: (label, options) =>
-        w.created.length === 0
-          ? w.invites.create(label, options)
-          : new Promise((resolve) => {
-              release = () => resolve(w.invites.create(label, options));
-            }),
-    };
-    await show(panel(w, { invites: slow }));
-    await typeName('Denis');
-    await act(async () => {
-      button(S.copy).dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-      nameField().dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
-      button(S.copy).click();
-    });
-    await act(async () => release?.());
-    await settle();
-    expect(w.created.map((c) => c.label)).toEqual([undefined, 'Denis']);
-    expect(written).toEqual([SHORT_B]);
-    expect(hasButton(S.copied)).toBe(true);
-    expect(text()).toContain(S.copiedAnnounce);
-    expect(w.cancelled).toEqual(['invite-0000000000000001']);
-    expect(nameField().readOnly).toBe(true);
-  });
-
-  it('IR-REL051-UF3-1: a link for another name on its way is never copied (the field changed back)', async () => {
-    const w = world();
-    const written = stubClipboard();
-    const releases: (() => void)[] = [];
-    const slow: InviteApi = {
-      ...w.invites,
-      create: (label, options) =>
-        w.created.length === 0 && releases.length === 0
-          ? w.invites.create(label, options)
-          : new Promise((resolve) => {
-              releases.push(() => resolve(w.invites.create(label, options)));
-            }),
-    };
-    await show(panel(w, { invites: slow }));
-    await typeName('Denis');
     await blurName();
-    // The name is cleared again while Denis's link is still being made; then Copy.
-    await typeName('');
-    await act(async () => button(S.copy).click());
-    await act(async () => {
-      for (const release of releases) release();
-    });
-    await settle();
-    expect(w.created.map((c) => c.label)).toEqual([undefined, 'Denis', undefined]);
-    // Denis's link (made second, SHORT_B) lands late, is cancelled, and is not what was copied.
-    expect(written).toEqual([SHORT_A]);
-    expect(w.cancelled).toContain('invite-0000000000000002');
-    expect(hasButton(S.copied)).toBe(true);
+    expect(w.created).toHaveLength(1);
   });
 
-  it('REL051-UF3 (R1-UI-04): a Copy click before the name was saved saves it first, once', async () => {
+  it('SEC-INVITE-CAPS: a refused presence makes nothing and keeps Create', async () => {
     const w = world();
-    const written = stubClipboard();
-    await show(panel(w));
-    await typeName('Denis');
-    await click(S.copy);
-    // The blur that follows (focus moved to the button) makes nothing new: the name went out.
-    await blurName();
-    expect(w.created.map((c) => c.label)).toEqual([undefined, 'Denis']);
-    expect(written).toEqual([SHORT_B]);
-    expect(hasButton(S.copied)).toBe(true);
+    const refusing: InviteApi = {
+      ...w.invites,
+      create: () => Promise.resolve({ kind: 'presence_rejected' }),
+    };
+    await show(panel(w, { invites: refusing }));
+    expect(w.created).toEqual([]);
+    expect(hasButton(S.createWithCode)).toBe(true);
   });
 
   it('leaving keeps the link, copied or not (REL051-B2: Copy link on Home gets it again)', async () => {
@@ -386,29 +345,14 @@ describe('the invite panel (A3/A5)', () => {
     expect(kept.cancelled).toEqual([]);
   });
 
-  // IR-W4-PEOPLE-INVITE-1 (M): the panel cancels only an invite whose ID its own create answered.
-  it('a failed list read never makes it cancel another invite', async () => {
+  // IR-W4-PEOPLE-INVITE-1 (M): the panel never cancels an invite made elsewhere.
+  it('an invite made elsewhere at the same time is never cancelled (leave)', async () => {
     const w = world({ listFails: true, concurrent: true });
     await show(panel(w));
-    await typeName('Denis');
-    await blurName();
     act(() => root?.unmount());
     root = undefined;
     await settle();
-    // The unnamed link it replaced goes; the named one stays when you leave (REL051-B2).
-    expect(w.cancelled).toEqual(['invite-0000000000000001']);
-    expect(w.cancelled.some((id) => id.startsWith('other'))).toBe(false);
-  });
-
-  it('an invite made elsewhere at the same time is never cancelled (rename, leave)', async () => {
-    const w = world({ concurrent: true });
-    await show(panel(w));
-    await typeName('Denis');
-    await blurName();
-    act(() => root?.unmount());
-    root = undefined;
-    await settle();
-    expect(w.cancelled).toEqual(['invite-0000000000000001']);
+    expect(w.cancelled).toEqual([]);
   });
 
   it('copying the link by selecting it anywhere counts as sent: it stays when you leave', async () => {
@@ -430,27 +374,6 @@ describe('the invite panel (A3/A5)', () => {
     expect(w.cancelled).toEqual([]);
   });
 
-  it('a copy of something else does not count as sent: the name still makes a fresh link', async () => {
-    const w = world();
-    await show(panel(w));
-    const other = document.createElement('p');
-    other.textContent = 'unrelated text';
-    document.body.append(other);
-    const range = document.createRange();
-    range.selectNodeContents(other);
-    document.getSelection()?.removeAllRanges();
-    document.getSelection()?.addRange(range);
-    await act(async () => {
-      document.dispatchEvent(new Event('copy', { bubbles: true }));
-    });
-    document.getSelection()?.removeAllRanges();
-    other.remove();
-    expect(nameField().readOnly).toBe(false);
-    await typeName('Denis');
-    await blurName();
-    expect(w.cancelled).toEqual(['invite-0000000000000001']);
-  });
-
   it('the long-link fallback says so in plain words', async () => {
     await show(panel(world(true)));
     expect(text()).toContain(S.fellBack);
@@ -465,8 +388,15 @@ describe('the invite panel (A3/A5)', () => {
     expect(text()).toContain(S.expires);
     await click(S.showQr);
     expect(host.querySelector('svg[role="img"]')).not.toBeNull();
-    await click(S.makeLong);
-    expect(w.created.at(-1)).toEqual({ label: undefined, long: true });
+  });
+
+  it('SEC-INVITE-CAPS: a long link is chosen before Create', async () => {
+    const w = world();
+    await show(panel(w), true, false);
+    const box = host.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    await act(async () => box?.click());
+    await confirmCreate();
+    expect(w.created).toEqual([{ label: undefined, long: true }]);
     expect(text()).toContain(S.kindLong);
   });
 

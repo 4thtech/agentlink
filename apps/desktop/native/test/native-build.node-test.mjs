@@ -39,6 +39,7 @@ test('exit code table is fixed and the same in both helpers', () => {
     weakKey: 18,
     usage: 64,
     badInput: 65,
+    detailRefused: 66,
     unavailable: 69,
     internalError: 70,
   });

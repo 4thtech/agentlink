@@ -4,6 +4,7 @@
 // (packages/node/src/local-ui/ui-contract-invites.test.ts) runs the REAL route handlers on the same
 // samples. Here the client must build exactly each sample request and read each sample answer as the
 // outcome word next to it. apps/local-ui never imports packages/node.
+import type { PresenceProof } from './owner.js';
 import {
   INVITE_CANCEL,
   INVITE_CANCEL_PATH,
@@ -81,18 +82,28 @@ describe('the page and the contract agree on the paths', () => {
   });
 });
 
+// SEC-INVITE-CAPS (owner decision 18 Nov 2026): create is an owner route; the JSON object travels in
+// X-AgentLink-Input and the body is the presence proof (here the master code).
+const CODE: PresenceProof = { kind: 'code', code: 'ABCD-EFGH' };
+const inputOf = (sent: { headers: Headers } | undefined): unknown => {
+  const raw = sent?.headers.get('x-agentlink-input') ?? '';
+  return JSON.parse(atob(raw.replace(/-/g, '+').replace(/_/g, '/')));
+};
+
 describe('create', () => {
-  it('sends {} for the short link and reads format short', async () => {
+  it('sends {} for the short link with the presence proof, and reads format short', async () => {
     const s = answering(shortAnswer);
-    const out = await createInviteApi({ fetch: s.fetch, token: 't' }).create(undefined);
-    expect(s.sent).toHaveLength(1);
-    expect(s.sent[0]?.method).toBe('POST');
-    expect(s.sent[0]?.path).toBe(INVITES_PATH);
-    expect(s.sent[0]?.search).toBe('');
-    expect(s.sent[0]?.headers.get('content-type')).toBe('application/octet-stream');
-    expect(s.sent[0]?.headers.get('x-agentlink-csrf')).toBe('t');
-    expect(s.sent[0]?.headers.get('x-agentlink-input')).toBeNull();
-    expect(JSON.parse(s.sent[0]?.body ?? '')).toEqual(INVITE_CREATE.short.body);
+    const out = await createInviteApi({ fetch: s.fetch, token: 't' }).create(
+      undefined,
+      undefined,
+      CODE,
+    );
+    const last = s.sent.at(-1);
+    expect(last?.method).toBe('POST');
+    expect(last?.path).toBe(INVITES_PATH);
+    expect(last?.search).toBe('');
+    expect(last?.headers.get('x-agentlink-csrf')).toBe('t');
+    expect(inputOf(last)).toEqual(INVITE_CREATE.short.body);
     expect(out.kind).toBe(INVITE_CREATE.short.outcome);
     if (out.kind !== 'ok') throw new Error('expected ok');
     expect(out.invite.inviteUrl).toBe(INVITES_WORLD.shortLink);
@@ -103,21 +114,38 @@ describe('create', () => {
   it('sends {long: true} only when asked, with or without the name', async () => {
     const s = answering(longAnswer);
     const api = createInviteApi({ fetch: s.fetch, token: 't' });
-    const out = await api.create(undefined, { long: true });
-    await api.create('Bo', { long: true });
-    await api.create('Bo', { long: false });
-    expect(JSON.parse(s.sent[0]?.body ?? '')).toEqual(INVITE_CREATE.long.body);
-    expect(JSON.parse(s.sent[1]?.body ?? '')).toEqual({ label: 'Bo', long: true });
-    expect(JSON.parse(s.sent[2]?.body ?? '')).toEqual({ label: 'Bo' });
+    const out = await api.create(undefined, { long: true }, CODE);
+    const a = s.sent.at(-1);
+    await api.create('Bo', { long: true }, CODE);
+    const b = s.sent.at(-1);
+    await api.create('Bo', { long: false }, CODE);
+    const c = s.sent.at(-1);
+    expect(inputOf(a)).toEqual(INVITE_CREATE.long.body);
+    expect(inputOf(b)).toEqual({ label: 'Bo', long: true });
+    expect(inputOf(c)).toEqual({ label: 'Bo' });
     expect(out.kind).toBe(INVITE_CREATE.long.outcome);
     if (out.kind === 'ok') expect(out.invite.format).toBe('long');
   });
 
   it('reads the automatic fallback (a long link when short was asked) as ok', async () => {
     const s = answering(longAnswer);
-    const out = await createInviteApi({ fetch: s.fetch, token: 't' }).create(undefined);
-    expect(JSON.parse(s.sent[0]?.body ?? '')).toEqual({});
+    const out = await createInviteApi({ fetch: s.fetch, token: 't' }).create(
+      undefined,
+      undefined,
+      CODE,
+    );
+    expect(inputOf(s.sent.at(-1))).toEqual({});
     expect(out.kind).toBe('ok');
+  });
+
+  it('reads a refused presence as presence_rejected (nothing made)', async () => {
+    const s = answering({ status: 403, body: { status: 'presence_rejected' } } as never);
+    const out = await createInviteApi({ fetch: s.fetch, token: 't' }).create(
+      undefined,
+      undefined,
+      CODE,
+    );
+    expect(out.kind).toBe('presence_rejected');
   });
 
   it('refuses a short link of the wrong shape and a missing or odd format', async () => {
@@ -129,7 +157,11 @@ describe('create', () => {
     ]) {
       const body = { ...shortAnswer.body, ...mutate };
       const s = answering({ status: 200, body: { ...body, shareText: `x ${body.inviteUrl}` } });
-      const out = await createInviteApi({ fetch: s.fetch, token: 't' }).create(undefined);
+      const out = await createInviteApi({ fetch: s.fetch, token: 't' }).create(
+        undefined,
+        undefined,
+        CODE,
+      );
       expect(out.kind).toBe('failed');
     }
   });

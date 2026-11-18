@@ -15,11 +15,15 @@
 import { canonicalize, encodeBase64url, randomBytes } from '@4thtech-io/crypto';
 import {
   AUTO_SAVE_DEFAULTS,
+  aiInviteLimitsOf,
   HISTORY_PRE_D148,
+  OUTGOING_DEFAULTS,
   OWNER_ACTION_MAX_LIFETIME_SECONDS,
   PROTOCOL_VERSION,
   compareUsd,
+  outgoingOf,
   ownerActionSchema,
+  proofCeilingsOf,
   type PolicyRule,
   type AgentLabelParams,
   type AgentResumeParams,
@@ -52,6 +56,8 @@ export type PreparableOp =
   | 'contact.remove'
   | 'contact.block'
   | 'contact.unblock'
+  | 'contact.keep'
+  | 'invite.create'
   | 'agent.label'
   | 'app.connect'
   | 'app.disconnect'
@@ -67,6 +73,10 @@ const PREPARABLE: readonly string[] = [
   // UX1112 WP-12 (F-2): the owner blocks or unblocks a contact from the local app (People).
   'contact.block',
   'contact.unblock',
+  // SEC-INVITE-CAPS (D-156): the owner keeps a contact the AI connected (People, Home).
+  'contact.keep',
+  // SEC-INVITE-CAPS (owner decision 18 Nov 2026): the owner's own invite (People, Get started).
+  'invite.create',
   // U3-d (D-138): the owner names this agent from the local app.
   'agent.label',
   // U3-f (D-138): the owner connects, moves or disconnects an AI app from the local app.
@@ -87,6 +97,8 @@ interface ParamsOf {
   readonly 'contact.remove': ContactRemoveParams;
   readonly 'contact.block': ContactBlockParams;
   readonly 'contact.unblock': ContactBlockParams;
+  readonly 'contact.keep': ContactBlockParams;
+  readonly 'invite.create': Record<string, never>;
   readonly 'agent.label': AgentLabelParams;
   readonly 'app.connect': AppChangeParams;
   readonly 'app.disconnect': AppChangeParams;
@@ -177,6 +189,8 @@ export type PrepareRefusal =
   | 'already_blocked'
   /** WP-12: Unblock for a contact that is not blocked (refused before the gesture). */
   | 'not_blocked'
+  /** SEC-INVITE-CAPS: Keep for a contact that is not waiting for the owner (refused before it). */
+  | 'not_waiting'
   /** W4-FILES-SAVE: not a received item ID `<envelope ID>.<index>` (index 00 to 15). */
   | 'item_invalid'
   /** WP-11: `backup.export` params that are not a 16-byte base64url kitId and full/identity. */
@@ -318,8 +332,28 @@ export function mergePolicyPatch(base: Policy, patch: PolicyPatch): Policy {
   // D-142 (06 §3): every policy.set this core signs carries `files.autoSave`; a base signed before
   // D-142 has none and is read with the defaults, so the complete document gets them.
   if (out.files.autoSave === undefined) out.files.autoSave = clone(AUTO_SAVE_DEFAULTS);
+  // D-156 (06 §3): every policy.set this core signs carries the hard proof ceilings and the
+  // outgoing caps; a base signed before D-156 has none and is read with the defaults, so the
+  // complete document gets them. A soft limit the patch does not name is lowered to its ceiling
+  // (how the engine already reads it); one the patch names above its ceiling fails the schema.
+  if (out.outgoing === undefined) out.outgoing = clone(OUTGOING_DEFAULTS);
+  const proofs = out.proofs;
+  if (proofs.hardMaxPerActionUSD === undefined || proofs.hardDailyUSD === undefined) {
+    const ceilings = proofCeilingsOf(base);
+    proofs.hardMaxPerActionUSD ??= ceilings.hardMaxPerActionUSD;
+    proofs.hardDailyUSD ??= ceilings.hardDailyUSD;
+  }
+  const named = patch.proofs ?? {};
+  if (named.perActionMaxUSD === undefined) {
+    proofs.perActionMaxUSD = minUsd(proofs.perActionMaxUSD, proofs.hardMaxPerActionUSD);
+  }
+  if (named.dailyBudgetUSD === undefined) {
+    proofs.dailyBudgetUSD = minUsd(proofs.dailyBudgetUSD, proofs.hardDailyUSD);
+  }
   return out;
 }
+
+const minUsd = (a: string, b: string): string => (compareUsd(a, b) > 0 ? b : a);
 
 const RULE_RANK: Readonly<Record<PolicyRule, number>> = { allow: 0, approval: 1, deny: 2 };
 const looserRule = (from: PolicyRule, to: PolicyRule): boolean => RULE_RANK[to] < RULE_RANK[from];
@@ -520,6 +554,16 @@ export const POLICY_FIELD_LOOSENING: {
       'contacts.rateLimitPerContactPerHour',
       (p) => p.contacts.rateLimitPerContactPerHour,
     ),
+    // SEC-INVITE-CAPS (D-156): more open or daily AI invites, or a longer expiry, lets the AI connect
+    // more people. A policy signed before it existed reads as the defaults.
+    aiInvites: (b, n) => {
+      const was = aiInviteLimitsOf(b);
+      const now = aiInviteLimitsOf(n);
+      return when(
+        now.maxOpen > was.maxOpen || now.perDay > was.perDay || now.expiryHours > was.expiryHours,
+        { code: 'limits_raised', fields: ['contacts.aiInvites'] },
+      );
+    },
   },
   files: {
     allowedFolders: (b, n) =>
@@ -592,6 +636,18 @@ export const POLICY_FIELD_LOOSENING: {
     exportFolder: anyChange('folder_changed', 'proofs.exportFolder', (p) => p.proofs.exportFolder),
     defaultChain: (b, n) =>
       when(n.proofs.defaultChain !== b.proofs.defaultChain, { code: 'proofs_chain_changed' }),
+    // D-156: raising a hard ceiling lets more be spent without a question. Absent reads as the
+    // defaults (a policy signed before D-156), so filling them in is no raise.
+    hardMaxPerActionUSD: (b, n) =>
+      when(
+        usdRaised(proofCeilingsOf(b).hardMaxPerActionUSD, proofCeilingsOf(n).hardMaxPerActionUSD),
+        { code: 'proofs_spend_raised', fields: ['proofs.hardMaxPerActionUSD'] },
+      ),
+    hardDailyUSD: (b, n) =>
+      when(usdRaised(proofCeilingsOf(b).hardDailyUSD, proofCeilingsOf(n).hardDailyUSD), {
+        code: 'proofs_spend_raised',
+        fields: ['proofs.hardDailyUSD'],
+      }),
   },
   receipts: {
     autoDelivered: (b, n) =>
@@ -615,6 +671,35 @@ export const POLICY_FIELD_LOOSENING: {
     autoAcceptMaxUSD: autoAcceptLoosening,
     autoAcceptDirection: autoAcceptLoosening,
     autoAcceptMinUSD: autoAcceptLoosening,
+  },
+  // D-156: a raised outgoing cap lets the AI send more without a question. A policy signed before
+  // D-156 reads as the defaults.
+  outgoing: {
+    messagesPerContactPerDay: raisedInt(
+      'limits_raised',
+      'outgoing.messagesPerContactPerDay',
+      (p) => outgoingOf(p).messagesPerContactPerDay,
+    ),
+    messagesPerDay: raisedInt(
+      'limits_raised',
+      'outgoing.messagesPerDay',
+      (p) => outgoingOf(p).messagesPerDay,
+    ),
+    filesPerContactPerDay: raisedInt(
+      'limits_raised',
+      'outgoing.filesPerContactPerDay',
+      (p) => outgoingOf(p).filesPerContactPerDay,
+    ),
+    filesPerDay: raisedInt(
+      'limits_raised',
+      'outgoing.filesPerDay',
+      (p) => outgoingOf(p).filesPerDay,
+    ),
+    fileMBPerDay: raisedInt(
+      'limits_raised',
+      'outgoing.fileMBPerDay',
+      (p) => outgoingOf(p).fileMBPerDay,
+    ),
   },
   // D-148 (RET-6): retention never widens what an agent or a contact can do; a shorter one deletes
   // local copies, which the Storage editor shows ("Right now this moves …") before the owner signs.

@@ -1,5 +1,8 @@
 # Identities and keys
 
+<!-- ai-knowledge: summary
+summary: How identities and keys work: principals and master seeds, where seeds live, the signed cards that tie an ID to its owner, owner operations and browser support for approval passkeys. For developers and security readers. -->
+
 > **Status: Current for v0.5.10.** Keys and agent cards shipped in v0.1.0; owner presence in the desktop app and the agent-key signing allowlist are described as of 0.5.10. Source: [04 §2](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). The exact derivation inputs are in the spec, and test vectors in [`test-vectors/`](https://github.com/4thtech/agentlink/tree/main/test-vectors).
 
 ## Principals

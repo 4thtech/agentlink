@@ -9,7 +9,16 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { fakeClaudeCode } from '../app-world.js';
 import { emulateReducedMotion, expectStableLayout, observeLayoutShift } from '../helpers/motion.js';
 import { CONNECT_WITH, getStartedWithTouchId } from './helpers-wizard.js';
-import { chapter, journeyPage, journeyWorld, startUi, startUiRun, text } from './world.js';
+import {
+  CREATE_INVITE_WITH,
+  chapter,
+  createInviteWithPresence,
+  journeyPage,
+  journeyWorld,
+  startUi,
+  startUiRun,
+  text,
+} from './world.js';
 
 const ch = chapter();
 beforeAll(() => ch.start(), 120_000);
@@ -102,8 +111,12 @@ describe('chapter 1: onboarding', () => {
     await page.waitForURL((url) => url.pathname === '/start/invite');
     await page.getByRole('heading', { name: 'Invite someone' }).waitFor();
     await page.getByRole('button', { name: 'Skip for now' }).waitFor();
-    // W4-WIRE: step 4 is U4's invite panel itself: the link is made at once, with Copy, in place.
-    await page.locator('.inv-link[data-state="ready"]').waitFor();
+    // W4-WIRE: step 4 is U4's invite panel itself. SEC-INVITE-CAPS (owner decision 18 Nov 2026;
+    // 08 §1 `invite.create`, 11 §5.12): the link is made once the owner confirms Create invite with
+    // Touch ID (no link before that), then Copy, in place.
+    await page.getByRole('button', { name: CREATE_INVITE_WITH }).waitFor();
+    expect(await page.locator('.inv-link[data-state="ready"]').count()).toBe(0);
+    await createInviteWithPresence(page);
     await page.getByRole('button', { name: 'Copy', exact: true }).waitFor();
 
     // No reload since step 1 (the finish answer's new generation is adopted in place); no layout

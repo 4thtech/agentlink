@@ -20,7 +20,7 @@ const rules = (receipts: Record<string, unknown>): Record<string, unknown> => ({
     proofs: {
       notarize: 'allow',
       dailyBudgetUSD: '5',
-      perActionMaxUSD: '1',
+      perActionMaxUSD: '0.2',
       allowKeyDisclosure: 'approval',
     },
     contacts: { acceptInvites: 'approval', unknownSenders: 'queue', allowed: 'paired', listed: 0 },

@@ -1,6 +1,9 @@
 # ChatGPT
 
-*Applies to AgentLink 0.5.8. Coming in a later version; you cannot set this up yet.*
+<!-- ai-knowledge: summary
+summary: ChatGPT on the web cannot use AgentLink yet; an always-on agent in your own cloud account is planned for a later version. Codex in the ChatGPT desktop app works today. -->
+
+*Coming in a later version; you cannot set this up yet.*
 
 ChatGPT on the web cannot run programs on your computer, so it cannot use AgentLink as it works today. The plan is to run your own always-on agent in your own cloud account and connect ChatGPT to it. That agent comes first for Claude (planned for AgentLink 0.6.0); ChatGPT on the web follows later, and the ChatGPT phone app is not planned yet. See [Always-on cloud agent](../apps/cloud-agent.md).
 

@@ -623,6 +623,12 @@ export interface InviteStepProps {
   readonly onSkip?: () => void;
   /** FILES-ONB-1: back to the step before (Files, or Connected in Connect another AI app). */
   readonly onBack?: () => void;
+  /**
+   * SEC-INVITE-CAPS UX: a link is on screen. Before that the panel's Create invite is the one
+   * primary action and only "Skip for now" leaves; "Done, go to Home" (primary) comes with the link.
+   * Without a panel (the link to People) Done is always there.
+   */
+  readonly linkMade?: boolean;
 }
 
 /** A3, the last step (optional): invite someone; "Skip for now" and "Done, go to Home". */
@@ -632,7 +638,9 @@ export function InviteStep({
   onHome,
   onSkip = onHome,
   onBack,
+  linkMade = false,
 }: InviteStepProps): ReactElement {
+  const done = panel === undefined || linkMade;
   const title = useTitleFocus<HTMLHeadingElement>();
   return (
     <section className="st-screen st-w-600" aria-labelledby="st-h">
@@ -655,9 +663,15 @@ export function InviteStep({
         <Button variant="ghost" size="lg" onClick={onSkip}>
           {I.skip}
         </Button>
-        <Button variant="secondary" size="lg" onClick={onHome}>
-          {I.done}
-        </Button>
+        {done ? (
+          <Button
+            variant={panel === undefined ? 'secondary' : 'primary'}
+            size="lg"
+            onClick={onHome}
+          >
+            {I.done}
+          </Button>
+        ) : null}
       </div>
     </section>
   );

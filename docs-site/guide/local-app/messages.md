@@ -1,6 +1,9 @@
 # Messages page
 
-*Applies to AgentLink 0.5.8. In 0.4.6 you read a conversation by opening a person on [Home](home.md): it shows both directions in one thread. This Messages page (Inbox and Sent per contact) is still there, reachable with Go to or its old link.*
+<!-- ai-knowledge: summary
+summary: The Messages page and Home conversations: read what you and your contacts wrote in an Inbox and Sent list, see delivery states and copy messages. To reply, ask your AI. -->
+
+*In 0.4.6 you read a conversation by opening a person on [Home](home.md): it shows both directions in one thread. This Messages page (Inbox and Sent per contact) is still there, reachable with Go to or its old link.*
 
 The Messages page shows what you and your contacts have written, one contact at a time, in an **Inbox** and a **Sent** list. It is for reading only. To reply, ask your AI.
 

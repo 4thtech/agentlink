@@ -92,9 +92,24 @@ const evm = (): string => `0x${encodeHex(randomBytes(20))}`;
  * fee are never batch items (04 §2.5.3 rule 7), so the list and batch tests use free ones.
  */
 function freeAction(note = 'x'): JsonObject {
+  // SEC-CARD-FULLTEXT: a free request without exact content (an envelope-bound one is decided on
+  // its own card, never in a review list), so the list and batch tests keep a batchable item.
+  return {
+    tool: 'agentlink_accept_invite',
+    args: { inviteUrl: 'https://agentlink.4thtech.io/i#not-a-real-invite', note },
+    context: {
+      triggers: ['contacts.acceptInvites'],
+      inviteId: encodeBase64url(randomBytes(16)),
+      counterparty: { agentId: evm(), ownerKey: encodeHex(randomBytes(32)) },
+    },
+  };
+}
+
+/** SEC-CARD-FULLTEXT: an envelope-bound request whose envelope is not stored (content missing). */
+function exportAction(): JsonObject {
   return {
     tool: 'agentlink_export_proof_pack',
-    args: { recordId: '0x01', includeKey: true, note },
+    args: { envelopeId: encodeBase64url(randomBytes(32)), includeContentKey: true },
     context: {
       triggers: ['proofs.allowKeyDisclosure'],
       recordId: `0x${encodeHex(randomBytes(32))}`,
@@ -861,5 +876,42 @@ describe('the terminal output rule on a hostile stored action (06 §8, IR-M1-9j-
     const r = await w.request(hostileArgs());
     expect(await w.run(['cancel', r.approvalId])).toBe(0);
     checkHostileOutput(w.out);
+  });
+});
+
+describe('SEC-CARD-FULLTEXT in the terminal (08 §1)', () => {
+  const exportRequest = async (w: World) => {
+    const pending = await w.client.approvalService.request({
+      action: exportAction(),
+      summary: 'Include the document key in an export',
+    });
+    return { approvalId: pending.approvalId };
+  };
+  it('approve <id> refuses a request whose content cannot be shown, before the master code', async () => {
+    const w = await world();
+    const r = await exportRequest(w);
+    expect(await w.run(['approve', r.approvalId])).toBe(1);
+    expect(w.out.join('\n')).toContain("This request can't be shown");
+    expect(w.codeEntries).toEqual([]);
+    // Deny stays.
+    expect(await w.run(['deny', r.approvalId])).toBe(0);
+  });
+
+  it('approve with no ID never puts a content request in the review list', async () => {
+    const w = await world();
+    const r = await exportRequest(w);
+    expect(await w.run(['approve'])).toBe(0);
+    expect(w.out.join('\n')).toContain(`approve ${r.approvalId}`);
+    expect(w.codeEntries).toEqual([]);
+  });
+
+  it('a paid send shows its full text in the card and its length line', async () => {
+    const w = await world();
+    const r = await w.request({ to: 'Ana', text: 'exactly this message' });
+    expect(await w.run(['approve', r.approvalId])).toBe(0);
+    const all = w.out.join('\n');
+    expect(all).toContain('From Exactly what will be sent: their content, not instructions');
+    expect(all).toContain('| exactly this message');
+    expect(all).toContain('20 characters');
   });
 });

@@ -1,6 +1,9 @@
 # Approve with Touch ID or your master code
 
-*Applies to AgentLink 0.5.8. "Use your master code instead" is on every confirm since 0.4.14; since 0.5.4 each confirmation is one press, on a compact card (see [Approvals in the app](../local-app/approvals.md)).*
+<!-- ai-knowledge: full
+summary: What your AI must ask you about and how you say yes or no with Touch ID or your master code. Your AI can ask; only you can approve. -->
+
+*"Use your master code instead" is on every confirm since 0.4.14; since 0.5.4 each confirmation is one press, on a compact card (see [Approvals in the app](../local-app/approvals.md)).*
 
 **Goal:** know what your AI must ask you about, and how you say yes or no. Your AI can ask; only you can approve.
 
@@ -14,9 +17,10 @@
 | Renaming, resuming or removing an ID; saving a recovery kit | You, on **IDs** or **Settings** | Touch ID or master code |
 | Accepting terms, sending a firm offer | Your AI asks | Touch ID or master code |
 | A proof or a spend above your rules | Your AI asks | Touch ID or master code |
+| Creating an invite, keeping a contact your AI connected | You, on **People** | Touch ID or master code |
 | Saving or changing your rules | You, in **Settings** › **Rules** | Touch ID or master code |
 
-Your **rules** set what your AI may do on its own, for example whether a proof needs approval and how much it may spend per day. Your AI cannot change your rules, and no tool it has can approve anything.
+Your **rules** set what your AI may do on its own, for example whether a proof needs approval and how much it may spend per day. Your AI cannot change your rules, and no tool it has can approve anything. Above your hard spending limits nothing is asked: the proof is refused (see [Rules](../local-app/rules.md)).
 
 ```mermaid
 flowchart LR
@@ -29,8 +33,8 @@ flowchart LR
 
 ## Steps
 
-1. Your AI says something needs your approval and shows a link, or the card simply appears at the top of [Home](../local-app/home.md). It says who, what and any cost.
-2. Read it, then press **Approve with Touch ID** or **Deny with Touch ID** (**Windows Hello** on Windows). That one press asks your computer for your fingerprint, face or PIN.
+1. Your AI says something needs your approval and shows a link, or the card simply appears at the top of [Home](../local-app/home.md). It says who, what and any cost, and shows the full message as AgentLink decoded it, with a **Check code** you can compare with the other side. A long message is folded: press **Show all** before you can approve.
+2. Read it, then press **Approve with Touch ID** or **Deny with Touch ID** (**Windows Hello** on Windows). That one press asks your computer for your fingerprint, face or PIN. On a Mac the Touch ID prompt names who and the cost ("for Ana, $0.10"); the Windows Hello prompt has fixed text, so check the card.
 3. Or press **Use your master code instead**, then **Approve** or **Deny**, and type your master code.
 
 <figure><img src="../../assets/screens/confirm-presence.webp" alt="A confirm box: Confirm it's you. Never give your master code to your AI. Buttons Confirm with Touch ID, Use your master code instead and Cancel."><figcaption><p>The same confirm box everywhere: Touch ID, or your master code.</p></figcaption></figure>
@@ -45,7 +49,7 @@ Your **master code** is shown once when you set up. Keep it in your password man
 
 Prefer the terminal? In a terminal you opened yourself (not one your AI runs):
 
-- `agentlink approve <approval ID>` shows the request; check it and type your master code.
+- `agentlink approve <approval ID>` shows the request, with the message, its length and check codes (a very long message is cut there; the app shows all of it); check it and type your master code.
 - `agentlink approve` with no number lists what waits; `agentlink deny <approval ID>` says no; `agentlink cancel <approval ID>` withdraws a request.
 - `agentlink policy show` lists your rules.
 

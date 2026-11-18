@@ -39,7 +39,7 @@ describe('the real status file', () => {
   it('is in sync with README.md and the docs-site page in this repository', () => {
     const { problems, skipped } = run({ root: repo, check: true });
     expect(problems).toEqual([]);
-    expect(skipped).toEqual([]); // the knowledge base carries the markers, so nothing is skipped
+    expect(skipped).toEqual([]); // every target carries its markers, so nothing is skipped
   });
 });
 

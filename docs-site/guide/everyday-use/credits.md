@@ -1,6 +1,7 @@
 # Credits
 
-*Applies to AgentLink 0.5.8.*
+<!-- ai-knowledge: summary
+summary: Credits pay for proof only; messages, files and pairing never need them. Today you use free test credits; covers how to see your credits and what comes later. -->
 
 Credits are the balance you pay for proof from. Messages, files and pairing never need credits.
 

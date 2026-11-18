@@ -21,6 +21,9 @@
 // - `POST …/block`, `POST …/unblock` (UX1112 WP-12, F-2; 02 F-14; D-72): no input. Core prepares
 //   `contact.block` for an active contact or `contact.unblock` for a blocked one and refuses
 //   anything else before the gesture; a blocked contact's later messages are dropped (04 §3.1.1).
+// - `POST …/keep` (SEC-INVITE-CAPS, D-156): no input. Core prepares `contact.keep` for a contact the
+//   AI connected through an AI-made invite that waits for the owner, and refuses anything else
+//   before the gesture; from then on the agent may send to it. (Remove is the other answer.)
 // A handler that returns without signing performed nothing; the gate answers 409 `refused`. No MCP
 // tool or CLI command reaches these routes (I-4).
 //
@@ -130,6 +133,8 @@ function row(view: ContactView): JsonObject | undefined {
       : {}),
     // W4-RENAME-REACHES-CONTACTS (D-141; 08 §1): the unseen former name, as core restricted it.
     ...formerNameOf(view),
+    // SEC-INVITE-CAPS (D-156; 08 §1): your AI connected them; Keep or Remove. Only exactly true.
+    ...(view.waitingForOwner === true ? { waitingForOwner: true } : {}),
   };
 }
 
@@ -297,6 +302,9 @@ const BLOCK_LINES = Object.freeze([
   'Block this contact. Messages from them are dropped until you unblock them.',
 ]);
 const UNBLOCK_LINES = Object.freeze(['Unblock this contact. Their messages arrive again.']);
+const KEEP_LINES = Object.freeze([
+  'Keep this contact your AI connected. Your AI can send to them from now on.',
+]);
 
 async function checkContact(
   context: LocalUiContext,
@@ -378,6 +386,32 @@ async function removeContact(
 }
 
 /**
+ * SEC-INVITE-CAPS (D-156): Keep, no input. Core prepares `contact.keep` for this contact (refusing
+ * an unknown, removed, revoked or not waiting one); it is signed only when it is exactly that op for
+ * this `ref`, with fixed review lines (never the contact's name, I-5), and applied by core (I-4).
+ */
+async function keepContact(
+  context: LocalUiContext,
+  request: LocalUiRequest,
+  owner: LocalUiOwnerOperation,
+): Promise<LocalUiResult> {
+  const client = context.client;
+  if (client === undefined) return UI_NOT_SET_UP;
+  const ref = refOf(request);
+  if (ref === undefined || request.input !== undefined) return NOT_SIGNED;
+  let prepared: PreparedOwnerAction;
+  try {
+    prepared = await client.contacts.prepareKeep(ref);
+  } catch {
+    return NOT_SIGNED;
+  }
+  if (prepared.status !== 'prepared' || prepared.body.op !== 'contact.keep') return NOT_SIGNED;
+  const params = prepared.body.params as { contact?: unknown };
+  if (params.contact !== ref) return NOT_SIGNED;
+  return signAndApply(context, owner, prepared, KEEP_LINES);
+}
+
+/**
  * WP-12: Block or Unblock, no input. Core prepares the body for this contact (refusing an unknown,
  * removed, revoked, already blocked or not blocked one); it is signed only when it is exactly that
  * op, with fixed review lines (never the contact's name, I-5), and applied by core (I-4).
@@ -420,4 +454,5 @@ export const contactsRoutes: readonly LocalUiRoute[] = Object.freeze([
   ownerOp('/api/ui/contacts/:ref/remove', removeContact),
   ownerOp('/api/ui/contacts/:ref/block', blockRoute('contact.block')),
   ownerOp('/api/ui/contacts/:ref/unblock', blockRoute('contact.unblock')),
+  ownerOp('/api/ui/contacts/:ref/keep', keepContact),
 ]);

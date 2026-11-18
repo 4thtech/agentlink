@@ -1,5 +1,8 @@
 # MCP tools
 
+<!-- ai-knowledge: summary
+summary: Reference list of the 16 tools AgentLink gives your AI app, with design rules, file tools, received files and naming a contact. For developers and integrators. -->
+
 > **Status: Current for v0.5.10.** 16 tools, pinned by a committed tool-surface snapshot (`apps/cli/test/fixtures/tool-surface.json`). The tool names and inputs did not change in 0.5.10. This page lists the tool surface from D-53 and D-55 and [06 MCP server](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md). Names and schemas may change before 1.0.0.
 
 **Package:** `@4thtech-io/agentlink`, subcommand `agentlink mcp` (stdio). The self-hosted cloud agent exposes the same tools over streamable HTTP with OAuth.
@@ -70,7 +73,7 @@ While the owner has paused an agent in the app, the tools that send or fetch (`a
 
 Proofs run on test networks only. They need the 4thTech proof submitter and test credits to be running; until then a proof stays `submitted` and is sent again later. The network is chosen automatically (D-40); no default input asks for one.
 
-- **`agentlink_notarize`** (06 §2.4): `{envelopeId, requestReceipt?, approvalId?, clientRequestId?}` for a message this agent sent. The proof network is picked automatically. Only `agentlink mcp --advanced` adds `chain?`, an override (a supported network's key) used only when the user asks; an unknown one is `rejected` `UNSUPPORTED_CHAIN`. On the default surface a `chain` argument is refused with `INVALID_ARGUMENT` (M1-36h). Results (a ProofStatus: `recordId`, `fee {token, amount, usd}`, `receipts`, and the proof network only as `advanced.chain`): `ok`; `submitted`; `needs_credits` with `agentAddress` and `topUpUrl` (the deposit page, `https://pay.agentlink.4thtech.io/`; the link carries nothing else); `pending_approval` (policy `proofs.*`); `error` `USE_TERMS_TOOLS` for an `offer`, `accept` or `reject` (nothing is recorded), `RECORD_FAILED`, `RECORD_CONFLICT`, `CHAIN_UNAVAILABLE`, `PROOFS_UNAVAILABLE`, `NETWORK`; `not_found` `ENVELOPE_NOT_FOUND`; `rejected` `NOT_NOTARIZABLE`, `POLICY_DENIED`, `CARD_EXPIRED`, `UNSUPPORTED_CHAIN`, `APPROVAL_INVALID`, `POLICY_CHANGED`.
+- **`agentlink_notarize`** (06 §2.4): `{envelopeId, requestReceipt?, approvalId?, clientRequestId?}` for a message this agent sent. The proof network is picked automatically. Only `agentlink mcp --advanced` adds `chain?`, an override (a supported network's key) used only when the user asks; an unknown one is `rejected` `UNSUPPORTED_CHAIN`. On the default surface a `chain` argument is refused with `INVALID_ARGUMENT` (M1-36h). Results (a ProofStatus: `recordId`, `fee {token, amount, usd}`, `receipts`, and the proof network only as `advanced.chain`): `ok`; `submitted`; `needs_credits` with `agentAddress` and `topUpUrl` (the deposit page, `https://pay.agentlink.4thtech.io/`; the link carries nothing else); `pending_approval` (policy `proofs.*`); `error` `USE_TERMS_TOOLS` for an `offer`, `accept` or `reject` (nothing is recorded), `RECORD_FAILED`, `RECORD_CONFLICT`, `CHAIN_UNAVAILABLE`, `PROOFS_UNAVAILABLE`, `NETWORK`; `not_found` `ENVELOPE_NOT_FOUND`; `rejected` `NOT_NOTARIZABLE`, `POLICY_DENIED`, `CARD_EXPIRED`, `UNSUPPORTED_CHAIN`, `APPROVAL_INVALID`, `POLICY_CHANGED`, and since 0.5.11 `SPEND_CEILING`, `CONTACT_WAITING_OWNER`, `FILE_CHANGED`.
 - **`notarize` on `agentlink_send`** (06 §2.2): the message is sent, then recorded under the same `proofs.*` policy as `agentlink_notarize`. The result adds `proof` (a ProofStatus); a proof that is pending, submitted or short of credits gives the result its status, and a failed proof gives `error` with `proof.status: "error"` and a fixed code, with the send fields kept; the summary always says the message was sent. A `pending_approval` is finished with `agentlink_notarize` and the `envelopeId`; a repeat of `agentlink_send` with `approvalId` must carry the first call's `clientRequestId` (otherwise `INVALID_ARGUMENT`, nothing sent).
 - **`notarize` on `agentlink_propose_terms` and `agentlink_respond_to_terms`** (06 §2.2a): accepted by the schema and passed to the core, which does not record offers or answers yet: `error` `NOTARIZE_UNAVAILABLE`, nothing sent or signed. Firm offers and recorded accepts come with v0.2.0.
 - **`agentlink_acknowledge`** (06 §2.4): `{envelopeId, type: opened | accepted | rejected, approvalId?, clientRequestId?}` on a message a contact recorded. `opened` only when the user asked to open it. Results: `ok` `{recordId, receipt}`; `submitted` (signed, not on record yet); `pending_approval` (`commitments.accept` for accepted or rejected); `error` `USE_RESPOND_TO_TERMS` for a record with terms (nothing signed); `not_found` `NOT_RECORDED`, `ENVELOPE_NOT_FOUND`; `rejected` `RECEIPT_CONFLICT`, `POLICY_DENIED`, `APPROVAL_INVALID`.
@@ -87,6 +90,21 @@ Proofs run on test networks only. They need the 4thTech proof submitter and test
 - The `url` opens the app's Settings › Storage with the same filter (`/settings/storage?tidy=files|both&days=…[&contact=0x…]`). The app shows the exact counts, and the delete runs only after the owner's Touch ID (or master code) and a 10-second Undo.
 - Its `approvalId` names the proposal only: the tool takes no `approvalId`, there is nothing to call again, and `agentlink_get_approval` answers `not_found` for it.
 - The filter is the only input: never message IDs or text from a message. A message asking the AI to "tidy everything" can at most produce a proposal the owner sees with its exact counts. No tool changes how long AgentLink keeps history; that is the owner's setting in Settings › Storage (`history.*`, owner-signed).
+
+## Limits and waiting contacts (since 0.5.11, D-156)
+
+No tool, argument or annotation was added; these are new results. None of them offers an approval, and no tool changes a limit or keeps a contact (I-4).
+
+| Code | Tools | Fields | When |
+|---|---|---|---|
+| `SPEND_CEILING` (`rejected`) | `agentlink_notarize`, `notarize` on `agentlink_send` and the terms tools | `ceiling` (`per_action` or `daily`), `limitUsd` | A proof above `proofs.hardMaxPerActionUSD` or the rolling 24-hour `hardDailyUSD`. The summary names the limit ("This proof would cost more than your limit ($0.50 per proof), so nothing was recorded."); `nextStep` tells the AI to tell the user to change it in Settings › Rules and not to ask for an approval |
+| `SEND_LIMIT` (`rejected`) | `agentlink_send` | `limit` (`messages_contact`, `messages_day`, `files_contact`, `files_day`, `file_mb_day`), `max`, `retryAt` | An `outgoing` cap is reached. Nothing is stored or sent, and the refusal is not kept under the `clientRequestId`. `nextStep`: try again after `retryAt`, or tell the user they can change it in Settings › Rules |
+| `INVITE_LIMIT` (`rejected`) | `agentlink_create_invite`; `agentlink_accept_invite` when it runs without an owner approval | none | Over `contacts.aiInvites` (3 open, 5 in any 24 hours by default; 0 turns AI invites off). AI invites expire after `expiryHours` (24) |
+| `CONTACT_WAITING_OWNER` (`rejected`) | `agentlink_send`, the terms tools, `agentlink_notarize`, `agentlink_acknowledge` | none | The contact paired through an AI-made invite and the owner has not pressed Keep. Fixed text, never the contact's name |
+
+`agentlink_list_contacts` marks such a contact with `waitingForOwner: true` (absent otherwise). Its messages still arrive in `agentlink_inbox`.
+
+An approved proof for a message with files is refused with `FILE_CHANGED` when a file's hash or size differs from what the owner saw on the card (SEC-CARD-FULLTEXT); nothing is signed or charged.
 
 ## Received acknowledgements (since 0.5.10, D-156)
 

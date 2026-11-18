@@ -32,7 +32,9 @@
   padding: var(--al-space-1) var(--al-space-4) var(--al-space-5);
   border-top: 1px solid var(--al-color-border-subtle);
 }
-/* NOTIFY-DEEPLINK: the conversation a notification or widget row opened, marked for a moment. */
+/* NOTIFY-DEEPLINK: the conversation a notification or widget row opened, marked for a moment.
+   WIDGET-POLISH-0511: never an overlay over the conversation (it hid the content while it loaded);
+   a 2 px accent bar beside the conversation's header row fades in once the content is there. */
 .hm-open:focus:not(:focus-visible) {
   outline: none;
 }
@@ -40,26 +42,26 @@
   outline: 1px solid var(--al-color-border-strong, currentColor);
   outline-offset: -1px;
 }
-.hm-open {
+.hm-open-head {
   position: relative;
 }
-.hm-open::after {
+.hm-open-head::before {
   content: '';
   position: absolute;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: calc(-1 * var(--al-space-4));
+  width: 2px;
   pointer-events: none;
-  background: var(--al-color-accent-subtle, rgba(127, 127, 127, 0.18));
+  background: var(--al-color-accent, currentColor);
   opacity: 0;
-  transition: opacity var(--al-duration-slow);
+  transition: opacity var(--al-duration-slow) var(--al-easing-standard);
 }
-.hm-open.hm-target {
-  box-shadow: inset 3px 0 0 var(--al-color-accent, currentColor);
-}
-.hm-open.hm-target::after {
+.hm-open.hm-target > .hm-open-head::before {
   opacity: 1;
 }
 @media (prefers-reduced-motion: reduce) {
-  .hm-open::after {
+  .hm-open-head::before {
     transition: none;
   }
 }

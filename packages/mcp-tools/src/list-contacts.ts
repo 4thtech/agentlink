@@ -29,6 +29,9 @@ export async function listContactsHandler(
     shortId: shortIdOf(view.id),
     pairing: view.pairing,
     safetyCodeChecked: view.safetyCodeChecked,
+    // SEC-INVITE-CAPS (D-156): connected by the AI, waiting for the owner's Keep (nothing can be
+    // sent to them until then; their messages arrive).
+    ...(view.waitingForOwner === true ? { waitingForOwner: true } : {}),
     ...connectedAtField(view),
     lastActivity: rfc3339(view.updatedAt),
     unread: unreadById.get(view.id) ?? 0,

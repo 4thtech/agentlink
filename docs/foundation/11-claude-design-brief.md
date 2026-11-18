@@ -326,6 +326,7 @@ Each has its own name and look. Never call any of them "password", and never sho
 |---|---|---|---|---|
 | **Contact check** (*D-146*; formerly "safety code") | Optional: read the 12 digits to the contact once, by phone. Proposed line (WP-9): "Optional. Read these 12 digits to {name} by phone. If they match, nobody tampered with your invite. Nothing to save." The digits are "the 12 digits", never a "code" | 12 digits, `4821 0937 5512` | No | Invite accept, new contact, contact detail (behind "Check") |
 | **ID tag** (*D-146*; formerly "owner fingerprint") | Short ID of an owner. Proposed line (WP-9): "Tells apart two contacts with the same name. Nothing to save." | `7F3A·19C2` | No | Under the hood only; not named in the Simple view (the §5.2 fallback `Contact 7F3A·19C2` stays) |
+| **Check code** (*0.5.11, SEC-CARD-FULLTEXT; proposed, owner confirms at merge*) | A short code for a message or a file on an approval card, so the owner can compare it with what the other side sees. "Check code" plus "The other side sees the same code for the same message or file." | 16 characters in four groups of four (Crockford base32, the first 80 bits of the SHA-256 value), e.g. `04HM ASW9 NF6Y Y093` | No | Approval cards, under the exact content; never a short 48-bit code as a decision field |
 | **Recovery code** | Restores the owner key (inside the recovery kit) | 24 characters in groups | **Yes** | First run, Backup, restore |
 | **Master code** (*D-146*; formerly "owner code" and, in the local app, "backup code"; *D-54, D-67, D-130*) | The generated secret that unlocks the owner key: it approves owner actions when the passkey can't be used (another browser, no Touch ID or Windows Hello, the command line over SSH); the default on the command line. Restoring the owner key is the recovery code's job, not this one's. Proposed copy (WP-9): "Use your master code instead" on every confirm screen, and a purpose line saying it approves when Touch ID or Windows Hello isn't available, is saved once and can't be recovered by us | 24 characters in groups (generated) | **Yes** | First-run page, shown once with a save step (*D-130 (1)*); terminal for `owner init` |
 | **Owner passphrase** | Protects approvals where there is no passkey or biometrics; on the command line, instead of the owner code only if the owner chooses it (*D-67*), never on a machine with a key file; on the Linux desktop app (M2) it is the presence mechanism (04 §2.2) | Chosen by the owner, at least 12 characters | **Yes** | Local first run, terminal prompt, Linux desktop |
@@ -487,6 +488,45 @@ The free, private "received" receipt the recipient's app sends back (04 §3.4, 0
 **Rules.**
 - "Received" means the contact's AI app received and checked the exact message, never that a person read it. "Received (older app)" is never shown as delivery of a proof.
 - An automatic device receipt is always named as such, apart from public receipts (§5.6).
+- Never "wallet", "gas", "seed phrase" or "transaction" (§5.1).
+
+### 5.11 Hard limits and sending limits (D-156)
+
+Rules page, More rules (SEC-HARD-CEILING, SEC-OUTBOUND-CAPS):
+
+| Key | Copy |
+|---|---|
+| Hard limits row | "Hard spending limits" · "Your AI can never spend more than this on proofs, not even with your approval. Only you can change these, here." · fields "Never more than, per proof" and "Never more than, in any 24 hours" |
+| Soft above hard | ""Ask me over" and the proof budget can be at most your hard spending limits." |
+| Sending limits row | "Sending limits" · "How much your AI can send in any 24 hours. Above these, sending stops until a slot frees up or you raise them." · fields "Messages to one person", "Messages in all", "Files to one person", "Files in all", "File data in all (MB)" |
+| Confirmation sheet | "Hard limit per proof", "Hard limit for 24 hours" |
+
+What the AI relays (tool results; never an approval):
+
+| Code | Summary · next step |
+|---|---|
+| `SPEND_CEILING` | "This proof would cost more than your limit ($0.50 per proof), so nothing was recorded." or "…go over your limit ($10 a day)…" · "Tell the user: This is over your limit. You can change it in Settings › Rules in the AgentLink app. Don't ask for an approval: an approval can't go over this limit." The terms tools use the same words. |
+| `SEND_LIMIT` | "Sending limit reached for Ana (300 messages a day), so nothing was sent." (per kind: messages in all, files to one person, files in all, MB of files) · "Try again after {time}. Or tell the user: This is over your limit. You can change it in Settings › Rules in the AgentLink app." |
+
+### 5.12 Contacts your AI connected (D-156)
+
+A contact paired through an invite the AI made waits for the owner (06 §2.1, 08 §1). Proposed, owner confirms at merge.
+
+| Where | String |
+|---|---|
+| People, the row (chip) | "New via your AI" |
+| People, the person (banner) | "New contact via your AI" · "Your AI connected this person with an invite it made. Their messages arrive, but your AI can't send them anything until you keep them." **Keep with {sensor}** · **Remove** |
+| After Keep | "Kept. Your AI can send to them now." |
+| Home (banner) | "New contact via your AI" · "Your AI connected 1 new contact. Keep or remove them in People." / "Your AI connected {count} new contacts. Keep or remove them in People." **Open People** |
+| Widget, Needs you | "New contact via your AI" / "{count} new contacts via your AI" |
+| Settings › Rules › More rules | "Invites your AI makes" · "At most {open} open, {day} a day, each for {hours} hours." / "Your AI can't create invites." · helper "Limits for invites your AI creates. People who connect through them wait for you to keep them. Invites you create in People are not limited." · fields "Open at once", "Per day", "Expire after (hours)" |
+| In chat, over a cap | "You have {count} open invites. Ask your owner to create more in the app, or wait for one to be used or expire." / "You made {count} invites in the last 24 hours. Ask your owner to create more in the app, or try again after {time} UTC." / "Your owner hasn't allowed you to create invites. Ask them to create one in the app." |
+| Add contact (People, Get started, Invite someone), before any link | statement "Create an invite from you. Whoever uses it first is connected with this ID as your contact." · **Create invite with {sensor}** / **Create invite with your master code** · Under the hood, before Create: "Make it a long link (nothing stored on the AgentLink service)" |
+| Terminal, `agentlink invite` † (before the owner's presence) | "Create an invite from you. Whoever uses it first is connected with this ID as your contact." · on failure "Problem  That didn't go through. No invite was made." |
+| In chat, a waiting contact | "This contact is waiting for your owner to keep them in the AgentLink app, so nothing was sent." |
+
+**Rules.**
+- Never the contact's name in Home's banner or the widget line (a count only); on the person it is shown as text only (I-5).
 - Never "wallet", "gas", "seed phrase" or "transaction" (§5.1).
 
 ## 6. Surfaces and information architecture

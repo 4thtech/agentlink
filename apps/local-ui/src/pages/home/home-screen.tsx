@@ -87,6 +87,7 @@ import { HomeApprovals } from './home-approvals.js';
 import { RenameBanner } from './rename-banner.js';
 import { createSendFolderApi, type SendFolderApi } from './send-folder-banner.js';
 import { FilesPanel } from './files-panel.js';
+import { useFilesSeen } from './files-seen.js';
 import type { Getter } from '../files/folders-summary.js';
 import { createRevealApi, type RevealApi } from '../../api/reveal-folder.js';
 import { createAttachApi, type AttachApi } from './attach-api.js';
@@ -250,6 +251,35 @@ function filesText(n: number): string {
 }
 
 /** "2 min ago", "Yesterday", or the date. */
+/**
+ * SEC-INVITE-CAPS (D-156; 08 §1): how many contacts the AI connected wait for Keep or Remove; the
+ * gesture itself is on People (presence). A count only: no name from another party here.
+ */
+export function ViaAiBanner({
+  contacts,
+}: {
+  readonly contacts: ReadonlyMap<string, ContactRow> | undefined;
+}): ReactElement | null {
+  const waiting = [...(contacts?.values() ?? [])].filter(
+    (c) => c.waitingForOwner === true && c.status === 'active',
+  ).length;
+  if (waiting === 0) return null;
+  return (
+    <Banner
+      tone="warning"
+      icon="user-plus"
+      title={S.viaAiTitle}
+      action={
+        <a className="al-btn al-btn-secondary al-btn-sm" href={PEOPLE_PATH} data-via-ai-open>
+          {S.viaAiOpen}
+        </a>
+      }
+    >
+      {waiting === 1 ? S.viaAiOne : fmt(S.viaAiMany, { count: String(waiting) })}
+    </Banner>
+  );
+}
+
 function ago(at: number, now: number): string {
   const s = Math.max(0, Math.floor(now / 1000) - at);
   if (s < 60) return S.agoNow;
@@ -319,15 +349,43 @@ function PersonOpen({
         : undefined,
     [contact, person.contactId, clients.attach, clients.sendFolder, refresh],
   );
+  // WIDGET-POLISH-0511: opening, saving or showing a received file marks this person's new files
+  // seen (the bell and the widget's Needs you); "Mark as seen" below does it without a file.
+  const { unseen: filesUnseen, markSeen: markFilesSeen } = useFilesSeen(
+    clients.api,
+    person.contactId,
+    tick,
+  );
+  const received = data.received;
+  const reveal = useCallback<Reveal>(
+    async (id) => {
+      const outcome = await clients.reveal(id);
+      if (outcome === 'shown' && received.has(id)) markFilesSeen();
+      return outcome;
+    },
+    [clients.reveal, received, markFilesSeen],
+  );
+  const preview = useCallback<Preview>(
+    async (id) => {
+      const outcome = await clients.preview(id);
+      if (outcome.kind === 'ok' && received.has(id)) markFilesSeen();
+      return outcome;
+    },
+    [clients.preview, received, markFilesSeen],
+  );
+  const onSaved = useCallback((): void => {
+    markFilesSeen();
+    refresh();
+  }, [markFilesSeen, refresh]);
   const fileContext = useMemo(
     () => ({
       received: data.received,
       sent: data.sent,
       folder: data.inboxFolder,
-      reveal: clients.reveal,
-      preview: clients.preview,
+      reveal,
+      preview,
     }),
-    [data.received, data.sent, data.inboxFolder, clients.reveal, clients.preview],
+    [data.received, data.sent, data.inboxFolder, reveal, preview],
   );
   return (
     <div
@@ -409,6 +467,27 @@ function PersonOpen({
           </div>
         </dl>
       ) : null}
+      {filesUnseen ? (
+        <Banner
+          tone="info"
+          icon="file"
+          compact
+          className="hm-new-files"
+          action={
+            <Button
+              size="sm"
+              variant="ghost"
+              className="hm-mark-seen"
+              aria-label={fmt(S.markFilesSeenLabel, { name: person.name })}
+              onClick={markFilesSeen}
+            >
+              {S.markSeen}
+            </Button>
+          }
+        >
+          {fmt(S.newFilesFrom, { name: person.name })}
+        </Banner>
+      ) : null}
       <Conversation
         name={person.name}
         agent={agent}
@@ -430,8 +509,8 @@ function PersonOpen({
         sent={data.sent}
         save={clients.save}
         passkey={passkey}
-        reveal={clients.reveal}
-        onSaved={refresh}
+        reveal={reveal}
+        onSaved={onSaved}
         {...(data.inboxFolder === undefined ? {} : { folder: data.inboxFolder })}
         {...(folderNote === undefined ? {} : { folderNote })}
       />
@@ -832,6 +911,16 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
       if (details !== null) details.open = true;
       el.scrollIntoView?.({ block: 'start', behavior: 'auto' });
       el.focus({ preventScroll: true });
+      mark(el, 0);
+    };
+    // WIDGET-POLISH-0511: the mark (a thin bar by the header, never an overlay) only once the
+    // conversation has rendered, so nothing covers it while it loads; at most ~10 s of waiting.
+    const mark = (el: HTMLElement, waited: number): void => {
+      if (!el.isConnected) return;
+      if (el.querySelector('[aria-busy="true"]') !== null && waited < 100) {
+        timer = setTimeout(() => mark(el, waited + 1), 100);
+        return;
+      }
       el.classList.add('hm-target');
       timer = setTimeout(() => el.classList.remove('hm-target'), 2000);
     };
@@ -1170,6 +1259,8 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
             {unfinished.map((row) => (
               <UnfinishedRemoval key={row.name} row={row} onFinish={setFinishing} />
             ))}
+            {/* SEC-INVITE-CAPS (D-156): contacts the AI connected wait for the owner's Keep. */}
+            <ViaAiBanner contacts={data?.contacts} />
             {/* WP-1: an ID whose card still carries an older name: repaired here, one gesture. */}
             <RenameBanner
               api={clients.agents}

@@ -1,5 +1,8 @@
 # Policies
 
+<!-- ai-knowledge: summary
+summary: Reference for the owner's policy, the rule book for one ID: defaults, received acknowledgements, per-contact overrides and how a change is signed. -->
+
 > **Status: Current for v0.5.10.** Source: [06 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md) and the schema in `packages/types/src/policy.ts`.
 
 **Purpose:** the reference for every policy key, its default and what it allows.
@@ -23,6 +26,7 @@ These are the defaults of a new policy (`POLICY_DEFAULTS`). A new ID's first rul
 | | `unknownSenders` | `queue` | Messages from unknown senders wait for the owner (`drop` discards them) |
 | | `allowed` | `paired` | Every paired contact may exchange messages |
 | | `rateLimitPerContactPerHour` | `120` | Most messages per contact and hour |
+| | `aiInvites` | `{maxOpen: 3, perDay: 5, expiryHours: 24}` | Caps on invites the AI makes (below). Absent means these values |
 | `files` | `allowedFolders` | none | Send folders. Empty means sending a file by path needs setup first |
 | | `inboxFolder` | `~/AgentLink/Inbox` | Where received files are saved |
 | | `maxSendSizeMB` / `maxReceiveSizeMB` | `100` / `200` | File size limits |
@@ -34,7 +38,8 @@ These are the defaults of a new policy (`POLICY_DEFAULTS`). A new ID's first rul
 | `envelopes` | `maxEnvelopeKB` | `24` | Largest message package |
 | `proofs` | `notarize` | `allow` | Adding a proof (`approval` asks each time, `deny` blocks) |
 | | `dailyBudgetUSD` | `"5"` | Over this in any 24 hours needs approval |
-| | `perActionMaxUSD` | `"1"` | A fee above this needs approval |
+| | `perActionMaxUSD` | `"0.2"` | A fee above this needs approval (`"1"` before 0.5.11) |
+| | `hardMaxPerActionUSD` / `hardDailyUSD` | `"0.5"` / `"10"` | Hard ceilings: above them a proof is refused, never asked (below) |
 | | `allowKeyDisclosure` | `approval` | Putting a content key in a proof pack needs approval |
 | | `exportFolder` | `~/AgentLink/Proofs` | Where proof packs are written |
 | | `defaultChain` | `base` | The proof network, picked automatically; shown only under Advanced |
@@ -46,7 +51,19 @@ These are the defaults of a new policy (`POLICY_DEFAULTS`). A new ID's first rul
 | | `autoAcceptDirection` | `buy` | Auto-accept only when we pay |
 | | `autoAcceptMinUSD` | `null` | Selling never auto-accepts |
 | `history` | `messagesKeepDays` / `filesKeepDays` | `0` / `0` | Keep everything (0 means forever) |
+| `outgoing` | `messagesPerContactPerDay` / `messagesPerDay` | `300` / `1000` | Messages the AI may send in any 24 hours (below) |
+| | `filesPerContactPerDay` / `filesPerDay` / `fileMBPerDay` | `50` / `200` / `2000` | Files and MB the AI may send in any 24 hours |
 | `contactRules` | | none | Per-contact overrides, below |
+
+## Hard limits (since 0.5.11, D-156)
+
+| Keys | Rule | When reached |
+|---|---|---|
+| `proofs.hardMaxPerActionUSD`, `proofs.hardDailyUSD` | A Record's `maxFee` above the per-proof ceiling, or the rolling 24-hour spend plus `maxFee` above the daily one. Set together; `perActionMaxUSD`, `dailyBudgetUSD` and a contact rule's `perActionMaxUSD` must be at most them. A contact rule never lifts them | `rejected` `SPEND_CEILING` with `ceiling` and `limitUsd`; no approval is offered and none passes it |
+| `outgoing.*` | Rolling 24-hour counts per ID of the messages `agentlink_send` sent (per contact and in all), the files they carried and their MB. Acks, receipts, proofs, pairing, card updates and terms are not counted | `rejected` `SEND_LIMIT` with `limit`, `max` and `retryAt`; nothing stored or sent |
+| `contacts.aiInvites` | `maxOpen` 0 to 20, `perDay` 0 to 50 (0 turns AI invites off), `expiryHours` 1 to 168. The owner's own invites (presence, `invite.create`) are not counted | `rejected` `INVITE_LIMIT`. A contact paired through an AI invite waits for the owner's Keep (`contact.keep`) |
+
+A policy signed before 0.5.11 has none of these keys and reads as the defaults above. Labels: **More rules** › "Hard spending limits", "Sending limits", "Invites your AI makes" (Settings › Rules). The hard ceilings are spending fields, so changing them takes the paid-action confirmation (04 §2.5.3).
 
 ## Received acknowledgements (`receipts.sendReceived`)
 
@@ -54,7 +71,7 @@ These are the defaults of a new policy (`POLICY_DEFAULTS`). A new ID's first rul
 - Label (Settings › Rules): "Tell contacts when your AI receives a message".
 - When on, the AgentLink app sends a signed off-chain acknowledgement for each message it processed from an active contact. It never does so for a blocked, removed or revoked contact, an unknown sender or a request.
 - A policy signed before 0.5.10 has no such key. Absent counts as on. People who update from an earlier version see a one-time notice; new installs do not.
-- The owner turns it off for everyone with the switch. A per-contact setting is planned (not in 0.5.10).
+- The owner turns it off for everyone with the switch; since 0.5.11 the switch saves (before, the edit was refused). A per-contact setting is planned.
 - What it tells the sender: [Privacy of proofs](../concepts/privacy.md).
 - On-chain DELIVERED receipts stay opt-in: `receipts.autoDelivered` is `false` unless the owner turns it on, here or per contact.
 

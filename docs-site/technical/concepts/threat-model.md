@@ -1,6 +1,9 @@
 # Threat model
 
-> **Status: Current for v0.5.10.** The public threat model as shipped in release 0.5.10. Source: [04 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md#7-threat-model), which is normative. It lists the threats the design addresses and how; it is not a list of known vulnerabilities. Findings from reviews and audits are handled privately ([SECURITY.md](https://github.com/4thtech/agentlink/blob/main/SECURITY.md)) and published only once fixed.
+<!-- ai-knowledge: summary
+summary: The public threat model in plain words, grouped by area: each threat the design addresses, how AgentLink limits it, and what remains. -->
+
+> **Status: Current for v0.5.11.** The public threat model as shipped in release 0.5.11. Source: [04 §7](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md#7-threat-model), which is normative. It lists the threats the design addresses and how; it is not a list of known vulnerabilities. Findings from reviews and audits are handled privately ([SECURITY.md](https://github.com/4thtech/agentlink/blob/main/SECURITY.md)) and published only once fixed.
 
 Section references such as (04 §4) point into the source spec. A "Residual" names what remains and what limits it.
 
@@ -41,6 +44,10 @@ Section references such as (04 §4) point into the source spec. A "Residual" nam
 | **Leaked file KeyStore on a headless machine** | Opt-in only, after a warning; Argon2id and AES-256-GCM; a generated unlock code by default; strict file modes and real-path checks; the owner key is never unlocked non-interactively, so a leak exposes the agent key only (04 §2.8, D-54). Residual: a passphrase stored on the same disk adds no at-rest protection beyond disk encryption |
 | **Local page imitating the approval page** (shared `localhost` passkey) | The owner's gesture is still required. The desktop app uses OS-drawn Touch ID and Windows Hello prompts instead of a localhost passkey; signed builds bind the owner key to a fixed-identity owner process (04 §2.5, D-145 (3)) |
 | **Agent key asked to sign foreign typed data** | The agent `KeyStore` signs only AgentLink's own EIP-712 shapes (OCC v2 records and receipts for an allowlisted chain and contract, agent cards, the credits top-up with a fixed recipient, allowlisted token and value cap). Anything else is refused before key material is loaded, in every backend. Owner signing is unchanged (04 §3.1.1, D-156) |
+| **AI steered into spending** | Your AI must ask you before a proof above $0.20 or above $5 in a day. Above $0.50 per proof or $10 in any 24 hours AgentLink refuses, whatever the AI asks; the AI is told plainly that a limit applies. Only the owner changes these limits, in **Settings** › **Rules**, with Touch ID, Windows Hello or the master code. Residual: spending inside the limits needs no approval |
+| **AI steered into sending too much** | Daily limits on outgoing messages, files and file size; above them nothing is sent and the AI is told plainly why. The owner sets the limits in **Settings** › **Rules**, with presence. Residual: sending inside the limits needs no approval |
+| **Approval that hides what is approved** | The approval card shows the full message text and must be opened in full before **Approve**; check codes let the owner match what the AI described. On a Mac the Touch ID prompt names who it is for and the cost; Windows Hello shows a fixed text, so the card is where the details are read |
+| **AI makes invites or contacts unseen** | Invites the AI makes are limited (3 open at a time, 5 a day, each valid 24 hours). A contact made through the AI shows as **New contact via your AI**, and stays limited until the owner keeps it (with presence) or removes it. Invites made in the app or the command line need presence |
 
 ## Pairing and identity
 

@@ -125,15 +125,14 @@
 //   object of allowlisted booleans (`underTheHood`, `menuExpanded`), at most 128 bytes. No owner
 //   presence, no owner store, nothing signed, no generation (it is the app's, not an agent's); the
 //   app host writes only `~/.agentlink/ui-settings.json`. Its read answers with no agent open too.
-// - UX2-d1 (owner decision 1.1; proposed in 08 §1, owner confirms at merge), creating an invite and
-//   checking a pasted one: the two `presence: 'invite'` routes are run by `inviteGate`, never by
-//   `ownerGate`. After the same session, CSRF, Origin, fetch-metadata and octet-stream checks, no
-//   query, operation input or presence header; the body is one strict JSON object (1 KiB for create,
-//   22 KiB for check). Create is limited to INVITE_CREATE_LIMIT per INVITE_CREATE_WINDOW_MS
-//   (429 `wait`). The handler gets only that object and the invite desk (local-ui/context.ts): no
-//   owner presence, no owner store, nothing signed. The body (a pasted link holds the invite
-//   secret) is wiped after the handler, and nothing here logs it. Accepting an invite is an ordinary
-//   owner route behind `ownerGate`.
+// - UX2-d1 (owner decision 1.1; proposed in 08 §1, owner confirms at merge), checking a pasted invite
+//   (and Cancel, Copy link, Not now): the `presence: 'invite'` routes are run by `inviteGate`, never
+//   by `ownerGate`. After the same session, CSRF, Origin, fetch-metadata and octet-stream checks, no
+//   query, operation input or presence header; the body is one strict JSON object (22 KiB for
+//   check). The handler gets only that object and the invite desk (local-ui/context.ts): no owner
+//   presence, no owner store, nothing signed. The body (a pasted link holds the invite secret) is
+//   wiped after the handler, and nothing here logs it. Creating an invite (SEC-INVITE-CAPS, owner
+//   decision 18 Nov 2026) and accepting one are ordinary owner routes behind `ownerGate`.
 // - M1-11s-c, owner setup on the first-run page (D-120 (1); proposed, owner confirms at merge): the
 //   two `presence: 'setup'` routes (begin, finish) are run by `setupGate`, never by `ownerGate`
 //   (which is unchanged). After the same session, CSRF, Origin, fetch-metadata and octet-stream
@@ -227,6 +226,14 @@ import {
   NO_APP_HTML,
 } from './approval-pages.js';
 import { isAppPagePath } from '@4thtech-io/types/ui-contract/app-pages';
+import {
+  APPROVAL_CONTENT_FILES_MAX,
+  APPROVAL_CONTENT_MAX,
+  CHECK_CODE_PATTERN,
+  isInertText,
+  presencePromptDetail,
+  type ApprovalContent,
+} from '@4thtech-io/types/ui-contract/approval-content';
 import { NodeKeyStoreError } from './errors.js';
 import { osKeychain, type KeychainBackend } from './keychain.js';
 import {
@@ -629,9 +636,6 @@ const REVEAL_ITEM_ID = /^[A-Za-z0-9_-]{1,64}\.[0-9]{2}$/;
 const MAX_INVITE_CHECK_BODY_BYTES = 22_528;
 /** UX2-d1: the largest create body: `{"label":"<name>"}`, a name of at most 128 characters. */
 const MAX_INVITE_CREATE_BODY_BYTES = 1_024;
-/** UX2-d1: at most this many invites created per window, per server (a store and spam bound). */
-const INVITE_CREATE_LIMIT = 10;
-const INVITE_CREATE_WINDOW_MS = 10 * 60_000;
 /** ATT-APP-ATTACH: at most this many attached messages per window, per server (then 429 `wait`). */
 const ATTACH_LIMIT = 20;
 const ATTACH_WINDOW_MS = 60_000;
@@ -736,6 +740,16 @@ export interface ApprovalDetails {
   readonly fromAi: readonly { readonly name: string; readonly value: string }[];
   /** For terms: the terms card's lines (headline, the contact's terms, what changed). */
   readonly terms?: readonly string[];
+  /**
+   * SEC-CARD-FULLTEXT (08 §1): the exact content the request is about, decoded by the app from the
+   * digest-bound action or the stored envelope it names; full, inert text and check codes.
+   */
+  readonly content?: ApprovalContent;
+  /**
+   * SEC-CARD-FULLTEXT: the content could not be decoded (or did not pass the checks here): the card
+   * says so and nothing approves it (fail closed); Deny stays.
+   */
+  readonly contentMissing?: true;
 }
 
 /** One pending request as the page shows it. `summary` is fixed text built by core (I-5, 06 §2.1). */
@@ -830,6 +844,8 @@ export type ApprovalServerEvent =
         | 'commitment'
         /** M1-PAY-CONFIRM-a (04 §2.5.3 rule 7): a paid item was in a review list. */
         | 'paid_item_in_batch'
+        /** SEC-CARD-FULLTEXT (08 §1 (b)): a request with exact content was in a review list. */
+        | 'content_item_in_batch'
         /** M1-PAY-CONFIRM-a: approving a paid item takes its own confirmation (begin, finish). */
         | 'confirm_required'
         /** REL051-SF1: the passkey has no kept credential key; the master code works. */
@@ -1555,14 +1571,59 @@ const header = (req: IncomingMessage, name: string): string | undefined => {
 const isText = (value: unknown, max: number, empty = false): value is string =>
   typeof value === 'string' && value.length <= max && (empty || value.length > 0);
 
+const isFileView = (value: unknown): value is ApprovalContent['files'][number] => {
+  if (typeof value !== 'object' || value === null) return false;
+  const { name, size, type, checkCode: code, ...rest } = value as Record<string, unknown>;
+  return (
+    Object.keys(rest).length === 0 &&
+    isText(name, MAX_DETAIL_CHARS) &&
+    isInertText(name) &&
+    !name.includes('\n') &&
+    isText(size, 64, true) &&
+    isText(type, 64) &&
+    typeof code === 'string' &&
+    CHECK_CODE_PATTERN.test(code)
+  );
+};
+
+/**
+ * SEC-CARD-FULLTEXT: the content block, checked field by field. Inert text only (no bidi or control
+ * character but line feed and tab), the stated length, check codes of the fixed pattern. Anything
+ * else is `false`, and the card then fails closed (`contentMissing`).
+ */
+function contentOf(value: unknown): ApprovalContent | false {
+  if (typeof value !== 'object' || value === null) return false;
+  const { label, text, length, checkCode: code, files, ...rest } = value as Record<string, unknown>;
+  if (Object.keys(rest).length > 0) return false;
+  if (!isText(label, MAX_DETAIL_CHARS) || !isInertText(label)) return false;
+  if (!isText(text, APPROVAL_CONTENT_MAX, true) || !isInertText(text)) return false;
+  if (typeof length !== 'number' || !Number.isSafeInteger(length) || length < 0) return false;
+  if (code !== undefined && (typeof code !== 'string' || !CHECK_CODE_PATTERN.test(code))) {
+    return false;
+  }
+  if (!Array.isArray(files) || files.length > APPROVAL_CONTENT_FILES_MAX) return false;
+  if (!files.every(isFileView)) return false;
+  return {
+    label,
+    text,
+    length,
+    ...(code === undefined ? {} : { checkCode: code as string }),
+    files: files.map((f) => ({ name: f.name, size: f.size, type: f.type, checkCode: f.checkCode })),
+  };
+}
+
+/** SEC-CARD-FULLTEXT: whether a request's content block failed (nothing may approve it). */
+function contentBlocked(details: unknown): boolean {
+  const facts = detailsOf(details);
+  return facts === false || facts?.contentMissing === true;
+}
+
 /** The card facts, checked field by field; undefined when anything is off (fail closed). */
 function detailsOf(value: unknown): ApprovalDetails | undefined | false {
   if (value === undefined) return undefined;
   if (typeof value !== 'object' || value === null) return false;
-  const { headline, who, what, cost, expires, rule, fromAi, terms } = value as Record<
-    string,
-    unknown
-  >;
+  const { headline, who, what, cost, expires, rule, fromAi, terms, content, contentMissing } =
+    value as Record<string, unknown>;
   for (const field of [who, what, cost, expires, rule]) {
     if (!isText(field, MAX_DETAIL_CHARS)) return false;
   }
@@ -1587,6 +1648,10 @@ function detailsOf(value: unknown): ApprovalDetails | undefined | false {
       lines.push(line);
     }
   }
+  // SEC-CARD-FULLTEXT: a content block that does not check, or a source that says it could not
+  // decode one, makes the card fail closed; never a card without it that looks complete.
+  const block = content === undefined ? undefined : contentOf(content);
+  const missing = contentMissing === true || block === false;
   return {
     ...(headline === undefined ? {} : { headline: headline as string }),
     who: who as string,
@@ -1596,7 +1661,31 @@ function detailsOf(value: unknown): ApprovalDetails | undefined | false {
     rule: rule as string,
     fromAi: fields,
     ...(lines === undefined ? {} : { terms: lines }),
+    ...(missing
+      ? { contentMissing: true as const }
+      : block === undefined
+        ? {}
+        : { content: block }),
   };
+}
+
+/** "$0.10" from a USD amount ("0.1"), rounded up to whole cents (11 §5.3), or "" when malformed. */
+function dollars(amount: string | null): string {
+  if (amount === null || !/^\d{1,12}(\.\d{1,6})?$/.test(amount)) return '';
+  const [whole = '0', frac = ''] = amount.split('.');
+  const micros = BigInt(whole) * 1_000_000n + BigInt((frac + '000000').slice(0, 6));
+  const cents = (micros + 9_999n) / 10_000n;
+  return `$${String(cents / 100n)}.${String(cents % 100n).padStart(2, '0')}`;
+}
+
+/**
+ * SEC-CARD-FULLTEXT (04 §2.5.3): the OS prompt detail for a decision: "for Ana, $0.10" for one
+ * request (its checked who and cost), "for 3 requests" for a review list.
+ */
+function decisionDetail(live: readonly ApprovalForDecision[]): string {
+  if (live.length !== 1) return `for ${String(live.length)} requests`;
+  const facts = detailsOf(live[0]?.details);
+  return facts === undefined || facts === false ? '' : presencePromptDetail(facts.who, facts.cost);
 }
 
 /** The view sent to the page: only checked, structured fields; never the action. */
@@ -1781,8 +1870,6 @@ export async function startApprovalServerWith(
   });
   /** UX2-d1: the invite desk of the invite-kind routes (never reachable from another route). */
   let invitesDesk = agentUi?.client === undefined ? undefined : inviteDesk(agentUi.client);
-  /** UX2-d1: when each recent invite was created (ms), oldest first, for the create limit. */
-  const invitesCreated: number[] = [];
   /** ATT-APP-ATTACH: the attach desk of the attach route (never reachable from another route). */
   const attachDeskOf = (ui: typeof agentUi) =>
     ui?.client === undefined
@@ -2781,11 +2868,36 @@ export async function startApprovalServerWith(
           return;
         }
         const live = entries as ApprovalForDecision[];
+        // SEC-CARD-FULLTEXT (08 §1): a request whose content cannot be shown is never approved.
+        const blocked = picks
+          .filter(
+            (p, i) =>
+              p.decision === 'approve' && contentBlocked((live[i] as ApprovalForDecision).details),
+          )
+          .map((p) => p.approvalId);
+        if (blocked.length > 0) {
+          finishDecision(res, 409, 'refused', listed(blocked));
+          return;
+        }
         if (review) {
           // D-31, 04 §2.5.2: terms are never part of a review list; each is decided on its own card.
           const terms = live.filter((e) => e.commitment).map((e) => e.approvalId);
           if (terms.length > 0) {
             finishDecision(res, 409, 'commitment', { items: terms });
+            return;
+          }
+          // SEC-CARD-FULLTEXT (08 §1 (b)): a request with exact content (or content that could not
+          // be shown) is decided on its own card, where the content is shown whole; never batched.
+          const own = live
+            .filter((e) => {
+              const facts = detailsOf(e.details);
+              return (
+                facts === false || facts?.content !== undefined || facts?.contentMissing === true
+              );
+            })
+            .map((e) => e.approvalId);
+          if (own.length > 0) {
+            finishDecision(res, 409, 'content_item_in_batch', { items: own });
             return;
           }
         }
@@ -2832,7 +2944,15 @@ export async function startApprovalServerWith(
         }
         if (native) {
           // DESK-D12c: one helper gesture for this one decision (or review list), after every check.
-          const got = await nativeFor(context.owner.ownerNostr, 'approve', req, res);
+          // SEC-CARD-FULLTEXT (04 §2.5.3): the OS prompt names who and the cost, from the stored
+          // request as the server checked it, so a look-alike page cannot hide them.
+          const got = await nativeFor(
+            context.owner.ownerNostr,
+            'approve',
+            req,
+            res,
+            decisionDetail(live),
+          );
           if (!('presence' in got)) {
             finishDecision(res, got.http, 'presence_rejected', { native: got.state });
             return;
@@ -2980,6 +3100,7 @@ export async function startApprovalServerWith(
     reason: NativeReason,
     req: IncomingMessage,
     res: ServerResponse,
+    detail?: string,
   ): Promise<
     | { readonly presence: OwnerPresence }
     | { readonly http: number; readonly state: NativeAnswerState }
@@ -2994,6 +3115,7 @@ export async function startApprovalServerWith(
       return {
         presence: await nativePresence(keychainOf(), nativeHelper, ownerNostr, reason, {
           signal: abandoned.signal,
+          ...(detail === undefined || detail === '' ? {} : { detail }),
         }),
       };
     } catch (error) {
@@ -4347,6 +4469,8 @@ export async function startApprovalServerWith(
     }
     if (recomputed !== entry.storedDigest) return 'changed';
     if (!isPaidPendingAction(entry.action)) return 'not_paid';
+    // SEC-CARD-FULLTEXT (08 §1): a request whose content cannot be shown is never approved.
+    if (contentBlocked(entry.details)) return 'refused';
     const facts = (entry.action as Record<string, unknown> | null)?.['context'];
     const counterparty =
       typeof facts === 'object' && facts !== null
@@ -4743,7 +4867,17 @@ export async function startApprovalServerWith(
         // DESK-D12c (04 §2.5.3, 04 §2.3.4 "The reason is display-only"): the statement of this hold
         // was shown at begin; the one unlock below signs exactly this hold's objects (rule 3) and
         // nothing else. The helper's `pay` text is display-only and binds nothing.
-        const got = await nativeFor(context.owner.ownerNostr, 'pay', payReq ?? res.req, res);
+        // SEC-CARD-FULLTEXT (04 §2.5.3): the sheet names who and the amount of this hold.
+        const got = await nativeFor(
+          context.owner.ownerNostr,
+          'pay',
+          payReq ?? res.req,
+          res,
+          presencePromptDetail(
+            hold.statement.counterparty ?? '',
+            dollars(hold.statement.amountUsd),
+          ),
+        );
         if (!('presence' in got)) {
           finishPay(res, got.http, 'presence_rejected', { native: got.state });
           return;
@@ -6955,23 +7089,6 @@ export async function startApprovalServerWith(
       sendJson(res, 400, { error: 'invalid' });
       return;
     }
-    if (route.step === 'create') {
-      const at = now();
-      while (
-        invitesCreated.length > 0 &&
-        (invitesCreated[0] as number) <= at - INVITE_CREATE_WINDOW_MS
-      ) {
-        invitesCreated.shift();
-      }
-      if (invitesCreated.length >= INVITE_CREATE_LIMIT) {
-        const oldest = invitesCreated[0] as number;
-        const retryAfter = Math.max(1, Math.ceil((oldest + INVITE_CREATE_WINDOW_MS - at) / 1000));
-        req.resume();
-        res.setHeader('Retry-After', String(retryAfter));
-        sendJson(res, 429, { error: 'wait', retryAfter });
-        return;
-      }
-    }
     const body = await boundedBody(
       req,
       res,
@@ -6995,7 +7112,6 @@ export async function startApprovalServerWith(
         agentChanged(res);
         return;
       }
-      if (route.step === 'create') invitesCreated.push(now());
       let result: LocalUiResult;
       try {
         result = await route.handler(uiContext, parsed as JsonObject, invitesDesk);

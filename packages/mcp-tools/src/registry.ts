@@ -142,6 +142,14 @@ const proofStatus = obj(
 );
 /** `needs_credits` (06 §2.1, §2.4): the agent address and the top-up link. */
 const creditFields = { agentAddress: agentId, topUpUrl };
+/** D-156 SPEND_CEILING: which hard ceiling refused the proof, and its amount. */
+const ceilingFields = { ceiling: oneOf(['per_action', 'daily']), limitUsd: usd };
+/** D-156 SEND_LIMIT: which outgoing cap refused the send, its number and when a slot frees. */
+const sendLimitFields = {
+  limit: oneOf(['messages_contact', 'messages_day', 'files_contact', 'files_day', 'file_mb_day']),
+  max: int(1),
+  retryAt: timestamp,
+};
 
 /** 06 §2.2a `TermsInput` (M1-21, D-74): strict at every level; the core re-checks with its schema. */
 const termsId = str({ pattern: '^[A-Za-z0-9_-]{1,16}$' });
@@ -474,6 +482,9 @@ const DEFINITIONS: readonly ToolDefinition[] = [
             shortId: str({ maxLength: 16 }),
             pairing,
             safetyCodeChecked: bool(),
+            // SEC-INVITE-CAPS (D-156): present (true) while the AI connected it and the owner has not
+            // kept it yet; nothing can be sent to it until then.
+            waitingForOwner: bool(),
             connectedAt: timestamp,
             lastActivity: timestamp,
             unread: int(),
@@ -526,6 +537,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
         file: sentFile,
         proof: proofStatus,
         ...creditFields,
+        ...sendLimitFields,
         candidates,
       },
       true,
@@ -552,7 +564,14 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     ),
     // M1-9d-4: `needs_credits` carries the top-up link as agentlink_send does (06 §2.1).
     outputSchema: output(
-      { envelopeId, ...termsOutput, proof: proofStatus, ...creditFields, candidates },
+      {
+        envelopeId,
+        ...termsOutput,
+        proof: proofStatus,
+        ...creditFields,
+        ...ceilingFields,
+        candidates,
+      },
       true,
     ),
     annotations: WRITE(true),
@@ -582,6 +601,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
         ...termsOutput,
         proof: proofStatus,
         ...creditFields,
+        ...ceilingFields,
       },
       true,
     ),
@@ -654,7 +674,7 @@ const DEFINITIONS: readonly ToolDefinition[] = [
     inputSchema: obj({ envelopeId, requestReceipt: bool(), approvalId, clientRequestId }, [
       'envelopeId',
     ]),
-    outputSchema: output({ ...proofStatusFields, ...creditFields }, true),
+    outputSchema: output({ ...proofStatusFields, ...creditFields, ...ceilingFields }, true),
     annotations: WRITE(true),
     approval: true,
   },

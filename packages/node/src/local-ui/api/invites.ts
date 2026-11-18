@@ -1,13 +1,19 @@
 // UX2-d1: the local app's invite routes (08 §1; 04 §3.6, §3.6.1, §4; 06 §2.1; b11 §21; owner
 // decision 1.1; I-1, I-4, I-5, I-7).
 //
+// SEC-INVITE-CAPS (owner decision 18 Nov 2026): Create invite is an owner route (`presence: true`,
+// behind the central presence gate):
+// - `POST /api/ui/invites`, input `{}` or `{"label": "<name>"}` (WP-1: also `"oldName": true`; Advanced:
+//   `"long": true`): core prepares `invite.create` `{}`, the owner's presence signs it once with
+//   fixed review lines, and core `createOwnerInvite` verifies it before it makes the invite (not
+//   capped, its contact kept). Answers `status: 'done'` with what `agentlink_create_invite` answers:
+//   the link, the ready-to-send text, the owner's short fingerprint and the expiry. The label is
+//   stored sealed as a suggested alias and stays one until the owner confirms the contact (06 §2.1
+//   rule 1); it is never echoed here or in the review lines.
+//
 // Invite kind (`presence: 'invite'`; no owner presence, nothing signed; the server's invite gate
 // checked the session, CSRF, Origin, fetch metadata and the octet-stream type, refused a query, an
-// operation input and a presence header, rate-limited create and parsed the body):
-// - `POST /api/ui/invites`, body `{}` or `{"label": "<name>"}` (WP-1: also `"oldName": true`): core `createInvite`. Answers what
-//   `agentlink_create_invite` answers: the link, the ready-to-send text, the owner's short
-//   fingerprint and the expiry. The label is stored sealed as a suggested alias and stays one until
-//   the owner confirms the contact (06 §2.1 rule 1); it is never echoed here.
+// operation input and a presence header, and parsed the body):
 // - `POST /api/ui/invites/check`, body `{"invite": "<link>"}`: core's accept step 1 only (the one D-69
 //   codec, strict schema, expiry, both card signatures, name and relays against the card, the relay
 //   URL rule of 04 §4). It stores nothing and answers who it is, so the page can ask "Is this who you
@@ -73,6 +79,7 @@ import {
   inviteShareText,
   type CreatedInvite,
   type PendingContact,
+  type PreparedOwnerAction,
 } from '@4thtech-io/core';
 import {
   canonicalizeToBytes,
@@ -302,12 +309,22 @@ async function nameUpdateNeeded(context: LocalUiContext): Promise<LocalUiResult 
   }
 }
 
+/** SEC-INVITE-CAPS: what the owner confirms (fixed text: never the label, I-5). */
+const CREATE_LINES = Object.freeze([
+  'Create an invite from you. Whoever uses it first is connected with this ID as your contact.',
+]);
+
 async function createInvite(
   context: LocalUiContext,
-  body: JsonObject,
-  invites: LocalUiInviteDesk | undefined,
+  request: LocalUiRequest,
+  owner: LocalUiOwnerOperation,
 ): Promise<LocalUiResult> {
+  const invites = context.invites;
   if (invites === undefined) return UI_NOT_SET_UP;
+  if ([...request.query.keys()].length > 0) return INVALID;
+  const input = request.input ?? {};
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) return INVALID;
+  const body = input as JsonObject;
   const keys = Object.keys(body);
   if (keys.some((k) => k !== 'label' && k !== 'long' && k !== 'oldName')) return INVALID;
   // WP-1: only `true` makes the invite under the card's old name.
@@ -327,9 +344,25 @@ async function createInvite(
   // W4-SHORT-INVITE (D-139 (7)): only `true` asks for the long link.
   if (keys.includes('long') && body['long'] !== true) return INVALID;
   const long = body['long'] === true;
+  let prepared: PreparedOwnerAction;
+  try {
+    prepared = await invites.prepareCreate();
+  } catch {
+    return UNAVAILABLE;
+  }
+  if (prepared.status !== 'prepared' || prepared.body.op !== 'invite.create') {
+    return UI_NOT_SET_UP;
+  }
+  const signatures = await owner.sign({ lines: CREATE_LINES }, [
+    { kind: 'owner-action', action: prepared.body as unknown as JsonObject },
+  ]);
+  const first = signatures[0];
+  if (signatures.length !== 1 || first === undefined || first.kind !== 'owner-action') {
+    return UNAVAILABLE;
+  }
   let created: CreatedInvite;
   try {
-    created = await invites.create({
+    created = await invites.createOwner(first.signed, {
       ...(label === undefined ? {} : { label }),
       ...(long ? { long: true as const } : {}),
     });
@@ -360,7 +393,8 @@ async function createInvite(
   return Object.freeze({
     status: 200,
     body: Object.freeze({
-      status: 'ok',
+      // SEC-INVITE-CAPS: an owner route answers `done` (the presence gate's success word).
+      status: 'done',
       inviteUrl,
       shareText: inviteShareText(inviteUrl, expiresAt),
       ownerFingerprint: short,
@@ -674,11 +708,11 @@ export async function acceptInviteLink(
 
 // --- routes -----------------------------------------------------------------------------------
 
-export const inviteCreateRoute: LocalUiInviteRoute = Object.freeze<LocalUiInviteRoute>({
+// SEC-INVITE-CAPS (owner decision 18 Nov 2026): the owner's presence makes an invite in the app.
+export const inviteCreateRoute: LocalUiOwnerRoute = Object.freeze<LocalUiOwnerRoute>({
   method: 'POST',
   path: INVITE_CREATE_PATH,
-  presence: 'invite',
-  step: 'create',
+  presence: true,
   handler: createInvite,
 });
 

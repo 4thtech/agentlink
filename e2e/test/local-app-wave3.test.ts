@@ -26,6 +26,7 @@ import {
   launchBrowser,
   newComputer,
   openedLink,
+  ownerKeepsWaitingContact,
   pageWithTouchId,
   runJoin,
   runUi,
@@ -37,6 +38,7 @@ import {
 } from './app-world.js';
 
 import { fillNameAfterPrefill } from './journey/helpers-agents.js';
+import { createInviteWithPresence } from './journey/world.js';
 // W4-WIZARD: first run is Get started (journey/helpers-wizard.ts).
 const CONNECT_WITH = /^Connect with (Touch ID|Windows Hello|your passkey)$/;
 // The long link, or W4-SHORT-INVITE's short one (`2.` and 43 characters).
@@ -236,6 +238,8 @@ describe('a new person: Welcome to a reply (U3-k)', () => {
     // The first agent invites from the Invite screen (W4-WIRE-2: the Add contact sheet is retired).
     await page.goto(new URL('/contacts?invite', link).href);
     await page.getByRole('heading', { name: 'Invite someone', level: 1 }).waitFor();
+    // SEC-INVITE-CAPS (owner decision 18 Nov 2026; 11 §5.12): Create invite with Touch ID first.
+    await createInviteWithPresence(page);
     const shown = page.locator('.inv-link[data-state="ready"]');
     await shown.waitFor();
     const value = (await shown.innerText()).trim();
@@ -336,7 +340,7 @@ describe('a friend joins from an invite link on a fresh home (U3-k)', () => {
     if (ready === undefined) return;
     const relays = memoryRelays();
     const inviterPc = await newComputer(relays);
-    await seedAgent(inviterPc, { name: 'default', displayName: 'Ana' });
+    const seeded = await seedAgent(inviterPc, { name: 'default', displayName: 'Ana' });
     const inviter = await startAiAppMcp(inviterPc, undefined);
     closers.push(() => inviter.close());
     const inviteUrl = String(
@@ -416,6 +420,18 @@ describe('a friend joins from an invite link on a fresh home (U3-k)', () => {
     );
     // Contacts see the name the friend typed, not the folder (U3-d-b).
     expect(contacts['name']).toBe('Friend agent');
+
+    // SEC-INVITE-CAPS (D-156; 11 §5.11): the invite was made by the AI (`agentlink_create_invite`),
+    // so the friend waits for the owner's Keep: the AI can't send to them until then.
+    expect(contacts['waitingForOwner']).toBe(true);
+    const early = await inviter.call('agentlink_send', { to: 'Friend agent', text: 'Too early' });
+    expect(early.structured['status']).toBe('rejected');
+    expect(early.structured['code']).toBe('CONTACT_WAITING_OWNER');
+    // The owner keeps them (one owner presence, an owner-signed `contact.keep`, 04 §2.5.1).
+    await ownerKeepsWaitingContact(inviterPc, 'default', seeded);
+    const kept = await inviter.call('agentlink_list_contacts');
+    const [keptOne] = (kept.structured['contacts'] ?? []) as Record<string, unknown>[];
+    expect(keptOne?.['waitingForOwner']).toBeUndefined();
 
     // A message goes both ways.
     const sent = await inviter.call('agentlink_send', {

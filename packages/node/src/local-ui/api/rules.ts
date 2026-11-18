@@ -15,6 +15,7 @@
 //
 // Fixed answers only, never an error's text or an input value (I-5, I-7).
 import type { EffectivePolicy, PreparedPolicyEdit } from '@4thtech-io/core';
+import { aiInviteLimitsOf } from '@4thtech-io/types';
 import {
   canonicalize,
   decodeBase64url,
@@ -26,6 +27,7 @@ import {
   type JsonObject,
   type JsonValue,
 } from '@4thtech-io/crypto';
+import { compareUsd, outgoingOf, proofCeilingsOf } from '@4thtech-io/types';
 import type { LocalUiContext } from '../context.js';
 import type {
   LocalUiOwnerOperation,
@@ -57,8 +59,27 @@ const NOT_SIGNED = answer(409, 'refused');
 
 /** The fields this page edits, per policy section (06 §3). Anything else is invalid_edit. */
 const EDITABLE: Readonly<Record<string, ReadonlySet<string>>> = Object.freeze({
-  proofs: new Set(['notarize', 'dailyBudgetUSD', 'perActionMaxUSD', 'allowKeyDisclosure']),
-  contacts: new Set(['acceptInvites', 'unknownSenders']),
+  proofs: new Set([
+    'notarize',
+    'dailyBudgetUSD',
+    'perActionMaxUSD',
+    'allowKeyDisclosure',
+    // D-156: the hard ceilings, changed only here, with presence (and the paid-action sheet).
+    'hardMaxPerActionUSD',
+    'hardDailyUSD',
+  ]),
+  // D-156: the outgoing caps.
+  outgoing: new Set([
+    'messagesPerContactPerDay',
+    'messagesPerDay',
+    'filesPerContactPerDay',
+    'filesPerDay',
+    'fileMBPerDay',
+  ]),
+  // SEC-INVITE-CAPS (D-156): the caps on invites the AI makes (a whole `aiInvites` object).
+  contacts: new Set(['acceptInvites', 'unknownSenders', 'aiInvites']),
+  // SEC-RECEIPTS-DEFAULT (D-156 (1)): "Send received receipts". Delivery receipts keep their own flow.
+  receipts: new Set(['sendReceived']),
   files: new Set(['maxSendSizeMB', 'maxReceiveSizeMB']),
   commitments: new Set(['accept', 'autoAcceptDirection', 'autoAcceptMaxUSD', 'autoAcceptMinUSD']),
 });
@@ -155,18 +176,34 @@ function view(policy: Doc): JsonObject {
     contactRules: unknown;
   };
   const allowed = p.contacts.allowed;
+  // D-156: the hard ceilings and outgoing caps in force (a policy signed before D-156 reads as the
+  // defaults), and each soft limit as the engine reads it: at most its ceiling.
+  const ceilings = proofCeilingsOf(policy as never);
+  const atMost = (soft: string, hard: string): string => (compareUsd(soft, hard) > 0 ? hard : soft);
+  const outgoing = outgoingOf(policy as never);
   return {
     proofs: {
       notarize: p.proofs.notarize as string,
-      dailyBudgetUSD: p.proofs.dailyBudgetUSD as string,
-      perActionMaxUSD: p.proofs.perActionMaxUSD as string,
+      dailyBudgetUSD: atMost(p.proofs.dailyBudgetUSD as string, ceilings.hardDailyUSD),
+      perActionMaxUSD: atMost(p.proofs.perActionMaxUSD as string, ceilings.hardMaxPerActionUSD),
       allowKeyDisclosure: p.proofs.allowKeyDisclosure as string,
+      hardMaxPerActionUSD: ceilings.hardMaxPerActionUSD,
+      hardDailyUSD: ceilings.hardDailyUSD,
+    },
+    outgoing: {
+      messagesPerContactPerDay: outgoing.messagesPerContactPerDay,
+      messagesPerDay: outgoing.messagesPerDay,
+      filesPerContactPerDay: outgoing.filesPerContactPerDay,
+      filesPerDay: outgoing.filesPerDay,
+      fileMBPerDay: outgoing.fileMBPerDay,
     },
     contacts: {
       acceptInvites: p.contacts.acceptInvites as string,
       unknownSenders: p.contacts.unknownSenders as string,
       allowed: allowed === 'paired' ? 'paired' : 'listed',
       listed: count(allowed),
+      // SEC-INVITE-CAPS (D-156): absent in the signed policy reads as the defaults (3, 5, 24 h).
+      aiInvites: { ...aiInviteLimitsOf(policy) },
     },
     files: {
       maxSendSizeMB: p.files.maxSendSizeMB as number,

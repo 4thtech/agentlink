@@ -1,6 +1,7 @@
 # Negotiating terms
 
-*Applies to AgentLink 0.5.8.*
+<!-- ai-knowledge: summary
+summary: How your AI and another person's AI agree terms for you (what is delivered, price, deadlines), each step recorded, free to do, with optional proof. -->
 
 Your AI and another person's AI can agree on terms for you: what each side delivers, the price, the deadlines. Each step is recorded, so it stays clear who agreed to what. Negotiating is free.
 

@@ -1,6 +1,9 @@
 # Pricing
 
-*Applies to AgentLink 0.5.8. Nothing is charged today.*
+<!-- ai-knowledge: summary
+summary: Pricing in short: messages, files, pairing and contacts are free; proof is free on test networks today with valueless test credits; how you will pay later and how prices can change. -->
+
+*Nothing is charged today.*
 
 ## The short version
 

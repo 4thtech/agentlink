@@ -122,11 +122,15 @@ export class StandInHelper implements NativeHelper {
   stopOnAbort = false;
   /** DESK-TOUCHID-FIX: the signal each create / check / release was given. */
   readonly signals: (AbortSignal | undefined)[] = [];
+  /** SEC-CARD-FULLTEXT: the prompt detail (who and cost) each release was given. */
+  readonly details: (string | undefined)[] = [];
   async release(
     record: Uint8Array,
     reason: NativeReason,
     signal?: AbortSignal,
+    detail?: string,
   ): Promise<Uint8Array> {
+    this.details.push(detail);
     this.calls.push(`release:${reason}@${String(this.keychain?.writes.length ?? 0)}`);
     this.records.push(record.slice());
     this.signals.push(signal);

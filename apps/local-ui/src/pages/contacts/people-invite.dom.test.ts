@@ -68,7 +68,8 @@ function server(state: State): typeof fetch {
         expiresAt: '2999-01-01T00:00:00Z',
       });
       return json({
-        status: 'ok',
+        // SEC-INVITE-CAPS: Create invite is an owner route; it answers `done`.
+        status: 'done',
         inviteUrl: SHORT,
         shareText: `Add my AI agent on AgentLink: ${SHORT}`,
         expiresAt: '2999-01-01T00:00:00Z',
@@ -111,7 +112,49 @@ afterEach(() => {
   Reflect.deleteProperty(navigator, 'clipboard');
 });
 
+async function settleOnly(): Promise<void> {
+  for (let i = 0; i < 6; i += 1) {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  }
+}
+
 async function settle(): Promise<void> {
+  await settleOnly();
+  await confirmCreate();
+  await settleOnly();
+}
+
+/**
+ * SEC-INVITE-CAPS (owner decision 18 Nov 2026): the invite panel makes a link only when the owner
+ * confirms Create invite; here with the master code (the fake invite API ignores the proof).
+ */
+async function confirmCreate(): Promise<void> {
+  const buttons = (): HTMLButtonElement[] => [...document.body.querySelectorAll('button')];
+  const start = buttons().find(
+    (b) => (b.textContent ?? '').trim() === 'Create invite with your master code',
+  );
+  if (start === undefined) return;
+  await act(async () => start.click());
+  for (let i = 0; i < 3; i += 1) {
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+  }
+  const input = document.body.querySelector<HTMLInputElement>('input[name="owner-code"]');
+  if (input === null) return;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+      input,
+      'ABCD-EFGH',
+    );
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const confirm = buttons().find(
+    (b) => (b.textContent ?? '').trim() === 'Confirm with your master code',
+  );
+  await act(async () => confirm?.click());
   for (let i = 0; i < 6; i += 1) {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));

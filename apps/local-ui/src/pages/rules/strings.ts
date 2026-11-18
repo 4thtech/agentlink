@@ -8,7 +8,8 @@ export const RULES_STRINGS = {
   pickerLabel: 'Rules for',
   masterCode: 'your master code',
   changedTag: 'Changed',
-  moreHelp: 'File sizes, who can message this ID, limits for accepting terms, exports',
+  moreHelp:
+    'Hard spending limits, sending limits, file sizes, who can message this ID, limits for accepting terms, exports',
   moreState: (n: number, changed: number): string =>
     changed === 0
       ? `${String(n)} rules · all at their defaults`
@@ -43,6 +44,23 @@ export const RULES_STRINGS = {
   proofAskBudget: 'Budget in any 24 hours when proofs are allowed:',
   budget: 'Proof budget in any 24 hours',
   askOver: 'Ask me over',
+  // D-156 (SEC-HARD-CEILING): above the hard limits a proof is refused, never asked.
+  softAboveHard: '"Ask me over" and the proof budget can be at most your hard spending limits.',
+  hardTitle: 'Hard spending limits',
+  hardHelp:
+    'Your AI can never spend more than this on proofs, not even with your approval. Only you can change these, here.',
+  hardPerProof: 'Never more than, per proof',
+  hardDaily: 'Never more than, in any 24 hours',
+  // D-156 (SEC-OUTBOUND-CAPS): what your AI may send in any 24 hours.
+  sendingTitle: 'Sending limits',
+  sendingHelp:
+    'How much your AI can send in any 24 hours. Above these, sending stops until a slot frees up or you raise them.',
+  sendMessagesContact: 'Messages to one person',
+  sendMessagesDay: 'Messages in all',
+  sendFilesContact: 'Files to one person',
+  sendFilesDay: 'Files in all',
+  sendMBDay: 'File data in all (MB)',
+  invalidCount: 'Enter a whole number.',
   invitesTitle: 'Connect with someone new',
   summaryInvites: 'New people',
   // REL051-SF5: `contacts.acceptInvites` gates accepting only (04 §3.6, 06 §2.1); making an invite
@@ -61,6 +79,20 @@ export const RULES_STRINGS = {
   whoPaired: 'Paired contacts',
   whoListed: (n: number): string =>
     n === 1 ? 'Only the 1 contact you listed' : `Only the ${String(n)} contacts you listed`,
+  // SEC-INVITE-CAPS (D-156; 11 §5): invites your AI makes. Yours in People are not limited.
+  aiInvitesTitle: 'Invites your AI makes',
+  aiInvitesHelp:
+    'Limits for invites your AI creates. People who connect through them wait for you to keep them. Invites you create in People are not limited.',
+  aiInvitesSummary: (open: number, day: number, hours: number): string =>
+    open === 0 || day === 0
+      ? 'Your AI can’t create invites.'
+      : `At most ${open} open, ${day} a day, each for ${hours} ${hours === 1 ? 'hour' : 'hours'}.`,
+  aiOpenLabel: 'Open at once',
+  aiDayLabel: 'Per day',
+  aiHoursLabel: 'Expire after (hours)',
+  invalidAiOpen: 'Enter 0 to 20 (0: your AI can’t create invites).',
+  invalidAiDay: 'Enter 0 to 50 (0: your AI can’t create invites).',
+  invalidAiHours: 'Enter 1 to 168 hours.',
   filesTitle: 'Files',
   filesSummary: (send: number, receive: number): string =>
     `Only from allowed folders · send up to ${String(send)} MB · receive up to ${String(receive)} MB`,

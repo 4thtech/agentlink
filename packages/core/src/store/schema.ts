@@ -126,6 +126,14 @@ export const TABLES = {
       name_changed_at: opt('int'),
       name_change_seen: opt('flag'),
       declared_name: opt('enc'),
+      // SEC-INVITE-CAPS (D-156; 07 §3; schema version 18): 1 while a contact paired through an
+      // AI-made invite waits for the owner's Keep (`contact.keep`): its messages arrive, but the agent
+      // sends it nothing. Null (kept) on every row from before version 18 and after Keep.
+      waiting_owner: opt('flag'),
+      // SEC-INVITE-CAPS (schema version 18): when the AI paired this contact by accepting an invite
+      // on its own (`contacts.acceptInvites: auto`, no owner approval): it counts toward the AI's
+      // daily invite cap for 24 hours. Null otherwise; never cleared by Keep.
+      ai_accepted_at: opt('int'),
     },
     primaryKey: ['contact_id'],
     unique: [{ columns: ['agent_nostr'] }],
@@ -147,6 +155,9 @@ export const TABLES = {
       relays: enc,
       created_at: int,
       expires_at: int,
+      // SEC-INVITE-CAPS (schema version 18): `ai` for an accept the AI started on its own (auto,
+      // no owner approval); it counts toward the daily cap and its contact waits for the owner.
+      created_by: optOneOf('owner', 'ai'),
     },
     primaryKey: ['pairing_id'],
   },
@@ -171,6 +182,10 @@ export const TABLES = {
       // again from Home or People while the invite is open. Cleared when it is used or cancelled;
       // null on a row from before version 14.
       invite_link: opt('enc'),
+      // SEC-INVITE-CAPS (D-156; 07 §3; schema version 18): who made the invite: `ai` through the MCP
+      // tool (capped, 06 §3 `contacts.aiInvites`), `owner` in the app or the CLI. Null on a row from
+      // before version 18, read as the owner's.
+      created_by: optOneOf('owner', 'ai'),
     },
     primaryKey: ['invite_id'],
   },
@@ -594,6 +609,16 @@ export const TABLES = {
   content_file_budget: {
     columns: { entry_id: id, t: int, bytes: int },
     primaryKey: ['entry_id'],
+  },
+  // SEC-OUTBOUND-CAPS (D-156 (6); 06 §3 `outgoing`; schema version 17): one row per message sent
+  // with `agentlink_send`, written in the transaction that stores the envelope: the envelope ID, the
+  // contact, the time, how many files it carried and their bytes. Counts only: no name, hash, key or
+  // locator. It is the outgoing caps' durable count, so deleting a file (retention, delete on
+  // receipt) or a message never frees a cap; rows older than the rolling 24 h are dropped by the
+  // same step.
+  outgoing_log: {
+    columns: { envelope_id: id, contact_id: id, t: int, files: int, bytes: int },
+    primaryKey: ['envelope_id'],
   },
 } as const satisfies Readonly<Record<string, TableSpec>>;
 

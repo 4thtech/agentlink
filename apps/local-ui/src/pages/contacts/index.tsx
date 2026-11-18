@@ -128,7 +128,7 @@ const personKey = (c: Person): string => `${c.id?.name ?? ''}:${c.ref}`;
 
 /** One owner operation waiting for presence. */
 interface Pending {
-  readonly what: 'check' | 'rename' | 'remove' | 'block' | 'unblock';
+  readonly what: 'check' | 'rename' | 'remove' | 'block' | 'unblock' | 'keep';
   readonly ref: string;
   readonly input?: unknown;
   readonly summary: string;
@@ -218,6 +218,14 @@ function StateChip({ contact }: { contact: ContactRow }): ReactElement | null {
     return (
       <Chip icon="triangle-alert" tone="warning">
         {S.mismatchChip}
+      </Chip>
+    );
+  }
+  // SEC-INVITE-CAPS: connected by your AI, waiting for you to Keep or Remove.
+  if (contact.waitingForOwner === true) {
+    return (
+      <Chip icon="user-plus" tone="warning">
+        {S.viaAiChip}
       </Chip>
     );
   }
@@ -553,6 +561,7 @@ function Detail({
             }
             if (pending.what === 'block') setNotice(S.blockedNow);
             if (pending.what === 'unblock') setNotice(S.unblocked);
+            if (pending.what === 'keep') setNotice(S.keptNow);
             onChanged(pending.what);
             return;
           }
@@ -769,6 +778,20 @@ function Detail({
         </dl>
       ) : null}
       {duplicate}
+      {contact.waitingForOwner === true && contact.status === 'active' && !confirmRemove ? (
+        <Banner tone="warning" icon="user-plus" title={S.viaAiTitle}>
+          <p className="al-text-body">{S.viaAiDetail}</p>
+          <div className="ct-actions">
+            {step(
+              { what: 'keep', ref, summary: SUMMARY.keep(name) },
+              { with: S.keepWith, code: S.keepWithCode },
+            )}
+            <Button variant="ghost" onClick={() => setConfirmRemove(true)}>
+              {S.remove}
+            </Button>
+          </div>
+        </Banner>
+      ) : null}
       {contact.status === 'blocked' ? (
         <>
           <p className="al-text-body">{S.blockedDetail}</p>

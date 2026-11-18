@@ -25,6 +25,11 @@ export const HOME_STRINGS = {
   notSetUp: "AgentLink isn't set up on this computer yet. Create your first ID on Home.",
   sessionExpired: 'This page has expired. Ask your AI to open AgentLink again.',
   tryAgain: 'Try again',
+  // SEC-INVITE-CAPS (D-156; 11 §5): contacts your AI connected wait for you (Keep or Remove).
+  viaAiTitle: 'New contact via your AI',
+  viaAiOne: 'Your AI connected 1 new contact. Keep or remove them in People.',
+  viaAiMany: 'Your AI connected {count} new contacts. Keep or remove them in People.',
+  viaAiOpen: 'Open People',
 
   // A person row (simple).
   lastMessage: 'Last message {when}',
@@ -209,6 +214,10 @@ export const HOME_STRINGS = {
   archive: 'Archive',
   restore: 'Restore',
   archiveLabel: 'Archive {name}',
+  // WIDGET-POLISH-0511: new files waiting in a conversation, and the way to dismiss them.
+  newFilesFrom: 'New files from {name}',
+  markSeen: 'Mark as seen',
+  markFilesSeenLabel: 'Mark the new files from {name} as seen',
   restoreLabel: 'Move {name} back to People',
   archived: 'Archived',
   archivedCount: 'Archived ({count})',

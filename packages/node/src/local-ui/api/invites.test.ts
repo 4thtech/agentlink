@@ -108,16 +108,6 @@ function desk(over: Partial<LocalUiInviteDesk> = {}): {
     created,
     checked,
     desk: {
-      create: (input) => {
-        created.push(input);
-        return Promise.resolve<CreatedInvite>({
-          inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
-          inviteUrl: LINK,
-          format: 'long',
-          ownerFingerprint: { short: 'EF56·7890', long: 'EF567890'.repeat(8) },
-          expiresAt: 1_793_786_400,
-        });
-      },
       check: (link) => {
         checked.push(link);
         return Promise.resolve<LocalUiCheckedInvite>({
@@ -132,75 +122,112 @@ function desk(over: Partial<LocalUiInviteDesk> = {}): {
   };
 }
 
-describe('create an invite (UX2-d1, decision 1.1)', () => {
-  it('is the invite kind, step create, a POST at /api/ui/invites', () => {
+// SEC-INVITE-CAPS (owner decision 18 Nov 2026): Create invite is an owner route. The owner's presence
+// signs one `invite.create` (fixed review lines, never the label); core makes the owner's invite only
+// after it verified that signature (client.createOwnerInvite).
+const MADE: CreatedInvite = {
+  inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
+  inviteUrl: LINK,
+  format: 'long',
+  ownerFingerprint: { short: 'EF56·7890', long: 'EF567890'.repeat(8) },
+  expiresAt: 1_793_786_400,
+};
+const PREPARED = {
+  status: 'prepared',
+  op: 'invite.create',
+  body: {
+    v: 1,
+    agent: AGENT,
+    owner: '02'.repeat(32),
+    op: 'invite.create',
+    params: {},
+    nonce: 'AAAAAAAAAAAAAAAAAAAAAA',
+    issuedAt: 1_790_000_000,
+    expiresAt: 1_790_000_600,
+  },
+  jcs: '{}',
+};
+
+function createWorld(port: Partial<LocalUiInviteAcceptPort> = {}) {
+  const made: { signed: unknown; input: unknown }[] = [];
+  const world = acceptWorld({
+    port: {
+      prepareCreate: () => Promise.resolve(PREPARED as never),
+      createOwner: (signed, input) => {
+        made.push({ signed, input });
+        return Promise.resolve(MADE);
+      },
+      ...port,
+    },
+  });
+  const create = (input?: unknown) =>
+    inviteCreateRoute.handler(
+      world.ctx,
+      {
+        params: {},
+        query: new URLSearchParams(),
+        ...(input === undefined ? {} : { input }),
+      } as never,
+      world.owner,
+    );
+  return { ...world, made, create };
+}
+
+describe('create an invite: owner presence (SEC-INVITE-CAPS)', () => {
+  it('is an owner route (presence), a POST at /api/ui/invites', () => {
     expect(inviteCreateRoute).toMatchObject({
       method: 'POST',
       path: INVITE_CREATE_PATH,
-      presence: 'invite',
-      step: 'create',
+      presence: true,
     });
     expect(INVITE_CREATE_PATH).toBe('/api/ui/invites');
   });
 
-  it('answers what agentlink_create_invite answers: link, share text, fingerprint, expiry', async () => {
-    const d = desk();
-    const result = await inviteCreateRoute.handler(context(), {}, d.desk);
+  it('signs exactly the prepared invite.create once, then core makes the invite with that signature', async () => {
+    const w = createWorld();
+    const result = await w.create();
     expect(result).toEqual({
       status: 200,
       body: {
-        status: 'ok',
+        status: 'done',
         inviteUrl: LINK,
         shareText: `Let's connect our AI agents with AgentLink. Open this link and follow the steps; it works once, until 4 Nov 2026: ${LINK}`,
         ownerFingerprint: 'EF56·7890',
         expiresAt: '2026-11-04T10:00:00Z',
         format: 'long',
-        // W4-PEOPLE-INVITE (IR-1 M): the public ID of this invite, so the page cancels only its own.
         inviteId: 'AQEBAQEBAQEBAQEBAQEBAQ',
       },
     });
-    expect(d.created).toEqual([{}]);
+    expect(w.seen.signed).toHaveLength(1);
+    expect((w.seen.signed[0]?.[0] as { action: JsonObject }).action['op']).toBe('invite.create');
+    expect(w.made).toHaveLength(1);
+    expect((w.made[0]?.signed as { body: JsonObject }).body['op']).toBe('invite.create');
+    expect(w.made[0]?.input).toEqual({});
   });
 
-  it('answers nothing usable when core gives an invite ID of another shape (fail closed)', async () => {
-    const d = desk({
-      create: () =>
-        Promise.resolve<CreatedInvite>({
-          inviteId: 'not an id/../x',
-          inviteUrl: LINK,
-          format: 'long',
-          ownerFingerprint: { short: 'EF56·7890', long: 'EF567890'.repeat(8) },
-          expiresAt: 1_793_786_400,
-        }),
-    });
-    const result = await inviteCreateRoute.handler(context(), {}, d.desk);
-    expect(result.status).not.toBe(200);
+  it('passes the optional name and the long link, never the name into what the owner signs', async () => {
+    const w = createWorld();
+    expect((await w.create({ label: 'Marko', long: true })).status).toBe(200);
+    expect(w.made[0]?.input).toEqual({ label: 'Marko', long: true });
+    expect(JSON.stringify(w.seen.signed)).not.toContain('Marko');
   });
 
-  it('passes the optional name as the invite label (a suggested alias in core)', async () => {
-    const d = desk();
-    expect((await inviteCreateRoute.handler(context(), { label: 'Marko' }, d.desk)).status).toBe(
-      200,
-    );
-    expect(d.created).toEqual([{ label: 'Marko' }]);
-  });
-
-  it('refuses any other body before core is called', async () => {
-    const d = desk();
-    for (const body of [
+  it('refuses any other input before anything is signed or made', async () => {
+    const w = createWorld();
+    for (const input of [
       { label: 7 },
       { label: '' },
       { label: 'x'.repeat(129) },
-      { label: ['Marko'] },
-      { label: null },
       { name: 'Marko' },
       { label: 'Marko', expiresInDays: 1 },
-      { inviteUrl: LINK },
-    ] as unknown as JsonObject[]) {
-      const result = await inviteCreateRoute.handler(context(), body, d.desk);
-      expect(result, JSON.stringify(body)).toEqual({ status: 400, body: { error: 'invalid' } });
+      { long: false },
+      [],
+    ]) {
+      const result = await w.create(input);
+      expect(result, JSON.stringify(input)).toEqual({ status: 400, body: { error: 'invalid' } });
     }
-    expect(d.created).toHaveLength(0);
+    expect(w.seen.signed).toHaveLength(0);
+    expect(w.made).toHaveLength(0);
   });
 
   it('maps core errors to fixed codes and never answers an error text or the link', async () => {
@@ -208,24 +235,25 @@ describe('create an invite (UX2-d1, decision 1.1)', () => {
       ['name_invalid', 400, 'invalid_label'],
       ['identity_missing', 409, 'not_set_up'],
       ['identity_revoked', 409, 'cannot_send'],
-      ['rotation_pending', 409, 'cannot_send'],
-      ['concurrent_rotation', 409, 'cannot_send'],
-      ['store_unavailable', 503, 'unavailable'],
+      ['invite_not_confirmed', 503, 'unavailable'],
     ];
     for (const [code, status, error] of cases) {
-      const d = desk({ create: () => Promise.reject(coreError(code)) });
-      const result = await inviteCreateRoute.handler(context(), { label: 'M' }, d.desk);
-      expect(result, code).toEqual({ status, body: { error } });
+      const w = createWorld({ createOwner: () => Promise.reject(coreError(code)) });
+      expect(await w.create({ label: 'M' }), code).toEqual({ status, body: { error } });
     }
-    const plain = desk({ create: () => Promise.reject(new Error(`boom ${LINK}`)) });
-    const result = await inviteCreateRoute.handler(context(), {}, plain.desk);
-    expect(result).toEqual({ status: 503, body: { error: 'unavailable' } });
+    const plain = createWorld({ createOwner: () => Promise.reject(new Error(`boom ${LINK}`)) });
+    expect(await plain.create()).toEqual({ status: 503, body: { error: 'unavailable' } });
   });
 
-  it('answers not_set_up without an agent', async () => {
-    expect(await inviteCreateRoute.handler(context({ client: undefined }), {}, undefined)).toBe(
-      UI_NOT_SET_UP,
+  it('answers not_set_up without an agent, signing nothing', async () => {
+    const w = acceptWorld({ noPort: true });
+    const result = await inviteCreateRoute.handler(
+      w.ctx,
+      { params: {}, query: new URLSearchParams() } as never,
+      w.owner,
     );
+    expect(result).toBe(UI_NOT_SET_UP);
+    expect(w.seen.signed).toHaveLength(0);
   });
 });
 
@@ -370,6 +398,9 @@ function acceptWorld(
 } {
   const seen: AcceptSeen = { checked: [], requested: [], accepted: [], signed: [], applied: [] };
   const port: LocalUiInviteAcceptPort = {
+    // SEC-INVITE-CAPS: Create invite (owner presence); unused here unless a test sets it.
+    prepareCreate: () => Promise.reject(new Error('unused')),
+    createOwner: () => Promise.reject(new Error('unused')),
     resolve: (link) => Promise.resolve(link),
     list: () => Promise.resolve([]),
     check: (link) => {
@@ -587,8 +618,8 @@ describe('a paused agent: create, check and accept answer agent_paused (W4-PAUSE
   const PAUSED = { status: 409, body: { error: 'agent_paused' } };
 
   it('create', async () => {
-    const d = desk({ create: () => Promise.reject(coreError('agent_paused')) });
-    expect(await inviteCreateRoute.handler(context(), {}, d.desk)).toEqual(PAUSED);
+    const w = createWorld({ createOwner: () => Promise.reject(coreError('agent_paused')) });
+    expect(await w.create()).toEqual(PAUSED);
   });
 
   it('check', async () => {

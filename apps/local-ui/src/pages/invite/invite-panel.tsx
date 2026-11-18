@@ -1,8 +1,10 @@
 // W4-PEOPLE-INVITE: the invite panel (prototype v23 A3 and A5; D-139 short invites; 11 §5; I-7).
 // Get started step 4 and the Invite screen both use it.
 //
-// - The link is made at once (a short link on the encrypted drop; the server falls back to a long
-//   one when the drop is down, and the panel says so in plain words). It exists only as the text of
+// - SEC-INVITE-CAPS (owner decision 18 Nov 2026): the link is made when the owner confirms Create
+//   invite with their presence (Touch ID, Windows Hello, passkey or master code), once per invite
+//   (a short link on the encrypted drop; the server falls back to a long one when the drop is down,
+//   and the panel says so in plain words). The name and the long link are chosen before that. It exists only as the text of
 //   the link box, as the text of Email's `mailto:` address and, Under the hood, as the QR code's
 //   drawing: never the title, the address, a log or an error. Everything goes to this same-origin
 //   server only; a `mailto:` link is opened by the computer's mail app, not by us.
@@ -24,7 +26,9 @@ import { useCallback, useEffect, useId, useRef, useState, type ReactElement } fr
 import { createAgentsApi, type AgentsApi } from '../agents/api.js';
 import { InviteNameGate } from '../agents/name-update.js';
 import { createInviteApi, type CreatedInvite, type InviteApi } from '../contacts/invite-api.js';
-import { createOwnerClient, type OwnerClient } from '../contacts/owner.js';
+import { createOwnerClient, type OwnerClient, type PresenceProof } from '../contacts/owner.js';
+import { PresenceButton } from '../contacts/presence-button.js';
+import { CONTACTS_STRINGS as CS } from '../contacts/strings.js';
 import { QrCode } from '../proofs/qr.js';
 import { CheckMark, CopyMark, MailIcon, ShareIcon } from './icons.js';
 import { INVITE_STRINGS as S, linkLabel, mailtoOf, worksFor } from './strings.js';
@@ -47,6 +51,11 @@ export interface InvitePanelProps {
   /** Whether a link is on screen that has not gone anywhere yet. */
   readonly onUnsent?: (unsent: boolean) => void;
   /**
+   * SEC-INVITE-CAPS UX: whether a link is on screen (made with the owner's presence, or this tab's
+   * kept one). Until then the page offers only its way out, not "Done".
+   */
+  readonly onLink?: (shown: boolean) => void;
+  /**
    * REL051-B2: set to true just before the panel goes when the owner chose not to invite ("Skip for
    * now" in Get started): a link that never left the screen is then cancelled. Otherwise it stays.
    */
@@ -67,7 +76,8 @@ interface Made {
   readonly askedLong: boolean;
 }
 
-type Phase = 'making' | 'ready' | 'error';
+/** SEC-INVITE-CAPS: `confirm` waits for the owner's Create invite (presence). */
+type Phase = 'confirm' | 'making' | 'ready' | 'error';
 
 /** True when the browser has a share sheet that takes this text. */
 function canShareText(text: string): boolean {
@@ -92,6 +102,7 @@ export function InvitePanel({
   invites: givenInvites,
   onCreated,
   onUnsent,
+  onLink,
   discard,
   now = () => Date.now(),
   agents: givenAgents,
@@ -116,6 +127,9 @@ export function InvitePanel({
   const [name, setName] = useState('');
   const [nameError, setNameError] = useState<string | undefined>(undefined);
   const [phase, setPhase] = useState<Phase>('making');
+  // SEC-INVITE-CAPS: chosen before Create (each invite is one presence).
+  const [wantLong, setWantLong] = useState(false);
+  const [useOldName, setUseOldName] = useState(false);
   const [made, setMade] = useState<Made | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
   const [shared, setShared] = useState(false);
@@ -145,7 +159,12 @@ export function InvitePanel({
     { readonly label: string; readonly promise: Promise<Made | undefined> } | undefined
   >(undefined);
   const makeNow = useCallback(
-    async (label: string, long: boolean, oldName = false): Promise<Made | undefined> => {
+    async (
+      label: string,
+      long: boolean,
+      oldName: boolean,
+      proof: PresenceProof,
+    ): Promise<Made | undefined> => {
       const mine = (run.current += 1);
       const previous = madeRef.current;
       setPhase('making');
@@ -157,6 +176,7 @@ export function InvitePanel({
         long || oldName
           ? { ...(long ? { long } : {}), ...(oldName ? { oldName } : {}) }
           : undefined,
+        proof,
       );
       if (outcome.kind !== 'ok') {
         if (mine !== run.current || !live.current) return undefined;
@@ -169,6 +189,25 @@ export function InvitePanel({
           setNameError(S.nameInvalid);
           setPhase(previous === undefined ? 'error' : 'ready');
           if (previous === undefined) setError(S.cantCreate);
+          return undefined;
+        }
+        // SEC-INVITE-CAPS: a refused or missing presence made nothing; Create stays.
+        if (
+          outcome.kind === 'presence_rejected' ||
+          outcome.kind === 'presence_required' ||
+          outcome.kind === 'busy' ||
+          outcome.kind === 'wait'
+        ) {
+          setPhase(previous === undefined ? 'confirm' : 'ready');
+          setError(
+            outcome.kind === 'presence_rejected'
+              ? proof.kind === 'code'
+                ? CS.presenceRejected
+                : CS.sensorRefused
+              : outcome.kind === 'presence_required'
+                ? CS.presenceRequired
+                : CS.busy,
+          );
           return undefined;
         }
         setPhase(previous === undefined ? 'error' : 'ready');
@@ -203,8 +242,13 @@ export function InvitePanel({
     [invites, onCreated],
   );
   const make = useCallback(
-    (label: string, long: boolean, oldName = false): Promise<Made | undefined> => {
-      const promise = makeNow(label, long, oldName);
+    (
+      label: string,
+      long: boolean,
+      oldName: boolean,
+      proof: PresenceProof,
+    ): Promise<Made | undefined> => {
+      const promise = makeNow(label, long, oldName, proof);
       const entry = { label, promise };
       pendingRef.current = entry;
       const done = (): void => {
@@ -224,16 +268,30 @@ export function InvitePanel({
     // IR-REL051-B2-1 (4): this tab's screen made an invite before the reload: show it again, while
     // it is still open (the link route answers only an open invite); otherwise make one.
     const kept = screenInvite();
+    // SEC-INVITE-CAPS: no link is made without the owner: show Create invite (and, WP-1, ask for the
+    // name update first while the card still carries an older name).
+    const confirm = async (): Promise<void> => {
+      if (!live.current || madeRef.current !== undefined) return;
+      setPhase('confirm');
+      try {
+        const name = await agents.cardName();
+        if (live.current && name.kind === 'differs') {
+          setNameGate({ cardName: name.cardName, label: '', name: '', long: false });
+        }
+      } catch {
+        // A read that fails never blocks an invite.
+      }
+    };
     const reuse = async (): Promise<void> => {
       if (kept === undefined || invites.link === undefined) {
-        await make('', false);
+        await confirm();
         return;
       }
       const out = await invites.link(kept.id);
       if (!live.current) return;
       if (out.kind !== 'ok' || madeRef.current !== undefined) {
         forgetScreenInvite();
-        if (madeRef.current === undefined) await make('', false);
+        if (madeRef.current === undefined) await confirm();
         return;
       }
       const next: Made = {
@@ -281,14 +339,8 @@ export function InvitePanel({
     return () => clearTimeout(t);
   }, [copiedMessage]);
 
-  // A name typed while the first link was still being made: apply it once the link is there, unless
-  // the field still has focus (its blur commits it).
   useEffect(() => {
-    if (phase !== 'ready' || made === undefined || sharedRef.current) return;
-    const wanted = name.trim();
-    if (wanted === made.label || document.activeElement?.id === nameId) return;
-    void make(wanted, made.askedLong);
-    // Only when a link arrives.
+    onLink?.(made !== undefined);
   }, [made]);
 
   const markShared = (): void => {
@@ -319,13 +371,8 @@ export function InvitePanel({
     return () => document.removeEventListener('copy', onCopy);
   }, []);
 
-  /** The name is committed (the field lost focus, or Enter): a fresh link while nothing went out. */
-  const commitName = (): void => {
-    const wanted = name.trim();
-    if (sharedRef.current || phase === 'making' || made === undefined) return;
-    if (wanted === made.label) return;
-    void make(wanted, made.askedLong);
-  };
+  /** SEC-INVITE-CAPS: the name is chosen before Create; once the link is made it is fixed. */
+  const commitName = (): void => undefined;
 
   /**
    * REL051-UF3 (R1-UI-04): the link a Copy, Email or Share click sends. A name typed and not saved
@@ -336,17 +383,8 @@ export function InvitePanel({
   const finalInvite = (): CreatedInvite | Promise<CreatedInvite | undefined> | undefined => {
     const current = madeRef.current;
     const pending = pendingRef.current;
-    const wanted = name.trim();
-    if (current !== undefined && !sharedRef.current && wanted !== current.label) {
-      if (pending?.label === wanted) return pending.promise.then((m) => m?.invite);
-      return make(wanted, current.askedLong).then((m) => m?.invite);
-    }
+    // SEC-INVITE-CAPS: one presence makes one link; a pending one is waited for, nothing new is made.
     if (pending !== undefined) {
-      // IR-REL051-UF3-1: a link for another name is on its way (the field changed back): never copy
-      // that one; make the link for the name in the field (the other is cancelled when it lands).
-      if (current !== undefined && !sharedRef.current && pending.label !== wanted) {
-        return make(wanted, current.askedLong).then((m) => m?.invite);
-      }
       return pending.promise.then((m) => m?.invite ?? madeRef.current?.invite);
     }
     return current?.invite;
@@ -490,7 +528,7 @@ export function InvitePanel({
             placeholder={S.placeholder}
             maxLength={MAX_NAME}
             value={name}
-            readOnly={shared}
+            readOnly={shared || made !== undefined || phase === 'making'}
             aria-describedby={hintId}
             aria-invalid={nameError === undefined ? undefined : 'true'}
             onChange={(e) => setName(e.currentTarget.value)}
@@ -508,11 +546,39 @@ export function InvitePanel({
           label={nameGate.label}
           agents={agents}
           owner={owner}
-          onUpdated={() => void make(nameGate.name, nameGate.long)}
-          onOldName={() => void make(nameGate.name, nameGate.long, true)}
+          onUpdated={() => setNameGate(undefined)}
+          onOldName={() => {
+            setUseOldName(true);
+            setNameGate(undefined);
+          }}
         />
       )}
-      {nameGate !== undefined && made === undefined ? null : (
+      {phase === 'confirm' && nameGate === undefined && made === undefined ? (
+        <section className="inv-card al-reveal inv-confirm" aria-label={S.createStatement}>
+          <label className="al-text-body-sm inv-long">
+            <input
+              type="checkbox"
+              checked={wantLong}
+              onChange={(e) => setWantLong(e.currentTarget.checked)}
+            />{' '}
+            {S.createLong}
+          </label>
+          <PresenceButton
+            withSensor={S.createWith}
+            withCode={S.createWithCode}
+            statement={S.createStatement}
+            busy={false}
+            error={error}
+            notUsed={CS.passkeyNotUsed}
+            onProof={(proof) => void make(wanted, wantLong, useOldName, proof)}
+            owner={owner}
+          />
+          <p className="al-text-body-sm al-muted inv-create-note" aria-hidden="true">
+            {S.createStatement}
+          </p>
+        </section>
+      ) : null}
+      {(nameGate !== undefined && made === undefined) || phase === 'confirm' ? null : (
         <section className="inv-card al-reveal" aria-label={linkLabel(wanted)}>
           <span className="inv-eyebrow">{linkLabel(wanted)}</span>
           <div className="inv-row">
@@ -600,7 +666,7 @@ export function InvitePanel({
           {error === undefined ? null : (
             <InlineError
               action={
-                <Button size="sm" onClick={() => void make(wanted, made?.askedLong === true)}>
+                <Button size="sm" onClick={() => setPhase('confirm')}>
                   {S.tryAgain}
                 </Button>
               }
@@ -628,16 +694,6 @@ export function InvitePanel({
                   }}
                 >
                   {qr ? S.hideQr : S.showQr}
-                </Button>
-                <Button
-                  size="sm"
-                  disabled={!ready}
-                  onClick={() => {
-                    setQr(false);
-                    void make(made?.label ?? '', invite.format !== 'long');
-                  }}
-                >
-                  {invite.format === 'long' ? S.makeShort : S.makeLong}
                 </Button>
               </div>
               {qr ? (

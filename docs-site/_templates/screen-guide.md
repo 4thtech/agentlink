@@ -1,6 +1,5 @@
 # <Page name, as in the app's navigation> page
 
-*Applies to AgentLink <version>.*
 <!-- One status line (MAINTAINING §3). No release history. -->
 
 <What the page is for, in one or two sentences. Then what looking changes (nothing) and what a change needs.> Every change needs your [passkey](../help/glossary.md) or your [master code](../help/glossary.md).

@@ -1,6 +1,7 @@
 # Codex
 
-*Applies to AgentLink 0.5.8.*
+<!-- ai-knowledge: summary
+summary: Set up AgentLink in Codex (command line, IDE extension and the Codex app in the ChatGPT desktop app), protect your approvals and check it works. Needs Node.js 22.14 or newer. -->
 
 This page sets up AgentLink in Codex (command line, IDE extension, and Codex in the ChatGPT desktop app). You need Node.js 22.14 or newer (check with `node --version`) and Codex.
 

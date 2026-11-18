@@ -284,7 +284,8 @@ export type ActivityEntry =
     })
   | (EntryBase & {
       /** QA2: the owner unblocked a contact, or did the Contact check (`contact.check`). */
-      readonly kind: 'contact_unblocked' | 'contact_checked';
+      /** SEC-INVITE-CAPS: `contact_kept`, the owner kept a contact the AI connected. */
+      readonly kind: 'contact_unblocked' | 'contact_checked' | 'contact_kept';
       /** A contact reference only; null when the store no longer ties the action to one contact. */
       readonly contactId: string | null;
     })
@@ -353,6 +354,8 @@ const OWNER_ACTION_KINDS = Object.freeze({
   'contact.block': 'contact_blocked',
   'contact.unblock': 'contact_unblocked',
   'contact.check': 'contact_checked',
+  // SEC-INVITE-CAPS (D-156).
+  'contact.keep': 'contact_kept',
 } as const);
 /**
  * QA2: how long after an ID's creation its first label and first rules still belong to creating it
@@ -934,12 +937,17 @@ export class ActivityService {
           continue;
         }
         const id = `${OWNER_ACTION}${r.nonce}`;
-        if (op === 'contact.block' || op === 'contact.unblock' || op === 'contact.check') {
+        if (
+          op === 'contact.block' ||
+          op === 'contact.unblock' ||
+          op === 'contact.check' ||
+          op === 'contact.keep'
+        ) {
           add(at, id, (t) => {
             const contactId =
               op === 'contact.block'
                 ? null
-                : op === 'contact.unblock'
+                : op === 'contact.unblock' || op === 'contact.keep'
                   ? unblockedContactTx(t, at)
                   : checkedContactTx(t, r.nonce);
             return {
@@ -949,7 +957,12 @@ export class ActivityService {
                 op === 'contact.block'
                   ? { kind: 'contact_blocked', id, at, contactId: null, contact: null }
                   : {
-                      kind: op === 'contact.unblock' ? 'contact_unblocked' : 'contact_checked',
+                      kind:
+                        op === 'contact.unblock'
+                          ? 'contact_unblocked'
+                          : op === 'contact.keep'
+                            ? 'contact_kept'
+                            : 'contact_checked',
                       id,
                       at,
                       contactId,

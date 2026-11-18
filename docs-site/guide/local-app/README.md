@@ -1,6 +1,9 @@
 # The local app
 
-*Applies to AgentLink 0.5.9. It is not in 0.2.0. The three-layer app is new in 0.4.6; the menu Home, People, My IDs, Activity, Settings and the grouped Settings are new in 0.5.0. There is now an early Mac app (see [Mac desktop app](../apps/desktop-app.md)); otherwise the app opens in your browser.*
+<!-- ai-knowledge: summary
+summary: Overview of the local app, the pages that open in your browser on your own computer: how to open it, the three layers (you, IDs, people), the frame and the list of pages. -->
+
+*It is not in 0.2.0. The three-layer app is new in 0.4.6; the menu Home, People, My IDs, Activity, Settings and the grouped Settings are new in 0.5.0. There is now an early Mac app (see [Mac desktop app](../apps/desktop-app.md)); otherwise the app opens in your browser.*
 
 The local app is a set of pages that open in your browser. They run on your own computer, and nothing on them is sent to 4thTech. Use them to see who your AI talks to, approve what needs you, and set up IDs and AI apps.
 

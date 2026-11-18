@@ -1,5 +1,8 @@
 # Versioning and changelog
 
+<!-- ai-knowledge: summary
+summary: How AgentLink versions releases, formats and these docs, with a link to the changelog. -->
+
 > **Status: Current.** Source: [versioning.md](https://github.com/4thtech/agentlink/blob/main/docs/process/versioning.md). Release history: [CHANGELOG.md](https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md) (Keep a Changelog) and GitHub Releases.
 
 ## Product version

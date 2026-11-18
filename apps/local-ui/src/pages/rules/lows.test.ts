@@ -29,7 +29,7 @@ const rules = (acceptInvites: string): unknown => ({
     proofs: {
       notarize: 'allow',
       dailyBudgetUSD: '5',
-      perActionMaxUSD: '1',
+      perActionMaxUSD: '0.2',
       allowKeyDisclosure: 'approval',
     },
     contacts: { acceptInvites, unknownSenders: 'queue', allowed: 'paired', listed: 0 },

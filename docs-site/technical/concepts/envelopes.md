@@ -1,5 +1,8 @@
 # Envelopes and encryption
 
+<!-- ai-knowledge: summary
+summary: How an envelope is built and encrypted once with a fresh content key wrapped per recipient, the payload, and signed received acknowledgements. For developers. -->
+
 > **Status: Current for v0.5.10.** Envelopes shipped in v0.1.0; signed "received" acks are on by default since 0.5.10. Source: [04 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). The spec defines exact byte layouts; this page is a summary.
 
 An **envelope** is the container for every message and file reference. It is encrypted once with a fresh content key, and that key is wrapped separately for each recipient.

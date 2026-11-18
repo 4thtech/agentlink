@@ -1,5 +1,8 @@
 # Records, receipts and proof packs
 
+<!-- ai-knowledge: summary
+summary: Technical explanation of records, receipts, proof of agreement, proof packs and fees; proof runs on test networks only. -->
+
 > **Status: Released on test networks in v0.2.0 (design below); paid on mainnet from v1.0.0 (M3). Sources: [05 §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md), [04 §5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), [07 §8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md).
 
 ## Records

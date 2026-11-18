@@ -157,7 +157,6 @@ export {
 };
 /** UX2-d1: the one path of each invite-kind step (U3-invite: `dismiss`, "Not now"). */
 const INVITE_STEP_PATHS: Readonly<Record<string, string>> = Object.freeze({
-  create: INVITE_CREATE_PATH,
   check: INVITE_CHECK_PATH,
   dismiss: JOIN_DISMISS_PATH,
   cancel: INVITE_CANCEL_PATH,
@@ -446,7 +445,6 @@ export class LocalUiRouteRegistry {
       // UX2-d1 (decision 1.1): create and check an invite only; the server's invite gate runs it.
       if (method !== 'POST') throw invalid('an invite route is a POST');
       if (
-        step !== 'create' &&
         step !== 'check' &&
         step !== 'dismiss' &&
         step !== 'cancel' &&

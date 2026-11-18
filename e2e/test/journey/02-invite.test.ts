@@ -9,6 +9,7 @@ import {
   chapter,
   checkInviteInApp,
   createInviteInApp,
+  createInviteWithPresence,
   eventually,
   journeyWorld,
   navTo,
@@ -73,8 +74,9 @@ describe('chapter 2: contacts and invites', () => {
     await until('Bo is paired with Ana', () => pairedWith(mcpB, 'Ana'), 30_000);
     await until('Ana is paired with Bo', () => pairedWith(mcpA, 'Bo'), 30_000);
 
-    // Gestures: creating an invite needs none; accepting needs one.
-    expect(a.gestures.total() - aBefore).toBe(0);
+    // Gestures: SEC-INVITE-CAPS (owner decision 18 Nov 2026; 08 §1 `invite.create`, 11 §5.12):
+    // creating an invite needs one (Create invite with Touch ID); accepting needs one.
+    expect(a.gestures.total() - aBefore).toBe(1);
     expect(b.gestures.total() - bBefore).toBe(1);
     await aProbe.check();
     await bProbe.check();
@@ -163,6 +165,7 @@ describe('chapter 2: contacts and invites', () => {
     await observeLayoutShift(a.page);
     const before = await layoutShiftScore(a.page);
     await openInviteScreen(a.page);
+    await createInviteWithPresence(a.page);
     const shown = await inviteLinkOnScreen(a.page);
     expect(shown).toMatch(SHORT_INVITE);
     await a.page.getByRole('button', { name: 'Copy', exact: true }).click();

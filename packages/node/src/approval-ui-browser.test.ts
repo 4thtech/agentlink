@@ -215,6 +215,8 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
     await page.goto(server.approvalUrl(id(1)));
     // J4 step 3: who, what, cost and the rule in plain words.
     const box = card(page, 1);
+    // SEC-CARD-FULLTEXT: "From your AI" is folded (not needed to decide); opened to read it here.
+    await box.locator('details.al-from-ai > summary').click();
     for (const text of [
       'Denis',
       'Record a proof',
@@ -355,6 +357,8 @@ describe('the local approval UI (M1-11a; Chromium, virtual PRF authenticator)', 
       // N3: Home's compact card folds the AI's words behind Review.
       if (view === '/')
         await card(page, 1).getByRole('button', { name: 'Review', exact: true }).click();
+      // SEC-CARD-FULLTEXT: "From your AI" is folded (not needed to decide); opened to read it here.
+      await card(page, 1).locator('details.al-from-ai > summary').click();
       await card(page, 1).getByText(`/tmp/${XSS}.pdf`).waitFor();
       expect(await page.evaluate(() => (globalThis as { __xss?: unknown }).__xss)).toBeUndefined();
       expect(await page.locator('main img').count()).toBe(0);

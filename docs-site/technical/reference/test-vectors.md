@@ -1,5 +1,8 @@
 # Test vectors
 
+<!-- ai-knowledge: skip
+summary: Outline of the shared test vectors covering key derivation, envelope signatures, encryption, pairing proof and terms hashes. -->
+
 > **Status: Available since v0.1.0** (the Talk vectors, in the `test-vectors/` directory of the repository) and Planned for v0.2.0 (M1) (proof-layer vectors). This page is an outline.
 
 **Purpose:** reference for the shared, cross-runtime test vectors that every implementation (TypeScript packages, contracts, third parties) must pass.

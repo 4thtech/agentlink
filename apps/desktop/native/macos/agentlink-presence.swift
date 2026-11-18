@@ -21,7 +21,14 @@
 //                        no enrolled finger exits 69, lockout 14, without a sheet), then one Touch ID
 //                        sheet; prints the 32-byte secret
 //   reason-id is one of: setup | approve | pay | code | reset. The sheet text is fixed here (reasonText below);
-//   the caller cannot supply text. macOS shows it as "<app> is trying to <text>".
+//   macOS shows it as "<app> is trying to <text>".
+//   ecdh <reason-id> <detail>   SEC-CARD-FULLTEXT (04 §2.5.3): as ecdh, and the sheet adds one plain line
+//                      the core built from the stored request, naming who and the cost ("for Ana,
+//                      $0.10"), after the fixed text. The detail is display-only (it binds nothing,
+//                      like the reason): at most 64 Unicode scalars, a space is the only allowed
+//                      whitespace, and no control, format (bidi, zero-width), separator, private-use
+//                      or unassigned scalar; anything else exits 66 (detail refused) before any key
+//                      is touched, so the core can tell it from an older helper's 64 (usage).
 //
 //   stdin: lowercase hex of the record, optionally followed by exactly one "\n"; at most 8192 bytes.
 //   stdout: on success only, lowercase hex followed by "\n". Nothing else, ever.
@@ -61,7 +68,7 @@
 //     0 ok · 10 cancelled (Cancel, Use Password, system or app cancel) · 11 failed (not recognised)
 //     12 not interactive (incl. the Mac is locked) · 13 key unusable (bad or foreign handle, public key mismatch, key no longer
 //     valid e.g. fingers changed, or a key that needs no gesture) · 14 lockout (too many attempts)
-//     15 caller refused (phase 3) · 16/17/18 Windows only · 64 usage · 65 bad input · 69 unavailable
+//     15 caller refused (phase 3) · 16/17/18 Windows only · 64 usage · 65 bad input · 66 detail refused (macOS) · 69 unavailable
 //     70 internal error
 //
 // SECURITY NOTES
@@ -100,6 +107,8 @@ enum Exit: Int32 {
   case weakKey = 18
   case usage = 64
   case badInput = 65
+  // SEC-CARD-FULLTEXT: `ecdh <reason> <detail>` with a detail that is not one short plain line.
+  case detailRefused = 66
   case unavailable = 69
   case internalError = 70
 }
@@ -206,6 +215,24 @@ func reasonText(_ id: String) -> String? {
   case "reset": return "start over AgentLink on this computer"
   default: return nil
   }
+}
+
+/// SEC-CARD-FULLTEXT: the prompt detail, checked (nil when it is not plain, short, one line).
+let maxDetailScalars = 64
+func checkedDetail(_ raw: String) -> String? {
+  let scalars = raw.unicodeScalars
+  guard !scalars.isEmpty, scalars.count <= maxDetailScalars else { return nil }
+  for u in scalars {
+    if u == " " { continue }
+    if u.properties.isWhitespace { return nil }
+    switch u.properties.generalCategory {
+    case .control, .format, .lineSeparator, .paragraphSeparator, .spaceSeparator, .privateUse,
+      .surrogate, .unassigned:
+      return nil
+    default: continue
+    }
+  }
+  return raw
 }
 
 let recordVersion: UInt8 = 0x01
@@ -481,5 +508,9 @@ case (2, "check"): cmdCheck()
 case (3, "ecdh"):
   guard let reason = reasonText(argv[2]) else { finish(.usage) }
   cmdEcdh(reason)
+case (4, "ecdh"):
+  guard let reason = reasonText(argv[2]) else { finish(.usage) }
+  guard let detail = checkedDetail(argv[3]) else { finish(.detailRefused) }
+  cmdEcdh("\(reason) \(detail)")
 default: finish(.usage)
 }

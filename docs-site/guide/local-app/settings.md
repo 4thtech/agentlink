@@ -1,6 +1,9 @@
 # Settings
 
-*Applies to AgentLink 0.5.9. The three groups, the states on each row, Find a setting and the list of pages beside each Settings page are new in 0.5.0.*
+<!-- ai-knowledge: summary
+summary: Overview of the Settings groups (Safety, Your AI, This app and more) with a link to each settings page and its status. -->
+
+*The three groups, the states on each row, Find a setting and the list of pages beside each Settings page are new in 0.5.0.*
 
 **Settings** is in the left menu. Its rows are in three groups, and each row says in one line where it stands.
 

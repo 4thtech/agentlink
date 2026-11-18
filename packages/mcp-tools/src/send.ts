@@ -60,6 +60,7 @@ import { notarizeOutput, notarizeWithFreeCredits, proofThrown } from './proofs-c
 import { copy } from './strings/index.js';
 import { TOOL_TEXT, noOwnerCard, noOwnerResult } from './text.js';
 import { NPX_COMMAND } from './cli-command.js';
+import { WAITING_OWNER_TEXT, waitingOwner } from './invite-common.js';
 
 /** Fixed text for this tool (I-5: no slot takes another party's or the agent's text). */
 export const SEND_TEXT = Object.freeze({
@@ -67,6 +68,8 @@ export const SEND_TEXT = Object.freeze({
   useTermsToolsNextStep:
     'Use agentlink_propose_terms to make an offer, or agentlink_respond_to_terms to answer one.',
   contactNotReady: "That contact isn't connected yet, so nothing was sent.",
+  // SEC-INVITE-CAPS (D-156): a contact the AI connected, waiting for the owner's Keep.
+  waitingOwner: WAITING_OWNER_TEXT.summary,
   contactNotReadyNextStep:
     'The pairing finishes when they answer. Call agentlink_list_contacts later to check.',
   keyReused: 'That clientRequestId was already used for a different message, so nothing was sent.',
@@ -74,6 +77,17 @@ export const SEND_TEXT = Object.freeze({
     'Use a new clientRequestId for a new message, or the same request to repeat it.',
   inProgress: 'This message is already being sent by another call, so nothing more was done.',
   inProgressNextStep: 'Wait a few seconds, then call again with the same clientRequestId.',
+  // D-156 (SEC-OUTBOUND-CAPS): an outgoing cap of the owner's rules; never an approval.
+  sendLimitContactMessages:
+    'Sending limit reached for {name} ({max} messages a day), so nothing was sent.',
+  sendLimitMessages: 'Sending limit reached ({max} messages a day in all), so nothing was sent.',
+  sendLimitContactFiles:
+    'Sending limit reached for {name} ({max} files a day), so nothing was sent.',
+  sendLimitFiles: 'Sending limit reached ({max} files a day in all), so nothing was sent.',
+  sendLimitMB: 'Sending limit reached ({max} MB of files a day), so nothing was sent.',
+  sendLimitNextStep:
+    'Try again after {time}. Or tell the user: This is over your limit. You can change it in Settings › Rules in the AgentLink app.',
+  proofCeiling: "The proof wasn't added: it is over your limit, so nothing was recorded.",
   policyDenied: "The owner's rules don't allow this message, so nothing was sent.",
   policyDeniedNextStep:
     'Tell the user their AgentLink rules blocked this message. Only they can change the rules.',
@@ -123,6 +137,8 @@ function coreErrorOutput(code: CoreErrorCode): HandlerOutput | undefined {
       return fail('error', SEND_TEXT.revoked, SEND_TEXT.revokedNextStep, 'AGENT_REVOKED');
     case 'contact_not_active':
       return contactNotReady();
+    case 'contact_waiting_owner':
+      return waitingOwner();
     case 'contact_not_found':
       return fail('not_found', TOOL_TEXT.contactNotFound, TOOL_TEXT.contactNotFoundNextStep);
     case 'envelope_too_large':
@@ -208,6 +224,8 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
   const resolved = resolveContact(to, await client.contacts());
   if (!resolved.ok) return resolved.output;
   if (resolved.contact.pairing !== 'complete') return contactNotReady();
+  // SEC-INVITE-CAPS (D-156): before anything is attached; core refuses it too (send.ts).
+  if (resolved.contact.waitingForOwner === true) return waitingOwner();
   const ref = contactRef(resolved.contact);
 
   // 5. The file: checked, never opened here (06 §2.3, 04 §4).
@@ -366,6 +384,9 @@ export async function sendHandler(input: unknown, context: ToolContext): Promise
             FILE_TEXT.payloadTooLargeNextStep,
             'PAYLOAD_TOO_LARGE',
           );
+        case 'SEND_LIMIT':
+          logger.info('send refused', { code: 'SEND_LIMIT' });
+          return sendLimit(result as unknown as Readonly<Record<string, unknown>>, renderRef(ref));
         default: {
           // FILES-AI-1: the `file` refusals (06 §2.3), fixed text by code.
           const content = byContent ? contentFileRefusal(result.code) : undefined;
@@ -472,11 +493,15 @@ async function withProofOf(
       typeof proofOut.result.code === 'string' && proofOut.result.code !== 'INTERNAL'
         ? proofOut.result.code
         : 'PROOF_FAILED';
+    // D-156: over a hard ceiling the proof is refused in plain words (no retry, no approval).
+    const ceiling = code === 'SPEND_CEILING';
     proofOut = {
       result: {
         status: 'error',
-        summary: SEND_TEXT.proofFailed,
-        nextStep: SEND_TEXT.proofFailedNextStep.replace('{envelopeId}', envelopeId),
+        summary: ceiling ? SEND_TEXT.proofCeiling : SEND_TEXT.proofFailed,
+        nextStep: ceiling
+          ? String(proofOut.result.nextStep)
+          : SEND_TEXT.proofFailedNextStep.replace('{envelopeId}', envelopeId),
         code,
       },
     };
@@ -509,4 +534,43 @@ async function withProofOf(
       proof,
     },
   };
+}
+
+/**
+ * D-156: the SEND_LIMIT refusal in plain words: which cap, its number, the contact for a
+ * per-contact cap, and when a slot frees. The numbers and the time come from the core's typed
+ * result and are checked here; nothing else is read from it.
+ */
+function sendLimit(result: Readonly<Record<string, unknown>>, name: string): HandlerOutput {
+  const limit = result['limit'];
+  const max = result['max'];
+  const retryAt = result['retryAt'];
+  const templates: Readonly<Record<string, string>> = {
+    messages_contact: SEND_TEXT.sendLimitContactMessages,
+    messages_day: SEND_TEXT.sendLimitMessages,
+    files_contact: SEND_TEXT.sendLimitContactFiles,
+    files_day: SEND_TEXT.sendLimitFiles,
+    file_mb_day: SEND_TEXT.sendLimitMB,
+  };
+  const template = typeof limit === 'string' ? templates[limit] : undefined;
+  const time =
+    typeof retryAt === 'string' &&
+    /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/.test(retryAt)
+      ? retryAt
+      : undefined;
+  if (
+    template === undefined ||
+    typeof max !== 'number' ||
+    !Number.isSafeInteger(max) ||
+    time === undefined
+  ) {
+    return internalError();
+  }
+  return fail(
+    'rejected',
+    template.replace('{name}', name).replace('{max}', String(max)),
+    SEND_TEXT.sendLimitNextStep.replace('{time}', time),
+    'SEND_LIMIT',
+    { limit, max, retryAt: time },
+  );
 }

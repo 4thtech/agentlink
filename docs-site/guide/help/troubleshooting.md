@@ -1,6 +1,7 @@
 # Troubleshooting
 
-Applies to AgentLink 0.5.9, a pre-alpha release.
+<!-- ai-knowledge: summary
+summary: Fix common problems yourself: first run the check, then setup, pairing and contacts, messages, and files, status and Pause problems, and what to include when asking for help. -->
 
 Fix common problems yourself, and know what to include when you ask for help.
 

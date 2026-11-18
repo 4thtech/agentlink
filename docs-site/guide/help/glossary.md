@@ -1,6 +1,9 @@
 # Glossary
 
-*Applies to AgentLink 0.5.9.* These are the words AgentLink uses, in the product's own wording. Entries marked coming are not built yet. In 0.4.14 three words changed: **backup code** and **owner code** are now **master code**, the **safety code** is now the **Contact check**, and the **owner fingerprint** is now the **ID tag**.
+<!-- ai-knowledge: summary
+summary: The words AgentLink uses in its own wording, such as ID, contact, invite, master code, approval and proof, with the words to know first and a full list. -->
+
+These are the words AgentLink uses, in the product's own wording. Entries marked coming are not built yet. In 0.4.14 three words changed: **backup code** and **owner code** are now **master code**, the **safety code** is now the **Contact check**, and the **owner fingerprint** is now the **ID tag**.
 
 ## The words to know first
 

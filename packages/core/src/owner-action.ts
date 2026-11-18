@@ -69,6 +69,8 @@ export type OwnerActionRefusal =
   // is not blocked
   | 'already_blocked'
   | 'not_blocked'
+  // SEC-INVITE-CAPS (D-156): a `contact.keep` for a contact that is not waiting for the owner
+  | 'not_waiting'
   | 'pairing_unavailable'
   | 'credential_missing'
   | 'credential_mismatch'
@@ -317,6 +319,8 @@ export function verifyOwnerAction(
     case 'contact.remove':
     case 'contact.block':
     case 'contact.unblock':
+    case 'contact.keep':
+    case 'invite.create':
     case 'storage.set':
     case 'storage.remove':
     case 'backup.export':

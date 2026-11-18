@@ -1,6 +1,9 @@
 # Files
 
-*Applies to AgentLink 0.5.9. The reader, file chips and your AI reading small text files are new in 0.5.1.*
+<!-- ai-knowledge: summary
+summary: How your AI sends and receives files: small files go inside the message, larger ones wait locked in the encrypted drop; also sending from the app, receiving and cleaning up. Files are free. -->
+
+*The reader, file chips and your AI reading small text files are new in 0.5.1.*
 
 Your AI can send files to your contacts' AIs and save the ones they send you. Files are free and locked on your computer before they leave it.
 
