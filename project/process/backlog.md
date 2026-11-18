@@ -11363,40 +11363,95 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Done:** policy `outgoing` (300 / 1000 messages, 50 / 200 files, 2000 MB per rolling 24 h, per ID; absent = these); counted from the durable `outgoing_log` (store schema 17) written in the send transaction, so a deleted file or message never frees a cap; `SEND_LIMIT` with the cap, its number and `retryAt`, never kept under a clientRequestId; acks, receipts, pairing and terms not counted; Rules page "Sending limits". Residual: a process with the agent key bypasses it; terms envelopes are not capped (SEC-TERMS-CAPS).
 
 #### SEC-TERMS-CAPS · Terms count toward the sending limits (0.5.12)
-- **Status:** built for 0.5.12 (branch `rel0512/terms-caps`, releasing) · **Security:** S2 · **Spec:** D-156 (6); 06 §3 `outgoing`
+- **Status:** built, released in 0.5.12 (branch `rel0512/terms-caps`) · **Security:** S2 · **Spec:** D-156 (6); 06 §3 `outgoing`
 - **Goal:** `offer`, `accept` and `reject` sent through the terms tools count toward the outgoing caps per contact and per day, as `agentlink_send` messages do (the terms send path, `terms-flow.ts`), with the same `SEND_LIMIT` refusal and the same durable count.
 - **Done:** counted in the storing transaction and checked again before anything is signed; `SEND_LIMIT` with the same words; not kept under a `clientRequestId`; an approved accept that hits a cap stays approved. Spec: 06 §2.2a, §3 `outgoing`.
 
 #### SEC-RELAY-READBACK · Relay availability check (0.5.12)
-- **Status:** built for 0.5.12 (branch `rel0512/relay-readback`, releasing) · **Security:** S2 · **Spec:** D-156 (7)
+- **Status:** built, released in 0.5.12 (branch `rel0512/relay-readback`) · **Security:** S2 · **Spec:** D-156 (7)
 - **Goal:** a message counts as sent once a relay serves it back.
 - **Done:** before "sent", the message is read back by id from at least one relay that acknowledged it (no login, fresh connection, signature checked); otherwise "Sent, availability unknown" after at most about 120 s; an empty read never makes a message `not_delivered`; a verified received receipt confirms availability; store schema 19 (two nullable `availability` columns); `agentlink_send` gains optional `availability`; `vet.mjs --live --id-readback`. Spec: 06 §2.2; 07 §3.2, §4.2, §4.3; 11 §5; `project/runbooks/relay-vetting.md`.
 
 #### SEC-RECORD-ATOMIC · Proof signing tied to the budget (0.5.12)
-- **Status:** built for 0.5.12 (branch `rel0512/record-atomic`, releasing) · **Security:** S2 · **Spec:** D-156
+- **Status:** built, released in 0.5.12 (branch `rel0512/record-atomic`) · **Security:** S2 · **Spec:** D-156
 - **Goal:** a proof is signed and counted against the budget in one step.
 - **Done:** the fee is reserved first and a single-use ticket is issued in the same transaction; the core signs a Record only under a live ticket whose reservation is held; one live Record per message; on a failure the fee stays reserved and the same Record is signed again under the held reservation. Spec: 06 §3; 07 §3.5. Note: a Record restored from a backup while it was being signed is signed again with the same record ID, so it lands at most once.
 
 #### SEC-RESTORE-GUARD · Budget after restore (0.5.12)
-- **Status:** built for 0.5.12 (branch `rel0512/restore-guard`, releasing) · **Security:** S2 · **Spec:** D-156
+- **Status:** built, released in 0.5.12 (branch `rel0512/restore-guard`) · **Security:** S2 · **Spec:** D-156
 - **Goal:** restoring a backup keeps spending and processed actions consistent.
 - **Done:** a restore mark in the KeyStore (reason restore or update), written before the seed and cleared on a failed restore; for 24 hours every paid action asks the owner (hard ceilings still refuse) and outgoing caps are halved; approvals, terms scopes and top-up approvals requested before the restore (5 minutes of skew) are void; replayed inbound starts no automatic action; a missing or unreadable mark fails closed; existing IDs get one 24-hour window on upgrade (owner decisions, 18 Nov). Spec: 04 §2.2, §2.3.3, §7; 06 §3; 07 §3.2; 11 §5.11.
 
 #### SEC-REFUSED-UPLOAD-CLEANUP · Uploads of a refused send are deleted (0.5.12)
-- **Status:** built for 0.5.12 (branch `rel0512/upload-cleanup`, releasing) · **Security:** S2 · **Spec:** D-156; 04 §4; 07 §5.6
+- **Status:** built, released in 0.5.12 (branch `rel0512/upload-cleanup`) · **Security:** S2 · **Spec:** D-156; 04 §4; 07 §5.6
 - **Done:** the contact is checked before upload; uploads of a send refused afterwards are deleted (bounded inline, then a background queue with backoff); queued drop rows stop after 8 days.
 
 #### DELETE-PLAN-ACKS · Delete history survives a late receipt (0.5.12)
-- **Status:** built for 0.5.12 (branch `rel0512/delete-plan-acks`, releasing) · **Security:** S2 · **Spec:** 04 §4.2; 07 §3.8
+- **Status:** built, released in 0.5.12 (branch `rel0512/delete-plan-acks`) · **Security:** S2 · **Spec:** 04 §4.2; 07 §3.8
 - **Done:** owner-approved on 18 Nov; the plan hash leaves received acks out; at apply time acks follow the confirmed messages; a new message or file still refuses; proofs and acks of notarized messages are kept.
 
 #### OWNER-FB-0512 · Widget and notification opens, files route (0.5.12)
-- **Status:** built for 0.5.12 (branch `rel0512/owner-fb`, releasing) · **Security:** S1 · **Spec:** 08 §1, §8
+- **Status:** built, released in 0.5.12 (branch `rel0512/owner-fb`) · **Security:** S1 · **Spec:** 08 §1, §8
 - **Done:** opening from the widget or a notification moves the app in place; the `files` route and `#person=<id>&files` fragment open a person's new file; what was opened is marked read; the status strip wraps.
 
 #### CI-HEAVY-ON-RELEASE · Release PRs run the heavy lanes (0.5.12)
-- **Status:** built for 0.5.12 (branch `rel0512/ci-heavy`, releasing) · **Security:** S2 (`.github/**`) · **Spec:** `project/process/ci-cd.md`
+- **Status:** built, released in 0.5.12 (branch `rel0512/ci-heavy`) · **Security:** S2 (`.github/**`) · **Spec:** `project/process/ci-cd.md`
 - **Done:** release PRs (by title or by `rel*/release` or `rel*/integration` branch) force and require `e2e-browser` and `e2e-deterministic`; a rename does not rerun CI.
+
+#### SEC-BUDGET-CLOCK · Spending limits read the clock inside the transaction (0.5.12)
+- **Status:** built, released in 0.5.12 · **Security:** S2 · **Spec:** 06 §3; 07 §3.5
+- **Done:** the budget check reads the clock inside the same store transaction as the ledger it sums, so a parallel call can never make "now" look earlier than the newest entry; a refusal inside the reserving step is reported as the limit it hit. On a ledger that cannot be summed an approval alone does not let an action through, and the hard daily ceiling still refuses where the entries can be summed (a clock earlier than the newest entry). 0.5.13 specs now say this (06 §3, 07 §3.5).
+
+#### DELIVERY-DETAILS · How many servers took and serve a message (0.5.13)
+- **Status:** built for 0.5.13 (releasing) · **Security:** S1 · **Spec:** 07 §3.2, §4.2; 11 §5.10
+- **Done:** a sent message keeps how many relays accepted it and how many served it back (counts only, no address; store schema 20: `relays_accepted`, `relays_available` on the outbox and the envelope). A row is marked sent at the first serve; the other reads get a 1 s grace only while a read slot is spare, and the count is raised afterwards. Under the hood: "Message network: accepted by N, available from M".
+#### RESTORE-TRACES · A restore leaves a visible trace (0.5.13)
+- **Status:** built for 0.5.13 (releasing) · **Security:** S2 · **Spec:** D-156; 04 §2.3.3; 07 §3.5; 08 §1; 11 §5.13
+- **Done:** Activity lists an entry when an ID was restored from a backup or an update started the 24-hour guard ("This entry is not a charge", present or past tense by the window, no amount); messages from before a restore from a backup get "From before the restore" (never after an update); store schema 21 (`budget_restores`, `restore_replays`, new and empty, written only by the core); the sync reads the restore mark once per batch.
+
+#### DEVICES-INTERIM · Notice when an ID is in use on another computer (0.5.13)
+- **Status:** built for 0.5.13 (releasing) · **Security:** S2 · **Spec:** 04 §2.2, §2.8; 06 §3, §8; 07 §3.5; 11 §5.13
+- **Done:** a KeyStore item `<agentId>:install-id` (never in a recovery kit, never sent); the ID's own sent copy of a message this computer never wrote, made after this store was opened, marks it; a notice in the app for 7 days and a warning in `agentlink doctor`: spending limits apply per computer; install id on budget rows; store schema 22 (`budget_ledger.install_id`, `install_state`). Informational: no decision reads it. Residual: a computer that only receives is not seen.
+
+#### E2E-HOSTILE · Hostile contact and relay tests in CI (0.5.13)
+- **Status:** built for 0.5.13 (releasing) · **Security:** S1 · **Spec:** `project/process/ci-cd.md`; 04 §3.4; 06 §3; 07 §3.8, §4.2
+- **Done:** the public suites in `e2e/hostile/` run in `e2e-deterministic` with a strict count check (no failed, skipped or missing test); see ci-cd.md "Hostile-peer and hostile-relay suites".
+
+#### RELAY-DEFAULTS-SWAP · New default relays, old ones read-only (0.5.13)
+- **Status:** built for 0.5.13 (releasing) · **Security:** S1 · **Spec:** D-75 (amended); 07 §4.3
+- **Done:** defaults are offchain.pub, relay.primal.net, relay.snort.social and nostr.bitcoiner.social; `LEGACY_READ_RELAYS` (nos.lol, nostr.mom) are read in catch-up and the live subscription, never published to, kept at least until 2027-03-02.
+
+#### RELAY-CARD-MIGRATION · Update your contact details (0.5.13)
+- **Status:** built for 0.5.13 (releasing) · **Security:** S2 · **Spec:** 04 §2.5, §2.6; 06 §8; 07 §4.3; 08 §1; 11 §5.13
+- **Done:** an ID whose card lists a dropped server moves to the current set with one owner approval ("Update your contact details" on Home, `agentlink owner update-contact-details`): a rotation to the next key epoch with the migrated list, signed with owner presence, no AI path. Card-updates also go to the legacy relays until 2027-01-31 and count as sent only on an acknowledgement from a non-legacy relay. `agentlink doctor` mentions it.
+
+#### BUDGET-BROKEN-UX · Refuse up front when the spending record is broken
+- **Status:** backlog · **Security:** S1 · **Spec:** 06 §3; 07 §3.5; 11 §5.11
+- **Goal:** on a ledger that is persisted as broken, say so before asking for an approval that cannot let the action through: refuse with "re-save your limits" and the way to do it.
+
+#### BUDGET-FAILCLOSED-REVIEW · Review the fail-closed paths of the budget
+- **Status:** backlog · **Security:** S2 · **Spec:** 06 §3; 07 §3.5
+- **Goal:** an independent review of every state in which the spending record cannot be summed: what the owner sees, what is refused, and that a fresh limits save always recovers.
+
+#### CARD-UPDATE-FAILED-STATE · A failed card update drives a retry
+- **Status:** backlog · **Security:** S1 · **Spec:** 07 §4.3
+- **Goal:** the "failed" result of a card-update pass, now only reported, makes the next pass retry the contact instead of waiting.
+
+#### DELIVERY-COUNTS-TEST · A core test for the later count update
+- **Status:** backlog · **Security:** S0 · **Spec:** 07 §3.2
+- **Goal:** a test in core for `updateRelayCounts` (the count raised after a row is already sent), beside the transport tests.
+
+#### LEGACY-RELAYS-REMOVAL · Stop reading the old default servers
+- **Status:** later (not before 2027-03-02) · **Security:** S1 · **Spec:** 07 §4.3; D-75
+- **Goal:** remove `LEGACY_READ_RELAYS` and the card-update fan-out after the dates in `legacy-relays.ts`, once contacts have moved; re-check how many IDs still list an old server before it goes.
+
+#### DEVICES-SPEND-SAFETY · Count other computers' charges
+- **Status:** later (with SEC-ALLOWANCE, M3) · **Security:** S2 · **Spec:** 04 §2.8; 06 §3
+- **Goal:** when the same ID runs on several computers, make the spending limits apply to the ID as a whole, not per computer; today they only apply per computer and the app says so.
+
+#### CONTACT-APP-NAME · Show a contact's AI app name
+- **Status:** later (needs the M2 protocol change) · **Security:** S1 · **Spec:** 03; 11 §5.8
+- **Goal:** the person view names the AI app a contact uses; this needs a field in the card or handshake, so it waits for the M2 protocol change.
 
 #### SEC-KEYSTORE-RECORD-GATE · Record-signing gate inside the KeyStore (before mainnet)
 - **Status:** later (before M3 mainnet) · **Security:** S2 · **Spec:** D-156; 04 §3.1.1 (`sign712`); 07 §3.5
@@ -11419,12 +11474,12 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Goal:** close the open notes on the cleanup queue.
 
 #### RELAY-DEFAULTS-HEALTH · Default relays that some networks cannot reach
-- **Status:** backlog · **Security:** S1 · **Spec:** 07 §4.3; `project/runbooks/relay-vetting.md`
-- **Goal:** two of the default relays cannot be reached from some networks; vet the default set from CI and replace or reorder entries that fail.
+- **Status:** built for 0.5.13 (releasing) · **Security:** S1 · **Spec:** 07 §4.3; `project/runbooks/relay-vetting.md`
+- **Done:** a daily, read-only check of the default set from CI (`relay-health` workflow, also on a pull request that changes the list); the swap itself is RELAY-DEFAULTS-SWAP. Not a merge gate.
 
 #### GOLDEN-PATH-S6-FLAKE · Golden path step 6 on a headless runner
-- **Status:** backlog · **Security:** S0 · **Spec:** `project/process/ci-cd.md`
-- **Goal:** the published-package browser open in the golden-path check runs reliably on a headless runner.
+- **Status:** built for 0.5.13 (releasing) · **Security:** S0 · **Spec:** `project/process/ci-cd.md`
+- **Done:** the golden-path check uses a deterministic browser stand-in and pins its directories to the test profile, so it runs reliably on a headless runner.
 
 #### CODEQL-DISMISS-TOOLING · Tooling to dismiss CodeQL alerts with a reason
 - **Status:** backlog · **Security:** S1 · **Spec:** `project/process/ci-cd.md`

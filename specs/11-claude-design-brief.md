@@ -480,6 +480,7 @@ The free, private "received" receipt the recipient's app sends back (04 §3.4, 0
 | One-time notice after the update | "AgentLink now tells your contacts when your AI app has received their message. This also shows them that your AI app was open at about that time. You can turn this off in Settings." **Got it** · **Open Settings** |
 | Sender, message status | "Sending…" · "Sent" · "Sent, availability unknown" · "Received by {contactName}'s app" · "Received (older app)" · "Not delivered" |
 | Sender, availability unknown (0.5.12) | "Sent, availability unknown" (the message network took it, but AgentLink could not yet confirm that it holds it; a received receipt from the contact replaces it). In `agentlink_send`: "Sent to Marko, availability unknown: AgentLink could not yet confirm that the message network holds it. End-to-end encrypted: only you, Marko and your AIs can read it." |
+| Sender, message network counts (0.5.13, DELIVERY-DETAILS; proposed, owner confirms at merge) | Under the hood only, in the message details: "Message network: accepted by {N}, available from {M}" (counts of servers, never their addresses). "Sent, availability unknown" when none could be asked. Nothing for a message sent before the counts were kept. Never "relay" in the default UI |
 | Sender, status detail | "Received by {contactName}'s app: their AI app confirmed it received this exact message." |
 | Sender, proof status | "Delivered: {contactName}'s AI confirmed it received this." · "Sent. No receipt yet." |
 | Recipient, under a received message (muted) | "Receipt sent to {contactName}" |
@@ -530,6 +531,32 @@ A contact paired through an invite the AI made waits for the owner (06 §2.1, 08
 
 **Rules.**
 - Never the contact's name in Home's banner or the widget line (a count only); on the person it is shown as text only (I-5).
+- Never "wallet", "gas", "seed phrase" or "transaction" (§5.1).
+
+### 5.13 Restore entries, other computers and contact details (0.5.13)
+
+Proposed, owner confirms at merge. RESTORE-TRACES, DEVICES-INTERIM and RELAY-CARD-MIGRATION.
+
+| Where | String |
+|---|---|
+| Activity, restore entry (restore) | "This ID was restored from a backup" |
+| Activity, restore entry (update) | "AgentLink was updated on this computer" |
+| Activity, restore entry, second line, while the 24 hours last | "For 24 hours, AgentLink asks you before anything that costs money (until {time}). This entry is not a charge." |
+| Activity, restore entry, second line, after the 24 hours | "For 24 hours, AgentLink asked you before anything that cost money. This entry is not a charge." |
+| Activity, restore entry, pill and link | "Backup" · "Open backup" |
+| Conversation, a message from them that was sent before a restore from a backup and arrived after it | "From before the restore" (quiet; never after an update) |
+| Notifications, this ID is also in use on another computer | "This ID is also in use on another computer" · "Spending limits apply per computer for now" |
+| `agentlink doctor`, other computer | "Warning  This ID is also in use on another computer" · "Spending limits apply per computer until AgentLink supports one ID on several computers." |
+| Home notice, contact details | "Update your contact details" · "AgentLink moved to more reliable servers. Your contacts need your new details once." · **Update with {sensor}** / **Update with your master code** |
+| After the update | "Contact details updated. Your contacts get your new details." |
+| Update refused or failed | "An earlier change of this ID is still finishing. Try again in a minute." · "That didn't go through. Your contact details didn't change. Try again." |
+| Terminal, `agentlink owner update-contact-details` † | "OK       Contact details updated. Your contacts get your new details." · "OK       Your contact details are up to date. Nothing to do." · "Problem  That didn't go through. Your contact details didn't change." · "Problem  An earlier change of this ID is still finishing. Try again in a minute." |
+| `agentlink doctor`, update needed | "Notice   Update your contact details: AgentLink moved to more reliable servers." · "Your contacts need your new details once. Run `agentlink owner update-contact-details`." |
+
+**Rules.**
+- Say "servers" or "message network" (Advanced and Under the hood), never "relay", in these strings (§5.1).
+- A restore entry never shows an amount and is never worded as a charge.
+- The other-computer notice never names the other computer, a time of its use or an install id.
 - Never "wallet", "gas", "seed phrase" or "transaction" (§5.1).
 
 ## 6. Surfaces and information architecture
