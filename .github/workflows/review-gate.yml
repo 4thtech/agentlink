@@ -1,4 +1,4 @@
-# Review gate: security class and review evidence (docs/process/audit-rules.md §2-§3, decision D-25).
+# Review gate: security class and review evidence (project/process/audit-rules.md §2-§3, decision D-25).
 #
 # Required status check: `review-gate`.
 #
@@ -157,7 +157,7 @@ jobs:
               [2, /^packages\/(crypto|core|node)\//],
               [2, /^apps\/(console|cloud-agent|submitter|drop)\//],
               [2, /^test-vectors\//],
-              [2, /^docs\/foundation\/04-security-and-crypto\.md$/],
+              [2, /^specs\/04-security-and-crypto\.md$/],
               // INSTALLER-1: the one-line installers download and run a runtime on users' computers.
               [2, /^installer\//],
               // D-145: the desktop apps and the CLI's core desktop host entry.
@@ -179,12 +179,14 @@ jobs:
               [1, /^tools\/release\//],
               // CI gate tooling, including the test quarantine (OPS-UNSTICK-A): a change can relax a gate.
               [1, /^tools\/ci\//],
-              [1, /^docs\/(foundation|process)\//],
+              [1, /^(specs|project\/process)\//],
               [1, /^(AGENTS|CLAUDE|SECURITY)\.md$/],
               // Public docs, published on merge (D-57). Owner decision 2026-10-25 (CHORE-CI-DOCS-FASTLANE):
               // the one generated page is exempt; its source docs/status.yaml is S0 and tools/docs-status
               // fails CI on any drift between the two.
-              [1, /^docs-site\/(?!technical\/project\/status-and-roadmap\.md$)/],
+              // DOCS-PHASE-B: the pointer stubs left at the old docs-site/ paths.
+              [1, /^docs-site\//],
+              [1, /^docs\/(?!status\.yaml$|technical\/project\/status-and-roadmap\.md$)/],
             ];
             const classify = (path) =>
               RULES.reduce((highest, [cls, re]) => (re.test(path) ? Math.max(highest, cls) : highest), 0);

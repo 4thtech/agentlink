@@ -1,4 +1,4 @@
 {
-  "$comment": "Visible, expiring test quarantine (OPS-UNSTICK-A; rules in tools/ci/quarantine.mjs and docs/process/ci-cd.md). A quarantined test still runs and is reported; its failure alone does not fail the job until `expires`. At most 5 entries, each at most 14 days. An expired entry fails CI: fix the test or delete the entry. Add only flakes with CI evidence (run and job).",
+  "$comment": "Visible, expiring test quarantine (OPS-UNSTICK-A; rules in tools/ci/quarantine.mjs and project/process/ci-cd.md). A quarantined test still runs and is reported; its failure alone does not fail the job until `expires`. At most 5 entries, each at most 14 days. An expired entry fails CI: fix the test or delete the entry. Add only flakes with CI evidence (run and job).",
   "entries": []
 }

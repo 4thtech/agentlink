@@ -1,5 +1,5 @@
 # PR hygiene: title starts with a task ID, body contains the sections of
-# .github/pull_request_template.md (docs/foundation/10-build-plan.md, working rules 1 and 6).
+# .github/pull_request_template.md (specs/10-build-plan.md, working rules 1 and 6).
 #
 # Required status check: `pr-hygiene`.
 #
@@ -163,7 +163,7 @@ jobs:
                 const noneWithoutReason = /^(none|n\/a)\s*[:\u2013\u2014-]\s*$/i.test(text);
                 if (bare || placeholder || noneWithoutReason) {
                   warnings.push(
-                    'Section "Docs impact": list the docs updated (README, docs-site, knowledge, CHANGELOG, specs), or write "none: <reason>" with a real reason.',
+                    'Section "Docs impact": list the docs updated (README, docs, knowledge, CHANGELOG, specs), or write "none: <reason>" with a real reason.',
                   );
                 }
               } else if (name === 'Security class') {

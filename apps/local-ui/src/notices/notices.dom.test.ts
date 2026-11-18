@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// UX 2026-11-12 (notices; docs/design/notices.md): the one notice system in the local app. The
+// UX 2026-11-12 (notices; project/design/notices.md): the one notice system in the local app. The
 // "Protect your approvals" page notice in its three contexts (browser, desktop, desktop with its
 // own sensor), its close remembered per ID, the toast bus and the shell's one stack, and the
 // remembered-dismissal store's limits (fixed keys only; blocked storage is fine).

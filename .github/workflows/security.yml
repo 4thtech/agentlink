@@ -19,7 +19,7 @@
 # requests) is NOT triggered from here: a push-triggered workflow always runs from the
 # pushed branch, so pushes to `sync` are scanned by a stub workflow that lives on that
 # branch and calls secret-scan.yml. The `secret-scan-sync` job below re-scans `sync`
-# weekly from this (reviewed) definition as a backstop. See docs/process/ci-cd.md.
+# weekly from this (reviewed) definition as a backstop. See project/process/ci-cd.md.
 name: Security
 
 # CHORE-CI-SPEED-1: `dependency-review` and `codeql` skip on a draft pull request and run when it is
@@ -115,7 +115,7 @@ jobs:
 
   # Weekly backstop for the orphan coordination branch `sync`, scanned with the reviewed definition from the
   # default branch. Pushes to `sync` are scanned by a stub workflow that lives on that branch
-  # (docs/process/ci-cd.md, "The sync branch"); a workflow on main cannot be triggered by pushes to another branch.
+  # (project/process/ci-cd.md, "The sync branch"); a workflow on main cannot be triggered by pushes to another branch.
   secret-scan-sync:
     name: secret-scan-sync
     if: github.event_name == 'schedule'

@@ -25,7 +25,7 @@
 # The jobs end with the canary scan (e2e/src/canary-scan.mjs) over every log and artifact of the
 # run, then upload the artifacts only when the scan passed.
 #
-# Security posture (docs/foundation/04 §7): `permissions: {}` at the top, `contents: read` per job,
+# Security posture (specs/04 §7): `permissions: {}` at the top, `contents: read` per job,
 # every action pinned to a full commit SHA, no lifecycle scripts on install, no event data in
 # shell scripts, harness CLIs downloaded as exact versions and checked against pinned sha512
 # integrity values (no npm install, no install scripts).

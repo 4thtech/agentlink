@@ -1,5 +1,5 @@
 // WIN-DESK-2 (R-WIN §6 item 6): the Windows tray icons are .ico files built from the brand PNGs in
-// docs/design/brand/icons/tray/windows (one per taskbar colour, 16/20/24/32 px).
+// project/design/brand/icons/tray/windows (one per taskbar colour, 16/20/24/32 px).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

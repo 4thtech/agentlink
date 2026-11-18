@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// OPS-REL-4 / D-43 (docs/process/versioning.md §5): a pull request that changes user-visible
+// OPS-REL-4 / D-43 (project/process/versioning.md §5): a pull request that changes user-visible
 // behaviour, a spec or the process must add a changelog fragment (`changelog.d/<card-id>.md`, format in
 // changelog.d/README.md) or, during the transition, a line under `## [Unreleased]` in CHANGELOG.md.
 // Editing CHANGELOG.md [Unreleased] directly only warns (fragments avoid merge-queue conflicts).
@@ -23,8 +23,8 @@ import { parseFragment } from './roll-changelog.mjs';
 const NEEDS_ENTRY = [
   /^apps\/[^/]+\/src\/.+/,
   /^packages\/[^/]+\/src\/.+/,
-  /^docs\/foundation\/.+/,
-  /^docs\/process\/(?!backlog\.md$).+/,
+  /^specs\/.+/,
+  /^project\/process\/(?!backlog\.md$).+/,
   /^AGENTS\.md$/,
 ];
 const TEST_FILE = /(\.test\.|\.spec\.|\/__tests__\/|\/test\/)/;

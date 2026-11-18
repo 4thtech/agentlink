@@ -873,7 +873,7 @@ function inStore(target, store) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The steps (docs/runbooks/dogfood-m1a.md §5 and §6). A = Claude Code (cc), B = OpenCode (oc).
+// The steps (project/runbooks/dogfood-m1a.md §5 and §6). A = Claude Code (cc), B = OpenCode (oc).
 
 const NOTE_STATUS =
   'Status note from the Claude Code agent\nThe design review is done and the notes are in the shared folder';

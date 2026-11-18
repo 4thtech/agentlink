@@ -2,7 +2,7 @@
 // packages moved to @4thtech-io/* and stay private (only the CLI, @4thtech-io/agentlink, publishes).
 // This scans every tracked file for a `<old scope>/<name>` reference, in any letter case and with or
 // without regex escaping of the slash. History keeps the old names: CHANGELOG.md files and the
-// decision files in docs/foundation/decisions/ (D-NNN.md and the index rows). Everything else must use
+// decision files in specs/decisions/ (D-NNN.md and the index rows). Everything else must use
 // the new scope.
 
 import { execFileSync } from 'node:child_process';
@@ -23,9 +23,9 @@ const isHistory = (path, line) =>
   path.endsWith('/CHANGELOG.md') ||
   // A decision file: only its heading, its Status line and the decision text (the paragraph lines),
   // never the Date, Specs or Index lines or another heading.
-  (/^docs\/foundation\/decisions\/D-\d{3}\.md$/.test(path) &&
+  (/^specs\/decisions\/D-\d{3}\.md$/.test(path) &&
     (/^# D-\d+: /.test(line) || /^- \*\*Status:\*\* /.test(line) || /^[^#\-\s]/.test(line))) ||
-  (path === 'docs/foundation/decisions/README.md' && /^\| \[D-\d+\]/.test(line));
+  (path === 'specs/decisions/README.md' && /^\| \[D-\d+\]/.test(line));
 
 /** Tracked files that mention the old scope with a slash: [{ path, line }]. */
 function oldScopeHits() {

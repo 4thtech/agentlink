@@ -11,22 +11,22 @@ Two required checks read this description (owner Decision 54: formalities only w
   which lists the docs updated or says "none: <reason>". It fails only on AI attribution.
 - `review-gate`: computes the class from the changed files (a lower or missing tick only
   warns). S2 and sensitive paths need the "Independent review" line; S2 also needs
-  "Threat note" and "Tests-first evidence" (docs/process/audit-rules.md §2-§3).
+  "Threat note" and "Tests-first evidence" (project/process/audit-rules.md §2-§3).
 Keep the section headings exactly as they are. HTML comments are ignored.
-One task per pull request (docs/process/backlog.md).
+One task per pull request (project/process/backlog.md).
 -->
 
 ## Task ID & summary
-<!-- Task ID from docs/process/backlog.md (e.g. M1-5) and 2-4 sentences: what changed and why. -->
+<!-- Task ID from project/process/backlog.md (e.g. M1-5) and 2-4 sentences: what changed and why. -->
 
 
 ## Spec sections implemented
-<!-- e.g. 04 §3.5, 07 §4.2. Specs in docs/foundation/ are the source of truth. -->
+<!-- e.g. 04 §3.5, 07 §4.2. Specs in specs/ are the source of truth. -->
 
 
 ## Invariants touched
 <!--
-Which of I-1 ... I-10 (docs/foundation/04-security-and-crypto.md §1) does this change touch, and how does each one still hold?
+Which of I-1 ... I-10 (specs/04-security-and-crypto.md §1) does this change touch, and how does each one still hold?
 Never weaken an invariant, test or policy default to make something pass; flag it here instead.
 Write "None" if no invariant is touched.
 -->
@@ -34,7 +34,7 @@ Write "None" if no invariant is touched.
 
 ## Security class
 <!-- Tick exactly one. review-gate computes the class from the paths (audit-rules.md §2.2); a lower tick only warns, a higher one (content rules, §2.4) raises the class. Only the owner may lower one. -->
-- [ ] **S0**: none (docs outside docs/foundation and docs/process, tooling without secrets, styling without data-flow change)
+- [ ] **S0**: none (docs outside specs and project/process, tooling without secrets, styling without data-flow change)
 - [ ] **S1**: sensitive (inbound content; files, paths or URLs; storage credentials; policy or approval UI; CI, release or supply-chain configuration; the chain client; specs and agent instructions)
 - [ ] **S2**: critical (crypto; keys and owner presence; envelope or pairing protocol; policy engine; contracts; anything that signs; the submitter; deploy scripts with roles; test vectors)
 
@@ -44,11 +44,11 @@ Write "None" if no invariant is touched.
 
 
 ## Docs / spec updated
-<!-- Cross-package interfaces change only through a PR that updates the relevant spec document. Status changes (a card done, a milestone or component moved, a deploy, a release) go in docs/status.yaml, then run `node tools/docs-status/index.mjs` to regenerate the README Status and the docs-site and knowledge pages; never claim unimplemented features. "None" if nothing changed. -->
+<!-- Cross-package interfaces change only through a PR that updates the relevant spec document. Status changes (a card done, a milestone or component moved, a deploy, a release) go in docs/status.yaml, then run `node tools/docs-status/index.mjs` to regenerate the README Status and the docs and knowledge pages; never claim unimplemented features. "None" if nothing changed. -->
 
 
 ## Docs impact
-<!-- Required. List every doc updated by this PR (README Status, docs/status.yaml and its generated blocks, docs-site/, knowledge/, changelog fragment in changelog.d/, specs, runbooks), or write "none: <reason>" (for example "none: internal refactor, no behaviour or interface change"). A bare "None" is refused by pr-hygiene. -->
+<!-- Required. List every doc updated by this PR (README Status, docs/status.yaml and its generated blocks, docs/, knowledge/, changelog fragment in changelog.d/, specs, runbooks), or write "none: <reason>" (for example "none: internal refactor, no behaviour or interface change"). A bare "None" is refused by pr-hygiene. -->
 
 
 ## Dependencies added

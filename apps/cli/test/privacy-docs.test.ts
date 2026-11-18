@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { en } from '@4thtech-io/mcp-tools/strings/index.js';
 
 const guide = (path: string): string =>
-  readFileSync(fileURLToPath(new URL(`../../../docs-site/guide/${path}`, import.meta.url)), 'utf8');
+  readFileSync(fileURLToPath(new URL(`../../../docs/guide/${path}`, import.meta.url)), 'utf8');
 
 describe('the user guide matches the 11 §5.6 strings', () => {
   const privacy = guide('privacy-and-security.md');

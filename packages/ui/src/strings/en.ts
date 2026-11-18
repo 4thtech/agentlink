@@ -1,4 +1,4 @@
-// M1-35c: the shipped English strings, a corrected copy of docs/design/d1/copy/strings.en.json
+// M1-35c: the shipped English strings, a corrected copy of project/design/d1/copy/strings.en.json
 // (109 keys, 14 Oct 2026) after DESIGN-ADJ-1 (a). Keys follow 11 §5.4; placeholders are ICU. Every
 // string follows 11 §5.1 (vocabulary), §5.2 (names) and §5.6 (what a proof makes public); the
 // strings.test.ts lint fails on a banned term in any key outside `advanced.*` and `devconfig.*`.

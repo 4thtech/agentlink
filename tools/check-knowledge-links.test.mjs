@@ -9,11 +9,7 @@ import {
   extractLinks,
 } from './check-knowledge-links.mjs';
 
-const present = new Set([
-  'README.md',
-  'knowledge/agentlink-overview.md',
-  'docs-site/guide/README.md',
-]);
+const present = new Set(['README.md', 'knowledge/agentlink-overview.md', 'docs/guide/README.md']);
 const exists = (path) => present.has(path);
 const base = 'https://github.com/4thtech/agentlink/blob/main/';
 
@@ -45,13 +41,13 @@ describe('checkLinks', () => {
   });
 
   it('accepts absolute links into this repository that exist, with or without a fragment', () => {
-    const text = `[a](${base}README.md) [b](${base}docs-site/guide/README.md#top)`;
+    const text = `[a](${base}README.md) [b](${base}docs/guide/README.md#top)`;
     expect(checkLinks('llms.txt', text, exists)).toEqual([]);
   });
 
   it('rejects absolute links into this repository that point nowhere', () => {
-    const problems = checkLinks('llms.txt', `[a](${base}docs-site/nope.md)`, exists);
-    expect(problems).toEqual([`llms.txt: link target does not exist: ${base}docs-site/nope.md`]);
+    const problems = checkLinks('llms.txt', `[a](${base}docs/nope.md)`, exists);
+    expect(problems).toEqual([`llms.txt: link target does not exist: ${base}docs/nope.md`]);
   });
 
   it('does not check other sites, mailto links or anchors', () => {

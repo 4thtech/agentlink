@@ -8,7 +8,7 @@
 # GitHub API with the numeric run id from the event payload, passed through `env:` and validated.
 # Only runs from this repository are retried (no forks), only attempt 1 (no loops), never a
 # cancelled run, never a merge-queue run (a failed queue run has already ejected the pull request).
-# Mixed jobs (for example `checks`: lint, typecheck, build, unit tests) qualify only by failed step. Rules: tools/ci/auto-retry.mjs and docs/process/ci-cd.md.
+# Mixed jobs (for example `checks`: lint, typecheck, build, unit tests) qualify only by failed step. Rules: tools/ci/auto-retry.mjs and project/process/ci-cd.md.
 name: CI auto-retry
 
 on:

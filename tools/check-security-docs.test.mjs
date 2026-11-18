@@ -140,12 +140,12 @@ describe('PR hygiene warning', () => {
   });
 
   it('is quiet with a security page, an explicit none, or no sensitive path', () => {
-    const paths = ['docs/foundation/04-security-and-crypto.md'];
+    const paths = ['specs/04-security-and-crypto.md'];
     expect(
-      securityDocsWarning([...paths, 'docs-site/technical/concepts/threat-model.md'], '', config),
+      securityDocsWarning([...paths, 'docs/technical/concepts/threat-model.md'], '', config),
     ).toBeNull();
     expect(securityDocsWarning(paths, 'security-docs: none (typo fix)', config)).toBeNull();
-    expect(securityDocsWarning(['docs-site/guide/README.md'], '', config)).toBeNull();
+    expect(securityDocsWarning(['docs/guide/README.md'], '', config)).toBeNull();
   });
 });
 

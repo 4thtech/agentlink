@@ -12,9 +12,9 @@ const repo = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 /** A copy of the parts of this repository the generators read (no screenshots). */
 function copyRepo() {
   const root = mkdtempSync(join(tmpdir(), 'docs-gen-'));
-  for (const rel of ['README.md', 'llms.txt', 'docs/status.yaml', 'docs/foundation', 'knowledge'])
+  for (const rel of ['README.md', 'llms.txt', 'docs/status.yaml', 'specs', 'knowledge'])
     cpSync(join(repo, rel), join(root, rel), { recursive: true });
-  cpSync(join(repo, 'docs-site'), join(root, 'docs-site'), {
+  cpSync(join(repo, 'docs'), join(root, 'docs'), {
     recursive: true,
     filter: (src) => !/\.(png|jpe?g|gif|webp|svg)$/i.test(src),
   });
@@ -50,15 +50,15 @@ describe('version banner', () => {
 
   it('keeps the marked banner current, and a stray stamp fails the check', () => {
     const root = copyRepo();
-    const readme = 'docs-site/guide/README.md';
+    const readme = 'docs/guide/README.md';
     edit(root, readme, (t) =>
       t.replace(/Applies to AgentLink \d+\.\d+\.\d+/, 'Applies to AgentLink 0.0.1'),
     );
-    edit(root, 'docs-site/guide/pricing.md', (t) => `${t}\n*Applies to AgentLink 0.5.8.*\n`);
+    edit(root, 'docs/guide/pricing.md', (t) => `${t}\n*Applies to AgentLink 0.5.8.*\n`);
     const checked = run({ root, check: true });
     expect(checked.problems.some((p) => /guide\/README\.md is out of date/.test(p))).toBe(true);
     expect(checked.problems.filter((p) => /a version stamp outside/.test(p))).toEqual([
-      expect.stringMatching(/^docs-site\/guide\/pricing\.md:\d+: /),
+      expect.stringMatching(/^docs\/guide\/pricing\.md:\d+: /),
     ]);
     run({ root });
     expect(readFileSync(join(root, readme), 'utf8')).toMatch(

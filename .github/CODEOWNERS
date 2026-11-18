@@ -2,10 +2,10 @@
 #
 # Code-owner review is NOT required on `main` (D-51, simplified): this file is for review
 # requests and notifications. Agents work under Tali's account; S2 and sensitive-path PRs merge
-# only after CI, the independent AI review and Tali's "merge" in chat (docs/process/audit-rules.md §3).
+# only after CI, the independent AI review and Tali's "merge" in chat (project/process/audit-rules.md §3).
 # Paths not listed here have no code owner.
 #
-# Listed: the S2 path defaults of docs/process/audit-rules.md §2.2, plus CI and release
+# Listed: the S2 path defaults of project/process/audit-rules.md §2.2, plus CI and release
 # configuration, the supply-chain files that execute code (package.json, pnpm-workspace.yaml,
 # .npmrc, .pnpmfile.*) and the agent rules. Keep this list, audit-rules.md §2.2 and the class rules in
 # .github/workflows/review-gate.yml in sync. Content-rule S2 changes on other paths
@@ -26,7 +26,7 @@
 
 # S2: canonical protocol vectors and the invariants
 /test-vectors/                                  @talirezun @denisjazbec
-/docs/foundation/04-security-and-crypto.md      @talirezun @denisjazbec
+/specs/04-security-and-crypto.md      @talirezun @denisjazbec
 
 # S2 (INSTALLER-1): the one-line installers (they download and run a runtime on users' computers),
 # their tests, and the invite site that serves them at agentlink.4thtech.io/install.sh and install.ps1.

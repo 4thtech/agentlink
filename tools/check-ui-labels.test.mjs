@@ -40,8 +40,8 @@ describe('findMisses', () => {
       'apps/local-ui/src/pages/home/view.ts': "const x = 'Not a strings file';",
       'apps/desktop/src/main/tray.ts': "label: 'Quit AgentLink'",
       'apps/desktop/src/main/tray.test.ts': "label: 'Only in a test'",
-      'docs-site/guide/SUMMARY.md': '# T\n',
-      'docs-site/guide/a.md':
+      'docs/guide/SUMMARY.md': '# T\n',
+      'docs/guide/a.md':
         '**Invite someone**, **Quit AgentLink**, **Go to Home**, **Not a strings file**, **Only in a test**, **Home**\n',
     });
     expect(uiCorpus(root)).toContain('\0Home\0');

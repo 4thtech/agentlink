@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Record an independent-review (IR) line in a PR body's '## Independent review' section.
 
-PROC-ORCH-PLAYBOOK (docs/process/orchestrator-playbook.md §6). Orchestrator tool; workers never
+PROC-ORCH-PLAYBOOK (project/process/orchestrator-playbook.md §6). Orchestrator tool; workers never
 run it (a worker never writes an IR verdict).
 
 usage:

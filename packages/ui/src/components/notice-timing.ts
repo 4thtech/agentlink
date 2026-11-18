@@ -1,4 +1,4 @@
-// The notice system's timing in one place (docs/design/notices.md; PLAN-NOTIFY §3.1).
+// The notice system's timing in one place (project/design/notices.md; PLAN-NOTIFY §3.1).
 // TOAST_MS and TOAST_ACTION_MS live with the toast stack (notice.tsx).
 
 /** How long a copy button says "Copied" before it goes back. */

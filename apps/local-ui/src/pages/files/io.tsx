@@ -1,5 +1,5 @@
 // Files: Received and Sent, and the tab strip (MSG-FILES-IO-f; 08 §1; 11 §5.7; design b11 §15,
-// §17.3; plan docs/process/proposals/MSG-FILES-IO.md §5).
+// §17.3; plan project/process/proposals/MSG-FILES-IO.md §5).
 //
 // Read-only lists of what this computer already holds, decrypted only here. Other people's file
 // names (and contact names) are untrusted (I-5): shown only inside UntrustedContent as plain text,

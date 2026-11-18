@@ -1,4 +1,4 @@
-// UI-REFRESH-q (S1; plan docs/process/proposals/UI-REFRESH.md §7, §8, §9; B-11 §13–§20): the
+// UI-REFRESH-q (S1; plan project/process/proposals/UI-REFRESH.md §7, §8, §9; B-11 §13–§20): the
 // refreshed local app, built (apps/local-ui/dist, made by `^build` through @4thtech-io/agentlink),
 // in Chromium. Every /api/** call is answered from fixtures; no agent, key store or network.
 //

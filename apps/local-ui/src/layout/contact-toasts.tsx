@@ -1,4 +1,4 @@
-// The app's one toast stack (docs/design/notices.md), on every page: the contact toasts
+// The app's one toast stack (project/design/notices.md), on every page: the contact toasts
 // (W5-INVITE-FEEDBACK: "{name} accepted your invite", "You're connected with {name}", and after a
 // re-pair "Connected again with {name}. Do the Contact check again." with one action to People,
 // where the code is checked; nothing here approves anything) and every toast a page raises with

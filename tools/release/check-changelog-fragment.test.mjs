@@ -23,8 +23,8 @@ describe('evaluateChangelog', () => {
     for (const p of [
       'apps/cli/src/index.ts',
       'packages/core/src/a.ts',
-      'docs/foundation/06-mcp.md',
-      'docs/process/versioning.md',
+      'specs/06-mcp.md',
+      'project/process/versioning.md',
       'AGENTS.md',
     ]) {
       const r = ev([p]);
@@ -36,7 +36,7 @@ describe('evaluateChangelog', () => {
   it('needs nothing for tests, backlog cards, CI, lockfiles or tooling', () => {
     for (const p of [
       'packages/core/src/a.test.ts',
-      'docs/process/backlog.md',
+      'project/process/backlog.md',
       '.github/workflows/ci.yml',
       'pnpm-lock.yaml',
       'tools/release/x.mjs',
@@ -69,7 +69,7 @@ describe('evaluateChangelog', () => {
   });
 
   it('exempts the Version packages PR', () => {
-    const r = ev(['CHANGELOG.md', 'docs/process/versioning.md'], {
+    const r = ev(['CHANGELOG.md', 'project/process/versioning.md'], {
       pr: { headRef: 'changeset-release/main', author: 'github-actions[bot]', sameRepo: true },
     });
     expect(r).toMatchObject({ ok: true, warnings: [] });

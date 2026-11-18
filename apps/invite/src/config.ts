@@ -2,15 +2,15 @@
 // here is a build constant: nothing is read from the invite, the page or the network.
 
 /**
- * The step-by-step guides on 4thTech Docs (wiki.4thtech.io, generated from docs-site/guide at each
- * release; a page's URL is `products/agentlink/` plus its path under docs-site/guide, without `.md`).
+ * The step-by-step guides on 4thTech Docs (wiki.4thtech.io, generated from docs/guide at each
+ * release; a page's URL is `products/agentlink/` plus its path under docs/guide, without `.md`).
  * The links are plain links in the HTML (new tab, no referrer); a test keeps the HTML equal to these.
  */
 export const DOCS_BASE = 'https://wiki.4thtech.io/products/agentlink';
 export const DOCS_LINKS = {
-  /** "Start here" (docs-site/guide/start-here.md), on the wiki since the 0.5.1 release. */
+  /** "Start here" (docs/guide/start-here.md), on the wiki since the 0.5.1 release. */
   guide: `${DOCS_BASE}/start-here`,
-  /** "Windows" (docs-site/guide/get-started/windows.md). */
+  /** "Windows" (docs/guide/get-started/windows.md). */
   windows: `${DOCS_BASE}/get-started/windows`,
 } as const;
 

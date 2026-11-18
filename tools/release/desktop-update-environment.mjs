@@ -22,7 +22,7 @@ export const OWNER_LOGIN = 'talirezun';
 /** talirezun's numeric GitHub id (a login can be renamed; the id cannot). */
 export const OWNER_ID = 61226945;
 
-const SETUP = 'Owner: set it up as in docs/runbooks/desktop-update-keys.md (RB-23), step 1.';
+const SETUP = 'Owner: set it up as in project/runbooks/desktop-update-keys.md (RB-23), step 1.';
 
 const fail = (why) => {
   throw new EnvironmentError(`The environment desktop-update ${why}. Nothing is signed. ${SETUP}`);

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// OPS-REL-3 / D-43 (docs/process/versioning.md §5, §6): the release workflow's CHANGELOG roll (the Release-body size check is inline in release.yml, not here: that job holds the OIDC token).
+// OPS-REL-3 / D-43 (project/process/versioning.md §5, §6): the release workflow's CHANGELOG roll (the Release-body size check is inline in release.yml, not here: that job holds the OIDC token).
 //
 //   roll   Run by the root script `version-packages` after `changeset version`. For a stable product
 //          version it renames `## [Unreleased]` to `## [<version>] - <date>`, adds a fresh empty

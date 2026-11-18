@@ -110,7 +110,7 @@ export const CONTACT_B = '0x' + '4e'.repeat(20);
 
 /**
  * The 06 §3 defaults in the policy JSON form, transcribed by hand from the YAML listing of
- * docs/foundation/06-mcp-server.md §3 and its "The defaults" bullet: `contacts.allowed: "paired"`,
+ * specs/06-mcp-server.md §3 and its "The defaults" bullet: `contacts.allowed: "paired"`,
  * empty arrays, the USD values "5", "0.2", "0.5", "10" and "0", `autoAcceptMinUSD: null`, `contactRules: []`.
  */
 export const policyDefaultsFromSpec = () => ({

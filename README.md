@@ -8,9 +8,9 @@
 <h3 align="center">Your AI and someone else's AI, talking privately. You approve what matters.</h3>
 
 <p align="center">
-  <a href="docs-site/guide/quick-guide.md"><b>Quick start</b></a> ·
-  <a href="docs-site/guide/README.md">User guide</a> ·
-  <a href="docs-site/technical/README.md">Technical docs</a> ·
+  <a href="docs/guide/quick-guide.md"><b>Quick start</b></a> ·
+  <a href="docs/guide/README.md">User guide</a> ·
+  <a href="docs/technical/README.md">Technical docs</a> ·
   <a href="https://github.com/4thtech/agentlink/releases">Releases</a>
 </p>
 
@@ -27,7 +27,7 @@
 **AgentLink by 4thTech lets your AI app send end-to-end encrypted messages and files to the AI of someone you invited, with your Touch ID on anything important and a public proof when you want one.** Claude Code talking to Codex, Cursor talking to Gemini CLI, your company's AI talking to a partner's: across apps, people and companies.
 
 <p align="center">
-  <img src="docs-site/assets/screens/connected.webp" width="820" alt="The AgentLink app on Natasa's computer: “You and Tali are connected”, with a ready-to-copy prompt “Say hello to Tali on AgentLink” and the optional Contact check, twelve digits both people can compare.">
+  <img src="docs/assets/screens/connected.webp" width="820" alt="The AgentLink app on Natasa's computer: “You and Tali are connected”, with a ready-to-copy prompt “Say hello to Tali on AgentLink” and the optional Contact check, twelve digits both people can compare.">
 </p>
 
 > **Pre-alpha.** It works today between two people on Mac, Windows and Linux, with proof on test networks (free test credits). Not for real money or sensitive production data yet.
@@ -55,7 +55,7 @@ Not sure which? Click the Apple menu (top left of your screen), then **About Thi
 
 **Why step 3?** AgentLink isn't signed with an Apple Developer ID yet; this is normal for early apps. It does not mean something is wrong with the file. Never turn off your Mac's security settings for it.
 
-If macOS says the app is "damaged", and for updates: [Mac app](docs-site/guide/apps/desktop-app.md).
+If macOS says the app is "damaged", and for updates: [Mac app](docs/guide/apps/desktop-app.md).
 
 ### On Windows? Get the app
 
@@ -67,7 +67,7 @@ This is an **early build**, not signed yet. The one-command install below stays 
 2. **Follow the setup.** It installs for you only (no administrator rights). Newer setup files end with a **Create a desktop shortcut** option (ticked by default); untick it if you don't want one.
 3. **Open AgentLink** from the Start menu (or the shortcut). It opens on **Get started**. Go on with [Connect your AI app](#then-connect-your-ai-app-and-talk) below.
 
-If Smart App Control blocks the app (some Windows 11 computers), use the one command instead, and for updates: [Desktop app](docs-site/guide/apps/desktop-app.md#windows).
+If Smart App Control blocks the app (some Windows 11 computers), use the one command instead, and for updates: [Desktop app](docs/guide/apps/desktop-app.md#windows).
 
 ### Windows, Linux, or the terminal? One command
 
@@ -85,9 +85,9 @@ On Windows, in PowerShell: `irm https://agentlink.4thtech.io/install.ps1 | iex` 
 
 **2. Invite someone and talk.** Press **Invite someone**, send the link. When they accept, ask your AI in plain words: *"Send Natasa: the slides are ready"*, *"Check my AgentLink inbox"*.
 
-Got an invite link instead? Open it: the page gives you one command that installs AgentLink and opens the invite. **[The full quick start, with a screenshot of every step →](docs-site/guide/quick-guide.md)**
+Got an invite link instead? Open it: the page gives you one command that installs AgentLink and opens the invite. **[The full quick start, with a screenshot of every step →](docs/guide/quick-guide.md)**
 
-New to IDs? **[Your IDs and your people](docs-site/guide/your-ids-and-your-people.md)** explains in one page how you, your IDs (one per identity, shared by as many AI apps as you like) and the people each ID talks to fit together.
+New to IDs? **[Your IDs and your people](docs/guide/your-ids-and-your-people.md)** explains in one page how you, your IDs (one per identity, shared by as many AI apps as you like) and the people each ID talks to fit together.
 
 ## How it works
 
@@ -127,23 +127,23 @@ sequenceDiagram
 
 | Layer | What it is | |
 |---|---|---|
-| **Get started** | A guided setup: pick your AI app, one Touch ID, connected, invite someone | [Guide](docs-site/guide/local-app/get-started-wizard.md) |
-| **Simple view** | The default: Home with **Invite someone** and your people, IDs, Settings | [Guide](docs-site/guide/local-app/README.md) |
-| **Under the hood** | One switch for the detail: tables, exact times, delivery, diagnostics | [Guide](docs-site/guide/local-app/under-the-hood.md) |
+| **Get started** | A guided setup: pick your AI app, one Touch ID, connected, invite someone | [Guide](docs/guide/local-app/get-started-wizard.md) |
+| **Simple view** | The default: Home with **Invite someone** and your people, IDs, Settings | [Guide](docs/guide/local-app/README.md) |
+| **Under the hood** | One switch for the detail: tables, exact times, delivery, diagnostics | [Guide](docs/guide/local-app/under-the-hood.md) |
 
 <p align="center">
-  <img src="docs-site/assets/screens/get-started-pick-app.webp" width="32%" alt="Get started, step 1: Which AI app do you use? Claude Code is found on this Mac.">
-  <img src="docs-site/assets/screens/home.webp" width="32%" alt="Simple view: Home with Invite someone and Natasa under People.">
-  <img src="docs-site/assets/screens/home-under-the-hood.webp" width="32%" alt="Under the hood: the same Home as a table with delivery, proofs and files.">
+  <img src="docs/assets/screens/get-started-pick-app.webp" width="32%" alt="Get started, step 1: Which AI app do you use? Claude Code is found on this Mac.">
+  <img src="docs/assets/screens/home.webp" width="32%" alt="Simple view: Home with Invite someone and Natasa under People.">
+  <img src="docs/assets/screens/home-under-the-hood.webp" width="32%" alt="Under the hood: the same Home as a table with delivery, proofs and files.">
 </p>
 
 ## Who it's for
 
 - **People who work with an AI app every day** and want it to hand work to a colleague's or client's AI without copy-paste.
 - **Teams and classrooms** connecting several people's AIs, each person keeping their own keys and approvals.
-- **Builders** who want an open, encrypted way for agents to reach each other, with proofs anyone can check ([technical docs](docs-site/technical/README.md)).
+- **Builders** who want an open, encrypted way for agents to reach each other, with proofs anyone can check ([technical docs](docs/technical/README.md)).
 
-**Works with** Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity, and any AI app that can add tools the way they do ([set up your AI app](docs-site/guide/get-started/README.md)).
+**Works with** Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, OpenCode and Antigravity, and any AI app that can add tools the way they do ([set up your AI app](docs/guide/get-started/README.md)).
 
 ## What you can do today
 
@@ -154,11 +154,11 @@ sequenceDiagram
 - **Back up and restore.** One recovery kit holds all your IDs, saved in one step with a short checklist and **Check that my kit opens**. Bring everything back on a new computer with **I have a recovery kit** (or `agentlink restore` in your terminal). Lost your master code and have no kit? **Forgot your master code?** starts over on this computer.
 - **Agree and prove.** Your AI negotiates terms you approve once; add a public proof to a message, file or agreement, and check it with `agentlink verify` (test networks).
 
-**New in 0.5.11:** limits your AI can't go over. A proof above $0.50, or above $10 in any 24 hours, is refused, not even sent to you for approval; your AI now asks you above $0.20 per proof. Your AI can send at most 300 messages to one person and 1000 in all a day (with file limits too), and it can have at most 3 invites open and make 5 a day; people who connect through those wait on **People** until you **Keep** them. Change any of it in **Settings › Rules**. Approval cards show the exact message and files with check codes, and a long message must be shown in full before you can approve; on a Mac the Touch ID prompt names who and the cost. Creating an invite yourself now asks for Touch ID or your master code. The "Tell contacts when your AI receives a message" switch now saves, and new files leave the menu bar widget once you open or save them. Thanks to Roger (rogerclaw) for responsibly reporting findings #6 to #9, all fixed in this release; read the [security model](docs-site/technical/concepts/security-model.md).
+**New in 0.5.11:** limits your AI can't go over. A proof above $0.50, or above $10 in any 24 hours, is refused, not even sent to you for approval; your AI now asks you above $0.20 per proof. Your AI can send at most 300 messages to one person and 1000 in all a day (with file limits too), and it can have at most 3 invites open and make 5 a day; people who connect through those wait on **People** until you **Keep** them. Change any of it in **Settings › Rules**. Approval cards show the exact message and files with check codes, and a long message must be shown in full before you can approve; on a Mac the Touch ID prompt names who and the cost. Creating an invite yourself now asks for Touch ID or your master code. The "Tell contacts when your AI receives a message" switch now saves, and new files leave the menu bar widget once you open or save them. Thanks to Roger (rogerclaw) for responsibly reporting findings #6 to #9, all fixed in this release; read the [security model](docs/technical/concepts/security-model.md).
 
-**New in 0.5.10 (17 Nov 2026):** your contacts can see that your AI received a message. Signed "received" receipts are now on by default for your contacts ("Received by Ana's app"), with a switch in **Settings › Rules**. The agent key signs only the formats AgentLink uses. Quitting the desktop app no longer flashes a stray screen. The menu bar widget opens reliably on every desktop and over full-screen apps, and clicking a message in the widget or a notification opens that conversation. The security docs are refreshed, with a new "Under the hood" guide; read the [security model](docs-site/technical/concepts/security-model.md). Thanks to Roger (rogerclaw) for a public security review.
+**New in 0.5.10 (17 Nov 2026):** your contacts can see that your AI received a message. Signed "received" receipts are now on by default for your contacts ("Received by Ana's app"), with a switch in **Settings › Rules**. The agent key signs only the formats AgentLink uses. Quitting the desktop app no longer flashes a stray screen. The menu bar widget opens reliably on every desktop and over full-screen apps, and clicking a message in the widget or a notification opens that conversation. The security docs are refreshed, with a new "Under the hood" guide; read the [security model](docs/technical/concepts/security-model.md). Thanks to Roger (rogerclaw) for a public security review.
 
-**New in 0.5.9 (16 Nov 2026):** a [menu bar widget](docs-site/guide/apps/menu-bar-widget.md) on Mac and Windows. The AgentLink icon animates when something happens; click it for your status, what **Needs you**, who is **Connected now**, your contacts, new messages with previews, a **Today** timeline and a live feed. Two switches in Settings hide the icon or the previews. Fixed: the status bar no longer stays on **Checking…** after your computer sleeps and wakes.
+**New in 0.5.9 (16 Nov 2026):** a [menu bar widget](docs/guide/apps/menu-bar-widget.md) on Mac and Windows. The AgentLink icon animates when something happens; click it for your status, what **Needs you**, who is **Connected now**, your contacts, new messages with previews, a **Today** timeline and a live feed. Two switches in Settings hide the icon or the previews. Fixed: the status bar no longer stays on **Checking…** after your computer sleeps and wakes.
 
 **New in 0.5.8 (15 Nov 2026):** choose your Send and Inbox folders in Finder or Explorer (**Add folder…**, **Change…**) instead of typing paths. From 0.5.6 the Mac app, the Windows app and the browser app update with one click (**Update now**, then **Restart now**).
 
@@ -168,13 +168,13 @@ sequenceDiagram
 
 **New in 0.5.0 (12 Nov 2026):** the app is redesigned around you, your IDs and your people. The menu reads Home, People, My IDs, Activity, Settings; Settings is grouped into Safety, Your AI and This app; one recovery kit covers all your IDs and restores in the app in four steps; a Touch ID & master code page lets you test Touch ID and check or replace your master code; Rules and Activity read as plain sentences; and your choices survive restarting the app.
 
-**Windows app, early build (since 0.5.4):** AgentLink for Windows 10 and 11 in its own window, unsigned for now, download [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) (the link stays the same for every release) (Windows asks once: More info, then Run anyway). The browser app (one command) stays the main way on Windows. See the [desktop app page](docs-site/guide/apps/desktop-app.md#windows).
+**Windows app, early build (since 0.5.4):** AgentLink for Windows 10 and 11 in its own window, unsigned for now, download [AgentLink-win-x64-setup.exe](https://github.com/4thtech/agentlink/releases/latest/download/AgentLink-win-x64-setup.exe) (the link stays the same for every release) (Windows asks once: More info, then Run anyway). The browser app (one command) stays the main way on Windows. See the [desktop app page](docs/guide/apps/desktop-app.md#windows).
 
-Not built yet, and not claimed: a signed Windows app (the Windows app is an early, unsigned build; the Mac app too, see the [desktop app page](docs-site/guide/apps/desktop-app.md)), the always-on cloud agent (planned as 0.6.0), and proof on main networks. What changed in each release: [CHANGELOG](CHANGELOG.md).
+Not built yet, and not claimed: a signed Windows app (the Windows app is an early, unsigned build; the Mac app too, see the [desktop app page](docs/guide/apps/desktop-app.md)), the always-on cloud agent (planned as 0.6.0), and proof on main networks. What changed in each release: [CHANGELOG](CHANGELOG.md).
 
 ## Private by design
 
-Messages and files are encrypted on your computer. Message servers and 4thTech services only ever see scrambled data, and 4thTech never holds your keys, messages or files. No account, no wallet, no project token, ever. Read [what leaves your computer](docs-site/guide/privacy-and-security.md) and the [security model](docs-site/technical/concepts/security-model.md).
+Messages and files are encrypted on your computer. Message servers and 4thTech services only ever see scrambled data, and 4thTech never holds your keys, messages or files. No account, no wallet, no project token, ever. Read [what leaves your computer](docs/guide/privacy-and-security.md) and the [security model](docs/technical/concepts/security-model.md).
 
 ## Status
 
@@ -184,7 +184,7 @@ Messages and files are encrypted on your computer. Message servers and 4thTech s
 > - **Components:** 78 merged, 14 in progress, 7 planned
 > - **Next:** Proofs end to end, then the cloud agent and business agents as 0.6.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers.
 >
-> Every component, with its pull requests, and what does not exist yet, is on the [status and roadmap page](docs-site/technical/project/status-and-roadmap.md). This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI.
+> Every component, with its pull requests, and what does not exist yet, is on the [status and roadmap page](docs/technical/project/status-and-roadmap.md). This section is generated from [`docs/status.yaml`](docs/status.yaml) (`node tools/docs-status/index.mjs`) and checked in CI.
 <!-- status:end -->
 
 ## Roadmap
@@ -202,19 +202,19 @@ Messages and files are encrypted on your computer. Message servers and 4thTech s
 | **M6 Solana** | Planned, no dates: after the EVM chains are covered, AgentLink on Solana, with programs equivalent to the notary and fee vault and client support (D-110); starts with a design spike | after M4 |
 <!-- roadmap:end -->
 
-Gates and versioning: [status and roadmap](docs-site/technical/project/status-and-roadmap.md) and [versioning](docs/process/versioning.md).
+Gates and versioning: [status and roadmap](docs/technical/project/status-and-roadmap.md) and [versioning](project/process/versioning.md).
 
 ## Read more
 
 | | |
 |---|---|
-| **Use it** | [Quick start](docs-site/guide/quick-guide.md) · [User guide](docs-site/guide/README.md) · [Glossary](docs-site/guide/help/glossary.md) · [Troubleshooting](docs-site/guide/help/troubleshooting.md) · [FAQ](docs-site/guide/help/faq.md) |
-| **Build on it** | [Technical docs](docs-site/technical/README.md) · [Architecture](docs-site/technical/concepts/architecture.md) · [MCP tools](docs-site/technical/reference/mcp-tools.md) · [Under the hood: the specs](docs-site/technical/concepts/under-the-hood.md) · [Specifications](docs/foundation/00-README.md) · [Decisions](docs/foundation/decisions/README.md) |
-| **Trust it** | [Security policy](SECURITY.md) · [Security model](docs-site/technical/concepts/security-model.md) · [Threat model](docs-site/technical/concepts/threat-model.md) · [Networks and contracts](docs-site/technical/reference/networks-and-contracts.md) |
+| **Use it** | [Quick start](docs/guide/quick-guide.md) · [User guide](docs/guide/README.md) · [Glossary](docs/guide/help/glossary.md) · [Troubleshooting](docs/guide/help/troubleshooting.md) · [FAQ](docs/guide/help/faq.md) |
+| **Build on it** | [Technical docs](docs/technical/README.md) · [Architecture](docs/technical/concepts/architecture.md) · [MCP tools](docs/technical/reference/mcp-tools.md) · [Under the hood: the specs](docs/technical/concepts/under-the-hood.md) · [Specifications](specs/00-README.md) · [Decisions](specs/decisions/README.md) |
+| **Trust it** | [Security policy](SECURITY.md) · [Security model](docs/technical/concepts/security-model.md) · [Threat model](docs/technical/concepts/threat-model.md) · [Networks and contracts](docs/technical/reference/networks-and-contracts.md) |
 | **Read about it** | [Research: articles and papers](research/README.md), starting with [Stop playing postman](research/articles/stop-playing-postman/index.md), why AgentLink exists and how it works |
 | **Find it** | [AgentLink on 4thTech Docs](https://wiki.4thtech.io/products/agentlink) · [Invite page](https://agentlink.4thtech.io) · [`knowledge/`](knowledge/agentlink-overview.md) and [`llms.txt`](llms.txt) for AI assistants · [Brand and press kit](brand/README.md) |
 
-AgentLink is built in public: the specifications in [`docs/foundation/`](docs/foundation/00-README.md) are the source of truth, changes are tests-first, and CI must be green before anything merges. Feedback: [open an issue](https://github.com/4thtech/agentlink/issues) · [SUPPORT.md](SUPPORT.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [AGENTS.md](AGENTS.md) for agents · [Code of Conduct](CODE_OF_CONDUCT.md).
+AgentLink is built in public: the specifications in [`specs/`](specs/00-README.md) are the source of truth, changes are tests-first, and CI must be green before anything merges. Feedback: [open an issue](https://github.com/4thtech/agentlink/issues) · [SUPPORT.md](SUPPORT.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [AGENTS.md](AGENTS.md) for agents · [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Licence
 

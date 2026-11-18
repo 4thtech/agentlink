@@ -1,7 +1,7 @@
 // Tray animation frames from the brand mark (two brackets and a diamond, 16x16 grid).
 // Pure Node: the same geometry feeds the SVG sources and a small supersampling rasteriser, so the
 // output is byte-for-byte deterministic. No dependencies. The brand art lives in
-// docs/design/brand/icons/tray; calm motion rules in docs/design/claude-design-handoff.md 4.4-4.6.
+// project/design/brand/icons/tray; calm motion rules in project/design/claude-design-handoff.md 4.4-4.6.
 import { deflateSync } from 'node:zlib';
 
 export const FRAME_MS = 40;

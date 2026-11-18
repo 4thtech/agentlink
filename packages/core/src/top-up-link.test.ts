@@ -1,4 +1,4 @@
-// The top-up link builder (M1-26-e; D-113, 08 §1, docs/design/topup-ux.md §5).
+// The top-up link builder (M1-26-e; D-113, 08 §1, project/design/topup-ux.md §5).
 import { describe, expect, it } from 'vitest';
 import {
   TOP_UP_MAX_USD,

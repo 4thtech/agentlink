@@ -1,5 +1,5 @@
 // MSG-FILES-IO-d: `client.filesIo` reads the sealed saved name (MSG-FILES-IO-b) for the local app's
-// Files, Received tab (plan docs/process/proposals/MSG-FILES-IO.md §3, §4; 08 §1; I-7).
+// Files, Received tab (plan project/process/proposals/MSG-FILES-IO.md §3, §4; 08 §1; I-7).
 // - A fetched file reads `saved` with `savedName`, the single name fetchFile chose in the Inbox
 //   folder; never the path it was saved to.
 // - One row whose saved name cannot be opened (`store_unreadable`) never hides the list: that item

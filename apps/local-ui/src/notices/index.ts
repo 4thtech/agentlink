@@ -1,4 +1,4 @@
-// The local app's side of the one notice system (docs/design/notices.md; components in
+// The local app's side of the one notice system (project/design/notices.md; components in
 // @4thtech-io/ui: Toast/ToastStack, Banner, PageNotice):
 //
 // - `notify()`: any page raises a toast; the shell's one ToastStack (layout/contact-toasts.tsx)

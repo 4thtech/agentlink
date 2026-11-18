@@ -1,0 +1,46 @@
+# Versioning and changelog
+
+<!-- ai-knowledge: summary
+summary: How AgentLink versions releases, formats and these docs, with a link to the changelog. -->
+
+> **Status: Current.** Source: [versioning.md](https://github.com/4thtech/agentlink/blob/main/project/process/versioning.md). Release history: [CHANGELOG.md](https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md) (Keep a Changelog) and GitHub Releases.
+
+## Product version
+
+AgentLink follows SemVer 2.0. During the beta, all public packages (the CLI and MCP server, the `@4thtech-io/*` libraries and, from M2, the desktop apps) share one product version, tagged `v<version>` with a GitHub Release.
+
+| Milestone | Version | Meaning |
+|---|---|---|
+| M0 Foundations | 0.0.x | Specs, process and CI; no packages |
+| M1a | 0.1.0 | First npm release: pair and talk |
+| M1 gate | 0.2.0 | Local beta on testnets |
+| Usable local app | 0.3.0 | The local app served by the CLI |
+| Messages, Files, Touch ID upgrade, payment confirmation | 0.4.0 | The local app release that follows 0.3.0 (released 27 Oct 2026) |
+| The three-layer app | 0.4.6 | Get started, Home, Agents (IDs since 0.4.9) with live status and Pause, short invite links, automatic saving of received files (released 31 Oct 2026) |
+| Invite feedback, Windows support | 0.4.7 | Both sides see an invite happen, Paste link on Home, closable panels, AgentLink starts from AI apps on Windows (released 1 Nov 2026) |
+| Golden-path fixes, new invite page | 0.4.8 | Quit-first before Touch ID, removed connections on Home, no early "Offline", the public invite page styled like the app (released 2 Nov 2026) |
+| The app redesign, one recovery kit, restore in the app | 0.5.0 | Home, People, My IDs, Activity, Settings; one recovery kit for all IDs; restore in the app and with `agentlink restore`; Touch ID & master code (released 12 Nov 2026, D-147) |
+| M2, cloud agent first | 0.6.0 | The self-hosted cloud agent, Claude on the web and phones (D-131) |
+| M2, rest | later 0.x.0 | Console, desktop apps and the other M2 work |
+| M3 mainnet beta | 1.0.0 | First strict SemVer promise |
+
+Before 1.0.0 a minor version may contain breaking changes; each is marked **BREAKING** in the changelog. Prereleases go to the npm `next` tag; only milestone versions and their patches reach `latest`.
+
+## Format versions
+
+Wire and storage formats are versioned independently of the product:
+
+| Format | Version | First shipped in (planned) |
+|---|---|---|
+| Envelope | v1 | 0.1.0 |
+| Payload and terms | v1 | 0.1.0 |
+| Agent card | v1 | 0.1.0 |
+| Invite | v1 | 0.1.0 |
+| Proof pack | v1 | 0.2.0 |
+| OCC v2 records and receipts | EIP-712 domain `"2"` | 0.2.0 (testnets) |
+
+Unknown versions are refused visibly, never guessed at. Proof packs and receipts are long-lived evidence, so verification reads every pack version ever issued. Deprecations are announced one minor version ahead.
+
+## This documentation
+
+The docs on this site describe the latest release and mark anything not yet released as planned or in development (v0.1.0 was released on 16 Oct 2026, v0.1.1 on 18 Oct 2026, and v0.2.0 on 24 Oct 2026, v0.3.0 on 26 Oct 2026, v0.4.0 on 27 Oct 2026, v0.4.1, v0.4.2 and v0.4.3 on 28 Oct 2026, v0.4.4 and v0.4.5 on 29 Oct 2026, v0.4.6 on 31 Oct 2026). Versioned copies per release are planned from 1.0.0; see [MAINTAINING.md](https://github.com/4thtech/agentlink/blob/main/docs/MAINTAINING.md).

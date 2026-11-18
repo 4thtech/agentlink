@@ -1,6 +1,6 @@
 // WIN-DESK-2 (R-WIN §6 item 6): the Windows tray icons. A .ico file can hold PNG images directly
 // (Windows Vista and later); this writes one from the brand PNGs in
-// docs/design/brand/icons/tray/windows, one file per taskbar colour, 16, 20, 24 and 32 px. The app
+// project/design/brand/icons/tray/windows, one file per taskbar colour, 16, 20, 24 and 32 px. The app
 // picks one at start (src/main/main.ts resourcePaths). Pure Node, so it runs on any build host.
 import { join } from 'node:path';
 import { DESKTOP_DIR } from './stage.mjs';
@@ -16,7 +16,17 @@ const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 /** The brand PNGs for each taskbar colour (the "connected" state), smallest first. */
 export function trayIcoSources() {
-  const dir = join(DESKTOP_DIR, '..', '..', 'docs', 'design', 'brand', 'icons', 'tray', 'windows');
+  const dir = join(
+    DESKTOP_DIR,
+    '..',
+    '..',
+    'project',
+    'design',
+    'brand',
+    'icons',
+    'tray',
+    'windows',
+  );
   const files = (taskbar) =>
     SIZES.map((size) =>
       join(dir, `agentlink-tray-windows-connected-${taskbar}-taskbar-${size}.png`),

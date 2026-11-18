@@ -148,7 +148,7 @@ describe('pushPaths and pathMatches', () => {
     expect(pathMatches(PATHS, 'apps/submitter/src/index.ts')).toBe(true);
     expect(pathMatches(PATHS, 'pnpm-lock.yaml')).toBe(true);
     expect(pathMatches(PATHS, 'apps/drop/src/index.ts')).toBe(false);
-    expect(pathMatches(PATHS, 'docs/process/ci-cd.md')).toBe(false);
+    expect(pathMatches(PATHS, 'project/process/ci-cd.md')).toBe(false);
     expect(pathMatches(['a/*.ts'], 'a/b/c.ts')).toBe(false);
     expect(() => pathMatches(['!apps/**'], 'apps/x')).toThrow(/negated/);
   });
@@ -216,7 +216,7 @@ describe('reconcile', () => {
   });
 
   it('does nothing when no commit since the deployed one touched the service paths', async () => {
-    const { result, calls } = await go(routes({ files: ['docs/process/ci-cd.md'] }));
+    const { result, calls } = await go(routes({ files: ['project/process/ci-cd.md'] }));
     expect(result).toMatchObject({ action: 'none', reason: 'current' });
     expect(dispatched(calls)).toEqual([]);
   });

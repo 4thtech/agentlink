@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// The notice system (UX 2026-11-12, docs/design/notices.md): the page notice, the inline banner's
+// The notice system (UX 2026-11-12, project/design/notices.md): the page notice, the inline banner's
 // close and the toast stack's auto-close. S1: behaviour and a11y only.
 import axe from 'axe-core';
 import { createElement as h, act, type ReactElement } from 'react';

@@ -30,7 +30,7 @@ Out of scope:
 - Social engineering, physical attacks, and denial-of-service through volumetric traffic.
 - Findings that need an already compromised device, a malicious operating-system user with the owner's passkey or passphrase, or other access the threat model already assumes the attacker lacks.
 
-The threat model and invariants are documented in `docs/foundation/04-security-and-crypto.md`.
+The threat model and invariants are documented in `specs/04-security-and-crypto.md`.
 
 ## What to expect
 

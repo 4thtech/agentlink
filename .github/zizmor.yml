@@ -2,7 +2,7 @@
 # `zizmor` job in .github/workflows/security.yml.
 #
 # Every remote `uses:` (anything but a local ./ path) must be pinned to a full commit SHA, including GitHub-owned
-# actions (docs/process/ci-cd.md). This is zizmor's default since v1.20.0; it is
+# actions (project/process/ci-cd.md). This is zizmor's default since v1.20.0; it is
 # spelled out here so the rule survives a future change of defaults.
 rules:
   unpinned-uses:

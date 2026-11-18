@@ -1,5 +1,5 @@
 // CHORE-CI-AUTORETRY: decides whether `.github/workflows/ci-auto-retry.yml` reruns the failed jobs of
-// a completed CI or Security run, once. Rules (docs/process/ci-cd.md "Automatic rerun of flaky jobs"):
+// a completed CI or Security run, once. Rules (project/process/ci-cd.md "Automatic rerun of flaky jobs"):
 // - only a run that ended `failure` on its first attempt (attempt 2 or later never: no loops);
 // - only pull_request and push on `main` (a failed merge-queue run already ejected the PR); only runs from this repository (no forks);
 // - every failed job (the aggregating gate aside) must be on the workflow's flaky list, and for a

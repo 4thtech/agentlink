@@ -28,7 +28,7 @@ The other files (`.mcpb`, `SHA256SUMS`) are for AI-app extensions and checks. Yo
 
 ### Install
 
-The one canonical page is [Desktop app](https://github.com/4thtech/agentlink/blob/main/docs-site/guide/apps/desktop-app.md). Short version:
+The one canonical page is [Desktop app](https://github.com/4thtech/agentlink/blob/main/docs/guide/apps/desktop-app.md). Short version:
 
 - **Mac:** open the `.dmg`, drag AgentLink to Applications and open it. macOS says it cannot check the app: click **Done**, then **System Settings**, **Privacy & Security**, **Open Anyway** (on macOS 13 or 14 you can also Control-click the app and choose **Open**). If macOS says the app is "damaged", run `xattr -dr com.apple.quarantine /Applications/AgentLink.app` in Terminal and open it again. The preview is not signed by Apple yet; the `.dmg` has a short "Read me first" file with these steps.
 - **Windows:** the desktop app is coming later. Use the browser app (one command; see the Windows guide).
