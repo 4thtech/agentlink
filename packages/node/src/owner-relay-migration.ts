@@ -33,7 +33,7 @@ import { keyEpochControlFor, type AgentEpochKeys } from './key-epoch.js';
 import { allowedTypedData, ownerOperationRefused } from './owner-allowlist.js';
 import { osKeychain } from './keychain.js';
 import { KeychainOwnerKeyStore } from './owner-keystore.js';
-import { secretLabel, type OwnerReview } from './owner-operation.js';
+import { secretLabel, type OwnerReview, type PromptingOwnerKeyStore } from './owner-operation.js';
 import { assertNoHarnessMarker, ttyOwnerTerminal, type OwnerTerminal } from './owner-terminal.js';
 import { NodeKeyStoreError } from './errors.js';
 
@@ -241,45 +241,61 @@ export async function signRelayMigration(
 export interface ContactDetailsAtTerminalInput extends RelayMigrationInput {
   /** The owner the agent's card names. */
   readonly ownerKeys: OwnerPublicKeys;
-  /** For tests: the owner store and terminal; production uses the OS keychain and this TTY. */
-  readonly store?: KeychainOwnerKeyStore;
-  readonly terminal?: OwnerTerminal;
 }
 
 /**
- * `agentlink owner update-contact-details` † (the package entry): one owner operation at this
- * process's own terminal. Shows the statement, asks "Continue?", reads the master code once at the
- * prompt, unlocks, runs signRelayMigration, then closes the session and locks the store whatever
- * happened. A wrong code is `presence_rejected` and nothing is signed. No argument, variable, file
- * or pipe carries the owner secret; an AI harness or a missing terminal is refused first.
+ * The owner operation with the owner store and terminal it is given (REL-0513-FENCE: internal, never
+ * a package export; tests reach it by this module path). Shows the statement, asks "Continue?",
+ * reads the master code once at the prompt, unlocks, runs signRelayMigration, then closes the
+ * session and locks the store whatever happened. A wrong code is `presence_rejected` and nothing is
+ * signed. The caller opens and closes the store. Refused before anything is shown when there is
+ * nothing to update.
+ */
+export async function updateContactDetailsWith(
+  store: PromptingOwnerKeyStore,
+  terminal: OwnerTerminal,
+  input: ContactDetailsAtTerminalInput,
+): Promise<RelayMigrationOutcome> {
+  const migration = await input.client.identity.relayMigration();
+  if (migration.status !== 'needed') return refused('current');
+  for (const line of CONTACT_DETAILS_REVIEW.lines) terminal.write(line);
+  if (!(await terminal.confirm('Continue?'))) {
+    throw new NodeKeyStoreError('owner_prompt_cancelled', 'Cancelled. Nothing was changed.');
+  }
+  const kind = await store.secretKind();
+  const presence: OwnerPresence =
+    terminal.readPresence === undefined
+      ? { kind: 'passphrase', secret: await terminal.readSecret(secretLabel(kind)) }
+      : await terminal.readPresence(secretLabel(kind));
+  const session = await store.unlock(presence);
+  try {
+    return await signRelayMigration(session, input.ownerKeys, input);
+  } finally {
+    await session.close();
+    await store.lock();
+  }
+}
+
+/**
+ * `agentlink owner update-contact-details` † (the package entry; REL-0513-FENCE): one owner
+ * operation on this OS user's keychain and this process's own TTY prompt, like
+ * performOwnerOperation, changeOwnerCode and restoreInTerminal. No owner-store or terminal seam: the
+ * input carries neither, and anything extra in it is never read. No argument, variable, file or pipe
+ * carries the owner secret; an AI harness or a missing terminal is refused first.
  */
 export async function updateContactDetailsAtTerminal(
   input: ContactDetailsAtTerminalInput,
 ): Promise<RelayMigrationOutcome> {
   assertNoHarnessMarker();
-  const terminal = input.terminal ?? ttyOwnerTerminal();
-  // Refusals before the owner is asked for anything.
-  const migration = await input.client.identity.relayMigration();
-  if (migration.status !== 'needed') return refused('current');
-  const store = input.store ?? (await KeychainOwnerKeyStore.open(osKeychain(), input.ownerKeys));
+  const terminal = ttyOwnerTerminal();
+  const { agent, client, epochKeys, ownerKeys } = input;
+  const checked: ContactDetailsAtTerminalInput = { agent, client, epochKeys, ownerKeys };
+  // Refusals before the owner store is opened.
+  if ((await client.identity.relayMigration()).status !== 'needed') return refused('current');
+  const store = await KeychainOwnerKeyStore.open(osKeychain(), ownerKeys);
   try {
-    for (const line of CONTACT_DETAILS_REVIEW.lines) terminal.write(line);
-    if (!(await terminal.confirm('Continue?'))) {
-      throw new NodeKeyStoreError('owner_prompt_cancelled', 'Cancelled. Nothing was changed.');
-    }
-    const kind = await store.secretKind();
-    const presence: OwnerPresence =
-      terminal.readPresence === undefined
-        ? { kind: 'passphrase', secret: await terminal.readSecret(secretLabel(kind)) }
-        : await terminal.readPresence(secretLabel(kind));
-    const session = await store.unlock(presence);
-    try {
-      return await signRelayMigration(session, input.ownerKeys, input);
-    } finally {
-      await session.close();
-      await store.lock();
-    }
+    return await updateContactDetailsWith(store, terminal, checked);
   } finally {
-    if (input.store === undefined) await store.close();
+    await store.close();
   }
 }
