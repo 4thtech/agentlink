@@ -11375,7 +11375,7 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 #### SEC-RECORD-ATOMIC · Proof signing tied to the budget (0.5.12)
 - **Status:** built for 0.5.12 (branch `rel0512/record-atomic`, releasing) · **Security:** S2 · **Spec:** D-156
 - **Goal:** a proof is signed and counted against the budget in one step.
-- **Done:** the fee is reserved first and a single-use ticket is issued in the same transaction; the KeyStore signs only under a live ticket whose reservation is held; one live Record per message; on a failure the fee stays reserved and the same Record is signed again under the held reservation. Spec: 06 §3; 07 §3.5.
+- **Done:** the fee is reserved first and a single-use ticket is issued in the same transaction; the core signs a Record only under a live ticket whose reservation is held; one live Record per message; on a failure the fee stays reserved and the same Record is signed again under the held reservation. Spec: 06 §3; 07 §3.5. Note: a Record restored from a backup while it was being signed is signed again with the same record ID, so it lands at most once.
 
 #### SEC-RESTORE-GUARD · Budget after restore (0.5.12)
 - **Status:** built for 0.5.12 (branch `rel0512/restore-guard`, releasing) · **Security:** S2 · **Spec:** D-156

@@ -758,6 +758,8 @@ export class TermsService {
       run === undefined ? undefined : await this.#idempotency().prepareEffect(run, [envelopeId]);
     // Loaded before the transaction: no await inside it (07 §3.1).
     const policy = await this.#policy();
+    // SEC-RESTORE-GUARD: the caps are halved in the restore window, as for agentlink_send.
+    const restoreWindow = await restoreWindowNow(this.#ctx);
     const outcome = await this.#ctx.store.transaction((tx) => {
       if (!snapshotCurrentTx(tx, input.snapshot)) return 'stale' as const;
       const contact = tx.get('contacts', { contact_id: input.to });
@@ -768,7 +770,7 @@ export class TermsService {
       if (contact.waiting_owner === 1) throw waitingOwnerError();
       // SEC-TERMS-CAPS: the authoritative cap check, before a commitment part is claimed.
       const now = nowOf(this.#ctx);
-      const over = outgoingRefusalTx(tx, policy, input.to, now);
+      const over = outgoingRefusalTx(tx, policy, input.to, now, { restoreWindow });
       if (over !== undefined) return over;
       if (input.claimTx !== undefined && !input.claimTx(tx, envelopeId, json)) {
         return 'lost' as const;
@@ -795,7 +797,10 @@ export class TermsService {
   /** SEC-TERMS-CAPS: the early cap check for one terms envelope to `to`, outside a transaction. */
   async #limited(to: string): Promise<SendLimitRefusal | undefined> {
     const policy = await this.#policy();
-    return this.#ctx.store.transaction((tx) => outgoingRefusalTx(tx, policy, to, nowOf(this.#ctx)));
+    const restoreWindow = await restoreWindowNow(this.#ctx);
+    return this.#ctx.store.transaction((tx) =>
+      outgoingRefusalTx(tx, policy, to, nowOf(this.#ctx), { restoreWindow }),
+    );
   }
 
   async #publish(envelopeId: string): Promise<void> {

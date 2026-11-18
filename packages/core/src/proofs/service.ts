@@ -110,7 +110,12 @@ import {
   type ProofEvaluation,
   type ProofTrigger,
 } from '../policy-engine.js';
-import { readRestoreState, restoreProofContext, restoredReplay } from '../restore-guard.js';
+import {
+  readRestoreState,
+  requestedBeforeRestore,
+  restoreProofContext,
+  restoredReplay,
+} from '../restore-guard.js';
 import type { Row } from '../store/schema.js';
 import type { StoreTx } from '../store/store.js';
 import type {
@@ -1645,6 +1650,13 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
         tx.get('approvals', { approval_id: entry.approval_id as string }),
       );
       if (approval === undefined || now > approval.expires_at) return undefined;
+      // SEC-RESTORE-GUARD (D-156): an approval (or grant) requested before a restore of this ID
+      // covers no replacement after it; an unreadable mark, none. The old Record cannot land (its
+      // deadline passed with nothing on-chain), so its reservation is released and nothing is
+      // charged; the owner is asked again by a new request.
+      if (requestedBeforeRestore(await readRestoreState(this.#ctx), approval.created_at)) {
+        return undefined;
+      }
       // A policy grant is a ledger row, never the owner's approval of a fee (04 §3.4.2).
       ownerApproved = approval.source === 'owner';
     }

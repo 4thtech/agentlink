@@ -160,7 +160,13 @@ export function outgoingRefusalTx(
   policy: EffectivePolicy,
   contact: string,
   now: number,
+  /** SEC-RESTORE-GUARD: the restore window is open (read before the transaction): halved caps. */
+  options: { readonly restoreWindow?: boolean } = {},
 ): SendLimitRefusal | undefined {
   const usage = outgoingUsage(tx, contact, now);
-  return limitRefusal(evaluateOutgoing(policy, { contact, files: 0, bytes: 0 }, usage), usage, now);
+  return limitRefusal(
+    evaluateOutgoing(policy, { contact, files: 0, bytes: 0 }, usage, options),
+    usage,
+    now,
+  );
 }

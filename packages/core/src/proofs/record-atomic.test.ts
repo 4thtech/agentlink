@@ -272,10 +272,14 @@ describe('SEC-RESTORE-GUARD: no replacement Record on an approval from before a 
     mark.value = clock.t;
     clock.t += 3601 + 60;
     chain.censor = false;
+    const credit = chain.creditOf(a.id);
     expect(await a.client.proofs.resubmitPending()).toMatchObject({ replaced: 0 });
     expect(a.signed).toHaveLength(1);
-    expect(chain.calls.notarize).toBe(0);
-    expect((await ledger(a)).filter((r) => r.state !== 'released')).toHaveLength(0);
+    expect(chain.creditOf(a.id)).toBe(credit);
+    // One reservation, the original's (kept, as for an expired approval); no new one, no charge.
+    const rows = await ledger(a);
+    expect(rows).toHaveLength(1);
+    expect(rows.filter((r) => r.state === 'charged')).toHaveLength(0);
   });
 
   it('an unreadable restore mark: no replacement on the approval either', async () => {
