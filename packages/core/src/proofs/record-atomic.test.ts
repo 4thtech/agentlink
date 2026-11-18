@@ -64,7 +64,14 @@ async function openAgent(n: number, owner: TestOwner, name: string): Promise<Age
   const keyStore = new MemoryKeyStore(seed(n), { nowSeconds: () => clock.now() });
   const base = chain.platform();
   const cipher = new TestStoreCipher();
-  const agent = { store, cipher, keyStore, owner, signed: [] as BuiltRecord[], hook: undefined } as {
+  const agent = {
+    store,
+    cipher,
+    keyStore,
+    owner,
+    signed: [] as BuiltRecord[],
+    hook: undefined,
+  } as {
     -readonly [K in keyof Agent]: Agent[K];
   };
   const platform: ProofsPlatform = {
