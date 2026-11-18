@@ -29,6 +29,11 @@
 // - `receipt` (IR-RET-3-1 Low 7): every `proof` envelope, an `ack` of a notarized message, an `ack`
 //   whose message stays, and an `ack` whose body does not name one message. Other acks follow the
 //   message they name: they go with it, or after it was deleted.
+//   The plan hash does not cover acks (DELETE-PLAN-ACKS, 0.5.12): a received receipt can land or
+//   change between the sheet's list and the press, or inside the Undo window. What the owner
+//   confirms is the messages, saved files and kept messages. At apply time the acks follow the
+//   confirmed messages by this rule; a new message or saved file still changes the hash and is
+//   refused. Proofs, and acks of notarized messages, are always kept.
 //
 // A later plan with `include: files` or `both` also lists the still indexed saved files of messages
 // deleted earlier (a Trash move that did not happen), so a partial apply leaves no orphans.
@@ -67,7 +72,10 @@ export interface HistoryDeletePlan {
   /** The input the plan was made from; apply plans it again and compares. */
   readonly input: HistoryDeleteInput;
   readonly include: HistoryDeleteInclude;
-  /** sha256 (hex) over the exact item set: what goes and what is kept. */
+  /**
+   * sha256 (hex) over the exact item set: the messages that go, the saved files and the messages
+   * kept. Acks are not part of it (DELETE-PLAN-ACKS): they follow their message at apply time.
+   */
   readonly planHash: string;
   /** The messages that go, oldest first (empty for `include: 'files'`'s message side). */
   readonly envelopeIds: readonly string[];
