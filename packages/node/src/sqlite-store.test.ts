@@ -653,6 +653,9 @@ describe(
       // Version 19 (SEC-RELAY-READBACK, D-156 (7)): two nullable columns appended
       // (sqlite-store-v19.test.ts). Versions 1 to 18 keep their statements.
       expect(MIGRATIONS[18]?.statements).toHaveLength(2);
+      // Version 20 (DEVICES-INTERIM): one nullable column appended and the `install_state` table
+      // (sqlite-store-v20.test.ts). Versions 1 to 19 keep their statements.
+      expect(MIGRATIONS[19]?.statements).toHaveLength(2);
     });
 
     it('migrates a version 13 file to version 14 (REL051-B2): invites kept, invite_link null', async () => {

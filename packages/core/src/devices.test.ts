@@ -1,0 +1,314 @@
+// DEVICES-INTERIM (D-156 follow-up; 04 §2.3.3, 06 §3, 07 §3.5): until one ID can be used on several
+// computers, AgentLink notices when the same ID is in use on another install and says so. The signal
+// is one the app already receives: the agent's own sent copy (04 §3.2 entry 4) of an envelope this
+// store never wrote. Nothing new goes on the wire; the install id stays on this computer and is
+// written on each budget ledger row.
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import { defaultPolicy } from '@4thtech-io/types';
+import { describe, expect, it } from 'vitest';
+import { checkAndReserveProof } from './budget.js';
+import { AgentLinkClient } from './client.js';
+import {
+  OTHER_INSTALL_NOTICE_SECONDS,
+  OTHER_INSTALL_SKEW_SECONDS,
+  type InstallIdSource,
+} from './devices.js';
+import type { EffectivePolicy } from './policy-engine.js';
+import type { RestoreMark } from './restore-guard.js';
+import { MemoryStore } from './store/memory-store.js';
+import { SINGLETON_SLOT } from './store/schema.js';
+import {
+  FakeClock,
+  RELAYS,
+  RecordingApprovalChannel,
+  TestStoreCipher,
+  passphrase,
+  seed,
+} from './testing/fixtures.js';
+import { cardUpdatePayload, giftWrapId, type TestAgent } from './testing/envelopes.js';
+
+const INSTALL_A = 'a1'.repeat(16);
+const INSTALL_B = 'b2'.repeat(16);
+
+const installSource = (id: string): InstallIdSource & { reads: number } => {
+  const source = {
+    reads: 0,
+    read: (): Promise<string> => {
+      source.reads += 1;
+      return Promise.resolve(id);
+    },
+  };
+  return source;
+};
+
+async function agentWith(
+  clock: FakeClock,
+  options: {
+    installId?: InstallIdSource;
+    restoreMark?: RestoreMark;
+    store?: MemoryStore;
+    seedN?: number;
+  } = {},
+): Promise<TestAgent> {
+  const keyStore = new MemoryKeyStore(seed(options.seedN ?? 61));
+  const owner = new MemoryOwnerKeyStore(seed(62), passphrase());
+  const store = options.store ?? new MemoryStore();
+  const cipher = new TestStoreCipher();
+  const client = await AgentLinkClient.create({
+    keyStore,
+    store,
+    cipher,
+    approvals: new RecordingApprovalChannel(),
+    clock: clock.now,
+    ...(options.installId === undefined ? {} : { installId: options.installId }),
+    ...(options.restoreMark === undefined ? {} : { restoreMark: options.restoreMark }),
+  });
+  if (options.store === undefined) {
+    await client.identity.init({
+      owner: await owner.unlock(passphrase()),
+      ownerKeys: await owner.getPublicKeys(),
+      name: 'alice',
+      relays: RELAYS,
+    });
+  }
+  return { client, store, cipher, keyStore, owner, id: client.agentId };
+}
+
+/** An own envelope signed with this ID's keys that this store never wrote (another computer's). */
+async function otherComputersCopy(agent: TestAgent): Promise<{ id: string; envelope: unknown }> {
+  const { built } = await agent.client.envelopes.prepare({
+    to: { owner: true },
+    payload: await cardUpdatePayload(agent),
+  });
+  return { id: built.envelope.id, envelope: built.envelope };
+}
+
+async function deliver(agent: TestAgent, envelope: unknown): Promise<void> {
+  const received = await agent.client.envelopes.receive({ envelope, giftWrapId: giftWrapId() });
+  expect(received.status).toBe('verified');
+  await agent.client.envelopes.processReceived();
+}
+
+describe('DEVICES-INTERIM: this ID in use on another computer', () => {
+  it('the notice constants are a week and the clock-skew allowance', () => {
+    expect(OTHER_INSTALL_NOTICE_SECONDS).toBe(7 * 86_400);
+    expect(OTHER_INSTALL_SKEW_SECONDS).toBe(300);
+  });
+
+  it('a fresh install has its id and sees no other computer', async () => {
+    const clock = new FakeClock();
+    const a = await agentWith(clock, { installId: installSource(INSTALL_A) });
+    expect(await a.client.devices.state()).toEqual({
+      installId: INSTALL_A,
+      otherInUse: false,
+      otherSeenAt: null,
+    });
+    const row = await a.store.transaction((tx) => tx.get('install_state', { slot: SINGLETON_SLOT }));
+    expect(row).toMatchObject({ install_id: INSTALL_A, since: clock.t, other_seen_at: null });
+  });
+
+  it('a sent copy this store never wrote, made after this install started, marks another computer', async () => {
+    const clock = new FakeClock();
+    const a = await agentWith(clock, { installId: installSource(INSTALL_A) });
+    await a.client.devices.state(); // the install starts now
+    clock.t += 3_600;
+    const copy = await otherComputersCopy(a);
+    clock.t += 30;
+    await deliver(a, copy.envelope);
+    expect(await a.client.devices.state()).toEqual({
+      installId: INSTALL_A,
+      otherInUse: true,
+      otherSeenAt: clock.t - 30,
+    });
+    // The copy itself is stored as sent, as before.
+    const row = await a.store.transaction((tx) => tx.get('envelopes', { envelope_id: copy.id }));
+    expect(row).toMatchObject({ direction: 'out', state: 'ok' });
+  });
+
+  it('this computer’s own sent copy (the row is held) is a duplicate and marks nothing', async () => {
+    const clock = new FakeClock();
+    const a = await agentWith(clock, { installId: installSource(INSTALL_A) });
+    await a.client.devices.state();
+    clock.t += 3_600;
+    const built = await a.client.envelopes.build({
+      to: { owner: true },
+      payload: await cardUpdatePayload(a),
+    });
+    await deliver(a, built.envelope);
+    expect((await a.client.devices.state()).otherInUse).toBe(false);
+  });
+
+  it('a copy made before this install started (an older copy on the relays) marks nothing', async () => {
+    const clock = new FakeClock();
+    const a = await agentWith(clock, { installId: installSource(INSTALL_A) });
+    const copy = await otherComputersCopy(a);
+    clock.t += OTHER_INSTALL_SKEW_SECONDS + 1;
+    await a.client.devices.state(); // the install starts after the copy was made
+    await deliver(a, copy.envelope);
+    expect((await a.client.devices.state()).otherInUse).toBe(false);
+  });
+
+  it('a copy made before a restore marks nothing (the backup did not hold it)', async () => {
+    const clock = new FakeClock();
+    const restoredAt = clock.t + 7_200;
+    const a = await agentWith(clock, {
+      installId: installSource(INSTALL_A),
+      restoreMark: { read: () => Promise.resolve(restoredAt) },
+    });
+    await a.client.devices.state();
+    clock.t += 3_600;
+    const before = await otherComputersCopy(a);
+    clock.t = restoredAt + 60;
+    await deliver(a, before.envelope);
+    expect((await a.client.devices.state()).otherInUse).toBe(false);
+    clock.t = restoredAt + OTHER_INSTALL_SKEW_SECONDS + 60;
+    const after = await otherComputersCopy(a);
+    await deliver(a, after.envelope);
+    expect((await a.client.devices.state()).otherInUse).toBe(true);
+  });
+
+  it('a restore mark that cannot be read marks nothing (a notice, never a guess)', async () => {
+    const clock = new FakeClock();
+    const a = await agentWith(clock, {
+      installId: installSource(INSTALL_A),
+      restoreMark: { read: () => Promise.reject(new Error('keychain')) },
+    });
+    await a.client.devices.state();
+    clock.t += 3_600;
+    await deliver(a, (await otherComputersCopy(a)).envelope);
+    expect((await a.client.devices.state()).otherInUse).toBe(false);
+  });
+
+  it('the notice ends a week after the last copy from the other computer', async () => {
+    const clock = new FakeClock();
+    const a = await agentWith(clock, { installId: installSource(INSTALL_A) });
+    await a.client.devices.state();
+    clock.t += 3_600;
+    const copy = await otherComputersCopy(a);
+    await deliver(a, copy.envelope);
+    const seenAt = clock.t;
+    clock.t = seenAt + OTHER_INSTALL_NOTICE_SECONDS - 1;
+    expect((await a.client.devices.state()).otherInUse).toBe(true);
+    clock.t = seenAt + OTHER_INSTALL_NOTICE_SECONDS;
+    expect(await a.client.devices.state()).toEqual({
+      installId: INSTALL_A,
+      otherInUse: false,
+      otherSeenAt: seenAt,
+    });
+  });
+
+  it('a store that came from another install (a restored snapshot) starts afresh here', async () => {
+    const clock = new FakeClock();
+    const a = await agentWith(clock, { installId: installSource(INSTALL_A) });
+    await a.client.devices.state();
+    clock.t += 3_600;
+    await deliver(a, (await otherComputersCopy(a)).envelope);
+    expect((await a.client.devices.state()).otherInUse).toBe(true);
+    clock.t += 600;
+    // The same store opened by an install with another id: since moves, the old sighting is not
+    // this computer's.
+    const moved = await agentWith(clock, {
+      installId: installSource(INSTALL_B),
+      store: a.store,
+    });
+    expect(await moved.client.devices.state()).toEqual({
+      installId: INSTALL_B,
+      otherInUse: false,
+      otherSeenAt: null,
+    });
+    const row = await a.store.transaction((tx) => tx.get('install_state', { slot: SINGLETON_SLOT }));
+    expect(row).toMatchObject({ install_id: INSTALL_B, since: clock.t });
+  });
+
+  it('without an install id source (tests, other hosts) there is no install and no notice', async () => {
+    const clock = new FakeClock();
+    const a = await agentWith(clock);
+    clock.t += 3_600;
+    await deliver(a, (await otherComputersCopy(a)).envelope);
+    expect(await a.client.devices.state()).toEqual({
+      installId: null,
+      otherInUse: false,
+      otherSeenAt: null,
+    });
+  });
+
+  it('an install id that is not 32 lowercase hex is never stored', async () => {
+    const clock = new FakeClock();
+    const a = await agentWith(clock, { installId: installSource('not-an-id') });
+    expect((await a.client.devices.state()).installId).toBeNull();
+    const row = await a.store.transaction((tx) => tx.get('install_state', { slot: SINGLETON_SLOT }));
+    expect(row).toBeUndefined();
+  });
+
+  it('the install id is read from its source once per client', async () => {
+    const clock = new FakeClock();
+    const source = installSource(INSTALL_A);
+    const a = await agentWith(clock, { installId: source });
+    await a.client.devices.state();
+    await a.client.devices.state();
+    expect(source.reads).toBe(1);
+  });
+});
+
+describe('DEVICES-INTERIM: budget rows carry the install id (07 §3.5)', () => {
+  const NOW = 1_800_000_000;
+  const policy = defaultPolicy();
+  policy.proofs.perActionMaxUSD = '1';
+  policy.proofs.hardMaxPerActionUSD = '1000';
+  policy.proofs.hardDailyUSD = '1000';
+  const effective: EffectivePolicy = { mode: 'signed', policy, version: 1 };
+
+  async function storeWith(install: string | undefined): Promise<MemoryStore> {
+    const store = new MemoryStore();
+    await store.transaction((tx) => {
+      tx.insert('budget_state', {
+        slot: SINGLETON_SLOT,
+        ledger_epoch: 1,
+        status: 'ok',
+        newest_t: NOW - 1000,
+        since: NOW - 1000,
+        broken_at: null,
+      });
+      if (install !== undefined) {
+        tx.insert('install_state', {
+          slot: SINGLETON_SLOT,
+          install_id: install,
+          since: NOW - 1000,
+          other_seen_at: null,
+        });
+      }
+    });
+    return store;
+  }
+
+  const reserve = (store: MemoryStore) =>
+    store.transaction((tx) =>
+      checkAndReserveProof(tx, {
+        effective,
+        action: { kind: 'proof', feeUsd: '0.1', maxFeeUsd: '0.1', counterparty: null },
+        now: NOW,
+        reservation: {
+          entryId: 'e0001',
+          recordId: `0x${'1'.padStart(64, '0')}`,
+          chainId: 8453,
+          approvalId: null,
+          deadline: NOW + 3600,
+        },
+        ownerApproved: false,
+      }),
+    );
+
+  it('a reserved row names this install', async () => {
+    const store = await storeWith(INSTALL_A);
+    expect((await reserve(store)).reserved).toBe(true);
+    const [row] = await store.transaction((tx) => tx.select('budget_ledger'));
+    expect(row?.install_id).toBe(INSTALL_A);
+  });
+
+  it('a store without an install keeps null (rows from before version 20 read the same)', async () => {
+    const store = await storeWith(undefined);
+    expect((await reserve(store)).reserved).toBe(true);
+    const [row] = await store.transaction((tx) => tx.select('budget_ledger'));
+    expect(row?.install_id).toBeNull();
+  });
+});
