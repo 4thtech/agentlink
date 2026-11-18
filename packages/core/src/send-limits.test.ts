@@ -223,6 +223,7 @@ function outRow(id: string, contact: string, type: string, at: number): Row<'env
     refused_at: null,
     request_accepted_at: null,
     deleted_at: null,
+    availability: null,
   };
 }
 

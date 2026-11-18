@@ -19,6 +19,7 @@ import {
   NOSTR_KIND_AUTH,
   encodeUtf8,
   parseJson,
+  verifyNostrEvent,
   type EnvelopeKeys,
   type NostrEvent,
 } from '@4thtech-io/crypto';
@@ -53,6 +54,10 @@ export const MIN_ACKS = 2;
 export const NIP11_MAX_BYTES = 65_536;
 /** 07 §4.2 (M1-5b-c): the NIP-11 wait has its own bound, inside the 10 s connect budget. */
 export const NIP11_TIMEOUT_MS = 3_000;
+/** SEC-RELAY-READBACK (D-156 (7)): one availability check, connect to answer, ends after this. */
+export const READBACK_TIMEOUT_MS = 5_000;
+/** SEC-RELAY-READBACK: availability checks open at once; one over this is unchecked at once. */
+export const MAX_READBACKS = 16;
 const NIP11_TTL_MS = 60 * 60 * 1000;
 const NIP11_FAILURE_TTL_MS = 5 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 512;
@@ -93,6 +98,15 @@ export interface PublishOutcome {
   /** True when at least MIN_ACKS relays of the list returned OK (07 §4.2). */
   readonly sent: boolean;
 }
+
+/**
+ * SEC-RELAY-READBACK (D-156 (7)): what one relay said when asked for an event by its id.
+ * - `served`: it returned that exact, validly signed event.
+ * - `missing`: it answered the read and did not return it.
+ * - `unchecked`: no answer could be had (it wants a login to read, closed the read, timed out, could
+ *   not be reached, or the address rule refused it). Never evidence either way.
+ */
+export type ReadbackOutcome = 'served' | 'missing' | 'unchecked';
 
 /** Per-relay health, for the activity feed and `doctor`. No event content. */
 export interface RelayHealth {
@@ -217,6 +231,15 @@ function readMaxMessageLength(doc: unknown): number | undefined {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined;
 }
 
+/** A relay-sent event verifies (id over its fields, then the signature); any fault reads as false. */
+function verifyEvent(event: NostrEvent): boolean {
+  try {
+    return verifyNostrEvent(event);
+  } catch {
+    return false;
+  }
+}
+
 /** `wss://host[:port]` of a relay URL: what health output and the activity feed may show. */
 function relayOrigin(url: string): string {
   const m = RELAY_PARTS.exec(url);
@@ -246,6 +269,9 @@ export class RelayPool {
   private readonly listeners = new Set<FrameListener>();
   private readonly closeListeners = new Set<CloseListener>();
   private closed = false;
+  private readbacks = 0;
+  private readbackSeq = 0;
+  private readonly readbackSockets = new Set<RelaySocket>();
 
   constructor(options: RelayPoolOptions) {
     this.connector = options.connector;
@@ -396,6 +422,132 @@ export class RelayPool {
   close(): void {
     this.closed = true;
     for (const conn of [...this.conns.values()]) this.drop(conn);
+    for (const socket of [...this.readbackSockets]) {
+      try {
+        socket.close();
+      } catch {
+        // closing a dead socket is not an error
+      }
+    }
+    this.readbackSockets.clear();
+  }
+
+  // --- availability check (SEC-RELAY-READBACK) -------------------------------------------------
+
+  /**
+   * Asks `relay` whether it serves the event `eventId` (D-156 (7); 07 §4.2, §4.3). The question goes
+   * on a new connection of its own, never a pooled one, so the answer does not depend on the
+   * connection that published; no login is ever sent on it (a relay that wants one is `unchecked`);
+   * the filter holds the id only. The relay URL rule and the address check apply as for any
+   * connection (04 §4). Bounded: READBACK_TIMEOUT_MS from start to answer, at most MAX_READBACKS at
+   * once. Never rejects; relay text never leaves this method, and nothing is logged.
+   */
+  async checkServed(relay: string, eventId: string): Promise<ReadbackOutcome> {
+    if (this.closed || typeof eventId !== 'string' || !HEX_32.test(eventId)) return 'unchecked';
+    if (!isAllowedRelayUrl(relay) || relayParts(relay) === undefined) return 'unchecked';
+    if (this.readbacks >= MAX_READBACKS) return 'unchecked';
+    this.readbacks += 1;
+    try {
+      return await this.readback(relay, eventId);
+    } catch {
+      return 'unchecked';
+    } finally {
+      this.readbacks -= 1;
+    }
+  }
+
+  private readback(relay: string, eventId: string): Promise<ReadbackOutcome> {
+    this.readbackSeq = (this.readbackSeq + 1) % Number.MAX_SAFE_INTEGER;
+    const subId = `r${this.readbackSeq}`;
+    const req = JSON.stringify(['REQ', subId, { ids: [eventId], limit: 1 }]);
+    return new Promise((resolve) => {
+      let socket: RelaySocket | undefined;
+      let open = false;
+      let sent = false;
+      let done = false;
+      const finish = (outcome: ReadbackOutcome): void => {
+        if (done) return;
+        done = true;
+        this.timers.clearTimeout(timer);
+        if (socket !== undefined) {
+          this.readbackSockets.delete(socket);
+          try {
+            socket.close();
+          } catch {
+            // closing a dead socket is not an error
+          }
+        }
+        resolve(outcome);
+      };
+      const sendReq = (): void => {
+        if (done || sent || socket === undefined || !open) return;
+        sent = true;
+        try {
+          socket.send(req);
+        } catch {
+          finish('unchecked');
+        }
+      };
+      const timer = this.timers.setTimeout(() => finish('unchecked'), READBACK_TIMEOUT_MS);
+      const onMessage = (data: unknown): void => {
+        if (done || typeof data !== 'string') return;
+        if (utf8Length(data, MAX_FRAME_BYTES) > MAX_FRAME_BYTES) return;
+        let frame: unknown;
+        try {
+          frame = parseJson(data);
+        } catch {
+          return;
+        }
+        if (!Array.isArray(frame) || frame[1] !== subId) return; // AUTH, NOTICE, others: ignored
+        if (frame[0] === 'EVENT') {
+          const event = frame[2] as NostrEvent | undefined;
+          if (
+            typeof event === 'object' &&
+            event !== null &&
+            event.id === eventId &&
+            verifyEvent(event)
+          ) {
+            finish('served');
+          }
+          return; // another event, or a copy that does not verify: not evidence; wait for EOSE
+        }
+        if (frame[0] === 'EOSE') finish('missing');
+        else if (frame[0] === 'CLOSED') finish('unchecked'); // a login wanted, or refused: no answer
+      };
+      void this.resolveTarget(relay).then(
+        (target) => {
+          if (done) return;
+          if (typeof target === 'string' || this.closed) {
+            finish('unchecked');
+            return;
+          }
+          try {
+            socket = this.connector.open(target, {
+              onOpen: () => {
+                open = true;
+                sendReq();
+              },
+              onMessage,
+              onClose: () => finish('unchecked'),
+            });
+          } catch {
+            finish('unchecked');
+            return;
+          }
+          if (done) {
+            try {
+              socket.close();
+            } catch {
+              // closing a dead socket is not an error
+            }
+            return;
+          }
+          this.readbackSockets.add(socket);
+          sendReq(); // the upgrade may have completed while open() ran
+        },
+        () => finish('unchecked'),
+      );
+    });
   }
 
   // --- publish ---------------------------------------------------------------------------------

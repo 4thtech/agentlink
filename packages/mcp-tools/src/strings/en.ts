@@ -20,6 +20,13 @@ export const en = {
   // ---- Tool results: ok -------------------------------------------------------------------
   'chat.status.ok.sent':
     'Sent to {contactName}. End-to-end encrypted: only you, {contactFirstName} and your AIs can read it.',
+  // SEC-RELAY-READBACK (D-156 (7)): accepted, but no part of the message network could be asked to
+  // hand it back yet (06 §2.2 `availability`): sent, never claimed as confirmed.
+  'chat.status.ok.sentUnknown':
+    'Sent to {contactName}, availability unknown: AgentLink could not yet confirm that the message network holds it. End-to-end encrypted: only you, {contactFirstName} and your AIs can read it.',
+  // SEC-RELAY-READBACK: the same, after the saved-and-sent sentence of a file written by content.
+  'chat.status.ok.availabilityUnknown':
+    'Availability unknown: AgentLink could not yet confirm that the message network holds it.',
   // REL051-CF2: an ok send that no relay accepted yet (06 §2.2 `delivery`): never "Sent".
   'chat.status.ok.queued':
     "Not sent yet: AgentLink can't reach the message network right now. The message to {contactName} is saved, and AgentLink sends it on its own when the connection is back.",

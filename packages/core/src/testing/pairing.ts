@@ -180,6 +180,7 @@ export async function storeTranscript(
       refused_at: null,
       request_accepted_at: null,
       deleted_at: null,
+      availability: null,
     });
   }
   await self.store.transaction((tx) => {

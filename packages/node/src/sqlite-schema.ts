@@ -110,6 +110,9 @@ const V17_TABLES: readonly TableName[] = ['outgoing_log'];
 const V18_INVITES_COLUMNS: readonly string[] = ['created_by'];
 const V18_CONTACTS_COLUMNS: readonly string[] = ['waiting_owner', 'ai_accepted_at'];
 const V18_PAIRINGS_COLUMNS: readonly string[] = ['created_by'];
+/** Columns added by version 19 (SEC-RELAY-READBACK, D-156 (7)): the availability check's result. */
+const V19_ENVELOPE_COLUMNS: readonly string[] = ['availability'];
+const V19_OUTBOX_COLUMNS: readonly string[] = ['availability'];
 
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
@@ -127,8 +130,14 @@ function without(spec: TableSpec, columns: readonly string[]): TableSpec {
  */
 function v1Spec(table: TableName): TableSpec {
   const spec = tableSpec(table);
-  if (table === 'envelopes')
-    return without(spec, [...V2_ENVELOPE_COLUMNS, ...V15_ENVELOPE_COLUMNS]);
+  if (table === 'envelopes') {
+    return without(spec, [
+      ...V2_ENVELOPE_COLUMNS,
+      ...V15_ENVELOPE_COLUMNS,
+      ...V19_ENVELOPE_COLUMNS,
+    ]);
+  }
+  if (table === 'outbox') return without(spec, V19_OUTBOX_COLUMNS);
   if (table === 'files') {
     return without(spec, [...V4_FILES_COLUMNS, ...V6_FILES_COLUMNS, ...V11_FILES_COLUMNS]);
   }
@@ -219,6 +228,26 @@ function v18Statements(): readonly string[] {
     ...V18_PAIRINGS_COLUMNS.map(
       (column) =>
         `ALTER TABLE "pairings" ADD COLUMN ${columnDef('pairings', column, pairings.columns[column] as ColumnSpec)}`,
+    ),
+  ];
+}
+
+/**
+ * Version 19 (SEC-RELAY-READBACK, D-156 (7); 07 §3.2): `envelopes.availability` and
+ * `outbox.availability` (`confirmed` | `unknown`), appended, nullable. Nothing is rewritten: every
+ * row stored before keeps null, which reads as before (no availability shown).
+ */
+function v19Statements(): readonly string[] {
+  const envelopes = tableSpec('envelopes');
+  const outbox = tableSpec('outbox');
+  return [
+    ...V19_ENVELOPE_COLUMNS.map(
+      (column) =>
+        `ALTER TABLE "envelopes" ADD COLUMN ${columnDef('envelopes', column, envelopes.columns[column] as ColumnSpec)}`,
+    ),
+    ...V19_OUTBOX_COLUMNS.map(
+      (column) =>
+        `ALTER TABLE "outbox" ADD COLUMN ${columnDef('outbox', column, outbox.columns[column] as ColumnSpec)}`,
     ),
   ];
 }
@@ -333,7 +362,8 @@ function v11Statements(): readonly string[] {
  * untouched), version 17 adds `outgoing_log` (SEC-OUTBOUND-CAPS, D-156; a new table, empty: sends
  * before the update are not counted), version 18 adds `invites.created_by`,
  * `contacts.waiting_owner`, `contacts.ai_accepted_at` and `pairings.created_by` (SEC-INVITE-CAPS,
- * D-156; nullable, null on existing rows). A later
+ * D-156; nullable, null on existing rows), version 19 adds `envelopes.availability` and
+ * `outbox.availability` (SEC-RELAY-READBACK, D-156 (7); nullable, null on existing rows). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -375,6 +405,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 16, statements: createSchemaStatements(V16_TABLES) }),
   Object.freeze({ version: 17, statements: createSchemaStatements(V17_TABLES) }),
   Object.freeze({ version: 18, statements: Object.freeze(v18Statements()) }),
+  Object.freeze({ version: 19, statements: Object.freeze(v19Statements()) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

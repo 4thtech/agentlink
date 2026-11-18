@@ -534,6 +534,8 @@ const DEFINITIONS: readonly ToolDefinition[] = [
         sentAt: timestamp,
         // REL051-CF2: sent (the relays took it) or queued (it goes out when the network is back).
         delivery: oneOf(['queued', 'sent', 'not_delivered']),
+        // SEC-RELAY-READBACK: only with delivery sent, when no relay could confirm it holds it.
+        availability: oneOf(['unknown']),
         file: sentFile,
         proof: proofStatus,
         ...creditFields,

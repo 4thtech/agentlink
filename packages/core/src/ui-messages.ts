@@ -116,6 +116,11 @@ export interface SentMessage extends InboxMessage {
    * weaker; never shown as delivered and never enough for a message sent with proof.
    */
   readonly receivedOlder?: true;
+  /**
+   * SEC-RELAY-READBACK (D-156 (7)): present (`unknown`) only on a `sent` message that no relay could
+   * be asked to serve back: "Sent, availability unknown". Absent once a relay served it back.
+   */
+  readonly availability?: 'unknown';
 }
 
 export type MessageItem = InboxMessage | SentMessage;
@@ -584,6 +589,9 @@ export class MessagesView {
             ...base,
             status: row.delivery,
             ...receiptFields(acked.get(row.envelope_id)),
+            ...(row.delivery === 'sent' && row.availability === 'unknown'
+              ? { availability: 'unknown' as const }
+              : {}),
           }),
         );
       } else {

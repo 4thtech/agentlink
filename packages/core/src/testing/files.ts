@@ -40,10 +40,11 @@ import { MemoryPolicyMark, newNonce, ownerHex, signWith } from './owner.js';
 export const WORK = '/home/u/Work';
 export const INBOX = '/home/u/AgentLink/Inbox';
 
-/** Records every publish and acks every relay. */
+/** Records every publish, acks every relay, and serves every wrap back (SEC-RELAY-READBACK). */
 export class PublishSpy {
   readonly published: { event: NostrEvent; relays: string[] }[] = [];
   readonly factory: TransportFactory = (deps) => ({
+    checkServed: () => Promise.resolve('served' as const),
     wrap: (envelope, recipients, keys) =>
       wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
     publish: (event, relays) => {

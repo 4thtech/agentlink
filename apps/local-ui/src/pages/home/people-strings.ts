@@ -128,6 +128,8 @@ export const HOME_STRINGS = {
   receivedOlder: 'Received (older app)',
   proofDelivered: "Delivered: {name}'s AI confirmed it received this.",
   sentNoReceipt: 'Sent. No receipt yet.',
+  // SEC-RELAY-READBACK (D-156 (7)): the relays took it, but none could be asked to hand it back.
+  sentAvailabilityUnknown: 'Sent, availability unknown',
   receiptPending: 'Pending',
   receiptTheirs: 'Sent by them',
   proof: 'Proof',

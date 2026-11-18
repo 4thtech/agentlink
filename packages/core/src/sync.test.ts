@@ -65,6 +65,7 @@ let clock: FakeClock;
 // --- An in-memory relay network (NIP-01 as far as RelayPool and SyncEngine use it) -------------
 
 interface Filter {
+  ids?: string[];
   kinds?: number[];
   '#p'?: string[];
   since?: number;
@@ -127,6 +128,7 @@ class RelayNetwork implements RelayConnector {
 }
 
 function matches(filter: Filter, event: NostrEvent): boolean {
+  if (filter.ids !== undefined && !filter.ids.includes(event.id)) return false;
   if (filter.kinds !== undefined && !filter.kinds.includes(event.kind)) return false;
   const wanted = filter['#p'];
   if (
@@ -372,9 +374,14 @@ describe('syncInbox (07 §2, §4.2): fetch, verify once, store, process', () => 
     expect(first.requests).toBe(0);
     expect(first.stored).toBe(1);
     // Only the agent's own relays were read, with #p = its own keys (07 §4.2, §4.3).
-    const reqRelays = new Set(net.reqs.map((r) => r.relay));
+    // (SEC-RELAY-READBACK: the sender's availability checks ask by id only; they are not reads.)
+    const reads = net.reqs.filter((r) => r.filter.ids === undefined);
+    for (const r of net.reqs.filter((q) => q.filter.ids !== undefined)) {
+      expect(Object.keys(r.filter).sort()).toEqual(['ids', 'limit']);
+    }
+    const reqRelays = new Set(reads.map((r) => r.relay));
     expect(reqRelays).toEqual(new Set(RELAYS_B));
-    for (const r of net.reqs) {
+    for (const r of reads) {
       expect(r.filter.kinds).toEqual([1059]);
       expect(r.filter['#p']).toEqual([b.nostr]);
     }
@@ -1448,6 +1455,7 @@ async function storeInboundOk(to: Agent, from: Agent, n: number): Promise<string
         refused_at: null,
         request_accepted_at: null,
         deleted_at: null,
+        availability: null,
       });
     }
   });
@@ -1494,6 +1502,7 @@ describe('M1-7h-b (IR-M1-7h-1 F04): catch-up counts, staged acks, a failing key 
           refused_at: null,
           request_accepted_at: null,
           deleted_at: null,
+          availability: null,
         });
       });
     });

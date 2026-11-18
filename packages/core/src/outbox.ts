@@ -58,6 +58,7 @@ import {
   SYNC_SKEW_SECONDS,
   type GiftWrap,
   type OutboxAttempt,
+  type OutboxAvailability,
   type OutboxGiveUpReason,
   type OutboxNotice,
   type OutboxPersistence,
@@ -154,7 +155,22 @@ function updateDelivery(tx: StoreTx, envelopeId: string): void {
     : scope.every((r) => r.state === 'sent')
       ? 'sent'
       : 'queued';
-  tx.update('envelopes', { envelope_id: envelopeId, direction: 'out' }, { delivery });
+  // SEC-RELAY-READBACK (D-156 (7)): a sent envelope is `confirmed` only when every row in scope was
+  // served back by a relay; one that no relay could be asked for makes it `unknown`. A row from
+  // before schema 19 (null) reads as before: no availability is claimed or shown for it.
+  const availability: Row<'envelopes'>['availability'] =
+    delivery !== 'sent'
+      ? null
+      : scope.some((r) => r.availability === 'unknown')
+        ? 'unknown'
+        : scope.every((r) => r.availability === 'confirmed')
+          ? 'confirmed'
+          : null;
+  tx.update(
+    'envelopes',
+    { envelope_id: envelopeId, direction: 'out' },
+    { delivery, availability },
+  );
 }
 
 /** OutboxPersistence over the Store, with the per-row claim described above. */
@@ -272,9 +288,15 @@ class StoreOutboxPersistence implements OutboxPersistence {
     return n === 1;
   }
 
-  async markSent(wrapId: string, acks: Readonly<Record<string, number>>): Promise<boolean> {
+  async markSent(
+    wrapId: string,
+    acks: Readonly<Record<string, number>>,
+    availability: OutboxAvailability,
+  ): Promise<boolean> {
     const sealed = await seal(this.#ctx, 'outbox', 'acks', [wrapId], canonicalize(acks));
-    return this.#finish(wrapId, { state: 'sent', acks: sealed });
+    // SEC-RELAY-READBACK: only the two known values are stored; anything else reads as unknown.
+    const stored: OutboxAvailability = availability === 'confirmed' ? 'confirmed' : 'unknown';
+    return this.#finish(wrapId, { state: 'sent', acks: sealed, availability: stored });
   }
 
   markNotDelivered(wrapId: string, reason: OutboxGiveUpReason): Promise<boolean> {
@@ -493,6 +515,7 @@ export class OutboxService {
         give_up_at: giveUpAt(now, wrap),
         state: 'pending',
         reason: null,
+        availability: null,
       });
     }
     if (rows.length !== routes.length) {

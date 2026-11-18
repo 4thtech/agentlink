@@ -340,6 +340,7 @@ describe('SEC-CARD-FULLTEXT: the card is decidable from app-decoded fields alone
         refused_at: null,
         request_accepted_at: null,
         deleted_at: null,
+        availability: null,
       }),
     );
     return { envelopeId, envelopeHash };

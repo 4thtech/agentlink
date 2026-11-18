@@ -139,13 +139,14 @@ describe('read-back before "sent"', () => {
     for (const url of relays) net.configure(url, { neverServes: true });
     const row = makeRow(relays);
     rows.add(row);
+    const start = nowSeconds();
     const first = await pass(worker);
     expect(first).toMatchObject({ sent: 0, retrying: 1 });
     const stored = rows.get(row.wrapId);
     expect(stored.state).toBe('pending');
     // An OK that the relay cannot back is not kept: the next pass publishes to it again.
     expect(stored.acks).toEqual({});
-    expect(stored.nextAttemptAt).toBe(nowSeconds() + 30);
+    expect(stored.nextAttemptAt).toBe(start + 30);
 
     vi.setSystemTime(Date.now() + OUTBOX_GIVE_UP_SECONDS * 1000);
     await pass(worker);

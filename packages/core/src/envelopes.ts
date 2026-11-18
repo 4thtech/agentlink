@@ -759,6 +759,7 @@ export class EnvelopeService {
           refused_at: null,
           request_accepted_at: null,
           deleted_at: null,
+          availability: null,
         });
         markSeen();
         return { status: 'verified', report: report(envelope.id, 'deferred') };
@@ -1548,6 +1549,7 @@ export class EnvelopeService {
       refused_at: null,
       request_accepted_at: null,
       deleted_at: null,
+      availability: null,
     };
     const now = nowOf(ctx);
     let revoked: RevokeActivity | undefined;
@@ -1805,6 +1807,7 @@ export class EnvelopeService {
         refused_at: now,
         request_accepted_at: null,
         deleted_at: null,
+        availability: null,
       });
       return report(item.envelopeId, 'refused', {
         reason: effective.reason,
@@ -1953,6 +1956,7 @@ export async function outboundRow(
     refused_at: null,
     request_accepted_at: null,
     deleted_at: null,
+    availability: null,
   };
 }
 

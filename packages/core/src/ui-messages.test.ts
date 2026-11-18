@@ -187,6 +187,7 @@ async function put(p: Put): Promise<string> {
       refused_at: state === 'refused' ? clock.t : null,
       request_accepted_at: null,
       deleted_at: null,
+      availability: null,
     }),
   );
   return id;
