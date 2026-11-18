@@ -1,0 +1,170 @@
+// RELAY-CARD-MIGRATION (S2; 04 §2.6, §3.4.1; 07 §4.3): the owner's relay migration is a rotation to
+// keyEpoch + 1 with the migrated list; contacts learn it through card-update, which during the
+// transition also goes to the legacy relays; afterwards the identity no longer needs the migration.
+import { type KeyStore } from '@4thtech-io/crypto';
+import { MemoryKeyStore, MemoryOwnerKeyStore } from '@4thtech-io/crypto/testing';
+import {
+  DEFAULT_RELAYS,
+  LEGACY_READ_RELAYS,
+  wrapEnvelope,
+  type PublishOutcome,
+} from '@4thtech-io/transport-nostr';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { AgentLinkClient } from './client.js';
+import { MemoryStore } from './store/memory-store.js';
+import { rowKeyOf } from './store/store.js';
+import {
+  FakeClock,
+  RecordingApprovalChannel,
+  TestStoreCipher,
+  passphrase,
+  seed,
+} from './testing/fixtures.js';
+import { pairWith, type TestAgent, type TestOwner } from './testing/envelopes.js';
+import { MemoryPolicyMark } from './testing/owner.js';
+import type { TransportFactory } from './transport.js';
+
+const clock = new FakeClock();
+/** An install from before 0.5.13: its card lists the two legacy relays and one kept relay. */
+const OLD_RELAYS = Object.freeze(['wss://nos.lol', 'wss://nostr.mom', 'wss://relay.example.org']);
+
+interface Agent extends TestAgent {
+  readonly published: { readonly kind: number; readonly relays: readonly string[] }[];
+}
+
+async function agent(n: number, owner: MemoryOwnerKeyStore, relays: readonly string[]) {
+  const store = new MemoryStore();
+  const cipher = new TestStoreCipher();
+  const keyStore: KeyStore = new MemoryKeyStore(seed(n), { nowSeconds: () => clock.now() });
+  const published: Agent['published'] = [];
+  const factory: TransportFactory = (deps) => ({
+    wrap: (envelope, recipients, keys) =>
+      wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
+    publish: (event, to) => {
+      published.push({ kind: event.kind, relays: [...to] });
+      return Promise.resolve({
+        results: to.map((relay) => ({ relay, ok: true, reason: 'ok' as const })),
+        acked: [...to],
+        sent: true,
+      } as PublishOutcome);
+    },
+    sync: () =>
+      Promise.resolve({
+        partial: false,
+        delivered: 0,
+        duplicates: 0,
+        dropped: 0,
+        deferred: 0,
+        relays: [],
+      }),
+  });
+  const client = await AgentLinkClient.create({
+    keyStore,
+    store,
+    cipher,
+    approvals: new RecordingApprovalChannel(),
+    clock: clock.now,
+    transport: factory,
+    policyMark: new MemoryPolicyMark(),
+  });
+  await client.identity.init({
+    owner: await owner.unlock(passphrase()),
+    ownerKeys: await owner.getPublicKeys(),
+    name: `agent${n}`,
+    relays,
+  });
+  const testOwner = owner as unknown as TestOwner;
+  return { client, store, cipher, keyStore, owner: testOwner, id: client.agentId, published };
+}
+
+async function migrate(x: Agent, relays: readonly string[]): Promise<void> {
+  await x.client.identity.rotate({
+    owner: await x.owner.unlock(passphrase()),
+    ownerKeys: await x.owner.getPublicKeys(),
+    epochControl: x.owner.epochControl(x.keyStore),
+    relays,
+  });
+}
+
+/** The relays of the contact-role outbox rows of `x`'s card-updates. */
+async function cardUpdateContactRelays(x: Agent): Promise<string[][]> {
+  const rows = await x.store.transaction((tx) => {
+    const ids = tx
+      .select('envelopes', { direction: 'out', type: 'card-update' })
+      .map((r) => r.envelope_id);
+    return tx.select('outbox').filter((r) => ids.includes(r.envelope_id) && r.role === 'contact');
+  });
+  const out: string[][] = [];
+  for (const row of rows) {
+    const text = await x.cipher.open(
+      { table: 'outbox', column: 'relays', rowKey: rowKeyOf([row.wrap_id]) },
+      row.relays,
+    );
+    out.push(JSON.parse(text) as string[]);
+  }
+  return out;
+}
+
+const ownerA = new MemoryOwnerKeyStore(seed(171), passphrase());
+const ownerB = new MemoryOwnerKeyStore(seed(172), passphrase());
+let a: Agent;
+let b: Agent;
+
+beforeEach(async () => {
+  a = await agent(71, ownerA, OLD_RELAYS);
+  b = await agent(72, ownerB, [...DEFAULT_RELAYS]);
+  await pairWith(clock, a, b);
+  await pairWith(clock, b, a);
+});
+
+describe('identity.relayMigration (detection)', () => {
+  it('an ID whose card lists a legacy relay needs the migration, with the migrated list', async () => {
+    const got = await a.client.identity.relayMigration();
+    expect(got.status).toBe('needed');
+    if (got.status !== 'needed') return;
+    expect(got.relays).toContain('wss://relay.example.org');
+    for (const legacy of LEGACY_READ_RELAYS) expect(got.relays).not.toContain(legacy);
+    for (const r of DEFAULT_RELAYS) expect(got.relays).toContain(r);
+  });
+
+  it('an ID on the new list needs nothing', async () => {
+    expect(await b.client.identity.relayMigration()).toEqual({ status: 'current' });
+  });
+});
+
+describe('rotate({relays}) (04 §2.6, 07 §4.3)', () => {
+  it('issues the card for keyEpoch + 1 with the migrated list; the notice clears', async () => {
+    const before = await a.client.identity.signedCard();
+    const got = await a.client.identity.relayMigration();
+    if (got.status !== 'needed') throw new Error('test: expected needed');
+    await migrate(a, got.relays);
+    const after = await a.client.identity.signedCard();
+    expect(after.card.keyEpoch).toBe(before.card.keyEpoch + 1);
+    expect(after.relays).toEqual(got.relays);
+    expect(after.card.relaysHash).not.toBe(before.card.relaysHash);
+    expect(await a.client.identity.relays()).toEqual(got.relays);
+    expect(await a.client.identity.relayMigration()).toEqual({ status: 'current' });
+  });
+
+  it('refuses an invalid list before anything is signed', async () => {
+    const before = await a.client.identity.signedCard();
+    await expect(migrate(a, ['wss://only-one.example.org'])).rejects.toMatchObject({
+      code: 'relays_invalid',
+    });
+    expect((await a.client.identity.signedCard()).card.keyEpoch).toBe(before.card.keyEpoch);
+  });
+});
+
+describe('card-update after the migration', () => {
+  it('goes to every contact, also published to the legacy relays during the transition', async () => {
+    const got = await a.client.identity.relayMigration();
+    if (got.status !== 'needed') throw new Error('test: expected needed');
+    await migrate(a, got.relays);
+    expect(await a.client.sendCardUpdates()).toEqual({ sent: 1, failed: 0 });
+    const lists = await cardUpdateContactRelays(a);
+    expect(lists).toHaveLength(1);
+    for (const legacy of LEGACY_READ_RELAYS) expect(lists[0]).toContain(legacy);
+    // The contact's own list is kept as well.
+    for (const r of DEFAULT_RELAYS) expect(lists[0]).toContain(r);
+  });
+});
