@@ -1,5 +1,15 @@
 # @4thtech-io/chain
 
+## 0.5.11
+
+### Patch Changes
+
+- Updated dependencies [bfbdbf3]
+- Updated dependencies [bfbdbf3]
+- Updated dependencies [bfbdbf3]
+  - @4thtech-io/types@0.5.11
+  - @4thtech-io/crypto@0.5.11
+
 ## 0.5.10
 
 ### Patch Changes

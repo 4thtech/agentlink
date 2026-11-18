@@ -1,5 +1,12 @@
 # @4thtech-io/local-ui
 
+## 0.0.30
+
+### Patch Changes
+
+- Updated dependencies [bfbdbf3]
+  - @4thtech-io/ui@0.5.11
+
 ## 0.0.29
 
 ### Patch Changes
