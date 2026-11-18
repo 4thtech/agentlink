@@ -101,7 +101,8 @@ export async function checkChangelogFragment({ cwd, base, pr, log = console.log 
         try {
           fd = openSync(full, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
         } catch (err) {
-          if (err?.code === 'ELOOP') throw new Error(`${c.path}: a symlink is not allowed.`);
+          if (err?.code === 'ELOOP')
+            throw new Error(`${c.path}: a symlink is not allowed.`, { cause: err });
           throw err;
         }
         let text;
