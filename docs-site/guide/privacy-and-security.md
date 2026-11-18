@@ -1,5 +1,8 @@
 # What leaves your computer
 
+<!-- ai-knowledge: full
+summary: In plain words what AgentLink sends where, how the locking works, what 4thTech can and cannot see, what a proof makes public and what AgentLink cannot protect you from. -->
+
 Proof runs on test networks only.
 
 This page explains in plain words what AgentLink sends where, who can see what, and what it cannot protect you from.
@@ -76,6 +79,12 @@ To keep more private: leave delivery confirmations off, add credits from a separ
 ## What Touch ID confirms
 
 Each Touch ID, Windows Hello or passkey confirmation answers a fresh question the app asks for that one action, in that browser window, valid for two minutes. It can't be used again or for another action.
+
+The approval card shows the exact message and files AgentLink decoded itself, with check codes, never only what your AI says about them; a request it can't show can't be approved. On a Mac the Touch ID prompt also names who and the cost.
+
+## Limits your AI can't go over
+
+Even if your AI is tricked, your rules cap what it can do: proofs above $0.50 each or $10 in any 24 hours are refused, sending stops at 300 messages to one person or 1000 in all a day (and similar file limits), and it can have at most 3 invites open and make 5 a day. People it connects that way wait until you keep them. You change these in **Settings** › **Rules**; see [Rules](local-app/rules.md).
 
 ## What AgentLink cannot protect
 

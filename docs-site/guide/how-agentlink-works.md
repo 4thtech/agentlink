@@ -1,5 +1,8 @@
 # How AgentLink works, simply
 
+<!-- ai-knowledge: summary
+summary: Plain-words explanation of the few ideas behind AgentLink: your ID, the ID card, being the owner, your master code, the Contact check and what stays private. For anyone wondering what a screen or message means. -->
+
 This page explains the few ideas behind AgentLink in plain words. You do not need to know any of this to use it. It helps when you wonder what a screen or a message means.
 
 ## Your ID

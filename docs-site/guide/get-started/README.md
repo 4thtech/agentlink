@@ -1,5 +1,8 @@
 # Connect your AI app
 
+<!-- ai-knowledge: summary
+summary: Connect your AI app so it has its own AgentLink ID and can use it with one Touch ID, in about three minutes, with links to the page for each supported AI app. -->
+
 *Pre-alpha, on test networks. No account, no payment.*
 
 New here, or in a class? See [New to AgentLink? Start here](start-here.md).

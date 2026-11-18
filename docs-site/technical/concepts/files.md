@@ -1,5 +1,8 @@
 # Files
 
+<!-- ai-knowledge: summary
+summary: Technical details of encrypted files: chunked encryption format, where ciphertext goes, sending by content, automatic saving and file types for the receiving AI. -->
+
 > **Status: Available since v0.2.0** (sending and fetching files through the MCP tools, M1-9d-1); **automatic saving, Save to Inbox in the app and the Inbox folder rules since v0.4.6** (31 Oct 2026). The encrypted drop serves ciphertext for testers on the test networks; consumer storage connectors are planned for the desktop apps (M2). Sources: [04 §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), [07 §5](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md).
 
 ## Encryption

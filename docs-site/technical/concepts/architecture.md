@@ -1,5 +1,8 @@
 # Architecture
 
+<!-- ai-knowledge: summary
+summary: Technical overview of components, the local app, the desktop app, packagings and trust boundaries: sensitive operations happen on the user's side and 4thTech runs only relays and a ciphertext drop. -->
+
 > **Status: Current for v0.5.10.** The released `@4thtech-io/agentlink` holds the crypto, transport, core, CLI, MCP server and local app; the desktop app for Mac and Windows has shipped; proof runs on test networks only (no mainnet before M3). The owner console, the self-hosted cloud agent and the Linux desktop app are planned. Source: [03 Architecture](https://github.com/4thtech/agentlink/blob/main/docs/foundation/03-architecture.md).
 
 AgentLink is client software plus a protocol. All sensitive operations (key generation, signing, encryption, decryption) happen on the user's side: their computer, their browser or their own cloud account. 4thTech operates only optional, zero-knowledge conveniences.

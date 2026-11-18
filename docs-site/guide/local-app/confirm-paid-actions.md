@@ -1,5 +1,8 @@
 # Confirming paid actions
 
+<!-- ai-knowledge: summary
+summary: Which actions cost credits or change how much your AI may spend and need your confirmation with Touch ID, Windows Hello or passkey on your computer, and what to do if confirming fails. -->
+
 Some things cost credits or change how much your AI may spend. For these, AgentLink asks you to confirm on your own computer, with the check you already use to unlock it: Touch ID on a Mac, Windows Hello on Windows, or your [passkey](../help/glossary.md). Your AI can't confirm this for you.
 
 <figure><img src="../.gitbook/assets/local-rules--confirm-spending.png" alt="A sheet titled Change your spending limits, showing the per-proof limit going from $0.50 to $1, the line Your credits stay yours, and a Confirm with Touch ID button."><figcaption><p>The confirmation sheet for a spending change, with made-up data.</p></figcaption></figure>
@@ -10,7 +13,8 @@ Some things cost credits or change how much your AI may spend. For these, AgentL
 |---|---|
 | A proof costs less than your per-proof limit and fits your 24-hour budget | No. It runs on its own, inside the limits you set |
 | A proof costs more than your limit, or you set proofs to **Ask me** | Yes, on its own sheet |
-| You change a spending limit on [Rules](rules.md): proofs on or off, the 24-hour budget, the per-proof limit, or a limit for one contact | Yes |
+| A proof costs more than your hard spending limit ($0.50 per proof or $10 in any 24 hours by default) | Never asked: it is refused, and your AI tells you |
+| You change a spending limit on [Rules](rules.md): proofs on or off, the 24-hour budget, the per-proof limit, the hard spending limits, or a limit for one contact | Yes |
 | Verified registration, which costs $5 | Yes, the same way. It is not available yet |
 
 Everything else keeps its usual passkey or backup-code check. AgentLink does not hold your credits or move money for you. The sheet says so: **Your credits stay yours; 4thTech never holds them.**
@@ -19,7 +23,7 @@ Everything else keeps its usual passkey or backup-code check. AgentLink does not
 
 1. Open the sheet. For a limits change it opens when you press **Continue** after the review on [Rules](rules.md). For a proof, your AI tells you it is waiting and shows its link.
 2. Read the amount and what it is for. A limits change shows each old and new value.
-3. Choose **Confirm with Touch ID** (or **Windows Hello**, or **your passkey**). Your computer shows its own prompt. Use your fingerprint, face or PIN there.
+3. Choose **Confirm with Touch ID** (or **Windows Hello**, or **your passkey**). Your computer shows its own prompt. Use your fingerprint, face or PIN there. On a Mac the prompt also names who and the cost; on Windows its text is fixed.
 4. The sheet shows a check and closes by itself after about a second. With reduced motion turned on, it waits for **Close**.
 
 No passkey, or it won't work? Choose **Use your master code instead** (a small link under the button) and type your master code.

@@ -551,7 +551,9 @@ jobs:
           node tools/check-spec-refs.mjs
           node tools/check-ui-labels.mjs
           node tools/check-private-docs.mjs
-          # Step 2 (after the markers land): node tools/docs/build-knowledge.mjs --check
+          # DOCS-COMPACT-A: every public page carries an ai-knowledge marker and the knowledge bundle
+          # stays under its cap (22k tokens; warning above 19k).
+          node tools/docs/build-knowledge.mjs --check
 
       - name: Doc tests (vocabulary, retired scope, networks page, skill file, status, knowledge)
         working-directory: tools

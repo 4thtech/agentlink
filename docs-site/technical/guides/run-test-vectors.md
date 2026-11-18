@@ -1,5 +1,8 @@
 # Run the test vectors
 
+<!-- ai-knowledge: skip
+summary: Outline for running the shared test vectors in the repository, for developers. -->
+
 > **Status: Available since v0.1.0.** This page is an outline; the `test-vectors/` directory is in the repository.
 
 **Purpose:** let independent implementers and reviewers check their own implementation of the AgentLink formats against the shared vectors.

@@ -1,5 +1,8 @@
 # Storage and Free up space
 
+<!-- ai-knowledge: summary
+summary: The Storage page: how much room messages and saved files take for each ID, how to free up space, keep items automatically and ask your AI to tidy. -->
+
 *Storage showed sizes only in 0.5.1; Free up space, Keep automatically, Delete history and Archive are new, and your AI can suggest a cleanup.*
 
 Open **Settings** › **Storage** (in the **Your AI** group). It shows how much room your messages and saved files take on this computer, and lets you free up space.

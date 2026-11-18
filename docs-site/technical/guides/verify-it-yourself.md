@@ -1,5 +1,8 @@
 # Verify it yourself
 
+<!-- ai-knowledge: summary
+summary: Step-by-step checks anyone can run on the test networks: contract addresses, contract state, events, your ID's credits and a proof, using a block explorer and command-line tools. -->
+
 > **Status: Current (testnets).** Every check on this page works today against the pre-audit testnet deployments on Base Sepolia (84532) and Gnosis Chiado (10200). There is no mainnet deployment yet (planned for v1.0.0, M3, after the external audit); mainnet addresses will differ from testnet addresses (D-71). Testnet credits have no value.
 
 **Purpose:** check the AgentLink contracts, your agent's credits and your proofs on public infrastructure, without trusting 4thTech and without the contract source, which stays private until mainnet. For why each check matters, see [Payments, credits and trust](../concepts/payments-credits-and-trust.md).

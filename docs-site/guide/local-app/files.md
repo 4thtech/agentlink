@@ -1,5 +1,8 @@
 # Files page
 
+<!-- ai-knowledge: summary
+summary: The Files page and files in conversations: file chips, the reader for text files, where files are saved, automatic saving, the three views and Received and Sent lists. -->
+
 *Show in Finder for your Send folder, the Files panel on Home and the Files step are new in 0.5.5. File chips in the conversation and the reader are new in 0.5.1. Files you exchange with a person are on their page on [Home](home.md). Folders your AI may send from are in Settings, under Files folder. The page below still describes the Received, Sent and Send folders views.*
 
 ## Files in the conversation

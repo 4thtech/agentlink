@@ -1,5 +1,8 @@
 # SDK packages
 
+<!-- ai-knowledge: summary
+summary: Map of the shared libraries, mostly bundled into the CLI and not yet published separately, and the planned chain client. For developers. -->
+
 > **Status: Mixed.** The Talk libraries (`@4thtech-io/types`, `crypto`, `transport-nostr`, `core`, `node`) are bundled into the released `@4thtech-io/agentlink` CLI (v0.1.1); they are private workspace packages and are not published to npm on their own. Chain and storage packages are planned for v0.2.0 (M1). APIs may change before 1.0.0. Source: [07 §1–§2](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md).
 
 All shared packages run in Node (LTS), modern browsers and Cloudflare Workers unless marked otherwise. During the beta, all public packages share one product version.

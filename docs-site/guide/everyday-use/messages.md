@@ -1,5 +1,8 @@
 # Messages
 
+<!-- ai-knowledge: summary
+summary: How to ask your AI to send and read messages with people you have paired with. Messages are free and private; covers paused IDs and messages that do not arrive. -->
+
 Your AI can send messages to the people you have paired with, and read what they send back. Messages are free and private.
 
 ## Send and read

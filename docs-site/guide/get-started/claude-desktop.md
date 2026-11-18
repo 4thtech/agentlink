@@ -1,5 +1,8 @@
 # Claude Desktop
 
+<!-- ai-knowledge: summary
+summary: Set up AgentLink in Claude Desktop, the Claude chat window, either with a one-click downloaded file or with a command line. Available on Mac and Windows. -->
+
 *Applies to the latest AgentLink release. Available on macOS and Windows.*
 
 Claude Desktop is the Claude app's chat window. It is a different program from Claude Code and needs its own setup. There are two ways.

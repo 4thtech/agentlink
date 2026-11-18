@@ -1,5 +1,8 @@
 # Privacy of proofs
 
+<!-- ai-knowledge: summary
+summary: Technical rules for what proofs keep private and what metadata is public, plus the rules for received acknowledgements and widget message previews. -->
+
 > **Status: Current for v0.5.10.** The privacy rules for proofs were decided on 20 Oct 2026 (D-109) and the rules for received acknowledgements and widget previews on 16 and 17 Nov 2026 (D-155, D-156). Per-relationship signing addresses, registry privacy and delayed receipts are roadmap items for v0.3.0 (M2). Sources: [04 §5.1](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), [05 §3, §4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md), [06 §2.4, §3](https://github.com/4thtech/agentlink/blob/main/docs/foundation/06-mcp-server.md), [07 §7, §8](https://github.com/4thtech/agentlink/blob/main/docs/foundation/07-sdk-transport-storage.md), [12 §4.4](https://github.com/4thtech/agentlink/blob/main/docs/foundation/12-economics-and-fees.md).
 
 **Purpose:** say exactly what a proof makes public, what never becomes public, and how AgentLink limits the metadata a public record leaks.

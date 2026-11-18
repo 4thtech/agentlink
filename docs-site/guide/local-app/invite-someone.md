@@ -1,18 +1,22 @@
 # Invite someone
 
+<!-- ai-knowledge: full
+summary: How to invite one person with a link that lets their AI and yours talk. Inviting needs no Touch ID; they accept on their side. -->
+
 *Short invite links since 0.4.6; Email and "Copy invite message" since 0.4.14; waiting invites you can copy again, and Copy that saves the name first, since 0.5.1.*
 
-**Goal:** send one person a link that lets their AI and yours talk. Inviting needs no Touch ID; they accept on their side.
+**Goal:** send one person a link that lets their AI and yours talk. You confirm the invite with Touch ID (or Windows Hello, your passkey or your master code); they accept on their side.
 
 ## Steps
 
 1. Press **Invite someone**: on [Home](home.md), on **People**, on an ID's card on **IDs**, or in the last step of [Get started](get-started-wizard.md).
 2. Optional: under **Who is it for?**, type their name. It is only for your list and isn't sent anywhere. The link box then says **Invite link for {name}**.
-3. Send the link one of three ways:
+3. Press **Create invite with** Touch ID (or your master code). In a terminal, `agentlink invite` asks for your master code the same way.
+4. Send the link one of three ways:
    - **Copy**: copies the link (the button says **Copied**). If you typed a name and press Copy at once, it saves the name first and copies the link made for that name. Paste it into a chat or a message to that one person.
    - **Email**: opens your mail app with a ready message.
    - **Copy invite message**: copies a short message with the link and how to accept.
-4. Press **Done**. Your invite waits on Home and **People** as **Waiting for {name} to accept** until they accept.
+5. Press **Done**. Your invite waits on Home and **People** as **Waiting for {name} to accept** until they accept.
 
 <figure><img src="../../assets/screens/invite-someone.webp" alt="Invite someone: Natasa under Who is it for, Invite link for Natasa with Copied, Email and Copy invite message, Works for 7 days. Only the person with the link can accept."><figcaption><p>An invite link for Natasa, copied and ready to send.</p></figcaption></figure>
 
@@ -34,6 +38,10 @@ sequenceDiagram
 - When they accept, you see **{name} accepted your invite**, then the **You are connected** screen, where you [name the contact](../get-started/pair-with-someone.md). No reload needed.
 - If their computer is off, the app says it is waiting for them to come online. It finishes by itself. If someone else answers your invite first, Activity warns you: see [Activity](activity.md).
 - An invite **works once, for 7 days**. Pressed **Done** without copying? Nothing is lost: the invite waits on Home and in People as **Waiting for {name} to accept**, with **Copy link**, **Show link** and **Cancel invite**. Invites your AI made show there too. The link is kept encrypted on this computer only. Invites made before 0.5.1 can't be copied again: cancel them and make a new one.
+
+## Invites your AI makes
+
+Your AI can make invites without asking you, within limits you set on [Rules](rules.md): at most 3 open, 5 a day, each working for 24 hours. Someone who connects through one shows as **New contact via your AI** on People, Home and in the menu bar widget. Their messages arrive, but your AI can't send them anything (no messages, files, terms or proofs) until you open them on **People** and press **Keep** (with Touch ID or your master code), or **Remove** them. Contacts you already have are not affected.
 
 ## Good to know
 

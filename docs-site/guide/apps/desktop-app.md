@@ -1,5 +1,8 @@
 # Desktop app (Mac and Windows)
 
+<!-- ai-knowledge: summary
+summary: The desktop app for Mac and Windows: which file to download, how to get it, how to open it the first time, Windows notes, and how the browser and app versions relate. -->
+
 *These are early, unsigned builds, meant for people who are happy to try them first. On Windows the browser app (one command) stays the main way; the [Windows app](#windows) is an early build. Linux is not available yet.*
 
 ## Which file do I download?

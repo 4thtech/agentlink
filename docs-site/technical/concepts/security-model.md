@@ -1,5 +1,8 @@
 # Security model
 
+<!-- ai-knowledge: summary
+summary: The security model as shipped: the invariants, core design, owner presence, and desktop and local app security features. -->
+
 > **Status: Current for v0.5.10.** This page describes the security model as shipped in release 0.5.10. Source: [04 Security and crypto](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md), which is normative; any change to it needs a recorded decision.
 
 ## Invariants
@@ -105,6 +108,38 @@ The agent key signs only AgentLink's own EIP-712 shapes: OCC v2 records and rece
 - **The widget opens reliably,** on the current Space and over full-screen apps.
 - **A widget row opens the exact item:** a message row opens that contact's conversation, an approval row that approval. Only an ID travels, checked against a strict pattern; an unknown target opens the list.
 
+## New in 0.5.11 (D-156)
+
+### Approval cards show what is approved (08 §1, 04 §2.3.4)
+
+- **Decoded by the app.** The card shows the full message text and its files from the digest-bound stored action or the stored envelope it names (checked against its hash or record), never what the AI wrote. What the AI wrote is folded under "From your AI (not needed to decide)".
+- **Inert and whole.** Plain text; control, bidi, zero-width and similar characters shown as visible `[U+XXXX]` markers. A text over 600 code points or 12 lines is folded and Approve stays disabled until the owner shows it once. Such a request is never part of a review list.
+- **Check codes** for the envelope and each file, which the other side sees too.
+- **Fail closed.** Content that can't be read or doesn't match gives "This request can't be shown, so it can't be approved"; the server refuses an approval of it and runs no presence prompt. An approved proof whose file changed since the card is refused (`FILE_CHANGED`).
+- **The prompt names who and the cost.** On macOS the Touch ID sheet adds one plain line built by the server from the stored request ("for Ana, $0.10"; "for 3 requests" for a review list), checked again by the helper. Windows Hello takes no caller text, so its prompt stays fixed and the card and the master code step ("Approve for Ana · $0.10") carry who and the cost. The line is display-only: it binds nothing.
+- **Terminal.** `agentlink approve <id>` shows the same content in a marked region, cut at 40 lines or 2000 code points with a visible marker, then its length and check codes; the app shows every character.
+
+### Hard limits (06 §3)
+
+| Limit | Default | Above it |
+|---|---|---|
+| Ask over (`perActionMaxUSD`), budget (`dailyBudgetUSD`) | $0.20 per proof, $5 per rolling 24 hours | The owner is asked |
+| Hard ceilings (`hardMaxPerActionUSD`, `hardDailyUSD`) | $0.50 per proof, $10 per rolling 24 hours | Refused (`SPEND_CEILING`), never asked; no approval passes it, a contact rule never lifts it |
+| Sending (`outgoing.*`) | 300 messages per contact, 1000 in all, 50 files per contact, 200 in all, 2000 MB, per rolling 24 hours | Refused (`SEND_LIMIT`) with when a slot frees; nothing stored or sent |
+
+The ceilings apply in every mode and, when the policy can't be read, as defaults (fail closed). Only an owner-signed policy from the Rules page changes them; the hard ceilings are spending fields (04 §2.5.3). The sending caps protect against a runaway or steered AI using the tools; the recipient's per-contact rate limit is the backstop.
+
+### Invites the AI makes (04 §3.6, 06 §2.1)
+
+- **Capped.** `agentlink_create_invite` is limited by `contacts.aiInvites`: 3 open, 5 per rolling 24 hours (used and cancelled ones count), each valid 24 hours; over a cap `INVITE_LIMIT`. Under `acceptInvites: auto`, an accept without an owner approval counts too.
+- **Waits for the owner.** A contact paired through an AI-made invite shows as "New contact via your AI" (People, Home, the widget). Its messages arrive, but the agent sends it nothing, no message, file, terms, proof, receipt or ack, until the owner keeps it with presence (`contact.keep`) or removes it (`CONTACT_WAITING_OWNER`; `waitingForOwner` in `agentlink_list_contacts`).
+- **Owner invites need presence.** Create invite in the app and `agentlink invite` sign `invite.create` with Touch ID, Windows Hello, a passkey or the master code; they are not capped. Contacts paired before 0.5.11 are not affected.
+
+### Also in 0.5.11
+
+- The "Tell contacts when your AI receives a message" switch now saves; it still needs presence.
+- The menu bar widget counts new files only under Needs you; they clear when opened, saved or shown in Finder or Explorer, or with "Mark as seen". The widget stays read-only.
+
 ## Updates and sending
 
 - **Updater trust (D-145, D-151).** The desktop app installs an update only if it is signed by the one update key whose public half is pinned in the app. CI signs the manifest (SHA-256 of each file, channel, short validity, no downgrades) only after the owner's approval click in a protected environment. The app re-checks every signature and hash before it replaces itself. Updating never touches IDs, keys or messages.
@@ -123,12 +158,8 @@ The agent key signs only AgentLink's own EIP-712 shapes: OCC v2 records and rece
 
 Later items of D-156, in order:
 
-- Planned: approval cards that show, in full, what will be signed, decoded by the app itself, 0.5.11.
-- Planned: hard owner ceilings per proof and per day, above which nothing is signed, 0.5.11.
-- Planned: caps on invites the AI makes, with added contacts waiting until the owner keeps them, 0.5.11.
-- Planned: outgoing caps per contact and per day for messages and files, 0.5.11.
 - Planned: a message counts as sent once a relay serves it back, 0.5.12.
-- Planned: a restore guard that keeps spending and processed actions consistent after a restore, 0.5.12.
+- Planned: a restore guard for spending and processed actions, 0.5.12.
 - Planned: an on-chain spending allowance and a protected signing helper on macOS, before mainnet (M3).
 
 ## Decisions behind the mechanisms
@@ -137,10 +168,13 @@ The decisions below shape the security mechanisms on this page and in 04; each f
 
 | Decision | What it settles |
 |---|---|
+| D-48 | The encrypted drop is the default for files: ciphertext only, random object keys, at most 7 days; own storage optional |
 | D-58, D-65 | The exact bodies of owner operations, cards and pairing messages, and owner-copy relays (04 §3.4.1) |
 | D-61, D-62 | Envelope signatures, keys and size limits, and the contract rules that go with them (04 §3.1.1) |
 | D-66 | The key commitment `aead.kc` and wraps derived from the content key, so one ciphertext cannot open differently for different recipients (04 §3.3) |
 | D-69 | Invite payload compression with bounded decoding (04 §3.6) |
+| D-71 | Separate deployer keys for testnets and mainnets, so mainnet contract addresses differ from testnet ones |
+| D-72 | Requests from unknown senders: accept, ignore or block; a blocked sender is dropped before any decryption |
 | D-75 | The default relay set and how relays are vetted |
 | D-78 | One owner with several local agents: logical separation, not a security boundary (04 §2.2) |
 | D-79 | The local approval page on `localhost` and its request guards |
@@ -153,9 +187,12 @@ The decisions below shape the security mechanisms on this page and in 04; each f
 | D-117 | Design rules: backup export behind owner presence, the plain-words vocabulary, the UX north star |
 | D-119 | An owner may loosen a policy only by signing it, after acknowledging each warning |
 | D-127 | A contact's proof flag is derived from refused rows, not stored separately; no MCP tool can clear it |
+| D-128 | Owner-signed JSON is verified from the exact text received, strictly |
 | D-129 | Drop storage: the 7-day lifecycle, per-file and weekly limits, a download limit per object (07 §5.4) |
+| D-131 | The cloud agent runs in the user's own Cloudflare account, under the same owner model |
 | D-134 | Show in Finder needs no extra gesture and opens only the recorded file inside the Inbox folder, through the OS opener |
 | D-136 | Business agents run in the company's own Cloudflare account, under the same owner model as the cloud agent |
+| D-139 | Short invite links: the invite is encrypted on the user's side and only ciphertext waits on the drop; the link carries the secret |
 | D-140 | One Touch ID creates an agent and connects its AI app, as one owner operation (04 §2.8) |
 | D-141 | A rename re-signs the agent card and reaches every contact through the existing card update |
 | D-149 | Received text files open in a safe in-app reader: plain text, never executed or rendered as active content |

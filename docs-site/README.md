@@ -1,6 +1,7 @@
 # Public documentation (source)
 
 <!-- version-banner:start -->
+*Applies to AgentLink 0.5.10 (pre-alpha, test networks).*
 <!-- version-banner:end -->
 
 This folder is the only source of AgentLink's public documentation. At each release tag, [`tools/docs/wiki-sync.mjs`](../tools/docs/wiki-sync.mjs) generates the AgentLink section of [4thTech Docs](https://wiki.4thtech.io) from it; never edit that copy. It is separate from [`docs/`](../docs/README.md), which holds the internal specifications, process and runbooks.

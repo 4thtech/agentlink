@@ -39,13 +39,7 @@ describe('the real status file', () => {
   it('is in sync with README.md and the docs-site page in this repository', () => {
     const { problems, skipped } = run({ root: repo, check: true });
     expect(problems).toEqual([]);
-    // The knowledge base carries the markers. DOCS-COMPACT-A: the banner, threat-model and
-    // llms.txt generators are skipped until Step 2 adds their markers; then this is [] again.
-    expect(
-      skipped.filter(
-        (s) => !/version-banner|threat-model-table|llms\.txt has no generated/.test(s),
-      ),
-    ).toEqual([]);
+    expect(skipped).toEqual([]); // every target carries its markers, so nothing is skipped
   });
 });
 

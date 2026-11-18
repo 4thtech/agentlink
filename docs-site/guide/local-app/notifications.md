@@ -1,5 +1,8 @@
 # Notifications
 
+<!-- ai-knowledge: summary
+summary: The notification bell, desktop notifications and Settings > Notifications: what counts as new and how to choose what you hear about. -->
+
 *The bell and Settings › Notifications are new in 0.5.4. In 0.5.5 a click opens the right place, other IDs are covered and notifications stay quiet while the window is in front.*
 
 ## The bell

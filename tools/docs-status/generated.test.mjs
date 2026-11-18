@@ -54,22 +54,20 @@ describe('version banner', () => {
     ]);
   });
 
-  it('is generated into marked files, and then stray stamps fail the check', () => {
+  it('keeps the marked banner current, and a stray stamp fails the check', () => {
     const root = copyRepo();
-    edit(root, 'docs-site/guide/README.md', (t) =>
-      t.replace(
-        /^# .*\n/,
-        (h) => `${h}\n<!-- version-banner:start -->\n<!-- version-banner:end -->\n`,
-      ),
+    const readme = 'docs-site/guide/README.md';
+    edit(root, readme, (t) =>
+      t.replace(/Applies to AgentLink \d+\.\d+\.\d+/, 'Applies to AgentLink 0.0.1'),
     );
+    edit(root, 'docs-site/guide/pricing.md', (t) => `${t}\n*Applies to AgentLink 0.5.8.*\n`);
     const checked = run({ root, check: true });
     expect(checked.problems.some((p) => /guide\/README\.md is out of date/.test(p))).toBe(true);
-    // The stamps still on the pages are reported once a banner exists.
-    expect(
-      checked.problems.filter((p) => /a version stamp outside/.test(p)).length,
-    ).toBeGreaterThan(10);
+    expect(checked.problems.filter((p) => /a version stamp outside/.test(p))).toEqual([
+      expect.stringMatching(/^docs-site\/guide\/pricing\.md:\d+: /),
+    ]);
     run({ root });
-    expect(readFileSync(join(root, 'docs-site/guide/README.md'), 'utf8')).toMatch(
+    expect(readFileSync(join(root, readme), 'utf8')).toMatch(
       /<!-- version-banner:start -->\n\*Applies to AgentLink \d+\.\d+\.\d+ \(pre-alpha, test networks\)\.\*\n<!-- version-banner:end -->/,
     );
   });
@@ -78,10 +76,10 @@ describe('version banner', () => {
 describe('threat model', () => {
   it('copies the 04 §7 table and makes bare section refs explicit', () => {
     const spec =
-      '## 6. X\n\n## 7. Threat model\n\n| Threat | Mitigation |\n|---|---|\n| **A** | B (§3.5, 07 §4.2) |\n\n---\n\n## 8. Rules\n| not | this |\n';
+      '## 6. X\n\n## 7. Threat model\n\n| Threat | Mitigation |\n|---|---|\n| **A** | B (§3.5, 07 §4.2, `x.md` §4.8) |\n\n---\n\n## 8. Rules\n| not | this |\n';
     expect(extractThreatTable(spec)).toHaveLength(3);
     expect(renderThreatModel(spec)).toBe(
-      '| Threat | Mitigation |\n|---|---|\n| **A** | B (04 §3.5, 07 §4.2) |',
+      '| Threat | Mitigation |\n|---|---|\n| **A** | B (04 §3.5, 07 §4.2, `x.md` §4.8) |',
     );
     expect(() => extractThreatTable('## 6. X\n')).toThrow(/no "## 7. Threat model"/);
   });
@@ -89,10 +87,14 @@ describe('threat model', () => {
   it('renders every row of the real spec into a marked page', () => {
     const root = copyRepo();
     const page = 'docs-site/technical/concepts/threat-model.md';
-    edit(
-      root,
-      page,
-      (t) => `${t}\n<!-- threat-model-table:start -->\n<!-- threat-model-table:end -->\n`,
+    edit(root, page, (t) =>
+      t.replace(
+        /(<!-- threat-model-table:start -->)[\s\S]*(<!-- threat-model-table:end -->)/,
+        '$1\n$2',
+      ),
+    );
+    expect(run({ root, check: true }).problems.join('\n')).toMatch(
+      /threat-model\.md is out of date/,
     );
     run({ root });
     const spec = readFileSync(join(root, 'docs/foundation/04-security-and-crypto.md'), 'utf8');
@@ -126,6 +128,7 @@ describe('llms.txt', () => {
 
   it('is left alone without the notice', () => {
     const root = copyRepo();
+    writeFileSync(join(root, 'llms.txt'), '# Hand-written\n');
     const { skipped } = run({ root, check: true });
     expect(skipped).toContain('llms.txt has no generated notice; skipped');
   });

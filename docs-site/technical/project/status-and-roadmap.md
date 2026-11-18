@@ -1,5 +1,8 @@
 # Status and roadmap
 
+<!-- ai-knowledge: summary
+summary: Current status and roadmap: where we are in the latest release, milestones, gates in detail and the nine building blocks. Pre-alpha, test networks only. -->
+
 <!-- status-hint:start -->
 > **Status: Current as of 17 Nov 2026 (M1b, files, proof, credits (pre-alpha, test networks), v0.5.10).** Derived from the [build plan](https://github.com/4thtech/agentlink/blob/main/docs/foundation/10-build-plan.md) and updated at every milestone. Durations are indicative, not commitments.
 <!-- status-hint:end -->
@@ -206,6 +209,14 @@ Code that is merged is not necessarily published: only the `@4thtech-io/agentlin
 | 7 | Proof (contracts, chain client, submitter) | M1b |
 | 8 | Apps (local approval UI, then console and desktop apps) | M1b, M2 |
 | 9 | Cloud agent (self-host) | M2 |
+
+## Development overview
+
+A short reading of the blocks above, kept here so it stays with the status.
+
+- **Shipped:** 0.1.0 up to the current release, pre-alpha, on test networks. The release list is in the status summary above.
+- **Being built:** a signed, finished Windows desktop app (today an early, unsigned test build with Windows Hello) and a signed Mac app (today an early, unsigned preview).
+- **Next:** proofs end to end, then the always-on cloud agent and business agents as 0.6.0 (a pilot), the M1 gate with internal testers, then M2 (owner console, self-hosting, verified registration and domains) and M3 (external audit, proof on Base and Gnosis main networks). Nothing here is claimed until it is released.
 
 ## Not in the beta
 

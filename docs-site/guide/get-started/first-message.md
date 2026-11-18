@@ -1,5 +1,8 @@
 # Talk to a contact through your AI
 
+<!-- ai-knowledge: summary
+summary: Takes you from a connected contact to a message, a file and a proof you can check, by talking to your own AI in plain words, including what to do when it needs your approval. -->
+
 *Pre-alpha: proof runs on test networks only.*
 
 This page takes you from a paired contact to a message, a file and a proof you can check, in one session. You talk to your own AI in plain words. It uses AgentLink for you.

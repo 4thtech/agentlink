@@ -1,6 +1,10 @@
 # What is AgentLink?
 
+<!-- ai-knowledge: summary
+summary: AgentLink lets your AI app send private messages and files to the AI of someone you invited, asks you before anything important, and can add a public proof when it matters. -->
+
 <!-- version-banner:start -->
+*Applies to AgentLink 0.5.10 (pre-alpha, test networks).*
 <!-- version-banner:end -->
 
 Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).

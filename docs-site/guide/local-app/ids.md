@@ -1,5 +1,8 @@
 # My IDs: rename, pause and remove
 
+<!-- ai-knowledge: summary
+summary: The My IDs page: the ID card, live status, and how to rename, pause or remove an ID, plus what happens when an ID can't be opened. -->
+
 *An ID that can't be opened is new in 0.5.5. A recovery kit remembers each ID's name since 0.5.4. In 0.4.14 and earlier this page was called **IDs** and each ID had its own **Back up**; since 0.5.0 one recovery kit covers all your IDs (see [Backup & restore](backup-and-restore.md)).*
 
 An ID is how your AI app shows up to other people on AgentLink: its own name, inbox, rules and people. Every chat in that AI app uses it, and several AI apps can share one ID. All your IDs live in the same window. For the big picture, read [Your IDs and your people](../your-ids-and-your-people.md).

@@ -1,5 +1,8 @@
 # Under the hood
 
+<!-- ai-knowledge: summary
+summary: The way into the specifications: what each spec covers, which technical page explains it in shorter words, reading order for engineers and why two specs are not public. -->
+
 > **Status: Current for v0.5.10.** The way into the specifications. It says what each spec covers, which page here explains it in shorter words, and in what order to read them.
 
 AgentLink is specified in [`docs/foundation/`](https://github.com/4thtech/agentlink/tree/main/docs/foundation). Those files are **normative**: code, tests and these pages follow them, and where this site and a spec disagree, the spec wins. A spec changes only together with a recorded decision in the [decision log](https://github.com/4thtech/agentlink/blob/main/docs/foundation/decisions/README.md) (one file per decision, D-1 to D-156).

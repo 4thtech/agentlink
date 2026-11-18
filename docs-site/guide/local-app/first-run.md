@@ -1,5 +1,8 @@
 # Your master code and recovery kit
 
+<!-- ai-knowledge: summary
+summary: Explains your master code and recovery kit, the two things that keep you in charge of your IDs when your fingerprint reader or computer is not there, and first run on any computer. -->
+
 *Saving a recovery kit in the app is new in 0.4.14; one kit for all your IDs, the save checklist and restoring in the app are new in 0.5.0. The words "backup code" and "owner code" became **master code** in 0.4.14; it is the same code.*
 
 Two things keep you in charge of your IDs when your fingerprint reader or your computer is not there: your **master code** and your **recovery kit**.

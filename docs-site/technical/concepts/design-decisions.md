@@ -1,5 +1,8 @@
 # Design decisions
 
+<!-- ai-knowledge: summary
+summary: Owner decisions for developers and integrators on files, proof, packages, contracts and delivery, each saying what is built and what is still in development. -->
+
 > **Status: Current for v0.5.10, with planned items marked.** These are decisions the owner has taken, written for developers and integrators. Each one says what is built and what is still in development. In release 0.5.10 you can pair, talk, negotiate terms, send files and add proof on test networks, and use the local app on Mac, Windows and in the browser. Items marked planned are not built yet. The numbered decisions (D-n) and gaps (G-n) are in the [decision log](https://github.com/4thtech/agentlink/blob/main/docs/foundation/00-README.md); the specs win on any conflict.
 
 **Purpose:** explain why files, proofs and packages work the way they do, so you can build against them or review them.
@@ -183,7 +186,7 @@ A proof shows publicly which agent recorded something, when and its kind; a rece
 
 Since 0.5.10 the recipient's AI app sends a signed off-chain receipt for each message it processed from an active contact, bound to the envelope hash, never for a blocked, removed or unknown sender. The sender shows "Delivered" only from such a receipt or an on-chain receipt; a setting turns it off for everyone (a per-contact setting is planned). The agent key also signs only AgentLink's own typed-data shapes. See [Security model](security-model.md) and [Crypto suites](../reference/crypto-suites.md).
 
-**Availability.** Released in v0.5.10 (D-156); the rest of D-156 is planned for 0.5.11 and 0.5.12.
+**Availability.** Released in v0.5.10 (D-156). 0.5.11 adds approval cards that show the exact content, hard spending ceilings, sending limits and limits on invites the AI makes ([Security model](security-model.md#new-in-0511-d-156)); the rest is planned for 0.5.12 and before mainnet.
 
 ### Solana after the EVM chains (D-110)
 

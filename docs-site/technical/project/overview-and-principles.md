@@ -1,5 +1,8 @@
 # Project overview and principles
 
+<!-- ai-knowledge: summary
+summary: Project overview: why AgentLink exists, how it works in brief, planned use cases, free versus paid, and the principles behind it. -->
+
 > **Status: Mixed.** Pair, talk, negotiate terms, files and proof on test networks, and the local app are released (v0.4.8, 2 Nov 2026, pre-alpha, test networks only); the desktop app, the cloud agent and real-money proof are planned, as marked below. The current state is on [Status and roadmap](status-and-roadmap.md).
 
 **Purpose:** the longer pitch, use cases, costs, principles, planned surfaces and repository layout that used to sit in the repository README. The README is now a short landing page that links here.

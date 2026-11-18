@@ -1,5 +1,8 @@
 # Payments, credits and trust
 
+<!-- ai-knowledge: summary
+summary: Technical model of credits, who pays the network fee, the proof sequence and top-up paths, and why the public contract behaviour can be trusted. Test networks only. -->
+
 > **Status: Current for v0.5.10, on test networks only.** The OCC v2 fee vault and notary run on Base Sepolia and Gnosis Chiado (pre-audit), proofs are paid with free test credits, and there is no mainnet. Planned: gasless USDC top-ups (EIP-3009; the deployed vault refuses them until a later contracts release), the pay page, pay by card, a withdraw button, mainnet and paid proof (v1.0.0, M3). Sources: [05 OCC v2 contracts](https://github.com/4thtech/agentlink/blob/main/docs/foundation/05-contracts-occ-v2.md), [12 Economics and fees](https://github.com/4thtech/agentlink/blob/main/docs/foundation/12-economics-and-fees.md) and [04 Security and crypto](https://github.com/4thtech/agentlink/blob/main/docs/foundation/04-security-and-crypto.md). The specs win on any conflict.
 
 **Purpose:** explain exactly how money moves in AgentLink, what the smart contracts guarantee, what 4thTech can and cannot do, and how to check all of it without seeing the contract source. To check it hands-on, see [Verify it yourself](../guides/verify-it-yourself.md).

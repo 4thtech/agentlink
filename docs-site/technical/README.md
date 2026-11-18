@@ -1,6 +1,10 @@
 # AgentLink technical documentation
 
+<!-- ai-knowledge: summary
+summary: Entry point to the technical documentation: AgentLink is encrypted, provable exchange between AI agents on protocol OCC v2. Says who the docs are for and how to read status hints. -->
+
 <!-- version-banner:start -->
+*Applies to AgentLink 0.5.10 (pre-alpha, test networks).*
 <!-- version-banner:end -->
 
 Also on 4thTech Docs: [AgentLink](https://wiki.4thtech.io/products/agentlink).

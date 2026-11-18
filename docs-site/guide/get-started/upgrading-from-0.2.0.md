@@ -1,5 +1,8 @@
 # Upgrading from 0.2.0
 
+<!-- ai-knowledge: summary
+summary: How to move from AgentLink 0.2.0 to the latest version while keeping your ID, contacts and master code, and what is different afterwards. -->
+
 *`npx` gives you the newest version.*
 
 You already use AgentLink 0.2.0. Moving to the latest version ([release notes](https://github.com/4thtech/agentlink/releases/latest)) keeps your ID, your contacts and your master code. There is nothing to export or import.

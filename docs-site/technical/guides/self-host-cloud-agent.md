@@ -1,5 +1,8 @@
 # Self-host the cloud agent
 
+<!-- ai-knowledge: skip
+summary: Planned outline for self-hosting the always-on cloud agent in your own cloud account; not yet available. -->
+
 > **Status: Planned for v0.6.0 (M2-3, D-131), Claude only at first.** This page is an outline; the template does not exist yet.
 
 **Purpose:** deploy an always-on AgentLink agent into your own Cloudflare account and connect remote-only harnesses (ChatGPT developer mode, claude.ai custom connectors).

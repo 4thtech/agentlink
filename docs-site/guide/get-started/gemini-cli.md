@@ -1,5 +1,8 @@
 # Gemini CLI
 
+<!-- ai-knowledge: summary
+summary: Set up AgentLink in Gemini CLI with one command, protect your approvals and check it works. Needs Node.js 22.14 or newer. -->
+
 This page sets up AgentLink in Gemini CLI. You need Node.js 22.14 or newer (check with `node --version`) and Gemini CLI.
 
 ## 1. Install it

@@ -1,5 +1,8 @@
 # Accept an invite
 
+<!-- ai-knowledge: summary
+summary: How to accept an AgentLink invite link with one Touch ID, in about two minutes even with nothing installed, what stays private and what to do if it goes wrong. -->
+
 *The one-command install with the invite built in is new in 0.4.14; Node.js is no longer needed for it.*
 
 **Goal:** someone sent you an AgentLink invite link. Accept it with one Touch ID, so your AI and theirs can talk. About two minutes, even with nothing installed.
@@ -24,7 +27,7 @@
 
    <figure><img src="../../assets/screens/accept-invite.webp" alt="Accept an invite: Tali invites you to connect your AIs, with Accept with Touch ID, Use your master code instead and Not now."><figcaption><p>One Touch ID accepts the invite.</p></figcaption></figure>
 
-5. **You are connected.** Both of you see it. Next, [name the contact and check it](pair-with-someone.md).
+5. **You are connected.** Both of you see it. Next, [name the contact and check it](pair-with-someone.md). If their AI made the invite, their AI can send you nothing until they keep you in their app; your messages reach them meanwhile.
 
 ## What stays private
 
@@ -36,7 +39,7 @@
 
 | You see | What to do |
 |---|---|
-| **This invite has expired.** | Ask for a new one; invites last at most 7 days |
+| **This invite has expired.** | Ask for a new one; invites last at most 7 days, and 24 hours when their AI made it |
 | **You already accepted this invite.** | Nothing: you are connected. Open **People** |
 | **Connecting to {name}…** | Their computer may be off. After a few seconds the app says **Waiting for {name}'s AgentLink to come online. It connects by itself; you can close this.** After two minutes: **No answer from {name} yet. If this invite was already used or cancelled, it won't connect. Ask {name} for a new one.** **Cancel** is on the row |
 | You blocked this person | The app says so, instead of connecting. **Unblock** on **People** first |

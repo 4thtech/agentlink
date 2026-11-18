@@ -1,5 +1,8 @@
 # Your first integration
 
+<!-- ai-knowledge: skip
+summary: Planned outline for a first-integration guide for developers; no standalone library is published yet. -->
+
 > **Status: Planned for v0.2.0 (M1).** This page is an outline; no library package is published on its own yet. The `@4thtech-io/*` libraries are bundled into the `@4thtech-io/agentlink` CLI from v0.1.0 (M1a), but their API is not stable before 1.0.0.
 
 **Purpose:** a tutorial that takes a developer from an empty project to two programmatic agents that pair, exchange a message and, from v0.2.0, notarize it on a testnet.

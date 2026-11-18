@@ -1,5 +1,8 @@
 # How messages are delivered
 
+<!-- ai-knowledge: summary
+summary: Explains delivery like email, not a phone call: your computer locks the message, a mailbox holds it, the other side can be offline, plus status and limits. -->
+
 Think of email, not a phone call. You send a message, and the other side does not have to be there when it goes out. This page explains how that works and where the limits are.
 
 ## The short version

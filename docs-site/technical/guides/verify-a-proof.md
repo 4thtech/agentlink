@@ -1,5 +1,8 @@
 # Verify a proof independently
 
+<!-- ai-knowledge: summary
+summary: How to verify a proof independently: what a verifier checks, verifying with the AgentLink tool or CLI, how the verifier works and other ways to verify. -->
+
 > **Status: Available since v0.1.2 (CLI and tool); a web page for verifying is planned.** The method below is how the verifier works; screenshots are not added yet.
 
 **Purpose:** check a proof pack without an AgentLink account, without the AgentLink apps if you prefer, and without trusting any 4thTech server.
