@@ -86,7 +86,7 @@ describe('restore mark item', () => {
     const stored = keychain.items.get(keychainAccount(AGENT, RESTORE_MARK_ITEM));
     // Written on an update (no mark yet): the reason is for the card copy only.
     expect(stored).toEqual(encodeRestoreMark(NOW, 'update'));
-    expect(await mark.reason()).toBe('update');
+    expect(await mark.reason?.()).toBe('update');
   });
 
   it('a damaged item starts a guard window now and is replaced (fail closed)', async () => {
@@ -107,7 +107,7 @@ describe('restore mark item', () => {
     }
     const keychain = new MemKeychain();
     keychain.items.set(keychainAccount(AGENT, RESTORE_MARK_ITEM), encodeRestoreMark(NOW - 5));
-    expect(await markOver(keychain).reason()).toBe('restore');
+    expect(await markOver(keychain).reason?.()).toBe('restore');
   });
 
   it('a mark in the future is kept (never lowered to now)', async () => {
