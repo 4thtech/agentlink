@@ -867,19 +867,11 @@ describe('CI-HEAVY-ON-RELEASE: isReleasePr and the workflow wiring', () => {
     expect(isReleasePr('anything', 'xrel0512/integration')).toBe(false);
   });
 
-  it('a title rename re-runs CI: edited is a trigger, every job runs for it only with a title change', () => {
+  it('pull_request.types does not include edited (a skipped job passes a required check)', () => {
     const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
-    expect(ci).toMatch(/types: \[opened, synchronize, reopened, ready_for_review, edited\]/);
-    const guard = "(github.event.action != 'edited' || github.event.changes.title != null)";
-    for (const j of ['detect', 'context-budget', 'stale-precheck', 'ci-gate']) {
-      const start = ci.indexOf(`\n  ${j}:\n`);
-      const ifLine = ci
-        .slice(start)
-        .split('\n')
-        .find((l) => l.startsWith('    if:'));
-      expect(ifLine, j).toContain(guard);
-    }
-    expect(ci).toContain("'-edit-noop'");
+    const types = ci.match(/^ {4}types: \[([^\]]*)\]/m);
+    expect(types?.[1]).toBeTruthy();
+    expect(types[1]).not.toMatch(/edited/);
   });
 
   it('e2e-browser builds and tests the full set on a release PR', () => {

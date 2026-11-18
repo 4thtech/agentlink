@@ -42,10 +42,11 @@ name: CI
 # forward (decision 54 item 2).
 on:
   pull_request:
-    # CI-HEAVY-ON-RELEASE: `edited` lets a rename to `RELEASE <version>` re-run the suite. Every
-    # job runs for it only when the title changed (`github.event.changes.title`); a body edit
-    # (such as the review lines record-ir.py writes) runs nothing and cancels nothing.
-    types: [opened, synchronize, reopened, ready_for_review, edited]
+    # CI-HEAVY-ON-RELEASE: there is deliberately no `edited` type. A skipped job counts as passing for a
+    # required check, so a body edit (record-ir.py) must never start a run. Renaming a PR to
+    # `RELEASE <version>` does not rerun CI: open release PRs with that title (tools/pr/open-pr.mjs) or
+    # from a rel*/release branch; after a rename, push a commit or rerun the workflow.
+    types: [opened, synchronize, reopened, ready_for_review]
     branches-ignore: [sync]
   # OPS-FASTLANE-4: a push runs only on the release branches (the heavy lane); a feature-branch push
   # is covered by its pull request run, so it no longer doubles CI.
@@ -55,7 +56,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}${{ github.event.action == 'edited' && github.event.changes.title == null && '-edit-noop' || '' }}
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   # A newer push to a branch or PR supersedes the older run; runs on `main` are never cancelled.
   cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main') }}
 
@@ -68,9 +69,8 @@ jobs:
   detect:
     name: detect
     # Draft pull requests skip the suite. `github.event.pull_request` is null on push and merge_group
-    # runs, so there the condition is true and nothing changes. An `edited` event runs only when the
-    # title changed.
-    if: github.event.pull_request.draft != true && (github.event.action != 'edited' || github.event.changes.title != null)
+    # runs, so there the condition is true and nothing changes.
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -1242,7 +1242,7 @@ jobs:
   # on a docs-only repository too and does not depend on `detect`. A missing file passes.
   context-budget:
     name: context-budget
-    if: github.event.pull_request.draft != true && (github.event.action != 'edited' || github.event.changes.title != null)
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -1341,7 +1341,7 @@ jobs:
   # base branch name comes through `env:` and is validated; no event text reaches a script body.
   stale-precheck:
     name: stale-precheck
-    if: github.event_name == 'pull_request' && github.event.pull_request.draft != true && (github.event.action != 'edited' || github.event.changes.title != null)
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft != true
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -1432,7 +1432,7 @@ jobs:
     # `ci-gate (push)` is what release.yml and the deploy-*.yml workflows require.
     name: ${{ github.event_name == 'push' && 'ci-gate (push)' || 'ci-gate' }}
     needs: [detect, checks, e2e-browser, docs-checks, vectors, keychain, path-guard, node-os, windows-smoke, context-budget, relays-docker, storage-minio, bundle-check, changesets, stale-precheck, e2e-deterministic]
-    if: always() && (github.event.action != 'edited' || github.event.changes.title != null)
+    if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
