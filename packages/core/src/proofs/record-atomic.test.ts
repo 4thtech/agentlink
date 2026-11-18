@@ -143,6 +143,7 @@ async function sendText(from: Agent, to: Agent, text: string): Promise<string> {
 
 const proofRows = (agent: Agent) => agent.store.transaction((tx) => tx.select('proofs'));
 const ledger = (agent: Agent) => agent.store.transaction((tx) => tx.select('budget_ledger'));
+const onChain = (recordId: string) => chain.records.get(recordId);
 const signedRows = async (agent: Agent) =>
   (await proofRows(agent)).filter((r) => {
     const item = parseJson(r.record_json) as { signature?: unknown };
@@ -220,7 +221,7 @@ describe('parallel proof requests never overspend (SEC-RECORD-ATOMIC)', () => {
 });
 
 describe('a failure between reserving and storing fails closed (SEC-RECORD-ATOMIC)', () => {
-  it('a signing failure keeps the fee reserved, signs nothing again, and frees it only after the deadline', async () => {
+  it('a signing failure keeps the fee reserved; a retry signs the same Record, charged once', async () => {
     const { a, b } = await twoAgents();
     const envelopeId = await sendText(a, b, 'one');
     a.hook = () => {
@@ -231,23 +232,102 @@ describe('a failure between reserving and storing fails closed (SEC-RECORD-ATOMI
     expect((await ledger(a)).map((e) => e.state)).toEqual(['reserved']);
     expect(await signedRows(a)).toEqual([]);
     expect(chain.calls.notarize).toBe(0);
+    const [unsigned] = await proofRows(a);
+    // While unsigned, the proof reads as pending, never as an unknown state.
+    expect(await a.client.getProof({ envelopeId })).toMatchObject({
+      status: 'pending',
+      recordId: unsigned!.record_id,
+    });
 
-    // A retry before the deadline neither signs nor reserves again.
+    // A retry re-signs the SAME Record under the held reservation: no second reservation.
     a.hook = undefined;
-    const retry = await a.client.notarize({ envelopeId });
-    expect(retry.status).not.toBe('ok');
-    expect(a.signed).toHaveLength(1);
-    expect(await ledger(a)).toHaveLength(1);
-    expect(await a.client.proofs.resubmitPending()).toMatchObject({ replaced: 0 });
-    expect((await ledger(a)).map((e) => e.state)).toEqual(['reserved']);
-
-    // Past the deadline, with nothing on-chain, the reservation is released; a new call records.
-    clock.t += 3601 + 60;
-    await a.client.proofs.resubmitPending();
-    expect((await ledger(a)).map((e) => e.state)).toEqual(['released']);
-    expect(await a.client.notarize({ envelopeId })).toMatchObject({ status: 'ok' });
+    expect(await a.client.notarize({ envelopeId })).toMatchObject({
+      status: 'ok',
+      recordId: unsigned!.record_id,
+    });
+    expect(a.signed.map((r) => r.recordId)).toEqual([unsigned!.record_id, unsigned!.record_id]);
+    expect((await ledger(a)).map((e) => e.state)).toEqual(['charged']);
     expect(chain.calls.notarize).toBe(1);
     expect(chain.creditOf(a.id)).toBe(9n * FEE_UNITS);
+  });
+
+  it('a signing failure is re-signed by the next pass without a retry', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b, 'one');
+    a.hook = () => {
+      throw new Error('test: signer unavailable');
+    };
+    await expect(a.client.notarize({ envelopeId })).rejects.toThrow();
+    const [unsigned] = await proofRows(a);
+    a.hook = undefined;
+    await a.client.proofs.resubmitPending();
+    expect(onChain(unsigned!.record_id)).toBeDefined();
+    expect((await ledger(a)).map((e) => e.state)).toEqual(['charged']);
+    expect(chain.creditOf(a.id)).toBe(9n * FEE_UNITS);
+  });
+
+  it('an unsigned Record past its deadline is replaced, never lost; still one charge', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b, 'one');
+    a.hook = () => {
+      throw new Error('test: signer unavailable');
+    };
+    await expect(a.client.notarize({ envelopeId })).rejects.toThrow();
+    a.hook = undefined;
+    clock.t += 3601 + 60;
+    expect(await a.client.proofs.resubmitPending()).toMatchObject({ replaced: 1, recorded: 1 });
+    expect((await ledger(a)).map((e) => e.state).sort()).toEqual(['charged', 'released']);
+    expect(await a.client.getProof({ envelopeId })).toMatchObject({ status: 'announced' });
+    expect(chain.calls.notarize).toBe(1);
+    expect(chain.creditOf(a.id)).toBe(9n * FEE_UNITS);
+  });
+
+  it('a transient signer failure during an automatic replacement is retried, not lost', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b, 'one');
+    chain.censor = true;
+    expect(await a.client.notarize({ envelopeId })).toMatchObject({ status: 'submitted' });
+    clock.t += 3601 + 60;
+    // Still censored: the first Record does not land, and its replacement's signer fails.
+    let failed = 0;
+    a.hook = () => {
+      failed += 1;
+      throw new Error('test: signer unavailable');
+    };
+    await a.client.proofs.resubmitPending().catch(() => undefined);
+    expect(failed).toBe(1);
+    expect((await proofRows(a)).map((r) => r.status).sort()).toEqual(['replaced', 'signing']);
+    a.hook = undefined;
+    chain.censor = false;
+    await a.client.proofs.resubmitPending();
+    const live = (await proofRows(a)).filter((r) => r.status === 'announced');
+    expect(live).toHaveLength(1);
+    expect(onChain(live[0]!.record_id)).toBeDefined();
+    expect((await ledger(a)).map((e) => e.state).sort()).toEqual(['charged', 'released']);
+    expect(chain.creditOf(a.id)).toBe(9n * FEE_UNITS);
+  });
+
+  it('an unsigned row whose Record the chain already shows is reconciled: recorded and charged', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b, 'one');
+    // The Record landed (an earlier copy of this store signed it) but this store kept no signature.
+    a.hook = (built) => {
+      chain.put(built.record);
+      throw new Error('test: crash before the signature was stored');
+    };
+    await expect(a.client.notarize({ envelopeId })).rejects.toThrow();
+    a.hook = undefined;
+    // A failed chain read keeps it reserved and unsigned (fail closed).
+    chain.stateReadsFail = true;
+    chain.readsFail = true;
+    await a.client.proofs.resubmitPending().catch(() => undefined);
+    expect((await ledger(a)).map((e) => e.state)).toEqual(['reserved']);
+    expect((await proofRows(a)).map((r) => r.status)).toEqual(['signing']);
+    chain.stateReadsFail = false;
+    chain.readsFail = false;
+    await a.client.proofs.resubmitPending();
+    expect((await ledger(a)).map((e) => e.state)).toEqual(['charged']);
+    expect(['recorded', 'announced']).toContain((await proofRows(a))[0]!.status);
   });
 
   it('a reservation released while signing: the signature is never stored or submitted', async () => {
