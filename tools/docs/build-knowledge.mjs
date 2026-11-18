@@ -58,8 +58,12 @@ function maskCode(text) {
  */
 export function cleanBody(text, link) {
   const { masked, restore } = maskCode(text);
-  let out = masked
-    .replace(/<!--[\s\S]*?-->/g, '')
+  let stripped = masked;
+  for (let prev = null; prev !== stripped; ) {
+    prev = stripped;
+    stripped = stripped.replace(/<!--[\s\S]*?-->/g, '');
+  }
+  let out = stripped
     .replace(/<figure>[\s\S]*?<\/figure>/g, '')
     .replace(/<img\b[^>]*>/g, '')
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')

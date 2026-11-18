@@ -39,8 +39,12 @@ export function headingAnchors(text) {
     if (fence !== null || f) continue;
     const h = /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line);
     if (!h) continue;
-    const base = h[1]
-      .replace(/<[^>]+>/g, '')
+    let heading = h[1];
+    for (let prev = null; prev !== heading;) {
+      prev = heading;
+      heading = heading.replace(/<[^>]+>/g, '');
+    }
+    const base = heading
       .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
       .toLowerCase()
       .replace(/[^\p{L}\p{N}\p{M}_ -]/gu, '')

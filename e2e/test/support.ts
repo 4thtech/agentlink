@@ -361,7 +361,8 @@ export async function ownerKeepsWaitingContact(agent: TestAgent): Promise<void> 
   try {
     const { client } = opened.agent;
     const waiting = (await client.contacts.list()).filter((c) => c.waitingForOwner === true);
-    if (waiting.length !== 1) throw new Error(`expected one waiting contact, saw ${waiting.length}`);
+    if (waiting.length !== 1)
+      throw new Error(`expected one waiting contact, saw ${waiting.length}`);
     const issuedAt = Math.floor(Date.now() / 1000);
     const keys = await agent.owner.getPublicKeys();
     const body: JsonObject = {

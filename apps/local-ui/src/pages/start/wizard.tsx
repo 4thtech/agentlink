@@ -664,7 +664,11 @@ export function InviteStep({
           {I.skip}
         </Button>
         {done ? (
-          <Button variant={panel === undefined ? 'secondary' : 'primary'} size="lg" onClick={onHome}>
+          <Button
+            variant={panel === undefined ? 'secondary' : 'primary'}
+            size="lg"
+            onClick={onHome}
+          >
             {I.done}
           </Button>
         ) : null}
