@@ -80,3 +80,8 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 - 0.5.7: Home Files panel shows the Send folder correctly. Owner confirmed Mac in-app update 0.5.6 → 0.5.7.
 - 0.5.8: choose Send and Inbox folders in Finder/Explorer; Windows updates clean up after themselves.
 - Next: owner checks Windows and browser updates; follow-up cards.
+
+## 2026-11-18 — 0.5.12 release PR, docs rename, 0.5.13 started
+- Docs folder rename merged (#846): docs/ (user guide, technical), specs/ (was docs/foundation), project/ (process, runbooks, lessons, design). Old links have pointer pages.
+- RELEASE 0.5.12 PR #847: delivery confirmation ("Sent, availability unknown" when it can't be checked), restore guard, atomic proof records, send limits for terms, refused-upload cleanup, delete history no longer blocked by receipts, widget deep links and status strip, release PRs run the long e2e lanes. Reviews passed; one more limits fix is being added before merge. npm and desktop update need the owner's clicks.
+- 0.5.13 in progress on rel0513/*: delivery details under the hood, restore entries in Activity, notice when the same ID runs on two computers, public e2e/hostile suite, daily relay health check, new default relays with a one-click contact-details update.
