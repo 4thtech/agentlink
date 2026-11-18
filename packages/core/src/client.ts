@@ -12,7 +12,7 @@ import { STORE_SCHEMA_VERSION } from './constants.js';
 import { ContactBook, waitingOwnerError, type ProofPackSigner } from './contacts.js';
 import { EnvelopeService } from './envelopes.js';
 import { nowOf, type CoreContext } from './context.js';
-import { devicesView, type DevicesView, type InstallIdSource } from './devices.js';
+import { devicesView, ensureInstall, type DevicesView, type InstallIdSource } from './devices.js';
 import { CoreError } from './errors.js';
 import { IdentityService, finishPendingRotation } from './identity.js';
 import { OwnStorage, type OwnStorageKeys } from './own-storage.js';
@@ -861,6 +861,9 @@ export class AgentLinkClient {
       ...(options.installId === undefined ? {} : { installId: options.installId }),
     };
     if (row !== undefined) await finishPendingRotation(ctx);
+    // DEVICES-INTERIM: `since` is this install's first open of the store, not its first sighting
+    // (devices.ts). A source that cannot be read now is tried again on first use.
+    await ensureInstall(ctx).catch(() => undefined);
     return new AgentLinkClient(
       bundle.agentId,
       ctx,

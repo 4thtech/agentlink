@@ -12,8 +12,8 @@
 //   copy (04 §3.2 entry 4) of an envelope this store never wrote. This install writes every envelope
 //   before any of its wraps is published (outbox.ts), so its own copies are duplicates (envelopes.ts
 //   `receive`); a copy accepted as `sent_copy` was built by another install of this ID. Only a copy
-//   whose signed creation time is at or after `since`, and after the last restore, both plus the
-//   clock-skew allowance, counts: an older copy still on the relays, or one the restored backup did
+//   whose signed creation time is at or after `since` (set when this install first opens the store),
+//   and after the last restore plus the clock-skew allowance, counts: an older copy still on the relays, or one the restored backup did
 //   not hold, is this ID's own past, not another computer.
 // - The notice holds for OTHER_INSTALL_NOTICE_SECONDS after the newest such copy.
 // - Informational, never a gate: an id or a restore mark that cannot be read marks nothing; nothing
@@ -36,10 +36,11 @@ export interface InstallIdSource {
   read(): Promise<string>;
 }
 
-/** What the app and `doctor` show. Never the other computer's identity: there is none to show. */
+/**
+ * What the app and `doctor` show: a flag and a time only. Never the install id, and never the other
+ * computer's identity: there is none to show.
+ */
 export interface DevicesState {
-  /** This install's id, or null without an install id source. Local only. */
-  readonly installId: string | null;
   /** A copy from another computer was seen in the last OTHER_INSTALL_NOTICE_SECONDS. */
   readonly otherInUse: boolean;
   /** The signed creation time of the newest such copy, or null. */
@@ -76,8 +77,8 @@ function installIdOf(ctx: CoreContext): Promise<string | undefined> {
 
 /**
  * Makes `install_state` this install's, in its own transaction: created when missing, started afresh
- * when it names another install. Before the transactions that write a budget row or accept a sent
- * copy. Without an install id (no source, or it cannot be read) nothing is written.
+ * when it names another install. When the client opens the store (so `since` is its first open), and
+ * again before the transactions that write a budget row or accept a sent copy. Without an install id (no source, or it cannot be read) nothing is written.
  */
 export async function ensureInstall(ctx: CoreContext): Promise<void> {
   const id = await installIdOf(ctx);
@@ -120,7 +121,9 @@ export function noteSentCopyTx(
   if (row === undefined) return false;
   if (input.restore.status === 'unknown') return false;
   const restoredAt = input.restore.status === 'restored' ? input.restore.restoredAt : 0;
-  const floor = Math.max(row.since, restoredAt) + OTHER_INSTALL_SKEW_SECONDS;
+  // `since` is when this store was first opened by this install (AgentLinkClient.create), so every
+  // own envelope after it is in this store; the skew allowance applies to the restore only.
+  const floor = Math.max(row.since, restoredAt + OTHER_INSTALL_SKEW_SECONDS);
   if (!Number.isSafeInteger(input.createdAt) || input.createdAt < floor) return false;
   const at = Math.min(input.createdAt, input.now);
   if (row.other_seen_at !== null && row.other_seen_at >= at) return true;
@@ -137,10 +140,9 @@ export function devicesView(ctx: CoreContext): DevicesView {
       const row = await ctx.store.transaction((tx) =>
         tx.get('install_state', { slot: SINGLETON_SLOT }),
       );
-      if (row === undefined) return { installId: null, otherInUse: false, otherSeenAt: null };
+      if (row === undefined) return { otherInUse: false, otherSeenAt: null };
       const seen = row.other_seen_at;
       return {
-        installId: row.install_id,
         otherInUse: seen !== null && now < seen + OTHER_INSTALL_NOTICE_SECONDS,
         otherSeenAt: seen,
       };

@@ -57,19 +57,15 @@ describe('doctor: this ID on another computer (DEVICES-INTERIM)', () => {
 
   it('warns while another computer uses this ID, and still exits OK', async () => {
     const seen = await doctor({
-      state: () =>
-        Promise.resolve({ installId: 'a1'.repeat(16), otherInUse: true, otherSeenAt: 1 }),
+      state: () => Promise.resolve({ otherInUse: true, otherSeenAt: 1 }),
     });
     expect(seen.code).toBe(EXIT_OK);
     expect(seen.text).toContain(DOCTOR_DEVICES_TEXT.otherComputer);
-    // The install id is never printed.
-    expect(seen.text).not.toContain('a1'.repeat(16));
   });
 
   it('says nothing when no other computer was seen, or the state cannot be read', async () => {
     const none = await doctor({
-      state: () =>
-        Promise.resolve({ installId: 'a1'.repeat(16), otherInUse: false, otherSeenAt: null }),
+      state: () => Promise.resolve({ otherInUse: false, otherSeenAt: null }),
     });
     expect(none.text).not.toContain('another computer');
     const broken = await doctor({ state: () => Promise.reject(new Error('store')) });

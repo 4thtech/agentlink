@@ -25,10 +25,22 @@ import {
   passphrase,
   seed,
 } from './testing/fixtures.js';
-import { cardUpdatePayload, giftWrapId, type TestAgent } from './testing/envelopes.js';
+import {
+  agentEnc,
+  cardUpdatePayload,
+  craft,
+  giftWrapId,
+  makeAgent,
+  ownerEnc,
+  ownerSigner,
+  pairWith,
+  textPayload,
+  type TestAgent,
+} from './testing/envelopes.js';
 
 const INSTALL_A = 'a1'.repeat(16);
 const INSTALL_B = 'b2'.repeat(16);
+const ownerB = new MemoryOwnerKeyStore(seed(64), passphrase());
 
 const installSource = (id: string): InstallIdSource & { reads: number } => {
   const source = {
@@ -95,18 +107,62 @@ describe('DEVICES-INTERIM: this ID in use on another computer', () => {
     expect(OTHER_INSTALL_SKEW_SECONDS).toBe(300);
   });
 
-  it('a fresh install has its id and sees no other computer', async () => {
+  it('a fresh install has its id from the first open and sees no other computer', async () => {
     const clock = new FakeClock();
+    const opened = clock.t;
     const a = await agentWith(clock, { installId: installSource(INSTALL_A) });
+    clock.t += 600;
     expect(await a.client.devices.state()).toEqual({
-      installId: INSTALL_A,
       otherInUse: false,
       otherSeenAt: null,
     });
     const row = await a.store.transaction((tx) =>
       tx.get('install_state', { slot: SINGLETON_SLOT }),
     );
-    expect(row).toMatchObject({ install_id: INSTALL_A, since: clock.t, other_seen_at: null });
+    expect(row).toMatchObject({ install_id: INSTALL_A, since: opened, other_seen_at: null });
+    // Surfaces get a flag and a time only, never the install id.
+    expect(Object.keys(await a.client.devices.state()).sort()).toEqual([
+      'otherInUse',
+      'otherSeenAt',
+    ]);
+  });
+
+  it('a copy made seconds after the first open counts (since is the open, not first use)', async () => {
+    const clock = new FakeClock();
+    const a = await agentWith(clock, { installId: installSource(INSTALL_A) });
+    clock.t += 10;
+    await deliver(a, (await otherComputersCopy(a)).envelope);
+    expect(await a.client.devices.state()).toEqual({ otherInUse: true, otherSeenAt: clock.t });
+  });
+
+  it('only a copy signed by this ID’s agent key counts: a contact’s message marks nothing', async () => {
+    const clock = new FakeClock();
+    const a = await agentWith(clock, { installId: installSource(INSTALL_A) });
+    const b = await makeAgent(clock, new MemoryKeyStore(seed(63)), ownerB, 'bob');
+    await pairWith(clock, a, b);
+    await pairWith(clock, b, a);
+    clock.t += 60;
+    // Signed by b's agent key, so it is b's message (outcome ok), never a sent copy of this ID.
+    const built = await b.client.envelopes.build({ to: { contact: a.id }, payload: textPayload() });
+    const received = await a.client.envelopes.receive({
+      envelope: built.envelope,
+      giftWrapId: giftWrapId(),
+    });
+    expect(received.status).toBe('verified');
+    expect(await a.client.envelopes.processReceived()).toEqual([
+      expect.objectContaining({ outcome: 'ok', contactId: b.id }),
+    ]);
+    // Signed by this ID's owner key (not the agent key): not a sent copy either.
+    const ownerCopy = await craft({
+      signer: await ownerSigner(a.owner),
+      entries: [{ pk: await agentEnc(a) }, { pk: await ownerEnc(a.owner) }],
+      payload: await cardUpdatePayload(a),
+      createdAt: clock.t,
+    });
+    await a.client.envelopes.receive({ envelope: ownerCopy, giftWrapId: giftWrapId() });
+    const reports = await a.client.envelopes.processReceived();
+    expect(reports.map((r) => r.outcome)).not.toContain('sent_copy');
+    expect(await a.client.devices.state()).toEqual({ otherInUse: false, otherSeenAt: null });
   });
 
   it('a sent copy this store never wrote, made after this install started, marks another computer', async () => {
@@ -118,7 +174,6 @@ describe('DEVICES-INTERIM: this ID in use on another computer', () => {
     clock.t += 30;
     await deliver(a, copy.envelope);
     expect(await a.client.devices.state()).toEqual({
-      installId: INSTALL_A,
       otherInUse: true,
       otherSeenAt: clock.t - 30,
     });
@@ -145,14 +200,15 @@ describe('DEVICES-INTERIM: this ID in use on another computer', () => {
     expect((await a.client.devices.state()).otherInUse).toBe(false);
   });
 
-  it('a copy made before this install started (an older copy on the relays) marks nothing', async () => {
+  it('a copy made before this install opened the store (an older copy on the relays) marks nothing', async () => {
     const clock = new FakeClock();
     const a = await agentWith(clock, { installId: installSource(INSTALL_A) });
     const copy = await otherComputersCopy(a);
-    clock.t += OTHER_INSTALL_SKEW_SECONDS + 1;
-    await a.client.devices.state(); // the install starts after the copy was made
-    await deliver(a, copy.envelope);
-    expect((await a.client.devices.state()).otherInUse).toBe(false);
+    clock.t += 10;
+    // This store opened by another install (a restored snapshot): its since is now.
+    const here = await agentWith(clock, { installId: installSource(INSTALL_B), store: a.store });
+    await deliver(here, copy.envelope);
+    expect((await here.client.devices.state()).otherInUse).toBe(false);
   });
 
   it('a copy made before a restore marks nothing (the backup did not hold it)', async () => {
@@ -198,7 +254,6 @@ describe('DEVICES-INTERIM: this ID in use on another computer', () => {
     expect((await a.client.devices.state()).otherInUse).toBe(true);
     clock.t = seenAt + OTHER_INSTALL_NOTICE_SECONDS;
     expect(await a.client.devices.state()).toEqual({
-      installId: INSTALL_A,
       otherInUse: false,
       otherSeenAt: seenAt,
     });
@@ -219,7 +274,6 @@ describe('DEVICES-INTERIM: this ID in use on another computer', () => {
       store: a.store,
     });
     expect(await moved.client.devices.state()).toEqual({
-      installId: INSTALL_B,
       otherInUse: false,
       otherSeenAt: null,
     });
@@ -235,7 +289,6 @@ describe('DEVICES-INTERIM: this ID in use on another computer', () => {
     clock.t += 3_600;
     await deliver(a, (await otherComputersCopy(a)).envelope);
     expect(await a.client.devices.state()).toEqual({
-      installId: null,
       otherInUse: false,
       otherSeenAt: null,
     });
@@ -244,7 +297,7 @@ describe('DEVICES-INTERIM: this ID in use on another computer', () => {
   it('an install id that is not 32 lowercase hex is never stored', async () => {
     const clock = new FakeClock();
     const a = await agentWith(clock, { installId: installSource('not-an-id') });
-    expect((await a.client.devices.state()).installId).toBeNull();
+    expect(await a.client.devices.state()).toEqual({ otherInUse: false, otherSeenAt: null });
     const row = await a.store.transaction((tx) =>
       tx.get('install_state', { slot: SINGLETON_SLOT }),
     );
