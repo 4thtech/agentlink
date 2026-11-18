@@ -1,0 +1,58 @@
+# RELAY-DEFAULTS-HEALTH: a daily, read-only check of the default relay set (D-75) from GitHub's
+# runners. It runs `tools/relays/vet.mjs --live --id-readback`: each relay is asked, without a login,
+# for recent kind 1059 ids and then for one of them on a fresh connection (the availability check,
+# D-156 (7)). It sends NO event and NO AUTH, uses no secret, and has only `contents: read`.
+# Results go to the job summary. Not part of ci-gate; a failure never blocks a merge. An unreachable
+# relay is the finding, not a failure: the job fails only if the check itself breaks.
+name: Relay health
+
+on:
+  schedule:
+    # 05:41 UTC, a quiet hour.
+    - cron: "41 5 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: relay-health
+  cancel-in-progress: false
+
+jobs:
+  relay-health:
+    name: relay-health
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build the packages the check imports
+        run: pnpm exec turbo run build --filter=@4thtech-io/transport-nostr...
+
+      - name: Check the default relays (read-only)
+        run: |
+          set -o pipefail
+          node tools/relays/vet.mjs --live --id-readback | tee relay-health.json
+          {
+            echo "### Default relay health (read-only id read-back, no event, no login)"
+            echo
+            echo '| Relay | Sample | Id read |'
+            echo '|---|---|---|'
+            node -e '
+              const rows = JSON.parse(require("node:fs").readFileSync("relay-health.json", "utf8"));
+              const c = (v) => String(v ?? "-").replace(/[|]/g, "/");
+              for (const r of rows) {
+                console.log("| " + c(r.relay) + " | " + c(r.refused ? "refused: " + r.refused : r.sample) + " | " + c(r.idRead) + " |");
+              }
+            '
+            echo
+            echo "Run at $(date -u +%Y-%m-%dT%H:%MZ)."
+          } >> "$GITHUB_STEP_SUMMARY"
