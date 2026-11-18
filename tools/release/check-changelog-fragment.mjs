@@ -14,7 +14,7 @@
 // RELEASE_BOT_LOGIN.
 
 import { spawnSync } from 'node:child_process';
-import { lstatSync, readFileSync } from 'node:fs';
+import { closeSync, constants, fstatSync, openSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isVersionPackagesPr } from './check-changesets.mjs';
@@ -96,9 +96,23 @@ export async function checkChangelogFragment({ cwd, base, pr, log = console.log 
     for (const c of changed.filter((x) => x.status !== 'D' && FRAGMENT.test(x.path))) {
       try {
         const full = join(cwd, c.path);
-        if (lstatSync(full).isSymbolicLink())
-          throw new Error(`${c.path}: a symlink is not allowed.`);
-        parseFragment({ name: c.path, text: readFileSync(full, 'utf8') });
+        // One open without following links; the type check and the read share the descriptor.
+        let fd;
+        try {
+          fd = openSync(full, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+        } catch (err) {
+          if (err?.code === 'ELOOP')
+            throw new Error(`${c.path}: a symlink is not allowed.`, { cause: err });
+          throw err;
+        }
+        let text;
+        try {
+          if (!fstatSync(fd).isFile()) throw new Error(`${c.path}: not a regular file.`);
+          text = readFileSync(fd, 'utf8');
+        } finally {
+          closeSync(fd);
+        }
+        parseFragment({ name: c.path, text });
       } catch (e) {
         result.errors.push(`Invalid changelog fragment: ${e.message}`);
         result.ok = false;

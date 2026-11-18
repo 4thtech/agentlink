@@ -159,6 +159,16 @@ describe('lifecycle: failures', () => {
     expect(fake.requests.some((r) => r.method === 'PUT')).toBe(false);
   });
 
+  it('reads a rule with a huge unterminated tag in linear time (input hardening)', async () => {
+    const doc = `<LifecycleConfiguration><Rule><A${'0'.repeat(200_000)}</Rule></LifecycleConfiguration>`;
+    const fake = fakeMultipartS3(BUCKET);
+    fake.lifecycle = doc;
+    const { lc } = setup({}, fake);
+    const started = Date.now();
+    await lc.apply().catch((e: unknown) => e);
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
   it('writes nothing when a rule element is not one it can carry over (IR-M1-6b-1-1 L2)', async () => {
     for (const doc of [
       `<LifecycleConfiguration><Rule id="x"><ID>attributed</ID><Status>Enabled</Status></Rule>${OTHER_RULE}</LifecycleConfiguration>`,
