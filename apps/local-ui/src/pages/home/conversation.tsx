@@ -166,9 +166,8 @@ function Delivery({
 }): ReactElement | null {
   const status = item.status;
   if (status === 'sent') {
-    // DELIVERY-DETAILS: the relay counts as a tooltip for everyone (Under the hood: a line).
     return (
-      <span className="hm-dl hm-f is-sent al-pop" title={relaysWord(item)}>
+      <span className="hm-dl hm-f is-sent al-pop">
         <Icon name="check" size={13} />
         <span>{sentWord(item, name)}</span>
       </span>

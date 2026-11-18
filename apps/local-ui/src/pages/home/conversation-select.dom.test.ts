@@ -77,7 +77,7 @@ describe('the conversation: select messages, then Delete (RET-4)', () => {
     expect(onDelete).toHaveBeenCalledWith(['out-1']);
   });
 
-  it('DELIVERY-DETAILS: a sent message shows its relay counts (tooltip, and a line under the hood)', async () => {
+  it('DELIVERY-DETAILS: a sent message shows its relay counts (only under the hood, never in the default view)', async () => {
     const counted: Thread = {
       ...THREAD,
       sent: {
@@ -105,10 +105,9 @@ describe('the conversation: select messages, then Delete (RET-4)', () => {
       });
     };
     await render(false);
-    expect(host.querySelector('.hm-dl.is-sent')?.getAttribute('title')).toBe(
-      'Accepted by 3 relays · available from 2',
-    );
-    expect(host.textContent).not.toContain('Accepted by');
+    expect(host.querySelector('.hm-dl.is-sent')?.hasAttribute('title')).toBe(false);
+    expect(host.textContent).not.toMatch(/relay/i);
+    expect(host.textContent).toContain('Sent');
     await render(true);
     expect(host.querySelector('.hm-msg.is-out .hm-msg-meta')?.textContent).toContain(
       'Accepted by 3 relays · available from 2',

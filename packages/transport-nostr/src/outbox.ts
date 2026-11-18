@@ -155,7 +155,8 @@ export interface OutboxPersistence {
 }
 
 /** What the worker uses of the pool. Without `checkServed` every `sent` row is availability `unknown`. */
-export type OutboxPool = Pick<RelayPool, 'publish'> & Partial<Pick<RelayPool, 'checkServed'>>;
+export type OutboxPool = Pick<RelayPool, 'publish'> &
+  Partial<Pick<RelayPool, 'checkServed' | 'readbackSpare'>>;
 
 export interface OutboxWorkerOptions {
   readonly persistence: OutboxPersistence;
@@ -173,6 +174,16 @@ type Readback =
   | { readonly kind: 'confirmed'; readonly served: number }
   | { readonly kind: 'unknown' }
   | { readonly kind: 'missing'; readonly relays: readonly string[] };
+
+type TimerHost = {
+  setTimeout(cb: () => void, ms: number): unknown;
+  clearTimeout(handle: unknown): void;
+};
+/** The global timers, read at call time so fake timers apply (no DOM or Node types here). */
+const setTimer = (cb: () => void, ms: number): unknown =>
+  (globalThis as unknown as TimerHost).setTimeout(cb, ms);
+const clearTimer = (handle: unknown): void =>
+  (globalThis as unknown as TimerHost).clearTimeout(handle);
 
 const defaultSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
@@ -412,11 +423,12 @@ export class OutboxWorker {
   private async readback(eventId: string, acked: readonly string[]): Promise<Readback> {
     const check = this.pool.checkServed?.bind(this.pool);
     if (check === undefined || acked.length === 0) return { kind: 'unknown' };
-    const first = await this.askAll(check, eventId, acked);
+    const spare = (): boolean => this.pool.readbackSpare?.() === true;
+    const first = await this.askAll(check, spare, eventId, acked);
     if (first.served > 0) return { kind: 'confirmed', served: first.served };
     if (first.missing.length === 0) return { kind: 'unknown' };
     await this.sleep(READBACK_RECHECK_MS);
-    const second = await this.askAll(check, eventId, first.missing);
+    const second = await this.askAll(check, spare, eventId, first.missing);
     if (second.served > 0) return { kind: 'confirmed', served: second.served };
     // A relay that answered without the wrap and then could not be asked again still counts as
     // missing: it never served it.
@@ -435,6 +447,7 @@ export class OutboxWorker {
       eventId: string,
       options: { readonly signal?: ReadbackSignal },
     ) => Promise<ReadbackOutcome>,
+    spare: () => boolean,
     eventId: string,
     relays: readonly string[],
   ): Promise<{ served: number; missing: string[]; answered: string[] }> {
@@ -446,17 +459,27 @@ export class OutboxWorker {
       const answered: string[] = [];
       let pending = relays.length;
       let served = 0;
+      let grace: unknown;
       const settle = (relay: string, outcome: ReadbackOutcome): void => {
         pending -= 1;
         if (outcome === 'served') {
           served += 1;
-          if (served === 1) void this.sleep(READBACK_COUNT_GRACE_MS).then(() => cancel.abort());
+          // Confirmation beats counting: the siblings run on only while no other check waits for a
+          // slot and one is free; otherwise they end at once and free their slots.
+          if (served === 1) {
+            if (pending > 0 && spare()) {
+              grace = setTimer(() => cancel.abort(), READBACK_COUNT_GRACE_MS);
+            } else cancel.abort();
+          }
         }
         if (outcome === 'missing') {
           missing.push(relay);
           answered.push(relay);
         }
-        if (pending === 0) resolve({ served, missing, answered });
+        if (pending === 0) {
+          if (grace !== undefined) clearTimer(grace);
+          resolve({ served, missing, answered });
+        }
       };
       for (const relay of relays) {
         let asked: Promise<ReadbackOutcome>;
