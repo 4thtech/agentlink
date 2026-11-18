@@ -860,6 +860,40 @@ describe('CI-HEAVY-ON-RELEASE: isReleasePr and the workflow wiring', () => {
     undefined,
   ])('a normal PR title (%j) is not a release PR', (t) => expect(isReleasePr(t)).toBe(false));
 
+  it('a release head branch counts, stricter only', () => {
+    expect(isReleasePr('anything', 'rel0512/integration')).toBe(true);
+    expect(isReleasePr('anything', 'rel0512/release')).toBe(true);
+    expect(isReleasePr('anything', 'rel0512/other')).toBe(false);
+    expect(isReleasePr('anything', 'xrel0512/integration')).toBe(false);
+  });
+
+  it('a title rename re-runs CI: edited is a trigger, every job runs for it only with a title change', () => {
+    const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
+    expect(ci).toMatch(/types: \[opened, synchronize, reopened, ready_for_review, edited\]/);
+    const guard = "(github.event.action != 'edited' || github.event.changes.title != null)";
+    for (const j of ['detect', 'context-budget', 'stale-precheck', 'ci-gate']) {
+      const start = ci.indexOf(`\n  ${j}:\n`);
+      const ifLine = ci
+        .slice(start)
+        .split('\n')
+        .find((l) => l.startsWith('    if:'));
+      expect(ifLine, j).toContain(guard);
+    }
+    expect(ci).toContain("'-edit-noop'");
+  });
+
+  it('e2e-browser builds and tests the full set on a release PR', () => {
+    const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
+    const start = ci.indexOf('\n  e2e-browser:\n');
+    const job = ci.slice(start, ci.indexOf('\n  docs-checks:\n'));
+    expect(
+      job.match(/\[ "\$TEST_SCOPE" = filtered \] && \[ "\$RELEASE_PR" != true \]/g),
+    ).toHaveLength(2);
+    expect(job.match(/RELEASE_PR: \$\{\{ needs\.detect\.outputs\.release_pr \}\}/g)).toHaveLength(
+      2,
+    );
+  });
+
   it('ci.yml forces both heavy lanes on a release PR and ci-gate requires them', () => {
     const ci = readFileSync(join(root, '.github/workflows/ci.yml'), 'utf8');
     expect(ci).toMatch(

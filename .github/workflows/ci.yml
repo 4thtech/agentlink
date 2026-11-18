@@ -20,8 +20,9 @@ name: CI
 # `sync` (markdown only, pushed directly) never runs CI: pushes to it and pull requests into it
 # are ignored. Tags do not trigger it. Only the `changesets` job (pull requests only) reads
 # `github.event.pull_request` (author and head repository, through `env:`, to recognise the bot's
-# "Version packages" PR); every other job behaves the same on a push, with the repository content
-# as the only input.
+# "Version packages" PR); `detect` also reads its title and head ref (CI-HEAVY-ON-RELEASE: a release
+# pull request runs and requires the heavy e2e lanes). Every other job behaves the same on a push,
+# with the repository content as the only input.
 #
 # CHORE-CI-SPEED-1: a DRAFT pull request skips the whole suite (`detect` and `context-budget` carry the
 # draft condition; every other job needs `detect` and so skips with it; `stale-precheck` has its own).
@@ -41,7 +42,10 @@ name: CI
 # forward (decision 54 item 2).
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    # CI-HEAVY-ON-RELEASE: `edited` lets a rename to `RELEASE <version>` re-run the suite. Every
+    # job runs for it only when the title changed (`github.event.changes.title`); a body edit
+    # (such as the review lines record-ir.py writes) runs nothing and cancels nothing.
+    types: [opened, synchronize, reopened, ready_for_review, edited]
     branches-ignore: [sync]
   # OPS-FASTLANE-4: a push runs only on the release branches (the heavy lane); a feature-branch push
   # is covered by its pull request run, so it no longer doubles CI.
@@ -51,7 +55,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}${{ github.event.action == 'edited' && github.event.changes.title == null && '-edit-noop' || '' }}
   # A newer push to a branch or PR supersedes the older run; runs on `main` are never cancelled.
   cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref != 'refs/heads/main') }}
 
@@ -64,8 +68,9 @@ jobs:
   detect:
     name: detect
     # Draft pull requests skip the suite. `github.event.pull_request` is null on push and merge_group
-    # runs, so there the condition is true and nothing changes.
-    if: github.event.pull_request.draft != true
+    # runs, so there the condition is true and nothing changes. An `edited` event runs only when the
+    # title changed.
+    if: github.event.pull_request.draft != true && (github.event.action != 'edited' || github.event.changes.title != null)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -210,6 +215,7 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           MQ_BASE_SHA: ${{ github.event.merge_group.base_sha }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
           relevant=true
@@ -219,9 +225,9 @@ jobs:
           if [ "$EVENT_NAME" = pull_request ]; then
             use_selector=true
             # CI-HEAVY-ON-RELEASE: the title is data; the selector script only pattern-matches it.
-            if [ "$(node tools/ci/select-affected.mjs --is-release "$PR_TITLE" 2> /dev/null || true)" = true ]; then
-              release_pr=true
-            fi
+            # A node failure fails the step (no fallback to false).
+            release_pr="$(node tools/ci/select-affected.mjs --is-release "$PR_TITLE" "$PR_HEAD_REF")"
+            [[ "$release_pr" =~ ^(true|false)$ ]]
           fi
           base=""
           case "$EVENT_NAME" in
@@ -472,8 +478,10 @@ jobs:
         env:
           TEST_SCOPE: ${{ needs.detect.outputs.test_scope }}
           TURBO_FILTERS: ${{ needs.detect.outputs.turbo_filters }}
+          RELEASE_PR: ${{ needs.detect.outputs.release_pr }}
         run: |
-          if [ "$TEST_SCOPE" = filtered ]; then
+          # CI-HEAVY-ON-RELEASE: a release pull request builds and tests the whole browser suite.
+          if [ "$TEST_SCOPE" = filtered ] && [ "$RELEASE_PR" != true ]; then
             # shellcheck disable=SC2086 # one word per --filter
             pnpm exec turbo run build $TURBO_FILTERS
           else
@@ -489,11 +497,12 @@ jobs:
         env:
           TEST_SCOPE: ${{ needs.detect.outputs.test_scope }}
           E2E_BROWSER_FILTERS: ${{ needs.detect.outputs.e2e_browser_filters }}
+          RELEASE_PR: ${{ needs.detect.outputs.release_pr }}
           AGENTLINK_CI_BROWSER_TESTS: only
         run: |
           reporters=(--reporter=default --reporter=github-actions --reporter=json --outputFile.json=.vitest-report.json "--reporter=$GITHUB_WORKSPACE/tools/ci/vitest-run-reporter.mjs")
           filters="$FULL_BROWSER_FILTERS"
-          if [ "$TEST_SCOPE" = filtered ]; then filters="$E2E_BROWSER_FILTERS"; fi
+          if [ "$TEST_SCOPE" = filtered ] && [ "$RELEASE_PR" != true ]; then filters="$E2E_BROWSER_FILTERS"; fi
           if [ -z "$filters" ]; then
             echo "::error::The job was selected but no browser package is in the selection."
             exit 1
@@ -1233,7 +1242,7 @@ jobs:
   # on a docs-only repository too and does not depend on `detect`. A missing file passes.
   context-budget:
     name: context-budget
-    if: github.event.pull_request.draft != true
+    if: github.event.pull_request.draft != true && (github.event.action != 'edited' || github.event.changes.title != null)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -1332,7 +1341,7 @@ jobs:
   # base branch name comes through `env:` and is validated; no event text reaches a script body.
   stale-precheck:
     name: stale-precheck
-    if: github.event_name == 'pull_request' && github.event.pull_request.draft != true
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft != true && (github.event.action != 'edited' || github.event.changes.title != null)
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -1423,7 +1432,7 @@ jobs:
     # `ci-gate (push)` is what release.yml and the deploy-*.yml workflows require.
     name: ${{ github.event_name == 'push' && 'ci-gate (push)' || 'ci-gate' }}
     needs: [detect, checks, e2e-browser, docs-checks, vectors, keychain, path-guard, node-os, windows-smoke, context-budget, relays-docker, storage-minio, bundle-check, changesets, stale-precheck, e2e-deterministic]
-    if: always()
+    if: always() && (github.event.action != 'edited' || github.event.changes.title != null)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

@@ -67,9 +67,13 @@ export const HEAVY_REFS = Object.freeze(['refs/heads/main', 'refs/heads/wave-4']
  * and ci-gate requires both. A spoofed title only makes CI stricter, never looser.
  *
  * @param {string | undefined} title
+ * @param {string | undefined} [headRef] a head branch such as `rel0512/integration` also counts
  */
-export function isReleasePr(title) {
-  return /^RELEASE \d+\.\d+\.\d+(?::|\s|$)/.test(String(title ?? '').trim());
+export function isReleasePr(title, headRef) {
+  return (
+    /^RELEASE \d+\.\d+\.\d+(?::|\s|$)/.test(String(title ?? '').trim()) ||
+    /^rel\d+\/(?:release|integration)$/.test(String(headRef ?? ''))
+  );
 }
 
 /**
@@ -522,7 +526,7 @@ function scope(argv) {
 
 function main(argv) {
   // `--is-release <pull request title>`: prints `true` or `false` (never throws).
-  if (argv[0] === '--is-release') return console.log(String(isReleasePr(argv[1])));
+  if (argv[0] === '--is-release') return console.log(String(isReleasePr(argv[1], argv[2])));
   if (argv[0] === '--scope') return scope(argv.slice(1));
   const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
   let files = null;
