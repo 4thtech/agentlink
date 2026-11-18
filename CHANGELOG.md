@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.12] - 2026-11-18
+
+### Changed
+
+- Release pull requests (title `RELEASE <version>`) now run the heavy e2e lanes, `e2e-deterministic` and `e2e-browser`, whatever their diff, and the required `ci-gate` fails if either did not pass (CI-HEAVY-ON-RELEASE). Other pull requests keep the fast lane. Renaming a PR to `RELEASE` does not rerun CI: open release PRs with that title (`tools/pr/open-pr.mjs`) or from a `rel*/release` branch, and after a rename push a commit or rerun the workflow.
+- The documentation folders have new names (DOCS-PHASE-B, S1, process): the public guide and technical docs moved from `docs-site/` to `docs/`, the specifications and decision log from `docs/foundation/` to `specs/`, and the internal process, runbooks, lessons and design files from `docs/` to `project/`. Every reference, the review-gate and CODEOWNERS rules (the security spec `specs/04-security-and-crypto.md` is still owner-gated) and the docs checks follow the new paths; the 4thTech Docs page addresses do not change, and short pointer files stay at the old paths that shipped downloads link to (`tools/docs/moved-paths.json`).
+- Specs, backlog, process and knowledge describe the 0.5.12 changes: relay availability check, restore guard, proof signing under a reservation, terms counted in sending limits, cleanup of refused uploads, delete history and receipts, the files route, release PRs running the heavy lanes (DOCS-REL0512, S0; D-156).
+
+### Fixed
+
+- Delete history works when a received receipt arrives in between (DELETE-PLAN-ACKS, S2, 04 §4.2, 07 §3.8): a receipt that lands after the delete sheet listed the items, or during the 10-second Undo, no longer makes the delete fail with "What would be deleted changed. Check it again." Receipts follow the message they name and are not part of the confirmed list; a new message or saved file still stops the delete, and nothing you did not see is deleted.
+- Opening a message or file from the menu bar widget or a notification no longer reloads the app or flashes a blank coloured panel; a new file opens at that file, and the item you opened is marked seen in the widget and the bell (OWNER-FB-0512, S1).
+- The Under the hood status strip wraps instead of scrolling sideways, with the full text of each item on hover (OWNER-FB-0512, S1).
+
+### Security
+
+- Proof spending limits are evaluated with a clock consistent with the budget they check, and the hard limits hold in every case; a proof refused by the spending limit now says so (SEC-RECORD-ATOMIC, S2, D-156; 06 §3, 07 §3.5).
+- Proofs are signed only after their fee is set aside in the spending budget, in one guarded step (SEC-RECORD-ATOMIC, S2, D-156; 06 §3, 07 §3.5). Parallel proof requests can no longer go over your limits or record the same message twice, and an interrupted proof keeps its fee set aside until it can no longer be recorded.
+- Refused file sends leave nothing behind (SEC-REFUSED-UPLOAD-CLEANUP, S2; 04 §3.4, 07 §5.6): when a send with files is refused after the files were stored, the stored copies are deleted, retried a few times, and any still left are removed on a later pass. The send stays refused either way, and the usual refusals are now checked before anything is stored.
+- Relay availability check (SEC-RELAY-READBACK, S2, D-156 (7)): a message now counts as sent only once part of the message network hands it back. When nothing can be checked, it shows as "Sent, availability unknown" instead of "Sent".
+- Spending stays in your hands after a restore (SEC-RESTORE-GUARD, S2, D-156): for 24 hours after an ID is restored from a backup, every paid action asks you first, sending limits are tighter and terms are never accepted automatically. Approvals given before the restore no longer count, and the approval card tells you why it asks. Messages from before the restore that arrive again are shown but start nothing automatically. IDs updated to this version start with the same 24 hours once.
+- Terms count toward the sending limits (SEC-TERMS-CAPS, S2, D-156; 06 §3 `outgoing`): offers, accepts and rejects count with messages, per contact and per day, and over a limit they are refused with the same words as other sends. An approved accept that hits a limit stays approved and can be sent once the limit allows.
+
 ## [0.5.11] - 2026-11-18
 
 ### Changed
@@ -1398,7 +1421,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.11...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.12...HEAD
+[0.5.12]: https://github.com/4thtech/agentlink/compare/v0.5.11...v0.5.12
 [0.5.11]: https://github.com/4thtech/agentlink/compare/v0.5.10...v0.5.11
 [0.5.10]: https://github.com/4thtech/agentlink/compare/v0.5.9...v0.5.10
 [0.5.9]: https://github.com/4thtech/agentlink/compare/v0.5.8...v0.5.9

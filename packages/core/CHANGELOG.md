@@ -1,5 +1,26 @@
 # @4thtech-io/core
 
+## 0.5.12
+
+### Patch Changes
+
+- 8cb862f: Budget: spending limits are evaluated with a transaction-consistent clock; a refusal by the hard limit inside the reserving step is reported as the spending limit.
+- 8cb862f: Fix: deleting history no longer fails at random with "What would be deleted changed" when a contact's received receipt (or your own) lands after the delete sheet listed the items or during the 10-second Undo. Receipts are not part of the confirmed list: they still go with the message they name, and a new message or saved file still stops the delete.
+- 8cb862f: Proofs: the fee is reserved before a proof is signed, and a signed proof is kept only while its reservation holds; parallel proof requests never go over the spending limits or sign one message twice (SEC-RECORD-ATOMIC).
+- 8cb862f: SEC-REFUSED-UPLOAD-CLEANUP: a file send that is refused after its files were stored now deletes them with a few retries, and anything it cannot delete yet is cleaned up on a later pass. The common refusals are checked before anything is stored.
+- 8cb862f: SEC-RELAY-READBACK (D-156 (7)): a message counts as sent only once a relay that accepted it hands it back when asked by its id, on a separate connection and without signing in (`RelayPool.checkServed`, bounded to 5 s, at most 16 at once, the relay address rule applies). If no relay can be asked, the message is sent with availability unknown: the outbox row and the envelope record `availability`, `agentlink_send` returns `availability: "unknown"` with `delivery: "sent"`, and the app shows "Sent, availability unknown". A relay that accepts a message but answers an id read empty never confirms it; the outbox keeps the OK and tries the row's other relays, and with none left, or at the give-up time with at least one OK, the message is sent with availability unknown (not delivered only when no relay accepted it). Store schema version 19 adds `outbox.availability` and `envelopes.availability` (nullable; existing rows unchanged).
+- 8cb862f: SEC-RESTORE-GUARD (D-156): after an ID is restored from a backup, every paid action asks the owner for 24 hours (the hard spending limits still refuse), the sending limits are halved for those 24 hours, and the rules alone never accept terms. Messages that were sent before the restore and arrive again are stored and shown but trigger nothing automatically: no received receipt, no automatic file save or on-chain receipt, no file link answered, and a contact they connect waits for the owner. The restore time is kept with the ID's keys; if it cannot be read, AgentLink acts as if the ID was just restored. Approvals and terms approvals asked for before the restore no longer count, so the owner is asked again, and the approval card says why in its own words (restored from a backup, or AgentLink updated).
+- 8cb862f: SEC-TERMS-CAPS (D-156): offers, accepts and rejects sent through the terms tools now count toward the sending limits, together with messages, and are refused over a limit with the same `SEND_LIMIT` result and words as `agentlink_send`.
+- Updated dependencies [8cb862f]
+- Updated dependencies [8cb862f]
+- Updated dependencies [8cb862f]
+  - @4thtech-io/storage@0.5.12
+  - @4thtech-io/transport-nostr@0.5.12
+  - @4thtech-io/types@0.5.12
+  - @4thtech-io/chain@0.5.12
+  - @4thtech-io/crypto@0.5.12
+  - @4thtech-io/log@0.5.12
+
 ## 0.5.11
 
 ### Patch Changes

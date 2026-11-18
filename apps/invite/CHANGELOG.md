@@ -1,5 +1,20 @@
 # @4thtech-io/invite
 
+## 0.0.32
+
+### Patch Changes
+
+- Updated dependencies [8cb862f]
+- Updated dependencies [8cb862f]
+- Updated dependencies [8cb862f]
+- Updated dependencies [8cb862f]
+- Updated dependencies [8cb862f]
+- Updated dependencies [8cb862f]
+- Updated dependencies [8cb862f]
+  - @4thtech-io/core@0.5.12
+  - @4thtech-io/types@0.5.12
+  - @4thtech-io/crypto@0.5.12
+
 ## 0.0.31
 
 ### Patch Changes
