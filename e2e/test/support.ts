@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
-import { computeActionDigest, nostrTransport } from '@4thtech-io/core';
+import { computeActionDigest, nostrTransport, rowKeyOf, type Sealed } from '@4thtech-io/core';
 import {
   encodeBase64url,
   encodeHex,
@@ -40,7 +40,7 @@ import {
 } from '../../apps/cli/dist/runtime/index.js';
 import { spellings } from '../src/canary-scan.mjs';
 import { localRelayConnector } from '../src/local-connector.mjs';
-import { RELAY_HOSTS } from '../src/relays.mjs';
+import { dumpRelay, RELAY_HOSTS } from '../src/relays.mjs';
 
 export const HOST = fileURLToPath(new URL('../src/agent-host.mjs', import.meta.url));
 export const SKILL_FILE = fileURLToPath(
@@ -187,7 +187,7 @@ export async function pendingApprovalIds(agent: TestAgent): Promise<string[]> {
 /** Rows of one store table of an agent, read the way `pendingApprovalIds` reads (a second reader). */
 export async function storeRows(
   agent: TestAgent,
-  table: 'envelopes' | 'approvals' | 'outbox' | 'outbox_staged',
+  table: 'envelopes' | 'approvals',
   where: Record<string, string> = {},
 ): Promise<Record<string, unknown>[]> {
   const deps = nodeOwnerDeps(agent.home);
@@ -198,6 +198,94 @@ export async function storeRows(
     return rows as unknown as Record<string, unknown>[];
   } finally {
     await opened.agent.close();
+  }
+}
+
+/** One automatic received ack (D-156) an agent sent: the contact it went to, what it acknowledges. */
+export interface AckSent {
+  readonly toContact: string | null;
+  readonly acked: string;
+}
+
+/** An agent's automatic acks, the relay wraps that carry them, and the messages it processed. */
+interface AckLedger {
+  /** Gift-wrap event IDs (07 §3.2 `outbox.wrap_id`) of every outbound `ack`, retries included. */
+  readonly wrapIds: ReadonlySet<string>;
+  readonly acks: readonly AckSent[];
+  /** Inbound envelopes processed (state `ok`, not an ack) -> the contact that sent each. */
+  readonly processed: ReadonlyMap<string, string>;
+}
+
+async function ackLedger(agent: TestAgent): Promise<AckLedger> {
+  const deps = nodeOwnerDeps(agent.home);
+  const opened = await deps.open(undefined);
+  if (opened.status !== 'ok') throw new Error(`agent ${agent.label} did not open`);
+  try {
+    const { acks, outbox, inbound } = await opened.agent.store.transaction((tx) => ({
+      acks: tx.select('envelopes', { direction: 'out', type: 'ack' }),
+      outbox: tx.select('outbox', {}),
+      inbound: tx.select('envelopes', { direction: 'in', state: 'ok' }),
+    }));
+    const ackIds = new Set(acks.map((r) => r.envelope_id));
+    const wrapIds = new Set(outbox.filter((r) => ackIds.has(r.envelope_id)).map((r) => r.wrap_id));
+    const sent: AckSent[] = [];
+    for (const r of acks) {
+      const text = await opened.agent.cipher.open(
+        { table: 'envelopes', column: 'payload_json', rowKey: rowKeyOf([r.envelope_id]) },
+        r.payload_json as Sealed,
+      );
+      const payload = JSON.parse(text) as { body?: { envelopeId?: unknown } };
+      sent.push({ toContact: r.contact_id, acked: String(payload.body?.envelopeId) });
+    }
+    const processed = new Map<string, string>();
+    for (const r of inbound) {
+      if (r.type !== 'ack' && r.contact_id !== null) processed.set(r.envelope_id, r.contact_id);
+    }
+    return { wrapIds, acks: sent, processed };
+  } finally {
+    await opened.agent.close();
+  }
+}
+
+/**
+ * Every event the relays hold, minus the gift wraps that carry the agents' automatic received acks
+ * (0.5.10, D-156: queued with a random 5-90 s delay, so they land at any time). The relays are read
+ * first: an outbox row is stored before its wrap is published, so every ack wrap on a relay is known
+ * by the time the stores are read. Anything else our code publishes still counts.
+ */
+export async function relayEventsBesidesAcks(
+  ports: readonly number[],
+  agents: readonly TestAgent[],
+): Promise<number> {
+  const ids: string[] = [];
+  for (const port of ports) {
+    for (const raw of (await dumpRelay(port)) as string[]) {
+      ids.push(String((JSON.parse(raw) as { id?: unknown }).id));
+    }
+  }
+  const ackWraps = new Set<string>();
+  for (const agent of agents) for (const id of (await ackLedger(agent)).wrapIds) ackWraps.add(id);
+  return ids.filter((id) => !ackWraps.has(id)).length;
+}
+
+/**
+ * The automatic acks stay bounded (04 §3.4, D-156): at most one per processed inbound message, only
+ * to the contact that sent it, never two for the same message. Throws on the first violation.
+ */
+export async function expectAcksBounded(agents: readonly TestAgent[]): Promise<void> {
+  for (const agent of agents) {
+    const { acks, processed } = await ackLedger(agent);
+    const seen = new Set<string>();
+    for (const ack of acks) {
+      if (seen.has(ack.acked)) throw new Error(`${agent.label} sent two acks for one message`);
+      seen.add(ack.acked);
+      const sender = processed.get(ack.acked);
+      if (sender === undefined)
+        throw new Error(`${agent.label} acked a message it did not process`);
+      if (sender !== ack.toContact) {
+        throw new Error(`${agent.label} sent an ack to a contact other than the sender`);
+      }
+    }
   }
 }
 
