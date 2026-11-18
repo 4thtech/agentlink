@@ -608,7 +608,8 @@ describe('POST /api/ui/agents/remove: refusals before the gesture (U3-e)', () =>
     // The app had closed its own hold to test; it opened the same agent again, same generation.
     expect(w.log).toEqual(['open work', 'close work', 'open work']);
     expect(await generationOf(w)).toBe('1');
-    expect(itemsOf(w.work.agentId)).toHaveLength(4);
+    expect(itemsOf(w.work.agentId)).toHaveLength(5);
+    expect(itemsOf(w.work.agentId)).toContain(`${w.work.agentId}:restore-mark`);
     expectFixedEvents(w);
   });
 
@@ -649,7 +650,7 @@ describe('POST /api/ui/agents/remove: refusals before the gesture (U3-e)', () =>
     expect(w.revoked.size).toBe(0);
     expect(w.log).not.toContain('mark work');
     expect(w.log.at(-1)).toBe('open work');
-    expect(itemsOf(w.work.agentId)).toHaveLength(4);
+    expect(itemsOf(w.work.agentId)).toHaveLength(5);
   });
 });
 
@@ -740,7 +741,7 @@ describe('POST /api/ui/agents/remove: the removal (U3-e, 04 §2.5 steps 2 to 7)'
     expect(w.revoked.has(w.work.agentId)).toBe(true);
     expect(w.log).toContain('mark work');
     expect(w.log).not.toContain('removeFolder work');
-    expect(itemsOf(w.work.agentId)).toHaveLength(4);
+    expect(itemsOf(w.work.agentId)).toHaveLength(5);
     // The page can ask: no other agent was opened, the generation is the same.
     expect(w.log.filter((l) => l.startsWith('open '))).toEqual(['open work']);
     expect(await generationOf(w)).toBe('1');
@@ -888,7 +889,7 @@ describe('POST /api/ui/agents/remove: the removal (U3-e, 04 §2.5 steps 2 to 7)'
       expect(recorded, fault).toBe(fault !== 'record');
       // Nothing is deleted before the mark, and the keys go only after the AI app entries.
       if (fault === 'record' || fault === 'mark' || fault === 'apps') {
-        expect(itemsOf(w.work.agentId), fault).toHaveLength(4);
+        expect(itemsOf(w.work.agentId), fault).toHaveLength(5);
       }
       expect(w.log, fault).not.toContain('removeFolder work');
       // A retired agent is never opened again as usable.
@@ -1013,7 +1014,7 @@ describe('W8-S3: AI app entries (04 §2.5 step 5) and finishing a removal', () =
     expect(w.events).toContainEqual({ kind: 'remove', outcome: 'failed', step: 'apps' });
     // Retired and marked, but the keys and the folder are still there, and so is the entry.
     expect(w.revoked.has(w.work.agentId)).toBe(true);
-    expect(itemsOf(w.work.agentId)).toHaveLength(4);
+    expect(itemsOf(w.work.agentId)).toHaveLength(5);
     expect(w.log).not.toContain('removeFolder work');
     expect(w.apps.get('claude-desktop')).toBe('work');
     w.faults.desktop = false;
@@ -1033,7 +1034,7 @@ describe('W8-S3: AI app entries (04 §2.5 step 5) and finishing a removal', () =
     expect(w.ownerStores).toEqual([]);
     expect(w.revoked.size).toBe(0);
     expect(w.apps.get('antigravity')).toBe('work');
-    expect(itemsOf(w.work.agentId)).toHaveLength(4);
+    expect(itemsOf(w.work.agentId)).toHaveLength(5);
     // A typed name is still checked when it is sent for a retired ID.
     w.revoked.set(w.work.agentId, await ownerRevoke(w.work.agentId));
     const wrong = await remove(w, { name: 'work', typedLabel: 'work' });
@@ -1062,7 +1063,7 @@ describe('W8-S3: AI app entries (04 §2.5 step 5) and finishing a removal', () =
     const res = await remove(w, { name: 'work' });
     expect(res.json).toEqual({ status: 'invalid' });
     expect(w.log).not.toContain('removeFolder work');
-    expect(itemsOf(w.work.agentId)).toHaveLength(4);
+    expect(itemsOf(w.work.agentId)).toHaveLength(5);
   });
 
   it('the port must remove AI app entries: a port without the step 5 methods does not typecheck', () => {
