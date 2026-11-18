@@ -52,6 +52,10 @@ interface Agent {
   readonly signed: BuiltRecord[];
   /** Runs before each Record signature (the test's view at the moment of signing). */
   hook: SignHook | undefined;
+  /** Runs before each Record submission, with the signature already stored. */
+  submitHook: (() => Promise<void>) | undefined;
+  /** Record submissions this core started (before the submitter's own on-chain check). */
+  submits: number;
   policyVersion: number;
 }
 
@@ -74,9 +78,25 @@ async function openAgent(n: number, owner: TestOwner, name: string): Promise<Age
     owner,
     signed: [],
     hook: undefined,
+    submitHook: undefined,
+    submits: 0,
   };
+  const [baseChain] = base.chains;
   const platform: ProofsPlatform = {
     ...base,
+    chains: [
+      {
+        ...baseChain!,
+        submitter: {
+          ...baseChain!.submitter,
+          notarize: async (item, call) => {
+            agent.submits += 1;
+            await agent.submitHook?.();
+            return baseChain!.submitter.notarize(item, call);
+          },
+        },
+      },
+    ],
     kit: {
       ...base.kit,
       signRecord: async (signer, built) => {
@@ -218,6 +238,46 @@ describe('parallel proof requests never overspend (SEC-RECORD-ATOMIC)', () => {
     expect(await proofRows(a)).toHaveLength(1);
     expect(chain.calls.notarize).toBe(1);
     expect(chain.creditOf(a.id)).toBe(9n * FEE_UNITS);
+  });
+});
+
+describe('a parallel call never submits a Record another call owns (SEC-RECORD-ATOMIC)', () => {
+  it('a call arriving after the signature is stored, while the first call submits, waits for it', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b, 'one');
+    let late: Promise<unknown> | undefined;
+    a.submitHook = async () => {
+      if (late !== undefined) return;
+      a.submitHook = undefined;
+      // The stored row is `signed` now; the second call runs as far as it can before we go on.
+      late = a.client.notarize({ envelopeId });
+      await new Promise((r) => setTimeout(r, 300));
+    };
+    const first = await a.client.notarize({ envelopeId });
+    expect(first).toMatchObject({ status: 'ok' });
+    expect(await late).toMatchObject({
+      status: 'ok',
+      recordId: (first as { recordId: string }).recordId,
+    });
+    expect(a.signed).toHaveLength(1);
+    expect(a.submits).toBe(1);
+    expect(chain.calls.notarize).toBe(1);
+    expect(chain.creditOf(a.id)).toBe(9n * FEE_UNITS);
+  });
+
+  it('a sync pass during the submission never submits the same Record again', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b, 'one');
+    let pass: Promise<unknown> | undefined;
+    a.submitHook = async () => {
+      a.submitHook = undefined;
+      pass = a.client.proofs.resubmitPending();
+      await new Promise((r) => setTimeout(r, 300));
+    };
+    expect(await a.client.notarize({ envelopeId })).toMatchObject({ status: 'ok' });
+    await pass;
+    expect(a.submits).toBe(1);
+    expect(chain.calls.notarize).toBe(1);
   });
 });
 
