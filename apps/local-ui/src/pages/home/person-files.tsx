@@ -213,6 +213,8 @@ export function PersonFiles({
   /** K3 (W4-AUTO-SAVE): "Saved to <folder>" and its Show in Finder, at the end of the title row. */
   readonly folderNote?: ReactNode;
 }): ReactElement {
+  // OWNER-FB-0512: the newest received file, where a new-file notification opens.
+  const newestIn = rows.findIndex((r) => !r.out);
   return (
     <div className="hm-files hm-c">
       <div className="hm-files-head hm-f">
@@ -223,11 +225,16 @@ export function PersonFiles({
         <p className="al-text-body-sm al-muted">{fmt(S.noFiles, { name })}</p>
       ) : (
         <ul className="hm-file-list">
-          {rows.map((row) => {
+          {rows.map((row, index) => {
             const meta = `${fmt(row.out ? S.toName : S.fromName, { name })} · ${shortTime(row.at)} · ${sizeText(row.size)}`;
             const sentItem = row.out ? sent.get(row.id) : undefined;
             return (
-              <li key={`${row.out ? 'o' : 'i'}-${row.id}`} className="hm-file hm-f">
+              <li
+                key={`${row.out ? 'o' : 'i'}-${row.id}`}
+                className="hm-file hm-f"
+                tabIndex={-1}
+                {...(!row.out && index === newestIn ? { 'data-file-newest': '' } : {})}
+              >
                 <Icon name="file" size={18} />
                 <div className="hm-file-main hm-c">
                   <FileName name={row.name} {...(row.out ? {} : { from: name })} />

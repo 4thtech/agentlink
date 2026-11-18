@@ -40,6 +40,12 @@ describe('opaque targets', () => {
     expect(parseShellMessage(line({ v: 1, type: 'show', route: 'inbox', target: PERSON }))).toEqual(
       { v: 1, type: 'show', route: 'inbox', target: PERSON },
     );
+    expect(parseShellMessage(line({ v: 1, type: 'show', route: 'files', target: PERSON }))).toEqual(
+      { v: 1, type: 'show', route: 'files', target: PERSON },
+    );
+    expect(parseShellMessage(line({ v: 1, type: 'show', route: 'files', target: APR }))).toBe(
+      undefined,
+    );
     expect(parseShellMessage(line({ v: 1, type: 'show', route: 'home', target: PERSON }))).toBe(
       undefined,
     );

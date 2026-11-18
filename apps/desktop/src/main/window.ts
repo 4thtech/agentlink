@@ -138,10 +138,23 @@ export class MainWindow {
   loadSessionUrl(url: string, onLoaded?: () => void): boolean {
     if (!this.#deps.lock.acceptSessionUrl(url)) return false;
     const window = this.#ensure();
+    // OWNER-FB-0512: a deep link (`#person=…`) to the page Home already shows moves in place (only the
+    // fragment changes: no reload, no blank page, the app keeps its state), as opening from inside
+    // the app does. Anything else loads the new link as before.
+    const inPlace = this.#sameHome(window, url);
     this.#loaded = true;
     this.#page = 'session';
     this.#status = null;
     const load = ++this.#sessionLoad;
+    if (inPlace !== null) {
+      void window.loadURL(inPlace).catch(() => undefined);
+      try {
+        onLoaded?.();
+      } catch {
+        // Never throws into Electron.
+      }
+      return true;
+    }
     // TRAY-SHELL: `onLoaded` once the page finished loading (its session cookie is set by then), and
     // only if this is still the window's latest session load.
     void window.loadURL(url).then(
@@ -163,6 +176,26 @@ export class MainWindow {
       () => undefined,
     );
     return true;
+  }
+
+  /**
+   * OWNER-FB-0512: the window's committed address with the new link's `#person=…` fragment, when the
+   * window already shows Home (`/`) of the same origin and the link is Home's person link; else null.
+   */
+  #sameHome(window: BrowserWindow, url: string): string | null {
+    if (!this.#loaded || this.#page !== 'session') return null;
+    try {
+      const next = new URL(url);
+      if (next.pathname !== '/' || !/^#person=0x[0-9a-f]{40}(?:&files)?$/.test(next.hash)) {
+        return null;
+      }
+      const current = new URL(window.webContents.getURL());
+      if (current.origin !== next.origin || current.pathname !== '/') return null;
+      current.hash = next.hash;
+      return current.toString();
+    } catch {
+      return null;
+    }
   }
 
   /** True once a session link was loaded into the current window. */

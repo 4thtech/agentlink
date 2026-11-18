@@ -417,10 +417,22 @@ export async function runDesktopHost(deps: DesktopHostDeps): Promise<number> {
     // (the page decides); an unknown person opens Home (the fallback below).
     if (route === 'approvals' && target !== undefined && isNotifyTarget('approvals', target)) {
       if (await approvalServer.open(target).catch(() => false)) return;
-    } else if (route === 'inbox' && target !== undefined && isNotifyTarget('inbox', target)) {
-      if (await approvalServer.openPerson(target).catch(() => false)) return;
+    } else if (
+      (route === 'inbox' || route === 'files') &&
+      target !== undefined &&
+      isNotifyTarget(route, target)
+    ) {
+      // A new file opens that person's conversation at the file (`&files`), a message at the thread.
+      if (
+        await approvalServer
+          .openPerson(target, route === 'files' ? 'files' : undefined)
+          .catch(() => false)
+      ) {
+        return;
+      }
     }
-    if (route === 'approvals' || route === 'inbox') await approvalServer.open().catch(() => false);
+    if (route === 'approvals' || route === 'inbox' || route === 'files')
+      await approvalServer.open().catch(() => false);
     else if (route === 'updates') await approvalServer.openUpdates().catch(() => false);
     else if (route === 'join') await approvalServer.openJoin().catch(() => false);
     else if (server.page === 'first-run' && !openedSinceStart) {

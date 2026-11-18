@@ -81,6 +81,7 @@ export const SHOW_ROUTES = Object.freeze([
   'approvals',
   'join',
   'inbox',
+  'files',
   'updates',
 ] as const);
 export type ShowRoute = (typeof SHOW_ROUTES)[number];
@@ -268,7 +269,7 @@ export function isNotifyTarget(kind: NotifyKind | ShowRoute, value: unknown): va
 // `/approve/<id>` and a `#person=<id>` fragment (NOTIFY-DEEPLINK): the fragment never leaves the
 // window (a browser does not send it to the server); Home reads it and opens that person.
 const SESSION_URL =
-  /^http:\/\/localhost:([1-9][0-9]{0,4})(?:\/|\/first-run|\/settings\/home|\/settings\/join|\/settings\/updates|\/approve\/apr_[A-Za-z0-9_-]{22})\?t=[A-Za-z0-9_-]{43}(?:#person=0x[0-9a-f]{40})?$/;
+  /^http:\/\/localhost:([1-9][0-9]{0,4})(?:\/|\/first-run|\/settings\/home|\/settings\/join|\/settings\/updates|\/approve\/apr_[A-Za-z0-9_-]{22})\?t=[A-Za-z0-9_-]{43}(?:#person=0x[0-9a-f]{40}(?:&files)?)?$/;
 
 /** 08 §4: the canonical invite (join.ts CANONICAL; a test keeps them equal). */
 const INVITE_CANONICAL = /^https:\/\/agentlink\.4thtech\.io\/i#[A-Za-z0-9_-]{1,21846}$/;

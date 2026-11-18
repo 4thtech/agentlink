@@ -47,7 +47,7 @@ export const UPDATE_AVAILABLE_TITLE = 'Update available';
 export const NOTIFY_ROUTES: Readonly<Record<NotifyKind, ShowRoute>> = Object.freeze({
   approvals: 'approvals',
   messages: 'inbox',
-  files: 'inbox',
+  files: 'files',
   update: 'updates',
 });
 

@@ -102,7 +102,9 @@ import { HOME_STRINGS as S, fmt, idWithApp } from './people-strings.js';
 import { filesOf, PersonFiles, type Reveal } from './person-files.js';
 import { PersonMenu } from './person-menu.js';
 import { PersonName } from './person-name.js';
-import { clearPersonHash, personFromHash } from './person-link.js';
+import { clearPersonHash, filesFromHash, personFromHash } from './person-link.js';
+import { markNotificationRead } from '../../api/notifications.js';
+import { notificationId } from '@4thtech-io/types/ui-contract/notifications';
 import './people.css';
 import { webAuthnHere } from '../../presence/webauthn-here.js';
 
@@ -871,13 +873,19 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
   // Then it is scrolled to, focused and marked for a moment. The fragment is read at the start and
   // again on `hashchange` (in-app navigation does not reload Home).
   const [wanted, setWanted] = useState<string | undefined>(() => personFromHash(location.hash));
+  // OWNER-FB-0512: `&files` asks for the person's new file, not the thread.
+  const wantFiles = useRef(filesFromHash(location.hash));
   const [missing, setMissing] = useState(false);
-  const [jump, setJump] = useState<{ readonly id: string } | undefined>(undefined);
+  const [jump, setJump] = useState<{ readonly id: string; readonly files: boolean } | undefined>(
+    undefined,
+  );
   const archivedBox = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     const onHash = (): void => {
       const id = personFromHash(location.hash);
-      if (id !== undefined) setWanted(id);
+      if (id === undefined) return;
+      wantFiles.current = filesFromHash(location.hash);
+      setWanted(id);
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
@@ -891,7 +899,12 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
       setQuery('');
       setFilter('all');
       setOpen(wanted);
-      setJump({ id: wanted });
+      setJump({ id: wanted, files: wantFiles.current });
+      // OWNER-FB-0512: opening from the widget or a notification marks what it was about as seen,
+      // the same display-state mark the bell uses (so the widget's count and the bell update).
+      void markNotificationRead(
+        notificationId(wantFiles.current ? 'files' : 'messages', wanted.toLowerCase()),
+      );
     } else {
       setMissing(true);
     }
@@ -920,6 +933,21 @@ export function HomeScreen(props: HomeScreenProps): ReactElement {
       if (el.querySelector('[aria-busy="true"]') !== null && waited < 100) {
         timer = setTimeout(() => mark(el, waited + 1), 100);
         return;
+      }
+      if (jump.files) {
+        // The newest received file's row: scrolled to, focused and marked (a thin bar, no overlay).
+        const row = el.querySelector<HTMLElement>('[data-file-newest]');
+        if (row === null && waited < 100) {
+          timer = setTimeout(() => mark(el, waited + 1), 100);
+          return;
+        }
+        if (row !== null) {
+          row.scrollIntoView?.({ block: 'center', behavior: 'auto' });
+          row.focus({ preventScroll: true });
+          row.classList.add('hm-file-target');
+          timer = setTimeout(() => row.classList.remove('hm-file-target'), 2000);
+          return;
+        }
       }
       el.classList.add('hm-target');
       timer = setTimeout(() => el.classList.remove('hm-target'), 2000);

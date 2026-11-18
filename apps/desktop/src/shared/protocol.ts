@@ -181,7 +181,7 @@ export function isStartFailure(reason: StopReason): reason is StartFailureReason
 
 /** The pages the shell may ask the core to open; the core maps each to a fixed path. */
 // N7: `inbox` (a new message or file: Home, where the people are) and `updates` (Settings › Updates).
-export const SHOW_ROUTES = ['home', 'approvals', 'join', 'inbox', 'updates'] as const;
+export const SHOW_ROUTES = ['home', 'approvals', 'join', 'inbox', 'files', 'updates'] as const;
 export type ShowRoute = (typeof SHOW_ROUTES)[number];
 
 /** N7: the kinds a native notification can be about (the notification store's kinds that alert). */
@@ -326,7 +326,7 @@ const PORT = '([1-9][0-9]{0,4})';
 const PATH =
   '(?:/|/first-run|/settings/home|/settings/join|/settings/updates|/approve/apr_[A-Za-z0-9_-]{22})';
 const SESSION_URL = new RegExp(
-  `^http://localhost:${PORT}${PATH}\\?t=${TOKEN}(?:#person=0x[0-9a-f]{40})?$`,
+  `^http://localhost:${PORT}${PATH}\\?t=${TOKEN}(?:#person=0x[0-9a-f]{40}(?:&files)?)?$`,
 );
 
 /** NOTIFY-DEEPLINK: the opaque targets (a request's or a person's local ID). Mirrors the core. */

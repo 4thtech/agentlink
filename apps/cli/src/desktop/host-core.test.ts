@@ -175,7 +175,8 @@ async function fakeServer(
     activity: { lastAt: () => 0, openStreams: () => 1, linksUsed: () => 0 },
     open: (approvalId?: string) =>
       sink(`${origin}${approvalId === undefined ? '/' : `/approve/${approvalId}`}?t=${mint()}`),
-    openPerson: (contactId: string) => sink(`${origin}/?t=${mint()}#person=${contactId}`),
+    openPerson: (contactId: string, focus?: 'files') =>
+      sink(`${origin}/?t=${mint()}#person=${contactId}${focus === 'files' ? '&files' : ''}`),
     openHome: () => sink(`${origin}/settings/home?t=${mint()}`),
     openFirstRun: () => sink(`${origin}/first-run?t=${mint()}`),
     openJoin: () => sink(`${origin}/settings/join?t=${mint()}`),
@@ -846,6 +847,22 @@ describe('N7: native notifications from the desktop host', () => {
       .map((u) => new URL(u));
     expect(urls.map((u) => u.pathname)).toEqual([`/approve/${apr}`, '/', '/']);
     expect(urls.map((u) => u.hash)).toEqual(['', `#person=${person}`, '']);
+    s.pipe.shell({ v: 1, type: 'shutdown' });
+    await run;
+  });
+
+  it("OWNER-FB-0512: a files show with a person opens at that person's file; without one, Home", async () => {
+    const s = setup();
+    const run = runDesktopHost(s.deps);
+    await until(() => readies(s.pipe.sent).length === 1);
+    const person = `0x${'ab'.repeat(20)}`;
+    s.pipe.shell({ v: 1, type: 'show', route: 'files', target: person });
+    s.pipe.shell({ v: 1, type: 'show', route: 'files' });
+    await until(() => readies(s.pipe.sent).length === 3);
+    const urls = readies(s.pipe.sent)
+      .slice(1)
+      .map((u) => new URL(u));
+    expect(urls.map((u) => u.hash)).toEqual([`#person=${person}&files`, '']);
     s.pipe.shell({ v: 1, type: 'shutdown' });
     await run;
   });
