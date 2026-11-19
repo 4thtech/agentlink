@@ -145,14 +145,21 @@ export function memoryNotificationPersistence(): NotificationPersistence {
 
 /**
  * Newest first, then by ID; at most 200, none older than 30 days except the `devices` state item,
- * whose time is the last sighting and which is removed only once it no longer holds.
+ * whose time is the last sighting, which is removed only once it no longer holds and which the
+ * 200 cap never drops.
  */
 function kept(items: readonly NotificationItem[], now: number): NotificationItem[] {
   const oldest = now - NOTIFICATION_KEEP_SECONDS;
-  return items
-    .filter((i) => i.kind === 'devices' || i.at >= oldest)
-    .sort((a, b) => b.at - a.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    .slice(0, NOTIFICATION_MAX_ITEMS);
+  const order = (a: NotificationItem, b: NotificationItem): number =>
+    b.at - a.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  // The `devices` item holds a place of its own: 200 newer items never push it out (its time is the
+  // last sighting, often old), so it is not dropped and made news again at the next poll.
+  const devices = items.filter((i) => i.kind === 'devices');
+  const rest = items
+    .filter((i) => i.kind !== 'devices' && i.at >= oldest)
+    .sort(order)
+    .slice(0, NOTIFICATION_MAX_ITEMS - devices.length);
+  return [...devices, ...rest].sort(order);
 }
 
 function item(

@@ -510,6 +510,7 @@ What the AI relays (tool results; never an approval):
 | Code | Summary · next step |
 |---|---|
 | `SPEND_CEILING` | "This proof would cost more than your limit ($0.50 per proof), so nothing was recorded." or "…go over your limit ($10 a day)…" · "Tell the user: This is over your limit. You can change it in Settings › Rules in the AgentLink app. Don't ask for an approval: an approval can't go over this limit." The terms tools use the same words. |
+| `BUDGET_BROKEN` (BUDGET-BROKEN-UX; proposed, owner confirms at merge) | "AgentLink can't check your spending limits right now, so nothing was recorded and nothing was charged." · "Tell the user: Please save your limits again in Settings › Rules in the AgentLink app. Don't ask for an approval: an approval can't fix this." The send tool says "The proof wasn't added: AgentLink can't check your spending limits right now, so nothing was recorded." |
 | `SEND_LIMIT` | "Sending limit reached for Ana (300 messages a day), so nothing was sent." (per kind: messages in all, files to one person, files in all, MB of files) · "Try again after {time}. Or tell the user: This is over your limit. You can change it in Settings › Rules in the AgentLink app." |
 
 ### 5.12 Contacts your AI connected (D-156)

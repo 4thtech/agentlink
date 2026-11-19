@@ -16,6 +16,7 @@ import {
   layoutShiftScore,
   observeLayoutShift,
   runningAnimations,
+  settleLayoutShift,
 } from './motion.js';
 
 const read = (rel: string): string =>
@@ -91,6 +92,27 @@ describe('layout shift', () => {
       banner.style.setProperty('height', '300px');
       document.body.prepend(banner);
     });
+    expect(await layoutShiftScore(page)).toBeGreaterThan(CLS_BUDGET);
+    await expect(expectStableLayout(page)).rejects.toThrow(/layout shift/i);
+  });
+});
+
+describe('settleLayoutShift', () => {
+  const pushDown = () =>
+    page.evaluate(async () => {
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const banner = document.createElement('div');
+      banner.style.setProperty('height', '300px');
+      document.body.prepend(banner);
+    });
+
+  it('forgets the shifts of the first paint but still counts every later one against the budget', async () => {
+    await observeLayoutShift(page);
+    await pushDown();
+    expect(await layoutShiftScore(page)).toBeGreaterThan(CLS_BUDGET);
+    await settleLayoutShift(page);
+    expect(await layoutShiftScore(page)).toBe(0);
+    await pushDown();
     expect(await layoutShiftScore(page)).toBeGreaterThan(CLS_BUDGET);
     await expect(expectStableLayout(page)).rejects.toThrow(/layout shift/i);
   });

@@ -672,6 +672,36 @@ describe('hard ceilings refuse, never ask (SEC-HARD-CEILING, D-156; 06 §3)', ()
   });
 });
 
+describe('a broken spending record refuses up front (BUDGET-BROKEN-UX; 06 §3, 07 §3.5)', () => {
+  const approvalRows = (agent: Agent) => agent.store.transaction((tx) => tx.select('approvals'));
+  const breakLedger = (agent: Agent) =>
+    agent.store.transaction((tx) =>
+      tx.update('budget_state', { slot: 'current' }, { status: 'broken', broken_at: 1 }),
+    );
+
+  it('notarize: BUDGET_BROKEN, no approval card, nothing signed; a fresh limits save recovers', async () => {
+    const { a, b } = await twoAgents();
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    const envelopeId = await sendText(a, b);
+    await breakLedger(a);
+    expect(await a.client.notarize({ envelopeId })).toEqual({
+      status: 'rejected',
+      code: 'BUDGET_BROKEN',
+    });
+    expect(await approvalRows(a)).toEqual([]);
+    expect(await proofRows(a)).toEqual([]);
+    expect(await ledger(a)).toEqual([]);
+    expect(chain.calls.notarize).toBe(0);
+    // Saving the limits again starts a fresh ledger; the same action asks the owner as usual.
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    expect(await a.client.notarize({ envelopeId })).toMatchObject({ status: 'pending_approval' });
+  });
+});
+
 describe('ACCEPTED / REJECTED without terms are commitments (D-31, 06 §2.4)', () => {
   it('no ACCEPTED under the default policy without an owner-signed approval; then exclusive', async () => {
     // The defaults in full (D-109: no automatic DELIVERED either); ACCEPTED is unchanged.

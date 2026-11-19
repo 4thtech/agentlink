@@ -226,6 +226,25 @@ describe('the notification store', () => {
     expect(items.some((i) => i.ref === ref(1))).toBe(false);
   });
 
+  it('the devices item stays when 200 newer items fill the list (the cap never drops it)', async () => {
+    const c = clock();
+    const store = createNotificationStore(memoryNotificationPersistence(), { now: c.now });
+    await store.observe({});
+    // Seen long ago, then 250 newer message items.
+    await store.observe({ otherComputer: true, otherComputerSeenAt: T0 - 100 });
+    const inbound = Array.from({ length: 250 }, (_, i) => ({
+      contactId: ref(i + 1),
+      kind: 'message' as const,
+      at: T0 + 1 + i,
+    }));
+    c.advance(1_000);
+    await store.observe({ inbound, otherComputer: true });
+    const items = await store.list();
+    expect(items).toHaveLength(NOTIFICATION_MAX_ITEMS);
+    expect(items.filter((i) => i.kind === 'devices')).toHaveLength(1);
+    expect(items[0]?.ref).toBe(ref(250));
+  });
+
   it('IR-NOTIFY-1 M-2: counts a message stored late with an older time (the read window overlaps)', async () => {
     const c = clock();
     const store = createNotificationStore(memoryNotificationPersistence(), { now: c.now });

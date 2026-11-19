@@ -243,6 +243,21 @@ export class CardUpdateSender {
     const payload = cardUpdatePayloadOf(signed);
     let sent = 0;
     let failed = 0;
+    // CARD-UPDATE-FAILED-STATE: a card-update stored by an earlier pass that no non-legacy relay has
+    // accepted yet is published again now (its rows' own backoff still applies), so the "failed"
+    // result of that pass drives this one instead of waiting for the outbox timer alone.
+    for (const envelopeId of (await this.#unconfirmed(fromKey))
+      .filter((u) => allowed(u.contactId, 0))
+      .slice(0, MAX_CARD_UPDATES_PER_PASS)
+      .map((u) => u.envelopeId)) {
+      try {
+        await this.#deps.outbox.publishEnvelope(envelopeId);
+        if (await this.#acceptedOffLegacy(envelopeId)) sent += 1;
+        else failed += 1;
+      } catch {
+        failed += 1;
+      }
+    }
     for (const contactId of dueIds
       .filter((id) => allowed(id, 0))
       .slice(0, MAX_CARD_UPDATES_PER_PASS)) {
@@ -256,6 +271,31 @@ export class CardUpdateSender {
     }
     if (sent > 0 || failed > 0) this.#ctx.log.info('card updates', { sent, failed });
     return { sent, failed };
+  }
+
+  /** Stored card-updates of the current key still waiting for a first acceptance (`queued`), for active, paired contacts. */
+  async #unconfirmed(
+    fromKey: string,
+  ): Promise<readonly { contactId: string; envelopeId: string }[]> {
+    return this.#ctx.store.transaction((tx) =>
+      tx
+        .select(
+          'envelopes',
+          { direction: 'out', type: 'card-update', from_key: fromKey, delivery: 'queued' },
+          { orderBy: [['created_at', 'asc']], limit: MAX_CARD_UPDATES_PER_PASS },
+        )
+        .filter((row) => {
+          const contact = tx.get('contacts', { contact_id: row.contact_id ?? '' });
+          return (
+            contact !== undefined &&
+            contact.status === 'active' &&
+            contact.pairing === 'complete' &&
+            contact.waiting_owner !== 1 &&
+            !isRevoked(tx, contact)
+          );
+        })
+        .map((row) => ({ contactId: row.contact_id ?? '', envelopeId: row.envelope_id })),
+    );
   }
 
   /** D-141 (6): the kids of this agent's superseded encryption keys (its earlier cards). */

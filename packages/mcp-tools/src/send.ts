@@ -88,6 +88,8 @@ export const SEND_TEXT = Object.freeze({
   sendLimitNextStep:
     'Try again after {time}. Or tell the user: This is over your limit. You can change it in Settings › Rules in the AgentLink app.',
   proofCeiling: "The proof wasn't added: it is over your limit, so nothing was recorded.",
+  proofBudgetBroken:
+    "The proof wasn't added: AgentLink can't check your spending limits right now, so nothing was recorded.",
   policyDenied: "The owner's rules don't allow this message, so nothing was sent.",
   policyDeniedNextStep:
     'Tell the user their AgentLink rules blocked this message. Only they can change the rules.',
@@ -506,11 +508,16 @@ async function withProofOf(
         ? proofOut.result.code
         : 'PROOF_FAILED';
     // D-156: over a hard ceiling the proof is refused in plain words (no retry, no approval).
-    const ceiling = code === 'SPEND_CEILING';
+    // BUDGET-BROKEN-UX: the same, with the way to re-save the limits (no approval can fix it).
+    const ceiling = code === 'SPEND_CEILING' || code === 'BUDGET_BROKEN';
     proofOut = {
       result: {
         status: 'error',
-        summary: ceiling ? SEND_TEXT.proofCeiling : SEND_TEXT.proofFailed,
+        summary: !ceiling
+          ? SEND_TEXT.proofFailed
+          : code === 'BUDGET_BROKEN'
+            ? SEND_TEXT.proofBudgetBroken
+            : SEND_TEXT.proofCeiling,
         nextStep: ceiling
           ? String(proofOut.result.nextStep)
           : SEND_TEXT.proofFailedNextStep.replace('{envelopeId}', envelopeId),

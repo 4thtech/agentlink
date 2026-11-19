@@ -198,7 +198,7 @@ function updateDelivery(tx: StoreTx, envelopeId: string): void {
 }
 
 /** OutboxPersistence over the Store, with the per-row claim described above. */
-class StoreOutboxPersistence implements OutboxPersistence {
+export class StoreOutboxPersistence implements OutboxPersistence {
   readonly #ctx: CoreContext;
   readonly #envelopeId: string | undefined;
   /** wrap_id -> the next_attempt_at this process wrote when it claimed the row. */
