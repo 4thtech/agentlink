@@ -65,6 +65,9 @@ export {
   type TransactionRefusal,
 } from './evm-tx.js';
 // SEC-KS-712-ALLOWLIST: the public rules of KeyStore.sign712 for the agent key (no key material).
+// SEC-KEYSTORE-RECORD-GATE: backends use sign712Snapshot (never signs a Record) and recordSnapshot
+// (Records only); the shared typedDataSnapshot underneath is module-internal, so no backend can
+// wire the Record-accepting check into sign712.
 export {
   AGENT_APP_ID,
   MAX_PROOF_DEADLINE_SECONDS,
@@ -74,7 +77,6 @@ export {
   recordSnapshot,
   sign712Snapshot,
   typedDataClock,
-  typedDataSnapshot,
   type TopUpToken,
   type TypedDataChain,
   type TypedDataRefusal,

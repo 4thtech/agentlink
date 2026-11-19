@@ -179,8 +179,10 @@ export interface KeyStore extends EnvelopeKeys {
    * not used before. The Record is checked against the allowlist again (`typed_data_refused`); then
    * the ticket is spent. One this store did not issue (a copy, a Proxy, another store's), one
    * already spent, or one issued for another Record (any field or the domain differs) is
-   * CryptoInputError `record_ticket_refused` with the fixed RECORD_TICKET_REFUSED. An issued ticket
-   * is spent by its first use, whatever the outcome. Every check happens before a key is read.
+   * CryptoInputError `record_ticket_refused` with the fixed RECORD_TICKET_REFUSED. A Record the
+   * allowlist refuses, or a ticket this store did not issue, spends nothing; otherwise the issued
+   * ticket is spent before its digest is compared, so a try with another Record spends it too and it
+   * never signs twice. Every check happens before a key is read.
    */
   signRecord(record: TypedData, ticket: RecordTicket): Promise<string>;
 

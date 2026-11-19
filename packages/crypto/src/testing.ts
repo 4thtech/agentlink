@@ -1689,6 +1689,58 @@ function runConformanceRecordGate(
         },
       );
 
+      runner.it('a ticket for a Record on one chain never signs a Record on another', async () => {
+        await withStore(async (store) => {
+          const chiado = DIRECT_TX_ALLOWLIST[10200] as DirectTxChain;
+          const base = conformanceTypedData(own, nowSeconds()).record();
+          const zero32 = `0x${'0'.repeat(64)}`;
+          const other = recordTypedData(occV2Domain(10200, chiado.notary), {
+            signer: own,
+            envelopeHash: `0x${'ab'.repeat(32)}`,
+            recipientCommitment: `0x${'cd'.repeat(32)}`,
+            parentRecordId: zero32,
+            appId: zero32,
+            kind: 1,
+            feeToken: `0x${'0'.repeat(40)}`,
+            maxFee: '100000',
+            nonce: '9',
+            deadline: nowSeconds() + 3_600,
+          });
+          const forBase = store.issueRecordTicket(base);
+          expectTicketRefusal(
+            await conformanceOutcome(() => store.signRecord(other, forBase)),
+            'a Base Sepolia ticket on a Gnosis Chiado Record',
+          );
+          const forOther = store.issueRecordTicket(other);
+          expectTicketRefusal(
+            await conformanceOutcome(() => store.signRecord(base, forOther)),
+            'a Gnosis Chiado ticket on a Base Sepolia Record',
+          );
+        });
+      });
+
+      runner.it(
+        'a Record the allowlist refuses spends nothing (a foreign ticket: see the look-alike case)',
+        async () => {
+          await withStore(async (store) => {
+            const shapes = conformanceTypedData(own, nowSeconds());
+            const record = shapes.record();
+            const ticket = store.issueRecordTicket(record);
+            const refused = await conformanceOutcome(() =>
+              store.signRecord(shapes.record({ maxFee: '500001' }), ticket),
+            );
+            conformanceCheck(
+              codeOfError(refused) === 'typed_data_refused',
+              'the allowlist refusal',
+            );
+            conformanceCheck(
+              signedBy(record, await store.signRecord(record, ticket)) === own,
+              'the ticket still signs its Record',
+            );
+          });
+        },
+      );
+
       runner.it('a ticket signs once: a replay is refused', async () => {
         await withStore(async (store) => {
           const record = conformanceTypedData(own, nowSeconds()).record();
@@ -1754,6 +1806,31 @@ function runConformanceRecordGate(
               'a Record for another signer',
               () => shapes.record({ signer: `0x${'11'.repeat(20)}` }),
               'signer_not_allowed',
+            ],
+            [
+              'a Record on a chain outside the allowlist',
+              () => ({ ...shapes.record(), domain: occV2Domain(1, `0x${'22'.repeat(20)}`) }),
+              'domain_not_allowed',
+            ],
+            [
+              'a Record for another contract on an allowed chain',
+              () => ({ ...shapes.record(), domain: occV2Domain(84532, `0x${'22'.repeat(20)}`) }),
+              'domain_not_allowed',
+            ],
+            [
+              'a Record with a fee token the chain does not offer',
+              () => shapes.record({ feeToken: `0x${'0'.repeat(40)}` }),
+              'fee_not_allowed',
+            ],
+            [
+              'a Record with another app ID',
+              () => shapes.record({ appId: `0x${'0'.repeat(63)}1` }),
+              'app_not_allowed',
+            ],
+            [
+              'a Record whose deadline is too far ahead',
+              () => shapes.record({ deadline: nowSeconds() + 3_600 + 300 + 120 }),
+              'deadline_not_allowed',
             ],
           ];
           try {

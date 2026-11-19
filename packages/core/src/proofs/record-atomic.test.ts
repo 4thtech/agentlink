@@ -269,7 +269,7 @@ describe('the KeyStore holds the record-signing gate (SEC-KEYSTORE-RECORD-GATE)'
     expect(a.keyCalls.some((c) => c === 'sign712:Record')).toBe(false);
   });
 
-  it('a ticket is issued only once the fee for that Record is reserved', async () => {
+  it('a proof the rules deny asks the KeyStore for no ticket and no signature', async () => {
     const { a, b } = await twoAgents();
     await setPolicy(a, (p) => {
       p.proofs.notarize = 'deny';
