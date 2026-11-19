@@ -83,10 +83,11 @@ import {
 } from './owner-prepare.js';
 import {
   POLICY_DEFAULTS_EFFECTIVE,
+  budgetSpentMicros,
   type EffectivePolicy,
   type PolicyProblem,
 } from './policy-engine.js';
-import { budgetLedgerSummable } from './budget.js';
+import { budgetLedgerSummable, readBudgetLedger } from './budget.js';
 import { SINGLETON_SLOT, type Row, type Sealed } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 
@@ -278,34 +279,26 @@ const nonceRow = (signed: SignedOwnerAction, actionHash: string, now: number) =>
 });
 
 /**
- * 07 §3.5 (BUDGET-RECOVER): the next applied policy.set starts a fresh ledger whenever the ledger
- * cannot be summed at `now`: `budget_state` missing or `broken`, a row the engine finds inconsistent,
- * a row from a later epoch, a clock earlier than its newest entry (a clock once set forward), or a
- * read error. The fresh epoch is past the state's and every row's epoch, so no older row counts in
- * it. A ledger that can be summed is left as it is (a save never resets what was spent). Only an
+ * 07 §3.5 (BUDGET-RECOVER): the next applied policy.set starts a fresh ledger whenever the ledger,
+ * read successfully, cannot be summed at `now`: `budget_state` missing or `broken`, a row the engine
+ * finds inconsistent, a row from a later epoch, or a clock earlier than its newest entry (a clock
+ * once set forward). The fresh epoch is past the state's and every row's epoch, so no older row
+ * counts in it. A ledger that can be summed is left as it is (a save never resets what was spent).
+ * A read error is thrown (R3-M1): the save fails, nothing is reset, and the owner retries. Only an
  * owner-signed policy.set reaches this; nothing else resets the ledger.
  */
 function freshLedgerIfBroken(tx: StoreTx, now: number): void {
-  if (budgetLedgerSummable(tx, now)) return;
-  // A record that cannot be read (a read error) also gets a fresh epoch, so the owner's save still
-  // applies. That spends nothing: while the read error lasts, every paid action is still refused
-  // (readBudgetLedgerOrBroken). An epoch at or past the highest safe integer (corruption only) is
-  // left out, so such a row stays in a later epoch and keeps the record refused (fail closed).
+  // Reads propagate their errors: a failed read never looks like a broken ledger here.
+  const view = readBudgetLedger(tx);
+  const rows = tx.select('budget_ledger');
+  const state = tx.select('budget_state')[0];
+  if (budgetSpentMicros(view, now) !== 'broken') return;
+  // An epoch at or past the highest safe integer (corruption only) is left out, so such a row stays
+  // in a later epoch and keeps the record refused (fail closed; card BUDGET-CORRUPT-REPAIR).
   const usable = (e: unknown): e is number =>
     typeof e === 'number' && Number.isSafeInteger(e) && e >= 0 && e < Number.MAX_SAFE_INTEGER;
-  const epochs: number[] = [];
-  try {
-    for (const r of tx.select('budget_ledger'))
-      if (usable(r.ledger_epoch)) epochs.push(r.ledger_epoch);
-  } catch {
-    // unreadable rows: see above
-  }
-  try {
-    const state = tx.select('budget_state')[0];
-    if (state !== undefined && usable(state.ledger_epoch)) epochs.push(state.ledger_epoch);
-  } catch {
-    // unreadable state: replaced below
-  }
+  const epochs = rows.map((r) => r.ledger_epoch).filter(usable);
+  if (state !== undefined && usable(state.ledger_epoch)) epochs.push(state.ledger_epoch);
   const fresh = {
     status: 'ok' as const,
     ledger_epoch: (epochs.length === 0 ? 0 : Math.max(...epochs)) + 1,

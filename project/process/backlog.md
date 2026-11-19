@@ -11450,6 +11450,10 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Status:** backlog · **Security:** S2 · **Spec:** 06 §3 step 0; 07 §3.5
 - **Goal:** when the stored limits can't be read and the spending record can't be summed either, refuse with `BUDGET_BROKEN` instead of asking (today an approval lets it through, with the per-Record ceiling and per-action owner presence; the documented residual in 06 §3). One owner save fixes both.
 
+#### BUDGET-CORRUPT-REPAIR · A guided repair for a spending record a save can't fix
+- **Status:** later · **Security:** S2 · **Spec:** 07 §3.5
+- **Goal:** a corrupt entry whose count number is out of range stays refused through every limits save (fail closed); add a guided repair step, with owner presence, that sets such entries aside so the owner can start a fresh count.
+
 #### BUDGET-RACE-COPY · Plain answer when the record breaks between check and reserve
 - **Status:** backlog · **Security:** S1 · **Spec:** 06 §2.4; 07 §3.5
 - **Goal:** when the spending record becomes unsummable between the up-front check and the reservation, answer `BUDGET_BROKEN`, not `POLICY_CHANGED` (fail closed either way; copy only).
