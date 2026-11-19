@@ -30,9 +30,10 @@ import {
   getChainConfig,
   signReceipt,
   signRecord,
+  type RecordSigner,
   type TypedDataSigner,
 } from '@4thtech-io/chain';
-import { encodeHex, randomBytes } from '@4thtech-io/crypto';
+import { encodeHex, randomBytes, type KeyStore } from '@4thtech-io/crypto';
 
 export interface SmokeTarget {
   /** The submitter's origin, `https://host[:port]`, with no path. */
@@ -46,7 +47,8 @@ export interface SmokeTarget {
 /** A fresh agent: its EVM address and a signer (the crypto test seam, injected by the test file). */
 export interface SmokeAgent {
   readonly address: string;
-  readonly signer: TypedDataSigner;
+  /** Receipts through sign712; a Record through signRecord with its ticket (SEC-KEYSTORE-RECORD-GATE). */
+  readonly signer: TypedDataSigner & RecordSigner & Pick<KeyStore, 'issueRecordTicket'>;
 }
 
 export class SmokeFailure extends Error {
@@ -166,7 +168,9 @@ export async function smokeSimulatedNotarize(
     maxFee: 0n,
     deadline: Math.floor(Date.now() / 1000) + 600,
   });
-  const signature = await signRecord(agent.signer, built);
+  // No fee is reserved here (the smoke agent holds no credits): the ticket is issued directly.
+  const ticket = agent.signer.issueRecordTicket(built.typedData);
+  const signature = await signRecord(agent.signer, built, ticket);
   const response = await post(target, '/v1/notarize', {
     chainId,
     records: [{ record: built.record, signature }],

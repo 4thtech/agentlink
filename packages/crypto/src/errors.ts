@@ -61,7 +61,12 @@ export type CryptoInputErrorCode =
    * SEC-KS-712-ALLOWLIST: typed data KeyStore.sign712 does not sign (04 §3.1.1). The message is one
    * of TYPED_DATA_REFUSED's fixed sentences, which name the rule, never the input.
    */
-  | 'typed_data_refused';
+  | 'typed_data_refused'
+  /**
+   * SEC-KEYSTORE-RECORD-GATE: KeyStore.signRecord without a live ticket that this store issued for
+   * exactly this Record (04 §3.1.1). One fixed message, RECORD_TICKET_REFUSED, for every cause.
+   */
+  | 'record_ticket_refused';
 
 /**
  * The one error type @4thtech-io/crypto throws for input it refuses.

@@ -21,6 +21,7 @@ import {
 } from './keystore-api.js';
 import type { WrappedCek } from './hpke.js';
 import type { NostrEvent, UnsignedNostrEvent } from './nostr-event.js';
+import type { RecordTicket } from './record-ticket.js';
 
 type Fn = (...args: never[]) => unknown;
 type MethodNames<T> = { [K in keyof T]-?: T[K] extends Fn ? K : never }[keyof T];
@@ -90,20 +91,24 @@ describe('KeyStore (type level)', () => {
     expectTypeOf<BytesReturning<KeyStore>>().toEqualTypeOf<'unwrapCek'>();
   });
 
-  it('every other result is public: identity, signed event, hex or base64 text, or nothing', () => {
+  it('every other result is public: identity, signed event, hex or base64 text, a Record ticket, or nothing', () => {
     expectTypeOf<Exclude<AllResults<KeyStore>, Uint8Array>>().toEqualTypeOf<
-      PublicIdentity | NostrEvent | string | void
+      PublicIdentity | NostrEvent | string | RecordTicket | void
     >();
+    // SEC-KEYSTORE-RECORD-GATE: a ticket is an opaque marker; its digest stays inside the store.
+    expectTypeOf<keyof RecordTicket>().toEqualTypeOf<'kind'>();
     expectTypeOf<keyof PublicIdentity>().toEqualTypeOf<
       'agentId' | 'agentEvm' | 'agentNostr' | 'agentEnc' | 'kid' | 'keyEpoch'
     >();
   });
 
-  it('has exactly EnvelopeKeys plus getPublicBundle, sign712, signCardPop, signDropRequest, signTransaction (M1-4c-b) and close (G-2); no hpkeOpen', () => {
+  it('has exactly EnvelopeKeys plus getPublicBundle, sign712, issueRecordTicket and signRecord (SEC-KEYSTORE-RECORD-GATE), signCardPop, signDropRequest, signTransaction (M1-4c-b) and close (G-2); no hpkeOpen', () => {
     expectTypeOf<MethodNames<KeyStore>>().toEqualTypeOf<
       | EnvelopeKeyName
       | 'getPublicBundle'
       | 'sign712'
+      | 'issueRecordTicket'
+      | 'signRecord'
       | 'signCardPop'
       | 'signDropRequest'
       | 'signTransaction'
@@ -125,6 +130,15 @@ describe('KeyStore (type level)', () => {
     >();
     expectTypeOf<Params<KeyStore, 'sign712'>>().toEqualTypeOf<[TypedData]>();
     expectTypeOf<Params<KeyStore, 'signTransaction'>>().toEqualTypeOf<[DirectTransaction]>();
+    expectTypeOf<Params<KeyStore, 'signRecord'>>().toEqualTypeOf<[TypedData, RecordTicket]>();
+  });
+
+  it('a Record ticket is on the agent KeyStore only, never on EnvelopeKeys or an OwnerSession', () => {
+    // SEC-KEYSTORE-RECORD-GATE: issued synchronously, so core asks for it inside its transaction.
+    expectTypeOf<Result<KeyStore, 'issueRecordTicket'>>().toEqualTypeOf<RecordTicket>();
+    expectTypeOf<'signRecord'>().not.toExtend<keyof EnvelopeKeys>();
+    expectTypeOf<'signRecord'>().not.toExtend<keyof OwnerSession>();
+    expectTypeOf<'issueRecordTicket'>().not.toExtend<keyof OwnerSession>();
   });
 });
 

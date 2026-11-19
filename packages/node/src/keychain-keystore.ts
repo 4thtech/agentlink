@@ -12,9 +12,11 @@ import {
   cardPopSnapshot,
   decodeHex,
   decodeHex0x,
+  RecordTicketBook,
   directTransactionSnapshot,
+  recordSnapshot,
+  sign712Snapshot,
   typedDataClock,
-  typedDataSnapshot,
   encodeHex0x,
   dropRequestEpoch,
   dropRequestSnapshot,
@@ -32,6 +34,7 @@ import {
   type KeyStore,
   type NostrEvent,
   type PublicIdentity,
+  type RecordTicket,
   type TypedData,
   type UnsignedNostrEvent,
   type WrappedCek,
@@ -222,6 +225,8 @@ export class KeychainKeyStore implements KeyStore {
   /** D-141: true when the epoch follows the agent's `key-epoch` item (no fixed epoch given). */
   readonly #follows: boolean;
   readonly #timeoutMs: number;
+  /** SEC-KEYSTORE-RECORD-GATE: this store's live Record tickets (in memory, no key material). */
+  readonly #tickets = new RecordTicketBook();
   #closed = false;
 
   private constructor(
@@ -396,10 +401,28 @@ export class KeychainKeyStore implements KeyStore {
   }
 
   async sign712(typedData: TypedData): Promise<string> {
-    // SEC-KS-712-ALLOWLIST: only the agent's own record, receipt, card and top-up shapes, checked
-    // before the seed is read; the snapshot is what gets signed. The EVM key exists only at epoch 0
-    // (04 §2.1), whatever the current key epoch.
-    const snapshot = typedDataSnapshot(typedData, this.#agentId, typedDataClock());
+    // SEC-KS-712-ALLOWLIST: only the agent's own receipt, card and top-up shapes, checked before the
+    // seed is read, never a Record (SEC-KEYSTORE-RECORD-GATE); the snapshot is what gets signed. The
+    // EVM key exists only at epoch 0 (04 §2.1), whatever the current key epoch.
+    const snapshot = sign712Snapshot(typedData, this.#agentId, typedDataClock());
+    return this.#withSeed((seed) =>
+      withSecret(seed, KEY_LABELS.evm, 0, (secretKey) => signTypedData(snapshot, secretKey)),
+    );
+  }
+
+  issueRecordTicket(record: TypedData): RecordTicket {
+    // SEC-KEYSTORE-RECORD-GATE: synchronous (core asks inside its reserving transaction); the
+    // allowlist first, and a closed store issues nothing. The keychain is not read.
+    const snapshot = recordSnapshot(record, this.#agentId, typedDataClock());
+    if (this.#closed) throw new KeyStoreError('keystore_closed', 'keystore: the store is closed');
+    return this.#tickets.issue(snapshot);
+  }
+
+  async signRecord(record: TypedData, ticket: RecordTicket): Promise<string> {
+    // SEC-KEYSTORE-RECORD-GATE: the allowlist, then the ticket is spent for this exact digest, both
+    // before the keychain is read.
+    const snapshot = recordSnapshot(record, this.#agentId, typedDataClock());
+    this.#tickets.spend(ticket, snapshot);
     return this.#withSeed((seed) =>
       withSecret(seed, KEY_LABELS.evm, 0, (secretKey) => signTypedData(snapshot, secretKey)),
     );
@@ -726,6 +749,8 @@ function keyStoreFacade(store: KeychainKeyStore): KeyStore {
     unwrapCek: (wrapped: WrappedCek, envelopeId: Uint8Array, options?: EpochOptions) =>
       store.unwrapCek(wrapped, envelopeId, options),
     sign712: (typedData: TypedData) => store.sign712(typedData),
+    issueRecordTicket: (record: TypedData) => store.issueRecordTicket(record),
+    signRecord: (record: TypedData, ticket: RecordTicket) => store.signRecord(record, ticket),
     signCardPop: (card: AgentCard) => store.signCardPop(card),
     signTransaction: (tx: DirectTransaction) => store.signTransaction(tx),
     signDropRequest: (request: DropAuthRequest, createdAt: number, options?: EpochOptions) =>

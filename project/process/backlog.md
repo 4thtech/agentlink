@@ -11454,8 +11454,12 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Goal:** the person view names the AI app a contact uses; this needs a field in the card or handshake, so it waits for the M2 protocol change.
 
 #### SEC-KEYSTORE-RECORD-GATE · Record-signing gate inside the KeyStore (before mainnet)
-- **Status:** later (before M3 mainnet) · **Security:** S2 · **Spec:** D-156; 04 §3.1.1 (`sign712`); 07 §3.5
-- **Goal:** move the record-signing gate into the KeyStore itself and bind the ticket to the Record digest.
+- **Status:** built for 0.5.14 · **Security:** S2 · **Spec:** D-156; 04 §3.1.1 (`sign712`, "Record signing"); 07 §3.5
+- **Done:** every KeyStore backend signs a Record only through `signRecord` with a single-use ticket it issued for that Record's digest; `sign712` signs no Record; core asks for the ticket inside the transaction that reserved the fee. A correctness guard, not a same-process boundary (04 §2.5 residual).
+
+#### RECORD-TICKET-LIFETIME · Tie the Record ticket to its reservation's lifetime
+- **Status:** backlog · **Security:** S1 · **Spec:** 04 §3.1.1 "Record signing"; 07 §3.5
+- **Goal:** give the KeyStore's Record ticket a bounded lifetime and keep it out of the core ticket's public fields, so it is used only through the core's signing step that re-checks the held reservation.
 
 #### PROOF-RECORD-LOWS · Low findings from the proof-signing review (0.5.12)
 - **Status:** backlog · **Security:** S1 · **Spec:** 07 §3.5
