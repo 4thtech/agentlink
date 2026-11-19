@@ -1,6 +1,8 @@
 // M1-8a: the agent KeyStore backed by the OS keychain (04 §2.2, §3.1.1; 07 §9). The seed is read
-// from the keychain for each operation, checked against the agent ID (04 §2.9), used and wiped
-// (04 §8.3, best effort): the store holds no seed between calls. Signing and encryption use the
+// from the keychain for each signing, encryption and decryption operation, checked against the
+// agent ID (04 §2.9), used and wiped (04 §8.3, best effort): the store holds no seed between calls.
+// The public bundle is derived once per key epoch and kept (public keys only, REL0514-KEYRING;
+// dropped on close, KEYCHAIN-CACHE-INVALIDATE). Signing and encryption use the
 // current epoch; only lookups, decryption and a drop DELETE (M1-1g-f) take one. Owner keys are never
 // here (04 §2.5).
 import {

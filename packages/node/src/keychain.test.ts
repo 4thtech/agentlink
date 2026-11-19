@@ -306,6 +306,10 @@ describe('KeychainKeyStore (KeyStore contract, 04 §3.1.1)', () => {
     await store.signEnvelopeHash(new Uint8Array(32));
     await store.sign712(OWN_RECEIPT);
     expect(keychain.reads - before).toBe(3);
+    // REL0514-KEYRING: only the public bundle is kept; signing again reads the seed again.
+    await store.signEnvelopeHash(new Uint8Array(32));
+    await store.signEnvelopeHash(new Uint8Array(32));
+    expect(keychain.reads - before).toBe(5);
     expect(keychain.handedOut.length).toBeGreaterThan(0);
     expect(keychain.handedOut.every(allZero)).toBe(true);
   });

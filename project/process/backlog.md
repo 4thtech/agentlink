@@ -11568,3 +11568,9 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Status:** built for 0.5.14 (branch `rel0514/ci`) · **Security:** S1 (touches `.github/**`: reviewed as S2) · **Spec:** `project/process/ci-cd.md`
 - **Goal:** the browser download timed out (exit 124) three times in one week; browsers must come from a cache on almost every run.
 - **Done:** `install-playwright` keys the cache on OS, CPU architecture, the Playwright version read from `pnpm-lock.yaml` (package.json pin as fallback) and the browser list; on a hit the install step is a 60 s verification, on a miss it keeps the bounded download (240 s, one retry). Saves stay main-only; no check is skipped. Also: the e2e.yml hostile-suite modifier check now catches `.only`/`.skip`/`.each` mid-line and ignores comments and strings (`tools/ci/hostile-modifiers.mjs`, tested).
+
+#### KEYCHAIN-CACHE-INVALIDATE · Drop the kept public bundle when the ID is removed or started over (follow-up from 0.5.14)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Spec:** 04 §2.5 "Removing an agent", §3.1.1; REL0514-KEYRING
+- **Repo/path:** agentlink · `packages/node/src/keychain-keystore.ts`; tests
+- **Goal:** since 0.5.14 a keychain KeyStore derives its public bundle once per key epoch and keeps it until close. When another process removes the ID or starts it over, a store that is still open keeps answering public look-ups from the kept bundle until it closes. Signing, encryption and decryption still read the seed every time, so they fail correctly (`identity_missing` or `identity_mismatch`); only public answers are stale.
+- **Done when:** `RED (expected):` commit first; an open store drops its kept bundles when a seed read fails with `identity_missing` or `identity_mismatch`, or follows a cheap removal signal, so a look-up after removal fails like signing does; no extra keychain read on the normal path.
