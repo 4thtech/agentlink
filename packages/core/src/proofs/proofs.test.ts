@@ -910,33 +910,53 @@ describe('BUDGET-RECOVER: a limits re-save recovers every broken spending record
     expect(rows.find((x) => x.reserved_usd === '9')?.ledger_epoch).toBe(after.ledger_epoch);
   });
 
-  it('a save while the record cannot be read still applies, and paid actions stay refused (Low)', async () => {
-    const { a, b } = await twoAgents();
+  it('read error: a failed read during a save rejects the save; the epoch and a reservation stay (R3-M1)', async () => {
+    const { a } = await twoAgents();
     await setPolicy(a, (p) => {
       p.proofs.notarize = 'approval';
     });
-    const envelopeId = await sendText(a, b);
     const before = (await budgetState(a))!;
+    await a.store.transaction((tx) =>
+      tx.insert('budget_ledger', ledgerRow(9, before.ledger_epoch, clock.t, { reserved_usd: '9' })),
+    );
+    // One transient failed read of the spending record, during the save.
+    let failed = false;
     const undo = hookTransactions(a, (target, key, value) =>
       key === 'select'
         ? (table: string, ...rest: unknown[]) => {
-            if (table === 'budget_ledger') throw new Error('read failed');
+            if (table === 'budget_ledger' && !failed) {
+              failed = true;
+              throw new Error('read failed');
+            }
             return (value as (...args: unknown[]) => unknown).call(target, table, ...rest);
           }
         : undefined,
     );
+    const policy = defaultPolicy();
+    policy.proofs.notarize = 'approval';
+    const signedText = await signedOwner(a, 'policy.set', {
+      version: a.policyVersion + 1,
+      policy: policy as unknown as JsonObject,
+    });
+    let applied = false;
+    try {
+      applied = (await a.client.ownerActions.apply(signedText)).status === 'applied';
+    } catch {
+      applied = false;
+    }
+    undo();
+    expect(failed).toBe(true);
+    expect(applied).toBe(false);
+    const after = (await budgetState(a))!;
+    expect(after.ledger_epoch).toBe(before.ledger_epoch);
+    expect((await ledger(a)).find((x) => x.reserved_usd === '9')?.ledger_epoch).toBe(
+      after.ledger_epoch,
+    );
+    // The owner retries: the save applies and the healthy record is kept.
     await setPolicy(a, (p) => {
       p.proofs.notarize = 'approval';
     });
-    // Still unreadable: still refused, nothing signed.
-    expect(await a.client.notarize({ envelopeId })).toEqual({
-      status: 'rejected',
-      code: 'BUDGET_BROKEN',
-    });
-    undo();
-    expect(chain.calls.notarize).toBe(0);
-    expect((await budgetState(a))!.ledger_epoch).toBe(before.ledger_epoch + 1);
-    expect(await a.client.notarize({ envelopeId })).toMatchObject({ status: 'pending_approval' });
+    expect((await budgetState(a))!.ledger_epoch).toBe(before.ledger_epoch);
   });
 });
 
