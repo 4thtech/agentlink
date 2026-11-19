@@ -86,7 +86,7 @@ import {
 import { feeContextFromQuote, type ApprovalService, type PendingApproval } from '../approvals.js';
 import {
   checkAndReserveProof,
-  readBudgetLedger,
+  readBudgetLedgerOrBroken,
   releaseProofReservation,
   settleProofCharged,
 } from '../budget.js';
@@ -774,7 +774,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     const pre = await this.#ctx.store.transaction((tx) =>
       evaluateProof(effective, action, {
         now: nowOf(this.#ctx),
-        ledger: readBudgetLedger(tx),
+        ledger: readBudgetLedgerOrBroken(tx),
         ...restore,
       }),
     );
@@ -896,7 +896,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     const pre = await this.#ctx.store.transaction((tx) =>
       evaluateProof(effective, action, {
         now: nowOf(this.#ctx),
-        ledger: readBudgetLedger(tx),
+        ledger: readBudgetLedgerOrBroken(tx),
         ...restore,
       }),
     );

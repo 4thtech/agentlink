@@ -86,6 +86,7 @@ import {
   type EffectivePolicy,
   type PolicyProblem,
 } from './policy-engine.js';
+import { budgetLedgerSummable } from './budget.js';
 import { SINGLETON_SLOT, type Row, type Sealed } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 
@@ -276,25 +277,32 @@ const nonceRow = (signed: SignedOwnerAction, actionHash: string, now: number) =>
   applied_at: now,
 });
 
-/** 07 §3.5: the next applied policy.set starts a fresh ledger when the ledger is broken or gone. */
+/**
+ * 07 §3.5 (BUDGET-RECOVER): the next applied policy.set starts a fresh ledger whenever the ledger
+ * cannot be summed at `now`: `budget_state` missing or `broken`, a row the engine finds inconsistent,
+ * a row from a later epoch, a clock earlier than its newest entry (a clock once set forward), or a
+ * read error. The fresh epoch is past the state's and every row's epoch, so no older row counts in
+ * it. A ledger that can be summed is left as it is (a save never resets what was spent). Only an
+ * owner-signed policy.set reaches this; nothing else resets the ledger.
+ */
 function freshLedgerIfBroken(tx: StoreTx, now: number): void {
+  if (budgetLedgerSummable(tx, now)) return;
   const state = tx.select('budget_state')[0];
-  if (state !== undefined && state.status !== 'broken') return;
-  const fresh = { status: 'ok' as const, newest_t: now, since: now, broken_at: null };
-  if (state !== undefined) {
-    tx.update(
-      'budget_state',
-      { slot: SINGLETON_SLOT },
-      { ...fresh, ledger_epoch: state.ledger_epoch + 1 },
-    );
-    return;
-  }
-  const epochs = tx.select('budget_ledger').map((r) => r.ledger_epoch);
-  tx.insert('budget_state', {
-    slot: SINGLETON_SLOT,
+  const epochs = tx
+    .select('budget_ledger')
+    .map((r) => r.ledger_epoch)
+    .filter((e) => Number.isSafeInteger(e) && e >= 0);
+  if (state !== undefined && Number.isSafeInteger(state.ledger_epoch))
+    epochs.push(state.ledger_epoch);
+  const fresh = {
+    status: 'ok' as const,
     ledger_epoch: (epochs.length === 0 ? 0 : Math.max(...epochs)) + 1,
-    ...fresh,
-  });
+    newest_t: now,
+    since: now,
+    broken_at: null,
+  };
+  tx.delete('budget_state', {});
+  tx.insert('budget_state', { slot: SINGLETON_SLOT, ...fresh });
 }
 
 export class OwnerActions {
@@ -1336,6 +1344,20 @@ export class OwnerActions {
    */
   async loadPolicy(): Promise<EffectivePolicy> {
     return (await this.#inspectPolicy()).effective;
+  }
+
+  /**
+   * BUDGET-RECOVER (07 §3.5; 11 §5.11): true when the spending record cannot be summed now, so
+   * paid actions are refused (BUDGET_BROKEN) until the owner saves the rules again (any applied
+   * policy.set starts a fresh record). Read-only: it changes and grants nothing (I-4). A read error
+   * is true (fail closed: the owner is offered the save).
+   */
+  async spendingRecordNeedsSave(): Promise<boolean> {
+    try {
+      return await this.#ctx.store.transaction((tx) => !budgetLedgerSummable(tx, nowOf(this.#ctx)));
+    } catch {
+      return true;
+    }
   }
 
   /**

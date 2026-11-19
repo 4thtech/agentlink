@@ -11439,8 +11439,20 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Done:** `settleLayoutShift` (e2e `helpers/motion.ts`, with its own test) waits for fonts and two frames, then restarts the score; `01-first-launch.test.ts` calls it once the first step shows. The budget (`CLS_BUDGET` 0.01) is unchanged and every shift after that still fails the test. The first-paint font swap near the budget decided some runs; if the first paint itself should also count, say so and the card moves to a real fix of that swap in the UI.
 
 #### BUDGET-FAILCLOSED-REVIEW · Review the fail-closed paths of the budget
-- **Status:** backlog · **Security:** S2 · **Spec:** 06 §3; 07 §3.5
+- **Status:** reviewed (fixes in BUDGET-RECOVER) · **Security:** S2 · **Spec:** 06 §3; 07 §3.5
 - **Goal:** an independent review of every state in which the spending record cannot be summed: what the owner sees, what is refused, and that a fresh limits save always recovers.
+
+#### BUDGET-RECOVER · A limits save recovers every spending record that can't be summed
+- **Status:** built in the rel0514 branch (not merged) · **Security:** S2 · **Spec:** 06 §3; 07 §3.5; 11 §5.11
+- **Done:** an applied `policy.set` starts a fresh epoch whenever the ledger can't be summed at that moment (any reason, whatever the stored status), past every row's epoch; a summable ledger is left as it is. The Rules page shows "Save your limits again" with "Save again" (presence, nothing changed needed); `GET /api/ui/rules` adds `spendingRecord: 'needs_save'`. A read error in the up-front check is `BUDGET_BROKEN`. Tests first through `ownerActions.apply` (clock ahead, later-epoch row, inconsistent row, missing state) and on the page; 07 §3.5 says a clock-only fault is refused.
+
+#### BUDGET-FAILCLOSED-APPROVAL · Stored limits unreadable and spending record broken: refuse too
+- **Status:** backlog · **Security:** S2 · **Spec:** 06 §3 step 0; 07 §3.5
+- **Goal:** when the stored limits can't be read and the spending record can't be summed either, refuse with `BUDGET_BROKEN` instead of asking (today an approval lets it through, with the per-Record ceiling and per-action owner presence; the documented residual in 06 §3). One owner save fixes both.
+
+#### BUDGET-RACE-COPY · Plain answer when the record breaks between check and reserve
+- **Status:** backlog · **Security:** S1 · **Spec:** 06 §2.4; 07 §3.5
+- **Goal:** when the spending record becomes unsummable between the up-front check and the reservation, answer `BUDGET_BROKEN`, not `POLICY_CHANGED` (fail closed either way; copy only).
 
 #### CARD-UPDATE-FAILED-STATE · A failed card update drives a retry
 - **Status:** built in the rel0514 branch (not merged) · **Security:** S1 · **Spec:** 07 §4.3

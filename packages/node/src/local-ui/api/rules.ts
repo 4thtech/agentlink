@@ -1,7 +1,8 @@
 // M1-11c-a5: the Rules page's API (08 §1; 06 §3; 11 §5, §6.2; D-118, D-119; I-4, I-5, I-7).
 //
 // - `GET /api/ui/rules`: the policy in force as the page shows it. Values of the page's own fields
-//   and counts; never an agent ID, a folder path or the proof network (UX north star).
+//   and counts; never an agent ID, a folder path or the proof network (UX north star). With
+//   `spendingRecord: 'needs_save'` when the spending record needs a fresh save (BUDGET-RECOVER).
 // - `GET /api/ui/rules/review?edit=`: the edit (base64url JSON `{ base, patch, keepDeliveryReceipts? }`)
 //   goes to core's `preparePolicyEdit` (M1-11r-b). The patch may name only the fields this page edits
 //   (EDITABLE): folders, storage, the proof network, contact lists and contact rules are other pages'
@@ -236,12 +237,21 @@ async function readRules(context: LocalUiContext): Promise<LocalUiResult> {
     return UNAVAILABLE;
   }
   if (effective.mode === 'fail_closed') return { status: 200, body: { status: 'not_valid' } };
+  // BUDGET-RECOVER (07 §3.5): the page offers "Save again" when the spending record needs a fresh
+  // save. Only this word leaves, never why. A failed read leaves it out (paid actions still refuse).
+  let needsSave = false;
+  try {
+    needsSave = (await client.policy.spendingRecordNeedsSave?.()) === true;
+  } catch {
+    needsSave = false;
+  }
   return {
     status: 200,
     body: {
       status: 'ok',
       version: effective.mode === 'signed' ? effective.version : 0,
       rules: view(effective.policy),
+      ...(needsSave ? { spendingRecord: 'needs_save' } : {}),
     },
   };
 }

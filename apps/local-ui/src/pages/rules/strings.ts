@@ -147,6 +147,11 @@ export const RULES_STRINGS = {
   saving: 'Saving…',
 
   saved: 'Rules saved.',
+  // BUDGET-RECOVER (07 §3.5; 11 §5.11): the spending record needs a fresh save.
+  spendingRecordTitle: 'Save your limits again',
+  spendingRecordBody:
+    "AgentLink can't check your spending limits right now, so proofs are paused. Save your rules again to start a fresh count. Nothing changes in your rules.",
+  saveAgain: 'Save again',
   leaveWarning:
     "You have changes to your rules that aren't saved. If you leave now, they are lost. Leave anyway?",
   wrongCode: "That didn't match. Try again.",

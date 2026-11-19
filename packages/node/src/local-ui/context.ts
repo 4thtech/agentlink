@@ -320,6 +320,12 @@ export interface LocalUiReadClient {
     load(): Promise<EffectivePolicy>;
     prepareEdit(patch: unknown, options: PolicyEditOptions): Promise<PreparedPolicyEdit>;
     recordReceiptsKept(version: number): Promise<boolean>;
+    /**
+     * BUDGET-RECOVER (07 §3.5): true when the spending record cannot be summed now and the owner
+     * should save the rules again (core `spendingRecordNeedsSave`). Read-only; grants nothing.
+     * Optional so that page fakes without it stay valid.
+     */
+    spendingRecordNeedsSave?(): Promise<boolean>;
   };
   /**
    * RET-6 (D-148; 04 §4.2): what a `history.*` setting would remove now, for the Storage editor
@@ -482,6 +488,7 @@ export function readOnlyClient(client: AgentLinkClient): LocalUiReadClient {
       prepareEdit: (patch: unknown, options: PolicyEditOptions) =>
         client.ownerActions.preparePolicyEdit(patch, options),
       recordReceiptsKept: (version: number) => client.ownerActions.recordReceiptsKept(version),
+      spendingRecordNeedsSave: () => client.ownerActions.spendingRecordNeedsSave(),
     }),
     retention: Object.freeze({
       preview: (keep: unknown) => client.historyRetention.preview(keep),
