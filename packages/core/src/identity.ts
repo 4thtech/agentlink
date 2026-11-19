@@ -62,6 +62,7 @@ import {
   cardPopInvalid,
   cardTypedData,
   checkName,
+  checkOwnRelays,
   checkRelays,
   ownCardText,
   ownerFingerprintHex,
@@ -421,7 +422,8 @@ export class IdentityService {
   async init(input: InitIdentityInput): Promise<IdentityView> {
     const ctx = this.#ctx;
     const name = checkName(input.name);
-    const relays = checkRelays(input.relays);
+    // 07 §4.3 "Counts" (owner D2): a new ID's own list holds 2 to 8 relays.
+    const relays = checkOwnRelays(input.relays);
     const bundle = await ctx.keyStore.getPublicBundle();
     const existing = await ctx.store.transaction((tx) => tx.count('identity'));
     if (existing > 0) {
@@ -497,6 +499,8 @@ export class IdentityService {
     );
     const relays = input.relays === undefined ? storedRelays : checkRelays(input.relays);
     const relaysChanged = !sameList(relays, storedRelays);
+    // 07 §4.3 "Counts" (owner D2): a changed own list holds 2 to 8 relays.
+    if (relaysChanged) checkOwnRelays(relays);
     if (renamed) {
       const allowance = renameAllowanceOf(oldStored, nowOf(ctx));
       if (allowance.status === 'limited') throw renameLimited();

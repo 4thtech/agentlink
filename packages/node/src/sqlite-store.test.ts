@@ -479,9 +479,9 @@ describe(
       // add a migration with the next version instead (07 §3.7: forward migrations only).
       const digestOf = (i: number) =>
         encodeHex(sha256(encodeUtf8(MIGRATIONS[i]?.statements.join(';\n') ?? '')));
-      expect(STORE_SCHEMA_VERSION).toBe(22);
+      expect(STORE_SCHEMA_VERSION).toBe(23);
       expect(MIGRATIONS.map((m) => m.version)).toEqual([
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
       ]);
       // Version 1 (G-9) is unchanged by D-72.
       expect(digestOf(0)).toMatchInlineSnapshot(
@@ -670,6 +670,13 @@ describe(
       // Version 22 (DEVICES-INTERIM): one nullable column appended, the `install_state` table and
       // its one-row trigger (sqlite-store-v22.test.ts). Versions 1 to 21 keep their statements.
       expect(MIGRATIONS[21]?.statements).toHaveLength(3);
+      // Version 23 (NET-STATS): the `relay_stats` table and its row-bound trigger only
+      // (sqlite-store-v23.test.ts). Versions 1 to 22 keep their statements.
+      const v23 = MIGRATIONS[22]?.statements ?? [];
+      expect(v23.filter((s) => s.startsWith('CREATE TABLE')).map((s) => s.split('"')[1])).toEqual([
+        'relay_stats',
+      ]);
+      expect(v23.every((s) => !s.startsWith('ALTER TABLE'))).toBe(true);
     });
 
     it('migrates a version 13 file to version 14 (REL051-B2): invites kept, invite_link null', async () => {

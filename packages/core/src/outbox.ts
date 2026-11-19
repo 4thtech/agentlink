@@ -64,9 +64,12 @@ import {
   type OutboxGiveUpReason,
   type OutboxNotice,
   type OutboxPersistence,
+  type OutboxPool,
   type OutboxRelayCounts,
   type OutboxRow,
   type OutboxSummary,
+  type ReadbackOptions,
+  type RelayProbeResult,
 } from '@4thtech-io/transport-nostr';
 import { acksFor, type AckTarget } from './acks.js';
 import { agentNostrKey } from './card.js';
@@ -81,6 +84,7 @@ import { nowOf, open, seal, type CoreContext } from './context.js';
 import { CoreError } from './errors.js';
 import type { IdentityService } from './identity.js';
 import { INBOX_TYPES } from './inbox.js';
+import { RelayTally, recordRelayStats } from './relay-stats.js';
 import type { Row } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 import type { RelayStatus, Transport, TransportFactory } from './transport.js';
@@ -470,6 +474,27 @@ export class OutboxService {
     }
   }
 
+  /**
+   * NET-PROBE: how each of the agent's own servers and the legacy read-only servers answers from
+   * this machine now (transport relayProbe: a fresh connection each, no login, the relay URL rule and
+   * address check, bounded). Only those lists: never a URL from a caller, a message or a contact.
+   * Undefined without a transport that can probe, while paused, or when the own list cannot be read.
+   * Never throws.
+   */
+  async relayProbe(): Promise<
+    readonly { readonly relay: string; readonly result: RelayProbeResult }[] | undefined
+  > {
+    const transport = this.#transport;
+    if (transport?.relayProbe === undefined || this.#transportClosed) return undefined;
+    try {
+      if (this.#pause !== undefined && (await this.#pause.paused())) return undefined;
+      const own = checkList((await this.#identity.signedCard()).relays);
+      return await transport.relayProbe([...new Set([...own, ...LEGACY_READ_RELAYS])]);
+    } catch {
+      return undefined;
+    }
+  }
+
   /** The transport, or `transport_unavailable` before anything is stored. Internal (send.ts). */
   requireTransport(): Transport {
     if (this.#transport === undefined) {
@@ -667,15 +692,17 @@ export class OutboxService {
         notices: [],
       };
     }
+    let ownKnown = false;
     try {
       this.#ownRelays = new Set(checkList((await this.#identity.signedCard()).relays));
+      ownKnown = true;
     } catch {
       this.#ownRelays = new Set(); // no readable own list: no AUTH anywhere (07 §4.3)
     }
     const persistence = new StoreOutboxPersistence(this.#ctx, envelopeId);
     this.#passes.add(persistence);
     try {
-      return await this.#passWith(persistence, transport);
+      return await this.#passWith(persistence, transport, ownKnown);
     } finally {
       this.#passes.delete(persistence);
     }
@@ -732,12 +759,50 @@ export class OutboxService {
   async #passWith(
     persistence: StoreOutboxPersistence,
     transport: Transport,
+    ownKnown: boolean,
   ): Promise<OutboxSummary> {
+    // NET-STATS: the pass's per-server results are tallied in memory and written once at its end
+    // (counters only, own and legacy servers only; relay-stats.ts).
+    const tally = new RelayTally();
+    const pool: OutboxPool = {
+      publish: async (event, relays) => {
+        const outcome = await transport.publish(event, relays);
+        tally.publish(outcome.results);
+        return outcome;
+      },
+      ...(transport.checkServed === undefined
+        ? {}
+        : {
+            checkServed: (relay: string, eventId: string, options?: ReadbackOptions) =>
+              (transport.checkServed as NonNullable<Transport['checkServed']>)(
+                relay,
+                eventId,
+                options,
+              ),
+          }),
+      ...(transport.readbackSpare === undefined
+        ? {}
+        : { readbackSpare: () => (transport.readbackSpare as () => boolean)() }),
+    };
     const worker = new OutboxWorker({
       persistence,
-      pool: transport,
+      pool,
       now: () => nowOf(this.#ctx) * 1000,
     });
+    try {
+      return await this.#runPass(worker, persistence);
+    } finally {
+      // An unreadable own list keeps the stored counters as they are (never pruned to legacy only).
+      if (!tally.empty && ownKnown) {
+        await recordRelayStats(this.#ctx, [...this.#ownRelays], tally);
+      }
+    }
+  }
+
+  async #runPass(
+    worker: OutboxWorker,
+    persistence: StoreOutboxPersistence,
+  ): Promise<OutboxSummary> {
     let sent = 0;
     let retrying = 0;
     let notDelivered = 0;

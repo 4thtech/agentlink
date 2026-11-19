@@ -21,11 +21,13 @@
  * `outbox.availability` and `envelopes.availability` (07 §3.2). Version 20 (DELIVERY-DETAILS) adds
  * `relays_accepted` and `relays_available` to both (counts only). Version 21 (RESTORE-TRACES, D-156)
  * adds `budget_restores` and `restore_replays` (07 §3.5). Version 22 (DEVICES-INTERIM) adds
- * `budget_ledger.install_id` and `install_state` (07 §3.5). An
+ * `budget_ledger.install_id` and `install_state` (07 §3.5). Version 23 (NET-STATS) adds `relay_stats`
+ * (per-server counters for the Message network view; named by content, renumbered if another lane
+ * lands a version first). An
  * older build refuses a newer store (`store_schema_newer`) when it opens it, so an upgrade cannot be
  * rolled back.
  */
-export const STORE_SCHEMA_VERSION = 22;
+export const STORE_SCHEMA_VERSION = 23;
 
 /** 04 §2.9: `storagePrefix` is 16 random bytes, base64url, generated at init. */
 export const STORAGE_PREFIX_BYTES = 16;

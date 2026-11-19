@@ -24,7 +24,7 @@ const INSTALL = 'a1'.repeat(16);
 
 describe('schema version 22 (DEVICES-INTERIM)', () => {
   it('appends budget_ledger.install_id and creates install_state', () => {
-    expect(STORE_SCHEMA_VERSION).toBe(22);
+    expect(STORE_SCHEMA_VERSION).toBeGreaterThanOrEqual(22);
     expect(MIGRATIONS[21]?.version).toBe(22);
     const v22 = MIGRATIONS[21]?.statements ?? [];
     expect(v22[0]).toMatch(/^ALTER TABLE "budget_ledger" ADD COLUMN "install_id" TEXT /);
@@ -95,9 +95,9 @@ describe('schema version 22 (DEVICES-INTERIM)', () => {
       )
       .run('e1', `0x${'1'.padStart(64, '0')}`, '0.1', 'reserved');
     raw.close();
-    expect(MIGRATIONS.slice(19).map((m) => m.version)).toEqual([20, 21, 22]);
+    expect(MIGRATIONS.slice(19, 22).map((m) => m.version)).toEqual([20, 21, 22]);
     const store = await SqliteStore.open(path());
-    expect(store.schemaVersion).toBe(22);
+    expect(store.schemaVersion).toBe(STORE_SCHEMA_VERSION);
     const [out] = await store.transaction((tx) => tx.select('outbox'));
     expect(out).toMatchObject({ availability: 'confirmed', relays_accepted: null });
     const [led] = await store.transaction((tx) => tx.select('budget_ledger'));

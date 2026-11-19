@@ -41,8 +41,10 @@ export {
   NIP11_MAX_BYTES,
   OK_TIMEOUT_MS,
   READBACK_QUEUE_WAIT_MS,
+  PROBE_TIMEOUT_MS,
   READBACK_TIMEOUT_MS,
   RelayPool,
+  relayOrigin,
   type CloseListener,
   type FrameListener,
   type PublishOutcome,
@@ -53,6 +55,8 @@ export {
   type RelayHealth,
   type RelayLink,
   type RelayPoolOptions,
+  type RelayProbeResult,
+  type RelayProbeState,
   type RelayPublishResult,
 } from './relay-pool.js';
 export {

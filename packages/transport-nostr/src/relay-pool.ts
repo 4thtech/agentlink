@@ -17,8 +17,10 @@
 //   host only (a relay URL path can carry a credential) and never carry event content.
 import {
   NOSTR_KIND_AUTH,
+  encodeHex,
   encodeUtf8,
   parseJson,
+  randomBytes,
   verifyNostrEvent,
   type EnvelopeKeys,
   type NostrEvent,
@@ -60,6 +62,8 @@ export const READBACK_TIMEOUT_MS = 5_000;
 export const MAX_READBACKS = 16;
 /** SEC-RELAY-READBACK: how long a check waits for a free slot before it is `unchecked`. */
 export const READBACK_QUEUE_WAIT_MS = 10_000;
+/** NET-PROBE: one probe's bound, from start to answer (connect, NIP-11 and one REQ in it). */
+export const PROBE_TIMEOUT_MS = 5_000;
 const NIP11_TTL_MS = 60 * 60 * 1000;
 const NIP11_FAILURE_TTL_MS = 5 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 512;
@@ -121,6 +125,53 @@ export interface ReadbackSignal {
 export interface ReadbackOptions {
   /** Ends the check at once (closing its connection and freeing its slot), e.g. once a sibling served. */
   readonly signal?: ReadbackSignal;
+}
+
+/**
+ * NET-PROBE: what one probe found. A fixed set: relay text never reaches a caller.
+ * - `ready`: connected and answered the probe's REQ (EOSE, or CLOSED);
+ * - `timeout`: no answer within PROBE_TIMEOUT_MS (`connectMs` says whether it connected);
+ * - `unreachable`: the name did not resolve, or the connection failed;
+ * - `blocked`: an answer of the name is not globally routable (04 §4); nothing was opened;
+ * - `invalid`: the URL fails the relay rule; nothing was resolved;
+ * - `unknown`: not probed (the pool is closed, or every read-back slot is busy).
+ */
+export type RelayProbeState =
+  'ready' | 'timeout' | 'unreachable' | 'blocked' | 'invalid' | 'unknown';
+
+export interface RelayProbeResult {
+  readonly state: RelayProbeState;
+  /** Whole milliseconds from the start to the open WebSocket; null when it did not open. */
+  readonly connectMs: number | null;
+  /** Whole milliseconds from the REQ to its answer; null without one. */
+  readonly roundTripMs: number | null;
+  /**
+   * The relay wants a sign-in (NIP-42): it closed the probe's REQ with `auth-required:`, or its NIP-11
+   * document says `limitation.auth_required: true`. null: not known (no answer and no document).
+   */
+  readonly authRequired: boolean | null;
+  /** NIP-11 `limitation.payment_required: true`. null: no readable document. */
+  readonly paymentRequired: boolean | null;
+}
+
+const probeResult = (state: RelayProbeState): RelayProbeResult =>
+  Object.freeze({
+    state,
+    connectMs: null,
+    roundTripMs: null,
+    authRequired: null,
+    paymentRequired: null,
+  });
+
+/** NIP-11 `limitation.auth_required` and `payment_required`: true only for a JSON `true`. */
+function readProbeFlags(doc: unknown): { auth: boolean; payment: boolean } | undefined {
+  if (typeof doc !== 'object' || doc === null || Array.isArray(doc)) return undefined;
+  const limitation = (doc as Record<string, unknown>).limitation;
+  if (typeof limitation !== 'object' || limitation === null || Array.isArray(limitation)) {
+    return { auth: false, payment: false };
+  }
+  const l = limitation as Record<string, unknown>;
+  return { auth: l.auth_required === true, payment: l.payment_required === true };
 }
 
 /** Per-relay health, for the activity feed and `doctor`. No event content. */
@@ -256,7 +307,7 @@ function verifyEvent(event: NostrEvent): boolean {
 }
 
 /** `wss://host[:port]` of a relay URL: what health output and the activity feed may show. */
-function relayOrigin(url: string): string {
+export function relayOrigin(url: string): string {
   const m = RELAY_PARTS.exec(url);
   if (m === null) return 'wss://invalid';
   return m[2] === undefined ? `wss://${m[1] as string}` : `wss://${m[1] as string}:${m[2]}`;
@@ -634,6 +685,191 @@ export class RelayPool {
     });
   }
 
+  // --- probe (NET-PROBE) ------------------------------------------------------------------------
+
+  /**
+   * How `relay` answers from here now (the app's Message network view, 08 §1): connect time, the
+   * round trip of one REQ for a random id (it matches nothing, so nothing is served and nothing names
+   * who asks), and whether the relay wants a sign-in (NIP-42 `auth-required:` on that REQ, or NIP-11)
+   * or a payment (NIP-11). Like checkServed: a new connection of its own, never pooled; no login ever
+   * sent; the relay URL rule and the address check on the connect and the NIP-11 fetch (04 §4).
+   * Bounded: PROBE_TIMEOUT_MS from start to answer (NIP-11 inside it with its own 3 s bound, 64 KiB);
+   * it uses a read-back slot and never waits for one (all busy: `unknown` at once). Never rejects;
+   * relay text never leaves this method, and nothing is logged.
+   */
+  async probe(relay: string): Promise<RelayProbeResult> {
+    if (this.closed) return probeResult('unknown');
+    if (!isAllowedRelayUrl(relay) || relayParts(relay) === undefined) return probeResult('invalid');
+    if (this.readbacks >= MAX_READBACKS) return probeResult('unknown');
+    this.readbacks += 1;
+    try {
+      return await this.runProbe(relay);
+    } catch {
+      return probeResult('unknown');
+    } finally {
+      this.releaseSlot();
+    }
+  }
+
+  private runProbe(relay: string): Promise<RelayProbeResult> {
+    this.readbackSeq = (this.readbackSeq + 1) % Number.MAX_SAFE_INTEGER;
+    const subId = `p${this.readbackSeq}`;
+    const req = JSON.stringify(['REQ', subId, { ids: [encodeHex(randomBytes(32))], limit: 1 }]);
+    const start = this.now();
+    const elapsed = (from: number): number => Math.max(0, Math.round(this.now() - from));
+    return new Promise((resolve) => {
+      let socket: RelaySocket | undefined;
+      let done = false;
+      let sentAt: number | undefined;
+      let connectMs: number | null = null;
+      let roundTripMs: number | null = null;
+      let reqAuth: boolean | null = null;
+      let flags: { auth: boolean; payment: boolean } | undefined;
+      let socketState: RelayProbeState | undefined;
+      let nip11Done = this.nip11 === undefined;
+      const closeSocket = (): void => {
+        if (socket === undefined) return;
+        this.readbackSockets.delete(socket);
+        try {
+          socket.close();
+        } catch {
+          // closing a dead socket is not an error
+        }
+      };
+      const finish = (state: RelayProbeState): void => {
+        if (done) return;
+        done = true;
+        this.timers.clearTimeout(timer);
+        closeSocket();
+        const auth =
+          reqAuth === true || flags?.auth === true
+            ? true
+            : reqAuth === false || flags !== undefined
+              ? false
+              : null;
+        resolve(
+          Object.freeze({
+            state,
+            connectMs,
+            roundTripMs,
+            authRequired: state === 'ready' || flags !== undefined ? auth : null,
+            paymentRequired: flags === undefined ? null : flags.payment,
+          }),
+        );
+      };
+      /** Both halves are in (the socket's answer and the NIP-11 document): answer now. */
+      const settle = (): void => {
+        if (socketState !== undefined && nip11Done) finish(socketState);
+      };
+      const socketDone = (state: RelayProbeState): void => {
+        if (socketState !== undefined) return;
+        socketState = state;
+        closeSocket();
+        settle();
+      };
+      const timer = this.timers.setTimeout(
+        () => finish(socketState ?? 'timeout'),
+        PROBE_TIMEOUT_MS,
+      );
+      if (this.closed) {
+        finish('unknown');
+        return;
+      }
+      const onMessage = (data: unknown): void => {
+        if (done || socketState !== undefined || typeof data !== 'string') return;
+        if (utf8Length(data, MAX_FRAME_BYTES) > MAX_FRAME_BYTES) return;
+        let frame: unknown;
+        try {
+          frame = parseJson(data);
+        } catch {
+          return;
+        }
+        if (!Array.isArray(frame) || frame[1] !== subId || sentAt === undefined) return;
+        if (frame[0] === 'EOSE') {
+          roundTripMs = elapsed(sentAt);
+          reqAuth = false;
+          socketDone('ready');
+        } else if (frame[0] === 'CLOSED') {
+          roundTripMs = elapsed(sentAt);
+          // Only the machine-readable prefix is read (NIP-01); the rest of the text is never kept.
+          reqAuth = typeof frame[2] === 'string' && frame[2].startsWith('auth-required:');
+          socketDone('ready');
+        }
+        // EVENT (a forged match), AUTH, NOTICE, anything else: ignored; the answer is EOSE or CLOSED.
+      };
+      void this.resolveTarget(relay, true).then(
+        (target) => {
+          if (done) return;
+          if (typeof target === 'string') {
+            nip11Done = true;
+            finish(
+              target === 'blocked_address'
+                ? 'blocked'
+                : target === 'invalid_url'
+                  ? 'invalid'
+                  : 'unreachable',
+            );
+            return;
+          }
+          if (this.closed) {
+            finish('unknown');
+            return;
+          }
+          const fetcher = this.nip11;
+          if (fetcher !== undefined) {
+            void this.boundedFetch(fetcher, target).then((body) => {
+              try {
+                if (
+                  typeof body === 'string' &&
+                  utf8Length(body, NIP11_MAX_BYTES) <= NIP11_MAX_BYTES
+                ) {
+                  flags = readProbeFlags(parseJson(body));
+                }
+              } catch {
+                flags = undefined; // an unreadable document: the flags stay unknown
+              }
+              nip11Done = true;
+              settle();
+            });
+          }
+          let opened = false;
+          const sendReq = (): void => {
+            if (done || socketState !== undefined || socket === undefined || !opened) return;
+            if (sentAt !== undefined) return;
+            sentAt = this.now();
+            try {
+              socket.send(req);
+            } catch {
+              socketDone('unreachable');
+            }
+          };
+          try {
+            socket = this.connector.open(target, {
+              onOpen: () => {
+                if (opened) return;
+                opened = true;
+                connectMs = elapsed(start);
+                sendReq();
+              },
+              onMessage,
+              onClose: () => socketDone('unreachable'),
+            });
+          } catch {
+            socketDone('unreachable');
+            return;
+          }
+          if (done || socketState !== undefined) {
+            closeSocket();
+            return;
+          }
+          this.readbackSockets.add(socket);
+          sendReq(); // the upgrade may have completed while open() ran
+        },
+        () => finish('unreachable'),
+      );
+    });
+  }
+
   // --- publish ---------------------------------------------------------------------------------
 
   private async publishOne(
@@ -846,8 +1082,11 @@ export class RelayPool {
     return isOpen ? undefined : 'connect_failed';
   }
 
-  /** 07 §4.2 steps 1 to 3: resolve, require every answer to be globally routable, pin the address. */
-  private async resolveTarget(url: string): Promise<RelayTarget | RelayFailure> {
+  /**
+   * 07 §4.2 steps 1 to 3: resolve, require every answer to be globally routable, pin the address.
+   * `quiet` (NET-PROBE): no log line, so a probe logs nothing at all.
+   */
+  private async resolveTarget(url: string, quiet = false): Promise<RelayTarget | RelayFailure> {
     const parts = relayParts(url);
     if (parts === undefined || parts.port < 1 || parts.port > 65535) return 'invalid_url';
     if (this.addressCheck === 'platform') {
@@ -857,16 +1096,19 @@ export class RelayPool {
     try {
       answers = await this.addressCheck.resolver.resolve(parts.host);
     } catch {
-      this.logger?.warn('relay skipped', { reason: 'resolve_failed', host: parts.host });
+      if (!quiet)
+        this.logger?.warn('relay skipped', { reason: 'resolve_failed', host: parts.host });
       return 'resolve_failed';
     }
     if (!Array.isArray(answers) || answers.length === 0) {
-      this.logger?.warn('relay skipped', { reason: 'resolve_failed', host: parts.host });
+      if (!quiet)
+        this.logger?.warn('relay skipped', { reason: 'resolve_failed', host: parts.host });
       return 'resolve_failed';
     }
     if (!answers.every(isGloballyRoutable)) {
       // Names the relay, never the address (07 §4.2 step 2).
-      this.logger?.warn('relay skipped', { reason: 'blocked_address', host: parts.host });
+      if (!quiet)
+        this.logger?.warn('relay skipped', { reason: 'blocked_address', host: parts.host });
       return 'blocked_address';
     }
     return { url, host: parts.host, port: parts.port, address: answers[0] as string };

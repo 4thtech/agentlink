@@ -413,7 +413,32 @@ export {
   CATCH_UP_SECONDS,
   type CardUpdateSendResult,
 } from './card-update.js';
-export { migratedRelays, needsRelayMigration, type RelayMigration } from './relay-migration.js';
+export {
+  migratedRelays,
+  migrationDroppedRelays,
+  needsRelayMigration,
+  type RelayMigration,
+} from './relay-migration.js';
+// NET-PROBE / NET-STATS / NET-ROUTE: the Message network view (read-only).
+export {
+  LEGACY_READ_UNTIL,
+  MAX_NETWORK_CONTACT_LISTS,
+  NetworkService,
+  networkMode,
+  networkServerList,
+  sharedServerCount,
+  type NetworkContactList,
+  type NetworkContactReach,
+  type NetworkServerEntry,
+  type NetworkServerKind,
+  type NetworkServers,
+} from './network.js';
+export {
+  MAX_RELAY_STATS_ROWS,
+  RELAY_STATS_WINDOW_SECONDS,
+  type RelayErrorClass,
+  type RelayStatsView,
+} from './relay-stats.js';
 export {
   INBOX_PAGE_MAX_LIMIT,
   INBOX_TYPES,

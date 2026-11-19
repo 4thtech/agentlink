@@ -64,6 +64,7 @@ import type { ApprovalContext } from '../owner-approval.js';
 import type { AgentEpochKeys } from '../key-epoch.js';
 import type { FirstAgentCard } from '../owner-first-card.js';
 import type { LocalUiDataFolder, LocalUiHealthBody, LocalUiHealthSource } from './api/health.js';
+import type { LocalUiNetworkBody } from './api/network.js';
 import type { LocalUiInviteDesk } from './route-types.js';
 import type { JoinDesk } from './join-desk.js';
 import type { LocalUiSettingsDesk } from './api/ui-settings.js';
@@ -817,6 +818,11 @@ export interface LocalUiContext {
    * only; never rejects.
    */
   readonly health?: () => Promise<LocalUiHealthBody>;
+  /**
+   * NET-ROUTE (08 §1 Message network): the bounded network view read (network-view.ts), for
+   * `GET /api/ui/network` only. Fixed fields only; contacts' hosts only when asked. Absent: needs_setup.
+   */
+  readonly network?: (options: { readonly contactHosts: boolean }) => Promise<LocalUiNetworkBody>;
   /**
    * U3-c (D-138, 08 §1): the Agents list of the app host, for `GET /api/ui/agents` only; absent
    * outside the app host (an approval page opened by an MCP process stays bound to its agent). Reads

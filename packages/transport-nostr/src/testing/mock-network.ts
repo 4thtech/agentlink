@@ -73,6 +73,8 @@ export interface MockRelayConfig {
   sameSocketOnly?: boolean;
   /** SEC-RELAY-READBACK: takes EVENT without a login, but closes every REQ until one (NIP-42). */
   reqNeedsAuth?: boolean;
+  /** NET-PROBE: answers every REQ only after this many ms (a slow relay round trip). */
+  reqDelayMs?: number;
   /** SEC-RELAY-READBACK: answers a REQ with an `ids` filter with this event instead of the stored one. */
   serveInstead?: NostrEvent;
 }
@@ -170,7 +172,15 @@ export class MockSocket implements RelaySocket {
       return;
     }
     if (frame[0] === 'REQ') {
-      this.handleReq(frame[1] as string, frame[2] as MockFilter, config);
+      if (config.reqDelayMs === undefined) {
+        this.handleReq(frame[1] as string, frame[2] as MockFilter, config);
+      } else {
+        // read at call time, so fake timers apply
+        const timers = globalThis as unknown as { setTimeout(cb: () => void, ms: number): unknown };
+        timers.setTimeout(() => {
+          if (!this.closed) this.handleReq(frame[1] as string, frame[2] as MockFilter, config);
+        }, config.reqDelayMs);
+      }
       return;
     }
     if (frame[0] === 'CLOSE') {
