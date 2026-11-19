@@ -293,7 +293,9 @@ export function PickStep({
                 <TerminalGlyph />
               </span>
               <span className="st-tile-name">{CARD_LABELS[t.id] ?? t.name}</span>
-              <Skeleton loading label={P.loading} lines={1} />
+              <span className="st-tile-skel">
+                <Skeleton loading label={P.loading} lines={1} />
+              </span>
             </div>
           ))}
         </div>

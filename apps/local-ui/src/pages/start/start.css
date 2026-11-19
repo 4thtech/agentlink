@@ -154,6 +154,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: var(--al-space-3);
+  box-sizing: border-box;
   min-block-size: 128px;
   margin: 1px;
   padding: var(--al-space-6);
@@ -221,6 +222,13 @@
   gap: var(--al-space-2);
   font-size: 13px;
   color: var(--al-color-fg-subtle);
+}
+/* The loading tile reserves the line the answer fills in (same height as .st-tile-state), so the
+   answer moves nothing (CLS). */
+.st-tile-skel {
+  display: block;
+  inline-size: 100%;
+  block-size: 16px;
 }
 .st-tile-state.is-found {
   color: var(--al-color-status-success-fg);

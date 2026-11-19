@@ -67,24 +67,6 @@ export async function observeLayoutShift(page: Page): Promise<void> {
   await page.evaluate(installObserver);
 }
 
-/**
- * Let the first paint settle, then count from here: waits for the web fonts and two frames (so the
- * shifts of the font swap and the first render are delivered), then starts the score again at 0.
- * The budget is NOT loosened: every shift after this call still counts against it. Used where a
- * test measures the steps of a flow, not the page's first load (a borderline first-launch flake,
- * where a font swap near the budget decided the run).
- */
-export async function settleLayoutShift(page: Page): Promise<void> {
-  await page.evaluate(() => document.fonts.ready.then(() => undefined));
-  await frames(page);
-  await page.evaluate(() => {
-    const state = (window as unknown as { __alCls?: ClsState }).__alCls;
-    if (state === undefined) return;
-    state.score = 0;
-    state.shifts.length = 0;
-  });
-}
-
 /** Wait two frames so pending layout-shift entries are delivered. */
 async function frames(page: Page): Promise<void> {
   await page.evaluate(

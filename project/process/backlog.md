@@ -11458,9 +11458,9 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Status:** built in the rel0514 branch (not merged) · **Security:** S1 · **Spec:** 08 §1 (notifications); 06 §3
 - **Done:** `kept()` in `packages/node/src/notifications.ts` sorted by time and cut at 200, so a `devices` item (its time is the last sighting, often old) was dropped when 200 newer items existed and came back as news at the next poll. It now holds a place of its own; test first in `notifications.test.ts`.
 
-#### REL0514-CLS-SETTLE · First-launch journey: count layout shift after the first paint settles
+#### REL0514-CLS-SETTLE · First-launch layout shift fixed in the app
 - **Status:** built in the rel0514 branch (not merged) · **Security:** S0 · **Spec:** project/process/ci-cd.md (journeys)
-- **Done:** `settleLayoutShift` (e2e `helpers/motion.ts`, with its own test) waits for fonts and two frames, then restarts the score; `01-first-launch.test.ts` calls it once the first step shows. The budget (`CLS_BUDGET` 0.01) is unchanged and every shift after that still fails the test. The first-paint font swap near the budget decided some runs; if the first paint itself should also count, say so and the card moves to a real fix of that swap in the UI.
+- **Done:** owner decision 19 Nov: fix the cause, count from the first paint. The shift was not the font swap: Geist is already loaded at first paint. The "Which AI app do you use?" loading tiles were 170 px high (the `min-block-size` of a `div` is content-box, a button's is border-box) against 136 px for the answered tiles, so the screen shrank by 68 px when the look answered. `.st-tile` is now border-box and the loading tile reserves the 16 px answer line. `settleLayoutShift` and its test are removed; `01-first-launch.test.ts` counts from the first paint with `CLS_BUDGET` 0.01. First launch: CLS 0 in 8 of 8 runs after the fix (before: 0.0096 in about half).
 
 #### BUDGET-FAILCLOSED-REVIEW · Review the fail-closed paths of the budget
 - **Status:** reviewed (fixes in BUDGET-RECOVER) · **Security:** S2 · **Spec:** 06 §3; 07 §3.5
