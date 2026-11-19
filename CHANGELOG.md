@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
-## [0.5.13] - 2026-11-18
+## [0.5.13] - 2026-11-19
 
 ### Added
 
@@ -86,7 +86,7 @@ The nine scenarios:
 - Sending limits (SEC-OUTBOUND-CAPS, S2, D-156 (6), 06 §3): your AI can send at most 300 messages to one person, 1 000 in all, 50 files to one person, 200 files and 2 000 MB in any 24 hours; you can change these on the Rules page.
 - Limits on invites your AI makes (SEC-INVITE-CAPS, S2, D-156): your AI can have at most 3 invites open and make at most 5 a day, and each one works for 24 hours. Change these in Settings › Rules › More rules ("Invites your AI makes"; 0 turns them off). Invites you make yourself are not limited: in the app you confirm Create invite with Touch ID, Windows Hello, your passkey or your master code, and `agentlink invite` in the terminal asks for your master code the same way. Someone who connects through an invite your AI made shows as "New contact via your AI" on People, Home and in the menu bar widget: their messages arrive, but your AI can't send them anything (no messages, files, terms or proofs) until you tap Keep. Contacts you already have are not affected.
 
-## [0.5.10] - 2026-11-17
+## [0.5.10] - 2026-11-18
 
 ### Added
 

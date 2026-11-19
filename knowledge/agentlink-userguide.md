@@ -119,11 +119,13 @@ Rules (Settings, "Rules", or "Rules" on an ID's card) limit what your AI may do 
 
 ## What are the three layers, and what is "Under the hood"?
 
-Three layers: Get started (guided setup), the Simple view (default) and Under the hood, a top-bar switch (Cmd+Shift+U): tables of messages with exact times, sizes, receipts and proof, a live activity stream, Relays & network and Diagnostics (a copyable report for support).
+Three layers: Get started (guided setup), the Simple view (default) and Under the hood, a top-bar switch (Cmd+Shift+U): tables of messages with exact times, sizes, receipts and proof, a live activity stream, Message network (live server view, 0.5.14) and Diagnostics (a copyable report for support).
 
 From 0.5.13, with Under the hood on, a sent message also shows "Message network: accepted by 3, available from 2" (server counts, never addresses), and old messages that arrive after a restore say "From before the restore". Activity lists a restore or an update ("This entry is not a charge"). The bell tells you when the same ID is also in use on another computer; spending limits count per computer, and `agentlink doctor` warns too.
 
 ## What is "Update your contact details"?
+
+From 0.5.14 (not released yet), Under the hood › Message network shows a live view: a three-column diagram (you, servers, contacts; a list on phones), a card per server (health, speed, role, the last 24 hours, contacts using it), "Reaches N contacts" and "Show contacts' servers"; normal users see no change. If AgentLink can't check your spending record, a proof is refused at once and Settings › Rules shows "Save your limits again" with a "Save again" button (one confirmation, no rule changes). A contact-details update no server took is retried; your own server list holds 2 to 8 servers; the same-ID notice always stays in the bell.
 
 From 0.5.13 AgentLink has new default message-network servers. An ID made earlier shows "Update your contact details" on Home; one approval (Update with Touch ID or your master code, or `agentlink owner update-contact-details`) moves it and your contacts learn the new details by themselves. Only you can do it. Nothing breaks if you wait: the old servers are still read for now.
 
