@@ -233,7 +233,7 @@ export function renderKnowledgeIntro(data) {
   const names = open.map(
     (m) => `${m.id} (${m.name.toLowerCase()}) is ${m.stateNote ?? 'in progress'}`,
   );
-  return `AgentLink is pre-alpha, last updated ${longDate(data.updated)}, version ${data.version}. ${names.join(' and ')}. ${data.current ? `${data.current} ` : ''}It opens with \`npx -y @4thtech-io/agentlink@latest\`; an AI can set itself up with \`npx -y @4thtech-io/agentlink@latest init\`. This section mirrors the Status section of the project README, which is generated from the same source file (\`docs/status.yaml\`).`;
+  return `AgentLink is pre-alpha, last updated ${longDate(data.updated)}, version ${data.version}. ${names.join(' and ')}. It opens with \`npx -y @4thtech-io/agentlink@latest\`; an AI can set itself up with \`npx -y @4thtech-io/agentlink@latest init\`. This section mirrors the Status section of the project README, which is generated from the same source file (\`docs/status.yaml\`).`;
 }
 
 /**
@@ -251,7 +251,6 @@ export function renderKnowledgeSummary(data) {
     `- **Testnet:** ${data.deploy.testnet.note}`,
     `- **Mainnet:** ${data.deploy.mainnet.note}`,
     `- **Coming next:** ${data.inProgress}`,
-    `- **Does not exist yet:** ${data.notYet}`,
   );
   if (releaseLines(data).length) {
     out.push(
@@ -264,23 +263,6 @@ export function renderKnowledgeSummary(data) {
     );
   }
   return out.join('\n');
-}
-
-/** Knowledge base: the milestones table. */
-export function renderKnowledgeMilestones(data) {
-  const status = (m) => {
-    if (m.state === 'planned') return 'Planned';
-    const word = m.stateNote ?? stateWord(m.state);
-    return `${word[0].toUpperCase()}${word.slice(1)}`;
-  };
-  const rows = data.roadmap.map(
-    (m) => `| ${m.id} ${m.name} | ${m.version} | ${m.outcome} | ${status(m)} |`,
-  );
-  return [
-    '| Milestone | Planned version | What it delivers | Status |',
-    '|---|---|---|---|',
-    ...rows,
-  ].join('\n');
 }
 
 // --- Targets: which file gets which block ----------------------------------------------------------
@@ -367,7 +349,6 @@ export const TARGETS = [
     blocks: {
       'status-intro': renderKnowledgeIntro,
       'status-summary': renderKnowledgeSummary,
-      'status-milestones': renderKnowledgeMilestones,
     },
   },
   // DOCS-COMPACT-A: the one version banner (enforced once a file carries its markers).
