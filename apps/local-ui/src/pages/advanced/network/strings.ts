@@ -32,6 +32,9 @@ export const NETWORK_STRINGS = {
   downNote: "Can't reach this server. Your messages use the others.",
   blockedNote: 'This network blocks this server. Your messages use the others.',
   // Banners.
+  dropTitle: 'Your list has more than 8 servers.',
+  drop: (n: number): string =>
+    `Updating your contact details keeps the first 8 and drops ${String(n)}.`,
   checkingTitle: 'Checking.',
   checking: 'Checking the servers. This takes a few seconds the first time.',
   noServers: 'No servers reported yet.',

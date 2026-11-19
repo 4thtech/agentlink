@@ -48,6 +48,8 @@ export interface NetworkAnswer {
   readonly legacyReadUntil: number | null;
   readonly contacts: { readonly total: number; readonly sharing: number };
   readonly contactHosts?: readonly NetworkContactHosts[];
+  /** Own servers an "Update your contact details" would drop (own lists are capped at 8); 0 when absent. */
+  readonly updateWouldDrop: number;
 }
 
 const AGENTS: ReadonlySet<string> = new Set(['running', 'paused', 'not_running', 'needs_setup']);
@@ -140,6 +142,7 @@ export function parseNetwork(data: unknown): NetworkAnswer | undefined {
     servers,
     legacyReadUntil: time(data['legacyReadUntil']),
     contacts: { total, sharing },
+    updateWouldDrop: count(data['updateWouldDrop']),
     ...(hosts === undefined ? {} : { contactHosts: hosts }),
   };
 }

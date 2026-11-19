@@ -259,6 +259,11 @@ export function NetworkView({
         )}
       </div>
       {load.kind === 'failed' ? <p className="al-text-body al-muted">{S.noAnswer}</p> : null}
+      {answer.updateWouldDrop > 0 ? (
+        <Banner tone="warning" title={S.dropTitle}>
+          {S.drop(answer.updateWouldDrop)}
+        </Banner>
+      ) : null}
       <Headline answer={answer} offline={offline} />
       {answer.servers.length === 0 ? null : (
         <ul className="nw-list">

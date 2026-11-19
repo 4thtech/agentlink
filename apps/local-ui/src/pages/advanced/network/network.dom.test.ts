@@ -494,3 +494,21 @@ describe('Message network view: live updates', () => {
     root = createRoot(host);
   });
 });
+
+describe('Message network view: contact-details update note', () => {
+  it('shows a warning when an update would drop servers', async () => {
+    await mount(answer({ updateWouldDrop: 2 }));
+    expect(text()).toContain(S.dropTitle);
+    expect(text()).toContain(S.drop(2));
+    expect(lintVocabulary(`${S.dropTitle} ${S.drop(2)}`)).toEqual([]);
+  });
+  it('is hidden when the field is 0', async () => {
+    await mount(answer({ updateWouldDrop: 0 }));
+    expect(text()).not.toContain(S.dropTitle);
+  });
+  it('is hidden when the field is missing', async () => {
+    await mount(answer());
+    expect(text()).not.toContain(S.dropTitle);
+    expect(parseNetwork(answer())?.updateWouldDrop).toBe(0);
+  });
+});
