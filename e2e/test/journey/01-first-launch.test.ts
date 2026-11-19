@@ -7,11 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { fakeClaudeCode } from '../app-world.js';
-import {
-  emulateReducedMotion,
-  expectStableLayout,
-  observeLayoutShift,
-} from '../helpers/motion.js';
+import { emulateReducedMotion, expectStableLayout, observeLayoutShift } from '../helpers/motion.js';
 import { CONNECT_WITH, getStartedWithTouchId } from './helpers-wizard.js';
 import {
   CREATE_INVITE_WITH,
