@@ -345,13 +345,22 @@ describe('typedDataSnapshot: everything else is refused with a fixed error', () 
 });
 
 describe('MemoryKeyStore.sign712 applies the allowlist before any key is used', () => {
-  it('signs each allowed shape with the agent EVM key', async () => {
+  it('signs each allowed shape but a Record with the agent EVM key', async () => {
     const store = new MemoryKeyStore(SEED, { keyEpoch: 2 });
-    for (const typed of [record(), receipt(), card(), topUp()]) {
+    for (const typed of [receipt(), card(), topUp()]) {
       const sig = await store.sign712(typed);
       const signer = recoverEvmAddress(hashTypedData(typed).digest, decodeEcdsaSignature(sig));
       expect(encodeHex0x(signer)).toBe(OWN);
     }
+  });
+
+  it('refuses an allowed Record: it is signed only through signRecord with its ticket', async () => {
+    const store = new MemoryKeyStore(SEED, { keyEpoch: 2 });
+    await expect(store.sign712(record())).rejects.toMatchObject(fixed('record_needs_ticket'));
+    const typed = record();
+    const sig = await store.signRecord(typed, store.issueRecordTicket(typed));
+    const signer = recoverEvmAddress(hashTypedData(typed).digest, decodeEcdsaSignature(sig));
+    expect(encodeHex0x(signer)).toBe(OWN);
   });
 
   it('refuses on a closed store with the fixed error, not keystore_closed', async () => {

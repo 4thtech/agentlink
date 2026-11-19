@@ -374,11 +374,23 @@ describe('buildRecord: fresh CSPRNG salt and nonce for every Record', () => {
 describe('signing through KeyStore.sign712', () => {
   const SIG = `0x${'ab'.repeat(65)}`;
 
-  it('signRecord, signReceipt and signAgentCard hand the exact typed data to sign712', async () => {
+  it('signRecord hands the exact Record and its ticket to KeyStore.signRecord, never sign712', async () => {
+    const sign712 = vi.fn(() => Promise.resolve(SIG));
+    const ticket = Object.freeze({ kind: 'record-ticket' as const });
+    const signRecordKs = vi.fn((td: TypedData, t: unknown) =>
+      Promise.resolve(`${SIG}|${digestOf(td)}|${t === ticket ? 'ticket' : 'none'}`),
+    );
+    const record = buildRecord(messageInput());
+    expect(await signRecord({ sign712, signRecord: signRecordKs }, record, ticket)).toBe(
+      `${SIG}|${record.digest}|ticket`,
+    );
+    expect(sign712).not.toHaveBeenCalled();
+  });
+
+  it('signReceipt and signAgentCard hand the exact typed data to sign712', async () => {
     const sign712 = vi.fn((td: TypedData) => Promise.resolve(`${SIG}|${digestOf(td)}`));
     const keyStore = { sign712 };
     const record = buildRecord(messageInput());
-    expect(await signRecord(keyStore, record)).toBe(`${SIG}|${record.digest}`);
     const receipt = buildReceipt({
       chainId: 84532,
       notary: RECORD_MESSAGE.notary,
@@ -390,14 +402,15 @@ describe('signing through KeyStore.sign712', () => {
     });
     expect(await signReceipt(keyStore, receipt)).toBe(`${SIG}|${receipt.digest}`);
     expect(await signAgentCard(keyStore, CARD_BASIC.card)).toBe(`${SIG}|${CARD_BASIC.digest}`);
-    expect(sign712).toHaveBeenCalledTimes(3);
+    expect(sign712).toHaveBeenCalledTimes(2);
   });
 
   it('refuses a Record whose typed data no longer matches its digest', async () => {
-    const sign712 = vi.fn(() => Promise.resolve(SIG));
+    const signRecordKs = vi.fn(() => Promise.resolve(SIG));
     const record = buildRecord(messageInput());
     const tampered = { ...record, digest: RECORD_MESSAGE.digest };
-    await expect(signRecord({ sign712 }, tampered)).rejects.toThrow();
-    expect(sign712).not.toHaveBeenCalled();
+    const ticket = Object.freeze({ kind: 'record-ticket' as const });
+    await expect(signRecord({ signRecord: signRecordKs }, tampered, ticket)).rejects.toThrow();
+    expect(signRecordKs).not.toHaveBeenCalled();
   });
 });

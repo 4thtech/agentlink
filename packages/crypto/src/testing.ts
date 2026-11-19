@@ -105,6 +105,7 @@ import {
   type DirectTxChain,
   type TransactionRefusal,
 } from './evm-tx.js';
+import { RECORD_TICKET_REFUSED, type RecordTicket } from './record-ticket.js';
 import {
   TYPED_DATA_REFUSED,
   typedDataClock,
@@ -1327,6 +1328,7 @@ export function runKeyStoreConformance(
 
   runConformanceSignTransaction(backend, runner);
   runConformanceSign712(backend, runner);
+  runConformanceRecordGate(backend, runner);
 }
 
 // --- signTransaction (M1-4c-b; 07 §6.2 direct mode) ----------------------------------------------
@@ -1529,12 +1531,12 @@ function runConformanceSign712(
 
   runner.describe(`${backend.name}: KeyStore conformance, sign712 (SEC-KS-712-ALLOWLIST)`, () => {
     runner.it(
-      'signs a Record, a Receipt, its own card and the vault top-up with the EVM key',
+      'signs a Receipt, its own card and the vault top-up with the EVM key',
       async () => {
         const store = await backend.open(CONFORMANCE_EPOCH);
         try {
           const shapes = conformanceTypedData(own, nowSeconds());
-          for (const typed of [shapes.record(), shapes.receipt, shapes.card, shapes.topUp()]) {
+          for (const typed of [shapes.receipt, shapes.card, shapes.topUp()]) {
             const sig = await store.sign712(typed);
             const signer = recoverEvmAddress(
               hashTypedData(typed).digest,
@@ -1591,4 +1593,173 @@ function runConformanceSign712(
       },
     );
   });
+}
+
+// --- signRecord (SEC-KEYSTORE-RECORD-GATE; 04 §3.1.1, 07 §3.5) -------------------------------------
+
+function runConformanceRecordGate(
+  backend: KeyStoreConformanceBackend,
+  runner: ConformanceRunner,
+): void {
+  const own = deriveAgentId(backend.seed);
+  const nowSeconds = (): number => Math.floor(Date.now() / 1000);
+
+  async function withStore(fn: (store: KeyStore) => Promise<void>): Promise<void> {
+    const store = await backend.open(CONFORMANCE_EPOCH);
+    try {
+      await fn(store);
+    } finally {
+      await store.close();
+    }
+  }
+
+  function expectTicketRefusal(error: unknown, what: string): void {
+    conformanceCheck(codeOfError(error) === 'record_ticket_refused', `${what}: refused`);
+    conformanceCheck(messageOfError(error) === RECORD_TICKET_REFUSED, `${what}: the fixed message`);
+  }
+
+  function signedBy(typed: TypedData, sig: string): string {
+    return encodeHex0x(recoverEvmAddress(hashTypedData(typed).digest, decodeEcdsaSignature(sig)));
+  }
+
+  runner.describe(
+    `${backend.name}: KeyStore conformance, record signing gate (SEC-KEYSTORE-RECORD-GATE)`,
+    () => {
+      runner.it('sign712 never signs a Record, with or without a ticket held', async () => {
+        await withStore(async (store) => {
+          const record = conformanceTypedData(own, nowSeconds()).record();
+          store.issueRecordTicket(record);
+          const error = await conformanceOutcome(() => store.sign712(record));
+          conformanceCheck(codeOfError(error) === 'typed_data_refused', 'refused');
+          conformanceCheck(
+            messageOfError(error) === TYPED_DATA_REFUSED.record_needs_ticket,
+            'the fixed message',
+          );
+        });
+      });
+
+      runner.it('signRecord signs the exact Record its ticket was issued for', async () => {
+        await withStore(async (store) => {
+          const record = conformanceTypedData(own, nowSeconds()).record();
+          const ticket = store.issueRecordTicket(record);
+          const sig = await store.signRecord(record, ticket);
+          conformanceCheck(signedBy(record, sig) === own, 'the agent EVM key');
+        });
+      });
+
+      runner.it('a ticket for one Record never signs another, and is spent by the try', async () => {
+        await withStore(async (store) => {
+          const shapes = conformanceTypedData(own, nowSeconds());
+          const a = shapes.record({ nonce: '9' });
+          const b = shapes.record({ nonce: '10' });
+          const c = shapes.record({ nonce: '9', maxFee: '100001' });
+          const ticket = store.issueRecordTicket(a);
+          expectTicketRefusal(
+            await conformanceOutcome(() => store.signRecord(b, ticket)),
+            'another Record',
+          );
+          expectTicketRefusal(
+            await conformanceOutcome(() => store.signRecord(a, ticket)),
+            'the spent ticket',
+          );
+          const second = store.issueRecordTicket(a);
+          expectTicketRefusal(
+            await conformanceOutcome(() => store.signRecord(c, second)),
+            'the same Record ID with another fee',
+          );
+        });
+      });
+
+      runner.it('a ticket signs once: a replay is refused', async () => {
+        await withStore(async (store) => {
+          const record = conformanceTypedData(own, nowSeconds()).record();
+          const ticket = store.issueRecordTicket(record);
+          await store.signRecord(record, ticket);
+          expectTicketRefusal(
+            await conformanceOutcome(() => store.signRecord(record, ticket)),
+            'a replayed ticket',
+          );
+        });
+      });
+
+      runner.it(
+        'only a ticket this store issued counts: a look-alike or another store\'s ticket is refused',
+        async () => {
+          const other = await backend.open(CONFORMANCE_EPOCH);
+          try {
+            await withStore(async (store) => {
+              const record = conformanceTypedData(own, nowSeconds()).record();
+              const foreign = other.issueRecordTicket(record);
+              const issued = store.issueRecordTicket(record);
+              const lookAlike = { ...(issued as object) } as RecordTicket;
+              for (const [what, ticket] of [
+                ['a ticket of another store', foreign],
+                ['a copy of an issued ticket', lookAlike],
+                ['no ticket', undefined],
+                ['a string', 'ticket'],
+              ] as const) {
+                expectTicketRefusal(
+                  await conformanceOutcome(() =>
+                    store.signRecord(record, ticket as unknown as RecordTicket),
+                  ),
+                  what,
+                );
+              }
+              // The genuine ticket still signs: the refusals above did not spend it.
+              conformanceCheck(
+                signedBy(record, await store.signRecord(record, issued)) === own,
+                'the issued ticket',
+              );
+            });
+          } finally {
+            await other.close();
+          }
+        },
+      );
+
+      runner.it(
+        'a ticket is issued only for a Record the agent key may sign, before any key is read',
+        async () => {
+          const store = await backend.open(CONFORMANCE_EPOCH);
+          const shapes = conformanceTypedData(own, nowSeconds());
+          const cases: [string, () => unknown, TypedDataRefusal][] = [
+            ['a Receipt', () => shapes.receipt, 'type_not_allowed'],
+            ['a card', () => shapes.card, 'type_not_allowed'],
+            ['a top-up', () => shapes.topUp(), 'type_not_allowed'],
+            ['a Record over the fee ceiling', () => shapes.record({ maxFee: '500001' }), 'fee_not_allowed'],
+            [
+              'a Record for another signer',
+              () => shapes.record({ signer: `0x${'11'.repeat(20)}` }),
+              'signer_not_allowed',
+            ],
+          ];
+          try {
+            for (const [what, typed, reason] of cases) {
+              let error: unknown;
+              try {
+                store.issueRecordTicket(typed() as TypedData);
+              } catch (caught) {
+                error = caught;
+              }
+              conformanceCheck(codeOfError(error) === 'typed_data_refused', `${what}: refused`);
+              conformanceCheck(
+                messageOfError(error) === TYPED_DATA_REFUSED[reason],
+                `${what}: the fixed message`,
+              );
+            }
+          } finally {
+            await store.close();
+          }
+          // A closed store issues nothing.
+          let closed: unknown;
+          try {
+            store.issueRecordTicket(shapes.record());
+          } catch (caught) {
+            closed = caught;
+          }
+          conformanceCheck(codeOfError(closed) === 'keystore_closed', 'a closed store');
+        },
+      );
+    },
+  );
 }
