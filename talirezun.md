@@ -103,3 +103,8 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 - 0.5.15 must have a Test button when you add your own server (in-app check: ready / slow / needs sign-in / refused, with plain reasons) before anything is saved (card NET-PRECHECK).
 - Diagram left label: "<name> · this computer" ("Your ID" when no name); keeps the ID wording rule (D-144). Tali, 19 Nov.
 - 0.5.14 ships without the 24-hour bar on server cards (CSS budget kept; same numbers shown in words); bar returns in 0.5.15 after a CSS clean-up card. Tali, 19 Nov.
+
+## 2026-11-19 — handoff (0.5.14 release PR open)
+- Release PR #853 (rel0514/integration → main) open. All lanes reviewed (KeyStore gate, spending-record recovery, message-network backend) and integrated; local suites green; browser checks fixed.
+- Holding merge: Linux keyring crashes in e2e on every 0.5.14 run, never on main → being investigated as a likely 0.5.14 cause. Tali has pre-approved the merge once CI is fully green.
+- Then: version PR, Tali's npm and desktop update clicks, docs/wiki/second brain flip, X post.
