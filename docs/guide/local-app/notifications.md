@@ -14,7 +14,7 @@ Open the bell to see a short list in three groups:
 | Group | What is in it |
 |---|---|
 | **Needs you** | Approvals waiting for you. They stay here, and in the number, until you approve or deny them. |
-| **New** | New messages and files, one line per person ("3 new messages from **Ana**"), a new version of AgentLink, and the message network when it has been unreachable for 10 minutes. |
+| **New** | New messages and files, one line per person ("3 new messages from **Ana**"), a new version of AgentLink, the message network when it has been unreachable for 10 minutes, and a notice when the same ID is in use on another computer. |
 | **Earlier** | What you have already seen. |
 
 - Click a line to go to it (Home for approvals and people, Settings › Updates, or the network page under Advanced). It is then marked as read.
@@ -24,6 +24,10 @@ Open the bell to see a short list in three groups:
 - On a phone the list opens across the screen.
 
 The list never holds what a message says, a file's name or a link. A person is named only by a name **you** gave them on People; someone who only has the name they chose for themselves, or anyone else, is "a contact". The list stays on this computer, in the ID's own folder, and keeps the last 30 days (at most 200 lines).
+
+## When the same ID is on another computer
+
+*New in 0.5.13.* If an ID you have open is also in use on another computer, the bell says This ID is also in use on another computer, "Spending limits apply per computer for now" and Last seen with the date. Spending limits count per computer until AgentLink supports one ID on several computers. `agentlink doctor` warns about the same thing. AgentLink notices it from messages sent from that ID, and sends nothing extra to find out. A computer that only receives is not seen. If the other computer is not seen for 7 days, the notice stays until AgentLink can tell that this computer is the one in use. The notice goes away once AgentLink can tell the other computer stopped using the ID, so remove AgentLink from a computer you no longer use.
 
 ## Notifications from the desktop app
 

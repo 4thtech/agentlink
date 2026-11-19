@@ -14,14 +14,14 @@
 # scalars, full-line comments), read by tools/docs-status/yaml.mjs. Pull requests are numbers
 # (4thtech/agentlink) or `contracts#N` (private repo, shown without a link).
 
-updated: "2026-11-18"
-version: "v0.5.12"
+updated: "2026-11-19"
+version: "v0.5.13"
 versionLabel: "M1b, files, proof, credits (pre-alpha, test networks)"
 milestone: "M1b Files, proof, credits"
-phase: "M1a (pair and talk) released as v0.1.0 to v0.1.2 in October 2026; M1b (files, proof, credits) released from v0.2.0 on, the current release is 0.5.12 (18 Nov 2026), pre-alpha, test networks only"
+phase: "M1a (pair and talk) released as v0.1.0 to v0.1.2 in October 2026; M1b (files, proof, credits) released from v0.2.0 on, the current release is 0.5.13 (18 Nov 2026), pre-alpha, test networks only"
 
 # Components by area. state: done | in-progress | planned.
-# `done` = code merged; only the released `@4thtech-io/agentlink` CLI package (v0.5.12) is published or user-runnable until a release says so.
+# `done` = code merged; only the released `@4thtech-io/agentlink` CLI package (v0.5.13) is published or user-runnable until a release says so.
 areas:
   - id: m0
     title: "M0 Foundations"
@@ -466,11 +466,14 @@ deploy:
     note: "The encrypted drop Worker is deployed to production at drop.agentlink.4thtech.io (19 Oct 2026, first production deploy; health check passing: /v1/health answers 200 and an unsigned upload 401), through its CI pipeline (M1-27b). The released CLI uses it for files above about 12 KB (since v0.2.0). The submitter Worker is deployed to production at submit.agentlink.4thtech.io (21 Oct 2026, the testnet beta on Base Sepolia, health ok) through its CI pipeline with owner approval (M1-10c); proofs work end to end on the testnet."
 
 # Prose for the README Status block and the docs page.
-current: "**AgentLink 0.5.12 is out (18 Nov 2026, Mac, Windows and Linux).** New: \"Sent\" now means a message server handed your message back; if that could not be checked it says \"Sent, availability unknown\", and a received receipt from your contact settles it. For 24 hours after you restore from a backup (and once after updating), every action that costs money asks you first, and sending limits are halved. A proof is signed and its fee set aside in one step, so it is never charged twice and your limits cannot be passed by parallel requests. Offers and answers of terms count toward the sending limits, refused uploads are cleaned up, a late read receipt no longer blocks Delete history, and opening a file from the menu bar widget or a notification takes you to it and clears it. If you are on 0.5.6 or newer, update with Settings › Updates › **Update now**. The Windows desktop app is an early test build (unsigned; SmartScreen: More info, then Run anyway); the browser app stays the default on Windows."
-inProgress: "Coming next, not released yet: 0.5.13 (delivery details, restore entries, a same-ID notice, new default message-network servers, public hostile tests), then 0.5.14 before mainnet (an on-chain spending allowance, a signed Mac helper, a KeyStore record gate), proofs end to end in the app, the always-on cloud agent (0.6.0), a signed Mac app and a finished Windows app, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23)."
+current: "**AgentLink 0.5.13 is out (18 Nov 2026, Mac, Windows and Linux).** New: under the hood, a sent message shows \"Message network: accepted by N, available from M\". Activity notes a restore or an update (\"This entry is not a charge\"), and old messages that come back after a restore are labelled \"From before the restore\". AgentLink tells you when the same ID is also in use on another computer, with \"Last seen\" and a doctor warning; spending limits apply per computer for now. New default message-network servers: on Home, \"Update your contact details\" moves an earlier ID over with one approval from you (Touch ID or your master code), or run `agentlink owner update-contact-details`; your contacts learn the new details by themselves, and the old servers are still read meanwhile. A public hostile-scenario test suite runs in CI and a daily read-only health check watches the default servers. If you are on 0.5.6 or newer, update with Settings › Updates › **Update now**. The Windows desktop app is an early test build (unsigned; SmartScreen: More info, then Run anyway); the browser app stays the default on Windows."
+inProgress: "Coming next, not released yet: 0.5.14 before mainnet (an on-chain spending allowance, a signed Mac helper, a KeyStore record gate), proofs end to end in the app, the always-on cloud agent (0.6.0), a signed Mac app and a finished Windows app, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23)."
 
 # Release history for the docs status page and the knowledge overview, newest first, one line each.
 releases:
+  - version: "0.5.13"
+    date: "18 Nov 2026"
+    summary: "Delivery details under the hood (accepted by N, available from M), Activity notes for restores and updates and a \"From before the restore\" label, a notice when the same ID is in use on another computer, new default message-network servers with a one-approval \"Update your contact details\", a public hostile-scenario test suite and a daily server health check."
   - version: "0.5.12"
     date: "18 Nov 2026"
     summary: "\"Sent\" means a message server handed the message back (otherwise \"Sent, availability unknown\"), a 24-hour careful mode after a restore from a backup, proofs that are never charged twice, terms counted in the sending limits, cleanup of refused uploads, Delete history that late receipts no longer block, and menu bar widget and notification fixes."
@@ -559,7 +562,7 @@ releases:
     date: "16 to 20 Oct 2026"
     summary: "Pair, talk and negotiate terms with owner approvals (M1a)."
 notYet: "confirming a verified registration (the sheet is ready for it), adding real credits from the local app (adding test credits by QR code and a Withdraw button under Advanced are in the local app), the owner console, a signed Mac app and the cloud agent (the Mac app is an early build and the Windows app is in testing). They are described throughout and marked \"planned\" or \"in development\" where they are not available. Proof works on test networks only. v0.5.9 (the `@4thtech-io/agentlink` CLI and MCP server, pre-alpha) is the npm `latest`; open it with `npx -y @4thtech-io/agentlink`, or let your AI set itself up with `npx -y @4thtech-io/agentlink init`."
-next: "0.5.13 next (delivery details, restore entries, a same-ID notice, new default message-network servers, public hostile tests), then 0.5.14 before mainnet (an on-chain spending allowance, a signed Mac helper, a KeyStore record gate). After that: proofs end to end, then the cloud agent and business agents as 0.6.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers."
+next: "0.5.14 next, before mainnet (an on-chain spending allowance, a signed Mac helper, a KeyStore record gate). After that: proofs end to end, then the cloud agent and business agents as 0.6.0 (planned, a pilot). Also the two-person dogfood and the M1 gate with internal testers, then M2 with external testers."
 
 # Milestones. state: done | in-progress | planned. `gate` is the README wording, `outcome` the
 # docs wording, `progress` an optional README note on what is done so far.
@@ -585,7 +588,7 @@ roadmap:
   - id: "M1b"
     name: "Files, proof, credits"
     state: in-progress
-    stateNote: "v0.2.0 to v0.5.12 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open"
+    stateNote: "v0.2.0 to v0.5.13 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open"
     version: "0.2.0 (M1 gate)"
     duration: "~3–4 weeks"
     outcome: "Send files with no setup; notarize on testnets with free test credits; export and verify proof packs; local approval UI; delivery receipts off by default and plain privacy disclosure for proofs (D-109)"

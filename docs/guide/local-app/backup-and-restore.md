@@ -77,6 +77,8 @@ On a new computer, install AgentLink and choose **I have a recovery kit** on the
 
 The same 24 hours apply once after you update to 0.5.12, and the card then says so too. If AgentLink cannot read when the restore happened, it acts as if it was just now.
 
+*New in 0.5.13.* [Activity](activity.md) now says when it happened: **This ID was restored from a backup**, or **AgentLink was updated on this computer** when an update started the 24 hours. While they last it adds "For 24 hours, AgentLink asks you before anything that costs money (until <time>). This entry is not a charge." Afterwards it reads "...asked you before anything that cost money. This entry is not a charge." The entry never has an amount. Messages sent before the restore that arrive after it are shown with the label From before the restore.
+
 **Still have the old computer?** Remove AgentLink there. Two computers using the same ID will both answer your people. **How to move** on Backup & restore walks through moving to a new computer.
 
 **No kit file or no code?** *I don't have my kit file* and *I lost my recovery code* explain your options: each kit has its own code and it can't be reset. If your old computer still works, save a new kit there; otherwise you can start fresh, and your people will need new invites.
