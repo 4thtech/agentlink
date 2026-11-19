@@ -239,7 +239,7 @@ async function readRules(context: LocalUiContext): Promise<LocalUiResult> {
   if (effective.mode === 'fail_closed') return { status: 200, body: { status: 'not_valid' } };
   // BUDGET-RECOVER (07 §3.5): the page offers "Save again" when the spending record needs a fresh
   // save. Only this word leaves, never why. A failed read leaves it out (paid actions still refuse).
-  let needsSave = false;
+  let needsSave: boolean;
   try {
     needsSave = (await client.policy.spendingRecordNeedsSave?.()) === true;
   } catch {

@@ -938,7 +938,7 @@ describe('BUDGET-RECOVER: a limits re-save recovers every broken spending record
       version: a.policyVersion + 1,
       policy: policy as unknown as JsonObject,
     });
-    let applied = false;
+    let applied: boolean;
     try {
       applied = (await a.client.ownerActions.apply(signedText)).status === 'applied';
     } catch {
