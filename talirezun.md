@@ -95,3 +95,7 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 - 0.5.13 live: npm latest, GitHub release v0.5.13, signed desktop update (Mac, Windows). Release PR #850, version PR #851, docs #852.
 - Contents: per-message delivery details (message network: accepted by N, available from M), restore and update entries in Activity with a "From before the restore" label, a notice with last-seen date when the same ID runs on another computer, new default message-network servers with a one-click owner-approved "Update your contact details" (CLI: agentlink owner update-contact-details), daily read-only server health check, public hostile-scenario test suite (25 scenarios), rewritten residual-risk section in specs/04.
 - Next: 0.5.14 before mainnet: on-chain spending allowance, signed Mac helper, KeyStore record gate.
+
+## 2026-11-19 — 0.5.14 started
+- Owner decisions (relay network): server names visible only under Under the hood (contacts' on expand); own list 2–8 servers; 30-day overlap after a change; two automatic servers mixed into a custom list by default (can turn off); sign-in servers allowed with a warning if ≥ 2 others work; 0.5.14 = KeyStore record gate + read-only live view, custom servers in 0.5.15 after Tali's design pass; spending allowance + signed Mac helper as a long track. Private-network servers: decision pending an assessment.
+- Lanes: rel0514/keystore-gate, rel0514/net-backend, rel0514/ci, rel0514/leftovers.
