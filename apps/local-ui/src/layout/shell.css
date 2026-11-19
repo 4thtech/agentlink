@@ -414,6 +414,18 @@
 .al-strip-item[data-fact-first] {
   margin-inline-start: auto;
 }
+.al-strip-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.al-strip-link:hover,
+.al-strip-link:focus-visible {
+  text-decoration: underline;
+}
 .al-strip-label {
   flex: none;
   color: var(--al-color-fg-subtle);

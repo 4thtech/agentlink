@@ -1,4 +1,4 @@
-// Advanced › Relays & network (W4-SETTINGS-ADVANCED; prototype v23 "Relays & network"). How many
+// Advanced › Message network (W4-SETTINGS-ADVANCED; prototype v23 "Relays & network"). How many
 // relays are connected, when the last update happened and that the network is picked automatically.
 // Counts only, from the health read; never an address, and no response time until one is measured
 // (a made-up number would be worse than none). Skeleton on the first load.
@@ -7,6 +7,7 @@ import { useEffect, useState, type ReactElement } from 'react';
 import type { ApiResult } from '../../api/client.js';
 import { parseHealth, readHealth } from '../../layout/health.js';
 import { parseRelays, type Relays } from './relays.js';
+import { NetworkView } from './network/view.js';
 import { ADVANCED_STRINGS as S } from './strings.js';
 import './advanced.css';
 
@@ -131,6 +132,8 @@ export function AdvancedPage({ read = readHealth }: AdvancedPageProps): ReactEle
           <p className="al-text-body al-muted">{S.unknown}</p>
         )}
       </Skeleton>
+      {/* NET-UI-A: the live view of the servers, Under the hood only; nothing changes without it. */}
+      {hood ? <NetworkView /> : null}
     </div>
   );
 }

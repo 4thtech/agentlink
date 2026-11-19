@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// W4-SETTINGS-ADVANCED (S1): Advanced › Relays & network. Counts and the last sync only; never a
+// W4-SETTINGS-ADVANCED (S1): Advanced › Message network. Counts and the last sync only; never a
 // relay address (the health answer carries none), never a made-up latency.
 import { lintVocabulary } from '@4thtech-io/ui';
 import { act, createElement as h } from 'react';
@@ -40,7 +40,7 @@ describe('parseRelays', () => {
   });
 });
 
-describe('Relays & network', () => {
+describe('Message network', () => {
   it('a running answer without relay counts says Working, never "No relays reported yet"', async () => {
     await mount(async () => ok({ agent: 'running', relays: null, lastSyncAt: null }));
     expect(host.textContent).toContain(S.relaysWorking);
@@ -86,7 +86,7 @@ describe('Relays & network', () => {
     expect(host.textContent).not.toContain(S.unknown);
   });
   it('uses plain words (11 §5)', () => {
-    // "Relays" is the Advanced group's own name (spec: Relays & network); nothing else may trip.
+    // "Relays" is the Advanced group's own name (spec: Message network); nothing else may trip.
     expect(lintVocabulary(JSON.stringify(S)).filter((w) => w !== 'nostr/relay')).toEqual([]);
   });
 });

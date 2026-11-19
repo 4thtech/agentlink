@@ -17,12 +17,18 @@ import { SHELL_STRINGS as S } from '../strings.js';
 import type { ConnectionState } from './connection.js';
 import { healthWord } from './health-word.js';
 import { VT_CLASS } from '@4thtech-io/ui';
+import { navigate } from '../router.js';
+
+/** NET-UI-A: the strip's servers item opens Advanced › Message network. */
+const NETWORK_PAGE = '/advanced/network';
 
 export interface StripItem {
   readonly label: string;
   readonly value: string;
   /** Absent for a plain fact (no dot). */
   readonly state?: LiveState;
+  /** NET-UI-A: where the item leads (the strip shows only under the hood). */
+  readonly href?: string;
 }
 
 /**
@@ -48,6 +54,7 @@ export function serverFacts(
     items.push({
       label: S.hoodServerRelays,
       value: `${String(relays.connected)} of ${String(relays.total)} connected`,
+      href: NETWORK_PAGE,
     });
   }
   if (relays?.lastSyncAt !== undefined) {
@@ -168,8 +175,28 @@ export function StatusStrip({
                 data-server-fact
                 {...(index === 0 ? { 'data-fact-first': '' } : {})}
               >
-                <span className="al-strip-label">{item.label}</span>
-                <span className="al-strip-value">{item.value}</span>
+                {item.href === undefined ? (
+                  <>
+                    <span className="al-strip-label">{item.label}</span>
+                    <span className="al-strip-value">{item.value}</span>
+                  </>
+                ) : (
+                  <a
+                    className="al-strip-link"
+                    href={item.href}
+                    onClick={(e) => {
+                      // A plain click stays in the app; a modified click or a middle click is the browser's.
+                      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)
+                        return;
+                      e.preventDefault();
+                      navigate(item.href ?? NETWORK_PAGE);
+                    }}
+                  >
+                    <span className="al-strip-label">{item.label}</span>
+                    <span className="al-strip-value">{item.value}</span>
+                    <span aria-hidden="true">›</span>
+                  </a>
+                )}
               </li>
             ))}
       </ul>
