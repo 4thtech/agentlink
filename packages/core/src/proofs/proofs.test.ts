@@ -702,6 +702,138 @@ describe('a broken spending record refuses up front (BUDGET-BROKEN-UX; 06 §3, 0
   });
 });
 
+// BUDGET-RECOVER (07 §3.5): every state in which the spending record cannot be summed now is
+// recovered by the owner saving the limits again (ownerActions.apply policy.set), never by anything
+// else. The states are produced as they happen in production, not by writing `broken` directly.
+describe('BUDGET-RECOVER: a limits re-save recovers every broken spending record (07 §3.5)', () => {
+  const ledgerRow = (n: number, epoch: number, t: number, extra: Record<string, unknown> = {}) => ({
+    entry_id: `recover-${n}`,
+    ledger_epoch: epoch,
+    t,
+    record_id: `0x${n.toString(16).padStart(64, '0')}`,
+    chain_id: 8453,
+    approval_id: null,
+    reserved_usd: '0.01',
+    charged_usd: null,
+    state: 'reserved' as const,
+    deadline: t + 3600,
+    replaces: null,
+    settled_at: null,
+    install_id: null,
+    ...extra,
+  });
+  const budgetState = (agent: Agent) =>
+    agent.store.transaction((tx) => tx.get('budget_state', { slot: 'current' }));
+
+  async function brokenThenRecovered(
+    breakIt: (agent: Agent) => Promise<unknown>,
+  ): Promise<{ a: Agent; epochBefore: number | undefined }> {
+    const { a, b } = await twoAgents();
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    const envelopeId = await sendText(a, b);
+    await breakIt(a);
+    const epochBefore = (await budgetState(a))?.ledger_epoch;
+    expect(await a.client.notarize({ envelopeId })).toEqual({
+      status: 'rejected',
+      code: 'BUDGET_BROKEN',
+    });
+    // Refusing again changes nothing (fail closed; no silent reset).
+    expect(await a.client.notarize({ envelopeId })).toEqual({
+      status: 'rejected',
+      code: 'BUDGET_BROKEN',
+    });
+    expect(chain.calls.notarize).toBe(0);
+    // One owner save of the same limits starts a summable record.
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    expect(await a.client.notarize({ envelopeId })).toMatchObject({ status: 'pending_approval' });
+    return { a, epochBefore };
+  }
+
+  it('the clock was ahead and is corrected (newest entry in the future)', async () => {
+    const { a } = await brokenThenRecovered((agent) =>
+      agent.store.transaction((tx) =>
+        tx.update('budget_state', { slot: 'current' }, { newest_t: clock.t + 30 * 86_400 }),
+      ),
+    );
+    const state = await budgetState(a);
+    expect(state).toMatchObject({ status: 'ok' });
+    expect(state!.newest_t).toBeLessThanOrEqual(clock.t);
+  });
+
+  it('a row from a later epoch: the fresh epoch is past every row', async () => {
+    const { a, epochBefore } = await brokenThenRecovered((agent) =>
+      agent.store.transaction((tx) => {
+        const s = tx.get('budget_state', { slot: 'current' })!;
+        tx.insert('budget_ledger', ledgerRow(1, s.ledger_epoch + 3, clock.t - 5));
+      }),
+    );
+    expect((await budgetState(a))!.ledger_epoch).toBe((epochBefore ?? 0) + 4);
+  });
+
+  it('an inconsistent row (charged without an amount)', async () => {
+    await brokenThenRecovered((agent) =>
+      agent.store.transaction((tx) => {
+        const s = tx.get('budget_state', { slot: 'current' })!;
+        tx.insert(
+          'budget_ledger',
+          ledgerRow(2, s.ledger_epoch, clock.t - 5, { state: 'charged', charged_usd: null }),
+        );
+      }),
+    );
+  });
+
+  it('the spending state row is missing', async () => {
+    const { a } = await brokenThenRecovered((agent) =>
+      agent.store.transaction((tx) => tx.delete('budget_state', {})),
+    );
+    expect(await budgetState(a)).toMatchObject({ status: 'ok' });
+  });
+
+  it('a healthy record is left as it is by a save (no reset of the spent amount)', async () => {
+    const { a } = await twoAgents();
+    const before = await budgetState(a);
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    expect(await budgetState(a)).toEqual(before);
+  });
+
+  it('a read error in the up-front check is BUDGET_BROKEN, not a generic error (L3)', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const store = a.store as unknown as {
+      transaction: <T>(fn: (tx: unknown) => T) => Promise<Awaited<T>>;
+    };
+    const original = store.transaction.bind(store);
+    store.transaction = (fn) =>
+      original((tx) =>
+        fn(
+          new Proxy(tx as object, {
+            get(target, key) {
+              const value = Reflect.get(target, key) as unknown;
+              if (key === 'select') {
+                return (table: string, ...rest: unknown[]) => {
+                  if (table === 'budget_ledger') throw new Error('read failed');
+                  return (value as (...args: unknown[]) => unknown).call(target, table, ...rest);
+                };
+              }
+              return typeof value === 'function' ? value.bind(target) : value;
+            },
+          }),
+        ),
+      );
+    expect(await a.client.notarize({ envelopeId })).toEqual({
+      status: 'rejected',
+      code: 'BUDGET_BROKEN',
+    });
+    expect(chain.calls.notarize).toBe(0);
+  });
+});
+
 describe('ACCEPTED / REJECTED without terms are commitments (D-31, 06 §2.4)', () => {
   it('no ACCEPTED under the default policy without an owner-signed approval; then exclusive', async () => {
     // The defaults in full (D-109: no automatic DELIVERED either); ACCEPTED is unchanged.

@@ -112,6 +112,7 @@ interface Setup {
   readonly clock: { t: number };
   readonly kept: Kept;
   readonly mark: Mark;
+  readonly store: MemoryStore;
   /** Signs and applies a whole policy edit as another surface (the CLI) would. */
   readonly applyElsewhere: (patch: JsonObject) => Promise<void>;
 }
@@ -121,9 +122,10 @@ async function setup(options: { identity?: boolean } = {}): Promise<Setup> {
   const clock = { t: 1_800_000_000 };
   const kept = new Kept();
   const mark = new Mark();
+  const store = new MemoryStore();
   const client = await AgentLinkClient.create({
     keyStore: new MemoryKeyStore(seed(4)),
-    store: new MemoryStore(),
+    store,
     cipher: new TestCipher(),
     approvals,
     clock: () => clock.t,
@@ -160,7 +162,7 @@ async function setup(options: { identity?: boolean } = {}): Promise<Setup> {
       await session.close();
     }
   };
-  return { client, context, owner, clock, kept, mark, applyElsewhere };
+  return { client, context, owner, clock, kept, mark, store, applyElsewhere };
 }
 
 /** The owner operation the central gate hands a presence route: one `sign`, checked as the gate does. */
@@ -259,10 +261,44 @@ describe('routes (M1-11c-a5; I-4)', () => {
     const view = context.client as unknown as Record<string, unknown>;
     expect(view).not.toBe(client);
     const policy = view.policy as Record<string, unknown>;
-    expect(Object.keys(policy).sort()).toEqual(['load', 'prepareEdit', 'recordReceiptsKept']);
+    expect(Object.keys(policy).sort()).toEqual([
+      'load',
+      'prepareEdit',
+      'recordReceiptsKept',
+      'spendingRecordNeedsSave',
+    ]);
     expect(Object.isFrozen(policy)).toBe(true);
     expect(view.ownerActions).toBeUndefined();
     expect(policy.apply).toBeUndefined();
+  });
+});
+
+// --- BUDGET-RECOVER (07 §3.5): the spending record needs a fresh save ----------------------------
+
+describe('GET /api/ui/rules: the spending record (BUDGET-RECOVER)', () => {
+  it('a record that cannot be summed is shown as needs_save; one save of the same rules clears it', async () => {
+    const { context, owner, store, clock } = await setup();
+    const before = await getRules(context);
+    expect((before.body as Record<string, unknown>).spendingRecord).toBeUndefined();
+    // The clock was ahead when a proof was reserved, and has been corrected since.
+    await store.transaction((tx) =>
+      tx.update('budget_state', { slot: 'current' }, { newest_t: clock.t + 7 * 86_400 }),
+    );
+    const broken = await getRules(context);
+    expect(broken.status).toBe(200);
+    const body = broken.body as { version: number; spendingRecord?: string; rules: JsonObject };
+    expect(body.spendingRecord).toBe('needs_save');
+    const files = body.rules.files as { maxSendSizeMB: number };
+    // "Save again": the same value restated, reviewed and signed with presence.
+    const reviewed = await reviewOk(context, {
+      base: body.version,
+      patch: { files: { maxSendSizeMB: files.maxSendSizeMB } },
+    });
+    const { op } = ownerOp(owner);
+    const saved = await save(context, op, { review: reviewed.review, acknowledged: [] });
+    expect(saved).toMatchObject({ status: 200, body: { status: 'saved' } });
+    const after = await getRules(context);
+    expect((after.body as Record<string, unknown>).spendingRecord).toBeUndefined();
   });
 });
 
