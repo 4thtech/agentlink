@@ -108,3 +108,8 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 - Release PR #853 (rel0514/integration → main) open. All lanes reviewed (KeyStore gate, spending-record recovery, message-network backend) and integrated; local suites green; browser checks fixed.
 - Holding merge: Linux keyring crashes in e2e on every 0.5.14 run, never on main → being investigated as a likely 0.5.14 cause. Tali has pre-approved the merge once CI is fully green.
 - Then: version PR, Tali's npm and desktop update clicks, docs/wiki/second brain flip, X post.
+
+## 2026-11-19 — 0.5.14 released
+- 0.5.14 LIVE: npm latest, GitHub release v0.5.14, signed desktop update (Mac, Windows). Release PR #853, version PR #854.
+- Contents: proof-record signing check inside the KeyStore; Under the hood › Message network (live servers, health, speed, contacts per server, three-column diagram); clear recovery when the spending record breaks ("Save again" in Settings › Rules); failed contact-details updates retry; own server lists capped at 8; same-ID notice always shown; first-launch layout fix; fewer keychain calls on Linux; CI browser cache.
+- Next: 0.5.15 — use your own servers (Test button, 2–8 servers, reset to automatic, public servers only), 24-hour bar back.
