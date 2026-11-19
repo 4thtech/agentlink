@@ -90,3 +90,8 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 - 0.5.12 live: npm latest, GitHub release v0.5.12, signed desktop update (Mac arm64/x64, Windows). Release PR #847, version PR #848, docs #849.
 - Contents: delivery confirmation ("Sent, availability unknown" when no server can confirm), restore guard (24 h owner approval for paid actions, old approvals void), proof signing and fee reservation in one step, consistent spending limits, negotiation messages count toward send limits, refused-upload cleanup, delete history not blocked by receipts, widget file links and clearing, Under the hood strip wraps, release PRs run the long e2e lanes.
 - Next: RELEASE 0.5.13 PR; 0.5.14 before mainnet (on-chain allowance, signed Mac helper, KeyStore record gate).
+
+## 2026-11-19 — 0.5.13 released
+- 0.5.13 live: npm latest, GitHub release v0.5.13, signed desktop update (Mac, Windows). Release PR #850, version PR #851, docs #852.
+- Contents: per-message delivery details (message network: accepted by N, available from M), restore and update entries in Activity with a "From before the restore" label, a notice with last-seen date when the same ID runs on another computer, new default message-network servers with a one-click owner-approved "Update your contact details" (CLI: agentlink owner update-contact-details), daily read-only server health check, public hostile-scenario test suite (25 scenarios), rewritten residual-risk section in specs/04.
+- Next: 0.5.14 before mainnet: on-chain spending allowance, signed Mac helper, KeyStore record gate.
