@@ -16,5 +16,6 @@ export {
   type ReceiptType,
   type RecordInput,
   type RecordKind,
+  type RecordSigner,
   type TypedDataSigner,
 } from './builders.js';

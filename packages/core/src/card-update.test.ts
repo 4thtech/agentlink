@@ -232,7 +232,11 @@ async function packOf(from: TestAgent, to: TestAgent, envelope: Envelope, cek: U
     deadline: clock.t + 3_600,
   };
   const domain = occV2Domain(config.chainId, notary);
-  const signature = await from.keyStore.sign712(recordTypedData(domain, record));
+  const typedRecord = recordTypedData(domain, record);
+  const signature = await from.keyStore.signRecord(
+    typedRecord,
+    from.keyStore.issueRecordTicket(typedRecord),
+  );
   const notarizedAt = clock.t + 100;
   const deliveredAt = clock.t + 200;
   const state = {

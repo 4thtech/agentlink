@@ -381,9 +381,8 @@ describe('signing through KeyStore.sign712', () => {
       Promise.resolve(`${SIG}|${digestOf(td)}|${t === ticket ? 'ticket' : 'none'}`),
     );
     const record = buildRecord(messageInput());
-    expect(await signRecord({ sign712, signRecord: signRecordKs }, record, ticket)).toBe(
-      `${SIG}|${record.digest}|ticket`,
-    );
+    const keyStore = { sign712, signRecord: signRecordKs };
+    expect(await signRecord(keyStore, record, ticket)).toBe(`${SIG}|${record.digest}|ticket`);
     expect(sign712).not.toHaveBeenCalled();
   });
 

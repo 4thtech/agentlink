@@ -105,11 +105,12 @@ import {
   type DirectTxChain,
   type TransactionRefusal,
 } from './evm-tx.js';
-import { RECORD_TICKET_REFUSED, type RecordTicket } from './record-ticket.js';
+import { RECORD_TICKET_REFUSED, RecordTicketBook, type RecordTicket } from './record-ticket.js';
 import {
   TYPED_DATA_REFUSED,
+  recordSnapshot,
+  sign712Snapshot,
   typedDataClock,
-  typedDataSnapshot,
   type TypedDataRefusal,
 } from './typed-data-allowlist.js';
 import { wipe } from './wipe.js';
@@ -413,6 +414,8 @@ const KEYSTORE_STATE = new WeakMap<object, KeyStoreState>();
 export class MemoryKeyStore implements KeyStore {
   readonly #state: KeyStoreState;
   readonly #nowSeconds: () => number;
+  /** SEC-KEYSTORE-RECORD-GATE: this store's live Record tickets. */
+  readonly #tickets = new RecordTicketBook();
 
   constructor(masterSeed: Uint8Array, options: MemoryKeyStoreOptions = {}) {
     const keyEpoch = options.keyEpoch ?? 0;
@@ -502,10 +505,32 @@ export class MemoryKeyStore implements KeyStore {
   }
 
   sign712(typedData: TypedData): Promise<string> {
-    // SEC-KS-712-ALLOWLIST: only the agent's own shapes, checked before the seed is used. The EVM
-    // key exists only at epoch 0 (04 §2.1), whatever the current key epoch.
+    // SEC-KS-712-ALLOWLIST: only the agent's own shapes, checked before the seed is used, and never
+    // a Record (SEC-KEYSTORE-RECORD-GATE). The EVM key exists only at epoch 0 (04 §2.1), whatever
+    // the current key epoch.
     return Promise.resolve().then(() => {
-      const snapshot = typedDataSnapshot(typedData, this.#state.agentId, this.#nowSeconds());
+      const snapshot = sign712Snapshot(typedData, this.#state.agentId, this.#nowSeconds());
+      return withSecret(this.#open(), KEY_LABELS.evm, 0, (secretKey) =>
+        signTypedData(snapshot, secretKey),
+      );
+    });
+  }
+
+  issueRecordTicket(record: TypedData): RecordTicket {
+    // SEC-KEYSTORE-RECORD-GATE: the allowlist first; a closed store issues nothing. No key is read.
+    const snapshot = recordSnapshot(record, this.#state.agentId, this.#nowSeconds());
+    if (this.#state.closed) {
+      throw new KeyStoreError('keystore_closed', 'keystore: the store is closed');
+    }
+    return this.#tickets.issue(snapshot);
+  }
+
+  signRecord(record: TypedData, ticket: RecordTicket): Promise<string> {
+    // SEC-KEYSTORE-RECORD-GATE: the allowlist, then the ticket is spent for this exact digest, all
+    // before the seed is used.
+    return Promise.resolve().then(() => {
+      const snapshot = recordSnapshot(record, this.#state.agentId, this.#nowSeconds());
+      this.#tickets.spend(ticket, snapshot);
       return withSecret(this.#open(), KEY_LABELS.evm, 0, (secretKey) =>
         signTypedData(snapshot, secretKey),
       );
@@ -1530,28 +1555,19 @@ function runConformanceSign712(
   const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 
   runner.describe(`${backend.name}: KeyStore conformance, sign712 (SEC-KS-712-ALLOWLIST)`, () => {
-    runner.it(
-      'signs a Receipt, its own card and the vault top-up with the EVM key',
-      async () => {
-        const store = await backend.open(CONFORMANCE_EPOCH);
-        try {
-          const shapes = conformanceTypedData(own, nowSeconds());
-          for (const typed of [shapes.receipt, shapes.card, shapes.topUp()]) {
-            const sig = await store.sign712(typed);
-            const signer = recoverEvmAddress(
-              hashTypedData(typed).digest,
-              decodeEcdsaSignature(sig),
-            );
-            conformanceCheck(
-              encodeHex0x(signer) === own,
-              `${typed.primaryType}: the agent EVM key`,
-            );
-          }
-        } finally {
-          await store.close();
+    runner.it('signs a Receipt, its own card and the vault top-up with the EVM key', async () => {
+      const store = await backend.open(CONFORMANCE_EPOCH);
+      try {
+        const shapes = conformanceTypedData(own, nowSeconds());
+        for (const typed of [shapes.receipt, shapes.card, shapes.topUp()]) {
+          const sig = await store.sign712(typed);
+          const signer = recoverEvmAddress(hashTypedData(typed).digest, decodeEcdsaSignature(sig));
+          conformanceCheck(encodeHex0x(signer) === own, `${typed.primaryType}: the agent EVM key`);
         }
-      },
-    );
+      } finally {
+        await store.close();
+      }
+    });
 
     runner.it(
       'refuses any other typed data with typed_data_refused, before any key is read',
@@ -1647,28 +1663,31 @@ function runConformanceRecordGate(
         });
       });
 
-      runner.it('a ticket for one Record never signs another, and is spent by the try', async () => {
-        await withStore(async (store) => {
-          const shapes = conformanceTypedData(own, nowSeconds());
-          const a = shapes.record({ nonce: '9' });
-          const b = shapes.record({ nonce: '10' });
-          const c = shapes.record({ nonce: '9', maxFee: '100001' });
-          const ticket = store.issueRecordTicket(a);
-          expectTicketRefusal(
-            await conformanceOutcome(() => store.signRecord(b, ticket)),
-            'another Record',
-          );
-          expectTicketRefusal(
-            await conformanceOutcome(() => store.signRecord(a, ticket)),
-            'the spent ticket',
-          );
-          const second = store.issueRecordTicket(a);
-          expectTicketRefusal(
-            await conformanceOutcome(() => store.signRecord(c, second)),
-            'the same Record ID with another fee',
-          );
-        });
-      });
+      runner.it(
+        'a ticket for one Record never signs another, and is spent by the try',
+        async () => {
+          await withStore(async (store) => {
+            const shapes = conformanceTypedData(own, nowSeconds());
+            const a = shapes.record({ nonce: '9' });
+            const b = shapes.record({ nonce: '10' });
+            const c = shapes.record({ nonce: '9', maxFee: '100001' });
+            const ticket = store.issueRecordTicket(a);
+            expectTicketRefusal(
+              await conformanceOutcome(() => store.signRecord(b, ticket)),
+              'another Record',
+            );
+            expectTicketRefusal(
+              await conformanceOutcome(() => store.signRecord(a, ticket)),
+              'the spent ticket',
+            );
+            const second = store.issueRecordTicket(a);
+            expectTicketRefusal(
+              await conformanceOutcome(() => store.signRecord(c, second)),
+              'the same Record ID with another fee',
+            );
+          });
+        },
+      );
 
       runner.it('a ticket signs once: a replay is refused', async () => {
         await withStore(async (store) => {
@@ -1683,7 +1702,7 @@ function runConformanceRecordGate(
       });
 
       runner.it(
-        'only a ticket this store issued counts: a look-alike or another store\'s ticket is refused',
+        "only a ticket this store issued counts: a look-alike or another store's ticket is refused",
         async () => {
           const other = await backend.open(CONFORMANCE_EPOCH);
           try {
@@ -1726,7 +1745,11 @@ function runConformanceRecordGate(
             ['a Receipt', () => shapes.receipt, 'type_not_allowed'],
             ['a card', () => shapes.card, 'type_not_allowed'],
             ['a top-up', () => shapes.topUp(), 'type_not_allowed'],
-            ['a Record over the fee ceiling', () => shapes.record({ maxFee: '500001' }), 'fee_not_allowed'],
+            [
+              'a Record over the fee ceiling',
+              () => shapes.record({ maxFee: '500001' }),
+              'fee_not_allowed',
+            ],
             [
               'a Record for another signer',
               () => shapes.record({ signer: `0x${'11'.repeat(20)}` }),

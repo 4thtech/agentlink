@@ -32,6 +32,7 @@ import type { WrappedCek } from './hpke.js';
 import type { PublicIdentity } from './keys.js';
 import type { JsonObject } from './jcs.js';
 import type { NostrEvent, UnsignedNostrEvent } from './nostr-event.js';
+import type { RecordTicket } from './record-ticket.js';
 import type { RecoveryCodeSecret } from './owner-seed-wrap.js';
 import type {
   OpenRecoveryKitOptions,
@@ -145,19 +146,43 @@ export interface KeyStore extends EnvelopeKeys {
   getPublicBundle(options?: EpochOptions): Promise<PublicIdentity>;
 
   /**
-   * EIP-712 signature by the agent EVM key (records, receipts, `cardAgentSig`, the vault top-up),
-   * in the canonical ECDSA form of 04 §2.4.1: `0x` + 130 lowercase hex.
+   * EIP-712 signature by the agent EVM key (receipts, `cardAgentSig`, the vault top-up), in the
+   * canonical ECDSA form of 04 §2.4.1: `0x` + 130 lowercase hex.
    *
-   * It is never a general typed-data signer (SEC-KS-712-ALLOWLIST): only an OCC v2 `Record` or
-   * `Receipt` for a Notary of TYPED_DATA_ALLOWLIST signed as this agent (a Record with the official
-   * app ID, an allowed fee token, `maxFee` at most the ceiling and a short deadline; a Receipt with
-   * a short deadline), this agent's own `AgentCard`, and the EIP-3009 `ReceiveWithAuthorization`
-   * of an allowlisted top-up token from this agent to that chain's fee vault, up to a cap and a
-   * short validity (typedDataSnapshot). Anything else is CryptoInputError `typed_data_refused` with
-   * the fixed message of the rule (TYPED_DATA_REFUSED). Every check happens before a key is read,
-   * and the checked snapshot is what gets signed.
+   * It is never a general typed-data signer (SEC-KS-712-ALLOWLIST): only an OCC v2 `Receipt` for a
+   * Notary of TYPED_DATA_ALLOWLIST signed as this agent with a short deadline, this agent's own
+   * `AgentCard`, and the EIP-3009 `ReceiveWithAuthorization` of an allowlisted top-up token from
+   * this agent to that chain's fee vault, up to a cap and a short validity (typedDataSnapshot).
+   * Anything else is CryptoInputError `typed_data_refused` with the fixed message of the rule
+   * (TYPED_DATA_REFUSED). Every check happens before a key is read, and the checked snapshot is what
+   * gets signed.
+   *
+   * A `Record` is never signed here (SEC-KEYSTORE-RECORD-GATE): even an allowed one is refused
+   * with `record_needs_ticket` (sign712Snapshot). Records go only through signRecord.
    */
   sign712(typedData: TypedData): Promise<string>;
+
+  /**
+   * SEC-KEYSTORE-RECORD-GATE (D-156; 07 §3.5): a single-use ticket for exactly this OCC v2 `Record`,
+   * bound to its EIP-712 digest (record-ticket.ts). Synchronous, so core asks for it inside the one
+   * store transaction that reserved the Record's fee in the budget ledger, and only there. The
+   * Record must pass the agent key's allowlist (a Record for a Notary of TYPED_DATA_ALLOWLIST,
+   * signed as this agent, with the official app ID, an allowed fee token, `maxFee` at most the
+   * ceiling and a short deadline; recordSnapshot), else `typed_data_refused`; a closed store is
+   * `keystore_closed`. Reads no key.
+   */
+  issueRecordTicket(record: TypedData): RecordTicket;
+
+  /**
+   * SEC-KEYSTORE-RECORD-GATE: the agent EVM key's signature of an OCC v2 `Record`, in the form of
+   * sign712, only with a ticket that this store instance issued for exactly this Record and that was
+   * not used before. The Record is checked against the allowlist again (`typed_data_refused`); then
+   * the ticket is spent. One this store did not issue (a copy, a Proxy, another store's), one
+   * already spent, or one issued for another Record (any field or the domain differs) is
+   * CryptoInputError `record_ticket_refused` with the fixed RECORD_TICKET_REFUSED. An issued ticket
+   * is spent by its first use, whatever the outcome. Every check happens before a key is read.
+   */
+  signRecord(record: TypedData, ticket: RecordTicket): Promise<string>;
 
   /**
    * The card's `cardPop` (M1-4d-d; 04 §2.9, D-102): BIP-340 by the Nostr key of the current epoch

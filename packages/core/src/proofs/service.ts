@@ -1169,7 +1169,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
             created_at: now,
           });
         }
-        const issued = issueRecordTicket(tx, recordId);
+        const issued = issueRecordTicket(tx, this.#ctx.keyStore, built);
         if (issued === undefined) throw new Abort();
         return issued;
       });
@@ -1191,7 +1191,7 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       store: this.#ctx.store,
       ticket,
       built,
-      sign: (b) => this.#kit.signRecord(this.#ctx.keyStore, b),
+      sign: (b, permit) => this.#kit.signRecord(this.#ctx.keyStore, b, permit),
       encode: (signature) => canonicalize({ record: built.record, signature } as never),
     });
   }
@@ -1285,7 +1285,9 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
       typedData,
       digest: encodeHex0x(hashTypedData(typedData).digest),
     } as unknown as BuiltRecord;
-    const ticket = await this.#ctx.store.transaction((tx) => issueRecordTicket(tx, row.record_id));
+    const ticket = await this.#ctx.store.transaction((tx) =>
+      issueRecordTicket(tx, this.#ctx.keyStore, built),
+    );
     if (ticket === undefined) return undefined;
     const json = await this.#signHeld(ticket, built);
     if (json === undefined) return undefined;

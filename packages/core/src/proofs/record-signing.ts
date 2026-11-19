@@ -6,7 +6,14 @@
 // exists without its reservation, and a reservation without a stored signature (a crash or a
 // signer failure in between) stays reserved: it is released only once the Record can no longer
 // land (its deadline passed and the chain shows no record), never earlier.
+//
+// SEC-KEYSTORE-RECORD-GATE (04 §3.1.1): the gate itself is in the KeyStore. The reserving
+// transaction asks the KeyStore for a single-use ticket bound to the digest of exactly this Record
+// (KeyStore.issueRecordTicket), and the KeyStore signs a Record only through signRecord with that
+// ticket; sign712 refuses every Record. A ticket from here can therefore sign nothing but the Record
+// whose fee that transaction reserved, and only once.
 import type { BuiltRecord } from '@4thtech-io/chain';
+import type { KeyStore, RecordTicket as KeyStoreTicket } from '@4thtech-io/crypto';
 import type { Store, StoreTx } from '../store/store.js';
 
 /** A Record row whose fee is reserved and whose signature is not stored yet. */
@@ -15,6 +22,8 @@ export const RECORD_SIGNING = 'signing';
 /** Issued by `issueRecordTicket` inside the reserving transaction; one signature, then spent. */
 export interface RecordTicket {
   readonly recordId: string;
+  /** The KeyStore's own ticket for this Record's digest (SEC-KEYSTORE-RECORD-GATE). */
+  readonly permit: KeyStoreTicket;
 }
 
 const issued = new WeakSet<RecordTicket>();
@@ -28,11 +37,18 @@ export function holdsReservation(tx: StoreTx, recordId: string): boolean {
 
 /**
  * Called inside the transaction that reserved the fee and stored the `signing` row. Undefined when
- * either is missing; the caller then aborts the transaction.
+ * either is missing; the caller then aborts the transaction. Only then does the KeyStore issue its
+ * ticket for `built` (synchronous, inside this transaction); a Record the KeyStore refuses throws,
+ * which aborts the transaction, so nothing is reserved for it.
  */
-export function issueRecordTicket(tx: StoreTx, recordId: string): RecordTicket | undefined {
-  if (!holdsReservation(tx, recordId)) return undefined;
-  const ticket: RecordTicket = Object.freeze({ recordId });
+export function issueRecordTicket(
+  tx: StoreTx,
+  keyStore: Pick<KeyStore, 'issueRecordTicket'>,
+  built: BuiltRecord,
+): RecordTicket | undefined {
+  if (!holdsReservation(tx, built.recordId)) return undefined;
+  const permit = keyStore.issueRecordTicket(built.typedData);
+  const ticket: RecordTicket = Object.freeze({ recordId: built.recordId, permit });
   issued.add(ticket);
   return ticket;
 }
@@ -48,7 +64,8 @@ export async function signUnderReservation(input: {
   readonly store: Store;
   readonly ticket: RecordTicket;
   readonly built: BuiltRecord;
-  readonly sign: (built: BuiltRecord) => Promise<string>;
+  /** Signs through KeyStore.signRecord with the KeyStore's ticket (`permit`). */
+  readonly sign: (built: BuiltRecord, permit: KeyStoreTicket) => Promise<string>;
   /** Encodes the stored item from the signature. */
   readonly encode: (signature: string) => string;
 }): Promise<string | undefined> {
@@ -59,7 +76,7 @@ export async function signUnderReservation(input: {
   issued.delete(ticket);
   const recordId = built.recordId;
   if (!(await store.transaction((tx) => holdsReservation(tx, recordId)))) return undefined;
-  const signature = await input.sign(built);
+  const signature = await input.sign(built, ticket.permit);
   const json = input.encode(signature);
   const stored = await store.transaction((tx) => {
     if (!holdsReservation(tx, recordId)) return false;

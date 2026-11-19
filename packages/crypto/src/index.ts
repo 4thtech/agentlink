@@ -71,12 +71,16 @@ export {
   MAX_TOP_UP_WINDOW_SECONDS,
   TYPED_DATA_ALLOWLIST,
   TYPED_DATA_REFUSED,
+  recordSnapshot,
+  sign712Snapshot,
   typedDataClock,
   typedDataSnapshot,
   type TopUpToken,
   type TypedDataChain,
   type TypedDataRefusal,
 } from './typed-data-allowlist.js';
+// SEC-KEYSTORE-RECORD-GATE: the single-use Record ticket every KeyStore backend keeps (no key material).
+export { RECORD_TICKET_REFUSED, RecordTicketBook, type RecordTicket } from './record-ticket.js';
 export {
   MAX_JSON_DEPTH,
   canonicalize,

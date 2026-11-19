@@ -614,6 +614,8 @@ describe('KeychainKeyStore.open (04 §2.9: the seed must derive the agent ID)', 
     expect(Object.keys(store).sort()).toEqual([
       'close',
       'getPublicBundle',
+      // SEC-KEYSTORE-RECORD-GATE: the single-use Record ticket and the one way to sign a Record.
+      'issueRecordTicket',
       'nip44Decrypt',
       'nip44Encrypt',
       'sign712',
@@ -621,6 +623,7 @@ describe('KeychainKeyStore.open (04 §2.9: the seed must derive the agent ID)', 
       'signDropRequest',
       'signEnvelopeHash',
       'signNostr',
+      'signRecord',
       // M1-4c-b: direct-mode transactions, under the KeyStore's own fixed rules.
       'signTransaction',
       'unwrapCek',

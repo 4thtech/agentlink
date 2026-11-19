@@ -1451,7 +1451,7 @@ async function recordDirectly(from: Agent, to: Agent, envelopeId: string, kind: 
     maxFee: FEE_UNITS,
     deadline: clock.t + 3600,
   });
-  await signRecord(from.keyStore, built);
+  await signRecord(from.keyStore, built, from.keyStore.issueRecordTicket(built.typedData));
   chain.put(built.record);
   return { recordId: built.recordId as string, salt: built.salt as string };
 }
@@ -1548,7 +1548,11 @@ async function signedRecordOf(
     maxFee: FEE_UNITS,
     deadline: clock.t + 3600,
   });
-  const signature = await signRecord(from.keyStore, built);
+  const signature = await signRecord(
+    from.keyStore,
+    built,
+    from.keyStore.issueRecordTicket(built.typedData),
+  );
   if (options.put !== false) chain.put(built.record);
   return {
     recordId: built.recordId,
