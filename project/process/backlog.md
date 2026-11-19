@@ -11574,3 +11574,9 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Repo/path:** agentlink · `packages/node/src/keychain-keystore.ts`; tests
 - **Goal:** since 0.5.14 a keychain KeyStore derives its public bundle once per key epoch and keeps it until close. When another process removes the ID or starts it over, a store that is still open keeps answering public look-ups from the kept bundle until it closes. Signing, encryption and decryption still read the seed every time, so they fail correctly (`identity_missing` or `identity_mismatch`); only public answers are stale.
 - **Done when:** `RED (expected):` commit first; an open store drops its kept bundles when a seed read fails with `identity_missing` or `identity_mismatch`, or follows a cheap removal signal, so a look-up after removal fails like signing does; no extra keychain read on the normal path.
+
+#### STORE-CREATE-ONE-TX · Create a new store in one transaction (follow-up from 0.5.14)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Spec:** 07 §3.7
+- **Repo/path:** agentlink · `packages/node/src/sqlite-store.ts` (`#migrate`); tests
+- **Goal:** creating a new store runs every migration step as its own commit (23 today), which is slow on Windows (about 12 s seen in one test on the CI runner). A new, empty file gets the whole schema in one transaction; an existing file still migrates step by step as now.
+- **Done when:** `RED (expected):` commit first (a commit count, not wall time); the created file's schema, pragmas and version are identical to today's; the Windows store tests run well under their timeout.
