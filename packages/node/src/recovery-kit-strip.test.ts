@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { stripInviteLinks } from './recovery-kit-export.js';
-import { MIGRATIONS } from './sqlite-schema.js';
+import { replayMigrations } from './old-store.fixture.js';
 import { SqliteStore } from './sqlite-store.js';
 
 let dir = '';
@@ -50,9 +50,7 @@ describe('the kit snapshot drops kept invite links (REL051-B2)', () => {
   it('leaves a store from before schema 14 (no column) unchanged', () => {
     const file = join(dir, 'old.sqlite');
     const raw = new Database(file);
-    for (const m of MIGRATIONS.slice(0, 13)) {
-      for (const statement of m.statements) raw.prepare(statement).run();
-    }
+    replayMigrations(raw, 13);
     raw.close();
     expect(() => stripInviteLinks(file)).not.toThrow();
   });

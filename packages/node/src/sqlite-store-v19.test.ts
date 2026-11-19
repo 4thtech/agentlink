@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { STORE_SCHEMA_VERSION } from '@4thtech-io/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { replayMigrations } from './old-store.fixture.js';
 import { MIGRATIONS, STORE_APPLICATION_ID } from './sqlite-schema.js';
 import { SqliteStore } from './sqlite-store.js';
 
@@ -36,9 +37,7 @@ describe('schema version 19 (SEC-RELAY-READBACK)', () => {
 
   it('migrates a version 18 file: rows kept, availability null, new values enforced', async () => {
     const raw = new Database(path());
-    for (const m of MIGRATIONS.slice(0, 18)) {
-      for (const statement of m.statements) raw.prepare(statement).run();
-    }
+    replayMigrations(raw, 18);
     raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
     raw.pragma('user_version = 18');
     raw
