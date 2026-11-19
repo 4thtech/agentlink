@@ -1,5 +1,15 @@
 # @4thtech-io/chain
 
+## 0.5.14
+
+### Patch Changes
+
+- 4a3c0eb: Proofs: the key store itself now guards proof signing. It signs a proof record only with a single-use ticket issued for exactly that record while its fee is set aside, and its general typed-data signer no longer signs proof records (SEC-KEYSTORE-RECORD-GATE).
+- Updated dependencies [4a3c0eb]
+- Updated dependencies [4a3c0eb]
+  - @4thtech-io/types@0.5.14
+  - @4thtech-io/crypto@0.5.14
+
 ## 0.5.13
 
 ### Patch Changes

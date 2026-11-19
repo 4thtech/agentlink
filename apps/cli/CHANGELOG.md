@@ -1,5 +1,12 @@
 # @4thtech-io/agentlink
 
+## 0.5.14
+
+### Patch Changes
+
+- 4a3c0eb: The local app can now show a live view of the message network under the hood: each server's host, whether it answers from this computer, how fast, whether it wants a sign-in or a payment, and how many messages it took and served today (`GET /api/ui/network`, a `network` live event, store version 23 `relay_stats`, counters only). The check runs only while that view is open and only against your own servers. Your own server list is now limited to 2 to 8 servers, as the spec says.
+- 4a3c0eb: Saving the rules again now recovers every spending record that can't be summed (a clock that was ahead, a record from a later count, an inconsistent entry, a missing record), and Settings › Rules says when that save is needed with a "Save again" button that works with nothing changed (BUDGET-RECOVER). A read error in the up-front check is the plain "save your limits again" refusal.
+
 ## 0.5.13
 
 ### Patch Changes

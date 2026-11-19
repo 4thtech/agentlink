@@ -1,5 +1,22 @@
 # @4thtech-io/core
 
+## 0.5.14
+
+### Patch Changes
+
+- 4a3c0eb: The local app can now show a live view of the message network under the hood: each server's host, whether it answers from this computer, how fast, whether it wants a sign-in or a payment, and how many messages it took and served today (`GET /api/ui/network`, a `network` live event, store version 23 `relay_stats`, counters only). The check runs only while that view is open and only against your own servers. Your own server list is now limited to 2 to 8 servers, as the spec says.
+- 4a3c0eb: Saving the rules again now recovers every spending record that can't be summed (a clock that was ahead, a record from a later count, an inconsistent entry, a missing record), and Settings › Rules says when that save is needed with a "Save again" button that works with nothing changed (BUDGET-RECOVER). A read error in the up-front check is the plain "save your limits again" refusal.
+- 4a3c0eb: A proof asked while the spending record cannot be read is refused up front with plain wording and the way to save the limits again (BUDGET-BROKEN-UX). A card-update whose first pass was not accepted is published again by the next pass (CARD-UPDATE-FAILED-STATE). The "in use on another computer" notice is never dropped by the 200-item cap of Notifications.
+- 4a3c0eb: Proofs: the key store itself now guards proof signing. It signs a proof record only with a single-use ticket issued for exactly that record while its fee is set aside, and its general typed-data signer no longer signs proof records (SEC-KEYSTORE-RECORD-GATE).
+- Updated dependencies [4a3c0eb]
+- Updated dependencies [4a3c0eb]
+  - @4thtech-io/types@0.5.14
+  - @4thtech-io/transport-nostr@0.5.14
+  - @4thtech-io/crypto@0.5.14
+  - @4thtech-io/chain@0.5.14
+  - @4thtech-io/storage@0.5.14
+  - @4thtech-io/log@0.5.14
+
 ## 0.5.13
 
 ### Patch Changes
