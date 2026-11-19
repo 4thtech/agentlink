@@ -310,6 +310,38 @@ describe('KeychainKeyStore (KeyStore contract, 04 §3.1.1)', () => {
     expect(keychain.handedOut.every(allZero)).toBe(true);
   });
 
+  // REL0514-KEYRING: the public bundle is public and a pure function of (seed, epoch), and the seed
+  // must derive this agent ID, so it is derived once per epoch. Every later call reads no seed: on
+  // Linux each keychain read is its own Secret Service connection, and that traffic is what crashed
+  // gnome-keyring in CI. Signing still reads the seed every time (the test above).
+  it('derives the public bundle from the seed once per epoch; later calls read no seed', async () => {
+    const before = keychain.reads;
+    for (let i = 0; i < 3; i += 1) {
+      expect(await store.getPublicBundle()).toEqual(derivePublicIdentity(SEED_A, 2));
+    }
+    expect(keychain.reads - before).toBe(1);
+    for (let i = 0; i < 2; i += 1) {
+      expect(await store.getPublicBundle({ epoch: 1 })).toEqual(derivePublicIdentity(SEED_A, 1));
+    }
+    expect(keychain.reads - before).toBe(2);
+    expect(keychain.handedOut.every(allZero)).toBe(true);
+  });
+
+  it('hands out a copy of the public bundle: changing one changes no later answer', async () => {
+    const first = await store.getPublicBundle();
+    (first.agentNostr as Uint8Array).fill(0);
+    (first.agentEnc as Uint8Array).fill(0);
+    (first.agentEvm as Uint8Array).fill(0);
+    (first.kid as Uint8Array).fill(0);
+    expect(await store.getPublicBundle()).toEqual(derivePublicIdentity(SEED_A, 2));
+  });
+
+  it('a public bundle derived before close is not handed out after it', async () => {
+    await store.getPublicBundle();
+    await store.close();
+    expect(await codeOf(() => store.getPublicBundle())).toBe('keystore_closed');
+  });
+
   it('close refuses every later call with keystore_closed', async () => {
     await store.close();
     expect(await codeOf(() => store.getPublicBundle())).toBe('keystore_closed');
