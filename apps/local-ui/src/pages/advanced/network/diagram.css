@@ -1,14 +1,22 @@
 /* NET-DIAGRAM: the three-column picture (this ID, servers, contacts). Tokens only, no inline styles
-   (CSP style-src 'self'). Nothing moves, so reduced motion needs no case. Lines: solid for sends and
-   receives, dashed for the old read-only servers, thin for what a contact shares (shape, not colour
-   alone). At 600 px and under, or in a narrow card, the picture becomes a stacked list. */
+   (CSP style-src 'self'). Nothing moves. One colour variable per state (--nc); lines are solid for
+   sends and receives, dashed for the old read-only servers, dotted when unreachable or unknown,
+   thin for what a contact shares (shape, not colour alone). In a narrow card the picture becomes
+   a stacked list. */
 .nwd {
   container-type: inline-size;
-  container-name: nwd;
   gap: var(--al-space-3);
 }
-.nwd-pic {
-  min-inline-size: 0;
+.nwd .is-ok {
+  --nc: var(--al-color-status-success-icon);
+}
+.nwd .is-slow,
+.nwd .is-down,
+.nwd .is-warn {
+  --nc: var(--al-color-status-warning-icon);
+}
+.nwd .is-old {
+  --nc: var(--al-color-fg-muted);
 }
 .nwd-wide {
   display: block;
@@ -17,41 +25,34 @@
   block-size: auto;
   margin-inline: auto;
   overflow: visible;
+  font-family: var(--al-font-family-sans);
 }
 .nwd-stack {
   display: none;
   flex-direction: column;
-  align-items: stretch;
 }
 
-/* Text: sizes are in the SVG's own units; the whole picture scales with the card. */
-.nwd-h {
+/* SVG text: sizes are in the SVG's own units; the whole picture scales with the card. */
+.nwd-h,
+.nwd-s {
   fill: var(--al-color-fg-muted);
-  font-family: var(--al-font-family-sans);
-  font-size: 10px;
+}
+.nwd-h {
   font-weight: var(--al-font-weight-semibold);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 .nwd-t {
   fill: var(--al-color-fg-default);
-  font-family: var(--al-font-family-sans);
-  font-size: 13px;
   font-weight: var(--al-font-weight-medium);
 }
-.nwd-t.is-code {
+.nwd-t.is-code,
+.nwd-av-t {
   font-family: var(--al-font-family-mono);
-  font-size: 12px;
-}
-.nwd-s {
-  fill: var(--al-color-fg-muted);
-  font-family: var(--al-font-family-sans);
-  font-size: 11px;
 }
 .nwd-node {
   fill: var(--al-color-bg-surface);
   stroke: var(--al-color-border-default);
-  stroke-width: 1px;
 }
 .nwd-node.is-id {
   stroke: var(--al-color-border-strong);
@@ -64,137 +65,86 @@
   fill: var(--al-color-accent-subtle);
   stroke: var(--al-color-border-default);
 }
+.nwd-av-t {
+  fill: var(--al-color-accent-fg);
+  font-weight: var(--al-font-weight-bold);
+}
 .nwd-av.is-id {
   fill: var(--al-color-accent-default);
   stroke: none;
 }
-.nwd-av-t {
-  fill: var(--al-color-accent-fg);
-  font-family: var(--al-font-family-mono);
-  font-size: 11px;
-  font-weight: var(--al-font-weight-bold);
-}
 .nwd-av-t.is-id {
   fill: var(--al-color-bg-surface);
-  font-size: 12px;
 }
 
-/* Lines. */
+/* Lines and health dots in the SVG (the same shapes as the cards' dots). */
 .nwd-ln {
-  fill: none;
-  stroke: var(--al-color-border-strong);
-  stroke-width: 2px;
-  stroke-linecap: round;
+  stroke: var(--nc, var(--al-color-border-strong));
 }
-.nwd-ln.is-ok {
-  stroke: var(--al-color-status-success-icon);
-}
-.nwd-ln.is-slow {
-  stroke: var(--al-color-status-warning-icon);
-}
-.nwd-ln.is-down {
-  stroke: var(--al-color-status-warning-icon);
-  stroke-dasharray: 2 5;
-}
+.nwd-ln.is-down,
 .nwd-ln.is-unknown {
-  stroke: var(--al-color-border-strong);
   stroke-dasharray: 2 5;
 }
 .nwd-ln.is-old {
-  stroke: var(--al-color-fg-muted);
   stroke-dasharray: 6 5;
 }
 .nwd-ln.is-contact {
   stroke: var(--al-color-border-strong);
-  stroke-width: 1px;
 }
-
-/* Health dots in the SVG: the same shapes as the cards' dots. */
 .nwd-dot-fill {
-  fill: var(--al-color-status-success-icon);
+  fill: var(--nc, var(--al-color-status-success-icon));
 }
-.nwd-dot-fill.is-warn {
-  fill: var(--al-color-status-warning-icon);
-}
-.nwd-dot-ring {
-  fill: none;
-  stroke: var(--al-color-fg-subtle);
-  stroke-width: 2px;
-}
-.nwd-dot-ring.is-warn {
-  stroke: var(--al-color-status-warning-icon);
-}
+.nwd-dot-ring,
 .nwd-dot-slash {
-  stroke: var(--al-color-status-warning-icon);
-  stroke-width: 2px;
-  stroke-linecap: round;
+  stroke: var(--nc, var(--al-color-fg-subtle));
 }
 
-/* The legend. */
+/* The legend keys and the stacked list's connector lines. */
 .nwd-legend {
   display: flex;
   flex-wrap: wrap;
   gap: var(--al-space-1) var(--al-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
 }
-.nwd-legend li {
+.nwd-legend li,
+.nwd-person {
   display: inline-flex;
   align-items: center;
   gap: var(--al-space-2);
 }
-.nwd-key {
+.nwd-key,
+.nwd-conn {
   display: inline-block;
   inline-size: 22px;
-  block-size: 0;
-  border-block-start: 2px solid var(--al-color-status-success-icon);
+  border-block-start: 2px solid var(--nc, var(--al-color-status-success-icon));
 }
 .nwd-key.is-old {
-  border-block-start: 2px dashed var(--al-color-fg-muted);
+  border-block-start-style: dashed;
 }
 .nwd-key.is-contact {
   border-block-start: 1px solid var(--al-color-border-strong);
-}
-
-/* The stacked list: ID card, then each server under a connector line, then who it reaches. */
-.nwd-stack-item {
-  display: flex;
-  flex-direction: column;
 }
 .nwd-conn {
   inline-size: 0;
   block-size: 16px;
   margin-inline-start: var(--al-space-5);
-  border-inline-start: 2px solid var(--al-color-border-strong);
+  border: 0;
+  border-inline-start: 2px solid var(--nc, var(--al-color-border-strong));
 }
-.nwd-conn.is-ok {
-  border-inline-start-color: var(--al-color-status-success-icon);
-}
-.nwd-conn.is-slow {
-  border-inline-start-color: var(--al-color-status-warning-icon);
-}
-.nwd-conn.is-down {
-  border-inline-start: 2px dotted var(--al-color-status-warning-icon);
-}
+.nwd-conn.is-down,
 .nwd-conn.is-unknown {
-  border-inline-start: 2px dotted var(--al-color-border-strong);
+  border-inline-start-style: dotted;
 }
 .nwd-conn.is-old {
-  border-inline-start: 2px dashed var(--al-color-fg-muted);
+  border-inline-start-style: dashed;
 }
 .nwd-nd {
   display: flex;
   align-items: center;
   gap: var(--al-space-3);
-  min-inline-size: 0;
   min-block-size: 44px;
-  box-sizing: border-box;
   padding: var(--al-space-2) var(--al-space-4);
   border: var(--al-border-width-thin) solid var(--al-color-border-default);
   border-radius: var(--al-radius-md);
-  background: var(--al-color-bg-surface);
-  color: var(--al-color-fg-default);
 }
 .nwd-nd.is-id {
   border-color: var(--al-color-border-strong);
@@ -203,63 +153,26 @@
   border-style: dashed;
   background: var(--al-color-bg-sunken);
 }
-.nwd-nd-name {
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.nwd-nd-r {
-  margin-inline-start: auto;
-  flex: none;
-  color: var(--al-color-fg-muted);
+.nwd-people {
+  flex-wrap: wrap;
 }
 .nwd-cap {
   margin-block: var(--al-space-3) var(--al-space-2);
-  color: var(--al-color-fg-muted);
-}
-.nwd-people {
-  flex-wrap: wrap;
-  gap: var(--al-space-2) var(--al-space-3);
-}
-.nwd-person {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--al-space-2);
-  min-inline-size: 0;
-  max-inline-size: 100%;
 }
 .nwd-chip-av {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
   inline-size: 24px;
   block-size: 24px;
-  border-radius: var(--al-radius-full);
   background: var(--al-color-accent-subtle);
-  border: var(--al-border-width-thin) solid var(--al-color-border-default);
   color: var(--al-color-accent-fg);
-  font-family: var(--al-font-family-mono);
-  font-size: 11px;
-  font-weight: var(--al-font-weight-bold);
+  font: var(--al-font-weight-bold) 11px var(--al-font-family-mono);
 }
 .nwd-chip-av.is-id {
   background: var(--al-color-accent-default);
-  border: 0;
   color: var(--al-color-bg-surface);
 }
 
-/* Narrow: a narrow card (container) or a narrow screen (600 px and under) shows the stack. */
-@container nwd (max-width: 560px) {
-  .nwd-wide {
-    display: none;
-  }
-  .nwd-stack {
-    display: flex;
-  }
-}
-@media (max-width: 600px) {
+/* A narrow card (or a narrow screen, where the card is narrow too) shows the stack. */
+@container (max-width: 560px) {
   .nwd-wide {
     display: none;
   }

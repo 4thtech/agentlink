@@ -303,30 +303,6 @@
 }
 
 /* Step 2: what the one confirmation also sets up (D-130 (2)), folded under the button. */
-.st-folders {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
-}
-.st-folders summary {
-  display: flex;
-  align-items: center;
-  min-block-size: 44px;
-  cursor: pointer;
-}
-.st-folders dl {
-  display: grid;
-  gap: var(--al-space-2);
-  margin: 0;
-}
-.st-folders dl div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--al-space-3);
-}
-.st-folders dd {
-  margin: 0;
-}
 
 /* Step 3: the Connected ✓ moment. */
 .st-done {

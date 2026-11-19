@@ -416,20 +416,17 @@ function ServerCard({
   return (
     <li className={`nw-srv${legacy ? ' is-old' : ''}`} data-state={s.state}>
       <div className="nw-srv-top">
-        <span className={`nw-dot ${DOT_SHAPE[s.state]}`} aria-hidden="true" />
+        <span className={`al-dot nw-dot ${DOT_SHAPE[s.state]}`} aria-hidden="true" />
         <span className="nw-host al-text-code" title={s.host}>
           {s.host}
         </span>
         <span className="nw-state al-text-body-sm">{S.health[s.state]}</span>
       </div>
       <div className="nw-meta al-text-body-sm al-muted">
-        <span className="nw-pill">{role}</span>
+        <span>{role}</span>
         {times.length === 0 ? null : <span>{times.join(' · ')}</span>}
         <span>{counted ? S.counts(s.publishedOk, s.publishedFailed, s.received) : S.noCounts}</span>
         {usedBy === null ? null : <span>{S.usedBy(usedBy)}</span>}
-        {s.publishedOk + s.publishedFailed > 0 ? (
-          <Bar ok={s.publishedOk} failed={s.publishedFailed} />
-        ) : null}
         <span>{s.lastOkAt === null ? S.neverOk : S.lastOk(agoText(s.lastOkAt, now))}</span>
       </div>
       {note === undefined ? null : <p className="al-text-body-sm nw-detail">{note}</p>}
@@ -440,18 +437,6 @@ function ServerCard({
         <p className="al-text-body-sm nw-detail">{S.needsPayment}</p>
       ) : null}
     </li>
-  );
-}
-
-/** Accepted versus failed in the last 24 hours: one small bar, never a number the text lacks. */
-function Bar({ ok, failed }: { readonly ok: number; readonly failed: number }): ReactElement {
-  const total = ok + failed;
-  const okPct = total === 0 ? 0 : Math.round((ok / total) * 100);
-  return (
-    <span className="nw-bar" role="img" aria-label={S.barLabel(ok, failed)}>
-      <i className={`nw-bar-ok nw-w${String(Math.round(okPct / 5))}`} />
-      <i className={`nw-bar-bad nw-w${String(20 - Math.round(okPct / 5))}`} />
-    </span>
   );
 }
 
@@ -497,7 +482,7 @@ function Reach({
               <div className="al-text-body-sm al-muted">
                 {S.contactServers(c.servers, c.shared)}
               </div>
-              <ul className="nw-hosts al-text-code">
+              <ul className="nw-hosts al-text-code al-muted">
                 {c.hosts.map((h) => (
                   <li
                     key={h}

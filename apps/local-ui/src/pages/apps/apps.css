@@ -129,9 +129,6 @@
   margin: 0;
   padding-left: var(--al-space-5);
 }
-.ap-error {
-  padding: var(--al-space-4);
-}
 @media (max-width: 600px) {
   .ap-entries {
     grid-template-columns: 1fr;

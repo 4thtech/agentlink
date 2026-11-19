@@ -15,11 +15,11 @@ import './diagram.css';
 
 /** Colour is never the only signal: each state has its own dot shape (see network.css). */
 export const DOT_SHAPE: Readonly<Record<ServerHealth, string>> = {
-  ready: 'is-filled',
+  ready: 'is-connected',
   slow: 'is-half',
-  unreachable: 'is-cross',
+  unreachable: 'is-not-running',
   blocked: 'is-square',
-  unknown: 'is-ring',
+  unknown: 'is-checking',
 };
 
 /** The most contacts drawn; the rest become "+ N more contacts". */
@@ -141,7 +141,14 @@ function SvgDot({
     case 'slow':
       return (
         <g>
-          <circle className="nwd-dot-ring is-warn" cx={cx} cy={cy} r={4.5} />
+          <circle
+            className="nwd-dot-ring is-warn"
+            fill="none"
+            strokeWidth={2}
+            cx={cx}
+            cy={cy}
+            r={4.5}
+          />
           <path
             className="nwd-dot-fill is-warn"
             d={`M${at(0, -4.5)} A4.5 4.5 0 0 0 ${at(0, 4.5)} Z`}
@@ -151,8 +158,19 @@ function SvgDot({
     case 'unreachable':
       return (
         <g>
-          <circle className="nwd-dot-ring is-warn" cx={cx} cy={cy} r={4.5} />
-          <path className="nwd-dot-slash" d={`M${at(-3.5, -3.5)} L${at(3.5, 3.5)}`} />
+          <circle
+            className="nwd-dot-ring is-warn"
+            fill="none"
+            strokeWidth={2}
+            cx={cx}
+            cy={cy}
+            r={4.5}
+          />
+          <path
+            className="nwd-dot-slash"
+            strokeWidth={2}
+            d={`M${at(-3.5, -3.5)} L${at(3.5, 3.5)}`}
+          />
         </g>
       );
     case 'blocked':
@@ -167,7 +185,9 @@ function SvgDot({
         />
       );
     case 'unknown':
-      return <circle className="nwd-dot-ring" cx={cx} cy={cy} r={4.5} />;
+      return (
+        <circle className="nwd-dot-ring" fill="none" strokeWidth={2} cx={cx} cy={cy} r={4.5} />
+      );
   }
 }
 
@@ -202,17 +222,19 @@ function Wide({
       viewBox={`0 0 ${String(width)} ${String(height)}`}
       width={width}
       height={height}
+      fontSize={11}
+      strokeLinecap="round"
       aria-hidden="true"
       focusable="false"
     >
-      <text className="nwd-h" x={ID_X} y={10}>
+      <text className="nwd-h" fontSize={10} x={ID_X} y={10}>
         {S.diagramHeadThisId}
       </text>
-      <text className="nwd-h" x={SRV_X} y={10}>
+      <text className="nwd-h" fontSize={10} x={SRV_X} y={10}>
         {S.diagramHeadServers}
       </text>
       {hasContacts ? (
-        <text className="nwd-h" x={CON_X} y={10}>
+        <text className="nwd-h" fontSize={10} x={CON_X} y={10}>
           {S.diagramHeadContacts}
         </text>
       ) : null}
@@ -220,6 +242,8 @@ function Wide({
         <path
           key={`l-${s.host}`}
           className={`nwd-ln ${lineClass(s)}`}
+          fill="none"
+          strokeWidth={2}
           d={curve(ID_X + ID_W, idY, SRV_X, srvY(i))}
         />
       ))}
@@ -228,16 +252,17 @@ function Wide({
           <path
             key={`c-${c.ref}-${String(si)}`}
             className="nwd-ln is-contact"
+            fill="none"
             d={curve(SRV_X + SRV_W, srvY(si), CON_X, conY(ci))}
           />
         )),
       )}
       <rect className="nwd-node is-id" x={ID_X} y={idY - 38} width={ID_W} height={76} rx={10} />
       <circle className="nwd-av is-id" cx={ID_X + 26} cy={idY - 2} r={13} />
-      <text className="nwd-av-t is-id" x={ID_X + 26} y={idY + 2} textAnchor="middle">
+      <text className="nwd-av-t is-id" fontSize={12} x={ID_X + 26} y={idY + 2} textAnchor="middle">
         {initial(label)}
       </text>
-      <text className="nwd-t" x={ID_X + 48} y={idY - 6}>
+      <text className="nwd-t" fontSize={13} x={ID_X + 48} y={idY - 6}>
         {clip(agent, 15)}
         <title>{agent}</title>
       </text>
@@ -257,7 +282,7 @@ function Wide({
               rx={8}
             />
             <SvgDot state={s.state} cx={SRV_X + 16} cy={top + 16} />
-            <text className="nwd-t is-code" x={SRV_X + 28} y={top + 20}>
+            <text className="nwd-t is-code" fontSize={12} x={SRV_X + 28} y={top + 20}>
               {clip(s.host, MAX_HOST_CHARS)}
               <title>{s.host}</title>
             </text>
@@ -280,10 +305,10 @@ function Wide({
               rx={8}
             />
             <circle className="nwd-av" cx={CON_X + 20} cy={cy} r={11} />
-            <text className="nwd-av-t" x={CON_X + 20} y={cy + 4} textAnchor="middle">
+            <text className="nwd-av-t" fontSize={11} x={CON_X + 20} y={cy + 4} textAnchor="middle">
               {initial(c.name)}
             </text>
-            <text className="nwd-t" x={CON_X + 38} y={cy + 4}>
+            <text className="nwd-t" fontSize={13} x={CON_X + 38} y={cy + 4}>
               {clip(c.name, MAX_NAME_CHARS)}
               <title>{c.name}</title>
             </text>
@@ -310,7 +335,7 @@ function Stack({
   return (
     <div className="nwd-stack">
       <div className="nwd-nd is-id">
-        <span className="nwd-chip-av is-id">{initial(label)}</span>
+        <span className="al-avatar nwd-chip-av is-id">{initial(label)}</span>
         <span className="nwd-nd-name">{S.diagramAgent(label)}</span>
         <span className="nwd-nd-r al-text-body-sm">{S.diagramThisComputer}</span>
       </div>
@@ -321,7 +346,7 @@ function Stack({
             className={`nwd-nd${s.kind === 'legacy' ? ' is-old' : ''}`}
             data-node-state={s.state}
           >
-            <span className={`nw-dot ${DOT_SHAPE[s.state]}`} />
+            <span className={`al-dot nw-dot ${DOT_SHAPE[s.state]}`} />
             <span className="nwd-nd-name al-text-code" title={s.host}>
               {s.host}
             </span>
@@ -333,11 +358,11 @@ function Stack({
       ))}
       {contacts.length === 0 ? null : (
         <>
-          <div className="nwd-cap al-text-label">{S.reaches(reach)}</div>
+          <div className="nwd-cap al-text-label al-muted">{S.reaches(reach)}</div>
           <div className="nwd-nd nwd-people">
             {contacts.map((c) => (
               <span key={c.ref} className="nwd-person" title={c.name}>
-                <span className="nwd-chip-av">{initial(c.name)}</span>
+                <span className="al-avatar nwd-chip-av">{initial(c.name)}</span>
                 <span className="nwd-nd-name">{c.name}</span>
               </span>
             ))}
@@ -369,15 +394,15 @@ function Legend({ showContact }: { readonly showContact: boolean }): ReactElemen
         </li>
       ) : null}
       <li>
-        <span className={`nw-dot ${DOT_SHAPE.ready}`} />
+        <span className={`al-dot nw-dot ${DOT_SHAPE.ready}`} />
         {S.legendWorking}
       </li>
       <li>
-        <span className={`nw-dot ${DOT_SHAPE.slow}`} />
+        <span className={`al-dot nw-dot ${DOT_SHAPE.slow}`} />
         {S.legendSlow}
       </li>
       <li>
-        <span className={`nw-dot ${DOT_SHAPE.unreachable}`} />
+        <span className={`al-dot nw-dot ${DOT_SHAPE.unreachable}`} />
         {S.legendDown}
       </li>
     </ul>

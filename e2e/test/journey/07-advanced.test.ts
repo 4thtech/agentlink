@@ -1,6 +1,6 @@
 // W4-SETTINGS-ADVANCED chapter 7, Advanced (W4 UX v2 three layers; A9 Settings, the Advanced group).
 // One owner on one computer. Under the hood on: the Advanced group appears in the menu, the live
-// activity stream, Relays & network and Diagnostics open in the same document (no reload), the
+// activity stream, Message network and Diagnostics open in the same document (no reload), the
 // diagnostics report copies without messages or keys, and reduced motion keeps fades only with no
 // layout shift. Settings (the list) and its Advanced rows are checked in the simple layer first.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -84,7 +84,7 @@ describe('chapter 7: advanced', () => {
       .getByRole('link', { name: /Live activity/ })
       .waitFor();
     // Rules and Proofs & credits are Settings pages now (asserted in the Settings list above).
-    for (const item of ['Relays & network', 'Diagnostics', 'Connections map']) {
+    for (const item of ['Message network', 'Diagnostics', 'Connections map']) {
       await sections(page).getByRole('link', { name: item }).waitFor();
     }
 
@@ -105,8 +105,8 @@ describe('chapter 7: advanced', () => {
     await page.getByRole('button', { name: 'Pause stream' }).click();
     await page.getByRole('button', { name: 'Resume stream' }).click();
 
-    await sections(page).getByRole('link', { name: 'Relays & network' }).click();
-    await page.getByRole('heading', { name: 'Relays & network', level: 1 }).waitFor();
+    await sections(page).getByRole('link', { name: 'Message network' }).click();
+    await page.getByRole('heading', { name: 'Message network', level: 1 }).waitFor();
     expect(await text(page)).not.toMatch(/wss?:\/\//);
 
     await sections(page).getByRole('link', { name: 'Connections map' }).click();
@@ -202,7 +202,7 @@ describe('chapter 7: advanced', () => {
     });
     expect(await bar.textContent()).not.toContain('Connected');
     await page.goto(new URL('/advanced/network', page.url()).href);
-    await page.getByRole('heading', { name: 'Relays & network', level: 1 }).waitFor();
+    await page.getByRole('heading', { name: 'Message network', level: 1 }).waitFor();
     await page.getByText(/^0 of \d+ connected$/).waitFor({ timeout: 30_000 });
     const advanced = await text(page);
     expect(advanced).not.toContain('Working');
@@ -211,9 +211,9 @@ describe('chapter 7: advanced', () => {
     // The relays come back: the app says so without a reload or a click.
     world.relays.setDown(false);
     await bar.getByText('Connected', { exact: true }).waitFor({ timeout: 30_000 });
-    // Relays & network reads once per visit: open it again for the new count.
+    // Message network reads once per visit: open it again for the new count.
     await page.reload();
-    await page.getByRole('heading', { name: 'Relays & network', level: 1 }).waitFor();
+    await page.getByRole('heading', { name: 'Message network', level: 1 }).waitFor();
     await page.getByText(/^[1-9]\d* of \d+ connected$/).waitFor({ timeout: 30_000 });
   }, 180_000);
 });

@@ -134,9 +134,6 @@
 .inv-note {
   margin: 0;
 }
-.inv-error {
-  color: var(--al-color-status-danger-fg);
-}
 .inv-details {
   display: flex;
   flex-direction: column;
