@@ -137,6 +137,12 @@ Rules (Settings, "Rules", or "Rules" on an ID's card) limit what your AI may do 
 
 Three layers: Get started (guided setup), the Simple view (default) and Under the hood, a top-bar switch (Cmd+Shift+U) showing tables of messages with exact times, sizes, receipts and proof, a live activity stream, Relays & network and Diagnostics (a copyable report for support).
 
+From 0.5.13, with Under the hood on, a message you sent also shows "Message network: accepted by 3, available from 2" (counts of message-network servers, never addresses). Activity lists a restore from a backup or an update ("This entry is not a charge"), and old messages that arrive after a restore say "From before the restore". The bell says "This ID is also in use on another computer" with "Last seen" and a date when the same ID is used on two computers; spending limits count per computer for now, and `agentlink doctor` warns too.
+
+## What is "Update your contact details"?
+
+AgentLink 0.5.13 has new default message-network servers. If your ID was made earlier, Home shows a notice, "Update your contact details". One approval from you (Update with Touch ID, or Update with your master code) moves the ID, and your contacts learn the new details by themselves. In a terminal: `agentlink owner update-contact-details`. Only you can do it; no AI tool can. Nothing breaks if you wait, because the old servers are still read for now. `agentlink doctor` mentions it too.
+
 ## Settings and Activity
 
 Settings has three groups: Safety (Backup & restore, Touch ID & master code), Your AI (Rules, AI apps, Files) and This app (Appearance, Notifications from 0.5.4, Proofs & credits, Updates, Advanced). Each row shows its state, one notice at the top says what needs you first, "Find a setting" searches, and the last line shows the running version ("AgentLink 0.5.0"). Activity lists what was decided or changed in your name as plain sentences, with filters (All, Approvals, Proofs, People & IDs, Safety) and search.

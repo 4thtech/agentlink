@@ -16,6 +16,8 @@ Activity is everything that was decided or changed in your name, by you or by yo
 
 <figure><img src="../../assets/screens/activity.webp" alt="Activity: four counts for the last 7 days, the filters All, Approvals, Proofs, People and IDs and Safety, and rows written as plain sentences."><figcaption><p>Activity: counts, filters and plain sentences.</p></figcaption></figure>
 
+Restores and updates. *New in 0.5.13.* After you restore an ID from a backup, or after an update starts the careful 24 hours, a row says **This ID was restored from a backup** or **AgentLink was updated on this computer**, with "This entry is not a charge." It has no amount; it only marks when AgentLink began asking you before anything that costs money. See [Back up and restore](backup-and-restore.md).
+
 **Someone else also answered your invite.** If a second person answers an invite you made, a row warns you and names the contact whose 12 digits to compare with. Read the digits to that person by phone or in person (see [Contact check](contacts.md)) before you trust the connection.
 
 A person the page can't name gets neutral words, never a blank. Nothing on this page changes anything. If it is empty, it says what will show up here.

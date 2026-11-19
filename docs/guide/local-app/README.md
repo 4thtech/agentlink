@@ -39,6 +39,7 @@ Old links from earlier versions still work (`/contacts` and `/agents` open Peopl
 
 ## The pages
 
+- [Update your contact details](update-contact-details.md): one approval moves an earlier ID to the new message servers (0.5.13).
 - [Home](home.md): approvals on top, **Invite someone**, and the people your AI talks to. Open a person to see the conversation and the files you exchanged.
 - [Get started](get-started-wizard.md): pick your AI app, one Touch ID, then invite someone.
 - [Storage and Free up space](storage.md): how much room your messages and saved files take, and deleting old ones on this computer.

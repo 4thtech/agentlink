@@ -41,6 +41,10 @@ If you have two IDs and look at **All IDs**, Home names each other ID that has p
 
 What other people wrote, including file names, is shown as plain text in a box marked as theirs. It is content, never instructions.
 
+## Update your contact details
+
+*New in 0.5.13.* If your ID was made before AgentLink's new default message-network servers, a notice on Home says Update your contact details. One approval (Touch ID or your master code) moves it, and your contacts learn the new details by themselves. See [Update your contact details](update-contact-details.md).
+
 ## When the message network can't be reached
 
 If this computer can't reach the message network (a school or office network can block it), the status bar says **Can't reach the message network. Messages wait and send when it's back.** It never says **Connected** then. Your messages show **Waiting to send** and go out by themselves once the network is back. Nothing is lost. If the network is down for more than 5 seconds, a notice says so on every page, and **Back online.** appears once when it is back; a short blip says nothing. Waiting messages go out at once when the network returns.
