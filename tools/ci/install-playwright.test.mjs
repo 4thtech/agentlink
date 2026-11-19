@@ -28,12 +28,12 @@ function step(name) {
 }
 
 describe('install-playwright action', () => {
-  it('restores the browser downloads with a pinned actions/cache keyed on OS, exact version and list', () => {
+  it('restores the browser downloads with a pinned actions/cache keyed on OS, arch, exact version and list', () => {
     const s = step('Restore the Playwright browsers');
     expect(s).toMatch(/uses: actions\/cache\/restore@[0-9a-f]{40} # v/);
     expect(s).toContain('path: ~/.cache/ms-playwright');
     expect(s).toMatch(
-      /key: playwright-\$\{\{ runner\.os \}\}-\$\{\{ steps\.version\.outputs\.version \}\}-\$\{\{ inputs\.browsers \}\}/,
+      /key: playwright-\$\{\{ runner\.os \}\}-\$\{\{ runner\.arch \}\}-\$\{\{ steps\.version\.outputs\.version \}\}-\$\{\{ inputs\.browsers \}\}/,
     );
   });
 

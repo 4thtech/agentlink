@@ -11539,3 +11539,8 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 #### CI-WINDOWS-TIMEOUT · Windows CI job finishes within its time limit (follow-up from 0.5.9)
 - **Status:** backlog · **Security:** S1 (S2 if `.github/**` changes) · **Spec:** `project/process/ci-cd.md`
 - **Goal:** the Windows job runs reliably within its timeout, with no skipped checks.
+
+#### CI-PLAYWRIGHT-CACHE · Playwright browser cache keyed on version, OS and arch (0.5.14)
+- **Status:** built for 0.5.14 (branch `rel0514/ci`) · **Security:** S1 (touches `.github/**`: reviewed as S2) · **Spec:** `project/process/ci-cd.md`
+- **Goal:** the browser download timed out (exit 124) three times in one week; browsers must come from a cache on almost every run.
+- **Done:** `install-playwright` keys the cache on OS, CPU architecture, the Playwright version read from `pnpm-lock.yaml` (package.json pin as fallback) and the browser list; on a hit the install step is a 60 s verification, on a miss it keeps the bounded download (240 s, one retry). Saves stay main-only; no check is skipped. Also: the e2e.yml hostile-suite modifier check now catches `.only`/`.skip`/`.each` mid-line and ignores comments and strings (`tools/ci/hostile-modifiers.mjs`, tested).

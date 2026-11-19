@@ -1,7 +1,7 @@
 name: Install Playwright browsers
 description: >-
   CHORE-CI-HARDEN-1, CHORE-CI-PLAYWRIGHT-2, CHORE-CI-PLAYWRIGHT-3. Restores the Playwright browser
-  downloads from a cache keyed by OS, exact Playwright version and browser list, downloads whatever
+  downloads from a cache keyed by OS, CPU architecture, exact Playwright version and browser list, downloads whatever
   is missing (no apt), and touches apt only when a browser needs a system library the runner lacks.
   The system packages apt needs come from a cache (each file checked against apt's signed index)
   so a slow Ubuntu mirror is rarely touched. Every network sub-step shares one deadline well inside
@@ -31,7 +31,13 @@ runs:
         set -euo pipefail
         BUDGET_SECONDS=510
         echo "deadline=$(( $(date +%s) + BUDGET_SECONDS ))" >> "$GITHUB_OUTPUT"
-        version="$(jq -r '(.devDependencies.playwright // .devDependencies["@playwright/test"] // "")' package.json | sed 's/^[^0-9]*//')"
+        # CI-PLAYWRIGHT-CACHE: the resolved version comes from pnpm-lock.yaml (the importer's `playwright`
+        # entry), so a range in package.json can never leave the cache key behind the installed browsers;
+        # the exact pin in package.json is the fallback.
+        version="$(awk '/^---$/{i=0;r=0;p=0} /^importers:/{i=1} i && /^  \.:/{r=1;next} r && /^  [^ ]/{r=0} r && /^      playwright:$/{p=1;next} p && /^        version: /{sub(/^        version: /,"");sub(/\(.*/,"");v=$0;p=0} END{print v}' pnpm-lock.yaml)"
+        if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          version="$(jq -r '(.devDependencies.playwright // .devDependencies["@playwright/test"] // "")' package.json | sed 's/^[^0-9]*//')"
+        fi
         if [ -z "$version" ]; then
           echo "::error::playwright is not a root devDependency; cannot key the browser cache."
           exit 1
@@ -58,7 +64,7 @@ runs:
         SEGMENT_DOWNLOAD_TIMEOUT_MINS: '1'
       with:
         path: ~/.cache/ms-playwright
-        key: playwright-${{ runner.os }}-${{ steps.version.outputs.version }}-${{ inputs.browsers }}
+        key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.version }}-${{ inputs.browsers }}
 
     # Browser binaries only (CDN download, no apt). On a cache hit this verifies and returns at once;
     # on a miss, or a partial cache, it downloads what is missing. Bounded, one retry.
@@ -67,11 +73,16 @@ runs:
       shell: bash
       env:
         BROWSERS: ${{ inputs.browsers }}
+        CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
         DEADLINE: ${{ steps.version.outputs.deadline }}
         BUDGET: ${{ github.action_path }}/budget.sh
       run: |
         set -euo pipefail
-        t="$(bash "$BUDGET" 240)"
+        # CI-PLAYWRIGHT-CACHE: on a hit the downloads are already on disk (the key holds the browser
+        # list), so this is only a quick verification (60 s); a miss gets the full 240 s per attempt.
+        cap=240
+        if [ "$CACHE_HIT" = "true" ]; then cap=60; fi
+        t="$(bash "$BUDGET" "$cap")"
         # shellcheck disable=SC2086 # BROWSERS is a fixed, space-separated list of browser names
         timeout -k 10 "$t" pnpm exec playwright install $BROWSERS || {
           echo "::warning::Playwright browser download failed once; retrying."
@@ -88,7 +99,7 @@ runs:
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ms-playwright
-        key: playwright-${{ runner.os }}-${{ steps.version.outputs.version }}-${{ inputs.browsers }}
+        key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.version }}-${{ inputs.browsers }}
 
     # Linux only: launch each browser once through Playwright's own API (probe.mjs). Playwright
     # validates its host requirements (system libraries, bundled library paths) at launch, so the
