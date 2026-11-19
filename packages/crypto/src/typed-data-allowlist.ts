@@ -4,9 +4,10 @@
 // (sign712Snapshot), so no generic path in the store signs a Record.
 //
 // The agent EVM key signs only AgentLink's own record, receipt, card and top-up formats. Every
-// KeyStore backend calls typedDataSnapshot(typedData, ownAddress, nowSeconds) before it reads a
-// seed, and signs the snapshot it returns, never the caller's object. Stateless: no counters, so
-// nothing to restore or sync. An OwnerSession's sign712 (cardSig, Registration) is not affected.
+// KeyStore backend checks the request before it reads a seed and signs the snapshot it returns,
+// never the caller's object: sign712 through sign712Snapshot (receipts, cards, top-ups; never a
+// Record), a Record only through signRecord with its ticket (recordSnapshot). Both build on the
+// module-internal typedDataSnapshot. Stateless: no counters, so nothing to restore or sync. An OwnerSession's sign712 (cardSig, Registration) is not affected.
 //
 // Allowed, with the exact types of @4thtech-io/crypto (field names, types and order) and exactly the
 // declared fields:
