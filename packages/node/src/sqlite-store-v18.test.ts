@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { STORE_SCHEMA_VERSION } from '@4thtech-io/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { replayMigrations } from './old-store.fixture.js';
 import { MIGRATIONS, STORE_APPLICATION_ID } from './sqlite-schema.js';
 import { SqliteStore } from './sqlite-store.js';
 
@@ -39,9 +40,7 @@ describe('schema version 18 (SEC-INVITE-CAPS)', () => {
 
   it('migrates a version 16 file through 17 (outgoing_log) to 18: invites read as the owner’s, contacts stay kept', async () => {
     const raw = new Database(path());
-    for (const m of MIGRATIONS.slice(0, 16)) {
-      for (const statement of m.statements) raw.prepare(statement).run();
-    }
+    replayMigrations(raw, 16);
     raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
     raw.pragma('user_version = 16');
     raw

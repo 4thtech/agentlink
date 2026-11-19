@@ -18,6 +18,7 @@ import {
 } from '@4thtech-io/core';
 import { encodeHex, encodeUtf8, sha256 } from '@4thtech-io/crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { replayMigrations } from './old-store.fixture.js';
 import {
   MIGRATIONS,
   STORE_APPLICATION_ID,
@@ -681,9 +682,7 @@ describe(
 
     it('migrates a version 13 file to version 14 (REL051-B2): invites kept, invite_link null', async () => {
       const raw = new Database(path());
-      for (const m of MIGRATIONS.slice(0, 13)) {
-        for (const statement of m.statements) raw.prepare(statement).run();
-      }
+      replayMigrations(raw, 13);
       raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
       raw.pragma('user_version = 13');
       raw
@@ -707,9 +706,7 @@ describe(
 
     it('migrates a version 12 file to version 13 (WP-13, F45): rows kept, version null', async () => {
       const raw = new Database(path());
-      for (const m of MIGRATIONS.slice(0, 12)) {
-        for (const statement of m.statements) raw.prepare(statement).run();
-      }
+      replayMigrations(raw, 12);
       raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
       raw.pragma('user_version = 12');
       // A row an older `agentlink mcp` wrote (no version column yet), and the other heartbeat rows.
@@ -775,9 +772,7 @@ describe(
       // The process that wrote the row keeps running the older code after the update: the migration
       // only appends a nullable column, so its later writes (named columns, no version) still work.
       const raw = new Database(path());
-      for (const m of MIGRATIONS.slice(0, 12)) {
-        for (const statement of m.statements) raw.prepare(statement).run();
-      }
+      replayMigrations(raw, 12);
       raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
       raw.pragma('user_version = 12');
       raw.close();
@@ -808,9 +803,7 @@ describe(
       async (withIdentity) => {
         const file = `${path()}-${withIdentity ? 'updated' : 'new'}`;
         const raw = new Database(file);
-        for (const m of MIGRATIONS.slice(0, 10)) {
-          for (const statement of m.statements) raw.prepare(statement).run();
-        }
+        replayMigrations(raw, 10);
         raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
         raw.pragma('user_version = 10');
         if (withIdentity) {
@@ -839,9 +832,7 @@ describe(
 
     it('migrates a version 11 file to version 12 (W4-PAUSE): rows kept, not paused', async () => {
       const raw = new Database(path());
-      for (const m of MIGRATIONS.slice(0, 11)) {
-        for (const statement of m.statements) raw.prepare(statement).run();
-      }
+      replayMigrations(raw, 11);
       raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
       raw.pragma('user_version = 11');
       raw.prepare('INSERT INTO "mcp_last_seen" ("app", "last_seen_at") VALUES (?, 1)').run('codex');
@@ -867,9 +858,7 @@ describe(
 
     it('migrates a version 9 file to version 10 (D-143): rows kept, the heartbeat tables empty', async () => {
       const raw = new Database(path());
-      for (const m of MIGRATIONS.slice(0, 9)) {
-        for (const statement of m.statements) raw.prepare(statement).run();
-      }
+      replayMigrations(raw, 9);
       raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
       raw.pragma('user_version = 9');
       raw
@@ -906,9 +895,7 @@ describe(
 
     it('migrates a version 7 file to version 8 (W4-SHORT-INVITE): invites kept, drop columns null', async () => {
       const raw = new Database(path());
-      for (const m of MIGRATIONS.slice(0, 7)) {
-        for (const statement of m.statements) raw.prepare(statement).run();
-      }
+      replayMigrations(raw, 7);
       raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
       raw.pragma('user_version = 7');
       raw
@@ -930,9 +917,7 @@ describe(
 
     it('migrates a version 8 file to version 9 (D-141): contacts and invites kept, the former-name columns null', async () => {
       const raw = new Database(path());
-      for (const m of MIGRATIONS.slice(0, 8)) {
-        for (const statement of m.statements) raw.prepare(statement).run();
-      }
+      replayMigrations(raw, 8);
       raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
       raw.pragma('user_version = 8');
       raw
@@ -980,9 +965,7 @@ describe(
 
     it('migrates a version 6 file to version 7 (U3-d): every row kept, local_owner_actions added', async () => {
       const raw = new Database(path());
-      for (const m of MIGRATIONS.slice(0, 6)) {
-        for (const statement of m.statements) raw.prepare(statement).run();
-      }
+      replayMigrations(raw, 6);
       raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
       raw.pragma('user_version = 6');
       raw
@@ -1036,9 +1019,7 @@ describe(
     it('migrates a version 5 file to version 6 (MSG-FILES-IO-b): files rows kept with saved_name null', async () => {
       // A file as the version 5 code left it: the frozen v1 to v5 statements and user_version 5.
       const raw = new Database(path());
-      for (const m of MIGRATIONS.slice(0, 5)) {
-        for (const statement of m.statements) raw.prepare(statement).run();
-      }
+      replayMigrations(raw, 5);
       raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
       raw.pragma('user_version = 5');
       const insert = raw.prepare(
@@ -1101,9 +1082,7 @@ describe(
     it('migrates a version 4 file to version 5 (M1-9i-a): rows kept, own_storage added (one row)', async () => {
       // A file as the version 4 code left it: the frozen v1 to v4 statements and user_version 4.
       const raw = new Database(path());
-      for (const m of MIGRATIONS.slice(0, 4)) {
-        for (const statement of m.statements) raw.prepare(statement).run();
-      }
+      replayMigrations(raw, 4);
       raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
       raw.pragma('user_version = 4');
       raw
@@ -1132,9 +1111,7 @@ describe(
     it('migrates a version 3 file to version 4 (M1-1g-i): files rows kept with delete_after null', async () => {
       // A file as the version 3 code left it: the frozen v1 to v3 statements and user_version 3.
       const raw = new Database(path());
-      for (const m of MIGRATIONS.slice(0, 3)) {
-        for (const statement of m.statements) raw.prepare(statement).run();
-      }
+      replayMigrations(raw, 3);
       raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
       raw.pragma('user_version = 3');
       raw
@@ -1170,9 +1147,7 @@ describe(
     it('migrates a version 2 file to version 3 (M1-7k-b): rows kept, publisher_lease and outbox_staged added', async () => {
       // A file as the version 2 code left it: the frozen v1 and v2 statements and user_version 2.
       const raw = new Database(path());
-      for (const m of MIGRATIONS.slice(0, 2)) {
-        for (const statement of m.statements) raw.prepare(statement).run();
-      }
+      replayMigrations(raw, 2);
       raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
       raw.pragma('user_version = 2');
       raw
@@ -1221,7 +1196,7 @@ describe(
     it('migrates a version 1 file to version 2 (D-72): rows kept, new columns null, blocked_keys added', async () => {
       // A file as the version 1 code left it: the frozen v1 statements and user_version 1.
       const raw = new Database(path());
-      for (const statement of MIGRATIONS[0]?.statements ?? []) raw.prepare(statement).run();
+      replayMigrations(raw, 1);
       raw.pragma(`application_id = ${STORE_APPLICATION_ID}`);
       raw.pragma('user_version = 1');
       raw
