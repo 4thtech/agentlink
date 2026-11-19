@@ -287,13 +287,25 @@ const nonceRow = (signed: SignedOwnerAction, actionHash: string, now: number) =>
  */
 function freshLedgerIfBroken(tx: StoreTx, now: number): void {
   if (budgetLedgerSummable(tx, now)) return;
-  const state = tx.select('budget_state')[0];
-  const epochs = tx
-    .select('budget_ledger')
-    .map((r) => r.ledger_epoch)
-    .filter((e) => Number.isSafeInteger(e) && e >= 0);
-  if (state !== undefined && Number.isSafeInteger(state.ledger_epoch))
-    epochs.push(state.ledger_epoch);
+  // A record that cannot be read (a read error) also gets a fresh epoch, so the owner's save still
+  // applies. That spends nothing: while the read error lasts, every paid action is still refused
+  // (readBudgetLedgerOrBroken). An epoch at or past the highest safe integer (corruption only) is
+  // left out, so such a row stays in a later epoch and keeps the record refused (fail closed).
+  const usable = (e: unknown): e is number =>
+    typeof e === 'number' && Number.isSafeInteger(e) && e >= 0 && e < Number.MAX_SAFE_INTEGER;
+  const epochs: number[] = [];
+  try {
+    for (const r of tx.select('budget_ledger'))
+      if (usable(r.ledger_epoch)) epochs.push(r.ledger_epoch);
+  } catch {
+    // unreadable rows: see above
+  }
+  try {
+    const state = tx.select('budget_state')[0];
+    if (state !== undefined && usable(state.ledger_epoch)) epochs.push(state.ledger_epoch);
+  } catch {
+    // unreadable state: replaced below
+  }
   const fresh = {
     status: 'ok' as const,
     ledger_epoch: (epochs.length === 0 ? 0 : Math.max(...epochs)) + 1,
@@ -1301,8 +1313,11 @@ export class OwnerActions {
       key,
       computeActionDigest(signed.body.params.policy),
     );
-    const now = base.now;
     const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      // R2-M1 (0.5.12 rule): the clock is read inside the transaction that checks the spending
+      // record, so a proof reserved while this save was verified can never make a healthy record
+      // look unsummable (and be reset) at an earlier `now`.
+      const now = nowOf(this.#ctx);
       if (tx.get('owner_action_nonces', { nonce: signed.body.nonce }) !== undefined) {
         return refused('policy.set', 'nonce_used');
       }
