@@ -1,5 +1,13 @@
 # @4thtech-io/storage
 
+## 0.5.14
+
+### Patch Changes
+
+- Updated dependencies [4a3c0eb]
+  - @4thtech-io/crypto@0.5.14
+  - @4thtech-io/log@0.5.14
+
 ## 0.5.13
 
 ### Patch Changes

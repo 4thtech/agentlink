@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [0.5.14] - 2026-11-19
+
+### Added
+
+- Message network view, back end (NET-PROBE, NET-STATS, NET-ROUTE, S1, D-157, 07 §3.2 and §4.3, 08 §1): the app can check each of your message-network servers from this computer while Advanced › Message network is open (connect time, round trip, sign-in and payment flags), keeps per-server counters for the last day (store version 23, counters only, your own and the old read-only servers only), and serves them at `GET /api/ui/network` with a `network` live event. Server hosts appear under the hood only; contacts' hosts only when you expand them. Nothing changes for anyone who never opens Under the hood.
+- Under the hood, Advanced is now "Message network" and shows a live view of the servers your messages travel through: each server's health, speed, 24 hour counts, last success and how many contacts use it, plus how many of your contacts share a server with you and an optional list of their servers. The status strip links to it. Nothing changes without Under the hood (NET-UI-A, S1, 08 §1).
+- The Message network page warns when updating your contact details would drop servers from a list longer than 8 (REL0514, S1, 08 §1).
+
+### Changed
+
+- The user guide, README, status page, security model and knowledge base describe AgentLink 0.5.13: delivery details, restore entries, the notice for an ID in use on another computer, "Update your contact details" (a new guide page) and the new default message servers (DOCS-REL-0513, S0).
+- The user guide, README, status page, security model and knowledge base describe what AgentLink 0.5.14 adds (the live Message network view, the KeyStore proof gate, "Save your limits again"), call Advanced "Message network" instead of "Relays & network", and give the right release dates for 0.5.10 (18 Nov 2026) and 0.5.13 (19 Nov 2026) (DOCS-REL-0514, S0).
+- Your own message-network server list now holds 2 to 8 servers (D-157 (2), 07 §4.3): a new or changed list outside that is refused, and the contact-details update keeps the first 8 of your own entries (Under the hood says how many it would leave out) and fills up to 8. Contacts' lists keep their limit of 16.
+
+### Fixed
+
+- When AgentLink can't read your spending record, a proof is now refused at once with "save your limits again in Settings › Rules", instead of asking for an approval that could not let it through (BUDGET-BROKEN-UX, S1, 06 §3, 07 §3.5, 11 §5.11).
+- Saving your rules again now always recovers a spending record AgentLink can't check (for example after the computer's clock was ahead), and Settings › Rules shows "Save your limits again" with a "Save again" button that works with nothing changed; owner presence as for any save (BUDGET-RECOVER, S2, 06 §3, 07 §3.5, 11 §5.11).
+- A contact-details update that no message server accepted the first time is published again by the next pass (CARD-UPDATE-FAILED-STATE, S1, 07 §4.3).
+- The notice that an ID is in use on another computer stays in Notifications even when 200 newer items fill the list (REL0514-DEVICES-CAP, S1).
+- Tests: the later count update of a delivery has its own core test (DELIVERY-COUNTS-TEST, S0); the first-launch journey counts layout shift after fonts and the first paint settle, with the same budget (REL0514-CLS-SETTLE, S0).
+
+### Security
+
+- The key store itself now guards proof signing (SEC-KEYSTORE-RECORD-GATE, S2, D-156; 04 §3.1.1, 07 §3.5). A proof record is signed only with a single-use ticket bound to exactly that record, which AgentLink asks for only in the step that sets the fee aside in your spending budget; a ticket never signs a second record or the same one twice, and no other signing path signs a proof record.
+
 ## [0.5.13] - 2026-11-19
 
 ### Added
@@ -1457,7 +1483,8 @@ M0 Foundations: specifications (spec pack v0.3), development and audit process, 
 
 - Audit of the CI and release workflows: actions pinned to full commit SHAs, least-privilege token permissions per job, no untrusted event data in scripts, no long-lived npm token, and publishing only from `main` through GitHub Environments with provenance.
 
-[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.13...HEAD
+[Unreleased]: https://github.com/4thtech/agentlink/compare/v0.5.14...HEAD
+[0.5.14]: https://github.com/4thtech/agentlink/compare/v0.5.13...v0.5.14
 [0.5.13]: https://github.com/4thtech/agentlink/compare/v0.5.12...v0.5.13
 [0.5.12]: https://github.com/4thtech/agentlink/compare/v0.5.11...v0.5.12
 [0.5.11]: https://github.com/4thtech/agentlink/compare/v0.5.10...v0.5.11

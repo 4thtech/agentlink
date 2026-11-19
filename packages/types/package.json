@@ -1,6 +1,6 @@
 {
   "name": "@4thtech-io/types",
-  "version": "0.5.13",
+  "version": "0.5.14",
   "private": true,
   "description": "Shared types and zod schemas.",
   "license": "MIT",

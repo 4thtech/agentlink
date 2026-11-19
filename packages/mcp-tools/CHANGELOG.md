@@ -1,5 +1,20 @@
 # @4thtech-io/mcp-tools
 
+## 0.5.14
+
+### Patch Changes
+
+- 4a3c0eb: A proof asked while the spending record cannot be read is refused up front with plain wording and the way to save the limits again (BUDGET-BROKEN-UX). A card-update whose first pass was not accepted is published again by the next pass (CARD-UPDATE-FAILED-STATE). The "in use on another computer" notice is never dropped by the 200-item cap of Notifications.
+- Updated dependencies [4a3c0eb]
+- Updated dependencies [4a3c0eb]
+- Updated dependencies [4a3c0eb]
+- Updated dependencies [4a3c0eb]
+  - @4thtech-io/types@0.5.14
+  - @4thtech-io/core@0.5.14
+  - @4thtech-io/crypto@0.5.14
+  - @4thtech-io/chain@0.5.14
+  - @4thtech-io/log@0.5.14
+
 ## 0.5.13
 
 ### Patch Changes
