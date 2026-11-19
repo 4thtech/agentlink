@@ -11,14 +11,19 @@ describe('the Message network server list', () => {
     const list = networkServerList(own, LEGACY_READ_RELAYS);
     expect(list.map((s) => s.kind)).toEqual(['own', 'own', 'legacy', 'legacy']);
     expect(list.map((s) => s.relay)).toEqual([...own, ...LEGACY_READ_RELAYS]);
-    const overlap = networkServerList([LEGACY_READ_RELAYS[0] as string, own[0] as string], LEGACY_READ_RELAYS);
+    const overlap = networkServerList(
+      [LEGACY_READ_RELAYS[0] as string, own[0] as string],
+      LEGACY_READ_RELAYS,
+    );
     expect(overlap.filter((s) => s.relay === LEGACY_READ_RELAYS[0])).toHaveLength(1);
     expect(overlap[0]?.kind).toBe('own');
   });
 
   it('is automatic while every own server is a default one', () => {
     expect(networkMode([...DEFAULT_RELAYS])).toBe('automatic');
-    expect(networkMode([DEFAULT_RELAYS[0] as string, DEFAULT_RELAYS[1] as string])).toBe('automatic');
+    expect(networkMode([DEFAULT_RELAYS[0] as string, DEFAULT_RELAYS[1] as string])).toBe(
+      'automatic',
+    );
     expect(networkMode([DEFAULT_RELAYS[0] as string, 'wss://mine.example.org'])).toBe('custom');
   });
 

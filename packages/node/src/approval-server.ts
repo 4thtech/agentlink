@@ -466,6 +466,11 @@ import {
 } from './local-ui/routes.js';
 import { createHealthReader } from './local-ui/api/health.js';
 import { networkHealthSource, type NetworkHealthClient } from './local-ui/network-health.js';
+import {
+  createNetworkReader,
+  type NetworkViewClient,
+  type NetworkViewReader,
+} from './local-ui/network-view.js';
 import { LiveEvents, type LiveEventSink } from './local-ui/api/events.js';
 import { LiveStatusTracker, liveAgentRecord } from './local-ui/live-status.js';
 import {
@@ -1757,6 +1762,23 @@ export async function startApprovalServerWith(
   /** U3-g-c: the app host's list-only AI apps reader, for while no agent is open (read-only). */
   const noAgentAiApps: LocalUiAiApps | undefined = listOnlyAiApps(options.host?.aiAppsList);
   let agentLabel: string | undefined;
+  /**
+   * NET-ROUTE: one bounded network view reader per open agent's client (network-view.ts), shared by
+   * `GET /api/ui/network` and the live `network` event, so a switch starts a fresh one.
+   */
+  const networkReaders = new WeakMap<object, NetworkViewReader>();
+  const networkReaderOf = (client: unknown): NetworkViewReader | undefined => {
+    const network = (client as Partial<NetworkViewClient> | undefined)?.network;
+    if (typeof client !== 'object' || client === null || typeof network?.probe !== 'function') {
+      return undefined;
+    }
+    let reader = networkReaders.get(client);
+    if (reader === undefined) {
+      reader = createNetworkReader(client as NetworkViewClient, { now: () => now() });
+      networkReaders.set(client, reader);
+    }
+    return reader;
+  };
   /** U3-c: the app host, when this server is one (created once every gate below exists). */
   let host: AppHostSlot | undefined = undefined;
   /** U3-c: the host hold of each mutating request in flight, for the re-check before acting. */
@@ -1837,12 +1859,16 @@ export async function startApprovalServerWith(
         readClient === undefined
           ? undefined
           : await widgetActivityMark(readClient, uiContext.notifications, now(), widgetMarkMemo);
+      // NET-ROUTE: the open ID's network mark (counters and finished probes; numbers only), compared
+      // by the hub for the `network` event, never sent.
+      const networkMark = client === undefined ? undefined : await networkReaderOf(client)?.mark();
       return {
         generation: list.generation,
         current: list.current,
         agents: list.agents.map(liveAgentRecord),
         contactsMark,
         activityMark,
+        networkMark,
       };
     },
     now,
@@ -2311,6 +2337,13 @@ export async function startApprovalServerWith(
         startedAt: serverStartedAt,
         now: () => now(),
       }),
+      // NET-ROUTE: the Message network view read (bounded probe, counters, contact reach).
+      ...(() => {
+        const reader = networkReaderOf(agentUi?.client);
+        return reader === undefined
+          ? {}
+          : { network: (o: { readonly contactHosts: boolean }) => reader.read(o) };
+      })(),
       // U3-c: the Agents list, in the app host only.
       ...(options.host === undefined ? {} : { agents: { list: () => listAgents() } }),
       ...(peopleAllDesk === undefined ? {} : { peopleAll: peopleAllDesk }),

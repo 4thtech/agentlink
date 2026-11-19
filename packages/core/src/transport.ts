@@ -28,6 +28,7 @@ import {
   type ReadbackOptions,
   type ReadbackOutcome,
   type RelayConnector,
+  type RelayProbeResult,
   SyncEngine,
   type EnvelopeHandler,
   type SyncIdentity,
@@ -119,6 +120,14 @@ export interface Transport {
    */
   relayStatus?(relays: readonly string[]): Promise<RelayStatus>;
   /**
+   * NET-PROBE: how each of `relays` answers from here now (RelayPool.probe: a fresh connection each,
+   * no login, connect and round-trip times, sign-in and payment flags). Distinct relays, at most 32,
+   * in parallel; never rejects. Fixed outcomes only: never relay text. Optional.
+   */
+  relayProbe?(
+    relays: readonly string[],
+  ): Promise<readonly { readonly relay: string; readonly result: RelayProbeResult }[]>;
+  /**
    * Closes every relay connection and ends what waits on one. Idempotent. Optional: a transport
    * that holds nothing open has nothing to close. A one-shot command calls it so the process can
    * end (an idle pooled connection otherwise keeps the process alive for minutes).
@@ -202,6 +211,12 @@ export function nostrTransport(options: NostrTransportOptions): TransportFactory
           }),
         );
         return { connected: open.filter(Boolean).length, total: unique.length };
+      },
+      relayProbe: async (relays) => {
+        const unique = [...new Set(relays)].slice(0, MAX_STATUS_RELAYS);
+        return Promise.all(
+          unique.map(async (relay) => ({ relay, result: await pool.probe(relay) })),
+        );
       },
       sync: (sync) =>
         engineFor(sync.persistence).sync({

@@ -29,6 +29,7 @@ import {
   type CreatedInvite,
 } from './pairing.js';
 import { RequestsQueue } from './requests.js';
+import { NetworkService } from './network.js';
 import { OutboxService } from './outbox.js';
 import { AgentPause } from './agent-pause.js';
 import { McpSession } from './mcp-session.js';
@@ -205,6 +206,8 @@ export class AgentLinkClient {
   readonly idempotency: IdempotencyService;
   /** The outbox: staged envelopes, delivery passes and retries (M1-7k; 07 §3.2, §4.2). */
   readonly outbox: OutboxService;
+  /** NET-ROUTE (08 §1 Message network): the read-only network view (servers, probe, counters). */
+  readonly network: NetworkService;
   /**
    * W4-PAUSE (D-143 (5); 06 §6 "Paused agents"; 07 §3.2 `agent_pause`): the owner's pause of this
    * agent. Only the app host's pause kind calls `pause()`; only a verified `agent.resume` ends it.
@@ -325,6 +328,8 @@ export class AgentLinkClient {
     this.requests = new RequestsQueue(ctx);
     // W4-PAUSE: nothing is published while the agent is paused (queued rows wait).
     this.outbox = new OutboxService(ctx, this.identity, this.contacts, transport, this.pause);
+    // NET-ROUTE: the Message network view's reads (read-only; no MCP tool reaches them, I-4).
+    this.network = new NetworkService(ctx, this.identity, this.contacts, this.outbox, this.pause);
     this.removal = new AgentRemovalService(ctx, {
       identity: this.identity,
       contacts: this.contacts,

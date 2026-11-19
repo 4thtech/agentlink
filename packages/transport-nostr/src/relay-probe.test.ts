@@ -112,7 +112,10 @@ describe('RelayPool.probe (NET-PROBE)', () => {
     net.configure(none, { nip11Body: null });
     net.configure(hang, { nip11Hang: true });
     net.configure(huge, {
-      nip11Body: JSON.stringify({ limitation: { payment_required: true }, pad: 'x'.repeat(70_000) }),
+      nip11Body: JSON.stringify({
+        limitation: { payment_required: true },
+        pad: 'x'.repeat(70_000),
+      }),
     });
     const results: RelayProbeResult[] = [];
     for (const relay of [none, hang, huge]) {
@@ -138,7 +141,9 @@ describe('RelayPool.probe (NET-PROBE)', () => {
     expect(out).toEqual([]);
     await vi.advanceTimersByTimeAsync(1);
     expect(out).toHaveLength(2);
-    const byConnect = out.sort((a, b) => (a.connectMs === null ? -1 : b.connectMs === null ? 1 : 0));
+    const byConnect = out.sort((a, b) =>
+      a.connectMs === null ? -1 : b.connectMs === null ? 1 : 0,
+    );
     expect(byConnect[0]).toMatchObject({ state: 'timeout', connectMs: null, roundTripMs: null });
     expect(byConnect[1]?.state).toBe('timeout');
     expect(byConnect[1]?.connectMs).not.toBeNull();

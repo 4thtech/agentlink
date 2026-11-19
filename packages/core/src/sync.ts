@@ -65,6 +65,7 @@ import type { InboxCounts, InboxItem, InboxService } from './inbox.js';
 import type { OutboxService } from './outbox.js';
 import type { OwnerActions } from './owner-actions.js';
 import { policyLimits } from './policy-engine.js';
+import { RelayTally, recordRelayStats } from './relay-stats.js';
 import { readRestoreState, type RestoreState } from './restore-guard.js';
 import type { StoreTx } from './store/store.js';
 
@@ -145,6 +146,8 @@ export interface InboxSubscription {
 
 /** The admission limit of a live subscription is read again at most this often (seconds). */
 const LIVE_LIMIT_REFRESH_SECONDS = 60;
+/** NET-STATS: a live subscription writes its per-server counters at most this often. */
+const LIVE_STATS_FLUSH_SECONDS = 60;
 
 /** The fetch-only catch-up's answer (M1-7h addendum): counts only. */
 export interface CatchUpResult extends InboxCounts {
@@ -456,9 +459,22 @@ export class SyncService {
 
     const inflight = new Set<Promise<SyncDisposition>>();
     let restoreOnce: Promise<RestoreState> | undefined;
+    // NET-STATS: wraps each server served, tallied in memory and written at most once a minute.
+    let liveTally = new RelayTally();
+    let liveTallyAt = nowOf(this.#ctx);
+    const noteLive = (relay: string): void => {
+      liveTally.received(relay);
+      const now = nowOf(this.#ctx);
+      if (now - liveTallyAt < LIVE_STATS_FLUSH_SECONDS) return;
+      const tally = liveTally;
+      liveTally = new RelayTally();
+      liveTallyAt = now;
+      void recordRelayStats(this.#ctx, relays, tally);
+    };
     const onEnvelope = (item: SyncItem): Promise<SyncDisposition> => {
       // After close nothing touches the store: the wrap is left for the next pass (not marked seen).
       if (closed) return Promise.resolve('retry');
+      noteLive(item.relay);
       const run = (async (): Promise<SyncDisposition> => {
         const limitValue = await limitNow();
         // RESTORE-TRACES: read once for the subscription, not per envelope.
@@ -545,7 +561,10 @@ export class SyncService {
 
     let stored = 0;
     const dropped = new Map<string, number>();
+    // NET-STATS: per-server results of this pass, written once at its end (relay-stats.ts).
+    const tally = new RelayTally();
     const onEnvelope = async (item: SyncItem): Promise<SyncDisposition> => {
+      tally.received(item.relay);
       const outcome = await this.#handle(item, limit, restore);
       if (outcome.stored) stored += 1;
       if (outcome.rateLimited !== undefined) {
@@ -568,6 +587,8 @@ export class SyncService {
       this.#ctx.log.warn('inbox fetch failed', { relays: relays.length });
       result = undefined;
     }
+    if (result !== undefined) tally.sync(result.relays);
+    if (!tally.empty) await recordRelayStats(this.#ctx, relays, tally);
     const rateLimited = [...dropped]
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .map(([contactId, n]) => ({ contactId, dropped: n }));

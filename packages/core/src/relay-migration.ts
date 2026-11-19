@@ -4,7 +4,8 @@
 // - Detection. An ID needs the migration when its stored card relay list holds any legacy relay.
 // - The migrated list. Legacy entries are removed; every relay the user had otherwise is kept, in its
 //   order; then the default relays not yet present are added, in order, while the list holds fewer
-//   than MAX_RELAYS entries. The result always holds MIN_RELAYS to MAX_RELAYS distinct entries.
+//   than MAX_OWN_RELAYS (8) entries. The result always holds MIN_RELAYS to MAX_OWN_RELAYS distinct
+//   entries (07 §4.3 "Counts": an own list holds 2 to 8; owner D2, 19 Nov 2026).
 // - The change itself is a rotation to keyEpoch + 1 (identity.rotate({relays})), signed by the owner
 //   with presence in an owner surface only. No MCP tool reaches it (I-4). Contacts learn the new card
 //   through card-update, which during the transition is ALSO published to the legacy relays
@@ -17,7 +18,7 @@ import {
   LEGACY_CARD_UPDATE_UNTIL,
   LEGACY_READ_RELAYS,
 } from '@4thtech-io/transport-nostr';
-import { MAX_RELAYS, MIN_RELAYS } from '@4thtech-io/types';
+import { MAX_OWN_RELAYS, MIN_RELAYS } from '@4thtech-io/types';
 
 /** Whether a relay list still names a relay the default set dropped. */
 export function needsRelayMigration(
@@ -36,16 +37,19 @@ export function migratedRelays(
   const defaults = options.defaults ?? DEFAULT_RELAYS;
   if (!needsRelayMigration(relays, legacy)) return Object.freeze([...relays]);
   const out: string[] = [];
-  for (const r of relays) if (!legacy.includes(r) && !out.includes(r)) out.push(r);
+  for (const r of relays) {
+    if (out.length >= MAX_OWN_RELAYS) break;
+    if (!legacy.includes(r) && !out.includes(r)) out.push(r);
+  }
   for (const r of defaults) {
-    if (out.length >= MAX_RELAYS) break;
+    if (out.length >= MAX_OWN_RELAYS) break;
     if (!out.includes(r) && !legacy.includes(r)) out.push(r);
   }
   if (out.length < MIN_RELAYS) {
     // Only reachable with a default set smaller than MIN_RELAYS; never a list the card refuses.
     throw new Error('relay migration: the default set is too small');
   }
-  return Object.freeze(out.slice(0, MAX_RELAYS));
+  return Object.freeze(out.slice(0, MAX_OWN_RELAYS));
 }
 
 /** What an ID's relay migration is: nothing to do, or the list its next card would carry. */

@@ -20,7 +20,7 @@ import {
   type OwnerPublicKeys,
   type TypedData,
 } from '@4thtech-io/crypto';
-import { displayNameSchema, relayListSchema } from '@4thtech-io/types';
+import { MAX_OWN_RELAYS, MIN_RELAYS, displayNameSchema, relayListSchema } from '@4thtech-io/types';
 import { CoreError } from './errors.js';
 
 /** A card with its signatures as the store keeps it, sealed in `agent_card_json` (07 §3, M-3). */
@@ -213,6 +213,23 @@ export function checkRelays(relays: unknown): readonly string[] {
   const parsed = relayListSchema.safeParse(relays);
   if (!parsed.success) throw new CoreError('relays_invalid', 'The relay list is not valid.');
   return Object.freeze([...parsed.data]);
+}
+
+/**
+ * The agent's own relay list (07 §4.3 "Counts"; owner D2, 19 Nov 2026): the relay URL rule on every
+ * entry and 2 to 8 distinct entries. A new card's list, or a changed one, must pass it; a list
+ * stored before keeps the card bound (checkRelays) so an existing ID still opens.
+ */
+export function checkOwnRelays(relays: unknown): readonly string[] {
+  const list = checkRelays(relays);
+  if (
+    list.length < MIN_RELAYS ||
+    list.length > MAX_OWN_RELAYS ||
+    new Set(list).size !== list.length
+  ) {
+    throw new CoreError('relays_invalid', 'The relay list is not valid.');
+  }
+  return list;
 }
 
 export function parseCard(card: unknown): AgentCard {

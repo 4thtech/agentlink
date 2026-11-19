@@ -11425,6 +11425,22 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Status:** built for 0.5.13 (releasing) · **Security:** S2 · **Spec:** 04 §2.5, §2.6; 06 §8; 07 §4.3; 08 §1; 11 §5.13
 - **Done:** an ID whose card lists a dropped server moves to the current set with one owner approval ("Update your contact details" on Home, `agentlink owner update-contact-details`): a rotation to the next key epoch with the migrated list, signed with owner presence, no AI path. Card-updates also go to the legacy relays until 2027-01-31 and count as sent only on an acknowledgement from a non-legacy relay. `agentlink doctor` mentions it.
 
+#### NET-PROBE · Check each message-network server from this computer (0.5.14)
+- **Status:** built for 0.5.14 (branch `rel0514/net-backend`) · **Security:** S1 · **Spec:** D-157; 07 §4.3 "Message network view"; 04 §4
+- **Done:** `RelayPool.probe` (fresh connection, no login, one REQ for a random id, NIP-11 with its own bound): connect time, round trip, sign-in and payment flags, fixed state; relay URL rule and address check; 5 s bound, shares the read-back slots, never queues. Core probes only the own and legacy servers, never while paused; the app probes at most every 15 s and only while the view is read. Own list bounded to 2 to 8 (`MAX_OWN_RELAYS`, D-157 (2)).
+
+#### NET-STATS · Per-server counters for the message network view (0.5.14)
+- **Status:** built for 0.5.14 (branch `rel0514/net-backend`) · **Security:** S1 · **Spec:** D-157; 07 §3.2 `relay_stats`
+- **Done:** store schema 23 (named by content; renumber at integration if another lane lands a version first): `relay_stats` per origin of the own and legacy servers, publishes accepted and refused, wraps served, last ok, last fault class, rolling 24 h; written once per delivery or sync pass (live: at most once a minute). Counters only.
+
+#### NET-ROUTE · `GET /api/ui/network` and the live `network` event (0.5.14)
+- **Status:** built for 0.5.14 (branch `rel0514/net-backend`) · **Security:** S1 · **Spec:** D-157; 08 §1 "Message network view"
+- **Done:** a fixed, allowlisted read: servers with roles, state, latency, flags and counters; contact reach counts; contacts' hosts only with `contacts=hosts`, inbound content (host text only, capped); `network` `{at}` on the events stream. Hosts only under the hood (D-157 (1)).
+
+#### NET-UI-A · Advanced › Message network page (0.5.14)
+- **Status:** in progress (another worker) · **Security:** S0/S1 · **Spec:** D-157; 08 §1; 11 §5
+- **Goal:** the Under the hood view built on `GET /api/ui/network`: server rows with health, latency and counters, contact reach with the expand, copy drift "Relays" → "Message network"/"Servers"; non-technical users see no change.
+
 #### BUDGET-BROKEN-UX · Refuse up front when the spending record is broken
 - **Status:** backlog · **Security:** S1 · **Spec:** 06 §3; 07 §3.5; 11 §5.11
 - **Goal:** on a ledger that is persisted as broken, say so before asking for an approval that cannot let the action through: refuse with "re-save your limits" and the way to do it.

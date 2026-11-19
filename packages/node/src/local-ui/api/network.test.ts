@@ -11,6 +11,7 @@
 //   already uses, and only in the expanded answer.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LocalUiContext } from '../context.js';
+import type { LocalUiReadRoute } from '../route-types.js';
 import { createLocalUiRoutes } from '../routes.js';
 import {
   NETWORK_MAX_CONTACT_HOSTS,
@@ -154,7 +155,13 @@ describe('networkBody (NET-ROUTE)', () => {
             {
               relay: 'wss://a.example.org',
               kind: 'own',
-              probe: { connectMs: null, roundTripMs: null, authRequired: null, paymentRequired: null, ...probe },
+              probe: {
+                connectMs: null,
+                roundTripMs: null,
+                authRequired: null,
+                paymentRequired: null,
+                ...probe,
+              },
             } as never,
           ],
         }),
@@ -174,7 +181,8 @@ describe('networkBody (NET-ROUTE)', () => {
     const body = networkBody(
       snapshot({
         servers: [
-          { relay: 'wss://x.example.org/<b>', kind: 'own', extra: 'leak' } as never,
+          { relay: 'wss://x.example.org/some/path', kind: 'own', extra: 'leak' } as never,
+          { relay: 'wss://y.example.org/<b>', kind: 'own' },
           { relay: 'wss://user@bad.example.org', kind: 'own' },
           { relay: 'wss://ok.example.org', kind: 'weird' } as never,
         ],
@@ -185,6 +193,7 @@ describe('networkBody (NET-ROUTE)', () => {
     expect(body.servers.map((s) => s.host)).toEqual(['x.example.org']);
     expect(JSON.stringify(body)).not.toContain('leak');
     expect(JSON.stringify(body)).not.toContain('<b>');
+    expect(JSON.stringify(body)).not.toContain('some/path');
   });
 
   it('caps the server list and refuses bad numbers and error text', () => {
@@ -231,7 +240,7 @@ describe('networkBody (NET-ROUTE)', () => {
         contactId: REF,
         relays: [
           'wss://relay.primal.net',
-          'wss://their.example.net/path?token=secret',
+          'wss://their.example.net/path/secret-token',
           'wss://<img src=x onerror=alert(1)>',
           ...Array.from({ length: 30 }, (_, i) => `wss://h${i}.example.net`),
         ],
@@ -271,12 +280,12 @@ describe('GET /api/ui/network (NET-ROUTE)', () => {
     now: () => NOW_MS,
     ...(network === undefined ? {} : { network }),
   });
-  const route = networkRoutes[0];
+  const route = networkRoutes[0] as LocalUiReadRoute;
 
   it('is one GET read route without presence, registered with the others', () => {
     expect(networkRoutes).toHaveLength(1);
     expect(route).toMatchObject({ method: 'GET', path: '/api/ui/network', presence: false });
-    const all = createLocalUiRoutes();
+    const all = createLocalUiRoutes().routes();
     expect(all.some((r) => r.path === '/api/ui/network' && r.method === 'GET')).toBe(true);
   });
 
@@ -305,7 +314,12 @@ describe('GET /api/ui/network (NET-ROUTE)', () => {
     expect((await call(''))?.status).toBe(200);
     expect((await call('contacts=hosts'))?.status).toBe(200);
     expect(seen).toEqual([false, true]);
-    for (const bad of ['contacts=all', 'contacts=hosts&contacts=hosts', 'x=1', 'contacts=hosts&x=1']) {
+    for (const bad of [
+      'contacts=all',
+      'contacts=hosts&contacts=hosts',
+      'x=1',
+      'contacts=hosts&x=1',
+    ]) {
       const res = await call(bad);
       expect(res?.status).toBe(400);
       expect(res?.body).toEqual({ error: 'invalid_query' });
@@ -369,7 +383,9 @@ describe('the network reader (NET-PROBE bounds)', () => {
           return Promise.resolve({
             total: 1,
             sharing: 1,
-            ...(o.lists ? { lists: [{ contactId: REF, relays: ['wss://relay.primal.net'], shared: 1 }] } : {}),
+            ...(o.lists
+              ? { lists: [{ contactId: REF, relays: ['wss://relay.primal.net'], shared: 1 }] }
+              : {}),
           });
         },
         statsMark: () => Promise.resolve(statsMark),

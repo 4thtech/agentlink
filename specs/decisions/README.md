@@ -164,3 +164,4 @@ Status: **Decided** (an owner decision; details may still say "owner confirms at
 | [D-154](D-154.md) | Choose folders in Finder or Explorer, and change the Inbox folder (FILES-FOLDER-PICKER, release 0.5.8) | Proposed | 2026-11-14 | 04, 08, 11 |
 | [D-155](D-155.md) | The menu bar widget: a living brand-mark icon and a read-only popover | Decided | 2026-11-16 | 04, 08, 11 |
 | [D-156](D-156.md) | Security hardening after community review | Decided | 2026-11-17 | 03, 04, 06, 07, 08, 11 |
+| [D-157](D-157.md) | The message network view: server hosts under the hood, own list of 2 to 8 | Decided | 2026-11-19 | 07, 08 |
