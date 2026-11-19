@@ -164,6 +164,24 @@ describe('KeyEpochControl over the item (owner flows only)', () => {
     expect((await mcp.getPublicBundle()).keyEpoch).toBe(1);
   });
 
+  it('a bundle derived before the epoch moved is never handed out after it (REL0514-KEYRING)', async () => {
+    const keychain = new MemoryKeychain();
+    const host = await openRecordedKeyStore('keychain', AGENT_ID, { keychain });
+    const mcp = await openRecordedKeyStore('keychain', AGENT_ID, { keychain });
+    const atZero = await mcp.getPublicBundle();
+    expect(atZero.keyEpoch).toBe(0);
+    expect((await mcp.getPublicBundle()).keyEpoch).toBe(0);
+    const token = epochKeysOf(host);
+    if (token === undefined) throw new Error('test: no token');
+    const owner = session();
+    await keyEpochControlFor(token, (s) => s === owner).advanceEpoch(0, owner);
+    const atOne = await mcp.getPublicBundle();
+    expect(atOne.keyEpoch).toBe(1);
+    expect(atOne.agentNostr).not.toEqual(atZero.agentNostr);
+    // The older epoch is still asked for by number, and answers as before.
+    expect(await mcp.getPublicBundle({ epoch: 0 })).toEqual(atZero);
+  });
+
   it('gives no token for a KeyStore this package did not open', () => {
     expect(epochKeysOf({})).toBeUndefined();
     expect(epochKeysOf(undefined)).toBeUndefined();

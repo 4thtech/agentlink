@@ -1,6 +1,8 @@
 // M1-8a: the agent KeyStore backed by the OS keychain (04 §2.2, §3.1.1; 07 §9). The seed is read
-// from the keychain for each operation, checked against the agent ID (04 §2.9), used and wiped
-// (04 §8.3, best effort): the store holds no seed between calls. Signing and encryption use the
+// from the keychain for each signing, encryption and decryption operation, checked against the
+// agent ID (04 §2.9), used and wiped (04 §8.3, best effort): the store holds no seed between calls.
+// The public bundle is derived once per key epoch and kept (public keys only, REL0514-KEYRING;
+// dropped on close, KEYCHAIN-CACHE-INVALIDATE). Signing and encryption use the
 // current epoch; only lookups, decryption and a drop DELETE (M1-1g-f) take one. Owner keys are never
 // here (04 §2.5).
 import {
@@ -227,6 +229,8 @@ export class KeychainKeyStore implements KeyStore {
   readonly #timeoutMs: number;
   /** SEC-KEYSTORE-RECORD-GATE: this store's live Record tickets (in memory, no key material). */
   readonly #tickets = new RecordTicketBook();
+  /** REL0514-KEYRING: the public bundle per key epoch, derived once (public keys, no key material). */
+  readonly #bundles = new Map<number, PublicIdentity>();
   #closed = false;
 
   private constructor(
@@ -330,7 +334,17 @@ export class KeychainKeyStore implements KeyStore {
     // D-141: the current bundle (and any epoch above the cached one) follows the item first.
     if (options?.epoch === undefined || options.epoch > this.#keyEpoch) await this.#follow();
     const epoch = this.#epochOf(options);
-    return this.#withSeed((seed) => derivePublicIdentity(seed, epoch));
+    if (this.#closed) throw new KeyStoreError('keystore_closed', 'keystore: the store is closed');
+    // REL0514-KEYRING: the bundle holds public keys only and is a pure function of the seed and the
+    // epoch, and the seed must derive this agent ID (checked in #withSeed), so it is derived once
+    // per epoch. Each keychain read is a Secret Service connection on Linux; reading the seed for a
+    // public answer was most of the agent's keychain traffic. Signing still reads the seed per call.
+    let bundle = this.#bundles.get(epoch);
+    if (bundle === undefined) {
+      bundle = await this.#withSeed((seed) => derivePublicIdentity(seed, epoch));
+      this.#bundles.set(epoch, bundle);
+    }
+    return copyBundle(bundle);
   }
 
   async signNostr(event: UnsignedNostrEvent): Promise<NostrEvent> {
@@ -500,8 +514,21 @@ export class KeychainKeyStore implements KeyStore {
 
   close(): Promise<void> {
     this.#closed = true;
+    this.#bundles.clear();
     return Promise.resolve();
   }
+}
+
+/** A copy of a public bundle, so no caller can change the one this store keeps. */
+function copyBundle(bundle: PublicIdentity): PublicIdentity {
+  return Object.freeze({
+    agentId: bundle.agentId,
+    agentEvm: bundle.agentEvm.slice(),
+    agentNostr: bundle.agentNostr.slice(),
+    agentEnc: bundle.agentEnc.slice(),
+    kid: bundle.kid.slice(),
+    keyEpoch: bundle.keyEpoch,
+  });
 }
 
 /**
