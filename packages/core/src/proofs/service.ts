@@ -86,7 +86,7 @@ import {
 import { feeContextFromQuote, type ApprovalService, type PendingApproval } from '../approvals.js';
 import {
   checkAndReserveProof,
-  readBudgetLedger,
+  readBudgetLedgerOrBroken,
   releaseProofReservation,
   settleProofCharged,
 } from '../budget.js';
@@ -350,7 +350,13 @@ export type ProofCode =
    * Refused, never asked: no approval is requested and an approval does not pass it. Carries
    * `ceiling` and `limitUsd`.
    */
-  | 'SPEND_CEILING';
+  | 'SPEND_CEILING'
+  /**
+   * BUDGET-BROKEN-UX (06 §3, 07 §3.5): the spending record cannot be summed, so no approval could let
+   * the action through (nothing is reserved on it). Refused up front, never asked, nothing signed;
+   * saving the limits again in the app starts a fresh record.
+   */
+  | 'BUDGET_BROKEN';
 
 /** SEC-CARD-FULLTEXT: the tools whose approval card shows the content of a stored envelope. */
 const CONTENT_TOOLS: ReadonlySet<string> = new Set([
@@ -768,11 +774,14 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     const pre = await this.#ctx.store.transaction((tx) =>
       evaluateProof(effective, action, {
         now: nowOf(this.#ctx),
-        ledger: readBudgetLedger(tx),
+        ledger: readBudgetLedgerOrBroken(tx),
         ...restore,
       }),
     );
     if (pre.decision === 'deny') return denied(pre);
+    // BUDGET-BROKEN-UX: an approval cannot let this through (nothing is reserved on a ledger that
+    // cannot be summed), so the owner is not asked for one.
+    if (pre.triggers.includes('ledger_broken')) return rejected('BUDGET_BROKEN');
     const files = payload.files.map((f) => ({
       plaintextSha256: f.plaintextSha256.toLowerCase(),
       size: f.size,
@@ -887,11 +896,12 @@ export class ProofService implements RecordLookup, CommitmentRecorder {
     const pre = await this.#ctx.store.transaction((tx) =>
       evaluateProof(effective, action, {
         now: nowOf(this.#ctx),
-        ledger: readBudgetLedger(tx),
+        ledger: readBudgetLedgerOrBroken(tx),
         ...restore,
       }),
     );
     if (pre.decision === 'deny') return denied(pre);
+    if (pre.triggers.includes('ledger_broken')) return rejected('BUDGET_BROKEN');
     return Object.freeze({
       status: 'ok',
       fee: priced.fee,

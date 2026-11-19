@@ -149,6 +149,8 @@ export type TermsCode =
    * approval can pass it. Carries `ceiling` and `limitUsd`.
    */
   | 'SPEND_CEILING'
+  /** BUDGET-BROKEN-UX: the spending record cannot be summed; no approval could pass. Nothing sent. */
+  | 'BUDGET_BROKEN'
   /**
    * `notarize` where no Record can be made: no proof platform on this machine, or a `reject`
    * with `notarize` (not specified; M1-9d-3, M1-9d-5). Nothing is sent.
@@ -538,6 +540,8 @@ function quoteRefusal(
         ...(quote.ceiling === undefined ? {} : { ceiling: quote.ceiling }),
         ...(quote.limitUsd === undefined ? {} : { limitUsd: quote.limitUsd }),
       });
+    case 'BUDGET_BROKEN':
+      return rejected('BUDGET_BROKEN');
     case 'CARD_EXPIRED':
       return rejected('CARD_EXPIRED');
     case 'PROOFS_UNAVAILABLE':

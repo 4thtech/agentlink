@@ -57,7 +57,7 @@ import {
   sellOn as viewSellOn,
   type Draft,
   type Review,
-  type RulesView,
+  type RulesAnswer,
 } from './data.js';
 import { createOwnerClient, type OwnerClient, type PasskeyInfo, type SaveAnswer } from './owner.js';
 import {
@@ -70,12 +70,7 @@ import { RULES_STRINGS as S } from './strings.js';
 import { warningText } from './warnings.js';
 import './rules.css';
 
-type Load =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'ok'; readonly version: number; readonly rules: RulesView }
-  | { readonly kind: 'not_valid' }
-  | { readonly kind: 'not_set_up' }
-  | { readonly kind: 'unavailable' };
+type Load = { readonly kind: 'loading' } | RulesAnswer;
 
 interface Confirm {
   readonly kind: 'confirm';
@@ -90,6 +85,8 @@ interface Confirm {
    * confirmed on the confirmation sheet with the platform check, not by the ordinary save.
    */
   readonly spending: boolean;
+  /** The patch this review was prepared from (a "Save again" restates one value, BUDGET-RECOVER). */
+  readonly patch: Record<string, Record<string, unknown>>;
 }
 
 type Step = { readonly kind: 'edit' } | { readonly kind: 'preparing' } | Confirm;
@@ -271,10 +268,14 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
   };
 
   /** Prepares the edit on the server and opens the confirm step. */
-  const prepare = async (keep?: boolean): Promise<void> => {
+  const prepare = async (
+    keep?: boolean,
+    given?: Record<string, Record<string, unknown>>,
+  ): Promise<void> => {
     if (load.kind !== 'ok' || checked === undefined) return;
+    const patch = given ?? (step.kind === 'confirm' ? step.patch : checked.patch);
     if (step.kind !== 'confirm') setStep({ kind: 'preparing' });
-    const res = await client.get(reviewPath(load.version, checked.patch, keep));
+    const res = await client.get(reviewPath(load.version, patch, keep));
     const review = res.kind === 'ok' ? parseReview(res.data) : undefined;
     if (review === undefined) {
       setStep({ kind: 'edit' });
@@ -292,7 +293,7 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
       return;
     }
     const passkey = step.kind === 'confirm' ? step.passkey : await ownerClient.passkey();
-    const proofs = checked.patch['proofs'] ?? {};
+    const proofs = patch['proofs'] ?? {};
     setCode('');
     setStep({
       kind: 'confirm',
@@ -302,7 +303,19 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
       passkey,
       busy: false,
       spending: SPENDING_FIELDS.some((f) => proofs[f] !== undefined),
+      patch,
     });
+  };
+
+  /**
+   * BUDGET-RECOVER (07 §3.5): "Save again" with nothing changed. One value is restated as it is;
+   * the server builds the whole rules at a newer version, the owner confirms with presence as for
+   * any save, and core starts a fresh spending record when the old one can't be summed.
+   */
+  const saveAgain = (): void => {
+    if (load.kind !== 'ok') return;
+    setNotice(undefined);
+    void prepare(undefined, { files: { maxSendSizeMB: load.rules.files.maxSendSizeMB } });
   };
 
   /** M1-PAY-CONFIRM-b: a spending change opens the sheet with the review the owner ticked. */
@@ -518,6 +531,24 @@ export function RulesPage({ api, owner, payConfirm }: RulesPageProps = {}): Reac
     <>
       {header}
       {noticeBanner}
+      {load.needsSave === true && !dirty ? (
+        <Banner
+          tone="warning"
+          title={S.spendingRecordTitle}
+          action={
+            <Button
+              variant="primary"
+              icon="approval"
+              disabled={step.kind === 'preparing'}
+              onClick={saveAgain}
+            >
+              {S.saveAgain}
+            </Button>
+          }
+        >
+          {S.spendingRecordBody}
+        </Banner>
+      ) : null}
       <Surface
         level="recessed"
         as="section"

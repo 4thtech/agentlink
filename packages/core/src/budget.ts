@@ -9,6 +9,7 @@
 // clock earlier than `newest_t`, or a read error makes the ledger broken, so every paid action needs
 // the owner's approval until the next applied `policy.set` starts a fresh epoch (owner-actions.ts).
 import {
+  budgetSpentMicros,
   evaluateProof,
   type BudgetLedgerView,
   type EffectivePolicy,
@@ -55,6 +56,27 @@ export function readBudgetLedger(tx: StoreTx): BudgetLedgerView {
   return { status: 'ok', epoch: state.ledger_epoch, newestT: state.newest_t, entries };
 }
 
+/**
+ * The ledger as readBudgetLedger reads it, or 'broken' on a read error (BUDGET-RECOVER L3): a read
+ * error is never an empty sum, and the caller refuses with the plain BUDGET_BROKEN answer.
+ */
+export function readBudgetLedgerOrBroken(tx: StoreTx): BudgetLedgerView {
+  try {
+    return readBudgetLedger(tx);
+  } catch {
+    return BROKEN;
+  }
+}
+
+/**
+ * True when the spending record can be summed at `now` (07 §3.5): a `budget_state` that is `ok`, no
+ * row the engine finds inconsistent, no row from a later epoch, and `now` not before its newest
+ * entry. False on a read error. Read-only.
+ */
+export function budgetLedgerSummable(tx: StoreTx, now: number): boolean {
+  return budgetSpentMicros(readBudgetLedgerOrBroken(tx), now) !== 'broken';
+}
+
 /** Marks the ledger broken, where a `budget_state` row exists to mark (07 §3.5). */
 function markBroken(tx: StoreTx, now: number): void {
   tx.update(
@@ -88,12 +110,7 @@ export function checkAndReserveProof(
   },
 ): ProofCheck {
   const { effective, action, now, reservation } = input;
-  let view: BudgetLedgerView;
-  try {
-    view = readBudgetLedger(tx);
-  } catch {
-    view = BROKEN; // a read error is never an empty sum
-  }
+  const view = readBudgetLedgerOrBroken(tx); // a read error is never an empty sum
   const result = evaluateProof(effective, action, {
     now,
     ledger: view,

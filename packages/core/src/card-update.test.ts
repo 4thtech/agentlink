@@ -77,11 +77,20 @@ const clock = new FakeClock();
 /** A relay spy: records every publish and acks every relay. */
 class RelaySpy {
   readonly published: NostrEvent[] = [];
+  /** CARD-UPDATE-FAILED-STATE: `none` makes every relay refuse (nothing accepted). */
+  mode: 'ack' | 'none' = 'ack';
   readonly factory: TransportFactory = (deps) => ({
     wrap: (envelope, recipients, keys) =>
       wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
     publish: (event, relays) => {
       this.published.push(event);
+      if (this.mode === 'none') {
+        return Promise.resolve({
+          results: relays.map((relay) => ({ relay, ok: false, reason: 'error' as const })),
+          acked: [],
+          sent: false,
+        } as unknown as PublishOutcome);
+      }
       return Promise.resolve({
         results: relays.map((relay) => ({ relay, ok: true, reason: 'ok' as const })),
         acked: [...relays],
@@ -351,6 +360,23 @@ describe('card-update sender (04 §2.6, §2.9, §3.4.1)', () => {
       ),
     );
     expect(await a.client.sendCardUpdates()).toEqual({ sent: 1, failed: 0 });
+  });
+
+  it('CARD-UPDATE-FAILED-STATE: a failed pass makes the next pass retry that contact, without a new card-update', async () => {
+    await rotate(a);
+    a.spy.mode = 'none';
+    expect(await a.client.sendCardUpdates()).toEqual({ sent: 0, failed: 2 });
+    const first = await sentCardUpdates(a);
+    expect(first).toHaveLength(2);
+    // Relays are back; the pass publishes the stored card-updates again (after their backoff).
+    a.spy.mode = 'ack';
+    clock.t += 3600;
+    const before = a.spy.published.length;
+    expect(await a.client.sendCardUpdates()).toEqual({ sent: 2, failed: 0 });
+    expect(a.spy.published.length).toBeGreaterThan(before);
+    // The same envelopes, no extra card-updates, and now nothing is left to retry.
+    expect(await sentCardUpdates(a)).toHaveLength(2);
+    expect(await a.client.sendCardUpdates()).toEqual({ sent: 0, failed: 0 });
   });
 
   it('refuses to send without a transport, before anything is stored', async () => {

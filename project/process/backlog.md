@@ -11426,20 +11426,47 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Done:** an ID whose card lists a dropped server moves to the current set with one owner approval ("Update your contact details" on Home, `agentlink owner update-contact-details`): a rotation to the next key epoch with the migrated list, signed with owner presence, no AI path. Card-updates also go to the legacy relays until 2027-01-31 and count as sent only on an acknowledgement from a non-legacy relay. `agentlink doctor` mentions it.
 
 #### BUDGET-BROKEN-UX · Refuse up front when the spending record is broken
-- **Status:** backlog · **Security:** S1 · **Spec:** 06 §3; 07 §3.5; 11 §5.11
+- **Status:** built in the rel0514 branch (not merged) · **Security:** S1 · **Spec:** 06 §3; 07 §3.5; 11 §5.11
 - **Goal:** on a ledger that is persisted as broken, say so before asking for an approval that cannot let the action through: refuse with "re-save your limits" and the way to do it.
+- **Done:** a paid action on a spending record that cannot be read is refused up front as `BUDGET_BROKEN` (notarize, the send tool's proof, the terms quote): no approval is requested; the next step says to save the limits again in Settings › Rules. Tests first in core and mcp-tools; spec 06 §3, 07 §3.5, 11 §5.11 say it.
+
+#### REL0514-DEVICES-CAP · The 200-item cap of Notifications must not drop the devices notice
+- **Status:** built in the rel0514 branch (not merged) · **Security:** S1 · **Spec:** 08 §1 (notifications); 06 §3
+- **Done:** `kept()` in `packages/node/src/notifications.ts` sorted by time and cut at 200, so a `devices` item (its time is the last sighting, often old) was dropped when 200 newer items existed and came back as news at the next poll. It now holds a place of its own; test first in `notifications.test.ts`.
+
+#### REL0514-CLS-SETTLE · First-launch journey: count layout shift after the first paint settles
+- **Status:** built in the rel0514 branch (not merged) · **Security:** S0 · **Spec:** project/process/ci-cd.md (journeys)
+- **Done:** `settleLayoutShift` (e2e `helpers/motion.ts`, with its own test) waits for fonts and two frames, then restarts the score; `01-first-launch.test.ts` calls it once the first step shows. The budget (`CLS_BUDGET` 0.01) is unchanged and every shift after that still fails the test. The first-paint font swap near the budget decided some runs; if the first paint itself should also count, say so and the card moves to a real fix of that swap in the UI.
 
 #### BUDGET-FAILCLOSED-REVIEW · Review the fail-closed paths of the budget
-- **Status:** backlog · **Security:** S2 · **Spec:** 06 §3; 07 §3.5
+- **Status:** reviewed (fixes in BUDGET-RECOVER) · **Security:** S2 · **Spec:** 06 §3; 07 §3.5
 - **Goal:** an independent review of every state in which the spending record cannot be summed: what the owner sees, what is refused, and that a fresh limits save always recovers.
 
+#### BUDGET-RECOVER · A limits save recovers every spending record that can't be summed
+- **Status:** built in the rel0514 branch (not merged) · **Security:** S2 · **Spec:** 06 §3; 07 §3.5; 11 §5.11
+- **Done:** an applied `policy.set` starts a fresh epoch whenever the ledger can't be summed at that moment (any reason, whatever the stored status), past every row's epoch; a summable ledger is left as it is. The Rules page shows "Save your limits again" with "Save again" (presence, nothing changed needed); `GET /api/ui/rules` adds `spendingRecord: 'needs_save'`. A read error in the up-front check is `BUDGET_BROKEN`. Tests first through `ownerActions.apply` (clock ahead, later-epoch row, inconsistent row, missing state) and on the page; 07 §3.5 says a clock-only fault is refused.
+
+#### BUDGET-FAILCLOSED-APPROVAL · Stored limits unreadable and spending record broken: refuse too
+- **Status:** backlog · **Security:** S2 · **Spec:** 06 §3 step 0; 07 §3.5
+- **Goal:** when the stored limits can't be read and the spending record can't be summed either, refuse with `BUDGET_BROKEN` instead of asking (today an approval lets it through, with the per-Record ceiling and per-action owner presence; the documented residual in 06 §3). One owner save fixes both.
+
+#### BUDGET-CORRUPT-REPAIR · A guided repair for a spending record a save can't fix
+- **Status:** later · **Security:** S2 · **Spec:** 07 §3.5
+- **Goal:** a corrupt entry whose count number is out of range stays refused through every limits save (fail closed); add a guided repair step, with owner presence, that sets such entries aside so the owner can start a fresh count.
+
+#### BUDGET-RACE-COPY · Plain answer when the record breaks between check and reserve
+- **Status:** backlog · **Security:** S1 · **Spec:** 06 §2.4; 07 §3.5
+- **Goal:** when the spending record becomes unsummable between the up-front check and the reservation, answer `BUDGET_BROKEN`, not `POLICY_CHANGED` (fail closed either way; copy only).
+
 #### CARD-UPDATE-FAILED-STATE · A failed card update drives a retry
-- **Status:** backlog · **Security:** S1 · **Spec:** 07 §4.3
+- **Status:** built in the rel0514 branch (not merged) · **Security:** S1 · **Spec:** 07 §4.3
 - **Goal:** the "failed" result of a card-update pass, now only reported, makes the next pass retry the contact instead of waiting.
+- **Done:** each card-update pass also publishes again the stored card-updates of the current key that no non-legacy relay accepted yet (rows' own backoff applies), without building a second one; test first in `card-update.test.ts`; 07 §4.3 says it.
 
 #### DELIVERY-COUNTS-TEST · A core test for the later count update
-- **Status:** backlog · **Security:** S0 · **Spec:** 07 §3.2
+- **Status:** built in the rel0514 branch (not merged) · **Security:** S0 · **Spec:** 07 §3.2
 - **Goal:** a test in core for `updateRelayCounts` (the count raised after a row is already sent), beside the transport tests.
+- **Done:** `packages/core/src/outbox-counts.test.ts` covers `updateRelayCounts` (raise only, capped at accepted, sent rows with a count only, the envelope follows); `StoreOutboxPersistence` is exported for it.
 
 #### LEGACY-RELAYS-REMOVAL · Stop reading the old default servers
 - **Status:** later (not before 2027-03-02) · **Security:** S1 · **Spec:** 07 §4.3; D-75
