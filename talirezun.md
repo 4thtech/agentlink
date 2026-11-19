@@ -101,3 +101,4 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 - Lanes: rel0514/keystore-gate, rel0514/net-backend, rel0514/ci, rel0514/leftovers.
 - 19 Nov design choices (Tali, all recommended): amber for slow/can't reach; health dots by shape and colour; 24 h bar per server; "Reaches N contacts"; "Needs your approval" label; contacts-per-server count on each card. First-launch: fix the font swap in the app. Wiki sync script becomes check-only.
 - 0.5.15 must have a Test button when you add your own server (in-app check: ready / slow / needs sign-in / refused, with plain reasons) before anything is saved (card NET-PRECHECK).
+- Diagram left label: "<name> · this computer" ("Your ID" when no name); keeps the ID wording rule (D-144). Tali, 19 Nov.
