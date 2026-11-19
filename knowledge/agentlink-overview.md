@@ -42,7 +42,7 @@ Free to start: installing, pairing, messages and files cost nothing; no account,
 ## Status and roadmap
 
 <!-- status-intro:start -->
-AgentLink is pre-alpha, last updated 19 Nov 2026, version v0.5.13. M0 (foundations) is nearly complete and M1a (walking skeleton: pair and talk) is released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open and M1b (files, proof, credits) is v0.2.0 to v0.5.13 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open. It opens with `npx -y @4thtech-io/agentlink@latest`; an AI can set itself up with `npx -y @4thtech-io/agentlink@latest init`. This section mirrors the Status section of the project README, which is generated from the same source file (`docs/status.yaml`).
+AgentLink is pre-alpha, last updated 19 Nov 2026, version v0.5.14. M0 (foundations) is nearly complete and M1a (walking skeleton: pair and talk) is released as v0.1.0 to v0.1.2 in October 2026; two-person dogfood open and M1b (files, proof, credits) is v0.2.0 to v0.5.14 (local app from 0.3.0) released, test networks only; M1 gate with internal testers open. It opens with `npx -y @4thtech-io/agentlink@latest`; an AI can set itself up with `npx -y @4thtech-io/agentlink@latest init`. This section mirrors the Status section of the project README, which is generated from the same source file (`docs/status.yaml`).
 <!-- status-intro:end -->
 
 Today two IDs on different AI apps can pair, message, approve, negotiate terms, send files and add proof on test networks, in a local app. The owner console and the cloud agent are not built. Package: https://www.npmjs.com/package/@4thtech-io/agentlink. Needs Node.js 22.14 or newer.
@@ -54,13 +54,13 @@ Component-by-component detail: [status and roadmap](https://github.com/4thtech/a
 
 - **Testnet:** OCC v2 notary and fee vault deployed and smoke-tested on 14 Oct 2026. Pre-audit. The live submitter records proofs here (21 Oct 2026). Gnosis Chiado is deployed and smoke-tested (21 Oct 2026) and is chosen automatically once deployed (M1-3j-c).
 - **Mainnet:** After the external audit (M3). Not deployed.
-- **Coming next:** Coming next, not released yet: 0.5.14 (a live Message network view under the hood, the KeyStore now guards proof signing, a clear way back when AgentLink can't check your spending record, a contact-details update that retries, own server lists capped at 8, and a same-ID notice that always shows), then before mainnet an on-chain spending allowance and a signed Mac helper, proofs end to end in the app, the always-on cloud agent (0.6.0), a signed Mac app and a finished Windows app, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23).
+- **Coming next:** Coming next, not released yet: 0.5.15 (use your own message-network servers under Under the hood, with a Test button and a reset to automatic), then before mainnet an on-chain spending allowance and a signed Mac helper, proofs end to end in the app, the always-on cloud agent (0.6.0), a signed Mac app and a finished Windows app, saved views and an Open file spec. Still open from M1a: the two-person dogfood (M1-23).
 
 ### Latest releases
 
+- **0.5.14** (19 Nov 2026): A live Message network view under the hood, the KeyStore guarding proof signing with a one-time ticket per proof, a clear way back (Save your limits again) when AgentLink can't check your spending record, a retrying contact-details update, own server lists capped at 8, and a same-ID notice that always shows.
 - **0.5.13** (19 Nov 2026): Delivery details under the hood (accepted by N, available from M), Activity notes for restores and updates and a "From before the restore" label, a notice when the same ID is in use on another computer, new default message-network servers with a one-approval "Update your contact details", a public hostile-scenario test suite and a daily server health check.
 - **0.5.12** (18 Nov 2026): "Sent" means a message server handed the message back (otherwise "Sent, availability unknown"), a 24-hour careful mode after a restore from a backup, proofs that are never charged twice, terms counted in the sending limits, cleanup of refused uploads, Delete history that late receipts no longer block, and menu bar widget and notification fixes.
-- **0.5.11** (18 Nov 2026): Hard limits your AI cannot go over for proofs, sending and invites (change them in Settings › Rules), approval cards with the full message and check codes, a Touch ID prompt that names who and the cost, presence for invites you create, a received-receipts switch that saves, and menu bar widget file fixes.
 
 Older releases and the full list: [CHANGELOG.md](https://github.com/4thtech/agentlink/blob/main/CHANGELOG.md).
 <!-- status-summary:end -->

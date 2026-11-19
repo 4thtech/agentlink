@@ -182,7 +182,7 @@ The ceilings apply in every mode and, when the policy can't be read, as defaults
 
 ## Roadmap
 
-D-156 shipped in 0.5.10 to 0.5.13, and in 0.5.14 (not released yet) the proof gate moves into the KeyStore: received receipts on by default, the typed-data allowlist for the agent key, owner spending ceilings, sending and invite limits, full-text approval cards, the relay availability check, the restore guard and its traces, proof signing tied to the budget, and the notice when an ID is used on another computer. Released in 0.5.12: a message counts as sent once a relay serves it back, and a restore guard for spending and processed actions. Still to come, before mainnet (M3):
+D-156 shipped in 0.5.10 to 0.5.13, and in 0.5.14 the proof gate moves into the KeyStore: received receipts on by default, the typed-data allowlist for the agent key, owner spending ceilings, sending and invite limits, full-text approval cards, the relay availability check, the restore guard and its traces, proof signing tied to the budget, and the notice when an ID is used on another computer. Released in 0.5.12: a message counts as sent once a relay serves it back, and a restore guard for spending and processed actions. Still to come, before mainnet (M3):
 
 - Planned: an on-chain spending allowance per ID and network, set only by the owner.
 - Planned: a small signed helper on macOS that holds the agent key.
