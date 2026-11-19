@@ -797,7 +797,7 @@ export class RelayPool {
         }
         // EVENT (a forged match), AUTH, NOTICE, anything else: ignored; the answer is EOSE or CLOSED.
       };
-      void this.resolveTarget(relay).then(
+      void this.resolveTarget(relay, true).then(
         (target) => {
           if (done) return;
           if (typeof target === 'string') {
@@ -1082,8 +1082,11 @@ export class RelayPool {
     return isOpen ? undefined : 'connect_failed';
   }
 
-  /** 07 §4.2 steps 1 to 3: resolve, require every answer to be globally routable, pin the address. */
-  private async resolveTarget(url: string): Promise<RelayTarget | RelayFailure> {
+  /**
+   * 07 §4.2 steps 1 to 3: resolve, require every answer to be globally routable, pin the address.
+   * `quiet` (NET-PROBE): no log line, so a probe logs nothing at all.
+   */
+  private async resolveTarget(url: string, quiet = false): Promise<RelayTarget | RelayFailure> {
     const parts = relayParts(url);
     if (parts === undefined || parts.port < 1 || parts.port > 65535) return 'invalid_url';
     if (this.addressCheck === 'platform') {
@@ -1093,16 +1096,19 @@ export class RelayPool {
     try {
       answers = await this.addressCheck.resolver.resolve(parts.host);
     } catch {
-      this.logger?.warn('relay skipped', { reason: 'resolve_failed', host: parts.host });
+      if (!quiet)
+        this.logger?.warn('relay skipped', { reason: 'resolve_failed', host: parts.host });
       return 'resolve_failed';
     }
     if (!Array.isArray(answers) || answers.length === 0) {
-      this.logger?.warn('relay skipped', { reason: 'resolve_failed', host: parts.host });
+      if (!quiet)
+        this.logger?.warn('relay skipped', { reason: 'resolve_failed', host: parts.host });
       return 'resolve_failed';
     }
     if (!answers.every(isGloballyRoutable)) {
       // Names the relay, never the address (07 §4.2 step 2).
-      this.logger?.warn('relay skipped', { reason: 'blocked_address', host: parts.host });
+      if (!quiet)
+        this.logger?.warn('relay skipped', { reason: 'blocked_address', host: parts.host });
       return 'blocked_address';
     }
     return { url, host: parts.host, port: parts.port, address: answers[0] as string };

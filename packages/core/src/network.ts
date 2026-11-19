@@ -18,6 +18,7 @@ import type { ContactBook } from './contacts.js';
 import type { CoreContext } from './context.js';
 import type { IdentityService } from './identity.js';
 import type { OutboxService } from './outbox.js';
+import { migrationDroppedRelays } from './relay-migration.js';
 import { readRelayStats, relayStatsMark, type RelayStatsView } from './relay-stats.js';
 
 /** The legacy servers are read for at least 30 days after the card-update fan-out ends (07 §4.3). */
@@ -76,6 +77,8 @@ export interface NetworkServers {
   readonly legacy: readonly string[];
   /** Unix seconds: the legacy servers are read at least until then. */
   readonly legacyReadUntil: number;
+  /** D-157 (2): own entries the pending contact-details update would leave out (0: none, or none pending). */
+  readonly updateDrops: number;
 }
 
 export interface NetworkContactList {
@@ -91,6 +94,11 @@ export interface NetworkContactReach {
   readonly total: number;
   /** Active contacts sharing at least one server with our own list. */
   readonly sharing: number;
+  /**
+   * Per origin (`wss://host[:port]`) of our own and legacy servers only: how many active contacts
+   * list it in their card. Counts only; a contact's other servers are never named here.
+   */
+  readonly perServer: Readonly<Record<string, number>>;
   readonly lists?: readonly NetworkContactList[];
 }
 
@@ -116,26 +124,27 @@ export class NetworkService {
     this.#pause = pause;
   }
 
-  /** The own and legacy lists and whether the agent is paused. Undefined without an own list. */
-  async servers(): Promise<NetworkServers | undefined> {
+  /**
+   * The own and legacy lists, whether the agent is paused, and how many own entries a pending
+   * contact-details update would leave out (D-157 (2)). Throws (a CoreError, fixed text) when the
+   * own list cannot be read: the local app answers that as unavailable, never as an empty network.
+   */
+  async servers(): Promise<NetworkServers> {
+    const own = await this.#identity.relays();
+    let paused: boolean;
     try {
-      const own = await this.#identity.relays();
-      let paused = false;
-      try {
-        paused = this.#pause !== undefined && (await this.#pause.paused());
-      } catch {
-        paused = true; // fail closed, like the outbox: an unreadable pause row reads as paused
-      }
-      return Object.freeze({
-        paused,
-        mode: networkMode(own),
-        own: Object.freeze([...own]),
-        legacy: LEGACY_READ_RELAYS,
-        legacyReadUntil: LEGACY_READ_UNTIL,
-      });
+      paused = this.#pause !== undefined && (await this.#pause.paused());
     } catch {
-      return undefined;
+      paused = true; // fail closed, like the outbox: an unreadable pause row reads as paused
     }
+    return Object.freeze({
+      paused,
+      mode: networkMode(own),
+      own: Object.freeze([...own]),
+      legacy: LEGACY_READ_RELAYS,
+      legacyReadUntil: LEGACY_READ_UNTIL,
+      updateDrops: migrationDroppedRelays(own),
+    });
   }
 
   /** One bounded probe of the own and legacy servers (outbox relayProbe). Never throws. */
@@ -165,6 +174,12 @@ export class NetworkService {
     const active = (await this.#contacts.list()).filter((c) => c.status === 'active');
     let sharing = 0;
     const lists: NetworkContactList[] = [];
+    // Counted in the same pass (one list read per contact), for our own and legacy servers only.
+    const perServer = new Map<string, number>();
+    for (const r of [...own, ...LEGACY_READ_RELAYS]) {
+      const o = relayOrigin(r);
+      if (o !== 'wss://invalid') perServer.set(o, 0);
+    }
     for (const contact of active) {
       let relays: readonly string[];
       try {
@@ -174,6 +189,10 @@ export class NetworkService {
       }
       const shared = sharedServerCount(own, relays);
       if (shared > 0) sharing += 1;
+      for (const o of new Set(relays.map(relayOrigin))) {
+        const n = perServer.get(o);
+        if (n !== undefined) perServer.set(o, n + 1);
+      }
       if (options.lists && lists.length < MAX_NETWORK_CONTACT_LISTS) {
         lists.push(Object.freeze({ contactId: contact.id, relays, shared }));
       }
@@ -181,6 +200,7 @@ export class NetworkService {
     return Object.freeze({
       total: active.length,
       sharing,
+      perServer: Object.freeze(Object.fromEntries(perServer)),
       ...(options.lists ? { lists: Object.freeze(lists) } : {}),
     });
   }

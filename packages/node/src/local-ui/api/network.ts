@@ -19,9 +19,12 @@
 //                  signInRequired, paymentRequired: boolean | null,
 //                  publishedOk, publishedFailed, received: int,   // the rolling day window
 //                  countsSince, lastOkAt: unixSec | null,
-//                  lastError: fixed class | null } ],             // at most 26 (own 16 + legacy)
+//                  lastError: fixed class | null,
+//                  contacts: int } ],                 // contacts listing it; at most 26 servers
 //     legacyReadUntil: unixSec | null,
 //     contacts: { total, sharing },             // counts: contacts sharing at least one server
+//     updateWouldDrop: int,                     // D-157 (2): own servers a pending contact-details
+//                                               // update would leave out (only the first 8 are kept)
 //     contactHosts?: [ { ref, servers, shared, hosts: [host] } ] } // only with contacts=hosts
 // Hosts (D1): the origin host only, never the scheme, a path, a query or credentials; a contact's
 // hosts are inbound content (I-5): only lowercase DNS text that passes the relay URL rule (04 §4)
@@ -108,10 +111,14 @@ export interface LocalUiNetworkSnapshot {
   readonly servers: readonly {
     readonly relay: string;
     readonly kind: 'own' | 'legacy';
+    /** Active contacts whose card lists this server (counts only). */
+    readonly contacts?: number;
     readonly probe?: LocalUiNetworkProbe;
     readonly stats?: LocalUiNetworkStats;
   }[];
   readonly legacyReadUntil?: number;
+  /** D-157 (2): own entries the pending contact-details update would leave out. */
+  readonly updateDrops?: number;
   readonly contacts?: { readonly total: number; readonly sharing: number };
   readonly contactLists?: readonly {
     readonly contactId: string;
@@ -135,6 +142,8 @@ export interface LocalUiNetworkServer extends JsonObject {
   readonly countsSince: number | null;
   readonly lastOkAt: number | null;
   readonly lastError: string | null;
+  /** Active contacts whose card lists this server (a count; never who). */
+  readonly contacts: number;
 }
 
 export interface LocalUiNetworkContactHosts extends JsonObject {
@@ -153,6 +162,8 @@ export interface LocalUiNetworkBody extends JsonObject {
   readonly servers: readonly LocalUiNetworkServer[];
   readonly legacyReadUntil: number | null;
   readonly contacts: { readonly total: number; readonly sharing: number };
+  /** D-157 (2): own servers the pending "Update your contact details" would leave out (0: none). */
+  readonly updateWouldDrop: number;
   readonly contactHosts?: readonly LocalUiNetworkContactHosts[];
 }
 
@@ -209,7 +220,7 @@ function stateOf(probe: unknown): LocalUiNetworkState {
 
 function serverOf(raw: unknown, nowMs: number): LocalUiNetworkServer | undefined {
   if (typeof raw !== 'object' || raw === null) return undefined;
-  const { relay, kind, probe, stats } = raw as Record<string, unknown>;
+  const { relay, kind, probe, stats, contacts } = raw as Record<string, unknown>;
   if (kind !== 'own' && kind !== 'legacy') return undefined;
   const host = networkHost(relay);
   if (host === null) return undefined;
@@ -232,6 +243,7 @@ function serverOf(raw: unknown, nowMs: number): LocalUiNetworkServer | undefined
     countsSince: time(s.since, nowMs),
     lastOkAt: time(s.lastOkAt, nowMs),
     lastError,
+    contacts: count(contacts),
   });
 }
 
@@ -264,6 +276,7 @@ export const NETWORK_NEEDS_SETUP: LocalUiNetworkBody = Object.freeze({
   servers: Object.freeze([]),
   legacyReadUntil: null,
   contacts: Object.freeze({ total: 0, sharing: 0 }),
+  updateWouldDrop: 0,
 });
 
 /** The answer when the agent's state could not be read. */
@@ -307,6 +320,7 @@ export function networkBody(
         ? snapshot.legacyReadUntil
         : null,
     contacts,
+    updateWouldDrop: Math.min(count(snapshot.updateDrops), 16),
   };
   if (!contactHosts) return Object.freeze(body);
   const rows: LocalUiNetworkContactHosts[] = [];

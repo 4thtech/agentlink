@@ -634,7 +634,7 @@ An owner has no relay list of its own: a card carries only the agent's `relaysHa
 
 | What | Value |
 |---|---|
-| The agent's own list, as signed into its card | 3 to 5 relays by default; 2 to 8 under Advanced. The core refuses a new card, or a changed list, outside 2 to 8 (`MAX_OWN_RELAYS`; 0.5.14, owner D-157 (2), 19 Nov 2026); the contact-details update keeps the owner's own entries first and adds default relays up to 8. A list stored before keeps opening. Below 2, no wrap could reach `sent` |
+| The agent's own list, as signed into its card | 3 to 5 relays by default; 2 to 8 under Advanced. The core refuses a new card, or a changed list, outside 2 to 8 (`MAX_OWN_RELAYS`; 0.5.14, owner D-157 (2), 19 Nov 2026); the contact-details update keeps the first 8 of the owner's own entries in the card's order (any later ones are left out, and the Message network view says how many before the owner updates) and adds default relays up to 8. A list stored before keeps opening. Below 2, no wrap could reach `sent` |
 | A list received with a card (invite, `handshake`, `handshake-ack`, `card-update`) | 2 to 16 entries, unique (04 §3.4; the minimum was 1). A contact can still have fewer than 2 *usable* relays (connect-time skips, NIP-11): its rows end `not_delivered` (§3.2), and the activity feed says why |
 | The owner's own Settings entries | 1 or more; local only |
 | Relays per wrap | At most 32: a received list has at most 16 entries, an own list at most 8 (16 during its overlap), and the union for one owner of both agents at most 32. The owner `card-update` also goes to the release's default set |

@@ -11437,6 +11437,14 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Status:** built for 0.5.14 (branch `rel0514/net-backend`) · **Security:** S1 · **Spec:** D-157; 08 §1 "Message network view"
 - **Done:** a fixed, allowlisted read: servers with roles, state, latency, flags and counters; contact reach counts; contacts' hosts only with `contacts=hosts`, inbound content (host text only, capped); `network` `{at}` on the events stream. Hosts only under the hood (D-157 (1)).
 
+#### NET-PROBE-SLOTS · Server checks never crowd out delivery checks
+- **Status:** backlog · **Security:** S1 · **Spec:** 07 §4.2, §4.3 "Message network view"
+- **Goal:** the view's server checks share the delivery-check slots: with a long own list some servers can show "unknown", and in a process that also sends, a check can make a delivery check wait a few seconds. Give the checks their own small bound (or lower priority) so delivery checks never wait for them, and every listed server gets checked.
+
+#### NET-CONTACT-REACH-COST · Cheaper contact reach for the network view
+- **Status:** backlog · **Security:** S0 · **Spec:** 08 §1 "Message network view"
+- **Goal:** the view reads every active contact's server list on each read and on each live update, with no cap on contacts. Cache the counts until contacts or lists change (the contacts mark), and cap the work per read.
+
 #### NET-UI-A · Advanced › Message network page (0.5.14)
 - **Status:** in progress (another worker) · **Security:** S0/S1 · **Spec:** D-157; 08 §1; 11 §5
 - **Goal:** the Under the hood view built on `GET /api/ui/network`: server rows with health, latency and counters, contact reach with the expand, copy drift "Relays" → "Message network"/"Servers"; non-technical users see no change.

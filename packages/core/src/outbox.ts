@@ -692,15 +692,17 @@ export class OutboxService {
         notices: [],
       };
     }
+    let ownKnown = false;
     try {
       this.#ownRelays = new Set(checkList((await this.#identity.signedCard()).relays));
+      ownKnown = true;
     } catch {
       this.#ownRelays = new Set(); // no readable own list: no AUTH anywhere (07 §4.3)
     }
     const persistence = new StoreOutboxPersistence(this.#ctx, envelopeId);
     this.#passes.add(persistence);
     try {
-      return await this.#passWith(persistence, transport);
+      return await this.#passWith(persistence, transport, ownKnown);
     } finally {
       this.#passes.delete(persistence);
     }
@@ -757,6 +759,7 @@ export class OutboxService {
   async #passWith(
     persistence: StoreOutboxPersistence,
     transport: Transport,
+    ownKnown: boolean,
   ): Promise<OutboxSummary> {
     // NET-STATS: the pass's per-server results are tallied in memory and written once at its end
     // (counters only, own and legacy servers only; relay-stats.ts).
@@ -789,7 +792,10 @@ export class OutboxService {
     try {
       return await this.#runPass(worker, persistence);
     } finally {
-      if (!tally.empty) await recordRelayStats(this.#ctx, [...this.#ownRelays], tally);
+      // An unreadable own list keeps the stored counters as they are (never pruned to legacy only).
+      if (!tally.empty && ownKnown) {
+        await recordRelayStats(this.#ctx, [...this.#ownRelays], tally);
+      }
     }
   }
 

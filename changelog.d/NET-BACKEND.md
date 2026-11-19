@@ -4,4 +4,4 @@
 
 ### Changed
 
-- Your own message-network server list now holds 2 to 8 servers (D-157 (2), 07 §4.3): a new or changed list outside that is refused, and the contact-details update keeps your own entries first and fills up to 8. Contacts' lists keep their limit of 16.
+- Your own message-network server list now holds 2 to 8 servers (D-157 (2), 07 §4.3): a new or changed list outside that is refused, and the contact-details update keeps the first 8 of your own entries (Under the hood says how many it would leave out) and fills up to 8. Contacts' lists keep their limit of 16.

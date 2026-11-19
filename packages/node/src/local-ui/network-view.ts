@@ -10,7 +10,9 @@
 //   counts are read on every request; contacts' lists only for the expanded answer.
 // - `mark()` is an opaque string for the event hub (numbers only): it changes when the counters
 //   change or a probe finishes. It never names a server.
-// - Never rejects; an error (and its text) is never kept or passed on.
+// - A read whose own list cannot be read rejects with a fixed error (the route answers 503
+//   `unavailable`); every other fault answers what could be read. `mark()` never rejects. An
+//   error's text is never kept or passed on.
 import type { RelayStatsView } from '@4thtech-io/core';
 import {
   NETWORK_NOT_RUNNING,
@@ -35,6 +37,7 @@ export interface NetworkViewClient {
           readonly own: readonly string[];
           readonly legacy: readonly string[];
           readonly legacyReadUntil: number;
+          readonly updateDrops?: number;
         }
       | undefined
     >;
@@ -45,6 +48,7 @@ export interface NetworkViewClient {
     contactReach(options: { readonly lists: boolean }): Promise<{
       readonly total: number;
       readonly sharing: number;
+      readonly perServer?: Readonly<Record<string, number>>;
       readonly lists?: readonly {
         readonly contactId: string;
         readonly relays: readonly string[];
@@ -127,15 +131,22 @@ export function createNetworkReader(
   };
 
   const read = async (o: { readonly contactHosts: boolean }): Promise<LocalUiNetworkBody> => {
+    let servers: Awaited<ReturnType<NetworkViewClient['network']['servers']>>;
     try {
-      const servers = await client.network.servers();
-      if (servers === undefined) return NETWORK_NOT_RUNNING;
+      servers = await client.network.servers();
+    } catch {
+      // The own list could not be read: a real read failure, answered 503 by the route (08 §1).
+      // A fixed error: the cause (and its text) is never kept or passed on.
+      throw new Error('network view unavailable');
+    }
+    if (servers === undefined) return NETWORK_NOT_RUNNING;
+    try {
       if (!servers.paused) await maybeProbe();
       const [stats, reach] = await Promise.all([
         client.network.stats().catch(() => [] as readonly RelayStatsView[]),
         client.network
           .contactReach({ lists: o.contactHosts })
-          .catch(() => ({ total: 0, sharing: 0 }) as const),
+          .catch(() => ({ total: 0, sharing: 0, perServer: undefined }) as const),
       ]);
       const byOrigin = new Map(stats.map((s) => [s.origin, s]));
       const list = [
@@ -155,11 +166,13 @@ export function createNetworkReader(
           return {
             relay,
             kind,
+            contacts: reach.perServer?.[originOf(relay)] ?? 0,
             ...(probe === undefined ? {} : { probe }),
             ...(stat === undefined ? {} : { stats: stat }),
           };
         }),
         legacyReadUntil: servers.legacyReadUntil,
+        updateDrops: servers.updateDrops ?? 0,
         contacts: { total: reach.total, sharing: reach.sharing },
         ...('lists' in reach && reach.lists !== undefined ? { contactLists: reach.lists } : {}),
       };

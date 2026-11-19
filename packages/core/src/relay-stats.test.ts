@@ -146,6 +146,19 @@ describe('recordRelayStats (NET-STATS)', () => {
     expect((await readRelayStats(ctx)).map((r) => r.origin)).toEqual(['wss://b.example.org:8443']);
   });
 
+  it('keeps the stored counters when the own list is empty (could not be read)', async () => {
+    const store = new MemoryStore();
+    const ctx = ctxAt(store, () => T0);
+    const tally = new RelayTally();
+    tally.received(OWN[0] as string);
+    await recordRelayStats(ctx, OWN, tally);
+    const before = await readRelayStats(ctx);
+    const next = new RelayTally();
+    next.received(LEGACY_READ_RELAYS[0] as string);
+    await recordRelayStats(ctx, [], next);
+    expect(await readRelayStats(ctx)).toEqual(before);
+  });
+
   it('never throws: a store fault leaves the pass as it was', async () => {
     const ctx = {
       store: { transaction: () => Promise.reject(new Error('busy')) },

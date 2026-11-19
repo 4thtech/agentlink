@@ -413,7 +413,12 @@ export {
   CATCH_UP_SECONDS,
   type CardUpdateSendResult,
 } from './card-update.js';
-export { migratedRelays, needsRelayMigration, type RelayMigration } from './relay-migration.js';
+export {
+  migratedRelays,
+  migrationDroppedRelays,
+  needsRelayMigration,
+  type RelayMigration,
+} from './relay-migration.js';
 // NET-PROBE / NET-STATS / NET-ROUTE: the Message network view (read-only).
 export {
   LEGACY_READ_UNTIL,

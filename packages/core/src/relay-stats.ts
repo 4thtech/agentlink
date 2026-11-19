@@ -151,6 +151,8 @@ export async function recordRelayStats(
   own: readonly string[],
   tally: RelayTally,
 ): Promise<void> {
+  // No own list (it could not be read): keep the stored counters as they are, write nothing.
+  if (own.length === 0) return;
   try {
     const tracked = new Set(
       [...own, ...LEGACY_READ_RELAYS].map(relayOrigin).filter((o) => o !== 'wss://invalid'),

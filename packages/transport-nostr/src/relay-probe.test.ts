@@ -214,6 +214,12 @@ describe('RelayPool.probe (NET-PROBE)', () => {
       reqNeedsAuth: true,
       nip11Body: JSON.stringify({ name: '<img src=x onerror=alert(1)>', limitation: {} }),
     });
+    // Nor for a server that does not resolve or resolves to a private address (no host in a log).
+    const [gone, priv] = relayUrls('quiet', 2) as [string, string];
+    net.dns.set(gone.slice('wss://'.length), []);
+    net.dns.set(priv.slice('wss://'.length), ['10.0.0.7']);
+    expect((await pool.probe(gone)).state).toBe('unreachable');
+    expect((await pool.probe(priv)).state).toBe('blocked');
     const result = await pool.probe(relay);
     expect(JSON.stringify(result)).not.toContain('img');
     expect(JSON.stringify(result)).not.toContain('log in');

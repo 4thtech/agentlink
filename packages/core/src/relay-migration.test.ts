@@ -3,7 +3,7 @@ import { DEFAULT_RELAYS, LEGACY_READ_RELAYS } from '@4thtech-io/transport-nostr'
 import { describe, expect, it } from 'vitest';
 import { MAX_OWN_RELAYS } from '@4thtech-io/types';
 import { checkOwnRelays, checkRelays } from './card.js';
-import { migratedRelays, needsRelayMigration } from './relay-migration.js';
+import { migratedRelays, migrationDroppedRelays, needsRelayMigration } from './relay-migration.js';
 
 const OLD = ['wss://nos.lol', 'wss://nostr.mom', 'wss://relay.primal.net'];
 
@@ -43,6 +43,14 @@ describe('the migrated relay list', () => {
     const small = migratedRelays(['wss://nos.lol', 'wss://nostr.mom']);
     expect(small.length).toBeGreaterThanOrEqual(2);
     expect(small.length).toBeLessThanOrEqual(MAX_OWN_RELAYS);
+  });
+
+  it('says how many own entries the migration leaves out (the ones after the first 8)', () => {
+    const many = Array.from({ length: 11 }, (_, i) => `wss://d${i}.example.org`);
+    expect(migrationDroppedRelays(['wss://nos.lol', ...many, many[0] as string])).toBe(3);
+    expect(migrationDroppedRelays(['wss://nos.lol', ...many.slice(0, 8)])).toBe(0);
+    // No migration needed: nothing is dropped.
+    expect(migrationDroppedRelays(many)).toBe(0);
   });
 
   it('an own list outside 2 to 8 is refused; a contact list keeps the card bound of 16', () => {

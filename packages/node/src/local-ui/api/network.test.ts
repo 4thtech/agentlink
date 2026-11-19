@@ -54,6 +54,7 @@ const NETWORK_SHAPE = {
       countsSince: NOW - 3600,
       lastOkAt: NOW - 60,
       lastError: 'ok_timeout',
+      contacts: 4,
     },
     {
       host: 'nos.lol',
@@ -70,10 +71,12 @@ const NETWORK_SHAPE = {
       countsSince: null,
       lastOkAt: null,
       lastError: null,
+      contacts: 0,
     },
   ],
   legacyReadUntil: 1_803_945_600,
   contacts: { total: 2, sharing: 1 },
+  updateWouldDrop: 2,
 } as const;
 
 const snapshot = (over: Partial<LocalUiNetworkSnapshot> = {}): LocalUiNetworkSnapshot => ({
@@ -85,6 +88,7 @@ const snapshot = (over: Partial<LocalUiNetworkSnapshot> = {}): LocalUiNetworkSna
     {
       relay: 'wss://relay.primal.net',
       kind: 'own',
+      contacts: 4,
       probe: {
         state: 'ready',
         connectMs: 42,
@@ -106,6 +110,7 @@ const snapshot = (over: Partial<LocalUiNetworkSnapshot> = {}): LocalUiNetworkSna
   ],
   legacyReadUntil: 1_803_945_600,
   contacts: { total: 2, sharing: 1 },
+  updateDrops: 2,
   ...over,
 });
 
@@ -300,6 +305,7 @@ describe('GET /api/ui/network (NET-ROUTE)', () => {
       servers: [],
       legacyReadUntil: null,
       contacts: { total: 0, sharing: 0 },
+      updateWouldDrop: 0,
     });
   });
 
@@ -383,6 +389,7 @@ describe('the network reader (NET-PROBE bounds)', () => {
           return Promise.resolve({
             total: 1,
             sharing: 1,
+            perServer: { 'wss://relay.primal.net': 1, 'wss://nos.lol': 0 },
             ...(o.lists
               ? { lists: [{ contactId: REF, relays: ['wss://relay.primal.net'], shared: 1 }] }
               : {}),
@@ -439,6 +446,12 @@ describe('the network reader (NET-PROBE bounds)', () => {
     expect(fake.lists()).toBe(0);
     const expanded = await reader.read({ contactHosts: true });
     expect(expanded.contactHosts?.[0]?.hosts).toEqual(['relay.primal.net']);
+    // Per-server contact counts are always there, also without the expand.
+    expect(plain.servers.map((s) => [s.host, s.contacts])).toEqual([
+      ['relay.primal.net', 1],
+      ['nos.lol', 0],
+    ]);
+    expect(expanded.servers[0]?.contacts).toBe(1);
     expect(fake.lists()).toBe(1);
   });
 
@@ -466,7 +479,7 @@ describe('the network reader (NET-PROBE bounds)', () => {
     expect(m2).not.toContain('relay');
   });
 
-  it('never rejects: a failing client answers not_running', async () => {
+  it('an unreadable own list rejects with fixed text (the route answers 503); other faults do not', async () => {
     const client: NetworkViewClient = {
       network: {
         servers: () => Promise.reject(new Error('wss://secret.example.org')),
@@ -477,9 +490,45 @@ describe('the network reader (NET-PROBE bounds)', () => {
       },
     };
     const reader = createNetworkReader(client, { now: () => Date.now() });
-    const body = await reader.read({ contactHosts: true });
-    expect(body.agent).toBe('not_running');
-    expect(JSON.stringify(body)).not.toContain('secret');
+    const err = await reader.read({ contactHosts: true }).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(Error);
+    expect(String(err)).not.toContain('secret');
     expect(await reader.mark()).toBeUndefined();
+    const route = networkRoutes[0] as LocalUiReadRoute;
+    const res = await route.handler(
+      {
+        client: undefined,
+        ownerContext: () => Promise.resolve(undefined),
+        applyOwnerAction: () => Promise.reject(new Error('never called')),
+        now: () => NOW_MS,
+        network: (o) => reader.read(o),
+      },
+      { params: {}, query: new URLSearchParams() },
+    );
+    expect(res).toEqual({ status: 503, body: { error: 'unavailable' } });
+    // Only the own list is a read failure: stats, contacts and probe faults still answer.
+    const partial = createNetworkReader(
+      {
+        network: {
+          ...client.network,
+          servers: () =>
+            Promise.resolve({
+              paused: false,
+              mode: 'custom',
+              own: ['wss://a.example.org', 'wss://b.example.org'],
+              legacy: [],
+              legacyReadUntil: 1,
+            }),
+        },
+      },
+      { now: () => Date.now() },
+    );
+    const body = await partial.read({ contactHosts: true });
+    expect(body.agent).toBe('running');
+    expect(body.servers.map((s) => s.host)).toEqual(['a.example.org', 'b.example.org']);
+    expect(body.updateWouldDrop).toBe(0);
   });
 });
