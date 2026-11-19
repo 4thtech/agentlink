@@ -134,6 +134,11 @@ export const PROOF_TEXT = Object.freeze({
     'This proof would go over your limit ({limit} a day), so nothing was recorded.',
   spendCeilingNextStep:
     "Tell the user: This is over your limit. You can change it in Settings › Rules in the AgentLink app. Don't ask for an approval: an approval can't go over this limit.",
+  // BUDGET-BROKEN-UX (06 §3, 07 §3.5): the spending record cannot be read; an approval cannot fix it.
+  budgetBroken:
+    "AgentLink can't check your spending limits right now, so nothing was recorded and nothing was charged.",
+  budgetBrokenNextStep:
+    "Tell the user: Please save your limits again in Settings › Rules in the AgentLink app. Don't ask for an approval: an approval can't fix this.",
   policyChanged: "The owner's rules changed while this ran, so nothing was recorded.",
   policyChangedNextStep: 'Call the tool again; it checks the current rules.',
   // M1-36i (owner decision 2026-10-22): free test credits, claimed once on the first proof that
@@ -376,6 +381,8 @@ export function proofRefusal(
   switch (code) {
     case 'SPEND_CEILING':
       return spendCeiling(details);
+    case 'BUDGET_BROKEN':
+      return fail('rejected', PROOF_TEXT.budgetBroken, PROOF_TEXT.budgetBrokenNextStep, code);
     case 'PROOFS_UNAVAILABLE':
       return fail('error', PROOF_TEXT.unavailable, PROOF_TEXT.unavailableNextStep, code);
     case 'ENVELOPE_NOT_FOUND':

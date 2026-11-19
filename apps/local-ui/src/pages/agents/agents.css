@@ -187,17 +187,6 @@
 .ag-row-removing .ag-label {
   opacity: 0.7;
 }
-.ag-error,
-.ag-error-box p {
-  color: var(--al-color-status-danger-fg);
-}
-.ag-error-box {
-  display: flex;
-  flex-direction: column;
-  gap: var(--al-space-3);
-  padding: var(--al-space-5);
-  align-items: flex-start;
-}
 .ag-page a.al-btn {
   text-decoration: none;
 }

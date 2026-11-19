@@ -153,11 +153,6 @@
   text-underline-offset: 3px;
   cursor: pointer;
 }
-.rs-error {
-  margin: 0;
-  color: var(--al-color-status-danger-fg);
-  font-size: 14px;
-}
 
 /* Step 1: found kits and the drop zone. */
 .rs-kits {
@@ -224,8 +219,7 @@
   flex: none;
 }
 .rs-kit:has(input:checked) .rs-tick,
-.rs-row:has(input:checked) .rs-tick,
-.rs-saved:has(input:checked) .rs-tick {
+.rs-row:has(input:checked) .rs-tick {
   background: var(--al-color-accent-default);
   border-color: var(--al-color-accent-default);
   color: var(--al-color-fg-on-accent);
@@ -469,24 +463,6 @@
   margin: 0;
   font-size: 14px;
   color: var(--al-color-fg-muted);
-}
-.rs-saved {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--al-space-3);
-  position: relative;
-  cursor: pointer;
-}
-.rs-saved input {
-  position: absolute;
-  opacity: 0;
-  inline-size: 24px;
-  block-size: 24px;
-  margin: 0;
-}
-.rs-saved:has(input:focus-visible) .rs-tick {
-  outline: 2px solid var(--al-color-focus-ring);
-  outline-offset: 2px;
 }
 .rs-apps {
   list-style: none;

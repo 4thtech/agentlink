@@ -156,7 +156,7 @@ The ceilings apply in every mode and, when the policy can't be read, as defaults
 
 ### Proofs, limits and cleanup
 
-- **One step per proof.** A Record is signed only under its held fee reservation: the reservation and the Record's row are stored in one transaction, which issues a single-use ticket, so a proof is never charged twice and parallel requests cannot pass the budget or the hard limits. An unsigned Record is signed again, replaced after its deadline, or recorded when the chain already shows it.
+- **One step per proof.** A Record is signed only under its held fee reservation: the reservation and the Record's row are stored in one transaction, which issues a single-use ticket, so a proof is never charged twice and parallel requests cannot pass the budget or the hard limits. From 0.5.14 the KeyStore itself holds the gate: it signs a proof record only with a one-time ticket issued for exactly that record, and never signs one twice. An unsigned Record is signed again, replaced after its deadline, or recorded when the chain already shows it.
 - **Terms count.** Offers, accepts and rejects count toward the sending limits like messages.
 - **Refused uploads.** When a send with files is refused after the files were uploaded, the uploads are removed.
 - **Delete history.** Receipts arriving after the delete sheet listed its items no longer make it fail; a new message or saved file still does.
@@ -171,7 +171,7 @@ The ceilings apply in every mode and, when the policy can't be read, as defaults
 
 - **No forward secrecy for stored messages** (04 §6). Owners must be able to read history (I-9), so a stolen encryption key opens past envelopes addressed to it. Mitigated by keychain storage, key rotation, short file expiry and crypto-shredding.
 - **Same-user processes** (G-1, D-67). A process running as the owner's OS user that modifies the installation, reads process memory or imitates a prompt can act beyond what I-4 promises. Limited by small balances, budgets, harness permissions, revocation and, in the desktop app, OS-drawn prompts.
-- **Signing gate in the core.** A proof is signed only under a single-use ticket tied to its budget reservation, but the core checks the ticket, not the KeyStore; code that calls the KeyStore directly is bounded by the typed-data rules only. Moving the gate into the KeyStore is planned before mainnet.
+- **The proof gate is a guard, not a wall (0.5.14).** The KeyStore signs a proof record only with a one-time ticket made for exactly that record, and the generic signing path refuses proof records. The KeyStore cannot see the spending ledger, so the core decides when to ask for a ticket. This stops faulty or generic code paths from signing a proof by accident; it is not a boundary against a program running as the same OS user (G-1).
 - **Several computers on one ID.** Until multi-device support and the on-chain allowance, spending limits and sending caps apply per computer. The app and `agentlink doctor` say when the same ID sends from another computer; a computer that only receives is not seen, and after 7 days without a sighting the notice stays on until a verified contact message addressed to this computer's current key shows it is the one in use.
 - **Old default relays.** During the 0.5.13 transition contacts that still list a dropped relay are reached there, and card updates also go there until 31 January 2027. Content stays end-to-end encrypted.
 - **Delivery not always confirmed.** A message that no relay serves back is reported as "Sent, availability unknown", not as confirmed.
@@ -182,11 +182,10 @@ The ceilings apply in every mode and, when the policy can't be read, as defaults
 
 ## Roadmap
 
-D-156 shipped in 0.5.10 to 0.5.13: received receipts on by default, the typed-data allowlist for the agent key, owner spending ceilings, sending and invite limits, full-text approval cards, the relay availability check, the restore guard and its traces, proof signing tied to the budget, and the notice when an ID is used on another computer. Released in 0.5.12: a message counts as sent once a relay serves it back, and a restore guard for spending and processed actions. Still to come, before mainnet (M3):
+D-156 shipped in 0.5.10 to 0.5.13, and in 0.5.14 (not released yet) the proof gate moves into the KeyStore: received receipts on by default, the typed-data allowlist for the agent key, owner spending ceilings, sending and invite limits, full-text approval cards, the relay availability check, the restore guard and its traces, proof signing tied to the budget, and the notice when an ID is used on another computer. Released in 0.5.12: a message counts as sent once a relay serves it back, and a restore guard for spending and processed actions. Still to come, before mainnet (M3):
 
 - Planned: an on-chain spending allowance per ID and network, set only by the owner.
 - Planned: a small signed helper on macOS that holds the agent key.
-- Planned: the proof-signing gate inside the KeyStore itself.
 
 ## Decisions behind the mechanisms
 

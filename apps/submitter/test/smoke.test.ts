@@ -107,9 +107,13 @@ describe('deploy smoke negative controls', () => {
     // can no longer be made through the KeyStore. The same bad signature is a valid one with its first
     // byte changed: it does not recover to the agent's address.
     const signer = Object.create(agent.signer, {
-      sign712: {
-        value: async (typedData: Parameters<typeof agent.signer.sign712>[0]) => {
-          const good = await agent.signer.sign712(typedData);
+      issueRecordTicket: {
+        value: (record: Parameters<typeof agent.signer.issueRecordTicket>[0]) =>
+          agent.signer.issueRecordTicket(record),
+      },
+      signRecord: {
+        value: async (...args: Parameters<typeof agent.signer.signRecord>) => {
+          const good = await agent.signer.signRecord(...args);
           const first = good.startsWith('0x') ? 2 : 0;
           const flipped = ((parseInt(good.slice(first, first + 2), 16) ^ 0xff) & 0xff)
             .toString(16)

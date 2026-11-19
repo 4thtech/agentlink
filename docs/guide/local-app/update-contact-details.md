@@ -28,6 +28,8 @@ It asks for your master code, then prints Contact details updated. Your contacts
 - Only you can do it. It needs Touch ID or your master code. Your AI cannot do it for you, and no AI tool can.
 - Your contacts do nothing. They receive your new details automatically.
 - Nothing breaks if you wait. For now AgentLink still reads from the old servers too, so nothing waiting there is lost, and it still reaches contacts whose invite lists them. New invites list only the new servers.
+- If no message server takes it. AgentLink publishes it again on its next pass (since 0.5.14, not released yet), so you do not need to do anything.
+- Your own list of message servers holds 2 to 8 servers; AgentLink keeps the first 8 of yours when it updates your details and says how many it left out (under Under the hood). Contacts' lists keep their limit of 16.
 - If it fails. Your contact details stay as they were. The notice says That didn't go through. Your contact details didn't change. Try again. If an earlier change of this ID is still finishing, try again in a minute. If it says to quit and open AgentLink again, do that and try once more.
 
 Back to [Home](home.md) or [The local app](README.md).

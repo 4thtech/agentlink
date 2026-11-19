@@ -56,7 +56,7 @@ import { VT_CLASS } from '@4thtech-io/ui';
 import { morph, toggleHood } from './hood.js';
 import { SectionRail, SectionSheet } from './section-menu.js';
 import { ShellDialogs, openShellDialog } from './shell-dialogs.js';
-import { StatusStrip } from './status-strip.js';
+import { StatusStrip, useStripReady } from './status-strip.js';
 import { ContactToasts } from './contact-toasts.js';
 import './shell.css';
 
@@ -242,7 +242,8 @@ export function Layout({
   const waiting = useApprovalsWaiting(path, waitingApprovals);
   const { hood } = usePrefs();
   const expanded = useMenuExpanded();
-  const settled = useUiSettingsSettled();
+  const settledSettings = useUiSettingsSettled();
+  const settled = useStripReady(hood, settledSettings);
   useShellKeys();
   useRouteAnnouncement(path);
   useEffect(() => {

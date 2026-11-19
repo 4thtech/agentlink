@@ -2,7 +2,8 @@
 //
 // The builders assemble the 05 §3.1 JSON form and hand it to @4thtech-io/crypto, which parses it
 // strictly and does the EIP-712 hashing that the shared vectors check in every runtime. Signing
-// happens only through `KeyStore.sign712` (04 §2.2): no key ever reaches this package.
+// happens only through `KeyStore.sign712`, and for a Record `KeyStore.signRecord` with its ticket
+// (04 §2.2; SEC-KEYSTORE-RECORD-GATE): no key ever reaches this package.
 //
 // Salts (04 §5, D-61): `buildRecord` draws a fresh 32-byte CSPRNG salt for every Record that has a
 // recipient and a random 256-bit nonce for every Record; it takes neither from its caller.
@@ -19,6 +20,7 @@ import {
   receiptTypedData,
   recordTypedData,
   type KeyStore,
+  type RecordTicket,
   type OccReceipt,
   type OccRecord,
   type OccV2Domain,
@@ -112,8 +114,14 @@ export interface BuiltReceipt {
   readonly digest: Hex;
 }
 
-/** The one KeyStore method the builders use. */
+/** The one KeyStore method the Receipt and card builders use. */
 export type TypedDataSigner = Pick<KeyStore, 'sign712'>;
+
+/**
+ * SEC-KEYSTORE-RECORD-GATE: the one KeyStore method a Record is signed with. KeyStore.sign712
+ * refuses every Record; signRecord needs the single-use ticket the KeyStore issued for it.
+ */
+export type RecordSigner = Pick<KeyStore, 'signRecord'>;
 
 const RECORD_INPUT_KEYS: ReadonlySet<string> = new Set([
   'chainId',
@@ -266,21 +274,35 @@ export function agentCardTypedData(card: unknown): TypedData {
   });
 }
 
+/** A caller-modified result would sign something other than what it shows: refuse it. */
+function checkDigest(td: TypedData, digest: string): void {
+  if (encodeHex0x(hashTypedData(td).digest) !== digest) {
+    fail('digest_mismatch', 'typed data does not match its digest');
+  }
+}
+
 async function signChecked(
   signer: TypedDataSigner,
   td: TypedData,
   digest: string,
 ): Promise<string> {
-  // A caller-modified result would sign something other than what it shows: refuse it.
-  if (encodeHex0x(hashTypedData(td).digest) !== digest) {
-    fail('digest_mismatch', 'typed data does not match its digest');
-  }
+  checkDigest(td, digest);
   return signer.sign712(td);
 }
 
-/** Signs a built Record with the agent EVM key through `KeyStore.sign712`. */
-export function signRecord(signer: TypedDataSigner, built: BuiltRecord): Promise<string> {
-  return Promise.resolve().then(() => signChecked(signer, built.typedData, built.digest));
+/**
+ * Signs a built Record with the agent EVM key through `KeyStore.signRecord`, with the ticket the
+ * KeyStore issued for this Record while its fee was reserved (SEC-KEYSTORE-RECORD-GATE).
+ */
+export function signRecord(
+  signer: RecordSigner,
+  built: BuiltRecord,
+  ticket: RecordTicket,
+): Promise<string> {
+  return Promise.resolve().then(() => {
+    checkDigest(built.typedData, built.digest);
+    return signer.signRecord(built.typedData, ticket);
+  });
 }
 
 /** Signs a built Receipt through `KeyStore.sign712`. */

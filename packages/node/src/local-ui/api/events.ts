@@ -17,6 +17,9 @@
 //   or newest exchange changed (widget.ts widgetActivityMark, an opaque mark compared here and never
 //   sent), not for a switch. Content-free: the page reads `GET /api/ui/widget` and
 //   `GET /api/ui/activity` again. Limits unchanged.
+// - NET-ROUTE: `network` `{at}` when the open ID's message-network facts changed (a finished probe or
+//   new per-server counters; network-view.ts mark, opaque, compared here and never sent), not for a
+//   switch. Content-free: the page reads `GET /api/ui/network` again.
 // - Changes only: while a stream is open the hub reads every 2 s (and at once on `poke`, after a
 //   switch), compares the allowlisted state with the last one sent, and emits only on a change.
 // - IDs and replay: `id: <boot>.<seq>`; `boot` is 8 random base64url characters chosen when the host
@@ -62,6 +65,11 @@ export interface LiveSnapshot {
    * when it cannot be read now. Compared here only; never written to a stream.
    */
   readonly activityMark?: string | undefined;
+  /**
+   * NET-ROUTE: the open ID's opaque network mark (network-view.ts), or undefined when it cannot be
+   * read now. Compared here only; never written to a stream.
+   */
+  readonly networkMark?: string | undefined;
 }
 
 /** One open stream's writer (the server adapts its response). */
@@ -139,6 +147,7 @@ export class LiveEvents {
   #mark: string | undefined;
   /** TRAY-WIDGET-API: the last activity mark read (never sent). */
   #activityMark: string | undefined;
+  #networkMark: string | undefined;
   #timer: unknown;
   #reading: Promise<void> | undefined;
   #closed = false;
@@ -293,6 +302,9 @@ export class LiveEvents {
     const activityMark = raw.activityMark;
     const prevActivityMark = this.#activityMark;
     if (typeof activityMark === 'string') this.#activityMark = activityMark;
+    const networkMark = raw.networkMark;
+    const prevNetworkMark = this.#networkMark;
+    if (typeof networkMark === 'string') this.#networkMark = networkMark;
     if (prev === undefined) return;
     const at = this.#seconds();
     const switched = prev.generation !== next.generation || prev.current !== next.current;
@@ -316,6 +328,15 @@ export class LiveEvents {
     ) {
       // TRAY-WIDGET-API: only `at`; the widget reads its data again through the usual reads.
       this.#emit('activity', { at });
+    }
+    if (
+      !switched &&
+      typeof networkMark === 'string' &&
+      prevNetworkMark !== undefined &&
+      networkMark !== prevNetworkMark
+    ) {
+      // NET-ROUTE: only `at`; Advanced › Message network reads `GET /api/ui/network` again.
+      this.#emit('network', { at });
     }
   }
 

@@ -15,7 +15,12 @@ import {
 const NOW = 1_800_000_000;
 const ID = `0x${'a'.repeat(64)}`;
 const OTHER = `0x${'b'.repeat(64)}`;
-const built = (recordId: string) => ({ recordId }) as unknown as BuiltRecord;
+const built = (recordId: string) =>
+  ({ recordId, typedData: { primaryType: 'Record' } }) as unknown as BuiltRecord;
+/** A stand-in KeyStore: hands out a fresh opaque ticket (its checks are the conformance suite's). */
+const keyStore = {
+  issueRecordTicket: vi.fn(() => Object.freeze({ kind: 'record-ticket' as const })),
+};
 
 async function reserved(recordId = ID, state: 'reserved' | 'released' = 'reserved') {
   const store = new MemoryStore();
@@ -52,10 +57,12 @@ async function reserved(recordId = ID, state: 'reserved' | 'released' = 'reserve
 }
 
 const ticketFor = (store: Store, recordId = ID) =>
-  store.transaction((tx) => issueRecordTicket(tx, recordId));
+  store.transaction((tx) => issueRecordTicket(tx, keyStore, built(recordId)));
 
 const run = (store: Store, ticket: RecordTicket, record = built(ID)) => {
-  const sign = vi.fn(() => Promise.resolve('0xsig'));
+  const sign = vi.fn((_built: BuiltRecord, permit: unknown) =>
+    Promise.resolve(permit === ticket.permit ? '0xsig' : '0xwrong-permit'),
+  );
   const out = signUnderReservation({
     store,
     ticket,
@@ -67,9 +74,19 @@ const run = (store: Store, ticket: RecordTicket, record = built(ID)) => {
 };
 
 describe('the Record signing gate (SEC-RECORD-ATOMIC)', () => {
-  it('no ticket without a held reservation and a signing row', async () => {
+  it('no ticket without a held reservation and a signing row; the KeyStore is not asked', async () => {
+    keyStore.issueRecordTicket.mockClear();
     expect(await ticketFor(await reserved(ID, 'released'))).toBeUndefined();
     expect(await ticketFor(await reserved(), OTHER)).toBeUndefined();
+    expect(keyStore.issueRecordTicket).not.toHaveBeenCalled();
+  });
+
+  it('a held reservation: the KeyStore issues its ticket for exactly that Record', async () => {
+    keyStore.issueRecordTicket.mockClear();
+    const record = built(ID);
+    const store = await reserved();
+    await store.transaction((tx) => issueRecordTicket(tx, keyStore, record));
+    expect(keyStore.issueRecordTicket).toHaveBeenCalledExactlyOnceWith(record.typedData);
   });
 
   it('a held reservation: signs once and stores the signed item', async () => {
@@ -84,7 +101,10 @@ describe('the Record signing gate (SEC-RECORD-ATOMIC)', () => {
 
   it('a forged ticket, a reused ticket, or one for another Record is refused before signing', async () => {
     const store = await reserved();
-    const forged = run(store, Object.freeze({ recordId: ID }));
+    const forged = run(
+      store,
+      Object.freeze({ recordId: ID, permit: Object.freeze({ kind: 'record-ticket' as const }) }),
+    );
     await expect(forged.out).rejects.toThrow();
     expect(forged.sign).not.toHaveBeenCalled();
 

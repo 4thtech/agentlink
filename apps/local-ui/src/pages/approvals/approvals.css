@@ -29,12 +29,6 @@
 }
 .al-approvals .al-lede,
 .al-approvals .al-note,
-.al-approvals .al-or {
-  margin: 0;
-  color: var(--al-color-fg-muted);
-  font-size: 13px;
-  line-height: 18px;
-}
 .al-approvals .al-list,
 .al-approvals .al-notices,
 .al-approvals .al-slot,

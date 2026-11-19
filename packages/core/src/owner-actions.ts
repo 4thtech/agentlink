@@ -83,9 +83,11 @@ import {
 } from './owner-prepare.js';
 import {
   POLICY_DEFAULTS_EFFECTIVE,
+  budgetSpentMicros,
   type EffectivePolicy,
   type PolicyProblem,
 } from './policy-engine.js';
+import { budgetLedgerSummable, readBudgetLedger } from './budget.js';
 import { SINGLETON_SLOT, type Row, type Sealed } from './store/schema.js';
 import type { StoreTx } from './store/store.js';
 
@@ -276,25 +278,36 @@ const nonceRow = (signed: SignedOwnerAction, actionHash: string, now: number) =>
   applied_at: now,
 });
 
-/** 07 §3.5: the next applied policy.set starts a fresh ledger when the ledger is broken or gone. */
+/**
+ * 07 §3.5 (BUDGET-RECOVER): the next applied policy.set starts a fresh ledger whenever the ledger,
+ * read successfully, cannot be summed at `now`: `budget_state` missing or `broken`, a row the engine
+ * finds inconsistent, a row from a later epoch, or a clock earlier than its newest entry (a clock
+ * once set forward). The fresh epoch is past the state's and every row's epoch, so no older row
+ * counts in it. A ledger that can be summed is left as it is (a save never resets what was spent).
+ * A read error is thrown (R3-M1): the save fails, nothing is reset, and the owner retries. Only an
+ * owner-signed policy.set reaches this; nothing else resets the ledger.
+ */
 function freshLedgerIfBroken(tx: StoreTx, now: number): void {
+  // Reads propagate their errors: a failed read never looks like a broken ledger here.
+  const view = readBudgetLedger(tx);
+  const rows = tx.select('budget_ledger');
   const state = tx.select('budget_state')[0];
-  if (state !== undefined && state.status !== 'broken') return;
-  const fresh = { status: 'ok' as const, newest_t: now, since: now, broken_at: null };
-  if (state !== undefined) {
-    tx.update(
-      'budget_state',
-      { slot: SINGLETON_SLOT },
-      { ...fresh, ledger_epoch: state.ledger_epoch + 1 },
-    );
-    return;
-  }
-  const epochs = tx.select('budget_ledger').map((r) => r.ledger_epoch);
-  tx.insert('budget_state', {
-    slot: SINGLETON_SLOT,
+  if (budgetSpentMicros(view, now) !== 'broken') return;
+  // An epoch at or past the highest safe integer (corruption only) is left out, so such a row stays
+  // in a later epoch and keeps the record refused (fail closed; card BUDGET-CORRUPT-REPAIR).
+  const usable = (e: unknown): e is number =>
+    typeof e === 'number' && Number.isSafeInteger(e) && e >= 0 && e < Number.MAX_SAFE_INTEGER;
+  const epochs = rows.map((r) => r.ledger_epoch).filter(usable);
+  if (state !== undefined && usable(state.ledger_epoch)) epochs.push(state.ledger_epoch);
+  const fresh = {
+    status: 'ok' as const,
     ledger_epoch: (epochs.length === 0 ? 0 : Math.max(...epochs)) + 1,
-    ...fresh,
-  });
+    newest_t: now,
+    since: now,
+    broken_at: null,
+  };
+  tx.delete('budget_state', {});
+  tx.insert('budget_state', { slot: SINGLETON_SLOT, ...fresh });
 }
 
 export class OwnerActions {
@@ -1293,8 +1306,11 @@ export class OwnerActions {
       key,
       computeActionDigest(signed.body.params.policy),
     );
-    const now = base.now;
     const outcome = await this.#ctx.store.transaction((tx): OwnerActionOutcome => {
+      // R2-M1 (0.5.12 rule): the clock is read inside the transaction that checks the spending
+      // record, so a proof reserved while this save was verified can never make a healthy record
+      // look unsummable (and be reset) at an earlier `now`.
+      const now = nowOf(this.#ctx);
       if (tx.get('owner_action_nonces', { nonce: signed.body.nonce }) !== undefined) {
         return refused('policy.set', 'nonce_used');
       }
@@ -1336,6 +1352,20 @@ export class OwnerActions {
    */
   async loadPolicy(): Promise<EffectivePolicy> {
     return (await this.#inspectPolicy()).effective;
+  }
+
+  /**
+   * BUDGET-RECOVER (07 §3.5; 11 §5.11): true when the spending record cannot be summed now, so
+   * paid actions are refused (BUDGET_BROKEN) until the owner saves the rules again (any applied
+   * policy.set starts a fresh record). Read-only: it changes and grants nothing (I-4). A read error
+   * is true (fail closed: the owner is offered the save).
+   */
+  async spendingRecordNeedsSave(): Promise<boolean> {
+    try {
+      return await this.#ctx.store.transaction((tx) => !budgetLedgerSummable(tx, nowOf(this.#ctx)));
+    } catch {
+      return true;
+    }
   }
 
   /**

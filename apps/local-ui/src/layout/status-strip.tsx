@@ -10,19 +10,25 @@ import { useEffect, useState, useSyncExternalStore, type ReactElement } from 're
 import type { ApiResult } from '../api/client.js';
 import { parseRelays } from '../pages/advanced/relays.js';
 import { parseHealth, readHealth } from './health.js';
-import { subscribeHealth } from './health-feed.js';
+import { lastHealthResult, subscribeHealth } from './health-feed.js';
 import { getLive, subscribeLive, LIVE_WORDS, type LiveState } from '../api/live.js';
 import { LiveDot } from './agent-switcher.js';
 import { SHELL_STRINGS as S } from '../strings.js';
 import type { ConnectionState } from './connection.js';
 import { healthWord } from './health-word.js';
 import { VT_CLASS } from '@4thtech-io/ui';
+import { navigate } from '../router.js';
+
+/** NET-UI-A: the strip's servers item opens Advanced › Message network. */
+const NETWORK_PAGE = '/advanced/network';
 
 export interface StripItem {
   readonly label: string;
   readonly value: string;
   /** Absent for a plain fact (no dot). */
   readonly state?: LiveState;
+  /** NET-UI-A: where the item leads (the strip shows only under the hood). */
+  readonly href?: string;
 }
 
 /**
@@ -48,6 +54,7 @@ export function serverFacts(
     items.push({
       label: S.hoodServerRelays,
       value: `${String(relays.connected)} of ${String(relays.total)} connected`,
+      href: NETWORK_PAGE,
     });
   }
   if (relays?.lastSyncAt !== undefined) {
@@ -94,10 +101,44 @@ export function uptimeOf(value: unknown): string | undefined {
 }
 
 function useServerFacts(): StripItem[] {
-  const [result, setResult] = useState<ApiResult<unknown> | undefined>(undefined);
+  // Starts from the answer the shared poller already has: the facts come with the first render.
+  const [result, setResult] = useState<ApiResult<unknown> | undefined>(lastHealthResult);
   useEffect(() => subscribeHealth(readHealth, { onResult: setResult }), []);
   const port = typeof window === 'undefined' ? '' : window.location.port;
   return serverFacts(result, port);
+}
+
+const NO_SUBSCRIBE = (): (() => void) => () => undefined;
+
+/** The longest the shell holds the page for the strip's first answers (layout shift guard). */
+const STRIP_WAIT_MS = 1500;
+
+/**
+ * CLS: the strip's lines come from two reads (the AI apps, the server's facts); a narrow screen
+ * wraps them onto several lines, so each late answer pushed the page down. Under the hood the shell
+ * holds the page until both have answered (at most STRIP_WAIT_MS), then shows strip and page in one
+ * frame. Latches: once true it stays true.
+ */
+export function useStripReady(hood: boolean, settled: boolean): boolean {
+  // Only under the hood: otherwise the strip is not shown and nothing here follows the live store.
+  const live = useSyncExternalStore(hood ? subscribeLive : NO_SUBSCRIBE, getLive, getLive);
+  const [healthAnswered, setHealthAnswered] = useState(() => lastHealthResult() !== undefined);
+  const [late, setLate] = useState(false);
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    if (!hood) return undefined;
+    return subscribeHealth(readHealth, { onResult: () => setHealthAnswered(true) });
+  }, [hood]);
+  useEffect(() => {
+    const t = setTimeout(() => setLate(true), STRIP_WAIT_MS);
+    return () => clearTimeout(t);
+  }, []);
+  const answered = (live.list !== undefined || live.error) && healthAnswered;
+  const ready = settled && (!hood || answered || late);
+  useEffect(() => {
+    if (ready) setDone(true);
+  }, [ready]);
+  return ready || done;
 }
 
 const RANK: Readonly<Record<LiveState, number>> = {
@@ -168,8 +209,28 @@ export function StatusStrip({
                 data-server-fact
                 {...(index === 0 ? { 'data-fact-first': '' } : {})}
               >
-                <span className="al-strip-label">{item.label}</span>
-                <span className="al-strip-value">{item.value}</span>
+                {item.href === undefined ? (
+                  <>
+                    <span className="al-strip-label">{item.label}</span>
+                    <span className="al-strip-value">{item.value}</span>
+                  </>
+                ) : (
+                  <a
+                    className="al-strip-link"
+                    href={item.href}
+                    onClick={(e) => {
+                      // A plain click stays in the app; a modified click or a middle click is the browser's.
+                      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0)
+                        return;
+                      e.preventDefault();
+                      navigate(item.href ?? NETWORK_PAGE);
+                    }}
+                  >
+                    <span className="al-strip-label">{item.label}</span>
+                    <span className="al-strip-value">{item.value}</span>
+                    <span aria-hidden="true">›</span>
+                  </a>
+                )}
               </li>
             ))}
       </ul>

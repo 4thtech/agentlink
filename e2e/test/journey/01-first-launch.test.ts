@@ -41,6 +41,9 @@ describe('chapter 1: onboarding', () => {
     await emulateReducedMotion(page);
     await page.goto(await startUi(pc, ready.files, ch.closers));
     await observeLayoutShift(page);
+    // Counting starts at the first paint: the web-font swap must not shift the layout (the app
+    // preloads the font and a size-matched fallback stands in until it arrives).
+    await page.getByRole('heading', { name: 'Which AI app do you use?' }).waitFor();
     const probe = await jp.arm();
 
     // Step 1 (A1): the app opens on Get started; Claude Code is found on this computer and picked.

@@ -45,6 +45,11 @@ export function resetHealthFeedForTests(): void {
   lastResult = undefined;
 }
 
+/** The poller's latest raw answer, if it has one yet (a strip that mounts later starts from it). */
+export function lastHealthResult(): ApiResult<unknown> | undefined {
+  return lastResult;
+}
+
 /** Follow the shared health poller (starting it if needed); returns the unsubscribe. */
 export function subscribeHealth(
   read: () => Promise<ApiResult<unknown>>,

@@ -19,7 +19,7 @@ describe('serverFacts', () => {
     expect(facts.map((f) => [f.label, f.value])).toEqual([
       ['Version', '0.5.1'],
       ['Port', '48123'],
-      ['Relays', '2 of 3 connected'],
+      ['Servers', '2 of 3 connected'],
       ['Last checked', expect.stringMatching(/^\d\d:\d\d$/)],
     ]);
   });

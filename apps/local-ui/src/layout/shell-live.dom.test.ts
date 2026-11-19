@@ -263,8 +263,8 @@ describe('the live status strip (Under the hood)', () => {
 
   it('keeps its items in place while the first answer arrives (no items before it)', async () => {
     serve({ underTheHood: true });
-    // Hold the agents read: the strip shows its (fixed height) region, but no item yet that the AI
-    // apps would push along when they arrive (a layout shift).
+    // Hold the agents read: the shell holds the strip (and the page) until the apps and the server's
+    // facts have both answered, so neither pushes a line along when it arrives (a layout shift).
     const real = globalThis.fetch;
     let release!: () => void;
     const held = new Promise<void>((r) => {
@@ -275,10 +275,10 @@ describe('the live status strip (Under the hood)', () => {
       return real(input, init);
     });
     await mount();
-    expect(q('[aria-label="Live status"]')).not.toBeNull();
     expect(qa('[aria-label="Live status"] li')).toEqual([]);
     release();
     await settle();
+    expect(q('[aria-label="Live status"]')).not.toBeNull();
     const items = qa('[aria-label="Live status"] li').map((li) => li.textContent);
     // The AI apps come first, then AgentLink; never AgentLink alone that the apps then push along.
     expect(items[items.length - 1]).toContain('AgentLink');

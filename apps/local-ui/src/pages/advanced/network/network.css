@@ -1,0 +1,104 @@
+/* NET-UI-A: Advanced › Message network (Under the hood only). Tokens only; shapes differ as well as
+   colour. The bordered surface (.nw-list, .nw-card) is shared with .ad-list in advanced.css. */
+.nw,
+.nw-card,
+.nw-srv,
+.nw-contact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+}
+.nw {
+  gap: var(--al-space-4);
+}
+.nw-card {
+  padding: var(--al-space-4);
+}
+.nw-head,
+.nw-reach,
+.nw-srv-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-3);
+}
+.nw :is(h2, h3, p) {
+  margin: 0;
+}
+.nw ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.nw-srv,
+.nw-contact {
+  gap: var(--al-space-2);
+  padding-block: var(--al-space-3);
+  border-block-start: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.nw-srv {
+  padding-inline: var(--al-space-4);
+}
+.nw-srv:first-child,
+.nw-contact:first-child {
+  border-block-start: 0;
+}
+.nw-srv.is-old {
+  background: var(--al-color-bg-sunken);
+}
+.nw-srv-top {
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  min-inline-size: 0;
+}
+.nw-host,
+.nw-hosts li,
+.nwd-nd-name {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nw-diagram-slot:empty {
+  display: none;
+}
+.nw-state,
+.nwd-nd-r {
+  margin-inline-start: auto;
+  flex: none;
+  color: var(--al-color-fg-muted);
+  white-space: nowrap;
+}
+.nw-meta,
+.nw-hosts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-1) var(--al-space-4);
+}
+.nw-hosts .is-shared {
+  color: var(--al-color-fg-default);
+}
+.nw-detail {
+  color: var(--al-color-status-warning-fg);
+}
+.nw-contact-name {
+  font-weight: var(--al-font-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+/* The health dot: the app's .al-dot shapes (filled, hollow, slashed) plus half and square here. */
+.nw-dot {
+  flex: none;
+}
+.nw-dot.is-half,
+.nw-dot.is-square {
+  border: var(--al-border-width-thin) solid var(--al-color-status-warning-icon);
+}
+.nw-dot.is-half {
+  background: linear-gradient(90deg, var(--al-color-status-warning-icon) 50%, transparent 50%);
+}
+.nw-dot.is-square {
+  background: var(--al-color-status-warning-icon);
+  border-radius: var(--al-radius-xs);
+}

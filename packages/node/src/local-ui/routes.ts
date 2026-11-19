@@ -71,6 +71,8 @@ import { filesSaveRoute } from './api/files-save.js';
 import { firstRunRoutes } from './api/first-run.js';
 // M1-11s-a-d: the status bar's health read (read-only).
 import { healthRoutes } from './api/health.js';
+// NET-ROUTE: the Message network view read (read-only).
+import { networkRoutes } from './api/network.js';
 // UX2-d1: create, check and accept an invite.
 import { invitesRoutes } from './api/invites.js';
 import { messagesRoutes } from './api/messages.js';
@@ -527,6 +529,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     firstRunRoutes,
     // M1-11s-a-d: the status bar's health read.
     healthRoutes,
+    // NET-ROUTE: the Message network view read (Under the hood).
+    networkRoutes,
     activityRoutes,
     // UX2-f1: the activity pulse, before the Messages routes so `pulse` never reaches :contactId.
     [pulseRoute],

@@ -1,9 +1,13 @@
 // SEC-KS-712-ALLOWLIST: what the agent key signs through KeyStore.sign712 (04 §3.1.1, 07 §6.2).
+// SEC-KEYSTORE-RECORD-GATE: an allowed Record is signed only through KeyStore.signRecord with the
+// single-use ticket issued for its exact digest (record-ticket.ts); sign712 refuses it
+// (sign712Snapshot), so no generic path in the store signs a Record.
 //
 // The agent EVM key signs only AgentLink's own record, receipt, card and top-up formats. Every
-// KeyStore backend calls typedDataSnapshot(typedData, ownAddress, nowSeconds) before it reads a
-// seed, and signs the snapshot it returns, never the caller's object. Stateless: no counters, so
-// nothing to restore or sync. An OwnerSession's sign712 (cardSig, Registration) is not affected.
+// KeyStore backend checks the request before it reads a seed and signs the snapshot it returns,
+// never the caller's object: sign712 through sign712Snapshot (receipts, cards, top-ups; never a
+// Record), a Record only through signRecord with its ticket (recordSnapshot). Both build on the
+// module-internal typedDataSnapshot. Stateless: no counters, so nothing to restore or sync. An OwnerSession's sign712 (cardSig, Registration) is not affected.
 //
 // Allowed, with the exact types of @4thtech-io/crypto (field names, types and order) and exactly the
 // declared fields:
@@ -110,7 +114,9 @@ export type TypedDataRefusal =
   | 'app_not_allowed'
   | 'deadline_not_allowed'
   | 'payee_not_allowed'
-  | 'value_not_allowed';
+  | 'value_not_allowed'
+  /** SEC-KEYSTORE-RECORD-GATE: a Record goes only through KeyStore.signRecord with its ticket. */
+  | 'record_needs_ticket';
 
 /** The one fixed message per refusal (I-7: none names an input). */
 export const TYPED_DATA_REFUSED: Readonly<Record<TypedDataRefusal, string>> = Object.freeze({
@@ -123,6 +129,7 @@ export const TYPED_DATA_REFUSED: Readonly<Record<TypedDataRefusal, string>> = Ob
   deadline_not_allowed: 'sign712: the deadline is too far ahead',
   payee_not_allowed: 'sign712: a top-up pays only the fee vault',
   value_not_allowed: 'sign712: the top-up value is above the cap',
+  record_needs_ticket: 'sign712: a record is signed only with its reservation ticket',
 });
 
 const refused = (reason: TypedDataRefusal): CryptoInputError =>
@@ -310,6 +317,36 @@ export function typedDataSnapshot(
   } catch {
     throw refused('malformed');
   }
+  return snapshot;
+}
+
+/**
+ * SEC-KEYSTORE-RECORD-GATE: what KeyStore.sign712 signs. The allowlist of typedDataSnapshot, except
+ * that an allowed OCC v2 `Record` is refused with `record_needs_ticket`: a Record is signed only
+ * through KeyStore.signRecord with the ticket issued for it (record-ticket.ts). Never reads a key.
+ */
+export function sign712Snapshot(
+  typedData: unknown,
+  ownAddress: string,
+  nowSeconds: number,
+): TypedData {
+  const snapshot = typedDataSnapshot(typedData, ownAddress, nowSeconds);
+  if (snapshot.primaryType === 'Record') throw refused('record_needs_ticket');
+  return snapshot;
+}
+
+/**
+ * SEC-KEYSTORE-RECORD-GATE: what KeyStore.issueRecordTicket and signRecord accept. An OCC v2
+ * `Record` that passes the allowlist of typedDataSnapshot; any other primary type is
+ * `type_not_allowed`. Never reads a key.
+ */
+export function recordSnapshot(
+  typedData: unknown,
+  ownAddress: string,
+  nowSeconds: number,
+): TypedData {
+  const snapshot = typedDataSnapshot(typedData, ownAddress, nowSeconds);
+  if (snapshot.primaryType !== 'Record') throw refused('type_not_allowed');
   return snapshot;
 }
 

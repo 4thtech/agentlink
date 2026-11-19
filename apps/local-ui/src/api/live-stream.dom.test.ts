@@ -480,6 +480,39 @@ describe('the contacts event (W5-INVITE-FEEDBACK)', () => {
   });
 });
 
+// NET-UI-A (0.5.14): the stream's `network` {at} becomes agentlink:network-changed (the Message
+// network view reads again); it is not an agents change.
+describe('the network event (NET-UI-A)', () => {
+  it('announces agentlink:network-changed, not agentlink:agents-changed', async () => {
+    const s = serve();
+    let seen = 0;
+    const onNetwork = (): void => {
+      seen += 1;
+    };
+    window.addEventListener('agentlink:network-changed', onNetwork);
+    try {
+      subscribeLive(() => undefined);
+      await flush();
+      s.streams[0]?.push(
+        block('BOOTboot.1', 'snapshot', {
+          generation: 1,
+          current: 'default',
+          agents: [record()],
+          at: NOW,
+        }),
+      );
+      await flush();
+      const agentsBefore = changed;
+      s.streams[0]?.push(block('BOOTboot.2', 'network', { at: NOW }));
+      await flush();
+      expect(seen).toBe(1);
+      expect(changed).toBe(agentsBefore);
+    } finally {
+      window.removeEventListener('agentlink:network-changed', onNetwork);
+    }
+  });
+});
+
 // TRAY-WIDGET-UI: the stream's activity {at} becomes agentlink:activity-changed (the widget reads again).
 describe('the activity event (TRAY-WIDGET-UI)', () => {
   it('announces agentlink:activity-changed, not agentlink:agents-changed', async () => {

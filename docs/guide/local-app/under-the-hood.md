@@ -3,7 +3,7 @@
 <!-- ai-knowledge: summary
 summary: The Under the hood switch (off by default) that shows more detail on the same screens, such as message IDs, exact times, receipts and extra pages, for people who want to look closer. -->
 
-*More facts on My IDs, People, Activity and Backup & restore are new in 0.5.0; the app's own facts in the status strip are new in 0.5.1.*
+*The live Message network view is new in 0.5.14 (not released yet). More facts on My IDs, People, Activity and Backup & restore are new in 0.5.0; the app's own facts in the status strip are new in 0.5.1.*
 
 Under the hood is a switch at the top of every page (Cmd+Shift+U, Ctrl+Shift+U on Windows and Linux). It is off by default. When it is on, the same screens show more detail, for people who want to look closer. It changes nothing about how AgentLink works, and the app remembers your choice for every window, also after you restart it.
 
@@ -23,7 +23,7 @@ Under the hood is a switch at the top of every page (Cmd+Shift+U, Ctrl+Shift+U o
 ## Extra pages
 
 - **Live activity stream.** What is happening now, as it happens.
-- **Network.** How AgentLink reaches the network. It is picked automatically and named here only. **Network status** shows the real count, for example **0 of 3 connected**, and **Last checked**, the last time a message server answered (**Checking the connection…** before the first check).
+- **Message network** (in Settings › Advanced; a live view since 0.5.14). How your messages travel, picked automatically. A diagram shows three columns: you, the message servers, and your contacts (on a phone-sized window it folds into a list). Each server has a card with its health (**Working**, **Slow**, **Can't reach**), connect and round-trip speed, its role (**Sends and receives**, or an old server that is read only), what happened in the last 24 hours (accepted, failed, received) and how many contacts use it too. "Reaches N contacts" says how many of your contacts share a server with you, and **Show contacts' servers** lists theirs. The status strip links here. AgentLink checks the servers from this computer while the page is open; the page shows counts and server names only, never a message. Without Under the hood you see none of this, and nothing about how messages travel changes.
 - **Diagnostics.** A report you can copy and share when you ask for help. It never contains a key, a code, a token or a private link.
 - **Connections map.** The live map of your IDs and the people they talk to.
 

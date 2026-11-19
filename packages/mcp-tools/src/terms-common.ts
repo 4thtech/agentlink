@@ -166,6 +166,9 @@ export function termsRefusal(
     case 'SPEND_CEILING':
       // D-156: over a hard ceiling the owner set; never an approval.
       return proofRefusal(code, fields);
+    case 'BUDGET_BROKEN':
+      // BUDGET-BROKEN-UX: the spending record cannot be read; never an approval.
+      return proofRefusal(code);
     case 'CHAIN_UNAVAILABLE':
     case 'CARD_EXPIRED':
       // The proof could not be priced or would not verify (M1-9d-3): nothing was sent or asked.

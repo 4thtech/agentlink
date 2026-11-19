@@ -51,6 +51,8 @@ interface Agent {
   readonly id: string;
   /** Every Record the KeyStore was asked to sign, in order. */
   readonly signed: BuiltRecord[];
+  /** SEC-KEYSTORE-RECORD-GATE: the KeyStore's record-related calls, in order. */
+  readonly keyCalls: string[];
   /** Runs before each Record signature (the test's view at the moment of signing). */
   hook: SignHook | undefined;
   /** Runs before each Record submission, with the signature already stored. */
@@ -71,14 +73,38 @@ async function openAgent(
   restoreMark?: RestoreMark,
 ): Promise<Agent> {
   const store = new MemoryStore();
-  const keyStore = new MemoryKeyStore(seed(n), { nowSeconds: () => clock.now() });
+  const inner = new MemoryKeyStore(seed(n), { nowSeconds: () => clock.now() });
+  const keyCalls: string[] = [];
+  // Records which KeyStore methods the proof flow uses for typed data (SEC-KEYSTORE-RECORD-GATE).
+  const keyStore: KeyStore = new Proxy(inner, {
+    get(target, prop) {
+      const value: unknown = Reflect.get(target, prop, target);
+      if (typeof value !== 'function') return value;
+      return (...args: unknown[]) => {
+        if (prop === 'sign712') {
+          keyCalls.push(`sign712:${String((args[0] as { primaryType?: unknown }).primaryType)}`);
+        } else if (prop === 'issueRecordTicket' || prop === 'signRecord') {
+          keyCalls.push(prop);
+        }
+        return (value as (...a: unknown[]) => unknown).apply(target, args);
+      };
+    },
+  });
   const base = chain.platform();
   const cipher = new TestStoreCipher();
   type Mutable = { -readonly [K in keyof Agent]: Agent[K] };
   // `client`, `id` and `policyVersion` are filled in below, once the client exists.
   const agent: Pick<
     Mutable,
-    'store' | 'cipher' | 'keyStore' | 'owner' | 'signed' | 'hook' | 'submitHook' | 'submits'
+    | 'store'
+    | 'cipher'
+    | 'keyStore'
+    | 'owner'
+    | 'signed'
+    | 'keyCalls'
+    | 'hook'
+    | 'submitHook'
+    | 'submits'
   > &
     Partial<Mutable> = {
     store,
@@ -86,6 +112,7 @@ async function openAgent(
     keyStore,
     owner,
     signed: [],
+    keyCalls,
     hook: undefined,
     submitHook: undefined,
     submits: 0,
@@ -108,10 +135,10 @@ async function openAgent(
     ],
     kit: {
       ...base.kit,
-      signRecord: async (signer, built) => {
+      signRecord: async (signer, built, ticket) => {
         agent.signed.push(built);
         await agent.hook?.(built, store);
-        return base.kit.signRecord(signer, built);
+        return base.kit.signRecord(signer, built, ticket);
       },
     },
   };
@@ -217,6 +244,40 @@ describe('a Record is signed only under a stored reservation (SEC-RECORD-ATOMIC)
     chain.censor = false;
     expect(await a.client.proofs.resubmitPending()).toMatchObject({ replaced: 1 });
     expect(seen).toEqual(['reserved']);
+  });
+});
+
+describe('the KeyStore holds the record-signing gate (SEC-KEYSTORE-RECORD-GATE)', () => {
+  it('a Record is signed through signRecord with a ticket issued for it, never sign712', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b, 'one');
+    a.keyCalls.length = 0;
+    expect(await a.client.notarize({ envelopeId })).toMatchObject({ status: 'ok' });
+    expect(a.keyCalls).toEqual(['issueRecordTicket', 'signRecord']);
+  });
+
+  it('a replacement gets its own ticket for its own Record', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b, 'one');
+    chain.censor = true;
+    expect(await a.client.notarize({ envelopeId })).toMatchObject({ status: 'submitted' });
+    clock.t += 3601 + 60;
+    chain.censor = false;
+    a.keyCalls.length = 0;
+    expect(await a.client.proofs.resubmitPending()).toMatchObject({ replaced: 1 });
+    expect(a.keyCalls).toEqual(['issueRecordTicket', 'signRecord']);
+    expect(a.keyCalls.some((c) => c === 'sign712:Record')).toBe(false);
+  });
+
+  it('a proof the rules deny asks the KeyStore for no ticket and no signature', async () => {
+    const { a, b } = await twoAgents();
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'deny';
+    });
+    const envelopeId = await sendText(a, b, 'one');
+    a.keyCalls.length = 0;
+    expect(await a.client.notarize({ envelopeId })).not.toMatchObject({ status: 'ok' });
+    expect(a.keyCalls).toEqual([]);
   });
 });
 

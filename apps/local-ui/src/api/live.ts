@@ -50,6 +50,8 @@ const CHANGED = 'agentlink:agents-changed';
 const CONTACTS_CHANGED = 'agentlink:contacts-changed';
 /** The widget page listens for this (pages/widget WIDGET_ACTIVITY_DOM_EVENT). */
 const ACTIVITY_CHANGED = 'agentlink:activity-changed';
+/** NET-UI-A: the Message network view listens for this (pages/advanced/network/data.ts NETWORK_CHANGED). */
+const NETWORK_CHANGED = 'agentlink:network-changed';
 
 /** A plain status (08 §1): Working (pulsing) / Ready / Idle / Not running / Not set up / Paused. */
 export type LiveState = 'working' | 'ready' | 'idle' | 'off' | 'none' | 'paused' | 'removing';
@@ -537,6 +539,12 @@ function onStreamEvent(e: SseEvent): void {
   if (e.event === 'activity') {
     attempt = 0;
     window.dispatchEvent(new Event(ACTIVITY_CHANGED));
+    return;
+  }
+  // NET-UI-A: the message network's counters or a probe changed (`{at}` only). The view reads again.
+  if (e.event === 'network') {
+    attempt = 0;
+    window.dispatchEvent(new Event(NETWORK_CHANGED));
     return;
   }
   const generation = timeOf(data['generation']);

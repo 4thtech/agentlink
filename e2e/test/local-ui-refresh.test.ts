@@ -71,7 +71,7 @@ const PAGES = [
   { path: '/settings/backup', title: 'Backup & restore' },
   { path: '/settings/apps', title: 'AI apps' },
   { path: '/settings/appearance', title: 'Appearance' },
-  { path: '/advanced/network', title: 'Relays & network' },
+  { path: '/advanced/network', title: 'Message network' },
   { path: '/advanced/diagnostics', title: 'Diagnostics' },
   // W4-WIRE (U6 low): the Connections map is checked like every Advanced page.
   { path: '/advanced/map', title: 'Connections map' },

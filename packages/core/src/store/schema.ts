@@ -676,6 +676,40 @@ export const TABLES = {
     columns: { envelope_id: id, restored_at: int },
     primaryKey: ['envelope_id'],
   },
+  // NET-STATS (08 §1 Message network; the schema version after DEVICES-INTERIM, named by content):
+  // per-server counters for the app's Message network view (relay-stats.ts). One row per origin
+  // (`wss://host[:port]`, never a path) of the agent's own list and the legacy read-only servers
+  // only; never a contact's server. `since` starts the rolling day window the three counters cover;
+  // `last_error` is a fixed class (never relay text). Counters only: no message, event or contact
+  // identifier. Written by the core after a delivery or sync pass; no MCP tool writes it (I-4).
+  relay_stats: {
+    columns: {
+      origin: id,
+      since: int,
+      published_ok: int,
+      published_failed: int,
+      received: int,
+      last_ok_at: opt('int'),
+      last_error: optOneOf(
+        'invalid_url',
+        'blocked_address',
+        'resolve_failed',
+        'connect_failed',
+        'connect_timeout',
+        'too_large',
+        'rejected',
+        'ok_timeout',
+        'auth_failed',
+        'closed',
+        'subscription_closed',
+        'connection_lost',
+        'too_many_events',
+      ),
+      last_error_at: opt('int'),
+    },
+    primaryKey: ['origin'],
+    maxRows: 32,
+  },
 } as const satisfies Readonly<Record<string, TableSpec>>;
 
 export type Tables = typeof TABLES;

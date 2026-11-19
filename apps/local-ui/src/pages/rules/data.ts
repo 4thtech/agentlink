@@ -122,7 +122,13 @@ function parseOutgoing(v: unknown): Outgoing | undefined {
 }
 
 export type RulesAnswer =
-  | { readonly kind: 'ok'; readonly version: number; readonly rules: RulesView }
+  | {
+      readonly kind: 'ok';
+      readonly version: number;
+      readonly rules: RulesView;
+      /** BUDGET-RECOVER (07 §3.5): the spending record needs a fresh save ("Save again"). */
+      readonly needsSave?: true;
+    }
   | { readonly kind: 'not_valid' }
   | { readonly kind: 'not_set_up' }
   | { readonly kind: 'unavailable' };
@@ -230,7 +236,11 @@ export function parseRules(data: unknown): RulesAnswer {
     return { kind: 'unavailable' };
   }
   const rules = parseView(data.rules);
-  return rules === undefined ? { kind: 'unavailable' } : { kind: 'ok', version, rules };
+  if (rules === undefined) return { kind: 'unavailable' };
+  // Any other value (or none, from an older server) shows nothing.
+  return data.spendingRecord === 'needs_save'
+    ? { kind: 'ok', version, rules, needsSave: true }
+    : { kind: 'ok', version, rules };
 }
 
 export function parseReview(data: unknown): Review | undefined {

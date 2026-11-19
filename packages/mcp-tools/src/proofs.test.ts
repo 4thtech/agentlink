@@ -585,6 +585,19 @@ describe('agentlink_notarize (06 §2.4)', () => {
     }
   });
 
+  it('BUDGET_BROKEN: refuses up front in plain words with how to re-save the limits, never an approval', async () => {
+    const { client } = fake({
+      notarize: () => ({ status: 'rejected', code: 'BUDGET_BROKEN' }) as never,
+    });
+    const r = await call('agentlink_notarize', { envelopeId: ENVELOPE }, client);
+    expect(r.structured).toMatchObject({ status: 'rejected', code: 'BUDGET_BROKEN' });
+    expect(r.structured.approvalId).toBeUndefined();
+    expect(String(r.structured.summary)).toContain("can't check your spending limits");
+    expect(String(r.structured.nextStep)).toContain('save your limits again in Settings › Rules');
+    expect(String(r.structured.nextStep)).toContain("Don't ask for an approval");
+    expect(r.structured.summary).not.toMatch(/chain|contract|on-chain|network|wallet|gas|ledger/i);
+  });
+
   it('the chain override is Advanced only: a known key maps to its ID, an unknown one is refused', async () => {
     const { client, calls } = fake();
     const advanced = { surface: 'advanced' } as const;

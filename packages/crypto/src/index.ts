@@ -65,18 +65,24 @@ export {
   type TransactionRefusal,
 } from './evm-tx.js';
 // SEC-KS-712-ALLOWLIST: the public rules of KeyStore.sign712 for the agent key (no key material).
+// SEC-KEYSTORE-RECORD-GATE: backends use sign712Snapshot (never signs a Record) and recordSnapshot
+// (Records only); the shared typedDataSnapshot underneath is module-internal, so no backend can
+// wire the Record-accepting check into sign712.
 export {
   AGENT_APP_ID,
   MAX_PROOF_DEADLINE_SECONDS,
   MAX_TOP_UP_WINDOW_SECONDS,
   TYPED_DATA_ALLOWLIST,
   TYPED_DATA_REFUSED,
+  recordSnapshot,
+  sign712Snapshot,
   typedDataClock,
-  typedDataSnapshot,
   type TopUpToken,
   type TypedDataChain,
   type TypedDataRefusal,
 } from './typed-data-allowlist.js';
+// SEC-KEYSTORE-RECORD-GATE: the single-use Record ticket every KeyStore backend keeps (no key material).
+export { RECORD_TICKET_REFUSED, RecordTicketBook, type RecordTicket } from './record-ticket.js';
 export {
   MAX_JSON_DEPTH,
   canonicalize,

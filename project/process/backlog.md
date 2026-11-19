@@ -11425,21 +11425,72 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Status:** built for 0.5.13 (releasing) · **Security:** S2 · **Spec:** 04 §2.5, §2.6; 06 §8; 07 §4.3; 08 §1; 11 §5.13
 - **Done:** an ID whose card lists a dropped server moves to the current set with one owner approval ("Update your contact details" on Home, `agentlink owner update-contact-details`): a rotation to the next key epoch with the migrated list, signed with owner presence, no AI path. Card-updates also go to the legacy relays until 2027-01-31 and count as sent only on an acknowledgement from a non-legacy relay. `agentlink doctor` mentions it.
 
+#### NET-PROBE · Check each message-network server from this computer (0.5.14)
+- **Status:** built for 0.5.14 (branch `rel0514/net-backend`) · **Security:** S1 · **Spec:** D-157; 07 §4.3 "Message network view"; 04 §4
+- **Done:** `RelayPool.probe` (fresh connection, no login, one REQ for a random id, NIP-11 with its own bound): connect time, round trip, sign-in and payment flags, fixed state; relay URL rule and address check; 5 s bound, shares the read-back slots, never queues. Core probes only the own and legacy servers, never while paused; the app probes at most every 15 s and only while the view is read. Own list bounded to 2 to 8 (`MAX_OWN_RELAYS`, D-157 (2)).
+
+#### NET-STATS · Per-server counters for the message network view (0.5.14)
+- **Status:** built for 0.5.14 (branch `rel0514/net-backend`) · **Security:** S1 · **Spec:** D-157; 07 §3.2 `relay_stats`
+- **Done:** store schema 23 (named by content; renumber at integration if another lane lands a version first): `relay_stats` per origin of the own and legacy servers, publishes accepted and refused, wraps served, last ok, last fault class, rolling 24 h; written once per delivery or sync pass (live: at most once a minute). Counters only.
+
+#### NET-ROUTE · `GET /api/ui/network` and the live `network` event (0.5.14)
+- **Status:** built for 0.5.14 (branch `rel0514/net-backend`) · **Security:** S1 · **Spec:** D-157; 08 §1 "Message network view"
+- **Done:** a fixed, allowlisted read: servers with roles, state, latency, flags and counters; contact reach counts; contacts' hosts only with `contacts=hosts`, inbound content (host text only, capped); `network` `{at}` on the events stream. Hosts only under the hood (D-157 (1)).
+
+#### NET-PROBE-SLOTS · Server checks never crowd out delivery checks
+- **Status:** backlog · **Security:** S1 · **Spec:** 07 §4.2, §4.3 "Message network view"
+- **Goal:** the view's server checks share the delivery-check slots: with a long own list some servers can show "unknown", and in a process that also sends, a check can make a delivery check wait a few seconds. Give the checks their own small bound (or lower priority) so delivery checks never wait for them, and every listed server gets checked.
+
+#### NET-CONTACT-REACH-COST · Cheaper contact reach for the network view
+- **Status:** backlog · **Security:** S0 · **Spec:** 08 §1 "Message network view"
+- **Goal:** the view reads every active contact's server list on each read and on each live update, with no cap on contacts. Cache the counts until contacts or lists change (the contacts mark), and cap the work per read.
+
+#### NET-UI-A · Advanced › Message network page (0.5.14)
+- **Status:** in progress (another worker) · **Security:** S0/S1 · **Spec:** D-157; 08 §1; 11 §5
+- **Goal:** the Under the hood view built on `GET /api/ui/network`: server rows with health, latency and counters, contact reach with the expand, copy drift "Relays" → "Message network"/"Servers"; non-technical users see no change.
+
 #### BUDGET-BROKEN-UX · Refuse up front when the spending record is broken
-- **Status:** backlog · **Security:** S1 · **Spec:** 06 §3; 07 §3.5; 11 §5.11
+- **Status:** built in the rel0514 branch (not merged) · **Security:** S1 · **Spec:** 06 §3; 07 §3.5; 11 §5.11
 - **Goal:** on a ledger that is persisted as broken, say so before asking for an approval that cannot let the action through: refuse with "re-save your limits" and the way to do it.
+- **Done:** a paid action on a spending record that cannot be read is refused up front as `BUDGET_BROKEN` (notarize, the send tool's proof, the terms quote): no approval is requested; the next step says to save the limits again in Settings › Rules. Tests first in core and mcp-tools; spec 06 §3, 07 §3.5, 11 §5.11 say it.
+
+#### REL0514-DEVICES-CAP · The 200-item cap of Notifications must not drop the devices notice
+- **Status:** built in the rel0514 branch (not merged) · **Security:** S1 · **Spec:** 08 §1 (notifications); 06 §3
+- **Done:** `kept()` in `packages/node/src/notifications.ts` sorted by time and cut at 200, so a `devices` item (its time is the last sighting, often old) was dropped when 200 newer items existed and came back as news at the next poll. It now holds a place of its own; test first in `notifications.test.ts`.
+
+#### REL0514-CLS-SETTLE · First-launch layout shift fixed in the app
+- **Status:** built in the rel0514 branch (not merged) · **Security:** S0 · **Spec:** project/process/ci-cd.md (journeys)
+- **Done:** owner decision 19 Nov: fix the cause, count from the first paint. The shift was not the font swap: Geist is already loaded at first paint. The "Which AI app do you use?" loading tiles were 170 px high (the `min-block-size` of a `div` is content-box, a button's is border-box) against 136 px for the answered tiles, so the screen shrank by 68 px when the look answered. `.st-tile` is now border-box and the loading tile reserves the 16 px answer line. `settleLayoutShift` and its test are removed; `01-first-launch.test.ts` counts from the first paint with `CLS_BUDGET` 0.01. First launch: CLS 0 in 8 of 8 runs after the fix (before: 0.0096 in about half).
 
 #### BUDGET-FAILCLOSED-REVIEW · Review the fail-closed paths of the budget
-- **Status:** backlog · **Security:** S2 · **Spec:** 06 §3; 07 §3.5
+- **Status:** reviewed (fixes in BUDGET-RECOVER) · **Security:** S2 · **Spec:** 06 §3; 07 §3.5
 - **Goal:** an independent review of every state in which the spending record cannot be summed: what the owner sees, what is refused, and that a fresh limits save always recovers.
 
+#### BUDGET-RECOVER · A limits save recovers every spending record that can't be summed
+- **Status:** built in the rel0514 branch (not merged) · **Security:** S2 · **Spec:** 06 §3; 07 §3.5; 11 §5.11
+- **Done:** an applied `policy.set` starts a fresh epoch whenever the ledger can't be summed at that moment (any reason, whatever the stored status), past every row's epoch; a summable ledger is left as it is. The Rules page shows "Save your limits again" with "Save again" (presence, nothing changed needed); `GET /api/ui/rules` adds `spendingRecord: 'needs_save'`. A read error in the up-front check is `BUDGET_BROKEN`. Tests first through `ownerActions.apply` (clock ahead, later-epoch row, inconsistent row, missing state) and on the page; 07 §3.5 says a clock-only fault is refused.
+
+#### BUDGET-FAILCLOSED-APPROVAL · Stored limits unreadable and spending record broken: refuse too
+- **Status:** backlog · **Security:** S2 · **Spec:** 06 §3 step 0; 07 §3.5
+- **Goal:** when the stored limits can't be read and the spending record can't be summed either, refuse with `BUDGET_BROKEN` instead of asking (today an approval lets it through, with the per-Record ceiling and per-action owner presence; the documented residual in 06 §3). One owner save fixes both.
+
+#### BUDGET-CORRUPT-REPAIR · A guided repair for a spending record a save can't fix
+- **Status:** later · **Security:** S2 · **Spec:** 07 §3.5
+- **Goal:** a corrupt entry whose count number is out of range stays refused through every limits save (fail closed); add a guided repair step, with owner presence, that sets such entries aside so the owner can start a fresh count.
+
+#### BUDGET-RACE-COPY · Plain answer when the record breaks between check and reserve
+- **Status:** backlog · **Security:** S1 · **Spec:** 06 §2.4; 07 §3.5
+- **Goal:** when the spending record becomes unsummable between the up-front check and the reservation, answer `BUDGET_BROKEN`, not `POLICY_CHANGED` (fail closed either way; copy only).
+
 #### CARD-UPDATE-FAILED-STATE · A failed card update drives a retry
-- **Status:** backlog · **Security:** S1 · **Spec:** 07 §4.3
+- **Status:** built in the rel0514 branch (not merged) · **Security:** S1 · **Spec:** 07 §4.3
 - **Goal:** the "failed" result of a card-update pass, now only reported, makes the next pass retry the contact instead of waiting.
+- **Done:** each card-update pass also publishes again the stored card-updates of the current key that no non-legacy relay accepted yet (rows' own backoff applies), without building a second one; test first in `card-update.test.ts`; 07 §4.3 says it.
 
 #### DELIVERY-COUNTS-TEST · A core test for the later count update
-- **Status:** backlog · **Security:** S0 · **Spec:** 07 §3.2
+- **Status:** built in the rel0514 branch (not merged) · **Security:** S0 · **Spec:** 07 §3.2
 - **Goal:** a test in core for `updateRelayCounts` (the count raised after a row is already sent), beside the transport tests.
+- **Done:** `packages/core/src/outbox-counts.test.ts` covers `updateRelayCounts` (raise only, capped at accepted, sent rows with a count only, the envelope follows); `StoreOutboxPersistence` is exported for it.
 
 #### LEGACY-RELAYS-REMOVAL · Stop reading the old default servers
 - **Status:** later (not before 2027-03-02) · **Security:** S1 · **Spec:** 07 §4.3; D-75
@@ -11454,8 +11505,12 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Goal:** the person view names the AI app a contact uses; this needs a field in the card or handshake, so it waits for the M2 protocol change.
 
 #### SEC-KEYSTORE-RECORD-GATE · Record-signing gate inside the KeyStore (before mainnet)
-- **Status:** later (before M3 mainnet) · **Security:** S2 · **Spec:** D-156; 04 §3.1.1 (`sign712`); 07 §3.5
-- **Goal:** move the record-signing gate into the KeyStore itself and bind the ticket to the Record digest.
+- **Status:** built for 0.5.14 · **Security:** S2 · **Spec:** D-156; 04 §3.1.1 (`sign712`, "Record signing"); 07 §3.5
+- **Done:** every KeyStore backend signs a Record only through `signRecord` with a single-use ticket it issued for that Record's digest; `sign712` signs no Record; core asks for the ticket inside the transaction that reserved the fee. A correctness guard, not a same-process boundary (04 §2.5 residual).
+
+#### RECORD-TICKET-LIFETIME · Tie the Record ticket to its reservation's lifetime
+- **Status:** backlog · **Security:** S1 · **Spec:** 04 §3.1.1 "Record signing"; 07 §3.5
+- **Goal:** give the KeyStore's Record ticket a bounded lifetime and keep it out of the core ticket's public fields, so it is used only through the core's signing step that re-checks the held reservation.
 
 #### PROOF-RECORD-LOWS · Low findings from the proof-signing review (0.5.12)
 - **Status:** backlog · **Security:** S1 · **Spec:** 07 §3.5
@@ -11508,3 +11563,20 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 #### CI-WINDOWS-TIMEOUT · Windows CI job finishes within its time limit (follow-up from 0.5.9)
 - **Status:** backlog · **Security:** S1 (S2 if `.github/**` changes) · **Spec:** `project/process/ci-cd.md`
 - **Goal:** the Windows job runs reliably within its timeout, with no skipped checks.
+
+#### CI-PLAYWRIGHT-CACHE · Playwright browser cache keyed on version, OS and arch (0.5.14)
+- **Status:** built for 0.5.14 (branch `rel0514/ci`) · **Security:** S1 (touches `.github/**`: reviewed as S2) · **Spec:** `project/process/ci-cd.md`
+- **Goal:** the browser download timed out (exit 124) three times in one week; browsers must come from a cache on almost every run.
+- **Done:** `install-playwright` keys the cache on OS, CPU architecture, the Playwright version read from `pnpm-lock.yaml` (package.json pin as fallback) and the browser list; on a hit the install step is a 60 s verification, on a miss it keeps the bounded download (240 s, one retry). Saves stay main-only; no check is skipped. Also: the e2e.yml hostile-suite modifier check now catches `.only`/`.skip`/`.each` mid-line and ignores comments and strings (`tools/ci/hostile-modifiers.mjs`, tested).
+
+#### KEYCHAIN-CACHE-INVALIDATE · Drop the kept public bundle when the ID is removed or started over (follow-up from 0.5.14)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S2 · **Spec:** 04 §2.5 "Removing an agent", §3.1.1; REL0514-KEYRING
+- **Repo/path:** agentlink · `packages/node/src/keychain-keystore.ts`; tests
+- **Goal:** since 0.5.14 a keychain KeyStore derives its public bundle once per key epoch and keeps it until close. When another process removes the ID or starts it over, a store that is still open keeps answering public look-ups from the kept bundle until it closes. Signing, encryption and decryption still read the seed every time, so they fail correctly (`identity_missing` or `identity_mismatch`); only public answers are stale.
+- **Done when:** `RED (expected):` commit first; an open store drops its kept bundles when a seed read fails with `identity_missing` or `identity_mismatch`, or follows a cheap removal signal, so a look-up after removal fails like signing does; no extra keychain read on the normal path.
+
+#### STORE-CREATE-ONE-TX · Create a new store in one transaction (follow-up from 0.5.14)
+- **Status:** backlog · **Size:** S · **Tier:** Opus · **Security:** S1 · **Spec:** 07 §3.7
+- **Repo/path:** agentlink · `packages/node/src/sqlite-store.ts` (`#migrate`); tests
+- **Goal:** creating a new store runs every migration step as its own commit (23 today), which is slow on Windows (about 12 s seen in one test on the CI runner). A new, empty file gets the whole schema in one transaction; an existing file still migrates step by step as now.
+- **Done when:** `RED (expected):` commit first (a commit count, not wall time); the created file's schema, pragmas and version are identical to today's; the Windows store tests run well under their timeout.

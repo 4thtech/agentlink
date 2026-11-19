@@ -431,6 +431,11 @@ export const MAX_FILES_PER_PAYLOAD = 16;
  */
 export const MIN_RELAYS = 2;
 export const MAX_RELAYS = 16;
+/**
+ * The agent's OWN relay list (the one its card carries and it reads): 2 to 8 (07 §4.3 "Counts";
+ * owner D2, 19 Nov 2026). A contact's list may still carry up to MAX_RELAYS.
+ */
+export const MAX_OWN_RELAYS = 8;
 export const MAX_RELAY_URL_LENGTH = 256;
 /** Raw, self-declared display name before `restrictName` (06 §2.1). Untrusted; never shown raw. */
 export const MAX_DISPLAY_NAME_CODE_POINTS = 256;

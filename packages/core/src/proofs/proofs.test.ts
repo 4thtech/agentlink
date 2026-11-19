@@ -672,6 +672,294 @@ describe('hard ceilings refuse, never ask (SEC-HARD-CEILING, D-156; 06 §3)', ()
   });
 });
 
+describe('a broken spending record refuses up front (BUDGET-BROKEN-UX; 06 §3, 07 §3.5)', () => {
+  const approvalRows = (agent: Agent) => agent.store.transaction((tx) => tx.select('approvals'));
+  const breakLedger = (agent: Agent) =>
+    agent.store.transaction((tx) =>
+      tx.update('budget_state', { slot: 'current' }, { status: 'broken', broken_at: 1 }),
+    );
+
+  it('notarize: BUDGET_BROKEN, no approval card, nothing signed; a fresh limits save recovers', async () => {
+    const { a, b } = await twoAgents();
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    const envelopeId = await sendText(a, b);
+    await breakLedger(a);
+    expect(await a.client.notarize({ envelopeId })).toEqual({
+      status: 'rejected',
+      code: 'BUDGET_BROKEN',
+    });
+    expect(await approvalRows(a)).toEqual([]);
+    expect(await proofRows(a)).toEqual([]);
+    expect(await ledger(a)).toEqual([]);
+    expect(chain.calls.notarize).toBe(0);
+    // Saving the limits again starts a fresh ledger; the same action asks the owner as usual.
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    expect(await a.client.notarize({ envelopeId })).toMatchObject({ status: 'pending_approval' });
+  });
+});
+
+// BUDGET-RECOVER (07 §3.5): every state in which the spending record cannot be summed now is
+// recovered by the owner saving the limits again (ownerActions.apply policy.set), never by anything
+// else. The states are produced as they happen in production, not by writing `broken` directly.
+describe('BUDGET-RECOVER: a limits re-save recovers every broken spending record (07 §3.5)', () => {
+  const ledgerRow = (n: number, epoch: number, t: number, extra: Record<string, unknown> = {}) => ({
+    entry_id: `recover-${n}`,
+    ledger_epoch: epoch,
+    t,
+    record_id: `0x${n.toString(16).padStart(64, '0')}`,
+    chain_id: 8453,
+    approval_id: null,
+    reserved_usd: '0.01',
+    charged_usd: null,
+    state: 'reserved' as const,
+    deadline: t + 3600,
+    replaces: null,
+    settled_at: null,
+    install_id: null,
+    ...extra,
+  });
+  const budgetState = (agent: Agent) =>
+    agent.store.transaction((tx) => tx.get('budget_state', { slot: 'current' }));
+
+  async function brokenThenRecovered(
+    breakIt: (agent: Agent) => Promise<unknown>,
+  ): Promise<{ a: Agent; epochBefore: number | undefined }> {
+    const { a, b } = await twoAgents();
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    const envelopeId = await sendText(a, b);
+    await breakIt(a);
+    const epochBefore = (await budgetState(a))?.ledger_epoch;
+    expect(await a.client.notarize({ envelopeId })).toEqual({
+      status: 'rejected',
+      code: 'BUDGET_BROKEN',
+    });
+    // Refusing again changes nothing (fail closed; no silent reset).
+    expect(await a.client.notarize({ envelopeId })).toEqual({
+      status: 'rejected',
+      code: 'BUDGET_BROKEN',
+    });
+    expect(chain.calls.notarize).toBe(0);
+    // One owner save of the same limits starts a summable record.
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    expect(await a.client.notarize({ envelopeId })).toMatchObject({ status: 'pending_approval' });
+    return { a, epochBefore };
+  }
+
+  it('the clock was ahead and is corrected (newest entry in the future)', async () => {
+    const { a } = await brokenThenRecovered((agent) =>
+      agent.store.transaction((tx) =>
+        tx.update('budget_state', { slot: 'current' }, { newest_t: clock.t + 30 * 86_400 }),
+      ),
+    );
+    const state = await budgetState(a);
+    expect(state).toMatchObject({ status: 'ok' });
+    expect(state!.newest_t).toBeLessThanOrEqual(clock.t);
+  });
+
+  it('a row from a later epoch: the fresh epoch is past every row', async () => {
+    const { a, epochBefore } = await brokenThenRecovered((agent) =>
+      agent.store.transaction((tx) => {
+        const s = tx.get('budget_state', { slot: 'current' })!;
+        tx.insert('budget_ledger', ledgerRow(1, s.ledger_epoch + 3, clock.t - 5));
+      }),
+    );
+    expect((await budgetState(a))!.ledger_epoch).toBe((epochBefore ?? 0) + 4);
+  });
+
+  it('an inconsistent row (charged without an amount)', async () => {
+    await brokenThenRecovered((agent) =>
+      agent.store.transaction((tx) => {
+        const s = tx.get('budget_state', { slot: 'current' })!;
+        tx.insert(
+          'budget_ledger',
+          ledgerRow(2, s.ledger_epoch, clock.t - 5, { state: 'charged', charged_usd: null }),
+        );
+      }),
+    );
+  });
+
+  it('the spending state row is missing', async () => {
+    const { a } = await brokenThenRecovered((agent) =>
+      agent.store.transaction((tx) => tx.delete('budget_state', {})),
+    );
+    expect(await budgetState(a)).toMatchObject({ status: 'ok' });
+  });
+
+  it('a healthy record is left as it is by a save (no reset of the spent amount)', async () => {
+    const { a } = await twoAgents();
+    const before = await budgetState(a);
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    expect(await budgetState(a)).toEqual(before);
+  });
+
+  it('a read error in the up-front check is BUDGET_BROKEN, not a generic error (L3)', async () => {
+    const { a, b } = await twoAgents();
+    const envelopeId = await sendText(a, b);
+    const store = a.store as unknown as {
+      transaction: <T>(fn: (tx: unknown) => T) => Promise<Awaited<T>>;
+    };
+    const original = store.transaction.bind(store);
+    store.transaction = (fn) =>
+      original((tx) =>
+        fn(
+          new Proxy(tx as object, {
+            get(target, key) {
+              const value = Reflect.get(target, key) as unknown;
+              if (key === 'select') {
+                return (table: string, ...rest: unknown[]) => {
+                  if (table === 'budget_ledger') throw new Error('read failed');
+                  return (value as (...args: unknown[]) => unknown).call(target, table, ...rest);
+                };
+              }
+              return typeof value === 'function' ? value.bind(target) : value;
+            },
+          }),
+        ),
+      );
+    expect(await a.client.notarize({ envelopeId })).toEqual({
+      status: 'rejected',
+      code: 'BUDGET_BROKEN',
+    });
+    expect(chain.calls.notarize).toBe(0);
+  });
+
+  /** Wraps every store transaction of `agent` with `hook` on the tx (a Proxy); returns an undo. */
+  function hookTransactions(
+    agent: Agent,
+    hook: (target: object, key: string | symbol, value: unknown) => unknown,
+  ): () => void {
+    const store = agent.store as unknown as {
+      transaction: <T>(fn: (tx: unknown) => T) => Promise<Awaited<T>>;
+    };
+    const original = store.transaction;
+    const bound = original.bind(store);
+    store.transaction = (fn) =>
+      bound((tx) =>
+        fn(
+          new Proxy(tx as object, {
+            get(target, key) {
+              const value = Reflect.get(target, key) as unknown;
+              const hooked = hook(target, key, value);
+              if (hooked !== undefined) return hooked;
+              return typeof value === 'function' ? value.bind(target) : value;
+            },
+          }),
+        ),
+      );
+    return () => {
+      store.transaction = original;
+    };
+  }
+
+  it('race: a reservation that lands while a save is applied is not reset and still counts (R2-M1)', async () => {
+    const { a } = await twoAgents();
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    const before = (await budgetState(a))!;
+    // The save reads its signature first; a proof reserved in a later second commits before the
+    // save's own transaction (here: inside the save's first read of its nonce, after it read the clock).
+    let armed = false;
+    let landed = false;
+    const undo = hookTransactions(a, (target, key, value) => {
+      if (!armed || landed || key !== 'get') return undefined;
+      return (table: string, ...rest: unknown[]) => {
+        if (!landed && armed && table === 'owner_action_nonces') {
+          landed = true;
+          clock.t += 1;
+          const tx = target as {
+            insert: (t: string, row: unknown) => void;
+            update: (t: string, where: unknown, set: unknown) => void;
+          };
+          tx.insert(
+            'budget_ledger',
+            ledgerRow(9, before.ledger_epoch, clock.t, { reserved_usd: '9' }),
+          );
+          tx.update('budget_state', { slot: 'current' }, { newest_t: clock.t });
+        }
+        return (value as (...args: unknown[]) => unknown).call(target, table, ...rest);
+      };
+    });
+    const policy = defaultPolicy();
+    policy.proofs.notarize = 'approval';
+    a.policyVersion += 1;
+    const signedText = await signedOwner(a, 'policy.set', {
+      version: a.policyVersion,
+      policy: policy as unknown as JsonObject,
+    });
+    armed = true;
+    const r = await a.client.ownerActions.apply(signedText);
+    undo();
+    expect(landed).toBe(true);
+    expect(r).toMatchObject({ status: 'applied' });
+    // Not reset: the same epoch, and the $9 reservation is in it.
+    const after = (await budgetState(a))!;
+    expect(after.ledger_epoch).toBe(before.ledger_epoch);
+    expect(after.status).toBe('ok');
+    const rows = await ledger(a);
+    expect(rows.find((x) => x.reserved_usd === '9')?.ledger_epoch).toBe(after.ledger_epoch);
+  });
+
+  it('read error: a failed read during a save rejects the save; the epoch and a reservation stay (R3-M1)', async () => {
+    const { a } = await twoAgents();
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    const before = (await budgetState(a))!;
+    await a.store.transaction((tx) =>
+      tx.insert('budget_ledger', ledgerRow(9, before.ledger_epoch, clock.t, { reserved_usd: '9' })),
+    );
+    // One transient failed read of the spending record, during the save.
+    let failed = false;
+    const undo = hookTransactions(a, (target, key, value) =>
+      key === 'select'
+        ? (table: string, ...rest: unknown[]) => {
+            if (table === 'budget_ledger' && !failed) {
+              failed = true;
+              throw new Error('read failed');
+            }
+            return (value as (...args: unknown[]) => unknown).call(target, table, ...rest);
+          }
+        : undefined,
+    );
+    const policy = defaultPolicy();
+    policy.proofs.notarize = 'approval';
+    const signedText = await signedOwner(a, 'policy.set', {
+      version: a.policyVersion + 1,
+      policy: policy as unknown as JsonObject,
+    });
+    let applied: boolean;
+    try {
+      applied = (await a.client.ownerActions.apply(signedText)).status === 'applied';
+    } catch {
+      applied = false;
+    }
+    undo();
+    expect(failed).toBe(true);
+    expect(applied).toBe(false);
+    const after = (await budgetState(a))!;
+    expect(after.ledger_epoch).toBe(before.ledger_epoch);
+    expect((await ledger(a)).find((x) => x.reserved_usd === '9')?.ledger_epoch).toBe(
+      after.ledger_epoch,
+    );
+    // The owner retries: the save applies and the healthy record is kept.
+    await setPolicy(a, (p) => {
+      p.proofs.notarize = 'approval';
+    });
+    expect((await budgetState(a))!.ledger_epoch).toBe(before.ledger_epoch);
+  });
+});
+
 describe('ACCEPTED / REJECTED without terms are commitments (D-31, 06 §2.4)', () => {
   it('no ACCEPTED under the default policy without an owner-signed approval; then exclusive', async () => {
     // The defaults in full (D-109: no automatic DELIVERED either); ACCEPTED is unchanged.
@@ -1451,7 +1739,7 @@ async function recordDirectly(from: Agent, to: Agent, envelopeId: string, kind: 
     maxFee: FEE_UNITS,
     deadline: clock.t + 3600,
   });
-  await signRecord(from.keyStore, built);
+  await signRecord(from.keyStore, built, from.keyStore.issueRecordTicket(built.typedData));
   chain.put(built.record);
   return { recordId: built.recordId as string, salt: built.salt as string };
 }
@@ -1548,7 +1836,11 @@ async function signedRecordOf(
     maxFee: FEE_UNITS,
     deadline: clock.t + 3600,
   });
-  const signature = await signRecord(from.keyStore, built);
+  const signature = await signRecord(
+    from.keyStore,
+    built,
+    from.keyStore.issueRecordTicket(built.typedData),
+  );
   if (options.put !== false) chain.put(built.record);
   return {
     recordId: built.recordId,

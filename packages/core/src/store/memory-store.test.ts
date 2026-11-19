@@ -90,6 +90,8 @@ describe('MemoryStore: schema (07 §3, §3.1–§3.5)', () => {
         // DEVICES-INTERIM: this computer's install, schema version 20.
         'install_state',
         'commitment_parts',
+        // NET-STATS (08 §1 Message network, schema 23): per-server counters only.
+        'relay_stats',
       ].sort(),
     );
     for (const name of TABLE_NAMES) {

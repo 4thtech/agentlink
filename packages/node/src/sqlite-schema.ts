@@ -125,6 +125,12 @@ const RESTORE_TRACES_TABLES: readonly TableName[] = ['budget_restores', 'restore
 /** Added by version 22 (DEVICES-INTERIM): the install on each budget row, and `install_state`. */
 const V22_BUDGET_LEDGER_COLUMNS: readonly string[] = ['install_id'];
 const V22_TABLES: readonly TableName[] = ['install_state'];
+/**
+ * Tables added by the network-stats version (NET-STATS; 07 §3.2), version 23 here: per-server counters
+ * for the Message network view. Named by content: if another lane adds a version first, this one takes
+ * the next number.
+ */
+const NET_STATS_TABLES: readonly TableName[] = ['relay_stats'];
 
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
@@ -416,7 +422,8 @@ function v11Statements(): readonly string[] {
  * `outbox.availability` (SEC-RELAY-READBACK, D-156 (7); nullable, null on existing rows), version 20
  * adds `relays_accepted` and `relays_available` to both (DELIVERY-DETAILS; nullable counts), version 21
  * adds `budget_restores` and `restore_replays` (RESTORE-TRACES, D-156; new tables, empty), version 22
- * adds `budget_ledger.install_id` and `install_state` (DEVICES-INTERIM; nullable, and a new table). A later
+ * adds `budget_ledger.install_id` and `install_state` (DEVICES-INTERIM; nullable, and a new table), version
+ * 23 adds `relay_stats` (NET-STATS; a new table, empty). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -438,7 +445,8 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
           !V16_TABLES.includes(t) &&
           !V17_TABLES.includes(t) &&
           !RESTORE_TRACES_TABLES.includes(t) &&
-          !V22_TABLES.includes(t),
+          !V22_TABLES.includes(t) &&
+          !NET_STATS_TABLES.includes(t),
       ),
       v1Spec,
     ),
@@ -464,6 +472,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 20, statements: Object.freeze(v20Statements()) }),
   Object.freeze({ version: 21, statements: createSchemaStatements(RESTORE_TRACES_TABLES) }),
   Object.freeze({ version: 22, statements: Object.freeze(v22Statements()) }),
+  Object.freeze({ version: 23, statements: createSchemaStatements(NET_STATS_TABLES) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {
