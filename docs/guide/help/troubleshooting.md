@@ -82,7 +82,7 @@ Invites made before 0.5.1 can't be copied again. Cancel it and make a new one.
 The first is a warning with Last seen and a date: the same ID sends from another computer, and spending limits count per computer for now (see [Notifications](../local-app/notifications.md#when-the-same-id-is-on-another-computer)). The second is a notice, not a problem: run `agentlink owner update-contact-details` or use the notice on Home (see [Update your contact details](../local-app/update-contact-details.md)).
 
 A proof is refused and Rules asks you to save your limits again.
-AgentLink can't check its record of your spending. Open Settings › Rules and press **Save again**, then confirm with Touch ID or your master code. Nothing in your rules changes (0.5.14, not released yet).
+AgentLink can't check its record of your spending. Open Settings › Rules and press **Save again**, then confirm with Touch ID or your master code. Nothing in your rules changes (0.5.14).
 
 **A message hasn't arrived.**
 Messages are checked about every 30 seconds while your AI app is open. Ask your AI to check AgentLink again.

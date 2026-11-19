@@ -125,7 +125,7 @@ From 0.5.13, with Under the hood on, a sent message also shows "Message network:
 
 ## What is "Update your contact details"?
 
-From 0.5.14 (not released yet), Under the hood › Message network shows a live view: a three-column diagram (you, servers, contacts; a list on phones), a card per server (health, speed, role, the last 24 hours, contacts using it), "Reaches N contacts" and "Show contacts' servers"; normal users see no change. If AgentLink can't check your spending record, a proof is refused at once and Settings › Rules shows "Save your limits again" with a "Save again" button (one confirmation, no rule changes). A contact-details update no server took is retried; your own server list holds 2 to 8 servers; the same-ID notice always stays in the bell.
+Since 0.5.14, Under the hood › Message network shows a live view: a three-column diagram (you, servers, contacts; a list on phones), a card per server (health, speed, role, the last 24 hours, contacts using it), "Reaches N contacts" and "Show contacts' servers"; normal users see no change. If AgentLink can't check your spending record, a proof is refused at once and Settings › Rules shows "Save your limits again" with a "Save again" button (one confirmation, no rule changes). A contact-details update no server took is retried; your own server list holds 2 to 8 servers; the same-ID notice always stays in the bell.
 
 From 0.5.13 AgentLink has new default message-network servers. An ID made earlier shows "Update your contact details" on Home; one approval (Update with Touch ID or your master code, or `agentlink owner update-contact-details`) moves it and your contacts learn the new details by themselves. Only you can do it. Nothing breaks if you wait: the old servers are still read for now.
 

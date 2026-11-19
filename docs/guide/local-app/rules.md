@@ -39,6 +39,6 @@ If you turn selling on, an extra warning appears while you do. Your AI cannot ch
 
 ## If your spending limits can't be checked
 
-If AgentLink can't read its record of your spending (for example after the computer's clock was ahead), a proof is refused at once, instead of asking for an approval that could not let it through. Rules then shows **Save your limits again** with a **Save again** button. Press it and confirm once with Touch ID or your master code: nothing in your rules changes, and AgentLink starts a fresh count (new in 0.5.14, not released yet).
+If AgentLink can't read its record of your spending (for example after the computer's clock was ahead), a proof is refused at once, instead of asking for an approval that could not let it through. Rules then shows **Save your limits again** with a **Save again** button. Press it and confirm once with Touch ID or your master code: nothing in your rules changes, and AgentLink starts a fresh count (new in 0.5.14).
 
 Back to [The local app](README.md).
