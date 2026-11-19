@@ -351,8 +351,9 @@ describe('Message network view: contacts', () => {
     await flush();
     expect(text()).toContain(S.reaches(1));
     expect(text()).toContain(S.reach(1, 2));
-    expect(read).toHaveBeenLastCalledWith(false);
-    expect(readContacts).not.toHaveBeenCalled();
+    // The diagram asks for contacts' hosts from the start (one read, no extra request) and names once.
+    expect(read).toHaveBeenLastCalledWith(true);
+    expect(readContacts).toHaveBeenCalledTimes(1);
     const toggle = [...host.querySelectorAll('button')].find((b) =>
       b.textContent?.includes(S.showContacts),
     ) as HTMLButtonElement;

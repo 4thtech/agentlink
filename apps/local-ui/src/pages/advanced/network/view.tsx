@@ -13,9 +13,16 @@
 //   Proposed defaults, pending the owner's confirmation (easy to change: TONES and DOT_SHAPE):
 //   "can't reach" and "slow" use the warning tone, not danger.
 import { Banner, Button, formatContactName, Skeleton } from '@4thtech-io/ui';
-import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactElement,
+} from 'react';
 import { createApiClient, type ApiResult } from '../../../api/client.js';
-import { agoText } from '../../../api/live.js';
+import { agoText, getLive, subscribeLive } from '../../../api/live.js';
 import { parseList, LIST_PATH as CONTACTS_PATH, type ContactRow } from '../../contacts/data.js';
 import {
   NETWORK_CHANGED,
@@ -29,8 +36,8 @@ import {
   type NetworkAnswer,
   type NetworkServer,
   type NetworkSummary,
-  type ServerHealth,
 } from './data.js';
+import { DOT_SHAPE, NetworkDiagram } from './diagram.js';
 import { NETWORK_STRINGS as S } from './strings.js';
 import './network.css';
 
@@ -46,15 +53,6 @@ const TONES: Readonly<Record<NetworkSummary, 'info' | 'warning' | 'neutral' | un
   all_down: 'warning',
 };
 
-/** Colour is never the only signal: each state has its own dot shape (see network.css). */
-const DOT_SHAPE: Readonly<Record<ServerHealth, string>> = {
-  ready: 'is-filled',
-  slow: 'is-half',
-  unreachable: 'is-cross',
-  blocked: 'is-square',
-  unknown: 'is-ring',
-};
-
 export interface NetworkViewProps {
   /** The network read (default: production); `contacts` asks for the expanded answer. */
   readonly read?: (contacts: boolean) => Promise<ApiResult<unknown>>;
@@ -65,12 +63,17 @@ export interface NetworkViewProps {
   /** Whether this computer is online (default: the browser's own flag). */
   readonly online?: () => boolean;
   readonly pollMs?: number;
+  /** This ID's label for the diagram (default: the live ID list's current ID). */
+  readonly agentLabel?: string;
 }
 
 type Load =
   | { readonly kind: 'loading' }
   | { readonly kind: 'failed'; readonly last?: NetworkAnswer }
   | { readonly kind: 'ok'; readonly answer: NetworkAnswer };
+
+/** After a failed `?contacts=hosts` read, the diagram shows servers alone for this long. */
+const HOSTS_RETRY_MS = 60_000;
 
 const api = createApiClient();
 const defaultRead = (contacts: boolean): Promise<ApiResult<unknown>> =>
@@ -95,15 +98,30 @@ export function NetworkView({
   now = defaultNow,
   online = defaultOnline,
   pollMs = NETWORK_POLL_MS,
+  agentLabel,
 }: NetworkViewProps): ReactElement {
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
   const [expanded, setExpanded] = useState(false);
   const [names, setNames] = useState<ReadonlyMap<string, string> | undefined>(undefined);
   const [, redraw] = useState(0);
+  const liveIds = useSyncExternalStore(subscribeLive, getLive);
+  const idLabel = agentLabel ?? liveIds.agents.find((a) => a.current)?.label;
   const last = useRef<NetworkAnswer | undefined>(undefined);
   const lastReadAt = useRef(0);
   const busy = useRef<(() => boolean) | undefined>(undefined);
+  const hostsRetryAt = useRef(0);
 
+  const attempt = useCallback(
+    async (contacts: boolean): Promise<NetworkAnswer | undefined> => {
+      try {
+        const res = await read(contacts);
+        return res.kind === 'ok' ? parseNetwork(res.data) : undefined;
+      } catch {
+        return undefined;
+      }
+    },
+    [read],
+  );
   const refresh = useCallback(
     async (live: () => boolean): Promise<void> => {
       // One read at a time, but a read whose effect has ended never blocks the next one.
@@ -111,9 +129,17 @@ export function NetworkView({
       busy.current = live;
       lastReadAt.current = Date.now();
       try {
-        const res = await read(expanded);
+        // The diagram needs contacts' hosts (`?contacts=hosts`); the view only mounts under the hood and
+        // reads only while the tab is visible. If that read fails, ask once without them (the diagram
+        // then shows the server column alone) and try the hosts again after HOSTS_RETRY_MS.
+        const tryHosts = expanded || Date.now() >= hostsRetryAt.current;
+        let answer = await attempt(tryHosts);
         if (!live()) return;
-        const answer = res.kind === 'ok' ? parseNetwork(res.data) : undefined;
+        if (answer === undefined && tryHosts && !expanded) {
+          hostsRetryAt.current = Date.now() + HOSTS_RETRY_MS;
+          answer = await attempt(false);
+          if (!live()) return;
+        }
         if (answer === undefined) {
           setLoad({
             kind: 'failed',
@@ -134,7 +160,7 @@ export function NetworkView({
         if (busy.current === live) busy.current = undefined;
       }
     },
-    [read, expanded],
+    [attempt, expanded],
   );
 
   useEffect(() => {
@@ -164,9 +190,17 @@ export function NetworkView({
     };
   }, [refresh, pollMs]);
 
-  // Names for the expanded list: one read of the contacts the Contacts page already uses.
+  // The diagram is drawn for a running or paused ID that has servers; contacts' hosts are asked for
+  // only then (the fetch below), and the picture falls back to the server column when they fail.
+  const shown = load.kind === 'ok' ? load.answer : load.kind === 'failed' ? load.last : undefined;
+  const diagramOn =
+    shown !== undefined &&
+    (shown.agent === 'running' || shown.agent === 'paused') &&
+    shown.servers.length > 0;
+  const wantContacts = diagramOn && shown.contacts.total > 0;
+  // Names for the expanded list and the diagram: one read of the contacts the Contacts page uses.
   useEffect(() => {
-    if (!expanded || names !== undefined) return;
+    if (!(expanded || wantContacts) || names !== undefined) return;
     let alive = true;
     readContacts().then(
       (res) => {
@@ -187,7 +221,7 @@ export function NetworkView({
     return () => {
       alive = false;
     };
-  }, [expanded, names, readContacts]);
+  }, [expanded, wantContacts, names, readContacts]);
 
   if (load.kind === 'loading') {
     return (
@@ -210,8 +244,10 @@ export function NetworkView({
   const offline = !online();
   return (
     <section className="nw" aria-label={S.serversHeading} data-agent={answer.agent}>
-      {/* The network diagram (owner's three-column design) is a separate card; it mounts here. */}
-      <div className="nw-diagram-slot" data-slot="network-diagram" />
+      {/* The network diagram (owner's three-column design): a separate card in its slot. */}
+      <div className="nw-diagram-slot" data-slot="network-diagram">
+        {diagramOn ? <NetworkDiagram answer={answer} names={names} agentLabel={idLabel} /> : null}
+      </div>
       <div className="nw-head">
         <h2 className="al-text-title-3">{S.serversHeading}</h2>
         {answer.mode === null ? null : (

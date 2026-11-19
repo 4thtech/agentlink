@@ -81,4 +81,28 @@ export const NETWORK_STRINGS = {
   shared: 'shared',
   someoneUnknown: 'A contact',
   lastChecked: (ago: string): string => `Last checked ${ago}`,
+  // The diagram (NET-DIAGRAM; owner's three columns: this ID, servers, contacts).
+  diagramHeadThisId: 'This ID',
+  diagramHeadServers: 'Servers',
+  diagramHeadContacts: 'Contacts',
+  /** The left node: the ID's name (D-144: "agent" never means the ID); the second line is "this computer". */
+  diagramAgent: (label: string | undefined): string =>
+    label === undefined || label === '' ? 'Your ID' : label,
+  diagramThisComputer: 'this computer',
+  diagramSendsReads: 'sends and receives',
+  diagramReadOnly: 'read only',
+  diagramMore: (n: number): string => `+ ${String(n)} more ${n === 1 ? 'contact' : 'contacts'}`,
+  diagramMoreShort: (n: number): string => `+${String(n)}`,
+  diagramSummary: (servers: number): string =>
+    `Diagram: this computer connects to ${String(servers)} ${servers === 1 ? 'server' : 'servers'}. The list below has the same facts.`,
+  diagramServerFact: (host: string, role: string, state: string, ms: string | undefined): string =>
+    `${host}, ${role}, ${state}${ms === undefined ? '' : `, ${ms}`}`,
+  diagramContactsFact: (names: readonly string[], more: number): string =>
+    `Contacts who use the same servers: ${names.join(', ')}${more > 0 ? `, and ${String(more)} more` : ''}.`,
+  legendSends: 'sends and receives',
+  legendOld: 'old, read only',
+  legendContact: 'contact uses it too',
+  legendWorking: 'working',
+  legendSlow: 'slow',
+  legendDown: "can't reach",
 } as const;
