@@ -291,10 +291,10 @@ describe('the two-pane frame', () => {
     expect(host.querySelector('.set-body')?.textContent).toBe('page');
   });
 
-  it('wraps the /settings/ pages of the list and Relays & network, not home or the other Advanced pages', () => {
+  it('wraps the /settings/ pages of the list and Message network, not home or the other Advanced pages', () => {
     expect(isSettingsSubpage('/settings')).toBe(false);
     expect(isSettingsSubpage('/settings/files')).toBe(true);
-    // UX1113: Settings' Advanced row opens Relays & network inside the two-pane.
+    // UX1113: Settings' Advanced row opens Message network inside the two-pane.
     expect(isSettingsSubpage('/advanced/network')).toBe(true);
     expect(isSettingsSubpage('/advanced/diagnostics')).toBe(false);
     expect(isSettingsSubpage('/settings/join')).toBe(false);

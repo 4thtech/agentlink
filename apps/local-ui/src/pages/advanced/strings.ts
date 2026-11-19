@@ -1,8 +1,10 @@
-// Advanced › Relays & network copy (W4-SETTINGS-ADVANCED; 11 §5). Counts and times only: the page
-// never shows where a relay is, and has no response time until the app measures one.
+// Advanced › Message network copy (W4-SETTINGS-ADVANCED; 11 §5). The default page shows counts and
+// times only; the servers' names show only under the hood (network/view.tsx, NET-UI-A).
+import { NETWORK_STRINGS } from './network/strings.js';
+
 export const ADVANCED_STRINGS = {
-  title: 'Relays & network',
-  intro: 'How your encrypted messages travel. Relays only ever see them scrambled.',
+  title: NETWORK_STRINGS.title,
+  intro: NETWORK_STRINGS.intro,
   relays: 'Relays',
   relayCount: (connected: number, total: number): string =>
     `${String(connected)} of ${String(total)} connected`,

@@ -105,7 +105,7 @@ describe('My IDs: folder name (Under the hood only)', () => {
   });
 });
 
-describe('Relays & network', () => {
+describe('Message network', () => {
   const read = (): Promise<ApiResult<unknown>> =>
     Promise.resolve({
       kind: 'ok',

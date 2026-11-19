@@ -52,7 +52,7 @@ export const SHELL_STRINGS = {
   liveStatus: 'Live status',
   hoodServerVersion: 'Version',
   hoodServerPort: 'Port',
-  hoodServerRelays: 'Relays',
+  hoodServerRelays: 'Servers',
   hoodServerLastSync: 'Last checked',
   hoodServerDataFolder: 'Data folder',
   hoodServerUptime: 'Uptime',
@@ -110,7 +110,7 @@ export const PAGE_TITLES = {
   notifications: 'Notifications',
   activityLog: 'Activity log',
   filesStorage: 'Files & storage',
-  network: 'Relays & network',
+  network: 'Message network',
   diagnostics: 'Diagnostics',
   connectionsMap: 'Connections map',
 } as const;

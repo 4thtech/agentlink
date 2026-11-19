@@ -1,0 +1,246 @@
+/* NET-UI-A: Advanced › Message network (Under the hood only). Tokens only; shapes differ as well as colour. */
+.nw {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-4);
+}
+.nw-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-3);
+}
+.nw-head h2,
+.nw-card h3,
+.nw-summary,
+.nw-detail,
+.nw-checked,
+.nw-ok {
+  margin: 0;
+}
+.nw-list,
+.nw-contacts,
+.nw-hosts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.nw-list {
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+  overflow: hidden;
+}
+.nw-srv {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+  padding: var(--al-space-3) var(--al-space-4);
+  border-block-start: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.nw-srv:first-child {
+  border-block-start: 0;
+}
+.nw-srv.is-old {
+  background: var(--al-color-bg-sunken);
+}
+.nw-srv-top {
+  display: flex;
+  align-items: center;
+  gap: var(--al-space-3);
+  min-inline-size: 0;
+}
+.nw-host {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nw-diagram-slot:empty {
+  display: none;
+}
+.nw-bar {
+  display: inline-flex;
+  inline-size: 72px;
+  block-size: 6px;
+  align-self: center;
+  border-radius: var(--al-radius-full);
+  background: var(--al-color-bg-sunken);
+  overflow: hidden;
+}
+.nw-bar-ok {
+  background: var(--al-color-status-success-icon);
+}
+.nw-bar-bad {
+  background: var(--al-color-status-warning-icon);
+}
+.nw-state {
+  margin-inline-start: auto;
+  color: var(--al-color-fg-muted);
+  white-space: nowrap;
+}
+.nw-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-1) var(--al-space-4);
+}
+.nw-pill {
+  padding: 0 var(--al-space-2);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-full);
+  color: var(--al-color-fg-default);
+}
+.nw-detail {
+  color: var(--al-color-status-warning-fg);
+}
+.nw-srv[data-state='ready'] .nw-detail,
+.nw-srv[data-state='unknown'] .nw-detail {
+  color: var(--al-color-fg-muted);
+}
+
+/* The health dot: 10 px, a different shape per state (never colour alone). */
+.nw-dot {
+  flex: none;
+  box-sizing: border-box;
+  inline-size: 10px;
+  block-size: 10px;
+  border-radius: var(--al-radius-full);
+  border: 2px solid var(--al-color-status-success-icon);
+  background: var(--al-color-status-success-icon);
+}
+.nw-dot.is-half {
+  border-color: var(--al-color-status-warning-icon);
+  background: linear-gradient(90deg, var(--al-color-status-warning-icon) 50%, transparent 50%);
+}
+.nw-dot.is-ring {
+  border-color: var(--al-color-fg-subtle);
+  background: transparent;
+}
+/* Crossed: a hollow ring with a slash through it. */
+.nw-dot.is-cross {
+  border-color: var(--al-color-status-warning-icon);
+  background: linear-gradient(
+    135deg,
+    transparent 40%,
+    var(--al-color-status-warning-icon) 40%,
+    var(--al-color-status-warning-icon) 60%,
+    transparent 60%
+  );
+}
+.nw-dot.is-square {
+  border-color: var(--al-color-status-warning-icon);
+  background: var(--al-color-status-warning-icon);
+  border-radius: var(--al-radius-xs);
+}
+
+.nw-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-3);
+  padding: var(--al-space-4);
+  border: var(--al-border-width-thin) solid var(--al-color-border-default);
+  border-radius: var(--al-radius-lg);
+  background: var(--al-color-bg-surface);
+}
+.nw-reach {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--al-space-3);
+}
+.nw-contacts {
+  display: flex;
+  flex-direction: column;
+}
+.nw-contact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-1);
+  padding-block: var(--al-space-3);
+  border-block-start: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.nw-contact-name {
+  font-weight: var(--al-font-weight-medium);
+  overflow-wrap: anywhere;
+}
+.nw-hosts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--al-space-1) var(--al-space-3);
+  color: var(--al-color-fg-muted);
+}
+.nw-hosts li {
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nw-hosts .is-shared {
+  color: var(--al-color-fg-default);
+}
+
+/* Bar widths in 5% steps (no inline style: CSP style-src 'self'). */
+.nw-w0 {
+  inline-size: 0%;
+}
+.nw-w1 {
+  inline-size: 5%;
+}
+.nw-w2 {
+  inline-size: 10%;
+}
+.nw-w3 {
+  inline-size: 15%;
+}
+.nw-w4 {
+  inline-size: 20%;
+}
+.nw-w5 {
+  inline-size: 25%;
+}
+.nw-w6 {
+  inline-size: 30%;
+}
+.nw-w7 {
+  inline-size: 35%;
+}
+.nw-w8 {
+  inline-size: 40%;
+}
+.nw-w9 {
+  inline-size: 45%;
+}
+.nw-w10 {
+  inline-size: 50%;
+}
+.nw-w11 {
+  inline-size: 55%;
+}
+.nw-w12 {
+  inline-size: 60%;
+}
+.nw-w13 {
+  inline-size: 65%;
+}
+.nw-w14 {
+  inline-size: 70%;
+}
+.nw-w15 {
+  inline-size: 75%;
+}
+.nw-w16 {
+  inline-size: 80%;
+}
+.nw-w17 {
+  inline-size: 85%;
+}
+.nw-w18 {
+  inline-size: 90%;
+}
+.nw-w19 {
+  inline-size: 95%;
+}
+.nw-w20 {
+  inline-size: 100%;
+}

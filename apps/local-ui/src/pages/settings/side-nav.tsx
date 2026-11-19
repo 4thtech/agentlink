@@ -13,7 +13,7 @@ const ADVANCED_NETWORK = '/advanced/network';
 
 /** A page that sits under Settings home and is listed in `SETTINGS_PAGES` with a `/settings/` path. */
 export function isSettingsSubpage(path: string): boolean {
-  // Advanced › Relays & network (/advanced/network) is the page behind Settings' "Advanced" row.
+  // Advanced › Message network (/advanced/network) is the page behind Settings' "Advanced" row.
   if (path === ADVANCED_NETWORK) return true;
   return path.startsWith('/settings/') && settingsPages().some((p) => p.path === path);
 }

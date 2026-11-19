@@ -92,7 +92,7 @@ const EXPECTED: ReadonlyArray<readonly [string, string, string | null]> = [
   ['/settings/proofs', 'Proofs & credits', 'Settings'],
   ['/advanced/rules', 'Rules', null],
   ['/advanced/proofs', 'Proofs & credits', null],
-  ['/advanced/network', 'Relays & network', null],
+  ['/advanced/network', 'Message network', null],
   ['/advanced/diagnostics', 'Diagnostics', null],
   ['/advanced/map', 'Connections map', null],
 ];
@@ -208,7 +208,7 @@ describe('the sections (nav.ts)', () => {
     ]);
     expect(ADVANCED_SECTIONS.map((s) => [s.label, s.path])).toEqual([
       ['Live activity', '/activity/live'],
-      ['Relays & network', '/advanced/network'],
+      ['Message network', '/advanced/network'],
       ['Diagnostics', '/advanced/diagnostics'],
       ['Connections map', '/advanced/map'],
     ]);
