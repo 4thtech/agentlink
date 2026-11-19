@@ -172,10 +172,6 @@
   margin-top: var(--al-space-1);
   flex: none;
 }
-.rl-error {
-  margin: 0;
-  color: var(--al-color-status-danger-fg);
-}
 /* WP-S3 round 2 */
 .rl-lead {
   margin: var(--al-space-2) 0 0;
@@ -258,9 +254,6 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--al-space-2);
-}
-.rl-error {
-  color: var(--al-color-commitment-fg);
 }
 /* Rules in force: a quiet one-line summary. */
 section.rl-summary {

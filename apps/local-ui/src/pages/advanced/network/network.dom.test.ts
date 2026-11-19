@@ -183,16 +183,14 @@ describe('Message network view: states', () => {
     expect(text()).toContain(S.lastChecked('just now'));
   });
 
-  it('a 24 h bar, a full-name title on the host, the diagram slot and unknown as a hollow dot', async () => {
+  it('a full-name title on the host, the diagram slot and unknown as a hollow dot', async () => {
     await mount(answer());
     const first = host.querySelector('.nw-srv') as HTMLElement;
-    const bar = first.querySelector('.nw-bar');
-    expect(bar?.getAttribute('aria-label')).toBe(S.barLabel(3, 1));
-    expect(bar?.querySelector('.nw-bar-ok')?.className).toContain('nw-w15');
-    expect(bar?.querySelector('.nw-bar-bad')?.className).toContain('nw-w5');
     expect(first.querySelector('.nw-host')?.getAttribute('title')).toBe('relay.primal.net');
     expect(host.querySelector('[data-slot="network-diagram"]')).not.toBeNull();
-    expect(host.querySelector('[data-state="unknown"] .nw-dot')?.className).toContain('is-ring');
+    expect(host.querySelector('[data-state="unknown"] .nw-dot')?.className).toContain(
+      'is-checking',
+    );
     // The route's own per-server count wins when it sends one.
     await mount(answer({ servers: [server({ contacts: 6 })] }));
     expect(text()).toContain(S.usedBy(6));
@@ -225,7 +223,7 @@ describe('Message network view: states', () => {
     expect(slow.textContent).toContain('Connect 1.9 s');
     expect(slow.textContent).toContain(S.slowNote);
     expect(slow.querySelector('.nw-dot')?.className).toContain('is-half');
-    expect(host.querySelector('[data-state="ready"] .nw-dot')?.className).toContain('is-filled');
+    expect(host.querySelector('[data-state="ready"] .nw-dot')?.className).toContain('is-connected');
   });
 
   it('one down: the warning tone, not danger; a hollow dot', async () => {
@@ -244,7 +242,7 @@ describe('Message network view: states', () => {
     const down = host.querySelector('[data-state="unreachable"]') as HTMLElement;
     expect(down.textContent).toContain(S.health.unreachable);
     expect(down.textContent).toContain(S.downNote);
-    expect(down.querySelector('.nw-dot')?.className).toContain('is-cross');
+    expect(down.querySelector('.nw-dot')?.className).toContain('is-not-running');
   });
 
   it('every server down uses the message network sentence; blocked has a square dot', async () => {

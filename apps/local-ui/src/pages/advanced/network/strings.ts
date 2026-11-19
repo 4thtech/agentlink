@@ -72,9 +72,6 @@ export const NETWORK_STRINGS = {
   reaches: (n: number): string => `Reaches ${String(n)} ${n === 1 ? 'contact' : 'contacts'}`,
   /** On a server card: how many contacts use this server too. */
   usedBy: (n: number): string => `${String(n)} ${n === 1 ? 'contact' : 'contacts'}`,
-  /** The 24 h bar's accessible name. */
-  barLabel: (ok: number, failed: number): string =>
-    `Last 24 hours: ${String(ok)} accepted, ${String(failed)} failed`,
   showContacts: "Show contacts' servers",
   hideContacts: "Hide contacts' servers",
   contactsLoading: 'Reading contacts…',

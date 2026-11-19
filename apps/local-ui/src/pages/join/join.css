@@ -40,9 +40,6 @@
 .jn-actions > * {
   min-block-size: 44px;
 }
-.jn-error {
-  color: var(--al-color-status-danger-fg);
-}
 .jn-live {
   position: absolute;
   inline-size: 1px;

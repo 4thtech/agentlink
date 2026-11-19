@@ -23,7 +23,6 @@
 .hm-thread,
 .hm-msgs,
 .hm-menu-panel,
-.hm-ap-bulk,
 .hm-approvals {
   gap: var(--al-space-3);
 }
@@ -353,7 +352,6 @@
 }
 .hm-cell[data-delivery='sent'],
 .hm-dl.is-sent,
-.hm-copied,
 .hm-v.is-proof,
 .hm-facts dd.is-checked {
   color: var(--al-color-status-success-fg);
@@ -383,7 +381,6 @@
   padding: 0;
 }
 .hm-danger,
-.hm-inline-error,
 .hm-remove > span {
   color: var(--al-color-status-danger-fg);
 }

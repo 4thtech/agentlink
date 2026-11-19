@@ -70,11 +70,9 @@
 
 /* Narrow: the pulse stays on the right; the word drops to its own line under the name. */
 @media (max-width: 479px) {
-  .ms-row,
   .ct-row {
     flex-wrap: wrap;
   }
-  .ms-row-main,
   .ct-row .al-contact-main {
     flex: 1 1 8em;
   }
