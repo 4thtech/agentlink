@@ -11580,3 +11580,9 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Repo/path:** agentlink · `packages/node/src/sqlite-store.ts` (`#migrate`); tests
 - **Goal:** creating a new store runs every migration step as its own commit (23 today), which is slow on Windows (about 12 s seen in one test on the CI runner). A new, empty file gets the whole schema in one transaction; an existing file still migrates step by step as now.
 - **Done when:** `RED (expected):` commit first (a commit count, not wall time); the created file's schema, pragmas and version are identical to today's; the Windows store tests run well under their timeout.
+
+#### WIN-MASTERCODE-TEST-SLOW · Restore tests near their timeout on Windows CI (follow-up from 0.5.14)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Spec:** `project/process/ci-cd.md`
+- **Repo/path:** agentlink · `packages/node/src/master-code-unsaved.test.ts`, `recovery-kit-restore.hardening.test.ts`, `local-ui/restore-server.test.ts`
+- **Goal:** on the Windows node-os job, master-code-unsaved.test.ts usually takes 40 to 58 s in total, with single tests at 2.4 to 6 s (main and 0.5.14 runs). In one 0.5.14 run, on a commit that changed only migration tests, the same tests took 12.7, 15.5, 19.4 and 21.1 s, and R2-CLASS-02 "the page went away before the answer" went past its 20 s timeout. In that run the hardening file went from 28 to 59 s and restore-server from 9 to 23 s. The slowdown came from runner load, not a code change, but these tests have too little margin.
+- **Done when:** the cost per test is measured and reduced (for example fewer key derivations or store opens per test, or shared setup), with no timeout raised and no test skipped; the Windows job runs these files with at least 3× margin.
