@@ -72,6 +72,9 @@ type Load =
   | { readonly kind: 'failed'; readonly last?: NetworkAnswer }
   | { readonly kind: 'ok'; readonly answer: NetworkAnswer };
 
+/** A server that took messages this recently and fails a fresh check gets downRecentNote. */
+const RECENT_OK_SECONDS = 600;
+
 /** After a failed `?contacts=hosts` read, the diagram shows servers alone for this long. */
 const HOSTS_RETRY_MS = 60_000;
 
@@ -245,16 +248,16 @@ export function NetworkView({
   return (
     <section className="nw" aria-label={S.serversHeading} data-agent={answer.agent}>
       {/* The network diagram (owner's three-column design): a separate card in its slot. */}
-      <div className="nw-diagram-slot" data-slot="network-diagram">
+      <div className="nw-diagram-slot" data-slot="network-diagram" hidden={!diagramOn}>
         {diagramOn ? <NetworkDiagram answer={answer} names={names} agentLabel={idLabel} /> : null}
       </div>
       <div className="nw-head">
         <h2 className="al-text-title-3">{S.serversHeading}</h2>
         {answer.mode === null ? null : (
-          <span className="al-chip al-tone-info">
-            <span className="al-text-label">
-              {answer.mode === 'automatic' ? S.modeAutomatic : S.modeCustom}
-            </span>
+          // NET-VIEW-0514-1: a static status chip, not the shell's `.al-chip` (the agent switcher's
+          // pill button); Custom arrives in 0.5.15, so nothing here looks clickable.
+          <span className="nw-mode al-text-body-sm">
+            {answer.mode === 'automatic' ? S.modeAutomatic : S.modeCustom}
           </span>
         )}
       </div>
@@ -332,7 +335,12 @@ function Headline({
   const summary = summarize(answer);
   const own = answer.servers.filter((s) => s.kind === 'own');
   const slow = own.filter((s) => s.state === 'slow').length;
-  const down = own.filter((s) => s.state === 'unreachable' || s.state === 'blocked').length;
+  const isDown = (s: NetworkServer): boolean => s.state === 'unreachable' || s.state === 'blocked';
+  const down = own.filter(isDown).length;
+  const oldDown = answer.servers.filter((s) => s.kind === 'legacy' && isDown(s)).length;
+  const old = oldDown === 0 ? '' : ` ${S.oldDown(oldDown)}`;
+  // A message counts as sent once MIN_ACKS (2) servers accept it: with fewer working, it waits.
+  const sending = own.length - down >= 2 ? S.stillSending : S.mayWait;
   const tone = TONES[summary];
   switch (summary) {
     case 'checking':
@@ -344,29 +352,33 @@ function Headline({
     case 'empty':
       return <p className="al-text-body al-muted">{S.noServers}</p>;
     case 'healthy':
-      return <p className="al-text-body al-muted nw-ok">{S.allHealthy}</p>;
+      return (
+        <p className="al-text-body al-muted nw-ok">
+          {oldDown === 0 ? S.allHealthy : `${S.ownHealthy}${old}`}
+        </p>
+      );
     case 'one_slow':
       return (
         <Banner tone={tone ?? 'warning'} title={S.oneSlowTitle}>
-          {S.oneSlow}
+          {`${S.oneSlow}${old}`}
         </Banner>
       );
     case 'some_slow':
       return (
         <Banner tone={tone ?? 'warning'} title={S.someSlowTitle(slow)}>
-          {S.someSlow}
+          {`${S.someSlow}${old}`}
         </Banner>
       );
     case 'one_down':
       return (
         <Banner tone={tone ?? 'warning'} title={S.oneDownTitle}>
-          {S.oneDown}
+          {`${sending}${old}`}
         </Banner>
       );
     case 'some_down':
       return (
         <Banner tone={tone ?? 'warning'} title={S.someDownTitle(down)}>
-          {S.someDown}
+          {`${sending}${old}`}
         </Banner>
       );
     case 'all_down':
@@ -409,7 +421,12 @@ function ServerCard({
     s.state === 'slow'
       ? S.slowNote
       : s.state === 'unreachable'
-        ? S.downNote
+        ? // NET-VIEW-0514-1: "Can't reach" next to "Last worked just now" is explained, not left as is.
+          s.lastOkAt !== null && now - s.lastOkAt <= RECENT_OK_SECONDS
+          ? S.downRecentNote
+          : legacy
+            ? S.oldDownNote
+            : S.downNote
         : s.state === 'blocked'
           ? S.blockedNote
           : undefined;

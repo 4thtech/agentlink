@@ -231,7 +231,12 @@ describe('Message network view: states', () => {
       answer({
         servers: [
           server(),
-          server({ host: 'nostr.bitcoiner.social', state: 'unreachable', connectMs: null }),
+          server({
+            host: 'nostr.bitcoiner.social',
+            state: 'unreachable',
+            connectMs: null,
+            lastOkAt: NOW - 3600,
+          }),
         ],
       }),
     );
@@ -554,9 +559,7 @@ describe('Message network view: banner copy, count and mode chip (NET-VIEW-0514-
   });
 
   it('two own servers down out of three: says new messages may wait', async () => {
-    await mount(
-      answer({ servers: [server(), down('offchain.pub'), down('relay.snort.social')] }),
-    );
+    await mount(answer({ servers: [server(), down('offchain.pub'), down('relay.snort.social')] }));
     const banner = host.querySelector('.al-banner') as HTMLElement;
     expect(banner.textContent).toContain("2 of your servers can't be reached.");
     expect(banner.textContent).toContain('may wait');
@@ -564,7 +567,9 @@ describe('Message network view: banner copy, count and mode chip (NET-VIEW-0514-
   });
 
   it('own servers fine, old read-only ones down: no warning, a plain line that names them', async () => {
-    await mount(answer({ servers: [server(), server({ host: 'offchain.pub' }), oldDown('nos.lol')] }));
+    await mount(
+      answer({ servers: [server(), server({ host: 'offchain.pub' }), oldDown('nos.lol')] }),
+    );
     expect(host.querySelector('.al-banner')).toBeNull();
     expect(text()).not.toContain(S.allHealthy);
     expect(text()).toContain("1 old read-only server can't be reached");
@@ -573,7 +578,15 @@ describe('Message network view: banner copy, count and mode chip (NET-VIEW-0514-
   });
 
   it('a card never says "Can\'t reach" and "Last worked just now" without explaining both', async () => {
-    await mount(answer({ servers: [server(), server({ host: 'relay.snort.social' }), down('offchain.pub', { lastOkAt: NOW - 5 })] }));
+    await mount(
+      answer({
+        servers: [
+          server(),
+          server({ host: 'relay.snort.social' }),
+          down('offchain.pub', { lastOkAt: NOW - 5 }),
+        ],
+      }),
+    );
     const card = host.querySelector('[data-state="unreachable"]') as HTMLElement;
     expect(card.textContent).toContain('worked');
     expect(card.textContent).not.toContain(S.downNote);

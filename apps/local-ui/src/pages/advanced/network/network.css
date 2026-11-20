@@ -23,12 +23,11 @@
   justify-content: space-between;
   gap: var(--al-space-3);
 }
-.nw :is(h2, h3, p) {
+.nw :is(h2, h3, p, ul) {
   margin: 0;
 }
 .nw ul {
   list-style: none;
-  margin: 0;
   padding: 0;
 }
 .nw-srv,
@@ -50,7 +49,6 @@
 .nw-srv-top {
   flex-wrap: nowrap;
   justify-content: flex-start;
-  min-inline-size: 0;
 }
 .nw-host,
 .nw-hosts li,
@@ -60,18 +58,22 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.nw-diagram-slot:empty {
-  display: none;
-}
 .nw-state,
+.nw-mode,
 .nwd-nd-r {
   margin-inline-start: auto;
   flex: none;
   color: var(--al-color-fg-muted);
   white-space: nowrap;
 }
+.nw-mode {
+  padding: 0 var(--al-space-2);
+  border-radius: var(--al-radius-sm);
+  background: var(--al-color-bg-sunken);
+}
 .nw-meta,
-.nw-hosts {
+.nw-hosts,
+.nwd-legend {
   display: flex;
   flex-wrap: wrap;
   gap: var(--al-space-1) var(--al-space-4);

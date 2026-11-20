@@ -476,8 +476,8 @@ export class OutboxService {
 
   /**
    * NET-PROBE: how each of the agent's own servers and the legacy read-only servers answers from
-   * this machine now (transport relayProbe: a fresh connection each, no login, the relay URL rule and
-   * address check, bounded). Only those lists: never a URL from a caller, a message or a contact.
+   * this machine now (transport relayProbe: a fresh connection each, or the pool's open one; no
+   * login, the relay URL rule and address check, bounded). Only those lists: never a URL from a caller, a message or a contact.
    * Undefined without a transport that can probe, while paused, or when the own list cannot be read.
    * Never throws.
    */
