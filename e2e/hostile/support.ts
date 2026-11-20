@@ -37,6 +37,8 @@ type OpenArgs = Parameters<RelayNetwork['open']>;
 /** The in-memory relay network, with a misbehaving mode that can be switched on and off. */
 export class MisbehavingRelays extends RelayNetwork {
   mode: RelayMode = 'honest';
+  /** The server of every read of the inbox (a request that is not a look-up by ID), in order. */
+  readonly reads: string[] = [];
 
   override open(...[target, handlers]: OpenArgs): ReturnType<RelayNetwork['open']> {
     const honest = super.open(target, handlers);
@@ -51,6 +53,7 @@ export class MisbehavingRelays extends RelayNetwork {
           return;
         }
         const filter = frame[0] === 'REQ' ? (frame[2] as { ids?: string[] }) : undefined;
+        if (filter !== undefined && filter.ids === undefined) this.reads.push(target.url);
         if (filter?.ids !== undefined && this.mode === 'ignores-lookups') return;
         if (filter?.ids !== undefined && this.mode === 'serves-another-event') {
           const subId = frame[1] as string;
