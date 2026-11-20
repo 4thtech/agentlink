@@ -112,13 +112,13 @@ describe('Message network', () => {
       status: 200,
       data: { relays: { connected: 2, total: 5 }, lastSyncAt: 1_759_449_600 },
     });
-  it('adds counts and the exact time with the switch on', async () => {
+  // NET-COMPACT (0.5.15): under the hood the live network view says all of this, so the old summary
+  // card (servers connected, known, last checked) is left out there.
+  it('leaves the old summary facts to the live view with the switch on', async () => {
     await mount(createElement(AdvancedPage, { read }), true);
-    expect(host.querySelector('[data-hood-fact="relays-connected"] dd')?.textContent).toBe('2');
-    expect(host.querySelector('[data-hood-fact="relays-known"] dd')?.textContent).toBe('5');
-    expect(host.querySelector('[data-hood-fact="last-update-time"] dd')?.textContent).toBe(
-      '2025-10-03T00:00:00.000Z',
-    );
+    expect(host.querySelector('[data-hood-fact="relays-connected"]')).toBeNull();
+    expect(host.querySelector('[data-hood-fact="relays-known"]')).toBeNull();
+    expect(host.querySelector('[data-hood-fact="last-update-time"]')).toBeNull();
   });
   it('shows none of it in Simple mode', async () => {
     await mount(createElement(AdvancedPage, { read }), false);
