@@ -393,6 +393,15 @@ describe('C3: the list', () => {
     await openOwn();
     await toList('wss://members.example-team.com');
     expect(text()).toContain(S.signInOkTitle);
+    // 11 §5.14: plain words, no "(they do)".
+    expect(S.signInOk).toBe(
+      "That's fine as long as 2 other servers work, and they do. We can't confirm delivery on this one.",
+    );
+    expect(text()).not.toContain('(they do)');
+    // A long list scrolls inside the panel's own list (a keyboard can reach it), not the page.
+    const list = document.body.querySelector('.al-sheet-body ul.nw-scroll') as HTMLElement;
+    expect(list.tabIndex).toBe(0);
+    expect(list.getAttribute('aria-label')).toBe(S.listLabel);
     expect(button(S.review)?.disabled).toBe(false);
     await click(document.body.querySelector('button[aria-label="Remove relay.primal.net"]'));
     expect(text()).toContain(S.needTwoTitle);

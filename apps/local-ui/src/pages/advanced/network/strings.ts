@@ -24,6 +24,12 @@ export const NETWORK_STRINGS = {
   counts: (ok: number, failed: number, received: number): string =>
     `Last 24 hours: ${String(ok)} accepted · ${String(failed)} failed · ${String(received)} received`,
   noCounts: 'Nothing counted in the last 24 hours yet',
+  /** NET-COMPACT: the folds. */
+  showAllServers: (n: number): string => `Show all ${String(n)} servers`,
+  showFewerServers: 'Show fewer servers',
+  oldGroup: (n: number, date: string | undefined): string =>
+    `Old servers (${String(n)}) · read only${date === undefined ? '' : ` until ${date}`}`,
+  oldGroupDown: (n: number): string => `${String(n)} can't be reached`,
   lastOk: (ago: string): string => `Last worked ${ago}`,
   neverOk: 'Not heard from yet',
   needsSignIn: 'This server asks for a sign-in.',
@@ -101,8 +107,10 @@ export const NETWORK_STRINGS = {
   diagramThisComputer: 'this computer',
   diagramSendsReads: 'sends and receives',
   diagramReadOnly: 'read only',
-  diagramMore: (n: number): string => `+ ${String(n)} more ${n === 1 ? 'contact' : 'contacts'}`,
-  diagramMoreShort: (n: number): string => `+${String(n)}`,
+  diagramMore: (n: number): string => `+${String(n)} more ${n === 1 ? 'contact' : 'contacts'}`,
+  diagramMoreServers: (n: number): string => `+${String(n)} more ${n === 1 ? 'server' : 'servers'}`,
+  diagramMoreServersFact: (n: number): string =>
+    `${String(n)} more ${n === 1 ? 'server is' : 'servers are'} in the list below.`,
   diagramSummary: (servers: number): string =>
     `Diagram: this computer connects to ${String(servers)} ${servers === 1 ? 'server' : 'servers'}. The list below has the same facts.`,
   diagramServerFact: (host: string, role: string, state: string, ms: string | undefined): string =>

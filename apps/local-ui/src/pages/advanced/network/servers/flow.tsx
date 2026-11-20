@@ -192,7 +192,7 @@ export function ServersFlow({
             </form>
             {rows.length === 0 ? null : (
               <section aria-label={S.testResults}>
-                <ul className="nw-list">
+                <ul className="nw-list nw-scroll" tabIndex={0}>
                   {rows.map((r) => (
                     <ResultRow
                       key={r.id}
@@ -219,7 +219,7 @@ export function ServersFlow({
         {step === 2 ? (
           <>
             <p className="al-text-body al-muted">{S.count(usable.length, max)}</p>
-            <ul className="nw-list">
+            <ul className="nw-list nw-scroll" tabIndex={0} aria-label={S.listLabel}>
               {usable.map((r) => (
                 <ListRow key={r.id} row={r} onRemove={() => remove(r.id)} />
               ))}
@@ -242,7 +242,7 @@ export function ServersFlow({
               <Banner tone="warning">{S.paid}</Banner>
             ) : null}
             <p className="al-text-body-sm al-muted">{S.retention}</p>
-            <div className="nw-card">
+            <div className="nw">
               <Switch
                 label={S.mixInLabel}
                 description={S.mixInBody}
@@ -356,18 +356,9 @@ export function consequences(review: Review): readonly Consequence[] {
   return out;
 }
 
-function Chip({
-  tone,
-  children,
-}: {
-  readonly tone: 'info' | 'success' | 'warning' | 'danger';
-  readonly children: string;
-}): ReactElement {
-  return (
-    <span className={`al-chip al-tone-${tone}`}>
-      <span className="al-text-label">{children}</span>
-    </span>
-  );
+/** A small static status tag; the shell's `.al-chip` is the agent switcher's pill button. */
+function Chip({ children }: { readonly children: string }): ReactElement {
+  return <span className="nw-mode al-text-body-sm">{children}</span>;
 }
 
 function ResultRow({
@@ -392,9 +383,9 @@ function ResultRow({
         </span>
         <span className="nw-state">
           {row.state === 'testing' ? (
-            <Chip tone="info">{S.testing}</Chip>
+            <Chip>{S.testing}</Chip>
           ) : words === undefined ? null : (
-            <Chip tone={words.tone}>{words.title}</Chip>
+            <Chip>{words.title}</Chip>
           )}
         </span>
       </div>
@@ -445,7 +436,7 @@ function ListRow({
       </div>
       <div className="nw-meta al-text-body-sm al-muted">
         <span>{S.role}</span>
-        {words === undefined ? null : <Chip tone={words.tone}>{words.title}</Chip>}
+        {words === undefined ? null : <Chip>{words.title}</Chip>}
       </div>
     </li>
   );

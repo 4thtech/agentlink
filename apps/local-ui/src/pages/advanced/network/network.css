@@ -104,3 +104,62 @@
   background: var(--al-color-status-warning-icon);
   border-radius: var(--al-radius-xs);
 }
+
+/* NET-COMPACT: a server row is one line (dot, host, state, time) that opens its details; the old
+   read-only servers sit in their own fold. NET-BAR24: accepted against failed is an SVG (width
+   attributes, never inline styles). Nothing animates by layout; the chevron only turns. */
+.nw-srv.is-fold {
+  padding: 0;
+  gap: 0;
+}
+.nw-srv-btn {
+  inline-size: 100%;
+  min-block-size: 44px;
+  padding: var(--al-space-2) var(--al-space-4);
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.nw-chev {
+  flex: none;
+  inline-size: 7px;
+  block-size: 7px;
+  border: solid var(--al-color-fg-muted);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+[aria-expanded='true'] > .nw-chev {
+  transform: rotate(-135deg);
+}
+.nw-more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--al-space-2);
+  padding: 0 var(--al-space-4) var(--al-space-3);
+}
+.nw-fold {
+  border-block-start: var(--al-border-width-thin) solid var(--al-color-border-subtle);
+}
+.nw-meta .nw-mode {
+  margin-inline-start: 0;
+}
+.nw-bar {
+  inline-size: 160px;
+  max-inline-size: 100%;
+  block-size: 6px;
+  border-radius: var(--al-radius-xs);
+}
+.nw-bar-ok {
+  fill: var(--al-color-status-success-icon);
+}
+.nw-bar-bad {
+  fill: var(--al-color-status-warning-icon);
+}
+/* The Your servers panel: long lists scroll inside the panel's list, the buttons stay in view. */
+.nw-scroll {
+  max-block-size: min(40dvh, 320px);
+  overflow-y: auto;
+}
