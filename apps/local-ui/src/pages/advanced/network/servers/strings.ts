@@ -101,8 +101,9 @@ export const SERVERS_STRINGS = {
   optOutLabel: "Don't also announce on the default servers",
   optOutBody: 'For companies that run everything on their own servers.',
   optOutTitle: 'Only your servers will know this ID',
+  // Fully quiet (owner, 20 Nov 2026): what stops at once, what stays 30 days, who may miss you.
   optOut:
-    "Another computer can find it only with your owner link or a backup. Contacts still only on AgentLink's old servers may miss your new details.",
+    "AgentLink's old public servers stop being used at once; your own previous servers stay readable for 30 days. Another computer can find this ID only with your owner link or a backup. Contacts still using an old copy of your contact details may not reach you until they receive the update.",
   // NET-ANNOUNCE-OPTOUT: the opt-out on its own (C3's switch and warning, 11 §5.14). Proposed:
   // the sheet's titles, confirm buttons, statements, toasts and two refusals.
   announceOffTitle: "Don't also announce on the default servers?",

@@ -170,6 +170,7 @@ async function agent(n: number, relays: readonly string[], drop?: Drop): Promise
             roundTripMs: 10,
             authRequired: false,
             paymentRequired: false,
+            reused: false,
           },
         })),
       );

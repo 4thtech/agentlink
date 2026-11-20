@@ -460,11 +460,10 @@ export class CardUpdateSender {
     // M1-7j: the own copies also go to the leaving servers (the owner surface may still read them).
     // NET-ANNOUNCE-OPTOUT (D-158 (7), 07 §4.3): the legacy fan-out only while the opt-out is off.
     const signed = await this.#deps.identity.signedCard();
+    const announce = await this.#deps.identity.announceDefault();
     const contactRoutes = await outbox.routes(await outbox.contactPeer(contactId));
     const routes = withLeavingRelays(
-      (await this.#deps.identity.announceDefault())
-        ? withLegacyRelays(contactRoutes, nowOf(this.#ctx))
-        : contactRoutes,
+      announce ? withLegacyRelays(contactRoutes, nowOf(this.#ctx)) : contactRoutes,
       ownKeysOf(signed),
       await outbox.leavingRelays(),
     );
@@ -480,6 +479,9 @@ export class CardUpdateSender {
       const contact = tx.get('contacts', { contact_id: contactId });
       // Another process sent it meanwhile, or the contact is no longer active: nothing stored.
       if (contact === undefined || !due(tx, contact, fromKey, catchUp)) return false;
+      // IR NET-ANNOUNCE-OPTOUT L2: an opt-out that committed after the routes were built stores
+      // nothing (the next pass builds them again without the default servers).
+      if (announce && optedOutTx(tx)) return false;
       tx.insert('envelopes', row);
       for (const r of rows) tx.insert('outbox', r);
       return true;
@@ -506,8 +508,12 @@ export class CardUpdateSender {
     const { identity, envelopes, outbox } = this.#deps;
     // NET-ANNOUNCE-OPTOUT: first, with the opt-out on, no pending retry keeps a default server (also
     // after a crash between the owner's `network.announce` and its clean-up). Store reads only.
-    await this.withdrawFromDefaultServers().catch(() => 0);
+    // IR L3: it fails closed: when the clean-up fails, the pass stops here (nothing new is built or
+    // published) and the caller reports it; the next pass tries again.
+    await this.withdrawFromDefaultServers();
     outbox.requireTransport();
+    // IR L2: the choice the routes below are built for, checked again in the insert transaction.
+    const announce = await identity.announceDefault();
     // IR-M1-7j L-2: whether anything is due is decided from store reads only, so a pass with nothing
     // due makes no KeyStore (keychain) call; the send check comes after.
     const signed = await identity.signedCard();
@@ -528,7 +534,7 @@ export class CardUpdateSender {
       await outbox.routes(undefined),
       ownKeysOf(signed),
       leaving,
-      (await identity.announceDefault()) ? DEFAULT_RELAYS : [],
+      announce ? DEFAULT_RELAYS : [],
     );
     if (state.envelopeId === undefined || state.envelopeJson === undefined) {
       const { built, row } = await envelopes.prepare({
@@ -549,6 +555,7 @@ export class CardUpdateSender {
       const stored = await this.#ctx.store.transaction((tx) => {
         // Another process stored this card's owner card-update meanwhile: nothing stored.
         if (ownerCardUpdatesTx(tx, fromKey).length > 0) return false;
+        if (announce && optedOutTx(tx)) return false; // IR L2
         tx.insert('envelopes', row);
         for (const r of rows) tx.insert('outbox', r);
         return true;
@@ -569,6 +576,7 @@ export class CardUpdateSender {
       const current = tx.select('outbox', { envelope_id: envelopeId });
       if (current.some((r) => r.state === 'pending')) return false;
       if (current.some((r) => r.attempt > state.lastAttempt)) return false;
+      if (announce && optedOutTx(tx)) return false; // IR L2
       for (const r of rows) tx.insert('outbox', r);
       return true;
     });
@@ -649,6 +657,11 @@ export class CardUpdateSender {
     }
     return false;
   }
+}
+
+/** IR NET-ANNOUNCE-OPTOUT L2: whether the opt-out is on, read inside the insert transaction. */
+function optedOutTx(tx: StoreTx): boolean {
+  return tx.select('identity')[0]?.announce_default === 0;
 }
 
 /** The stored owner card-updates (owner channel: no contact) of one key, newest first. */

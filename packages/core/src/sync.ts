@@ -44,7 +44,6 @@
 // I-5, I-7: nothing from an inbound envelope reaches a log line, an error or a report beyond its
 // validated envelope ID and fixed codes. Logs carry counts only; relay URLs are never logged here.
 import { encodeHex, encodeHex0x, envelopeHash } from '@4thtech-io/crypto';
-import { LEGACY_READ_RELAYS } from '@4thtech-io/transport-nostr';
 import {
   MAX_SYNC_IDENTITIES,
   seenPruneBefore,
@@ -407,7 +406,8 @@ export class SyncService {
       ...new Set([
         ...routes.flatMap((r) => r.relays),
         ...(await outbox.leavingRelays()),
-        ...LEGACY_READ_RELAYS,
+        // NET-ANNOUNCE-OPTOUT (fully quiet): none while the opt-out is on.
+        ...(await outbox.legacyReadRelays()),
       ]),
     ];
     const identities = await this.#identities();
@@ -561,7 +561,8 @@ export class SyncService {
         ...new Set([
           ...routes.flatMap((r) => r.relays),
           ...(await outbox.leavingRelays()),
-          ...LEGACY_READ_RELAYS,
+          // NET-ANNOUNCE-OPTOUT (fully quiet): none while the opt-out is on.
+          ...(await outbox.legacyReadRelays()),
         ]),
       ];
       identities = await this.#identities();

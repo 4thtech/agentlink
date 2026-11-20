@@ -58,6 +58,8 @@ describe('contactReach (one pass: reach and per-server counts)', () => {
           ),
       } as never,
       {
+        // The opt-out is off here: the legacy servers are read (NET-ANNOUNCE-OPTOUT).
+        legacyReadRelays: () => Promise.resolve(LEGACY_READ_RELAYS),
         contactPeer: (id: string) => {
           reads += 1;
           const relays = lists[id];

@@ -71,6 +71,7 @@ import {
   type ReadbackOptions,
   type RelayProbeResult,
 } from '@4thtech-io/transport-nostr';
+import { DEFAULT_AND_LEGACY_SERVERS } from './announce-optout.js';
 import { acksFor, type AckTarget } from './acks.js';
 import { agentNostrKey } from './card.js';
 import {
@@ -489,7 +490,8 @@ export class OutboxService {
     try {
       if (this.#pause !== undefined && (await this.#pause.paused())) return undefined;
       const own = checkList((await this.#identity.signedCard()).relays);
-      return await transport.relayProbe([...new Set([...own, ...LEGACY_READ_RELAYS])]);
+      // NET-ANNOUNCE-OPTOUT (fully quiet): with the opt-out on, no legacy server is probed.
+      return await transport.relayProbe([...new Set([...own, ...(await this.legacyReadRelays())])]);
     } catch {
       return undefined;
     }
@@ -510,7 +512,25 @@ export class OutboxService {
    */
   async leavingRelays(): Promise<readonly string[]> {
     try {
-      return (await this.#identity.leavingServers()).map((e) => e.url);
+      const leaving = (await this.#identity.leavingServers()).map((e) => e.url);
+      // NET-ANNOUNCE-OPTOUT (fully quiet, owner 20 Nov 2026; D-158 (7)): with the opt-out on, a
+      // leaving server that is a default or old default server is neither read nor published to; the
+      // ID's own previous servers still are, for their 30 days.
+      if (await this.#identity.announceDefault()) return leaving;
+      return leaving.filter((r) => !DEFAULT_AND_LEGACY_SERVERS.has(r));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * NET-ANNOUNCE-OPTOUT (fully quiet): the legacy servers read for the transition (fetch, live
+   * subscription, probe), or none while the opt-out is on. Fails closed: none when the choice cannot
+   * be read. Never throws.
+   */
+  async legacyReadRelays(): Promise<readonly string[]> {
+    try {
+      return (await this.#identity.announceDefault()) ? LEGACY_READ_RELAYS : [];
     } catch {
       return [];
     }

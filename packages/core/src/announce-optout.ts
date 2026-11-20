@@ -72,8 +72,8 @@ export async function withdrawFromDefaultServers(
       try {
         contactLists.set(contactId, new Set((await deps.outbox.contactPeer(contactId)).relays));
       } catch {
-        // An unreadable contact list: its rows are left as they are (the outbox's own rules apply).
-        contactLists.set(contactId, undefined);
+        // IR L3, fail closed: an unreadable contact list allows none of the default servers.
+        contactLists.set(contactId, new Set());
       }
     }
     return contactLists.get(contactId);

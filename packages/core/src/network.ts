@@ -177,7 +177,8 @@ export class NetworkService {
       paused,
       mode: networkMode(own),
       own: Object.freeze([...own]),
-      legacy: LEGACY_READ_RELAYS,
+      // NET-ANNOUNCE-OPTOUT (fully quiet): none while the opt-out is on.
+      legacy: await this.#outbox.legacyReadRelays(),
       legacyReadUntil: LEGACY_READ_UNTIL,
       updateDrops: migrationDroppedRelays(own),
     });
@@ -212,7 +213,7 @@ export class NetworkService {
     const lists: NetworkContactList[] = [];
     // Counted in the same pass (one list read per contact), for our own and legacy servers only.
     const perServer = new Map<string, number>();
-    for (const r of [...own, ...LEGACY_READ_RELAYS]) {
+    for (const r of [...own, ...(await this.#outbox.legacyReadRelays())]) {
       const o = relayOrigin(r);
       if (o !== 'wss://invalid') perServer.set(o, 0);
     }

@@ -588,7 +588,7 @@ D-158 (decided by Tali in chat, 19–20 Nov 2026: the C1–C8 wireframes are the
 | C3, needs sign-in allowed (warning) | "One server needs a sign-in to read" · "That's fine as long as 2 other servers work, and they do. We can't confirm delivery on this one." |
 | C3, blocked: fewer than 2 ready | "Add at least one more server to continue" · "Two working servers are needed" · "One isn't enough: if it goes down, your messages stop. Add another, or go back to automatic." |
 | C3, opt-out switch (mix-in off only) | "Don't also announce on the default servers" · "For companies that run everything on their own servers." |
-| C3, opt-out on (warning) | "Only your servers will know this ID" · "Another computer can find it only with your owner link or a backup. Contacts still only on AgentLink's old servers may miss your new details." |
+| C3, opt-out on (warning) | "Only your servers will know this ID" · "AgentLink's old public servers stop being used at once; your own previous servers stay readable for 30 days. Another computer can find this ID only with your owner link or a backup. Contacts still using an old copy of your contact details may not reach you until they receive the update." (fully quiet, owner, 20 Nov 2026) |
 | C4, review | "Review" · "Nothing changes until you approve." · "Step 3 of 3" · kind "Needs your approval" · title "Use these {n} message servers" · roles "Yours · {ms} ms" / "Automatic mix-in" |
 | C4, consequence: leaving servers | "Your old servers stay readable for 30 days" · "Until {date}, nothing sent to your old servers is missed: {hosts}." |
 | C4, consequence: contacts | "Your contacts get your new details once" · "AgentLink sends the update to all {n} for you." |
