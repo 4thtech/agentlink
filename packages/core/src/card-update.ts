@@ -420,7 +420,8 @@ export class CardUpdateSender {
   async announceToOwner(): Promise<OwnerAnnounceResult> {
     const { identity, envelopes, outbox } = this.#deps;
     outbox.requireTransport();
-    await identity.assertCanSend();
+    // IR-M1-7j L-2: whether anything is due is decided from store reads only, so a pass with nothing
+    // due makes no KeyStore (keychain) call; the send check comes after.
     const signed = await identity.signedCard();
     const fromKey = signed.card.agentNostr.slice(2);
     const leaving = await outbox.leavingRelays();
@@ -429,15 +430,17 @@ export class CardUpdateSender {
     const now = nowOf(this.#ctx);
     const state = await this.#ownerState(fromKey);
     if (state.pending) return 'pending';
-    if (state.envelopeId !== undefined && state.lastWrapAt !== undefined) {
-      if (now >= state.lastWrapAt && now - state.lastWrapAt < interval) return 'not_due';
+    if (state.envelopeId !== undefined && state.lastAcceptedAt !== undefined) {
+      if (now >= state.lastAcceptedAt && now - state.lastAcceptedAt < interval) return 'not_due';
     }
-    // The new list, the leaving servers and the default set (NET-ANNOUNCE-OPTOUT gates the last).
+    await identity.assertCanSend();
+    // The new list, the leaving servers and, unless the owner opted out (`announce_default` false,
+    // IR-M1-7j L-1; 07 §4.3 "Privacy"), the release's default set.
     const routes = withLeavingRelays(
       await outbox.routes(undefined),
       ownKeysOf(signed),
       leaving,
-      DEFAULT_RELAYS,
+      (await identity.announceDefault()) ? DEFAULT_RELAYS : [],
     );
     if (state.envelopeId === undefined || state.envelopeJson === undefined) {
       const { built, row } = await envelopes.prepare({
@@ -490,7 +493,12 @@ export class CardUpdateSender {
   async #ownerState(fromKey: string): Promise<{
     readonly envelopeId: string | undefined;
     readonly envelopeJson: string | undefined;
-    readonly lastWrapAt: number | undefined;
+    /**
+     * When the last wrap that relays accepted (`sent`) was made. A wrap that ended `not_delivered`
+     * does not count, so the next pass tries again at once (IR-M1-7j L-5): its rows had the
+     * outbox's own backoff until give_up_at.
+     */
+    readonly lastAcceptedAt: number | undefined;
     readonly lastAttempt: number;
     readonly pending: boolean;
   }> {
@@ -500,16 +508,17 @@ export class CardUpdateSender {
         return {
           envelopeId: undefined,
           envelopeJson: undefined,
-          lastWrapAt: undefined,
+          lastAcceptedAt: undefined,
           lastAttempt: 0,
           pending: false,
         };
       }
       const wraps = tx.select('outbox', { envelope_id: latest.envelope_id });
+      const sent = wraps.filter((r) => r.state === 'sent');
       return {
         envelopeId: latest.envelope_id,
         envelopeJson: latest.envelope_json ?? undefined,
-        lastWrapAt: wraps.length === 0 ? undefined : Math.max(...wraps.map((r) => r.created_at)),
+        lastAcceptedAt: sent.length === 0 ? undefined : Math.max(...sent.map((r) => r.created_at)),
         lastAttempt: wraps.length === 0 ? 0 : Math.max(...wraps.map((r) => r.attempt)),
         pending: wraps.some((r) => r.state === 'pending'),
       };

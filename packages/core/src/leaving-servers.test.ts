@@ -57,6 +57,8 @@ const C = list('c', 2);
 let skew = false;
 let inTx = false;
 const now = (): number => (skew && inTx ? clock.t + 1 : clock.t);
+/** While true, every relay refuses every publish. */
+let refuseAll = false;
 
 /** A store whose transactions mark `inTx`, so the clock can tell where it is read. */
 function watchedStore(inner: MemoryStore): Store {
@@ -86,12 +88,26 @@ interface Agent extends TestAgent {
   readonly live: string[][];
   /** Items the fake relays serve, by relay. */
   readonly served: Map<string, SyncItem[]>;
+  /** KeyStore (keychain) calls the client made. */
+  readonly keyCalls: { n: number };
 }
 
 async function agent(n: number, owner: MemoryOwnerKeyStore, relays: readonly string[]) {
   const store = new MemoryStore();
   const cipher = new TestStoreCipher();
   const keyStore: KeyStore = new MemoryKeyStore(seed(n), { nowSeconds: now });
+  const keyCalls = { n: 0 };
+  // The client's KeyStore counts its calls (IR-M1-7j L-2: a keychain read per pass matters on Linux).
+  const countedKeys = new Proxy(keyStore, {
+    get(target, prop) {
+      const value = Reflect.get(target, prop, target) as unknown;
+      if (typeof value !== 'function') return value;
+      return (...args: unknown[]) => {
+        keyCalls.n += 1;
+        return (value as (...a: unknown[]) => unknown).apply(target, args);
+      };
+    },
+  });
   const reads: string[][] = [];
   const live: string[][] = [];
   const served = new Map<string, SyncItem[]>();
@@ -99,11 +115,19 @@ async function agent(n: number, owner: MemoryOwnerKeyStore, relays: readonly str
     wrap: (envelope, recipients, keys) =>
       wrapEnvelope(envelope, recipients, keys, { now: deps.now }),
     publish: (_event, to) =>
-      Promise.resolve({
-        results: to.map((relay) => ({ relay, ok: true, reason: 'ok' as const })),
-        acked: [...to],
-        sent: to.length > 0,
-      } as PublishOutcome),
+      Promise.resolve(
+        refuseAll
+          ? ({
+              results: to.map((relay) => ({ relay, ok: false, reason: 'connect_failed' as const })),
+              acked: [],
+              sent: false,
+            } as PublishOutcome)
+          : ({
+              results: to.map((relay) => ({ relay, ok: true, reason: 'ok' as const })),
+              acked: [...to],
+              sent: to.length > 0,
+            } as PublishOutcome),
+      ),
     sync: async (options) => {
       reads.push([...options.relays]);
       let delivered = 0;
@@ -121,7 +145,7 @@ async function agent(n: number, owner: MemoryOwnerKeyStore, relays: readonly str
     },
   });
   const client = await AgentLinkClient.create({
-    keyStore,
+    keyStore: countedKeys,
     store: watchedStore(store),
     cipher,
     approvals: new RecordingApprovalChannel(),
@@ -146,6 +170,7 @@ async function agent(n: number, owner: MemoryOwnerKeyStore, relays: readonly str
     reads,
     live,
     served,
+    keyCalls,
   } satisfies Agent;
 }
 
@@ -212,6 +237,7 @@ let a: Agent;
 beforeEach(async () => {
   clock.t = START;
   skew = false;
+  refuseAll = false;
   a = await agent(81, ownerA, A);
 });
 
@@ -479,6 +505,43 @@ describe('what is published to the leaving servers', () => {
     clock.t += 5 * DAY;
     await a.client.cardUpdates.announceToOwner();
     expect((await owned()).length).toBeGreaterThan(n);
+  });
+});
+
+describe('owner card-update review fixes (IR-M1-7j)', () => {
+  it('L-1: with announce_default false nothing goes to any default server; own + leaving only', async () => {
+    await change(a, B, false);
+    expect(await a.client.cardUpdates.announceToOwner()).toBe('published');
+    const owned = (await outboxRows(a)).filter(
+      (x) => x.type === 'card-update' && x.contact === null,
+    );
+    expect(owned).toHaveLength(2);
+    for (const r of owned) {
+      for (const relay of DEFAULT_RELAYS) expect(r.relays).not.toContain(relay);
+      expect([...r.relays].sort()).toEqual([...B, ...A].sort());
+    }
+  });
+
+  it('L-2: a pass with nothing due makes no KeyStore (keychain) call', async () => {
+    expect(await a.client.cardUpdates.announceToOwner()).toBe('published');
+    a.keyCalls.n = 0;
+    expect(await a.client.cardUpdates.announceToOwner()).toBe('not_due');
+    expect(a.keyCalls.n).toBe(0);
+  });
+
+  it('L-5: a wrap no relay accepted is tried again at once after it ends, not after the interval', async () => {
+    refuseAll = true;
+    await a.client.cardUpdates.announceToOwner();
+    const rows = await a.store.transaction((tx) => tx.select('outbox'));
+    expect(rows.length).toBeGreaterThan(0);
+    // The outbox's own backoff runs until give_up_at; then the rows end not_delivered.
+    clock.t = Math.max(...rows.map((r) => r.give_up_at)) + 1;
+    await a.client.outbox.processDue();
+    const ended = await a.store.transaction((tx) => tx.select('outbox'));
+    expect(ended.every((r) => r.state === 'not_delivered')).toBe(true);
+    expect(clock.t - START).toBeLessThan(7 * DAY);
+    refuseAll = false;
+    expect(await a.client.cardUpdates.announceToOwner()).toBe('published');
   });
 });
 

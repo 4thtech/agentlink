@@ -258,10 +258,17 @@ async function openAgent(
   }
   const receives = { count: 0 };
   const receive = client.envelopes.receive.bind(client.envelopes);
-  const ownKey = encodeHex((await keyStore.getPublicBundle()).agentNostr);
-  client.envelopes.receive = (input) => {
-    // M1-7j: the agent's own copy of its owner card-update is not counted (a duplicate of its own row).
-    if ((input.envelope as { from?: unknown }).from !== ownKey) receives.count += 1;
+  client.envelopes.receive = async (input) => {
+    // M1-7j: only the agent's own copy of its owner card-update (a duplicate of its own stored row,
+    // owner channel, no contact) is not counted; every other envelope is.
+    const id = (input.envelope as { id?: unknown }).id;
+    const own =
+      typeof id === 'string' &&
+      (await store.transaction((tx) => {
+        const row = tx.get('envelopes', { envelope_id: id });
+        return row !== undefined && ownerAnnounce(row);
+      }));
+    if (!own) receives.count += 1;
     return receive(input);
   };
   return {

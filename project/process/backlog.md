@@ -11625,6 +11625,13 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Goal:** a per-ID owner choice, offered only with the mix-in off: the owner card-update then goes to the ID's own and leaving servers only, and the card-update fan-out to the old default servers stops too. Contacts' messages are unchanged; invites carry the card's list; a reset clears it.
 - **Done when:** `RED (expected):` commit first; with the opt-out on nothing is published to the default set; the short-invite path still reaches the ID; a restore from a backup on a new computer keeps the list and the choice and finds the ID.
 
+#### NET-PREV-DOCTOR · `doctor` names an unreadable list of leaving servers (from the M1-7j review, L-4)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Spec:** 07 §3 (`identity.prev_relays`: "a value that does not open … `doctor` names it"); D-158 (5)
+- **Repo/path:** agentlink · core identity (a read-only check), CLI `doctor`, the app's diagnostics
+- **Depends on:** M1-7j
+- **Goal:** today a stored list of leaving servers that does not open only writes a fixed log line; the agent then reads its own list and the legacy servers, counts the list as empty for the 16 limit, and the next server change replaces it. `doctor` (and the app's diagnostics) says, in fixed text and without any address, that the list of servers still read after a change could not be opened, and what that means (messages a contact sent to a server you left may not arrive until it learns your new details).
+- **Done when:** a test stores a value that does not open and `doctor` reports the fixed finding; a readable or empty list reports nothing; no server address or stored value appears in the output or the logs.
+
 #### RELAY-PER-IP-LIMIT · A default server that refuses a third connection
 - **Status:** backlog · **Security:** S1 · **Spec:** 07 §4.2, §4.3; `project/runbooks/relay-vetting.md`
 - **Goal:** offchain.pub appears to refuse a third connection from one computer; with several AI apps connected (one connection each) a user could be refused there. Measure the limit, and if confirmed reconsider it as a default.
