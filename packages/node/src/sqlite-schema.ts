@@ -29,7 +29,10 @@ export const MAX_INT = SQL_MAX_INT;
 export interface StoreMigration {
   /** The schema version this migration produces; migrations run in order from the stored version. */
   readonly version: number;
-  /** Statements run in one transaction, together with the version bump. */
+  /**
+   * Schema and row statements only (no pragma, no VACUUM). All pending migrations run in one
+   * transaction together with the version bump (STORE-CREATE-ONE-TX).
+   */
   readonly statements: readonly string[];
 }
 

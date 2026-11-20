@@ -11,7 +11,8 @@
 //   text here. It never reads a clock for data; only the lock wait uses one.
 // - Fail closed: a stored value outside its column's type is `store_unreadable`, never absent; a lost
 //   transaction (SQLite rolled it back on an I/O error) stops every later statement of the body.
-// - Forward migrations only (07 §3.7): a newer schema version is refused, never downgraded.
+// - Forward migrations only (07 §3.7): a newer schema version is refused, never downgraded. All
+//   pending steps run in one transaction (STORE-CREATE-ONE-TX): all of them or none.
 // - RET-2 (D-148; 04 §4.2 "Space on disk"; 07 §3.8): `auto_vacuum=INCREMENTAL`. A new file gets it
 //   before its first table; an existing file is switched once with a VACUUM, after the migrations,
 //   under the ID's inter-process lock, only when the volume has at least twice the store's size (file
@@ -484,6 +485,17 @@ export class SqliteStore implements Store {
       db.pragma('busy_timeout = 0');
       const store = new SqliteStore(db, path, lockTimeoutMs);
       await store.#retryBusy(() => {
+        // RET-2: a file without any table yet gets incremental auto_vacuum before its first table.
+        // It must come before the switch to WAL: on a new file that switch writes the first page,
+        // which fixes the mode (set after it, the pragma was ignored and the first open paid for a
+        // VACUUM, STORE-CREATE-ONE-TX).
+        const objects = Number(
+          db
+            .prepare("SELECT count(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'")
+            .pluck()
+            .get(),
+        );
+        if (objects === 0) db.pragma(`auto_vacuum = ${String(AUTO_VACUUM_INCREMENTAL)}`);
         if (String(db.pragma('journal_mode = WAL', { simple: true })).toLowerCase() !== 'wal') {
           throw new NodeStoreError('store_failed');
         }
@@ -495,14 +507,6 @@ export class SqliteStore implements Store {
       if (Number(db.pragma('secure_delete = ON', { simple: true })) !== 1) {
         throw new NodeStoreError('store_failed');
       }
-      // RET-2: a file without any table yet gets incremental auto_vacuum before its first table.
-      const objects = Number(
-        db
-          .prepare("SELECT count(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'")
-          .pluck()
-          .get(),
-      );
-      if (objects === 0) db.pragma(`auto_vacuum = ${String(AUTO_VACUUM_INCREMENTAL)}`);
       store.#schemaVersion = await store.#migrate(migrations);
       verifySchema(db);
       await store.#switchAutoVacuum(
@@ -585,38 +589,46 @@ export class SqliteStore implements Store {
     return next;
   }
 
-  /** Brings the schema to the last migration's version in one IMMEDIATE transaction per step. */
+  /**
+   * Brings the schema to the last migration's version in one IMMEDIATE transaction
+   * (STORE-CREATE-ONE-TX, 07 §3.7): every pending step in order, then the version, then one commit.
+   * A new file gets the whole schema in one commit and an older file is upgraded in one commit (one
+   * commit per step before). A failing step rolls the whole upgrade back: the file stays at its old
+   * version, never at a version in between. The version is read once the write lock is held, so
+   * when another opener (the agent, the owner CLI) upgraded the file first there is nothing left to
+   * do. Migration steps hold schema and row statements only; journal_mode, auto_vacuum and VACUUM
+   * cannot run in a transaction and stay outside (open, #switchAutoVacuum).
+   */
   async #migrate(migrations: readonly StoreMigration[]): Promise<number> {
     const target = migrations.at(-1)?.version ?? 0;
-    for (;;) {
-      await this.#retryBusy(() => this.#db.prepare('BEGIN IMMEDIATE').run());
-      try {
-        const appId = Number(this.#db.pragma('application_id', { simple: true }));
-        const version = Number(this.#db.pragma('user_version', { simple: true }));
-        const objects = Number(
-          this.#db
-            .prepare("SELECT count(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'")
-            .pluck()
-            .get(),
-        );
-        if (appId !== STORE_APPLICATION_ID && !(appId === 0 && version === 0 && objects === 0)) {
-          throw new NodeStoreError('store_foreign');
-        }
-        if (version > target) throw new NodeStoreError('store_too_new');
-        if (version === target) {
-          this.#db.prepare('COMMIT').run();
-          return version;
-        }
-        const next = migrations.find((m) => m.version === version + 1);
+    await this.#retryBusy(() => this.#db.prepare('BEGIN IMMEDIATE').run());
+    try {
+      const appId = Number(this.#db.pragma('application_id', { simple: true }));
+      const version = Number(this.#db.pragma('user_version', { simple: true }));
+      const objects = Number(
+        this.#db
+          .prepare("SELECT count(*) FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'")
+          .pluck()
+          .get(),
+      );
+      if (appId !== STORE_APPLICATION_ID && !(appId === 0 && version === 0 && objects === 0)) {
+        throw new NodeStoreError('store_foreign');
+      }
+      if (version > target) throw new NodeStoreError('store_too_new');
+      for (let from = version; from < target; from += 1) {
+        const next = migrations.find((m) => m.version === from + 1);
         if (next === undefined) throw new NodeStoreError('store_foreign');
         for (const statement of next.statements) this.#db.prepare(statement).run();
-        this.#db.pragma(`application_id = ${STORE_APPLICATION_ID}`);
-        this.#db.pragma(`user_version = ${next.version}`);
-        this.#db.prepare('COMMIT').run();
-      } catch (error) {
-        this.#rollback();
-        throw error;
       }
+      if (version < target) {
+        this.#db.pragma(`application_id = ${STORE_APPLICATION_ID}`);
+        this.#db.pragma(`user_version = ${String(target)}`);
+      }
+      this.#db.prepare('COMMIT').run();
+      return target;
+    } catch (error) {
+      this.#rollback();
+      throw error;
     }
   }
 
