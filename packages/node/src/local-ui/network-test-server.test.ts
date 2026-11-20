@@ -46,7 +46,11 @@ afterEach(async () => {
 });
 
 /** An in-memory relay that stores EVENTs and serves them by id: enough for `ready`. */
-function memoryRelays(): { connector: RelayConnector; frames: unknown[][]; targets: RelayTarget[] } {
+function memoryRelays(): {
+  connector: RelayConnector;
+  frames: unknown[][];
+  targets: RelayTarget[];
+} {
   const stored: { id: string }[] = [];
   const frames: unknown[][] = [];
   const targets: RelayTarget[] = [];
@@ -72,7 +76,8 @@ function memoryRelays(): { connector: RelayConnector; frames: unknown[][]; targe
             push(['OK', event.id, true, '']);
           } else if (frame[0] === 'REQ') {
             const ids = (frame[2] as { ids?: string[] }).ids ?? [];
-            for (const event of stored) if (ids.includes(event.id)) push(['EVENT', frame[1], event]);
+            for (const event of stored)
+              if (ids.includes(event.id)) push(['EVENT', frame[1], event]);
             push(['EOSE', frame[1]]);
           }
         },

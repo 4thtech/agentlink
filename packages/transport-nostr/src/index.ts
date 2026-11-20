@@ -24,6 +24,7 @@ export type {
   AddressCheck,
   HostResolver,
   Nip11Fetcher,
+  RelayConnectFailure,
   RelayConnector,
   RelaySocket,
   RelaySocketHandlers,
@@ -59,6 +60,21 @@ export {
   type RelayProbeState,
   type RelayPublishResult,
 } from './relay-pool.js';
+// NET-PRECHECK: the in-app server Test (04 §4; 07 §4.3).
+export {
+  PRECHECK_MAX_SERVERS,
+  PRECHECK_NIP11_TIMEOUT_MS,
+  PRECHECK_RATE_LIMIT,
+  PRECHECK_RATE_WINDOW_MS,
+  PRECHECK_SLOW_MS,
+  PRECHECK_TOTAL_MS,
+  PrecheckRateLimit,
+  precheckServers,
+  type PrecheckOptions,
+  type PrecheckOutcome,
+  type PrecheckRefusal,
+  type PrecheckResult,
+} from './precheck.js';
 export {
   OUTBOX_GIVE_UP_SECONDS,
   OutboxWorker,

@@ -265,6 +265,8 @@ describe('the default registry: one stub per page (M1-11s-b)', () => {
       '/api/ui/widget',
       // NET-ROUTE: the Message network view read (api/network.test.ts).
       '/api/ui/network',
+      // NET-PRECHECK: the server Test (api/network-test.test.ts, network-test-server.test.ts).
+      '/api/ui/network/test',
     ]);
     const registry = createLocalUiRoutes();
     // M1-11b-1: the first-run page has its real status route (api/first-run.test.ts).

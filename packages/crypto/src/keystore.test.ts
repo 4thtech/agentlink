@@ -160,6 +160,8 @@ describe('@4thtech-io/crypto/keystore', () => {
       'nostrEventId',
       'verifyNostrEvent',
       'createGiftWrap',
+      // NET-PRECHECK: a kind 1059 event under a key made and wiped inside the call.
+      'createThrowawayEvent',
       'KeyStoreError',
       'OWNER_SESSION_DEFAULT_TTL_MS',
       'OWNER_SESSION_MAX_TTL_MS',

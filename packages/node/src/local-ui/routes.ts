@@ -45,9 +45,12 @@
 //   with a handler, once; it takes no input at all.
 // - ATT-APP-ATTACH: a `presence: 'attach'` route is only a POST at ATTACH_PATH with a handler,
 //   registered once; the server's attach gate runs it.
+// - NET-PRECHECK: a `presence: 'net-test'` route (the server Test) is only a POST at
+//   NETWORK_TEST_PATH with a handler, registered once; the server's net-test gate runs it.
 // - The page files in api/ each own their routes; this file only lists them.
 import { activityRoutes } from './api/activity.js';
 import { attachRoute } from './api/attach.js';
+import { networkTestRoute } from './api/network-test.js';
 // U3-c: the Agents list and the switch kind; the stubs of U3-d, U3-e, U3-f and U3-flow.
 import { agentsRoutes } from './api/agents.js';
 import { eventsRoutes } from './api/events.js';
@@ -108,6 +111,7 @@ import {
   AGENTS_RESUME_PATH,
   AGENTS_SWITCH_PATH,
   ATTACH_PATH,
+  NETWORK_TEST_PATH,
   BACKUP_EXPORT_PATH,
   BACKUP_PATH,
   CREATE_AGENT_PATHS,
@@ -471,6 +475,16 @@ export class LocalUiRouteRegistry {
       if (this.#entries.some((e) => e.route.presence === 'attach')) {
         throw invalid('the attach route is already registered');
       }
+    } else if (presence === 'net-test') {
+      // NET-PRECHECK: the server Test only; the server's net-test gate runs it (no presence).
+      if (method !== 'POST') throw invalid('a net-test route is a POST');
+      if (route.path !== NETWORK_TEST_PATH) {
+        throw invalid('a net-test route is only at the network test path');
+      }
+      if (typeof handler !== 'function') throw invalid('a net-test route needs a handler');
+      if (this.#entries.some((e) => e.route.presence === 'net-test')) {
+        throw invalid('the net-test route is already registered');
+      }
     } else if (typeof handler !== 'function') {
       throw invalid('no handler');
     } else if (method === 'GET') {
@@ -531,6 +545,8 @@ export function createLocalUiRoutes(): LocalUiRouteRegistry {
     healthRoutes,
     // NET-ROUTE: the Message network view read (Under the hood).
     networkRoutes,
+    // NET-PRECHECK: the server Test (the net-test kind; no presence, changes nothing).
+    [networkTestRoute],
     activityRoutes,
     // UX2-f1: the activity pulse, before the Messages routes so `pulse` never reaches :contactId.
     [pulseRoute],

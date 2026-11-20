@@ -46,7 +46,7 @@ const frames = (net: MockNetwork, kind: string): unknown[][] =>
   net.received.map((r) => JSON.parse(r.frame) as unknown[]).filter((f) => f[0] === kind);
 
 const one = async (
-  net: MockNetwork,
+  _net: MockNetwork,
   run: (urls: readonly unknown[], ms?: number) => Promise<readonly PrecheckResult[]>,
   url: string,
 ): Promise<PrecheckResult> => {
@@ -83,7 +83,9 @@ describe('precheckServers (NET-PRECHECK)', () => {
     expect(frames(net, 'AUTH')).toHaveLength(0);
     expect(net.sockets.every((s) => s.closed)).toBe(true);
     expect(net.resolves).toEqual(['good-0.nostr-test.dev']);
-    expect(net.opens.every((t) => t.address === PUBLIC_ADDRESS && t.host === 'good-0.nostr-test.dev')).toBe(true);
+    expect(
+      net.opens.every((t) => t.address === PUBLIC_ADDRESS && t.host === 'good-0.nostr-test.dev'),
+    ).toBe(true);
     expect(net.nip11Fetches.every((t) => t.address === PUBLIC_ADDRESS)).toBe(true);
     expect(net.nip11Options[0]?.maxBytes).toBe(65_536);
   });
@@ -137,7 +139,11 @@ describe('precheckServers (NET-PRECHECK)', () => {
       nip11Body: JSON.stringify({ limitation: { payment_required: true, auth_required: 'true' } }),
     });
     const results = await run([a, b, c]);
-    expect(results.map((r) => r.outcome)).toEqual(['needs_sign_in', 'needs_payment', 'needs_payment']);
+    expect(results.map((r) => r.outcome)).toEqual([
+      'needs_sign_in',
+      'needs_payment',
+      'needs_payment',
+    ]);
   });
 
   it('a server that refuses events, or drops them, is refused: rejected_events', async () => {
@@ -157,7 +163,10 @@ describe('precheckServers (NET-PRECHECK)', () => {
     const { net, run } = setup();
     const [url] = relayUrls('same', 1) as [string];
     net.configure(url, { sameSocketOnly: true });
-    expect(await one(net, run, url)).toMatchObject({ outcome: 'refused', reason: 'rejected_events' });
+    expect(await one(net, run, url)).toMatchObject({
+      outcome: 'refused',
+      reason: 'rejected_events',
+    });
   });
 
   it('a forged event under the test id is not a read-back', async () => {
@@ -278,12 +287,14 @@ describe('precheckServers (NET-PRECHECK)', () => {
   });
 
   it('a failed or empty lookup is dns_failed', async () => {
-    const { net, run } = setup();
+    const { net } = setup();
     const [a, b] = relayUrls('nx', 2) as [string, string];
     net.dns.set('nx-0.nostr-test.dev', []);
     const failing = {
       resolve: (host: string) =>
-        host === 'nx-1.nostr-test.dev' ? Promise.reject(new Error('ENOTFOUND nx-1')) : net.resolve(host),
+        host === 'nx-1.nostr-test.dev'
+          ? Promise.reject(new Error('ENOTFOUND nx-1'))
+          : net.resolve(host),
     };
     const pending = precheckServers([a, b], { resolver: failing, connector: net, nip11: net });
     await vi.advanceTimersByTimeAsync(100);
@@ -330,24 +341,41 @@ describe('precheckServers (NET-PRECHECK)', () => {
     const { net } = setup();
     const urls = relayUrls('cap', PRECHECK_MAX_SERVERS);
     for (const [i, url] of urls.entries()) {
-      net.configure(url, i % 2 === 0 ? { okDelayMs: 60_000 } : { reqDelayMs: 60_000, nip11Hang: true });
+      net.configure(
+        url,
+        i % 2 === 0 ? { okDelayMs: 60_000 } : { reqDelayMs: 60_000, nip11Hang: true },
+      );
     }
     let done = false;
-    const pending = precheckServers(urls, { resolver: net, connector: net, nip11: net }).then((r) => {
-      done = true;
-      return r;
-    });
+    const pending = precheckServers(urls, { resolver: net, connector: net, nip11: net }).then(
+      (r) => {
+        done = true;
+        return r;
+      },
+    );
     await vi.advanceTimersByTimeAsync(PRECHECK_TOTAL_MS);
     expect(done).toBe(true);
     const results = await pending;
     expect(results).toHaveLength(PRECHECK_MAX_SERVERS);
-    expect(results.every((r) => r.outcome === 'refused' && r.reason === 'timeout')).toBe(true);
+    // Nothing Nostr-like ever came back (no OK): not_nostr; an OK but no read-back: timeout.
+    expect(results.map((r) => r.reason)).toEqual(
+      urls.map((_, i) => (i % 2 === 0 ? 'not_nostr' : 'timeout')),
+    );
+    expect(results.every((r) => r.outcome === 'refused')).toBe(true);
     expect(net.sockets.every((s) => s.closed)).toBe(true);
   });
 
   describe('hostile NIP-11 documents are ignored, never fatal and never echoed', () => {
     it.each([
-      ['huge', { nip11Body: JSON.stringify({ name: 'x'.repeat(70_000), limitation: { auth_required: true } }) }],
+      [
+        'huge',
+        {
+          nip11Body: JSON.stringify({
+            name: 'x'.repeat(70_000),
+            limitation: { auth_required: true },
+          }),
+        },
+      ],
       ['malformed', { nip11Body: '{"limitation": {"auth_required": tru' }],
       ['not an object', { nip11Body: '[1,2,3]' }],
       ['unavailable', { nip11Body: null }],
@@ -386,7 +414,10 @@ describe('precheckServers (NET-PRECHECK)', () => {
     const results = await run(['ws://x.nostr-test.dev', ...urls]);
     expect(results.map((r) => r.outcome)).toEqual(['refused', 'ready', 'refused', 'ready']);
     await expect(
-      precheckServers(relayUrls('many', PRECHECK_MAX_SERVERS + 1), { resolver: net, connector: net }),
+      precheckServers(relayUrls('many', PRECHECK_MAX_SERVERS + 1), {
+        resolver: net,
+        connector: net,
+      }),
     ).rejects.toBeInstanceOf(TransportError);
     await expect(precheckServers([], { resolver: net, connector: net })).rejects.toBeInstanceOf(
       TransportError,

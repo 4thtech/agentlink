@@ -13,10 +13,7 @@ import {
   type TestCertificate,
   type TestRelay,
 } from '../../relay-io.fixture.js';
-import {
-  createNip11FetcherWith,
-  createRelayConnectorWith,
-} from '../../relay-io.js';
+import { createNip11FetcherWith, createRelayConnectorWith } from '../../relay-io.js';
 import type { LocalUiContext } from '../context.js';
 import {
   NETWORK_TEST_MAX_SERVERS,
@@ -31,7 +28,6 @@ const HOST_B = 'relay-b.nostr-test.dev';
 const HOST_C = 'relay-c.nostr-test.dev';
 const ADDRESS_A = '93.184.215.21';
 const ADDRESS_B = '93.184.215.22';
-const ADDRESS_C = '93.184.215.23';
 
 let certificate: TestCertificate;
 let otherCertificate: TestCertificate;
@@ -155,10 +151,17 @@ describe('POST /api/ui/network/test (NET-PRECHECK)', () => {
     );
     const route = createNetworkTestRoute(() => w.io);
     const res = await call(route, {
-      servers: [`wss://${HOST_A}`, `wss://${HOST_B}/`, `wss://${HOST_C}`, 'ws://plain.nostr-test.dev'],
+      servers: [
+        `wss://${HOST_A}`,
+        `wss://${HOST_B}/`,
+        `wss://${HOST_C}`,
+        'ws://plain.nostr-test.dev',
+      ],
     });
     expect(res.status).toBe(200);
-    const body = res.body as { results: { host: string | null; outcome: string; reason: string | null }[] };
+    const body = res.body as {
+      results: { host: string | null; outcome: string; reason: string | null }[];
+    };
     expect(Object.keys(body)).toEqual(['results']);
     expect(body.results.map((r) => [r.host, r.outcome, r.reason])).toEqual([
       [HOST_A, 'ready', null],
@@ -180,7 +183,10 @@ describe('POST /api/ui/network/test (NET-PRECHECK)', () => {
     const good = await startTestRelay(certificate, { onSocket: speakNostr(store) });
     relays.push(good);
     const w = world({ [HOST_A]: [[ADDRESS_A], ['127.0.0.1']] }, { [ADDRESS_A]: good.port });
-    const res = await call(createNetworkTestRoute(() => w.io), { servers: [`wss://${HOST_A}`] });
+    const res = await call(
+      createNetworkTestRoute(() => w.io),
+      { servers: [`wss://${HOST_A}`] },
+    );
     expect((res.body as { results: { outcome: string }[] }).results[0]?.outcome).toBe('ready');
     expect(w.resolves).toEqual([HOST_A]);
     expect(w.dialed.length).toBeGreaterThanOrEqual(2);
@@ -197,7 +203,10 @@ describe('POST /api/ui/network/test (NET-PRECHECK)', () => {
     });
     relays.push(good);
     const w = world({ [HOST_A]: [[ADDRESS_A]] }, { [ADDRESS_A]: good.port });
-    const res = await call(createNetworkTestRoute(() => w.io), { servers: [`wss://${HOST_A}`] });
+    const res = await call(
+      createNetworkTestRoute(() => w.io),
+      { servers: [`wss://${HOST_A}`] },
+    );
     expect((res.body as { results: { outcome: string }[] }).results[0]?.outcome).toBe('ready');
     expect(good.seen.filter((s) => s.kind === 'http')).toHaveLength(1);
     expect(w.dialed.every((a) => a === ADDRESS_A)).toBe(true);
@@ -207,7 +216,9 @@ describe('POST /api/ui/network/test (NET-PRECHECK)', () => {
     const wrongCert = await startTestRelay(otherCertificate, { onSocket: speakNostr([]) });
     const noUpgrade = await startTestRelay(certificate, {
       upgrade: (_req, socket) => {
-        socket.end('HTTP/1.1 302 Found\r\nLocation: wss://evil.nostr-test.dev/\r\nContent-Length: 0\r\n\r\n');
+        socket.end(
+          'HTTP/1.1 302 Found\r\nLocation: wss://evil.nostr-test.dev/\r\nContent-Length: 0\r\n\r\n',
+        );
         return false;
       },
     });
@@ -216,9 +227,12 @@ describe('POST /api/ui/network/test (NET-PRECHECK)', () => {
       { [HOST_A]: [[ADDRESS_A]], [HOST_B]: [[ADDRESS_B]] },
       { [ADDRESS_A]: wrongCert.port, [ADDRESS_B]: noUpgrade.port },
     );
-    const res = await call(createNetworkTestRoute(() => w.io), {
-      servers: [`wss://${HOST_A}`, `wss://${HOST_B}`],
-    });
+    const res = await call(
+      createNetworkTestRoute(() => w.io),
+      {
+        servers: [`wss://${HOST_A}`, `wss://${HOST_B}`],
+      },
+    );
     expect((res.body as { results: { reason: string }[] }).results.map((r) => r.reason)).toEqual([
       'tls_failed',
       'not_nostr',
@@ -242,15 +256,23 @@ describe('POST /api/ui/network/test (NET-PRECHECK)', () => {
     });
     relays.push(authRelay);
     const w = world({ [HOST_A]: [[ADDRESS_A]] }, { [ADDRESS_A]: authRelay.port });
-    const res = await call(createNetworkTestRoute(() => w.io), { servers: [`wss://${HOST_A}`] });
-    expect((res.body as { results: { outcome: string }[] }).results[0]?.outcome).toBe('needs_sign_in');
+    const res = await call(
+      createNetworkTestRoute(() => w.io),
+      { servers: [`wss://${HOST_A}`] },
+    );
+    expect((res.body as { results: { outcome: string }[] }).results[0]?.outcome).toBe(
+      'needs_sign_in',
+    );
     expect(frames.some((f) => f[0] === 'AUTH')).toBe(false);
   }, 30_000);
 
   it('refuses a malformed body: 400 invalid, nothing resolved', async () => {
     const w = world({}, {});
     const route = createNetworkTestRoute(() => w.io);
-    const tooMany = Array.from({ length: NETWORK_TEST_MAX_SERVERS + 1 }, (_, i) => `wss://r${i}.nostr-test.dev`);
+    const tooMany = Array.from(
+      { length: NETWORK_TEST_MAX_SERVERS + 1 },
+      (_, i) => `wss://r${i}.nostr-test.dev`,
+    );
     for (const body of [
       {},
       { servers: [] },

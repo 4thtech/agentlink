@@ -249,6 +249,8 @@ export {
   type UnsignedNostrEvent,
 } from './nostr-event.js';
 export { createGiftWrap } from './gift-wrap.js';
+// NET-PRECHECK: the server Test's throwaway-key event (kind 1059 only; no secret in or out).
+export { createThrowawayEvent } from './throwaway-event.js';
 export {
   ECDSA_SIGNATURE_BYTES,
   decodeEcdsaSignature,

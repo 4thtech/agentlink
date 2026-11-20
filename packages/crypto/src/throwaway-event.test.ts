@@ -11,7 +11,12 @@ describe('createThrowawayEvent (NET-PRECHECK)', () => {
     const seen: string[] = [];
     const event = createThrowawayEvent((pubkey) => {
       seen.push(pubkey);
-      return { kind: NOSTR_KIND_GIFT_WRAP, created_at: 1_760_000_000, tags: [['p', pubkey]], content: 'x' };
+      return {
+        kind: NOSTR_KIND_GIFT_WRAP,
+        created_at: 1_760_000_000,
+        tags: [['p', pubkey]],
+        content: 'x',
+      };
     });
     expect(seen).toHaveLength(1);
     expect(seen[0]).toMatch(/^[0-9a-f]{64}$/);
