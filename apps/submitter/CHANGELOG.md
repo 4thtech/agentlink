@@ -1,5 +1,13 @@
 # @4thtech-io/submitter
 
+## 0.1.33
+
+### Patch Changes
+
+- Updated dependencies [043345e]
+  - @4thtech-io/crypto@0.5.15
+  - @4thtech-io/chain@0.5.15
+
 ## 0.1.32
 
 ### Patch Changes

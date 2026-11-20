@@ -1,5 +1,12 @@
 # @4thtech-io/drop
 
+## 0.0.36
+
+### Patch Changes
+
+- Updated dependencies [043345e]
+  - @4thtech-io/crypto@0.5.15
+
 ## 0.0.35
 
 ### Patch Changes

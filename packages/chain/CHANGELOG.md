@@ -1,5 +1,14 @@
 # @4thtech-io/chain
 
+## 0.5.15
+
+### Patch Changes
+
+- Updated dependencies [043345e]
+- Updated dependencies [043345e]
+  - @4thtech-io/types@0.5.15
+  - @4thtech-io/crypto@0.5.15
+
 ## 0.5.14
 
 ### Patch Changes
