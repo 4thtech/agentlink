@@ -85,6 +85,22 @@ export interface CardUpdateSendResult {
  * stored one), `not_due` (published less than the interval ago), `pending` (a wrap of it is still
  * being delivered). Fixed codes only.
  */
+/** NET-OWNER-SET: one contact's state after a change of the card (CardUpdateSender.progress). */
+export interface CardUpdateProgressItem {
+  readonly contactId: string;
+  readonly state: 'sent' | 'waiting';
+}
+
+/** NET-OWNER-SET: the card-update progress after a change (08 §1 `GET /api/ui/network/progress`). */
+export interface CardUpdateProgress {
+  /** Unix seconds the current card was committed; null at the first card (nothing changed yet). */
+  readonly changedAt: number | null;
+  readonly total: number;
+  readonly sent: number;
+  readonly waiting: number;
+  readonly items: readonly CardUpdateProgressItem[];
+}
+
 export type OwnerAnnounceResult = 'published' | 'not_due' | 'pending';
 
 export interface CardUpdateSenderDeps {
@@ -129,6 +145,26 @@ function holdsCard(tx: StoreTx, contact: Row<'contacts'>, fromKey: string): bool
       from_key: fromKey,
     })
     .some((row) => row.delivery !== 'not_delivered');
+}
+
+/**
+ * NET-OWNER-SET: whether a relay accepted a message carrying the card whose key is `fromKey` for the
+ * contact: its pairing message from that key, or a card-update from it whose delivery is `sent`.
+ */
+function reachedWith(tx: StoreTx, contact: Row<'contacts'>, fromKey: string): boolean {
+  for (const id of [contact.handshake_envelope_id, contact.handshake_ack_envelope_id]) {
+    if (id === null) continue;
+    const row = tx.get('envelopes', { envelope_id: id });
+    if (row?.direction === 'out' && row.from_key === fromKey) return true;
+  }
+  return tx
+    .select('envelopes', {
+      direction: 'out',
+      type: 'card-update',
+      contact_id: contact.contact_id,
+      from_key: fromKey,
+    })
+    .some((row) => row.delivery === 'sent');
 }
 
 const isRevoked = (tx: StoreTx, row: Row<'contacts'>): boolean =>
@@ -318,6 +354,47 @@ export class CardUpdateSender {
     }
     if (sent > 0 || failed > 0) this.#ctx.log.info('card updates', { sent, failed });
     return { sent, failed };
+  }
+
+  /**
+   * NET-OWNER-SET (08 §1 `GET /api/ui/network/progress`; 07 §4.3): after a change of the card, which
+   * contacts the card-update sender has reached. A read of the stored rows only. Each active, paired
+   * contact the sender would tell is `sent` once a relay accepted a message carrying the current card
+   * (its pairing message from the current key, or a card-update from it whose delivery is `sent`),
+   * else `waiting`. `changedAt` is when the current card was committed; null at the first card.
+   * Contact IDs only: never a card, a list or a key (I-7).
+   */
+  async progress(): Promise<CardUpdateProgress> {
+    const got = await readIdentity(this.#ctx);
+    if (got === undefined || got.revoked || got.row.key_epoch === 0) {
+      return Object.freeze({ changedAt: null, total: 0, sent: 0, waiting: 0, items: [] });
+    }
+    const changedAt = got.row.updated_at;
+    const signed = await this.#deps.identity.signedCard();
+    const fromKey = signed.card.agentNostr.slice(2);
+    const items = await this.#ctx.store.transaction((tx) =>
+      tx
+        .select(
+          'contacts',
+          { status: 'active', pairing: 'complete' },
+          { orderBy: [['contact_id', 'asc']] },
+        )
+        .filter((row) => row.waiting_owner !== 1 && !isRevoked(tx, row))
+        .map((row) =>
+          Object.freeze({
+            contactId: row.contact_id,
+            state: reachedWith(tx, row, fromKey) ? ('sent' as const) : ('waiting' as const),
+          }),
+        ),
+    );
+    const sent = items.filter((i) => i.state === 'sent').length;
+    return Object.freeze({
+      changedAt,
+      total: items.length,
+      sent,
+      waiting: items.length - sent,
+      items: Object.freeze(items),
+    });
   }
 
   /** Stored card-updates of the current key still waiting for a first acceptance (`queued`), for active, paired contacts. */

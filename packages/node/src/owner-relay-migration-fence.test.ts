@@ -74,7 +74,15 @@ describe('updateContactDetailsAtTerminal takes no seams (fence)', () => {
 
   it('the seam variant and the signing pieces are not package exports', () => {
     const names = Object.keys(entry);
-    for (const name of ['updateContactDetailsWith', 'signRelayMigration', 'RelayCardSession']) {
+    // NET-OWNER-SET (I-4): the server-list change's signing piece and routes are not exports either.
+    for (const name of [
+      'updateContactDetailsWith',
+      'signRelayMigration',
+      'RelayCardSession',
+      'signServerChange',
+      'createNetworkServersRoutes',
+      'networkServersRoutes',
+    ]) {
       expect(names).not.toContain(name);
     }
     expect(names).toContain('updateContactDetailsAtTerminal');

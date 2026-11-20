@@ -154,10 +154,7 @@ function setup(over: Partial<Fake> = {}) {
     ...(input === undefined ? {} : { input }),
   });
   /** What the server does: the precheck, then (only when it lets the request on) the handler. */
-  const confirm = async (
-    route: LocalUiOwnerRoute,
-    input: JsonObject,
-  ): Promise<LocalUiResult> => {
+  const confirm = async (route: LocalUiOwnerRoute, input: JsonObject): Promise<LocalUiResult> => {
     const early = await route.precheck?.(context, req(input));
     if (early !== undefined) return early;
     return route.handler(context, req(input), owner);
@@ -236,10 +233,18 @@ describe('POST /api/ui/network/servers: the review signs nothing', () => {
     const invalid = { status: 400, body: { error: 'invalid_list' } };
     expect(await bad({ servers: own(1), automatic: false, announce: true })).toEqual(invalid);
     expect(
-      await bad({ servers: ['wss://a.example.org', 'wss://a.example.org'], automatic: false, announce: true }),
+      await bad({
+        servers: ['wss://a.example.org', 'wss://a.example.org'],
+        automatic: false,
+        announce: true,
+      }),
     ).toEqual(invalid);
     expect(
-      await bad({ servers: ['wss://a.example.org', 'wss://1.2.3.4'], automatic: false, announce: true }),
+      await bad({
+        servers: ['wss://a.example.org', 'wss://1.2.3.4'],
+        automatic: false,
+        announce: true,
+      }),
     ).toEqual(invalid);
     expect(await bad({ servers: own(2), automatic: true })).toEqual(invalid);
     expect(await bad({ servers: own(2), automatic: true, announce: true, extra: 1 })).toEqual(
@@ -302,7 +307,10 @@ describe('POST /api/ui/network/servers: the confirm (presence) signs exactly the
     const input = { servers: own(3), automatic: false, announce: true };
     await w.review(w.servers, input);
     expect((await w.confirm(w.servers, input)).status).toBe(200);
-    expect(await w.confirm(w.servers, input)).toEqual({ status: 409, body: { error: 'same_list' } });
+    expect(await w.confirm(w.servers, input)).toEqual({
+      status: 409,
+      body: { error: 'same_list' },
+    });
     expect(w.signed).toHaveLength(1);
   });
 

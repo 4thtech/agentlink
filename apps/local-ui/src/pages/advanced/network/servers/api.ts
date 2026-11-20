@@ -3,8 +3,9 @@
 // `GET /api/ui/network/progress`, and the 0.5.15 additions to `GET /api/ui/network`). Every answer is
 // checked field by field before use; a server-supplied or contact-supplied text (a host, a contact
 // name) is plain text, never markup (I-5). The page never signs: the confirm sends the owner's proof
-// to a `presence: true` route and the server signs. Assumption to confirm at wiring: the review
-// (`{…, review: true}`) signs nothing and is sent without a presence proof.
+// to a `presence: true` route and the server signs. NET-OWNER-SET wiring: the review
+// (`{…, review: true}`) goes to the same owner route with its input in `X-AgentLink-Input` and an
+// empty body (no presence proof); the server answers it before its presence gate and signs nothing.
 import { createApiClient, type ApiClient, type OwnerPresence } from '../../../../api/client.js';
 import type { PresenceProof } from '../../../contacts/owner.js';
 
@@ -275,6 +276,14 @@ function pageToken(): string {
   return document.querySelector('meta[name="agentlink-csrf"]')?.getAttribute('content') ?? '';
 }
 
+/** base64url without padding of a UTF-8 string (as the shared client sends an owner input). */
+function base64url(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 function presenceOf(proof: PresenceProof): OwnerPresence {
   return proof.kind === 'code'
     ? proof.code
@@ -335,8 +344,38 @@ export function createServersApi(options: ServersApiOptions = {}): ServersApi {
     return { status: res.status, data };
   }
 
+  // NET-OWNER-SET: the review on an owner route: the input in X-AgentLink-Input, an empty
+  // octet-stream body (no master code, no passkey), so the server answers it before presence.
+  async function postInput(
+    path: string,
+    input: unknown,
+  ): Promise<{ readonly status: number; readonly data: unknown } | 'offline'> {
+    let res: Response;
+    try {
+      res = await doFetch(path, {
+        method: 'POST',
+        headers: {
+          'X-AgentLink-CSRF': options.token ?? pageToken(),
+          'content-type': 'application/octet-stream',
+          'X-AgentLink-Input': base64url(JSON.stringify(input)),
+        },
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+    } catch {
+      return 'offline';
+    }
+    let data: unknown;
+    try {
+      data = await res.json();
+    } catch {
+      data = undefined;
+    }
+    return { status: res.status, data };
+  }
+
   async function review(path: string, body: Record<string, unknown>): Promise<Out<Review>> {
-    const res = await post(path, { ...body, review: true });
+    const res = await postInput(path, { ...body, review: true });
     if (res === 'offline') return { kind: 'offline' };
     if (res.status === 401 || res.status === 403) return { kind: 'session' };
     if (res.status === 200) {

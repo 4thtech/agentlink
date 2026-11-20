@@ -172,7 +172,10 @@ describe('signServerChange: one gesture signs the next card with exactly the pla
     await changeTo(w, own(3), false);
     now += 60;
     const { outcome } = await changeTo(w, DEFAULT_RELAYS, true);
-    expect(outcome).toMatchObject({ status: 'changed', leavingUntil: now + LEAVING_SERVER_SECONDS });
+    expect(outcome).toMatchObject({
+      status: 'changed',
+      leavingUntil: now + LEAVING_SERVER_SECONDS,
+    });
     expect(await w.client.identity.relays()).toEqual(DEFAULT_RELAYS);
     expect(await w.client.identity.announceDefault()).toBe(true);
     expect((await w.client.identity.get())?.keyEpoch).toBe(2);

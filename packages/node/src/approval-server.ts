@@ -328,7 +328,7 @@ import {
 } from './owner-first-card.js';
 import { signNewAgent } from './owner-add-agent.js';
 import { signRename } from './owner-rename.js';
-import { signRelayMigration } from './owner-relay-migration.js';
+import { signRelayMigration, signServerChange } from './owner-relay-migration.js';
 import {
   CREATE_CONNECT_HOLD_MS,
   CREATE_CONNECT_NONCE_BYTES,
@@ -360,6 +360,7 @@ import { NETWORK_TEST_MAX_BODY_BYTES } from './local-ui/route-types.js';
 import {
   creditsPort,
   fileSavePort,
+  serverListPort,
   inviteAcceptPort,
   inviteDesk,
   pauseDesk,
@@ -1863,7 +1864,22 @@ export async function startApprovalServerWith(
           : await widgetActivityMark(readClient, uiContext.notifications, now(), widgetMarkMemo);
       // NET-ROUTE: the open ID's network mark (counters and finished probes; numbers only), compared
       // by the hub for the `network` event, never sent.
-      const networkMark = client === undefined ? undefined : await networkReaderOf(client)?.mark();
+      const viewMark = client === undefined ? undefined : await networkReaderOf(client)?.mark();
+      // NET-OWNER-SET: the card-update progress after a server-list change joins it (counts only),
+      // so the page's progress view reads `GET /api/ui/network/progress` again when it moves.
+      const progressMark =
+        client === undefined
+          ? undefined
+          : await Promise.resolve()
+              .then(() => client.cardUpdates.progress())
+              .then((p) => `${p.changedAt ?? 0}.${p.sent}.${p.waiting}`)
+              .catch(() => undefined);
+      const networkMark =
+        viewMark === undefined
+          ? undefined
+          : progressMark === undefined
+            ? viewMark
+            : `${viewMark}|${progressMark}`;
       return {
         generation: list.generation,
         current: list.current,
@@ -2304,6 +2320,9 @@ export async function startApprovalServerWith(
       // W4-FILES-SAVE: for the save owner route only; core takes only a `file.save` and re-verifies
       // the owner signature before it saves (I-4).
       ...(agentUi?.client === undefined ? {} : { fileSave: fileSavePort(agentUi.client) }),
+      // NET-OWNER-SET: the server-list routes' reads (own list, leaving servers, announce choice,
+      // pause, contacts, card-update progress); the change itself is the gate's `changeServers`.
+      ...(agentUi?.client === undefined ? {} : { serverList: serverListPort(agentUi.client) }),
       // REL051-A34: the in-app preview's checked read (the route passes only store values).
       previewRead,
       // UX2-d1: accepting an invite, for the accept owner route; it pairs only after core used an
@@ -4279,6 +4298,46 @@ export async function startApprovalServerWith(
                           contacts: client.contacts,
                         },
                         epochKeys,
+                      });
+                    },
+                  }),
+              // NET-OWNER-SET (D-158 (6); 04 §2.6; 07 §4.3): a server-list change or a reset, in
+              // the app host only and with the open agent's key items. One owner operation: exactly
+              // the open agent's next card with exactly the plan's list, the announce choice stored
+              // with it (signServerChange); never `sign` as well.
+              ...(host === undefined ||
+              byNostr !== undefined ||
+              renameUi?.client === undefined ||
+              renameUi.epochKeys === undefined
+                ? {}
+                : {
+                    changeServers: async (plan: {
+                      readonly relays: readonly string[];
+                      readonly announceDefault: boolean;
+                    }) => {
+                      if (used) {
+                        throw new NodeKeyStoreError(
+                          'owner_operation_invalid',
+                          'One owner operation signs once.',
+                        );
+                      }
+                      used = true;
+                      if (!stillCurrent(req)) throw new AgentChanged();
+                      const client = renameUi.client;
+                      const epochKeys = renameUi.epochKeys;
+                      if (client === undefined || epochKeys === undefined) {
+                        throw new NodeKeyStoreError('owner_operation_invalid', 'Not here.');
+                      }
+                      return signServerChange(session, ownerKeys, {
+                        agent: client.agentId,
+                        client: {
+                          identity: client.identity,
+                          sendCardUpdates: () => client.sendCardUpdates(),
+                          contacts: client.contacts,
+                        },
+                        epochKeys,
+                        relays: plan.relays,
+                        announceDefault: plan.announceDefault,
                       });
                     },
                   }),

@@ -411,9 +411,31 @@ export {
   CardUpdateSender,
   MAX_CARD_UPDATES_PER_PASS,
   CATCH_UP_SECONDS,
+  type CardUpdateProgress,
+  type CardUpdateProgressItem,
   type CardUpdateSendResult,
   type OwnerAnnounceResult,
 } from './card-update.js';
+// NET-OWNER-SET (D-158): the core list builder of "Use your own servers".
+export {
+  AUTOMATIC_SERVERS,
+  MIX_IN_SERVERS,
+  OWN_WITH_MIX_IN_MAX,
+  SERVER_LIST_MAX,
+  SERVER_LIST_MIN,
+  automaticServerPlan,
+  buildServerList,
+  isAutomaticList,
+  parseOwnServers,
+  planLeaving,
+  type LeavingPlan,
+  type PlannedServer,
+  type ServerListBuild,
+  type ServerListPlan,
+  type ServerListWarning,
+  type ServerTestOutcome,
+  type TestedServer,
+} from './server-list.js';
 // M1-7j (D-158 (5)): the servers that left the own list stay readable for 30 days.
 export {
   LEAVING_SERVER_SECONDS,

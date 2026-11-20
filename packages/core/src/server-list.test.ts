@@ -172,7 +172,12 @@ describe('buildServerList: tested again, at least 2 own ready, the mix-in within
 
   it('the announce opt-out is refused while the mix-in is on', () => {
     expect(
-      buildServerList({ own: tested(own(2)), automatic: true, announce: false, defaults: defaults() }),
+      buildServerList({
+        own: tested(own(2)),
+        automatic: true,
+        announce: false,
+        defaults: defaults(),
+      }),
     ).toEqual({ status: 'refused', reason: 'mix_in_on' });
     const off = buildServerList({
       own: tested(own(2)),
@@ -252,15 +257,21 @@ async function agent(n: number, owner: MemoryOwnerKeyStore, name: string): Promi
     name,
     relays: RELAYS,
   });
-  return { client, store, cipher, keyStore, owner: owner as unknown as TestOwner, id: client.agentId };
+  return {
+    client,
+    store,
+    cipher,
+    keyStore,
+    owner: owner as unknown as TestOwner,
+    id: client.agentId,
+  };
 }
 
 async function change(x: TestAgent, relays: readonly string[], announceDefault?: boolean) {
-  const owner = x.owner as unknown as MemoryOwnerKeyStore;
   await x.client.identity.rotate({
-    owner: await owner.unlock(passphrase()),
-    ownerKeys: await owner.getPublicKeys(),
-    epochControl: owner.epochControl(x.keyStore),
+    owner: await x.owner.unlock(passphrase()),
+    ownerKeys: await x.owner.getPublicKeys(),
+    epochControl: x.owner.epochControl(x.keyStore),
     relays,
     ...(announceDefault === undefined ? {} : { announceDefault }),
   });
@@ -274,9 +285,10 @@ async function cardUpdateBodies(x: TestAgent): Promise<Record<string, JsonValue>
   );
   const out: Record<string, JsonValue>[] = [];
   for (const row of rows) {
+    if (row.payload_json == null) throw new Error('test: no payload');
     const text = await x.cipher.open(
       { table: 'envelopes', column: 'payload_json', rowKey: rowKeyOf([row.envelope_id]) },
-      row.payload_json ?? '',
+      row.payload_json,
     );
     out.push((JSON.parse(text) as { body: Record<string, JsonValue> }).body);
   }

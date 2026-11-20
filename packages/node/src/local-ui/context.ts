@@ -36,6 +36,7 @@ import type {
   EffectivePolicy,
   ExchangeTimes,
   FlowEvents,
+  LeavingServer,
   MessageBox,
   MessageItem,
   OwnerActionOutcome,
@@ -619,6 +620,99 @@ export function fileSavePort(client: AgentLinkClient): LocalUiFileSavePort {
  * (a fresh frozen object): core `pause.pause`, which writes only the agent's pause row and signs
  * nothing. Only the server's pause gate holds it; no page handler reaches it.
  */
+/**
+ * NET-OWNER-SET (D-158; 08 §1 `/api/ui/network/servers`, `/reset`, `/progress`): the reads the server
+ * list routes need of the open agent: the own list, the leaving servers, the announce choice, the
+ * pause and send state, the contact count and the card-update progress. Reads only: nothing here
+ * rotates, signs or writes (the change is the gate's one-use `changeServers`, I-4).
+ */
+export interface LocalUiServerListState {
+  readonly relays: readonly string[];
+  readonly leaving: readonly LeavingServer[];
+  readonly announceDefault: boolean;
+  readonly paused: boolean;
+  readonly sendState: SendState;
+}
+
+/** NET-OWNER-SET: the card-update progress after a change; names under the name rule (I-5). */
+export interface LocalUiServerProgress {
+  readonly changedAt: number | null;
+  readonly total: number;
+  readonly sent: number;
+  readonly waiting: number;
+  readonly items: readonly {
+    readonly ref: string;
+    readonly name: string;
+    readonly state: 'sent' | 'waiting';
+  }[];
+  readonly leavingUntil: number | null;
+}
+
+export interface LocalUiServerListPort {
+  state(): Promise<LocalUiServerListState>;
+  /** Active, paired contacts (the ones a change tells). */
+  contacts(): Promise<number>;
+  progress(): Promise<LocalUiServerProgress>;
+}
+
+/** At most this many progress items (08 §1). */
+export const SERVER_PROGRESS_MAX_ITEMS = 64;
+
+/** The server-list port over `client` (reads only). */
+export function serverListPort(client: AgentLinkClient): LocalUiServerListPort {
+  return Object.freeze<LocalUiServerListPort>({
+    state: async () => {
+      const [relays, leaving, announceDefault, network, sendState] = await Promise.all([
+        client.identity.relays(),
+        client.identity.leavingServers(),
+        client.identity.announceDefault(),
+        client.network.servers(),
+        client.identity.sendState(),
+      ]);
+      return Object.freeze({
+        relays,
+        leaving,
+        announceDefault,
+        paused: network.paused,
+        sendState,
+      });
+    },
+    contacts: async () =>
+      (await client.contacts.list()).filter(
+        (c) => c.status === 'active' && c.pairing === 'complete',
+      ).length,
+    progress: async () => {
+      const [progress, leaving, contacts] = await Promise.all([
+        client.cardUpdates.progress(),
+        client.identity.leavingServers(),
+        client.contacts.list(),
+      ]);
+      const names = new Map(contacts.map((c) => [c.id, c.display.name]));
+      let leavingUntil: number | null = null;
+      for (const e of leaving)
+        if (leavingUntil === null || e.until > leavingUntil) leavingUntil = e.until;
+      return Object.freeze({
+        changedAt: progress.changedAt,
+        total: progress.total,
+        sent: progress.sent,
+        waiting: progress.waiting,
+        items: Object.freeze(
+          progress.items
+            .slice(0, SERVER_PROGRESS_MAX_ITEMS)
+            .map((i) =>
+              Object.freeze({
+                ref: i.contactId,
+                name: names.get(i.contactId) ?? '',
+                state: i.state,
+              }),
+            ),
+        ),
+        leavingUntil,
+      });
+    },
+  });
+}
+
 export interface LocalUiPauseDesk {
   pause(): Promise<'paused' | 'already'>;
 }
@@ -823,6 +917,12 @@ export interface LocalUiContext {
    * `GET /api/ui/network` only. Fixed fields only; contacts' hosts only when asked. Absent: needs_setup.
    */
   readonly network?: (options: { readonly contactHosts: boolean }) => Promise<LocalUiNetworkBody>;
+  /**
+   * NET-OWNER-SET: the reads of the server-list routes (serverListPort), for
+   * `POST /api/ui/network/servers`, `/reset` and `GET /api/ui/network/progress` only. Absent: those
+   * routes answer `needs_setup`.
+   */
+  readonly serverList?: LocalUiServerListPort;
   /**
    * U3-c (D-138, 08 §1): the Agents list of the app host, for `GET /api/ui/agents` only; absent
    * outside the app host (an approval page opened by an MCP process stays bound to its agent). Reads
