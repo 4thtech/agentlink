@@ -107,6 +107,17 @@ export {
   type ContactDetailsAtTerminalInput,
   type RelayMigrationOutcome,
 } from './owner-relay-migration.js';
+// NET-CLI (D-158; 06 §8): `agentlink owner servers set | reset` † on this user's keychain and own
+// TTY prompt, and the server test for `owner servers test` (no presence). The planner, the signing
+// piece and the seam variant stay inside the package.
+export {
+  changeServersAtTerminal,
+  type ServerChangeRequest,
+  type ServerChangeReview,
+  type ServersAtTerminalInput,
+  type ServersAtTerminalOutcome,
+} from './owner-server-change-terminal.js';
+export { testOwnServers } from './local-ui/api/network-test.js';
 export {
   LOCAL_APPROVAL_LIFETIME_S,
   MAX_APPROVAL_BATCH_ITEMS,

@@ -23,7 +23,8 @@ const DAY = 86_400;
 const OWNER_TTY: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: {} };
 const PIPED: TerminalContext = { stdinIsTTY: false, stdoutIsTTY: false, env: {} };
 const HARNESS: TerminalContext = { stdinIsTTY: true, stdoutIsTTY: true, env: { CLAUDECODE: '1' } };
-const HEX = (n: number, bytes: number): string => '0x' + n.toString(16).padStart(2, '0').repeat(bytes);
+const HEX = (n: number, bytes: number): string =>
+  '0x' + n.toString(16).padStart(2, '0').repeat(bytes);
 
 type ChangeInput = Parameters<NonNullable<OwnerCommandDeps['changeServers']>>[0];
 type ChangeOutcome = Awaited<ReturnType<NonNullable<OwnerCommandDeps['changeServers']>>>;
@@ -108,7 +109,10 @@ function deps(): OwnerCommandDeps {
       calls.push({ request: input.request, review });
       if (refusePresence) {
         return Promise.reject(
-          Object.assign(new Error('presence'), { name: 'KeyStoreError', code: 'presence_rejected' }),
+          Object.assign(new Error('presence'), {
+            name: 'KeyStoreError',
+            code: 'presence_rejected',
+          }),
         );
       }
       return Promise.resolve(outcome);
@@ -175,7 +179,8 @@ describe('agentlink owner servers list (no presence)', () => {
     expect(r.text).toContain(formatDate(new Date((NOW + 20 * DAY) * 1000)));
     expect(r.text).toContain(SERVERS_TEXT.mixInOn);
     expect(r.text).toContain(SERVERS_TEXT.announceOn);
-    expect(r.text).not.toMatch(/relay\b|nostr|wallet|gas|transaction/i);
+    const words = r.text.replace(/[a-z0-9.-]+\.(net|org|pub)\b/g, '');
+    expect(words).not.toMatch(/relay|nostr|wallet|\bgas\b|transaction/i);
     expect(r.text).not.toContain('wss://');
   });
 
@@ -297,7 +302,7 @@ describe('agentlink owner servers set †', () => {
     expect(review).toContain('Nothing changes until you approve.');
     expect(review).toContain('old.example.org');
     expect(review).toContain('Your contacts get your new details once');
-    expect(review).not.toMatch(/relay\b|nostr/i);
+    expect(review.replace(/[a-z0-9.-]+\.(net|org|pub)\b/g, '')).not.toMatch(/relay|nostr/i);
     expect(r.text).toContain(SERVERS_TEXT.changed);
     expect(r.text).toContain(
       `Old servers stay readable until ${formatDate(new Date((NOW + 30 * DAY) * 1000))}.`,

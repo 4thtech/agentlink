@@ -23,7 +23,7 @@ function sources(dir: string, out: string[] = []): string[] {
 }
 
 const FORBIDDEN =
-  /\/api\/ui\/network\/(servers|reset|announce|progress)|changeServers|signServerChange|serverListPort|serverList\b|network-servers|owner-relay-migration|network-announce|network\.announce|prepareAnnounce|afterAnnounce|withdrawFromDefaultServers|owner servers|use your own servers|automatic servers/i;
+  /\/api\/ui\/network\/(servers|reset|announce|progress)|changeServers|signServerChange|serverListPort|serverList\b|network-servers|owner-relay-migration|network-announce|network\.announce|prepareAnnounce|afterAnnounce|withdrawFromDefaultServers|owner servers|use your own servers|automatic servers|changeServersAtTerminal|owner-server-change-terminal|server-change-plan|planServerChange/i;
 
 describe('no MCP or agent path names a server-list change (full source scan, I-4)', () => {
   it('reads every source of the MCP tools and the CLI MCP server; none names it', () => {

@@ -17,8 +17,13 @@ import {
   epochKeysOf,
   initOwner,
   performOwnerOperation,
+  changeServersAtTerminal,
+  testOwnServers,
   updateContactDetailsAtTerminal,
   type RelayMigrationOutcome,
+  type ServerChangeRequest,
+  type ServerChangeReview,
+  type ServersAtTerminalOutcome,
   type AddAgentOptions,
   type AddAgentResult,
   type AgentEpochKeys,
@@ -34,6 +39,7 @@ import {
   type OwnerSignature,
   type ReviewedApproval,
 } from '@4thtech-io/node';
+import type { PrecheckResult } from '@4thtech-io/transport-nostr';
 import {
   listAgentNames,
   nodeRuntimeDeps,
@@ -127,6 +133,22 @@ export interface OwnerCommandDeps {
     readonly agent: OwnerAgent;
     readonly owner: OwnerPublicKeys;
   }): Promise<RelayMigrationOutcome>;
+  /**
+   * NET-CLI: `owner servers test` (@4thtech-io/node testOwnServers): the app's server test with this
+   * process's budget. No presence; changes nothing. Absent: the command says it didn't go through.
+   */
+  testServers?(servers: readonly string[]): Promise<readonly PrecheckResult[] | 'busy' | 'invalid'>;
+  /**
+   * NET-CLI: `owner servers set | reset` † (@4thtech-io/node changeServersAtTerminal): the review
+   * (`describe`), "Continue?", presence at this process's own terminal, then the ID's next card with
+   * exactly the reviewed list (signServerChange, the app's path). Absent: it didn't go through.
+   */
+  changeServers?(input: {
+    readonly agent: OwnerAgent;
+    readonly owner: OwnerPublicKeys;
+    readonly request: ServerChangeRequest;
+    readonly describe: (review: ServerChangeReview) => readonly string[];
+  }): Promise<ServersAtTerminalOutcome>;
 }
 
 /** Opens an agent through the M1-9k runtime, keeping the store and cipher it opened. */
@@ -233,6 +255,19 @@ export function nodeOwnerDeps(home: string = homedir()): OwnerCommandDeps {
         },
         epochKeys: agent.epochKeys,
         ownerKeys: owner,
+      });
+    },
+    testServers: (servers) => testOwnServers(servers),
+    changeServers: async ({ agent, owner, request, describe }) => {
+      // Only an agent whose KeyStore the node package opened carries its key items.
+      if (agent.epochKeys === undefined) return { status: 'refused', reason: 'not_applied' };
+      return changeServersAtTerminal({
+        agent: agent.client.agentId,
+        client: agent.client,
+        epochKeys: agent.epochKeys,
+        ownerKeys: owner,
+        request,
+        describe,
       });
     },
   });

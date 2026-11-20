@@ -142,6 +142,7 @@ function script(code: Uint8Array | undefined, answer = true): Script {
         log.push('secret');
         return Promise.resolve(code === undefined ? new Uint8Array(8) : code.slice());
       },
+      clearScreen: () => undefined,
     },
   };
 }
@@ -177,7 +178,8 @@ describe('changeServersWith: review, then Continue?, then presence, then the one
       automatic: true,
       announce: true,
     });
-    expect(outcome).toMatchObject({ status: 'changed', leavingUntil: T0 + LEAVING_SERVER_SECONDS });
+    // The two starting servers are the first two automatic ones, mixed in again: none leaves.
+    expect(outcome).toMatchObject({ status: 'changed', leavingUntil: null });
     const review = s.log.findIndex((l) => l.startsWith('write:REVIEW 4 servers'));
     const confirm = s.log.findIndex((l) => l.startsWith('confirm:'));
     const secret = s.log.indexOf('secret');
@@ -283,7 +285,11 @@ describe('changeServersWith: review, then Continue?, then presence, then the one
     const s = script(w.code);
     expect(
       await run(w, s, { kind: 'servers', servers: own(8, 'c'), automatic: false, announce: true }),
-    ).toEqual({ status: 'refused', reason: 'too_many_previous', fitsAt: T0 + LEAVING_SERVER_SECONDS });
+    ).toEqual({
+      status: 'refused',
+      reason: 'too_many_previous',
+      fitsAt: T0 + LEAVING_SERVER_SECONDS,
+    });
     expect(s.log).toEqual([]);
     expect((await w.client.identity.get())?.keyEpoch).toBe(2);
   });

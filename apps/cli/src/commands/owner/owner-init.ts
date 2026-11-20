@@ -22,6 +22,7 @@ import type { OwnerSetupOptions } from '@4thtech-io/node';
 import { isAgentLabel, isAgentName } from '../../runtime/agent-name.js';
 import { badArguments, openOne, ownerStep } from './common.js';
 import { updateContactDetailsOne } from './contact-details.js';
+import { serversOne } from './servers.js';
 import type { OwnerCommandDeps } from './deps.js';
 import { OWNER_TEXT } from './strings.js';
 
@@ -297,7 +298,17 @@ async function changeCodeOne(deps: OwnerCommandDeps, context: CommandContext): P
 export function ownerHandler(deps: OwnerCommandDeps) {
   return (context: CommandContext): Promise<number> =>
     ownerStep(context, deps, (deps) => {
-      const { positionals } = context.parsed;
+      const { positionals, values } = context.parsed;
+      // NET-CLI: `owner servers` (servers.ts) guards `set` and `reset` itself; list and test are
+      // read-only. Its flags belong to it only.
+      if (positionals[0] === 'servers') return serversOne(deps, context);
+      if (
+        values['json'] === true ||
+        values['no-automatic'] === true ||
+        values['no-announce'] === true
+      ) {
+        return Promise.resolve(badArguments(context.output));
+      }
       if (positionals.length === 1 && positionals[0] === 'init') return initOne(deps, context);
       if (positionals.length === 1 && positionals[0] === 'add-agent') {
         return addAgentOne(deps, context);

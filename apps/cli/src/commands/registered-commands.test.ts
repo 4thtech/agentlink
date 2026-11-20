@@ -8,7 +8,7 @@ import { COMMANDS, createDispatcher, helpText, type DispatchIO } from '../dispat
 
 /** The subcommands each command really handles (06 §8). */
 const SUBCOMMANDS: Readonly<Record<string, readonly string[]>> = {
-  owner: ['init', 'add-agent', 'change-code', 'update-contact-details'],
+  owner: ['init', 'add-agent', 'change-code', 'update-contact-details', 'servers'],
   contacts: ['rename', 'remove'],
   policy: ['show', 'allow-folder', 'remove-folder', 'recover', 'allow-send-folder'],
   requests: ['accept', 'ignore', 'block', 'blocked', 'unblock'],
