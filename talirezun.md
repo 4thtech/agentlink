@@ -113,3 +113,8 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 - 0.5.14 LIVE: npm latest, GitHub release v0.5.14, signed desktop update (Mac, Windows). Release PR #853, version PR #854.
 - Contents: proof-record signing check inside the KeyStore; Under the hood › Message network (live servers, health, speed, contacts per server, three-column diagram); clear recovery when the spending record breaks ("Save again" in Settings › Rules); failed contact-details updates retry; own server lists capped at 8; same-ID notice always shown; first-launch layout fix; fewer keychain calls on Linux; CI browser cache.
 - Next: 0.5.15 — use your own servers (Test button, 2–8 servers, reset to automatic, public servers only), 24-hour bar back.
+
+## 2026-11-20 — 0.5.15 planned: finish "use your own servers" end to end
+- Owner (Tali): finish the whole own-servers chapter in 0.5.15 (companies can run AgentLink on their own relays); only bug iterations after. No separate 0.5.14 patch: the Message network view fixes (false "can't reach", truthful banner, Automatic label) ship in 0.5.15.
+- Decisions: reset/change allowed during the 30-day overlap (old lists stay readable, up to 16 servers); the 2 mixed-in automatic servers count toward the 8 (up to 6 own, ≥ 2 own ready); slow servers count as ready with a warning; wireframes C1–C8 are the design; the "don't also announce on the default servers" option is in 0.5.15.
+- Waiting for Tali's go to start the build wave.
