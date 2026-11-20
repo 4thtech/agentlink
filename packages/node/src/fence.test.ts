@@ -47,6 +47,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // M1-8f: the file KeyStore's prompting entry points (no directory, KDF, kek or probe seam).
       'changeFileKeyStorePassphrase',
       'changeOwnerCode',
+      // NET-CLI (D-158; 06 §8): `owner servers set | reset` at this user's keychain and own TTY
+      // prompt; no owner-store, terminal or planner seam (the seam variant stays inside).
+      'changeServersAtTerminal',
       'createFileKeyStoreAgent',
       'createInboxFile',
       'createOsKeychainAgent',
@@ -124,6 +127,9 @@ describe('@4thtech-io/node entry (the 04 §8.1 fence)', () => {
       // WP-D3: the same server for the desktop host; session links go to the pipe sink, never the
       // OS opener (approval-server-link-sink.test.ts).
       'startApprovalServerWithLinkSink',
+      // NET-CLI: `owner servers test`, the app's server test under the process budget (no presence,
+      // no resolver or socket seam).
+      'testOwnServers',
       // RET-3: one saved Inbox file to the Trash, only while unchanged (no key, no store).
       'trashSavedFile',
       'unlockFileKeyStoreAgent',
