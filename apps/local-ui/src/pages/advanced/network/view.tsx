@@ -38,6 +38,7 @@ import {
   type NetworkSummary,
 } from './data.js';
 import { DOT_SHAPE, NetworkDiagram } from './diagram.js';
+import { ServersEntry } from './servers/entry.js';
 import { NETWORK_STRINGS as S } from './strings.js';
 import './network.css';
 
@@ -288,6 +289,7 @@ export function NetworkView({
           {S.lastChecked(agoText(answer.checkedAt, clock))}
         </p>
       )}
+      <ServersEntry />
     </section>
   );
 }
