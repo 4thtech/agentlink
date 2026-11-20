@@ -800,3 +800,32 @@ describe('IR F2: the contact exception is per recipient, never for the own copie
     }
   });
 });
+
+describe('REL-0515 F1: the live subscription follows its read set', () => {
+  it('opened with the opt-out off, then the signed opt-out: the read set drops the legacy servers', async () => {
+    const sub = await a.client.subscribeInbox();
+    expect(a.live.at(-1)?.some((r) => LEGACY_READ_RELAYS.includes(r))).toBe(true);
+    expect(await a.client.liveReadSet()).toBe(sub.readSet);
+    expect(await announce(a, false)).toMatchObject({ status: 'applied' });
+    const now = await a.client.liveReadSet();
+    expect(now).not.toBe(sub.readSet);
+    await sub.close();
+    // Reopened (what the loop does on the change): no legacy server any more.
+    const again = await a.client.subscribeInbox();
+    expect(again.readSet).toBe(now);
+    expect(offLimits(a.live.at(-1) ?? [])).toEqual([]);
+    await again.close();
+  });
+
+  it('a leaving server past its end leaves the read set', async () => {
+    clock.t += 60;
+    await change(a, OWN2);
+    const sub = await a.client.subscribeInbox();
+    for (const r of OWN) expect(a.live.at(-1)).toContain(r);
+    clock.t += 31 * DAY;
+    const now = await a.client.liveReadSet();
+    expect(now).not.toBe(sub.readSet);
+    for (const r of OWN) expect(now.split('\n')).not.toContain(r);
+    await sub.close();
+  });
+});

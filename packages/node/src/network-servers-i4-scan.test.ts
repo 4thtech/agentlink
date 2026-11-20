@@ -30,6 +30,12 @@ const FORBIDDEN = [
   '/api/ui/network/reset',
   '/api/ui/network/announce',
   '/api/ui/network/progress',
+  // REL-0515 L2: the server Test, its core and transport pieces, and the owner card-update.
+  '/api/ui/network/test',
+  'testownservers',
+  'precheckservers',
+  'announcetoowner',
+  'ownercardupdates',
   'serverlist',
   'changeservers',
   'signserverchange',

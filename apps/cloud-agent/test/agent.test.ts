@@ -97,6 +97,18 @@ describe('AgentDO alarm sync (08 §3.1, spike S-5)', () => {
     expect(relay.published).toHaveLength(0);
   });
 
+  it('REL-0515 L3: a run publishes no owner card-update, also with nothing received', async () => {
+    const { stub } = await setUp();
+    await runDurableObjectAlarm(stub);
+    await runDurableObjectAlarm(stub);
+    expect(relay.published).toHaveLength(0);
+    const own = await rowsOf(
+      stub,
+      `SELECT envelope_id FROM envelopes WHERE direction = 'out' AND type = 'card-update'`,
+    );
+    expect(own).toHaveLength(0);
+  });
+
   it('a run that throws still leaves the next alarm armed, and reports only a fixed code', async () => {
     const { stub } = await setUp();
     await stub.setFailRuns(true);

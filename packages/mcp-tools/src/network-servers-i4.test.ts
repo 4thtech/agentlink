@@ -14,7 +14,7 @@ import { ADVANCED_TOOLS, TOOLS } from './registry.js';
 
 /** The server-list change's routes, owner pieces and words (never in a tool). */
 const FORBIDDEN =
-  /\/api\/ui\/network\/(servers|reset|announce|progress)|changeServers|signServerChange|serverList|network\.announce|prepareAnnounce|owner servers|use your own servers|automatic servers/i;
+  /\/api\/ui\/network\/(servers|reset|announce|progress)|changeServers|signServerChange|serverList|network\.announce|prepareAnnounce|\/api\/ui\/network\/test|testOwnServers|precheckServers|announceToOwner|ownerCardUpdates|owner servers|use your own servers|automatic servers/i;
 
 type ChangeMember = Extract<
   keyof ToolClient,
