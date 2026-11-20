@@ -11673,6 +11673,20 @@ Owner (Tali, 17 Nov 2026): "Approve, start 0.5.10", the recommended option of ev
 - **Goal:** (a) the system sheet names the change ("Use {n} message servers") instead of the generic approve reason; (b) the announce choice is stored with the card under the gesture, but no signed `network.announce` owner action is made yet: NET-ANNOUNCE-OPTOUT signs it with the card (or the spec is amended); (c) a refusal after presence (`changed`, `same_list`, a state refusal) answers its own fixed code instead of the gate's generic `refused`, and a refused change is not reported as a done owner operation.
 - **Done when:** tests for (a) and (c); (b) closed by NET-ANNOUNCE-OPTOUT.
 
+#### NET-CLI-TEST-BUDGET · Repeated `owner servers test` runs share no limit (from the NET-CLI review, L1)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Spec:** 06 §8; 07 §4.3 "Use your own servers"; 08 §1 (server test limit)
+- **Repo/path:** agentlink · `apps/cli/src/commands/owner/servers.ts`, `packages/node/src/local-ui/api/network-test.ts`
+- **Depends on:** NET-CLI
+- **Goal:** the server-test limit (10 a minute) is kept per app process. Each `agentlink owner servers test` run is a new process, so running the command again and again is not held to that limit. Decide whether the terminal runs share a limit with each other and with the app (for example a small store-backed counter), or state in 06 §8 and the CLI reference that the limit is per run.
+- **Done when:** either repeated terminal runs are held to the documented limit (test), or the spec and docs say exactly what is limited.
+
+#### NET-CLI-REVIEW-STALE · Old-server hosts in the terminal review can go stale (from the NET-CLI review, L2)
+- **Status:** backlog · **Size:** S · **Tier:** Sonnet · **Security:** S1 · **Spec:** 06 §8; 07 §4.3; 11 §5.14
+- **Repo/path:** agentlink · `apps/cli/src/commands/owner/servers.ts`, `packages/node/src/owner-server-change-terminal.ts`
+- **Depends on:** NET-CLI
+- **Goal:** `set` and `reset` show the review, including the old servers that stay readable, then wait at "Continue?" and the master-code prompt. If the ID's lists change meanwhile (another process applies a change), the hosts shown can differ from what is signed. Re-read the state after presence and refuse, or show the review again, when it changed.
+- **Done when:** a test changes the list between the review and presence; nothing is signed for the old review, and the terminal says why.
+
 #### RELAY-PER-IP-LIMIT · A default server that refuses a third connection
 - **Status:** backlog · **Security:** S1 · **Spec:** 07 §4.2, §4.3; `project/runbooks/relay-vetting.md`
 - **Goal:** offchain.pub appears to refuse a third connection from one computer; with several AI apps connected (one connection each) a user could be refused there. Measure the limit, and if confirmed reconsider it as a default.
