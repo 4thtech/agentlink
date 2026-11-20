@@ -176,6 +176,10 @@ describe('networkBody (NET-ROUTE)', () => {
     expect(state({ state: 'ready', connectMs: 1, roundTripMs: 2 })).toBe('ready');
     expect(state({ state: 'timeout', connectMs: 10 })).toBe('slow');
     expect(state({ state: 'timeout' })).toBe('unreachable');
+    // NET-VIEW-0514-1: a probe over the pool's open connection that got no answer in time is slow:
+    // the connection is up (the pool holds it), so it is never "can't reach".
+    expect(state({ state: 'timeout', reused: true })).toBe('slow');
+    expect(state({ state: 'timeout', reused: 'yes' })).toBe('unreachable');
     expect(state({ state: 'unreachable' })).toBe('unreachable');
     expect(state({ state: 'blocked' })).toBe('blocked');
     expect(state({ state: 'invalid' })).toBe('unknown');

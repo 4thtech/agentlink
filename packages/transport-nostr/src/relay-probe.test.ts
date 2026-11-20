@@ -40,7 +40,7 @@ function setup(options: Partial<RelayPoolOptions> = {}) {
   return { net, pool, lines };
 }
 
-const KEYS = ['authRequired', 'connectMs', 'paymentRequired', 'roundTripMs', 'state'];
+const KEYS = ['authRequired', 'connectMs', 'paymentRequired', 'reused', 'roundTripMs', 'state'];
 
 const frames = (net: MockNetwork, relay: string, kind: string): unknown[][] =>
   net.received
@@ -162,6 +162,7 @@ describe('RelayPool.probe (NET-PROBE)', () => {
       roundTripMs: null,
       authRequired: null,
       paymentRequired: null,
+      reused: false,
     });
     expect(net.opens).toHaveLength(0);
     expect(net.nip11Fetches).toHaveLength(0);
@@ -224,6 +225,69 @@ describe('RelayPool.probe (NET-PROBE)', () => {
     expect(JSON.stringify(result)).not.toContain('img');
     expect(JSON.stringify(result)).not.toContain('log in');
     expect(lines).toEqual([]);
+  });
+});
+
+// NET-VIEW-0514-1: the owner's 0.5.14 view showed offchain.pub as "Can't reach" next to "Last worked
+// just now". The relay limits connections from one address: the agent's pooled connection was up,
+// and the probe's extra fresh connection was refused at once (ECONNREFUSED). A probe now asks over
+// the pool's open connection when there is one, so it never needs a second connection to that relay.
+describe('RelayPool.probe over an open pooled connection (NET-VIEW-0514-1)', () => {
+  it('a relay that allows one connection per address is ready while the pool holds it', async () => {
+    const { net, pool } = setup();
+    const [relay] = relayUrls('limited', 1) as [string];
+    net.configure(relay, { maxConnections: 1, reqDelayMs: 30 });
+    const link = await pool.connect(relay);
+    expect(typeof link).not.toBe('string');
+    const opens = net.opens.length;
+    const pending = pool.probe(relay);
+    await vi.advanceTimersByTimeAsync(100);
+    const result = await pending;
+    expect(result.state).toBe('ready');
+    expect(result.reused).toBe(true);
+    expect(result.connectMs).toBeNull();
+    expect(result.roundTripMs).toBeGreaterThanOrEqual(30);
+    // No second connection was opened, the pooled one stays open, and the probe's REQ is closed.
+    expect(net.opens.length).toBe(opens);
+    expect(pool.connectionCount).toBe(1);
+    expect(frames(net, relay, 'CLOSE')).toHaveLength(1);
+    // Never a login on the probe's behalf.
+    expect(frames(net, relay, 'AUTH')).toHaveLength(0);
+    if (typeof link !== 'string') link.release();
+  });
+
+  it('without a pooled connection, the same relay still gets a fresh one', async () => {
+    const { net, pool } = setup();
+    const [relay] = relayUrls('limited', 1) as [string];
+    net.configure(relay, { maxConnections: 1 });
+    const result = await pool.probe(relay);
+    expect(result).toMatchObject({ state: 'ready', reused: false });
+    expect(net.sockets.every((s) => s.closed)).toBe(true);
+  });
+
+  it('a pooled connection that never answers is slow, not unreachable', async () => {
+    const { net, pool } = setup();
+    const [relay] = relayUrls('quietpool', 1) as [string];
+    net.configure(relay, { silentReq: true });
+    const link = await pool.connect(relay);
+    const out: RelayProbeResult[] = [];
+    void pool.probe(relay).then((r) => out.push(r));
+    await vi.advanceTimersByTimeAsync(PROBE_TIMEOUT_MS);
+    expect(out[0]).toMatchObject({ state: 'timeout', reused: true, roundTripMs: null });
+    if (typeof link !== 'string') link.release();
+  });
+
+  it('does not need a read-back slot when it reuses the pooled connection', async () => {
+    const { net, pool } = setup();
+    const relays = relayUrls('busy2', MAX_READBACKS + 1);
+    for (const url of relays.slice(0, MAX_READBACKS)) net.configure(url, { silentReq: true });
+    const pooled = relays[MAX_READBACKS] as string;
+    const link = await pool.connect(pooled);
+    for (const url of relays.slice(0, MAX_READBACKS)) void pool.probe(url);
+    const result = await pool.probe(pooled);
+    expect(result).toMatchObject({ state: 'ready', reused: true });
+    await vi.advanceTimersByTimeAsync(PROBE_TIMEOUT_MS);
+    if (typeof link !== 'string') link.release();
   });
 });
 
