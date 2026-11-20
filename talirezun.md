@@ -121,3 +121,4 @@ _Updated 2026-11-18 · claude-code / claude-haiku-5-5 · orchestrator, handoff_
 - 20 Nov: owner chose: the opt-out also stops the old-server update fan-out. Build wave started (rel0515/integration).
 - 20 Nov: Message network page stays compact: one-line server rows that open on tap, "Show all N" after 5, old servers folded, diagram capped at 5 servers / 5 contacts with "+N more", problems always on top; built with the 24-hour bar.
 - 20 Nov: Tali approved the compact Message network layout (screenshots with 12 servers / 30 contacts).
+- 20 Nov: opt-out is "fully quiet": with it on, AgentLink also stops reading and probing the old public servers and sends nothing to public servers during the 30-day overlap; own previous servers stay readable 30 days; warning names that contacts with very old details may miss you until updated.
