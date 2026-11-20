@@ -117,7 +117,7 @@ async function agent(n: number, owner: MemoryOwnerKeyStore, relays: readonly str
     },
     subscribe: (options) => {
       live.push([...options.relays]);
-      return () => undefined;
+      return () => Promise.resolve();
     },
   });
   const client = await AgentLinkClient.create({
@@ -174,7 +174,9 @@ async function storedLeaving(x: Agent): Promise<unknown> {
 /** Every outbox row of `x` with its opened relays and its envelope's type and contact. */
 async function outboxRows(x: Agent) {
   const rows = await x.store.transaction((tx) =>
-    tx.select('outbox').map((r) => ({ row: r, env: tx.get('envelopes', { envelope_id: r.envelope_id }) })),
+    tx
+      .select('outbox')
+      .map((r) => ({ row: r, env: tx.get('envelopes', { envelope_id: r.envelope_id }) })),
   );
   const out: {
     envelopeId: string;
@@ -432,9 +434,10 @@ describe('what is published to the leaving servers', () => {
     }
     // The own copies of the contact card-update go to the leaving servers too.
     const contactUpdate = rows.filter(
-      (x) => x.type === 'card-update' && x.contact === peer.id && x.role === 'owner',
+      (x) =>
+        x.type === 'card-update' && x.contact === peer.id && B.every((r) => x.relays.includes(r)),
     );
-    expect(contactUpdate.length).toBeGreaterThan(0);
+    expect(contactUpdate).toHaveLength(2);
     for (const r of contactUpdate) for (const old of A) expect(r.relays).toContain(old);
     // The owner card-update: the new list, the leaving servers and the default set.
     const ownerUpdate = rows.filter((x) => x.type === 'card-update' && x.contact === null);

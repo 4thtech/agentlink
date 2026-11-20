@@ -134,6 +134,12 @@ const V22_TABLES: readonly TableName[] = ['install_state'];
  * the next number.
  */
 const NET_STATS_TABLES: readonly TableName[] = ['relay_stats'];
+/**
+ * Identity columns added by the leaving-servers version (M1-7j, D-158; 07 §3), version 24 here: the
+ * servers that left the own list and are still read, and the announce choice. Named by content: if
+ * another lane adds a version first, this one takes the next number.
+ */
+const LEAVING_SERVERS_IDENTITY_COLUMNS: readonly string[] = ['prev_relays', 'announce_default'];
 
 /** A table's spec without the given columns: the frozen shape of an earlier version. */
 function without(spec: TableSpec, columns: readonly string[]): TableSpec {
@@ -169,6 +175,7 @@ function v1Spec(table: TableName): TableSpec {
   if (table === 'contacts') return without(spec, [...V9_CONTACTS_COLUMNS, ...V18_CONTACTS_COLUMNS]);
   if (table === 'pairings') return without(spec, V18_PAIRINGS_COLUMNS);
   if (table === 'budget_ledger') return without(spec, V22_BUDGET_LEDGER_COLUMNS);
+  if (table === 'identity') return without(spec, LEAVING_SERVERS_IDENTITY_COLUMNS);
   return spec;
 }
 
@@ -312,6 +319,19 @@ function v22Statements(): readonly string[] {
 }
 
 /**
+ * Version 24 (M1-7j, D-158 (5), (7); 07 §3): `identity.prev_relays` (sealed, nullable) and
+ * `identity.announce_default` (a nullable flag), appended. The row stored before keeps null in both:
+ * no server is being read after a change, and the announce choice is the default (true).
+ */
+function v24Statements(): readonly string[] {
+  const identity = tableSpec('identity');
+  return LEAVING_SERVERS_IDENTITY_COLUMNS.map(
+    (column) =>
+      `ALTER TABLE "identity" ADD COLUMN ${columnDef('identity', column, identity.columns[column] as ColumnSpec)}`,
+  );
+}
+
+/**
  * Version 2 (D-72, M1-7e-2): `envelopes.refused_at` and `envelopes.request_accepted_at`, appended
  * (ALTER TABLE ADD COLUMN appends, which is also their place in TABLES), and the `blocked_keys`
  * table. A `refused` row stored before version 2 has a null refused_at: the core treats it as
@@ -426,7 +446,8 @@ function v11Statements(): readonly string[] {
  * adds `relays_accepted` and `relays_available` to both (DELIVERY-DETAILS; nullable counts), version 21
  * adds `budget_restores` and `restore_replays` (RESTORE-TRACES, D-156; new tables, empty), version 22
  * adds `budget_ledger.install_id` and `install_state` (DEVICES-INTERIM; nullable, and a new table), version
- * 23 adds `relay_stats` (NET-STATS; a new table, empty). A later
+ * 23 adds `relay_stats` (NET-STATS; a new table, empty), version 24 adds `identity.prev_relays` and
+ * `identity.announce_default` (M1-7j, D-158; nullable, null on the existing row). A later
  * schema version appends a migration (ALTER TABLE, new tables) and never edits an earlier one;
  * sqlite-store.test.ts pins the digest of every version, so a TABLES change without a new migration
  * fails the build.
@@ -476,6 +497,7 @@ export const MIGRATIONS: readonly StoreMigration[] = Object.freeze([
   Object.freeze({ version: 21, statements: createSchemaStatements(RESTORE_TRACES_TABLES) }),
   Object.freeze({ version: 22, statements: Object.freeze(v22Statements()) }),
   Object.freeze({ version: 23, statements: createSchemaStatements(NET_STATS_TABLES) }),
+  Object.freeze({ version: 24, statements: Object.freeze(v24Statements()) }),
 ]);
 
 if (MIGRATIONS.at(-1)?.version !== STORE_SCHEMA_VERSION) {

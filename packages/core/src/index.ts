@@ -412,7 +412,17 @@ export {
   MAX_CARD_UPDATES_PER_PASS,
   CATCH_UP_SECONDS,
   type CardUpdateSendResult,
+  type OwnerAnnounceResult,
 } from './card-update.js';
+// M1-7j (D-158 (5)): the servers that left the own list stay readable for 30 days.
+export {
+  LEAVING_SERVER_SECONDS,
+  MAX_LEAVING_SERVERS,
+  OWNER_CARD_UPDATE_OVERLAP_SECONDS,
+  OWNER_CARD_UPDATE_SECONDS,
+  TooManyPreviousError,
+  type LeavingServer,
+} from './leaving-servers.js';
 export {
   migratedRelays,
   migrationDroppedRelays,

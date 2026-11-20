@@ -230,6 +230,9 @@ async function openAgent(
       name,
       relays,
     });
+    // M1-7j (07 §4.3): the owner card-update of the first card goes out once here, so the counts of
+    // the tests below see only what they send (it is re-published after 7 days; leaving-servers.test.ts).
+    await client.cardUpdates.announceToOwner();
   }
   if (options.rateLimit !== undefined || options.sendReceived !== undefined) {
     const policy = defaultPolicy();
@@ -255,8 +258,10 @@ async function openAgent(
   }
   const receives = { count: 0 };
   const receive = client.envelopes.receive.bind(client.envelopes);
+  const ownKey = encodeHex((await keyStore.getPublicBundle()).agentNostr);
   client.envelopes.receive = (input) => {
-    receives.count += 1;
+    // M1-7j: the agent's own copy of its owner card-update is not counted (a duplicate of its own row).
+    if ((input.envelope as { from?: unknown }).from !== ownKey) receives.count += 1;
     return receive(input);
   };
   return {
@@ -336,18 +341,30 @@ async function publishAcks(agent: Agent): Promise<void> {
   await agent.client.outbox.processDue();
 }
 
+/** M1-7j: the owner card-update (owner channel, no contact): left out of the rows below. */
+const ownerAnnounce = (r: { direction: string; type: string; contact_id: string | null }) =>
+  r.direction === 'out' && r.type === 'card-update' && r.contact_id === null;
+
 const rowsOf = (agent: Agent) =>
-  agent.store.transaction((tx) => ({
-    envelopes: tx.select('envelopes'),
-    contacts: tx.select('contacts'),
-    outbox: tx.select('outbox'),
-    seen: tx.select('seen'),
-    cursors: tx.select('sync_cursors'),
-    receipts: tx.select('receipts'),
-    rate: tx.select('rate_counters'),
-    pairings: tx.select('pairings'),
-    invites: tx.select('invites'),
-  }));
+  agent.store.transaction((tx) => {
+    const announced = new Set(
+      tx
+        .select('envelopes')
+        .filter(ownerAnnounce)
+        .map((r) => r.envelope_id),
+    );
+    return {
+      envelopes: tx.select('envelopes').filter((r) => !announced.has(r.envelope_id)),
+      contacts: tx.select('contacts'),
+      outbox: tx.select('outbox').filter((r) => !announced.has(r.envelope_id)),
+      seen: tx.select('seen'),
+      cursors: tx.select('sync_cursors'),
+      receipts: tx.select('receipts'),
+      rate: tx.select('rate_counters'),
+      pairings: tx.select('pairings'),
+      invites: tx.select('invites'),
+    };
+  });
 
 const inboundText = async (agent: Agent) =>
   (await rowsOf(agent)).envelopes.filter((r) => r.direction === 'in' && r.type === 'text');
@@ -481,9 +498,10 @@ describe('syncInbox (07 §2, §4.2): fetch, verify once, store, process', () => 
     expect(second.items).toEqual([]);
     expect(b.receives.count).toBe(1);
     expect(await inboundText(b)).toHaveLength(1);
-    // The second wrap is now recorded too, so it is not opened again (07 §3.2).
+    // The second wrap is now recorded too, so it is not opened again (07 §3.2). (The third: the
+    // wrap of b's own owner card-update copy, M1-7j.)
     const wraps = (await rowsOf(b)).seen.filter((s) => s.kind === 'wrap');
-    expect(wraps).toHaveLength(2);
+    expect(wraps).toHaveLength(3);
   });
 
   it('is idempotent across a restart: a new client over the same store neither re-verifies nor re-delivers', async () => {

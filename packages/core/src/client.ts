@@ -451,6 +451,14 @@ export class AgentLinkClient {
     await this.cardUpdates.sendPending().catch(() => {
       this.#ctx.log.warn('card updates not sent');
     });
+    // M1-7j (07 §4.3): the owner card-update when due, and leaving servers whose end has passed are
+    // pruned. Best effort, as above.
+    await this.cardUpdates.announceToOwner().catch(() => {
+      this.#ctx.log.warn('owner card update not sent');
+    });
+    await this.identity.pruneLeavingServers().catch(() => {
+      this.#ctx.log.warn('leaving servers not pruned');
+    });
     // M1-1g-h: delete on receipt, per `files.deleteAfter`. Best effort, as above.
     await this.deleteFilesOnReceipt().catch(() => {
       this.#ctx.log.warn('delete on receipt not run');
@@ -506,7 +514,12 @@ export class AgentLinkClient {
    */
   async sendCardUpdates(): Promise<CardUpdateSendResult> {
     await this.pause.assertRunning();
-    return this.cardUpdates.sendPending();
+    const result = await this.cardUpdates.sendPending();
+    // M1-7j (07 §4.3): the owner card-update for the new card too. Best effort.
+    await this.cardUpdates.announceToOwner().catch(() => {
+      this.#ctx.log.warn('owner card update not sent');
+    });
+    return result;
   }
 
   /**

@@ -480,9 +480,9 @@ describe(
       // add a migration with the next version instead (07 §3.7: forward migrations only).
       const digestOf = (i: number) =>
         encodeHex(sha256(encodeUtf8(MIGRATIONS[i]?.statements.join(';\n') ?? '')));
-      expect(STORE_SCHEMA_VERSION).toBe(23);
+      expect(STORE_SCHEMA_VERSION).toBe(24);
       expect(MIGRATIONS.map((m) => m.version)).toEqual([
-        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
       ]);
       // Version 1 (G-9) is unchanged by D-72.
       expect(digestOf(0)).toMatchInlineSnapshot(
@@ -678,6 +678,9 @@ describe(
         'relay_stats',
       ]);
       expect(v23.every((s) => !s.startsWith('ALTER TABLE'))).toBe(true);
+      // Version 24 (M1-7j, D-158): two nullable identity columns appended
+      // (sqlite-store-v24.test.ts). Versions 1 to 23 keep their statements.
+      expect(MIGRATIONS[23]?.statements).toHaveLength(2);
     });
 
     it('migrates a version 13 file to version 14 (REL051-B2): invites kept, invite_link null', async () => {
