@@ -25,6 +25,10 @@
 //     contacts: { total, sharing },             // counts: contacts sharing at least one server
 //     updateWouldDrop: int,                     // D-157 (2): own servers a pending contact-details
 //                                               // update would leave out (only the first 8 are kept)
+//     mixIn: boolean,                           // 0.5.15: the list holds default servers
+//     announceDefault: boolean,                 // 0.5.15: false after the announce opt-out
+//     change: null | 'paused' | 'rotation_pending', // 0.5.15: why changing servers is off now
+//     previousUntil: unixSec | null,            // 0.5.15: the latest end of the leaving servers
 //     contactHosts?: [ { ref, servers, shared, hosts: [host] } ] } // only with contacts=hosts
 // Hosts (D1): the origin host only, never the scheme, a path, a query or credentials; a contact's
 // hosts are inbound content (I-5): only lowercase DNS text that passes the relay URL rule (04 §4)
@@ -122,6 +126,11 @@ export interface LocalUiNetworkSnapshot {
   /** D-157 (2): own entries the pending contact-details update would leave out. */
   readonly updateDrops?: number;
   readonly contacts?: { readonly total: number; readonly sharing: number };
+  /** 0.5.15 (08 §1 additions; D-158, NET-ANNOUNCE-OPTOUT). Absent: false, true, null, null. */
+  readonly mixIn?: boolean;
+  readonly announceDefault?: boolean;
+  readonly previousUntil?: number;
+  readonly change?: null | 'paused' | 'rotation_pending';
   readonly contactLists?: readonly {
     readonly contactId: string;
     readonly relays: readonly string[];
@@ -166,6 +175,14 @@ export interface LocalUiNetworkBody extends JsonObject {
   readonly contacts: { readonly total: number; readonly sharing: number };
   /** D-157 (2): own servers the pending "Update your contact details" would leave out (0: none). */
   readonly updateWouldDrop: number;
+  /** 0.5.15 (08 §1): true when the own list holds default servers (the mix-in). */
+  readonly mixIn: boolean;
+  /** 0.5.15: false only after the owner's announce opt-out (D-158 (7)). */
+  readonly announceDefault: boolean;
+  /** 0.5.15: why changing servers is off now (C7b). */
+  readonly change: null | 'paused' | 'rotation_pending';
+  /** 0.5.15: the latest end of the leaving servers (unix seconds), or null. */
+  readonly previousUntil: number | null;
   readonly contactHosts?: readonly LocalUiNetworkContactHosts[];
 }
 
@@ -283,6 +300,10 @@ export const NETWORK_NEEDS_SETUP: LocalUiNetworkBody = Object.freeze({
   legacyReadUntil: null,
   contacts: Object.freeze({ total: 0, sharing: 0 }),
   updateWouldDrop: 0,
+  mixIn: false,
+  announceDefault: true,
+  change: null,
+  previousUntil: null,
 });
 
 /** The answer when the agent's state could not be read. */
@@ -327,6 +348,21 @@ export function networkBody(
         : null,
     contacts,
     updateWouldDrop: Math.min(count(snapshot.updateDrops), 16),
+    mixIn: snapshot.mixIn === true,
+    announceDefault: snapshot.announceDefault !== false,
+    // A paused agent always says so; a change still finishing only while running.
+    change:
+      agent === 'paused'
+        ? 'paused'
+        : snapshot.change === 'rotation_pending' || snapshot.change === 'paused'
+          ? snapshot.change
+          : null,
+    previousUntil:
+      typeof snapshot.previousUntil === 'number' &&
+      Number.isInteger(snapshot.previousUntil) &&
+      snapshot.previousUntil > 0
+        ? snapshot.previousUntil
+        : null,
   };
   if (!contactHosts) return Object.freeze(body);
   const rows: LocalUiNetworkContactHosts[] = [];

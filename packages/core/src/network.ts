@@ -7,6 +7,7 @@
 // many contacts share at least one server with us. A contact's list is read only when the caller
 // asks for it (the expanded view); it is inbound content (I-5) and the local app shows host text only.
 // Nothing here signs, changes a list or opens a URL a caller gives: no MCP tool reaches it (I-4).
+import { holdsDefaultServer } from './announce-optout.js';
 import {
   DEFAULT_RELAYS,
   LEGACY_CARD_UPDATE_UNTIL,
@@ -16,7 +17,7 @@ import {
 } from '@4thtech-io/transport-nostr';
 import type { ContactBook } from './contacts.js';
 import type { CoreContext } from './context.js';
-import type { IdentityService } from './identity.js';
+import { readIdentity, type IdentityService } from './identity.js';
 import type { OutboxService } from './outbox.js';
 import { migrationDroppedRelays } from './relay-migration.js';
 import { readRelayStats, relayStatsMark, type RelayStatsView } from './relay-stats.js';
@@ -79,6 +80,15 @@ export interface NetworkServers {
   readonly legacyReadUntil: number;
   /** D-157 (2): own entries the pending contact-details update would leave out (0: none, or none pending). */
   readonly updateDrops: number;
+  /**
+   * 0.5.15 (08 §1 `GET /api/ui/network` additions; D-158): true when the own list holds a default
+   * (or old default) server, the mix-in; the announce choice; the latest end of the leaving servers
+   * (unix seconds, null when none runs); and why changing servers is off now.
+   */
+  readonly mixIn: boolean;
+  readonly announceDefault: boolean;
+  readonly previousUntil: number | null;
+  readonly change: null | 'paused' | 'rotation_pending';
 }
 
 export interface NetworkContactList {
@@ -137,7 +147,33 @@ export class NetworkService {
     } catch {
       paused = true; // fail closed, like the outbox: an unreadable pause row reads as paused
     }
+    let announceDefault: boolean;
+    try {
+      announceDefault = await this.#identity.announceDefault();
+    } catch {
+      announceDefault = true;
+    }
+    let previousUntil: number | null = null;
+    try {
+      for (const e of await this.#identity.leavingServers()) {
+        if (previousUntil === null || e.until > previousUntil) previousUntil = e.until;
+      }
+    } catch {
+      previousUntil = null;
+    }
+    // A change still finishing: the pending card is stored (a store read only, no KeyStore call, so
+    // the view's polling adds no keychain read).
+    let rotating: boolean;
+    try {
+      rotating = (await readIdentity(this.#ctx))?.row.pending_card_json != null;
+    } catch {
+      rotating = false;
+    }
     return Object.freeze({
+      mixIn: holdsDefaultServer(own),
+      announceDefault,
+      previousUntil,
+      change: paused ? ('paused' as const) : rotating ? ('rotation_pending' as const) : null,
       paused,
       mode: networkMode(own),
       own: Object.freeze([...own]),

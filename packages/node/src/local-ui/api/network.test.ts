@@ -77,6 +77,11 @@ const NETWORK_SHAPE = {
   legacyReadUntil: 1_803_945_600,
   contacts: { total: 2, sharing: 1 },
   updateWouldDrop: 2,
+  // 0.5.15 (08 §1 additions; D-158): the mix-in, the announce choice, the change state, the overlap.
+  mixIn: true,
+  announceDefault: true,
+  change: null,
+  previousUntil: null,
 } as const;
 
 const snapshot = (over: Partial<LocalUiNetworkSnapshot> = {}): LocalUiNetworkSnapshot => ({
@@ -111,6 +116,9 @@ const snapshot = (over: Partial<LocalUiNetworkSnapshot> = {}): LocalUiNetworkSna
   legacyReadUntil: 1_803_945_600,
   contacts: { total: 2, sharing: 1 },
   updateDrops: 2,
+  mixIn: true,
+  announceDefault: true,
+  change: null,
   ...over,
 });
 
@@ -150,6 +158,56 @@ describe('networkHost (D1: origin host only)', () => {
 describe('networkBody (NET-ROUTE)', () => {
   it('answers exactly the pinned shape', () => {
     expect(networkBody(snapshot(), NOW_MS, false)).toEqual(NETWORK_SHAPE);
+  });
+
+  it('0.5.15 additions: custom with the mix-in off and the opt-out, a change finishing, the overlap', () => {
+    const body = networkBody(
+      snapshot({
+        mode: 'custom',
+        mixIn: false,
+        announceDefault: false,
+        change: 'rotation_pending',
+        previousUntil: NOW + 30 * 86_400,
+      }),
+      NOW_MS,
+      false,
+    );
+    expect(body).toMatchObject({
+      mode: 'custom',
+      mixIn: false,
+      announceDefault: false,
+      change: 'rotation_pending',
+      previousUntil: NOW + 30 * 86_400,
+    });
+    // Paused always says so; anything else is the fixed default.
+    expect(networkBody(snapshot({ agent: 'paused' }), NOW_MS, false).change).toBe('paused');
+    const odd = networkBody(
+      snapshot({
+        mixIn: 'yes' as never,
+        announceDefault: 0 as never,
+        change: 'later' as never,
+        previousUntil: -1,
+      }),
+      NOW_MS,
+      false,
+    );
+    expect(odd).toMatchObject({
+      mixIn: false,
+      announceDefault: true,
+      change: null,
+      previousUntil: null,
+    });
+    // Absent (an older reader): the defaults.
+    const { mixIn: _m, announceDefault: _a, change: _c, ...older } = snapshot();
+    void _m;
+    void _a;
+    void _c;
+    expect(networkBody(older, NOW_MS, false)).toMatchObject({
+      mixIn: false,
+      announceDefault: true,
+      change: null,
+      previousUntil: null,
+    });
   });
 
   it('maps the probe states to the view states', () => {
@@ -310,6 +368,10 @@ describe('GET /api/ui/network (NET-ROUTE)', () => {
       legacyReadUntil: null,
       contacts: { total: 0, sharing: 0 },
       updateWouldDrop: 0,
+      mixIn: false,
+      announceDefault: true,
+      change: null,
+      previousUntil: null,
     });
   });
 

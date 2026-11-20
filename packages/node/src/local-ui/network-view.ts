@@ -38,6 +38,11 @@ export interface NetworkViewClient {
           readonly legacy: readonly string[];
           readonly legacyReadUntil: number;
           readonly updateDrops?: number;
+          /** 0.5.15 (08 §1 additions; D-158): optional for older doubles. */
+          readonly mixIn?: boolean;
+          readonly announceDefault?: boolean;
+          readonly previousUntil?: number | null;
+          readonly change?: null | 'paused' | 'rotation_pending';
         }
       | undefined
     >;
@@ -173,6 +178,12 @@ export function createNetworkReader(
         }),
         legacyReadUntil: servers.legacyReadUntil,
         updateDrops: servers.updateDrops ?? 0,
+        ...(servers.mixIn === undefined ? {} : { mixIn: servers.mixIn }),
+        ...(servers.announceDefault === undefined
+          ? {}
+          : { announceDefault: servers.announceDefault }),
+        ...(servers.previousUntil == null ? {} : { previousUntil: servers.previousUntil }),
+        ...(servers.change === undefined ? {} : { change: servers.change }),
         contacts: { total: reach.total, sharing: reach.sharing },
         ...('lists' in reach && reach.lists !== undefined ? { contactLists: reach.lists } : {}),
       };
