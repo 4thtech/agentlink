@@ -95,7 +95,12 @@ export function buildServerList(input: {
   readonly announce: boolean;
   readonly defaults: readonly TestedServer[];
 }): ServerListBuild {
-  if (input.automatic && !input.announce) {
+  // D-158 (7), 04 §2.5.1: the opt-out only while the list holds no default server, the mix-in's or
+  // one the owner typed as an own server.
+  if (
+    !input.announce &&
+    (input.automatic || input.own.some((s) => DEFAULT_RELAYS.includes(s.url)))
+  ) {
     return Object.freeze({ status: 'refused', reason: 'mix_in_on' });
   }
   const notReady = Object.freeze({ status: 'refused', reason: 'not_ready' } as const);

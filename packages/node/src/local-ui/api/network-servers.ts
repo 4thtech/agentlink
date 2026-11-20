@@ -54,7 +54,7 @@ import {
   type LocalUiRoute,
 } from '../route-types.js';
 import { nodeHostResolver, nodeNip11Fetcher, nodeRelayConnector } from '../../relay-io.js';
-import type { NetworkTestIo } from './network-test.js';
+import { PrecheckBudget, processPrecheckBudget, type NetworkTestIo } from './network-test.js';
 
 export const NETWORK_SERVERS_PATH = '/api/ui/network/servers';
 export const NETWORK_RESET_PATH = '/api/ui/network/reset';
@@ -131,6 +131,10 @@ const hostOf = (url: string): string => relayOrigin(url).slice('wss://'.length);
 const sameList = (a: readonly string[], b: readonly string[]): boolean =>
   a.length === b.length && a.every((x, i) => x === b[i]);
 
+/** Nothing would change: the same list in the same order and the same announce choice. */
+const unchanged = (plan: ServerListPlan, state: LocalUiServerListState): boolean =>
+  sameList(plan.relays, state.relays) && plan.announceDefault === state.announceDefault;
+
 /** The agent's state refusals (before and after presence), else undefined. */
 function stateRefusal(state: LocalUiServerListState): LocalUiResult | undefined {
   if (state.paused) return refusal('agent_paused');
@@ -194,35 +198,37 @@ const samePlan = (a: ServerListPlan, b: ServerListPlan): boolean =>
   a.servers.every((s, i) => s.role === b.servers[i]?.role);
 
 /**
- * The server-list routes over `io` (tests: a stub resolver and in-memory relays). The app registers
- * one set (`networkServersRoutes`), so the memory of reviews and the one-test-at-a-time guard are
- * per process.
+ * The server-list routes over `io` (tests: a stub resolver and in-memory relays) and `budget`
+ * (IR L1: the app shares the process budget with the Test, 10 tests a minute and one at a time; each
+ * review or confirm that tests takes one). The app registers one set (`networkServersRoutes`), so the
+ * memory of reviews is per process.
  */
 export function createNetworkServersRoutes(
   io: () => NetworkTestIo = productionIo,
+  budget: PrecheckBudget = new PrecheckBudget(),
 ): readonly LocalUiRoute[] {
   const reviewed = new Remembered(REVIEW_TTL_MS);
   const confirmed = new Remembered(CONFIRM_TTL_MS);
-  let testing = false;
 
   /** Tests the own servers again (and the default set for the mix-in), then builds the plan. */
   async function tested(ask: Ask): Promise<ServerListPlan | LocalUiResult> {
     if (ask.kind === 'reset') return automaticServerPlan();
     if (ask.automatic && !ask.announce) return refusal('mix_in_on');
-    if (testing) return BUSY;
-    testing = true;
-    let own: readonly PrecheckResult[];
-    let defaults: readonly PrecheckResult[] = [];
-    try {
+    // IR L3 (04 §2.5.1, D-158 (7)): the opt-out only while the list holds no default server, also
+    // one the owner typed as an own server.
+    if (!ask.announce && ask.own.some((url) => isAutomaticList([url]))) {
+      return refusal('mix_in_on');
+    }
+    const ran = await budget.run(() => {
       const { resolver, connector, nip11 } = io();
       const options = { resolver, connector, ...(nip11 === undefined ? {} : { nip11 }) };
-      [own, defaults] = await Promise.all([
+      return Promise.all([
         precheckServers(ask.own, options),
         ask.automatic ? precheckServers(AUTOMATIC_SERVERS, options) : Promise.resolve([]),
       ]);
-    } finally {
-      testing = false;
-    }
+    });
+    if (ran === 'busy') return BUSY;
+    const [own, defaults]: readonly (readonly PrecheckResult[])[] = ran;
     const built = buildServerList({
       own: ask.own.map((url, i) => ({
         url,
@@ -251,12 +257,17 @@ export function createNetworkServersRoutes(
     if (ask.kind === 'reset' && isAutomaticList(state.relays) && state.announceDefault) {
       return refusal('same_list');
     }
-    if (ask.kind === 'servers' && !ask.automatic && sameList(ask.own, state.relays)) {
+    if (
+      ask.kind === 'servers' &&
+      !ask.automatic &&
+      ask.announce === state.announceDefault &&
+      sameList(ask.own, state.relays)
+    ) {
       return refusal('same_list');
     }
     const plan = await tested(ask);
     if (!('relays' in plan)) return plan;
-    if (sameList(plan.relays, state.relays)) return refusal('same_list');
+    if (unchanged(plan, state)) return refusal('same_list');
     const now = Math.floor(context.now() / 1000);
     const leaving = planLeaving(state.leaving, state.relays, plan.relays, now);
     if (leaving.status === 'refused') {
@@ -324,7 +335,7 @@ export function createNetworkServersRoutes(
     const state = await port.state();
     const refused = stateRefusal(state);
     if (refused !== undefined) return refused;
-    if (sameList(plan.relays, state.relays)) return refusal('same_list');
+    if (unchanged(plan, state)) return refusal('same_list');
     if (owner.changeServers === undefined) return NOT_AVAILABLE;
     const outcome = await owner.changeServers({
       relays: plan.relays,
@@ -394,4 +405,7 @@ export function createNetworkServersRoutes(
 }
 
 /** The routes the app registers (routes.ts): the Node relay I/O, one memory for the process. */
-export const networkServersRoutes: readonly LocalUiRoute[] = createNetworkServersRoutes();
+export const networkServersRoutes: readonly LocalUiRoute[] = createNetworkServersRoutes(
+  productionIo,
+  processPrecheckBudget,
+);

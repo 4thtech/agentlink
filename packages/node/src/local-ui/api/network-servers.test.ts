@@ -35,6 +35,7 @@ import {
   NETWORK_SERVERS_PATH,
   createNetworkServersRoutes,
 } from './network-servers.js';
+import { PrecheckBudget, createNetworkTestRoute } from './network-test.js';
 
 const NOW = 1_800_000_000;
 const DAYS30 = 30 * 86_400;
@@ -95,7 +96,7 @@ interface Fake {
   sendState: string;
 }
 
-function setup(over: Partial<Fake> = {}) {
+function setup(over: Partial<Fake> = {}, budget: PrecheckBudget = new PrecheckBudget()) {
   const state: Fake = {
     relays: ['wss://relay.primal.net', 'wss://offchain.pub'],
     leaving: [],
@@ -129,7 +130,10 @@ function setup(over: Partial<Fake> = {}) {
     serverList,
     now: () => NOW * 1000,
   } as unknown as LocalUiContext;
-  const routes = createNetworkServersRoutes(() => ({ resolver, connector: memoryRelays() }));
+  const routes = createNetworkServersRoutes(
+    () => ({ resolver, connector: memoryRelays() }),
+    budget,
+  );
   const find = (method: string, path: string) => {
     const r = routes.find((x) => x.method === method && x.path === path);
     if (r === undefined) throw new Error(`no route ${method} ${path}`);
@@ -381,5 +385,74 @@ describe('GET /api/ui/network/progress', () => {
     });
     const query = { params: {}, query: new URLSearchParams('x=1') };
     expect((await w.progressRoute.handler(w.context, query)).status).toBe(400);
+  });
+});
+
+describe('IR L1: the re-test shares the Test budget (10 a minute per process, then 429 busy)', () => {
+  it('the 11th review in a minute is busy; the Test and the review draw on one budget', async () => {
+    let t = NOW * 1000;
+    const budget = new PrecheckBudget(() => t);
+    const w = setup({}, budget);
+    const input = { servers: own(2), automatic: false, announce: true };
+    for (let i = 0; i < 10; i += 1) expect((await w.review(w.servers, input)).status).toBe(200);
+    expect(await w.review(w.servers, input)).toEqual({ status: 429, body: { error: 'busy' } });
+    // A confirm that would test again is busy too: nothing reaches the presence gate.
+    expect(await w.servers.precheck?.(w.context, w.req(input))).toEqual({
+      status: 429,
+      body: { error: 'busy' },
+    });
+    t += 61_000;
+    expect((await w.review(w.servers, input)).status).toBe(200);
+    // The Test route with the same budget: its tests count against the review's.
+    const test = createNetworkTestRoute(() => ({ resolver, connector: memoryRelays() }), budget);
+    for (let i = 0; i < 9; i += 1) {
+      expect((await test.handler(w.context, { servers: own(1) })).status).toBe(200);
+    }
+    expect(await w.review(w.servers, input)).toEqual({ status: 429, body: { error: 'busy' } });
+  });
+
+  it('a reset never tests, so it never takes from the budget', async () => {
+    let t = NOW * 1000;
+    const budget = new PrecheckBudget(() => t);
+    const w = setup({ relays: own(3) }, budget);
+    const input = { servers: own(2), automatic: false, announce: true };
+    for (let i = 0; i < 10; i += 1) await w.review(w.servers, input);
+    expect((await w.review(w.reset, {})).status).toBe(200);
+    t += 1;
+  });
+});
+
+describe('IR L3: the opt-out and default servers', () => {
+  it('the opt-out is refused while any own server is a default one', async () => {
+    const w = setup();
+    const res = await w.review(w.servers, {
+      servers: [...own(1), DEFAULT_RELAYS[0] as string],
+      automatic: false,
+      announce: false,
+    });
+    expect(res).toEqual({ status: 409, body: { error: 'mix_in_on' } });
+    const all = await w.review(w.servers, {
+      servers: [...DEFAULT_RELAYS],
+      automatic: false,
+      announce: false,
+    });
+    expect(all).toEqual({ status: 409, body: { error: 'mix_in_on' } });
+  });
+
+  it('a reset clears the opt-out even when the list is already the default set', async () => {
+    const w = setup({ relays: DEFAULT_RELAYS, announceDefault: false });
+    expect((await w.review(w.reset, {})).status).toBe(200);
+    expect((await w.confirm(w.reset, {})).status).toBe(200);
+    expect(w.signed).toEqual([{ relays: DEFAULT_RELAYS, announceDefault: true }]);
+    // Now automatic with the choice on: nothing left to clear.
+    expect(await w.review(w.reset, {})).toEqual({ status: 409, body: { error: 'same_list' } });
+  });
+
+  it('the same own list with another announce choice is a change, not same_list', async () => {
+    const w = setup({ relays: own(2), announceDefault: true });
+    const input = { servers: own(2), automatic: false, announce: false };
+    expect((await w.review(w.servers, input)).status).toBe(200);
+    expect((await w.confirm(w.servers, input)).status).toBe(200);
+    expect(w.signed).toEqual([{ relays: own(2), announceDefault: false }]);
   });
 });

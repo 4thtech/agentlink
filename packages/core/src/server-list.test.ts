@@ -189,6 +189,17 @@ describe('buildServerList: tested again, at least 2 own ready, the mix-in within
     expect(off.status === 'ok' && off.plan.warnings).toContain('announce_off');
   });
 
+  it('IR L3: the opt-out is refused while an own server is a default one', () => {
+    expect(
+      buildServerList({
+        own: tested([...own(2), DEFAULT_RELAYS[0] as string]),
+        automatic: false,
+        announce: false,
+        defaults: [],
+      }),
+    ).toEqual({ status: 'refused', reason: 'mix_in_on' });
+  });
+
   it('the automatic list is the release default set', () => {
     expect(AUTOMATIC_SERVERS).toEqual(DEFAULT_RELAYS);
   });

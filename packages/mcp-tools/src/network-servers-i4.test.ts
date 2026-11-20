@@ -4,48 +4,13 @@
 // terminal. No MCP tool, tool argument, tool description, fixed text or `nextStep` names or starts
 // them, and the tools' client surface has nothing that could.
 import { describe, expect, it } from 'vitest';
-import { ACK_TEXT } from './acknowledge.js';
 import type { ToolClient } from './context.js';
-import { EXPORT_TEXT } from './export-proof-pack.js';
-import { FETCH_FILE_TEXT } from './fetch-file.js';
-import { FILE_TEXT } from './files-common.js';
-import { GET_PROOF_TEXT } from './get-proof.js';
-import { INBOX_TEXT } from './inbox.js';
 import { matchesSchema } from './input.js';
-import { INVITE_TEXT } from './invite-common.js';
-import { PROOF_TEXT } from './proofs-common.js';
 import { ADVANCED_TOOLS, TOOLS } from './registry.js';
-import { RESULT_TEXT } from './result.js';
-import { SEND_TEXT } from './send.js';
-import { en } from './strings/en.js';
-import { TERMS_TEXT } from './terms-common.js';
-import { TOOL_TEXT } from './text.js';
-import { VERIFY_TEXT } from './verify-proof-pack.js';
 
-/** Every fixed string of the tools' text tables (summaries, nextStep, copy), with where it is. */
-function strings(value: unknown, at: string, out: [string, string][] = []): [string, string][] {
-  if (typeof value === 'string') out.push([at, value]);
-  else if (typeof value === 'object' && value !== null) {
-    for (const [key, v] of Object.entries(value)) strings(v, `${at}.${key}`, out);
-  }
-  return out;
-}
-const TABLES = {
-  ACK_TEXT,
-  EXPORT_TEXT,
-  FETCH_FILE_TEXT,
-  FILE_TEXT,
-  GET_PROOF_TEXT,
-  INBOX_TEXT,
-  INVITE_TEXT,
-  PROOF_TEXT,
-  RESULT_TEXT,
-  SEND_TEXT,
-  TERMS_TEXT,
-  TOOL_TEXT,
-  VERIFY_TEXT,
-  en,
-};
+// IR L2: the full scan of every source of this package (all text tables, strings/privacy.ts, inline
+// strings, tables added later) and of the CLI's MCP server is packages/node/src/
+// network-servers-i4-scan.test.ts (a Node package; this one may not read files).
 
 /** The server-list change's routes, owner pieces and words (never in a tool). */
 const FORBIDDEN =
@@ -79,12 +44,6 @@ describe('no MCP path to a server-list change (NET-OWNER-SET, I-4)', () => {
       for (const body of bodies)
         expect(matchesSchema(tool.inputSchema, body), tool.name).toBe(false);
     }
-  });
-
-  it('no fixed summary, nextStep or copy string names the routes or the owner pieces', () => {
-    const all = Object.entries(TABLES).flatMap(([name, table]) => strings(table, name));
-    expect(all.length).toBeGreaterThan(100);
-    for (const [at, text] of all) expect(text, at).not.toMatch(FORBIDDEN);
   });
 
   it('ToolClient has no member that changes servers (checked by the typecheck too)', () => {

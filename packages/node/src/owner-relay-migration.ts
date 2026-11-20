@@ -317,6 +317,16 @@ export type ServerChangeOutcome =
 const changeRefused = (reason: ServerChangeRefusal, fitsAt?: number): ServerChangeOutcome =>
   Object.freeze({ status: 'refused', reason, ...(fitsAt === undefined ? {} : { fitsAt }) });
 
+/** The stored announce choice (core identity.announceDefault); true when it cannot be read. */
+async function announceOf(identity: ServerChangeClient['identity']): Promise<boolean> {
+  const read = (identity as Partial<Pick<IdentityService, 'announceDefault'>>).announceDefault;
+  try {
+    return read === undefined ? true : await read.call(identity);
+  } catch {
+    return true;
+  }
+}
+
 /** A lost compare-and-set or an earlier unfinished rotation (core identity.rotate). */
 const isRotationConflict = (error: unknown): boolean =>
   error instanceof CoreError &&
@@ -342,7 +352,12 @@ export async function signServerChange(
   const { identity } = input.client;
   const relays = Object.freeze([...input.relays]);
   const current = await identity.relays();
-  if (current.length === relays.length && current.every((r, i) => r === relays[i])) {
+  // The same list with another announce choice still rotates (a reset clears the opt-out, IR L3).
+  if (
+    current.length === relays.length &&
+    current.every((r, i) => r === relays[i]) &&
+    (await announceOf(identity)) === input.announceDefault
+  ) {
     return changeRefused('same_list');
   }
   let contacts: number;
