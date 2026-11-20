@@ -1,5 +1,17 @@
 # @4thtech-io/transport-nostr
 
+## 0.5.15
+
+### Patch Changes
+
+- 043345e: The local app can test a server address before you use it (`POST /api/ui/network/test`, Under the hood only): up to 8 `wss://` addresses, each checked against the server address rules and the public internet only (every DNS answer must be public, then the address is pinned). A tiny test message signed by a one-time key, never your ID's key, must be accepted without a login and read back on a fresh connection, by its id and by the filter AgentLink reads with. Each answers ready, slow, sign-in or refused with a plain reason (not accepted, not kept, unreachable, not allowed, too small, invalid), with sign-in and payment warnings. At most 10 tests a minute, 10 s per server; nothing is saved or signed by your ID.
+- 043345e: Message network view fixes: a server's check now asks over the app's own open connection to it when there is one, so a server that allows only a few connections from one computer no longer shows "Can't reach" while it carries your messages. The banner no longer promises an automatic server swap; it counts your own servers, names the old read-only ones apart and says a message counts as sent once 2 servers accept it. The "Automatic" label is a small, static chip.
+- Updated dependencies [043345e]
+- Updated dependencies [043345e]
+  - @4thtech-io/types@0.5.15
+  - @4thtech-io/crypto@0.5.15
+  - @4thtech-io/log@0.5.15
+
 ## 0.5.14
 
 ### Patch Changes

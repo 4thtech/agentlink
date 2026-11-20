@@ -1,5 +1,25 @@
 # @4thtech-io/core
 
+## 0.5.15
+
+### Patch Changes
+
+- 043345e: Servers that leave an ID's own list stay readable for 30 days, each with its own end (`identity.prev_relays`, at most 16; a change that needs more is refused with `too_many_previous` and the date it fits). Catch-up and the live subscription read the own list, the leaving servers and the legacy relays; only card-updates are published to the leaving servers. The owner card-update is now sent on the owner channel for every new card, to the new list, the leaving servers and the default set, and re-published every 24 h while a leaving server runs, otherwise every 7 days. `identity.announce_default` is stored, restored and exposed for the announce opt-out. Store schema version 24 (M1-7j, D-158).
+- 043345e: The owner card-update is a host capability (`ownerCardUpdates`), off by default: the desktop and CLI host turns it on, and a cloud agent's run publishes nothing on its own (M1-7j).
+- 043345e: "Don't also announce on the default servers" (NET-ANNOUNCE-OPTOUT, D-158 (7)): a new owner action, `network.announce`, turns it on or off without changing the list, from the local app (`POST /api/ui/network/announce`, owner presence; the OS sheet names the action, and a server-list change now names "Use {n} message servers"). It is refused while the list holds a default or an old default server. With it on, the ID is fully quiet on the default and old default servers: no publish (owner card-update, card-update copies, the legacy fan-out, a leaving server that is a default one), no read, live subscription or probe there, except a server a contact's own card lists; its own previous servers are still read for 30 days. Pending card-update retries stop naming those servers at once and on every sync pass; the clean-up fails closed, and an opt-out that commits while a card-update is built stores nothing. Contacts' messages, handshakes and card-updates still go to each contact's own list; invites carry the card's own list. A list change that brings a default server back clears the opt-out, and a restore from a recovery kit keeps the list and the choice. No AI app or MCP tool can reach it.
+- 043345e: Save your own server list in the local app (Advanced › Message network, Under the hood only): `POST /api/ui/network/servers` and `POST /api/ui/network/reset` are owner operations with presence. The app tests every server again on this computer before anything is signed (at least 2 of your own must be ready; slow counts as ready; a server that needs sign-in needs 2 other ready ones), mixes in 2 of AgentLink's automatic servers by default (they count toward the 8), shows the review first (the list with each server's role, the servers that leave and until when they are still read, how many contacts are told, and warnings), then signs exactly one new card with one gesture. A change that would keep more than 16 leaving servers is refused with the date it fits from. Contacts get the new details through the usual card-update, `GET /api/ui/network/progress` shows who has them, and the announce choice is stored with the card (an interrupted change keeps it when it finishes on the next open). Reset is the same path to the automatic servers. No AI app or MCP tool can reach any of it (NET-OWNER-SET, D-158).
+- 043345e: Message network view fixes: a server's check now asks over the app's own open connection to it when there is one, so a server that allows only a few connections from one computer no longer shows "Can't reach" while it carries your messages. The banner no longer promises an automatic server swap; it counts your own servers, names the old read-only ones apart and says a message counts as sent once 2 servers accept it. The "Automatic" label is a small, static chip.
+- 043345e: The live inbox subscription follows the servers it should read: the background loop compares the subscription's read set with the current one each pass (store reads only) and reopens it when they differ, so turning on "Don't also announce on the default servers" stops reading the old public servers at once, and a leaving server stops being read when its 30 days end (REL-0515 F1).
+- Updated dependencies [043345e]
+- Updated dependencies [043345e]
+- Updated dependencies [043345e]
+  - @4thtech-io/types@0.5.15
+  - @4thtech-io/crypto@0.5.15
+  - @4thtech-io/transport-nostr@0.5.15
+  - @4thtech-io/chain@0.5.15
+  - @4thtech-io/storage@0.5.15
+  - @4thtech-io/log@0.5.15
+
 ## 0.5.14
 
 ### Patch Changes
